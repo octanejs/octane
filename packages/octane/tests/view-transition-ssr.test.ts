@@ -156,7 +156,14 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 
 	// A .tsx parent passes descriptor children, which ssrChild already frames as
 	// one childSlot range; a second frame made the client's adoption mismatch.
-	for (const name of ['ComponentChild', 'HostChild', 'TextChild'] as const) {
+	for (const name of [
+		'ComponentChild',
+		'HostChild',
+		'TextChild',
+		'ArrayChild',
+		'EmptyChild',
+		'SuspenseChild',
+	] as const) {
 		it(`hydrates a .tsx ${name} without regenerating it`, async () => {
 			container.innerHTML = ServerRT.renderToString(serverJsx[name], {}).html;
 			const glyph = container.querySelector('#glyph');
@@ -167,12 +174,38 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 			});
 			expect(onRecoverableError).not.toHaveBeenCalled();
 			expect(container.querySelector('#glyph')).toBe(glyph);
-			expect(vt(container.querySelector('span')!.firstElementChild)).toEqual(
-				name === 'TextChild' ? null : { 'vt-update': 'none' },
+			expect(vt(container.querySelector('span')!.firstElementChild)?.['vt-update']).toBe(
+				name === 'TextChild' || name === 'EmptyChild' ? undefined : 'none',
 			);
 			root.unmount();
 		});
 	}
+
+	it('frames compiler HTML children exactly like a compiled children body', () => {
+		const body = ServerRT.renderToString(server.AnnotationsApp, {}).html;
+		const carrier = ServerRT.renderToString(
+			(_props: object, scope: never) =>
+				ServerRT.ssrComponent(
+					scope,
+					ServerRT.ViewTransition,
+					{ default: 'none', children: ServerRT.ssrHtml('<i id="glyph">x</i>') },
+					false,
+				),
+			{},
+		).html;
+		const viaBody = ServerRT.renderToString(
+			(_props: object, scope: never) =>
+				ServerRT.ssrComponent(
+					scope,
+					ServerRT.ViewTransition,
+					{ default: 'none', children: () => ServerRT.ssrHtml('<i id="glyph">x</i>') },
+					false,
+				),
+			{},
+		).html;
+		expect(body).toContain('vt-update');
+		expect(carrier).toBe(viaBody);
+	});
 
 	// Per ReactDOMFizzViewTransition-test.js:142
 	it('emits enter/exit annotations for view transitions inside Suspense', async () => {

@@ -6587,8 +6587,13 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		}
 		const annotated = vtSsrAnnotate(inner, attrs);
 		const body = props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated;
-		// A descriptor child is already one childSlot range; only a compiled children body needs one.
-		return ssrHtml(typeof props.children === 'function' ? ssrBlock(body) : body);
+		// ssrChild already frames every child as one childSlot range except a compiled children body
+		// and a compiler HTML carrier, which reach here unframed.
+		const children = props.children;
+		const unframed =
+			typeof children === 'function' ||
+			(children !== null && typeof children === 'object' && SERVER_HTML in children);
+		return ssrHtml(unframed ? ssrBlock(body) : body);
 	},
 	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'ViewTransition',
