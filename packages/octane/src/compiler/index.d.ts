@@ -133,6 +133,7 @@ export interface CompileOptions {
 	universalRuntime?: { runtime: string; thread: 'background' | 'main-thread' };
 	clientOnlyImports?: readonly unknown[];
 	isVoidComponentImport?: (request: string, imported: string) => boolean;
+	isLiteComponentImport?: (request: string, imported: string) => boolean;
 	isDescriptorChildrenImport?: (request: string, imported: string) => boolean;
 	/** Preserve the compiler's existing experimental integration options. */
 	[option: string]: unknown;

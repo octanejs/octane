@@ -1240,13 +1240,99 @@ describe('effectful component regions', () => {
 	});
 });
 
-function loadImportedModule(source: string, id: string, runtimeModules?: Record<string, any>) {
+// The lite exports each imported module published, keyed by request, as a
+// production bundler hands them to the importer's compile.
+type LiteProofs = Readonly<Record<string, readonly string[]>>;
+
+function liteCompileOptions(lite: LiteProofs) {
+	return {
+		hmr: false,
+		dev: false,
+		isLiteComponentImport: (request: string, imported: string) =>
+			lite[request]?.includes(imported) === true,
+	};
+}
+
+function liteExportsOf(source: string, id: string, lite: LiteProofs = {}): readonly string[] {
+	const result = compile(source, id, {
+		...liteCompileOptions(lite),
+		collectLiteComponentExports: true,
+	}) as { liteComponentExports?: string[] };
+	return result.liteComponentExports ?? [];
+}
+
+function loadImportedModule(
+	source: string,
+	id: string,
+	runtimeModules?: Record<string, any>,
+	lite: LiteProofs = {},
+	mode: 'client' | 'server' = 'client',
+) {
 	return loadCompiledFixtureSource(source, {
 		id,
-		mode: 'client',
-		compileOptions: { hmr: false, dev: false },
+		mode,
+		compileOptions: liteCompileOptions(lite),
 		runtimeModules,
 	});
+}
+
+// Each module is its own file. Leaf and Badge are hookless and read no context,
+// so the bundler proves them lite, and Mid too through its proven imports.
+// Counter is hookful, so the edge to it keeps a Block and its updates never
+// re-run App. Badge's root can render nothing, so its lite edge keeps an
+// anchor among its siblings.
+const IMPORTED_LITE_MODULES = {
+	leaf: `export function Leaf(props) @{ <span class="leaf">{props.text as string}</span> }`,
+	badge: `export function Badge(props) @{ @if (props.on) { <b class="badge">{'on'}</b> } }`,
+	counter: `import { useState } from 'octane';
+		export function Counter(props) @{
+			const [count, setCount] = useState(0);
+			<button class="counter" onClick={() => setCount(count + 1)}>
+				{(props.text + ':' + count) as string}
+			</button>
+		}`,
+	mid: `import { Leaf } from './leaf';
+		import { Badge } from './badge';
+		export function Mid(props) @{
+			<div class="mid">
+				<Leaf text={props.text} />
+				<Badge on={props.on} />
+				<Leaf text="tail" />
+			</div>
+		}`,
+	app: `import { Mid } from './mid';
+		import { Counter } from './counter';
+		export function App(props) @{
+			props.onRender();
+			<section data-tick={props.tick}>
+				<Mid text={props.text} on={props.on} />
+				<Counter text={props.text} />
+			</section>
+		}`,
+};
+
+function loadImportedLiteApp(mode: 'client' | 'server' = 'client') {
+	const sources = IMPORTED_LITE_MODULES;
+	const lite = {
+		'./leaf': liteExportsOf(sources.leaf, 'lite-leaf.tsrx'),
+		'./badge': liteExportsOf(sources.badge, 'lite-badge.tsrx'),
+		'./counter': liteExportsOf(sources.counter, 'lite-counter.tsrx'),
+	};
+	const all = { ...lite, './mid': liteExportsOf(sources.mid, 'lite-mid.tsrx', lite) };
+	const modules = {
+		'./leaf': loadImportedModule(sources.leaf, 'lite-leaf.tsrx', undefined, {}, mode),
+		'./badge': loadImportedModule(sources.badge, 'lite-badge.tsrx', undefined, {}, mode),
+		'./counter': loadImportedModule(sources.counter, 'lite-counter.tsrx', undefined, {}, mode),
+	};
+	const mid = loadImportedModule(sources.mid, 'lite-mid.tsrx', modules, lite, mode);
+	const app = loadImportedModule(
+		sources.app,
+		'lite-app.tsrx',
+		{ ...modules, './mid': mid },
+		all,
+		mode,
+	);
+	return { app, lite: all };
 }
 
 describe('imported component regions', () => {
@@ -1319,23 +1405,24 @@ describe('imported component regions', () => {
 
 	it('refreshes a memo() context consumer below a cached imported edge', () => {
 		const Theme = createContext('t0');
-		const reader = loadImportedModule(
-			`import { memo, useContext } from 'octane';
+		const readerSource = `import { memo, useContext } from 'octane';
 			 import { Theme } from './theme';
 			 function ReaderImpl(props) @{
 				const theme = useContext(Theme);
 				<b>{(props.label + ':' + theme) as string}</b>
 			 }
-			 export const Reader = memo(ReaderImpl);`,
-			'imported-context-reader.tsrx',
-			{ './theme': { Theme } },
-		);
-		const wrapper = loadImportedModule(
-			`import { Reader } from './reader';
-			 export function Wrapper(props) @{ <span><Reader label={props.label} /></span> }`,
-			'imported-context-wrapper.tsrx',
-			{ './reader': reader },
-		);
+			 export const Reader = memo(ReaderImpl);`;
+		const reader = loadImportedModule(readerSource, 'imported-context-reader.tsrx', {
+			'./theme': { Theme },
+		});
+		const wrapperSource = `import { Reader } from './reader';
+			 export function Wrapper(props) @{ <span><Reader label={props.label} /></span> }`;
+		const wrapper = loadImportedModule(wrapperSource, 'imported-context-wrapper.tsrx', {
+			'./reader': reader,
+		});
+		// The bundler's proofs, as built: a memo() export is never lite, so the
+		// Wrapper edge that renders it must keep refreshing context.
+		const readerLite = liteExportsOf(readerSource, 'imported-context-reader.tsrx');
 		const { App } = loadImportedModule(
 			`import { Theme } from './theme';
 			 import { Wrapper } from './wrapper';
@@ -1346,6 +1433,11 @@ describe('imported component regions', () => {
 			 }`,
 			'imported-context-parent.tsrx',
 			{ './theme': { Theme }, './wrapper': wrapper },
+			{
+				'./wrapper': liteExportsOf(wrapperSource, 'imported-context-wrapper.tsrx', {
+					'./reader': readerLite,
+				}),
+			},
 		);
 		const root = mount(App, { label: 'x', theme: 't1' });
 		try {
@@ -1403,6 +1495,88 @@ describe('imported component regions', () => {
 		} finally {
 			root.unmount();
 			setAutoMemoCycleValue('v0');
+		}
+	});
+
+	it('runs proven hookless imports through lite edges', () => {
+		const { app, lite } = loadImportedLiteApp();
+		expect(lite).toEqual({
+			'./leaf': ['Leaf'],
+			'./badge': ['Badge'],
+			'./counter': [],
+			'./mid': ['Mid'],
+		});
+		const code = compile(IMPORTED_LITE_MODULES.app, 'lite-app.tsrx', liteCompileOptions(lite)).code;
+		expect(code).toMatch(/_\$componentSlotLite\([^;]*, Mid,/);
+		expect(code).not.toMatch(/_\$componentSlotLite\([^;]*, Counter,/);
+
+		let renders = 0;
+		const onRender = () => renders++;
+		const root = mount(app.App, { text: 'a', on: false, tick: 0, onRender });
+		const order = () =>
+			Array.from(
+				root.findAll('.mid > *, .counter'),
+				(child) => child.className + ':' + child.textContent,
+			);
+		try {
+			const leaf = root.find('.leaf');
+			expect(order()).toEqual(['leaf:a', 'leaf:tail', 'counter:a:0']);
+			// Equal props: every cached edge hits and the DOM stays in place.
+			root.update(app.App, { text: 'a', on: false, tick: 1, onRender });
+			expect(root.find('.leaf')).toBe(leaf);
+			expect(order()).toEqual(['leaf:a', 'leaf:tail', 'counter:a:0']);
+			// The hookful import owns its state: its update does not re-run App.
+			expect(renders).toBe(2);
+			root.click('.counter');
+			expect(order()).toEqual(['leaf:a', 'leaf:tail', 'counter:a:1']);
+			expect(renders).toBe(2);
+			root.update(app.App, { text: 'a', on: true, tick: 2, onRender });
+			expect(order()).toEqual(['leaf:a', 'badge:on', 'leaf:tail', 'counter:a:1']);
+			root.update(app.App, { text: 'b', on: false, tick: 3, onRender });
+			expect(order()).toEqual(['leaf:b', 'leaf:tail', 'counter:b:1']);
+			root.update(app.App, { text: 'b', on: true, tick: 4, onRender });
+			expect(order()).toEqual(['leaf:b', 'badge:on', 'leaf:tail', 'counter:b:1']);
+			expect(root.find('.leaf')).toBe(leaf);
+		} finally {
+			const container = root.container;
+			root.unmount();
+			expect(container.innerHTML).toBe('');
+		}
+	});
+
+	it('hydrates proven hookless imports through lite edges', () => {
+		const server = loadImportedLiteApp('server').app;
+		const { app } = loadImportedLiteApp();
+		let renders = 0;
+		const onRender = () => renders++;
+		const props = { text: 'a', on: true, tick: 0, onRender };
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, props).html;
+		const leaf = container.querySelector('.leaf');
+		const badge = container.querySelector('.badge');
+		const counter = container.querySelector('.counter') as HTMLButtonElement;
+		const order = () =>
+			Array.from(
+				container.querySelectorAll('.mid > *, .counter'),
+				(child) => child.className + ':' + child.textContent,
+			);
+		const root = hydrateRoot(container, app.App, props);
+		try {
+			expect(container.querySelector('.leaf')).toBe(leaf);
+			expect(container.querySelector('.badge')).toBe(badge);
+			expect(container.querySelector('.counter')).toBe(counter);
+			const hydrated = renders;
+			flushSync(() => counter.click());
+			expect(order()).toEqual(['leaf:a', 'badge:on', 'leaf:tail', 'counter:a:1']);
+			expect(renders).toBe(hydrated);
+			flushSync(() => root.render(app.App, { text: 'b', on: false, tick: 1, onRender }));
+			expect(order()).toEqual(['leaf:b', 'leaf:tail', 'counter:b:1']);
+			flushSync(() => root.render(app.App, { text: 'b', on: true, tick: 2, onRender }));
+			expect(order()).toEqual(['leaf:b', 'badge:on', 'leaf:tail', 'counter:b:1']);
+			expect(container.querySelector('.leaf')).toBe(leaf);
+		} finally {
+			root.unmount();
+			expect(container.innerHTML).toBe('');
 		}
 	});
 });

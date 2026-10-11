@@ -11682,6 +11682,8 @@ function compileInternal(
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		isVoidComponentImport:
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
+		isLiteComponentImport:
+			typeof options?.isLiteComponentImport === 'function' ? options.isLiteComponentImport : null,
 		descriptorChildrenBindings: collectDescriptorChildrenBindings(
 			ast,
 			options?.isDescriptorChildrenImport,
@@ -12255,7 +12257,7 @@ function compileInternal(
 		info.autoMemoMayReadContext =
 			autoMemoSafe &&
 			(containsAutoMemoContextRead(root, ctx) ||
-				autoMemoImportedComponents.size > 0 ||
+				[...autoMemoImportedComponents].some((name) => !isProvenLiteImport(ctx, name)) ||
 				[...free].some((name) => ctx.defaultMemoBindings.has(name)) ||
 				rendersOpaqueChild(root, locals, ctx));
 		// Hookless check.
@@ -13031,6 +13033,8 @@ function compileInternal(
 		},
 		diagnostics: nativeChangeDiagnostics,
 	};
+	if (options?.collectLiteComponentExports === true)
+		result.liteComponentExports = collectLiteComponentExports(ast.body, ctx);
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -16927,6 +16931,46 @@ function finalizeComponentInitializers(ctx, bodyNodes) {
 			if (declaration !== undefined) bodyNodes[index] = { ...statement, declaration };
 		}
 	}
+}
+
+// Whether the bundler proved an imported tag's export lite: see
+// collectLiteComponentExports.
+function isProvenLiteImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		binding !== undefined && ctx.isLiteComponentImport?.(binding.request, binding.imported) === true
+	);
+}
+
+// Exports an importer may call through componentSlotLite: hookless void bodies
+// (componentInfo.eligible) that a cached region can skip without refreshing
+// context. A body without a compiler memo proof makes every region over it
+// miss, so only a proven body must also be context-free.
+function collectLiteComponentExports(body, ctx) {
+	const lite = (name) => {
+		const info = ctx.componentInfo.get(name);
+		return (
+			info?.eligible === true &&
+			!(info.autoMemoSafe && info.autoMemoMayReadContext) &&
+			!ctx._universalRuntimeUnitsByBinding.has(name)
+		);
+	};
+	const exports = [];
+	for (const statement of body) {
+		const declaration = statement.declaration;
+		if (statement.type === 'ExportDefaultDeclaration') {
+			const name = declaration?.type === 'Identifier' ? declaration.name : declaration?.id?.name;
+			if (name !== undefined && lite(name)) exports.push('default');
+		} else if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
+			if (declaration?.type === 'FunctionDeclaration' && lite(declaration.id.name))
+				exports.push(declaration.id.name);
+			for (const specifier of statement.specifiers || []) {
+				if (lite(specifier.local.name))
+					exports.push(specifier.exported.name ?? specifier.exported.value);
+			}
+		}
+	}
+	return exports;
 }
 
 // The definition-site proof that lets a cached region skip this component, or
@@ -34463,11 +34507,14 @@ function makeCompCall(
 				ctx.importedNames.has(compName) &&
 				!ctx.octaneImportLocals?.has(compName)
 			) {
+				// A proven lite export renders like a same-module lite callee.
+				const lite = isProvenLiteImport(ctx, compName);
+				if (lite) liteEligible = callSiteOk;
 				memoCallee = {
 					autoMemoSafe: true,
 					autoMemoCaptures: [],
 					autoMemoImportedComponents: [compName],
-					autoMemoMayReadContext: true,
+					autoMemoMayReadContext: !lite,
 				};
 			}
 		}
