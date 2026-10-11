@@ -1547,6 +1547,42 @@ describe('imported component regions', () => {
 		}
 	});
 
+	it.each([
+		['a child hole', '<span>{props.content}</span>'],
+		['a host children prop', '<span children={props.content} />'],
+		['a host spread', '<span {...props.host} />'],
+	])('refreshes context below an imported edge that renders %s', (_name, body) => {
+		const Theme = createContext('t0');
+		const slotSource = `export function Slot(props) @{ ${body} }`;
+		const slot = loadImportedModule(slotSource, 'imported-prop-slot.tsrx');
+		const { App, Reader } = loadImportedModule(
+			`import { useContext } from 'octane';
+			 import { Theme } from './theme';
+			 import { Slot } from './slot';
+			 export function Reader(props) @{
+				const theme = useContext(Theme);
+				<b>{(props.label + ':' + theme) as string}</b>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Slot content={props.content} host={props.host} /></p></Theme>
+			 }`,
+			'imported-prop-slot-parent.tsrx',
+			{ './theme': { Theme }, './slot': slot },
+			{ './slot': liteExportsOf(slotSource, 'imported-prop-slot.tsrx') },
+		);
+		// The parent passes the same element down, so the cached edge hits.
+		const content = createElement(Reader, { label: 'x' });
+		const props = { content, host: { children: content } };
+		const root = mount(App, { ...props, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('x:t1');
+			root.update(App, { ...props, theme: 't2' });
+			expect(root.find('b').textContent).toBe('x:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('publishes no lite export from a native-read module', () => {
 		// A native-read body subscribes the Block it renders in; behind a lite
 		// edge that is the importer's region owner, which a cache hit does not

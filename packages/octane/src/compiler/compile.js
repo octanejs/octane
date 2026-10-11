@@ -5624,8 +5624,9 @@ function containsAutoMemoContextRead(root, ctx) {
 
 // Whether a body can render a component no module-level analysis sees: a tag
 // bound inside the body (a prop or local), a member or dynamic tag, or a child
-// hole or value the body returns that is neither text nor JSX. That component
-// may read context, so a cached region over the body must keep refreshing it.
+// hole, host `children` prop or value the body returns that is neither text nor
+// JSX. A host spread may carry `children` too. That component may read context,
+// so a cached region over the body must keep refreshing it.
 function rendersOpaqueChild(root, locals, ctx) {
 	const bound = new Set(locals);
 	const tags = [];
@@ -5654,6 +5655,17 @@ function rendersOpaqueChild(root, locals, ctx) {
 				return;
 			}
 			tags.push(tag.name);
+		} else if (
+			node.type === 'JSXElement' &&
+			node.openingElement.attributes.some((attribute) =>
+				attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute'
+					? true
+					: attribute.name?.name === 'children' &&
+						isOpaqueRenderable(attribute.value?.expression ?? attribute.value),
+			)
+		) {
+			found = true;
+			return;
 		}
 		for (const param of node.params || []) collectBindings(param, bound);
 		if (node.type === 'VariableDeclarator') collectBindings(node.id, bound);
