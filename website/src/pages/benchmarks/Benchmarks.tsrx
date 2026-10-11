@@ -276,7 +276,7 @@ export function Benchmarks() @{
 								{'benchmarks/'}
 							</a>
 							{
-								' for what each suite measures. This snapshot measures Octane main at e4d5908db9 on 11 October 2026. See the '
+								' for what each suite measures. This snapshot measures Octane main at 6892fd6682 on 11 October 2026. See the '
 							}
 							<a
 								href="https://github.com/octanejs/octane/blob/main/benchmarks/baselines/website-refresh.md"

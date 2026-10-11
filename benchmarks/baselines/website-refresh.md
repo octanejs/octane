@@ -8,14 +8,14 @@ The homepage's 20 summary rows and bundle-size ranges are recomputed with
 ## Source and environment
 
 - Measured Octane main revision:
-  [`e4d5908db954b9f399fb44da86f3547e84c15304`](https://github.com/octanejs/octane/commit/e4d5908db954b9f399fb44da86f3547e84c15304)
-  (package version 0.13.0). This is a source snapshot, not a measurement of
+  [`6892fd6682af9f02f8be477da23b81e349c111ec`](https://github.com/octanejs/octane/commit/6892fd6682af9f02f8be477da23b81e349c111ec)
+  (package version 0.13.1). This is a source snapshot, not a measurement of
   the published Octane release or subsequent main changes.
-- [Measurement run](https://github.com/octanejs/octane/actions/runs/38096539284):
+- [Measurement run](https://github.com/octanejs/octane/actions/runs/38164749859):
   all 29 suites ran sequentially in one CI job with `full: true`.
-  Measurements ran from 10 October 2026, 23:53:59 UTC to 11 October 2026,
-  00:35:10 UTC (11 October, 00:53:59–01:35:10 Europe/London).
-- Blacksmith `blacksmith-4vcpu-ubuntu-2404` runner: AMD EPYC, four vCPUs,
+  Measurements ran on 11 October 2026, 18:40:59–19:20:33 UTC
+  (19:40:59–20:20:33 Europe/London).
+- Blacksmith `blacksmith-4vcpu-ubuntu-2404` runner: Intel Xeon, four vCPUs,
   Linux 6.6.141, x64.
 - Node 24.19.0, pnpm 12.9.1, Playwright 1.61.1, Chromium 149.0.7827.55,
   Vite 8.1.5.
@@ -33,9 +33,10 @@ complete suite invocation. The normal sample counts and default single harness
 invocation per suite are retained; this is not a quick run or a five-run
 `bench:stable` aggregate.
 
-As in the 10 October snapshot, the `js-framework` harness measures `select`,
+The `js-framework` harness measures `select`,
 `swap`, and `select_lots` in bounded, calibrated batches targeting about 20 ms,
-followed by untimed warmup of the exact batch. Each score is normalized per committed click;
+followed by untimed warmup of the exact batch. Each score is normalized per
+committed click;
 `repeat` and `sampleMs` retain the batch size and median batch duration. Selection
 alternates rows and swaps use odd counts, with the usual correctness gates.
 These warm batch averages differ from the isolated-click timings published
@@ -43,7 +44,8 @@ before 10 October 2026 and must not be presented as direct speedups over them.
 The other operations, including `update` and `remove`, retain single-click
 samples because repetition changes their workload.
 
-Runner state can differ between snapshots. Absolute timing differences alone
+This run used an Intel Xeon runner; the previous snapshot used AMD EPYC.
+Runner state can also differ between snapshots. Absolute timing differences alone
 do not establish a framework speedup. The source, toolchain, and sampling
 configuration are recorded here for reproduction.
 
@@ -86,12 +88,12 @@ All applicable bundle-size guards passed.
 
 | Suite / operation | Target / reference | Observed ratio | Maximum |
 | --- | --- | ---: | ---: |
-| `memo-wall` / `one_change_A` | Octane JSX / Octane TSRX | 10.1420× | 10× |
-| `svg-dashboard` / `select_toggle` | Octane TSRX / Solid | 1.0936× | 0.9× |
+| `svg-dashboard` / `select_toggle` | Octane TSRX / Solid | 1.0916× | 0.9× |
+| `uibench` / `tree/[2,2,2,2,2,2,2,2,2,2]/render` | Octane TSRX / React | 2.0722× | 1.9× |
 
 These are the unmodified measurements from the complete run. The SVG guard also
-breached in the previous snapshot; the memo-wall guard breached in this run.
+breached in the previous snapshot; the UIbench guard breached in this run.
 This refresh records those outcomes without changing guard bounds or adding
-waivers. The prior snapshot's UIbench deep-binary-tree guard passed in this run.
+waivers. The prior snapshot's memo-wall JSX/TSRX guard passed in this run.
 The timings alone do not determine whether a change is a regression or runner
 variation; that needs a controlled investigation.
