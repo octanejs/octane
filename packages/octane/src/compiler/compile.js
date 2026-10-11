@@ -34686,8 +34686,14 @@ function makeCompCall(
 	}
 	// A tag bound in this body names a component no proof covers, yet a cached
 	// region may skip it. Arm its context reads so the region's refresh, which
-	// rendersOpaqueChild requests, finds them.
-	if (ctx.autoMemo && ctx.currentComponentLocals?.has(compName))
+	// rendersOpaqueChild requests, finds them. A split module's certified
+	// captures keep their module identity.
+	if (
+		ctx.autoMemo &&
+		ctx.currentComponentLocals?.has(compName) &&
+		!isImmutableComponentTag(node.openingElement?.name ?? node.id, ctx) &&
+		!isPrivateSplitContextProvider(node, ctx)
+	)
 		compNode = b.call(requireRuntimeForContext(ctx, 'compilerOpaqueTag'), b.id('__s'), compNode);
 
 	// Append-safety for the anchorless all-component-children emission (see

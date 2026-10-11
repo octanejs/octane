@@ -43,8 +43,11 @@ function facts(authored, query = false, options = {}) {
 	}
 	const providers = [];
 	walk(ast, (node) => {
-		if (node.type === 'CallExpression' && node.arguments[3]?.name === 'Theme')
-			providers.push(imports.get(node.callee.name));
+		if (node.type !== 'CallExpression') return;
+		// An unproven tag reaches the slot through compilerOpaqueTag(__s, Theme).
+		const tag = node.arguments[3];
+		const name = tag?.type === 'CallExpression' ? tag.arguments[1]?.name : tag?.name;
+		if (name === 'Theme') providers.push(imports.get(node.callee.name));
 	});
 	return {
 		factory: [...imports.values()].includes('__createCompiledContext'),
