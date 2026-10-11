@@ -53,15 +53,16 @@
 //
 // Positional arguments select framework targets in every set. Bytes are reported,
 // never gated: the pull request benchmark comment lists every change. The
-// void-root specialization verdict below fails the run.
+// void-root specialization and hydration-entry reachability checks fail the run.
 process.env.NODE_ENV = 'production';
 
 import assert from 'node:assert/strict';
-import { build } from 'vite';
+import { build, parseAst } from 'vite';
 import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
@@ -333,17 +334,35 @@ for (const set of SETS)
 // including deferred chunks. Server output is excluded from these client totals.
 if (selected('octane-tsrx')) {
 	const appRoot = path.resolve(__dirname, '../../examples/wayfinder');
+	// This app has no function form actions or Fragment refs. Its real generated
+	// entry must not install their generic descriptor capabilities. Source ranges
+	// still identify retained implementations after minification or inlining.
+	const entryDeclarations = [
+		'createElementFromConfig',
+		'enableDescriptorFormActions',
+		'enableDescriptorFragmentRefs',
+		'renderFragmentRefDescriptor',
+	];
+	const entryRanges = resolveDeclarationRanges(
+		(source) =>
+			fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
+		(text, source) => parseAst(text, { lang: 'ts' }, source),
+		entryDeclarations.map((name) => ({ name, source: 'runtime.ts' })),
+	);
+	const retainedEntryDeclarations = new Set();
 	console.log(`building wayfinder (production, ${VITE_MINIFY} minify)…`);
 	await build({
 		root: appRoot,
 		logLevel: 'warn',
-		build: { minify: VITE_MINIFY, target: 'esnext' },
+		build: { minify: VITE_MINIFY, target: 'esnext', sourcemap: 'hidden' },
 	});
 	const clientDir = path.join(appRoot, 'dist/client');
 	const entry = byName.get('octane-tsrx');
 	const totals = { raw: 0, gzip: 0, brotli: 0 };
 	for (const file of walk(clientDir)) {
 		if (!/\.m?js$/.test(file)) continue;
+		const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+		for (const name of retainedDeclarations(map, entryRanges)) retainedEntryDeclarations.add(name);
 		const buf = fs.readFileSync(file);
 		totals.raw += buf.length;
 		totals.gzip += gz(buf);
@@ -355,6 +374,15 @@ if (selected('octane-tsrx')) {
 		});
 	}
 	assert(totals.raw > 0, 'Wayfinder emitted no client JavaScript');
+	assert(
+		retainedEntryDeclarations.has('createElementFromConfig'),
+		'Wayfinder entry descriptor control is absent; update its reachability check',
+	);
+	assert.deepEqual(
+		entryDeclarations.slice(1).filter((name) => retainedEntryDeclarations.has(name)),
+		[],
+		'Wayfinder hydration entry retained unused form-action or Fragment-ref descriptor capabilities',
+	);
 	for (const [metric, bytes] of Object.entries(totals)) {
 		entry.ops['wayfinder_js_' + metric] = val(bytes);
 	}
