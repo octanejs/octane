@@ -1,3 +1,4 @@
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeCompiledModule, findVoidComponentImports } from 'octane/compiler/bundler';
 import { sourceHash } from './module-graph.js';
@@ -14,7 +15,9 @@ const RELATIVE_IMPORT = /\bfrom\s*['"]\.\.?\//;
 const ROOT_FACTORY_IMPORT =
 	/\bimport\s*\{[^}]*\b(?:createRoot|hydrateRoot)\b[^}]*\}\s*from\s*['"]octane['"]/;
 
-const FINALIZE_LOADER = fileURLToPath(new URL('./finalize-loader.js', import.meta.url));
+// Resolved from the module's own path: a jsdom test environment replaces the
+// global URL, which Node's fileURLToPath then rejects.
+const FINALIZE_LOADER = join(dirname(fileURLToPath(import.meta.url)), 'finalize-loader.js');
 
 export function voidImportKey(request, imported) {
 	return `${request}\0${imported}`;
