@@ -207,9 +207,19 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 				withRenderer: loads(/packages\/octane\/src\/runtime\.ts$/),
 			};
 		};
-		const mixed = await buildProject();
+		// Give the placement oracle an actual signal Action consumer in both builds.
+		const transitionCounter = {
+			'src/Counter.tsrx': `import { startTransition } from 'octane';
+import { count$, increment } from './state.tsrx';
+export function Counter() @{
+  'use dom bindings';
+  <button type="button" onClick={() => startTransition(increment)}>{count$}</button>
+}`,
+		};
+		const mixed = await buildProject(transitionCounter);
 		expect(placement(mixed.graph)).toEqual({ withSignals: true, withRenderer: false });
 		const islandsOnly = await buildProject({
+			...transitionCounter,
 			'octane.config.ts': `import { defineConfig, RenderRoute } from '@octanejs/vite-plugin';
 export default defineConfig({
 	router: {

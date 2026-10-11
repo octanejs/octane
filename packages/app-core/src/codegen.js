@@ -1,6 +1,7 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export { generateServerEntry, generateServerManifestEntry } from './server/server-entry.js';
 
@@ -329,7 +330,8 @@ async function bootstrapDocumentLifecycle() {
  * octane specifics:
  *   - `initializeHydrationEventCapture()` runs before any async route work so
  *     interaction boundaries can preserve intent that precedes `hydrateRoot()`.
- *   - `import { hydrateRoot } from 'octane'` (NO `mount`).
+ *   - The default entry runtime uses hydrateRoot and classified component
+ *     descriptors for pending/catch fallbacks (NO `mount`).
  *   - `hydrateRoot(container, body, props)` signature (container FIRST, React-18
  *     shape) — no `{ target, props }` wrapper.
  *   - The layout `children` is a props-first ComponentBody whose closure calls
@@ -361,7 +363,8 @@ async function bootstrapDocumentLifecycle() {
  * @returns {string}
  */
 export function create_client_entry_source(options = {}) {
-	const runtimeModuleId = options.runtimeModuleId ?? 'octane';
+	const runtimeModuleId =
+		options.runtimeModuleId ?? fileURLToPath(new URL('./client-entry-runtime.js', import.meta.url));
 	return (
 		client_entry_prelude(
 			options,

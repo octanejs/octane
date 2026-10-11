@@ -15,8 +15,8 @@
 //
 // Only .js assets are summed; index.html and CSS are excluded. Weather's CSS is
 // shared byte-for-byte by every port, so including it would add the same constant
-// to every column rather than measure framework output. Bytes are deterministic
-// per build, so median === min.
+// to every column rather than measure framework output. Each row records one
+// build, so median === min. Generated build IDs can cause small gzip variation.
 //
 // Each build's emitted JavaScript is classified into two buckets: `app`
 // (authored app modules, including weather's shared sources) and `framework`
@@ -327,6 +327,39 @@ for (const set of SETS)
 		});
 		entry.meta.files.push(...files.map((f) => ({ ...f, set: px || 'js' })));
 	}
+
+// The metaframework entry is absent from the SPA sets above. Keep this real
+// application's normal chunking, and count every emitted client JS asset,
+// including deferred chunks. Server output is excluded from these client totals.
+if (selected('octane-tsrx')) {
+	const appRoot = path.resolve(__dirname, '../../examples/wayfinder');
+	console.log(`building wayfinder (production, ${VITE_MINIFY} minify)…`);
+	await build({
+		root: appRoot,
+		logLevel: 'warn',
+		build: { minify: VITE_MINIFY, target: 'esnext' },
+	});
+	const clientDir = path.join(appRoot, 'dist/client');
+	const entry = byName.get('octane-tsrx');
+	const totals = { raw: 0, gzip: 0, brotli: 0 };
+	for (const file of walk(clientDir)) {
+		if (!/\.m?js$/.test(file)) continue;
+		const buf = fs.readFileSync(file);
+		totals.raw += buf.length;
+		totals.gzip += gz(buf);
+		totals.brotli += br(buf);
+		entry.meta.files.push({
+			file: path.relative(clientDir, file),
+			bytes: buf.length,
+			set: 'wayfinder',
+		});
+	}
+	assert(totals.raw > 0, 'Wayfinder emitted no client JavaScript');
+	for (const [metric, bytes] of Object.entries(totals)) {
+		entry.ops['wayfinder_js_' + metric] = val(bytes);
+	}
+	console.log(`  wayfinder: total gz ${totals.gzip}`);
+}
 
 for (const [name, { root, entries }] of ceilings) {
 	const specifiers = [...entries.keys()].sort();
