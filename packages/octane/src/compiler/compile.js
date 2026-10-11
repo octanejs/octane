@@ -11097,7 +11097,7 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 
 // Called only after the existing renderer preparation found no boundary in this
 // module. Project-wide registry options do not imply renderer participation.
-function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabled) {
+function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabled, source) {
 	if (
 		options?.dev ||
 		options?.hmr ||
@@ -11117,6 +11117,7 @@ function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabl
 	) {
 		return ast;
 	}
+	let hoistingContext;
 	const tools = {
 		mapAst,
 		cloneAstNode,
@@ -11131,6 +11132,13 @@ function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabl
 		forEachRuntimeAstChild,
 		isIdentifierReference,
 		componentInvocationSite,
+		componentHasEarlyReference(node) {
+			hoistingContext ??= {
+				mapSource: source,
+				earlyComponentReferenceOffsets: collectEarlyComponentReferenceOffsets(source, ast.body),
+			};
+			return componentReferencedAboveDeclaration(hoistingContext, node, node.id.name);
+		},
 	};
 	const cleanFilename = cleanCompileFilename(filename);
 	const delegated = markLocalComponentDelegations(ast, cleanFilename, tools);
@@ -11300,7 +11308,7 @@ function compileInternal(
 					: { __nativeChangeDiagnostics: serverAuthoredDiagnostics }),
 			},
 			serverBoundaryPreparation?.ast ??
-				fuseStaticDomComponentTemplates(analyzedAst, filename, options, strongModeEnabled),
+				fuseStaticDomComponentTemplates(analyzedAst, filename, options, strongModeEnabled, source),
 			hasStringChildProofs,
 		);
 		return compiled;
@@ -11405,6 +11413,7 @@ function compileInternal(
 			filename,
 			options,
 			strongModeEnabled,
+			source,
 		);
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
@@ -15677,7 +15686,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
 	// comp-call root of a `@{}` body — which is exactly this emit.
-	const inherit = ctx._ssrInheritRoot === true && !node._octaneBindingSite;
+	const staticArm = node._octaneBindingSite
+		? undefined
+		: (node.openingElement ?? node).metadata?.octaneStaticArm;
+	const inherit =
+		(ctx._ssrInheritRoot === true || staticArm !== undefined) && !node._octaneBindingSite;
 	ctx._ssrInheritRoot = false;
 	// Capture before compiling attributes/children: nested subs temporarily mutate
 	// this context flag. Only this component's immediate children sub inherits the
@@ -15870,7 +15883,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	if (node._octaneBindingSite) {
 		args.push(b.literal(bindingMarker(node._octaneBindingSite, 'v')));
 	}
-	return ssrCall(helper, args, node);
+	return annotateTemplateFusion(
+		ssrCall(helper, args, node),
+		staticArm ? [staticArm] : null,
+		'static component arm',
+	);
 }
 
 function bindingMarker(site, kind) {
@@ -28911,7 +28928,7 @@ function planJsx(
 		}
 		const trailing = [];
 		if (ifAnchor) trailing.push(ifAnchor);
-		else if (ifEnv) trailing.push(undefinedNode());
+		else if (ifEnv) trailing.push(ic.staticArmOrigins ? b.void0 : undefinedNode());
 		if (ifEnv) trailing.push(ifEnv);
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
@@ -28934,7 +28951,7 @@ function planJsx(
 		}
 		const structural = ctx.presentationHydration?.structural && ic.bindingSite;
 		if (ic.liteMask && !structural) {
-			while (trailing.length < 2) trailing.push(undefinedNode());
+			while (trailing.length < 2) trailing.push(ic.staticArmOrigins ? b.void0 : undefinedNode());
 			trailing.push(b.literal(ic.liteMask));
 		}
 		ctx.runtimeNeeded.add('ifBlock');
@@ -28959,7 +28976,14 @@ function planJsx(
 				...invocation.arguments,
 			);
 		}
-		const call = b.stmt(invocation);
+		const statement = b.stmt(invocation);
+		const call = ic.staticArmOrigins
+			? annotateTemplateFusion(
+					inheritOriginLoc(statement, org),
+					ic.staticArmOrigins,
+					'static component arm',
+				)
+			: statement;
 		pushAfterStmt(ic.id, org, conditionDeclaration ? b.block([conditionDeclaration, call]) : call);
 	}
 	for (const cc of compCalls) {
@@ -29515,27 +29539,34 @@ function planJsx(
 		const swEnv = envNodeFor(sc);
 		const trailing = [];
 		if (switchAnchor) trailing.push(switchAnchor);
-		else if (swEnv) trailing.push(undefinedNode());
+		else if (swEnv) trailing.push(sc.staticArmOrigins ? b.void0 : undefinedNode());
 		if (swEnv) trailing.push(swEnv);
 		if (sc.liteMask) {
-			while (trailing.length < 2) trailing.push(undefinedNode());
+			while (trailing.length < 2) trailing.push(sc.staticArmOrigins ? b.void0 : undefinedNode());
 			trailing.push(b.literal(sc.liteMask));
 		}
+		const statement = b.stmt(
+			b.call(
+				'_$switchBlock',
+				b.id('__s'),
+				b.literal(slotIndex),
+				hostNodeFor(`_switchHost$${sc.id}`),
+				sc.discExpr,
+				sc.casesExpr,
+				inheritOriginLoc(helperRefNode(sc.defaultHelper), sc.defaultKeyword),
+				...trailing,
+			),
+		);
 		pushAfterStmt(
 			sc.id,
 			org,
-			b.stmt(
-				b.call(
-					'_$switchBlock',
-					b.id('__s'),
-					b.literal(slotIndex),
-					hostNodeFor(`_switchHost$${sc.id}`),
-					sc.discExpr,
-					sc.casesExpr,
-					inheritOriginLoc(helperRefNode(sc.defaultHelper), sc.defaultKeyword),
-					...trailing,
-				),
-			),
+			sc.staticArmOrigins
+				? annotateTemplateFusion(
+						inheritOriginLoc(statement, org),
+						sc.staticArmOrigins,
+						'static component arm',
+					)
+				: statement,
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
@@ -33513,6 +33544,15 @@ function controlFlowArmIsLite(stmts) {
 	})(stmts);
 }
 
+function staticComponentArmOrigin(statements) {
+	if (statements?.length !== 1) return null;
+	const call = statements[0],
+		opening = call.openingElement ?? call;
+	return call._octaneBindingSite || opening._octaneBindingSite
+		? null
+		: (opening.metadata?.octaneStaticArm ?? null);
+}
+
 function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.test, node.consequent (BlockStatement | Element | null), node.alternate (BlockStatement | IfStatement | null)
 	// A null consequent (`{cond ? null : <Jsx/>}` lowered by wrapAsBlockStmt)
@@ -33534,22 +33574,26 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		thenStmts && { stmts: thenStmts, params: [] },
 		elseStmts && { stmts: elseStmts, params: [] },
 	]);
-	const thenHelperName = thenStmts
-		? hoistBodyHelper(
-				ctx,
-				inlinedSubs,
-				'__then',
-				thenStmts,
-				[],
-				parentNs,
-				cssHash,
-				envNames,
-				directiveKeywordOrigin(ctx, node),
-			)
-		: null;
+	const thenStatic = staticComponentArmOrigin(thenStmts),
+		elseStatic = staticComponentArmOrigin(elseStmts);
+	const thenHelperName =
+		thenStatic?.component ??
+		(thenStmts
+			? hoistBodyHelper(
+					ctx,
+					inlinedSubs,
+					'__then',
+					thenStmts,
+					[],
+					parentNs,
+					cssHash,
+					envNames,
+					directiveKeywordOrigin(ctx, node),
+				)
+			: null);
 
-	let elseHelperName = null;
-	if (elseStmts) {
+	let elseHelperName = elseStatic?.component ?? null;
+	if (elseStmts && elseStatic === null) {
 		elseHelperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -33573,6 +33617,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
+		staticArmOrigins: thenStatic || elseStatic ? [thenStatic, elseStatic].filter(Boolean) : null,
 		// ifBlock's lite mask: 1 when the then arm is hookless, 2 when the else arm is.
 		liteMask:
 			(thenStmts !== null && controlFlowArmIsLite(thenStmts) ? 1 : 0) |
@@ -34733,6 +34778,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
  */
 function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	const caseRecords = [];
+	let staticArmOrigins = null;
 	let defaultHelper = 'null';
 	let defaultKeyword = null;
 	// Phase 2: one shared env tuple across every case + default (see unionEnv).
@@ -34745,19 +34791,23 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
+		const staticArm = staticComponentArmOrigin(stmts);
+		if (staticArm) (staticArmOrigins ??= []).push(staticArm);
 		if ((isDefault || caseRecords.length < 30) && stmts.length > 0 && controlFlowArmIsLite(stmts))
 			liteMask |= isDefault ? 1 : 2 << caseRecords.length;
-		const helperName = hoistBodyHelper(
-			ctx,
-			inlinedSubs,
-			`__${isDefault ? 'default' : 'case'}`,
-			stmts,
-			[],
-			parentNs,
-			cssHash,
-			envNames,
-			c.keyword ?? null,
-		);
+		const helperName =
+			staticArm?.component ??
+			hoistBodyHelper(
+				ctx,
+				inlinedSubs,
+				`__${isDefault ? 'default' : 'case'}`,
+				stmts,
+				[],
+				parentNs,
+				cssHash,
+				envNames,
+				c.keyword ?? null,
+			);
 		if (isDefault) {
 			defaultHelper = helperName;
 			defaultKeyword = c.keyword ?? null;
@@ -34790,6 +34840,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
 		defaultKeyword,
+		staticArmOrigins,
 		liteMask,
 		hostPath: null,
 	};

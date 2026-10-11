@@ -274,6 +274,7 @@ export function fuseStaticLocalComponentTemplates(ast, filename, tools) {
 		isComponentTag,
 		unwrapTsExpr,
 		hasInlineMemoDirectEval,
+		componentHasEarlyReference,
 	} = tools;
 	const hosts = new Set(['div', 'span', 'em', 'strong', 'section']);
 	const skipKeys = new Set([
@@ -353,16 +354,52 @@ export function fuseStaticLocalComponentTemplates(ast, filename, tools) {
 		declarations.set(node.id.name, node);
 		if (parameter?.type === 'ObjectPattern') hasStringParameters = true;
 	}
-	// One removable private child and a distinct retained entry are needed.
-	// Most modules cannot qualify; avoid lexical analysis until this check passes.
-	if (declarations.size === 0 || entries.size < 2) return ast;
+	if (declarations.size === 0) return ast;
 	let styled = false,
-		hasWith = false;
+		hasWith = false,
+		armSites;
 	walk(ast, (node) => {
 		if (node.type === 'JSXStyleElement' || node.css || (element(node) && tagName(node) === 'style'))
 			styled = true;
 		if (node.type === 'WithStatement') hasWith = true;
+		if (node._octaneBindingSite || typeof componentHasEarlyReference !== 'function') return;
+		const arms =
+			node.type === 'JSXIfExpression'
+				? [node.consequent, node.alternate].map((arm) =>
+						arm?.type === 'BlockStatement' ? arm.body : null,
+					)
+				: node.type === 'JSXSwitchExpression'
+					? node.cases.map((arm) => arm.consequent)
+					: null;
+		if (arms === null) return;
+		for (const arm of arms) {
+			if (arm?.length !== 1) continue;
+			const call = arm[0];
+			if (!element(call) || !isComponentTag(call)) continue;
+			const target = declarations.get(tagName(call)),
+				parameter = target?.params[0];
+			if (
+				!target ||
+				target.export ||
+				target.default ||
+				target._octaneBindingView ||
+				target._octanePresentationHydration ||
+				target._octaneScalarBindingClaims ||
+				(parameter &&
+					(parameter.type !== 'Identifier' ||
+						['this', '__s', '__extra'].includes(parameter.name))) ||
+				call._octaneBindingSite ||
+				call.openingElement?._octaneBindingSite ||
+				attrs(call).length !== 0 ||
+				children(call).length !== 0
+			)
+				continue;
+			(armSites ??= new Map()).set(call, target);
+		}
 	});
+	// A single private host can supply a static arm body without a second entry
+	// to fuse. Most modules still stop before any binding analysis.
+	if (entries.size < 2 && armSites === undefined) return ast;
 	// Eval can observe/reassign otherwise private bindings, including through
 	// TypeScript wrappers. Reuse the compiler's shared direct-eval analysis.
 	if (
@@ -380,7 +417,7 @@ export function fuseStaticLocalComponentTemplates(ast, filename, tools) {
 	const reassigned = collectReassignedBindings(ast);
 	for (const [name, node] of declarations) if (reassigned.has(node.id)) declarations.delete(name);
 	for (const node of entries) if (reassigned.has(node.id)) entries.delete(node);
-	if (declarations.size === 0 || entries.size < 2) return ast;
+	if (declarations.size === 0 || (entries.size < 2 && armSites === undefined)) return ast;
 	const lexical = createLexicalAnalysis(ast);
 	const ownTag = (node) => {
 		const id = tag(node),
@@ -410,14 +447,65 @@ export function fuseStaticLocalComponentTemplates(ast, filename, tools) {
 	walk(ast, (node) => {
 		if (node.type === 'JSXCodeBlock') scanTemplate(node.render);
 	});
-	const escaped = collectFreeIdentifiers(ast.body, [], allowed);
+	let readSafety;
+	function canReadArmTarget(site, target) {
+		if (readSafety === undefined) {
+			const order = new Map(),
+				owners = new Map(),
+				names = new Set(),
+				duplicates = new Set();
+			for (const [index, statement] of ast.body.entries()) {
+				const owner = statement.declaration ?? statement;
+				if (owner.type !== 'FunctionDeclaration' || owner.id?.type !== 'Identifier') continue;
+				order.set(owner, index);
+				if (names.has(owner.id.name)) duplicates.add(owner.id.name);
+				names.add(owner.id.name);
+				const scope = lexical.nodeScopes.get(owner.body)?.functionScope;
+				if (owner.body?.type === 'JSXCodeBlock' && scope !== undefined) owners.set(scope, owner);
+			}
+			readSafety = { order, owners, duplicates };
+		}
+		if (readSafety.duplicates.has(target.id.name)) return false;
+		if (componentHasEarlyReference(target)) return true;
+		const scope = lexical.nodeScopes.get(tag(site))?.functionScope;
+		const owner = scope === undefined ? undefined : readSafety.owners.get(scope);
+		// A const-emitted owner can only expose this eager body reference after
+		// an earlier target initialized. Otherwise retain the helper's deferred
+		// lookup, including unselected arms and a pending owner's skipped replay.
+		return (
+			owner !== undefined &&
+			owner._octaneDirectCallTwin !== true &&
+			!readSafety.duplicates.has(owner.id.name) &&
+			!reassigned.has(owner.id) &&
+			!componentHasEarlyReference(owner) &&
+			readSafety.order.get(target) < readSafety.order.get(owner)
+		);
+	}
+	let armTargets,
+		ignored = allowed;
+	if (armSites !== undefined) {
+		armTargets = new Set();
+		for (const [site, target] of armSites) {
+			if (!ownTag(site) || !canReadArmTarget(site, target)) {
+				armSites.delete(site);
+				continue;
+			}
+			if (ignored === allowed) ignored = new Set(allowed);
+			ignored.add(site);
+			armTargets.add(target);
+		}
+	}
+	const escaped = collectFreeIdentifiers(ast.body, [], ignored);
 	for (const site of allowed) {
 		// Ignoring a tag must not hide a function escaping through one of its props.
 		for (const name of collectFreeIdentifiers(attrs(site), [], allowed)) escaped.add(name);
 	}
 	for (const [name, node] of declarations) {
-		if (escaped.has(name) || collectFreeIdentifiers(node.body, [], allowed).has(name))
-			declarations.delete(name);
+		const unsafe = escaped.has(name) || collectFreeIdentifiers(node.body, [], allowed).has(name);
+		if (unsafe) armTargets?.delete(node);
+		// Arm tags were escapes in the original fusion pass. Restore that fact
+		// for its expansion graph; admitting an arm must not enable other fusion.
+		if (unsafe || armTargets?.has(node)) declarations.delete(name);
 	}
 	// Props at these sites are fresh data records. A template literal evaluates
 	// its coercion at the authored outer call and can only deliver a primitive
@@ -603,12 +691,13 @@ export function fuseStaticLocalComponentTemplates(ast, filename, tools) {
 		if (copy.attributes) copy.attributes = attributes;
 		return { ...copy, children: output };
 	}
-	const rewritten = mapAst(ast, (node) => {
+	const replacements = new Map(),
+		closedArms = armTargets?.size ? new Set() : null;
+	for (const node of entries) {
 		// Keep the entry's callable/export identity. The expanded pure body can
 		// use the compiler's ordinary Lite/singleRoot classification. Input facts
 		// belong only to private, non-escaping declarations: exported/escaped
 		// entries may receive arbitrary props from callers outside this module.
-		if (!entries.has(node)) return null;
 		const env = new Map();
 		const fields =
 			declarations.get(node.id.name) === node ? incomingStrings?.get(node.id.name) : undefined;
@@ -621,12 +710,36 @@ export function fuseStaticLocalComponentTemplates(ast, filename, tools) {
 		// Bound each expanded occurrence, not just unique literals: different
 		// parent prefixes cannot share an interned template containing a large leaf.
 		const render = expand(node.body.render, env, [], { left: 256, codeUnits: 8192 });
-		if (render === null) return null;
+		if (render === null) continue;
 		let fused = false;
 		walk(render, (part) => {
 			if (part._octaneFusionOrigins) fused = true;
 		});
-		return fused ? { ...node, body: { ...node.body, render } } : null;
+		if (fused) replacements.set(node, { ...node, body: { ...node.body, render } });
+		// Only the actual adopted expansion (or unchanged closed leaf) can run
+		// as a generic arm. Empty-env proof excludes props reads and latent work.
+		if (armTargets?.has(node) && env.size === 0) closedArms.add(node);
+	}
+	if (replacements.size === 0 && !closedArms?.size) return ast;
+	const rewritten = mapAst(ast, (node) => {
+		const replacement = replacements.get(node);
+		if (replacement) return replacement;
+		const target = armSites?.get(node);
+		if (!target || !closedArms?.has(target)) return null;
+		const opening = node.openingElement ?? node;
+		const marked = {
+			...opening,
+			metadata: {
+				...opening.metadata,
+				octaneStaticArm: {
+					component: target.id.name,
+					file: filename,
+					call: siteLocation(node),
+					definition: siteLocation(target),
+				},
+			},
+		};
+		return node.openingElement ? { ...node, openingElement: marked } : marked;
 	});
 	return rewritten === ast ? ast : { ...rewritten, _octaneHasTemplateFusion: true };
 }

@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { measureCssModules } from './css-modules.mjs';
 import { measureForRootKeys } from './for-root-key.mjs';
+import { measureStaticComponentArms } from './static-component-arms.mjs';
 import { measureRspackCssModules } from './rspack-css-modules.mjs';
 import { measureRspackVoidRoots } from './rspack-void-roots.mjs';
 
@@ -263,6 +264,7 @@ const cssModules = await measureCssModules();
 // Equivalent row-key syntax must retain native row templates, independently
 // of the aggregate's mix of optimized and fallback fixtures.
 const forRootKeys = await measureForRootKeys();
+const staticComponentArms = await measureStaticComponentArms();
 // The real adapter must keep producing the proven input. A low-level compiler
 // sentinel alone would stay green if graph proof collection became a no-op.
 const rspackCssModules = await measureRspackCssModules();
@@ -297,6 +299,7 @@ const payload = {
 		{ name: 'text-types-inferred', ops: textTypes.inferred, meta: textTypes.meta },
 		...cssModules.targets,
 		...forRootKeys.targets,
+		...staticComponentArms.targets,
 		...rspackCssModules.targets,
 		...rspackVoidRoots.targets,
 	],
@@ -319,6 +322,11 @@ console.log(
 for (const [name, measured] of Object.entries(forRootKeys.summary)) {
 	console.log(
 		`for root key ${name} sentinel  raw ${measured.raw}  min ${measured.minified}  gz ${measured.gzip}`,
+	);
+}
+for (const [name, measured] of Object.entries(staticComponentArms.summary)) {
+	console.log(
+		`static component arm ${name} sentinel  raw ${measured.raw}  min ${measured.minified}  gz ${measured.gzip}`,
 	);
 }
 for (const mode of ['client', 'server']) {
