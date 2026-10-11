@@ -34433,7 +34433,7 @@ function makeCompCall(
 		autoMemoDepNodes,
 		autoMemoWitnesses,
 		autoMemoContextAware,
-		autoMemoLite,
+		autoMemoLite: node._octaneBindingSite ? false : autoMemoLite,
 		autoMemoPublicationWitnesses,
 		voidComponent,
 		singleRoot: node._octaneBindingSite ? false : singleRoot,
