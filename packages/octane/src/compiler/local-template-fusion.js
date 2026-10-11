@@ -330,10 +330,22 @@ export function annotateTemplateFusion(node, origins, sharedRegion) {
 	return {
 		...node,
 		__octaneFusionLeading: [
-			{ type: 'Block', value: ` octane-inline START shared ${sharedRegion}: ${text} ` },
+			{
+				type: 'Block',
+				value: ` octane-inline START shared ${sharedRegion}: ${text} `,
+				start: node.start,
+				end: node.end,
+				loc: node.loc,
+			},
 		],
 		__octaneFusionTrailing: [
-			{ type: 'Block', value: ` octane-inline END shared ${sharedRegion}: ${text} ` },
+			{
+				type: 'Block',
+				value: ` octane-inline END shared ${sharedRegion}: ${text} `,
+				start: node.start,
+				end: node.end,
+				loc: node.loc,
+			},
 		],
 	};
 }

@@ -125,21 +125,28 @@ export function App() @{ <Card/> }`;
 	it.each(['client', 'server'] as const)(
 		'prints paired JS provenance with authored component locations in %s output',
 		(mode) => {
-			const result = compile(source, filename, { ...production, mode, inspect: true });
-			const comments = annotations(result.code);
-			const starts = comments.filter((entry) => entry.boundary === 'START');
-			const ends = comments.filter((entry) => entry.boundary === 'END');
-			expect(starts.length).toBeGreaterThan(0);
-			expect(ends.map((entry) => entry.region).sort()).toEqual(
-				starts.map((entry) => entry.region).sort(),
-			);
-			for (const name of ['Frame', 'Panel', 'Details', 'Label']) {
-				const origin = `${name} (${filename}:${position(source, `function ${name}`)}; call `;
-				expect(starts.some((entry) => entry.region.includes(origin))).toBe(true);
-			}
-			expect(result.map.sourcesContent).toContain(source);
-			for (const template of result.inspect?.templates ?? []) {
-				expect(template.html).not.toContain('octane-inline');
+			const previous = process.env.OCTANE_COMPILE_ASSERT_LOC;
+			try {
+				process.env.OCTANE_COMPILE_ASSERT_LOC = '1';
+				const result = compile(source, filename, { ...production, mode, inspect: true });
+				const comments = annotations(result.code);
+				const starts = comments.filter((entry) => entry.boundary === 'START');
+				const ends = comments.filter((entry) => entry.boundary === 'END');
+				expect(starts.length).toBeGreaterThan(0);
+				expect(ends.map((entry) => entry.region).sort()).toEqual(
+					starts.map((entry) => entry.region).sort(),
+				);
+				for (const name of ['Frame', 'Panel', 'Details', 'Label']) {
+					const origin = `${name} (${filename}:${position(source, `function ${name}`)}; call `;
+					expect(starts.some((entry) => entry.region.includes(origin))).toBe(true);
+				}
+				expect(result.map.sourcesContent).toContain(source);
+				for (const template of result.inspect?.templates ?? []) {
+					expect(template.html).not.toContain('octane-inline');
+				}
+			} finally {
+				if (previous === undefined) delete process.env.OCTANE_COMPILE_ASSERT_LOC;
+				else process.env.OCTANE_COMPILE_ASSERT_LOC = previous;
 			}
 		},
 	);
