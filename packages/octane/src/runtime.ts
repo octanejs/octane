@@ -12562,6 +12562,10 @@ type RenderPhaseSnapshot = {
 };
 let renderPhaseOwner: Block | null = null;
 let renderPhaseUpdates: Map<RenderPhaseCell, RenderPhaseSnapshot> | null = null;
+// Advances when an outermost render starts. Only render code runs within one
+// pass, and render code cannot move a live import, so compilerMemoWitness reads
+// each proof once per pass.
+let compilerMemoPass = 0;
 
 function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapshot['key']): void {
 	const updates = (renderPhaseUpdates ??= new Map());
@@ -12613,6 +12617,7 @@ export function renderBlock(block: Block): void {
 	}
 	const previousOwner = renderPhaseOwner;
 	let previousUpdates = renderPhaseUpdates;
+	if (previousOwner === null) compilerMemoPass++;
 	renderPhaseOwner = block;
 	renderPhaseUpdates = null;
 	try {
@@ -15685,25 +15690,43 @@ export const hookMemoEqual = Object.is;
 interface CompilerMemoProof {
 	read: (() => unknown[]) | null;
 	values: unknown[];
+	pass: number;
 }
 let COMPILER_MEMO_PROOFS: WeakMap<Function, CompilerMemoProof> | null = null;
+let unprovenCompilerMemo = 0;
 
-/** Definition-site proof; copying a function's statics cannot transfer it. */
+/**
+ * Definition-site proof; copying a function's statics cannot transfer it.
+ * `read` returns the live imports the body reads and the witnesses of the
+ * imported components it renders, so a proof holds only for a proven subtree.
+ */
 export function markCompilerMemo<T extends Function>(
 	component: T,
 	read: (() => unknown[]) | null,
 ): T {
-	(COMPILER_MEMO_PROOFS ??= new WeakMap()).set(component, { read, values: [] });
+	(COMPILER_MEMO_PROOFS ??= new WeakMap()).set(component, { read, values: [], pass: -1 });
 	return component;
 }
 
-/** One witness per cached region, outside its component/list work. */
-export function compilerMemoWitness(component: any): unknown[] | Function | undefined {
+/**
+ * One witness per cached region, outside its component/list work. An unproven
+ * component answers a value no earlier call returned, so every region over it,
+ * and every proof that reads its witness, misses.
+ */
+export function compilerMemoWitness(component: any): unknown[] | Function | number {
+	if (typeof component !== 'function') return --unprovenCompilerMemo;
 	if (component.__memo === true && component.__compare === undefined) return component;
 	const proof = COMPILER_MEMO_PROOFS?.get(component);
-	if (proof === undefined || 'defaultProps' in component) return undefined;
-	if (proof.read === null) return proof.values;
-	const values = proof.read();
+	if (proof === undefined || 'defaultProps' in component) return --unprovenCompilerMemo;
+	const read = proof.read;
+	if (read === null) return proof.values;
+	if (proof.pass === compilerMemoPass) return proof.values;
+	// A proof re-entered mid-read sits on a component cycle across modules, and
+	// one whose read threw this pass is incomplete; neither vouches for itself.
+	if (proof.pass === ~compilerMemoPass) return --unprovenCompilerMemo;
+	proof.pass = ~compilerMemoPass;
+	const values = read();
+	proof.pass = compilerMemoPass;
 	const previous = proof.values;
 	if (values.length !== previous.length) return (proof.values = values);
 	for (let index = 0; index < values.length; index++) {

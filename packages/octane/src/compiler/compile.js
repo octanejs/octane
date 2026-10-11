@@ -7133,6 +7133,27 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 	}
 }
 
+// The export names of each local a module exports by specifier
+// (`export { Row as Item }`) or as a bare default (`export default Row`);
+// exported declarations carry their own flag.
+function collectExportedLocals(body) {
+	const names = new Map();
+	const add = (local, exported) => names.set(local, [...(names.get(local) ?? []), exported]);
+	for (const statement of body) {
+		if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
+			for (const specifier of statement.specifiers || []) {
+				add(specifier.local.name, specifier.exported?.name ?? specifier.exported?.value);
+			}
+		} else if (
+			statement.type === 'ExportDefaultDeclaration' &&
+			statement.declaration?.type === 'Identifier'
+		) {
+			add(statement.declaration.name, 'default');
+		}
+	}
+	return names;
+}
+
 // Omitting a JSX descriptor also omits its live `Component.defaultProps` read.
 // Only private declarations whose every reference is an immediately rendered,
 // attribute-free template position can therefore bypass descriptor construction. JSX
@@ -11642,6 +11663,9 @@ function compileInternal(
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		isVoidComponentImport:
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
+		isCompilerMemoImport:
+			typeof options?.isCompilerMemoImport === 'function' ? options.isCompilerMemoImport : null,
+		compilerMemoExports: [],
 		descriptorChildrenBindings: collectDescriptorChildrenBindings(
 			ast,
 			options?.isDescriptorChildrenImport,
@@ -12113,6 +12137,7 @@ function compileInternal(
 	ctx.privateUnescapedComponents = ctx.autoMemo
 		? collectPrivateUnescapedComponents(ast.body, ctx)
 		: new Set();
+	ctx.exportedLocals = ctx.autoMemo ? collectExportedLocals(ast.body) : null;
 	for (const [, info] of ctx.componentInfo) {
 		const compNode = info.node;
 		// The body proof belongs to the initial function object. A writable
@@ -13002,6 +13027,7 @@ function compileInternal(
 		},
 		diagnostics: nativeChangeDiagnostics,
 	};
+	if (ctx.compilerMemoExports.length > 0) result.compilerMemoExports = ctx.compilerMemoExports;
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -16900,6 +16926,45 @@ function finalizeComponentInitializers(ctx, bodyNodes) {
 	}
 }
 
+// The definition-site proof that lets a cached region skip this component, or
+// null. An exported pure body is skippable from another module's region while
+// the live imports it reads and the witnesses of the imported components it
+// renders are unchanged.
+function compilerMemoCaptures(ctx, info, name, exported) {
+	if (info?.effectfulMemoCaptures)
+		return info.effectfulMemoCaptures.map((capture) => b.id(capture));
+	if (
+		!ctx.autoMemo ||
+		ctx.mode !== 'client' ||
+		ctx._universalRuntimeUnit != null ||
+		info?.autoMemoSafe !== true ||
+		(!exported && !ctx.exportedLocals.has(name))
+	)
+		return null;
+	// With import facts available, a proof over an import that has none could
+	// never hold, so the export publishes none either.
+	if (
+		ctx.isCompilerMemoImport !== null &&
+		info.autoMemoImportedComponents.some((component) => !isCompilerMemoImport(ctx, component))
+	)
+		return null;
+	return [
+		...info.autoMemoCaptures.map((capture) => b.id(capture)),
+		...info.autoMemoImportedComponents.map((component) =>
+			b.call(requireRuntimeForContext(ctx, 'compilerMemoWitness'), b.id(component)),
+		),
+	];
+}
+
+// Whether the imported binding `name` names an export its module published a
+// compiler memo proof for.
+function isCompilerMemoImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		binding !== undefined && ctx.isCompilerMemoImport?.(binding.request, binding.imported) === true
+	);
+}
+
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
@@ -17000,14 +17065,17 @@ function compileComponent(node, ctx, options) {
 	const pendingWarm = ctx._pendingWarm;
 	ctx._pendingWarm = null;
 	const componentInfo = ctx.componentInfo.get(name);
-	const memoCaptures = componentInfo?.effectfulMemoCaptures;
+	const memoCaptures = compilerMemoCaptures(ctx, componentInfo, name, isExported);
+	// Importers admit a cached region only for an export that carries a proof.
+	if (memoCaptures !== null) {
+		if (isExported) ctx.compilerMemoExports.push(isDefault ? 'default' : name);
+		ctx.compilerMemoExports.push(...(ctx.exportedLocals?.get(name) ?? []));
+	}
 	const memoInitializer = (component) =>
 		b.call(
 			requireRuntimeForContext(ctx, 'markCompilerMemo'),
 			component,
-			memoCaptures.length === 0
-				? b.literal(null)
-				: b.arrow([], b.array(memoCaptures.map((capture) => b.id(capture)))),
+			memoCaptures.length === 0 ? b.literal(null) : b.arrow([], b.array(memoCaptures)),
 		);
 
 	// The compiled function stays a NODE (M2 AST emit): compileComponent returns
@@ -27399,7 +27467,6 @@ function emitAutoMemoRegion(
 		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
 	}
 	for (let index = 0; index < componentNames.length; index++) {
-		misses.push(b.binary('===', b.id(componentNames[index]), b.id('undefined')));
 		misses.push(b.binary('!==', cacheAt(componentBase + index), b.id(componentNames[index])));
 	}
 	const publish = () => [
@@ -29277,7 +29344,11 @@ function planJsx(
 				: optionalCallArgs(
 						b.literal(cc.invocationSite),
 						memoAnchor,
-						cc.singleRoot ? b.literal(true) : null,
+						cc.singleRoot
+							? b.literal(true)
+							: cc.maybeSingleRoot && !cc.inheritRange
+								? b.literal(2)
+								: null,
 						cc.inheritRange ? b.literal(true) : null,
 					);
 			let invocation = b.call(
@@ -34373,6 +34444,7 @@ function makeCompCall(
 	} else if (ctx.componentInfo && compName !== null) {
 		const callSiteOk = !hasSpreadProp && !hasChildrenProp;
 		const calleeInfo = ctx.componentInfo.get(compName);
+		let memoCallee = calleeInfo;
 		if (calleeInfo) {
 			// A direct shared renderer keeps the authored call's memo decision and
 			// full slot. Re-executing it can retire effects from host callbacks, and
@@ -34381,94 +34453,6 @@ function makeCompCall(
 			if (keyExpr == null) {
 				if (calleeInfo.eligible) liteEligible = callSiteOk;
 				else if (calleeInfo.singleRoot) singleRoot = callSiteOk;
-				const ordinaryMemoSafe =
-					ctx.currentAutoMemoCallsitesSafe !== false && calleeInfo.autoMemoSafe === true;
-				const stableHookful =
-					!ordinaryMemoSafe &&
-					ctx.currentBodyIsComponentScope === true &&
-					ctx._universalRuntimeUnit == null &&
-					ctx.componentInfo.get(componentName)?.stableHookfulChild?.ownsState === true &&
-					calleeInfo.stableHookfulChild !== undefined &&
-					calleeInfo.stableHookfulChild.publications.length <= 16 &&
-					warmCallsiteOwnsRequiredProps(calleeInfo, attrs);
-				if (
-					ctx.autoMemo &&
-					ctx.currentComponentLocals &&
-					callSiteOk &&
-					(ordinaryMemoSafe || stableHookful) &&
-					!containsRenderCall([node], ctx) &&
-					!containsAutoMemoUnsafeStructure([node], ctx) &&
-					!containsImportedMemberRead(node, ctx.importedNames)
-				) {
-					const free = collectFreeIdentifiers(node, []);
-					const calleeCaptures = stableHookful
-						? calleeInfo.stableHookfulChild.captures
-						: calleeInfo.autoMemoCaptures || [];
-					const deps = new Set(calleeCaptures);
-					const callsiteDeps = collectAutoMemoDependencyExpressions(propDependencyNodes);
-					for (const dependency of callsiteDeps.dependencies) deps.add(dependency);
-					let depsSafe =
-						callsiteDeps.safe &&
-						!callsiteDeps.hasComponentValue &&
-						!ctx.currentComponentLocals.has(compName);
-					// A caller-local shadow would make `[capture]` name the wrong value;
-					// decline until module captures receive compiler-owned aliases.
-					for (const capture of calleeCaptures) {
-						if (ctx.currentComponentLocals.has(capture)) depsSafe = false;
-					}
-					for (const witness of calleeInfo.autoMemoImportedComponents || []) {
-						if (ctx.currentComponentLocals.has(witness)) depsSafe = false;
-					}
-					if (stableHookful) {
-						for (const publication of calleeInfo.stableHookfulChild.publications) {
-							if (ctx.currentComponentLocals.has(publication)) depsSafe = false;
-						}
-					}
-					for (const name of free) {
-						if (name === compName) continue;
-						if (
-							ctx.importNamespaceNames.has(name) ||
-							// A local laundering a ref or live-import member read (see
-							// collectAutoMemoLocalHazards) — its per-render value is not a
-							// complete witness, so the site keeps ordinary entry semantics.
-							ctx.currentAutoMemoLocalHazards?.has(name) === true
-						) {
-							depsSafe = false;
-						} else if (ctx.currentComponentLocals.has(name) || ctx.importedNames.has(name)) {
-							if (!callsiteDeps.coveredRoots.has(name)) deps.add(name);
-						} else if (
-							ctx.componentInfo.has(name) ||
-							ctx.defaultMemoBindings.has(name) ||
-							ctx.moduleFunctionDeclarations?.has(name)
-						) {
-							// Same-module FunctionDeclaration identity is immutable.
-							continue;
-						} else {
-							// A module/global read at the call site is not a reactive witness.
-							depsSafe = false;
-						}
-					}
-					if (depsSafe) {
-						autoMemoDeps = [...deps].sort((left, right) => {
-							const leftOrder = callsiteDeps.dependencyOrder.get(left) ?? left;
-							const rightOrder = callsiteDeps.dependencyOrder.get(right) ?? right;
-							return leftOrder < rightOrder ? -1 : leftOrder > rightOrder ? 1 : 0;
-						});
-						autoMemoDepNodes = callsiteDeps.dependencyNodes;
-						if (stableHookful) {
-							autoMemoLite = liteEligible;
-							autoMemoPublicationWitnesses = calleeInfo.stableHookfulChild.publications;
-						} else {
-							autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
-							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
-							// The ordinary cache may need a context-stamping Block. The
-							// proven synchronous state-only path keeps its existing lite
-							// representation and therefore adds no mount boundaries.
-							liteEligible = false;
-							singleRoot = calleeInfo.singleRoot === true;
-						}
-					}
-				}
 			}
 		} else if (
 			keyExpr == null &&
@@ -34479,6 +34463,112 @@ function makeCompCall(
 			// change each render, so their marker regime cannot follow the first
 			// identity's stamp.
 			maybeSingleRoot = callSiteOk;
+			// An imported body is opaque here. When its module published a
+			// definition-site proof, compilerMemoWitness reads it in place of the
+			// same-module summary; an import without one keeps the plain call. A
+			// presentation view keeps it too: hydration prepares only its own helpers.
+			if (
+				ctx._universalRuntimeUnit == null &&
+				ctx.presentationHydration == null &&
+				isCompilerMemoImport(ctx, compName)
+			) {
+				memoCallee = {
+					autoMemoSafe: true,
+					autoMemoCaptures: [],
+					autoMemoImportedComponents: [compName],
+					autoMemoMayReadContext: true,
+				};
+			}
+		}
+		if (memoCallee !== undefined && keyExpr == null) {
+			const ordinaryMemoSafe =
+				ctx.currentAutoMemoCallsitesSafe !== false && memoCallee.autoMemoSafe === true;
+			const stableHookful =
+				!ordinaryMemoSafe &&
+				ctx.currentBodyIsComponentScope === true &&
+				ctx._universalRuntimeUnit == null &&
+				ctx.componentInfo.get(componentName)?.stableHookfulChild?.ownsState === true &&
+				memoCallee.stableHookfulChild !== undefined &&
+				memoCallee.stableHookfulChild.publications.length <= 16 &&
+				warmCallsiteOwnsRequiredProps(memoCallee, attrs);
+			if (
+				ctx.autoMemo &&
+				ctx.currentComponentLocals &&
+				callSiteOk &&
+				(ordinaryMemoSafe || stableHookful) &&
+				!containsRenderCall([node], ctx) &&
+				!containsAutoMemoUnsafeStructure([node], ctx) &&
+				!containsImportedMemberRead(node, ctx.importedNames)
+			) {
+				const free = collectFreeIdentifiers(node, []);
+				const calleeCaptures = stableHookful
+					? memoCallee.stableHookfulChild.captures
+					: memoCallee.autoMemoCaptures || [];
+				const deps = new Set(calleeCaptures);
+				const callsiteDeps = collectAutoMemoDependencyExpressions(propDependencyNodes);
+				for (const dependency of callsiteDeps.dependencies) deps.add(dependency);
+				let depsSafe =
+					callsiteDeps.safe &&
+					!callsiteDeps.hasComponentValue &&
+					!ctx.currentComponentLocals.has(compName);
+				// A caller-local shadow would make `[capture]` name the wrong value;
+				// decline until module captures receive compiler-owned aliases.
+				for (const capture of calleeCaptures) {
+					if (ctx.currentComponentLocals.has(capture)) depsSafe = false;
+				}
+				for (const witness of memoCallee.autoMemoImportedComponents || []) {
+					if (ctx.currentComponentLocals.has(witness)) depsSafe = false;
+				}
+				if (stableHookful) {
+					for (const publication of memoCallee.stableHookfulChild.publications) {
+						if (ctx.currentComponentLocals.has(publication)) depsSafe = false;
+					}
+				}
+				for (const name of free) {
+					if (name === compName) continue;
+					if (
+						ctx.importNamespaceNames.has(name) ||
+						// A local laundering a ref or live-import member read (see
+						// collectAutoMemoLocalHazards) — its per-render value is not a
+						// complete witness, so the site keeps ordinary entry semantics.
+						ctx.currentAutoMemoLocalHazards?.has(name) === true
+					) {
+						depsSafe = false;
+					} else if (ctx.currentComponentLocals.has(name) || ctx.importedNames.has(name)) {
+						if (!callsiteDeps.coveredRoots.has(name)) deps.add(name);
+					} else if (
+						ctx.componentInfo.has(name) ||
+						ctx.defaultMemoBindings.has(name) ||
+						ctx.moduleFunctionDeclarations?.has(name)
+					) {
+						// Same-module FunctionDeclaration identity is immutable.
+						continue;
+					} else {
+						// A module/global read at the call site is not a reactive witness.
+						depsSafe = false;
+					}
+				}
+				if (depsSafe) {
+					autoMemoDeps = [...deps].sort((left, right) => {
+						const leftOrder = callsiteDeps.dependencyOrder.get(left) ?? left;
+						const rightOrder = callsiteDeps.dependencyOrder.get(right) ?? right;
+						return leftOrder < rightOrder ? -1 : leftOrder > rightOrder ? 1 : 0;
+					});
+					autoMemoDepNodes = callsiteDeps.dependencyNodes;
+					if (stableHookful) {
+						autoMemoLite = liteEligible;
+						autoMemoPublicationWitnesses = memoCallee.stableHookfulChild.publications;
+					} else {
+						autoMemoWitnesses = [...(memoCallee.autoMemoImportedComponents || [])];
+						autoMemoContextAware = memoCallee.autoMemoMayReadContext === true;
+						// The ordinary cache may need a context-stamping Block. The
+						// proven synchronous state-only path keeps its existing lite
+						// representation and therefore adds no mount boundaries.
+						liteEligible = false;
+						singleRoot = memoCallee.singleRoot === true;
+					}
+				}
+			}
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
 		if (

@@ -39,6 +39,7 @@ import { PROFILE_DEFINE, foldProfileGuards } from './profile-guards.js';
 
 export { discoverOctaneSourceDependencies };
 const VOID_EXPORTS_META = 'octane:void-component-exports';
+const COMPILER_MEMO_EXPORTS_META = 'octane:compiler-memo-exports';
 const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 const INDEPENDENT_WIDGETS_META = 'octane:independent-widgets';
@@ -391,7 +392,7 @@ async function loadImportMetadata(
 	importer,
 	metadataKey,
 	proofWaits,
-	{ failLoud = false } = {},
+	{ failLoud = false, hints = null } = {},
 ) {
 	if (typeof context.resolve !== 'function' || typeof context.load !== 'function') return new Set();
 	const proven = new Set();
@@ -446,6 +447,14 @@ async function loadImportMetadata(
 			// record. Read that record after the awaited load without touching the
 			// unsupported `ModuleInfo.code` accessor.
 			const moduleInfo = context.getModuleInfo?.(resolved.id) ?? loadedModuleInfo;
+			// Hints ride on the same load. An importer reads one only as an
+			// optimization the runtime still checks, so it needs no final-code proof.
+			const hinted = hints === null ? null : moduleInfo?.meta?.[hints.metadataKey]?.exports;
+			if (Array.isArray(hinted)) {
+				for (const { imported } of candidates) {
+					if (hinted.includes(imported)) hints.exports.add(voidImportKey(request, imported));
+				}
+			}
 			const metadata = moduleInfo?.meta?.[metadataKey];
 			if (metadata == null) return;
 			const valid =
@@ -474,8 +483,10 @@ async function loadImportMetadata(
 	return proven;
 }
 
-async function loadVoidComponentImports(context, imports, importer, proofWaits) {
-	return loadImportMetadata(context, imports, importer, VOID_EXPORTS_META, proofWaits);
+async function loadVoidComponentImports(context, imports, importer, proofWaits, memoExports) {
+	return loadImportMetadata(context, imports, importer, VOID_EXPORTS_META, proofWaits, {
+		hints: { metadataKey: COMPILER_MEMO_EXPORTS_META, exports: memoExports },
+	});
 }
 
 async function readDescriptorSourceAnalysis(id, descriptorSourceCache) {
@@ -1303,6 +1314,11 @@ export function octane(options = {}) {
 						...(structure === null ? null : { structure }),
 					};
 				}
+				// A hint, not a proof: the importer's region still reads the runtime
+				// witness, so a stale entry costs only a region that misses.
+				if (result.kind === 'compile' && Array.isArray(result.compilerMemoExports)) {
+					meta[COMPILER_MEMO_EXPORTS_META] = { exports: result.compilerMemoExports };
+				}
 				if (
 					(result.kind === 'compile' && Array.isArray(result.descriptorChildrenExports)) ||
 					propagatedExports.length > 0
@@ -1326,6 +1342,7 @@ export function octane(options = {}) {
 				descriptorProven = new Set(),
 				clientOnlyImports = [],
 				cssImports = null,
+				memoProven = null,
 			) => {
 				const propagatedExports = [...descriptorProven]
 					.filter((key) => key.startsWith('export\0'))
@@ -1359,6 +1376,14 @@ export function octane(options = {}) {
 						? {
 								isVoidComponentImport: (request, imported) =>
 									proven.has(voidImportKey(request, imported)),
+							}
+						: {}),
+					// Production client output always answers this, so a component over
+					// an import without a proof publishes none of its own.
+					...(specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
+						? {
+								isCompilerMemoImport: (request, imported) =>
+									memoProven?.has(voidImportKey(request, imported)) === true,
 							}
 						: {}),
 					...(descriptorProven.size
@@ -1444,8 +1469,15 @@ export function octane(options = {}) {
 			if (voidImports.length === 0 && descriptorImports.length === 0 && cssRequests.length === 0) {
 				return transformWithProof(null);
 			}
+			const memoProven = new Set();
 			return Promise.all([
-				loadVoidComponentImports(this, voidImports, id, proofWaitGraph(this, environment)),
+				loadVoidComponentImports(
+					this,
+					voidImports,
+					id,
+					proofWaitGraph(this, environment),
+					memoProven,
+				),
 				loadDescriptorChildrenImports(
 					this,
 					descriptorImports,
@@ -1457,7 +1489,7 @@ export function octane(options = {}) {
 				),
 				loadCssImports(),
 			]).then(([proven, descriptorProven, cssImports]) =>
-				transformWithProof(proven, descriptorProven, [], cssImports),
+				transformWithProof(proven, descriptorProven, [], cssImports, memoProven),
 			);
 		},
 	};
