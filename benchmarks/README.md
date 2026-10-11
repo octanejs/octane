@@ -450,6 +450,13 @@ runtime cost separately. App-shaped
 sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
 service and formatting modules count as app code in both framework builds.
 
+The Octane-only `wayfinder_js_*` rows measure all production client JavaScript
+with Wayfinder's normal chunking and no app/framework split. The build runs in
+place, so a local benchmark run overwrites `examples/wayfinder/dist`. Hidden
+source maps gate the absence of unused form-action and Fragment-ref descriptor
+capabilities from this application's generated hydration entry; bytes remain
+report-only.
+
 The `bindings_*` set is an Octane-only application,
 [`bundle-size/apps/bindings`](bundle-size/apps/bindings/octane-tsrx), that
 renders components and hooks from `@octanejs/radix`, `@octanejs/base-ui`,

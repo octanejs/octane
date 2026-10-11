@@ -34555,7 +34555,10 @@ export function createElementAt<P>(
 	return createElementFromConfig(invocationSite, type, props, children);
 }
 
-/** @internal Compiler-owned positional children; omitted children allocate no rest array. */
+/**
+ * @internal Compiler-owned positional children; omitted children allocate no rest array.
+ * Also consumed by app-core/src/client-entry-runtime.js; coordinate ABI changes with that adapter.
+ */
 export function createElementFromConfig<P>(
 	invocationSite: string | undefined,
 	type: ComponentBody<P> | string | typeof Fragment,
