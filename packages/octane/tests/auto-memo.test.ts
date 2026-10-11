@@ -2092,6 +2092,38 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it('refreshes a context consumer a cached callee renders from a prop', () => {
+		const Theme = createContext('t0');
+		const { App, Reader } = loadCompiledFixtureSource(
+			`import { useContext } from 'octane';
+			 import { Theme } from './theme';
+			 export function Reader(props) @{
+				const theme = useContext(Theme);
+				<b>{(props.label + ':' + theme) as string}</b>
+			 }
+			 function Slot(props) @{ <span>{props.content}</span> }
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Slot content={props.content} /></p></Theme>
+			 }`,
+			{
+				id: 'auto-memo-prop-renderable.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme } },
+			},
+		);
+		// The parent passes the same element down, so Slot's cache hits.
+		const content = createElement(Reader, { label: 'slot' });
+		const root = mount(App, { content, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('slot:t1');
+			root.update(App, { content, theme: 't2' });
+			expect(root.find('b').textContent).toBe('slot:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
@@ -5436,7 +5468,7 @@ describe('compiler-owned component-region memoization', () => {
 	it('emits the full memo boundary by default only for a production-safe call', () => {
 		const source = `
 			function Rows(props) @{
-				<ul>@for (const item of props.items; key item.id) { <li>{item.label}</li> }</ul>
+				<ul>@for (const item of props.items; key item.id) { <li>{item.label as string}</li> }</ul>
 			}
 			function Returned(props) { return <p>{props.label}</p>; }
 			export function App(props) @{ <><Rows items={props.items} /><Returned label={props.label} /></> }

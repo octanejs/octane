@@ -5622,6 +5622,91 @@ function containsAutoMemoContextRead(root, ctx) {
 	return found;
 }
 
+// Whether a body can render a component no module-level analysis sees: a tag
+// bound inside the body (a prop or local), a member or dynamic tag, or a child
+// hole whose value is neither text nor JSX. That component may read context, so
+// a cached region over the body must keep refreshing it.
+function rendersOpaqueChild(root, locals, ctx) {
+	const bound = new Set(locals);
+	const tags = [];
+	let found = false;
+	const seen = new WeakSet();
+	function walk(node, child) {
+		if (found || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) walk(item, child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (child && node.type === 'JSXExpressionContainer' && isOpaqueRenderable(node.expression)) {
+			found = true;
+			return;
+		}
+		if (node.type === 'JSXElement' && isComponentTag(node)) {
+			const tag = node.openingElement.name;
+			if (tag.type !== 'JSXIdentifier') {
+				found = true;
+				return;
+			}
+			tags.push(tag.name);
+		}
+		for (const param of node.params || []) collectBindings(param, bound);
+		if (node.type === 'VariableDeclarator') collectBindings(node.id, bound);
+		else if (node.type === 'CatchClause') collectBindings(node.param, bound);
+		else if (node.type === 'FunctionDeclaration' && node.id) bound.add(node.id.name);
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key], key === 'children');
+		}
+	}
+	walk(root, false);
+	return (
+		found ||
+		tags.some(
+			(name) =>
+				bound.has(name) ||
+				(!ctx.componentInfo.has(name) &&
+					!ctx.importedNames.has(name) &&
+					!ctx.defaultMemoBindings.has(name)),
+		)
+	);
+}
+
+// A child value that may hold a component built elsewhere: anything but text,
+// JSX written here, nullish/boolean literals, and lists of those.
+function isOpaqueRenderable(expression) {
+	// A text proof may be the `as string` cast itself, so test before unwrapping.
+	if (isKnownTextChildExpression(expression, null)) return false;
+	const node = unwrapTsExpr(expression);
+	if (
+		node == null ||
+		node.type === 'JSXEmptyExpression' ||
+		node.type === 'JSXElement' ||
+		node.type === 'JSXFragment' ||
+		node.type === 'Literal' ||
+		(node.type === 'Identifier' && node.name === 'undefined')
+	)
+		return false;
+	if (node.type === 'ConditionalExpression')
+		return isOpaqueRenderable(node.consequent) || isOpaqueRenderable(node.alternate);
+	if (node.type === 'LogicalExpression')
+		return (
+			(node.operator !== '&&' && isOpaqueRenderable(node.left)) || isOpaqueRenderable(node.right)
+		);
+	if (node.type === 'ArrayExpression') return node.elements.some(isOpaqueRenderable);
+	// `items.map((item) => <Row … />)` renders the JSX its callback returns.
+	const callback = node.type === 'CallExpression' ? node.arguments[0] : null;
+	if (
+		node.callee?.type === 'MemberExpression' &&
+		node.callee.property?.name === 'map' &&
+		callback?.type === 'ArrowFunctionExpression' &&
+		callback.body.type !== 'BlockStatement'
+	)
+		return isOpaqueRenderable(callback.body);
+	return true;
+}
+
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
 function autoMemoBuiltinHookName(call, ctx) {
@@ -12240,7 +12325,8 @@ function compileInternal(
 			autoMemoSafe &&
 			(containsAutoMemoContextRead(root, ctx) ||
 				autoMemoImportedComponents.size > 0 ||
-				[...free].some((name) => ctx.defaultMemoBindings.has(name)));
+				[...free].some((name) => ctx.defaultMemoBindings.has(name)) ||
+				rendersOpaqueChild(root, locals, ctx));
 		// Hookless check.
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
