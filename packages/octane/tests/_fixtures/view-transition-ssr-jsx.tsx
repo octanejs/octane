@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { Suspense, ViewTransition } from 'octane';
 
 const Glyph = () => <i id="glyph">x</i>;

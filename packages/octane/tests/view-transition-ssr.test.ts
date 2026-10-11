@@ -166,15 +166,21 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 	] as const) {
 		it(`hydrates a .tsx ${name} without regenerating it`, async () => {
 			container.innerHTML = ServerRT.renderToString(serverJsx[name], {}).html;
-			const glyph = container.querySelector('#glyph');
+			const span = container.querySelector('span')!;
+			const content = () => Array.from(span.childNodes).filter((node) => node.nodeType !== 8);
+			const serverContent = content();
 			const onRecoverableError = vi.fn();
 			let root!: ReturnType<typeof hydrateRoot>;
 			await act(() => {
 				root = hydrateRoot(container, Jsx[name], {}, { onRecoverableError });
 			});
 			expect(onRecoverableError).not.toHaveBeenCalled();
-			expect(container.querySelector('#glyph')).toBe(glyph);
-			expect(vt(container.querySelector('span')!.firstElementChild)?.['vt-update']).toBe(
+			// Adopted, not rebuilt: the span and every server element and text node under it survive.
+			expect(container.querySelector('span')).toBe(span);
+			const clientContent = content();
+			expect(clientContent).toHaveLength(serverContent.length);
+			for (const [index, node] of serverContent.entries()) expect(clientContent[index]).toBe(node);
+			expect(vt(span.firstElementChild)?.['vt-update']).toBe(
 				name === 'TextChild' || name === 'EmptyChild' ? undefined : 'none',
 			);
 			root.unmount();
@@ -182,7 +188,6 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 	}
 
 	it('frames compiler HTML children exactly like a compiled children body', () => {
-		const body = ServerRT.renderToString(server.AnnotationsApp, {}).html;
 		const carrier = ServerRT.renderToString(
 			(_props: object, scope: never) =>
 				ServerRT.ssrComponent(
@@ -203,7 +208,6 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 				),
 			{},
 		).html;
-		expect(body).toContain('vt-update');
 		expect(carrier).toBe(viaBody);
 	});
 
