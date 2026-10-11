@@ -34771,9 +34771,9 @@ function makeCompCall(
 					});
 					autoMemoDepNodes = callsiteDeps.dependencyNodes;
 					if (stableHookful) {
-						// The region does not witness a Strong lite callee's own state, so
-						// that callee keeps the Block its updates re-render directly.
-						if (memoCallee.liteHooks) {
+						// The region does not witness state held in a Strong callee's lite
+						// subtree, so that callee keeps the Block its updates re-render.
+						if (memoCallee.liteStateful) {
 							liteEligible = false;
 							singleRoot = memoCallee.singleRoot === true;
 						}

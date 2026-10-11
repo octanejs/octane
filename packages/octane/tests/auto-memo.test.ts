@@ -1804,10 +1804,17 @@ describe('Strong hookful lite edges', () => {
 	});
 
 	// Child owns state its parent's stable-hookful region does not witness, so
-	// the region must cover a Block that its own update re-renders directly.
-	it.each<StrongMode>(['strong', 'default'])(
-		'keeps a stable hookful region over a state owner fresh in %s mode',
-		(mode) => {
+	// the region must cover a Block that its own update re-renders directly,
+	// including when a hookless Wrap stands between them.
+	it.each<[StrongMode, boolean]>([
+		['strong', false],
+		['strong', true],
+		['default', false],
+		['default', true],
+	])(
+		'keeps a stable hookful region over a state owner fresh in %s mode (wrapped: %s)',
+		(mode, wrapped) => {
+			const child = wrapped ? '<Wrap label={props.label} />' : '<Child label={props.label} />';
 			const source = `${mode === 'strong' ? '"use strong";' : ''}
 				import { useState } from 'octane';
 				let parentSetter = null;
@@ -1819,17 +1826,22 @@ describe('Strong hookful lite edges', () => {
 					childSetter = setOwn;
 					<b id="stable-child">{(props.label + ':' + own) as string}</b>
 				}
+				function Wrap(props) @{ <i><Child label={props.label} /></i> }
 				function Parent(props) @{
 					const [tick, setTick] = useState(0);
 					parentSetter = setTick;
-					<p id="stable-parent" data-tick={tick as number}><Child label={props.label} /></p>
+					<p id="stable-parent" data-tick={tick as number}>${child}</p>
 				}
 				export function App(props) @{ <Parent label={props.label} /> }`;
 			const options = { hmr: false, dev: false };
 			const parent = compile(source, `stable-hookful-${mode}.tsrx`, options).code;
-			// The region also witnesses the published setter.
+			// The region also witnesses the published setter. Only a default-mode
+			// Wrap may stay lite under it: there, Child keeps a Block of its own.
+			const slot = mode === 'default' && wrapped ? 'Lite' : 'Void';
 			expect(parent).toMatch(
-				/\|\| _mc\d+\[\d+\] !== childSetter\) \{\s+_\$componentSlotVoid\(__s, 1,/,
+				new RegExp(
+					`\\|\\| _mc\\d+\\[\\d+\\] !== childSetter\\) \\{\\s+_\\$componentSlot${slot}\\(__s, 1,`,
+				),
 			);
 			const client = loadCompiledFixtureSource(source, {
 				id: `stable-hookful-${mode}.tsrx`,
@@ -1837,16 +1849,17 @@ describe('Strong hookful lite edges', () => {
 				compileOptions: options,
 			});
 			const root = mount(client.App, { label: 'x' });
-			const child = root.find('#stable-child');
+			const leaf = root.find('#stable-child');
 			flushSync(() => client.bumpChild());
-			expect(child.textContent).toBe('x:1');
+			expect(leaf.textContent).toBe('x:1');
 			flushSync(() => client.bumpParent());
 			expect(root.find('#stable-parent').getAttribute('data-tick')).toBe('1');
 			flushSync(() => client.bumpChild());
-			expect(root.find('#stable-child')).toBe(child);
-			expect(child.textContent).toBe('x:2');
+			expect(root.find('#stable-child')).toBe(leaf);
+			expect(leaf.textContent).toBe('x:2');
 			// The single-root callee still needs no markers.
-			expect(root.find('#stable-parent').innerHTML).toBe('<b id="stable-child">x:2</b>');
+			const html = '<b id="stable-child">x:2</b>';
+			expect(root.find('#stable-parent').innerHTML).toBe(wrapped ? `<i>${html}</i>` : html);
 			root.unmount();
 		},
 	);
