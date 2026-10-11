@@ -246,9 +246,9 @@ Effects with `null` dependencies, callback or dependency factories, render-time
 ref reads, and unsupported hooks keep the child live. This proof is specific to
 compiled TSRX bodies; returned JSX retains its existing behavior.
 
-An exported pure component carries the same proof across modules. In Vite
-production builds, a parent in another module then skips it when its props are
-unchanged, as a parent in the same module already does. The proof covers the
+An exported pure component carries the same proof across modules. In Vite and
+Rspack production builds, a parent in another module then skips it when its
+props are unchanged, as a parent in the same module already does. The proof covers the
 component's whole subtree: an export whose subtree renders an imported
 component without a proof, such as one that calls a hook, publishes none, and
 a cached call lapses while any live import the subtree reads changes.
