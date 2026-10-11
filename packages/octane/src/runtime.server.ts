@@ -6586,7 +6586,9 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 			attrs.push(['vt-parent-' + kind.toLowerCase() + '-x', value ?? (handler ? 'auto' : 'none')]);
 		}
 		const annotated = vtSsrAnnotate(inner, attrs);
-		return ssrHtml(ssrBlock(props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated));
+		const body = props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated;
+		// A descriptor child is already one childSlot range; only a compiled children body needs one.
+		return ssrHtml(typeof props.children === 'function' ? ssrBlock(body) : body);
 	},
 	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'ViewTransition',
