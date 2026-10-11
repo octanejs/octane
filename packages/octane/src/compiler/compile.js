@@ -17028,8 +17028,10 @@ function isProvenLiteImport(ctx, name) {
 // Exports an importer may call through componentSlotLite: hookless void bodies
 // (componentInfo.eligible) that a cached region can skip without refreshing
 // context. A region over a body without a compiler memo proof always misses,
-// so only a proven body must also be context-free.
+// so only a proven body must also be context-free. A native-read body would
+// subscribe the importer's region owner, which a cache hit does not re-run.
 function collectLiteComponentExports(body, ctx) {
+	if (ctx.nativeReads) return [];
 	const lite = (name) => {
 		const info = ctx.componentInfo.get(name);
 		return (

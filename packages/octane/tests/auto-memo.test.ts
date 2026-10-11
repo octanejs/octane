@@ -1531,6 +1531,23 @@ describe('imported component regions', () => {
 		}
 	});
 
+	it('publishes no lite export from a native-read module', () => {
+		// A native-read body subscribes the Block it renders in; behind a lite
+		// edge that is the importer's region owner, which a cache hit does not
+		// re-run. Its memo proof still stands.
+		const label = `import 'octane/signals';
+			export function Label(props) @{ <span>{props.value$ as string}</span> }`;
+		const result = compile(label, 'native-lite-label.tsrx', liteCompileOptions({})) as {
+			compilerMemoExports?: string[];
+			liteComponentExports?: string[];
+		};
+		expect(result.compilerMemoExports).toEqual(['Label']);
+		expect(result.liteComponentExports).toBeUndefined();
+		expect(
+			liteExportsOf(label.replace("import 'octane/signals';", ''), 'plain-label.tsrx'),
+		).toEqual(['Label']);
+	});
+
 	it('hydrates proven hookless imports through lite edges', () => {
 		const server = loadImportedLiteApp('server').app;
 		const { app } = loadImportedLiteApp();
