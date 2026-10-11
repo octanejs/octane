@@ -34772,7 +34772,10 @@ function makeCompCall(
 					if (stableHookful) {
 						// The region does not witness a Strong lite callee's own state, so
 						// that callee keeps the Block its updates re-render directly.
-						if (memoCallee.liteHooks) liteEligible = false;
+						if (memoCallee.liteHooks) {
+							liteEligible = false;
+							singleRoot = memoCallee.singleRoot === true;
+						}
 						autoMemoLite = liteEligible;
 						autoMemoPublicationWitnesses = memoCallee.stableHookfulChild.publications;
 					} else {

@@ -1845,6 +1845,8 @@ describe('Strong hookful lite edges', () => {
 			flushSync(() => client.bumpChild());
 			expect(root.find('#stable-child')).toBe(child);
 			expect(child.textContent).toBe('x:2');
+			// The single-root callee still needs no markers.
+			expect(root.find('#stable-parent').innerHTML).toBe('<b id="stable-child">x:2</b>');
 			root.unmount();
 		},
 	);
