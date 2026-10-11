@@ -1,4 +1,4 @@
-import { useState, createContext, use } from 'octane';
+import { useState, createContext, use, useLayoutEffect } from 'octane';
 
 export function Label(props) @{
 	<span class="lbl">{props.text as string}</span>
@@ -98,3 +98,188 @@ export const ArrowFragHost = () => @{
 		<Label text="sibling" />
 	</>
 };
+
+function SharedStaticIcon() {
+	return (
+		<svg class="shared-icon" viewBox="0 0 10 10" aria-hidden="true">
+			<title>Shared icon</title>
+			<path d="M1 1L9 9" />
+		</svg>
+	);
+}
+
+function SharedStaticLabel() {
+	return <span class="shared-label">Shared label</span>;
+}
+
+export function useConnectedElementEffect(report: (event: string) => void) {
+	useLayoutEffect(() => {
+		report('connected');
+		return () => report('cleanup');
+	}, []);
+}
+
+function StaticCustomElement() {
+	return <octane-connected-effect-probe />;
+}
+
+export function ConnectedCustomElementParent(props: { tick: string }) @{
+	<main>
+		<StaticCustomElement />
+		<span class="connected-tick">{props.tick as string}</span>
+	</main>
+}
+
+function SharedReturnedRoot() @{
+	<SharedStaticIcon />
+}
+
+export function SharedReturnedChildren(props: {
+	show: boolean;
+	rows: string[];
+	selected: string;
+	tick: number;
+}) @{
+	<main class="shared-children" data-tick={props.tick}>
+		<div class="shared-direct">
+			<SharedStaticIcon />
+			<SharedStaticLabel />
+		</div>
+		<div class="shared-if">
+			@if (props.show) {
+				<SharedStaticIcon />
+			}
+		</div>
+		<div class="shared-rows">
+			@for (const row of props.rows; key row) {
+				<article data-row={row}>
+					<SharedStaticIcon />
+				</article>
+			}
+		</div>
+		<div class="shared-switch">
+			@switch (props.selected) {
+				@case 'icon': {
+					<SharedStaticIcon />
+				}
+				@default: {
+					<SharedStaticLabel />
+				}
+			}
+		</div>
+		<div class="shared-sole">
+			<SharedReturnedRoot />
+		</div>
+		<input class="shared-draft" defaultValue="seed" />
+	</main>
+}
+
+function ShadowedStaticIcon() {
+	return <em class="module-icon">Module icon</em>;
+}
+
+function LocallyShadowedReturnedChild() @{
+	const ShadowedStaticIcon = () => <em class="local-icon">Local icon</em>;
+	<aside>
+		<ShadowedStaticIcon />
+	</aside>
+}
+
+export function ShadowedReturnedChild() @{
+	<section>
+		<ShadowedStaticIcon />
+		<LocallyShadowedReturnedChild />
+	</section>
+}
+
+function EscapedStaticLabel() {
+	return <span class="escaped-label">Escaped label</span>;
+}
+
+export function escapedReturnedDescriptor() {
+	return <EscapedStaticLabel />;
+}
+
+function EscapedReturnedNeighbor() {
+	return (
+		<aside>
+			<EscapedStaticLabel />
+		</aside>
+	);
+}
+
+export function EscapedReturnedChild() @{
+	<section>
+		<EscapedStaticLabel />
+		<EscapedReturnedNeighbor />
+	</section>
+}
+
+interface ReturnedRetryProps {
+	promise: Promise<string>;
+	failed?: boolean;
+}
+
+function ReturnedRetryValue(props: ReturnedRetryProps) @{
+	if (props.failed) throw new Error('retry failed');
+	const value = use(props.promise);
+	<p class="retry-value">{value as string}</p>
+}
+
+export function ReturnedRetryBoundary(props: ReturnedRetryProps) @{
+	<main>
+		<input class="retry-sibling-draft" defaultValue="sibling seed" />
+		@try {
+			<section class="retry-content">
+				<SharedStaticIcon />
+				<ReturnedRetryValue promise={props.promise} failed={props.failed} />
+				<SharedStaticLabel />
+				<input class="retry-draft" defaultValue="primary seed" />
+			</section>
+		} @pending {
+			<p class="retry-pending">Loading</p>
+		} @catch (error: unknown, reset: () => void) {
+			<button class="retry-reset" onClick={reset}>
+				{'Retry: ' + (error as Error).message}
+			</button>
+		}
+	</main>
+}
+
+function ParameterIcon() {
+	return <span class="parameter-escaped-icon">parameter icon</span>;
+}
+
+class ReturnedIconHolder {
+	constructor(public value = ParameterIcon()) {}
+}
+
+const heldParameterIcon = new ReturnedIconHolder();
+
+export function readParameterReturnedDescriptor() {
+	return heldParameterIcon.value;
+}
+
+export function ParameterReturnedChild() @{
+	<main>
+		<ParameterIcon />
+	</main>
+}
+
+export function ForwardReturnedCard() {
+	return (
+		<div>
+			<ForwardReturnedIcon />
+		</div>
+	);
+}
+
+function ForwardReturnedIcon() {
+	return <span class="forward-escaped-icon">forward icon</span>;
+}
+
+export function ForwardReturnedChild() @{
+	<main>
+		<ForwardReturnedIcon />
+	</main>
+}

@@ -2939,6 +2939,10 @@ function collectBindings(pattern, out) {
 		out.add(pattern.name);
 		return;
 	}
+	if (pattern.type === 'TSParameterProperty') {
+		collectBindings(pattern.parameter, out);
+		return;
+	}
 	if (pattern.type === 'ObjectPattern') {
 		for (const p of pattern.properties || []) {
 			if (p.type === 'RestElement') collectBindings(p.argument, out);
@@ -4570,6 +4574,9 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 	function walkPatternExpressions(pattern, scope) {
 		if (!pattern || typeof pattern !== 'object') return;
 		switch (pattern.type) {
+			case 'TSParameterProperty':
+				walkPatternExpressions(pattern.parameter, scope);
+				return;
 			case 'AssignmentPattern':
 				walkPatternExpressions(pattern.left, scope);
 				walk(pattern.right, scope);
@@ -4626,6 +4633,32 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		// seeing those references; only the container name itself is non-reactive.
 		if (t === 'TSModuleDeclaration' || t === 'TSModuleBlock') {
 			walk(n.body, scope);
+			return;
+		}
+		// Enum initializers execute; only their declared names are type syntax.
+		// Member references belong to the enum, not equally named outer bindings.
+		if (t === 'TSEnumDeclaration') {
+			if (n.declare !== true) {
+				const members = n.body?.members ?? n.members ?? [];
+				const enumScope = new Set(scope);
+				collectBindings(n.id, enumScope);
+				for (const member of members) {
+					const name = member.id?.type === 'Identifier' ? member.id.name : member.id?.value;
+					if (!member.computed && typeof name === 'string') enumScope.add(name);
+				}
+				for (const member of members) {
+					if (member.computed) walk(member.id, enumScope);
+					walk(member.initializer, enumScope);
+				}
+			}
+			return;
+		}
+		if (t === 'TSImportEqualsDeclaration') {
+			if (n.importKind !== 'type' && n.moduleReference?.type !== 'TSExternalModuleReference') {
+				let reference = n.moduleReference;
+				while (reference?.type === 'TSQualifiedName') reference = reference.left;
+				walk(reference, scope);
+			}
 			return;
 		}
 		// The compiler's own renderable child hole (a normalized `{expr}` or
@@ -7102,7 +7135,7 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 
 // Omitting a JSX descriptor also omits its live `Component.defaultProps` read.
 // Only private declarations whose every reference is an immediately rendered,
-// attribute-free host child can therefore bypass descriptor construction. JSX
+// attribute-free template position can therefore bypass descriptor construction. JSX
 // descriptors returned/stored/passed elsewhere expose their `.type`, so those
 // sites count as escapes even though their tag looks equally static.
 function collectPrivateUnescapedComponents(body, ctx) {
@@ -7120,25 +7153,54 @@ function collectPrivateUnescapedComponents(body, ctx) {
 	if (candidates.size === 0) return candidates;
 
 	const allowed = new Set();
-	const visitHost = (host) => {
-		for (const child of host.children || []) {
-			if (child?.type !== 'Element' && child?.type !== 'JSXElement') continue;
-			if (!isComponentTag(child)) {
-				visitHost(child);
-				continue;
+	const visitOutput = (node, returnedOwner = null) => {
+		if (node == null) return;
+		if (Array.isArray(node)) {
+			for (const child of node) visitOutput(child, returnedOwner);
+		} else if (node.type === 'Element' || node.type === 'JSXElement') {
+			if (!isComponentTag(node)) visitOutput(node.children, returnedOwner);
+			else {
+				const name = tagBindingName(node);
+				const attrs = node.attributes || node.openingElement?.attributes || [];
+				// Returned roots fold in declaration order. A later component has no
+				// renderer yet, so its descriptor can escape through the returned props.
+				if (
+					candidates.has(name) &&
+					attrs.length === 0 &&
+					!node.children?.length &&
+					(returnedOwner === null ||
+						ctx.moduleFunctionDeclarations.get(name).start < returnedOwner.start)
+				) {
+					allowed.add(node);
+				}
 			}
-			const name = tagBindingName(child);
-			const attrs = child.attributes || child.openingElement?.attributes || [];
-			if (name !== null && candidates.has(name) && attrs.length === 0 && !child.children?.length) {
-				allowed.add(child);
-			}
+		} else if (node.type === 'JSXFragment' || node.type === 'Fragment') {
+			visitOutput(node.children, returnedOwner);
+		} else if (node.type === 'JSXCodeBlock') {
+			visitOutput(node.body, returnedOwner);
+			visitOutput(node.render, returnedOwner);
+		} else if (node.type === 'BlockStatement') {
+			visitOutput(node.body, returnedOwner);
+		} else if (node.type === 'IfStatement' || node.type === 'JSXIfExpression') {
+			visitOutput(node.consequent, returnedOwner);
+			visitOutput(node.alternate, returnedOwner);
+		} else if (node.type === 'ForOfStatement' || node.type === 'JSXForExpression') {
+			visitOutput(node.body, returnedOwner);
+			visitOutput(node.empty, returnedOwner);
+		} else if (node.type === 'SwitchStatement' || node.type === 'JSXSwitchExpression') {
+			for (const entry of node.cases || []) visitOutput(entry.consequent, returnedOwner);
+		} else if (node.type === 'TryStatement' || node.type === 'JSXTryExpression') {
+			visitOutput(node.block, returnedOwner);
+			visitOutput(node.handler?.body, returnedOwner);
+			visitOutput(node.pending, returnedOwner);
 		}
 	};
 	for (const info of ctx.componentInfo.values()) {
+		if (info.node.body?.type === 'JSXCodeBlock') visitOutput(info.node.body);
 		if (!info.returnJsx) continue;
 		for (const statement of info.node.body.body || []) {
 			if (statement.type === 'ReturnStatement' && isPlainHostRoot(statement.argument)) {
-				visitHost(statement.argument);
+				visitOutput(statement.argument, info.node);
 			}
 		}
 	}
@@ -12780,6 +12842,7 @@ function compileInternal(
 	// value-position `$$singleRoot` descriptor check.
 	const stampNodes = [];
 	if (ctx.componentInfo) {
+		let referencedPrivateComponents;
 		const locStamp = (target, value) =>
 			inheritOriginLoc(
 				b.try(
@@ -12791,6 +12854,18 @@ function compileInternal(
 			);
 		for (const [name, info] of ctx.componentInfo) {
 			if (info.singleRoot === true && info.singleRootInitialized !== true) {
+				// Do not retain an unused wrapper solely to stamp cross-module metadata.
+				// Forward calls still name it in the emitted tree and keep their stamp.
+				if (
+					ctx.privateUnescapedComponents.has(name) &&
+					info.staticFragmentRenderer &&
+					!(referencedPrivateComponents ??= collectFreeIdentifiers([
+						...helperNodes,
+						...bodyNodes,
+						...profileNodes,
+					])).has(name)
+				)
+					continue;
 				stampNodes.push(
 					inheritOriginLoc(
 						b.stmt(
@@ -22657,8 +22732,8 @@ function isStaticFragmentRendererProps(props, ctx) {
 	return true;
 }
 
-function isStaticReturnedFragmentComponent(node, ctx) {
-	if (!ctx.autoMemo || ctx._foldCtx?.immediateRenderedOutput !== true) return false;
+function isStaticFragmentComponent(node, ctx) {
+	if (!ctx.autoMemo) return false;
 	const name = tagBindingName(node);
 	if (
 		name === null ||
@@ -22878,7 +22953,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 				// a hole too, since it may be a local/member/dynamic tag that the hoisted
 				// renderer cannot reference directly.
 				newChildren.push(extractFragmentComponent(child, ctx, holeProps, childNs));
-			} else if (isComponentTag(child) && isStaticReturnedFragmentComponent(child, ctx)) {
+			} else if (
+				isComponentTag(child) &&
+				ctx._foldCtx?.immediateRenderedOutput === true &&
+				isStaticFragmentComponent(child, ctx)
+			) {
 				// The original function remains callable and still returns its authored
 				// descriptor. Only this nonescaping call can reuse its already-hoisted,
 				// hookless fragment directly through the existing lite component ABI.
@@ -29225,7 +29304,7 @@ function planJsx(
 					ctx,
 					cc.autoMemoDeps,
 					slotIndex,
-					b.stmt(invocation),
+					{ ...b.stmt(invocation), __octaneInlineComponent: cc.inlineComponent },
 					null,
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
@@ -29251,10 +29330,8 @@ function planJsx(
 		if (cc.inheritRange) {
 			const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
 			ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
-			pushAfterStmt(
-				cc.id,
-				org,
-				b.stmt(
+			pushAfterStmt(cc.id, org, {
+				...b.stmt(
 					b.call(
 						componentHelper,
 						b.id('__s'),
@@ -29270,7 +29347,8 @@ function planJsx(
 						),
 					),
 				),
-			);
+				__octaneInlineComponent: cc.inlineComponent,
+			});
 			continue;
 		}
 		// Design (c) lite path: hookless same-module callees with no key/spread/
@@ -29283,10 +29361,8 @@ function planJsx(
 			// Anchor — same rules as componentSlot (see anchorNodeFor); the
 			// endMarker case keeps the lite range inside the owning block.
 			const liteAnchor = slotAnchorNodeFor(cc, 'compAnchor');
-			pushAfterStmt(
-				cc.id,
-				org,
-				b.stmt(
+			pushAfterStmt(cc.id, org, {
+				...b.stmt(
 					b.call(
 						'_$componentSlotLite',
 						b.id('__s'),
@@ -29297,7 +29373,8 @@ function planJsx(
 						...optionalCallArgs(b.literal(cc.invocationSite), liteAnchor),
 					),
 				),
-			);
+				__octaneInlineComponent: cc.inlineComponent,
+			});
 			continue;
 		}
 		const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
@@ -29332,7 +29409,10 @@ function planJsx(
 				b.literal(bindingMarker(cc.bindingSite, 'v')),
 				...invocation.arguments,
 			);
-		pushAfterStmt(cc.id, org, b.stmt(invocation));
+		pushAfterStmt(cc.id, org, {
+			...b.stmt(invocation),
+			__octaneInlineComponent: cc.inlineComponent,
+		});
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
@@ -34061,7 +34141,18 @@ function makeCompCall(
 	const id = ctx.nextHelperId++;
 	const invocationSite = componentInvocationSite(ctx, node);
 	const compName = tagBindingName(node);
-	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
+	const directRenderer = isStaticFragmentComponent(node, ctx)
+		? ctx.componentInfo.get(compName).staticFragmentRenderer
+		: undefined;
+	// Descriptor-valued props must still be evaluated in the authored callee's
+	// scope. The direct full-slot replacement also needs the existing single-root
+	// proof; descriptor-built or parser-repaired hosts retain their original path.
+	const staticFragmentRenderer =
+		node.openingElement?.metadata?.staticFragmentRenderer ??
+		(directRenderer?.props.properties.length === 0 &&
+		ctx.componentInfo.get(compName)?.singleRoot === true
+			? directRenderer
+			: undefined);
 	const activityDescriptor = isActivityLongForm(node, ctx);
 	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
 	let compNode = activityDescriptor
@@ -34274,16 +34365,19 @@ function makeCompCall(
 			node.openingElement?.name ?? node.id,
 		);
 		voidComponent = true;
-	} else if (staticFragmentRenderer) {
-		// The renderer is already a void, hookless component body. A memo boundary
-		// would force a full Block and could hide a hookful descendant's update.
+	} else if (node.openingElement?.metadata?.staticFragmentRenderer) {
+		// Keep the renderer's existing memo policy: a new memo boundary could hide
+		// a hookful descendant's update in a returned-host fold.
 		liteEligible = true;
 		voidComponent = true;
 	} else if (ctx.componentInfo && compName !== null) {
 		const callSiteOk = !hasSpreadProp && !hasChildrenProp;
 		const calleeInfo = ctx.componentInfo.get(compName);
 		if (calleeInfo) {
-			voidComponent = !ctx.hmr && calleeInfo.voidOutput === true;
+			// A direct shared renderer keeps the authored call's memo decision and
+			// full slot. Re-executing it can retire effects from host callbacks, and
+			// selecting Lite could add a new runtime helper to the app's bundle.
+			voidComponent = !ctx.hmr && (calleeInfo.voidOutput === true || !!staticFragmentRenderer);
 			if (keyExpr == null) {
 				if (calleeInfo.eligible) liteEligible = callSiteOk;
 				else if (calleeInfo.singleRoot) singleRoot = callSiteOk;
@@ -34421,6 +34515,7 @@ function makeCompCall(
 		id,
 		invocationSite,
 		compNode,
+		inlineComponent: staticFragmentRenderer ? compName : undefined,
 		propsExpr,
 		hostPath: null,
 		keyExpr,
@@ -36685,8 +36780,26 @@ function escapeAttr(s) {
 }
 
 const PURE_ANNOTATION_COMMENTS = [{ type: 'Block', value: ' @__PURE__ ' }];
+function inlineComponentComments(node, edge) {
+	return node.__octaneInlineComponent
+		? [
+				{
+					type: 'Block',
+					value: ` octane-inline ${edge} shared renderer: ${node.__octaneInlineComponent} `,
+					start: node.start,
+					end: node.end,
+					loc: node.loc,
+				},
+			]
+		: undefined;
+}
 const esrapCommentOptions = {
-	getLeadingComments: (node) => (node.__octanePure ? PURE_ANNOTATION_COMMENTS : undefined),
+	getLeadingComments: (node) => {
+		const comments = inlineComponentComments(node, 'START');
+		if (!node.__octanePure) return comments;
+		return comments ? [...comments, ...PURE_ANNOTATION_COMMENTS] : PURE_ANNOTATION_COMMENTS;
+	},
+	getTrailingComments: (node) => inlineComponentComments(node, 'END'),
 };
 
 const COMMENT_MEMBER_TYPES = new Set([
@@ -36710,9 +36823,10 @@ function typescriptCommentOptions(source) {
 			// As in core's TS printer, a newline is safe before declarations and
 			// members, but could change `return expression` or invalidate `throw`.
 			const comments =
-				node.type.endsWith('Declaration') ||
-				node.type.endsWith('Statement') ||
-				COMMENT_MEMBER_TYPES.has(node.type)
+				node.leadingComments?.length &&
+				(node.type.endsWith('Declaration') ||
+					node.type.endsWith('Statement') ||
+					COMMENT_MEMBER_TYPES.has(node.type))
 					? node.leadingComments?.map((comment) => ({
 							...comment,
 							// The JS parser normalizes block-comment indentation. Recover
@@ -36723,8 +36837,10 @@ function typescriptCommentOptions(source) {
 							),
 						}))
 					: undefined;
-			return node.__octanePure ? [...(comments ?? []), ...PURE_ANNOTATION_COMMENTS] : comments;
+			const generated = esrapCommentOptions.getLeadingComments(node);
+			return comments ? (generated ? [...comments, ...generated] : comments) : generated;
 		},
+		getTrailingComments: esrapCommentOptions.getTrailingComments,
 	};
 }
 
