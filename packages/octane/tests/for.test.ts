@@ -1905,9 +1905,31 @@ describe('large keyed list fills', () => {
 		expect(r.find('[data-fast-host-id="12"]').textContent).toBe('updated row 12');
 		expect(r.findAll('.fast-host-row')).toEqual(rows);
 
+		// Removing a row shifts the surviving suffix, including rows whose inputs
+		// change in the same update. Reinsertions must keep those survivors alive.
+		const removed = changed
+			.filter((row) => row.id !== 5)
+			.map((row) => (row.id === 20 ? { ...row, label: 'updated row 20' } : row));
+		r.update(FastHostKeyedList, { items: removed, selected: 12, onPick });
+		const survivors = rows.filter((_, index) => index !== 4);
+		const remaining = r.findAll('.fast-host-row');
+		expect(remaining).toHaveLength(survivors.length);
+		remaining.forEach((row, index) => expect(row).toBe(survivors[index]));
+		expect(r.find('[data-fast-host-id="20"]').textContent).toBe('updated row 20');
+		r.update(FastHostKeyedList, { items: removed.slice(1), selected: 20, onPick });
+		expect(r.find('.fast-host-row.selected')).toBe(rows[19]);
+		r.click('[data-fast-host-id="20"]');
+		expect(picked).toEqual([5, 20]);
+		r.update(FastHostKeyedList, { items: changed, selected: 12, onPick });
+		const restored = r.findAll('.fast-host-row');
+		for (let index = 0; index < rows.length; index++) {
+			if (index !== 0 && index !== 4) expect(restored[index]).toBe(rows[index]);
+		}
+		expect(r.find('[data-fast-host-id="20"]').textContent).toBe('row 20');
+
 		const reversed = changed.toReversed();
 		r.update(FastHostKeyedList, { items: reversed, selected: 12, onPick });
-		expect(r.findAll('.fast-host-row')).toEqual(rows.toReversed());
+		expect(r.findAll('.fast-host-row')).toEqual(restored.toReversed());
 		r.update(FastHostKeyedList, { items: [], selected: null, onPick });
 		expect(r.findAll('.fast-host-row')).toHaveLength(0);
 		r.update(FastHostKeyedList, { items, selected: 1, onPick });
