@@ -5731,9 +5731,9 @@ function isOpaqueRenderable(expression) {
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
 // Builtins a Strong callee may call and still render through componentSlotLite.
-// Each keeps its cell in CURRENT_SCOPE and schedules CURRENT_BLOCK. `use` stays
-// out: its thenables are positional on the Block, as are the Activity and
-// transition hooks' extra per-Block records.
+// Each keeps its cell in CURRENT_SCOPE and schedules CURRENT_BLOCK. `use` stores
+// its thenables by call order on the Block, and the other builtins read or stage
+// per-Block render state, so they keep a Block until audited.
 const STRONG_LITE_HOOKS = new Set([
 	'useState',
 	'useReducer',
@@ -12491,7 +12491,8 @@ function compileInternal(
 		// Whether a lite edge to this body can bring hook state into its caller's
 		// Block: settled across same-module callees below.
 		info.liteStateful =
-			info.liteHooks || (info.eligible && [...free].some((name) => isStrongLiteImport(ctx, name)));
+			info.liteHooks ||
+			(strongLiteHooks && info.eligible && [...free].some((name) => isStrongLiteImport(ctx, name)));
 		info.liteCallees = strongLiteHooks
 			? [...free].filter((name) => ctx.componentInfo.has(name))
 			: [];
