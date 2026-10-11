@@ -13226,6 +13226,10 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		}
 		if (useSingleRoot) {
 			const d = out as ElementDescriptor;
+			// A value-position mount, as childSlot's are: the body may return one it
+			// received (`return props.content`), which a cached region skips with the
+			// body. Arm it as childSlot does, through the Block it inherits from.
+			if (!block.memoInChain) promoteMemoAncestry(block);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
