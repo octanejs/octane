@@ -5624,22 +5624,27 @@ function containsAutoMemoContextRead(root, ctx) {
 
 // Whether a body can render a component no module-level analysis sees: a tag
 // bound inside the body (a prop or local), a member or dynamic tag, or a child
-// hole whose value is neither text nor JSX. That component may read context, so
-// a cached region over the body must keep refreshing it.
+// hole, host `children` prop or value the body returns that is neither text nor
+// JSX. A host spread may carry `children` too. That component may read context,
+// so a cached region over the body must keep refreshing it.
 function rendersOpaqueChild(root, locals, ctx) {
 	const bound = new Set(locals);
 	const tags = [];
 	let found = false;
 	const seen = new WeakSet();
-	function walk(node, child) {
+	// `nested`: inside a function the body creates, whose returns render nothing here.
+	function walk(node, child, nested) {
 		if (found || !node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
-			for (const item of node) walk(item, child);
+			for (const item of node) walk(item, child, nested);
 			return;
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
-		if (child && node.type === 'JSXExpressionContainer' && isOpaqueRenderable(node.expression)) {
+		if (
+			(child && node.type === 'JSXExpressionContainer' && isOpaqueRenderable(node.expression)) ||
+			(!nested && node.type === 'ReturnStatement' && isOpaqueRenderable(node.argument))
+		) {
 			found = true;
 			return;
 		}
@@ -5650,17 +5655,33 @@ function rendersOpaqueChild(root, locals, ctx) {
 				return;
 			}
 			tags.push(tag.name);
+		} else if (
+			node.type === 'JSXElement' &&
+			node.openingElement.attributes.some((attribute) =>
+				attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute'
+					? true
+					: attribute.name?.name === 'children' &&
+						isOpaqueRenderable(attribute.value?.expression ?? attribute.value),
+			)
+		) {
+			found = true;
+			return;
 		}
 		for (const param of node.params || []) collectBindings(param, bound);
 		if (node.type === 'VariableDeclarator') collectBindings(node.id, bound);
 		else if (node.type === 'CatchClause') collectBindings(node.param, bound);
 		else if (node.type === 'FunctionDeclaration' && node.id) bound.add(node.id.name);
+		const inner =
+			nested ||
+			node.type === 'ArrowFunctionExpression' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration';
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(node[key], key === 'children');
+			walk(node[key], key === 'children', inner);
 		}
 	}
-	walk(root, false);
+	walk(root, false, false);
 	return (
 		found ||
 		tags.some(
