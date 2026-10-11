@@ -41127,6 +41127,20 @@ export function compilerCacheContext(
 	return current;
 }
 
+/**
+ * Compiler ABI for a component tag bound inside the body (`const C =
+ * props.comp; <C />`). Every other component a cached region skips either reads
+ * no context or records its reads (memo walls, value-position mounts). This
+ * one is unknown until render, so arm the scope before its slot mounts: Blocks
+ * created below inherit memoInChain, and compilerCacheContext's refresh then
+ * finds the consumer.
+ * @internal
+ */
+export function compilerOpaqueTag<T>(scope: Scope, tag: T): T {
+	if (!scope.block.memoInChain) promoteMemoAncestry(scope);
+	return tag;
+}
+
 const OBJ_PROTO = Object.prototype;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),

@@ -1615,6 +1615,7 @@ function importSpecifierPair(entry) {
 const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'compilerMemoRegion',
 	'compilerMemoWitness',
+	'compilerOpaqueTag',
 	'markCompilerMemo',
 	'hookMemoCreate',
 	'hookMemoEqual',
@@ -34674,6 +34675,11 @@ function makeCompCall(
 			voidComponent = true;
 		}
 	}
+	// A tag bound in this body names a component no proof covers, yet a cached
+	// region may skip it. Arm its context reads so the region's refresh, which
+	// rendersOpaqueChild requests, finds them.
+	if (ctx.autoMemo && ctx.currentComponentLocals?.has(compName))
+		compNode = b.call(requireRuntimeForContext(ctx, 'compilerOpaqueTag'), b.id('__s'), compNode);
 
 	// Append-safety for the anchorless all-component-children emission (see
 	// emitElementHtml). Only a componentSlotLite lowering can lose its
@@ -35348,7 +35354,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			itemMemoWitnesses = [
 				...collectImportedComponentReferences(bodyAst, ctx.importedNames),
 			].sort();
-			if (itemMemoWitnesses.length > 0) itemMemoContextAware = true;
+			if (
+				itemMemoWitnesses.length > 0 ||
+				rendersOpaqueChild(bodyAst, [...ctx.currentComponentLocals, ...bodyScope], ctx)
+			)
+				itemMemoContextAware = true;
 			for (const name of free) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
 					itemMemo = false;
@@ -35418,7 +35428,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
 		const listDeps = new Set();
 		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);
-		let listMayReadContext = witnesses.size > 0 || containsAutoMemoContextRead(regionAst, ctx);
+		let listMayReadContext =
+			witnesses.size > 0 ||
+			containsAutoMemoContextRead(regionAst, ctx) ||
+			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {

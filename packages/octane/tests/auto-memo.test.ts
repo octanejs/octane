@@ -2124,6 +2124,189 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	const CONTEXT_READER = `import { useContext, useState } from 'octane';
+		 import { Theme } from './theme';
+		 export function Reader(props) @{
+			const theme = useContext(Theme);
+			<b>{(props.label + ':' + theme) as string}</b>
+		 }`;
+
+	// A component a tag names through a body binding is unknown to the cache
+	// over that body, so the same component must still see a Provider change.
+	it.each([
+		['a local', `function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }`],
+		['a destructured prop', `function Tag({ comp: C }) @{ <i><C label="tag" /></i> }`],
+		[
+			'a local at the body root',
+			`function Tag(props) @{ const C = props.comp; <C label="tag" /> }`,
+		],
+		[
+			'a local inside @if',
+			`function Tag(props) @{ const C = props.comp; <i>@if (C) { <C label="tag" /> }</i> }`,
+		],
+	])('refreshes a context consumer a cached callee renders through %s', (shape, tag) => {
+		const { App, Reader } = loadCompiledFixtureSource(
+			`${CONTEXT_READER}
+			 ${tag}
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Tag comp={props.comp} /></p></Theme>
+			 }`,
+			{
+				id: `auto-memo-bound-tag-${shape.replaceAll(' ', '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme: createContext('t0') } },
+			},
+		);
+		const root = mount(App, { comp: Reader, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('tag:t1');
+			root.update(App, { comp: Reader, theme: 't2' });
+			expect(root.find('b').textContent).toBe('tag:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('refreshes a context consumer an imported cached callee renders through a local tag', () => {
+		const tag = loadImportedModule(
+			`export function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }`,
+			'imported-bound-tag.tsrx',
+		);
+		const { App, Reader } = loadImportedModule(
+			`${CONTEXT_READER}
+			 import { Tag } from './tag';
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Tag comp={props.comp} /></p></Theme>
+			 }`,
+			'imported-bound-tag-parent.tsrx',
+			{ './tag': tag, './theme': { Theme: createContext('t0') } },
+		);
+		const root = mount(App, { comp: Reader, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('tag:t1');
+			root.update(App, { comp: Reader, theme: 't2' });
+			expect(root.find('b').textContent).toBe('tag:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// The hook keeps List itself uncached, so only its whole-list cache, or the
+	// row cache under an iterable the list cannot cache, skips the rows.
+	it.each([
+		[
+			'a row local tag',
+			'props.items',
+			'',
+			`const C = item.comp; <li><C label={item.label} /></li>`,
+		],
+		[
+			'a parent local tag',
+			'props.items',
+			'const C = props.comp;',
+			`<li><C label={item.label} /></li>`,
+		],
+		['a value hole', 'props.items', '', `<li>{item.content}</li>`],
+		[
+			'a parent local tag in uncached rows',
+			'props.items.filter(Boolean)',
+			'const C = props.comp;',
+			`<li><C label={item.label} /></li>`,
+		],
+	])(
+		'refreshes a context consumer cached list rows render through %s',
+		(shape, iterable, setup, row) => {
+			const { App, Reader } = loadCompiledFixtureSource(
+				`${CONTEXT_READER}
+			 function List(props) @{
+				const [count] = useState(0);
+				${setup}
+				<ul data-count={count as number}>
+					@for (const item of ${iterable}; key item.id) { ${row} }
+				</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><List comp={props.comp} items={props.items} /></Theme>
+			 }`,
+				{
+					id: `auto-memo-bound-row-${shape.replaceAll(' ', '-')}.tsrx`,
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './theme': { Theme: createContext('t0') } },
+				},
+			);
+			const items = [
+				{ id: 1, label: 'row', comp: Reader, content: createElement(Reader, { label: 'row' }) },
+			];
+			const root = mount(App, { comp: Reader, items, theme: 't1' });
+			try {
+				expect(root.find('b').textContent).toBe('row:t1');
+				root.update(App, { comp: Reader, items, theme: 't2' });
+				expect(root.find('b').textContent).toBe('row:t2');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('refreshes hydrated context consumers behind cached local tags', () => {
+		const source = `${CONTEXT_READER}
+			 function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }
+			 function List(props) @{
+				const [count] = useState(0);
+				<ul data-count={count as number}>
+					@for (const item of props.items; key item.id) {
+						const C = item.comp;
+						<li><C label={item.label} /></li>
+					}
+				</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}>
+					<p><Tag comp={props.comp} /></p>
+					<List items={props.items} />
+				</Theme>
+			 }`;
+		const id = 'auto-memo-bound-tag-hydration.tsrx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './theme': { Theme: ServerRuntime.createContext('t0') } },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './theme': { Theme: createContext('t0') } },
+		});
+		const props = (Reader: unknown, theme: string) => ({
+			comp: Reader,
+			items: [{ id: 1, label: 'row', comp: Reader }],
+			theme,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, props(server.Reader, 't1')).html;
+		const [tag, row] = Array.from(container.querySelectorAll('b'));
+		const clientProps = props(client.Reader, 't1');
+		const root = hydrateRoot(container, client.App, clientProps);
+		const adopted = () => {
+			const [nextTag, nextRow] = container.querySelectorAll('b');
+			expect(nextTag).toBe(tag);
+			expect(nextRow).toBe(row);
+		};
+		try {
+			adopted();
+			expect([tag.textContent, row.textContent]).toEqual(['tag:t1', 'row:t1']);
+			flushSync(() => root.render(client.App, { ...clientProps, theme: 't2' }));
+			adopted();
+			expect([tag.textContent, row.textContent]).toEqual(['tag:t2', 'row:t2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
