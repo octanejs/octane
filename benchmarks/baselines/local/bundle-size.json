@@ -236,13 +236,13 @@
           "samples": 1
         },
         "full_fw_gzip": {
-          "median": 174216,
-          "min": 174216,
+          "median": 174217,
+          "min": 174217,
           "samples": 1
         },
         "full_fw_brotli": {
-          "median": 146603,
-          "min": 146603,
+          "median": 146584,
+          "min": 146584,
           "samples": 1
         }
       },
@@ -379,13 +379,13 @@
           "samples": 1
         },
         "full_fw_gzip": {
-          "median": 174216,
-          "min": 174216,
+          "median": 174217,
+          "min": 174217,
           "samples": 1
         },
         "full_fw_brotli": {
-          "median": 146603,
-          "min": 146603,
+          "median": 146584,
+          "min": 146584,
           "samples": 1
         }
       },
