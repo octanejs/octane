@@ -4526,7 +4526,8 @@ export function ImportedTree(props) @{ 'use dom bindings';
 				imported.publish({ active: true, label: 'Early' });
 				const labels = [...importedButton.children];
 				const client = loadCompiledFixtureSource(importedParent, {
-					...importedOptions,
+					// A production Vite build reports the imported view's memo proof.
+					compileOptions: { dev, hmr: false, isCompilerMemoImport: () => true },
 					id: '/src/dom-presentation.tsrx',
 					mode: 'client',
 					runtimeModules: {

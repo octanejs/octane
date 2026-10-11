@@ -34371,8 +34371,13 @@ function makeCompCall(
 			maybeSingleRoot = callSiteOk;
 			// An imported body is opaque here. When its module published a
 			// definition-site proof, compilerMemoWitness reads it in place of the
-			// same-module summary; an import without one keeps the plain call.
-			if (ctx._universalRuntimeUnit == null && isCompilerMemoImport(ctx, compName)) {
+			// same-module summary; an import without one keeps the plain call. A
+			// presentation view keeps it too: hydration prepares only its own helpers.
+			if (
+				ctx._universalRuntimeUnit == null &&
+				ctx.presentationHydration == null &&
+				isCompilerMemoImport(ctx, compName)
+			) {
 				memoCallee = {
 					autoMemoSafe: true,
 					autoMemoCaptures: [],
