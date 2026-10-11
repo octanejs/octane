@@ -1928,7 +1928,10 @@ describe('Strong hookful lite edges', () => {
 		const log: string[] = [];
 		const transcript: string[] = [];
 		const first = resource('first');
-		const root = mount(client.App, { resource: first, log: log.push.bind(log) });
+		const root = mount<Record<string, unknown>>(client.App, {
+			resource: first,
+			log: log.push.bind(log),
+		});
 		const step = (label: string) => {
 			flushEffects();
 			const shown = root.findAll('p, button, i').map((el) => el.textContent);
@@ -2085,7 +2088,7 @@ describe('Strong hookful lite edges', () => {
 			).code;
 			const liteTags = (
 				code.match(/_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*(\w+),/g) ?? []
-			).map((call) => call.match(/(\w+),$/)![1]);
+			).map((call: string) => call.match(/(\w+),$/)![1]);
 			expect(liteTags).toEqual(mode === 'strong' ? ['Counter', 'Shell', 'Wrap', 'Leaf'] : ['Leaf']);
 
 			const load = (source: string, id: string, runtimeModules?: Record<string, any>) =>
