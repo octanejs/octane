@@ -15692,10 +15692,8 @@ interface CompilerMemoProof {
 	values: unknown[];
 	pass: number;
 	reading: boolean;
-	unproven: boolean;
 }
 let COMPILER_MEMO_PROOFS: WeakMap<Function, CompilerMemoProof> | null = null;
-// Every unproven answer is a fresh value, so a region over it always misses.
 let unprovenCompilerMemo = 0;
 // Counts re-entries into a proof that is still being read.
 let compilerMemoCycles = 0;
@@ -15714,15 +15712,14 @@ export function markCompilerMemo<T extends Function>(
 		values: [],
 		pass: -1,
 		reading: false,
-		unproven: false,
 	});
 	return component;
 }
 
 /**
- * One witness per cached region, outside its component/list work. It answers a
- * token that changes whenever the component's live inputs do, or a number for
- * an unproven component.
+ * One witness per cached region, outside its component/list work. An unproven
+ * component answers a value no earlier call returned, so every region over it,
+ * and every proof that reads its witness, misses.
  */
 export function compilerMemoWitness(component: any): unknown[] | Function | number {
 	if (typeof component !== 'function') return --unprovenCompilerMemo;
@@ -15734,12 +15731,11 @@ export function compilerMemoWitness(component: any): unknown[] | Function | numb
 	// A re-entry is a component cycle across modules: answer the committed
 	// token, while the outer read still compares every value the cycle reaches.
 	else if (proof.reading) compilerMemoCycles++;
-	return proof.unproven ? --unprovenCompilerMemo : proof.values;
+	return proof.values;
 }
 
 function readCompilerMemoProof(proof: CompilerMemoProof): void {
 	const cycles = compilerMemoCycles;
-	const unproven = unprovenCompilerMemo;
 	proof.pass = compilerMemoPass;
 	proof.reading = true;
 	let values: unknown[] | undefined;
@@ -15750,9 +15746,6 @@ function readCompilerMemoProof(proof: CompilerMemoProof): void {
 		// After a throw, or when the read saw an unfinished proof, read it again.
 		if (values === undefined || compilerMemoCycles !== cycles) proof.pass = -1;
 	}
-	// An unproven descendant leaves the whole subtree unproven.
-	proof.unproven = unprovenCompilerMemo !== unproven;
-	if (proof.unproven) return;
 	const previous = proof.values;
 	if (values.length !== previous.length) {
 		proof.values = values;

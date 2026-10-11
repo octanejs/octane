@@ -12,11 +12,6 @@ import { EffectImportRow } from './_fixtures/auto-memo-effect-row.tsrx';
 import { setEffectRowImports } from './_fixtures/auto-memo-effect-imports';
 import { AutoMemoCycleA } from './_fixtures/auto-memo-cycle-a.tsrx';
 import { setAutoMemoCycleValue } from './_fixtures/auto-memo-cycle-b.tsrx';
-import { AutoMemoSwapApp } from './_fixtures/auto-memo-imported-swap-parent.tsrx';
-import {
-	setAutoMemoSwapProven,
-	setAutoMemoSwapValue,
-} from './_fixtures/auto-memo-imported-swap.tsrx';
 import {
 	TsxAutoMemoApp,
 	TsxBoundMapApp,
@@ -1182,47 +1177,63 @@ describe('effectful component regions', () => {
 	});
 });
 
+// Every import is reported as proven, as a stale build fact would be: the
+// runtime witness must still keep each region correct.
 function loadImportedModule(source: string, id: string, runtimeModules?: Record<string, any>) {
 	return loadCompiledFixtureSource(source, {
 		id,
 		mode: 'client',
-		compileOptions: { hmr: false, dev: false },
+		compileOptions: { hmr: false, dev: false, isCompilerMemoImport: () => true },
 		runtimeModules,
 	});
 }
 
 describe('imported component regions', () => {
-	it('marks exported pure components and caches their imported call sites', () => {
-		const child = compile(
-			`import { useState } from 'octane';
+	it('admits imported regions only for exports that publish a proof', () => {
+		const card = `import { useState } from 'octane';
 			 import { Leaf } from './leaf';
 			 export function Card(props) @{ <div><Leaf label={props.label} /></div> }
 			 function Private(props) @{ <i>{props.label as string}</i> }
 			 export function Stateful() @{ const [count] = useState(0); <b>{count as number}</b> }
-			 export { Private };`,
-			'imported-memo-card.tsrx',
-			{ hmr: false, autoMemo: true },
-		).code;
-		// The proof witnesses the imported child it renders, live binding and proof.
-		expect(child).toMatch(/const Card = \/\* @__PURE__ \*\/ _\$markCompilerMemo\(/);
-		expect(child).toMatch(/\(\) => \[Leaf, _\$compilerMemoWitness\(Leaf\)\]/);
-		expect(child).toMatch(/const Private = \/\* @__PURE__ \*\/ _\$markCompilerMemo\(/);
-		expect(child).toMatch(/const Stateful = \/\* @__PURE__ \*\/ _\$__s\(/);
+			 export { Private as Item };`;
+		const compileCard = (leafProven: boolean) =>
+			compile(card, 'imported-memo-card.tsrx', {
+				hmr: false,
+				autoMemo: true,
+				isCompilerMemoImport: (request: string, imported: string) =>
+					leafProven && request === './leaf' && imported === 'Leaf',
+			});
+		const proven = compileCard(true);
+		// The proof witnesses the imported child it renders: live binding and proof.
+		expect(proven.code).toMatch(/\(\) => \[Leaf, _\$compilerMemoWitness\(Leaf\)\]/);
+		expect(proven.code).toMatch(/const Stateful = \/\* @__PURE__ \*\/ _\$__s\(/);
+		expect(proven.compilerMemoExports).toEqual(['Card', 'Item']);
+		// A proof over an import without one could never hold.
+		expect(compileCard(false).compilerMemoExports).toEqual(['Item']);
 
-		const parent = compile(
-			`import { Card } from './card';
-			 export function App(props) @{ <p data-tick={props.tick}><Card label={props.label} /></p> }`,
-			'imported-memo-parent.tsrx',
-			{ hmr: false, autoMemo: true },
-		).code;
-		expectCompilerRegion(parent);
-		expect(parent).toContain('_$compilerMemoWitness(Card)');
+		const parent = `import { Card } from './card';
+			 import { Stateful } from './stateful';
+			 export function App(props) @{
+				<p data-tick={props.tick}><Card label={props.label} /><Stateful label={props.label} /></p>
+			 }`;
+		const compileParent = (proofs: string[]) =>
+			compile(parent, 'imported-memo-parent.tsrx', {
+				hmr: false,
+				autoMemo: true,
+				isCompilerMemoImport: (request: string) => proofs.includes(request),
+			}).code;
+		const admitted = compileParent(['./card']);
+		expectCompilerRegion(admitted);
+		expect(admitted).toContain('_$compilerMemoWitness(Card)');
+		// An import without a published proof keeps its plain call.
+		expect(admitted).not.toContain('_$compilerMemoWitness(Stateful)');
+		expectNoCompilerRegion(compileParent([]));
 
 		const withChildren = compile(
 			`import { Card } from './card';
 			 export function App(props) @{ <p data-tick={props.tick}><Card label={props.label}><b /></Card></p> }`,
 			'imported-memo-children.tsrx',
-			{ hmr: false, autoMemo: true },
+			{ hmr: false, autoMemo: true, isCompilerMemoImport: () => true },
 		).code;
 		expectNoCompilerRegion(withChildren);
 	});
@@ -1296,30 +1307,6 @@ describe('imported component regions', () => {
 			expect(root.find('b').textContent).toBe('x:t2');
 		} finally {
 			root.unmount();
-		}
-	});
-
-	it('follows a live component binding between proven and unproven components', () => {
-		setAutoMemoSwapProven(true);
-		setAutoMemoSwapValue('v0');
-		const root = mount(AutoMemoSwapApp, { label: 'x', tick: 0 });
-		try {
-			expect(root.find('i').textContent).toBe('proven:x');
-			setAutoMemoSwapProven(false);
-			root.update(AutoMemoSwapApp, { label: 'x', tick: 1 });
-			expect(root.find('i').textContent).toBe('unproven:x:v0');
-			setAutoMemoSwapValue('v1');
-			root.update(AutoMemoSwapApp, { label: 'x', tick: 2 });
-			expect(root.find('i').textContent).toBe('unproven:x:v1');
-			setAutoMemoSwapProven(true);
-			root.update(AutoMemoSwapApp, { label: 'x', tick: 3 });
-			expect(root.find('i').textContent).toBe('proven:x');
-			root.update(AutoMemoSwapApp, { label: 'y', tick: 4 });
-			expect(root.find('i').textContent).toBe('proven:y');
-		} finally {
-			root.unmount();
-			setAutoMemoSwapProven(true);
-			setAutoMemoSwapValue('v0');
 		}
 	});
 

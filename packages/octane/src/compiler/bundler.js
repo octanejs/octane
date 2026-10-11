@@ -1671,6 +1671,9 @@ class OctaneBundlerCompiler {
 				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
 					? { isVoidComponentImport: options.isVoidComponentImport }
 					: null),
+				...(environment === 'client' && typeof options.isCompilerMemoImport === 'function'
+					? { isCompilerMemoImport: options.isCompilerMemoImport }
+					: null),
 				...(typeof options.isDescriptorChildrenImport === 'function'
 					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }
 					: null),
@@ -1718,6 +1721,9 @@ class OctaneBundlerCompiler {
 					: {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
+				...(out.compilerMemoExports === undefined
+					? null
+					: { compilerMemoExports: out.compilerMemoExports }),
 				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
 				...(independentWidgets === undefined ? null : { independentWidgets }),
 				descriptorChildrenExports:
