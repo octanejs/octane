@@ -1,5 +1,13 @@
 # octane
 
+## 0.13.1
+
+### Patch Changes
+
+- 7d6f6c0: Let applications that deliver streamed signal frames directly omit unused receiver-attachment code from their bundles.
+- efe12e3: Vendor the Alien Signals dependency graph and move internal signal feature helpers out of classes so unused feature code can be removed from application bundles.
+- 4bc1eaa: Stop server-rendered `<ViewTransition>` from wrapping `.tsx` element children in an extra hydration range, which made every such boundary mismatch on hydration and regenerate on the client.
+
 ## 0.13.0
 
 ### Minor Changes
