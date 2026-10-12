@@ -41,6 +41,23 @@ function deferred<T>(): Deferred<T> {
 	return { promise, resolve, reject };
 }
 
+// An external store whose listeners are notified directly, outside any event.
+function toggleStore() {
+	let on = true;
+	const listeners = new Set<() => void>();
+	return {
+		read: () => on,
+		subscribe(listener: () => void) {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+		turnOff() {
+			on = false;
+			for (const listener of listeners) listener();
+		},
+	};
+}
+
 function resourceReader<T>(promise: Promise<T>, wakeable: PromiseLike<T> = promise): () => T {
 	let result:
 		| { status: 'pending' }
@@ -420,15 +437,7 @@ describe('Suspense — React conformance', () => {
 	])(
 		'replays a shifted use() call with its own promise when %s changes in the resume task',
 		async (_, viaProps) => {
-			let on = true;
-			const listeners = new Set<() => void>();
-			const toggle = {
-				read: () => on,
-				subscribe(listener: () => void) {
-					listeners.add(listener);
-					return () => listeners.delete(listener);
-				},
-			};
+			const toggle = toggleStore();
 			const x = deferred<string>();
 			const y = deferred<string>();
 			const props = { first: x.promise, second: y.promise, toggle, viaProps };
@@ -447,8 +456,7 @@ describe('Suspense — React conformance', () => {
 			// where the suspended attempt stored the first promise.
 			await act(async () => {
 				y2.resolve('y2');
-				on = false;
-				for (const listener of listeners) listener();
+				toggle.turnOff();
 			});
 			expect(r.find('i').textContent).toBe('off/y2');
 			r.unmount();
@@ -457,15 +465,7 @@ describe('Suspense — React conformance', () => {
 
 	it('still reuses an unchanged sibling stored promise after an updated Block replays', async () => {
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-		let on = true;
-		const listeners = new Set<() => void>();
-		const toggle = {
-			read: () => on,
-			subscribe(listener: () => void) {
-				listeners.add(listener);
-				return () => listeners.delete(listener);
-			},
-		};
+		const toggle = toggleStore();
 		// After its first read, every read mints a promise that never settles.
 		const fresh = (first: Promise<string>) => {
 			let reads = 0;
@@ -490,8 +490,7 @@ describe('Suspense — React conformance', () => {
 			// fresh promise and must keep the one its suspended attempt stored.
 			await act(async () => {
 				next.resolve('two');
-				on = false;
-				for (const listener of listeners) listener();
+				toggle.turnOff();
 			});
 			expect(r.find('i').textContent).toBe('off');
 			expect(r.find('b').textContent).toBe('two');

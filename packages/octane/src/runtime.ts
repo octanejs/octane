@@ -12880,11 +12880,6 @@ function renderBlockInner(block: Block): true | undefined {
 	(block as any).__warmEpisode = CURRENT_WARM_EPISODE;
 	EFFECT_EVENT_RENDER_TARGET = effectEventTarget;
 	EFFECT_EVENT_ACTION_TARGET = effectEventActionTarget;
-	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
-	// gets re-rendered here; a block reached as a descendant of some OTHER queued
-	// block's cascade is also brought up to date here, so flush() can skip its
-	// redundant standalone render (it checks `pending` before rendering). Cleared
-	// at the TOP so a re-entrant setState during this render re-queues correctly.
 	// A Suspense replay that reaches a Block with an update queued since the
 	// suspended attempt renders new inputs: that update, and the props it passes
 	// down. Render the subtree as the ordinary update the scheduler would have run
@@ -12894,6 +12889,11 @@ function renderBlockInner(block: Block): true | undefined {
 	// leaves the update queued, so it still replays.
 	const replayUpdate = RESUME_REPLAY && block.pending && urgentTransitionRender === null;
 	if (replayUpdate) RESUME_REPLAY = false;
+	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
+	// gets re-rendered here; a block reached as a descendant of some OTHER queued
+	// block's cascade is also brought up to date here, so flush() can skip its
+	// redundant standalone render (it checks `pending` before rendering). Cleared
+	// at the TOP so a re-entrant setState during this render re-queues correctly.
 	block.pending = false;
 	block.crossRenderUpdate = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
