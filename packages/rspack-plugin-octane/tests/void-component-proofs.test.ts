@@ -111,7 +111,7 @@ async function build(root: string, options: VoidBuildOptions = {}) {
 	return { directory, sources };
 }
 
-function render(directory: string, entry: 'render' | 'renderValue' = 'render') {
+function render(directory: string, entry: 'render' | 'renderValue' = 'render', markers = false) {
 	const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
 		runScripts: 'outside-only',
 		url: 'https://fixture.test/',
@@ -122,7 +122,7 @@ function render(directory: string, entry: 'render' | 'renderValue' = 'render') {
 		const container = dom.window.document.getElementById('root')!;
 		const unmount = api[entry](container);
 		// Marker comments vary with how each call is lowered, not with the output.
-		const html = container.innerHTML.replace(/<!--.*?-->/g, '');
+		const html = markers ? container.innerHTML : container.innerHTML.replace(/<!--.*?-->/g, '');
 		unmount();
 		return html;
 	} finally {
@@ -372,6 +372,35 @@ describe.each(parallelModes)('imported lite components on %s', (_name, parallel)
 				'<em><span>Ping</span><em><span>Pong</span><em><span>Ping</span></em></em></em>' +
 				'<s>b0</s><u>b</u></p>',
 		);
+	}, 60_000);
+
+	it('drops the anchor of a lite call only when its module proves the root holds position', async () => {
+		const root = createFixture({
+			'Leaf.tsrx': `export function Leaf(props) @{ <b>{props.label as string}</b> }`,
+			'Maybe.tsrx': `export function Maybe(props) @{ @if (props.tick > 0) { <q>{'on'}</q> } }`,
+			'App.tsrx': `import { Leaf } from './Leaf.tsrx';
+import { Maybe } from './Maybe.tsrx';
+export function App(props) @{
+	<main>
+		<p><Leaf label={props.label} /><Leaf label="tail" /></p>
+		<div><Maybe tick={props.tick} /><Leaf label="tail" /></div>
+	</main>
+}`,
+			'entry.ts': TICK_ENTRY,
+		});
+		roots.push(root);
+		const { directory, sources } = await build(root, { parallel });
+		expect(sources.get('App.tsrx')).toMatch(call('componentSlotLite', 'Maybe'));
+		const html = render(directory, 'render', true);
+		const anchored = (selector: string) =>
+			[...JSDOM.fragment(html).querySelector(selector)!.childNodes].some(
+				(node) => node.nodeType === 8,
+			);
+		// Maybe mounts empty, so its later content needs its anchor to land first.
+		expect(html.replace(/<!--.*?-->/g, '')).toBe(
+			'<main><p><b>b</b><b>tail</b></p><div><q>on</q><b>tail</b></div></main>',
+		);
+		expect([anchored('p'), anchored('div')]).toEqual([false, true]);
 	}, 60_000);
 
 	it('rebuilds an importer generically when a lite export it consumed loses its proof', async () => {
