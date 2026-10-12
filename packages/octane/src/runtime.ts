@@ -653,6 +653,8 @@ interface ChildScope {
 	// lookup, and the key is only an identity tag — unmount walks `children` directly).
 	key: symbol | string | number;
 	scope: Scope;
+	/** The parent's `_slots` length at registration: walks visit it before that slot. */
+	at: number;
 }
 
 /**
@@ -13636,7 +13638,11 @@ export function componentSlotLite<P>(
 		}
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
-		(parentScope.children ??= []).push({ key: slotKey, scope });
+		(parentScope.children ??= []).push({
+			key: slotKey,
+			scope,
+			at: parentScope._slots === null ? 0 : parentScope._slots.length,
+		});
 		if (unframed !== undefined) {
 			mountUnframedLite(
 				hydration!,
@@ -13668,6 +13674,12 @@ export function componentSlotLite<P>(
 	}
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
+	// A Strong hookful body keeps its effects on this Scope. Count the call sites
+	// it reaches apart from the owning Block's, as renderBlockInner does per
+	// Block, so finishEffectRender retires exactly the ones this render skipped.
+	const effectReached = CURRENT_EFFECT_REACHED;
+	CURRENT_EFFECT_REACHED = 0;
+	if (scope.effectSlots !== null) ensureEffectRenderVersion();
 	CURRENT_SCOPE = scope;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(scope, comp);
@@ -13697,6 +13709,7 @@ export function componentSlotLite<P>(
 		} else comp(props, scope, undefined);
 		if (hydration !== null) hydration.settleUnclaimed(scope);
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
+		if (scope.effectSlots !== null) finishEffectRender(scope);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
@@ -13710,6 +13723,7 @@ export function componentSlotLite<P>(
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		if (ACTIVE_WARM_PLANS.length !== warmPlanCheckpoint)
 			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		CURRENT_EFFECT_REACHED = effectReached;
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
@@ -14026,6 +14040,9 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	if (effects !== null) {
 		for (let i = 0; i < effects.length; i++) {
 			const slot = effects[i];
+			// Retire this call site's queued entries. The drains skip a disposed
+			// Block's, but a lite Scope's stand-in is never disposed.
+			slot.revision++;
 			const cleanup = slot.cleanup;
 			if (cleanup === undefined) continue;
 			slot.cleanup = undefined;
@@ -14148,18 +14165,22 @@ function unmountScopeChildrenAndSlots(
 // component's hook-owned subscriptions while fully deleting rendered children.
 // Ordinary unmount still calls both halves above in the established order.
 function unmountScopeChildrenAndSlotsOnly(scope: Scope, detachDom: boolean): void {
-	// Then recurse into child scopes (parent → child order).
+	// Then recurse into child scopes and slot-stashed child Blocks (ifBlock /
+	// forBlock / componentSlot / portal), parent → child, siblings in the order
+	// they registered (ChildScope.at), so their teardown follows the tree.
 	const children = scope.children;
-	if (children !== null)
-		for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
-	// Walk slot-stashed child Blocks (ifBlock / forBlock / componentSlot / portal).
 	const slots = scope._slots;
+	let c = 0;
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
-			const val = slots[i];
-			unmountSlot(val, detachDom);
+			if (children !== null)
+				for (; c < children.length && children[c].at <= i; c++)
+					unmountScope(children[c].scope, detachDom);
+			unmountSlot(slots[i], detachDom);
 		}
 	}
+	if (children !== null)
+		for (; c < children.length; c++) unmountScope(children[c].scope, detachDom);
 }
 
 function unmountSlot(val: any, detachDom: boolean): void {
@@ -36757,7 +36778,11 @@ export function hostComponent(
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
 		const childScope = new ScopeImpl(scope, block);
 		state.childScope = childScope;
-		(scope.children ??= []).push({ key: slot, scope: childScope });
+		(scope.children ??= []).push({
+			key: slot,
+			scope: childScope,
+			at: scope._slots === null ? 0 : scope._slots.length,
+		});
 		domNode(block.parentNode).insertBefore(el, anchor ?? block.endMarker);
 		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
 	}
@@ -47676,11 +47701,14 @@ function forEachSubtreeChild(
 	visit: (child: Scope) => void,
 	includeHiddenTry: boolean = true,
 ): void {
+	// Child scopes interleave with the slots by ChildScope.at, as unmount walks.
 	const children = scope.children;
-	if (children !== null) for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
 	const slots = scope._slots;
+	let c = 0;
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
+			if (children !== null)
+				for (; c < children.length && children[c].at <= i; c++) visit(children[c].scope);
 			const val = slots[i];
 			if (val.__kind === 'forBlockSlot') {
 				for (let b: Block | null = val.head; b !== null; b = b.nextSibling) visit(b);
@@ -47707,6 +47735,7 @@ function forEachSubtreeChild(
 			} else if (val.lite != null) visit(val.lite);
 		}
 	}
+	if (children !== null) for (; c < children.length; c++) visit(children[c].scope);
 }
 
 // Detach every host ref in a subtree (object refs → null, callback refs called with

@@ -142,6 +142,28 @@ describe('production Vite void-component proofs across import cycles', { timeout
 		expect(run(chunks[0])).toEqual({ text: 'ABC', empty: true });
 	});
 
+	it('proves a Strong hookful export lite only for Strong importers', async () => {
+		const importer = (name: string, strong: boolean) =>
+			(strong ? '"use strong";\n' : '') +
+			`import B from './B.tsrx';\n` +
+			`export default function ${name}() @{ <main><span>${name}</span><B /></main> }\n`;
+		const counter =
+			'"use strong";\nimport { useState } from \'octane\';\n' +
+			'export default function B() @{\n' +
+			'\tconst [count, setCount] = useState(1);\n' +
+			"\t<b onClick={() => setCount(count + 1)}>{('B' + count) as string}</b>\n}\n";
+		for (const strong of [true, false]) {
+			const root = fixture({
+				'B.tsrx': counter,
+				'A.tsrx': importer('A', strong),
+				'entry.ts': ENTRY('A'),
+			});
+			const { compiled, chunks } = await buildFixture(root, ['entry.ts']);
+			expect(compiled['A.tsrx'].includes('componentSlotLite(')).toBe(strong);
+			expect(run(chunks[0])).toEqual({ text: 'AB1', empty: true });
+		}
+	});
+
 	it('drops the anchor of a lite call only when its module proves the root holds position', async () => {
 		const root = fixture({
 			'Leaf.tsrx': `export default function Leaf({ label }) @{ <b>{label as string}</b> }`,
