@@ -1,6 +1,14 @@
 // @ts-check
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
+
+/**
+ * A production client entry embeds this until every chunk is rendered. It has
+ * the length of the content id `seal` returns, so the swap moves no mappings.
+ */
+export const PENDING_CLIENT_BUILD_ID = '__octane_pending_client_build_id__'.padEnd(43, '_');
+// Rolldown labels rendered modules with cwd-relative paths that minifying drops.
+const REGION_COMMENT = /^\/\/#(?:end)?region\b.*$/gm;
 
 /**
  * One identity per actual Vite client generation. Discovery is replaceable per
@@ -9,6 +17,7 @@ import path from 'node:path';
  * @param {(buildId: string) => void} [onIncompatibleDiscovery]
  */
 export function createClientBuildState(onIncompatibleDiscovery) {
+	/** @type {string} */
 	let buildId = randomUUID();
 	let hadHotUpdates = false;
 	/** @type {Map<string, Map<string, { moduleId: string, styles: string[] }>>} */
@@ -22,7 +31,7 @@ export function createClientBuildState(onIncompatibleDiscovery) {
 			return sources.size !== 0 || signalSources.size !== 0;
 		},
 		begin() {
-			buildId = randomUUID();
+			buildId = PENDING_CLIENT_BUILD_ID;
 			hadHotUpdates = false;
 			sources.clear();
 			signalSources.clear();
@@ -36,6 +45,25 @@ export function createClientBuildState(onIncompatibleDiscovery) {
 		},
 		noteHotUpdate() {
 			hadHotUpdates = true;
+		},
+		/**
+		 * Name a production generation by its rendered client graph, so identical
+		 * inputs reproduce identical output. Rolldown hashes file names after
+		 * renderChunk, so the entries that embed this id are named by it too.
+		 * @param {Record<string, import('vite').Rollup.RenderedChunk>} chunks
+		 */
+		seal(chunks) {
+			if (buildId !== PENDING_CLIENT_BUILD_ID) return buildId;
+			const graph = Object.keys(chunks)
+				.sort()
+				.map((file) => [
+					file,
+					Object.values(chunks[file].modules).map((module) =>
+						module.code?.replace(REGION_COMMENT, ''),
+					),
+				]);
+			buildId = createHash('sha256').update(JSON.stringify(graph)).digest('base64url');
+			return buildId;
 		},
 		/** @param {string} root @param {string} id @param {any[]} templates @param {boolean} [streamedSignals] */
 		record(root, id, templates, streamedSignals = false) {
