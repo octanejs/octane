@@ -146,6 +146,15 @@ function voidImportKey(request, imported) {
 	return `${request}\0${imported}`;
 }
 
+// A relative request never starts with these prefixes, so the keys cannot collide.
+function liteImportKey(request, imported) {
+	return `lite\0${request}\0${imported}`;
+}
+
+function anchorlessImportKey(request, imported) {
+	return `anchorless\0${request}\0${imported}`;
+}
+
 function compiledCodeFingerprint(code) {
 	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
 }
@@ -476,6 +485,10 @@ async function loadImportMetadata(
 			for (const { imported, exported } of candidates) {
 				if (!metadata.exports.includes(imported)) continue;
 				proven.add(voidImportKey(request, imported));
+				if (Array.isArray(metadata.lite) && metadata.lite.includes(imported))
+					proven.add(liteImportKey(request, imported));
+				if (Array.isArray(metadata.anchorless) && metadata.anchorless.includes(imported))
+					proven.add(anchorlessImportKey(request, imported));
 				if (exported !== undefined) proven.add(`export\0${exported}`);
 			}
 		}),
@@ -1308,10 +1321,21 @@ export function octane(options = {}) {
 					// so only it pays for the reprint-tolerant structural fingerprint.
 					const structure =
 						voidExports.length === 0 ? null : structuralCodeFingerprint(this, result.code);
+					// Lite exports are void exports whose bodies an importer may also run
+					// without a Block, and anchorless ones are lite exports whose calls also
+					// need no anchor. The same fingerprint vouches for every list.
+					const lite = (result.liteComponentExports ?? []).filter((name) =>
+						voidExports.includes(name),
+					);
+					const anchorless = (result.anchorlessComponentExports ?? []).filter((name) =>
+						lite.includes(name),
+					);
 					meta[VOID_EXPORTS_META] = {
 						exports: voidExports,
 						fingerprint: compiledCodeFingerprint(result.code),
 						...(structure === null ? null : { structure }),
+						...(lite.length === 0 ? null : { lite }),
+						...(anchorless.length === 0 ? null : { anchorless }),
 					};
 				}
 				// A hint, not a proof: the importer's region still reads the runtime
@@ -1376,6 +1400,18 @@ export function octane(options = {}) {
 						? {
 								isVoidComponentImport: (request, imported) =>
 									proven.has(voidImportKey(request, imported)),
+								isLiteComponentImport: (request, imported) =>
+									proven.has(liteImportKey(request, imported)),
+								isAnchorlessComponentImport: (request, imported) =>
+									proven.has(anchorlessImportKey(request, imported)),
+							}
+						: {}),
+					// Production client output always answers this, so a component over
+					// an import without a proof publishes none of its own.
+					...(specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
+						? {
+								isCompilerMemoImport: (request, imported) =>
+									memoProven?.has(voidImportKey(request, imported)) === true,
 							}
 						: {}),
 					// Production client output always answers this, so a component over

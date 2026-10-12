@@ -111,7 +111,7 @@ async function build(root: string, options: VoidBuildOptions = {}) {
 	return { directory, sources };
 }
 
-function render(directory: string, entry: 'render' | 'renderValue' = 'render') {
+function render(directory: string, entry: 'render' | 'renderValue' = 'render', markers = false) {
 	const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
 		runScripts: 'outside-only',
 		url: 'https://fixture.test/',
@@ -121,7 +121,8 @@ function render(directory: string, entry: 'render' | 'renderValue' = 'render') {
 		const api = (dom.window as unknown as { voidFixture: Record<string, any> }).voidFixture;
 		const container = dom.window.document.getElementById('root')!;
 		const unmount = api[entry](container);
-		const html = container.innerHTML;
+		// Marker comments vary with how each call is lowered, not with the output.
+		const html = markers ? container.innerHTML : container.innerHTML.replace(/<!--.*?-->/g, '');
 		unmount();
 		return html;
 	} finally {
@@ -129,7 +130,9 @@ function render(directory: string, entry: 'render' | 'renderValue' = 'render') {
 	}
 }
 
-function expectSpecialized(sources: Sources) {
+// A proven call to Greeting, a hookless void export, also runs through a lite
+// edge while only Octane's own pipeline produced Greeting's final code.
+function expectSpecialized(sources: Sources, greetingCall = 'componentSlotLite(') {
 	// Both roots omit options; only App has the complete void-return proof.
 	const entry = sources.get('entry.ts');
 	expect(entry).toContain(
@@ -142,9 +145,11 @@ function expectSpecialized(sources: Sources) {
 		/function renderValue\(container\) \{\s+var root = _\$createRootDefaultOptions\(container\);/,
 	);
 	// Greeting's call drops its (absent) return; Value's keeps reconciliation.
-	expect(sources.get('App.tsrx')).toContain('componentSlotVoid');
+	expect(sources.get('App.tsrx')).toContain(greetingCall);
 	expect(sources.get('App.tsrx')).toMatch(/\bcomponentSlot\b/);
 }
+
+const SPECIALIZED_CALL = /componentSlot(?:Void|Lite)\(/;
 
 function expectGeneric(sources: Sources) {
 	const entry = sources.get('entry.ts');
@@ -153,7 +158,7 @@ function expectGeneric(sources: Sources) {
 	);
 	expect(entry).toContain('_$createRootDefaultOptions(container)');
 	expect(entry).not.toContain('__createVoidRoot');
-	expect(sources.get('App.tsrx')).not.toContain('componentSlotVoid');
+	expect(sources.get('App.tsrx')).not.toMatch(SPECIALIZED_CALL);
 }
 
 /** A post-order loader over the named fixture module, applied after SWC. */
@@ -189,7 +194,10 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		const rules = [postLoader(root, /Greeting\.tsrx$/, `return '// reprinted\\n' + source;`)];
 		const { directory, sources } = await build(root, { parallel, rules });
 		expect(sources.get('Greeting.tsrx')).toMatch(/^\/\/ reprinted/);
-		expectSpecialized(sources);
+		// The void proof re-proves the reprinted export, but a later loader could
+		// also have added a hook, so the call keeps its Block.
+		expectSpecialized(sources, 'componentSlotVoid(');
+		expect(sources.get('App.tsrx')).not.toContain('componentSlotLite(');
 		expect(render(directory)).toBe(EXPECTED_HTML);
 	}, 60_000);
 
@@ -199,7 +207,7 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		const rules = [postLoader(root, /Greeting\.tsrx$/, `return source + '\\nGreeting = Loud;';`)];
 		const { directory, sources } = await build(root, { parallel, rules });
 		expect(render(directory)).toBe('<main><p>loud</p><b>value</b></main>');
-		expect(sources.get('App.tsrx')).not.toContain('componentSlotVoid');
+		expect(sources.get('App.tsrx')).not.toMatch(SPECIALIZED_CALL);
 	}, 60_000);
 
 	it('rebuilds a root generically when a later loader changes a provider rebuilt with it', async () => {
@@ -220,7 +228,7 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		);
 		expect(entry).not.toContain('__createVoidRoot');
 		// App's own proven call is unaffected.
-		expect(sources.get('App.tsrx')).toContain('componentSlotVoid');
+		expect(sources.get('App.tsrx')).toContain('componentSlotLite(');
 	}, 60_000);
 
 	it('rebuilds an importer generically when a later loader rebinds a proven import', async () => {
@@ -236,11 +244,23 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		const { directory, sources } = await build(root, { parallel, rules });
 		expect(render(directory)).toBe('<main><p>loud</p><b>value</b></main>');
 		expect(sources.get('App.tsrx')).toContain('Loud as Greeting');
-		expect(sources.get('App.tsrx')).not.toContain('componentSlotVoid');
+		expect(sources.get('App.tsrx')).not.toMatch(SPECIALIZED_CALL);
 		// The unrelated entry root keeps its proof of App.
 		expect(sources.get('entry.ts')).toContain('__createVoidRoot');
 	}, 60_000);
 });
+
+// An equal-prop tick, then a changed label through the cached edges.
+const TICK_ENTRY = `/** @jsxImportSource octane */
+import { createRoot, flushSync } from 'octane';
+import { App } from './App.tsrx';
+export function render(container: HTMLElement) {
+	const root = createRoot(container);
+	for (const props of [{ label: 'a', tick: 0 }, { label: 'a', tick: 1 }, { label: 'b', tick: 2 }]) {
+		flushSync(() => root.render(App, props));
+	}
+	return () => root.unmount();
+}`;
 
 // Card renders an imported Leaf, so it publishes its memo proof only after a
 // rebuild over Leaf's hint, and App admits a region at Card only a round later.
@@ -259,17 +279,7 @@ import { Stateful } from './Stateful.tsrx';
 export function App(props) @{
 	<p data-tick={props.tick}><Card label={props.label} /><Stateful label={props.label} /></p>
 }`,
-		'entry.ts': `/** @jsxImportSource octane */
-import { createRoot, flushSync } from 'octane';
-import { App } from './App.tsrx';
-export function render(container: HTMLElement) {
-	const root = createRoot(container);
-	// An equal-prop tick, then a changed label through the cached edges.
-	for (const props of [{ label: 'a', tick: 0 }, { label: 'a', tick: 1 }, { label: 'b', tick: 2 }]) {
-		flushSync(() => root.render(App, props));
-	}
-	return () => root.unmount();
-}`,
+		'entry.ts': TICK_ENTRY,
 	});
 	roots.push(root);
 	return root;
@@ -289,6 +299,133 @@ describe.each(parallelModes)('imported compiler memo hints on %s', (_name, paral
 		expect(app).toContain('var __memoComponent = _$compilerMemoWitness(Card);');
 		expect(app).not.toContain('compilerMemoWitness(Stateful)');
 		expect(render(directory)).toBe(MEMO_HTML);
+	}, 60_000);
+});
+
+// C, B and A form a hookless chain, so each publishes its lite export one
+// rebuild round after the module below it. Ping and Pong render each other, so
+// neither proof can rest on the other. Counter owns state and Label reads
+// natively; neither is a lite export at all.
+function liteFixture() {
+	const cycle = (name: string, next: string) => `import { ${next} } from './${next}.tsrx';
+export function ${name}(props) @{
+	<em><span>{'${name}'}</span>@if (props.depth > 0) { <${next} depth={props.depth - 1} /> }</em>
+}`;
+	const root = createFixture({
+		'C.tsrx': `export function C(props) @{ <b>{props.label as string}</b> }`,
+		'B.tsrx': `import { C } from './C.tsrx';
+export function B(props) @{ <span><C label={props.label} /></span> }`,
+		'A.tsrx': `import { B } from './B.tsrx';
+export function A(props) @{ <i><B label={props.label} /></i> }`,
+		'Ping.tsrx': cycle('Ping', 'Pong'),
+		'Pong.tsrx': cycle('Pong', 'Ping'),
+		'Counter.tsrx': `import { useState } from 'octane';
+export function Counter(props) @{
+	const [count] = useState(0);
+	<s>{(props.label + count) as string}</s>
+}`,
+		'Label.tsrx': `import 'octane/signals';
+export function Label(props) @{ <u>{props.label as string}</u> }`,
+		'App.tsrx': `import { A } from './A.tsrx';
+import { Counter } from './Counter.tsrx';
+import { Label } from './Label.tsrx';
+import { Ping } from './Ping.tsrx';
+export function App(props) @{
+	<p data-tick={props.tick}>
+		<A label={props.label} />
+		<Ping depth={2} />
+		<Counter label={props.label} />
+		<Label label={props.label} />
+	</p>
+}`,
+		'entry.ts': TICK_ENTRY,
+	});
+	roots.push(root);
+	return root;
+}
+
+/** A call to `component` through the named slot helper. */
+function call(helper: string, component: string) {
+	return new RegExp(`\\b${helper}\\([^;]*, ${component},`);
+}
+
+describe.each(parallelModes)('imported lite components on %s', (_name, parallel) => {
+	it('runs a hookless chain through lite edges and keeps other imports on Blocks', async () => {
+		const root = liteFixture();
+		const { directory, sources } = await build(root, { parallel });
+		expect(sources.get('B.tsrx')).toMatch(call('componentSlotLite', 'C'));
+		expect(sources.get('A.tsrx')).toMatch(call('componentSlotLite', 'B'));
+		expect(sources.get('App.tsrx')).toMatch(call('componentSlotLite', 'A'));
+		for (const [importer, component] of [
+			['App', 'Ping'],
+			['Ping', 'Pong'],
+			['Pong', 'Ping'],
+			['App', 'Counter'],
+			['App', 'Label'],
+		]) {
+			const code = sources.get(`${importer}.tsrx`);
+			expect(code).toMatch(call('componentSlotVoid', component));
+			expect(code).not.toMatch(call('componentSlotLite', component));
+		}
+		expect(render(directory)).toBe(
+			'<p data-tick="2"><i><span><b>b</b></span></i>' +
+				'<em><span>Ping</span><em><span>Pong</span><em><span>Ping</span></em></em></em>' +
+				'<s>b0</s><u>b</u></p>',
+		);
+	}, 60_000);
+
+	it('drops the anchor of a lite call only when its module proves the root holds position', async () => {
+		const root = createFixture({
+			'Leaf.tsrx': `export function Leaf(props) @{ <b>{props.label as string}</b> }`,
+			'Maybe.tsrx': `export function Maybe(props) @{ @if (props.tick > 0) { <q>{'on'}</q> } }`,
+			'App.tsrx': `import { Leaf } from './Leaf.tsrx';
+import { Maybe } from './Maybe.tsrx';
+export function App(props) @{
+	<main>
+		<p><Leaf label={props.label} /><Leaf label="tail" /></p>
+		<div><Maybe tick={props.tick} /><Leaf label="tail" /></div>
+	</main>
+}`,
+			'entry.ts': TICK_ENTRY,
+		});
+		roots.push(root);
+		const { directory, sources } = await build(root, { parallel });
+		expect(sources.get('App.tsrx')).toMatch(call('componentSlotLite', 'Maybe'));
+		const html = render(directory, 'render', true);
+		const anchored = (selector: string) =>
+			[...JSDOM.fragment(html).querySelector(selector)!.childNodes].some(
+				(node) => node.nodeType === 8,
+			);
+		// Maybe mounts empty, so its later content needs its anchor to land first.
+		expect(html.replace(/<!--.*?-->/g, '')).toBe(
+			'<main><p><b>b</b><b>tail</b></p><div><q>on</q><b>tail</b></div></main>',
+		);
+		expect([anchored('p'), anchored('div')]).toEqual([false, true]);
+	}, 60_000);
+
+	it('rebuilds an importer generically when a lite export it consumed loses its proof', async () => {
+		const root = createFixture({
+			'Leaf.tsrx': `export function Leaf() @{ <b>{'leaf'}</b> }`,
+			'Shell.tsrx': `import { Leaf } from './Leaf.tsrx';
+export function Shell() @{ <s><Leaf /></s> }
+export function Loud() { return <q>loud</q>; }`,
+			'Mid.tsrx': `import { Leaf } from './Leaf.tsrx';
+import { Shell } from './Shell.tsrx';
+export function Mid() @{ <i><Leaf /></i> }
+export function Box() @{ <u><Shell /></u> }`,
+			'App.tsrx': `import { Mid } from './Mid.tsrx';
+export function App() @{ <p><Mid /></p> }`,
+			'entry.ts': TICK_ENTRY,
+		});
+		roots.push(root);
+		// Mid proves Mid lite over Leaf, and App consumes that a round later. Shell
+		// is proven only after its own rebuild, where it no longer holds, so Mid is
+		// rebuilt without proofs and withdraws the lite export App consumed.
+		const rules = [postLoader(root, /Shell\.tsrx$/, `return source + '\\nShell = Loud;';`)];
+		const { directory, sources } = await build(root, { parallel, rules });
+		expect(sources.get('Mid.tsrx')).not.toMatch(SPECIALIZED_CALL);
+		expect(sources.get('App.tsrx')).not.toMatch(SPECIALIZED_CALL);
+		expect(render(directory)).toBe('<p><i><b>leaf</b></i></p>');
 	}, 60_000);
 });
 
