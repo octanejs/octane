@@ -5667,7 +5667,9 @@ function rendersOpaqueChild(root, locals, ctx) {
 			node.type === 'FunctionDeclaration';
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(node[key], key === 'children', inner);
+			// A `@switch` case holds its output hole directly, not under `children`.
+			const hole = key === 'children' || (key === 'consequent' && node.type === 'SwitchCase');
+			walk(node[key], hole, inner);
 		}
 	}
 	walk(root, false, false);

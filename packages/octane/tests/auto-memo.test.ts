@@ -2206,6 +2206,10 @@ describe('compiler-owned component-region memoization', () => {
 			'a returned prop value',
 			`function Tag(props) { if (props.content) return props.content; return <i>{'off'}</i>; }`,
 		],
+		[
+			'a @switch case hole',
+			`function Tag(props) @{ <i>@switch (props.content ? 'shown' : 'hidden') { @case 'shown': { {props.content} } @default: { <s /> } }</i> }`,
+		],
 	])('refreshes a context consumer a cached callee renders through %s', (shape, tag) => {
 		const { App, Reader } = loadCompiledFixtureSource(
 			`${CONTEXT_READER}
