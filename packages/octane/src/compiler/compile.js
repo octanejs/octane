@@ -5622,6 +5622,112 @@ function containsAutoMemoContextRead(root, ctx) {
 	return found;
 }
 
+// Whether a body can render a component no module-level analysis sees: a tag
+// bound inside the body (a prop or local), a member or dynamic tag, or a child
+// hole, host `children` prop or value the body returns that is neither text nor
+// JSX. A host spread may carry `children` too. That component may read context,
+// so a cached region over the body must keep refreshing it.
+function rendersOpaqueChild(root, locals, ctx) {
+	const bound = new Set(locals);
+	const tags = [];
+	let found = false;
+	const seen = new WeakSet();
+	// `nested`: inside a function the body creates, whose returns render nothing here.
+	function walk(node, child, nested) {
+		if (found || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) walk(item, child, nested);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (
+			(child && node.type === 'JSXExpressionContainer' && isOpaqueRenderable(node.expression)) ||
+			(!nested && node.type === 'ReturnStatement' && isOpaqueRenderable(node.argument))
+		) {
+			found = true;
+			return;
+		}
+		if (node.type === 'JSXElement' && isComponentTag(node)) {
+			const tag = node.openingElement.name;
+			if (tag.type !== 'JSXIdentifier') {
+				found = true;
+				return;
+			}
+			tags.push(tag.name);
+		} else if (
+			node.type === 'JSXElement' &&
+			node.openingElement.attributes.some((attribute) =>
+				attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute'
+					? true
+					: attribute.name?.name === 'children' &&
+						isOpaqueRenderable(attribute.value?.expression ?? attribute.value),
+			)
+		) {
+			found = true;
+			return;
+		}
+		for (const param of node.params || []) collectBindings(param, bound);
+		if (node.type === 'VariableDeclarator') collectBindings(node.id, bound);
+		else if (node.type === 'CatchClause') collectBindings(node.param, bound);
+		else if (node.type === 'FunctionDeclaration' && node.id) bound.add(node.id.name);
+		const inner =
+			nested ||
+			node.type === 'ArrowFunctionExpression' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration';
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key], key === 'children', inner);
+		}
+	}
+	walk(root, false, false);
+	return (
+		found ||
+		tags.some(
+			(name) =>
+				bound.has(name) ||
+				(!ctx.componentInfo.has(name) &&
+					!ctx.importedNames.has(name) &&
+					!ctx.defaultMemoBindings.has(name)),
+		)
+	);
+}
+
+// A child value that may hold a component built elsewhere: anything but text,
+// JSX written here, nullish/boolean literals, and lists of those.
+function isOpaqueRenderable(expression) {
+	// A text proof may be the `as string` cast itself, so test before unwrapping.
+	if (isKnownTextChildExpression(expression, null)) return false;
+	const node = unwrapTsExpr(expression);
+	if (
+		node == null ||
+		node.type === 'JSXEmptyExpression' ||
+		node.type === 'JSXElement' ||
+		node.type === 'JSXFragment' ||
+		node.type === 'Literal' ||
+		(node.type === 'Identifier' && node.name === 'undefined')
+	)
+		return false;
+	if (node.type === 'ConditionalExpression')
+		return isOpaqueRenderable(node.consequent) || isOpaqueRenderable(node.alternate);
+	if (node.type === 'LogicalExpression')
+		return (
+			(node.operator !== '&&' && isOpaqueRenderable(node.left)) || isOpaqueRenderable(node.right)
+		);
+	if (node.type === 'ArrayExpression') return node.elements.some(isOpaqueRenderable);
+	// `items.map((item) => <Row … />)` renders the JSX its callback returns.
+	const callback = node.type === 'CallExpression' ? node.arguments[0] : null;
+	if (
+		node.callee?.type === 'MemberExpression' &&
+		node.callee.property?.name === 'map' &&
+		callback?.type === 'ArrowFunctionExpression' &&
+		callback.body.type !== 'BlockStatement'
+	)
+		return isOpaqueRenderable(callback.body);
+	return true;
+}
+
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
 function autoMemoBuiltinHookName(call, ctx) {
@@ -11663,6 +11769,8 @@ function compileInternal(
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		isVoidComponentImport:
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
+		isLiteComponentImport:
+			typeof options?.isLiteComponentImport === 'function' ? options.isLiteComponentImport : null,
 		isCompilerMemoImport:
 			typeof options?.isCompilerMemoImport === 'function' ? options.isCompilerMemoImport : null,
 		compilerMemoExports: [],
@@ -12239,8 +12347,9 @@ function compileInternal(
 		info.autoMemoMayReadContext =
 			autoMemoSafe &&
 			(containsAutoMemoContextRead(root, ctx) ||
-				autoMemoImportedComponents.size > 0 ||
-				[...free].some((name) => ctx.defaultMemoBindings.has(name)));
+				[...autoMemoImportedComponents].some((name) => !isProvenLiteImport(ctx, name)) ||
+				[...free].some((name) => ctx.defaultMemoBindings.has(name)) ||
+				rendersOpaqueChild(root, locals, ctx));
 		// Hookless check.
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
@@ -13028,6 +13137,8 @@ function compileInternal(
 		diagnostics: nativeChangeDiagnostics,
 	};
 	if (ctx.compilerMemoExports.length > 0) result.compilerMemoExports = ctx.compilerMemoExports;
+	const liteExports = ctx.autoMemo ? collectLiteComponentExports(ast.body, ctx) : [];
+	if (liteExports.length > 0) result.liteComponentExports = liteExports;
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -16924,6 +17035,40 @@ function finalizeComponentInitializers(ctx, bodyNodes) {
 			if (declaration !== undefined) bodyNodes[index] = { ...statement, declaration };
 		}
 	}
+}
+
+// Whether the bundler proved an imported tag's export lite: see
+// collectLiteComponentExports.
+function isProvenLiteImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		binding !== undefined && ctx.isLiteComponentImport?.(binding.request, binding.imported) === true
+	);
+}
+
+// Exports an importer may call through componentSlotLite: hookless void bodies
+// (componentInfo.eligible) that a cached region can skip without refreshing
+// context. A region over a body without a compiler memo proof always misses,
+// so only a proven body must also be context-free. A native-read body would
+// subscribe the importer's region owner, which a cache hit does not re-run.
+function collectLiteComponentExports(body, ctx) {
+	if (ctx.nativeReads) return [];
+	const lite = (name) => {
+		const info = ctx.componentInfo.get(name);
+		return (
+			info?.eligible === true &&
+			!(info.autoMemoSafe && info.autoMemoMayReadContext) &&
+			!ctx._universalRuntimeUnitsByBinding.has(name)
+		);
+	};
+	const exports = [];
+	for (const statement of body) {
+		const declaration = statement.declaration;
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id && lite(declaration.id.name))
+			exports.push(statement.type === 'ExportDefaultDeclaration' ? 'default' : declaration.id.name);
+	}
+	for (const [local, names] of ctx.exportedLocals) if (lite(local)) exports.push(...names);
+	return exports;
 }
 
 // The definition-site proof that lets a cached region skip this component, or
@@ -34467,17 +34612,18 @@ function makeCompCall(
 			// definition-site proof, compilerMemoWitness reads it in place of the
 			// same-module summary; an import without one keeps the plain call. A
 			// presentation view keeps it too: hydration prepares only its own helpers.
-			if (
-				ctx._universalRuntimeUnit == null &&
-				ctx.presentationHydration == null &&
-				isCompilerMemoImport(ctx, compName)
-			) {
-				memoCallee = {
-					autoMemoSafe: true,
-					autoMemoCaptures: [],
-					autoMemoImportedComponents: [compName],
-					autoMemoMayReadContext: true,
-				};
+			if (ctx._universalRuntimeUnit == null && ctx.presentationHydration == null) {
+				// A proven lite export renders like a same-module lite callee.
+				const lite = isProvenLiteImport(ctx, compName);
+				if (lite) liteEligible = callSiteOk;
+				if (isCompilerMemoImport(ctx, compName)) {
+					memoCallee = {
+						autoMemoSafe: true,
+						autoMemoCaptures: [],
+						autoMemoImportedComponents: [compName],
+						autoMemoMayReadContext: !lite,
+					};
+				}
 			}
 		}
 		if (memoCallee !== undefined && keyExpr == null) {

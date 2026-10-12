@@ -135,6 +135,8 @@ export interface CompileOptions {
 	isVoidComponentImport?: (request: string, imported: string) => boolean;
 	/** Whether an imported component's module published a compiler memo proof for it. */
 	isCompilerMemoImport?: (request: string, imported: string) => boolean;
+	/** Whether an imported component's module published it as a lite export. */
+	isLiteComponentImport?: (request: string, imported: string) => boolean;
 	isDescriptorChildrenImport?: (request: string, imported: string) => boolean;
 	/** Preserve the compiler's existing experimental integration options. */
 	[option: string]: unknown;
