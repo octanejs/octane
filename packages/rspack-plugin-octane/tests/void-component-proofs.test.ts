@@ -201,6 +201,26 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		expect(render(directory)).toBe(EXPECTED_HTML);
 	}, 60_000);
 
+	it.each([
+		['syntax lowering', { jsc: { target: 'es2015' } }, 'componentSlotLite('],
+		// Globals substitution can put any call, a hook included, into a body.
+		[
+			'optimizer globals',
+			{ jsc: { transform: { optimizer: { globals: { vars: { __OCTANE_FIXTURE__: 'true' } } } } } },
+			'componentSlotVoid(',
+		],
+	])(
+		'lets a later SWC pass with %s keep the provider lite or not',
+		async (_kind, options, call) => {
+			const root = voidFixture();
+			const rules = [{ test: /Greeting\.tsrx$/, use: [{ loader: 'builtin:swc-loader', options }] }];
+			const { directory, sources } = await build(root, { parallel, rules });
+			expectSpecialized(sources, call);
+			expect(render(directory)).toBe(EXPECTED_HTML);
+		},
+		60_000,
+	);
+
 	it('keeps an import generic when a later loader changes the provider export', async () => {
 		const root = voidFixture();
 		// The provider's final Greeting returns JSX; a void call would drop it.
