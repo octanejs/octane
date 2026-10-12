@@ -3311,6 +3311,94 @@ export default function Default() @{ <scene version={1} /> }`);
 		},
 	);
 
+	// Importers keep the bindings of the evaluation they linked against, so a
+	// value exported beside hot-updated components must propagate the update.
+	// The region case clones a local hook into a generated export, which is
+	// neither a value importers read nor stable across evaluations.
+	it.each(['universal', 'dom'] as const)(
+		'propagates an update to the importers of a value exported beside %s-owned components',
+		async (owner) => {
+			const bridge = '@test/hmr-value-bridge';
+			const config = normalizeRendererConfig({
+				registry: { object: { module: 'octane/universal', text: 'host' } },
+				boundaries: {
+					[bridge]: {
+						Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: 'children' },
+					},
+				},
+			});
+			const domRuntime = await import('../src/index.js');
+			const modules =
+				owner === 'universal'
+					? undefined
+					: {
+							octane: domRuntime,
+							'octane/internal/client': domRuntime,
+							'octane/universal': UniversalRuntime,
+							[bridge]: { Canvas: UniversalRuntime.createUniversalHostBoundary('object') },
+						};
+			const evaluate = (
+				label: string,
+				exported: boolean,
+				hmr: 'vite' | 'webpack',
+				hot: HmrContext,
+			) => {
+				const value = `${exported ? 'export ' : ''}const label = '${label}';`;
+				const output =
+					owner === 'universal'
+						? compile(
+								`interface Props { label: string }\nexport { Props };\n${value}\nexport function Scene() @{ <scene label={label} /> }`,
+								'/src/Values.object.tsrx',
+								{ renderer, hmr },
+							).code
+						: compile(
+								`import { Canvas } from '${bridge}';\n${value}\nfunction useLabel() { return label; }\nfunction Scene() @{ <scene label={useLabel()} /> }\nexport function App() @{ <main><Canvas><Scene /></Canvas></main> }`,
+								'/src/Values.tsrx',
+								{ hmr, rendererBoundaries: config.boundaries, rendererRegistry: config.registry },
+							).code;
+				return evaluateUniversalHmrModule(output, hot, modules);
+			};
+
+			// Vite hands the previous evaluation's callbacks the next namespace.
+			let accept: HmrAccept[] = [];
+			const vite: HmrContext = {
+				data: {},
+				dispose() {},
+				accept(callback = () => {}) {
+					accept.push(callback);
+				},
+				invalidate: vi.fn(),
+			};
+			const update = (label: string) => {
+				const previousAccept = accept;
+				accept = [];
+				const next = evaluate(label, true, 'vite', vite);
+				for (const callback of previousAccept) callback(next);
+			};
+			update('v1');
+			update('v1');
+			expect(vite.invalidate).not.toHaveBeenCalled();
+			update('v2');
+			expect(vite.invalidate).toHaveBeenCalled();
+
+			// A webpack replacement cannot see what its importers last read.
+			const accepts = (exported: boolean) => {
+				let accepted = false;
+				evaluate('v1', exported, 'webpack', {
+					data: undefined,
+					dispose() {},
+					accept() {
+						accepted = true;
+					},
+					invalidate: vi.fn(),
+				});
+				return accepted;
+			};
+			expect(accepts(true)).toBe(false);
+			expect(accepts(false)).toBe(true);
+		},
+	);
+
 	// `export default (function Counter() @{…})` binds `Counter` only inside the
 	// component, so the rest of the module may bind or read `Counter` on its own.
 	// The component still renders itself by that name and hot-updates as

@@ -17,7 +17,11 @@ export function evalModuleCode(
 	// `import.meta.hot` shim — `import.meta` is illegal outside a real module,
 	// so HMR-enabled client output rewrites it to this injected value (pass a
 	// `{ accept }` stub to capture the registration, or leave undefined).
-	hot?: { accept(cb: (module: any) => void): void },
+	hot?: {
+		accept(cb: (module: any) => void): void;
+		data?: Record<string, unknown>;
+		invalidate?(): void;
+	},
 ): Record<string, any> {
 	let defaultName: string | null = null;
 	code = code.replace(/import\.meta\.hot/g, '__hot');
@@ -40,7 +44,16 @@ export function evalModuleCode(
 		defaultName = name;
 		return '';
 	});
+	const listed: string[] = [];
+	code = code.replace(/^export\s*\{([^}]*)\};?$/gm, (_m: string, names: string) => {
+		for (const specifier of names.split(',')) {
+			const [local, exported = local] = specifier.trim().split(/\s+as\s+/);
+			if (local) listed.push(`__exports.${exported} = ${local};`);
+		}
+		return '';
+	});
 	if (defaultName) code += `\n__exports.default = ${defaultName};`;
+	code += `\n${listed.join('\n')}`;
 	const fn = new Function('__mods', '__exports', '__hot', code + '\nreturn __exports;');
 	return fn(
 		{ 'octane/internal/client': ClientRuntime, 'octane/internal/server': ServerRuntime, ...mods },

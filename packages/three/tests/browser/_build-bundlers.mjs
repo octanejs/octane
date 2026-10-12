@@ -53,12 +53,13 @@ async function compileRspack(config) {
 function isSelfAcceptingWebpackModule(source) {
 	if (source.includes('import.meta.webpackHot.accept()')) return true;
 	// The compiler may alias the HMR root before accessing it so Rspack can
-	// lower the meta property safely. Follow that binding without pinning its
-	// generated name.
-	const binding = source.match(
-		/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*import\.meta\.webpackHot\b/,
-	)?.[1];
-	return binding !== undefined && source.includes(`${binding}.accept()`);
+	// lower the meta property safely. Follow those bindings without pinning
+	// their generated names.
+	return [
+		...source.matchAll(
+			/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*import\.meta\.webpackHot\b/g,
+		),
+	].some(([, binding]) => source.includes(`${binding}.accept()`));
 }
 
 const viteResult = await viteBuild({

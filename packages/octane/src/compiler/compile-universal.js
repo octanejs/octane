@@ -4431,36 +4431,8 @@ function buildUniversalHmrBlocksAst(state, origin) {
 				),
 			);
 		}
-		const acceptArgs = [];
-		if (!webpack) {
-			const moduleName = allocName(state, '__octaneUniversalHmrModule');
-			const changedExports = state.hmrComponents
-				.map((component) =>
-					b.binary(
-						'!==',
-						b.member(
-							b.id(moduleName),
-							component.exportKind === 'default' ? 'default' : component.name,
-						),
-						b.id(component.name),
-					),
-				)
-				.reduce((left, right) => b.logical('||', left, right));
-			// The handoff already refreshed compatible exports. Missing or changed
-			// boundaries must invalidate rather than leave the previous owner live.
-			acceptArgs.push(
-				b.arrow(
-					[b.id(moduleName)],
-					b.block([
-						b.if(
-							b.logical('&&', b.id(moduleName), changedExports),
-							b.stmt(b.call(b.member(hot, 'invalidate'))),
-						),
-					]),
-				),
-			);
-		}
-		handoff.push(b.stmt(b.call(b.member(hot, 'accept'), ...acceptArgs)));
+		// The DOM compile that prints every module accepts once for all of its
+		// renderers, comparing these components beside the module's other exports.
 		tail.push(inheritGeneratedOrigin(b.if(hot, b.block(handoff)), origin));
 	}
 	return { prelude, tail };
@@ -4785,6 +4757,7 @@ export function lowerUniversalRendererRegionAst(
 				block: state.helpers.block,
 			}),
 			components: Object.freeze(state.components),
+			hmrComponents: Object.freeze(state.hmrComponents),
 			bindings: Object.freeze([...specializationBindings]),
 			generatedRuntimeAliases,
 			renderer,
@@ -4931,6 +4904,7 @@ export function compileUniversal(
 			block: state.helpers.block,
 		},
 		components: state.components,
+		hmrComponents: state.hmrComponents,
 	};
 	const profileImport = universalProfileImportAst(state, moduleOrigin);
 	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, moduleOrigin);
