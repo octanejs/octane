@@ -11,6 +11,7 @@ import {
 	TransitiveTrio,
 	TransitiveTwin,
 	MultiHopTransitiveTrio,
+	FragmentChainTrio,
 	Pair,
 	Tree,
 	KeyedPair,
@@ -278,6 +279,25 @@ describe('all-component-children host sibling order', () => {
 		expect(order(r)).toEqual(['leaf:C']);
 		r.update(MultiHopTransitiveTrio, { bBig: true });
 		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('a chain child leading a fragment body reappears before its sibling root', () => {
+		// B empties in the same render that removes the sibling @if, then
+		// returns: it must land ahead of the @if's content, inside the fragment.
+		const r = mount(FragmentChainTrio, { big: true, on: true });
+		expect(order(r)).toEqual(['big:B', 'on:on', 'leaf:C']);
+
+		r.update(FragmentChainTrio, { big: false, on: false });
+		expect(order(r)).toEqual(['leaf:C']);
+		r.update(FragmentChainTrio, { big: true, on: false });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.update(FragmentChainTrio, { big: true, on: true });
+		expect(order(r)).toEqual(['big:B', 'on:on', 'leaf:C']);
+		r.update(FragmentChainTrio, { big: false, on: true });
+		expect(order(r)).toEqual(['on:on', 'leaf:C']);
+		r.update(FragmentChainTrio, { big: true, on: true });
+		expect(order(r)).toEqual(['big:B', 'on:on', 'leaf:C']);
 		r.unmount();
 	});
 

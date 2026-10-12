@@ -124,6 +124,23 @@ function MultiHopEmptyLeaf(props: { big?: boolean; label: string }) @{
 	}
 }
 
+/** A chain child leading a fragment body, ahead of a toggled sibling root. */
+function ChainThenToggle(props: { big?: boolean; on?: boolean }) @{
+	<>
+		<PanelViaChain big={props.big} label="B" />
+		@if (props.on) {
+			<em class="on">on</em>
+		}
+	</>
+}
+
+export function FragmentChainTrio(props: { big?: boolean; on?: boolean }) @{
+	<section class="host">
+		<ChainThenToggle big={props.big} on={props.on} />
+		<Leaf label="C" />
+	</section>
+}
+
 // ---- Single-root proven children (anchorless componentSlot regime) ----
 
 // Local state inside the flipping component: the @if flip replaces only the
