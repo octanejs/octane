@@ -46,6 +46,7 @@ function candidateInfo(module) {
 		typeof info.sourceHash !== 'string' ||
 		!HASH.test(info.sourceHash) ||
 		!strings(info.exports) ||
+		!strings(info.memoExports) ||
 		!strings(info.consumed) ||
 		!importEntries(info.imports, false) ||
 		(info.bindings !== null && !importEntries(info.bindings, true))
@@ -216,6 +217,34 @@ function verifyFinalSources(compilation, state) {
 	}
 }
 
+/**
+ * Hint each candidate import whose target's latest build listed it as a memo
+ * export. A rebuild over new hints can publish more exports, so callers repeat
+ * this until no importer gains one. Hints only accumulate, which bounds the
+ * rounds by the import graph. They need no final-code proof: an importer's
+ * region still reads the runtime witness, so a stale hint costs only a miss.
+ * Returns the importers that gained a hint.
+ */
+function collectMemoHints(compilation, state) {
+	const grown = [];
+	for (const [id, importer] of currentModules(compilation.modules)) {
+		const info = candidateInfo(importer);
+		if (!(info?.imports.length > 0)) continue;
+		const targets = targetsFor(compilation, importer, requestsOf(info.imports));
+		const hints = new Set(state.memo.get(id));
+		const size = hints.size;
+		for (const { request, imported } of info.imports) {
+			if (candidateInfo(targets.get(request))?.memoExports.includes(imported)) {
+				hints.add(voidImportKey(request, imported));
+			}
+		}
+		if (hints.size === size) continue;
+		state.memo.set(id, [...hints]);
+		grown.push(id);
+	}
+	return grown;
+}
+
 async function collectAndRebuild(compilation, state) {
 	if (state.started) return;
 	state.started = true;
@@ -240,10 +269,12 @@ async function collectAndRebuild(compilation, state) {
 			if (imports.length > 0) state.proofs.set(id, { sourceHash: info.sourceHash, imports });
 		}
 	}
-	if (state.proofs.size === 0) return;
-	await rebuildModules(compilation, [...state.proofs.keys()], changed);
+	let rebuild = [...new Set([...state.proofs.keys(), ...collectMemoHints(compilation, state)])];
+	if (rebuild.length === 0) return;
+	do await rebuildModules(compilation, rebuild, changed);
+	while ((rebuild = collectMemoHints(compilation, state)).length > 0);
 	// Every consumed provider is proven on its final code here, including one
-	// rebuilt as an importer in this batch. A later loader can also rewrite
+	// rebuilt as an importer in these rounds. A later loader can also rewrite
 	// what Octane specialized; an importer whose proof does not hold is rebuilt
 	// once more without one. Any change after that fails closed.
 	const invalid = receiptRebuilt(compilation, state, analyses);
@@ -267,8 +298,9 @@ async function collectAndRebuild(compilation, state) {
  * Prove imported void components for production client builds. Rspack runs a
  * loader before it knows its module's outgoing edges or their final output, so
  * the proof is established after make from the effective graph, then supplied
- * to a rebuild of each importer that can use it. A one-shot build consumes
- * proofs and fails closed if any proven module changes later; a watch build
+ * to a rebuild of each importer that can use it, with the compiler memo hints
+ * its imports' modules published. A one-shot build consumes proofs and hints
+ * and fails closed if any proven module changes later; a watch build
  * only records the facts its cached modules need for a later one-shot build.
  */
 export function installVoidComponentProofs(compiler) {
@@ -286,6 +318,7 @@ export function installVoidComponentProofs(compiler) {
 			discoverOnly: !oneShotProduction(compiler),
 			started: false,
 			proofs: new Map(),
+			memo: new Map(),
 			receipts: new Map(),
 		};
 		states.set(compilation, state);
@@ -293,6 +326,7 @@ export function installVoidComponentProofs(compiler) {
 			context[VOID_COMPONENT_CONTEXT_KEY] = {
 				enabled: true,
 				proof: state.proofs.get(identifier(module)) ?? null,
+				memo: state.memo.get(identifier(module)) ?? null,
 			};
 		});
 		if (state.discoverOnly) return;

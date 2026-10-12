@@ -25,9 +25,10 @@ export function clearVoidComponentBuildInfo(module) {
 
 /**
  * Prepare this exact authored loader input's void-component facts. Every build
- * the controller enables records its own void exports and candidate imports,
- * so cached modules carry the same facts in a watch and a one-shot build. Only
- * a one-shot build's proof pass supplies proven imports.
+ * the controller enables records its own void exports, memo exports and
+ * candidate imports, so cached modules carry the same facts in a watch and a
+ * one-shot build. Only a one-shot build's proof pass supplies proven imports
+ * and memo hints.
  */
 export function prepareVoidComponents(context, source, id, options) {
 	const data = context[VOID_COMPONENT_CONTEXT_KEY];
@@ -47,9 +48,10 @@ export function prepareVoidComponents(context, source, id, options) {
 		hash !== null && data.proof.sourceHash === hash
 			? new Set(data.proof.imports.map(({ request, imported }) => voidImportKey(request, imported)))
 			: null;
-	// A proof is a fact about other modules' final output, outside this module's
-	// cache key. Output that may consume one is never cached.
-	if (proven !== null) context.cacheable?.(false);
+	const memo = new Set(data.memo);
+	// A proof or hint is a fact about other modules' output, outside this
+	// module's cache key. Output that may consume one is never cached.
+	if (proven !== null || memo.size > 0) context.cacheable?.(false);
 	const consumed = new Set();
 	return {
 		source,
@@ -58,6 +60,9 @@ export function prepareVoidComponents(context, source, id, options) {
 		consumed,
 		transformOptions: {
 			collectVoidComponentExports: true,
+			// Always answered, so an export over an unhinted import publishes no
+			// memo proof of its own.
+			isCompilerMemoImport: (request, imported) => memo.has(voidImportKey(request, imported)),
 			...(proven === null
 				? null
 				: {
@@ -83,11 +88,13 @@ export function finishVoidComponents(context, prepared, result) {
 	const compiled = result?.kind === 'compile';
 	const exports =
 		compiled && Array.isArray(result.voidComponentExports) ? result.voidComponentExports : [];
+	const memoExports =
+		compiled && Array.isArray(result.compilerMemoExports) ? result.compilerMemoExports : [];
 	const imports =
 		RELATIVE_IMPORT.test(prepared.source) && (compiled || ROOT_FACTORY_IMPORT.test(prepared.source))
 			? findVoidComponentImports(prepared.source, prepared.id)
 			: [];
-	if (exports.length === 0 && imports.length === 0) return;
+	if (exports.length === 0 && memoExports.length === 0 && imports.length === 0) return;
 	const consumed = [...prepared.consumed].sort();
 	// null (unparseable output) can never match the final code's bindings.
 	const bindings =
@@ -100,6 +107,7 @@ export function finishVoidComponents(context, prepared, result) {
 	module.buildInfo[VOID_COMPONENT_BUILD_INFO_KEY] = {
 		sourceHash: prepared.sourceHash ?? sourceHash(prepared.source),
 		exports: [...exports],
+		memoExports: [...memoExports],
 		imports: imports.map(({ request, imported }) => ({ request, imported })),
 		consumed,
 		bindings,
