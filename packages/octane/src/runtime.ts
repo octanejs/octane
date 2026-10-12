@@ -12885,6 +12885,15 @@ function renderBlockInner(block: Block): true | undefined {
 	// block's cascade is also brought up to date here, so flush() can skip its
 	// redundant standalone render (it checks `pending` before rendering). Cleared
 	// at the TOP so a re-entrant setState during this render re-queues correctly.
+	// A Suspense replay that reaches a Block with an update queued since the
+	// suspended attempt renders new inputs: that update, and the props it passes
+	// down. Render the subtree as the ordinary update the scheduler would have run
+	// had it flushed before the retry. The replay's stored use() sequence belongs
+	// to the old inputs, and a shifted call would otherwise take another call's
+	// thenable. An urgent pass over a queued transition reads committed cells and
+	// leaves the update queued, so it still replays.
+	const replayUpdate = RESUME_REPLAY && block.pending && urgentTransitionRender === null;
+	if (replayUpdate) RESUME_REPLAY = false;
 	block.pending = false;
 	block.crossRenderUpdate = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
@@ -13075,6 +13084,7 @@ function renderBlockInner(block: Block): true | undefined {
 		CURRENT_EFFECT_REACHED = prevEffectReached;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
+		if (replayUpdate) RESUME_REPLAY = true;
 		try {
 			if (NATIVE_READ_DRIVER)
 				NATIVE_READ_DRIVER.endRender(block, renderCompleted, isSuspenseException(profileThrown));
@@ -19567,6 +19577,8 @@ function trackThenable(thenable: TrackedThenable<any>): void {
  * True while commitResume replays a try body after a resolution. Gates the
  * fresh-thenable reuse leniency and the waterfall diagnostic in useThenable —
  * both are replay-only semantics; ordinary updates must keep replacing.
+ * renderBlockInner clears it below a Block whose queued update the replay
+ * renders, so only bodies with unchanged inputs replay.
  */
 let RESUME_REPLAY = false;
 
