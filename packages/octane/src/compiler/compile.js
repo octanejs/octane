@@ -12487,7 +12487,11 @@ function compileInternal(
 		}
 	}
 	// Anchorless append-safety for componentSlotLite call sites (see
-	// anchorlessRootShape for the shape rules and the hazard). Optimistic
+	// anchorlessRootShape for the shape rules and the hazard). A component arm
+	// inherits its lite callee's hazard: an arm that self-marked on the callee's
+	// element keeps no pair, so when the callee's root branch empties it anchors
+	// on the node after that element. Without anchors that node is the next
+	// sibling's, which a later render of that sibling may replace. Optimistic
 	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
 	// components stay safe; a locally-unsafe shape drains through its
 	// dependents, so declaration order and recursion do not matter. An edge to a
