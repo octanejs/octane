@@ -2407,6 +2407,254 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	const CONTEXT_READER = `import { useContext, useState } from 'octane';
+		 import { Theme } from './theme';
+		 export function Reader(props) @{
+			const theme = useContext(Theme);
+			<b>{(props.label + ':' + theme) as string}</b>
+		 }`;
+
+	// A component a body names through a binding, or returns from its props, is
+	// unknown to the cache over that body, so it must still see a Provider change.
+	it.each([
+		['a local', `function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }`],
+		['a destructured prop', `function Tag({ comp: C }) @{ <i><C label="tag" /></i> }`],
+		[
+			'a local at the body root',
+			`function Tag(props) @{ const C = props.comp; <C label="tag" /> }`,
+		],
+		[
+			'a local inside @if',
+			`function Tag(props) @{ const C = props.comp; <i>@if (C) { <C label="tag" /> }</i> }`,
+		],
+		[
+			'a returned prop value',
+			`function Tag(props) { if (props.content) return props.content; return <i>{'off'}</i>; }`,
+		],
+		[
+			'a @switch case hole',
+			`function Tag(props) @{ <i>@switch (props.content ? 'shown' : 'hidden') { @case 'shown': { {props.content} } @default: { <s /> } }</i> }`,
+		],
+	])('refreshes a context consumer a cached callee renders through %s', (shape, tag) => {
+		const { App, Reader } = loadCompiledFixtureSource(
+			`${CONTEXT_READER}
+			 ${tag}
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Tag comp={props.comp} content={props.content} /></p></Theme>
+			 }`,
+			{
+				id: `auto-memo-bound-tag-${shape.replaceAll(' ', '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme: createContext('t0') } },
+			},
+		);
+		const content = createElement(Reader, { label: 'tag' });
+		const root = mount(App, { comp: Reader, content, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('tag:t1');
+			root.update(App, { comp: Reader, content, theme: 't2' });
+			expect(root.find('b').textContent).toBe('tag:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('refreshes a context consumer an imported cached callee renders through a local tag', () => {
+		const tag = loadImportedModule(
+			`export function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }`,
+			'imported-bound-tag.tsrx',
+		);
+		const { App, Reader } = loadImportedModule(
+			`${CONTEXT_READER}
+			 import { Tag } from './tag';
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Tag comp={props.comp} /></p></Theme>
+			 }`,
+			'imported-bound-tag-parent.tsrx',
+			{ './tag': tag, './theme': { Theme: createContext('t0') } },
+		);
+		const root = mount(App, { comp: Reader, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('tag:t1');
+			root.update(App, { comp: Reader, theme: 't2' });
+			expect(root.find('b').textContent).toBe('tag:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// The hook keeps List itself uncached, so only its whole-list cache, or the
+	// row cache under an iterable the list cannot cache, skips the rows.
+	it.each([
+		[
+			'a row local tag',
+			'props.items',
+			'',
+			`const C = item.comp; <li><C label={item.label} /></li>`,
+		],
+		[
+			'a parent local tag',
+			'props.items',
+			'const C = props.comp;',
+			`<li><C label={item.label} /></li>`,
+		],
+		['a value hole', 'props.items', '', `<li>{item.content}</li>`],
+		[
+			'a parent local tag in uncached rows',
+			'props.items.filter(Boolean)',
+			'const C = props.comp;',
+			`<li><C label={item.label} /></li>`,
+		],
+	])(
+		'refreshes a context consumer cached list rows render through %s',
+		(shape, iterable, setup, row) => {
+			const { App, Reader } = loadCompiledFixtureSource(
+				`${CONTEXT_READER}
+			 function List(props) @{
+				const [count] = useState(0);
+				${setup}
+				<ul data-count={count as number}>
+					@for (const item of ${iterable}; key item.id) { ${row} }
+				</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><List comp={props.comp} items={props.items} /></Theme>
+			 }`,
+				{
+					id: `auto-memo-bound-row-${shape.replaceAll(' ', '-')}.tsrx`,
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './theme': { Theme: createContext('t0') } },
+				},
+			);
+			const items = [
+				{ id: 1, label: 'row', comp: Reader, content: createElement(Reader, { label: 'row' }) },
+			];
+			const root = mount(App, { comp: Reader, items, theme: 't1' });
+			try {
+				expect(root.find('b').textContent).toBe('row:t1');
+				root.update(App, { comp: Reader, items, theme: 't2' });
+				expect(root.find('b').textContent).toBe('row:t2');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	// The owner's own update clears its context aggregate, then hits the cache.
+	// The hit must restore the skipped consumer's reads, or the next Provider
+	// change lets the owner's memo wall bail over it.
+	it.each([
+		[
+			'a list row hole',
+			`@for (const item of props.items; key item.id) { <li>{item.content}</li> }`,
+		],
+		[
+			'a list row tag',
+			`@for (const item of props.items; key item.id) { const C = item.comp; <li><C label="r" /></li> }`,
+		],
+		['a callee hole', `<Slot content={props.content} />`],
+		['a callee local tag', `<Tag comp={props.comp} />`],
+		['a memo() consumer below a callee', `<Wrapper label={props.content} />`],
+	])(
+		'refreshes context below a cache hit inside a re-rendered memo() owner through %s',
+		(shape, body) => {
+			const { App, Reader } = loadCompiledFixtureSource(
+				`import { memo } from 'octane';
+			 ${CONTEXT_READER}
+			 const MemoReader = memo(Reader);
+			 function Slot(props) @{ <span>{props.content}</span> }
+			 function Tag(props) @{ const C = props.comp; <span><C label="r" /></span> }
+			 function Wrapper(props) @{ <span><MemoReader label="r" /></span> }
+			 function List(props) @{
+				const [tick, setTick] = useState(0);
+				<ul data-tick={tick as number} onClick={() => setTick(tick + 1)}>${body}</ul>
+			 }
+			 const MemoList = memo(List);
+			 export function App(props) @{
+				<Theme value={props.theme}><MemoList items={props.items} content={props.content} comp={props.comp} /></Theme>
+			 }`,
+				{
+					id: `auto-memo-owner-hit-${shape.replaceAll(' ', '-').replace(/[()]/g, '')}.tsrx`,
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './theme': { Theme: createContext('t0') } },
+				},
+			);
+			const content = createElement(Reader, { label: 'r' });
+			const props = { items: [{ id: 1, comp: Reader, content }], content, comp: Reader };
+			const root = mount(App, { ...props, theme: 't1' });
+			try {
+				root.click('ul');
+				expect(root.find('ul').getAttribute('data-tick')).toBe('1');
+				expect(root.find('b').textContent).toBe('r:t1');
+				root.update(App, { ...props, theme: 't2' });
+				expect(root.find('b').textContent).toBe('r:t2');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('refreshes hydrated context consumers behind cached local tags and returns', () => {
+		const source = `${CONTEXT_READER}
+			 function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }
+			 function Returned(props) { if (props.content) return props.content; return <i>{'off'}</i>; }
+			 function List(props) @{
+				const [count] = useState(0);
+				<ul data-count={count as number}>
+					@for (const item of props.items; key item.id) {
+						const C = item.comp;
+						<li><C label={item.label} /></li>
+					}
+				</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}>
+					<p><Tag comp={props.comp} /></p>
+					<List items={props.items} />
+					<p><Returned content={props.content} /></p>
+				</Theme>
+			 }`;
+		const id = 'auto-memo-bound-tag-hydration.tsrx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './theme': { Theme: ServerRuntime.createContext('t0') } },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './theme': { Theme: createContext('t0') } },
+		});
+		const props = (Reader: any, theme: string) => ({
+			comp: Reader,
+			content: createElement(Reader, { label: 'returned' }),
+			items: [{ id: 1, label: 'row', comp: Reader }],
+			theme,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, props(server.Reader, 't1')).html;
+		const consumers = Array.from(container.querySelectorAll('b'));
+		const clientProps = props(client.Reader, 't1');
+		const root = hydrateRoot(container, client.App, clientProps);
+		const texts = () =>
+			Array.from(container.querySelectorAll('b'), (node, index) => {
+				expect(node).toBe(consumers[index]);
+				return node.textContent;
+			});
+		try {
+			expect(texts()).toEqual(['tag:t1', 'row:t1', 'returned:t1']);
+			flushSync(() => root.render(client.App, { ...clientProps, theme: 't2' }));
+			expect(texts()).toEqual(['tag:t2', 'row:t2', 'returned:t2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('keeps a pure callee lite inside its cache unless the cache must refresh context', () => {
 		const code = compile(LITE_CALLEE_REGION_SOURCE, 'lite-callee-region.tsrx', {
 			hmr: false,

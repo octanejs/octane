@@ -1615,6 +1615,7 @@ function importSpecifierPair(entry) {
 const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'compilerMemoRegion',
 	'compilerMemoWitness',
+	'compilerOpaqueTag',
 	'markCompilerMemo',
 	'hookMemoCreate',
 	'hookMemoEqual',
@@ -5678,7 +5679,9 @@ function rendersOpaqueChild(root, locals, ctx) {
 			node.type === 'FunctionDeclaration';
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(node[key], key === 'children', inner);
+			// A `@switch` case holds its output hole directly, not under `children`.
+			const hole = key === 'children' || (key === 'consequent' && node.type === 'SwitchCase');
+			walk(node[key], hole, inner);
 		}
 	}
 	walk(root, false, false);
@@ -27556,7 +27559,6 @@ function emitAutoMemoRegion(
 	contextAware,
 	depNode,
 	initValue = null,
-	restoreCachedContext = false,
 	publicationWitnesses = null,
 	sameValueDependencies = false,
 	strictEqualityDependencyIndex = -1,
@@ -27701,23 +27703,24 @@ function emitAutoMemoRegion(
 		]);
 	}
 	ctx.runtimeNeeded.add('compilerCacheContext');
-	const cacheContextCall = () =>
-		restoreCachedContext
-			? b.call(
-					'_$compilerCacheContext',
-					b.id('__s'),
-					b.literal(slotIndex),
-					cacheAt(contextIndex),
-					b.literal(true),
-				)
-			: b.call('_$compilerCacheContext', b.id('__s'), b.literal(slotIndex), cacheAt(contextIndex));
+	// A hit restores the skipped subtree's context reads onto memoized ancestors,
+	// whose own render cleared them. A miss renders or bails every descendant,
+	// and those record their reads themselves.
+	const cacheContextCall = (hit) =>
+		b.call(
+			'_$compilerCacheContext',
+			b.id('__s'),
+			b.literal(slotIndex),
+			cacheAt(contextIndex),
+			...(hit ? [b.literal(true)] : []),
+		);
 	return b.block([
 		...depDecls,
 		b.if(
 			orChain(misses),
 			b.block([
 				...computeStatements,
-				b.const('_c', cacheContextCall()),
+				b.const('_c', cacheContextCall(false)),
 				writable(),
 				...publish(),
 				b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c'))),
@@ -27726,7 +27729,7 @@ function emitAutoMemoRegion(
 			b.block([
 				profileHit(),
 				...replayNative,
-				b.const('_c', cacheContextCall()),
+				b.const('_c', cacheContextCall(true)),
 				b.if(
 					b.binary('!==', b.id('_c'), cacheAt(contextIndex)),
 					b.block([writable(), b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c')))]),
@@ -29064,7 +29067,6 @@ function planJsx(
 					fc.autoMemoContextAware,
 					depNode,
 					b.id(nativeName),
-					false,
 					null,
 					sameValueListDependencies,
 					strictListDependencyIndex,
@@ -29115,7 +29117,6 @@ function planJsx(
 				fc.autoMemoContextAware,
 				depNode,
 				null,
-				false,
 				null,
 				sameValueListDependencies,
 				strictListDependencyIndex,
@@ -29308,7 +29309,6 @@ function planJsx(
 						true,
 						undefined,
 						null,
-						true,
 					);
 					pushAfterStmt(
 						cc.id,
@@ -29412,7 +29412,6 @@ function planJsx(
 						true,
 						undefined,
 						null,
-						true,
 					);
 					update = b.if(b.call('_$compilerCacheArray', V(), chp()), cached, ordinary);
 				}
@@ -29557,7 +29556,6 @@ function planJsx(
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
 					null,
-					false,
 					cc.autoMemoPublicationWitnesses,
 					true,
 					-1,
@@ -34770,6 +34768,17 @@ function makeCompCall(
 			voidComponent = true;
 		}
 	}
+	// A tag bound in this body names a component no proof covers, yet a cached
+	// region may skip it. Arm its context reads so the region's refresh, which
+	// rendersOpaqueChild requests, finds them. A split module's certified
+	// captures keep their module identity.
+	if (
+		ctx.autoMemo &&
+		ctx.currentComponentLocals?.has(compName) &&
+		!isImmutableComponentTag(node.openingElement?.name ?? node.id, ctx) &&
+		!isPrivateSplitContextProvider(node, ctx)
+	)
+		compNode = b.call(requireRuntimeForContext(ctx, 'compilerOpaqueTag'), b.id('__s'), compNode);
 
 	// Append-safety for the anchorless all-component-children emission (see
 	// emitElementHtml). Only a componentSlotLite lowering can lose its
@@ -35446,7 +35455,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			itemMemoWitnesses = [
 				...collectImportedComponentReferences(bodyAst, ctx.importedNames),
 			].sort();
-			if (itemMemoWitnesses.length > 0) itemMemoContextAware = true;
+			if (
+				itemMemoWitnesses.length > 0 ||
+				rendersOpaqueChild(bodyAst, [...ctx.currentComponentLocals, ...bodyScope], ctx)
+			)
+				itemMemoContextAware = true;
 			for (const name of free) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
 					itemMemo = false;
@@ -35516,7 +35529,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
 		const listDeps = new Set();
 		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);
-		let listMayReadContext = witnesses.size > 0 || containsAutoMemoContextRead(regionAst, ctx);
+		let listMayReadContext =
+			witnesses.size > 0 ||
+			containsAutoMemoContextRead(regionAst, ctx) ||
+			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {

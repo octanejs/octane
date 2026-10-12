@@ -13230,6 +13230,10 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		}
 		if (useSingleRoot) {
 			const d = out as ElementDescriptor;
+			// A value-position mount, as childSlot's are: the body may return one it
+			// received (`return props.content`), which a cached region skips with the
+			// body. Arm it as childSlot does, through the Block it inherits from.
+			if (!block.memoInChain) promoteMemoAncestry(block);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -41066,9 +41070,9 @@ function refreshCachedBlock(block: Block, contextChanged: boolean): void {
  * that reconciliation, so an intervening Provider commit must refresh the
  * slot's existing Block(s) directly. Activity/Suspense reveals must also
  * reconnect effects retained by a skipped subtree, in its live source order,
- * and opted-in renderable-array regions restore their descendants' context
- * reads onto memoized ancestors. Existing mapped regions keep their original
- * constant-time hit; only array-region hits inspect precomputed memo ancestry.
+ * and a hit (`restampMemoAncestors`) restores its descendants' context reads
+ * onto memoized ancestors, whose own render cleared them. Outside a memo chain
+ * a hit stays constant-time.
  * `previous === undefined` snapshots the epoch after a cache miss without
  * revisiting the freshly-rendered subtree.
  * @internal
@@ -41132,6 +41136,20 @@ export function compilerCacheContext(
 	}
 	if (restamp) restampCachedSlotContext(slot);
 	return current;
+}
+
+/**
+ * Compiler ABI for a component tag bound inside the body (`const C =
+ * props.comp; <C />`). Every other component a cached region skips either reads
+ * no context or records its reads (memo walls, value-position mounts). This
+ * one is unknown until render, so arm the scope before its slot mounts: Blocks
+ * created below inherit memoInChain, and compilerCacheContext's refresh then
+ * finds the consumer.
+ * @internal
+ */
+export function compilerOpaqueTag<T>(scope: Scope, tag: T): T {
+	if (!scope.block.memoInChain) promoteMemoAncestry(scope);
+	return tag;
 }
 
 const OBJ_PROTO = Object.prototype;
