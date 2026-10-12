@@ -55,6 +55,18 @@ function ClientOnlySuspendingChild(props) @{
 	</button>
 }
 
+// A custom hook's use() is not batched by the compiler.
+function useClientValue(promise) {
+	return use(promise);
+}
+
+function ClientOnlyHookChild(props) @{
+	const value = useClientValue(props.promise);
+	<button id="client-only-content" onClick={() => props.onClick?.(value)}>
+		{value as string}
+	</button>
+}
+
 export function ClientOnlyHydrate(props) @{
 	<section id="client-only-host">
 		@if (props.show) {
@@ -64,7 +76,11 @@ export function ClientOnlyHydrate(props) @{
 				fallback={<span id="client-only-fallback">{'Loading client content'}</span>}
 				onHydrated={props.onHydrated}
 			>
-				<ClientOnlySuspendingChild promise={props.promise} onClick={props.onClick} />
+				@if (props.viaHook) {
+					<ClientOnlyHookChild promise={props.promise} onClick={props.onClick} />
+				} @else {
+					<ClientOnlySuspendingChild promise={props.promise} onClick={props.onClick} />
+				}
 			</Hydrate>
 		}
 	</section>

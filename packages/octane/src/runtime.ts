@@ -18533,7 +18533,10 @@ function initializeHydrateComponent(
 				state.props = props;
 				// Parent/capture or context updates can stale preserved HTML. An unchanged
 				// native refresh instead rechecks the strategy and retains its subscriptions.
-				if (!state.independent && !state.hydrated) {
+				// A client-only boundary has no server HTML to gate: like its first mount
+				// and installHydrateBoundary, it ignores the strategy, so a pending render
+				// re-enters with new props instead of leaving them to a promise replay.
+				if (!state.independent && !state.hydrated && state.serverPreserved) {
 					const strategy = resolveHydrateStrategy(state);
 					if (strategy._t === 'never') {
 						// Only the hydration trigger changes here. Preparation has an independent
