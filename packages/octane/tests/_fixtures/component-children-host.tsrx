@@ -82,6 +82,18 @@ export function TransitiveTrio(props: { bBig?: boolean }) @{
 	</section>
 }
 
+/**
+ * Two transitive panels: the first can empty out after mounting with content
+ * while the second swaps arms in the same render.
+ */
+export function TransitiveTwin(props: { aBig?: boolean; bOff?: boolean }) @{
+	<section class="host">
+		<PanelViaChain big={props.aBig} label="A" />
+		<PanelViaChain off={props.bOff} label="B" />
+		<Leaf label="C" />
+	</section>
+}
+
 /** A root-first multi-hop chain whose leaf can mount empty. */
 export function MultiHopTransitiveTrio(props: { bBig?: boolean }) @{
 	<section class="host">

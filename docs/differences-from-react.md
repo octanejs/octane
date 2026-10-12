@@ -396,6 +396,18 @@ onClick={() => setItems((current) => current.filter((entry) => entry.id !== item
 The first form remains correct and supported. Strong mode does not change its
 closure semantics or promise to skip its reevaluation.
 
+### Component updates
+
+Compatibility mode keeps React's rule that a child's state update never
+re-renders its parent. In Strong production client builds, a component whose
+only hooks are `useState`, `useReducer`, `useRef`, `useEffect`,
+`useLayoutEffect`, `useContext`, and `useId` may instead render inside its
+caller's Block. Its hooks keep their own state, effects, and cleanup order, but
+its update re-renders the nearest enclosing component that owns a Block, so that
+component's body runs again. Strong render purity makes the extra evaluation
+unobservable, and effects still run only when their inferred dependencies change.
+An imported component renders that way only when both modules are Strong.
+
 ### Local mutation and retained rows
 
 Mutation of fresh render-local data is supported when it finishes before that

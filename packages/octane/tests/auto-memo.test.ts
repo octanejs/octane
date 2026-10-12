@@ -1651,6 +1651,514 @@ describe('imported component regions', () => {
 	});
 });
 
+// Strong renders hookful same-module callees through lite edges: a callee's
+// hook cells live in its Scope, and an update re-renders the nearest Block.
+// Counter `a` sits in an arm the parent keeps rendering around; `b` and Panel
+// each guard an effect so a render can skip it, `b` while Panel still reaches
+// its own; `m` reads context below a memo wall. Each scenario runs once per
+// mode, and the two must not differ.
+const STRONG_HOOKFUL_LITE_SOURCE = `"use strong";
+	import { Activity, createContext, memo, useContext, useEffect, useId, useLayoutEffect, useState } from 'octane';
+
+	export const Theme = createContext('light');
+
+	function Counter(props) @{
+		const [count, setCount] = useState(0);
+		const theme = useContext(Theme);
+		const uid = useId();
+		const log = props.log;
+		const name = props.name;
+		useLayoutEffect(() => {
+			log('layout:' + name + count);
+			return () => log('layout-cleanup:' + name + count);
+		});
+		if (props.watch) {
+			useEffect(() => {
+				log('effect:' + name + count);
+				return () => log('cleanup:' + name + count);
+			});
+		}
+		<button id={props.name} data-uid={uid} ref={props.cell} onClick={() => setCount(count + 1)}>
+			{(props.name + ':' + theme + ':' + count) as string}
+		</button>
+	}
+
+	function Panel(props) @{
+		const [tick, setTick] = useState(0);
+		const log = props.log;
+		if (props.watch !== 'none') {
+			useEffect(() => {
+				log('watch:' + tick);
+				return () => log('unwatch:' + tick);
+			});
+		}
+		<section id="panel" data-tick={tick as number}>
+			<button id="tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+			@if (props.show) {
+				<Counter name="a" watch={true} log={props.log} cell={props.cell} />
+			}
+			<Counter name="b" watch={props.watch === 'all'} log={props.log} />
+		</section>
+	}
+
+	const Frame = memo(function Frame(props) @{
+		<div id="frame"><Counter name="m" watch={false} log={props.log} /></div>
+	});
+
+	export function App(props) @{
+		<Theme value={props.theme}>
+			<Activity mode={props.mode}>
+				<Panel show={props.show} watch={props.watch} log={props.log} cell={props.cell} />
+			</Activity>
+			<Frame log={props.log} />
+		</Theme>
+	}
+`;
+
+type StrongMode = 'strong' | 'default';
+
+function strongHookfulSource(mode: StrongMode): string {
+	return mode === 'strong'
+		? STRONG_HOOKFUL_LITE_SOURCE
+		: STRONG_HOOKFUL_LITE_SOURCE.replace('"use strong";', '');
+}
+
+function loadStrongHookfulApp(mode: StrongMode, environment: 'client' | 'server' = 'client') {
+	return loadCompiledFixtureSource(strongHookfulSource(mode), {
+		id: `strong-hookful-lite-${mode}.tsrx`,
+		mode: environment,
+		compileOptions: { hmr: false, dev: false },
+	});
+}
+
+describe('Strong hookful lite edges', () => {
+	it('lowers hookful callees to lite edges only in Strong mode', () => {
+		const lite = /_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*Counter,/g;
+		const strong = compile(strongHookfulSource('strong'), 'strong-hookful.tsrx', {
+			hmr: false,
+			dev: false,
+		}).code;
+		expect(strong.match(lite)).toHaveLength(3);
+		const compatible = compile(strongHookfulSource('default'), 'default-hookful.tsrx', {
+			hmr: false,
+			dev: false,
+		}).code;
+		expect(compatible.match(lite)).toBeNull();
+	});
+
+	function runHookfulScenario(mode: StrongMode): string[] {
+		const client = loadStrongHookfulApp(mode);
+		const log: string[] = [];
+		const cell = (el: Element | null) => log.push('ref:' + (el === null ? null : el.id));
+		const props = {
+			theme: 'light',
+			mode: 'visible',
+			show: true,
+			watch: 'all',
+			log: log.push.bind(log),
+			cell,
+		};
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			flushEffects();
+			const text = root.findAll('button[data-uid]').map((el) => el.textContent);
+			transcript.push(`${label} | ${text.join(' ')} | ${log.splice(0).join(' ')}`);
+		};
+		step('mount');
+		const panel = root.find('#panel');
+		const b = root.find('#b');
+		root.click('#a');
+		step('own update');
+		root.click('#tick');
+		step('parent update');
+		expect(root.find('#b')).toBe(b);
+		root.update(client.App, { ...props, theme: 'dark' });
+		step('context');
+		root.update(client.App, { ...props, theme: 'dark', watch: 'panel' });
+		step('skip child effect');
+		root.update(client.App, { ...props, theme: 'dark', watch: 'none' });
+		step('skip parent effect');
+		root.update(client.App, { ...props, theme: 'dark', watch: 'none', show: false });
+		step('arm off');
+		root.update(client.App, { ...props, theme: 'dark', show: true });
+		step('arm on');
+		root.update(client.App, { ...props, theme: 'dark', mode: 'hidden' });
+		step('hide');
+		root.update(client.App, { ...props, theme: 'dark' });
+		step('reveal');
+		expect(root.find('#panel')).toBe(panel);
+		expect(root.find('#b')).toBe(b);
+		root.unmount();
+		step('unmount');
+		// Passive mount effects are still queued when the root unmounts.
+		const early = mount(client.App, props);
+		early.unmount();
+		step('unmount before passive flush');
+		return transcript;
+	}
+
+	it('keeps state, effects, refs and context of hookful lite callees', () => {
+		const strong = runHookfulScenario('strong');
+		expect(strong).toEqual(runHookfulScenario('default'));
+		expect(strong).toEqual([
+			'mount | a:light:0 b:light:0 m:light:0 | ref:a layout:a0 layout:b0 layout:m0 effect:a0 effect:b0 watch:0',
+			'own update | a:light:1 b:light:0 m:light:0 | layout-cleanup:a0 layout:a1 cleanup:a0 effect:a1',
+			'parent update | a:light:1 b:light:0 m:light:0 | unwatch:0 watch:1',
+			'context | a:dark:1 b:dark:0 m:dark:0 | ',
+			'skip child effect | a:dark:1 b:dark:0 m:dark:0 | cleanup:b0',
+			'skip parent effect | a:dark:1 b:dark:0 m:dark:0 | unwatch:1',
+			'arm off | b:dark:0 m:dark:0 | layout-cleanup:a1 ref:null cleanup:a1',
+			'arm on | a:dark:0 b:dark:0 m:dark:0 | ref:a layout:a0 effect:a0 effect:b0 watch:1',
+			'hide | a:dark:0 b:dark:0 m:dark:0 | unwatch:1 layout-cleanup:a0 cleanup:a0 layout-cleanup:b0 cleanup:b0 ref:null',
+			'reveal | a:dark:0 b:dark:0 m:dark:0 | ref:a layout:a0 layout:b0 effect:a0 effect:b0 watch:1',
+			'unmount |  | layout-cleanup:a0 layout-cleanup:b0 layout-cleanup:m0 ref:null unwatch:1 cleanup:a0 cleanup:b0',
+			'unmount before passive flush |  | ref:a layout:a0 layout:b0 layout:m0 layout-cleanup:a0 layout-cleanup:b0 layout-cleanup:m0 ref:null',
+		]);
+	});
+
+	// Child owns state its parent's stable-hookful region does not witness, so
+	// the region must cover a Block that its own update re-renders directly,
+	// including when a hookless Wrap stands between them.
+	it.each<[StrongMode, boolean]>([
+		['strong', false],
+		['strong', true],
+		['default', false],
+		['default', true],
+	])(
+		'keeps a stable hookful region over a state owner fresh in %s mode (wrapped: %s)',
+		(mode, wrapped) => {
+			const child = wrapped ? '<Wrap label={props.label} />' : '<Child label={props.label} />';
+			const source = `${mode === 'strong' ? '"use strong";' : ''}
+				import { useState } from 'octane';
+				let parentSetter = null;
+				let childSetter = null;
+				export function bumpParent() { parentSetter((value) => value + 1); }
+				export function bumpChild() { childSetter((value) => value + 1); }
+				function Child(props) @{
+					const [own, setOwn] = useState(0);
+					childSetter = setOwn;
+					<b id="stable-child">{(props.label + ':' + own) as string}</b>
+				}
+				function Wrap(props) @{ <i><Child label={props.label} /></i> }
+				function Parent(props) @{
+					const [tick, setTick] = useState(0);
+					parentSetter = setTick;
+					<p id="stable-parent" data-tick={tick as number}>${child}</p>
+				}
+				export function App(props) @{ <Parent label={props.label} /> }`;
+			const options = { hmr: false, dev: false };
+			const parent = compile(source, `stable-hookful-${mode}.tsrx`, options).code;
+			// The region also witnesses the published setter. Only a default-mode
+			// Wrap may stay lite under it: there, Child keeps a Block of its own.
+			const slot = mode === 'default' && wrapped ? 'Lite' : 'Void';
+			expect(parent).toMatch(
+				new RegExp(
+					`\\|\\| _mc\\d+\\[\\d+\\] !== childSetter\\) \\{\\s+_\\$componentSlot${slot}\\(__s, 1,`,
+				),
+			);
+			const client = loadCompiledFixtureSource(source, {
+				id: `stable-hookful-${mode}.tsrx`,
+				mode: 'client',
+				compileOptions: options,
+			});
+			const root = mount(client.App, { label: 'x' });
+			const leaf = root.find('#stable-child');
+			flushSync(() => client.bumpChild());
+			expect(leaf.textContent).toBe('x:1');
+			flushSync(() => client.bumpParent());
+			expect(root.find('#stable-parent').getAttribute('data-tick')).toBe('1');
+			flushSync(() => client.bumpChild());
+			expect(root.find('#stable-child')).toBe(leaf);
+			expect(leaf.textContent).toBe('x:2');
+			// The single-root callee still needs no markers.
+			const html = '<b id="stable-child">x:2</b>';
+			expect(root.find('#stable-parent').innerHTML).toBe(wrapped ? `<i>${html}</i>` : html);
+			root.unmount();
+		},
+	);
+
+	// Reader registers an effect and then suspends through a legacy resource read,
+	// which keeps it lite. The inner boundary must catch it, discard the
+	// uncommitted attempt, and keep Counter's committed state across a re-suspend.
+	async function runSuspenseScenario(mode: StrongMode): Promise<string[]> {
+		const source = `${mode === 'strong' ? '"use strong";' : ''}
+			import { useEffect, useLayoutEffect, useState } from 'octane';
+			function Counter(props) @{
+				const [count, setCount] = useState(0);
+				const log = props.log;
+				useLayoutEffect(() => {
+					log('layout:' + count);
+					return () => log('layout-cleanup:' + count);
+				});
+				useEffect(() => {
+					log('effect:' + count);
+					return () => log('cleanup:' + count);
+				});
+				<button id="suspense-counter" onClick={() => setCount(count + 1)}>
+					{('count:' + count) as string}
+				</button>
+			}
+			function Reader(props) @{
+				const [seen] = useState(() => props.resource.label);
+				const log = props.log;
+				useEffect(() => {
+					log('read:' + seen);
+					return () => log('unread:' + seen);
+				});
+				const value = props.resource.read();
+				<i id="suspense-value">{(seen + '=' + value) as string}</i>
+			}
+			export function App(props) @{
+				@try {
+					<section>
+						@try {
+							<>
+								<Counter log={props.log} />
+								<Reader resource={props.resource} log={props.log} />
+							</>
+						} @pending {
+							<p id="inner-pending">{'inner'}</p>
+						}
+					</section>
+				} @pending {
+					<p id="outer-pending">{'outer'}</p>
+				}
+			}`;
+		const lite = /_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*(Counter|Reader),/g;
+		const code = compile(source, `suspense-${mode}.tsrx`, { hmr: false, dev: false }).code;
+		expect(code.match(lite)?.length ?? 0).toBe(mode === 'strong' ? 2 : 0);
+		const client = loadCompiledFixtureSource(source, {
+			id: `suspense-${mode}.tsrx`,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const resource = (label: string) => {
+			let settle!: () => void;
+			const promise = new Promise<void>((resolve) => (settle = resolve));
+			let done = false;
+			return {
+				label,
+				read() {
+					if (!done) throw promise;
+					return 'ready';
+				},
+				async resolve() {
+					done = true;
+					settle();
+					await act(async () => {
+						await promise;
+					});
+				},
+			};
+		};
+		const log: string[] = [];
+		const transcript: string[] = [];
+		const first = resource('first');
+		const root = mount<Record<string, unknown>>(client.App, {
+			resource: first,
+			log: log.push.bind(log),
+		});
+		const step = (label: string) => {
+			flushEffects();
+			const shown = root.findAll('p, button, i').map((el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')} | ${log.splice(0).join(' ')}`);
+		};
+		step('suspended mount');
+		await first.resolve();
+		step('revealed');
+		root.click('#suspense-counter');
+		step('own update');
+		const second = resource('second');
+		root.update(client.App, { resource: second, log: log.push.bind(log) });
+		step('re-suspended');
+		await second.resolve();
+		step('re-revealed');
+		root.unmount();
+		step('unmount');
+		return transcript;
+	}
+
+	it('suspends the nearest boundary from a hookful lite callee', async () => {
+		const strong = await runSuspenseScenario('strong');
+		expect(strong).toEqual(await runSuspenseScenario('default'));
+		expect(strong).toEqual([
+			'suspended mount | count:0 inner | ',
+			'revealed | count:0 first=ready | layout:0 effect:0 read:first',
+			'own update | count:1 first=ready | layout-cleanup:0 layout:1 cleanup:0 effect:1',
+			're-suspended | count:1 first=ready inner | layout-cleanup:1',
+			're-revealed | count:1 first=ready | layout:1 cleanup:1 unread:first effect:1 read:first',
+			'unmount |  | layout-cleanup:1 cleanup:1 unread:first',
+		]);
+	});
+
+	it.each<StrongMode>(['strong', 'default'])(
+		'hydrates hookful lite callees in place in %s mode',
+		(mode) => {
+			const server = loadStrongHookfulApp(mode, 'server');
+			const client = loadStrongHookfulApp(mode);
+			const log: string[] = [];
+			const cell = (el: Element | null) => log.push('ref:' + (el === null ? null : el.id));
+			const props = {
+				theme: 'light',
+				mode: 'visible',
+				show: true,
+				watch: 'all',
+				log: log.push.bind(log),
+				cell,
+			};
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(server.App, props).html;
+			expect(log).toEqual([]);
+			const buttons = Array.from(container.querySelectorAll('button[data-uid]'));
+			const ids = buttons.map((el) => el.getAttribute('data-uid'));
+			expect(buttons.map((el) => el.textContent)).toEqual(['a:light:0', 'b:light:0', 'm:light:0']);
+			const root = hydrateRoot(container, client.App, props);
+			flushEffects();
+			const hydrated = Array.from(container.querySelectorAll('button[data-uid]'));
+			expect(hydrated).toHaveLength(3);
+			hydrated.forEach((el, index) => expect(el).toBe(buttons[index]));
+			expect(hydrated.map((el) => el.getAttribute('data-uid'))).toEqual(ids);
+			expect(log.splice(0)).toEqual([
+				'ref:a',
+				'layout:a0',
+				'layout:b0',
+				'layout:m0',
+				'effect:a0',
+				'effect:b0',
+				'watch:0',
+			]);
+			flushSync(() => (buttons[0] as HTMLButtonElement).click());
+			flushSync(() => root.render(client.App, { ...props, theme: 'dark' }));
+			flushEffects();
+			expect(hydrated.map((el) => el.textContent)).toEqual(['a:dark:1', 'b:dark:0', 'm:dark:0']);
+			expect(log.splice(0)).toEqual(['layout-cleanup:a0', 'layout:a1', 'cleanup:a0', 'effect:a1']);
+			root.unmount();
+			expect(container.innerHTML).toBe('');
+		},
+	);
+
+	// Strong modules publish exports whose lite subtree holds hook state on a
+	// list of their own. Only a Strong importer runs them without a Block: a
+	// default importer's Block must not re-render for its child's update.
+	const STRONG_LITE_MODULES = {
+		counter: `"use strong";
+			import { useState } from 'octane';
+			export function Counter(props) @{
+				const [count, setCount] = useState(0);
+				<button class={props.name} onClick={() => setCount(count + 1)}>
+					{(props.name + ':' + count) as string}
+				</button>
+			}
+			export function Shell() @{ <p><Counter name="shell" /></p> }`,
+		// The ref keeps Wrap out of compiler regions, so it can publish a lite proof.
+		wrap: `"use strong";
+			import { Counter } from './counter';
+			export function Wrap(props) @{ <div ref={props.cell}><Counter name="wrapped" /></div> }`,
+		leaf: `"use strong";
+			export function Leaf(props) @{ <span class="leaf">{props.text as string}</span> }`,
+		app: `import { Counter, Shell } from './counter';
+			import { Wrap } from './wrap';
+			import { Leaf } from './leaf';
+			export function App(props) @{
+				props.onRender();
+				<section>
+					<Counter name="direct" />
+					<Shell />
+					<Wrap cell={props.cell} />
+					<Leaf text={props.text} />
+				</section>
+			}`,
+	};
+
+	// Only the pure Leaf publishes a compiler memo proof, as a production build does.
+	type StrongLiteProofs = Readonly<Record<string, readonly string[]>>;
+	function strongLiteOptions(lite: LiteProofs, strongLite: StrongLiteProofs) {
+		return {
+			...liteCompileOptions(lite),
+			isCompilerMemoImport: (request: string) => request === './leaf',
+			isStrongLiteComponentImport: (request: string, imported: string) =>
+				strongLite[request]?.includes(imported) === true,
+		};
+	}
+
+	it.each<StrongMode>(['strong', 'default'])(
+		'runs Strong hookful exports through lite edges only from a %s importer',
+		(mode) => {
+			const sources = STRONG_LITE_MODULES;
+			const listsOf = (
+				source: string,
+				id: string,
+				lite: LiteProofs,
+				strongLite: StrongLiteProofs,
+			) => {
+				const result = compile(source, id, strongLiteOptions(lite, strongLite)) as {
+					liteComponentExports?: string[];
+					strongLiteComponentExports?: string[];
+				};
+				return [result.liteComponentExports ?? [], result.strongLiteComponentExports ?? []];
+			};
+			const [counterLite, counterStrong] = listsOf(sources.counter, 'sl-counter.tsrx', {}, {});
+			expect([counterLite, counterStrong]).toEqual([[], ['Counter', 'Shell']]);
+			// A default module's hookful export keeps its Block, so Shell stays stateless.
+			expect(
+				listsOf(sources.counter.replace('"use strong";', ''), 'sl-counter-default.tsrx', {}, {}),
+			).toEqual([['Shell'], []]);
+			const [leafLite, leafStrong] = listsOf(sources.leaf, 'sl-leaf.tsrx', {}, {});
+			expect([leafLite, leafStrong]).toEqual([['Leaf'], []]);
+			// Shell and Wrap are hookless, but a lite edge to Counter brings its state along.
+			const strongLite = { './counter': counterStrong };
+			expect(listsOf(sources.wrap, 'sl-wrap.tsrx', {}, strongLite)).toEqual([[], ['Wrap']]);
+			const proofs = {
+				lite: { './leaf': { lite: leafLite, anchorless: [] } },
+				strongLite: { ...strongLite, './wrap': ['Wrap'] },
+			};
+			const app = mode === 'strong' ? `"use strong";\n${sources.app}` : sources.app;
+			const code = compile(
+				app,
+				`sl-app-${mode}.tsrx`,
+				strongLiteOptions(proofs.lite, proofs.strongLite),
+			).code;
+			const liteTags = (
+				code.match(/_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*(\w+),/g) ?? []
+			).map((call: string) => call.match(/(\w+),$/)![1]);
+			expect(liteTags).toEqual(mode === 'strong' ? ['Counter', 'Shell', 'Wrap', 'Leaf'] : ['Leaf']);
+
+			const load = (source: string, id: string, runtimeModules?: Record<string, any>) =>
+				loadCompiledFixtureSource(source, {
+					id,
+					mode: 'client',
+					compileOptions: strongLiteOptions(proofs.lite, proofs.strongLite),
+					runtimeModules,
+				});
+			const counter = load(sources.counter, 'sl-counter.tsrx');
+			const modules = {
+				'./counter': counter,
+				'./wrap': load(sources.wrap, 'sl-wrap.tsrx', { './counter': counter }),
+				'./leaf': load(sources.leaf, 'sl-leaf.tsrx'),
+			};
+			const client = load(app, `sl-app-${mode}.tsrx`, modules);
+			let renders = 0;
+			const cell = () => {};
+			const root = mount(client.App, { text: 'a', cell, onRender: () => renders++ });
+			const leaf = root.find('.leaf');
+			root.click('.direct');
+			root.click('.shell');
+			root.click('.wrapped');
+			root.click('.wrapped');
+			expect(root.find('.direct').textContent).toBe('direct:1');
+			expect(root.find('.shell').textContent).toBe('shell:1');
+			expect(root.find('.wrapped').textContent).toBe('wrapped:2');
+			if (mode === 'default') expect(renders).toBe(1);
+			root.update(client.App, { text: 'b', cell, onRender: () => renders++ });
+			expect(root.find('.leaf')).toBe(leaf);
+			expect(leaf.textContent).toBe('b');
+			expect(root.find('.wrapped').textContent).toBe('wrapped:2');
+			root.unmount();
+		},
+	);
+});
+
 describe('compiler-owned component-region memoization', () => {
 	it('keeps alternate Provider children distinct while retaining live form state', () => {
 		const client = loadCompiledFixtureSource(
@@ -2407,6 +2915,254 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	const CONTEXT_READER = `import { useContext, useState } from 'octane';
+		 import { Theme } from './theme';
+		 export function Reader(props) @{
+			const theme = useContext(Theme);
+			<b>{(props.label + ':' + theme) as string}</b>
+		 }`;
+
+	// A component a body names through a binding, or returns from its props, is
+	// unknown to the cache over that body, so it must still see a Provider change.
+	it.each([
+		['a local', `function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }`],
+		['a destructured prop', `function Tag({ comp: C }) @{ <i><C label="tag" /></i> }`],
+		[
+			'a local at the body root',
+			`function Tag(props) @{ const C = props.comp; <C label="tag" /> }`,
+		],
+		[
+			'a local inside @if',
+			`function Tag(props) @{ const C = props.comp; <i>@if (C) { <C label="tag" /> }</i> }`,
+		],
+		[
+			'a returned prop value',
+			`function Tag(props) { if (props.content) return props.content; return <i>{'off'}</i>; }`,
+		],
+		[
+			'a @switch case hole',
+			`function Tag(props) @{ <i>@switch (props.content ? 'shown' : 'hidden') { @case 'shown': { {props.content} } @default: { <s /> } }</i> }`,
+		],
+	])('refreshes a context consumer a cached callee renders through %s', (shape, tag) => {
+		const { App, Reader } = loadCompiledFixtureSource(
+			`${CONTEXT_READER}
+			 ${tag}
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Tag comp={props.comp} content={props.content} /></p></Theme>
+			 }`,
+			{
+				id: `auto-memo-bound-tag-${shape.replaceAll(' ', '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme: createContext('t0') } },
+			},
+		);
+		const content = createElement(Reader, { label: 'tag' });
+		const root = mount(App, { comp: Reader, content, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('tag:t1');
+			root.update(App, { comp: Reader, content, theme: 't2' });
+			expect(root.find('b').textContent).toBe('tag:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('refreshes a context consumer an imported cached callee renders through a local tag', () => {
+		const tag = loadImportedModule(
+			`export function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }`,
+			'imported-bound-tag.tsrx',
+		);
+		const { App, Reader } = loadImportedModule(
+			`${CONTEXT_READER}
+			 import { Tag } from './tag';
+			 export function App(props) @{
+				<Theme value={props.theme}><p><Tag comp={props.comp} /></p></Theme>
+			 }`,
+			'imported-bound-tag-parent.tsrx',
+			{ './tag': tag, './theme': { Theme: createContext('t0') } },
+		);
+		const root = mount(App, { comp: Reader, theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('tag:t1');
+			root.update(App, { comp: Reader, theme: 't2' });
+			expect(root.find('b').textContent).toBe('tag:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// The hook keeps List itself uncached, so only its whole-list cache, or the
+	// row cache under an iterable the list cannot cache, skips the rows.
+	it.each([
+		[
+			'a row local tag',
+			'props.items',
+			'',
+			`const C = item.comp; <li><C label={item.label} /></li>`,
+		],
+		[
+			'a parent local tag',
+			'props.items',
+			'const C = props.comp;',
+			`<li><C label={item.label} /></li>`,
+		],
+		['a value hole', 'props.items', '', `<li>{item.content}</li>`],
+		[
+			'a parent local tag in uncached rows',
+			'props.items.filter(Boolean)',
+			'const C = props.comp;',
+			`<li><C label={item.label} /></li>`,
+		],
+	])(
+		'refreshes a context consumer cached list rows render through %s',
+		(shape, iterable, setup, row) => {
+			const { App, Reader } = loadCompiledFixtureSource(
+				`${CONTEXT_READER}
+			 function List(props) @{
+				const [count] = useState(0);
+				${setup}
+				<ul data-count={count as number}>
+					@for (const item of ${iterable}; key item.id) { ${row} }
+				</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><List comp={props.comp} items={props.items} /></Theme>
+			 }`,
+				{
+					id: `auto-memo-bound-row-${shape.replaceAll(' ', '-')}.tsrx`,
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './theme': { Theme: createContext('t0') } },
+				},
+			);
+			const items = [
+				{ id: 1, label: 'row', comp: Reader, content: createElement(Reader, { label: 'row' }) },
+			];
+			const root = mount(App, { comp: Reader, items, theme: 't1' });
+			try {
+				expect(root.find('b').textContent).toBe('row:t1');
+				root.update(App, { comp: Reader, items, theme: 't2' });
+				expect(root.find('b').textContent).toBe('row:t2');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	// The owner's own update clears its context aggregate, then hits the cache.
+	// The hit must restore the skipped consumer's reads, or the next Provider
+	// change lets the owner's memo wall bail over it.
+	it.each([
+		[
+			'a list row hole',
+			`@for (const item of props.items; key item.id) { <li>{item.content}</li> }`,
+		],
+		[
+			'a list row tag',
+			`@for (const item of props.items; key item.id) { const C = item.comp; <li><C label="r" /></li> }`,
+		],
+		['a callee hole', `<Slot content={props.content} />`],
+		['a callee local tag', `<Tag comp={props.comp} />`],
+		['a memo() consumer below a callee', `<Wrapper label={props.content} />`],
+	])(
+		'refreshes context below a cache hit inside a re-rendered memo() owner through %s',
+		(shape, body) => {
+			const { App, Reader } = loadCompiledFixtureSource(
+				`import { memo } from 'octane';
+			 ${CONTEXT_READER}
+			 const MemoReader = memo(Reader);
+			 function Slot(props) @{ <span>{props.content}</span> }
+			 function Tag(props) @{ const C = props.comp; <span><C label="r" /></span> }
+			 function Wrapper(props) @{ <span><MemoReader label="r" /></span> }
+			 function List(props) @{
+				const [tick, setTick] = useState(0);
+				<ul data-tick={tick as number} onClick={() => setTick(tick + 1)}>${body}</ul>
+			 }
+			 const MemoList = memo(List);
+			 export function App(props) @{
+				<Theme value={props.theme}><MemoList items={props.items} content={props.content} comp={props.comp} /></Theme>
+			 }`,
+				{
+					id: `auto-memo-owner-hit-${shape.replaceAll(' ', '-').replace(/[()]/g, '')}.tsrx`,
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './theme': { Theme: createContext('t0') } },
+				},
+			);
+			const content = createElement(Reader, { label: 'r' });
+			const props = { items: [{ id: 1, comp: Reader, content }], content, comp: Reader };
+			const root = mount(App, { ...props, theme: 't1' });
+			try {
+				root.click('ul');
+				expect(root.find('ul').getAttribute('data-tick')).toBe('1');
+				expect(root.find('b').textContent).toBe('r:t1');
+				root.update(App, { ...props, theme: 't2' });
+				expect(root.find('b').textContent).toBe('r:t2');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('refreshes hydrated context consumers behind cached local tags and returns', () => {
+		const source = `${CONTEXT_READER}
+			 function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }
+			 function Returned(props) { if (props.content) return props.content; return <i>{'off'}</i>; }
+			 function List(props) @{
+				const [count] = useState(0);
+				<ul data-count={count as number}>
+					@for (const item of props.items; key item.id) {
+						const C = item.comp;
+						<li><C label={item.label} /></li>
+					}
+				</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}>
+					<p><Tag comp={props.comp} /></p>
+					<List items={props.items} />
+					<p><Returned content={props.content} /></p>
+				</Theme>
+			 }`;
+		const id = 'auto-memo-bound-tag-hydration.tsrx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './theme': { Theme: ServerRuntime.createContext('t0') } },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './theme': { Theme: createContext('t0') } },
+		});
+		const props = (Reader: any, theme: string) => ({
+			comp: Reader,
+			content: createElement(Reader, { label: 'returned' }),
+			items: [{ id: 1, label: 'row', comp: Reader }],
+			theme,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, props(server.Reader, 't1')).html;
+		const consumers = Array.from(container.querySelectorAll('b'));
+		const clientProps = props(client.Reader, 't1');
+		const root = hydrateRoot(container, client.App, clientProps);
+		const texts = () =>
+			Array.from(container.querySelectorAll('b'), (node, index) => {
+				expect(node).toBe(consumers[index]);
+				return node.textContent;
+			});
+		try {
+			expect(texts()).toEqual(['tag:t1', 'row:t1', 'returned:t1']);
+			flushSync(() => root.render(client.App, { ...clientProps, theme: 't2' }));
+			expect(texts()).toEqual(['tag:t2', 'row:t2', 'returned:t2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('keeps a pure callee lite inside its cache unless the cache must refresh context', () => {
 		const code = compile(LITE_CALLEE_REGION_SOURCE, 'lite-callee-region.tsrx', {
 			hmr: false,
@@ -2550,6 +3306,107 @@ describe('compiler-owned component-region memoization', () => {
 			expect(root.find('b').textContent).toBe('slot:t1');
 			root.update(App, { content, theme: 't2' });
 			expect(root.find('b').textContent).toBe('slot:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Each list skips its unchanged rows, and a filtered iterable or a selection
+	// change keeps any whole-list cache from covering them. Only that skip can
+	// then refresh a consumer a row renders from a value hole.
+	const FILTERED = '@for (const item of props.items.filter(Boolean); key item.id)';
+	const KEYED_ROWS = `@for (const item of props.items; key item.id) {
+		<li class={selected === item.id ? 'on' : ''}>{item.content}</li>
+	}`;
+	const MAPPED_ROWS = `{props.items.filter(Boolean).map((item) => <li key={item.id}>{item.content}</li>)}`;
+	function loadSkippedRows(shape: string, source: string) {
+		return loadCompiledFixtureSource(
+			`import { memo, useContext, useState } from 'octane';
+			 import { Theme } from './theme';
+			 export function Reader(props) @{
+				const theme = useContext(Theme);
+				<b>{(props.label + ':' + theme) as string}</b>
+			 }
+			 ${source}`,
+			{
+				id: `auto-memo-skipped-${shape.replaceAll(' ', '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme: createContext('t0') } },
+			},
+		);
+	}
+
+	it.each([
+		['item-only @for rows', `${FILTERED} { <li>{item.content}</li> }`],
+		[
+			'@for rows with a parent capture',
+			`${FILTERED} { <li data-count={count}>{item.content}</li> }`,
+		],
+		['component @for rows', `${FILTERED} { <Row content={item.content} /> }`],
+		['keyed selection rows', KEYED_ROWS],
+		['mapped rows', MAPPED_ROWS],
+	])('refreshes context consumers skipped %s render from value holes', (shape, rows) => {
+		const { App, Reader } = loadSkippedRows(
+			shape,
+			`function Row(props) @{ <li>{props.content}</li> }
+			 function List(props) @{
+				const [count] = useState(0);
+				const selected = props.selected;
+				<ul data-count={count as number}>${rows}</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><List items={props.items} selected={props.selected} /></Theme>
+			 }`,
+		);
+		const items = [1, 2, 3].map((id) => ({
+			id,
+			content: createElement(Reader, { label: 'r' + id }),
+		}));
+		const root = mount(App, { items, selected: 1, theme: 't1' });
+		const texts = () =>
+			Array.from(root.container.querySelectorAll('b'), (node) => node.textContent);
+		try {
+			expect(texts()).toEqual(['r1:t1', 'r2:t1', 'r3:t1']);
+			root.update(App, { items, selected: 2, theme: 't2' });
+			expect(texts()).toEqual(['r1:t2', 'r2:t2', 'r3:t2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// A memoized owner's own update clears the context reads it recorded while
+	// every consumer row is skipped. Unless the skipped rows restore them, the
+	// owner's later bail on a Provider change strands the consumer.
+	it.each([
+		['@for rows', `${FILTERED} { <li>{item.content}</li> }`],
+		['keyed selection rows', KEYED_ROWS],
+		['mapped rows', MAPPED_ROWS],
+	])('refreshes consumers in skipped %s below a locally updated memo owner', (shape, rows) => {
+		const { App, Reader } = loadSkippedRows(
+			`memo-owner ${shape}`,
+			`function List(props) @{
+				const [selected, setSelected] = useState(1);
+				<ul onClick={() => setSelected(3 - selected)}>${rows}</ul>
+			 }
+			 const MemoList = memo(List);
+			 export function App(props) @{
+				<Theme value={props.theme}><MemoList items={props.items} /></Theme>
+			 }`,
+		);
+		// Only the third row holds a consumer, so selecting the first two rows
+		// never renders it.
+		const items = [1, 2, 3].map((id) => ({
+			id,
+			content: id === 3 ? createElement(Reader, { label: 'r3' }) : 'r' + id,
+		}));
+		const root = mount(App, { items, theme: 't1' });
+		try {
+			root.click('ul');
+			root.click('ul');
+			expect(root.find('b').textContent).toBe('r3:t1');
+			root.update(App, { items, theme: 't2' });
+			expect(root.find('b').textContent).toBe('r3:t2');
 		} finally {
 			root.unmount();
 		}

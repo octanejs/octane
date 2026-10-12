@@ -653,6 +653,8 @@ interface ChildScope {
 	// lookup, and the key is only an identity tag — unmount walks `children` directly).
 	key: symbol | string | number;
 	scope: Scope;
+	/** The parent's `_slots` length at registration: walks visit it before that slot. */
+	at: number;
 }
 
 /**
@@ -701,6 +703,10 @@ let STAGED_COMMIT_CAPTURE: StagedCommitCapture | null = null;
 // delegates events; the dispatch loop still records the submit for manual
 // useFormStatus activation.
 let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
+// Only a recorded context read can leave a skipped list row stale, so the
+// recorder installs the row refresh and applications that never read context
+// omit the refresh graph from their lists.
+let SKIPPED_ROW_REFRESH: typeof refreshSkippedRows | null = null;
 // Record actual committed ref identities only when an Activity is in use. A
 // hidden render may already have replaced its manifest's ref before cleanup;
 // the committed identity is the one that must be disconnected exactly once.
@@ -13226,6 +13232,10 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		}
 		if (useSingleRoot) {
 			const d = out as ElementDescriptor;
+			// A value-position mount, as childSlot's are: the body may return one it
+			// received (`return props.content`), which a cached region skips with the
+			// body. Arm it as childSlot does, through the Block it inherits from.
+			if (!block.memoInChain) promoteMemoAncestry(block);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -13628,7 +13638,11 @@ export function componentSlotLite<P>(
 		}
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
-		(parentScope.children ??= []).push({ key: slotKey, scope });
+		(parentScope.children ??= []).push({
+			key: slotKey,
+			scope,
+			at: parentScope._slots === null ? 0 : parentScope._slots.length,
+		});
 		if (unframed !== undefined) {
 			mountUnframedLite(
 				hydration!,
@@ -13660,6 +13674,12 @@ export function componentSlotLite<P>(
 	}
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
+	// A Strong hookful body keeps its effects on this Scope. Count the call sites
+	// it reaches apart from the owning Block's, as renderBlockInner does per
+	// Block, so finishEffectRender retires exactly the ones this render skipped.
+	const effectReached = CURRENT_EFFECT_REACHED;
+	CURRENT_EFFECT_REACHED = 0;
+	if (scope.effectSlots !== null) ensureEffectRenderVersion();
 	CURRENT_SCOPE = scope;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(scope, comp);
@@ -13689,6 +13709,7 @@ export function componentSlotLite<P>(
 		} else comp(props, scope, undefined);
 		if (hydration !== null) hydration.settleUnclaimed(scope);
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
+		if (scope.effectSlots !== null) finishEffectRender(scope);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
@@ -13702,6 +13723,7 @@ export function componentSlotLite<P>(
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		if (ACTIVE_WARM_PLANS.length !== warmPlanCheckpoint)
 			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		CURRENT_EFFECT_REACHED = effectReached;
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
@@ -14018,6 +14040,9 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	if (effects !== null) {
 		for (let i = 0; i < effects.length; i++) {
 			const slot = effects[i];
+			// Retire this call site's queued entries. The drains skip a disposed
+			// Block's, but a lite Scope's stand-in is never disposed.
+			slot.revision++;
 			const cleanup = slot.cleanup;
 			if (cleanup === undefined) continue;
 			slot.cleanup = undefined;
@@ -14140,18 +14165,22 @@ function unmountScopeChildrenAndSlots(
 // component's hook-owned subscriptions while fully deleting rendered children.
 // Ordinary unmount still calls both halves above in the established order.
 function unmountScopeChildrenAndSlotsOnly(scope: Scope, detachDom: boolean): void {
-	// Then recurse into child scopes (parent → child order).
+	// Then recurse into child scopes and slot-stashed child Blocks (ifBlock /
+	// forBlock / componentSlot / portal), parent → child, siblings in the order
+	// they registered (ChildScope.at), so their teardown follows the tree.
 	const children = scope.children;
-	if (children !== null)
-		for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
-	// Walk slot-stashed child Blocks (ifBlock / forBlock / componentSlot / portal).
 	const slots = scope._slots;
+	let c = 0;
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
-			const val = slots[i];
-			unmountSlot(val, detachDom);
+			if (children !== null)
+				for (; c < children.length && children[c].at <= i; c++)
+					unmountScope(children[c].scope, detachDom);
+			unmountSlot(slots[i], detachDom);
 		}
 	}
+	if (children !== null)
+		for (; c < children.length; c++) unmountScope(children[c].scope, detachDom);
 }
 
 function unmountSlot(val: any, detachDom: boolean): void {
@@ -18951,6 +18980,7 @@ function promoteMemoAncestry(scope: Scope): void {
 
 function recordContextDependency(block: Block | null, context: Context<any>): void {
 	if (block === null || !block.memoInChain) return;
+	SKIPPED_ROW_REFRESH = refreshSkippedRows;
 	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
@@ -36748,7 +36778,11 @@ export function hostComponent(
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
 		const childScope = new ScopeImpl(scope, block);
 		state.childScope = childScope;
-		(scope.children ??= []).push({ key: slot, scope: childScope });
+		(scope.children ??= []).push({
+			key: slot,
+			scope: childScope,
+			at: scope._slots === null ? 0 : scope._slots.length,
+		});
 		domNode(block.parentNode).insertBefore(el, anchor ?? block.endMarker);
 		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
 	}
@@ -38977,6 +39011,7 @@ function renderPreparedChildList(
 			tail: null,
 			size: 0,
 			cachedDeps: null,
+			ctxEpoch: 0,
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
@@ -39147,6 +39182,7 @@ function renderPreparedChildList(
 			ssrMarkerless,
 			normalizeKey,
 		);
+		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state.forSlot, parentBlock);
 	}
 	// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 	// children whose keys have no new item) are orphans inside the range —
@@ -41059,9 +41095,9 @@ function refreshCachedBlock(block: Block, contextChanged: boolean): void {
  * that reconciliation, so an intervening Provider commit must refresh the
  * slot's existing Block(s) directly. Activity/Suspense reveals must also
  * reconnect effects retained by a skipped subtree, in its live source order,
- * and opted-in renderable-array regions restore their descendants' context
- * reads onto memoized ancestors. Existing mapped regions keep their original
- * constant-time hit; only array-region hits inspect precomputed memo ancestry.
+ * and a hit (`restampMemoAncestors`) restores its descendants' context reads
+ * onto memoized ancestors, whose own render cleared them. Outside a memo chain
+ * a hit stays constant-time.
  * `previous === undefined` snapshots the epoch after a cache miss without
  * revisiting the freshly-rendered subtree.
  * @internal
@@ -41125,6 +41161,20 @@ export function compilerCacheContext(
 	}
 	if (restamp) restampCachedSlotContext(slot);
 	return current;
+}
+
+/**
+ * Compiler ABI for a component tag bound inside the body (`const C =
+ * props.comp; <C />`). Every other component a cached region skips either reads
+ * no context or records its reads (memo walls, value-position mounts). This
+ * one is unknown until render, so arm the scope before its slot mounts: Blocks
+ * created below inherit memoInChain, and compilerCacheContext's refresh then
+ * finds the consumer.
+ * @internal
+ */
+export function compilerOpaqueTag<T>(scope: Scope, tag: T): T {
+	if (!scope.block.memoInChain) promoteMemoAncestry(scope);
+	return tag;
 }
 
 const OBJ_PROTO = Object.prototype;
@@ -47651,11 +47701,14 @@ function forEachSubtreeChild(
 	visit: (child: Scope) => void,
 	includeHiddenTry: boolean = true,
 ): void {
+	// Child scopes interleave with the slots by ChildScope.at, as unmount walks.
 	const children = scope.children;
-	if (children !== null) for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
 	const slots = scope._slots;
+	let c = 0;
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
+			if (children !== null)
+				for (; c < children.length && children[c].at <= i; c++) visit(children[c].scope);
 			const val = slots[i];
 			if (val.__kind === 'forBlockSlot') {
 				for (let b: Block | null = val.head; b !== null; b = b.nextSibling) visit(b);
@@ -47682,6 +47735,7 @@ function forEachSubtreeChild(
 			} else if (val.lite != null) visit(val.lite);
 		}
 	}
+	if (children !== null) for (; c < children.length; c++) visit(children[c].scope);
 }
 
 // Detach every host ref in a subtree (object refs → null, callback refs called with
@@ -48055,6 +48109,10 @@ interface ForSlot {
 	// the runtime treats the body as PURE for the survivor short-circuit — saving
 	// the entire body call for every item whose ref + position are unchanged.
 	cachedDeps: any[] | null;
+	// Context epoch at which every row was last rendered or refreshed. A pure
+	// skip bypasses its rows' renders, so refreshSkippedRows compares this
+	// before revisiting them.
+	ctxEpoch: number;
 	// `@for (...) { ... } @empty { ... }` support: mounted-empty-branch Block,
 	// or null when there are items (or no `@empty` branch was compiled). The
 	// empty body is hoisted by the compiler as its own helper and passed to
@@ -48202,6 +48260,7 @@ export function forBlock<T>(
 			tail: null,
 			size: 0,
 			cachedDeps: null,
+			ctxEpoch: 0,
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
@@ -48386,12 +48445,32 @@ export function forBlock<T>(
 			(f & 8) !== 0,
 			(f & 16) !== 0,
 		);
+		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentBlock);
 	}
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
 	hydration?.parkPast(state.end, parentScope);
+}
+
+// A pure row skip bypasses the row's render, and with it the context work its
+// slots would do: a value hole can still mount a consumer, as an armed
+// childSlot that records its reads. So, as a memo bail does, a skipped row
+// refreshes after a Provider commit when it is stamped at an older epoch, and
+// under memo ancestry restores its reads onto the ancestors whose render
+// cleared them. A pure body is hookless, so a row with no child scope or slot
+// reads no context.
+function refreshSkippedRows(list: ForSlot, owner: Block): void {
+	const epoch = contextEpochNow();
+	const refresh = list.ctxEpoch !== epoch;
+	if (!refresh && !owner.memoInChain) return;
+	for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
+		if (item._slots === null && item.children === null) continue;
+		if (refresh && item.$$ctxDepsEpoch !== epoch) refreshBlockForContext(item);
+		if (owner.memoInChain) restampCachedContextScope(item);
+	}
+	list.ctxEpoch = epoch;
 }
 
 /**
@@ -48442,6 +48521,7 @@ export function keyedForBlock<T>(
 			selectionBody,
 		)
 	) {
+		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentScope.block);
 		return;
 	}
 

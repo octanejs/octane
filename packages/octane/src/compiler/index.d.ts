@@ -137,6 +137,8 @@ export interface CompileOptions {
 	isCompilerMemoImport?: (request: string, imported: string) => boolean;
 	/** Whether an imported component's module published it as a lite export. */
 	isLiteComponentImport?: (request: string, imported: string) => boolean;
+	/** Whether a Strong module published an export whose lite subtree holds hook state. */
+	isStrongLiteComponentImport?: (request: string, imported: string) => boolean;
 	/** Whether a lite import's module also published its body root as anchorless-safe. */
 	isAnchorlessComponentImport?: (request: string, imported: string) => boolean;
 	isDescriptorChildrenImport?: (request: string, imported: string) => boolean;

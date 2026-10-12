@@ -1,5 +1,3 @@
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { analyzeCompiledModule, findVoidComponentImports } from 'octane/compiler/bundler';
 import { sourceHash } from './module-graph.js';
 
@@ -15,9 +13,53 @@ const RELATIVE_IMPORT = /\bfrom\s*['"]\.\.?\//;
 const ROOT_FACTORY_IMPORT =
 	/\bimport\s*\{[^}]*\b(?:createRoot|hydrateRoot)\b[^}]*\}\s*from\s*['"]octane['"]/;
 
-// Resolved from the module's own path: a jsdom test environment replaces the
-// global URL, which Node's fileURLToPath then rejects.
-const FINALIZE_LOADER = join(dirname(fileURLToPath(import.meta.url)), 'finalize-loader.js');
+// SWC options that only parse, lower syntax, or add helper and polyfill
+// imports. Any other option, such as optimizer globals, const modules, import
+// rewrites, React transforms, minification or wasm plugins, can rewrite a body.
+const LOWERING_SWC_OPTIONS = {
+	detectSyntax: true,
+	isModule: true,
+	sourceMaps: true,
+	inputSourceMap: true,
+	collectTypeScriptInfo: true,
+	env: true,
+	jsc: {
+		parser: true,
+		target: true,
+		loose: true,
+		externalHelpers: true,
+		keepClassNames: true,
+		output: true,
+		experimental: {
+			cacheRoot: true,
+			keepImportAttributes: true,
+			emitAssertForImportAttributes: true,
+			disableAllLints: true,
+		},
+		transform: {
+			legacyDecorator: true,
+			decoratorMetadata: true,
+			decoratorVersion: true,
+			useDefineForClassFields: true,
+			verbatimModuleSyntax: true,
+		},
+	},
+};
+
+function lowersOnlyOptions(options, allowed = LOWERING_SWC_OPTIONS) {
+	return (
+		options !== null &&
+		typeof options === 'object' &&
+		Object.entries(options).every(([key, value]) => {
+			const rule = Object.hasOwn(allowed, key) ? allowed[key] : undefined;
+			return (
+				value === undefined ||
+				rule === true ||
+				(rule !== undefined && lowersOnlyOptions(value, rule))
+			);
+		})
+	);
+}
 
 export function voidImportKey(request, imported) {
 	return `${request}\0${imported}`;
@@ -34,15 +76,18 @@ export function anchorlessImportKey(request, imported) {
 
 /**
  * Lite is a fact about the body Octane emitted: it calls no hook and reads no
- * context or signal that an importer's lite edge would misplace. Only Octane's
- * own finalizer and SWC's syntax lowering may stand between that body and the
- * module's final code; any other later loader could add such a read.
+ * context or signal that an importer's lite edge would misplace. Only SWC's
+ * syntax lowering may stand between that body and the module's final code; any
+ * other later loader or SWC option could add such a read. Loader options are
+ * visible on the main thread only, so the parallel finalizer's pitch, which
+ * runs after every later loader is known, records this for its worker.
  */
-function lowersOnly(context) {
+export function lowersOnly(context) {
 	return (
 		context.loaders
 			?.slice(0, context.loaderIndex)
-			.every(({ path }) => path === FINALIZE_LOADER || path === 'builtin:swc-loader') === true
+			.every(({ path, options }) => path === 'builtin:swc-loader' && lowersOnlyOptions(options)) ===
+		true
 	);
 }
 
@@ -136,7 +181,8 @@ export function finishVoidComponents(context, prepared, result) {
 		compiled && Array.isArray(result.voidComponentExports) ? result.voidComponentExports : [];
 	const memoExports =
 		compiled && Array.isArray(result.compilerMemoExports) ? result.compilerMemoExports : [];
-	const lowered = compiled && lowersOnly(context);
+	const lowered =
+		compiled && (context[VOID_COMPONENT_CONTEXT_KEY].lowersOnly ?? lowersOnly(context));
 	const lite =
 		lowered && Array.isArray(result.liteComponentExports) ? result.liteComponentExports : [];
 	const anchorless =

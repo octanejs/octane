@@ -1615,6 +1615,7 @@ function importSpecifierPair(entry) {
 const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'compilerMemoRegion',
 	'compilerMemoWitness',
+	'compilerOpaqueTag',
 	'markCompilerMemo',
 	'hookMemoCreate',
 	'hookMemoEqual',
@@ -5678,7 +5679,9 @@ function rendersOpaqueChild(root, locals, ctx) {
 			node.type === 'FunctionDeclaration';
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(node[key], key === 'children', inner);
+			// A `@switch` case holds its output hole directly, not under `children`.
+			const hole = key === 'children' || (key === 'consequent' && node.type === 'SwitchCase');
+			walk(node[key], hole, inner);
 		}
 	}
 	walk(root, false, false);
@@ -5729,6 +5732,20 @@ function isOpaqueRenderable(expression) {
 }
 
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
+
+// Builtins a Strong callee may call and still render through componentSlotLite.
+// Each keeps its cell in CURRENT_SCOPE and schedules CURRENT_BLOCK. `use` stores
+// its thenables by call order on the Block, and the other builtins read or stage
+// per-Block render state, so they keep a Block until audited.
+const STRONG_LITE_HOOKS = new Set([
+	'useState',
+	'useReducer',
+	'useRef',
+	'useEffect',
+	'useLayoutEffect',
+	'useContext',
+	'useId',
+]);
 
 function autoMemoBuiltinHookName(call, ctx) {
 	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
@@ -11810,6 +11827,10 @@ function compileInternal(
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
 		isLiteComponentImport:
 			typeof options?.isLiteComponentImport === 'function' ? options.isLiteComponentImport : null,
+		isStrongLiteComponentImport:
+			typeof options?.isStrongLiteComponentImport === 'function'
+				? options.isStrongLiteComponentImport
+				: null,
 		isAnchorlessComponentImport:
 			typeof options?.isAnchorlessComponentImport === 'function'
 				? options.isAnchorlessComponentImport
@@ -12289,6 +12310,9 @@ function compileInternal(
 		? collectPrivateUnescapedComponents(ast.body, ctx)
 		: new Set();
 	ctx.exportedLocals = ctx.autoMemo ? collectExportedLocals(ast.body) : null;
+	const strongLiteHooks = ctx.strongMemo === true && !ctx.nativeReads;
+	// Inferred effect deps read methods through this compiler helper.
+	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
 	for (const [, info] of ctx.componentInfo) {
 		const compNode = info.node;
 		// The body proof belongs to the initial function object. A writable
@@ -12397,7 +12421,11 @@ function compileInternal(
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
 		// these functions may participate in output-shape proofs but never lite.
+		// Strong render purity also admits the builtins in STRONG_LITE_HOOKS: their
+		// cells live in the lite Scope, and an update re-renders the nearest real
+		// Block, which re-runs this body without an observable difference.
 		let eligible = info.voidOutput;
+		let liteHooks = false;
 		for (const n of free) {
 			if (
 				HOOK_NAMES.has(n) ||
@@ -12406,6 +12434,10 @@ function compileInternal(
 				n === 'memo' ||
 				n === 'createPortal'
 			) {
+				if (strongLiteHooks && STRONG_LITE_HOOKS.has(ctx.octaneImportLocals.get(n))) {
+					liteHooks = true;
+					continue;
+				}
 				eligible = false;
 				break;
 			}
@@ -12447,7 +12479,12 @@ function compileInternal(
 				if (t === 'TryStatement' || t === 'JSXTryExpression') return true;
 				if (t === 'CallExpression' && n.callee && n.callee.type === 'Identifier') {
 					const cname = n.callee.name;
-					if (!locals.has(cname) && !ctx.componentInfo.has(cname) && !HOOK_NAMES.has(cname)) {
+					if (
+						!locals.has(cname) &&
+						!ctx.componentInfo.has(cname) &&
+						!HOOK_NAMES.has(cname) &&
+						!(liteHooks && (cname === 'useContext' || cname === methodDepLocal))
+					) {
 						return true;
 					}
 				}
@@ -12496,6 +12533,15 @@ function compileInternal(
 			if (inheritSoleCompRoot(bodyNodes, ctx)) eligible = false;
 		}
 		info.eligible = eligible && !compNode._octaneBindingView;
+		info.liteHooks = info.eligible && liteHooks;
+		// Whether a lite edge to this body can bring hook state into its caller's
+		// Block: settled across same-module callees below.
+		info.liteStateful =
+			info.liteHooks ||
+			(strongLiteHooks && info.eligible && [...free].some((name) => isStrongLiteImport(ctx, name)));
+		info.liteCallees = strongLiteHooks
+			? [...free].filter((name) => ctx.componentInfo.has(name))
+			: [];
 		// Single-ELEMENT-root output: the component's body renders exactly one plain
 		// DOM element (not a component tag, fragment, or control-flow). Such a
 		// component self-delimits via that element on CLIENT mount — its
@@ -12609,6 +12655,15 @@ function compileInternal(
 		info.autoMemoImportedComponents = [...state.importedComponents].sort();
 		info.autoMemoMayReadContext = state.mayReadContext;
 	}
+	for (let changed = strongLiteHooks; changed;) {
+		changed = false;
+		for (const info of ctx.componentInfo.values()) {
+			if (info.eligible !== true || info.liteStateful) continue;
+			if (info.liteCallees.some((name) => ctx.componentInfo.get(name).liteStateful)) {
+				info.liteStateful = changed = true;
+			}
+		}
+	}
 	if (ctx.autoMemo) {
 		classifyStableHookfulChildCalls(ast.body, ctx);
 		ctx.privateMappedProviderComponents = collectPrivateMappedProviderComponents(ast.body, ctx);
@@ -12639,14 +12694,19 @@ function compileInternal(
 		}
 	}
 	// Anchorless append-safety for componentSlotLite call sites (see
-	// anchorlessRootShape for the shape rules and the hazard). Optimistic
+	// anchorlessRootShape for the shape rules and the hazard). A component arm
+	// inherits its lite callee's hazard: an arm that self-marked on the callee's
+	// element keeps no pair, so when the callee's root branch empties it anchors
+	// on the node after that element. Without anchors that node is the next
+	// sibling's, which a later render of that sibling may replace. Optimistic
 	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
 	// components stay safe; a locally-unsafe shape drains through its
 	// dependents, so declaration order and recursion do not matter. An edge to a
 	// non-lite callee is safe outright — its componentSlot mints its own
-	// positional markers. So is an imported one, even when proven lite: it still
-	// renders inside its arm's own branch range. That keeps this proof, which
-	// lite exports publish, independent of every other module's proofs.
+	// positional markers. An imported edge is not followed either, which keeps
+	// this proof, which lite exports publish, independent of every other
+	// module's proofs; that leaves a proven-lite import that is not anchorless
+	// exposed to the hazard above.
 	let unsafeWorklist = null;
 	for (const [name, info] of ctx.componentInfo) {
 		info.anchorlessRootShape = anchorlessRootShape(info.node);
@@ -13194,10 +13254,13 @@ function compileInternal(
 	};
 	if (ctx.compilerMemoExports.length > 0) result.compilerMemoExports = ctx.compilerMemoExports;
 	if (ctx.autoMemo) {
-		const { lite, anchorless } = collectLiteComponentExports(ast.body, ctx);
+		const { lite, anchorless } = collectLiteComponentExports(ast.body, ctx, false);
 		if (lite.length > 0) result.liteComponentExports = lite;
 		if (anchorless.length > 0) result.anchorlessComponentExports = anchorless;
 	}
+	// Strong-lite calls keep their anchors: anchorless proofs cover the hookless list.
+	const strongLite = ctx.strongMemo ? collectLiteComponentExports(ast.body, ctx, true).lite : [];
+	if (strongLite.length > 0) result.strongLiteComponentExports = strongLite;
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -17105,6 +17168,18 @@ function isProvenLiteImport(ctx, name) {
 	);
 }
 
+// Whether a Strong importer may inline an export whose lite subtree holds hook
+// state: see collectLiteComponentExports.
+function isStrongLiteImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		ctx.strongMemo === true &&
+		!ctx.nativeReads &&
+		binding !== undefined &&
+		ctx.isStrongLiteComponentImport?.(binding.request, binding.imported) === true
+	);
+}
+
 // Whether the bundler also proved a lite import's body root anchorless-safe:
 // see collectLiteComponentExports.
 function isProvenAnchorlessImport(ctx, name) {
@@ -17115,14 +17190,16 @@ function isProvenAnchorlessImport(ctx, name) {
 	);
 }
 
-// Exports an importer may call through componentSlotLite: hookless void bodies
+// Exports an importer may call through componentSlotLite: void bodies
 // (componentInfo.eligible) that a cached region can skip without refreshing
 // context. A region over a body without a compiler memo proof always misses,
 // so only a proven body must also be context-free. A native-read body would
 // subscribe the importer's region owner, which a cache hit does not re-run.
 // `anchorless` lists the lite exports whose body root holds its position
 // (anchorlessRootSafe), so an importer's call needs no anchor either.
-function collectLiteComponentExports(body, ctx) {
+// A `stateful` body's hooks would run against the importer's Block, which only
+// a Strong importer may re-render unobservably, so it gets its own list.
+function collectLiteComponentExports(body, ctx, stateful) {
 	const lite = [];
 	const anchorless = [];
 	if (ctx.nativeReads) return { lite, anchorless };
@@ -17130,6 +17207,7 @@ function collectLiteComponentExports(body, ctx) {
 		const info = ctx.componentInfo.get(local);
 		if (
 			info?.eligible !== true ||
+			info.liteStateful !== stateful ||
 			(info.autoMemoSafe && info.autoMemoMayReadContext) ||
 			ctx._universalRuntimeUnitsByBinding.has(local)
 		)
@@ -27601,7 +27679,6 @@ function emitAutoMemoRegion(
 	contextAware,
 	depNode,
 	initValue = null,
-	restoreCachedContext = false,
 	publicationWitnesses = null,
 	sameValueDependencies = false,
 	strictEqualityDependencyIndex = -1,
@@ -27746,23 +27823,24 @@ function emitAutoMemoRegion(
 		]);
 	}
 	ctx.runtimeNeeded.add('compilerCacheContext');
-	const cacheContextCall = () =>
-		restoreCachedContext
-			? b.call(
-					'_$compilerCacheContext',
-					b.id('__s'),
-					b.literal(slotIndex),
-					cacheAt(contextIndex),
-					b.literal(true),
-				)
-			: b.call('_$compilerCacheContext', b.id('__s'), b.literal(slotIndex), cacheAt(contextIndex));
+	// A hit restores the skipped subtree's context reads onto memoized ancestors,
+	// whose own render cleared them. A miss renders or bails every descendant,
+	// and those record their reads themselves.
+	const cacheContextCall = (hit) =>
+		b.call(
+			'_$compilerCacheContext',
+			b.id('__s'),
+			b.literal(slotIndex),
+			cacheAt(contextIndex),
+			...(hit ? [b.literal(true)] : []),
+		);
 	return b.block([
 		...depDecls,
 		b.if(
 			orChain(misses),
 			b.block([
 				...computeStatements,
-				b.const('_c', cacheContextCall()),
+				b.const('_c', cacheContextCall(false)),
 				writable(),
 				...publish(),
 				b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c'))),
@@ -27771,7 +27849,7 @@ function emitAutoMemoRegion(
 			b.block([
 				profileHit(),
 				...replayNative,
-				b.const('_c', cacheContextCall()),
+				b.const('_c', cacheContextCall(true)),
 				b.if(
 					b.binary('!==', b.id('_c'), cacheAt(contextIndex)),
 					b.block([writable(), b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c')))]),
@@ -29109,7 +29187,6 @@ function planJsx(
 					fc.autoMemoContextAware,
 					depNode,
 					b.id(nativeName),
-					false,
 					null,
 					sameValueListDependencies,
 					strictListDependencyIndex,
@@ -29160,7 +29237,6 @@ function planJsx(
 				fc.autoMemoContextAware,
 				depNode,
 				null,
-				false,
 				null,
 				sameValueListDependencies,
 				strictListDependencyIndex,
@@ -29353,7 +29429,6 @@ function planJsx(
 						true,
 						undefined,
 						null,
-						true,
 					);
 					pushAfterStmt(
 						cc.id,
@@ -29457,7 +29532,6 @@ function planJsx(
 						true,
 						undefined,
 						null,
-						true,
 					);
 					update = b.if(b.call('_$compilerCacheArray', V(), chp()), cached, ordinary);
 				}
@@ -29602,7 +29676,6 @@ function planJsx(
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
 					null,
-					false,
 					cc.autoMemoPublicationWitnesses,
 					true,
 					-1,
@@ -34692,7 +34765,7 @@ function makeCompCall(
 			if (ctx._universalRuntimeUnit == null && ctx.presentationHydration == null) {
 				// A proven lite export renders like a same-module lite callee.
 				const lite = isProvenLiteImport(ctx, compName);
-				if (lite) liteEligible = callSiteOk;
+				if (lite || isStrongLiteImport(ctx, compName)) liteEligible = callSiteOk;
 				if (isCompilerMemoImport(ctx, compName)) {
 					memoCallee = {
 						autoMemoSafe: true,
@@ -34779,6 +34852,12 @@ function makeCompCall(
 					});
 					autoMemoDepNodes = callsiteDeps.dependencyNodes;
 					if (stableHookful) {
+						// The region does not witness state held in a Strong callee's lite
+						// subtree, so that callee keeps the Block its updates re-render.
+						if (memoCallee.liteStateful) {
+							liteEligible = false;
+							singleRoot = memoCallee.singleRoot === true;
+						}
 						autoMemoLite = liteEligible;
 						autoMemoPublicationWitnesses = memoCallee.stableHookfulChild.publications;
 					} else {
@@ -34815,6 +34894,17 @@ function makeCompCall(
 			voidComponent = true;
 		}
 	}
+	// A tag bound in this body names a component no proof covers, yet a cached
+	// region may skip it. Arm its context reads so the region's refresh, which
+	// rendersOpaqueChild requests, finds them. A split module's certified
+	// captures keep their module identity.
+	if (
+		ctx.autoMemo &&
+		ctx.currentComponentLocals?.has(compName) &&
+		!isImmutableComponentTag(node.openingElement?.name ?? node.id, ctx) &&
+		!isPrivateSplitContextProvider(node, ctx)
+	)
+		compNode = b.call(requireRuntimeForContext(ctx, 'compilerOpaqueTag'), b.id('__s'), compNode);
 
 	// Append-safety for the anchorless all-component-children emission (see
 	// emitElementHtml). Only a componentSlotLite lowering can lose its
@@ -35491,7 +35581,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			itemMemoWitnesses = [
 				...collectImportedComponentReferences(bodyAst, ctx.importedNames),
 			].sort();
-			if (itemMemoWitnesses.length > 0) itemMemoContextAware = true;
+			if (
+				itemMemoWitnesses.length > 0 ||
+				rendersOpaqueChild(bodyAst, [...ctx.currentComponentLocals, ...bodyScope], ctx)
+			)
+				itemMemoContextAware = true;
 			for (const name of free) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
 					itemMemo = false;
@@ -35561,7 +35655,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
 		const listDeps = new Set();
 		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);
-		let listMayReadContext = witnesses.size > 0 || containsAutoMemoContextRead(regionAst, ctx);
+		let listMayReadContext =
+			witnesses.size > 0 ||
+			containsAutoMemoContextRead(regionAst, ctx) ||
+			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
