@@ -8801,8 +8801,8 @@ function collectSingleRootIfDeps(render, locals, ctx) {
 }
 
 /**
- * Local (non-transitive) anchorless-append shape of a lite component's body
- * root, for the all-component-children emission (see emitElementHtml and
+ * Whether a lite component's body root holds its position without an anchor,
+ * for the all-component-children emission (see emitElementHtml and
  * makeCompCall's anchorlessAppendSafe). A componentSlotLite call with no
  * anchor keeps NO positional record — its body inserts at `endMarker = null`
  * (appendChild). The one runtime state that loses a position entirely is a
@@ -8814,24 +8814,23 @@ function collectSingleRootIfDeps(render, locals, ctx) {
  * its own comment pair — gets the branch pair minted around it), so we admit:
  *   - one plain host root (the element is the boundary), and
  *   - an @if with a FULL @else chain or an @switch with a @default whose every
- *     arm is exactly one plain host, one component tag (safe unless it lowers
- *     to an unsafe lite slot — resolved transitively via `edges` by the
- *     componentInfo fixpoint), or a nested exhaustive directive.
+ *     arm is exactly one plain host, one component tag, or a nested exhaustive
+ *     directive. A component arm is safe whatever its callee renders: a
+ *     componentSlot mints its own markers, and an arm that self-marks on a lite
+ *     callee's element follows that callee's branch when it empties or swaps
+ *     the element (replaceSharedBlockBoundary in runtime.ts).
  * Everything else (missing @else/@default, @for/hole/fragment roots,
- * multi-node arms) returns null: the call site keeps its `<!>` anchor.
+ * multi-node arms) returns false: the call site keeps its `<!>` anchor.
  * Note every admitted shape renders at least one node in every state, which
  * is what keeps each mounted arm's boundary derivable.
- *
- * Returns { edges: string[] } when the shape qualifies, else null.
  */
-function anchorlessRootShape(node) {
+function isAnchorlessRoot(node) {
 	let render = null;
 	if (node?.body?.type === 'JSXCodeBlock') render = node.body.render;
 	else if (node?.body?.body?.length === 1 && node.body.body[0]?.type === 'ReturnStatement')
 		render = node.body.body[0].argument;
-	if (render == null) return null;
-	if (isPlainHostRoot(render)) return { edges: [] };
-	const edges = [];
+	if (render == null) return false;
+	if (isPlainHostRoot(render)) return true;
 	const armOk = (arm, insideSwitch = false) => {
 		const statements = Array.isArray(arm) ? arm : statementsOf(arm);
 		if (insideSwitch && hasSwitchCaseLocalBinding(statements)) return false;
@@ -8840,13 +8839,9 @@ function anchorlessRootShape(node) {
 		const n = out[0];
 		if (isIfDirective(n)) return chainOk(n, insideSwitch);
 		if (isSwitchDirective(n)) return switchOk(n);
-		if (isPlainHostRoot(n)) return true;
-		if ((n.type === 'Element' || n.type === 'JSXElement') && isComponentTag(n)) {
-			const name = tagBindingName(n);
-			if (name != null) edges.push(name);
-			return true;
-		}
-		return false;
+		return (
+			isPlainHostRoot(n) || ((n.type === 'Element' || n.type === 'JSXElement') && isComponentTag(n))
+		);
 	};
 	const chainOk = (ifNode, insideSwitch = false) =>
 		ifNode.alternate != null &&
@@ -8863,10 +8858,9 @@ function anchorlessRootShape(node) {
 		}
 		return hasDefault;
 	};
-	return (isIfDirective(render) && chainOk(render)) ||
-		(isSwitchDirective(render) && switchOk(render))
-		? { edges }
-		: null;
+	return (
+		(isIfDirective(render) && chainOk(render)) || (isSwitchDirective(render) && switchOk(render))
+	);
 }
 
 /**
@@ -12721,62 +12715,9 @@ function compileInternal(
 		}
 	}
 	// Anchorless append-safety for componentSlotLite call sites (see
-	// anchorlessRootShape for the shape rules and the hazard). A component arm
-	// inherits its lite callee's hazard: an arm that self-marked on the callee's
-	// element keeps no pair, so when the callee's root branch empties it anchors
-	// on the node after that element. Without anchors that node is the next
-	// sibling's, which a later render of that sibling may replace. Optimistic
-	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
-	// components stay safe; a locally-unsafe shape drains through its
-	// dependents, so declaration order and recursion do not matter. An edge to a
-	// non-lite callee is safe outright — its componentSlot mints its own
-	// positional markers. An imported edge is not followed either, which keeps
-	// this proof, which lite exports publish, independent of every other
-	// module's proofs; that leaves a proven-lite import that is not anchorless
-	// exposed to the hazard above.
-	let unsafeWorklist = null;
-	for (const [name, info] of ctx.componentInfo) {
-		info.anchorlessRootShape = anchorlessRootShape(info.node);
-		info.anchorlessRootSafe = info.anchorlessRootShape !== null;
-		if (info.eligible === true && info.anchorlessRootSafe !== true) {
-			unsafeWorklist ??= [];
-			unsafeWorklist.push(name);
-		}
-	}
-	// Index each relevant edge in the direction invalidation travels.
-	// Keep the graph lazy: without an unsafe seed, optimistic safety is already
-	// settled and no queue or adjacency state is needed.
-	if (unsafeWorklist !== null) {
-		let anchorlessDependents = null;
-		for (const [dependentName, info] of ctx.componentInfo) {
-			if (!info.anchorlessRootSafe) continue;
-			for (const calleeName of info.anchorlessRootShape.edges) {
-				const callee = ctx.componentInfo.get(calleeName);
-				if (callee === undefined || callee.eligible !== true) continue;
-				anchorlessDependents ??= new Map();
-				let dependents = anchorlessDependents.get(calleeName);
-				if (dependents === undefined) {
-					dependents = [];
-					anchorlessDependents.set(calleeName, dependents);
-				}
-				dependents.push(dependentName);
-			}
-		}
-		if (anchorlessDependents !== null) {
-			for (let cursor = 0; cursor < unsafeWorklist.length; cursor++) {
-				const dependents = anchorlessDependents.get(unsafeWorklist[cursor]);
-				if (dependents === undefined) continue;
-				for (const dependentName of dependents) {
-					const dependent = ctx.componentInfo.get(dependentName);
-					if (dependent.anchorlessRootSafe !== true) continue;
-					dependent.anchorlessRootSafe = false;
-					// Only lite-eligible callees can invalidate their callers. An
-					// ineligible dependent still records its own result, but stops here.
-					if (dependent.eligible === true) unsafeWorklist.push(dependentName);
-				}
-			}
-		}
-	}
+	// isAnchorlessRoot). The proof reads only the component's own body, so a
+	// lite export publishes it independently of its imports' proofs.
+	for (const [, info] of ctx.componentInfo) info.anchorlessRootSafe = isAnchorlessRoot(info.node);
 
 	// M2 AST emit: the module is assembled as an array of top-level statement
 	// NODES — in exactly the historical statement order — and printed ONCE by
@@ -34949,9 +34890,9 @@ function makeCompCall(
 	// emitElementHtml). Only a componentSlotLite lowering can lose its
 	// position (no markers, no anchor, no record) — and only when the callee's
 	// body root can take a null-arm branch; anchorlessRootSafe carries that
-	// transitive proof (see anchorlessRootShape). Every non-lite lowering
-	// self-positions: componentSlot mints its marker pair, and the singleRoot
-	// regimes keep the root element from mount. (A staticFragmentRenderer fold
+	// proof (see isAnchorlessRoot). Every non-lite lowering self-positions:
+	// componentSlot mints its marker pair, and the singleRoot regimes keep
+	// the root element from mount. (A staticFragmentRenderer fold
 	// registers only for single-plain-host-root callees, so its authored
 	// info's shape proof holds.) A proven lite import carries its module's proof.
 	const anchorlessAppendSafe =
