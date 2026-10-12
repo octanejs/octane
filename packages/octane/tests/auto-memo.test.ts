@@ -1545,6 +1545,42 @@ describe('imported component regions', () => {
 		}
 	});
 
+	it('keeps proven hookless panels in order when one empties as another swaps', () => {
+		// Badge is proven lite but not anchorless. Each Panel's @else arm can take
+		// Badge's element as its boundary, in a host whose calls keep no anchors.
+		const badge = IMPORTED_LITE_MODULES.badge;
+		const { Twin } = loadImportedModule(
+			`import { Badge } from './badge';
+			 function Panel(props) @{
+				@if (props.off) {
+					<span class="off">{'off'}</span>
+				} @else {
+					<Badge on={props.on} />
+				}
+			 }
+			 function Tail() @{ <i class="tail">{'tail'}</i> }
+			 export function Twin(props) @{
+				<section><Panel on={props.on} /><Panel off={props.off} /><Tail /></section>
+			 }`,
+			'lite-twin.tsrx',
+			{ './badge': loadImportedModule(badge, 'lite-badge.tsrx') },
+			{ './badge': liteExportsOf(badge, 'lite-badge.tsrx') },
+		);
+		const root = mount(Twin, { on: true, off: false });
+		const order = () => Array.from(root.find('section').children, (child) => child.className);
+		try {
+			expect(order()).toEqual(['badge', 'tail']);
+			root.update(Twin, { on: false, off: true });
+			expect(order()).toEqual(['off', 'tail']);
+			root.update(Twin, { on: true, off: false });
+			expect(order()).toEqual(['badge', 'tail']);
+			root.update(Twin, { on: true, off: true });
+			expect(order()).toEqual(['badge', 'off', 'tail']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('publishes no lite export over a body that renders a prop value', () => {
 		// Such a value may hold a component that reads context, so a cache hit
 		// over the export must keep refreshing it.

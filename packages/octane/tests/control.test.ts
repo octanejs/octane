@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
+import { mount, type MountResult } from './_helpers';
 import {
 	Toggle,
 	SwitchToggle,
@@ -14,6 +14,8 @@ import {
 	IfTrailingText,
 	ForTrailingText,
 	WhitespaceInIf,
+	ArmOverLiteCall,
+	ChainArmOverLiteCall,
 } from './_fixtures/control.tsrx';
 
 function expectExpandedArmReplacement(body: typeof Toggle) {
@@ -141,6 +143,30 @@ describe('ifBlock', () => {
 			}
 		} finally {
 			r.unmount();
+		}
+	});
+
+	it('keeps an arm in place when the hookless call it wraps replaces its element', () => {
+		// Mounts with the @else arm's only output being SizedLeaf's element, then
+		// visits every ordered pair of states, so the inner branch empties and
+		// swaps its element before each outer swap.
+		const walk = 'big none off none small none big off big small off small big'.split(' ') as Array<
+			'off' | 'big' | 'small' | 'none'
+		>;
+		const expectShown = (r: MountResult, show: (typeof walk)[number]) =>
+			expect([...r.find('section').children].map((el) => el.className)).toEqual(
+				show === 'none' ? ['tail'] : [show, 'tail'],
+			);
+		for (const body of [ArmOverLiteCall, ChainArmOverLiteCall]) {
+			const r = mount(body, { show: walk[0] });
+			try {
+				for (const show of walk) {
+					r.update(body, { show });
+					expectShown(r, show);
+				}
+			} finally {
+				r.unmount();
+			}
 		}
 	});
 
