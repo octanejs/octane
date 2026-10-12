@@ -12942,12 +12942,21 @@ function compileInternal(
 	// Vite replaces accept callbacks after each evaluation, so an evaluation-local
 	// callback cannot carry the mounted owners across consecutive updates.
 	const hmrNodes = [];
-	if (hmrComponents.length > 0) {
+	// Universal components hand off in their own module or region tails. Every
+	// module ends here, so this block accepts once for all of its renderers.
+	const universalHmrComponents = [
+		...(options?.__universal?.hmrComponents ?? []),
+		...universalUnits.flatMap((unit) => unit.hmrComponents),
+	];
+	const acceptedComponents = [...hmrComponents, ...universalHmrComponents];
+	if (acceptedComponents.length > 0) {
 		// `hmr` is already registered as a needed runtime symbol by the
 		// inline-wrap pass on each exported component. We still need `HMR` (the
 		// Symbol key used to reach the wrapper's meta on `.update(...)`).
-		ctx.runtimeNeeded.add('hmr');
-		ctx.runtimeNeeded.add('HMR');
+		if (hmrComponents.length > 0) {
+			ctx.runtimeNeeded.add('hmr');
+			ctx.runtimeNeeded.add('HMR');
+		}
 		const importMeta = () => ({
 			type: 'MetaProperty',
 			meta: b.id('import'),
@@ -12960,14 +12969,6 @@ function compileInternal(
 		const webpackHotName = hmrDialect === 'webpack' ? allocCompilerName(ctx, '_$webpackHot') : null;
 		const hot = () =>
 			webpackHotName === null ? b.member(importMeta(), 'hot') : b.id(webpackHotName);
-		if (webpackHotName !== null) {
-			hmrNodes.push(
-				inheritOriginLoc(
-					b.const(webpackHotName, b.member(importMeta(), 'webpackHot')),
-					moduleOrigin,
-				),
-			);
-		}
 		const componentKey = (component) =>
 			component.exportKind === 'default' ? 'default' : component.name;
 		const componentStore = (optional = false) =>
@@ -13034,8 +13035,12 @@ function compileInternal(
 		// namespace, so it invalidates when one differs or cannot be compared. A
 		// webpack replacement only sees data its predecessor left, and the
 		// re-execution that an invalidation causes would differ again, so a module
-		// with such exports does not accept.
-		const componentLocals = new Set(hmrComponents.map((c) => c.name));
+		// with such exports does not accept. Helpers a renderer region generated
+		// are exported for the region alone and are not values importers read.
+		const componentLocals = new Set([
+			...acceptedComponents.map((c) => c.name),
+			...universalUnits.flatMap((unit) => unit.bindings),
+		]);
 		const valueExports = runtimeExportBindings(
 			ctx.output === 'ts' ? dropTypeOnlyStatements(ast.body) : ast.body,
 		).filter(([, local]) => !componentLocals.has(local));
@@ -13049,7 +13054,7 @@ function compileInternal(
 				: b.logical(
 						'&&',
 						b.id(hmrModuleName),
-						[...hmrComponents.map((c) => [componentKey(c), c.name]), ...valueExports]
+						[...acceptedComponents.map((c) => [componentKey(c), c.name]), ...valueExports]
 							.map(([name, local]) => {
 								const key = b.key(name);
 								return b.binary(
@@ -13077,24 +13082,30 @@ function compileInternal(
 		// updating there too would remount the already-handed-off component twice.
 		// A host without persistent data can still load the module and invalidate
 		// on replacement, but cannot retain wrapper identity across evaluations.
-		hmrNodes.push(
-			inheritOriginLoc(
-				b.if(
-					hot(),
-					b.block([
-						...handoffs,
+		const hotStatements = [
+			...handoffs,
+			...(hmrComponents.length === 0
+				? []
+				: [
 						webpackHotName === null
 							? b.if(b.member(hot(), 'data'), b.block([persist]))
 							: b.stmt(
 									b.call(b.member(hot(), 'dispose'), b.arrow([b.id('data')], b.block([persist]))),
 								),
-						...(accept === null ? [] : [accept]),
 					]),
-					null,
-				),
-				moduleOrigin,
-			),
-		);
+			...(accept === null ? [] : [accept]),
+		];
+		if (hotStatements.length > 0) {
+			if (webpackHotName !== null) {
+				hmrNodes.push(
+					inheritOriginLoc(
+						b.const(webpackHotName, b.member(importMeta(), 'webpackHot')),
+						moduleOrigin,
+					),
+				);
+			}
+			hmrNodes.push(inheritOriginLoc(b.if(hot(), b.block(hotStatements), null), moduleOrigin));
+		}
 	}
 
 	// Profiling registrations intentionally run AFTER the HMR handoff block in

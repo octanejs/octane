@@ -135,7 +135,7 @@ export async function compileMdx(source, id, options = {}) {
 		{ value: source, path: id },
 		buildMdxOptions(id, options, diagnosticContext),
 	);
-	return octaneStage(String(out.value), out.map, source, id, options, diagnosticContext);
+	return octaneStage(out, source, id, options, diagnosticContext);
 }
 
 /**
@@ -157,7 +157,7 @@ export function compileMdxSync(source, id, options = {}) {
 		{ value: source, path: id },
 		buildMdxOptions(id, options, diagnosticContext),
 	);
-	return octaneStage(String(out.value), out.map, source, id, options, diagnosticContext);
+	return octaneStage(out, source, id, options, diagnosticContext);
 }
 
 /**
@@ -356,15 +356,16 @@ function restoreAuthoredJsxAttributeLocations(context) {
 }
 
 /**
- * @param {string} jsxSource
- * @param {unknown} mdxMap
+ * @param {{ value: unknown, map?: unknown, data: Record<string, any> }} mdxFile
  * @param {string} authoredSource
  * @param {string} id
  * @param {CompileMdxOptions} options
  * @param {DiagnosticMappingContext} diagnosticContext
  * @returns {CompileMdxResult}
  */
-function octaneStage(jsxSource, mdxMap, authoredSource, id, options, diagnosticContext) {
+function octaneStage(mdxFile, authoredSource, id, options, diagnosticContext) {
+	const jsxSource = String(mdxFile.value);
+	const mdxMap = mdxFile.map;
 	const mode = options.mode ?? 'client';
 	const out = octaneCompile(jsxSource, id, {
 		mode,
@@ -401,19 +402,34 @@ function octaneStage(jsxSource, mdxMap, authoredSource, id, options, diagnosticC
 	// `@{}`-form components in `hmr(...)` — `MDXContent` (a passthrough function
 	// returning a ternary of descriptors) isn't recognized as one, so the octane
 	// `hmr` flag alone leaves `.mdx` edits as full module invalidations. The
-	// PIPELINE knows the emitted shape, so it appends the exact registration the
+	// PIPELINE knows the emitted shape, so it appends the registration the
 	// octane compiler emits for `.tsrx` exports: wrap the default export in the
-	// runtime `hmr()` (identity-stable across edits — parents keep their mounted
-	// wrapper) + a self-accepting `import.meta.hot` block that swaps the body
-	// and re-renders live blocks in place. Appending after the fact keeps the
-	// source map's earlier segments valid (ESM imports hoist).
+	// runtime `hmr()`, hand each evaluation's body to the wrapper that importers
+	// and live blocks already hold (kept in `hot.data`, so parents never remount
+	// the document), and self-accept. Importers keep the bindings they linked
+	// against, so the callback invalidates when another export they read
+	// changed or cannot be compared. Appending after the fact keeps the source
+	// map's earlier segments valid (ESM imports hoist).
 	if (mode === 'client' && options.hmr && /\bexport default function MDXContent\b/.test(out.code)) {
+		const namedExports = mdxFile.data.octaneNamedExports;
+		const changed =
+			namedExports === null
+				? '_$mdxModule'
+				: `_$mdxModule && (${[['default', 'MDXContent'], ...namedExports]
+						.map(([name, local]) => `_$mdxModule[${JSON.stringify(name)}] !== ${local}`)
+						.join(' || ')})`;
 		out.code +=
 			"\nimport { hmr as _$mdxHmr, HMR as _$mdxHMR } from 'octane';\n" +
 			'MDXContent = _$mdxHmr(MDXContent);\n' +
 			'if (import.meta.hot) {\n' +
-			'  import.meta.hot.accept((module) => {\n' +
-			'    module && MDXContent[_$mdxHMR].update(module.default);\n' +
+			'  const _$mdxPrevious = import.meta.hot.data?.__octaneMdxContent;\n' +
+			'  if (_$mdxPrevious) {\n' +
+			'    if (_$mdxPrevious[_$mdxHMR].update(MDXContent)) MDXContent = _$mdxPrevious;\n' +
+			'    else import.meta.hot.invalidate();\n' +
+			'  }\n' +
+			'  if (import.meta.hot.data) import.meta.hot.data.__octaneMdxContent = MDXContent;\n' +
+			'  import.meta.hot.accept((_$mdxModule) => {\n' +
+			`    if (${changed}) import.meta.hot.invalidate();\n` +
 			'  });\n' +
 			'}\n';
 	}
@@ -608,10 +624,41 @@ function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id, authoredAt
 const MDX_BODY_NAME = '_createMdxContent';
 
 function recmaOctaneAdapter() {
-	/** @param {unknown} tree */
-	return (tree) => {
+	/**
+	 * @param {unknown} tree
+	 * @param {{ data: Record<string, unknown> }} file
+	 */
+	return (tree, file) => {
 		walkReplace(/** @type {EstreeNode} */ (tree), adaptNode);
+		file.data.octaneNamedExports = namedExportBindings(/** @type {any} */ (tree));
 	};
+}
+
+/**
+ * The document's named exports as [exportName, localName] pairs, or null when
+ * one has no single module binding to compare: a re-export, `export *`, or a
+ * destructuring declaration.
+ *
+ * @param {{ body: any[] }} program
+ * @returns {Array<[string, string]> | null}
+ */
+function namedExportBindings(program) {
+	/** @type {Array<[string, string]>} */
+	const bindings = [];
+	for (const node of program.body) {
+		if (node.type === 'ExportAllDeclaration') return null;
+		if (node.type !== 'ExportNamedDeclaration') continue;
+		if (node.source) return null;
+		const declaration = node.declaration;
+		for (const { id } of declaration?.declarations ?? (declaration ? [declaration] : [])) {
+			if (id.type !== 'Identifier') return null;
+			bindings.push([id.name, id.name]);
+		}
+		for (const specifier of node.specifiers) {
+			bindings.push([specifier.exported.name ?? specifier.exported.value, specifier.local.name]);
+		}
+	}
+	return bindings;
 }
 
 /** @typedef {{ type: string, [key: string]: unknown }} EstreeNode */

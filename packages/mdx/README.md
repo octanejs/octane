@@ -143,7 +143,10 @@ async — it works in the vite plugin and `compileMdx`, not `compileMdxSync`.
 - `.mdx` edits fast-refresh in dev: the pipeline wraps the document's default
   export in octane's runtime `hmr()` and self-accepts, so live mounts re-render
   the new body in place (no page reload; the vite plugin enables this in serve
-  mode automatically).
+  mode automatically). Importers keep the named exports they read, such as
+  `frontmatter`, so the update also reaches them when one is no longer
+  identical. An object export, `frontmatter` included, is a new object after
+  every edit.
 
 ## Status
 
