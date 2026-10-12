@@ -19485,7 +19485,10 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	}
 
 	const stored = state[idx];
-	// Replay path: same promise as last attempt — fast lookup of the cached entry.
+	if (stored !== undefined && stored !== thenable && !replaceOnResume)
+		thenable = replayThenable(block, stored, thenable);
+	// Replay path: same promise as last attempt, or the stored one a replay kept
+	// — fast lookup of the cached entry.
 	if (stored === thenable) {
 		if (thenable.status === 'fulfilled') return thenable.value as T;
 		if (thenable.status === 'rejected') throw thenable.reason;
@@ -19493,24 +19496,8 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 		throw new SuspenseException(thenable);
 	}
 
-	// Resume-replay leniency (React parity: ReactFiberThenable's "reuse the
-	// previous thenable, and drop the new one"): the body is replaying after a
-	// resolution, and an UNMEMOIZED creation minted a fresh promise for a slot
-	// that already holds one. Components are assumed idempotent — keep the
-	// stored thenable; the fresh one's fetch already fired (that duplicate
-	// request is exactly what the compiler's use()-argument memoization
-	// eliminates). Without this, a fresh promise per replay re-suspends
-	// forever. Normal renders (updates with genuinely new promises) take the
-	// replacement path below unchanged.
-	if (stored !== undefined && RESUME_REPLAY && !replaceOnResume) {
-		if (process.env.NODE_ENV !== 'production') warnUncachedUsePromise(block);
-		if (stored.status === 'fulfilled') return stored.value as T;
-		if (stored.status === 'rejected') throw stored.reason;
-		throw new SuspenseException(stored);
-	}
-
 	// A batch that suspended before this unwrap ran recorded the replay's fresh
-	// promise for its member. Keep the held one, as above.
+	// promise for its member. Keep the held one, as replayThenable does.
 	if (rare.batchThenables !== undefined)
 		thenable = heldBatchThenable(rare.batchThenables, thenable);
 	// New thenable at this slot — tag status if untracked, attach listeners.
@@ -19530,6 +19517,26 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	)
 		warnUseWaterfall(block, idx);
 	throw new SuspenseException(thenable);
+}
+
+/**
+ * Resume-replay leniency (React parity: ReactFiberThenable's "reuse the previous
+ * thenable, and drop the new one"): the body is replaying after a resolution,
+ * and an UNMEMOIZED creation minted a fresh promise for a use() call that
+ * already holds `kept`. Components are assumed idempotent — keep it; the fresh
+ * one's fetch already fired (that duplicate request is exactly what the
+ * compiler's use()-argument memoization eliminates). Without this, a fresh
+ * promise per replay re-suspends forever. Normal renders (updates with
+ * genuinely new promises) keep the new one.
+ */
+function replayThenable(
+	block: Block,
+	kept: TrackedThenable<any>,
+	thenable: TrackedThenable<any>,
+): TrackedThenable<any> {
+	if (!RESUME_REPLAY) return thenable;
+	if (process.env.NODE_ENV !== 'production') warnUncachedUsePromise(block);
+	return kept;
 }
 
 /**
@@ -19711,9 +19718,8 @@ function holdBatchThenables(items: any[]): TrackedThenable<any>[] | null {
 		const kept = held[at];
 		if (kept === undefined) held[at] = it;
 		else if (kept !== it) {
-			if (process.env.NODE_ENV !== 'production') warnUncachedUsePromise(block);
 			held[at + 1] = it;
-			it = kept;
+			it = replayThenable(block, kept, it);
 		}
 		at += 2;
 		// The same rejected-member cutoff as useBatch, on the kept members.
