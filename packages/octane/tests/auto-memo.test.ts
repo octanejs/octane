@@ -2528,6 +2528,61 @@ describe('compiler-owned component-region memoization', () => {
 		},
 	);
 
+	// The owner's own update clears its context aggregate, then hits the cache.
+	// The hit must restore the skipped consumer's reads, or the next Provider
+	// change lets the owner's memo wall bail over it.
+	it.each([
+		[
+			'a list row hole',
+			`@for (const item of props.items; key item.id) { <li>{item.content}</li> }`,
+		],
+		[
+			'a list row tag',
+			`@for (const item of props.items; key item.id) { const C = item.comp; <li><C label="r" /></li> }`,
+		],
+		['a callee hole', `<Slot content={props.content} />`],
+		['a callee local tag', `<Tag comp={props.comp} />`],
+		['a memo() consumer below a callee', `<Wrapper label={props.content} />`],
+	])(
+		'refreshes context below a cache hit inside a re-rendered memo() owner through %s',
+		(shape, body) => {
+			const { App, Reader } = loadCompiledFixtureSource(
+				`import { memo } from 'octane';
+			 ${CONTEXT_READER}
+			 const MemoReader = memo(Reader);
+			 function Slot(props) @{ <span>{props.content}</span> }
+			 function Tag(props) @{ const C = props.comp; <span><C label="r" /></span> }
+			 function Wrapper(props) @{ <span><MemoReader label="r" /></span> }
+			 function List(props) @{
+				const [tick, setTick] = useState(0);
+				<ul data-tick={tick as number} onClick={() => setTick(tick + 1)}>${body}</ul>
+			 }
+			 const MemoList = memo(List);
+			 export function App(props) @{
+				<Theme value={props.theme}><MemoList items={props.items} content={props.content} comp={props.comp} /></Theme>
+			 }`,
+				{
+					id: `auto-memo-owner-hit-${shape.replaceAll(' ', '-').replace(/[()]/g, '')}.tsrx`,
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './theme': { Theme: createContext('t0') } },
+				},
+			);
+			const content = createElement(Reader, { label: 'r' });
+			const props = { items: [{ id: 1, comp: Reader, content }], content, comp: Reader };
+			const root = mount(App, { ...props, theme: 't1' });
+			try {
+				root.click('ul');
+				expect(root.find('ul').getAttribute('data-tick')).toBe('1');
+				expect(root.find('b').textContent).toBe('r:t1');
+				root.update(App, { ...props, theme: 't2' });
+				expect(root.find('b').textContent).toBe('r:t2');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it('refreshes hydrated context consumers behind cached local tags and returns', () => {
 		const source = `${CONTEXT_READER}
 			 function Tag(props) @{ const C = props.comp; <i><C label="tag" /></i> }

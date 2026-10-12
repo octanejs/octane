@@ -41063,9 +41063,9 @@ function refreshCachedBlock(block: Block, contextChanged: boolean): void {
  * that reconciliation, so an intervening Provider commit must refresh the
  * slot's existing Block(s) directly. Activity/Suspense reveals must also
  * reconnect effects retained by a skipped subtree, in its live source order,
- * and opted-in renderable-array regions restore their descendants' context
- * reads onto memoized ancestors. Existing mapped regions keep their original
- * constant-time hit; only array-region hits inspect precomputed memo ancestry.
+ * and a hit (`restampMemoAncestors`) restores its descendants' context reads
+ * onto memoized ancestors, whose own render cleared them. Outside a memo chain
+ * a hit stays constant-time.
  * `previous === undefined` snapshots the epoch after a cache miss without
  * revisiting the freshly-rendered subtree.
  * @internal

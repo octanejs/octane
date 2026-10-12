@@ -27527,7 +27527,6 @@ function emitAutoMemoRegion(
 	contextAware,
 	depNode,
 	initValue = null,
-	restoreCachedContext = false,
 	publicationWitnesses = null,
 	sameValueDependencies = false,
 	strictEqualityDependencyIndex = -1,
@@ -27672,23 +27671,24 @@ function emitAutoMemoRegion(
 		]);
 	}
 	ctx.runtimeNeeded.add('compilerCacheContext');
-	const cacheContextCall = () =>
-		restoreCachedContext
-			? b.call(
-					'_$compilerCacheContext',
-					b.id('__s'),
-					b.literal(slotIndex),
-					cacheAt(contextIndex),
-					b.literal(true),
-				)
-			: b.call('_$compilerCacheContext', b.id('__s'), b.literal(slotIndex), cacheAt(contextIndex));
+	// A hit restores the skipped subtree's context reads onto memoized ancestors,
+	// whose own render cleared them. A miss renders or bails every descendant,
+	// and those record their reads themselves.
+	const cacheContextCall = (hit) =>
+		b.call(
+			'_$compilerCacheContext',
+			b.id('__s'),
+			b.literal(slotIndex),
+			cacheAt(contextIndex),
+			...(hit ? [b.literal(true)] : []),
+		);
 	return b.block([
 		...depDecls,
 		b.if(
 			orChain(misses),
 			b.block([
 				...computeStatements,
-				b.const('_c', cacheContextCall()),
+				b.const('_c', cacheContextCall(false)),
 				writable(),
 				...publish(),
 				b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c'))),
@@ -27697,7 +27697,7 @@ function emitAutoMemoRegion(
 			b.block([
 				profileHit(),
 				...replayNative,
-				b.const('_c', cacheContextCall()),
+				b.const('_c', cacheContextCall(true)),
 				b.if(
 					b.binary('!==', b.id('_c'), cacheAt(contextIndex)),
 					b.block([writable(), b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c')))]),
@@ -29035,7 +29035,6 @@ function planJsx(
 					fc.autoMemoContextAware,
 					depNode,
 					b.id(nativeName),
-					false,
 					null,
 					sameValueListDependencies,
 					strictListDependencyIndex,
@@ -29086,7 +29085,6 @@ function planJsx(
 				fc.autoMemoContextAware,
 				depNode,
 				null,
-				false,
 				null,
 				sameValueListDependencies,
 				strictListDependencyIndex,
@@ -29279,7 +29277,6 @@ function planJsx(
 						true,
 						undefined,
 						null,
-						true,
 					);
 					pushAfterStmt(
 						cc.id,
@@ -29383,7 +29380,6 @@ function planJsx(
 						true,
 						undefined,
 						null,
-						true,
 					);
 					update = b.if(b.call('_$compilerCacheArray', V(), chp()), cached, ordinary);
 				}
@@ -29528,7 +29524,6 @@ function planJsx(
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
 					null,
-					false,
 					cc.autoMemoPublicationWitnesses,
 					true,
 					-1,
