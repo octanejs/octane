@@ -43,7 +43,6 @@ function toolchainProvenance() {
 		esbuild: () => require.resolve('esbuild'),
 		'@tsrx/core': () => requireFromOctane.resolve('@tsrx/core'),
 		'@tsrx/runtime': () => requireFromTsrx.resolve('@tsrx/runtime/ref'),
-		'alien-signals': () => requireFromOctane.resolve('alien-signals'),
 	};
 	for (const [name, resolveEntry] of Object.entries(resolvers)) {
 		const entry = fs.realpathSync(resolveEntry());

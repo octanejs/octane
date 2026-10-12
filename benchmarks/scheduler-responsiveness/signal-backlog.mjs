@@ -15,6 +15,8 @@ const source = path.resolve(
 );
 const report = process.argv.includes('--report');
 const dependencies = createRequire(path.join(repository, 'packages/octane/package.json'));
+// Archived sources predating the vendored signal graph still import Alien.
+const comparator = createRequire(path.join(repository, 'benchmarks/scoped-signals/package.json'));
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-signal-backlog-'));
 const outfile = path.join(scratch, 'runtime.mjs');
 await build({
@@ -31,8 +33,8 @@ await build({
 	define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 	alias: {
 		devalue: dependencies.resolve('devalue'),
-		'alien-signals': dependencies.resolve('alien-signals'),
-		'alien-signals/system': dependencies.resolve('alien-signals/system'),
+		'alien-signals': comparator.resolve('alien-signals'),
+		'alien-signals/system': comparator.resolve('alien-signals/system'),
 	},
 });
 const dom = new JSDOM('<!doctype html><html><body></body></html>', {
