@@ -2315,7 +2315,7 @@ describe('Strong hookful lite edges', () => {
 		}
 	`;
 
-	function testStore(name: string, log: string[], value = 0, server = value) {
+	function testStore<T = number>(name: string, log: string[], value = 0 as T, server = value) {
 		const listeners = new Set<() => void>();
 		return {
 			read: () => value,
@@ -2328,7 +2328,7 @@ describe('Strong hookful lite edges', () => {
 					log.push('unsubscribe:' + name);
 				};
 			},
-			set(next: number) {
+			set(next: T) {
 				value = next;
 				listeners.forEach((listener) => listener());
 			},
@@ -2425,6 +2425,97 @@ describe('Strong hookful lite edges', () => {
 			expect(log).toEqual(['unsubscribe:a', 'unsubscribe:b', 'unsubscribe:c']);
 		},
 	);
+
+	// Panel keeps a Block because it calls use(), so lite Probe's Effect Event
+	// versions Panel. Panel and Reader update from their own stores in one flush:
+	// Panel completes with a new event body, then Reader suspends the shared
+	// boundary. Until it reveals, the event keeps its committed body even when
+	// called from outside the hidden primary.
+	const HIDDEN_EFFECT_EVENT_SOURCE = `
+		import { use, useEffectEvent, useLayoutEffect, useSyncExternalStore } from 'octane';
+
+		function Probe(props) @{
+			const report = useEffectEvent(() => props.log('event:' + props.label));
+			useLayoutEffect(() => {
+				props.expose(report);
+			});
+			<b>{props.label as string}</b>
+		}
+
+		function Panel(props) @{
+			const suffix = use(props.ready);
+			const label = useSyncExternalStore(props.labels.subscribe, props.labels.read);
+			<div>
+				<Probe label={label + suffix} log={props.log} expose={props.expose} />
+			</div>
+		}
+
+		function Reader(props) @{
+			const promise = useSyncExternalStore(props.promises.subscribe, props.promises.read);
+			const value = use(promise);
+			<i>{value as string}</i>
+		}
+
+		export function App(props) @{
+			@try {
+				<section>
+					<Panel ready={props.ready} labels={props.labels} log={props.log} expose={props.expose} />
+					<Reader promises={props.promises} />
+				</section>
+			} @pending {
+				<p>{'pending'}</p>
+			}
+		}
+	`;
+
+	async function runHiddenEffectEventScenario(mode: StrongMode): Promise<string[]> {
+		const { client, lite } = loadLiteScenario(
+			HIDDEN_EFFECT_EVENT_SOURCE,
+			mode,
+			'lite-hidden-event',
+		);
+		expect(lite).toEqual(mode === 'strong' ? ['Probe'] : []);
+		const settled = (value: string) =>
+			Object.assign(Promise.resolve(value), { status: 'fulfilled', value });
+		const log: string[] = [];
+		let report = () => {};
+		const labels = testStore('labels', [], 'a');
+		const promises = testStore<Promise<string>>('promises', [], settled('one'));
+		const props = {
+			ready: settled('!'),
+			labels,
+			promises,
+			log: log.push.bind(log),
+			expose: (fn: () => void) => (report = fn),
+		};
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			flushEffects();
+			report();
+			const shown = root.findAll('b, i, p').map((el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')} | ${log.splice(0).join(' ')}`);
+		};
+		step('mount');
+		let resolve!: (value: string) => void;
+		labels.set('b');
+		promises.set(new Promise<string>((done) => (resolve = done)));
+		step('hidden update');
+		await act(async () => resolve('two'));
+		step('revealed');
+		root.unmount();
+		return transcript;
+	}
+
+	it('keeps a lite Effect Event body parked while its boundary hides the primary', async () => {
+		const strong = await runHiddenEffectEventScenario('strong');
+		expect(strong).toEqual(await runHiddenEffectEventScenario('default'));
+		expect(strong).toEqual([
+			'mount | a! one | event:a!',
+			'hidden update | b! one pending | event:a!',
+			'revealed | b! two | event:b!',
+		]);
+	});
 
 	// Status reads the <form> its owner renders around it, while Todo never sees
 	// the form it renders itself. Each Todo owns its Action queue, optimistic
