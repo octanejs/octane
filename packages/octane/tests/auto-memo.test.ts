@@ -67,6 +67,64 @@ function loadEffectRow(source = EFFECT_ROW_SOURCE, mode: 'client' | 'server' = '
 	});
 }
 
+// Middle's caches over the hookless Leaf and Badge hit on every tick while
+// Counter, their hookful sibling, re-renders. Badge's root can render nothing,
+// so its lite slot keeps an anchor. Frame is hookless too, but it renders a
+// memo wall that may read context, so its cache must keep refreshing that
+// reader.
+const LITE_CALLEE_REGION_SOURCE = `
+	import { createContext, memo, useContext, useState } from 'octane';
+
+	const Theme = createContext('light');
+
+	function Counter(props) @{
+		const [own, setOwn] = useState(0);
+		<button id="lite-region-counter" onClick={() => setOwn(own + 1)}>
+			{props.label + ':' + own}
+		</button>
+	}
+
+	function Leaf(props) @{
+		<span id="lite-region-leaf">{props.label as string}</span>
+	}
+
+	function Badge(props) @{
+		@if (props.on) {
+			<b id="lite-region-badge">{'on'}</b>
+		}
+	}
+
+	function Middle(props) @{
+		<div id="lite-region-middle">
+			<Leaf label={props.label} />
+			<Badge on={props.on} />
+			<Counter label={props.label + '/' + props.tick} />
+		</div>
+	}
+
+	const Themed = memo(function Themed() @{
+		const theme = useContext(Theme);
+		<em id="lite-region-themed">{theme as string}</em>
+	});
+
+	function Frame(props) @{
+		<p id="lite-region-frame" title={props.label}><Themed /></p>
+	}
+
+	function Shell(props) @{
+		<section id="lite-region">
+			<Middle label={props.label} tick={props.tick} on={props.on} />
+			<Frame label={props.label} />
+		</section>
+	}
+
+	export function App(props) @{
+		<Theme value={props.theme}>
+			<Shell label={props.label} tick={props.tick} on={props.on} />
+		</Theme>
+	}
+`;
+
 function trailingVersion(text: string | null): number {
 	return Number(text?.match(/(\d+)$/)?.[1]);
 }
@@ -2090,6 +2148,122 @@ describe('compiler-owned component-region memoization', () => {
 		expect(container.querySelector('#hookful-pure-hydrated-child')).toBe(child);
 		expect(child?.textContent).toBe('changed:1');
 		root.unmount();
+	});
+
+	it('keeps a pure callee lite inside its cache unless the cache must refresh context', () => {
+		const code = compile(LITE_CALLEE_REGION_SOURCE, 'lite-callee-region.tsrx', {
+			hmr: false,
+			dev: false,
+		}).code;
+		const middle = code.slice(code.indexOf('function Middle('), code.indexOf('const Themed'));
+		expectCompilerRegion(middle);
+		expect(middle).toContain('_$componentSlotLite(__s, 1, _b.a, Leaf,');
+		const shell = code.slice(code.indexOf('function Shell('), code.indexOf('function App('));
+		expect(shell).toMatch(/_\$componentSlotVoid\(__s, \d+, [^,]+, Frame,/);
+		expect(shell).toContain('_$compilerCacheContext(');
+
+		const client = loadCompiledFixtureSource(LITE_CALLEE_REGION_SOURCE, {
+			id: 'lite-callee-region.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App, { label: 'a', theme: 'light', tick: 0, on: false });
+		const leaf = root.find('#lite-region-leaf');
+		const counter = root.find('#lite-region-counter');
+		const themed = root.find('#lite-region-themed');
+		const middleChildren = () =>
+			Array.from(root.find('#lite-region-middle').children, (child) => child.id);
+		expect(middleChildren()).toEqual(['lite-region-leaf', 'lite-region-counter']);
+		expect(leaf.textContent).toBe('a');
+		expect(counter.textContent).toBe('a/0:0');
+		expect(themed.textContent).toBe('light');
+
+		// Middle re-renders while its cache over Leaf hits.
+		root.update(client.App, { label: 'a', theme: 'light', tick: 1, on: false });
+		expect(root.find('#lite-region-leaf')).toBe(leaf);
+		expect(leaf.textContent).toBe('a');
+		expect(root.find('#lite-region-counter')).toBe(counter);
+		expect(counter.textContent).toBe('a/1:0');
+
+		root.click('#lite-region-counter');
+		expect(counter.textContent).toBe('a/1:1');
+		root.update(client.App, { label: 'a', theme: 'light', tick: 2, on: false });
+		expect(counter.textContent).toBe('a/2:1');
+		expect(root.find('#lite-region-leaf')).toBe(leaf);
+
+		root.update(client.App, { label: 'b', theme: 'light', tick: 2, on: false });
+		expect(root.find('#lite-region-leaf')).toBe(leaf);
+		expect(leaf.textContent).toBe('b');
+		expect(counter.textContent).toBe('b/2:1');
+
+		root.update(client.App, { label: 'b', theme: 'light', tick: 2, on: true });
+		expect(middleChildren()).toEqual([
+			'lite-region-leaf',
+			'lite-region-badge',
+			'lite-region-counter',
+		]);
+		root.update(client.App, { label: 'b', theme: 'light', tick: 3, on: true });
+		expect(middleChildren()).toEqual([
+			'lite-region-leaf',
+			'lite-region-badge',
+			'lite-region-counter',
+		]);
+		root.update(client.App, { label: 'b', theme: 'light', tick: 3, on: false });
+		expect(middleChildren()).toEqual(['lite-region-leaf', 'lite-region-counter']);
+		expect(root.find('#lite-region-leaf')).toBe(leaf);
+		expect(root.find('#lite-region-counter')).toBe(counter);
+
+		// Frame's cache hits, so only its context refresh reaches the memo wall.
+		root.update(client.App, { label: 'b', theme: 'dark', tick: 3, on: false });
+		expect(root.find('#lite-region-themed')).toBe(themed);
+		expect(themed.textContent).toBe('dark');
+		expect(leaf.textContent).toBe('b');
+
+		const container = root.container;
+		root.unmount();
+		expect(container.innerHTML).toBe('');
+	});
+
+	it('hydrates a pure callee kept lite inside its cache', () => {
+		const id = 'lite-callee-region-hydration.tsrx';
+		const server = loadCompiledFixtureSource(LITE_CALLEE_REGION_SOURCE, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(LITE_CALLEE_REGION_SOURCE, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const props = { label: 'a', theme: 'light', tick: 0, on: true };
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, props).html;
+		const leaf = container.querySelector('#lite-region-leaf');
+		const counter = container.querySelector('#lite-region-counter') as HTMLButtonElement;
+		const themed = container.querySelector('#lite-region-themed');
+		const root = hydrateRoot(container, client.App, props);
+		expect(container.querySelector('#lite-region-leaf')).toBe(leaf);
+		expect(container.querySelector('#lite-region-counter')).toBe(counter);
+		expect(container.querySelector('#lite-region-themed')).toBe(themed);
+		const badge = container.querySelector('#lite-region-badge');
+		expect(badge?.previousElementSibling).toBe(leaf);
+		expect(badge?.nextElementSibling).toBe(counter);
+
+		flushSync(() => root.render(client.App, { ...props, tick: 1 }));
+		expect(container.querySelector('#lite-region-badge')).toBe(badge);
+		flushSync(() => counter.click());
+		expect(counter.textContent).toBe('a/1:1');
+		expect(container.querySelector('#lite-region-leaf')).toBe(leaf);
+
+		flushSync(() => root.render(client.App, { label: 'b', theme: 'dark', tick: 1, on: false }));
+		expect(container.querySelector('#lite-region-badge')).toBe(null);
+		expect(container.querySelector('#lite-region-leaf')).toBe(leaf);
+		expect(leaf?.textContent).toBe('b');
+		expect(counter.textContent).toBe('b/1:1');
+		expect(themed?.textContent).toBe('dark');
+		root.unmount();
+		expect(container.innerHTML).toBe('');
 	});
 
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
@@ -5466,13 +5640,14 @@ describe('compiler-owned component-region memoization', () => {
 		}).code;
 
 		expectCompilerRegion(defaultBuild);
-		expect(defaultBuild).toContain('componentSlotVoid as');
+		// Rows is hookless and cannot read context, so its cache keeps it lite.
+		expect(defaultBuild).toContain('componentSlotLite as');
 		expect(defaultBuild).toContain('componentSlot as');
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.items\)?;/);
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.label\)?;/);
 		expect(defaultBuild).not.toMatch(/const __memoDep[\w$]* = \(?props\)?;/);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotLite\([^;]*, Rows,/,
 		);
 		expect(defaultBuild).toMatch(
 			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot\([^;]*, Returned,/,
