@@ -2192,7 +2192,9 @@ module's importers only through them. Under Vite, the accept block invalidates
 when such an export changed or cannot be compared, which propagates the update to
 the importers. Under webpack and Rspack, a module with such exports does not
 accept its own updates, so the bundler re-executes its importers. Either way, the
-importers refresh through their own boundaries or reload the page.
+importers refresh through their own boundaries or reload the page. Universal
+renderer modules, modules that render renderer-owned regions, and `.mdx` documents
+follow the same rule.
 
 Hook slot ids are numbered per module in source order, so inserting or reordering
 a hook call shifts every later hook's key in that file and remaps its state. That

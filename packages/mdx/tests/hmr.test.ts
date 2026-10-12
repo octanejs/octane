@@ -26,44 +26,76 @@ describe('mdx HMR', () => {
 		expect(server.code).not.toContain('import.meta.hot');
 	});
 
-	it('hot-swaps an edited document into live mounts in place', () => {
-		const v1 = compileMdxSync('# One\n\nfirst\n', '/docs/doc.mdx', { hmr: true });
-		let accepted: ((module: any) => void) | null = null;
-		const mod1 = evalModuleCode(v1.code, MODS, { accept: (cb) => (accepted = cb) });
+	it('hot-swaps consecutive edits into live mounts in place', () => {
+		const doc = hotDocument();
+		const v1 = doc.load('# One\n\nfirst\n');
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		const root = Octane.createRoot(container);
-		root.render(mod1.default, {});
+		root.render(v1.default, {});
 		Octane.flushSync(() => {});
 		expect(container.querySelector('h1')?.textContent).toBe('One');
-		expect(accepted).not.toBeNull();
 
-		// The "edit": recompile the same id with new content; vite would re-run
-		// the module and hand the new namespace to the accept callback.
-		const v2 = compileMdxSync('# Two\n\nsecond\n', '/docs/doc.mdx', { hmr: true });
-		const mod2 = evalModuleCode(v2.code, MODS, { accept: () => {} });
-		accepted!({ default: mod2.default });
-		Octane.flushSync(() => {});
-
-		// The SAME mounted root re-rendered with the new document body.
-		expect(container.querySelector('h1')?.textContent).toBe('Two');
-		expect(container.textContent).toContain('second');
+		// Each edit hands its body to the wrapper importers and mounts hold, so a
+		// parent never remounts the document and the second edit lands too.
+		for (const [title, body] of [
+			['Two', 'second'],
+			['Three', 'third'],
+		]) {
+			expect(doc.load(`# ${title}\n\n${body}\n`).default).toBe(v1.default);
+			Octane.flushSync(() => {});
+			expect(container.querySelector('h1')?.textContent).toBe(title);
+			expect(container.textContent).toContain(body);
+		}
 		expect(container.textContent).not.toContain('first');
+		expect(doc.invalidations).toBe(0);
 		root.unmount();
 		container.remove();
 	});
 
-	it('keeps the wrapper identity stable so a parent does not remount the document', () => {
-		const v1 = compileMdxSync('# One\n', '/docs/doc.mdx', { hmr: true });
-		let accepted: ((module: any) => void) | null = null;
-		const mod1 = evalModuleCode(v1.code, MODS, { accept: (cb) => (accepted = cb) });
-		expect(typeof (mod1.default as any)[Octane.HMR]?.update).toBe('function');
-
-		const v2 = compileMdxSync('# Two\n', '/docs/doc.mdx', { hmr: true });
-		const mod2 = evalModuleCode(v2.code, MODS, { accept: () => {} });
-		// update() unwraps an incoming wrapper down to the raw body — no nesting.
-		accepted!({ default: mod2.default });
-		expect((mod1.default as any)[Octane.HMR].fn).toBe((mod2.default as any)[Octane.HMR].fn);
+	it.each([
+		['the document', ''],
+		['an exported component', 'export function Note() { return <aside>note</aside>; }\n'],
+	])('sends a changed named export beside %s to its importers', (_label, component) => {
+		const doc = hotDocument();
+		const source = (title: string, body: string) =>
+			`export const title = '${title}';\n${component}\n# ${body}\n`;
+		doc.load(source('One', 'first'));
+		// Importers still hold the previous evaluation's bindings. An unchanged
+		// value keeps them current, so the document stays its own boundary.
+		doc.load(source('One', 'second'));
+		expect(doc.invalidations).toBe(0);
+		doc.load(source('Two', 'second'));
+		expect(doc.invalidations).toBeGreaterThan(0);
 	});
 });
+
+/**
+ * One `.mdx` module across successive Vite saves: each `load` evaluates the
+ * edit with the module's persistent `hot.data`, then hands the new namespace
+ * to the previous evaluation's accept callbacks.
+ */
+function hotDocument() {
+	const data: Record<string, unknown> = {};
+	let accept: Array<(module: any) => void> = [];
+	const doc = {
+		invalidations: 0,
+		load(source: string): Record<string, any> {
+			const previousAccept = accept;
+			accept = [];
+			const module = evalModuleCode(
+				compileMdxSync(source, '/docs/doc.mdx', { hmr: true }).code,
+				MODS,
+				{
+					data,
+					accept: (callback) => accept.push(callback),
+					invalidate: () => doc.invalidations++,
+				},
+			);
+			for (const callback of previousAccept) callback(module);
+			return module;
+		},
+	};
+	return doc;
+}

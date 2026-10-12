@@ -203,6 +203,45 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		expect(template).toContain('<!--ssr-body-->');
 	});
 
+	it('names the client build by its content, reproducibly from another checkout', async () => {
+		const copy = createTempProject('octane-vite-prod-copy');
+		const clientJs = (root: string) =>
+			Object.fromEntries(
+				listFiles(path.join(root, 'dist/client'))
+					.filter((file) => file.endsWith('.js'))
+					.map((file) => [file, fs.readFileSync(path.join(root, 'dist/client', file), 'utf8')]),
+			);
+		const buildId = (root: string) =>
+			JSON.parse(fs.readFileSync(path.join(root, 'dist/server/octane-client-build.json'), 'utf8'))
+				.buildId;
+		try {
+			fs.cpSync(fixtureSource, copy.root, { recursive: true });
+			fs.symlinkSync(
+				path.join(fixtureRoot, 'node_modules'),
+				path.join(copy.root, 'node_modules'),
+				'dir',
+			);
+			await build({ root: copy.root, logLevel: 'silent' });
+			expect(clientJs(copy.root)).toEqual(clientJs(fixtureRoot));
+
+			const page = path.join(copy.root, 'src/Page.tsrx');
+			fs.writeFileSync(
+				page,
+				fs.readFileSync(page, 'utf8').replaceAll("'Fixture page '", "'Edited page '"),
+			);
+			await build({ root: copy.root, logLevel: 'silent' });
+			const edited = buildId(copy.root);
+			expect(edited).not.toBe(buildId(fixtureRoot));
+			const [entryFile, entryCode] = Object.entries(clientJs(copy.root)).find(([file]) =>
+				file.includes('octane-hydrate-'),
+			)!;
+			expect(entryCode).toContain(edited);
+			expect(clientJs(fixtureRoot)).not.toHaveProperty([entryFile]);
+		} finally {
+			copy.dispose();
+		}
+	}, 120_000);
+
 	it('the server bundle is self-contained (imports only node builtins)', () => {
 		const entry = fs.readFileSync(path.join(distDir, 'server/entry.js'), 'utf-8');
 		// The server build is intentionally unminified by default. Its explicit

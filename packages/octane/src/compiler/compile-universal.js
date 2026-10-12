@@ -4371,8 +4371,10 @@ function buildUniversalHmrBlocksAst(state, origin) {
 	}
 	// Rspack only lowers the webpackHot root reliably. Vite's self-accept call
 	// must stay a direct import.meta.hot.accept(...) for its static analysis.
+	// The module owner and each renderer region allocate from separate name sets,
+	// so the names a region declares here carry its reserved prefix.
 	const webpack = state.hmrDialect === 'webpack';
-	const hotName = webpack ? allocName(state, '__octaneWebpackHot') : null;
+	const hotName = webpack ? allocName(state, `${state.planPrefix ?? '__octane'}WebpackHot`) : null;
 	const hot =
 		hotName === null ? importMetaMember('hot', origin) : generatedIdentifier(hotName, origin);
 	const prelude =
@@ -4385,7 +4387,7 @@ function buildUniversalHmrBlocksAst(state, origin) {
 	const save = b.stmt(b.assignment('=', store, hmrComponentObject(state, store, origin)));
 	const ready =
 		webpack && state.hmrComponents.length > 0 && disposals.length > 0
-			? allocName(state, '__octaneUniversalHmrComponentsReady')
+			? allocName(state, `${state.planPrefix ?? '__octaneUniversal'}HmrComponentsReady`)
 			: null;
 	if (ready !== null) prelude.push(generatedConst(ready, b.literal(false), origin, 'let'));
 	if (disposals.length > 0) {
@@ -4431,36 +4433,8 @@ function buildUniversalHmrBlocksAst(state, origin) {
 				),
 			);
 		}
-		const acceptArgs = [];
-		if (!webpack) {
-			const moduleName = allocName(state, '__octaneUniversalHmrModule');
-			const changedExports = state.hmrComponents
-				.map((component) =>
-					b.binary(
-						'!==',
-						b.member(
-							b.id(moduleName),
-							component.exportKind === 'default' ? 'default' : component.name,
-						),
-						b.id(component.name),
-					),
-				)
-				.reduce((left, right) => b.logical('||', left, right));
-			// The handoff already refreshed compatible exports. Missing or changed
-			// boundaries must invalidate rather than leave the previous owner live.
-			acceptArgs.push(
-				b.arrow(
-					[b.id(moduleName)],
-					b.block([
-						b.if(
-							b.logical('&&', b.id(moduleName), changedExports),
-							b.stmt(b.call(b.member(hot, 'invalidate'))),
-						),
-					]),
-				),
-			);
-		}
-		handoff.push(b.stmt(b.call(b.member(hot, 'accept'), ...acceptArgs)));
+		// The DOM compile that prints every module accepts once for all of its
+		// renderers, comparing these components beside the module's other exports.
 		tail.push(inheritGeneratedOrigin(b.if(hot, b.block(handoff)), origin));
 	}
 	return { prelude, tail };
@@ -4785,6 +4759,7 @@ export function lowerUniversalRendererRegionAst(
 				block: state.helpers.block,
 			}),
 			components: Object.freeze(state.components),
+			hmrComponents: Object.freeze(state.hmrComponents),
 			bindings: Object.freeze([...specializationBindings]),
 			generatedRuntimeAliases,
 			renderer,
@@ -4931,6 +4906,7 @@ export function compileUniversal(
 			block: state.helpers.block,
 		},
 		components: state.components,
+		hmrComponents: state.hmrComponents,
 	};
 	const profileImport = universalProfileImportAst(state, moduleOrigin);
 	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, moduleOrigin);
