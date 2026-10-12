@@ -5,6 +5,7 @@ import {
 	useLayoutEffect,
 	useMemo,
 	useDeferredValue,
+	useSyncExternalStore,
 	Suspense as ResourceSuspense,
 	ErrorBoundary as ResourceErrorBoundary,
 } from 'octane';
@@ -448,4 +449,67 @@ export function CommittedThenNewSibling(props) @{
 			<li class="fallback">{'loading'}</li>
 		}
 	</ul>
+}
+
+// A use() behind a condition shifts the call order of every use() after it.
+// When the condition flips in the same task that resolves the suspension, the
+// replay's first use() call is a different call than the stored first entry.
+function ConditionalUseBody(props) @{
+	const on = useSyncExternalStore(props.toggle.subscribe, props.toggle.read);
+	const first = on ? use(props.first) : 'off';
+	const second = use(props.second);
+	<i>{(first + '/' + second) as string}</i>
+}
+
+function ConditionalUseChild(props) @{
+	const first = props.on ? use(props.first) : 'off';
+	const second = use(props.second);
+	<i>{(first + '/' + second) as string}</i>
+}
+
+// The store lives in the parent, so the child's condition arrives as a prop.
+function ConditionalUseParent(props) @{
+	const on = useSyncExternalStore(props.toggle.subscribe, props.toggle.read);
+	<ConditionalUseChild on={on} first={props.first} second={props.second} />
+}
+
+export function ConditionalUseResume(props) @{
+	@try {
+		<section>
+			@if (props.viaProps) {
+				<ConditionalUseParent first={props.first} second={props.second} toggle={props.toggle} />
+			} @else {
+				<ConditionalUseBody first={props.first} second={props.second} toggle={props.toggle} />
+			}
+		</section>
+	} @pending {
+		<p>{'pending'}</p>
+	}
+}
+
+function StoreLabel(props) @{
+	const on = useSyncExternalStore(props.toggle.subscribe, props.toggle.read);
+	<i>{(on ? 'on' : 'off') as string}</i>
+}
+
+// `source.promise` may mint a fresh promise on every read. Reading it in a
+// custom hook keeps the compiler from memoizing or batching that read.
+function useSourceValue(source) {
+	return use(source.promise);
+}
+
+function FreshPromiseReader(props) @{
+	const value = useSourceValue(props.source);
+	<b>{value as string}</b>
+}
+
+export function UpdatedSiblingResume(props) @{
+	@try {
+		<section>
+			<StoreLabel toggle={props.toggle} />
+			<FreshPromiseReader source={props.source} />
+		</section>
+	} @pending {
+		<p>{'pending'}</p>
+	}
 }

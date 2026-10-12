@@ -1699,6 +1699,9 @@ and remains sequential.
   creates a fresh promise for a slot that already holds one reuses the stored
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
+  A component with an update queued since the suspended attempt, and everything
+  it renders, renders that update instead of replaying, so a changed condition
+  cannot hand a shifted `use()` call another call's thenable.
 
 Composition is regression-pinned in `benchmarks/async-composition`, whose
 dashboard fixture reads eight resources — seven independent, one truly dependent

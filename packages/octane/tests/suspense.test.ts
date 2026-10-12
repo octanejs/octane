@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount, act, nextPaint } from './_helpers';
 import {
 	BasicSuspense,
@@ -23,6 +23,8 @@ import {
 	ThrownResourceSuspense,
 	ThrownResourceJsxSuspense,
 	PromiseThrownFromLayout,
+	ConditionalUseResume,
+	UpdatedSiblingResume,
 } from './_fixtures/suspense.tsrx';
 
 interface Deferred<T> {
@@ -37,6 +39,23 @@ function deferred<T>(): Deferred<T> {
 		reject = rej;
 	});
 	return { promise, resolve, reject };
+}
+
+// An external store whose listeners are notified directly, outside any event.
+function toggleStore() {
+	let on = true;
+	const listeners = new Set<() => void>();
+	return {
+		read: () => on,
+		subscribe(listener: () => void) {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+		turnOff() {
+			on = false;
+			for (const listener of listeners) listener();
+		},
+	};
 }
 
 function resourceReader<T>(promise: Promise<T>, wakeable: PromiseLike<T> = promise): () => T {
@@ -410,6 +429,75 @@ describe('Suspense — React conformance', () => {
 		});
 		expect(r.find('.both').textContent).toBe('X/Y');
 		r.unmount();
+	});
+
+	it.each([
+		['its own store', false],
+		['a parent store prop', true],
+	])(
+		'replays a shifted use() call with its own promise when %s changes in the resume task',
+		async (_, viaProps) => {
+			const toggle = toggleStore();
+			const x = deferred<string>();
+			const y = deferred<string>();
+			const props = { first: x.promise, second: y.promise, toggle, viaProps };
+			const r = mount(ConditionalUseResume, props);
+			await act(() => {
+				x.resolve('x1');
+				y.resolve('y1');
+			});
+			expect(r.find('i').textContent).toBe('x1/y1');
+
+			const y2 = deferred<string>();
+			r.update(ConditionalUseResume, { ...props, second: y2.promise });
+			expect(r.find('p').textContent).toBe('pending');
+			// The retry runs before the store's render, so the replay itself sees the
+			// store turned off. Its first use() call is now use(second), at the index
+			// where the suspended attempt stored the first promise.
+			await act(async () => {
+				y2.resolve('y2');
+				toggle.turnOff();
+			});
+			expect(r.find('i').textContent).toBe('off/y2');
+			r.unmount();
+		},
+	);
+
+	it('still reuses an unchanged sibling stored promise after an updated Block replays', async () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const toggle = toggleStore();
+		// After its first read, every read mints a promise that never settles.
+		const fresh = (first: Promise<string>) => {
+			let reads = 0;
+			return {
+				get promise() {
+					return reads++ === 0 ? first : new Promise<string>(() => {});
+				},
+			};
+		};
+		try {
+			const initial = deferred<string>();
+			const r = mount(UpdatedSiblingResume, { toggle, source: fresh(initial.promise) });
+			await act(() => {
+				initial.resolve('one');
+			});
+			expect(r.find('b').textContent).toBe('one');
+
+			const next = deferred<string>();
+			r.update(UpdatedSiblingResume, { toggle, source: fresh(next.promise) });
+			expect(r.find('p').textContent).toBe('pending');
+			// StoreLabel renders its update first, then the reader replays with a
+			// fresh promise and must keep the one its suspended attempt stored.
+			await act(async () => {
+				next.resolve('two');
+				toggle.turnOff();
+			});
+			expect(r.find('i').textContent).toBe('off');
+			expect(r.find('b').textContent).toBe('two');
+			r.unmount();
+		} finally {
+			errors.mockRestore();
+		}
 	});
 });
 
