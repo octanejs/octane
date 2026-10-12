@@ -65,9 +65,13 @@ export function voidImportKey(request, imported) {
 	return `${request}\0${imported}`;
 }
 
-// A relative request never starts with this prefix, so the keys cannot collide.
+// A relative request never starts with these prefixes, so the keys cannot collide.
 export function liteImportKey(request, imported) {
 	return `lite\0${voidImportKey(request, imported)}`;
+}
+
+export function anchorlessImportKey(request, imported) {
+	return `anchorless\0${voidImportKey(request, imported)}`;
 }
 
 /**
@@ -119,6 +123,7 @@ export function prepareVoidComponents(context, source, id, options) {
 			? new Set(data.proof.imports.map(({ request, imported }) => voidImportKey(request, imported)))
 			: null;
 	const lite = new Set(proven === null ? null : data.proof.lite);
+	const anchorless = new Set(proven === null ? null : data.proof.anchorless);
 	const memo = new Set(data.memo);
 	// A proof or hint is a fact about other modules' output, outside this
 	// module's cache key. Output that may consume one is never cached.
@@ -151,6 +156,13 @@ export function prepareVoidComponents(context, source, id, options) {
 							consumed.add(liteImportKey(request, imported));
 							return true;
 						},
+						isAnchorlessComponentImport(request, imported) {
+							const key = voidImportKey(request, imported);
+							if (!anchorless.has(key)) return false;
+							consumed.add(key);
+							consumed.add(anchorlessImportKey(request, imported));
+							return true;
+						},
 					}),
 		},
 	};
@@ -169,11 +181,13 @@ export function finishVoidComponents(context, prepared, result) {
 		compiled && Array.isArray(result.voidComponentExports) ? result.voidComponentExports : [];
 	const memoExports =
 		compiled && Array.isArray(result.compilerMemoExports) ? result.compilerMemoExports : [];
+	const lowered =
+		compiled && (context[VOID_COMPONENT_CONTEXT_KEY].lowersOnly ?? lowersOnly(context));
 	const lite =
-		compiled &&
-		Array.isArray(result.liteComponentExports) &&
-		(context[VOID_COMPONENT_CONTEXT_KEY].lowersOnly ?? lowersOnly(context))
-			? result.liteComponentExports
+		lowered && Array.isArray(result.liteComponentExports) ? result.liteComponentExports : [];
+	const anchorless =
+		lowered && Array.isArray(result.anchorlessComponentExports)
+			? result.anchorlessComponentExports
 			: [];
 	const imports =
 		RELATIVE_IMPORT.test(prepared.source) && (compiled || ROOT_FACTORY_IMPORT.test(prepared.source))
@@ -194,6 +208,7 @@ export function finishVoidComponents(context, prepared, result) {
 		exports: [...exports],
 		memoExports: [...memoExports],
 		lite: [...lite],
+		anchorless: [...anchorless],
 		imports: imports.map(({ request, imported }) => ({ request, imported })),
 		consumed,
 		bindings,

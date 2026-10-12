@@ -11,6 +11,7 @@ import {
 	targetsFor,
 } from './module-graph.js';
 import {
+	anchorlessImportKey,
 	liteImportKey,
 	VOID_COMPONENT_BUILD_INFO_KEY,
 	VOID_COMPONENT_CONTEXT_KEY,
@@ -49,6 +50,7 @@ function candidateInfo(module) {
 		!strings(info.exports) ||
 		!strings(info.memoExports) ||
 		!strings(info.lite) ||
+		!strings(info.anchorless) ||
 		!strings(info.consumed) ||
 		!importEntries(info.imports, false) ||
 		(info.bindings !== null && !importEntries(info.bindings, true))
@@ -99,14 +101,16 @@ function finalFacts(module, id, analyses) {
  *
  * While proofs are collected, a provider that can consume proofs itself is
  * usually about to be rebuilt, so its current code is not what will run. Its
- * final code is proven after the rebuild instead (`deferred`). A `lite` proof
- * also needs the build behind that final code to have listed the export lite.
+ * final code is proven after the rebuild instead (`deferred`). A `lite` or
+ * `anchorless` proof (`list`) also needs the build behind that final code to
+ * have listed the export there.
  */
-function provenProvider(target, imported, analyses, deferred = false, lite = false) {
+function provenProvider(target, imported, analyses, deferred = false, list = undefined) {
 	const id = identifier(target);
 	if (id === null || !JAVASCRIPT_TYPES.has(target.type)) return null;
 	const info = candidateInfo(target);
-	if (!info?.exports.includes(imported) || (lite && !info.lite.includes(imported))) return null;
+	if (!info?.exports.includes(imported) || (list !== undefined && !info[list].includes(imported)))
+		return null;
 	if (deferred && info.imports.length > 0) return { id };
 	const facts = finalFacts(target, id, analyses);
 	return facts?.exports.has(imported) ? { id, fingerprint: facts.fingerprint } : null;
@@ -123,6 +127,7 @@ function bindingsHold(info, facts) {
 		info.bindings.flatMap(({ request, imported }) => [
 			voidImportKey(request, imported),
 			liteImportKey(request, imported),
+			anchorlessImportKey(request, imported),
 		]),
 	);
 	if (!info.consumed.every((key) => bound.has(key))) return false;
@@ -151,7 +156,12 @@ function receiptRebuilt(compilation, state, analyses) {
 			const key = voidImportKey(entry.request, entry.imported);
 			supplied.set(key, entry);
 			if (proof.lite.includes(key))
-				supplied.set(liteImportKey(entry.request, entry.imported), { ...entry, lite: true });
+				supplied.set(liteImportKey(entry.request, entry.imported), { ...entry, list: 'lite' });
+			if (proof.anchorless.includes(key))
+				supplied.set(anchorlessImportKey(entry.request, entry.imported), {
+					...entry,
+					list: 'anchorless',
+				});
 		}
 		if (info.consumed.some((key) => !supplied.has(key))) {
 			changed(id, undefined, 'the compiler consumed an unprovided import');
@@ -159,8 +169,8 @@ function receiptRebuilt(compilation, state, analyses) {
 		const consumed = info.consumed.map((key) => supplied.get(key));
 		const targets = targetsFor(compilation, importer, requestsOf(consumed));
 		const imports = [];
-		for (const { request, imported, lite } of consumed) {
-			const provider = provenProvider(targets.get(request), imported, analyses, false, lite);
+		for (const { request, imported, list } of consumed) {
+			const provider = provenProvider(targets.get(request), imported, analyses, false, list);
 			if (provider === null) break;
 			imports.push({ request, imported, ...provider });
 		}
@@ -231,8 +241,8 @@ function verifyFinalSources(compilation, state) {
 
 /**
  * Hint each candidate import whose target's latest build listed it as a memo
- * export, and supply a lite proof for each proven import listed as a lite
- * export. A rebuild over either can publish more of both (an export over a lite
+ * export, and supply a lite or anchorless proof for each proven import listed
+ * as one. A rebuild over either can publish more of both (an export over a lite
  * import needs no context refresh), so callers repeat this until no importer
  * gains one. Both only accumulate from what an earlier round published, which
  * bounds the rounds by the import graph and never lets a cycle prove itself
@@ -252,16 +262,21 @@ function collectHints(compilation, state) {
 		);
 		const hints = new Set(state.memo.get(id));
 		const lite = new Set(proof?.lite);
-		const size = hints.size + lite.size;
+		const anchorless = new Set(proof?.anchorless);
+		const size = hints.size + lite.size + anchorless.size;
 		for (const { request, imported } of info.imports) {
 			const key = voidImportKey(request, imported);
 			const target = candidateInfo(targets.get(request));
 			if (target?.memoExports.includes(imported)) hints.add(key);
 			if (proven.has(key) && target?.lite.includes(imported)) lite.add(key);
+			if (proven.has(key) && target?.anchorless.includes(imported)) anchorless.add(key);
 		}
-		if (hints.size + lite.size === size) continue;
+		if (hints.size + lite.size + anchorless.size === size) continue;
 		state.memo.set(id, [...hints]);
-		if (proof !== undefined) proof.lite = [...lite];
+		if (proof !== undefined) {
+			proof.lite = [...lite];
+			proof.anchorless = [...anchorless];
+		}
 		grown.push(id);
 	}
 	return grown;
@@ -289,7 +304,7 @@ async function collectAndRebuild(compilation, state) {
 					provenProvider(targets.get(request), imported, analyses, true) !== null,
 			);
 			if (imports.length > 0)
-				state.proofs.set(id, { sourceHash: info.sourceHash, imports, lite: [] });
+				state.proofs.set(id, { sourceHash: info.sourceHash, imports, lite: [], anchorless: [] });
 		}
 	}
 	let rebuild = [...new Set([...state.proofs.keys(), ...collectHints(compilation, state)])];
