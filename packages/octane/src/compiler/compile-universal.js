@@ -4371,8 +4371,10 @@ function buildUniversalHmrBlocksAst(state, origin) {
 	}
 	// Rspack only lowers the webpackHot root reliably. Vite's self-accept call
 	// must stay a direct import.meta.hot.accept(...) for its static analysis.
+	// The module owner and each renderer region allocate from separate name sets,
+	// so the names a region declares here carry its reserved prefix.
 	const webpack = state.hmrDialect === 'webpack';
-	const hotName = webpack ? allocName(state, '__octaneWebpackHot') : null;
+	const hotName = webpack ? allocName(state, `${state.planPrefix ?? '__octane'}WebpackHot`) : null;
 	const hot =
 		hotName === null ? importMetaMember('hot', origin) : generatedIdentifier(hotName, origin);
 	const prelude =
@@ -4385,7 +4387,7 @@ function buildUniversalHmrBlocksAst(state, origin) {
 	const save = b.stmt(b.assignment('=', store, hmrComponentObject(state, store, origin)));
 	const ready =
 		webpack && state.hmrComponents.length > 0 && disposals.length > 0
-			? allocName(state, '__octaneUniversalHmrComponentsReady')
+			? allocName(state, `${state.planPrefix ?? '__octaneUniversal'}HmrComponentsReady`)
 			: null;
 	if (ready !== null) prelude.push(generatedConst(ready, b.literal(false), origin, 'let'));
 	if (disposals.length > 0) {
