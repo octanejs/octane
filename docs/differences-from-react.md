@@ -400,8 +400,9 @@ closure semantics or promise to skip its reevaluation.
 
 Compatibility mode keeps React's rule that a child's state update never
 re-renders its parent. In Strong production client builds, a component whose
-hooks are all Octane builtins other than `use` may instead render inside its
-caller's Block. Its hooks keep their own state, effects, and cleanup order, but
+hooks are all Octane builtins may instead render inside its caller's Block, as
+long as each `use` call reads a context the same module creates with
+`createContext`. Its hooks keep their own state, effects, and cleanup order, but
 its update re-renders the nearest enclosing component that owns a Block, so that
 component's body runs again. Strong render purity makes the extra evaluation
 unobservable, and effects still run only when their inferred dependencies change.
