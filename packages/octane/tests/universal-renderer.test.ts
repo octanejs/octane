@@ -3513,16 +3513,13 @@ export default (function Counter({ depth }) @{
 		}
 	});
 
-	// The owner and both regions each emit HMR scaffolding into one module. The
-	// owner thread site gives webpack's owner and first region a readiness flag
-	// each. It stays out of the Vite row, whose single dispose handler cannot yet
-	// clean up two thread-owning units.
-	it.each([
-		{ hmr: 'vite', ownerThread: false },
-		{ hmr: 'webpack', ownerThread: true },
-	] as const)(
-		'preserves thread cleanup across $hmr edits to mixed renderer modules',
-		async ({ hmr, ownerThread }) => {
+	// The owner and both regions each emit HMR scaffolding into one module, and
+	// the owner and first region each own a thread site. That gives webpack's
+	// owner and first region a readiness flag each, and gives Vite's single
+	// dispose handler two units' thread cleanup to run.
+	it.each(['vite', 'webpack'] as const)(
+		'preserves thread cleanup across %s edits to mixed renderer modules',
+		async (hmr) => {
 			const domRuntime = await import('../src/index.js');
 			const definitions = new Map<string, (...args: any[]) => unknown>();
 			let failRegistration = false;
@@ -3587,7 +3584,7 @@ export default (function Counter({ depth }) @{
 				const source = `
 import { Canvas, Html } from '${bridgeModule}';
 export function App() @{
-  <group${ownerThread ? ` main-thread:bindtap={() => { 'main thread'; return ${version}; }}` : ''}>
+  <group main-thread:bindtap={() => { 'main thread'; return ${version}; }}>
     <Html>
       <main data-version={${version}}>
         <Canvas><scene main-thread:bindtap={() => { 'main thread'; return ${version}; }} /></Canvas>
@@ -3612,7 +3609,7 @@ export function App() @{
 				for (const callback of previousAccept) callback(module);
 				expect(
 					[...definitions.values()].map((implementation) => implementation([], undefined, [])),
-				).toEqual(ownerThread ? [version, version] : [version]);
+				).toEqual([version, version]);
 				disposeModule();
 				expect(definitions.size).toBe(0);
 				previousAccept = accept;
