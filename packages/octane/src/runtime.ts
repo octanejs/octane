@@ -39153,7 +39153,7 @@ function renderPreparedChildList(
 			ssrMarkerless,
 			normalizeKey,
 		);
-		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state.forSlot);
+		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state.forSlot, parentBlock);
 	}
 	// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 	// children whose keys have no new item) are orphans inside the range —
@@ -48398,7 +48398,7 @@ export function forBlock<T>(
 			(f & 8) !== 0,
 			(f & 16) !== 0,
 		);
-		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state);
+		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentBlock);
 	}
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
@@ -48407,17 +48407,21 @@ export function forBlock<T>(
 	hydration?.parkPast(state.end, parentScope);
 }
 
-// A pure row skip bypasses the row's render, and with it the context refresh
-// its slots would run: a value hole can still mount a consumer, as an armed
-// childSlot that records its reads. After a Provider commit, refresh each row
-// still stamped at an older epoch, as a memo bail refreshes its subtree. A pure
-// body is hookless, so a row with no child scope or slot reads no context.
-function refreshSkippedRows(list: ForSlot): void {
+// A pure row skip bypasses the row's render, and with it the context work its
+// slots would do: a value hole can still mount a consumer, as an armed
+// childSlot that records its reads. So, as a memo bail does, a skipped row
+// refreshes after a Provider commit when it is stamped at an older epoch, and
+// under memo ancestry restores its reads onto the ancestors whose render
+// cleared them. A pure body is hookless, so a row with no child scope or slot
+// reads no context.
+function refreshSkippedRows(list: ForSlot, owner: Block): void {
 	const epoch = contextEpochNow();
-	if (list.ctxEpoch === epoch) return;
+	const refresh = list.ctxEpoch !== epoch;
+	if (!refresh && !owner.memoInChain) return;
 	for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
-		if ((item._slots !== null || item.children !== null) && item.$$ctxDepsEpoch !== epoch)
-			refreshBlockForContext(item);
+		if (item._slots === null && item.children === null) continue;
+		if (refresh && item.$$ctxDepsEpoch !== epoch) refreshBlockForContext(item);
+		if (owner.memoInChain) restampCachedContextScope(item);
 	}
 	list.ctxEpoch = epoch;
 }
@@ -48470,7 +48474,7 @@ export function keyedForBlock<T>(
 			selectionBody,
 		)
 	) {
-		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state);
+		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentScope.block);
 		return;
 	}
 
