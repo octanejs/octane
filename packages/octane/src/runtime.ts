@@ -701,6 +701,10 @@ let STAGED_COMMIT_CAPTURE: StagedCommitCapture | null = null;
 // delegates events; the dispatch loop still records the submit for manual
 // useFormStatus activation.
 let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
+// Only a recorded context read can leave a skipped list row stale, so the
+// recorder installs the row refresh and applications that never read context
+// omit the refresh graph from their lists.
+let SKIPPED_ROW_REFRESH: typeof refreshSkippedRows | null = null;
 // Record actual committed ref identities only when an Activity is in use. A
 // hidden render may already have replaced its manifest's ref before cleanup;
 // the committed identity is the one that must be disconnected exactly once.
@@ -18951,6 +18955,7 @@ function promoteMemoAncestry(scope: Scope): void {
 
 function recordContextDependency(block: Block | null, context: Context<any>): void {
 	if (block === null || !block.memoInChain) return;
+	SKIPPED_ROW_REFRESH = refreshSkippedRows;
 	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
@@ -38977,6 +38982,7 @@ function renderPreparedChildList(
 			tail: null,
 			size: 0,
 			cachedDeps: null,
+			ctxEpoch: 0,
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
@@ -39147,6 +39153,7 @@ function renderPreparedChildList(
 			ssrMarkerless,
 			normalizeKey,
 		);
+		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state.forSlot, parentBlock);
 	}
 	// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 	// children whose keys have no new item) are orphans inside the range —
@@ -48055,6 +48062,10 @@ interface ForSlot {
 	// the runtime treats the body as PURE for the survivor short-circuit — saving
 	// the entire body call for every item whose ref + position are unchanged.
 	cachedDeps: any[] | null;
+	// Context epoch at which every row was last rendered or refreshed. A pure
+	// skip bypasses its rows' renders, so refreshSkippedRows compares this
+	// before revisiting them.
+	ctxEpoch: number;
 	// `@for (...) { ... } @empty { ... }` support: mounted-empty-branch Block,
 	// or null when there are items (or no `@empty` branch was compiled). The
 	// empty body is hoisted by the compiler as its own helper and passed to
@@ -48202,6 +48213,7 @@ export function forBlock<T>(
 			tail: null,
 			size: 0,
 			cachedDeps: null,
+			ctxEpoch: 0,
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
@@ -48386,12 +48398,32 @@ export function forBlock<T>(
 			(f & 8) !== 0,
 			(f & 16) !== 0,
 		);
+		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentBlock);
 	}
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
 	hydration?.parkPast(state.end, parentScope);
+}
+
+// A pure row skip bypasses the row's render, and with it the context work its
+// slots would do: a value hole can still mount a consumer, as an armed
+// childSlot that records its reads. So, as a memo bail does, a skipped row
+// refreshes after a Provider commit when it is stamped at an older epoch, and
+// under memo ancestry restores its reads onto the ancestors whose render
+// cleared them. A pure body is hookless, so a row with no child scope or slot
+// reads no context.
+function refreshSkippedRows(list: ForSlot, owner: Block): void {
+	const epoch = contextEpochNow();
+	const refresh = list.ctxEpoch !== epoch;
+	if (!refresh && !owner.memoInChain) return;
+	for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
+		if (item._slots === null && item.children === null) continue;
+		if (refresh && item.$$ctxDepsEpoch !== epoch) refreshBlockForContext(item);
+		if (owner.memoInChain) restampCachedContextScope(item);
+	}
+	list.ctxEpoch = epoch;
 }
 
 /**
@@ -48442,6 +48474,7 @@ export function keyedForBlock<T>(
 			selectionBody,
 		)
 	) {
+		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentScope.block);
 		return;
 	}
 

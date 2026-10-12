@@ -2555,6 +2555,107 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	// Each list skips its unchanged rows, and a filtered iterable or a selection
+	// change keeps any whole-list cache from covering them. Only that skip can
+	// then refresh a consumer a row renders from a value hole.
+	const FILTERED = '@for (const item of props.items.filter(Boolean); key item.id)';
+	const KEYED_ROWS = `@for (const item of props.items; key item.id) {
+		<li class={selected === item.id ? 'on' : ''}>{item.content}</li>
+	}`;
+	const MAPPED_ROWS = `{props.items.filter(Boolean).map((item) => <li key={item.id}>{item.content}</li>)}`;
+	function loadSkippedRows(shape: string, source: string) {
+		return loadCompiledFixtureSource(
+			`import { memo, useContext, useState } from 'octane';
+			 import { Theme } from './theme';
+			 export function Reader(props) @{
+				const theme = useContext(Theme);
+				<b>{(props.label + ':' + theme) as string}</b>
+			 }
+			 ${source}`,
+			{
+				id: `auto-memo-skipped-${shape.replaceAll(' ', '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme: createContext('t0') } },
+			},
+		);
+	}
+
+	it.each([
+		['item-only @for rows', `${FILTERED} { <li>{item.content}</li> }`],
+		[
+			'@for rows with a parent capture',
+			`${FILTERED} { <li data-count={count}>{item.content}</li> }`,
+		],
+		['component @for rows', `${FILTERED} { <Row content={item.content} /> }`],
+		['keyed selection rows', KEYED_ROWS],
+		['mapped rows', MAPPED_ROWS],
+	])('refreshes context consumers skipped %s render from value holes', (shape, rows) => {
+		const { App, Reader } = loadSkippedRows(
+			shape,
+			`function Row(props) @{ <li>{props.content}</li> }
+			 function List(props) @{
+				const [count] = useState(0);
+				const selected = props.selected;
+				<ul data-count={count as number}>${rows}</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><List items={props.items} selected={props.selected} /></Theme>
+			 }`,
+		);
+		const items = [1, 2, 3].map((id) => ({
+			id,
+			content: createElement(Reader, { label: 'r' + id }),
+		}));
+		const root = mount(App, { items, selected: 1, theme: 't1' });
+		const texts = () =>
+			Array.from(root.container.querySelectorAll('b'), (node) => node.textContent);
+		try {
+			expect(texts()).toEqual(['r1:t1', 'r2:t1', 'r3:t1']);
+			root.update(App, { items, selected: 2, theme: 't2' });
+			expect(texts()).toEqual(['r1:t2', 'r2:t2', 'r3:t2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// A memoized owner's own update clears the context reads it recorded while
+	// every consumer row is skipped. Unless the skipped rows restore them, the
+	// owner's later bail on a Provider change strands the consumer.
+	it.each([
+		['@for rows', `${FILTERED} { <li>{item.content}</li> }`],
+		['keyed selection rows', KEYED_ROWS],
+		['mapped rows', MAPPED_ROWS],
+	])('refreshes consumers in skipped %s below a locally updated memo owner', (shape, rows) => {
+		const { App, Reader } = loadSkippedRows(
+			`memo-owner ${shape}`,
+			`function List(props) @{
+				const [selected, setSelected] = useState(1);
+				<ul onClick={() => setSelected(3 - selected)}>${rows}</ul>
+			 }
+			 const MemoList = memo(List);
+			 export function App(props) @{
+				<Theme value={props.theme}><MemoList items={props.items} /></Theme>
+			 }`,
+		);
+		// Only the third row holds a consumer, so selecting the first two rows
+		// never renders it.
+		const items = [1, 2, 3].map((id) => ({
+			id,
+			content: id === 3 ? createElement(Reader, { label: 'r3' }) : 'r' + id,
+		}));
+		const root = mount(App, { items, theme: 't1' });
+		try {
+			root.click('ul');
+			root.click('ul');
+			expect(root.find('b').textContent).toBe('r3:t1');
+			root.update(App, { items, theme: 't2' });
+			expect(root.find('b').textContent).toBe('r3:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
