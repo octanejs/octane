@@ -139,6 +139,8 @@ export interface CompileOptions {
 	isLiteComponentImport?: (request: string, imported: string) => boolean;
 	/** Whether a Strong module published an export whose lite subtree holds hook state. */
 	isStrongLiteComponentImport?: (request: string, imported: string) => boolean;
+	/** Whether a lite import's module also published its body root as anchorless-safe. */
+	isAnchorlessComponentImport?: (request: string, imported: string) => boolean;
 	isDescriptorChildrenImport?: (request: string, imported: string) => boolean;
 	/** Preserve the compiler's existing experimental integration options. */
 	[option: string]: unknown;

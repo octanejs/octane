@@ -244,8 +244,11 @@ for (const production of [false, true]) {
 							await new Promise(resolve => setTimeout(resolve, 25));
 						}
 						window.__formSubmission.release();
+						// Activation expiry alone takes about 5 s, so the replay gets its own
+						// deadline: the released island still compiles on demand in Vite dev.
+						const replayDeadline = performance.now() + 20000;
 						while (!window.__formSubmission.state().clicks.includes('activate-button')) {
-							if (performance.now() > deadline) throw Error('replay did not finish');
+							if (performance.now() > replayDeadline) throw Error('replay did not finish');
 							await new Promise(resolve => setTimeout(resolve, 25));
 						}
 						return window.__formSubmission.state();

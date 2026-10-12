@@ -155,6 +155,10 @@ function strongLiteImportKey(request, imported) {
 	return `strong\0${request}\0${imported}`;
 }
 
+function anchorlessImportKey(request, imported) {
+	return `anchorless\0${request}\0${imported}`;
+}
+
 function compiledCodeFingerprint(code) {
 	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
 }
@@ -489,6 +493,8 @@ async function loadImportMetadata(
 					proven.add(liteImportKey(request, imported));
 				if (Array.isArray(metadata.strongLite) && metadata.strongLite.includes(imported))
 					proven.add(strongLiteImportKey(request, imported));
+				if (Array.isArray(metadata.anchorless) && metadata.anchorless.includes(imported))
+					proven.add(anchorlessImportKey(request, imported));
 				if (exported !== undefined) proven.add(`export\0${exported}`);
 			}
 		}),
@@ -1322,10 +1328,14 @@ export function octane(options = {}) {
 					const structure =
 						voidExports.length === 0 ? null : structuralCodeFingerprint(this, result.code);
 					// Lite exports are void exports whose bodies an importer may also run
-					// without a Block; Strong importers alone may run the strongLite ones.
-					// The same fingerprint vouches for every list.
+					// without a Block, and anchorless ones are lite exports whose calls also
+					// need no anchor; Strong importers alone may run the strongLite ones. The
+					// same fingerprint vouches for every list.
 					const lite = (result.liteComponentExports ?? []).filter((name) =>
 						voidExports.includes(name),
+					);
+					const anchorless = (result.anchorlessComponentExports ?? []).filter((name) =>
+						lite.includes(name),
 					);
 					const strongLite = (result.strongLiteComponentExports ?? []).filter((name) =>
 						voidExports.includes(name),
@@ -1336,6 +1346,7 @@ export function octane(options = {}) {
 						...(structure === null ? null : { structure }),
 						...(lite.length === 0 ? null : { lite }),
 						...(strongLite.length === 0 ? null : { strongLite }),
+						...(anchorless.length === 0 ? null : { anchorless }),
 					};
 				}
 				// A hint, not a proof: the importer's region still reads the runtime
@@ -1404,6 +1415,8 @@ export function octane(options = {}) {
 									proven.has(liteImportKey(request, imported)),
 								isStrongLiteComponentImport: (request, imported) =>
 									proven.has(strongLiteImportKey(request, imported)),
+								isAnchorlessComponentImport: (request, imported) =>
+									proven.has(anchorlessImportKey(request, imported)),
 							}
 						: {}),
 					// Production client output always answers this, so a component over
