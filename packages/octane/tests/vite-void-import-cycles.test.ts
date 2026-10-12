@@ -142,6 +142,40 @@ describe('production Vite void-component proofs across import cycles', { timeout
 		expect(run(chunks[0])).toEqual({ text: 'ABC', empty: true });
 	});
 
+	it('drops the anchor of a lite call only when its module proves the root holds position', async () => {
+		const root = fixture({
+			'Leaf.tsrx': `export default function Leaf({ label }) @{ <b>{label as string}</b> }`,
+			'Maybe.tsrx': `export default function Maybe({ on }) @{ @if (on) { <q>{'on'}</q> } }`,
+			'Host.tsrx': `import Leaf from './Leaf.tsrx';
+import Maybe from './Maybe.tsrx';
+export default function Host({ on }) @{
+	<main>
+		<p><Leaf label="a" /><Leaf label="b" /></p>
+		<div><Maybe on={on} /><Leaf label="tail" /></div>
+	</main>
+}`,
+			'entry.ts': `import { createRoot, flushSync } from 'octane';
+import Host from './Host.tsrx';
+export function run(host) {
+	const root = createRoot(host);
+	root.render(Host, { on: false });
+	flushSync(() => root.render(Host, { on: true }));
+	const anchored = (element) => [...element.childNodes].some((node) => node.nodeType === 8);
+	const result = {
+		text: host.textContent,
+		anchored: [anchored(host.querySelector('p')), anchored(host.querySelector('div'))],
+	};
+	root.unmount();
+	return result;
+}
+`,
+		});
+		const { compiled, chunks } = await buildFixture(root, ['entry.ts']);
+		expect(compiled['Host.tsrx']).toContain('componentSlotLite(');
+		// Maybe mounts empty, so its later content needs its anchor to land first.
+		expect(run(chunks[0])).toEqual({ text: 'abontail', anchored: [false, true] });
+	});
+
 	it('builds and renders mutually recursive components', async () => {
 		const root = fixture({ ...components(['A', 'B'], true), 'entry.ts': ENTRY('A') });
 		const { compiled, chunks } = await buildFixture(root, ['entry.ts']);

@@ -11771,6 +11771,10 @@ function compileInternal(
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
 		isLiteComponentImport:
 			typeof options?.isLiteComponentImport === 'function' ? options.isLiteComponentImport : null,
+		isAnchorlessComponentImport:
+			typeof options?.isAnchorlessComponentImport === 'function'
+				? options.isAnchorlessComponentImport
+				: null,
 		isCompilerMemoImport:
 			typeof options?.isCompilerMemoImport === 'function' ? options.isCompilerMemoImport : null,
 		compilerMemoExports: [],
@@ -12600,8 +12604,10 @@ function compileInternal(
 	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
 	// components stay safe; a locally-unsafe shape drains through its
 	// dependents, so declaration order and recursion do not matter. An edge to a
-	// non-lite or cross-module callee is safe outright — its componentSlot mints
-	// its own positional markers.
+	// non-lite callee is safe outright — its componentSlot mints its own
+	// positional markers. So is an imported one, even when proven lite: it still
+	// renders inside its arm's own branch range. That keeps this proof, which
+	// lite exports publish, independent of every other module's proofs.
 	let unsafeWorklist = null;
 	for (const [name, info] of ctx.componentInfo) {
 		info.anchorlessRootShape = anchorlessRootShape(info.node);
@@ -13137,8 +13143,11 @@ function compileInternal(
 		diagnostics: nativeChangeDiagnostics,
 	};
 	if (ctx.compilerMemoExports.length > 0) result.compilerMemoExports = ctx.compilerMemoExports;
-	const liteExports = ctx.autoMemo ? collectLiteComponentExports(ast.body, ctx) : [];
-	if (liteExports.length > 0) result.liteComponentExports = liteExports;
+	if (ctx.autoMemo) {
+		const { lite, anchorless } = collectLiteComponentExports(ast.body, ctx);
+		if (lite.length > 0) result.liteComponentExports = lite;
+		if (anchorless.length > 0) result.anchorlessComponentExports = anchorless;
+	}
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -17046,29 +17055,47 @@ function isProvenLiteImport(ctx, name) {
 	);
 }
 
+// Whether the bundler also proved a lite import's body root anchorless-safe:
+// see collectLiteComponentExports.
+function isProvenAnchorlessImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		binding !== undefined &&
+		ctx.isAnchorlessComponentImport?.(binding.request, binding.imported) === true
+	);
+}
+
 // Exports an importer may call through componentSlotLite: hookless void bodies
 // (componentInfo.eligible) that a cached region can skip without refreshing
 // context. A region over a body without a compiler memo proof always misses,
 // so only a proven body must also be context-free. A native-read body would
 // subscribe the importer's region owner, which a cache hit does not re-run.
+// `anchorless` lists the lite exports whose body root holds its position
+// (anchorlessRootSafe), so an importer's call needs no anchor either.
 function collectLiteComponentExports(body, ctx) {
-	if (ctx.nativeReads) return [];
-	const lite = (name) => {
-		const info = ctx.componentInfo.get(name);
-		return (
-			info?.eligible === true &&
-			!(info.autoMemoSafe && info.autoMemoMayReadContext) &&
-			!ctx._universalRuntimeUnitsByBinding.has(name)
-		);
+	const lite = [];
+	const anchorless = [];
+	if (ctx.nativeReads) return { lite, anchorless };
+	const add = (local, names) => {
+		const info = ctx.componentInfo.get(local);
+		if (
+			info?.eligible !== true ||
+			(info.autoMemoSafe && info.autoMemoMayReadContext) ||
+			ctx._universalRuntimeUnitsByBinding.has(local)
+		)
+			return;
+		lite.push(...names);
+		if (info.anchorlessRootSafe) anchorless.push(...names);
 	};
-	const exports = [];
 	for (const statement of body) {
 		const declaration = statement.declaration;
-		if (declaration?.type === 'FunctionDeclaration' && declaration.id && lite(declaration.id.name))
-			exports.push(statement.type === 'ExportDefaultDeclaration' ? 'default' : declaration.id.name);
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id)
+			add(declaration.id.name, [
+				statement.type === 'ExportDefaultDeclaration' ? 'default' : declaration.id.name,
+			]);
 	}
-	for (const [local, names] of ctx.exportedLocals) if (lite(local)) exports.push(...names);
-	return exports;
+	for (const [local, names] of ctx.exportedLocals) add(local, names);
+	return { lite, anchorless };
 }
 
 // The definition-site proof that lets a cached region skip this component, or
@@ -34747,9 +34774,11 @@ function makeCompCall(
 	// self-positions: componentSlot mints its marker pair, and the singleRoot
 	// regimes keep the root element from mount. (A staticFragmentRenderer fold
 	// registers only for single-plain-host-root callees, so its authored
-	// info's shape proof holds.)
+	// info's shape proof holds.) A proven lite import carries its module's proof.
 	const anchorlessAppendSafe =
-		!liteEligible || ctx.componentInfo?.get(compName)?.anchorlessRootSafe === true;
+		!liteEligible ||
+		(ctx.componentInfo?.get(compName)?.anchorlessRootSafe ??
+			isProvenAnchorlessImport(ctx, compName)) === true;
 
 	return {
 		id,

@@ -1235,27 +1235,37 @@ describe('effectful component regions', () => {
 	});
 });
 
-// The lite exports each imported module published, keyed by request, as a
-// production bundler hands them to the importer's compile. Every import is
-// reported memo-proven, as a stale build fact would be: the runtime witness
-// must still keep each region correct.
-type LiteProofs = Readonly<Record<string, readonly string[]>>;
+// The lite exports each imported module published, and the anchorless ones
+// among them, keyed by request, as a production bundler hands them to the
+// importer's compile. Every import is reported memo-proven, as a stale build
+// fact would be: the runtime witness must still keep each region correct.
+interface LiteProof {
+	readonly lite: readonly string[];
+	readonly anchorless: readonly string[];
+}
+type LiteProofs = Readonly<Record<string, LiteProof>>;
 
-function liteCompileOptions(lite: LiteProofs) {
+function liteCompileOptions(proofs: LiteProofs) {
 	return {
 		hmr: false,
 		dev: false,
 		isCompilerMemoImport: () => true,
 		isLiteComponentImport: (request: string, imported: string) =>
-			lite[request]?.includes(imported) === true,
+			proofs[request]?.lite.includes(imported) === true,
+		isAnchorlessComponentImport: (request: string, imported: string) =>
+			proofs[request]?.anchorless.includes(imported) === true,
 	};
 }
 
-function liteExportsOf(source: string, id: string, lite: LiteProofs = {}): readonly string[] {
-	const result = compile(source, id, liteCompileOptions(lite)) as {
+function liteExportsOf(source: string, id: string, proofs: LiteProofs = {}): LiteProof {
+	const result = compile(source, id, liteCompileOptions(proofs)) as {
 		liteComponentExports?: string[];
+		anchorlessComponentExports?: string[];
 	};
-	return result.liteComponentExports ?? [];
+	return {
+		lite: result.liteComponentExports ?? [],
+		anchorless: result.anchorlessComponentExports ?? [],
+	};
 }
 
 function loadImportedModule(
@@ -1276,8 +1286,8 @@ function loadImportedModule(
 // Each module is its own file. Leaf and Badge are hookless and read no context,
 // so the bundler proves them lite, and Mid too through its proven imports.
 // Counter is hookful, so the edge to it keeps a Block and its updates never
-// re-run App. Badge's root can render nothing, so its lite edge keeps an
-// anchor among its siblings.
+// re-run App. Badge's root can render nothing, so it is not anchorless, and its
+// lite edge keeps an anchor among its siblings; Mid's call needs none.
 const IMPORTED_LITE_MODULES = {
 	leaf: `export function Leaf(props) @{ <span class="leaf">{props.text as string}</span> }`,
 	badge: `export function Badge(props) @{ @if (props.on) { <b class="badge">{'on'}</b> } }`,
@@ -1488,10 +1498,10 @@ describe('imported component regions', () => {
 	it('runs proven hookless imports through lite edges', () => {
 		const { app, lite } = loadImportedLiteApp();
 		expect(lite).toEqual({
-			'./leaf': ['Leaf'],
-			'./badge': ['Badge'],
-			'./counter': [],
-			'./mid': ['Mid'],
+			'./leaf': { lite: ['Leaf'], anchorless: ['Leaf'] },
+			'./badge': { lite: ['Badge'], anchorless: [] },
+			'./counter': { lite: [], anchorless: [] },
+			'./mid': { lite: ['Mid'], anchorless: ['Mid'] },
 		});
 		const code = compile(IMPORTED_LITE_MODULES.app, 'lite-app.tsrx', liteCompileOptions(lite)).code;
 		expect(code).toMatch(/_\$componentSlotLite\([^;]*, Mid,/);
@@ -1505,9 +1515,13 @@ describe('imported component regions', () => {
 				root.findAll('.mid > *, .counter'),
 				(child) => child.className + ':' + child.textContent,
 			);
+		const anchored = (host: Element) => [...host.childNodes].some((node) => node.nodeType === 8);
 		try {
 			const leaf = root.find('.leaf');
 			expect(order()).toEqual(['leaf:a', 'leaf:tail', 'counter:a:0']);
+			// Only the proven anchorless call drops its anchor.
+			expect(anchored(root.find('section'))).toBe(false);
+			expect(anchored(root.find('.mid'))).toBe(true);
 			// Equal props: every cached edge hits and the DOM stays in place.
 			root.update(app.App, { text: 'a', on: false, tick: 1, onRender });
 			expect(root.find('.leaf')).toBe(leaf);
@@ -1537,13 +1551,13 @@ describe('imported component regions', () => {
 		const shell = (child: string) => `${child}
 			export function Shell(props) @{ <div><Child on={props.on} content={props.content} /></div> }`;
 		const proven = "function Child(props) @{ <i>{props.on ? 'on' : 'off'}</i> }";
-		expect(liteExportsOf(shell(proven), 'lite-shell-text.tsrx')).toEqual(['Shell']);
+		expect(liteExportsOf(shell(proven), 'lite-shell-text.tsrx').lite).toEqual(['Shell']);
 		for (const child of [
 			'function Child(props) @{ <i>{props.content}</i> }',
 			"function Child(props) { if (props.on) return props.content; return <i>{'off'}</i>; }",
 			'function Child(props) @{ const C = props.content; <C /> }',
 		]) {
-			expect(liteExportsOf(shell(child), 'lite-shell-opaque.tsrx')).toEqual([]);
+			expect(liteExportsOf(shell(child), 'lite-shell-opaque.tsrx').lite).toEqual([]);
 		}
 	});
 
@@ -1596,7 +1610,7 @@ describe('imported component regions', () => {
 		expect(result.compilerMemoExports).toEqual(['Label']);
 		expect(result.liteComponentExports).toBeUndefined();
 		expect(
-			liteExportsOf(label.replace("import 'octane/signals';", ''), 'plain-label.tsrx'),
+			liteExportsOf(label.replace("import 'octane/signals';", ''), 'plain-label.tsrx').lite,
 		).toEqual(['Label']);
 	});
 
