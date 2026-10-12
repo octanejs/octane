@@ -12609,9 +12609,10 @@ function compileInternal(
 	// components stay safe; a locally-unsafe shape drains through its
 	// dependents, so declaration order and recursion do not matter. An edge to a
 	// non-lite callee is safe outright — its componentSlot mints its own
-	// positional markers. So is an imported one, even when proven lite: it still
-	// renders inside its arm's own branch range. That keeps this proof, which
-	// lite exports publish, independent of every other module's proofs.
+	// positional markers. An imported edge is not followed either, which keeps
+	// this proof, which lite exports publish, independent of every other
+	// module's proofs; that leaves a proven-lite import that is not anchorless
+	// exposed to the hazard above.
 	let unsafeWorklist = null;
 	for (const [name, info] of ctx.componentInfo) {
 		info.anchorlessRootShape = anchorlessRootShape(info.node);
