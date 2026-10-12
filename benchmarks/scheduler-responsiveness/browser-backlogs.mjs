@@ -14,6 +14,8 @@ const fixture = path.join(repository, 'packages/octane/tests/browser/scheduler-b
 /** Production bundles and one local server shared by Vitest and the CLI. */
 export async function serveBacklogs(source = repository, policy = 'elapsed') {
 	const dependencies = createRequire(path.join(repository, 'packages/octane/package.json'));
+	// Archived sources predating the vendored signal graph still import Alien.
+	const comparator = createRequire(path.join(repository, 'benchmarks/scoped-signals/package.json'));
 	const react = createRequire(path.join(repository, 'benchmarks/news/react/package.json'));
 	const serverBundle = await build({
 		stdin: {
@@ -53,8 +55,8 @@ export async function serveBacklogs(source = repository, policy = 'elapsed') {
 			alias: {
 				octane: path.join(source, 'packages/octane/src/index.ts'),
 				devalue: dependencies.resolve('devalue'),
-				'alien-signals': dependencies.resolve('alien-signals'),
-				'alien-signals/system': dependencies.resolve('alien-signals/system'),
+				'alien-signals': comparator.resolve('alien-signals'),
+				'alien-signals/system': comparator.resolve('alien-signals/system'),
 				react: react.resolve('react'),
 				'react-dom/client': react.resolve('react-dom/client'),
 			},

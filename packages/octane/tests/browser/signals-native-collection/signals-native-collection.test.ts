@@ -24,22 +24,6 @@ afterAll(async () => {
 	await browser?.close();
 });
 
-function packageRoot(entry: string, name: string): string {
-	let directory = dirname(entry);
-	for (;;) {
-		try {
-			if (JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')).name === name) {
-				return directory;
-			}
-		} catch {
-			// A resolved entry can be nested below its package manifest.
-		}
-		const parent = dirname(directory);
-		if (parent === directory) throw new Error('Missing manifest for ' + name);
-		directory = parent;
-	}
-}
-
 function appConfig(kind: 'native' | 'ordinary', scratch: string): InlineConfig {
 	const manifest = JSON.parse(readFileSync(join(PACKAGE, 'package.json'), 'utf8'));
 	const alias = Object.entries(manifest.exports).flatMap(([key, value]) => {
@@ -53,19 +37,8 @@ function appConfig(kind: 'native' | 'ordinary', scratch: string): InlineConfig {
 			},
 		];
 	});
-	// Resolve the actual package selected for Octane, including its browser ESM
-	// entry. This also supports the explicitly recorded supplemental source lane.
-	const alien = packageRoot(requirePackage.resolve('alien-signals/system'), 'alien-signals');
-	const alienManifest = JSON.parse(readFileSync(join(alien, 'package.json'), 'utf8'));
 	const devalue = requirePackage.resolve('devalue');
-	alias.push(
-		{
-			find: /^alien-signals\/system$/,
-			replacement: resolve(alien, alienManifest.exports['./system'].import),
-		},
-		{ find: /^alien-signals$/, replacement: resolve(alien, alienManifest.exports['.'].import) },
-		{ find: /^devalue$/, replacement: devalue },
-	);
+	alias.push({ find: /^devalue$/, replacement: devalue });
 	return {
 		configFile: false,
 		root: HERE,
@@ -76,7 +49,7 @@ function appConfig(kind: 'native' | 'ordinary', scratch: string): InlineConfig {
 		server: {
 			host: '127.0.0.1',
 			port: 0,
-			fs: { allow: [resolve(PACKAGE, '../..'), alien, dirname(devalue)] },
+			fs: { allow: [resolve(PACKAGE, '../..'), dirname(devalue)] },
 		},
 		preview: { host: '127.0.0.1', port: 0 },
 		build: {
