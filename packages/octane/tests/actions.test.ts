@@ -8,6 +8,7 @@ import {
 	RawFormWithStatus,
 	StatusProbe,
 	SelfFormStatus,
+	NestedSelfFormStatus,
 	OptimisticForm,
 	BareOptimistic,
 	OptimisticCounter,
@@ -301,16 +302,24 @@ describe('useFormStatus', () => {
 		r.unmount();
 	});
 
-	it('ignores a form rendered by the same component (no ancestor form)', () => {
+	it.each([
+		['as the root', SelfFormStatus],
+		['as a child', NestedSelfFormStatus],
+	])('ignores a form rendered by the same component %s (no ancestor form)', async (_, App) => {
 		let captured: any;
-		const r = mount(SelfFormStatus, {
-			action: () => {},
-			expose: (s: any) => (captured = s),
-		});
-		flushSync(() => {});
-		// The hook's component renders the form, so there is NO ancestor form → idle.
+		const d = deferred();
+		const props = { action: () => d.promise, expose: (s: any) => (captured = s) };
+		const r = mount(App, props);
+		// The second render finds the component's range already in the document.
+		r.update(App, { ...props, expose: (s: any) => (captured = s) });
+		// The hook's component renders the form, so there is NO ancestor form →
+		// idle, even while that form's own action is pending.
+		submit(r.container);
+		await tick();
 		expect(r.find('#self').textContent).toBe('idle');
 		expect(captured.pending).toBe(false);
+		d.resolve();
+		await settle();
 		r.unmount();
 	});
 
