@@ -2266,6 +2266,67 @@ describe('compiler-owned component-region memoization', () => {
 		expect(container.innerHTML).toBe('');
 	});
 
+	// Each list skips its unchanged rows, and a filtered iterable or a selection
+	// change keeps any whole-list cache from covering them. Only that skip can
+	// then refresh a consumer a row renders from a value hole.
+	const FILTERED = '@for (const item of props.items.filter(Boolean); key item.id)';
+	it.each([
+		['item-only @for rows', `${FILTERED} { <li>{item.content}</li> }`],
+		[
+			'@for rows with a parent capture',
+			`${FILTERED} { <li data-count={count}>{item.content}</li> }`,
+		],
+		['component @for rows', `${FILTERED} { <Row content={item.content} /> }`],
+		[
+			'keyed selection rows',
+			`@for (const item of props.items; key item.id) {
+				<li class={selected === item.id ? 'on' : ''}>{item.content}</li>
+			}`,
+		],
+		[
+			'mapped rows',
+			`{props.items.filter(Boolean).map((item) => <li key={item.id}>{item.content}</li>)}`,
+		],
+	])('refreshes context consumers skipped %s render from value holes', (shape, rows) => {
+		const { App, Reader } = loadCompiledFixtureSource(
+			`import { useContext, useState } from 'octane';
+			 import { Theme } from './theme';
+			 export function Reader(props) @{
+				const theme = useContext(Theme);
+				<b>{(props.label + ':' + theme) as string}</b>
+			 }
+			 function Row(props) @{ <li>{props.content}</li> }
+			 function List(props) @{
+				const [count] = useState(0);
+				const selected = props.selected;
+				<ul data-count={count as number}>${rows}</ul>
+			 }
+			 export function App(props) @{
+				<Theme value={props.theme}><List items={props.items} selected={props.selected} /></Theme>
+			 }`,
+			{
+				id: `auto-memo-skipped-${shape.replaceAll(' ', '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './theme': { Theme: createContext('t0') } },
+			},
+		);
+		const items = [1, 2, 3].map((id) => ({
+			id,
+			content: createElement(Reader, { label: 'r' + id }),
+		}));
+		const root = mount(App, { items, selected: 1, theme: 't1' });
+		const texts = () =>
+			Array.from(root.container.querySelectorAll('b'), (node) => node.textContent);
+		try {
+			expect(texts()).toEqual(['r1:t1', 'r2:t1', 'r3:t1']);
+			root.update(App, { items, selected: 2, theme: 't2' });
+			expect(texts()).toEqual(['r1:t2', 'r2:t2', 'r3:t2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
