@@ -5,6 +5,7 @@ import {
 } from './css-module-data.js';
 import {
 	clearVoidComponentBuildInfo,
+	lowersOnly,
 	VOID_COMPONENT_BUILD_INFO_KEY,
 	VOID_COMPONENT_CONTEXT_KEY,
 } from './void-component-data.js';
@@ -17,7 +18,9 @@ export function pitch() {
 	this.data ??= {};
 	this.data.octaneLayer = this._module?.layer ?? null;
 	this.data[CSS_MODULE_CONTEXT_KEY] = this[CSS_MODULE_CONTEXT_KEY] ?? null;
-	this.data[VOID_COMPONENT_CONTEXT_KEY] = this[VOID_COMPONENT_CONTEXT_KEY] ?? null;
+	const voidComponents = this[VOID_COMPONENT_CONTEXT_KEY];
+	this.data[VOID_COMPONENT_CONTEXT_KEY] =
+		voidComponents == null ? null : { ...voidComponents, lowersOnly: lowersOnly(this) };
 	clearCssModuleBuildInfo(this._module);
 	clearVoidComponentBuildInfo(this._module);
 	if (this._module?.buildInfo && typeof this._module.buildInfo === 'object') {
