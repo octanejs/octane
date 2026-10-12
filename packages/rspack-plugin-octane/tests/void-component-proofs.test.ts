@@ -242,6 +242,56 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 	}, 60_000);
 });
 
+// Card renders an imported Leaf, so it publishes its memo proof only after a
+// rebuild over Leaf's hint, and App admits a region at Card only a round later.
+function memoFixture() {
+	const root = createFixture({
+		'Leaf.tsrx': `export function Leaf(props) @{ <b>{props.label as string}</b> }`,
+		'Card.tsrx': `import { Leaf } from './Leaf.tsrx';
+export function Card(props) @{ <span><Leaf label={props.label} /></span> }`,
+		'Stateful.tsrx': `import { useState } from 'octane';
+export function Stateful(props) @{
+	const [count] = useState(0);
+	<i>{(props.label + count) as string}</i>
+}`,
+		'App.tsrx': `import { Card } from './Card.tsrx';
+import { Stateful } from './Stateful.tsrx';
+export function App(props) @{
+	<p data-tick={props.tick}><Card label={props.label} /><Stateful label={props.label} /></p>
+}`,
+		'entry.ts': `/** @jsxImportSource octane */
+import { createRoot, flushSync } from 'octane';
+import { App } from './App.tsrx';
+export function render(container: HTMLElement) {
+	const root = createRoot(container);
+	// An equal-prop tick, then a changed label through the cached edges.
+	for (const props of [{ label: 'a', tick: 0 }, { label: 'a', tick: 1 }, { label: 'b', tick: 2 }]) {
+		flushSync(() => root.render(App, props));
+	}
+	return () => root.unmount();
+}`,
+	});
+	roots.push(root);
+	return root;
+}
+
+const MEMO_HTML = '<p data-tick="2"><span><b>b</b></span><i>b0</i></p>';
+const CARD_PROOF =
+	/_\$markCompilerMemo\([\s\S]*return \[\s*Leaf,\s*_\$compilerMemoWitness\(Leaf\)\s*\]/;
+
+describe.each(parallelModes)('imported compiler memo hints on %s', (_name, parallel) => {
+	it('admits regions only at imports whose modules published a memo proof', async () => {
+		const root = memoFixture();
+		const { directory, sources } = await build(root, { parallel });
+		expect(sources.get('Card.tsrx')).toMatch(CARD_PROOF);
+		expect(sources.get('Stateful.tsrx')).not.toContain('markCompilerMemo');
+		const app = sources.get('App.tsrx');
+		expect(app).toContain('var __memoComponent = _$compilerMemoWitness(Card);');
+		expect(app).not.toContain('compilerMemoWitness(Stateful)');
+		expect(render(directory)).toBe(MEMO_HTML);
+	}, 60_000);
+});
+
 describe('void component proof lifetime', () => {
 	it.each([
 		['provider', 'Greeting.tsrx'],
@@ -292,6 +342,17 @@ describe('void component proof lifetime', () => {
 		expectGeneric(sources);
 		expect(render(directory)).toBe(EXPECTED_HTML);
 		expect(render(directory, 'renderValue')).toBe('<b>value</b>');
+	}, 60_000);
+
+	it('publishes no memo proof over an unhinted import in a production watch build', async () => {
+		const root = memoFixture();
+		const sources: Sources = new Map();
+		const { directory, configuration } = voidConfiguration(root, sources);
+		await watchOnce(configuration);
+		expect(sources.get('Leaf.tsrx')).toContain('markCompilerMemo');
+		expect(sources.get('Card.tsrx')).not.toContain('markCompilerMemo');
+		expect(sources.get('App.tsrx')).not.toContain('compilerMemoWitness');
+		expect(render(directory)).toBe(MEMO_HTML);
 	}, 60_000);
 
 	it('specializes again after a production watch shares its persistent cache', async () => {
