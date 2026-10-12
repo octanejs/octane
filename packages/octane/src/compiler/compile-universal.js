@@ -4397,14 +4397,40 @@ function buildUniversalHmrBlocksAst(state, origin) {
 			...(ready === null ? [] : [b.if(b.id(ready), b.block([save]))]),
 			...disposals,
 		];
+		const disposeWith = (body) => b.stmt(b.call(b.member(hot, 'dispose'), b.arrow([data], body)));
+		// Vite runs only the last dispose handler a module registers, but the owner
+		// and each renderer region own thread functions. Each unit queues its
+		// cleanup on the persistent data and registers the same draining handler,
+		// so whichever registers last cleans up every unit.
+		const queue = (root) => b.member(root, '__octaneThreadDisposals');
+		const dispose = generatedIdentifier('dispose', origin);
 		prelude.push(
 			inheritGeneratedOrigin(
-				b.if(
-					hot,
-					b.block([
-						b.stmt(b.call(b.member(hot, 'dispose'), b.arrow([data], b.block(disposalBody)))),
-					]),
-				),
+				webpack
+					? b.if(hot, b.block([disposeWith(b.block(disposalBody))]))
+					: b.if(
+							b.logical('&&', hot, b.member(hot, 'data')),
+							b.block([
+								b.stmt(
+									b.call(
+										b.member(
+											b.assignment('??=', queue(b.member(hot, 'data')), b.array([])),
+											'push',
+										),
+										b.arrow([], b.block(disposals)),
+									),
+								),
+								disposeWith(
+									b.block([
+										b.for_of(
+											b.const(dispose, null),
+											b.call(b.member(queue(data), 'splice'), b.literal(0)),
+											b.stmt(b.call(dispose)),
+										),
+									]),
+								),
+							]),
+						),
 				origin,
 			),
 		);
