@@ -70,6 +70,7 @@ const TODOMVC = path.resolve(__dirname, '../todomvc');
 const CHAT_STREAM = path.resolve(__dirname, '../chat-stream');
 const WEATHER_APP = path.resolve(__dirname, '../weather-app');
 const BINDINGS_APP = path.join(__dirname, 'apps/bindings');
+const APP_SHELL = path.join(__dirname, 'apps/app-shell');
 const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: dist)
 // Vite 8's default client minifier; see the fairness note above.
 const VITE_MINIFY = 'oxc';
@@ -131,6 +132,13 @@ const SETS = [
 		prefix: 'bindings_',
 		targets: ['octane-tsrx'],
 		// Its imports are binding packages, not framework entry points.
+		ceiling: false,
+	},
+	{
+		root: APP_SHELL,
+		prefix: 'shell_',
+		targets: ['octane-jsx', 'react'],
+		// Its signal and alien-signals imports would widen the rows ceilings.
 		ceiling: false,
 	},
 ];

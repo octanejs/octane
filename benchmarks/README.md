@@ -480,6 +480,8 @@ the build compiles them with the production Octane compiler and they count as
 `app` bytes. It is the only row whose bytes move with compiler output for plain
 `.ts` binding hooks.
 
+The `shell_*` set, [`bundle-size/apps/app-shell`](bundle-size/apps/app-shell), is the smallest app that combines the features a production Octane app uses together: `hydrateRoot`, a `lazy` page under `Suspense`, `ViewTransition`, `startTransition`, and a `useSignal$` counter. It has under 1 kB of app code, so its bytes are almost all runtime. Its `react` twin is the same component on React 19.3 with `alien-signals`. It pins React 19.3 exactly, the first stable release with `<ViewTransition>`, because the default catalog is still on 19.2. The set has no ceiling build, so its signal and `alien-signals` imports do not widen the rows ceilings.
+
 `bundle-reachability` builds twenty-five independent public-entry feature fixtures
 across thirty-three production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's
