@@ -137,6 +137,47 @@ export function NestedComponentToggle({ UnknownComp }: { UnknownComp: typeof Nes
 	</div>
 }
 
+type ArmShow = 'off' | 'big' | 'small' | 'none';
+
+function SizedLeaf({ size }: { size: ArmShow }) @{
+	@switch (size) {
+		@case 'big': {
+			<div class="big">{'big'}</div>
+		}
+		@case 'small': {
+			<p class="small">{'small'}</p>
+		}
+	}
+}
+
+// The @else arm's only output is a hookless component's inner branch, so the
+// arm can take that branch's element as its own boundary.
+export function ArmOverLiteCall({ show }: { show: ArmShow }) @{
+	<section>
+		@if (show === 'off') {
+			<span class="off">{'off'}</span>
+		} @else {
+			<SizedLeaf size={show} />
+		}
+		<i class="tail">{'tail'}</i>
+	</section>
+}
+
+function OffOrSizedLeaf({ show }: { show: ArmShow }) @{
+	@if (show === 'off') {
+		<span class="off">{'off'}</span>
+	} @else {
+		<SizedLeaf size={show} />
+	}
+}
+
+export function ChainArmOverLiteCall({ show }: { show: ArmShow }) @{
+	<section>
+		<OffOrSizedLeaf show={show} />
+		<i class="tail">{'tail'}</i>
+	</section>
+}
+
 export function IfOnly() @{
 	const [show, setShow] = useState(false);
 	<div>

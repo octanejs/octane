@@ -400,8 +400,9 @@ closure semantics or promise to skip its reevaluation.
 
 Compatibility mode keeps React's rule that a child's state update never
 re-renders its parent. In Strong production client builds, a component whose
-hooks are all Octane builtins other than `use` may instead render inside its
-caller's Block. Its hooks keep their own state, effects, and cleanup order, but
+hooks are all Octane builtins may instead render inside its caller's Block, as
+long as each `use` call reads a context the same module creates with
+`createContext`. Its hooks keep their own state, effects, and cleanup order, but
 its update re-renders the nearest enclosing component that owns a Block, so that
 component's body runs again. Strong render purity makes the extra evaluation
 unobservable, and effects still run only when their inferred dependencies change.
@@ -1698,6 +1699,9 @@ and remains sequential.
   creates a fresh promise for a slot that already holds one reuses the stored
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
+  A component with an update queued since the suspended attempt, and everything
+  it renders, renders that update instead of replaying, so a changed condition
+  cannot hand a shifted `use()` call another call's thenable.
 
 Composition is regression-pinned in `benchmarks/async-composition`, whose
 dashboard fixture reads eight resources — seven independent, one truly dependent
@@ -2182,6 +2186,13 @@ Octane declines a refresh when the old and new compiler bodies use incompatible
 direct-template and returned-output layouts, or when a live block has no coherent,
 exclusively resettable DOM range. The emitted accept block then calls
 `import.meta.hot.invalidate()` for a full page reload.
+
+As with React's bundler plugins, an export other than a component reaches the
+module's importers only through them. Under Vite, the accept block invalidates
+when such an export changed or cannot be compared, which propagates the update to
+the importers. Under webpack and Rspack, a module with such exports does not
+accept its own updates, so the bundler re-executes its importers. Either way, the
+importers refresh through their own boundaries or reload the page.
 
 Hook slot ids are numbered per module in source order, so inserting or reordering
 a hook call shifts every later hook's key in that file and remaps its state. That

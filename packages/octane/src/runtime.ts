@@ -12885,6 +12885,15 @@ function renderBlockInner(block: Block): true | undefined {
 	(block as any).__warmEpisode = CURRENT_WARM_EPISODE;
 	EFFECT_EVENT_RENDER_TARGET = effectEventTarget;
 	EFFECT_EVENT_ACTION_TARGET = effectEventActionTarget;
+	// A Suspense replay that reaches a Block with an update queued since the
+	// suspended attempt renders new inputs: that update, and the props it passes
+	// down. Render the subtree as the ordinary update the scheduler would have run
+	// had it flushed before the retry. The replay's stored use() sequence belongs
+	// to the old inputs, and a shifted call would otherwise take another call's
+	// thenable. An urgent pass over a queued transition reads committed cells and
+	// leaves the update queued, so it still replays.
+	const replayUpdate = RESUME_REPLAY && block.pending && urgentTransitionRender === null;
+	if (replayUpdate) RESUME_REPLAY = false;
 	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
 	// gets re-rendered here; a block reached as a descendant of some OTHER queued
 	// block's cascade is also brought up to date here, so flush() can skip its
@@ -13077,6 +13086,7 @@ function renderBlockInner(block: Block): true | undefined {
 		CURRENT_EFFECT_REACHED = prevEffectReached;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
+		if (replayUpdate) RESUME_REPLAY = true;
 		try {
 			if (NATIVE_READ_DRIVER)
 				NATIVE_READ_DRIVER.endRender(block, renderCompleted, isSuspenseException(profileThrown));
@@ -19575,6 +19585,8 @@ function trackThenable(thenable: TrackedThenable<any>): void {
  * True while commitResume replays a try body after a resolution. Gates the
  * fresh-thenable reuse leniency and the waterfall diagnostic in useThenable —
  * both are replay-only semantics; ordinary updates must keep replacing.
+ * renderBlockInner clears it below a Block whose queued update the replay
+ * renders, so only bodies with unchanged inputs replay.
  */
 let RESUME_REPLAY = false;
 
@@ -46455,7 +46467,9 @@ function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
  * more enclosing sole-root blocks (for example a branch directly inside a
  * keyed item). When the inner branch replaces that element, keep every exact
  * borrower pointed at the new element/range so keyed moves and later teardown
- * never retain a detached boundary.
+ * never retain a detached boundary. A lite component's stand-in has no range
+ * (startMarker undefined), so a borrower can sit above one: an arm whose only
+ * output is a hookless call's inner branch.
  */
 function replaceSharedBlockBoundary(
 	parent: Block | null,
@@ -46465,17 +46479,18 @@ function replaceSharedBlockBoundary(
 	newEnd: Node | null,
 ): void {
 	if (oldStart === null || oldEnd === null) return;
-	let block = parent;
-	while (block !== null && block.startMarker === oldStart && block.endMarker === oldEnd) {
+	for (let block = parent; block !== null; block = block.parentBlock) {
+		if (block.startMarker === undefined) continue;
+		if (block.startMarker !== oldStart || block.endMarker !== oldEnd) return;
 		journalRootProperty(block, 'startMarker', block.startMarker);
 		journalRootProperty(block, 'endMarker', block.endMarker);
 		block.startMarker = newStart;
 		block.endMarker = newEnd;
-		block = block.parentBlock;
 	}
 }
 
 function sharesBlockBoundary(parent: Block | null, start: Node | null, end: Node | null): boolean {
+	while (parent !== null && parent.startMarker === undefined) parent = parent.parentBlock;
 	return (
 		parent !== null &&
 		start !== null &&
