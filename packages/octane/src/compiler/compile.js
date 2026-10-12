@@ -12600,14 +12600,19 @@ function compileInternal(
 		}
 	}
 	// Anchorless append-safety for componentSlotLite call sites (see
-	// anchorlessRootShape for the shape rules and the hazard). Optimistic
+	// anchorlessRootShape for the shape rules and the hazard). A component arm
+	// inherits its lite callee's hazard: an arm that self-marked on the callee's
+	// element keeps no pair, so when the callee's root branch empties it anchors
+	// on the node after that element. Without anchors that node is the next
+	// sibling's, which a later render of that sibling may replace. Optimistic
 	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
 	// components stay safe; a locally-unsafe shape drains through its
 	// dependents, so declaration order and recursion do not matter. An edge to a
 	// non-lite callee is safe outright — its componentSlot mints its own
-	// positional markers. So is an imported one, even when proven lite: it still
-	// renders inside its arm's own branch range. That keeps this proof, which
-	// lite exports publish, independent of every other module's proofs.
+	// positional markers. An imported edge is not followed either, which keeps
+	// this proof, which lite exports publish, independent of every other
+	// module's proofs; that leaves a proven-lite import that is not anchorless
+	// exposed to the hazard above.
 	let unsafeWorklist = null;
 	for (const [name, info] of ctx.componentInfo) {
 		info.anchorlessRootShape = anchorlessRootShape(info.node);
