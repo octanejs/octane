@@ -45,7 +45,7 @@ import {
 	write_project_generated_file,
 } from './project-codegen.js';
 import { createClientAssetMap } from './client-assets.js';
-import { createClientBuildState } from './client-build.js';
+import { PENDING_CLIENT_BUILD_ID, createClientBuildState } from './client-build.js';
 
 import { patch_global_fetch, is_rpc_request } from '@ripple-ts/adapter/rpc';
 
@@ -675,6 +675,14 @@ export function octane(inlineOptions = {}) {
 					preserveSignature: 'strict',
 				});
 			}
+		},
+
+		renderChunk(code, _chunk, _options, meta) {
+			if (!code.includes(PENDING_CLIENT_BUILD_ID)) return null;
+			return {
+				code: code.replaceAll(PENDING_CLIENT_BUILD_ID, clientBuild.seal(meta.chunks)),
+				map: null,
+			};
 		},
 
 		writeBundle() {
