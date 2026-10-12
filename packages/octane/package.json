@@ -433,7 +433,6 @@
     "@types/react-dom": "catalog:default",
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default",
-    "alien-signals": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
     "playwright": "catalog:default",
