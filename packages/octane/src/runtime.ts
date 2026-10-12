@@ -46403,7 +46403,9 @@ function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
  * more enclosing sole-root blocks (for example a branch directly inside a
  * keyed item). When the inner branch replaces that element, keep every exact
  * borrower pointed at the new element/range so keyed moves and later teardown
- * never retain a detached boundary.
+ * never retain a detached boundary. A lite component's stand-in has no range
+ * (startMarker undefined), so a borrower can sit above one: an arm whose only
+ * output is a hookless call's inner branch.
  */
 function replaceSharedBlockBoundary(
 	parent: Block | null,
@@ -46413,17 +46415,18 @@ function replaceSharedBlockBoundary(
 	newEnd: Node | null,
 ): void {
 	if (oldStart === null || oldEnd === null) return;
-	let block = parent;
-	while (block !== null && block.startMarker === oldStart && block.endMarker === oldEnd) {
+	for (let block = parent; block !== null; block = block.parentBlock) {
+		if (block.startMarker === undefined) continue;
+		if (block.startMarker !== oldStart || block.endMarker !== oldEnd) return;
 		journalRootProperty(block, 'startMarker', block.startMarker);
 		journalRootProperty(block, 'endMarker', block.endMarker);
 		block.startMarker = newStart;
 		block.endMarker = newEnd;
-		block = block.parentBlock;
 	}
 }
 
 function sharesBlockBoundary(parent: Block | null, start: Node | null, end: Node | null): boolean {
+	while (parent !== null && parent.startMarker === undefined) parent = parent.parentBlock;
 	return (
 		parent !== null &&
 		start !== null &&

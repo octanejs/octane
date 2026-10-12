@@ -5735,9 +5735,11 @@ const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext'])
 
 // Builtins a Strong callee may call and still render through componentSlotLite.
 // Each keeps its cells in CURRENT_SCOPE and schedules or versions CURRENT_BLOCK,
-// the nearest real Block. `use` keeps a Block: it stores thenables by call order
-// on CURRENT_BLOCK, so a lite callee would share its owner's sequence, and a
-// resume replay whose sequence shifted would reuse another call's thenable.
+// the nearest real Block. `use` stores thenables by call order on CURRENT_BLOCK,
+// so a lite callee would share its owner's sequence, and a resume replay whose
+// sequence shifted would reuse another call's thenable. The lite pass therefore
+// admits only `use(Context)` on a proven module context, which reads exactly as
+// useContext does.
 const STRONG_LITE_HOOKS = new Set([
 	'useState',
 	'useReducer',
@@ -5749,6 +5751,7 @@ const STRONG_LITE_HOOKS = new Set([
 	'useImperativeHandle',
 	'useLayoutSnapshot',
 	'useEffectEvent',
+	'use',
 	'useContext',
 	'useId',
 	'useSyncExternalStore',
@@ -12491,8 +12494,18 @@ function compileInternal(
 				seen.add(n);
 				const t = n.type;
 				if (t === 'TryStatement' || t === 'JSXTryExpression') return true;
+				// `use` stays lite only as `use(Context)`: any other argument, or a
+				// call through `use` passed on as a value, may read a thenable.
+				if (liteHooks && t === 'Identifier' && ctx.octaneImportLocals.get(n.name) === 'use')
+					return true;
 				if (t === 'CallExpression' && n.callee && n.callee.type === 'Identifier') {
 					const cname = n.callee.name;
+					if (liteHooks && ctx.octaneImportLocals.get(cname) === 'use')
+						return (
+							n.optional === true ||
+							n.arguments.length !== 1 ||
+							!isProvenContextUse(n.arguments[0], ctx.provenContextBindings)
+						);
 					if (
 						!locals.has(cname) &&
 						!ctx.componentInfo.has(cname) &&
