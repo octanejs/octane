@@ -16316,7 +16316,9 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useEffectEvent');
 	const scope = CURRENT_SCOPE!;
-	const block = scope.block;
+	// The rendering Block versions the attempt. A lite Scope's stand-in never
+	// renders on its own, so its version would never commit.
+	const block = CURRENT_BLOCK!;
 	const rare = blockRare(block);
 	if (rare.eventRender === 0) rare.eventRender = 1;
 	let s = scope.hooks?.get(slot) as EffectEventCell | undefined;
@@ -45349,7 +45351,12 @@ export function useActionState<S>(
 // ---------------------------------------------------------------------------
 
 function findAncestorForm(block: Block): HTMLFormElement | null {
-	let n: Node | null = block.startMarker ?? block.parentNode ?? null;
+	// Start above the range: a single-root Block's start is its own root element,
+	// which may be the <form> this component renders.
+	const start = block.startMarker;
+	let n: Node | null = start
+		? (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode
+		: (block.parentNode ?? null);
 	while (n) {
 		if ((n as any).nodeName === 'FORM') return n as HTMLFormElement;
 		n = (STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode;
@@ -45382,7 +45389,9 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 	// rendered form (or a moved consumer) means the form can appear/change after
 	// the first run. Re-subscribe when it changes; caching only the first result
 	// would leave the hook stuck reporting idle for a form that showed up later.
-	const form = findAncestorForm(block);
+	// Start from this component's own range: a lite Scope's stand-in sits at its
+	// host node, inside any <form> the owning Block renders around it.
+	const form = findAncestorForm(scope.block);
 	if (form !== s.form) {
 		if (s.form && s.listener) FORM_STATUS_LISTENERS.get(s.form)?.delete(s.listener);
 		s.form = form;

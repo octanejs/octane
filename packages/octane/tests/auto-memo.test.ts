@@ -2157,6 +2157,551 @@ describe('Strong hookful lite edges', () => {
 			root.unmount();
 		},
 	);
+
+	// Compiles a scenario in `mode` and names the callees it lowered to lite
+	// edges, so each parity scenario proves that Strong really ran them lite.
+	function loadLiteScenario(source: string, mode: StrongMode, id: string) {
+		const authored = mode === 'strong' ? `"use strong";\n${source}` : source;
+		const options = { hmr: false, dev: false };
+		const code = compile(authored, `${id}-${mode}.tsrx`, options).code;
+		const lite = (code.match(/_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*\w+,/g) ?? []).map(
+			(call: string) => call.match(/(\w+),$/)![1],
+		);
+		const client = loadCompiledFixtureSource(authored, {
+			id: `${id}-${mode}.tsrx`,
+			mode: 'client',
+			compileOptions: options,
+		});
+		return { client, lite };
+	}
+
+	// Two Probe instances share one owner Block, so a cell or handle keyed on that
+	// Block instead of the lite Scope collides between them.
+	const EFFECT_HOOKS_SOURCE = `
+		import { Activity, useEffect, useEffectEvent, useImperativeHandle, useInsertionEffect, useLayoutSnapshot, useLazyRef, useState } from 'octane';
+
+		function Probe(props) @{
+			const [count, setCount] = useState(0);
+			const log = props.log;
+			const name = props.name;
+			const clicks = useLazyRef(() => ({ name, total: 0 }));
+			useInsertionEffect(() => {
+				log('insert:' + name + count);
+				return () => log('uninsert:' + name + count);
+			});
+			const report = useEffectEvent(() => log('event:' + name + count));
+			useEffect(() => {
+				if (props.ping > 0) report();
+			});
+			useImperativeHandle(props.handle, () => ({ read: () => name + count }));
+			const shown = useLayoutSnapshot(() => props.measure(name), { initial: '-' });
+			<button
+				id={props.prefix + name}
+				data-shown={shown}
+				onClick={() => {
+					clicks.current.total++;
+					log('click:' + clicks.current.name + clicks.current.total);
+					setCount(count + 1);
+				}}
+			>
+				{(name + ':' + count) as string}
+			</button>
+		}
+
+		export function App(props) @{
+			<Activity mode={props.mode}>
+				<section>
+					<Probe name="a" prefix={props.prefix} ping={props.ping} log={props.log} handle={props.handles.a} measure={props.measure} />
+					<Probe name="b" prefix={props.prefix} ping={props.ping} log={props.log} handle={props.handles.b} measure={props.measure} />
+					@if (props.showC) {
+						<Probe name="c" prefix={props.prefix} ping={props.ping} log={props.log} handle={props.handles.c} measure={props.measure} />
+					}
+				</section>
+			</Activity>
+		}
+	`;
+
+	function runEffectHooksScenario(mode: StrongMode): string[] {
+		const { client, lite } = loadLiteScenario(EFFECT_HOOKS_SOURCE, mode, 'lite-effect-hooks');
+		expect(lite).toEqual(mode === 'strong' ? ['Probe', 'Probe', 'Probe'] : []);
+		const prefix = `effect-hooks-${mode}-`;
+		const log: string[] = [];
+		const handles = {
+			a: { current: null as { read(): string } | null },
+			b: { current: null as { read(): string } | null },
+			c: { current: null as { read(): string } | null },
+		};
+		const props = {
+			prefix,
+			mode: 'visible',
+			ping: 0,
+			showC: true,
+			log: log.push.bind(log),
+			handles,
+			measure: (name: string) => document.getElementById(prefix + name)?.textContent ?? '?',
+		};
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			flushEffects();
+			const shown = root
+				.findAll('button')
+				.map((el) => `${el.textContent}[${el.getAttribute('data-shown')}]`);
+			const read = Object.entries(handles).map(
+				([name, ref]) => `${name}=${ref.current === null ? null : ref.current.read()}`,
+			);
+			transcript.push(
+				`${label} | ${shown.join(' ')} | ${read.join(' ')} | ${log.splice(0).join(' ')}`,
+			);
+		};
+		step('mount');
+		root.click(`#${prefix}a`);
+		step('own update');
+		root.update(client.App, { ...props, ping: 1 });
+		step('effect event');
+		root.click(`#${prefix}b`);
+		root.update(client.App, { ...props, ping: 2 });
+		step('sibling update');
+		root.update(client.App, { ...props, ping: 2, showC: false });
+		step('arm off');
+		root.update(client.App, { ...props, ping: 2, showC: false, mode: 'hidden' });
+		step('hide');
+		root.update(client.App, { ...props, ping: 2, showC: false });
+		step('reveal');
+		root.click(`#${prefix}a`);
+		step('update after reveal');
+		root.unmount();
+		step('unmount');
+		return transcript;
+	}
+
+	it('keeps lazy refs, insertion effects, Effect Events, handles and snapshots per lite callee', () => {
+		const strong = runEffectHooksScenario('strong');
+		expect(strong).toEqual(runEffectHooksScenario('default'));
+		expect(strong).toEqual([
+			'mount | a:0[a:0] b:0[b:0] c:0[c:0] | a=a0 b=b0 c=c0 | insert:a0 insert:b0 insert:c0',
+			'own update | a:1[a:1] b:0[b:0] c:0[c:0] | a=a1 b=b0 c=c0 | click:a1 uninsert:a0 insert:a1',
+			'effect event | a:1[a:1] b:0[b:0] c:0[c:0] | a=a1 b=b0 c=c0 | event:a1 event:b0 event:c0',
+			'sibling update | a:1[a:1] b:1[b:1] c:0[c:0] | a=a1 b=b1 c=c0 | click:b1 uninsert:b0 insert:b1 event:a1 event:b1 event:c0',
+			'arm off | a:1[a:1] b:1[b:1] | a=a1 b=b1 c=null | uninsert:c0',
+			'hide | a:1[a:1] b:1[b:1] | a=null b=null c=null | ',
+			'reveal | a:1[a:1] b:1[b:1] | a=a1 b=b1 c=null | event:a1 event:b1',
+			'update after reveal | a:2[a:2] b:1[b:1] | a=a2 b=b1 c=null | click:a2 uninsert:a1 insert:a2',
+			'unmount |  | a=null b=null c=null | uninsert:a2 uninsert:b1',
+		]);
+	});
+
+	// Each Mirror subscribes to its own store and links an editable draft to the
+	// store's value; the conditional one unsubscribes when its arm turns off.
+	const STORE_HOOKS_SOURCE = `
+		import { useLinkedState, useSyncExternalStore } from 'octane';
+
+		function Mirror(props) @{
+			const value = useSyncExternalStore(props.store.subscribe, props.store.read, props.store.server);
+			const [draft, setDraft] = useLinkedState(value, (source) => source * 10);
+			<button class={props.name} onClick={() => setDraft((current) => current + 1)}>
+				{(props.name + ':' + value + '/' + draft) as string}
+			</button>
+		}
+
+		export function App(props) @{
+			<section>
+				<Mirror name="a" store={props.stores.a} />
+				<Mirror name="b" store={props.stores.b} />
+				@if (props.showC) {
+					<Mirror name="c" store={props.stores.c} />
+				}
+			</section>
+		}
+	`;
+
+	function testStore<T = number>(name: string, log: string[], value = 0 as T, server = value) {
+		const listeners = new Set<() => void>();
+		return {
+			read: () => value,
+			server: () => server,
+			subscribe(listener: () => void) {
+				listeners.add(listener);
+				log.push('subscribe:' + name);
+				return () => {
+					listeners.delete(listener);
+					log.push('unsubscribe:' + name);
+				};
+			},
+			set(next: T) {
+				value = next;
+				listeners.forEach((listener) => listener());
+			},
+		};
+	}
+
+	function runStoreHooksScenario(mode: StrongMode): string[] {
+		const { client, lite } = loadLiteScenario(STORE_HOOKS_SOURCE, mode, 'lite-store-hooks');
+		expect(lite).toEqual(mode === 'strong' ? ['Mirror', 'Mirror', 'Mirror'] : []);
+		const log: string[] = [];
+		const stores = { a: testStore('a', log), b: testStore('b', log), c: testStore('c', log) };
+		const props = { stores, showC: true };
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			flushEffects();
+			const shown = root.findAll('button').map((el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')} | ${log.splice(0).join(' ')}`);
+		};
+		step('mount');
+		stores.a.set(1);
+		step('store a');
+		root.click('.a');
+		step('edit a');
+		root.click('.b');
+		root.click('.b');
+		step('edit b');
+		stores.b.set(2);
+		step('store b relinks');
+		root.click('.c');
+		stores.c.set(3);
+		step('store c');
+		root.update(client.App, { ...props, showC: false });
+		step('arm off');
+		stores.c.set(4);
+		step('store c after unmount');
+		root.unmount();
+		step('unmount');
+		return transcript;
+	}
+
+	it('keeps external-store subscriptions and linked state per lite callee', () => {
+		const strong = runStoreHooksScenario('strong');
+		expect(strong).toEqual(runStoreHooksScenario('default'));
+		expect(strong).toEqual([
+			'mount | a:0/0 b:0/0 c:0/0 | subscribe:a subscribe:b subscribe:c',
+			'store a | a:1/10 b:0/0 c:0/0 | ',
+			'edit a | a:1/11 b:0/0 c:0/0 | ',
+			'edit b | a:1/11 b:0/2 c:0/0 | ',
+			'store b relinks | a:1/11 b:2/20 c:0/0 | ',
+			'store c | a:1/11 b:2/20 c:3/30 | ',
+			'arm off | a:1/11 b:2/20 | unsubscribe:c',
+			'store c after unmount | a:1/11 b:2/20 | ',
+			'unmount |  | unsubscribe:a unsubscribe:b',
+		]);
+	});
+
+	// The server renders each store's server snapshot. Hydration adopts that DOM,
+	// then the commit-time store check moves every Mirror to its client value.
+	it.each<StrongMode>(['strong', 'default'])(
+		'hydrates external-store and linked-state lite callees in %s mode',
+		(mode) => {
+			const authored =
+				mode === 'strong' ? `"use strong";\n${STORE_HOOKS_SOURCE}` : STORE_HOOKS_SOURCE;
+			const load = (environment: 'client' | 'server') =>
+				loadCompiledFixtureSource(authored, {
+					id: `lite-store-hydrate-${mode}.tsrx`,
+					mode: environment,
+					compileOptions: { hmr: false, dev: false },
+				});
+			const log: string[] = [];
+			const stores = {
+				a: testStore('a', log, 7, 5),
+				b: testStore('b', log, 5, 5),
+				c: testStore('c', log, 7, 5),
+			};
+			const props = { stores, showC: true };
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(load('server').App, props).html;
+			const buttons = Array.from(container.querySelectorAll('button'));
+			expect(buttons.map((el) => el.textContent)).toEqual(['a:5/50', 'b:5/50', 'c:5/50']);
+			const root = hydrateRoot(container, load('client').App, props);
+			flushEffects();
+			const hydrated = Array.from(container.querySelectorAll('button'));
+			expect(hydrated).toHaveLength(3);
+			hydrated.forEach((el, index) => expect(el).toBe(buttons[index]));
+			expect(hydrated.map((el) => el.textContent)).toEqual(['a:7/70', 'b:5/50', 'c:7/70']);
+			expect(log.splice(0)).toEqual(['subscribe:a', 'subscribe:b', 'subscribe:c']);
+			flushSync(() => (buttons[1] as HTMLButtonElement).click());
+			stores.a.set(8);
+			flushEffects();
+			expect(hydrated.map((el) => el.textContent)).toEqual(['a:8/80', 'b:5/51', 'c:7/70']);
+			root.unmount();
+			expect(log).toEqual(['unsubscribe:a', 'unsubscribe:b', 'unsubscribe:c']);
+		},
+	);
+
+	// Panel keeps a Block because it calls use(), so lite Probe's Effect Event
+	// versions Panel. Panel and Reader update from their own stores in one flush:
+	// Panel completes with a new event body, then Reader suspends the shared
+	// boundary. Until it reveals, the event keeps its committed body even when
+	// called from outside the hidden primary.
+	const HIDDEN_EFFECT_EVENT_SOURCE = `
+		import { use, useEffectEvent, useLayoutEffect, useSyncExternalStore } from 'octane';
+
+		function Probe(props) @{
+			const report = useEffectEvent(() => props.log('event:' + props.label));
+			useLayoutEffect(() => {
+				props.expose(report);
+			});
+			<b>{props.label as string}</b>
+		}
+
+		function Panel(props) @{
+			const suffix = use(props.ready);
+			const label = useSyncExternalStore(props.labels.subscribe, props.labels.read);
+			<div>
+				<Probe label={label + suffix} log={props.log} expose={props.expose} />
+			</div>
+		}
+
+		function Reader(props) @{
+			const promise = useSyncExternalStore(props.promises.subscribe, props.promises.read);
+			const value = use(promise);
+			<i>{value as string}</i>
+		}
+
+		export function App(props) @{
+			@try {
+				<section>
+					<Panel ready={props.ready} labels={props.labels} log={props.log} expose={props.expose} />
+					<Reader promises={props.promises} />
+				</section>
+			} @pending {
+				<p>{'pending'}</p>
+			}
+		}
+	`;
+
+	async function runHiddenEffectEventScenario(mode: StrongMode): Promise<string[]> {
+		const { client, lite } = loadLiteScenario(
+			HIDDEN_EFFECT_EVENT_SOURCE,
+			mode,
+			'lite-hidden-event',
+		);
+		expect(lite).toEqual(mode === 'strong' ? ['Probe'] : []);
+		const settled = (value: string) =>
+			Object.assign(Promise.resolve(value), { status: 'fulfilled', value });
+		const log: string[] = [];
+		let report = () => {};
+		const labels = testStore('labels', [], 'a');
+		const promises = testStore<Promise<string>>('promises', [], settled('one'));
+		const props = {
+			ready: settled('!'),
+			labels,
+			promises,
+			log: log.push.bind(log),
+			expose: (fn: () => void) => (report = fn),
+		};
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			flushEffects();
+			report();
+			const shown = root.findAll('b, i, p').map((el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')} | ${log.splice(0).join(' ')}`);
+		};
+		step('mount');
+		let resolve!: (value: string) => void;
+		labels.set('b');
+		promises.set(new Promise<string>((done) => (resolve = done)));
+		step('hidden update');
+		await act(async () => resolve('two'));
+		step('revealed');
+		root.unmount();
+		return transcript;
+	}
+
+	it('keeps a lite Effect Event body parked while its boundary hides the primary', async () => {
+		const strong = await runHiddenEffectEventScenario('strong');
+		expect(strong).toEqual(await runHiddenEffectEventScenario('default'));
+		expect(strong).toEqual([
+			'mount | a! one | event:a!',
+			'hidden update | b! one pending | event:a!',
+			'revealed | b! two | event:b!',
+		]);
+	});
+
+	// Status reads the <form> its owner renders around it, while Todo never sees
+	// the form it renders itself. Each Todo owns its Action queue, optimistic
+	// count, transition and deferred query.
+	const ACTION_HOOKS_SOURCE = `
+		import { useActionState, useDeferredValue, useFormState, useFormStatus, useOptimistic, useTransition } from 'octane';
+
+		function Status(props) @{
+			const status = useFormStatus();
+			<i class={'status-' + props.name}>{(status.pending ? 'pending' : 'idle') as string}</i>
+		}
+
+		function Todo(props) @{
+			const [saved, save, saving] = useActionState(async (count, step) => {
+				await props.gate();
+				return count + step;
+			}, 0);
+			const [shown, addOptimistic] = useOptimistic(saved, (count, step) => count + step);
+			const [busy, start] = useTransition();
+			const query = useDeferredValue(props.query);
+			const own = useFormStatus();
+			const [resets, reset] = useFormState((count) => count + 1, 0);
+			<form
+				class={'form-' + props.name}
+				action={() => {
+					addOptimistic(1);
+					return save(1);
+				}}
+			>
+				<Status name={props.name} />
+				<b>
+					{(props.name + ':' + shown + '/' + saved + (saving ? ' saving' : '') + (busy ? ' busy' : '') + (own.pending ? ' own' : '') + ' r=' + resets + ' q=' + query) as string}
+				</b>
+				<button class={'go-' + props.name} type="button" onClick={() => start(async () => { await props.gate(); })}>
+					{'go'}
+				</button>
+				<button class={'reset-' + props.name} type="button" onClick={() => reset()}>
+					{'reset'}
+				</button>
+			</form>
+		}
+
+		export function App(props) @{
+			<section>
+				<Todo name="a" gate={props.gate} query={props.query} />
+				<Todo name="b" gate={props.gate} query={props.query + '!'} />
+			</section>
+		}
+	`;
+
+	async function runActionHooksScenario(mode: StrongMode): Promise<string[]> {
+		const { client, lite } = loadLiteScenario(ACTION_HOOKS_SOURCE, mode, 'lite-action-hooks');
+		expect(lite).toEqual(mode === 'strong' ? ['Status', 'Todo', 'Todo'] : []);
+		const gates: Array<() => void> = [];
+		const gate = () => new Promise<void>((resolve) => gates.push(resolve));
+		const props = { gate, query: 'x' };
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = async (label: string) => {
+			await act(async () => {});
+			flushEffects();
+			const shown = root.findAll('i, b').map((el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')}`);
+		};
+		await step('mount');
+		flushSync(() =>
+			root
+				.find('.form-a')
+				.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true })),
+		);
+		await step('submit a');
+		gates.shift()!();
+		await step('saved a');
+		root.click('.go-b');
+		await step('transition b');
+		gates.shift()!();
+		await step('transition b done');
+		root.click('.reset-b');
+		await step('form state b');
+		root.update(client.App, { ...props, query: 'y' });
+		const stale = root.findAll('b').map((el) => el.textContent);
+		transcript.push(`urgent query | ${stale.join(' ')}`);
+		await step('deferred query');
+		root.unmount();
+		return transcript;
+	}
+
+	it('keeps Actions, optimistic state, transitions, deferred values and form status per lite callee', async () => {
+		const strong = await runActionHooksScenario('strong');
+		expect(strong).toEqual(await runActionHooksScenario('default'));
+		expect(strong).toEqual([
+			'mount | idle a:0/0 r=0 q=x idle b:0/0 r=0 q=x!',
+			'submit a | pending a:1/0 saving r=0 q=x idle b:0/0 r=0 q=x!',
+			'saved a | idle a:1/1 r=0 q=x idle b:0/0 r=0 q=x!',
+			'transition b | idle a:1/1 r=0 q=x idle b:0/0 busy r=0 q=x!',
+			'transition b done | idle a:1/1 r=0 q=x idle b:0/0 r=0 q=x!',
+			'form state b | idle a:1/1 r=0 q=x idle b:0/0 r=1 q=x!',
+			'urgent query | a:1/1 r=0 q=x b:0/0 r=1 q=x!',
+			'deferred query | idle a:1/1 r=0 q=y idle b:0/0 r=1 q=y!',
+		]);
+	});
+
+	// use() stores thenables by call order on the rendering Block. Maybe calls it
+	// only while its store is on. A resume that lands in the same task as the
+	// store turning off replays Later's use() first in the sequence, where a
+	// shared sequence would still hold Maybe's promise.
+	const USE_SEQUENCE_SOURCE = `
+		import { use, useLayoutEffect, useSyncExternalStore } from 'octane';
+
+		function Maybe(props) @{
+			const on = useSyncExternalStore(props.toggle.subscribe, props.toggle.read);
+			const label = on ? use(props.promise) : 'off';
+			useLayoutEffect(() => {
+				props.log('maybe:' + label);
+			});
+			<i>{('maybe:' + label) as string}</i>
+		}
+
+		function Later(props) @{
+			const label = use(props.promise);
+			useLayoutEffect(() => {
+				props.log('later:' + label);
+			});
+			<b>{('later:' + label) as string}</b>
+		}
+
+		export function App(props) @{
+			@try {
+				<section>
+					<Maybe promise={props.first} toggle={props.toggle} log={props.log} />
+					<Later promise={props.second} log={props.log} />
+				</section>
+			} @pending {
+				<p>{'pending'}</p>
+			}
+		}
+	`;
+
+	async function runUseSequenceScenario(mode: StrongMode): Promise<string[]> {
+		const { client } = loadLiteScenario(USE_SEQUENCE_SOURCE, mode, 'lite-use-sequence');
+		const pending = () => {
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => (resolve = done));
+			return { promise, resolve };
+		};
+		const log: string[] = [];
+		const toggle = testStore('toggle', [], 1);
+		const first = pending();
+		const second = pending();
+		const props = {
+			first: first.promise,
+			second: second.promise,
+			toggle,
+			log: log.push.bind(log),
+		};
+		const root = mount(client.App, props);
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			flushEffects();
+			const shown = root.findAll('i, b, p').map((el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')} | ${log.splice(0).join(' ')}`);
+		};
+		await act(async () => first.resolve('one'));
+		await act(async () => second.resolve('two'));
+		step('mount');
+		const third = pending();
+		root.update(client.App, { ...props, second: third.promise });
+		step('suspended update');
+		await act(async () => {
+			third.resolve('three');
+			toggle.set(0);
+		});
+		step('resolved while turning off');
+		root.unmount();
+		return transcript;
+	}
+
+	it('keeps use() callees on their own thenable sequence across a resume', async () => {
+		const strong = await runUseSequenceScenario('strong');
+		expect(strong).toEqual(await runUseSequenceScenario('default'));
+		expect(strong).toEqual([
+			'mount | maybe:one later:two | maybe:one later:two',
+			'suspended update | maybe:one later:two pending | ',
+			'resolved while turning off | maybe:off later:three | maybe:off later:three',
+		]);
+	});
 });
 
 describe('compiler-owned component-region memoization', () => {
