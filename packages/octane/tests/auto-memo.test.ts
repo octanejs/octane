@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 import { compile } from '../src/compiler/compile.js';
-import { createContext, createElement, flushSync, hydrateRoot, use } from '../src/index.js';
+import {
+	createContext,
+	createElement,
+	createRoot,
+	flushSync,
+	hydrateRoot,
+	use,
+} from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
@@ -2737,6 +2744,126 @@ describe('Strong hookful lite edges', () => {
 			'suspended update | maybe:one later:two pending | ',
 			'resolved while turning off | maybe:off later:three | maybe:off later:three',
 		]);
+	});
+
+	// use(Context) reads exactly as useContext does, so a callee whose use() calls
+	// all take a proven module context stays lite. Dynamic's argument could be a
+	// thenable, so it keeps its Block. Frame's memo wall has no props: only the
+	// context reads of the lite callees inside it re-render it.
+	const USE_CONTEXT_SOURCE = `
+		import { createContext, memo, use, useState } from 'octane';
+
+		const Theme = createContext('light');
+
+		function Label(props) @{
+			const theme = use(Theme);
+			<i>{(props.name + ':' + theme) as string}</i>
+		}
+
+		function Counter(props) @{
+			const theme = use(Theme);
+			const [count, setCount] = useState(0);
+			<button id={props.name} onClick={() => setCount(count + 1)}>
+				{(props.name + ':' + theme + ':' + count) as string}
+			</button>
+		}
+
+		function Dynamic(props) @{
+			const theme = use(props.usable);
+			<b>{('dynamic:' + theme) as string}</b>
+		}
+
+		const Frame = memo(function Frame() @{
+			<div><Label name="m" /><Counter name="m" /></div>
+		});
+
+		export function App(props) @{
+			<Theme value={props.theme}>
+				<Label name="a" />
+				<Counter name="a" />
+				<Dynamic usable={Theme} />
+				<Frame />
+			</Theme>
+		}
+	`;
+
+	function runUseContextScenario(mode: StrongMode, hydrate: boolean): string[] {
+		const { client, lite } = loadLiteScenario(USE_CONTEXT_SOURCE, mode, 'lite-use-context');
+		expect(lite).toEqual(mode === 'strong' ? ['Label', 'Counter', 'Label', 'Counter'] : []);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const props = { theme: 'light' };
+		let root;
+		if (hydrate) {
+			const server = loadCompiledFixtureSource(
+				mode === 'strong' ? `"use strong";\n${USE_CONTEXT_SOURCE}` : USE_CONTEXT_SOURCE,
+				{
+					id: `lite-use-context-${mode}.tsrx`,
+					mode: 'server',
+					compileOptions: { hmr: false, dev: false },
+				},
+			);
+			container.innerHTML = ServerRuntime.renderToString(server.App, props).html;
+			root = hydrateRoot(container, client.App, props);
+		} else {
+			root = createRoot(container);
+			root.render(client.App, props);
+		}
+		flushSync(() => {});
+		const m = container.querySelector('#m') as HTMLButtonElement;
+		const transcript: string[] = [];
+		const step = (label: string) => {
+			const shown = Array.from(container.querySelectorAll('i, button, b'), (el) => el.textContent);
+			transcript.push(`${label} | ${shown.join(' ')}`);
+		};
+		step('mount');
+		flushSync(() => (container.querySelector('#a') as HTMLButtonElement).click());
+		flushSync(() => m.click());
+		step('own updates');
+		flushSync(() => root.render(client.App, { theme: 'dark' }));
+		step('dark');
+		flushSync(() => root.render(client.App, { theme: 'light' }));
+		step('light');
+		expect(container.querySelector('#m')).toBe(m);
+		root.unmount();
+		container.remove();
+		return transcript;
+	}
+
+	it.each([false, true])(
+		'keeps use(Context) callees lite and current through a memo wall (hydrate: %s)',
+		(hydrate) => {
+			const strong = runUseContextScenario('strong', hydrate);
+			expect(strong).toEqual(runUseContextScenario('default', hydrate));
+			expect(strong).toEqual([
+				'mount | a:light a:light:0 dynamic:light m:light m:light:0',
+				'own updates | a:light a:light:1 dynamic:light m:light m:light:1',
+				'dark | a:dark a:dark:1 dynamic:dark m:dark m:dark:1',
+				'light | a:light a:light:1 dynamic:light m:light m:light:1',
+			]);
+		},
+	);
+
+	// Each read below may reach a thenable, which use() stores on the Block.
+	it.each([
+		'const theme = use(props.usable);',
+		'const theme = use(Theme, props.usable);',
+		'const theme = use?.(Theme);',
+		'const read = use; const theme = read(props.usable);',
+		'const theme = use(Imported);',
+	])('keeps a Block for a Strong callee that runs %s', (read) => {
+		const source = `"use strong";
+			import { createContext, use } from 'octane';
+			import { Imported } from './theme';
+			const Theme = createContext('light');
+			function Reader(props) @{
+				${read}
+				<i>{theme as string}</i>
+			}
+			export function App(props) @{ <Theme value="dark"><Reader usable={props.usable} /></Theme> }`;
+		const code = compile(source, 'use-thenable-reader.tsrx', { hmr: false, dev: false }).code;
+		expect(code).not.toMatch(/_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*Reader,/);
+		expect(code).toMatch(/_\$componentSlotVoid\(\s*__s,\s*\d+,\s*[^,]+,\s*Reader,/);
 	});
 });
 
