@@ -2183,6 +2183,13 @@ direct-template and returned-output layouts, or when a live block has no coheren
 exclusively resettable DOM range. The emitted accept block then calls
 `import.meta.hot.invalidate()` for a full page reload.
 
+As with React's bundler plugins, an export other than a component reaches the
+module's importers only through them. Under Vite, the accept block invalidates
+when such an export changed or cannot be compared, which propagates the update to
+the importers. Under webpack and Rspack, a module with such exports does not
+accept its own updates, so the bundler re-executes its importers. Either way, the
+importers refresh through their own boundaries or reload the page.
+
 Hook slot ids are numbered per module in source order, so inserting or reordering
 a hook call shifts every later hook's key in that file and remaps its state. That
 is a known limitation, not a supported edit.
