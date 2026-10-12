@@ -13001,16 +13001,17 @@ function compileInternal(
 			),
 		);
 		// Importers keep the bindings of the evaluation they linked against. The
-		// handoff refreshes component wrappers in place, but any other export they
-		// read stays stale unless the update propagates to them. Vite's callback
-		// sees the previous bindings beside the new namespace, so it invalidates
-		// when one differs or cannot be compared. A webpack replacement only sees
-		// data its predecessor left, and the re-execution that an invalidation
-		// causes would differ again, so a module with such exports does not accept.
-		const componentKeys = new Set(hmrComponents.map(componentKey));
+		// handoff refreshes component wrappers in place, under any export name,
+		// but any other export they read stays stale unless the update propagates
+		// to them. Vite's callback sees the previous bindings beside the new
+		// namespace, so it invalidates when one differs or cannot be compared. A
+		// webpack replacement only sees data its predecessor left, and the
+		// re-execution that an invalidation causes would differ again, so a module
+		// with such exports does not accept.
+		const componentLocals = new Set(hmrComponents.map((c) => c.name));
 		const valueExports = runtimeExportBindings(
 			ctx.output === 'ts' ? dropTypeOnlyStatements(ast.body) : ast.body,
-		).filter(([name]) => !componentKeys.has(name));
+		).filter(([, local]) => !componentLocals.has(local));
 		let accept = null;
 		if (webpackHotName !== null) {
 			if (valueExports.length === 0) accept = b.stmt(b.call(b.member(hot(), 'accept')));

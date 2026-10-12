@@ -387,6 +387,10 @@ describe('hmr — runtime wrapper', () => {
 		} finally {
 			r.unmount();
 		}
+		// Another name for a component exports the same handed-off wrapper.
+		const aliased = webpackHotModule('/src/Aliased.tsrx');
+		await aliased.load(`export function App() @{ <p>app</p> }\nexport { App as Main };`);
+		expect(aliased.accepted).toBe(true);
 	});
 
 	it('renders the initial component body', () => {
