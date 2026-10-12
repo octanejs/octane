@@ -5735,9 +5735,11 @@ const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext'])
 
 // Builtins a Strong callee may call and still render through componentSlotLite.
 // Each keeps its cells in CURRENT_SCOPE and schedules or versions CURRENT_BLOCK,
-// the nearest real Block. `use` keeps a Block: it stores thenables by call order
-// on CURRENT_BLOCK, so a lite callee would share its owner's sequence, and a
-// resume replay whose sequence shifted would reuse another call's thenable.
+// the nearest real Block. `use` stores thenables by call order on CURRENT_BLOCK,
+// so a lite callee would share its owner's sequence, and a resume replay whose
+// sequence shifted would reuse another call's thenable. The lite pass therefore
+// admits only `use(Context)` on a proven module context, which reads exactly as
+// useContext does.
 const STRONG_LITE_HOOKS = new Set([
 	'useState',
 	'useReducer',
@@ -5749,6 +5751,7 @@ const STRONG_LITE_HOOKS = new Set([
 	'useImperativeHandle',
 	'useLayoutSnapshot',
 	'useEffectEvent',
+	'use',
 	'useContext',
 	'useId',
 	'useSyncExternalStore',
@@ -9680,6 +9683,45 @@ function dropTypeOnlyExports(body, typeNames) {
 	return result;
 }
 
+// Each runtime export as [exportName, localName]. `localName` is null when no
+// module binding holds the exported value: a re-export, `export *` (whose
+// exportName is also null), or an anonymous default.
+function runtimeExportBindings(body) {
+	const bindings = [];
+	for (const node of body) {
+		if (node.type === 'ExportAllDeclaration') {
+			bindings.push([null, null]);
+		} else if (node.type === 'ExportDefaultDeclaration') {
+			const value = node.declaration;
+			bindings.push([
+				'default',
+				value.type === 'Identifier'
+					? value.name
+					: value.type === 'FunctionDeclaration' || value.type === 'ClassDeclaration'
+						? (value.id?.name ?? null)
+						: null,
+			]);
+		} else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
+			const names = new Set();
+			if (node.declaration.type === 'VariableDeclaration') {
+				for (const declarator of node.declaration.declarations)
+					collectBindings(declarator.id, names);
+			} else if (node.declaration.id?.type === 'Identifier') {
+				names.add(node.declaration.id.name);
+			}
+			for (const name of names) bindings.push([name, name]);
+		} else if (node.type === 'ExportNamedDeclaration') {
+			for (const specifier of node.specifiers) {
+				bindings.push([
+					identifierName(specifier.exported),
+					node.source ? null : specifier.local.name,
+				]);
+			}
+		}
+	}
+	return bindings;
+}
+
 // ---------------------------------------------------------------------------
 // `module server` analysis + emit
 // ---------------------------------------------------------------------------
@@ -12452,8 +12494,18 @@ function compileInternal(
 				seen.add(n);
 				const t = n.type;
 				if (t === 'TryStatement' || t === 'JSXTryExpression') return true;
+				// `use` stays lite only as `use(Context)`: any other argument, or a
+				// call through `use` passed on as a value, may read a thenable.
+				if (liteHooks && t === 'Identifier' && ctx.octaneImportLocals.get(n.name) === 'use')
+					return true;
 				if (t === 'CallExpression' && n.callee && n.callee.type === 'Identifier') {
 					const cname = n.callee.name;
+					if (liteHooks && ctx.octaneImportLocals.get(cname) === 'use')
+						return (
+							n.optional === true ||
+							n.arguments.length !== 1 ||
+							!isProvenContextUse(n.arguments[0], ctx.provenContextBindings)
+						);
 					if (
 						!locals.has(cname) &&
 						!ctx.componentInfo.has(cname) &&
@@ -12975,37 +13027,49 @@ function compileInternal(
 				),
 			),
 		);
-		const hmrModuleName = webpackHotName === null ? allocCompilerName(ctx, '_$hmrModule') : null;
-		const accept = b.stmt(
-			b.call(
-				b.member(hot(), 'accept'),
-				...(webpackHotName === null
-					? [
-							b.arrow(
-								[b.id(hmrModuleName)],
-								b.block([
-									b.if(
-										b.logical(
-											'&&',
-											b.id(hmrModuleName),
-											hmrComponents
-												.map((c) =>
-													b.binary(
-														'!==',
-														b.member(b.id(hmrModuleName), componentKey(c)),
-														b.id(c.name),
-													),
-												)
-												.reduce((left, right) => b.logical('||', left, right)),
-										),
-										b.stmt(b.call(b.member(hot(), 'invalidate'))),
-									),
-								]),
-							),
-						]
-					: []),
-			),
-		);
+		// Importers keep the bindings of the evaluation they linked against. The
+		// handoff refreshes component wrappers in place, under any export name,
+		// but any other export they read stays stale unless the update propagates
+		// to them. Vite's callback sees the previous bindings beside the new
+		// namespace, so it invalidates when one differs or cannot be compared. A
+		// webpack replacement only sees data its predecessor left, and the
+		// re-execution that an invalidation causes would differ again, so a module
+		// with such exports does not accept.
+		const componentLocals = new Set(hmrComponents.map((c) => c.name));
+		const valueExports = runtimeExportBindings(
+			ctx.output === 'ts' ? dropTypeOnlyStatements(ast.body) : ast.body,
+		).filter(([, local]) => !componentLocals.has(local));
+		let accept = null;
+		if (webpackHotName !== null) {
+			if (valueExports.length === 0) accept = b.stmt(b.call(b.member(hot(), 'accept')));
+		} else {
+			const hmrModuleName = allocCompilerName(ctx, '_$hmrModule');
+			const changed = valueExports.some(([, local]) => local === null)
+				? b.id(hmrModuleName)
+				: b.logical(
+						'&&',
+						b.id(hmrModuleName),
+						[...hmrComponents.map((c) => [componentKey(c), c.name]), ...valueExports]
+							.map(([name, local]) => {
+								const key = b.key(name);
+								return b.binary(
+									'!==',
+									b.member(b.id(hmrModuleName), key, key.type !== 'Identifier'),
+									b.id(local),
+								);
+							})
+							.reduce((left, right) => b.logical('||', left, right)),
+					);
+			accept = b.stmt(
+				b.call(
+					b.member(hot(), 'accept'),
+					b.arrow(
+						[b.id(hmrModuleName)],
+						b.block([b.if(changed, b.stmt(b.call(b.member(hot(), 'invalidate'))))]),
+					),
+				),
+			);
+		}
 		// Vite's data object itself survives evaluations. Persist directly: Vite
 		// keeps only one dispose callback, which renderer/thread cleanup may own.
 		// Webpack creates the next data object through its dispose callback instead.
@@ -13024,7 +13088,7 @@ function compileInternal(
 							: b.stmt(
 									b.call(b.member(hot(), 'dispose'), b.arrow([b.id('data')], b.block([persist]))),
 								),
-						accept,
+						...(accept === null ? [] : [accept]),
 					]),
 					null,
 				),

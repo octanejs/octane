@@ -48,26 +48,47 @@ interface TestHotContext {
 	invalidate(): void;
 }
 
+type HmrTestOptions = { hmr?: 'vite' | 'webpack'; hot?: TestHotContext };
+
 async function compileHmrComponent(
 	source: string,
 	exportName = 'App',
+	filename?: string,
+	modules?: Record<string, Record<string, unknown>>,
+	options?: HmrTestOptions,
+): Promise<ComponentBody<any>> {
+	return (await compileHmrModule(source, [exportName], filename, modules, options))[exportName];
+}
+
+/** Evaluates compiled output and returns the namespace of `exportNames`. */
+async function compileHmrModule(
+	source: string,
+	exportNames: readonly string[],
 	filename = '/src/App.tsrx',
 	modules: Record<string, Record<string, unknown>> = {},
-	options: { hmr?: 'vite' | 'webpack'; hot?: TestHotContext } = {},
-): Promise<ComponentBody<any>> {
+	options: HmrTestOptions = {},
+): Promise<Record<string, any>> {
 	const [{ compile }, runtime, internalRuntime] = await Promise.all([
 		import('octane/compiler'),
 		import('../src/index.js'),
 		import('octane/internal/client'),
 	]);
 	const code = compile(source, filename, { hmr: options.hmr ?? 'webpack' }).code;
-	// An anonymous default export has no authored binding: its export clause
-	// names the module binding that holds it.
-	const local =
-		exportName === 'default'
-			? /^export\s*\{\s*([\w$]+)\s+as\s+default\s*\};?\s*$/m.exec(code)?.[1]
-			: exportName;
-	if (local === undefined) throw new Error('The compiled module has no default export binding');
+	// Export clauses name the module binding behind a renamed export, including
+	// an anonymous default export, which has no authored binding.
+	const locals = new Map<string, string>();
+	for (const [, clause] of code.matchAll(/^export\s*\{([^}]*)\};?\s*$/gm)) {
+		for (const specifier of clause.split(',')) {
+			const [local, exported = local] = specifier.trim().split(/\s+as\s+/);
+			if (local) locals.set(exported, local);
+		}
+	}
+	const namespace = exportNames.map((name) => {
+		if (name === 'default' && !locals.has(name)) {
+			throw new Error('The compiled module has no default export binding');
+		}
+		return `${JSON.stringify(name)}: ${locals.get(name) ?? name}`;
+	});
 	const transformed =
 		code
 			.replace(
@@ -95,7 +116,7 @@ async function compileHmrComponent(
 			// instead of `export let X = …`; drop the list form the same way.
 			.replace(/^export\s*\{[^}]*\};?\s*$/gm, '')
 			.replaceAll('import.meta.webpackHot', 'hot')
-			.replaceAll('import.meta.hot', 'hot') + `\nreturn ${local};`;
+			.replaceAll('import.meta.hot', 'hot') + `\nreturn { ${namespace.join(', ')} };`;
 	const hot = options.hot ?? {
 		data: undefined,
 		dispose() {},
@@ -108,22 +129,25 @@ async function compileHmrComponent(
 		'hot',
 		'modules',
 		transformed,
-	)(runtime, internalRuntime, hot, modules) as ComponentBody<any>;
+	)(runtime, internalRuntime, hot, modules);
 }
 
 /**
  * One webpack module across successive saves: each `load` runs the previous
  * evaluation's dispose handler, then evaluates the edit, which hands every
  * export to its canonical wrapper and invalidates when one declines.
+ * `accepted` reports whether the latest evaluation is its own update boundary.
  */
 function webpackHotModule(filename: string) {
 	const data: Record<string, unknown> = {};
 	let dispose: ((data: Record<string, unknown>) => void) | undefined;
 	const module = {
+		accepted: false,
 		invalidated: false,
 		load(source: string): Promise<ComponentBody<any>> {
 			dispose?.(data);
 			dispose = undefined;
+			module.accepted = false;
 			return compileHmrComponent(
 				source,
 				'App',
@@ -136,7 +160,9 @@ function webpackHotModule(filename: string) {
 						dispose(callback) {
 							dispose = callback;
 						},
-						accept() {},
+						accept() {
+							module.accepted = true;
+						},
 						invalidate() {
 							module.invalidated = true;
 						},
@@ -284,6 +310,88 @@ describe('hmr — runtime wrapper', () => {
 			}
 		},
 	);
+
+	it.each([
+		['a declaration', 'label', (label: string) => `export const label = '${label}';`],
+		[
+			'a renamed binding',
+			'value',
+			(label: string) => `const value = '${label}';\nexport { value as label };`,
+		],
+		[
+			'a destructuring',
+			'label',
+			(label: string) => `export const { label } = { label: '${label}' };`,
+		],
+	])(
+		'sends a value exported by %s beside a component to its Vite importers',
+		async (_form, local, exportLabel) => {
+			let accept: Parameters<TestHotContext['accept']>[0];
+			let invalidations = 0;
+			const hot: TestHotContext = {
+				data: {},
+				dispose() {},
+				accept(callback) {
+					accept = callback;
+				},
+				invalidate() {
+					invalidations++;
+				},
+			};
+			const load = async (label: string, prefix: string) => {
+				const previousAccept = accept;
+				const module = await compileHmrModule(
+					`${exportLabel(label)}
+					 export function App() @{ <p>{'${prefix} ' + ${local}}</p> }`,
+					['App', 'label'],
+					'/src/App.tsrx',
+					{},
+					{ hmr: 'vite', hot },
+				);
+				flushSync(() => previousAccept?.(module));
+				return module;
+			};
+			const r = mount((await load('v1', 'first')).App);
+			try {
+				// Importers still hold the previous evaluation's bindings. An unchanged
+				// value keeps them current, so the module stays its own boundary.
+				await load('v1', 'second');
+				expect(r.find('p').textContent).toBe('second v1');
+				expect(invalidations).toBe(0);
+				// A changed value must propagate the update to those importers.
+				await load('v2', 'second');
+				expect(r.find('p').textContent).toBe('second v2');
+				expect(invalidations).toBe(1);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('lets webpack re-execute the importers of a module exporting values beside a component', async () => {
+		const hot = webpackHotModule('/src/App.tsrx');
+		const source = (label: string) =>
+			`export const label = '${label}';
+			 export function App() @{ <p>{label as string}</p> }`;
+		const App = await hot.load(source('v1'));
+		const r = mount(App);
+		try {
+			// A replacement cannot see what its importers last read, and comparing
+			// against its previous evaluation would invalidate every re-execution.
+			expect(hot.accepted).toBe(false);
+			expect(await hot.load(source('v2'))).toBe(App);
+			flushSync(() => {});
+			expect(r.find('p').textContent).toBe('v2');
+			expect(hot.accepted).toBe(false);
+			expect(hot.invalidated).toBe(false);
+		} finally {
+			r.unmount();
+		}
+		// Another name for a component exports the same handed-off wrapper.
+		const aliased = webpackHotModule('/src/Aliased.tsrx');
+		await aliased.load(`export function App() @{ <p>app</p> }\nexport { App as Main };`);
+		expect(aliased.accepted).toBe(true);
+	});
 
 	it('renders the initial component body', () => {
 		const Foo = hmr(((_props: any, scope: Scope, _extra: any) => {
