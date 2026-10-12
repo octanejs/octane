@@ -12421,6 +12421,10 @@ interface BlockRare {
 	// renderBlockInner resets to 0 at the start of every render of this Block.
 	thenables: TrackedThenable<unknown>[] | undefined;
 	thenableIdx: number;
+	// Thenables a compiler use() batch suspended on before its unwraps ran: the
+	// held one at twice its call position, then the fresh one a replay dropped.
+	// They share the lifetime of `thenables`.
+	batchThenables: TrackedThenable<unknown>[] | undefined;
 	// Fetch-tree warming cache for this render episode.
 	warmCache: Map<HookSlot, WarmEntry[]> | undefined;
 	warmCacheEpisode: number | undefined;
@@ -12452,6 +12456,7 @@ function blockRare(block: Block): BlockRare {
 		activitySlot: undefined,
 		thenables: undefined,
 		thenableIdx: 0,
+		batchThenables: undefined,
 		warmCache: undefined,
 		warmCacheEpisode: undefined,
 		updateChain: -1,
@@ -12909,12 +12914,9 @@ function renderBlockInner(block: Block): true | undefined {
 		if (rare.eventRender !== 0) rare.eventRender++;
 		rare.thenableIdx = 0;
 		const tState = rare.thenables;
-		if (
-			tState !== undefined &&
-			tState.length !== 0 &&
-			(!RESUME_REPLAY || (block as any).__thenableDone === true)
-		) {
-			tState.length = 0;
+		if (tState !== undefined && (!RESUME_REPLAY || (block as any).__thenableDone === true)) {
+			if (tState.length !== 0) tState.length = 0;
+			rare.batchThenables = undefined;
 		}
 	}
 	(block as any).__thenableDone = false;
@@ -19494,6 +19496,10 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 		throw new SuspenseException(stored);
 	}
 
+	// A batch that suspended before this unwrap ran recorded the replay's fresh
+	// promise for its member. Keep the held one, as above.
+	if (rare.batchThenables !== undefined)
+		thenable = heldBatchThenable(rare.batchThenables, thenable);
 	// New thenable at this slot — tag status if untracked, attach listeners.
 	state[idx] = thenable;
 	trackThenable(thenable);
@@ -19644,7 +19650,10 @@ export function useBatch(items: any[], warm?: () => void): void {
 		// members must not — the unwraps need to run so this rejection reaches
 		// its use() and routes to @catch instead of re-suspending forever.
 		if (it.status === 'rejected') break;
-		if (it.status === 'pending') (pending ??= []).push(it);
+		if (it.status === 'pending') {
+			pending = holdBatchThenables(items);
+			break;
+		}
 	}
 	if (pending === null) return;
 	runActiveWarmPlans(warm);
@@ -19662,6 +19671,49 @@ export function useBatch(items: any[], warm?: () => void): void {
 		}
 	});
 	throw new SuspenseException(combined);
+}
+
+/**
+ * A batch suspends before its unwraps reach useThenable, so it applies the
+ * resume-replay leniency itself and returns the members it suspends on. It
+ * holds each member at the call position its unwrap takes when no other use()
+ * runs in between. A replay that brings a fresh promise for a held member keeps
+ * the held one, and records the fresh one so the unwrap can find the held one
+ * wherever its call lands.
+ */
+function holdBatchThenables(items: any[]): TrackedThenable<any>[] | null {
+	const block = CURRENT_BLOCK!;
+	const rare = blockRare(block);
+	// renderBlockInner drops the held entries along with `thenables`.
+	rare.thenables ??= [];
+	const held: TrackedThenable<any>[] = (rare.batchThenables ??= []);
+	let pending: TrackedThenable<any>[] | null = null;
+	for (let i = 0, at = rare.thenableIdx * 2; i < items.length; i++) {
+		let it = items[i];
+		if (it == null || typeof it.then !== 'function') continue;
+		trackThenable(it);
+		// Held entries survive only the replays of one suspension episode.
+		const kept = held[at];
+		if (kept === undefined) held[at] = it;
+		else if (kept !== it) {
+			if (process.env.NODE_ENV !== 'production') warnUncachedUsePromise(block);
+			held[at + 1] = it;
+			it = kept;
+		}
+		at += 2;
+		// The same rejected-member cutoff as useBatch, on the kept members.
+		if (it.status === 'rejected') break;
+		if (it.status === 'pending') (pending ??= []).push(it);
+	}
+	return pending;
+}
+
+function heldBatchThenable(
+	held: TrackedThenable<any>[],
+	thenable: TrackedThenable<any>,
+): TrackedThenable<any> {
+	for (let i = 1; i < held.length; i += 2) if (held[i] === thenable) return held[i - 1];
+	return thenable;
 }
 
 /** @internal Compiler-owned registration for a component warm plan. */
