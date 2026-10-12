@@ -5734,17 +5734,31 @@ function isOpaqueRenderable(expression) {
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
 // Builtins a Strong callee may call and still render through componentSlotLite.
-// Each keeps its cell in CURRENT_SCOPE and schedules CURRENT_BLOCK. `use` stores
-// its thenables by call order on the Block, and the other builtins read or stage
-// per-Block render state, so they keep a Block until audited.
+// Each keeps its cells in CURRENT_SCOPE and schedules or versions CURRENT_BLOCK,
+// the nearest real Block. `use` keeps a Block: it stores thenables by call order
+// on CURRENT_BLOCK, so a lite callee would share its owner's sequence, and a
+// resume replay whose sequence shifted would reuse another call's thenable.
 const STRONG_LITE_HOOKS = new Set([
 	'useState',
 	'useReducer',
 	'useRef',
+	'useLazyRef',
 	'useEffect',
 	'useLayoutEffect',
+	'useInsertionEffect',
+	'useImperativeHandle',
+	'useLayoutSnapshot',
+	'useEffectEvent',
 	'useContext',
 	'useId',
+	'useSyncExternalStore',
+	'useLinkedState',
+	'useTransition',
+	'useDeferredValue',
+	'useOptimistic',
+	'useActionState',
+	'useFormState',
+	'useFormStatus',
 ]);
 
 function autoMemoBuiltinHookName(call, ctx) {

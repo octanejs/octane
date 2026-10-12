@@ -86,6 +86,14 @@ export function SelfFormStatus(props) @{
 	</form>
 }
 
+// The same component rendered as a child, where its single <form> root is
+// the start of its own range.
+export function NestedSelfFormStatus(props) @{
+	<section>
+		<SelfFormStatus action={props.action} expose={props.expose} />
+	</section>
+}
+
 // useOptimistic: optimisticState shows the pending value during the action, then
 // converges to the real committed state.
 export function OptimisticForm(props) @{
