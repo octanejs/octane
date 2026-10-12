@@ -69,15 +69,9 @@ const version = (request) => {
 	}
 };
 const tooling = Object.fromEntries(
-	[
-		'esbuild',
-		'vite',
-		'@tsrx/core',
-		'@tsrx/oxc/tsrx-core-compat',
-		'alien-signals',
-		'devalue',
-		'jsdom',
-	].map((request) => [request, version(request)]),
+	['esbuild', 'vite', '@tsrx/core', '@tsrx/oxc/tsrx-core-compat', 'devalue', 'jsdom'].map(
+		(request) => [request, version(request)],
+	),
 );
 for (const id of ['root-static', 'hooks-state', 'context']) {
 	const original = fs.readFileSync(path.join(fixtureInputs, id + '.tsrx'), 'utf8');

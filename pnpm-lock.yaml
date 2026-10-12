@@ -7324,9 +7324,6 @@ importers:
       '@wagmi/core':
         specifier: catalog:default
         version: 3.6.5(@tanstack/query-core@5.102.8)(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))
-      alien-signals:
-        specifier: catalog:default
-        version: 3.2.1
       esbuild:
         specifier: catalog:default
         version: 0.28.1
