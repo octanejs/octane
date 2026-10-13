@@ -19377,7 +19377,13 @@ function isPropCreationExpr(expr, ctx, includesLiteral = false) {
 				blocked = true;
 				return;
 			}
-			if (FN_TYPES.has(n.type)) return; // does not run during render
+			if (FN_TYPES.has(n.type)) {
+				// A regular function can mutate its receiver even if it never names
+				// the literal binding. Keep receiver-owning methods/accessors fresh.
+				// Arrow properties cannot acquire the literal as their `this`.
+				if (includesLiteral && n.type !== 'ArrowFunctionExpression') blocked = true;
+				return; // does not run during render
+			}
 			// Same render-time-call inventory as containsRenderCall: plain and
 			// optional calls, constructions, tagged templates, and dynamic
 			// import() (ESTree flavor; the Babel flavor is a CallExpression).

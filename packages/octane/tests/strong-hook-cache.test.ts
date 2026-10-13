@@ -724,6 +724,47 @@ ${close}`,
 		}
 	});
 
+	it.each(['named', 'inline'])(
+		'starts a fresh child value after an event mutates its method receiver (%s)',
+		(form) => {
+			const literal = '{ count: 0, next() { return ++this.count; } }';
+			const { App } = loadCompiledFixtureSource(
+				`/** @jsxImportSource octane */
+"use strong";
+import { useState } from 'octane';
+function Display(props) {
+  return <div>
+    <output>{props.noise + ':' + props.model.count as string}</output>
+    <button id="value" onClick={() => props.model.next()}>change</button>
+  </div>;
+}
+export function App() ${open}
+  const [noise, setNoise] = useState(0);
+  ${form === 'named' ? `const model = ${literal};` : ''}
+  ${render}
+  <div>
+    <button id="noise" onClick={() => setNoise(noise + 1)}>advance</button>
+    <Display model={${form === 'named' ? 'model' : literal}} noise={noise} />
+  </div>
+${close}`,
+				{
+					id: `/src/StrongMethodMutableChild.${extension}`,
+					mode: 'client',
+					compileOptions: { dev: false, hmr: false },
+				},
+			);
+			const mounted = mount(App);
+			try {
+				expect(mounted.find('output').textContent).toBe('0:0');
+				mounted.click('#value');
+				mounted.click('#noise');
+				expect(mounted.find('output').textContent).toBe('1:0');
+			} finally {
+				mounted.unmount();
+			}
+		},
+	);
+
 	it('does not carry an event mutation of a child prop into a later render', () => {
 		const { App } = loadCompiledFixtureSource(
 			`/** @jsxImportSource octane */
