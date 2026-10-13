@@ -1748,6 +1748,14 @@ states and the 8-request floor, level with React. A transition driven by
 something other than hook state, such as an external store, still holds per
 boundary. See [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).
 
+Signals written inside a transition hold the same way, which React's external
+stores cannot: React renders an external store's change during a transition
+urgently. A signal keeps its committed value for committed readers,
+subscriptions and DOM bindings until the transition commits, while the renders
+that fold the transition read its pending value. Urgent writes rebase as state
+updates do, and two transitions that write the same signal commit together. See
+[signals](./signals.md).
+
 ## Root component entry points and container ownership
 
 Both entry forms are valid:

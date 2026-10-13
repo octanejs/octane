@@ -698,12 +698,12 @@ activate one per task, so input and paint are not held up behind all of them; se
 [activation pacing](./deferred-hydration.md#activation-pacing).
 
 When every `RenderRoute` uses `hydrate: 'islands'`, the production client build
-also resolves Octane with the `octane-islands` package condition. The signal
-Action frame, its transition coordinator, and the code that stages resources and
-derived values inside an Action then ship with the renderer, not the signal graph.
-Only renderer Actions use them, so islands pages that load signals without the
-renderer stop downloading about 5 KB gzip. Renderer pages and renderer islands
-load them alongside the renderer and keep staging Action writes. An app that also
+also resolves Octane with the `octane-islands` package condition. The code that
+keeps signal writes pending inside a transition, including resources and derived
+values, then ships with the renderer, not the signal graph. Only renderer
+transitions use it, so islands pages that load signals without the renderer
+don't download it. Renderer pages and renderer islands load it alongside the
+renderer and keep transition writes pending. An app that also
 has fully hydrated routes keeps the default placement, so its renderer pages pay
 nothing when they don't use signals. Another bundler can opt in by adding
 `octane-islands` to its resolve conditions.
