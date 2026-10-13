@@ -17762,7 +17762,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	const block = state.block;
 	let preserved = preservedHydrateActivations?.get(state);
 	if (preserved !== undefined && !currentPresentations(preserved.capture)) {
-		discardHydratePresentation(state, preserved.capture);
+		discardHydratePresentation(state, preserved.capture, preserved.hydration);
 		preserved = undefined;
 	}
 	const activationSlot = block.slots[0] as TrySlot | undefined;
@@ -17790,7 +17790,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (block.idState.renderOwner?.bindingLeases?.size) {
 		hydration.retryPresentation = () => {
 			if (block.disposed) return;
-			discardHydratePresentation(state, capture);
+			discardHydratePresentation(state, capture, hydration);
 			scheduleRender(state.parentBlock);
 		};
 	}
@@ -17853,7 +17853,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		discardOffscreenCapture(capture);
 		state.block.mounted = false;
 		if (error instanceof PresentationAdoptionMiss) {
-			discardHydratePresentation(state, capture);
+			discardHydratePresentation(state, capture, hydration);
 			if (error.retry && error.lease?.active()) {
 				retryPresentationMiss(error, () => {
 					if (!block.disposed) scheduleRender(state.parentBlock);
@@ -17873,9 +17873,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (restart !== undefined) {
 		// As a suspended Suspense arm does, the island keeps its server DOM, with
 		// nothing reported, and its retry adopts it afresh, seeding afresh too.
-		hydration.rollback();
 		hydration.discardSeeds();
-		discardHydratePresentation(state, capture);
+		discardHydratePresentation(state, capture, hydration);
 		block.idState.next = hydration.idStart;
 		const generation = state.activationGeneration;
 		resumeOnSettle(restart.thenable, () => {
@@ -17977,8 +17976,17 @@ function discardHydrateTail(state: HydrateSlot): void {
 	}
 }
 
-/** The speculative renderer owns scopes only until the early lease is accepted. */
-function discardHydratePresentation(state: HydrateSlot, capture: OffscreenCapture): void {
+/**
+ * The speculative renderer owns scopes only until the early lease is accepted.
+ * The attempt's retry adopts afresh, so restore the server DOM it changed, such
+ * as the arm markers it put inside a boundary's range.
+ */
+function discardHydratePresentation(
+	state: HydrateSlot,
+	capture: OffscreenCapture,
+	hydration: HydrationCapability,
+): void {
+	hydration.rollback();
 	const refs: SuspenseRefEntry[] = [];
 	collectVisibleSubtreeRefs(state.block, refs);
 	discardOffscreenCapture(capture);
