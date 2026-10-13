@@ -217,7 +217,7 @@ import {
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
-import { bindingRootMarker } from './dom-binding-protocol.js';
+import { BINDING_OPEN_PREFIX, bindingRootMarker } from './dom-binding-protocol.js';
 import {
 	BOUNDARY_CLIENT,
 	BOUNDARY_CLIENT_ERROR,
@@ -46466,7 +46466,9 @@ function renderBranchSlot(
 		if (state.start !== null) {
 			// MARKER path — hydration-adopted, or already markered (multi-node / post-
 			// swap). The branch borrows the slot's start/end (exclusiveMarkers teardown
-			// keeps the markers); hydration adopts the inner range byte-for-byte.
+			// keeps the markers). The server renders the arm directly inside the slot's
+			// range (hydration-protocol.ts), and hydration adopts it there, but a
+			// presentation-binding view's arm can have a range of its own.
 			if (body) {
 				let bStart: Node;
 				let bEnd: Node;
@@ -46475,7 +46477,14 @@ function renderBranchSlot(
 				let inner: Comment | null = null;
 				let innerEnd: Comment | null = null;
 				let first: Node | null = null;
-				if (hydration !== null && hydration.isOpen(getNextSibling(state.start))) {
+				if (
+					hydration !== null &&
+					(STAGED_DOM
+						? STAGED_DOM.view(state.start as Comment)
+						: (state.start as Comment)
+					).data.startsWith(BINDING_OPEN_PREFIX) &&
+					hydration.isOpen(getNextSibling(state.start))
+				) {
 					inner = getNextSibling(state.start) as Comment;
 					innerEnd = hydration.close(inner);
 					if (innerEnd !== state.end && getNextSibling(innerEnd) !== state.end) {
@@ -46499,14 +46508,12 @@ function renderBranchSlot(
 					bStart = state.start;
 					bEnd = state.end as Node;
 					borrowed = true;
-					// Hydrating with no inner branch markers, the server rendered this
-					// branch empty. Park the cursor on the slot's first node (the close
-					// marker when empty), so a body that renders content finds a mismatch
-					// there rather than reading a stale cursor. A pair this hydration
-					// minted (a swap) holds client content only: build the branch into it
-					// as client DOM.
+					// Hydrating, the arm adopts the server's content from the slot's first
+					// node (the close marker when the server rendered nothing). A pair this
+					// hydration minted (a swap) holds client content only: build the branch
+					// into it as client DOM.
 					if (hydration !== null) {
-						if (hydration.isOpen(state.start)) hydration.node = getNextSibling(state.start);
+						if (hydration.isOpen(state.start)) hydration.node = first = getNextSibling(state.start);
 						else rebuild = true;
 					}
 				}
@@ -46529,7 +46536,7 @@ function renderBranchSlot(
 					// for the next sibling.
 					hydration!.suspend(() => renderBlock(b));
 					hydration!.node = getNextSibling(state.end as Node);
-				} else if (inner !== null) {
+				} else if (first !== null) {
 					const parked = hydration!.renderAdoptedArm(b);
 					// The server may have rendered another arm here, longer than this one
 					// or one this arm renders nothing of.

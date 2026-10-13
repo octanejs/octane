@@ -16242,10 +16242,12 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 		thenSub ? thenSub.fnName : null,
 		elseFnName,
 	]);
-	// A guaranteed direct host in every arm can borrow the outer slot range;
-	// otherwise retain the inner branch range required by opaque/multi-node arms.
+	// An arm renders directly inside the slot's one range (hydration-protocol.ts).
+	// A presentation-binding view keeps a range of its own around an arm that is
+	// not a guaranteed direct host.
 	const borrowBranchRange =
-		canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts);
+		!node._octaneBindingSite ||
+		(canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts));
 	const thenCall = thenSub
 		? ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)
 		: null;
@@ -16591,9 +16593,6 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
 	const cases = node.cases || [];
-	const borrowBranchRange =
-		cases.some((arm) => arm.test == null) &&
-		cases.every((arm) => canBorrowSsrHostBranchRange(arm.consequent));
 	const arms = [];
 	let defaultCall = ssrHtmlTemplate([], node, ctx);
 	let caseIndex = 0;
@@ -16612,17 +16611,11 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 		// itself starts before it, so anchor the arm on the keyword when known.
 		const armOrigin = c.keyword ?? c;
 		registerClauseOrigin(ctx, c.keyword, [sub.fnName]);
-		// Direct-host cases can borrow the outer slot range, just like @if arms.
+		// A case renders directly inside the slot's one range, like an @if arm.
 		const armCall = ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin);
 		const renderedArm = ssrCall(
 			'ssrArm',
-			[
-				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
-				ssrThunk(
-					borrowBranchRange ? armCall : ssrCall('ssrBlock', [armCall], armOrigin),
-					armOrigin,
-				),
-			],
+			[b.literal(c.test == null ? 'default' : `case:${caseIndex}`), ssrThunk(armCall, armOrigin)],
 			armOrigin,
 		);
 		if (c.test == null) defaultCall = renderedArm;
@@ -16661,9 +16654,8 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(trySub.fn);
-	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
-	// client adopts it as the boundary's branch range during hydration without
-	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
+	// ssrTry renders the boundary as one range whose open records which arm the
+	// server rendered (hydration-protocol.ts).
 	let pendFn = inheritOriginLoc(b.literal(null), node); // no @pending → empty slot
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(
