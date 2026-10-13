@@ -37,6 +37,7 @@ packages:
   - benchmarks/lynx-list
   - benchmarks/lynx-table
   - benchmarks/bundle-size
+  - benchmarks/bundle-size/apps/app-shell/*
   - benchmarks/three
   - benchmarks/async-waterfall
   - benchmarks/async-waterfall/*

@@ -1,0 +1,13 @@
+{
+  "name": "octane-app-shell-bundle-size",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Bundle-size app shell modeled on a production Octane app: hydration, lazy routes, Suspense, ViewTransition, portals, transitions, and signals.",
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

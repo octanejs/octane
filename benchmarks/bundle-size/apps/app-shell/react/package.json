@@ -1,0 +1,16 @@
+{
+  "name": "react-app-shell-bundle-size",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "React 19 + alien-signals twin of the Octane bundle-size app shell.",
+  "dependencies": {
+    "alien-signals": "catalog:default",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

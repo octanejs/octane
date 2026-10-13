@@ -119,7 +119,7 @@ ${renderGrowthTable(growth, 30)}
 
 What the rows are:
 - \`bundle-reachability\` targets are minimal public-import entries built and executed by benchmarks/bundle-size/run-minimal.mjs (fixtures in benchmarks/bundle-size/fixtures/minimal).
-- \`bundle-size\` targets are complete applications built by benchmarks/bundle-size/run.mjs. In the bundle column, \`app\` is authored and compiled application code, \`fw\` is the runtime it reaches, \`js\` is both, \`full_fw\` is every export of the framework entry points, and a \`todo_\`, \`chat_\`, \`weather_\`, or \`bindings_\` prefix names the application.
+- \`bundle-size\` targets are complete applications built by benchmarks/bundle-size/run.mjs. In the bundle column, \`app\` is authored and compiled application code, \`fw\` is the runtime it reaches, \`js\` is both, \`full_fw\` is every export of the framework entry points, and a \`todo_\`, \`chat_\`, \`weather_\`, \`bindings_\`, or \`shell_\` prefix names the application.
 
 Do this:
 1. Read the landed diff with \`git diff ${baseSha} ${headSha}\`, narrowing it by path. Focus on code that ships to clients: packages/octane/src (runtime and compiler output) and binding sources.
