@@ -4069,8 +4069,11 @@ function stageBag(bag: any): any[] {
 	if (bag.$ > BAG_SIZE) return bagResume(bag);
 	const state = bag.$;
 	let next = bag.next;
-	if (next === null) next = bag.next = new Array((state & BAG_SIZE) + 2).fill(bag);
-	else if ((state & BAG_STAGED) === 0) next.fill(bag);
+	if (next === null) {
+		// Packed from the start: the commit function reads every cell.
+		next = bag.next = [];
+		for (let i = (state & BAG_SIZE) + 2; i > 0; i--) next.push(bag);
+	} else if ((state & BAG_STAGED) === 0) next.fill(bag);
 	bag.$ = state | BAG_STAGED;
 	return next;
 }
