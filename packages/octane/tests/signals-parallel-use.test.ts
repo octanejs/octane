@@ -203,7 +203,10 @@ describe('native reads in use() creations', () => {
 					},
 				}),
 			).toThrow(failure);
-			expect(constructed).toEqual(['construct', 'first']);
+			// The root renders off-document and its button would upgrade only as it
+			// connects at commit. The throw comes first, as in React, where it
+			// precedes the host's creation.
+			expect(constructed).toEqual(['first']);
 		}
 		for (const View of [
 			client.ParallelJsxAttribute,
