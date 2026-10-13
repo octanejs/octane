@@ -21,7 +21,6 @@ import { createStrongRenderPolicy } from './strong-render-policy.js';
 import {
 	collectLazyRefIdioms,
 	lazyRefSuggestion,
-	manualMemoSuggestion,
 	readsLayout,
 	strongDocsUrl,
 } from './strong-fixes.js';
@@ -6259,10 +6258,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		...analyzeStrongExternalStore(ast, strongHookAnalysis, stateDiagnostic),
 	);
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
-		const suggestions =
-			policy.hook === 'useCallback' ? [manualMemoSuggestion(policy.node, source)] : [];
 		diagnostics.push({
-			...diagnostic(policy.code, filename, policy.node, policy.message, suggestions),
+			...diagnostic(policy.code, filename, policy.node, policy.message),
 			severity: policy.severity,
 		});
 	}

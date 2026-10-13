@@ -4988,7 +4988,9 @@ const CALLBACK_IDENTITY_OWNING_HOOKS = new Set(
 );
 
 function hookOwnsCallbackIdentity(call) {
-	const name = hookShapedCalleeName(call);
+	// After dependency inference, use the resolved hook even when an import
+	// alias looks like a custom hook. Earlier passes still use the spelling.
+	const name = stableHookCallName(call) ?? hookShapedCalleeName(call);
 	return name !== null && CALLBACK_IDENTITY_OWNING_HOOKS.has(name);
 }
 

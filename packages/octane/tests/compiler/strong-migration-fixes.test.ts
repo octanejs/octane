@@ -242,40 +242,6 @@ export function Name({ name }: { name: string }) {
 	});
 });
 
-describe('Strong migration rewrites for useCallback', () => {
-	it.each([
-		['a callback', 'useCallback((id: string) => pick(id), [pick])', '(id: string) => pick(id)'],
-		['a callback reference', 'useCallback(pick, [pick])', 'pick'],
-	])('rewrites %s', (_, call, replacement) => {
-		const hook = call.slice(0, call.indexOf('('));
-		const source = `import { ${hook} } from 'octane';
-export function List({ items, pick }: { items: string[]; pick: (id: string) => void }) {
-	const value = ${call};
-	return <div onClick={() => pick(String(value))} />;
-}
-`;
-		const [diagnostic] = errors(source);
-		expect(diagnostic.code).toBe('OCTANE_STRONG_MANUAL_MEMO');
-		const fixed = applyEdits(source, editsOf(diagnostic)!);
-		expect(fixed).toContain(`const value = ${replacement};`);
-		expect(() => compile(fixed, '/src/App.tsx')).not.toThrow();
-	});
-
-	it('describes a spread callback without applying an unsafe edit', () => {
-		const source = `import { useCallback } from 'octane';
-export function List({ pick }: { pick: () => void }) {
-	const value = useCallback(...[pick, [pick]] as const);
-	return <button onClick={value}>Pick</button>;
-}
-`;
-		const memo = errors(source).find(
-			(diagnostic) => diagnostic.code === 'OCTANE_STRONG_MANUAL_MEMO',
-		);
-		expect(memo?.suggestions?.[0].message).toBeTruthy();
-		expect(editsOf(memo)).toBeUndefined();
-	});
-});
-
 describe('collectDiagnostics', () => {
 	const CLOCK = `export function Clock() {
 	const now = Date.now();

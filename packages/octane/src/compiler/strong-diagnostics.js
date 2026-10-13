@@ -144,14 +144,6 @@ export const STRONG_DIAGNOSTICS = [
 			'Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.',
 	},
 	{
-		code: 'OCTANE_STRONG_MANUAL_MEMO',
-		section: 'effects',
-		severity: 'error',
-		detects: "A call to Octane's `useCallback`, including known import aliases.",
-		replacement:
-			'Write a normal callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useCallback(fn, deps)` to `fn`. Use `useMemo` when you need to control the dependencies of a calculation.',
-	},
-	{
 		code: 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY',
 		section: 'effects',
 		severity: 'error',
@@ -532,30 +524,6 @@ export function Label({ text }: { text: string }) {
 }
 `,
 		note: 'A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state.',
-	},
-	{
-		id: 'manual-memo',
-		title: 'Drop useCallback',
-		react: 'const pick = useCallback(() => onPick(total), [onPick, total]);',
-		strong: 'const pick = () => onPick(total);',
-		codes: ['OCTANE_STRONG_MANUAL_MEMO'],
-		before: `import { useCallback, useMemo } from 'octane';
-
-export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
-	const total = useMemo(() => items.reduce((sum, item) => sum + item, 0), [items]);
-	const pick = useCallback(() => onPick(total), [onPick, total]);
-	return <button onClick={pick}>{String(total)}</button>;
-}
-`,
-		after: `import { useMemo } from 'octane';
-
-export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
-	const total = useMemo(() => items.reduce((sum, item) => sum + item, 0), [items]);
-	const pick = () => onPick(total);
-	return <button onClick={pick}>{String(total)}</button>;
-}
-`,
-		note: 'Eligible callbacks keep a stable identity in every build until their inferred inputs change. `octane analyze --fix` applies this rewrite. `useMemo` keeps its authored dependencies.',
 	},
 	{
 		id: 'latest-ref',

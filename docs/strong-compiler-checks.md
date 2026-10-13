@@ -2,10 +2,10 @@
 
 Put `"use strong"` before imports, or enable `compiler: { strong: true }` for
 application-owned modules. Dependencies keep their own mode. These checks apply
-to client, server, and editor compilation. Strong allows `useMemo` with manual
-dependencies while it infers effect dependencies and caches eligible callbacks.
-Compatibility modules also support `useCallback`, arbitrary effect dependency
-lists, and ordinary raw HTML props.
+to client, server, and editor compilation. Strong allows `useMemo` and
+`useCallback` with manual dependencies while it infers effect dependencies
+and caches eligible declarations. Compatibility modules also support arbitrary
+effect dependency lists and ordinary raw HTML props.
 
 The [Strong mode guide](https://octanejs.dev/docs/strong-mode) covers adoption
 and migration recipes. The diagnostic tables here are generated from
@@ -27,7 +27,6 @@ edit the catalog, not the tables.
 | [`OCTANE_STRONG_UNLINKED_PROP_STATE`](https://octanejs.dev/docs/strong-mode#octane-strong-unlinked-prop-state) | An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture. |
 | [`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`](https://octanejs.dev/docs/strong-mode#octane-strong-explicit-dependencies) | An effect or imperative handle dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved. | Omit the dependency argument. |
 | [`OCTANE_STRONG_UNTRACKED_EFFECT`](https://octanejs.dev/docs/strong-mode#octane-strong-untracked-effect) | An effect or imperative handle receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render. | Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref. |
-| [`OCTANE_STRONG_MANUAL_MEMO`](https://octanejs.dev/docs/strong-mode#octane-strong-manual-memo) | A call to Octane's `useCallback`, including known import aliases. | Write a normal callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useCallback(fn, deps)` to `fn`. Use `useMemo` when you need to control the dependencies of a calculation. |
 | [`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`](https://octanejs.dev/docs/strong-mode#octane-strong-effect-event-dependency) | A statically known Effect Event is listed in an explicit hook dependency array. | Remove it. Effect Events are non-reactive, so they never belong in dependencies. |
 | [`OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`](https://octanejs.dev/docs/strong-mode#octane-strong-automatic-memo-unsupported) | A module compiled through the `manualSlots` integration option has a declaration Strong compilation would cache. That option cannot allocate the extra hook slots the cache needs. | Compile the module through the normal Octane integration, or keep it in compatibility mode. |
 <!-- strong-diagnostics:effects:end -->

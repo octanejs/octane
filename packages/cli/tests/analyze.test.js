@@ -539,14 +539,15 @@ describe('octane analyze Strong migration', () => {
 		'}\n';
 
 	const CART =
-		"import { useMemo, useRef, useState } from 'octane';\n" +
+		"import { useCallback, useMemo, useRef, useState } from 'octane';\n" +
 		'class Store { add() {} }\n' +
 		'export function Cart({ items }: { items: number[] }) {\n' +
 		'  const store = useRef<Store | null>(null);\n' +
 		'  if (store.current === null) store.current = new Store();\n' +
 		'  const total = useMemo(() => items.reduce((a, b) => a + b, 0), [items]);\n' +
+		'  const add = useCallback(() => store.current?.add(), []);\n' +
 		'  const [open] = useState(false);\n' +
-		'  return <button onClick={() => store.current?.add()}>{String(total) + String(open)}</button>;\n' +
+		'  return <button onClick={add}>{String(total) + String(open)}</button>;\n' +
 		'}\n';
 
 	it('reports every Strong violation in a file, not only the first', async () => {
@@ -631,13 +632,14 @@ describe('octane analyze Strong migration', () => {
 		const result = await run(root, ['--strong-preview', '--fix']);
 		expect(result.json().fixed).toEqual({ findings: 1, files: ['src/Cart.tsx'] });
 		expect(readFileSync(file, 'utf8')).toBe(
-			"import { useMemo, useState, useLazyRef } from 'octane';\n" +
+			"import { useCallback, useMemo, useState, useLazyRef } from 'octane';\n" +
 				'class Store { add() {} }\n' +
 				'export function Cart({ items }: { items: number[] }) {\n' +
 				'  const store = useLazyRef(() => new Store());\n' +
 				'  const total = useMemo(() => items.reduce((a, b) => a + b, 0), [items]);\n' +
+				'  const add = useCallback(() => store.current?.add(), []);\n' +
 				'  const [open] = useState(false);\n' +
-				'  return <button onClick={() => store.current?.add()}>{String(total) + String(open)}</button>;\n' +
+				'  return <button onClick={add}>{String(total) + String(open)}</button>;\n' +
 				'}\n',
 		);
 		// What remains is reported from the rewritten module: nothing.

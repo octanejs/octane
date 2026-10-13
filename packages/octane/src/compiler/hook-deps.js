@@ -2341,19 +2341,8 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 	for (const { call, scope } of analysis.calls) {
 		const name = callNames.get(call);
 		const config = DEPENDENCY_HOOKS.get(name);
-		// useMemo is the manual dependency escape hatch; effect policies do not apply to it.
-		if (config === undefined || name === 'useMemo') continue;
-		if (name === 'useCallback') {
-			diagnostics.push({
-				code: 'OCTANE_STRONG_MANUAL_MEMO',
-				node: call,
-				hook: name,
-				severity: 'error',
-				message:
-					'Strong mode owns callback caching. Replace useCallback with a const declaration and let the compiler track its inputs.',
-			});
-			continue;
-		}
+		// Authored memo hooks own their dependencies; effect policies do not apply to them.
+		if (config === undefined || name === 'useMemo' || name === 'useCallback') continue;
 		const argument = call.arguments[config.deps];
 		if (argument === undefined || isUnshadowedUndefined(argument, scope)) {
 			// Inference would run this hook on every render, which is the

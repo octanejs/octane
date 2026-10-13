@@ -244,24 +244,6 @@ export function lazyRefSuggestion(idiom, ast, source) {
 	return { ...suggestion, edits };
 }
 
-/**
- * Replace `useCallback(fn, deps)` with `fn`.
- *
- * @param {any} call
- * @param {string} source
- */
-export function manualMemoSuggestion(call, source) {
-	const callback = unwrap(call.arguments?.[0]);
-	const message = 'Pass the function directly; Strong compilation keeps its identity stable.';
-	if (callback == null || call.arguments.some((argument) => argument.type === 'SpreadElement')) {
-		return { message };
-	}
-	return {
-		message,
-		edits: [{ start: call.start, end: call.end, text: source.slice(callback.start, callback.end) }],
-	};
-}
-
 // Properties and calls that read the committed layout. A state update in an
 // effect that reads one of these is a measurement, which useLayoutSnapshot owns.
 const LAYOUT_PROPERTIES = new Set([

@@ -600,12 +600,14 @@ context, or pass an immutable snapshot as a prop. The checks follow provable
 synchronous calls through local callbacks and `useEffectEvent`. Calling a statically
 known Effect Event during render or including it in an explicit hook dependency
 list is also a compile error. Strong modules use normal const declarations for
-automatic memoization. `useCallback` and non-equivalent explicit dependencies on
-effects or imperative handles are errors; equivalent arrays keep their behavior
-and produce a hint. `useMemo` is supported when a calculation needs manual
-dependency control. Explicit arrays are used as written, omitted dependencies
-are inferred, and `null` recomputes on each render. Its factory still runs
-during render and must obey Strong's purity and snapshot rules.
+automatic memoization. Non-equivalent explicit dependencies on effects or
+imperative handles are errors; equivalent arrays keep their behavior and produce
+a hint. `useMemo` and `useCallback` support manual dependency control.
+Explicit arrays are used as written, omitted or `undefined` dependencies are
+inferred, and `null` recomputes the memo or refreshes the callback on each
+render. A `useMemo` factory still runs during render and must obey Strong's
+purity and snapshot rules. Creating a callback does not execute its body;
+calling it during render remains subject to those rules.
 
 Inside an async function, code after a guaranteed `await` is not synchronous. In
 effect work, an `await` that resumes without waiting, such as `await null`, does

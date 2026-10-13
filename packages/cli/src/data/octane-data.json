@@ -3588,12 +3588,6 @@
         "replacement": "Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-untracked-effect"
       },
-      "OCTANE_STRONG_MANUAL_MEMO": {
-        "severity": "error",
-        "detects": "A call to Octane's `useCallback`, including known import aliases.",
-        "replacement": "Write a normal callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useCallback(fn, deps)` to `fn`. Use `useMemo` when you need to control the dependencies of a calculation.",
-        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-manual-memo"
-      },
       "OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY": {
         "severity": "error",
         "detects": "A statically known Effect Event is listed in an explicit hook dependency array.",
@@ -3814,13 +3808,6 @@
         "react": "<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>",
         "strong": "const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });",
         "codes": ["OCTANE_STRONG_REF_STATE_UPDATE"]
-      },
-      {
-        "id": "manual-memo",
-        "title": "Drop useCallback",
-        "react": "const pick = useCallback(() => onPick(total), [onPick, total]);",
-        "strong": "const pick = () => onPick(total);",
-        "codes": ["OCTANE_STRONG_MANUAL_MEMO"]
       },
       {
         "id": "latest-ref",
