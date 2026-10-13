@@ -36,10 +36,18 @@ import {
 	nativeAdoptionMiss,
 	nativeReadRebase,
 	registerNativeBatchHooks,
+	registerNativeSignalHydration,
 	reportNativeRead,
 	type NativeReadSource,
 	type NativeSerializedScope,
 } from './read-protocol.js';
+import {
+	captureInitialDocumentSignals,
+	createNativeAdoptionState,
+	materializeNativeSignalManifest,
+	parseNativeSignalManifest,
+} from './native-read-seeds.js';
+import { installEarlyControlBridge } from './early-values.js';
 import type {
 	initializeResource,
 	QueryDefinition,
@@ -107,6 +115,13 @@ interface FrameData {
 let activeFrames: Map<ScopeImpl, AdoptionFrameImpl> | undefined;
 
 registerNativeBatchHooks({ startBatch: startSignalBatch, endBatch: endSignalBatch });
+registerNativeSignalHydration({
+	capture: captureInitialDocumentSignals,
+	parse: parseNativeSignalManifest,
+	materialize: materializeNativeSignalManifest,
+	create: createNativeAdoptionState,
+	start: installEarlyControlBridge,
+});
 
 function requireKey(key: string, label: string): void {
 	if (typeof key !== 'string' || !key.trim()) {

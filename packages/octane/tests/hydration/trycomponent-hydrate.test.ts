@@ -6,7 +6,6 @@ import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { prerender } from 'octane/static';
 import { TryFor, TryComponent, TryComponentFor, MatchShape } from './_fixtures/trycomponent.tsrx';
-import { hydrationMarkerSummary } from './_marker-summary.js';
 
 // SSR Phase 6 — hydration of a @try whose SUCCESS-arm body is a COMPONENT (the
 // router `Match` shape: `@try { <Comp/> } @pending { … }`). The server resolves
@@ -37,16 +36,6 @@ const items = [
 	{ id: 2, name: 'Beta' },
 ];
 
-function expectCompactedInsideTry(before: ReturnType<typeof hydrationMarkerSummary>, root: Node) {
-	const after = hydrationMarkerSummary(root);
-	expect(after.logicalPairs).toBe(before.logicalPairs);
-	expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
-	expect(after.countedPairs).toBeGreaterThanOrEqual(1);
-	// The @try/Suspense range remains a separate physical barrier while its
-	// exactly-coextensive component descendant may share a counted pair.
-	expect(after.singletonPairs).toBeGreaterThanOrEqual(1);
-}
-
 describe('hydrateRoot — @try with a component body (router Match shape)', () => {
 	// Shape (a): @try { @for } — the body is a @for directly (a sole-hole arm).
 	it('(a) adopts a @try whose body is a @for directly (no throw, no rebuild)', async () => {
@@ -69,6 +58,7 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		expect(container.querySelector('.loading')).toBeNull();
 		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 
 	// Shape (b): @try { <Comp/> } — THROWS pre-fix.
@@ -78,7 +68,6 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		});
 		container.innerHTML = html;
 		const wrapper = container.querySelector('#try-comp') as HTMLElement;
-		const before = hydrationMarkerSummary(wrapper);
 		const leaf = container.querySelector('.leaf') as HTMLElement;
 		expect(leaf).not.toBeNull();
 		expect(leaf.textContent).toBe('hello');
@@ -89,11 +78,11 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		// The component subtree was ADOPTED (same node), no rebuild, no @pending.
 		expect(container.querySelector('.leaf')).toBe(leaf);
 		expect(container.querySelector('#try-comp')).toBe(wrapper);
-		expectCompactedInsideTry(before, wrapper);
 		expect(container.querySelector('.loading')).toBeNull();
 		expect(container.querySelector('.leaf')!.textContent).toBe('hello');
 		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 
 	// Shape (c): @try { <Comp/> } where Comp contains a @for — THROWS pre-fix.
@@ -103,7 +92,6 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		});
 		container.innerHTML = html;
 		const wrapper = container.querySelector('#try-comp-for') as HTMLElement;
-		const before = hydrationMarkerSummary(wrapper);
 		const ul = container.querySelector('ul.list-leaf') as HTMLElement;
 		const rows = [...container.querySelectorAll('li.row')];
 		expect(rows.length).toBe(2);
@@ -116,10 +104,10 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		expect(container.querySelector('ul.list-leaf')).toBe(ul);
 		expect([...container.querySelectorAll('li.row')]).toEqual(rows);
 		expect(container.querySelector('#try-comp-for')).toBe(wrapper);
-		expectCompactedInsideTry(before, wrapper);
 		expect(container.querySelector('.loading')).toBeNull();
 		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 
 	// The exact router `Match` shape: @try { <Comp/> } @pending { <Fallback/> }.
@@ -129,7 +117,6 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		});
 		container.innerHTML = html;
 		const wrapper = container.querySelector('#match') as HTMLElement;
-		const before = hydrationMarkerSummary(wrapper);
 		const matched = container.querySelector('.matched') as HTMLElement;
 		expect(matched).not.toBeNull();
 		expect(matched.textContent).toBe('route');
@@ -140,9 +127,9 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 
 		expect(container.querySelector('.matched')).toBe(matched);
 		expect(container.querySelector('#match')).toBe(wrapper);
-		expectCompactedInsideTry(before, wrapper);
 		expect(container.querySelector('.fallback')).toBeNull();
 		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 });

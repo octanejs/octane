@@ -6,6 +6,7 @@ import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import {
 	DeepWrapperChain,
+	DraftList,
 	KeyedReturnWrapper,
 	KeyedWrapperList,
 	ReturnedSuspenseChildSlot,
@@ -131,6 +132,54 @@ describe('hydrateRoot — nested wrapper and boundary adoption', () => {
 		]);
 		expect(bButton.textContent).toBe('b:1');
 		root.unmount();
+	});
+
+	it('adopts edited wrapped fields and releases only removed keyed rows', () => {
+		const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+		container.innerHTML = renderServer('DraftList', { rows });
+		const a = container.querySelector('[data-draft="a"]')!;
+		const b = container.querySelector('[data-draft="b"]')!;
+		const c = container.querySelector('[data-draft="c"]')!;
+		const input = b.querySelector('input')!;
+		const button = b.querySelector('button')!;
+		input.value = 'typed before hydration';
+		input.focus();
+		input.setSelectionRange(4, 8);
+		const attached: (HTMLInputElement | null)[] = [];
+		const fieldRef = (el: HTMLInputElement | null) => {
+			attached.push(el);
+		};
+
+		const root = hydrateRoot(container, DraftList, { rows, fieldRef });
+		flushSync(() => {});
+		expect([...container.querySelectorAll('li')]).toEqual([a, b, c]);
+		expect(attached.filter(Boolean)).toEqual([
+			a.querySelector('input'),
+			input,
+			c.querySelector('input'),
+		]);
+		expect(input.value).toBe('typed before hydration');
+		expect(document.activeElement).toBe(input);
+		expect([input.selectionStart, input.selectionEnd]).toEqual([4, 8]);
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('b:1');
+
+		flushSync(() => root.render(DraftList, { rows: [rows[1], rows[0]], fieldRef }));
+		expect([...container.querySelectorAll('li')]).toEqual([b, a]);
+		expect(c.isConnected).toBe(false);
+		expect(input.value).toBe('typed before hydration');
+		expect(button.textContent).toBe('b:1');
+		flushSync(() => root.render(DraftList, { rows: [rows[2], rows[1]], fieldRef }));
+		const newC = container.querySelector('[data-draft="c"]')!;
+		expect(newC).not.toBe(c);
+		expect([...container.querySelectorAll('li')]).toEqual([newC, b]);
+		expect(newC.querySelector('input')!.value).toBe('c');
+		expect(a.isConnected).toBe(false);
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('b:2');
+		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
+		expect(attached.at(-1)).toBe(null);
 	});
 
 	it('adopts ready content nested inside Suspense and wrapper components', () => {
