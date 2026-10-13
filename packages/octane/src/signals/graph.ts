@@ -22,12 +22,12 @@ import {
 	getNativeAdoptionResolver,
 	isNativeAdoptionMiss,
 	isNativeWriteGuarded,
+	nativeReadSerializer,
 	reportNativeRead,
 	setNativeAdoptionResolver,
 	setNativeReadObserver,
 	type NativeReadInspection,
 	type NativeReadSource,
-	type NativeSerializedScope,
 } from './read-protocol.js';
 import {
 	SIGNAL_BINDING_READ,
@@ -54,10 +54,6 @@ export interface GraphOwner {
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState?: boolean;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
-	serializeRead(
-		node: ScopedNode,
-		read: SignalReadMode,
-	): readonly NativeSerializedScope[] | undefined;
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void;
 }
 
@@ -870,7 +866,7 @@ function createGraphSource(node: ScopedNode, read: SignalReadMode): NativeReadSo
 			return attachObserver(node, notify, true);
 		},
 		serialize: (revision) =>
-			node.revision === revision ? node.owner.serializeRead(node, read) : undefined,
+			node.revision === revision ? nativeReadSerializer!(node, read) : undefined,
 		inspect: () => inspectNativeNode(node, read),
 	};
 }

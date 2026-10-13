@@ -1,7 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
-import type { ScopedNode } from './graph.js';
+import type { ScopedNode, SignalReadMode } from './graph.js';
 
 /** Explicit async reads own an observer edge instead of a synchronous graph edge. */
 export const SIGNAL_DEPENDENT_NODE: unique symbol = Symbol('octane.signalDependent');
@@ -194,6 +194,21 @@ export interface NativeAdoptionOwner {
 export interface NativeSerializedScope {
 	readonly owner: NativeAdoptionOwner;
 	readonly seed: ScopeSeed;
+}
+
+/**
+ * Serializes a graph source's observed subgraph (seed-serialization.ts). Only
+ * the server read driver serializes sources, and it supplies this first, so a
+ * client bundle keeps no serializer although every graph source names it.
+ */
+export let nativeReadSerializer:
+	| ((node: ScopedNode, read: SignalReadMode) => readonly NativeSerializedScope[] | undefined)
+	| undefined;
+
+export function supplyNativeReadSerializer(
+	serializer: NonNullable<typeof nativeReadSerializer>,
+): void {
+	nativeReadSerializer = serializer;
 }
 
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;

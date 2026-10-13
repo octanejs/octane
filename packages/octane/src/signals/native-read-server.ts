@@ -1,11 +1,12 @@
 import { createNativeReadCollector, type NativeReadWitness } from './native-read-collector.js';
-import { setSignalDeclarationInvocation } from './read-protocol.js';
+import { setSignalDeclarationInvocation, supplyNativeReadSerializer } from './read-protocol.js';
 import {
 	mergeNativeSeedReads,
 	rewindNativeSeedReads,
 	serializeNativeSeedReads,
 	type NativeSeedReads,
 } from './native-read-seeds.js';
+import { serializeScopeRead } from './seed-serialization.js';
 
 interface ServerFrame {
 	collectorToken: number;
@@ -24,6 +25,8 @@ export function createNativeServerReadDriver(
 	record: (reads: NativeReadWitness) => void,
 	recordFailure: () => void,
 ) {
+	// This driver's serialize is the only consumer of source serialization.
+	supplyNativeReadSerializer(serializeScopeRead);
 	const frames: ServerFrame[] = [];
 	const passes: PassFrame[] = [];
 	let depth = 0;
