@@ -57,8 +57,9 @@ through `useCallback`, `useEffectEvent`, and functions returned by analyzable
 `useMemo` factories. Statically known Effect
 Event calls during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`) and Effect
 Events in explicit hook dependency lists
-(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong now rejects manual memo hooks and
-non-equivalent explicit dependency lists; equivalent arrays retain their
+(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong rejects `useCallback` and
+non-equivalent explicit dependency lists on effects and imperative handles;
+`useMemo` may use authored lists, inferred lists, or `null`. Equivalent effect arrays retain their
 behavior and produce a redundancy hint. See the
 [complete current compiler checks](./strong-compiler-checks.md).
 Synchronously evaluated state initializers, linked-state reconcilers, and

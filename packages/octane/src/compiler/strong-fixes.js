@@ -244,66 +244,21 @@ export function lazyRefSuggestion(idiom, ast, source) {
 	return { ...suggestion, edits };
 }
 
-const PRIMARY_EXPRESSIONS = new Set([
-	'ArrayExpression',
-	'CallExpression',
-	'Identifier',
-	'JSXElement',
-	'JSXFragment',
-	'Literal',
-	'MemberExpression',
-	'ParenthesizedExpression',
-	'TaggedTemplateExpression',
-	'TemplateLiteral',
-]);
-
 /**
- * Replace `useMemo(() => value, deps)` with `value` and
- * `useCallback(fn, deps)` with `fn`. A block-bodied memo factory other than a
- * single `return` keeps its message only.
+ * Replace `useCallback(fn, deps)` with `fn`.
  *
  * @param {any} call
- * @param {'useMemo' | 'useCallback'} name
  * @param {string} source
  */
-export function manualMemoSuggestion(call, name, source) {
+export function manualMemoSuggestion(call, source) {
 	const callback = unwrap(call.arguments?.[0]);
-	const message =
-		name === 'useMemo'
-			? 'Write the calculation as a plain expression; Strong compilation caches it.'
-			: 'Pass the function directly; Strong compilation keeps its identity stable.';
+	const message = 'Pass the function directly; Strong compilation keeps its identity stable.';
 	if (callback == null || call.arguments.some((argument) => argument.type === 'SpreadElement')) {
 		return { message };
 	}
-	if (name === 'useCallback') {
-		return {
-			message,
-			edits: [
-				{ start: call.start, end: call.end, text: source.slice(callback.start, callback.end) },
-			],
-		};
-	}
-	if (
-		callback.type !== 'ArrowFunctionExpression' ||
-		callback.async === true ||
-		callback.params.length > 0
-	) {
-		return { message };
-	}
-	let body = callback.body;
-	if (body?.type === 'BlockStatement') {
-		const only = body.body?.length === 1 ? body.body[0] : null;
-		if (only?.type !== 'ReturnStatement' || only.argument == null) return { message };
-		body = only.argument;
-	}
-	const text = source.slice(body.start, body.end);
-	if (FUNCTION_SCOPE_WORDS.test(text)) return { message };
-	// The call was a primary expression, so anything that binds less tightly
-	// keeps that grouping in parentheses: `useMemo(() => !a, []).b` is `(!a).b`.
-	const parenthesize = !PRIMARY_EXPRESSIONS.has(body.type);
 	return {
 		message,
-		edits: [{ start: call.start, end: call.end, text: parenthesize ? `(${text})` : text }],
+		edits: [{ start: call.start, end: call.end, text: source.slice(callback.start, callback.end) }],
 	};
 }
 

@@ -606,10 +606,9 @@ describe('octane analyze Strong migration', () => {
 		const result = await run(root, ['--strong-preview']);
 		expect(result.exitCode).toBe(0);
 		expect(result.json().strongPreview).toEqual({
-			findings: 3,
+			findings: 2,
 			modules: 1,
 			byCode: {
-				OCTANE_STRONG_MANUAL_MEMO: 1,
 				OCTANE_STRONG_RENDER_REF_READ: 1,
 				OCTANE_STRONG_RENDER_REF_WRITE: 1,
 			},
@@ -626,17 +625,17 @@ describe('octane analyze Strong migration', () => {
 		const file = path.join(root, 'src/Cart.tsx');
 
 		const dry = await run(root, ['--strong-preview', '--fix', '--dry-run']);
-		expect(dry.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
+		expect(dry.json().fixed).toEqual({ findings: 1, files: ['src/Cart.tsx'] });
 		expect(readFileSync(file, 'utf8')).toBe(CART);
 
 		const result = await run(root, ['--strong-preview', '--fix']);
-		expect(result.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
+		expect(result.json().fixed).toEqual({ findings: 1, files: ['src/Cart.tsx'] });
 		expect(readFileSync(file, 'utf8')).toBe(
-			"import { useState, useLazyRef } from 'octane';\n" +
+			"import { useMemo, useState, useLazyRef } from 'octane';\n" +
 				'class Store { add() {} }\n' +
 				'export function Cart({ items }: { items: number[] }) {\n' +
 				'  const store = useLazyRef(() => new Store());\n' +
-				'  const total = items.reduce((a, b) => a + b, 0);\n' +
+				'  const total = useMemo(() => items.reduce((a, b) => a + b, 0), [items]);\n' +
 				'  const [open] = useState(false);\n' +
 				'  return <button onClick={() => store.current?.add()}>{String(total) + String(open)}</button>;\n' +
 				'}\n',

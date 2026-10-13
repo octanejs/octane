@@ -2341,14 +2341,15 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 	for (const { call, scope } of analysis.calls) {
 		const name = callNames.get(call);
 		const config = DEPENDENCY_HOOKS.get(name);
-		if (config === undefined) continue;
-		if (name === 'useMemo' || name === 'useCallback') {
+		// useMemo is the manual dependency escape hatch; effect policies do not apply to it.
+		if (config === undefined || name === 'useMemo') continue;
+		if (name === 'useCallback') {
 			diagnostics.push({
 				code: 'OCTANE_STRONG_MANUAL_MEMO',
 				node: call,
 				hook: name,
 				severity: 'error',
-				message: `Strong mode owns calculation and callback caching. Replace ${name} with a const declaration and let the compiler track its inputs.`,
+				message: 'Strong mode owns callback caching. Replace useCallback with a const declaration and let the compiler track its inputs.',
 			});
 			continue;
 		}

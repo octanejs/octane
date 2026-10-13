@@ -6260,9 +6260,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	);
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
 		const suggestions =
-			policy.hook === 'useMemo' || policy.hook === 'useCallback'
-				? [manualMemoSuggestion(policy.node, policy.hook, source)]
-				: [];
+			policy.hook === 'useCallback' ? [manualMemoSuggestion(policy.node, source)] : [];
 		diagnostics.push({
 			...diagnostic(policy.code, filename, policy.node, policy.message, suggestions),
 			severity: policy.severity,

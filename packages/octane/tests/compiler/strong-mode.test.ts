@@ -711,7 +711,7 @@ export function App(props) @{
 				.filter(({ code }) => code === HOOK_LOCALITY || code === EVENT_HANDLER_LOCALITY)
 				.map(({ code }) => code),
 		).toEqual([HOOK_LOCALITY]);
-		expect(diagnostics).toContainEqual(expect.objectContaining({ code: MANUAL_MEMO }));
+		expect(diagnostics).not.toContainEqual(expect.objectContaining({ code: MANUAL_MEMO }));
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 

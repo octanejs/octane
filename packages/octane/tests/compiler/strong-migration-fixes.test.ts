@@ -242,16 +242,8 @@ export function Name({ name }: { name: string }) {
 	});
 });
 
-describe('Strong migration rewrites for useMemo and useCallback', () => {
+describe('Strong migration rewrites for useCallback', () => {
 	it.each([
-		['an expression body', 'useMemo(() => items.length, [items])', 'items.length'],
-		['a single return', 'useMemo(() => { return items.length; }, [items])', 'items.length'],
-		[
-			'an object literal',
-			'useMemo(() => ({ size: items.length }), [items])',
-			'({ size: items.length })',
-		],
-		['a lower-precedence body', 'useMemo(() => !items.length, [items])', '(!items.length)'],
 		['a callback', 'useCallback((id: string) => pick(id), [pick])', '(id: string) => pick(id)'],
 		['a callback reference', 'useCallback(pick, [pick])', 'pick'],
 	])('rewrites %s', (_, call, replacement) => {
@@ -269,15 +261,11 @@ export function List({ items, pick }: { items: string[]; pick: (id: string) => v
 		expect(() => compile(fixed, '/src/App.tsx')).not.toThrow();
 	});
 
-	it.each([
-		['several statements', 'useMemo(() => { const n = items.length; return n; }, [items])'],
-		['a parameter', 'useMemo((n?: number) => n ?? items.length, [items])'],
-		['a spread argument', 'useMemo(...[() => items.length, [items]] as const)'],
-	])('describes the replacement without an edit for %s', (_, call) => {
-		const source = `import { useMemo } from 'octane';
-export function List({ items }: { items: string[] }) {
-	const value = ${call};
-	return <div>{String(value)}</div>;
+	it('describes a spread callback without applying an unsafe edit', () => {
+		const source = `import { useCallback } from 'octane';
+export function List({ pick }: { pick: () => void }) {
+	const value = useCallback(...[pick, [pick]] as const);
+	return <button onClick={value}>Pick</button>;
 }
 `;
 		const memo = errors(source).find(
