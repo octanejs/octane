@@ -482,8 +482,8 @@ the build compiles them with the production Octane compiler and they count as
 
 The `shell_*` set, [`bundle-size/apps/app-shell`](bundle-size/apps/app-shell), is the smallest app that combines the features a production Octane app uses together: `hydrateRoot`, a `lazy` page under `Suspense`, `ViewTransition`, `startTransition`, and a `useSignal$` counter. It has under 1 kB of app code, so its bytes are almost all runtime. Its `react` twin is the same component on React 19.3 with `alien-signals`. It pins React 19.3 exactly, the first stable release with `<ViewTransition>`, because the default catalog is still on 19.2. The set has no ceiling build, so its signal and `alien-signals` imports do not widen the rows ceilings.
 
-`bundle-reachability` builds twenty-five independent public-entry feature fixtures
-across thirty-three production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-nine independent public-entry feature fixtures
+across thirty-eight production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's
 `'oxc'` and esbuild's `minify: true`. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
@@ -502,6 +502,17 @@ click handlers remain live. The `octane/behavior` fixture adopts existing DOM,
 registers an externally owned range, handles a native click, and disposes its
 owners and handlers while preserving the original nodes. Both production builds
 reject renderer, compiler, and server modules.
+
+The `split-shell` fixture ships the way a production Rolldown and oxc application
+does: ESM chunks whose `codeSplitting` groups put Octane's signal engine and the
+rest of the octane package in chunks of their own. Its client hydrates a
+server-rendered shell through a dynamic import after activating a renderer-free
+behavior island, with native signal reads, a `<Hydrate when={visible()}>`
+boundary, a lazy route behind `useTransition`, `@try` over `use()`, a portal, and
+a keyed list. It reports the whole application and each group's chunk, rejects
+Octane modules in application chunks, and checks through the source map that
+the runtime chunk drops the unused ViewTransition and Activity drivers. Its
+chunks run in jsdom linked into one script, unminified and untreeshaken.
 
 The generated SPA scenario loads the actual CLI entry and complete landing-page
 templates without maintaining duplicate fixture sources; its compiled bundle
