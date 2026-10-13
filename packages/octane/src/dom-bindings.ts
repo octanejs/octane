@@ -7,17 +7,7 @@ import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
 import { BINDING_HANDOFF } from './signals/control-handoff.js';
 import type { BindingHandoff, BindingHandoffCapability } from './dom-binding-handoff.js';
 import type { createBindingClassGroup } from './dom-binding-classes.js';
-import type {
-	__createBindingSignals,
-	BindingSignalConnection,
-	BindingPreparedValue,
-} from './dom-binding-signals.js';
-import type { BindingControlPreview } from './signals/control-binding.js';
-import {
-	forwardNativeTransitionConsumer,
-	type NativeTransitionNotify,
-	type NativeTransitionPresentation,
-} from './signals/read-protocol.js';
+import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
 import type { __createBindingStyles, BindingStyleSnapshot } from './dom-binding-styles.js';
 import type {
 	__createBindingProjections,
@@ -798,32 +788,8 @@ export function __adoptBindings<Props>(
 			}
 		}
 	};
-	const drain = (preview = false): void | NativeTransitionPresentation => {
-		if (disposed) return;
-		if (busy) return preview ? { validate: () => false, commit() {}, discard() {} } : undefined;
-		const version = revision;
-		const previousDirty = dirty;
-		const previousUpdates = preview && signalUpdates ? [...signalUpdates] : undefined;
-		const preparedSignals =
-			preview && signalConnections ? new Map(signalConnections) : signalConnections;
-		const preparedProjections = preview && projections ? new Map(projections) : projections;
-		const receipts: BindingPreparedValue[] | undefined = preview ? [] : undefined;
-		const controlReceipts: BindingControlPreview[] | undefined = preview ? [] : undefined;
-		let accepted = false;
-		let retired = false;
-		const discard = preview
-			? (): void => {
-					if (accepted || retired) return;
-					retired = true;
-					for (const receipt of receipts!) receipt.discard();
-					for (const control of controlReceipts!) control.discard();
-					for (const [index, connection] of preparedSignals ?? [])
-						if (connection !== signalConnections?.get(index)) connection.dispose(true);
-					for (const [index, connection] of preparedProjections ?? [])
-						if (connection !== projections?.get(index)) connection.dispose(true);
-				}
-			: undefined;
-		if (preview) dirty = true;
+	const drain = (): void => {
+		if (disposed || busy) return;
 		busy = true;
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
@@ -853,26 +819,24 @@ export function __adoptBindings<Props>(
 						for (const group of descriptor.projectionGroups) {
 							if (disposed || dirty) break;
 							const first = group[0]![0];
-							let connection = preparedProjections!.get(first);
+							let connection = projections!.get(first);
 							if (!connection) {
 								connection = projectionFactory.connect(
 									group,
 									bindings,
 									nodes,
-									forwardNativeTransitionConsumer(refresh, () => {
+									() => {
 										if (!disposed) {
 											revision++;
 											signalUpdates!.add(first);
 											drain();
 										}
-									}),
+									},
 									options?.restoreStyles,
 								);
-								for (const [index] of group) preparedProjections!.set(index, connection);
+								for (const [index] of group) projections!.set(index, connection);
 							}
-							const receipt = preview ? connection.preview(values[first]) : undefined;
-							if (receipt) receipts!.push(receipt);
-							const projected = receipt ? receipt.value : connection.read(values[first]);
+							const projected = connection.read(values[first]);
 							if (resolved === values) resolved = [...values];
 							for (const [index] of group) (resolved as unknown[])[index] = projected[index];
 						}
@@ -880,61 +844,49 @@ export function __adoptBindings<Props>(
 					if (styleFactory && descriptor.styleIndices) {
 						for (const index of descriptor.styleIndices) {
 							if (disposed || dirty) break;
-							let connection = preparedSignals!.get(index);
+							let connection = signalConnections!.get(index);
 							if (!connection) {
 								connection = styleFactory.connect(
 									nodes[bindings[index]![0]]!,
-									forwardNativeTransitionConsumer(refresh, () => {
+									() => {
 										if (!disposed) {
 											revision++;
 											signalUpdates!.add(index);
 											drain();
 										}
-									}),
+									},
 									options?.restoreStyles,
 								);
-								preparedSignals!.set(index, connection);
+								signalConnections!.set(index, connection);
 							}
 							if (resolved === values) resolved = [...values];
-							const receipt = preview ? connection.preview(values[index]) : undefined;
-							if (receipt) receipts!.push(receipt);
-							(resolved as unknown[])[index] = receipt
-								? receipt.value
-								: connection.read(values[index]);
+							(resolved as unknown[])[index] = connection.read(values[index]);
 						}
 					}
 					if (signalFactory && descriptor.signalIndices) {
 						for (const index of descriptor.signalIndices) {
 							if (disposed || dirty) break;
-							let connection = preparedSignals!.get(index);
+							let connection = signalConnections!.get(index);
 							if (!connection && signalFactory.isSignal(values[index])) {
-								connection = signalFactory.connect(
-									forwardNativeTransitionConsumer(refresh, () => {
-										if (!disposed) {
-											revision++;
-											signalUpdates!.add(index);
-											drain();
-										}
-									}),
-								);
-								preparedSignals!.set(index, connection);
+								connection = signalFactory.connect(() => {
+									if (!disposed) {
+										revision++;
+										signalUpdates!.add(index);
+										drain();
+									}
+								});
+								signalConnections!.set(index, connection);
 							}
 							if (connection) {
 								if (resolved === values) resolved = [...values];
-								const receipt = preview ? connection.preview(values[index]) : undefined;
-								if (receipt) receipts!.push(receipt);
-								(resolved as unknown[])[index] = receipt
-									? receipt.value
-									: connection.read(values[index]);
+								(resolved as unknown[])[index] = connection.read(values[index]);
 							}
 						}
 					}
 					next = resolved.map((value, index) => {
 						const control = controls?.get(index);
 						if (control) {
-							const prepared = preview ? control.preview(value) : control.prepare(value);
-							controlReceipts?.push(prepared as BindingControlPreview);
-							preparedControls!.set(index, prepared);
+							preparedControls!.set(index, control.prepare(value));
 							return null;
 						}
 						return normalize(bindings[index]!, value);
@@ -952,7 +904,7 @@ export function __adoptBindings<Props>(
 				}
 				// Invalidation during another channel's coercion settles only connected
 				// values, without fetching or projecting the application source again.
-				while (!preview && signalUpdates?.size && !dirty && !disposed) {
+				while (signalUpdates?.size && !dirty && !disposed) {
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
 					for (const index of pending) {
@@ -975,7 +927,7 @@ export function __adoptBindings<Props>(
 					);
 				// Early edits publish only after every channel has prepared successfully.
 				// Settle their derived channels before committing any native writes.
-				if (preparedControls && !preview) {
+				if (preparedControls) {
 					while (!dirty && !disposed) {
 						for (const control of preparedControls.values()) {
 							control.publish();
@@ -1011,41 +963,10 @@ export function __adoptBindings<Props>(
 				}
 				// A getter/coercion may synchronously notify or end the owner lifetime.
 				// Never publish an obsolete prepared snapshot or mutate after disposal.
-				if (preview)
-					return {
-						validate: () =>
-							!retired &&
-							!disposed &&
-							revision === version &&
-							receipts!.every((receipt) => receipt.validate()) &&
-							controlReceipts!.every((control) => control.validate()),
-						discard: discard!,
-						commit() {
-							if (disposed || retired || accepted) return;
-							accepted = true;
-							busy = true;
-							try {
-								for (const [index, connection] of preparedSignals ?? [])
-									signalConnections!.set(index, connection);
-								for (const [index, connection] of preparedProjections ?? [])
-									projections!.set(index, connection);
-								for (const receipt of receipts!) receipt.commit();
-								for (const control of preparedControls?.values() ?? []) control.publish();
-								writePrepared(next, indices, preparedControls, preparedGroups);
-							} finally {
-								busy = false;
-								published?.();
-							}
-						},
-					};
 				if (dirty || disposed) continue;
 				writePrepared(next, indices, preparedControls, preparedGroups);
 			}
 		} catch (error) {
-			if (preview) {
-				discard!();
-				throw error;
-			}
 			try {
 				dispose();
 			} catch {
@@ -1053,15 +974,11 @@ export function __adoptBindings<Props>(
 			}
 			throw error;
 		} finally {
-			if (preview) {
-				dirty ||= previousDirty;
-				for (const index of previousUpdates ?? []) signalUpdates!.add(index);
-			}
 			busy = false;
-			if (!preview) published?.();
+			published?.();
 		}
 	};
-	const refresh: NativeTransitionNotify = (): void => {
+	const refresh = (): void => {
 		if (disposed) return;
 		revision++;
 		dirty = true;
@@ -1158,17 +1075,13 @@ export function __adoptBindings<Props>(
 			if (binding[1] === 'control') {
 				controls!.set(
 					index,
-					controlFactory!.claim(
-						node,
-						binding[2] as 'value' | 'checked',
-						forwardNativeTransitionConsumer(refresh, () => {
-							if (!disposed) {
-								revision++;
-								signalUpdates!.add(index);
-								drain();
-							}
-						}),
-					),
+					controlFactory!.claim(node, binding[2] as 'value' | 'checked', () => {
+						if (!disposed) {
+							revision++;
+							signalUpdates!.add(index);
+							drain();
+						}
+					}),
 				);
 			}
 			if (binding[1] === 'classGroup') {
@@ -1197,10 +1110,10 @@ export function __adoptBindings<Props>(
 /**
  * @internal Compiler-selected adopter for fixed nodes whose every channel is a
  * fixed scalar, or a URL whose sanitizer the artifact carries. It shares node
- * resolution, channel claims, legacy claim publication, signal connections and
- * native transition preview with `__adoptBindings`, but retains none of the
- * projection, control, class-group, style-restoration, host-handoff or
- * addressed-topology integrations.
+ * resolution, channel claims, legacy claim publication and signal connections
+ * with `__adoptBindings`, but retains none of the projection, control,
+ * class-group, style-restoration, host-handoff or addressed-topology
+ * integrations.
  */
 export function __adoptScalarBindings<Props>(
 	root: Element,
@@ -1235,7 +1148,6 @@ export function __adoptScalarBindings<Props>(
 	let disposed = false;
 	let busy = true;
 	let dirty = false;
-	let revision = 0;
 	let unsubscribe: (() => void) | undefined;
 	const signal = options?.signal;
 	const dispose = (): void => {
@@ -1288,27 +1200,8 @@ export function __adoptScalarBindings<Props>(
 			}
 		}
 	};
-	const drain = (preview = false): void | NativeTransitionPresentation => {
-		if (disposed) return;
-		if (busy) return preview ? { validate: () => false, commit() {}, discard() {} } : undefined;
-		const version = revision;
-		const previousDirty = dirty;
-		const previousUpdates = preview && signalUpdates ? [...signalUpdates] : undefined;
-		const preparedSignals =
-			preview && signalConnections ? new Map(signalConnections) : signalConnections;
-		const receipts: BindingPreparedValue[] | undefined = preview ? [] : undefined;
-		let accepted = false;
-		let retired = false;
-		const discard = preview
-			? (): void => {
-					if (accepted || retired) return;
-					retired = true;
-					for (const receipt of receipts!) receipt.discard();
-					for (const [index, connection] of preparedSignals ?? [])
-						if (connection !== signalConnections?.get(index)) connection.dispose();
-				}
-			: undefined;
-		if (preview) dirty = true;
+	const drain = (): void => {
+		if (disposed || busy) return;
 		busy = true;
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
@@ -1336,26 +1229,19 @@ export function __adoptScalarBindings<Props>(
 					if (signalFactory && descriptor.signalIndices) {
 						for (const index of descriptor.signalIndices) {
 							if (disposed || dirty) break;
-							let connection = preparedSignals!.get(index);
+							let connection = signalConnections!.get(index);
 							if (!connection && signalFactory.isSignal(values[index])) {
-								connection = signalFactory.connect(
-									forwardNativeTransitionConsumer(refresh, () => {
-										if (!disposed) {
-											revision++;
-											signalUpdates!.add(index);
-											drain();
-										}
-									}),
-								);
-								preparedSignals!.set(index, connection);
+								connection = signalFactory.connect(() => {
+									if (!disposed) {
+										signalUpdates!.add(index);
+										drain();
+									}
+								});
+								signalConnections!.set(index, connection);
 							}
 							if (connection) {
 								if (resolved === values) resolved = [...values];
-								const receipt = preview ? connection.preview(values[index]) : undefined;
-								if (receipt) receipts!.push(receipt);
-								(resolved as unknown[])[index] = receipt
-									? receipt.value
-									: connection.read(values[index]);
+								(resolved as unknown[])[index] = connection.read(values[index]);
 							}
 						}
 					}
@@ -1369,7 +1255,7 @@ export function __adoptScalarBindings<Props>(
 				}
 				// Invalidation during another channel's coercion settles only connected
 				// values, without fetching or projecting the application source again.
-				while (!preview && signalUpdates?.size && !dirty && !disposed) {
+				while (signalUpdates?.size && !dirty && !disposed) {
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
 					for (const index of pending) {
@@ -1379,36 +1265,10 @@ export function __adoptScalarBindings<Props>(
 				}
 				// A getter/coercion may synchronously notify or end the owner lifetime.
 				// Never publish an obsolete prepared snapshot or mutate after disposal.
-				if (preview)
-					return {
-						validate: () =>
-							!retired &&
-							!disposed &&
-							revision === version &&
-							receipts!.every((receipt) => receipt.validate()),
-						discard: discard!,
-						commit() {
-							if (disposed || retired || accepted) return;
-							accepted = true;
-							busy = true;
-							try {
-								for (const [index, connection] of preparedSignals ?? [])
-									signalConnections!.set(index, connection);
-								for (const receipt of receipts!) receipt.commit();
-								writePrepared(next, indices);
-							} finally {
-								busy = false;
-							}
-						},
-					};
 				if (dirty || disposed) continue;
 				writePrepared(next, indices);
 			}
 		} catch (error) {
-			if (preview) {
-				discard!();
-				throw error;
-			}
 			try {
 				dispose();
 			} catch {
@@ -1416,16 +1276,11 @@ export function __adoptScalarBindings<Props>(
 			}
 			throw error;
 		} finally {
-			if (preview) {
-				dirty ||= previousDirty;
-				for (const index of previousUpdates ?? []) signalUpdates!.add(index);
-			}
 			busy = false;
 		}
 	};
-	const refresh: NativeTransitionNotify = (): void => {
+	const refresh = (): void => {
 		if (disposed) return;
-		revision++;
 		dirty = true;
 		drain();
 	};

@@ -27,13 +27,6 @@ export type NativeTransitionNotify = (() => void) & {
 	[NATIVE_TRANSITION_CONSUMER]?: object;
 };
 
-/** Prepared DOM binding work stays private until it is committed or discarded. */
-export interface NativeTransitionPresentation {
-	validate(): boolean;
-	commit(): void;
-	discard(): void;
-}
-
 /** Preserve presentation identity when an owner or lifetime wraps a subscription. */
 export function forwardNativeTransitionConsumer<T extends () => void>(
 	notify: NativeTransitionNotify,

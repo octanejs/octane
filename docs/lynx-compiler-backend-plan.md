@@ -320,8 +320,9 @@ architecture below. These change the details:
   Action-capability split (#1678, #1683), and declaration redeclaration
   staging (`redeclaration.ts`). The renderer-independent presentation protocol
   in `signals/read-protocol.ts` (`NativeTransitionConsumer`:
-  `prepare`/`validate`/`commit`/`discard`) is the seam a Lynx consumer
-  implements (§5.1). The native-read gate itself is unchanged: DOM only.
+  `prepare`/`validate`/`commit`/`discard`) was then the seam for a Lynx
+  consumer; #2043 later replaced it with the consumer tag that §5.1 names. The
+  native-read gate itself is unchanged: DOM only.
 - **Strong.** New families:
   - render scheduling rejection (#1617);
   - cached inline render calculations (#1611);
@@ -621,9 +622,10 @@ Phase 4 supports the primitive form. Phase 6 adds structural text children.
     or rejection.
   - A signal write schedules its consumer owners through the kernel scheduler.
   - Reuse `signals/native-read-collector.ts`, `owner-context.ts`, and the
-    `read-protocol.ts` presentation contract (`NativeTransitionConsumer`), so
-    a Lynx consumer prepares, validates, commits, or discards its native work
-    the way a DOM consumer does. Do not import `runtime.ts`.
+    `read-protocol.ts` consumer tag (`NATIVE_TRANSITION_CONSUMER`). A
+    subscription tagged with its owner lets a transition that writes what the
+    owner reads render that owner with its batch (`signals/pending.ts`), as it
+    renders a DOM Block. Do not import `runtime.ts`.
   - Explicit data scopes own producers independently of UI consumers.
 - **Granularity.** Phase 5 invalidates at component granularity, which matches
   the DOM contract. Compiled site comparisons then keep a sparse change to the
