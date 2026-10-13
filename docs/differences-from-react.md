@@ -1732,22 +1732,20 @@ Controlled `value`, `checked` and `selected` are held too. Each carries a
 back together — restoring the node alone would leave the record believing the new
 value had already landed, so re-projecting it on resume would be skipped.
 
-A held synchronous transition now defers its whole commit: content the
-transition patched outside the suspended boundary — shell text, attributes,
-keyed structure — reverts with the hold and lands in one step on resolve, with
-`isPending` staying on throughout. `benchmarks/async-composition` pins the
-update at zero exposed intermediate states, level with React. One residual is
-pinned at its own ceiling there: after the dependent request resolves, the
-promoted round re-creates the warm-started panel fetches (13 creations against
-the 8-call floor; the app-level cache serves the same promises, so nothing
-refetches over the network) until the resume/warm work in
-[the deferred-commit plan](./transition-deferred-commit-plan.md) restores the
-floor. Both need the transition to become a deferred commit — a keyed
-removal disposes blocks and runs their cleanups, which cannot be undone, and
-reverting content outside a boundary needs the reveal to re-render where the
-transition began rather than just the boundary. See
-[Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
-benchmark pins the exposed-state count at zero.
+A held transition defers its whole commit. `useState`, `useReducer` and
+`useLinkedState` keep React's update queue: a transition's updates stay queued
+until a transition render folds them, and a render that suspends into a hold
+commits nothing, so content the transition patched outside the suspended
+boundary — shell text, attributes, keyed structure — never shows early, and
+`isPending` stays on throughout. When the data arrives, the transition renders
+again from where it started and lands in one step, reusing the requests the
+held render already started. An urgent update to the same state commits on the
+committed value first and the transition then applies the queue in order, as
+React rebases it; an urgent update no longer discards a held transition.
+`benchmarks/async-composition` pins the update at zero exposed intermediate
+states and the 8-request floor, level with React. A transition driven by
+something other than hook state, such as an external store, still holds per
+boundary. See [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).
 
 ## Root component entry points and container ownership
 
