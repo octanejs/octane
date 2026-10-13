@@ -466,8 +466,9 @@ const SUITES = [
 	},
 	{
 		// Headless-Chromium production hydration of a ~1,650-Block signal-enabled
-		// app frame on fresh pages at 4x CPU throttling, with jitless call and
-		// heap counters. `run.mjs --base=<checkout>` adds paired head/base ratios.
+		// app frame and its plain twin on fresh pages at 4x CPU throttling, with
+		// jitless call and heap counters and the paired frame/frame-plain ratio.
+		// `run.mjs --base=<checkout>` adds paired head/base ratios.
 		name: 'app-frame-hydration',
 		cwd: 'app-frame-hydration',
 		servers: [],
