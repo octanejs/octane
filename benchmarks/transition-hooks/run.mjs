@@ -364,12 +364,10 @@ function scenarios(bundle) {
 					request.resolve();
 					await quiesce(observations);
 					requests.delete(previous);
-					// Promotion renders the held value forward and the Action's
-					// completion publishes the falling edge.
-					expectRenders('held release', observations, [
-						['held', next, true],
-						['held', next, false],
-					]);
+					// The retry renders the held transition again, and the new value
+					// commits with its falling edge in that one render, as React
+					// retries the transition lane.
+					expectRenders('held release', observations, [['held', next, false]]);
 					expectText('held release', container, `idlevalue-${next}`);
 					if (container.querySelector('p') !== null)
 						throw new Error('held release: fallback shown');
