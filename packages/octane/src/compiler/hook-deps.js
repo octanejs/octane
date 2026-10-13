@@ -2349,7 +2349,8 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 				node: call,
 				hook: name,
 				severity: 'error',
-				message: 'Strong mode owns callback caching. Replace useCallback with a const declaration and let the compiler track its inputs.',
+				message:
+					'Strong mode owns callback caching. Replace useCallback with a const declaration and let the compiler track its inputs.',
 			});
 			continue;
 		}
