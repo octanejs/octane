@@ -5,6 +5,13 @@ vi.mock('@tanstack/query-devtools', () => ({
 	TanstackQueryDevtoolsPanel: vi.fn(),
 }));
 
+// Load both entries once at collection time, which has no test timeout. A
+// module's first fetch and transform can take seconds on a loaded runner; the
+// tests' re-imports after vi.resetModules() still evaluate fresh instances under
+// their stubbed NODE_ENV, without fetching again.
+await import('../../src/index');
+await import('../../src/production');
+
 describe('@octanejs/tanstack-query-devtools root entry', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs();
