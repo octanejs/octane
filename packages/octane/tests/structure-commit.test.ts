@@ -93,7 +93,7 @@ describe('structural deletions commit with their render', () => {
 			}
 		});
 
-		it(`builds a swapped branch off-document and inserts it at commit (${priority})`, async () => {
+		it(`builds replaced branches and components off-document and inserts them at commit (${priority})`, async () => {
 			let observing = false;
 			let during: MutationRecord[] | null = null;
 			const observer = new MutationObserver(() => {});
@@ -119,8 +119,10 @@ describe('structural deletions commit with their render', () => {
 					observing = false;
 					// Nothing reached the committed DOM while the render was running.
 					expect(during).toEqual([]);
-					expect(app.findAll('b, i, s').map((node) => node.textContent)).toEqual(
-						show ? ['shown'] : ['hidden', 'second root'],
+					expect(app.findAll('b, i, s, q, em, small').map((node) => node.textContent)).toEqual(
+						show
+							? ['shown', 'keyed', 'shown value']
+							: ['hidden', 'second root', 'keyed', 'hidden value', 'second value root'],
 					);
 				}
 				expect(shown.isConnected).toBe(false);

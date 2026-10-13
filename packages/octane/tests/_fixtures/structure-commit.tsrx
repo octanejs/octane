@@ -69,6 +69,21 @@ function Probe(props: { probe: () => void }) @{
 }
 
 // A later sibling observes the DOM while the swap above it is still rendering.
+function Shown() @{
+	<em class="value">{'shown value'}</em>
+}
+
+function Hidden() @{
+	<>
+		<em class="value">{'hidden value'}</em>
+		<small>{'second value root'}</small>
+	</>
+}
+
+function Keyed(props: { label: string }) @{
+	<q>{props.label}</q>
+}
+
 export function BranchProbeApp(props: { show: boolean; probe: () => void }) @{
 	<main>
 		@if (props.show) {
@@ -79,6 +94,8 @@ export function BranchProbeApp(props: { show: boolean; probe: () => void }) @{
 				<s>{'second root'}</s>
 			</>
 		}
+		<Keyed key={props.show ? 'shown' : 'hidden'} label="keyed" />
+		{props.show ? <Shown /> : <Hidden />}
 		<Probe probe={props.probe} />
 	</main>
 }

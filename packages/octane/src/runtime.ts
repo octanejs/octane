@@ -2962,29 +2962,6 @@ let TRANSITION_DEPTH = 0;
 let ASYNC_TRANSITION_COUNT = 0;
 
 /**
- * Optional off-screen swap capability. Generic component/child/control-flow
- * slots must not reference the concrete off-screen renderer directly: one
- * ordinary `@if` would otherwise retain the complete WIP/Suspense/descriptor
- * graph even when the application has no transition entry point. A Suspense
- * primary with a pending arm (tryBlock) and startTransition() install it.
- */
-interface TransitionSwapDriver {
-	render: typeof renderOffscreen;
-	dispose: typeof disposeWip;
-	splice: typeof spliceWipCapture;
-}
-
-let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
-
-function ensureOffscreenSwapDriver(): void {
-	TRANSITION_SWAP_DRIVER ??= {
-		render: renderOffscreen,
-		dispose: disposeWip,
-		splice: spliceWipCapture,
-	};
-}
-
-/**
  * Transition holds and cue scheduling. Every path that can create
  * transition-priority work runs through startTransition(), which installs this
  * driver before raising TRANSITION_DEPTH. Until then no render runs at
@@ -3010,14 +2987,7 @@ interface TransitionRootDriver {
 	discard: typeof discardHeldRoot;
 }
 
-function ensureTransitionSwapDriver(): void {
-	// Written out rather than calling ensureOffscreenSwapDriver, so applications
-	// that start transitions but render no Suspense pending arm carry one install.
-	TRANSITION_SWAP_DRIVER ??= {
-		render: renderOffscreen,
-		dispose: disposeWip,
-		splice: spliceWipCapture,
-	};
+function ensureTransitionDrivers(): void {
 	TRANSITION_ROOT_DRIVER ??= {
 		fold: foldTransitionUpdate,
 		queue: queueTransitionUpdate,
@@ -4409,7 +4379,7 @@ interface SlotNext {
 	/** The Block whose slot this is: a deletion cleanup can dispose it first. */
 	owner: Block | null;
 	/**
-	 * The incoming content replaces the first outgoing range and lands where
+	 * The incoming content replaces the last outgoing range and lands where
 	 * that range stands at commit, wherever an earlier entry moved it.
 	 */
 	follows: boolean;
@@ -4456,15 +4426,44 @@ function slotFrontier(
 	before: Node | null,
 ): DocumentFragment {
 	const next = slotNext(slot);
-	let frag = next.frag;
-	if (frag === null) {
-		frag = next.frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
-		(frag as any).$$next = next;
-		next.members = [];
-		next.parent = parent;
-		next.before = before;
-		next.owner = owningBlock(owner);
-	}
+	if (next.frag === null) openFrontier(next, owner, parent, before);
+	return next.frag!;
+}
+
+/**
+ * A frontier of its own, for content that lands where no slot existed before
+ * this render: a new return slot, or a root's first mount.
+ */
+function queueFrontier(owner: Block, parent: Node, before: Node | null): DocumentFragment {
+	const tx = ROOT_RENDER_TRANSACTION!;
+	const next: SlotNext = {
+		tx,
+		out: [],
+		frag: null,
+		parent: null,
+		before: null,
+		members: null,
+		owner: null,
+		follows: false,
+		bound: null,
+	};
+	tx.ops.push(applyNext, next);
+	return openFrontier(next, owner, parent, before);
+}
+
+function openFrontier(
+	next: SlotNext,
+	owner: Block,
+	parent: Node,
+	before: Node | null,
+): DocumentFragment {
+	const frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	(frag as any).$$next = next;
+	next.frag = frag;
+	next.members = [];
+	next.parent = parent;
+	next.before = before;
+	next.owner = owningBlock(owner);
 	return frag;
 }
 
@@ -4476,19 +4475,32 @@ function noteFrontierMember(parent: Node, member: object): void {
 
 /**
  * Whether a slot of `parentBlock` that changes structure in the open root
- * render writes through a frontier: its owner is committed, so the DOM it
- * would write into is live. Hydration records adopted structure instead.
+ * render writes through a frontier: its owner's DOM is live. Hydration that is
+ * adopting server DOM records that structure instead.
  */
-function usesFrontier(parentBlock: Block): boolean {
+function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
-	return (
-		transaction !== null &&
-		!transaction.aborted &&
-		!ROOT_RENDER_ROLLBACK &&
-		transaction.hydrating !== true &&
-		!hydrating &&
-		!isCreatedInRootRender(transaction, owningBlock(parentBlock))
-	);
+	if (
+		transaction === null ||
+		transaction.aborted ||
+		ROOT_RENDER_ROLLBACK ||
+		(hydrating && activeHydration() !== null)
+	)
+		return false;
+	// A Block this render created writes fresh DOM, unless it adopted live DOM.
+	const owner = owningBlock(parentBlock);
+	if (isCreatedInRootRender(transaction, owner) && !transaction.retainedCreated?.has(owner))
+		return false;
+	// A lite Scope this render created carries its owner's stamp but fresh DOM.
+	if (owner === parentBlock) return true;
+	let node = domParent;
+	for (
+		let parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
+		parent !== null;
+		parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode
+	)
+		node = parent;
+	return node.nodeType !== 11 || (node as any).$$next === undefined;
 }
 
 /** Retire a committed Block or lite arm and queue its range's deletion on `slot`. */
@@ -4509,14 +4521,17 @@ function queueSlotDeletion(
 function applySlotNext(slot: { next: SlotNext | null }): void {
 	const next = slot.next;
 	slot.next = null;
-	if (next === null) return;
+	if (next !== null) applyNext(next);
+}
+
+function applyNext(next: SlotNext): void {
 	const out = next.out;
 	const parent = next.parent;
 	let before = next.before;
-	if (next.follows) {
-		const first: Node = out[1];
-		if ((STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === parent)
-			before = getNextSibling(out[2]);
+	if (next.follows && out.length !== 0) {
+		const first: Node | null = out[out.length - 2];
+		if (first !== null && (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === parent)
+			before = getNextSibling(out[out.length - 1]);
 	}
 	applyOutgoing(out);
 	const frag = next.frag;
@@ -4694,8 +4709,9 @@ function queueRootUnmount(scope: Scope, exclusive: boolean): void {
 			last = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling;
 		}
 	} else if (block.kind === 'root') {
-		first = getFirstChild(block.parentNode);
-		last = (STAGED_DOM ? STAGED_DOM.view(block.parentNode) : block.parentNode).lastChild;
+		const parent = block.parentNode;
+		first = getFirstChild(parent);
+		last = (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild;
 	}
 	// A teardown inside an aborted mount keeps that mount's ref suppression.
 	const suppressed = REF_DETACH_SUPPRESSION;
@@ -7525,8 +7541,8 @@ interface StoreInst<T> {
 
 // Pending store-syncs to reconcile at the next commit (drained in commitEffects
 // after runLayoutEffects). Populated at RENDER time, so — like effects — pushes
-// during an off-screen (WIP) render are redirected into WIP_CAPTURE.stores and
-// spliced back only if that render commits (see renderOffscreen/spliceWipCapture).
+// during a captured render are redirected into WIP_CAPTURE.stores and spliced
+// back only if that render commits (spliceOffscreenCapture).
 const storeSyncQueue: StoreInst<any>[] = [];
 
 // Deferred ref attaches (React-19 timing parity). On mount the whole subtree is
@@ -7561,15 +7577,13 @@ function attachLiveFragmentRef(instance: FragmentInstance): void {
 	attachRef(instance._currentRef, instance);
 }
 
-// Off-screen (WIP) effect capture. While a transition swaps in a NEW subtree that
-// may suspend, that subtree is rendered "off-screen" (its DOM kept out of the slot's
-// committed range until it completes — see renderOffscreen). Its effects and ref
-// attaches must NOT fire at the normal commit: the nodes aren't committed yet, and if
-// the WIP suspends they belong to content that never lands. While `WIP_CAPTURE` is set,
+// Effect capture for a render that may not commit: a root transaction or a hidden
+// boundary's retry. Its effects and ref attaches must NOT fire until it commits, and
+// belong to content that never lands if it is dropped. While `WIP_CAPTURE` is set,
 // enqueueEffect/queueRefAttach redirect into it instead of the live queues; on commit
 // the captured entries are spliced back so the normal pipeline drains them (child-first,
-// after the new nodes are connected). The off-screen render is synchronous and
-// single-threaded, so every effect enqueued while the buffer is set belongs to the WIP.
+// after the new nodes are connected). The render is synchronous and single-threaded, so
+// every effect enqueued while the buffer is set belongs to it.
 interface OffscreenCapture {
 	/** Root journals already record render validity without a second subtree set. */
 	rootTransaction: boolean;
@@ -7639,23 +7653,9 @@ function createOffscreenCapture(): OffscreenCapture {
 // Active append targets for Effect Event render output. renderBlockInner takes
 // length checkpoints and truncates on throw, so a later sibling suspension rolls
 // back every completed descendant without allocating a transaction object/array
-// for the overwhelmingly common no-Effect-Event render. renderOffscreen swaps
-// these targets to its existing WIP capture.
+// for the overwhelmingly common no-Effect-Event render.
 let EFFECT_EVENT_RENDER_TARGET = effectEventQueue;
 let EFFECT_EVENT_ACTION_TARGET = effectEventCommitActions;
-
-// A subtree rendered off-screen by `renderOffscreen` (its DOM sits between owned
-// `start`/`end` markers, outside the committed slot range, with its effects captured).
-interface OffscreenWip {
-	retrySignalOwners?: SignalRetryOwners;
-	block: Block;
-	start: Comment;
-	end: Comment;
-	capture: OffscreenCapture;
-	domParent: Node;
-	/** Discarded WIPs must not publish detaches for refs whose attach never committed. */
-	refDetachCheckpoint: number;
-}
 
 // Live fragment refs need a commit-time child diff even before a listener or
 // observer is installed: each current first-level host child exposes its owning
@@ -12981,6 +12981,13 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		const existingRet = block.slots[0] as any;
 		let replacedStart: Node | null = null;
 		let replacedEnd: Node | null = null;
+		// A kind flip over committed DOM (usesFrontier) and its unwind point.
+		let frontier: SlotNext | null = null;
+		let domParent: Node = block.parentNode;
+		let anchor: Node | null = block.endMarker;
+		let journalAt = 0;
+		let opsAt = 0;
+		let retiredAt = 0;
 		const useSingleRoot =
 			isComponentDescriptor &&
 			((out as any).type.$$singleRoot === true ||
@@ -13006,44 +13013,6 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 			existingRet !== undefined &&
 			existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
 		) {
-			const swapDriver = TRANSITION_SWAP_DRIVER ? TRANSITION_SWAP_DRIVER : null;
-			const transitionMode = block.currentRenderMode === 'transition';
-			const committedSuspense =
-				swapDriver !== null &&
-				(!hydrating || activeHydration() === null) &&
-				preservesCommittedSuspense(block);
-			const transitionSwap =
-				ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
-			const suspenseSwap =
-				transitionSwap !== null &&
-				!transitionMode &&
-				(!hydrating || activeHydration() === null) &&
-				committedSuspense;
-			// A transition can cross the markerless-single-root optimization boundary
-			// (text/list → compiled host fragment, or the reverse). A fallback-capable
-			// committed Suspense primary needs the same probe for an urgent replacement.
-			// Probe the incoming returned value off-screen before disposing the committed
-			// slot; a suspend or error then leaves the old DOM/state intact.
-			if (
-				transitionSwap !== null &&
-				(!hydrating || activeHydration() === null) &&
-				(transitionMode || suspenseSwap)
-			) {
-				const tail = returnSlotTail(block, existingRet);
-				if (tail !== null) {
-					const probe = transitionSwap.render(
-						block,
-						block.parentNode,
-						tail,
-						ROOT_RENDERABLE_BODY,
-						out,
-						renderReturnedValue,
-					);
-					transitionSwap.dispose(probe.wip);
-					if (probe.failed) throw probe.error;
-					if (probe.suspended) throw new SuspenseException(probe.suspended);
-				}
-			}
 			if (
 				ROOT_RENDER_TRANSACTION !== null &&
 				!existingRet.inherited &&
@@ -13063,86 +13032,111 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 					replacedEnd = last;
 				}
 			}
-			disposeReturnSlot(block, existingRet);
-			// Slot teardown runs user cleanups. A synchronous owning-root unmount must
-			// not let this render publish a replacement into the disposed container.
-			if (block.disposed) return;
+			if (usesFrontier(block, block.parentNode)) {
+				// Over committed DOM the incoming slot renders in a fragment of its own
+				// and takes the outgoing slot's place at commit. If it throws, the flip
+				// unwinds like a rollback window and the outgoing slot stays.
+				const transaction = ROOT_RENDER_TRANSACTION!;
+				journalAt = TRANSITION_JOURNAL!.length;
+				opsAt = transaction.ops.length;
+				retiredAt = transaction.retired?.size ?? 0;
+				const frag = queueFrontier(block, block.parentNode, block.endMarker);
+				frontier = (frag as any).$$next as SlotNext;
+				disposeReturnSlot(block, existingRet, frontier.out);
+				frontier.follows = true;
+				anchor = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+				(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(anchor);
+				domParent = frag;
+			} else {
+				disposeReturnSlot(block, existingRet);
+				// Slot teardown runs user cleanups. A synchronous owning-root unmount must
+				// not let this render publish a replacement into the disposed container.
+				if (block.disposed) return;
+			}
 		}
-		if (useSingleRoot) {
-			const d = out as ElementDescriptor;
-			// A value-position mount, as childSlot's are: the body may return one it
-			// received (`return props.content`), which a cached region skips with the
-			// body. Arm it as childSlot does, through the Block it inherits from.
-			if (!block.memoInChain) promoteMemoAncestry(block);
-			if (
-				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-				__OCTANE_PROFILE_ENABLED__ &&
-				!__profileHasComponentMetadata(d.type as Function)
-			) {
-				withProfileComponentOverride(d.type as Function, null, () =>
+		try {
+			if (useSingleRoot) {
+				const d = out as ElementDescriptor;
+				// A value-position mount, as childSlot's are: the body may return one it
+				// received (`return props.content`), which a cached region skips with the
+				// body. Arm it as childSlot does, through the Block it inherits from.
+				if (!block.memoInChain) promoteMemoAncestry(block);
+				if (
+					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+					__OCTANE_PROFILE_ENABLED__ &&
+					!__profileHasComponentMetadata(d.type as Function)
+				) {
+					withProfileComponentOverride(d.type as Function, null, () =>
+						componentSlot(
+							block,
+							0,
+							domParent,
+							d.type as ComponentBody,
+							d.props,
+							d.__octaneInvocationSite,
+							anchor,
+							true,
+							undefined,
+							d.key ?? undefined,
+							hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
+						),
+					);
+				} else {
 					componentSlot(
 						block,
 						0,
-						block.parentNode,
+						domParent,
 						d.type as ComponentBody,
 						d.props,
 						d.__octaneInvocationSite,
-						block.endMarker,
+						anchor,
 						true,
 						undefined,
 						d.key ?? undefined,
 						hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
-					),
-				);
+					);
+				}
 			} else {
-				componentSlot(
-					block,
-					0,
-					block.parentNode,
-					d.type as ComponentBody,
-					d.props,
-					d.__octaneInvocationSite,
-					block.endMarker,
-					true,
-					undefined,
-					d.key ?? undefined,
-					hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
-				);
+				// A nested return-based component whose server output is EMPTY owns an
+				// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
+				// An unframed third-party SSR root receives an equivalent synthetic range.
+				// Borrow either component range for the return slot instead of letting
+				// childSlot mint an empty `<!---->` anchor during hydration. The return
+				// slot is the block's entire output, so it can safely reconcile future
+				// text/component values between the borrowed markers while the block
+				// remains their owner. This keeps hydration byte-preserving for `return
+				// null` / `false` / `''` components (including memo wrappers).
+				// A component returned where the server rendered a primitive borrows the
+				// range too, so the server's text stays inside every range below it,
+				// where a component that returns that text adopts it.
+				const returnHydration = hydrating ? activeHydration() : null;
+				if (
+					returnHydration !== null &&
+					block.slots[0] === undefined &&
+					block.startMarker !== null &&
+					block.endMarker !== null &&
+					block.startMarker !== block.endMarker &&
+					block.startMarker.nodeType === 8 &&
+					block.endMarker.nodeType === 8 &&
+					(getNextSibling(block.startMarker) === block.endMarker ||
+						returnHydration.isUnframedRootRange(block.startMarker, block.endMarker) ||
+						(isComponentDescriptor && returnHydration.holdsServerText(block)))
+				) {
+					const borrowed = returnHydration.lendRange(
+						block.startMarker as Comment,
+						block.endMarker as Comment,
+					);
+					block.slots[0] = borrowed;
+					registerSlot(block, borrowed);
+				}
+				childSlot(block, 0, domParent, out, anchor);
 			}
-		} else {
-			// A nested return-based component whose server output is EMPTY owns an
-			// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
-			// An unframed third-party SSR root receives an equivalent synthetic range.
-			// Borrow either component range for the return slot instead of letting
-			// childSlot mint an empty `<!---->` anchor during hydration. The return
-			// slot is the block's entire output, so it can safely reconcile future
-			// text/component values between the borrowed markers while the block
-			// remains their owner. This keeps hydration byte-preserving for `return
-			// null` / `false` / `''` components (including memo wrappers).
-			// A component returned where the server rendered a primitive borrows the
-			// range too, so the server's text stays inside every range below it,
-			// where a component that returns that text adopts it.
-			const returnHydration = hydrating ? activeHydration() : null;
-			if (
-				returnHydration !== null &&
-				block.slots[0] === undefined &&
-				block.startMarker !== null &&
-				block.endMarker !== null &&
-				block.startMarker !== block.endMarker &&
-				block.startMarker.nodeType === 8 &&
-				block.endMarker.nodeType === 8 &&
-				(getNextSibling(block.startMarker) === block.endMarker ||
-					returnHydration.isUnframedRootRange(block.startMarker, block.endMarker) ||
-					(isComponentDescriptor && returnHydration.holdsServerText(block)))
-			) {
-				const borrowed = returnHydration.lendRange(
-					block.startMarker as Comment,
-					block.endMarker as Comment,
-				);
-				block.slots[0] = borrowed;
-				registerSlot(block, borrowed);
+		} catch (error) {
+			if (frontier !== null) {
+				rollbackTransitionJournal(journalAt, block);
+				dropRootOps(ROOT_RENDER_TRANSACTION!, opsAt, retiredAt);
 			}
-			childSlot(block, 0, block.parentNode, out, block.endMarker);
+			throw error;
 		}
 		if (replacedStart !== null) {
 			const incoming = block.slots[0] as any;
@@ -13154,7 +13148,15 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 				incoming.end ??
 				null;
 			const last = incoming.end ?? incoming.block?.endMarker ?? first;
-			replaceSharedBlockBoundary(block, replacedStart, replacedEnd, first, last);
+			if (frontier === null)
+				replaceSharedBlockBoundary(block, replacedStart, replacedEnd, first, last);
+			else frontier.bound = [block, replacedStart, replacedEnd, first, last];
+		}
+		if (frontier !== null) {
+			// A single-root call that rendered at the fragment's end inserts before
+			// the Block's end, as an in-place mount does.
+			markerlessBranchRoots(block, domParent, anchor, block.endMarker);
+			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(anchor!);
 		}
 		const state = block.slots[0] as any;
 		if (!block.disposed && state !== undefined && state.returnedOutput !== true) {
@@ -13176,7 +13178,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 // registry entry so the newly-chosen path rebuilds (and unmountScope won't
 // double-process a now-stale slot of the wrong kind). Shared-body handoffs
 // also use this path to replace native control-flow output with a different kind.
-function disposeReturnSlot(block: Block, state: any): void {
+function disposeReturnSlot(block: Block, state: any, out?: any[]): void {
 	const kind = state.__kind;
 	// A branch slot's arm is a Block, or a lite arm's stand-in with the same bound.
 	const arm = state.block ?? state.lite?.block;
@@ -13227,7 +13229,8 @@ function disposeReturnSlot(block: Block, state: any): void {
 		}
 		// Keep the retired slot intact for connected-DOM cleanup. Only its
 		// registry entry changes while the new return shape renders alongside it.
-		queueRootDeletion(state, first, last);
+		if (out === undefined) queueRootDeletion(state, first, last);
+		else out.push(state, first, last);
 		journalRootProperty(block.slots, 0, block.slots[0]);
 		const registry = block._slots;
 		if (registry !== null) {
@@ -35077,7 +35080,9 @@ function componentSlotImpl(
 	const keyChanged = key !== undefined && state.prevKey !== NO_KEY && nextKey !== state.prevKey;
 	const replacing = identity !== state.currentComp || keyChanged;
 	const journaledSlot = ROOT_RENDER_TRANSACTION !== null && state.block !== null && replacing;
-	if (journaledSlot) {
+	const frontier = journaledSlot && usesFrontier(parentBlock, domParent);
+	if (frontier) journalObjectOnce(state);
+	else if (journaledSlot) {
 		// Owned component markers belong to the replaced range; inherited markers
 		// do not. A self-marked component takes its range from its live Block.
 		if (state.inherited) {
@@ -35146,167 +35151,19 @@ function componentSlotImpl(
 						component: identity,
 						key: nextKey,
 					};
-		const swapDriver = TRANSITION_SWAP_DRIVER ? TRANSITION_SWAP_DRIVER : null;
-		const transitionMode = parentBlock.currentRenderMode === 'transition';
-		const canSwapOffscreen =
-			swapDriver !== null && state.block !== null && state.block.mounted && hydration === null;
-		const committedSuspense = canSwapOffscreen && preservesCommittedSuspense(parentBlock);
-		// A root-owned replacement needs no probe: its transaction preserves the
-		// outgoing tree. An explicit boundary still owns its existing hide/hold
-		// policy, so preserve that boundary's replacement path.
-		const transitionSwap =
-			ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
-		const suspenseSwap = canSwapOffscreen && !transitionMode && committedSuspense;
-		const probeOnly = suspenseSwap && !transitionMode;
-		const rootTransaction = ROOT_RENDER_TRANSACTION;
-		if (
-			rootTransaction !== null &&
-			!committedSuspense &&
-			hydration === null &&
-			state.block !== null &&
-			state.block.mounted &&
-			!isCreatedInRootRender(rootTransaction, state.block)
-		) {
-			// Keep the committed range connected until the whole root succeeds.
-			// This is the incoming subtree's only render, not a probe: its captured
-			// work and owned pair become the slot after successful completion.
-			const oldBlock = state.block;
-			const oldStart = oldBlock.startMarker;
-			const oldEnd = oldBlock.endMarker;
-			const inherited = state.inherited;
-			let first = inherited
-				? state.start === null
-					? getFirstChild(domParent)
-					: getNextSibling(state.start)
-				: (state.start ?? oldStart);
-			if (inherited && first === state.end) first = null;
-			const last = inherited
-				? first === null
-					? null
-					: state.end === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: domNode(state.end).previousSibling
-				: (state.end ?? oldEnd);
-			// With borrowed markers, stage after the last CONTENT node, still
-			// inside the parent's pair. Exact-range retirement leaves the WIP alone
-			// and needs no commit-time move or change to the parent's boundary.
-			const stageAfter = first === null ? (inherited ? state.start : null) : last;
-			if (
-				stageAfter !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(stageAfter) : stageAfter).parentNode === domParent
-			) {
-				const r = renderOffscreen(
-					parentBlock,
-					domParent,
-					stageAfter,
-					body,
-					renderProps,
-					outputHandler,
-					'dynamic',
-					undefined,
-					false,
-					signalInstanceKey,
-					retryLocation,
-				);
-				if (r.suspended || r.failed) {
-					disposeWip(r.wip);
-					if (r.suspended !== null) throw new SuspenseException(r.suspended);
-					throw r.error;
-				}
-				domNode(r.wip.start).data = 'comp';
-				domNode(r.wip.end).data = '/comp';
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.singleRoot = false;
-				state.inherited = false;
-				state.block = r.wip.block;
-				state.currentComp = identity;
-				if (!inherited) {
-					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, r.wip.start, r.wip.end);
-				}
-				spliceWipCapture(r.wip);
-				queueSlotDeletion(state, oldBlock, first, last);
-				return;
-			}
-		}
-		// Off-screen swap (React WIP model): a transition or fallback-capable
-		// committed Suspense primary replacing a DIFFERENT component renders the
-		// incoming tree first WITHOUT tearing down the old. Urgent Suspense uses the
-		// conservative probe path below; transitions can adopt a completed marked WIP.
-		if (transitionSwap !== null && canSwapOffscreen && (transitionMode || suspenseSwap)) {
-			if (!probeOnly && !state.singleRoot && !state.inherited && state.end !== null) {
-				// COMMIT the WIP (no double render): the off-screen block already owns a
-				// `<!--wip-->`/`<!--/wip-->` pair, which is EXACTLY componentSlot's non-
-				// singleRoot regime (the slot's start/end ARE the block's owned markers,
-				// exclusiveMarkers=false). On completion we adopt that pair as the slot's
-				// markers and rename it in place. The wip pair was inserted right after
-				// `state.end`, so once the old range (start..end inclusive) is unmounted the
-				// pair sits exactly where the old range was — no DOM move needed. We rename
-				// the comments rather than replacing them: descendant slots inside the WIP
-				// (e.g. a return-slot childSlot) may anchor on `wip.end`, so it must survive.
-				const r = transitionSwap.render(
-					parentBlock,
-					domParent,
-					state.end,
-					body,
-					renderProps,
-					outputHandler,
-					'dynamic',
-					undefined,
-					false,
-					signalInstanceKey,
-					retryLocation,
-				);
-				if (r.suspended || r.failed) {
-					transitionSwap.dispose(r.wip);
-					if (r.failed) throw r.error;
-					throw new SuspenseException(r.suspended);
-				}
-				domNode(r.wip.start).data = 'comp';
-				domNode(r.wip.end).data = '/comp';
-				// Old block owns state.start/state.end (exclusiveMarkers=false) → removed
-				// inclusive of its markers, leaving the (renamed) wip pair in position.
-				const oldBlock = state.block!;
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.block = r.wip.block;
-				state.currentComp = identity;
-				transitionSwap.splice(r.wip);
-				// Publish the incoming range before old-tree cleanups can synchronously
-				// unmount the owner. Reentrant teardown now discovers and disposes the WIP,
-				// and the captured lifecycle queues skip its disposed scope.
-				unmountBlock(oldBlock);
-				if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
-				return;
-			}
-			// singleRoot + INHERITED slots keep the PROBE + discard double render:
-			// singleRoot self-marks with a single root element (no comment markers), so
-			// committing a comment-marked WIP block would change the DOM shape and break
-			// the self-marking cascade an enclosing @if relies on; an inherited slot's
-			// markers BELONG to the parent block, so adopting a wip pair would change
-			// the parent's range shape. Probe off-screen to surface a suspend/error,
-			// discard, then fall through to the legacy swap below. (An inherited slot's
-			// probe anchor is the borrowed end marker — the wip renders after it,
-			// outside the parent's range, and is disposed before the swap.)
-			const probeAfter = state.end ?? state.anchor;
-			if (probeAfter !== null) {
-				const r = transitionSwap.render(
-					parentBlock,
-					domParent,
-					probeAfter,
-					body,
-					renderProps,
-					outputHandler,
-					'dynamic',
-					undefined,
-					false,
-					signalInstanceKey,
-					retryLocation,
-				);
-				transitionSwap.dispose(r.wip);
-				if (r.failed) throw r.error;
-				if (r.suspended) throw new SuspenseException(r.suspended);
-			}
+		if (frontier) {
+			swapComponentFrontier(
+				state,
+				parentBlock,
+				domParent,
+				body,
+				identity,
+				renderProps,
+				outputHandler,
+				signalInstanceKey,
+				retryLocation,
+			);
+			return;
 		}
 		// Hydrating, an update that replaces the component this slot already
 		// rendered, as a suspended deferred boundary's retry does after its
@@ -35636,59 +35493,40 @@ function coerceChildText(v: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// Off-screen (WIP-model) rendering — React's "render the new tree off the current
-// one, commit atomically" applied per-swap. When a TRANSITION render replaces
-// committed content with a NEW subtree that may suspend, we render the new subtree
-// with its own markers placed OUTSIDE the committed slot range (so the old content
-// is untouched and stays on screen), capturing its effects. If it completes we move
-// it into place + tear down the old (atomic commit). If it suspends we discard the
-// partial and route to the enclosing tryBlock, whose EXISTING transition hold keeps
-// the old content live (branch===1, hiddenDom===null) and resumes on settle. Urgent
-// (non-transition) + hydration renders keep the legacy clear-then-render path.
+// Frontier rendering (#2043): a slot that replaces committed content renders
+// the incoming subtree into its pending fragment, never into live DOM. The
+// commit deletes the outgoing range and inserts the fragment in its place; a
+// render that never commits leaves the committed content exactly as it was.
 // ---------------------------------------------------------------------------
 
-// Render `body(props)` off-screen: fresh `start`/`end` markers inserted right AFTER
-// `afterNode` (so OUTSIDE a slot range that ends at `afterNode`), in `domParent`, with
-// effects/refs captured (WIP_CAPTURE) so they don't fire until commit. `parentBlock`
-// is the LIVE parent so suspends route up the real tryBlock chain and context resolves
-// against live providers — only the DOM marker position is off to the side.
-function renderOffscreen(
+/**
+ * Render a slot's incoming Block between a fresh pair at the end of its
+ * frontier fragment (slotFrontier). A throw discards the Block, whose nodes
+ * never left the fragment, and the slot keeps what it had.
+ */
+function renderFrontierBlock(
+	frag: DocumentFragment,
 	parentBlock: Block,
-	domParent: Node,
-	afterNode: Node,
+	label: string,
 	body: ComponentBody,
 	props: any,
 	outputHandler: OutputHandler | null,
-	// Block kind for the off-screen block. Only 'root' is behaviorally special, so
-	// this is DOM-shape fidelity (branch commits pass 'control-flow' to mirror their
-	// in-place blocks), not correctness — 'dynamic' works for every non-root caller.
-	kind: BlockKind = 'dynamic',
-	// Hoisted-helper env tuple (compiled-output Phase 2): a branch-swap WIP whose
-	// body is a CAPTURING hoisted helper destructures `__extra` — the wip block
-	// must carry the construct's env or that destructure throws off-screen.
-	env?: any[],
-	implicitBail = false,
+	implicitBail: boolean,
 	signalInstanceKey?: SignalInstanceKey,
 	retryLocation?: SignalRetryLocation,
-): { wip: OffscreenWip; suspended: any; error: any; failed: boolean } {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('wip');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/wip');
-	const ref = getNextSibling(afterNode);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, ref);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, ref);
-	const capture = createOffscreenCapture();
-	const refDetachCheckpoint = refDetachQueue.length;
-	const prev = WIP_CAPTURE;
-	WIP_CAPTURE = capture;
+): Block {
+	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(label);
+	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + label);
+	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).append(start, end);
 	const block = createBlock(
-		kind,
+		'dynamic',
 		parentBlock,
-		domParent,
+		frag,
 		start,
 		end,
 		body,
 		props,
-		env,
+		undefined,
 		outputHandler,
 	);
 	if (signalInstanceKey !== undefined) stampSignalInstanceKey(block, signalInstanceKey);
@@ -35700,27 +35538,33 @@ function renderOffscreen(
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
-		kind === 'dynamic' &&
 		body !== (hostStringTagBody as unknown as ComponentBody) &&
 		body !== (hostElementBody as unknown as ComponentBody)
 	)
 		profileTrackComponent(block, body);
-	let suspended: any = null;
-	let error: any = null;
-	let failed = false;
 	try {
 		renderBlock(block);
-	} catch (err) {
-		if (isSuspenseException(err)) suspended = (err as SuspenseException).thenable;
-		else {
-			error = err;
-			failed = true;
-		}
-	} finally {
-		WIP_CAPTURE = prev;
+	} catch (error) {
+		discardFrontierBlock(block, parentBlock, error, retryLocation);
+		removeAfter(frag, (STAGED_DOM ? STAGED_DOM.view(start) : start).previousSibling, null);
+		throw error;
 	}
-	const wip: OffscreenWip = { block, start, end, capture, domParent, refDetachCheckpoint };
-	if (suspended !== null && retryLocation !== undefined) {
+	return block;
+}
+
+/**
+ * Discard an incoming Block that threw before its commit. Its scope leaves, a
+ * ref it never attached detaches nothing, and a suspended Block's signal owners
+ * stay with the boundary or root that retries it.
+ */
+function discardFrontierBlock(
+	block: Block,
+	parentBlock: Block,
+	error: unknown,
+	retryLocation: SignalRetryLocation | undefined,
+): void {
+	const previousRetained = RETAINED_SIGNAL_OWNERS;
+	if (retryLocation !== undefined && isSuspenseException(error)) {
 		const owner = parentBlock.idState.renderOwner;
 		const boundary = signalRetryBoundary(parentBlock);
 		const retryRoot = boundary?.tryBlock ?? owner?.current;
@@ -35730,22 +35574,99 @@ function renderOffscreen(
 			for (const created of ROOT_RENDER_TRANSACTION?.created ?? [])
 				if (!created.disposed && blockIsAncestorOf(block, created))
 					retainSignalRetryScope(created, retryRoot, holder);
-			wip.retrySignalOwners = holder.retrySignalOwners;
+			if (holder.retrySignalOwners !== undefined) RETAINED_SIGNAL_OWNERS = holder.retrySignalOwners;
 		}
 	}
-	return {
-		wip,
-		suspended,
-		error,
-		failed,
-	};
+	const queued = refDetachQueue.length;
+	const captured = WIP_CAPTURE?.detaches?.length ?? 0;
+	try {
+		unmountBlock(block, false);
+	} finally {
+		RETAINED_SIGNAL_OWNERS = previousRetained;
+		refDetachQueue.length = queued;
+		if (WIP_CAPTURE?.detaches !== undefined) WIP_CAPTURE.detaches.length = captured;
+	}
 }
 
-// Splice a COMPLETED off-screen WIP's captured effects/refs/store-syncs back into the
-// live queues so the surrounding commit drains them (child-first, now that the WIP's
-// nodes are connected). Shared by every commit site — childSlot (which also DOM-moves
-// the range, moveOffscreenRange) and the componentSlot / renderBranchSlot commit branches
-// (which adopt the WIP's markers in place, so no DOM move is needed).
+/**
+ * A component replacement in a root render over committed DOM (usesFrontier):
+ * the incoming Block renders between a fresh pair in the slot's fragment, and
+ * its commit deletes the outgoing range and inserts the pair in its place.
+ */
+function swapComponentFrontier(
+	state: CompSlot,
+	parentBlock: Block,
+	domParent: Node,
+	body: ComponentBody,
+	identity: ComponentBody | string,
+	renderProps: any,
+	outputHandler: OutputHandler | null,
+	signalInstanceKey: SignalInstanceKey | undefined,
+	retryLocation: SignalRetryLocation | undefined,
+): void {
+	const old = state.block!;
+	// A fresh Block is an earlier replacement's in this render, in the fragment.
+	const fresh = isCreatedInRootRender(ROOT_RENDER_TRANSACTION!, old);
+	const inherited = state.inherited;
+	const oldStart = old.startMarker;
+	const oldEnd = old.endMarker;
+	let first: Node | null = null;
+	let last: Node | null = null;
+	let before: Node | null;
+	if (fresh) before = state.next!.before;
+	else if (inherited) {
+		// Borrowed parent markers stay; only the content between them leaves.
+		first = state.start === null ? getFirstChild(domParent) : getNextSibling(state.start);
+		if (first === state.end) first = null;
+		else
+			last =
+				state.end === null
+					? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
+					: domNode(state.end).previousSibling;
+		before = state.end;
+	} else {
+		first = state.start ?? oldStart;
+		last = state.end ?? oldEnd;
+		if (first === null) {
+			before = state.anchor;
+			last = null;
+		} else before = getNextSibling(last!);
+	}
+	const frag = slotFrontier(state, parentBlock, domParent, before);
+	const block = renderFrontierBlock(
+		frag,
+		parentBlock,
+		'comp',
+		body,
+		renderProps,
+		outputHandler,
+		false,
+		signalInstanceKey,
+		retryLocation,
+	);
+	if (fresh) unmountBlock(old);
+	else queueSlotDeletion(state, old, first, last);
+	if (parentBlock.disposed) return;
+	state.start = block.startMarker as Comment;
+	state.end = block.endMarker as Comment;
+	state.singleRoot = false;
+	state.inherited = false;
+	state.block = block;
+	state.currentComp = identity;
+	const pending = state.next!;
+	if (!fresh && !inherited && first !== null) {
+		pending.follows = true;
+		if (sharesBlockBoundary(parentBlock, oldStart, oldEnd))
+			pending.bound = [parentBlock, oldStart, oldEnd, null, null];
+	}
+	if (pending.bound !== null) {
+		pending.bound[3] = state.start;
+		pending.bound[4] = state.end;
+	}
+}
+
+// Splice a committed capture's effects/refs/store-syncs back into the live queues (or
+// the enclosing capture) so the surrounding commit drains them, child-first.
 
 function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAcceptance = false): void {
 	if (capture.presentations !== undefined && WIP_CAPTURE !== null)
@@ -35810,10 +35731,6 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	}
 }
 
-function spliceWipCapture(wip: OffscreenWip): void {
-	spliceOffscreenCapture(wip.capture);
-}
-
 /** Drop captured commit work that never became visible. */
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
@@ -35835,38 +35752,6 @@ function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (cleanups !== undefined) {
 		capture.renderCleanups = undefined;
 		for (const cleanup of cleanups) cleanup(true);
-	}
-}
-
-/** Move a completed WIP range after its ownership/capture has been published. */
-function moveOffscreenRange(wip: OffscreenWip, beforeNode: Node): void {
-	const parent = wip.domParent;
-	let n: Node | null = wip.start;
-	while (n !== null) {
-		const next: Node | null = getNextSibling(n);
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(n, beforeNode);
-		if (n === wip.end) break;
-		n = next;
-	}
-}
-
-// Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
-// partial cleanups. Captured effects/refs are dropped (they never ran).
-function disposeWip(wip: OffscreenWip): void {
-	const previousCapture = WIP_CAPTURE;
-	const previousRetained = RETAINED_SIGNAL_OWNERS;
-	if (wip.retrySignalOwners !== undefined) RETAINED_SIGNAL_OWNERS = wip.retrySignalOwners;
-	WIP_CAPTURE = wip.capture;
-	try {
-		unmountBlock(wip.block, true);
-	} finally {
-		RETAINED_SIGNAL_OWNERS = previousRetained;
-		WIP_CAPTURE = previousCapture;
-		// A completed descendant in an ultimately discarded WIP is marked mounted,
-		// so its teardown can enqueue ref(null). Its attach is still only in the
-		// discarded capture and never became observable; drop the matching detach.
-		refDetachQueue.splice(wip.refDetachCheckpoint);
-		discardOffscreenCapture(wip.capture);
 	}
 }
 
@@ -36008,50 +35893,6 @@ function clearChildContent(state: ChildSlot): void {
 	// drop the stale reference — a later pure-host render must rebuild, not "reuse" a
 	// detached element.
 	state.hostNode = null;
-}
-
-/**
- * Tear down a replaced child block while the live slot already owns its incoming
- * WIP. Keeping this separate from clearChildContent prevents old-tree user cleanup
- * from hiding the WIP from a reentrant owning-root unmount.
- */
-function clearReplacedChildBlock(state: ChildSlot, oldBlock: Block): void {
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		const parent = state.ownerHost ?? domNode(state.start)?.parentNode ?? oldBlock.parentNode;
-		let first =
-			state.ownerHost !== null
-				? getFirstChild(parent)
-				: (domNode(state.start)?.nextSibling ?? null);
-		const after = state.ownerHost !== null ? null : state.end;
-		if (first === after) first = null;
-		const last =
-			first === null
-				? null
-				: after === null
-					? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
-					: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling;
-		queueSlotDeletion(state, oldBlock, first, last);
-		return;
-	}
-	unmountBlock(oldBlock, false);
-	if (state.ownerHost !== null) {
-		let node: Node | null = getFirstChild(state.ownerHost);
-		while (node !== null) {
-			const next = getNextSibling(node);
-			domNode(state.ownerHost).removeChild(node);
-			node = next;
-		}
-	} else if (state.start !== null) {
-		const parent = domNode(state.start).parentNode;
-		if (parent !== null) {
-			let node: Node | null = getNextSibling(state.start);
-			while (node !== null && node !== state.end) {
-				const next = getNextSibling(node);
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
-				node = next;
-			}
-		}
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -39756,97 +39597,6 @@ export function childSlot(
 						component: isBodyFn ? undefined : comp,
 						key: undefined,
 					};
-		// Off-screen swap (React WIP model): a transition or fallback-capable
-		// committed Suspense primary replacing content with a DIFFERENT component
-		// renders the new one off-screen and HOLDS the old until it is ready. Urgent
-		// Suspense probes and discards a completed WIP, then uses the in-place path;
-		// transitions can commit the WIP directly.
-		// (`state.end` is non-null on this path for marked slots; an OWNS-PARENT
-		// slot has none — it takes the legacy swap below, like singleRoot
-		// componentSlots.)
-		const swapDriver = TRANSITION_SWAP_DRIVER ? TRANSITION_SWAP_DRIVER : null;
-		const transitionMode = parentBlock.currentRenderMode === 'transition';
-		const committedSuspense =
-			swapDriver !== null &&
-			state.block !== null &&
-			state.block.mounted &&
-			hydration === null &&
-			preservesCommittedSuspense(parentBlock);
-		const transitionSwap =
-			ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
-		const canSwapOffscreen =
-			transitionSwap !== null &&
-			state.block !== null &&
-			state.block.mounted &&
-			state.end !== null &&
-			hydration === null;
-		const suspenseSwap = canSwapOffscreen && !transitionMode && committedSuspense;
-		const probeOnly = suspenseSwap && !transitionMode;
-		if (canSwapOffscreen && (transitionMode || suspenseSwap)) {
-			const r =
-				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-				__OCTANE_PROFILE_ENABLED__ &&
-				isBodyFn &&
-				!__profileHasComponentMetadata(comp)
-					? withProfileComponentOverride(comp, null, () =>
-							transitionSwap.render(
-								parentBlock,
-								domParent,
-								state.end!,
-								comp,
-								props,
-								renderReturnedValue,
-								'dynamic',
-								undefined,
-								false,
-								signalInstanceKey,
-								retryLocation,
-							),
-						)
-					: transitionSwap.render(
-							parentBlock,
-							domParent,
-							state.end!,
-							comp,
-							props,
-							renderReturnedValue,
-							'dynamic',
-							undefined,
-							false,
-							signalInstanceKey,
-							retryLocation,
-						);
-			if (r.suspended || r.failed) {
-				// Discard the partial; the OLD content was never touched, so it stays live.
-				// Re-throw so the enclosing tryBlock's existing catch holds the old content
-				// (transition). Re-throwing (vs swallowing the suspend + returning) is what
-				// keeps the try body's success path from immediately RELEASING the hold; the
-				// resume re-renders the try body, which re-drives this swap to completion.
-				transitionSwap.dispose(r.wip);
-				if (r.failed) throw r.error;
-				throw new SuspenseException(r.suspended);
-			}
-			if (state.borrowed || probeOnly) {
-				// The retained pair belongs to a coextensive parent range. Probe for
-				// suspension, discard, then use the in-place mount below; committing
-				// a nested WIP pair would split the compacted ownership graph.
-				transitionSwap.dispose(r.wip);
-			} else {
-				// Completed → publish ownership and captured lifecycle first, then tear
-				// down the old block while the WIP still sits outside its range. A cleanup
-				// that synchronously unmounts the owning root can now find the WIP and this
-				// path will not move detached nodes or resurrect lifecycle work afterward.
-				const oldBlock = state.block!;
-				state.block = r.wip.block;
-				state.currentComp = comp;
-				state.currentIsBodyFn = isBodyFn;
-				transitionSwap.splice(r.wip);
-				clearReplacedChildBlock(state, oldBlock);
-				if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
-				moveOffscreenRange(r.wip, state.end!);
-				return;
-			}
-		}
 		// PURE-HOST → BLOCKS UPGRADE (adopt, don't rebuild): the slot's last render
 		// was a raw pure-host tree (state.hostNode), and this render the SAME-TAG
 		// host descriptor now carries component descendants (e.g. a
@@ -39902,94 +39652,74 @@ export function childSlot(
 			}
 			return;
 		}
-		if (
-			ROOT_RENDER_TRANSACTION !== null &&
-			rootShapeChanged &&
-			(parentScope.mounted || ROOT_RENDER_TRANSACTION.retainedCreated?.has(parentBlock)) &&
-			!committedSuspense &&
-			hydration === null
-		) {
-			const stageAfter =
-				state.ownerHost !== null || (state.borrowed && state.start === null)
-					? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-					: state.end !== null
-						? domNode(state.end).previousSibling
-						: (state.block?.endMarker ?? state.text ?? state.hostNode);
-			if (
-				stageAfter !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(stageAfter) : stageAfter).parentNode === domParent
-			) {
-				// Capture the outgoing content before the WIP is inserted. Clearing
-				// changes only slot ownership during a root transaction, leaving the
-				// old focused range connected beside the genuine new subtree.
-				clearChildContent(state);
-				const implicitBail = !isBodyFn || isChildrenBlock(comp);
-				const r =
-					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-					__OCTANE_PROFILE_ENABLED__ &&
-					isBodyFn &&
-					!__profileHasComponentMetadata(comp)
-						? withProfileComponentOverride(comp, null, () =>
-								renderOffscreen(
-									parentBlock,
-									domParent,
-									stageAfter,
-									comp!,
-									props,
-									renderReturnedValue,
-									'dynamic',
-									undefined,
-									implicitBail,
-									signalInstanceKey,
-									retryLocation,
-								),
-							)
-						: renderOffscreen(
+		if (rootShapeChanged && usesFrontier(parentBlock, domParent)) {
+			// The incoming Block renders in the slot's fragment, between a pair of
+			// its own, and lands where the outgoing content stands at commit.
+			const owned = state.ownerHost !== null || (state.borrowed && state.start === null);
+			// A de-opt item owns its pair directly: the incoming pair replaces it,
+			// preserving one pair per item. Other borrowed ranges may have
+			// enclosing slot owners and keep their pair.
+			const promote =
+				parentScope === parentBlock &&
+				parentBlock.forSlot !== null &&
+				!parentBlock.exclusiveMarkers &&
+				state.borrowed &&
+				sharesBlockBoundary(parentBlock, state.start, state.end);
+			const implicitBail = !isBodyFn || isChildrenBlock(comp);
+			const frag = slotFrontier(
+				state,
+				parentBlock,
+				domParent,
+				owned ? null : promote ? getNextSibling(state.end!) : state.end,
+			);
+			const block =
+				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+				__OCTANE_PROFILE_ENABLED__ &&
+				isBodyFn &&
+				!__profileHasComponentMetadata(comp)
+					? withProfileComponentOverride(comp, null, () =>
+							renderFrontierBlock(
+								frag,
 								parentBlock,
-								domParent,
-								stageAfter,
-								comp,
+								'',
+								comp!,
 								props,
 								renderReturnedValue,
-								'dynamic',
-								undefined,
 								implicitBail,
 								signalInstanceKey,
 								retryLocation,
-							);
-				if (r.suspended || r.failed) {
-					disposeWip(r.wip);
-					if (r.suspended !== null) throw new SuspenseException(r.suspended);
-					throw r.error;
-				}
-				if (
-					parentScope === parentBlock &&
-					parentBlock.forSlot !== null &&
-					!parentBlock.exclusiveMarkers &&
-					state.borrowed &&
-					sharesBlockBoundary(parentBlock, state.start, state.end)
-				) {
-					// A de-opt item owns its pair directly: promote that ownership to
-					// the genuine WIP pair, preserving one pair per item. Other borrowed
-					// ranges may have enclosing slot owners and cannot be retargeted here.
-					const oldStart = state.start!;
-					const oldEnd = state.end!;
-					state.start = r.wip.start;
-					state.end = r.wip.end;
-					journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
-					r.wip.block.exclusiveMarkers = true;
-					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, state.start, state.end);
-					slotNext(state).out.push(null, oldStart, oldStart, null, oldEnd, oldEnd);
-				}
-				if (state.start === null && state.ownerHost === null && !state.borrowed) {
-					state.start = r.wip.start;
-				}
-				state.block = r.wip.block;
-				state.currentComp = comp;
-				state.currentIsBodyFn = isBodyFn;
-				spliceWipCapture(r.wip);
-				return;
+							),
+						)
+					: renderFrontierBlock(
+							frag,
+							parentBlock,
+							'',
+							comp,
+							props,
+							renderReturnedValue,
+							implicitBail,
+							signalInstanceKey,
+							retryLocation,
+						);
+			const anchorless = !owned && state.end === null;
+			clearChildContent(state);
+			const pending = state.next!;
+			if (anchorless || promote) pending.follows = true;
+			if (promote) {
+				const oldStart = state.start!;
+				const oldEnd = state.end!;
+				state.start = block.startMarker as Comment;
+				state.end = block.endMarker as Comment;
+				block.exclusiveMarkers = true;
+				pending.out.push(null, oldStart, oldStart, null, oldEnd, oldEnd);
+				pending.bound = [parentBlock, oldStart, oldEnd, state.start, state.end];
+			} else if (state.start === null && state.ownerHost === null && !state.borrowed) {
+				state.start = block.startMarker as Comment;
 			}
+			state.block = block;
+			state.currentComp = comp;
+			state.currentIsBodyFn = isBodyFn;
+			return;
 		}
 		// New component (first render, or identity swap from text / another comp).
 		// While hydrating the FIRST render adopts the server content between our
@@ -42026,7 +41756,6 @@ export function tryBlock(
 	// disposing browser-owned state, then either commit it or show @pending while
 	// the old arm stays connected and hidden.
 	if (pendingBody !== null) {
-		ensureOffscreenSwapDriver();
 		ensureScheduledVisibilityDriver();
 	}
 	const parentBlock = parentScope.block;
@@ -44386,7 +44115,7 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookSlot): void {
 	// Install the optional off-screen swap graph before any listener or user
 	// update can observe transition priority.
-	ensureTransitionSwapDriver();
+	ensureTransitionDrivers();
 	ensureNativeActionResolver();
 	// Bump the priority flag FIRST so any scheduleRender calls fired by the
 	// listener notification (and by fn itself) are tagged as transition.
@@ -45489,24 +45218,6 @@ export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node
 	return own;
 }
 
-/** True when a committed primary must survive a replacement that may suspend. */
-function preservesCommittedSuspense(block: Block): boolean {
-	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const state: TrySlot | undefined = current.rare?.trySlot;
-		if (
-			state !== undefined &&
-			state.tryBlock === current &&
-			state.pendingBody !== null &&
-			state.hasResolved &&
-			state.branch === 1 &&
-			state.hiddenDom === null
-		) {
-			return true;
-		}
-	}
-	return false;
-}
-
 /** Count direct root slots, and retarget their provisional anchors to `end` when given. */
 function markerlessBranchRoots(
 	scope: Scope,
@@ -45816,6 +45527,7 @@ function sharesBlockBoundary(parent: Block | null, start: Node | null, end: Node
  */
 function swapBranchFrontier(
 	parentScope: Scope,
+	slotKey: number,
 	state: BranchSlot,
 	domParent: Node,
 	next: number,
@@ -45884,7 +45596,11 @@ function swapBranchFrontier(
 	const pairInFrag =
 		frag !== null && paired && state.end !== null && domNode(state.end).parentNode === frag;
 	// The fragment's content before the incoming arm's: the fresh arm's, if any.
-	const mark = pairInFrag ? domNode(state.end!).previousSibling : (frag?.lastChild ?? null);
+	const mark = pairInFrag
+		? domNode(state.end!).previousSibling
+		: frag === null
+			? null
+			: (STAGED_DOM ? STAGED_DOM.view(frag) : frag).lastChild;
 	let arm: Block | null = null;
 	let suspended: unknown = null;
 	let pending = false;
@@ -45898,6 +45614,18 @@ function swapBranchFrontier(
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).appendChild(end);
 		}
 		arm = createBlock('control-flow', parentBlock, frag!, null, end, body, undefined, env);
+		const retryLocation: SignalRetryLocation | undefined =
+			parentBlock.idState.renderOwner?.signalOwner === undefined
+				? undefined
+				: {
+						parent: parentScope,
+						slot: slotKey,
+						kind: state.__kind,
+						branch: next,
+						component: undefined,
+						key: undefined,
+					};
+		if (retryLocation !== undefined) SIGNAL_RETRY_LOCATIONS.set(arm, retryLocation);
 		try {
 			renderBlock(arm);
 		} catch (error) {
@@ -45905,7 +45633,7 @@ function swapBranchFrontier(
 			// arm that suspends stays the slot's pending arm, as an in-place mount
 			// does, so its retry resumes this Block and its state.
 			if (old !== null || !isSuspenseException(error)) {
-				unmountBlock(arm, false);
+				discardFrontierBlock(arm, parentBlock, error, retryLocation);
 				removeAfter(frag!, mark, pairInFrag ? end : null);
 				throw error;
 			}
@@ -46051,8 +45779,8 @@ function renderBranchSlot(
 			state.branch !== -1
 		)
 			__profileArm(true);
-		if (usesFrontier(parentBlock)) {
-			swapBranchFrontier(parentScope, state, domParent, next, body, marker, env);
+		if (usesFrontier(parentBlock, domParent)) {
+			swapBranchFrontier(parentScope, slotKey, state, domParent, next, body, marker, env);
 			return;
 		}
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
@@ -46106,19 +45834,6 @@ function renderBranchSlot(
 				}
 			}
 		}
-		const swapDriver = TRANSITION_SWAP_DRIVER ? TRANSITION_SWAP_DRIVER : null;
-		const transitionMode = parentBlock.currentRenderMode === 'transition';
-		const committedSuspense =
-			swapDriver !== null &&
-			state.block !== null &&
-			state.block.mounted &&
-			!state.unfinalized &&
-			body !== null &&
-			hydration === null &&
-			preservesCommittedSuspense(parentBlock);
-		const transitionSwap =
-			ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
-		const suspenseSwap = !transitionMode && committedSuspense;
 		let provisionalAfter: Node | null = null;
 		if (state.unfinalized && state.block !== null) {
 			// The first arm suspended before it could publish a stable boundary. Its
@@ -46162,234 +45877,6 @@ function renderBranchSlot(
 			armBlock.endMarker !== null
 				? armBlock.endMarker
 				: state.end;
-		const rootTransaction = ROOT_RENDER_TRANSACTION;
-		if (
-			rootTransaction !== null &&
-			!committedSuspense &&
-			hydration === null &&
-			(state.block !== null
-				? state.block.mounted && !isCreatedInRootRender(rootTransaction, state.block)
-				: state.lite !== null &&
-					!isCreatedInRootRender(rootTransaction, owningBlock(state.lite.block)))
-		) {
-			const oldBlock = state.block;
-			const oldLite = state.lite;
-			const oldStart = armBlock!.startMarker;
-			const oldEnd = armBlock!.endMarker;
-			const borrowed = state.borrowed;
-			let first = borrowed
-				? state.start === null
-					? getFirstChild(domParent)
-					: getNextSibling(state.start)
-				: (state.start ?? oldStart);
-			if (borrowed && first === state.end) first = null;
-			let last = borrowed
-				? first === null
-					? null
-					: state.end === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: domNode(state.end).previousSibling
-				: liveEnd;
-			if (body === null) {
-				// A deletion has no candidate to render. Retain any durable slot pair
-				// and retire only its old content after root success; rollback then
-				// restores metadata without detaching the focused outgoing subtree.
-				if (state.start !== null) {
-					first = getNextSibling(state.start);
-					if (first === state.end) first = null;
-					last = first === null ? null : domNode(state.end!).previousSibling;
-				} else {
-					const after = last === null ? state.anchor : getNextSibling(last);
-					if (sharesBlockBoundary(parentBlock, oldStart, oldEnd)) {
-						const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-						const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(
-							'/' + marker,
-						);
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, after);
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, after);
-						state.start = start;
-						state.end = end;
-						state.borrowed = false;
-						replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, start, end);
-					} else {
-						state.anchor = after;
-						state.end = null;
-					}
-				}
-				state.block = null;
-				state.lite = null;
-				state.branch = next;
-				queueSlotDeletion(state, (oldBlock ?? oldLite)!, first, last);
-				return;
-			}
-			const stageAfter = first === null ? (borrowed ? state.start : null) : last;
-			if (
-				stageAfter !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(stageAfter) : stageAfter).parentNode === domParent
-			) {
-				// Render the genuine new arm once beside the still-connected old
-				// content. Borrowed parent pairs stay in place; owned/self-marked
-				// ranges adopt the incoming pair and update their exact borrowers.
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-					__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
-				const r = renderOffscreen(
-					parentBlock,
-					domParent,
-					stageAfter,
-					body,
-					undefined,
-					null,
-					'control-flow',
-					env,
-					false,
-					undefined,
-					parentBlock.idState.renderOwner?.signalOwner === undefined
-						? undefined
-						: {
-								parent: parentScope,
-								slot: slotKey,
-								kind: state.__kind,
-								branch: next,
-								component: undefined,
-								key: undefined,
-							},
-				);
-				if (r.suspended || r.failed) {
-					disposeWip(r.wip);
-					if (r.suspended !== null) throw new SuspenseException(r.suspended);
-					throw r.error;
-				}
-				domNode(r.wip.start).data = marker;
-				domNode(r.wip.end).data = '/' + marker;
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.borrowed = false;
-				state.block = r.wip.block;
-				state.lite = null;
-				state.branch = next;
-				if (!borrowed) {
-					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, r.wip.start, r.wip.end);
-				}
-				// The slot now owns this pair. Undo ownership before created-block
-				// disposal so a failed root also removes the speculative comments.
-				journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
-				r.wip.block.exclusiveMarkers = true;
-				spliceWipCapture(r.wip);
-				queueSlotDeletion(state, (oldBlock ?? oldLite)!, first, last);
-				return;
-			}
-		}
-		// Off-screen swap (React WIP model): when a transition or committed Suspense
-		// primary swaps to a new branch that may suspend, render it off-screen FIRST
-		// without tearing down the old branch. If it
-		// suspends, dispose + route to the enclosing tryBlock so its transition hold keeps
-		// the old branch on screen and resumes — the resume re-renders the try body, which
-		// re-drives this swap. On completion we COMMIT the WIP (no double render): the off-
-		// screen block owns a `<!--wip-->`/`<!--/wip-->` pair which we adopt as the slot's
-		// durable markers (renamed in place — descendant slots may anchor on `wip.end`, so
-		// it must survive) and mark exclusiveMarkers=true so the NEXT swap's marker path
-		// finds them still attached after its own unmountBlock. Hydration, an urgent swap
-		// outside committed Suspense, and a swap TO an empty branch (body === null), keep
-		// the legacy in-place path below.
-		if (
-			transitionSwap !== null &&
-			state.block !== null &&
-			body !== null &&
-			hydration === null &&
-			(transitionMode || suspenseSwap)
-		) {
-			// Commit path requires a live branch boundary: renderOffscreen
-			// inserts the wip pair AFTER its reference node, which matches "right after the
-			// old end marker" — but in the anchor regime the legacy path mounts BEFORE the
-			// anchor, so committing there would land the branch on the wrong side of the
-			// anchor's trailing static siblings. Anchor-regime swaps keep the legacy
-			// in-place path below.
-			if (liveEnd !== null) {
-				const oldBlock = state.block;
-				const oldBlockStart = oldBlock.startMarker;
-				const oldBlockEnd = oldBlock.endMarker;
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-					__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
-				const r = transitionSwap.render(
-					parentBlock,
-					domParent,
-					liveEnd,
-					body,
-					undefined,
-					null,
-					'control-flow',
-					env,
-					false,
-					undefined,
-					parentBlock.idState.renderOwner?.signalOwner === undefined
-						? undefined
-						: {
-								parent: parentScope,
-								slot: slotKey,
-								kind: state.__kind,
-								branch: next,
-								component: undefined,
-								key: undefined,
-							},
-				);
-				if (r.suspended || r.failed) {
-					transitionSwap.dispose(r.wip);
-					if (r.failed) throw r.error;
-					throw new SuspenseException(r.suspended);
-				}
-				// A hydration-compacted branch borrows a pair that still belongs to
-				// its parent (and possibly several outer wrapper states). Probe for
-				// suspension off-screen, then discard and use the in-place path below;
-				// adopting the WIP pair would strand every outer owner on removed
-				// comments. This mirrors componentSlot's inherited transition path.
-				if (state.borrowed) {
-					transitionSwap.dispose(r.wip);
-				} else {
-					domNode(r.wip.start).data = marker;
-					domNode(r.wip.end).data = '/' + marker;
-					// Tear down the old branch. A borrowed-marker branch (exclusiveMarkers=true)
-					// keeps oldStart/oldEnd; a self-marked branch removes its element. The wip
-					// pair was inserted after `probeAfter` (state.end/anchor) and stays put.
-					const oldStart = state.start;
-					const oldEnd = state.end;
-					const oldBlock = state.block;
-					state.start = r.wip.start;
-					state.end = r.wip.end;
-					state.block = r.wip.block;
-					state.branch = next;
-					replaceSharedBlockBoundary(
-						parentBlock,
-						oldBlockStart,
-						oldBlockEnd,
-						r.wip.start,
-						r.wip.end,
-					);
-					// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
-					r.wip.block.exclusiveMarkers = true;
-					transitionSwap.splice(r.wip);
-					// Publish the completed incoming arm before old-tree cleanups can run user
-					// code. A reentrant owning-root unmount can now discover and dispose the
-					// WIP instead of letting this path resurrect it afterward.
-					unmountBlock(oldBlock);
-					// Orphaned old slot markers (borrowed regime) — nothing references them once
-					// the old block is dead; remove so only the adopted wip pair bounds the slot.
-					if (oldStart !== null) {
-						(STAGED_DOM ? STAGED_DOM.view(oldStart) : oldStart).remove();
-						(STAGED_DOM
-							? STAGED_DOM.view(oldEnd as ChildNode | null)
-							: (oldEnd as ChildNode | null)
-						)?.remove();
-					}
-					if (
-						owningBlock(parentBlock).disposed ||
-						state.block !== r.wip.block ||
-						r.wip.block.disposed
-					)
-						return;
-					return;
-				}
-			}
-		}
 		// Position for the new branch: just after the current branch's trailing node,
 		// or the slot anchor on first mount. Captured BEFORE teardown (a self-marked
 		// branch's trailing node is removed by it).
