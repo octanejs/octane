@@ -4968,7 +4968,6 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 	const previousRollback = ROOT_RENDER_ROLLBACK;
 	ROOT_RENDER_ROLLBACK = true;
 	try {
-		dropRootOps(transaction, 0, 0);
 		const owner = transaction.owner.current;
 		if (owner !== null) rollbackTransitionJournal(0, owner);
 		else {
@@ -4983,6 +4982,8 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 			}
 			transaction.log.length = 0;
 		}
+		// After the replay, which can restore a bag's queued state.
+		dropRootOps(transaction, 0, 0);
 		// A Block discarded with its parent has no creation entry
 		// (createdInRootRender). Unmount any its parent's undo did not reach.
 		const created = transaction.created;
