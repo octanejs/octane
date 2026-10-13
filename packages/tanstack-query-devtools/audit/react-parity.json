@@ -220,7 +220,7 @@
     },
     {
       "path": "packages/tanstack-query-devtools/tests/conformance/production-switch.test.ts",
-      "sha256": "50bfcf6de469924ba95c1eafc2c00b4435c791259d58ed5c66a51ab3c75285c2",
+      "sha256": "44990301df8180b6aa49a7f101d861fa9d483e8fefaed65d431ce80725ddb737",
       "cases": [
         {
           "id": "conformance:tanstack-query-devtools-renders-nothing-outside-development",
