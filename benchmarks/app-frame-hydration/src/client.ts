@@ -114,8 +114,9 @@ export async function clickBeforeSettled(): Promise<boolean> {
 
 /**
  * Prove the hydration was a real adoption, then unmount: every server element
- * survives, a delegated click reaches a component and re-renders a native-read
- * arm, and unmount leaves no DOM behind.
+ * survives, a delegated click reaches a component and re-renders the arm that
+ * reads the store (natively, or through useSyncExternalStore in the plain
+ * twin, which subscribes in a passive effect), and unmount leaves no DOM behind.
  */
 export function verifyFrame(): FrameHydration {
 	if (active === null) throw new Error('No hydrated frame to verify.');
@@ -127,6 +128,7 @@ export function verifyFrame(): FrameHydration {
 		if (hydratedElements[index] !== serverElements[index]) replaced++;
 	}
 
+	drainPassiveEffects();
 	const search = container.querySelector<HTMLElement>('.sidebar-header-actions button');
 	if (search !== null) flushSync(() => search.click());
 	const opened = container.querySelector('.search-dialog') !== null;

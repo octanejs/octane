@@ -491,8 +491,8 @@ All emitted JS counts, including the lazy page. Both rows use the same
 production Oxc settings as every comparative app. The byte deltas are reported
 in pull request benchmarks and have no pass/fail budget.
 
-`bundle-reachability` builds twenty-five independent public-entry feature fixtures
-across thirty-three production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-nine independent public-entry feature fixtures
+across thirty-eight production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's
 `'oxc'` and esbuild's `minify: true`. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
@@ -511,6 +511,17 @@ click handlers remain live. The `octane/behavior` fixture adopts existing DOM,
 registers an externally owned range, handles a native click, and disposes its
 owners and handlers while preserving the original nodes. Both production builds
 reject renderer, compiler, and server modules.
+
+The `split-shell` fixture ships the way a production Rolldown and oxc application
+does: ESM chunks whose `codeSplitting` groups put Octane's signal engine and the
+rest of the octane package in chunks of their own. Its client hydrates a
+server-rendered shell through a dynamic import after activating a renderer-free
+behavior island, with native signal reads, a `<Hydrate when={visible()}>`
+boundary, a lazy route behind `useTransition`, `@try` over `use()`, a portal, and
+a keyed list. It reports the whole application and each group's chunk, rejects
+Octane modules in application chunks, and checks through the source map that
+the runtime chunk drops the unused ViewTransition and Activity drivers. Its
+chunks run in jsdom linked into one script, unminified and untreeshaken.
 
 The generated SPA scenario loads the actual CLI entry and complete landing-page
 templates without maintaining duplicate fixture sources; its compiled bundle
