@@ -30300,18 +30300,13 @@ export function bagRecordEvent(
 	committed: unknown,
 	el: Element,
 ): any[] | null {
+	// setEventHandler(el) publishes only the authority, and only when it moved.
 	if (
-		(SIGNAL_BINDINGS_ENABLED ||
-			signalDocumentEnabled ||
-			activeSynchronousSignalOwner !== null ||
-			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS_RECORDED) &&
-		(activeSynchronousSignalOwner !== null ||
-			activeSignalOwnerEnvironment !== undefined ||
-			STAGED_COMMIT_CAPTURE ||
-			signalDocumentEnabled ||
-			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			(el as any).$$signalOwner !== CURRENT_SCOPE)
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		activeSynchronousSignalOwner !== null ||
+		activeSignalOwnerEnvironment !== undefined ||
+		SIGNAL_EVENT_OWNERS_RECORDED
 	)
 		setEventHandler(el);
 	return bagRecord(bag, next, cell, value, committed);
