@@ -1,5 +1,6 @@
 ---
 'octane': patch
+'@octanejs/mcp-server': patch
 ---
 
 Keep Strong-mode ref arrays and immutable object/array props stable when their

@@ -504,7 +504,7 @@ Enable it per module with `"use strong"` before the imports; comments, other dir
 
 In a Strong module:
 
-- `useMemo` and `useCallback` are errors (`OCTANE_STRONG_MANUAL_MEMO`). Write plain `const` calculations and callbacks; the compiler caches eligible ones from their inferred inputs.
+- `useMemo` and `useCallback` may control their own dependencies. Explicit lists are preserved, omitted lists are inferred, and `null` recomputes on every render. The compiler also caches eligible plain `const` calculations and callbacks automatically.
 - Omit dependency arrays. An explicit array that differs from the inferred inputs, or cannot be proven equivalent, is an error; an equivalent array is a hint that never fails a build (`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`). `null` dependencies are an error (`OCTANE_STRONG_UNTRACKED_EFFECT`).
 - Render never reads or writes `ref.current` (`OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE`). Create a value once with `useLazyRef(() => create())` instead of `if (ref.current === null) ref.current = create()`.
 - Effect setup never updates state synchronously (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). Render a DOM measurement from `useLayoutSnapshot(measure, { initial })` instead of setting state in a layout effect, and use `useLinkedState` when state follows a prop.
@@ -613,7 +613,7 @@ See the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 - `useImperativeHandle` infers dependencies from its handle factory when the third argument is omitted; ref identity is still tracked separately.
 - An explicit array is authoritative. `[]` retains mount/reconnect-only or stable-value behavior, `[a, b]` tracks exactly those values, and `null` opts into every-render/recompute behavior.
 - In production compiles, eligible `useMemo`/`useCallback` declarations become inline caches (no per-render closure or deps-array allocation). This is transparent — identical semantics, including `Object.is` dependency compares.
-- These rules describe compatibility mode, the default. A Strong module rejects `useMemo`/`useCallback` (`OCTANE_STRONG_MANUAL_MEMO`), `null` dependencies, and explicit arrays that differ from the inferred inputs; see Strong mode above.
+- These rules also apply to `useMemo` and `useCallback` in Strong mode. Strong effects reject `null` dependencies and explicit arrays that differ from the inferred inputs; see Strong mode above.
 
 ## Async data with use()
 

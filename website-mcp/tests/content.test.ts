@@ -144,7 +144,6 @@ describe('llms text', () => {
 				'useEffectEvent',
 				'useLazyRef',
 				'useLayoutSnapshot',
-				'OCTANE_STRONG_MANUAL_MEMO',
 				'OCTANE_STRONG_RENDER_REF_READ',
 				'--strong-preview',
 				'--fix',
