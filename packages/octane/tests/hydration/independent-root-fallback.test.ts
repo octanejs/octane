@@ -4,7 +4,7 @@ import {
 	bootstrapIndependentHydration,
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
-import { HYDRATE_INDEPENDENT_ATTR } from '../../src/hydration-markers.js';
+import { HYDRATE_INDEPENDENT_ATTR } from '../../src/hydration-protocol.js';
 import { flushSync, hasPendingWork, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { evaluateCompiledFixtureCode, loadCompiledFixtureSource } from '../_server-fixture.js';

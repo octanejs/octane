@@ -35,21 +35,14 @@ import type {
 	LayoutSnapshotOptions,
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
-import {
-	BINDING_OPEN_TAIL_SOURCE,
-	bindingRootMarker,
-	encodeBindingKey,
-	isBindingOpenComment,
-	type BindingKey,
-} from './dom-binding-protocol.js';
+import { bindingRootMarker, encodeBindingKey, type BindingKey } from './dom-binding-protocol.js';
 import {
 	CLIENT_ERROR_ARM_COMMENT,
 	CLIENT_RENDER_ARM_COMMENT,
 	formatUseId,
-	HYDRATION_FOR_EMPTY,
-	HYDRATION_FOR_ITEMS,
-	HYDRATION_START,
-} from './hydration-markers.js';
+	isRangeOpen,
+	RANGE_OPEN_SOURCE,
+} from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
 	// Children-block tagging shares the client's key so identity holds across
@@ -2380,9 +2373,7 @@ export function ssrBindingChild(value: unknown, scope: SSRScope, marker: string)
 	const openingEnd = html.indexOf('-->');
 	const framed =
 		html.startsWith(BLOCK_OPEN) ||
-		(html.startsWith('<!--') &&
-			openingEnd !== -1 &&
-			isBindingOpenComment(html.slice(4, openingEnd)));
+		(html.startsWith('<!--') && openingEnd !== -1 && isRangeOpen(html.slice(4, openingEnd)));
 	const content =
 		framed && html.endsWith(BLOCK_CLOSE) ? html.slice(openingEnd + 3, -BLOCK_CLOSE.length) : html;
 	return ssrBindingBlock(content, marker);
@@ -10968,19 +10959,12 @@ let STREAM_RUNTIME_JS: string | undefined;
 function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
 		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
-		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
-		// for safe integer N >= 2. An open may also carry an @for arm or a
-		// presentation-binding receipt, each closed by a plain `]`; a fallback
-		// that renders a list directly must count those opens too. Keep this in
-		// sync with hydrationMarkerMultiplicity.
-		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
-		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s||c==="["&&/^(' +
-		HYDRATION_FOR_EMPTY.slice(HYDRATION_START.length) +
-		'|' +
-		HYDRATION_FOR_ITEMS.slice(HYDRATION_START.length) +
-		'|' +
-		BINDING_OPEN_TAIL_SOURCE +
-		')$/.test(s);};' +
+		// The range grammar (hydration-protocol.ts): `]` closes, and isRangeOpen
+		// as RANGE_OPEN_SOURCE opens, including the @for, binding and boundary
+		// kinds a fallback can render directly.
+		'var M=function(v,c){return c==="]"?v===c:/' +
+		RANGE_OPEN_SOURCE +
+		'/.test(v)};' +
 		// Share parser/range rules with the optional driver; the base swap owns
 		// transport even when animation prepares its carrier before insertion.
 		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +

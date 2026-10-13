@@ -64,8 +64,6 @@ import {
 	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
-	HYDRATION_FOR_EMPTY,
-	HYDRATION_FOR_ITEMS,
 	HYDRATION_TEXT_SEP,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_ATTR_PROPS,
@@ -221,14 +219,16 @@ import {
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
-import { bindingRootMarker, isForBindingOpenComment } from './dom-binding-protocol.js';
+import { bindingRootMarker } from './dom-binding-protocol.js';
 import {
 	CLIENT_ERROR_ARM_COMMENT,
 	CLIENT_RENDER_ARM_COMMENT,
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
+	HYDRATION_FOR_PREFIX,
 	HYDRATE_MARKER_SELECTOR,
-} from './hydration-markers.js';
+	isRangeOpen,
+} from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
 	CHILDREN_BLOCK_TAG as CHILDREN_BLOCK,
@@ -245,7 +245,6 @@ import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { snapshotSignalValue } from './data-encoding.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
-	hydrationMarkerMultiplicity,
 	isRendererStreamBoundaryTemplate,
 	isRendererStreamToken,
 	rendererRangeClose,
@@ -25275,18 +25274,22 @@ export function setBindingClassIfChanged(
 // navigation stays behind methods that client-only builds discard.
 // ---------------------------------------------------------------------------
 
-/** True if `node` is a legacy or counted block-open marker. */
+/** True if `node` opens a hydration range (hydration-protocol.ts). */
 function isBlockOpen(node: Node | null): node is Comment {
-	if (node === null || node.nodeType !== 8) return false;
-	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
-	return hydrationMarkerMultiplicity(data, true) > 0;
+	return (
+		node !== null &&
+		node.nodeType === 8 &&
+		isRangeOpen((STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data)
+	);
 }
 
-/** True if `node` is a legacy or counted block-close marker. */
+/** True if `node` closes a hydration range. */
 function isBlockClose(node: Node | null): node is Comment {
-	if (node === null || node.nodeType !== 8) return false;
-	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
-	return data === HYDRATION_END || hydrationMarkerMultiplicity(data, false) > 1;
+	return (
+		node !== null &&
+		node.nodeType === 8 &&
+		(STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data === HYDRATION_END
+	);
 }
 
 /**
@@ -25339,24 +25342,14 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 	while (node !== null) {
 		if (node.nodeType === 8) {
 			const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
-			let close = data === HYDRATION_END;
-			let nestedOpen = data === HYDRATION_START;
-			if (!close && !nestedOpen && data.length > 1) {
-				const first = data.charCodeAt(0);
-				if (first === HYDRATION_END.charCodeAt(0)) {
-					close = hydrationMarkerMultiplicity(data, false) > 0;
-				} else if (first === HYDRATION_START.charCodeAt(0)) {
-					nestedOpen = hydrationMarkerMultiplicity(data, true) > 0;
-				}
-			}
-			if (close) {
+			if (data === HYDRATION_END) {
 				const found = node as Comment;
 				if (nested === null || nested.length === 0) {
 					matches.set(open, found);
 					return found;
 				}
 				matches.set(nested.pop()!, found);
-			} else if (nestedOpen) {
+			} else if (isRangeOpen(data)) {
 				(nested ??= []).push(node as Comment);
 			}
 		}
@@ -25416,17 +25409,12 @@ class DeferredHydrationSuspension extends NativeAdoptionMiss {
 	}
 }
 
-/** -1 = legacy/general marker, 0 = server @empty, 1 = server items. */
+/** -1 = not an @for open, 0 = server @empty, 1 = server items (a binding view's too). */
 function ssrForMarkerState(node: Node): -1 | 0 | 1 {
 	if (node.nodeType !== 8) return -1;
 	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
-	if (data === HYDRATION_FOR_EMPTY) return 0;
-	if (data === HYDRATION_FOR_ITEMS) return 1;
-	return isForBindingOpenComment(data)
-		? data.charCodeAt(HYDRATION_FOR_ARM_INDEX) === 48
-			? 0
-			: 1
-		: -1;
+	if (!data.startsWith(HYDRATION_FOR_PREFIX) || !isRangeOpen(data)) return -1;
+	return data.charCodeAt(HYDRATION_FOR_ARM_INDEX) === 48 ? 0 : 1;
 }
 
 /** Logical index-0 child: `node.firstChild` for both client and hydration. */

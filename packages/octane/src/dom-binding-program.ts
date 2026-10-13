@@ -27,7 +27,7 @@ import {
 	NATIVE_SIGNAL_FRESH_COMMENT,
 	STREAM_SEED_COMMENT,
 	SUSPENSE_RESOLVED_COMMENT,
-} from './hydration-markers.js';
+} from './hydration-protocol.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { rendererRangeClose, STREAM_BOUNDARY_ATTR } from './stream-protocol.js';
 import {
