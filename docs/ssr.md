@@ -547,6 +547,11 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
   Suspense or `<Hydrate>` boundary around it, or else the root, renders on the
   client instead of adopting the server HTML, and `onRecoverableError` reports
   it once (error #338). Keep comments when minifying server-rendered HTML.
+- The server and the client must use the same version of these markers. The
+  seed script names the version the server wrote, and a root whose server used
+  another version renders on the client instead of adopting the server HTML,
+  reporting it once through `onRecoverableError` (error #345). Deploy the server
+  and client bundles from the same Octane version.
 - `<Activity mode="visible">` renders its children normally. A hidden Activity
   does not evaluate or serialize its children on the server; hydratable output
   retains only an empty internal range so `hydrateRoot` can build the preserved
