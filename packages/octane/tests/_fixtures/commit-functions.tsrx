@@ -1,4 +1,4 @@
-import { memo, startTransition, use, useState } from 'octane';
+import { createElement, memo, startTransition, use, useState } from 'octane';
 
 function Wait(props: { wait: Promise<unknown> }) @{
 	use(props.wait);
@@ -25,6 +25,33 @@ export function Held(props: {
 			<Wait wait={props.wait} />
 		}
 	</section>
+}
+
+// A spread carrying attributes, a handler, a ref and the host's children,
+// beside the same root-suspending gate.
+export function HeldSpread(props: {
+	attrs: Record<string, unknown>;
+	wait: Promise<unknown> | null;
+}) @{
+	<section>
+		<button id="spread" {...props.attrs} />
+		@if (props.wait) {
+			<Wait wait={props.wait} />
+		}
+	</section>
+}
+
+// The same props on a descriptor host.
+export function HeldDescriptor(props: {
+	attrs: Record<string, unknown>;
+	wait: Promise<unknown> | null;
+}) {
+	return createElement(
+		'section',
+		null,
+		createElement('button', { id: 'descriptor', ...props.attrs }),
+		props.wait ? createElement(Wait, { wait: props.wait }) : null,
+	);
 }
 
 const MemoLabel = memo(function MemoLabel(props: { label: string }) @{

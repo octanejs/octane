@@ -822,12 +822,18 @@ describe('native reads in use() creations', () => {
 		expect(conditionalStarts).toEqual([]);
 		expect(conditional.html).toContain('hidden');
 		for (const View of [server.ParallelErrors, server.ParallelJsxErrors]) {
+			// The source-order first rejection wins even when a later one settles
+			// first. As in React, the server reports it rather than rendering the
+			// catch arm, and ships the pending fallback for a client render.
 			const firstError = deferred<string>();
 			const secondError = deferred<string>();
 			let completed = false;
-			const errors = prerender(View, {
-				load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
-			});
+			const onError = vi.fn();
+			const errors = prerender(
+				View,
+				{ load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise) },
+				{ onError },
+			);
 			void errors.then(() => {
 				completed = true;
 			});
@@ -836,17 +842,29 @@ describe('native reads in use() creations', () => {
 			await drain();
 			expect(completed).toBe(false);
 			firstError.reject(new Error('first error'));
-			expect((await errors).html).toContain('first error');
-			expect((await errors).html).not.toContain('later error');
+			const html = (await errors).html;
+			expect(html).toContain('class="pending"');
+			expect(html).not.toContain('first error');
+			expect(html).not.toContain('later error');
+			expect(onError).toHaveBeenCalledTimes(1);
+			expect(onError.mock.calls[0][0]).toMatchObject({ message: 'first error' });
 			const failedStarts: string[] = [];
-			const failed = await prerender(View, {
-				load: (key: string) => {
-					failedStarts.push(key);
-					throw new Error('synchronous first error');
+			const failedOnError = vi.fn();
+			const failed = await prerender(
+				View,
+				{
+					load: (key: string) => {
+						failedStarts.push(key);
+						throw new Error('synchronous first error');
+					},
 				},
-			});
+				{ onError: failedOnError },
+			);
 			expect(failedStarts).toEqual(['first']);
-			expect(failed.html).toContain('synchronous first error');
+			expect(failed.html).toContain('class="pending"');
+			expect(failed.html).not.toContain('synchronous first error');
+			expect(failedOnError).toHaveBeenCalledTimes(1);
+			expect(failedOnError.mock.calls[0][0]).toMatchObject({ message: 'synchronous first error' });
 		}
 	});
 
