@@ -21,6 +21,15 @@ scenario renders the same frame with two section roots, the sidebar and the
 composer, reading a signal themselves. Releasing the adopted server values after
 the hydration commit then re-renders those whole sections in the same task.
 
+The `frame-plain` scenario is the same frame with no `octane/signals` import
+anywhere, so nothing compiles with native reads. Its build stands
+`src/plain/store.ts` in for the signals entry and swaps each module that reads a
+signal for its copy in `src/plain/`, which reads the same store through
+`useSyncExternalStore`. The run fails if the twin's server HTML differs from
+`frame`'s, less the native seed script, and reports the paired `frame/frame-plain`
+ratio: what native reads cost a frame that barely reads a signal. A change to a
+signal-reading module belongs in its `src/plain/` copy too.
+
 ## Operations
 
 - `hydrate_cold`: a fresh browser context per sample, so no JIT state or
@@ -30,8 +39,8 @@ the hydration commit then re-renders those whole sections in the same task.
   long-lived page, after four warmups, under the same throttle.
 
 Every sample verifies that hydration adopts every server element, raises no
-recoverable error, delivers a delegated click that re-renders a native-read
-arm, and unmounts cleanly.
+recoverable error, delivers a delegated click that re-renders the arm reading
+the store, and unmounts cleanly.
 
 ## Counters
 
@@ -46,6 +55,7 @@ Each row's `meta` records:
 - Signal-owner calls.
 - `productionCalls`: all production calls.
 - `heapBytes`: JS heap bytes allocated by hydration.
+- `clientBytes` and `clientGzipBytes`: the minified client bundle.
 
 ## Running
 
@@ -65,5 +75,6 @@ The base checkout needs its own dependencies or links to these. The fixture and
 harness come from this checkout. The base build compiles them with that
 checkout's `packages/octane` runtime and compiler and server-renders its own
 HTML, and the run notes when the two candidates' HTML differs. Each scenario
-then reports the median head/base ratio with a bootstrap 95% interval.
+then reports the median head/base ratio with a bootstrap 95% interval, as does
+each candidate's `frame/frame-plain` ratio.
 `--throttle=<rate>`, `--warm-reps=<n>` and `--scenarios=<a,b>` adjust the run.
