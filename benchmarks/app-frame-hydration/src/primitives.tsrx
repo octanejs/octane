@@ -1,7 +1,7 @@
-import { useCallback, useContext, useId, useState, type OctaneNode } from 'octane';
+import { useCallback, useContext, useId, useLayoutEffect, useState, type OctaneNode } from 'octane';
 import 'octane/signals';
 import type { WritableSignal } from 'octane/signals';
-import { StringsContext } from './state';
+import { settledBoundary, StringsContext } from './state';
 
 // Small wrappers in the shape of a design system: almost every one forwards an
 // optional `style` prop that callers leave undefined.
@@ -118,4 +118,10 @@ export function Disclosure(props: { open$: WritableSignal<boolean>; children?: O
 			<div class="disclosure-body">{props.children}</div>
 		}
 	</div>
+}
+
+/** Counts one Suspense boundary's commit, for the `frame-boundaries` scenario. */
+export function Settled() {
+	useLayoutEffect(() => settledBoundary(), []);
+	return null;
 }

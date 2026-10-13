@@ -6,7 +6,9 @@
 // HTML on fresh pages under CPU throttling. Optional `--base=<checkout>` builds
 // the same fixture against another checkout's runtime and compiler and
 // interleaves its samples with this checkout's in every round, reporting the
-// paired head/base ratio with a bootstrap 95% interval.
+// paired head/base ratio with a bootstrap 95% interval. Each cold sample is
+// traced until every Suspense boundary has hydrated, which can take later host
+// tasks, for the longest main-thread task and the busy total.
 //
 // `frame-plain` builds the same frame with no octane/signals import anywhere
 // (see plainTwin), so its paired ratio against `frame` tracks what native
@@ -14,7 +16,7 @@
 //
 //   node benchmarks/app-frame-hydration/run.mjs [rounds] [--base=<checkout>]
 //        [--throttle=4] [--warm-reps=<n>]
-//        [--scenarios=frame,frame-live-sections,frame-plain]
+//        [--scenarios=frame,frame-live-sections,frame-plain,frame-boundaries]
 process.env.NODE_ENV = 'production';
 
 import fs from 'node:fs';
@@ -45,9 +47,14 @@ const flags = new Map(
 const rounds = Number.parseInt(positional[0] ?? '20', 10);
 const throttle = Number(flags.get('throttle') ?? '4');
 const warmReps = Number.parseInt(flags.get('warm-reps') ?? '1', 10);
-const scenarios = (flags.get('scenarios') ?? 'frame,frame-live-sections,frame-plain').split(',');
+const scenarios = (
+	flags.get('scenarios') ?? 'frame,frame-live-sections,frame-plain,frame-boundaries'
+).split(',');
 const baseCheckout = flags.has('base') ? path.resolve(flags.get('base')) : null;
 const WARMUPS = 4;
+// Cold samples report the hydrateRoot task and, from their trace, the longest
+// main-thread task and the busy total until every Suspense boundary hydrated.
+const OPS = ['hydrate_cold', 'hydrate_warm', 'longest_task_cold', 'busy_cold'];
 
 if (!Number.isSafeInteger(rounds) || rounds < 1)
 	throw new Error('rounds must be a positive integer');
@@ -258,14 +265,89 @@ async function prepare(session, scenario) {
 	);
 }
 
-async function hydrateOnce(session, scenario) {
+async function hydrateOnce(session, scenario, browser) {
 	await prepare(session, scenario);
 	await session.page.evaluate(() => globalThis.gc?.());
-	const durationMs = await session.page.evaluate(() => window.AppFrameHydration.hydrateFrame());
+	if (browser !== undefined) {
+		await browser.startTracing(session.page, { categories: TRACE_CATEGORIES });
+		// Let tracing reach the renderer before the measured task starts.
+		await session.page.evaluate(
+			() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve))),
+		);
+	}
+	const durationMs = await session.page.evaluate(() =>
+		window.AppFrameHydration.hydrateFrameSettled(),
+	);
+	const tasks = browser === undefined ? undefined : tasksFromTrace(await browser.stopTracing());
 	const outcome = await session.page.evaluate(() => window.AppFrameHydration.verifyFrame());
 	assertVerified(session.url, outcome);
 	if (session.errors.length !== 0) throw new Error(session.errors.join('\n'));
-	return { durationMs, elements: outcome.elements };
+	return { durationMs, elements: outcome.elements, ...tasks };
+}
+
+const TRACE_CATEGORIES = ['toplevel', 'devtools.timeline', 'blink.user_timing'];
+
+/**
+ * The main-thread tasks between the hydrate-start and hydrate-settled marks:
+ * the longest one and their total. A task is an outermost complete event on
+ * the marks' thread, usually RunTask; a task that tracing joined after it was
+ * dispatched has no RunTask event, only its inner one. The microtask
+ * checkpoint after a task is recorded beside it and counts as part of it.
+ */
+function tasksFromTrace(buffer) {
+	const parsed = JSON.parse(buffer.toString('utf8'));
+	const events = parsed.traceEvents ?? parsed;
+	const mark = (name) =>
+		events.find((event) => event.name === name && event.cat?.includes('blink.user_timing'));
+	const start = mark('hydrate-start');
+	const end = mark('hydrate-settled');
+	if (start === undefined || end === undefined)
+		throw new Error('The trace is missing the hydration marks.');
+	const tasks = events
+		.filter(
+			(event) =>
+				event.ph === 'X' &&
+				event.pid === start.pid &&
+				event.tid === start.tid &&
+				event.ts + event.dur > start.ts &&
+				event.ts < end.ts,
+		)
+		.sort((a, b) => a.ts - b.ts || b.dur - a.dur);
+	const durations = [];
+	let outerEnd = -Infinity;
+	for (const task of tasks) {
+		if (task.ts + task.dur <= outerEnd) continue;
+		outerEnd = task.ts + task.dur;
+		if (task.name === 'BlinkScheduler_PerformMicrotaskCheckpoint' && durations.length !== 0)
+			durations[durations.length - 1] += task.dur / 1000;
+		else durations.push(task.dur / 1000);
+	}
+	if (durations.length === 0)
+		throw new Error('The trace has no main-thread task between the hydration marks.');
+	return {
+		tasks: durations.length,
+		longestTaskMs: Math.max(...durations),
+		busyMs: durations.reduce((sum, duration) => sum + duration, 0),
+	};
+}
+
+/**
+ * A click on the first collapsible sidebar section right after hydrateRoot
+ * returns, before any later task runs, must still collapse it.
+ */
+async function verifyEarlyClick(browser, origin, candidate, scenario) {
+	const session = await openPage(browser, `${origin}/${candidate.name}/${scenario}`);
+	try {
+		await loadPage(session);
+		await prepare(session, scenario);
+		const collapsed = await session.page.evaluate(() =>
+			window.AppFrameHydration.clickBeforeSettled(),
+		);
+		if (!collapsed) throw new Error(`${session.url} lost a click made before hydration settled`);
+		if (session.errors.length !== 0) throw new Error(session.errors.join('\n'));
+	} finally {
+		await session.context.close();
+	}
 }
 
 async function resetFrame(session) {
@@ -276,13 +358,20 @@ async function resetFrame(session) {
 
 /** One cold hydration: a fresh browser context, so no JIT state or feedback survives. */
 async function coldSample(browser, origin, candidate, scenario) {
-	const session = await openPage(browser, `${origin}/${candidate.name}/${scenario}`);
-	try {
-		await session.cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
-		await loadPage(session);
-		return await hydrateOnce(session, scenario);
-	} finally {
-		await session.context.close();
+	// Chromium occasionally drops a long task from the trace. That trace's
+	// longest task is shorter than the hydrateRoot call alone, and it reruns.
+	for (let attempt = 1; ; attempt++) {
+		const session = await openPage(browser, `${origin}/${candidate.name}/${scenario}`);
+		let sample;
+		try {
+			await session.cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
+			await loadPage(session);
+			sample = await hydrateOnce(session, scenario, browser);
+		} finally {
+			await session.context.close();
+		}
+		if (sample.longestTaskMs >= sample.durationMs) return sample;
+		if (attempt === 3) throw new Error(`${session.url}: the trace missed the hydrateRoot task`);
 	}
 }
 
@@ -308,7 +397,7 @@ async function countWork(browser, origin, candidate, scenario) {
 		await loadPage(session);
 		await prepare(session, scenario);
 		await session.cdp.send('Profiler.takePreciseCoverage');
-		await session.page.evaluate(() => window.AppFrameHydration.hydrateFrame());
+		await session.page.evaluate(() => window.AppFrameHydration.hydrateFrameSettled());
 		const coverage = await session.cdp.send('Profiler.takePreciseCoverage');
 		await session.page.evaluate(() => window.AppFrameHydration.verifyFrame());
 		await session.cdp.send('Profiler.stopPreciseCoverage');
@@ -328,7 +417,7 @@ async function countWork(browser, origin, candidate, scenario) {
 		await prepare(session, scenario);
 		await session.page.evaluate(() => globalThis.gc());
 		const before = await session.cdp.send('Runtime.getHeapUsage');
-		await session.page.evaluate(() => window.AppFrameHydration.hydrateFrame());
+		await session.page.evaluate(() => window.AppFrameHydration.hydrateFrameSettled());
 		const after = await session.cdp.send('Runtime.getHeapUsage');
 		assertVerified(
 			session.url,
@@ -339,6 +428,12 @@ async function countWork(browser, origin, candidate, scenario) {
 	} finally {
 		await session.context.close();
 	}
+}
+
+function median(values) {
+	const sorted = [...values].sort((a, b) => a - b);
+	const middle = sorted.length >> 1;
+	return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function errorText(error) {
@@ -373,13 +468,14 @@ try {
 		],
 	});
 
-	const cold = new Map();
-	const warm = new Map();
+	const samples = new Map();
 	const key = (candidate, scenario) => `${candidate.name}/${scenario}`;
 	for (const candidate of candidates) {
 		for (const scenario of scenarios) {
-			cold.set(key(candidate, scenario), []);
-			warm.set(key(candidate, scenario), []);
+			samples.set(key(candidate, scenario), {
+				...Object.fromEntries(OPS.map((op) => [op, []])),
+				tasks: [],
+			});
 		}
 	}
 
@@ -400,14 +496,21 @@ try {
 	}
 	// One discarded cold sample per pair primes the browser's process pool.
 	for (const candidate of candidates)
-		for (const scenario of scenarios) await coldSample(browser, pages.origin, candidate, scenario);
+		for (const scenario of scenarios) {
+			await coldSample(browser, pages.origin, candidate, scenario);
+			await verifyEarlyClick(browser, pages.origin, candidate, scenario);
+		}
 
 	const elements = new Map();
 	for (let round = 0; round < rounds; round++) {
 		for (const scenario of roundOrder(scenarios, round)) {
 			for (const candidate of roundOrder(candidates, round)) {
 				const sample = await coldSample(browser, pages.origin, candidate, scenario);
-				cold.get(key(candidate, scenario)).push(sample.durationMs);
+				const own = samples.get(key(candidate, scenario));
+				own.hydrate_cold.push(sample.durationMs);
+				own.longest_task_cold.push(sample.longestTaskMs);
+				own.busy_cold.push(sample.busyMs);
+				own.tasks.push(sample.tasks);
 				elements.set(key(candidate, scenario), sample.elements);
 				const session = warmPages.get(key(candidate, scenario));
 				let total = 0;
@@ -415,7 +518,7 @@ try {
 					total += (await hydrateOnce(session, scenario)).durationMs;
 					await resetFrame(session);
 				}
-				warm.get(key(candidate, scenario)).push(total / warmReps);
+				own.hydrate_warm.push(total / warmReps);
 			}
 		}
 	}
@@ -424,21 +527,20 @@ try {
 	for (const scenario of scenarios) {
 		for (const candidate of candidates) {
 			const work = await countWork(counterBrowser, pages.origin, candidate, scenario);
+			const own = samples.get(key(candidate, scenario));
 			const { client } = candidate.clients.get(fixtureOf(scenario).variant);
-			const coldStat = summarizeSamples(cold.get(key(candidate, scenario)));
-			const warmStat = summarizeSamples(warm.get(key(candidate, scenario)));
 			rows.push({
 				name: candidates.length === 1 ? scenario : `${scenario}@${candidate.name}`,
-				ops: {
-					hydrate_cold: timingStatForJson(coldStat),
-					hydrate_warm: timingStatForJson(warmStat),
-				},
+				ops: Object.fromEntries(
+					OPS.map((op) => [op, timingStatForJson(summarizeSamples(own[op]))]),
+				),
 				meta: {
 					correctness: 'pass',
 					browser: 'chromium',
 					browserVersion: browser.version(),
 					cpuThrottle: throttle,
 					elements: elements.get(key(candidate, scenario)),
+					tasks: median(own.tasks),
 					blocks: work.BlockImpl,
 					blockRenders: work.renderBlockInner,
 					renderBlockEntries: work.renderBlock,
@@ -458,14 +560,16 @@ try {
 		}
 		if (candidates.length === 2) {
 			const [base, head] = candidates;
-			for (const op of ['cold', 'warm']) {
-				const samples = op === 'cold' ? cold : warm;
+			for (const op of OPS) {
 				comparisons.push({
 					scenario,
-					op: `hydrate_${op}`,
+					op,
 					of: 'head/base',
 					serverHtmlIdentical: base.html.get(scenario) === head.html.get(scenario),
-					...pairedRatio(samples.get(key(base, scenario)), samples.get(key(head, scenario))),
+					...pairedRatio(
+						samples.get(key(base, scenario))[op],
+						samples.get(key(head, scenario))[op],
+					),
 				});
 			}
 		}
@@ -476,15 +580,14 @@ try {
 	for (const scenario of scenarios) {
 		if (!scenarios.includes(`${scenario}-plain`)) continue;
 		for (const candidate of candidates) {
-			for (const op of ['cold', 'warm']) {
-				const samples = op === 'cold' ? cold : warm;
+			for (const op of ['hydrate_cold', 'hydrate_warm']) {
 				comparisons.push({
 					scenario: candidates.length === 1 ? scenario : `${scenario}@${candidate.name}`,
-					op: `hydrate_${op}`,
+					op,
 					of: `${scenario}/${scenario}-plain`,
 					...pairedRatio(
-						samples.get(key(candidate, `${scenario}-plain`)),
-						samples.get(key(candidate, scenario)),
+						samples.get(key(candidate, `${scenario}-plain`))[op],
+						samples.get(key(candidate, scenario))[op],
 					),
 				});
 			}
@@ -495,7 +598,9 @@ try {
 		console.log(
 			`PASS app-frame-hydration/${row.name}: cold ${row.ops.hydrate_cold.score.toFixed(2)}ms ` +
 				`±${row.ops.hydrate_cold.rme.toFixed(1)}%, warm ${row.ops.hydrate_warm.score.toFixed(2)}ms ` +
-				`±${row.ops.hydrate_warm.rme.toFixed(1)}% (${row.meta.blocks} blocks, ` +
+				`±${row.ops.hydrate_warm.rme.toFixed(1)}%, longest task ` +
+				`${row.ops.longest_task_cold.score.toFixed(2)}ms, busy ` +
+				`${row.ops.busy_cold.score.toFixed(2)}ms over ${row.meta.tasks} tasks (${row.meta.blocks} blocks, ` +
 				`${row.meta.blockRenders} renders, ${row.meta.renderBlockEntries} renderBlock entries, ` +
 				`${row.meta.heapBytes} heap bytes, ${row.meta.clientGzipBytes} client gzip bytes)`,
 		);

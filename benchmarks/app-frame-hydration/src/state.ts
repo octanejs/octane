@@ -15,10 +15,45 @@ export const FRAME_PROPS = { activeId: 'chat-3', signedIn: false };
 // `frame` keeps native reads in leaf components, as the audited app frame does.
 // `frame-live-sections` reads in two section roots, so releasing the adopted
 // server values re-renders those whole sections after hydration commits.
+// `frame-boundaries` puts the frame's sections in 11 Suspense boundaries.
 export const SCENARIOS = {
 	frame: { liveSections: false },
 	'frame-live-sections': { liveSections: true },
+	'frame-boundaries': { liveSections: false },
 } as const;
+
+export const BOUNDARIES: Record<keyof typeof SCENARIOS, number> = {
+	frame: 0,
+	'frame-live-sections': 0,
+	'frame-boundaries': 11,
+};
+
+let settled = 0;
+let waiter: { count: number; resolve: () => void } | null = null;
+
+export function settledBoundary(): void {
+	settled++;
+	if (waiter !== null && settled >= waiter.count) {
+		const { resolve } = waiter;
+		waiter = null;
+		resolve();
+	}
+}
+
+/** Resolves once `count` boundaries have committed since the last call. */
+export function whenSettled(count: number): Promise<void> {
+	const done = settled >= count;
+	settled = done ? settled - count : settled;
+	if (done) return Promise.resolve();
+	return new Promise((resolve) => {
+		waiter = { count, resolve };
+	});
+}
+
+export function resetSettled(): void {
+	settled = 0;
+	waiter = null;
+}
 
 export type Scenario = keyof typeof SCENARIOS;
 

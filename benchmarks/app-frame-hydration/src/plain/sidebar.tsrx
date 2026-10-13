@@ -1,5 +1,5 @@
 import { useContext, useState, useSyncExternalStore } from 'octane';
-import { Badge, Button, Icon, IconButton, Link, Tooltip } from './primitives.tsrx';
+import { Badge, Button, Icon, IconButton, Link, Settled, Tooltip } from './primitives.tsrx';
 import { searchOpen$, sidebarOpen$, StringsContext, type NavEntry } from '../state';
 
 type Style = Record<string, string> | undefined;
@@ -131,5 +131,76 @@ export function Sidebar(props: {
 			</div>
 		}
 		<SidebarFooter />
+	</aside>
+}
+
+/** The sidebar with each section in its own Suspense boundary. */
+export function BoundedSidebar(props: {
+	projects: NavEntry[];
+	history: NavEntry[];
+	tools: NavEntry[];
+	activeId: string | null;
+}) @{
+	<aside class="sidebar" data-open="true">
+		@try {
+			<>
+				<SidebarHeader />
+				<Settled />
+			</>
+		} @pending {
+			<div class="pending" />
+		}
+		<div class="sidebar-body">
+			@try {
+				<>
+					<SidebarShortcuts />
+					<Settled />
+				</>
+			} @pending {
+				<div class="pending" />
+			}
+			@try {
+				<>
+					<NavSection
+						title="Projects"
+						entries={props.projects}
+						activeId={null}
+						collapsible={true}
+					/>
+					<Settled />
+				</>
+			} @pending {
+				<div class="pending" />
+			}
+			@try {
+				<>
+					<NavSection title="Tools" entries={props.tools} activeId={null} collapsible={true} />
+					<Settled />
+				</>
+			} @pending {
+				<div class="pending" />
+			}
+			@try {
+				<>
+					<NavSection
+						title="Chats"
+						entries={props.history}
+						activeId={props.activeId}
+						collapsible={false}
+					/>
+					<Settled />
+				</>
+			} @pending {
+				<div class="pending" />
+			}
+		</div>
+		@try {
+			<>
+				<SidebarFooter />
+				<Settled />
+			</>
+		} @pending {
+			<div class="pending" />
+		}
 	</aside>
 }
