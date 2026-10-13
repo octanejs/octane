@@ -1,5 +1,4 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { hydrationStarted } from '../hydration-flag.js';
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { ScopedNode } from './graph.js';
@@ -200,23 +199,27 @@ export interface NativeSerializedScope {
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;
 let nativeAdoptionResolver: NativeAdoptionResolver | null = null;
 
-// Hydration can precede the first signal module (a suspended root, lazy route
-// or dormant island). Retain the signal protocol independently of either
-// renderer. Only the signal engine supplies decoding and early edit capture.
-export interface NativeSignalHydration {
-	capture: typeof import('./native-read-seeds.js').captureInitialDocumentSignals;
-	parse: typeof import('./native-read-seeds.js').parseNativeSignalManifest;
-	materialize: typeof import('./native-read-seeds.js').materializeNativeSignalManifest;
-	create: typeof import('./native-read-seeds.js').createNativeAdoptionState;
-	start: typeof import('./early-values.js').installEarlyControlBridge;
+// Hydration and signals can load in either order. Record only availability
+// here: the signal engine must not make renderer seed decoding reachable.
+export let nativeSignalHydration = false;
+let signalDeclarationsEnabled = false;
+let earlySignalHydrationStarter: (() => void) | null = null;
+
+export function registerNativeSignalHydration(): void {
+	nativeSignalHydration = true;
 }
 
-export let nativeSignalHydration: NativeSignalHydration | null = null;
+/** Only declarations can consume pre-module edits when their cells are created. */
+export function registerEarlySignalHydration(): void {
+	signalDeclarationsEnabled = true;
+	// A subsequently loaded declaration module claims already queued native edits.
+	if (earlySignalHydrationStarter) earlySignalHydrationStarter();
+}
 
-export function registerNativeSignalHydration(driver: NativeSignalHydration): void {
-	nativeSignalHydration = driver;
-	// A subsequently loaded signal module must claim already queued native edits.
-	if (hydrationStarted) driver.start();
+/** Only a hydration entry can supply the control-capture bridge. */
+export function startEarlySignalHydration(start: () => void): void {
+	earlySignalHydrationStarter = start;
+	if (signalDeclarationsEnabled) start();
 }
 
 /**

@@ -284,6 +284,7 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	nativeProducerPublication,
 	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
+	startEarlySignalHydration,
 	readNativeDomStyle,
 	registerNativeActionResolver,
 	registerNativeReadRebase,
@@ -298,6 +299,10 @@ import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-rea
 import {
 	NATIVE_SIGNAL_SEED_ATTR,
 	NATIVE_SIGNAL_FRESH_COMMENT,
+	captureInitialDocumentSignals,
+	createNativeAdoptionState,
+	materializeNativeSignalManifest,
+	parseNativeSignalManifest,
 	type NativeAdoptionState,
 	type NativeSignalManifest,
 } from './signals/native-read-seeds.js';
@@ -325,6 +330,7 @@ export {
 import {
 	associateSignalOwnerDocument,
 	hasHydrationControlSignalWriter,
+	installEarlyControlBridge,
 	registerHydrationControlSignalWriter,
 } from './signals/early-values.js';
 import {
@@ -2078,8 +2084,8 @@ function ownNativeAdoption(
 		((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
 			?.scopeKey ?? 'octane:document';
 	let state: NativeAdoptionState | null | undefined = NATIVE_SIGNAL_HYDRATION
-		? NATIVE_SIGNAL_HYDRATION.create(
-				typeof manifest === 'string' ? NATIVE_SIGNAL_HYDRATION.parse(manifest) : manifest,
+		? createNativeAdoptionState(
+				typeof manifest === 'string' ? parseNativeSignalManifest(manifest) : manifest,
 				initial,
 				initialScopeKey,
 			)
@@ -2088,9 +2094,9 @@ function ownNativeAdoption(
 	// Delay only that case; loaded signal apps still validate before adopting.
 	const adoption: NativeAdoptionState = state ?? {
 		resolve(owner) {
-			if (state === null) return undefined;
-			state ??= NATIVE_SIGNAL_HYDRATION!.create(
-				typeof manifest === 'string' ? NATIVE_SIGNAL_HYDRATION!.parse(manifest) : manifest,
+			if (state === null || !NATIVE_SIGNAL_HYDRATION) return undefined;
+			state ??= createNativeAdoptionState(
+				typeof manifest === 'string' ? parseNativeSignalManifest(manifest) : manifest,
 				initial,
 				initialScopeKey,
 			);
@@ -43030,10 +43036,7 @@ function takeInitialSuspenseHydration(
 	};
 }
 
-function finishInitialSuspenseHydration(
-	initial: InitialSuspenseHydration,
-	hydration: HydrationCapability,
-): void {
+function finishInitialSuspenseHydration(initial: InitialSuspenseHydration): void {
 	for (const node of initial.metadata) (STAGED_DOM ? STAGED_DOM.view(node) : node).remove();
 	initial.consume?.();
 }
@@ -43222,7 +43225,7 @@ function renderInitialSuspenseHydration(
 		// its server metadata and ranges replayable until that capture commits.
 		(capture.renderCleanups ??= []).push((discarded) => {
 			if (discarded) return;
-			finishInitialSuspenseHydration(initial, hydration);
+			finishInitialSuspenseHydration(initial);
 		});
 		spliceOffscreenCapture(capture);
 		return;
@@ -43267,10 +43270,10 @@ function renderInitialSuspenseHydration(
 			adoptServerCatch ? initial.start : undefined,
 			adoptServerCatch ? initial.end : undefined,
 		);
-		if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial, hydration);
+		if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial);
 		else
 			(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
-				if (!discarded) finishInitialSuspenseHydration(initial, hydration);
+				if (!discarded) finishInitialSuspenseHydration(initial);
 			});
 	} finally {
 		swapHydration(outerHydration);
@@ -51896,7 +51899,7 @@ function hydrateRootWithOutputHandler(
 	assertValidRootContainer(container);
 	// Leases, presentations and streamed arms below outlive the adoption pass.
 	installHydrationDriver();
-	if (NATIVE_SIGNAL_HYDRATION) NATIVE_SIGNAL_HYDRATION.start();
+	startEarlySignalHydration(installEarlyControlBridge);
 	let body: ComponentBody;
 	let props: any;
 	let rootKey: any = null;
@@ -51967,7 +51970,7 @@ function hydrateRootWithOutputHandler(
 		rootOptions?.initialDocumentSignals === undefined
 			? undefined
 			: NATIVE_SIGNAL_HYDRATION
-				? NATIVE_SIGNAL_HYDRATION.capture(
+				? captureInitialDocumentSignals(
 						rootOptions.initialDocumentSignals,
 						((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
 							?.scopeKey ?? 'octane:document',
@@ -51980,8 +51983,8 @@ function hydrateRootWithOutputHandler(
 			: (STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar).textContent || '';
 	const nativeManifest =
 		nativeRaw !== undefined && NATIVE_SIGNAL_HYDRATION
-			? NATIVE_SIGNAL_HYDRATION.materialize(
-					NATIVE_SIGNAL_HYDRATION.parse(nativeRaw),
+			? materializeNativeSignalManifest(
+					parseNativeSignalManifest(nativeRaw),
 					initialDocumentSignals,
 				)
 			: nativeRaw;
@@ -52130,7 +52133,7 @@ function hydrateRootWithOutputHandler(
 		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
 			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
-				owner.initialDocumentSignals = NATIVE_SIGNAL_HYDRATION.capture(
+				owner.initialDocumentSignals = captureInitialDocumentSignals(
 					owner.initialDocumentSignals,
 					((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
 						?.scopeKey ?? 'octane:document',
