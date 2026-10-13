@@ -9814,19 +9814,25 @@ export function Answer() @{
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
 
-				// A server @catch arm is adopted in place when the client read fails too.
+				// As in React, the server never renders @catch: a failed read ships the
+				// @pending fallback, and the client rebuilds the arm, whose read fails
+				// too and shows @catch until reset retries.
 				generation$.set(6);
 				request(6).reject(new Error('server failure'));
 				await settle();
 				const failed = fixture();
 				container.innerHTML = failed.html;
-				const serverRetry = container.querySelector('button')!;
-				expect(serverRetry.textContent).toBe('Error: server failure');
-				const failedHandle = failed.attach(container.querySelector('section')!, failed.state);
-				expect(container.querySelector('button')).toBe(serverRetry);
+				expect(container.querySelector('[data-pending]')!.textContent).toBe('waiting');
+				expect(container.querySelector('button')).toBeNull();
+				const failedSection = container.querySelector('section')!;
+				const failedHandle = failed.attach(failedSection, failed.state);
+				expect(container.querySelector('section')).toBe(failedSection);
+				const clientRetry = container.querySelector('button')!;
+				expect(clientRetry.textContent).toBe('Error: server failure');
+				expect(container.querySelector('[data-pending]')).toBeNull();
 				generation$.set(7);
 				request(7).resolve('seventh');
-				serverRetry.click();
+				clientRetry.click();
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('seventh');
 				failedHandle.dispose();
