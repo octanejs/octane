@@ -4174,6 +4174,8 @@ interface RootRenderOwner {
 	nativeRetry?: NativeReadRetry;
 	transaction: RootRenderTransaction | null;
 	disposed: boolean;
+	/** A finished transaction's empty commit queue, which the next one reuses. */
+	spareOps: any[] | null;
 }
 
 interface RootRenderTransaction {
@@ -4288,7 +4290,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			retainedCreated: null,
 			retired: null,
 			structures: null,
-			ops: [],
+			ops: owner.spareOps ?? [],
 			rendering: 0,
 			cells: null,
 			batches: null,
@@ -4297,6 +4299,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			aborted: false,
 			rootRequest: false,
 		};
+		owner.spareOps = null;
 		owner.transaction = transaction;
 		ROOT_RENDER_TRANSACTIONS.push(transaction);
 	}
@@ -4762,19 +4765,18 @@ function assertRehomed(scope: any, frag: DocumentFragment): void {
 		scope.__kind === 'portalSlotSlot'
 	) {
 		if (scope.domParent === frag || scope.host === frag)
-			throw new Error('Octane: a slot was left in its fragment');
+			throw new Error(formatClientError(346, 'a slot'));
 		return;
 	}
-	if (scope.block.parentNode === frag) throw new Error('Octane: a Block was left in its fragment');
+	if (scope.block.parentNode === frag) throw new Error(formatClientError(346, 'a Block'));
 	const bag = scope.slots[0];
 	if (bag != null && bag[BINDING_BAG_ARITY] !== undefined)
 		for (const key in bag)
-			if (bag[key] === frag) throw new Error('Octane: a binding bag kept its fragment');
+			if (bag[key] === frag) throw new Error(formatClientError(346, 'a binding bag'));
 	const slots: any[] | null = scope._slots;
 	if (slots !== null)
 		for (let i = 0; i < slots.length; i++)
-			if (slots[i].domParent === frag)
-				throw new Error('Octane: a try slot was left in its fragment');
+			if (slots[i].domParent === frag) throw new Error(formatClientError(346, 'a try slot'));
 	if (scope.block.disposed !== true)
 		forEachSubtreeChild(scope, (child) => assertRehomed(child, frag));
 }
@@ -5305,6 +5307,10 @@ function commitRootTransactions(): void {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileRootExit();
 			finishStagedOwner?.();
+			// Committed or dropped, its queue is empty: the owner's next transaction
+			// reuses it rather than allocating one.
+			if (transaction.ops.length === 0 && owner.transaction !== transaction)
+				owner.spareOps = transaction.ops;
 		}
 	}
 }
@@ -13021,27 +13027,6 @@ function setReturnedOutputOwner(state: any, returned: boolean): void {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
 	}
 	state.returnedOutput = returned;
-}
-
-function returnSlotTail(block: Block, state: any): Node | null {
-	const candidates = [
-		state?.end,
-		state?.block?.endMarker,
-		state?.hostNode,
-		state?.text,
-		block.endMarker,
-		domNode(block.parentNode).lastChild,
-	];
-	for (let i = 0; i < candidates.length; i++) {
-		const node = candidates[i] as Node | null | undefined;
-		if (
-			node !== null &&
-			node !== undefined &&
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === block.parentNode
-		)
-			return node;
-	}
-	return null;
 }
 
 function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
@@ -36095,6 +36080,82 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	}
 }
 
+/**
+ * A nested window's checkpoint into the capture its render records into: the
+ * lengths a dropped window truncates the capture back to.
+ */
+interface CaptureWindow {
+	capture: OffscreenCapture;
+	insertion: number;
+	layout: number;
+	passive: number;
+	events: number;
+	actions: number;
+	refs: number;
+	detaches: number;
+	stores: number;
+	cleanups: number;
+	rendered: number;
+	commits: number;
+	presentations: number;
+}
+
+function openCaptureWindow(capture: OffscreenCapture): CaptureWindow {
+	return {
+		capture,
+		insertion: capture.effects[INSERTION].length,
+		layout: capture.effects[LAYOUT].length,
+		passive: capture.effects[PASSIVE].length,
+		events: capture.events.length,
+		actions: capture.eventActions.length,
+		refs: capture.refs.length,
+		detaches: capture.detaches?.length ?? 0,
+		stores: capture.stores.length,
+		cleanups: capture.renderCleanups?.length ?? 0,
+		rendered: capture.renderedBlocks?.size ?? 0,
+		commits: capture.suspenseCommits?.size ?? 0,
+		presentations: capture.presentations?.length ?? 0,
+	};
+}
+
+/** Drop the commit work a window captured, as discardOffscreenCapture drops a capture's. */
+function dropCaptureWindow(window: CaptureWindow): void {
+	const capture = window.capture;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCaptureDiscarded(window);
+	capture.effects[INSERTION].length = window.insertion;
+	capture.effects[LAYOUT].length = window.layout;
+	capture.effects[PASSIVE].length = window.passive;
+	capture.events.length = window.events;
+	capture.eventActions.length = window.actions;
+	capture.refs.length = window.refs;
+	if (capture.detaches !== undefined) capture.detaches.length = window.detaches;
+	const stores = capture.stores;
+	for (let i = window.stores; i < stores.length; i++) stores[i].queued = false;
+	stores.length = window.stores;
+	if (capture.presentations !== undefined) capture.presentations.length = window.presentations;
+	const rendered = capture.renderedBlocks;
+	if (rendered !== null && rendered.size > window.rendered) {
+		// A completed earlier sibling's preserved props are not a valid bailout.
+		let i = 0;
+		for (const block of rendered) {
+			if (i++ < window.rendered) continue;
+			rendered.delete(block);
+			invalidateRender(block, capture.renderRoot);
+		}
+	}
+	const commits = capture.suspenseCommits;
+	if (commits !== undefined && commits.size > window.commits) {
+		let i = 0;
+		for (const state of commits) if (i++ >= window.commits) commits.delete(state);
+	}
+	const cleanups = capture.renderCleanups;
+	if (cleanups !== undefined && cleanups.length > window.cleanups) {
+		const dropped = cleanups.splice(window.cleanups);
+		for (const cleanup of dropped) cleanup(true);
+	}
+}
+
 /** Drop captured commit work that never became visible. */
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
@@ -42414,7 +42475,14 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 	const journalCheckpoint = armTransitionJournal(state);
 	const previousCapture = WIP_CAPTURE;
-	const capture = journalCheckpoint < 0 ? null : createOffscreenCapture();
+	// The window records into its enclosing capture and checkpoints it: success
+	// costs nothing, a drop truncates (dropCaptureWindow). Native reads still
+	// validate per window, in a capture of its own.
+	const window =
+		journalCheckpoint < 0 || previousCapture === null || NATIVE_READ_DRIVER
+			? null
+			: openCaptureWindow(previousCapture);
+	const capture = journalCheckpoint < 0 || window !== null ? null : createOffscreenCapture();
 	// A transition hold replays the root journal, including touched effect cells.
 	// An urgent update superseding an existing hold can instead show @pending
 	// without replaying that journal; a propagating boundary may do likewise in
@@ -42422,7 +42490,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	// urgent too (renderBlockInner overrides its pendingMode). Keep the old
 	// snapshot for these cold paths and detached renders without a root transaction.
 	const effectDeps =
-		capture !== null &&
+		(capture !== null || window !== null) &&
 		(ROOT_RENDER_TRANSACTION === null ||
 			state.propagateSuspense ||
 			(block.pendingMode ?? CURRENT_BLOCK?.currentRenderMode) !== 'transition' ||
@@ -42452,10 +42520,11 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 	try {
 		if (didThrow) {
-			if (capture !== null) {
+			if (capture !== null || window !== null) {
 				refDetachQueue.splice(refDetachCheckpoint);
 				if (effectDeps !== null) restoreSubtreeEffectDeps(block, effectDeps);
-				discardOffscreenCapture(capture);
+				if (window !== null) dropCaptureWindow(window);
+				else discardOffscreenCapture(capture);
 			}
 			if (isHostContextRequest(renderError) || isAdoptionControl(renderError)) throw renderError;
 			if (isSuspenseException(renderError)) {
@@ -43768,9 +43837,15 @@ function commitResumeInner(state: TrySlot): void {
 				// again. The effects and refs of that attempt are already discarded
 				// below; its DOM writes need the same treatment.
 				const journalCheckpoint = armTransitionJournal(state);
-				const resumeCapture = createOffscreenCapture();
-				const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 				const previousCapture = WIP_CAPTURE;
+				// Within a root render the replay checkpoints that render's capture. A
+				// reveal that reconnects effects does so against queues of its own.
+				const window =
+					previousCapture === null || NATIVE_READ_DRIVER || reconnectEffects
+						? null
+						: openCaptureWindow(previousCapture);
+				const resumeCapture = window === null ? createOffscreenCapture() : previousCapture!;
+				const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 				const refDetachCheckpoint = refDetachQueue.length;
 				const prevReplay = RESUME_REPLAY;
 				RESUME_REPLAY = true;
@@ -43825,9 +43900,9 @@ function commitResumeInner(state: TrySlot): void {
 				if (!didThrow) {
 					if (state.detachedRefs !== null) {
 						refDetachQueue.splice(refDetachCheckpoint);
-						resumeCapture.refs.length = 0;
+						resumeCapture.refs.length = window === null ? 0 : window.refs;
 					}
-					spliceOffscreenCapture(resumeCapture, deferredNativeAcceptance);
+					if (window === null) spliceOffscreenCapture(resumeCapture, deferredNativeAcceptance);
 					state.hasResolved = true;
 				} else {
 					// The journal has to outlive handleSuspense, which is what replays it,
@@ -43837,7 +43912,8 @@ function commitResumeInner(state: TrySlot): void {
 					try {
 						refDetachQueue.splice(refDetachCheckpoint);
 						restoreSubtreeEffectDeps(tryBlock, effectDeps);
-						discardOffscreenCapture(resumeCapture);
+						if (window !== null) dropCaptureWindow(window);
+						else discardOffscreenCapture(resumeCapture);
 						if (isSuspenseException(renderError)) {
 							handleSuspense(state, renderError.thenable, tryBlock, journalCheckpoint);
 						} else {
@@ -44293,6 +44369,8 @@ function attemptHiddenRevealInner(
 	// Every hidden retry is speculative until its whole body completes. Capture
 	// commit work even for urgent retries: a ref/effect can mount before a later
 	// sibling suspends, and must not leak while the fallback remains visible.
+	// A hidden retry reconnects effects against its own queues, so it keeps a
+	// capture of its own rather than a window into its render's.
 	const hiddenCapture = createOffscreenCapture();
 	let deferredNativeAcceptance = false;
 	const previousCapture = WIP_CAPTURE;
@@ -51084,6 +51162,7 @@ function makeRoot(
 		retryKey: null,
 		transaction: null,
 		disposed: false,
+		spareOps: [],
 	};
 	idState.renderOwner = renderOwner;
 	const renderResolved = (

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 346,
+  "nextCode": 347,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2072,6 +2072,12 @@
     "345": {
       "message": "Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
       "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "346": {
+      "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
+      "argumentCount": 1,
       "runtime": ["client"],
       "status": "active"
     }

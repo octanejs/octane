@@ -307,6 +307,7 @@ type ClientErrorArguments = {
 	343: [];
 	344: [];
 	345: [];
+	346: [unknown];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1353,6 +1354,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 345:
 				return formatDevErrorMessage(
 					"Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
+					args,
+				);
+			case 346:
+				return formatDevErrorMessage(
+					'A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.',
 					args,
 				);
 			default:
