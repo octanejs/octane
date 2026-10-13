@@ -79,13 +79,15 @@ describe('attributes', () => {
 				const host = r.find('section');
 				const svg = r.find('svg');
 				const path = r.find('path');
+				// As in React, render evaluates every binding and the commit coerces
+				// the written values afterwards, in binding order.
 				expect(log.splice(0)).toEqual([
 					'class',
 					'title',
-					'coerce-title',
 					'data',
-					'coerce-data',
 					'aria',
+					'coerce-title',
+					'coerce-data',
 				]);
 				expect(host.className).toBe('surface first');
 				expect(host.getAttribute('title')).toBe('first');
@@ -95,7 +97,7 @@ describe('attributes', () => {
 				expect(svg.getAttribute('class')).toBe('icon first');
 				expect(path.getAttribute('fill')).toBe('red');
 				r.update(Surface, propsFor('second', true));
-				expect(log).toEqual(['class', 'title', 'coerce-title', 'data', 'coerce-data', 'aria']);
+				expect(log).toEqual(['class', 'title', 'data', 'aria', 'coerce-title', 'coerce-data']);
 				expect(r.find('section')).toBe(host);
 				expect(r.find('svg')).toBe(svg);
 				expect(r.find('path')).toBe(path);

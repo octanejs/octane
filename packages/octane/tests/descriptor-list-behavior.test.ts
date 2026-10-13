@@ -218,9 +218,11 @@ describe('descriptor list state and lifecycle', () => {
  for(const button of host.querySelectorAll('button')) button.click();
  await act(()=>resolve('ready'));
  const stale=snapshot();root.unmount();return {attempted,held,accepted,stale,events};`);
+			// Render never writes live DOM: a later sibling observing the attempt sees
+			// the committed rows, as in React, and the attempt never reaches the DOM.
 			expect(attempted).toContainEqual({
-				labels: ['A1', 'B0'],
-				values: ['1', '0'],
+				labels: ['A0', 'B0'],
+				values: ['0', '0'],
 				state: ['1', '0'],
 			});
 			expect(result).toEqual({
