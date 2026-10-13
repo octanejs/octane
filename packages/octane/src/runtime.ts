@@ -33513,18 +33513,39 @@ interface PortalSlot {
 	host: Node;
 	start: Comment | null;
 	end: Comment | null;
+	/** Its target delegates its events: from creation, or from the commit that inserts it. */
+	registered: boolean;
 	fragmentOwners?: FragmentInstance | readonly FragmentInstance[];
 	fragmentAnchor?: Node;
 	sourceAnchor?: Node;
 	interleavedFragment?: FragmentInstance;
 }
 
-function registerPortalEventRange(target: Node, portal: PortalSlot): void {
+function installPortalEvents(): void {
 	if (preparePortalEventOwners === noop) {
 		preparePortalEventOwners = prepareRegisteredPortalEventOwners;
 		teardownPortalState = teardownRegisteredPortalState;
 		releasePortalTarget = releaseRegisteredPortalTarget;
 	}
+}
+
+/**
+ * Give a portal its share of its target's event delegation. Portal target
+ * hosts handlers stamped via the same `el.$oclick = …` mechanism as the main
+ * tree, so it needs the delegated listeners too. Refcounted: a target hosting
+ * two portals attaches once, detaches when the last portal unmounts.
+ */
+function registerPortalTarget(portal: PortalSlot): void {
+	const target = portal.target;
+	// Torn down before the commit that would have inserted it.
+	if (target === null) return;
+	registerPortalEventRange(target, portal);
+	registerDelegationTarget(target);
+	portal.registered = true;
+}
+
+function registerPortalEventRange(target: Node, portal: PortalSlot): void {
+	installPortalEvents();
 	if (
 		DEFERRED_LAYOUT_DRIVER &&
 		DEFERRED_LAYOUT_DRIVER.stageAction(() => registerPortalEventRange(target, portal))
@@ -33922,18 +33943,29 @@ function renderPortalState(
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 			__profileTrackComponent(block, profilePortalComponent(rawBody, norm.body));
 		}
-		state = { __kind: 'portalSlotSlot', block, target, key, childType, host, start, end };
+		state = {
+			__kind: 'portalSlotSlot',
+			block,
+			target,
+			key,
+			childType,
+			host,
+			start,
+			end,
+			registered: false,
+		};
 		if (host.nodeType === 11) noteFrontierMember(host, state);
-		registerPortalEventRange(target, state);
 		activityPortalCreated?.(block);
-		// Portal target hosts handlers stamped via the same `el.$oclick = …`
-		// mechanism as the main tree, so it needs the delegated event listeners too.
-		// Refcounted: a target hosting two portals attaches once, detaches when the
-		// last portal unmounts.
-		registerDelegationTarget(target);
-		if (ROOT_RENDER_TRANSACTION !== null) {
-			const created = state;
-			journalUndo(() => releasePortalTarget(created));
+		if (into !== target) {
+			// Its target starts delegating with the commit that inserts it.
+			installPortalEvents();
+			transaction!.ops.push(registerPortalTarget, state);
+		} else {
+			registerPortalTarget(state);
+			if (ROOT_RENDER_TRANSACTION !== null) {
+				const created = state;
+				journalUndo(() => releasePortalTarget(created));
+			}
 		}
 		renderBlock(block);
 	} else {
@@ -34014,8 +34046,10 @@ function teardownRegisteredPortalState(state: PortalSlot): void {
  */
 function releaseRegisteredPortalTarget(state: PortalSlot): void {
 	if (state.target) {
-		unregisterPortalEventRange(state.target, state);
-		unregisterDelegationTarget(state.target);
+		if (state.registered) {
+			unregisterPortalEventRange(state.target, state);
+			unregisterDelegationTarget(state.target);
+		}
 		state.target = null;
 	}
 }

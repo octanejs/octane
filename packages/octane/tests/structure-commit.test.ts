@@ -388,7 +388,7 @@ describe('de-opt host children change at commit', () => {
 
 describe('content outside the container lands at commit', () => {
 	for (const priority of ['urgent', 'transition'] as const) {
-		it(`appends a new head element and portal only when their render commits (${priority})`, async () => {
+		it(`appends a new head element and portal, and delegates the portal's events, only when their render commits (${priority})`, async () => {
 			const target = document.createElement('aside');
 			document.body.appendChild(target);
 			const label = `outside-${priority}`;
@@ -399,6 +399,8 @@ describe('content outside the container lands at commit', () => {
 				return records.splice(0);
 			};
 			let during: MutationRecord[] | null = null;
+			// The delegation's iOS tap shim marks a target that listens.
+			let listening: boolean | null = null;
 			const initial: OutsideProps = { show: false, label, target, probe: () => {} };
 			const app = mount(OutsideApp, initial);
 			observer.observe(document.head, { childList: true, subtree: true, characterData: true });
@@ -412,6 +414,7 @@ describe('content outside the container lands at commit', () => {
 							...initial,
 							probe: () => {
 								during = mutations();
+								listening = target.onclick !== null;
 							},
 							...props,
 						});
@@ -426,11 +429,14 @@ describe('content outside the container lands at commit', () => {
 				expect(mutations()).toEqual([]);
 				expect(titles()).toHaveLength(0);
 				expect(target.childNodes).toHaveLength(0);
+				expect(target.onclick).toBe(null);
 
 				await render({ show: true });
 				expect(during).toEqual([]);
+				expect(listening).toBe(false);
 				expect(titles()).toHaveLength(1);
 				expect(target.querySelector('.portal-out')?.textContent).toBe(label);
+				expect(target.onclick).not.toBe(null);
 			} finally {
 				observer.disconnect();
 				app.unmount();
