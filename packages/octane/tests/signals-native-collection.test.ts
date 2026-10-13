@@ -84,6 +84,22 @@ describe('compiled component invocation native reads', () => {
 		expect(model.scope.inspect().nodes.every((node) => node.subscribers === 0)).toBe(true);
 	});
 
+	it('updates reads made through an opaque helper in a body, arm, child and rows', () => {
+		const model = state$('compiled-collection-helper');
+		rendered = mount(client.HelperReader, { count$: model.count$, items: [1, 2] });
+		const text = () => rendered!.findAll('b, i, u').map((host) => host.textContent);
+		const hosts = rendered.findAll('b, i, u');
+		expect(text()).toEqual(['2', '2', '2:1', '2:2']);
+		flushSync(() => model.count$.set(3));
+		expect(text()).toEqual(['6', '6', '6:1', '6:2']);
+		const updated = rendered.findAll('b, i, u');
+		expect(updated).toHaveLength(hosts.length);
+		hosts.forEach((host, index) => expect(updated[index]).toBe(host));
+		rendered.update(client.HelperReader, { count$: model.count$, items: [] });
+		flushSync(() => model.count$.set(4));
+		expect(text()).toEqual(['8']);
+	});
+
 	it('keeps sibling reads live across props updates and retires only disabled readers', () => {
 		const model = state$('compiled-collection-siblings');
 		const parentInput$ = model.scope.signal$('parent-input', 20);

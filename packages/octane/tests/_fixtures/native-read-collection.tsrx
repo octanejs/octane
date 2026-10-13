@@ -123,3 +123,25 @@ export function CaughtReader(props: { count$: SignalHandle<number> }) @{
 		}
 	</section>
 }
+
+// The read happens in a call: the renderer, not the calling body, collects it.
+function doubled$(source$: SignalHandle<number>): string {
+	return String(source$.get() * 2);
+}
+
+function HelperChild(props: { source$: SignalHandle<number> }) @{
+	<i>{doubled$(props.source$)}</i>
+}
+
+// Every read goes through doubled$: a body, an arm, a child and rows.
+export function HelperReader(props: { count$: SignalHandle<number>; items: number[] }) @{
+	<section>
+		<b>{doubled$(props.count$)}</b>
+		@if (props.items.length > 0) {
+			<HelperChild source$={props.count$} />
+		}
+		@for (const item of props.items; key item) {
+			<u>{doubled$(props.count$) + ':' + item}</u>
+		}
+	</section>
+}
