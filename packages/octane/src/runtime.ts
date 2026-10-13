@@ -4668,8 +4668,9 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	)
 		return false;
 	// A Block this render created writes fresh DOM, unless it adopted live DOM.
-	const owner = owningBlock(parentBlock);
-	if (isCreatedInRootRender(transaction, owner) && !transaction.retainedCreated?.has(owner))
+	let owner = parentBlock;
+	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
+	if (owner.createdStamp === transaction.createdStamp && !transaction.retainedCreated?.has(owner))
 		return false;
 	// A committed Block can still render a slot into fresh DOM, as can a lite
 	// Scope this render created under one: a frontier, which commit inserts.
@@ -4961,8 +4962,11 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 		if (TRANSITION_JOURNAL_DEPTH > 1) journalObjectOnce(next.out);
 		return next;
 	}
-	const parent = domNode(state.end).parentNode!;
+	const end = state.end;
+	const parent = (STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
+	let owner = parentBlock;
+	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
 	next = state.next = {
 		tx,
 		out: [],
@@ -4970,7 +4974,7 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 		parent,
 		before: null,
 		members: [],
-		owner: owningBlock(parentBlock),
+		owner,
 		follows: false,
 		bound: null,
 	};
@@ -4997,8 +5001,10 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
  * row connects before the next row arrives.
  */
 function placeRun(parent: Node, frag: DocumentFragment, anchor: Node): void {
-	for (let node = getFirstChild(frag); node !== null; node = getFirstChild(frag))
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
+	const from = STAGED_DOM ? STAGED_DOM.view(frag) : frag;
+	const into = STAGED_DOM ? STAGED_DOM.view(parent) : parent;
+	for (let node = from.firstChild; node !== null; node = from.firstChild)
+		into.insertBefore(node, anchor);
 	(frag as any).$$next = undefined;
 }
 
@@ -47928,7 +47934,11 @@ function mountFastHostItems<T>(
 			CURRENT_BLOCK = previousBlock;
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.endRender(block, true, false);
 			block.mounted = true;
-			const root = lastBefore(host, anchor)!;
+			const root = (
+				anchor === null
+					? (STAGED_DOM ? STAGED_DOM.view(host) : host).lastChild
+					: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling
+			)!;
 			block.startMarker = root;
 			block.endMarker = root;
 			state.items.set(key, block);
@@ -49689,7 +49699,11 @@ function mountItem<T>(
 		// and promote it to start === end. From now on `block.endMarker` is the
 		// actual element (so subsequent body re-renders insert nothing — the
 		// update path mutates the cached _b._el$N refs directly).
-		const root = lastBefore(parentNode, anchor)!;
+		const root = (
+			anchor === null
+				? (STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).lastChild
+				: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling
+		)!;
 		block.startMarker = root;
 		block.endMarker = root;
 		return block;
