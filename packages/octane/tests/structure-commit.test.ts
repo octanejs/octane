@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { startTransition } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
-import { StructureApp, type StructureProps } from './_fixtures/structure-commit.tsrx';
+import {
+	BranchProbeApp,
+	StructureApp,
+	type StructureProps,
+} from './_fixtures/structure-commit.tsrx';
 
 // Render computes, commit writes (#2043): content a render removes stays
 // connected and untouched until its commit, which runs the deletion cleanups
@@ -83,6 +87,43 @@ describe('structural deletions commit with their render', () => {
 				await render(REMOVE_ALL, priority);
 				expect([...log].sort()).toEqual(REMOVED.map((id) => `${id}:true`).sort());
 				for (const node of nodes) expect(node.isConnected).toBe(false);
+			} finally {
+				observer.disconnect();
+				app.unmount();
+			}
+		});
+
+		it(`builds a swapped branch off-document and inserts it at commit (${priority})`, async () => {
+			let observing = false;
+			let during: MutationRecord[] | null = null;
+			const observer = new MutationObserver(() => {});
+			const probe = () => {
+				if (observing) during = observer.takeRecords();
+			};
+			const app = mount(BranchProbeApp, { show: true, probe });
+			const shown = app.find('#shown');
+			observer.observe(app.container, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				characterData: true,
+			});
+			try {
+				for (const show of [false, true]) {
+					observing = true;
+					await act(() => {
+						const next = () => app.root.render(BranchProbeApp, { show, probe: () => probe() });
+						if (priority === 'transition') startTransition(next);
+						else next();
+					});
+					observing = false;
+					// Nothing reached the committed DOM while the render was running.
+					expect(during).toEqual([]);
+					expect(app.findAll('b, i, s').map((node) => node.textContent)).toEqual(
+						show ? ['shown'] : ['hidden', 'second root'],
+					);
+				}
+				expect(shown.isConnected).toBe(false);
 			} finally {
 				observer.disconnect();
 				app.unmount();

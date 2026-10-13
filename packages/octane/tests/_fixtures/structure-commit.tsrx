@@ -62,3 +62,23 @@ export function StructureApp(props: StructureProps) @{
 		}
 	</main>
 }
+
+function Probe(props: { probe: () => void }) @{
+	props.probe();
+	<u>{'probe'}</u>
+}
+
+// A later sibling observes the DOM while the swap above it is still rendering.
+export function BranchProbeApp(props: { show: boolean; probe: () => void }) @{
+	<main>
+		@if (props.show) {
+			<b id="shown">{'shown'}</b>
+		} @else {
+			<>
+				<i id="hidden">{'hidden'}</i>
+				<s>{'second root'}</s>
+			</>
+		}
+		<Probe probe={props.probe} />
+	</main>
+}

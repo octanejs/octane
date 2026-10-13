@@ -4725,6 +4725,28 @@ interface SlotNext {
 	 * Scope, a slot, a cleanup callback or null), then its first and last node.
 	 */
 	out: any[];
+	/**
+	 * The frontier: incoming content built off-document, which commit inserts
+	 * into `parent` before `before` (slotFrontier).
+	 */
+	frag: DocumentFragment | null;
+	parent: Node | null;
+	before: Node | null;
+	/** Blocks, lite stand-ins and try slots created directly in `frag`. */
+	members: any[] | null;
+	/** The Block whose slot this is: a deletion cleanup can dispose it first. */
+	owner: Block | null;
+	/**
+	 * The incoming content replaces the first outgoing range and lands where
+	 * that range stands at commit, wherever an earlier entry moved it.
+	 */
+	follows: boolean;
+	/**
+	 * Where a sole-root ancestor shares the replaced range's bound: the slot's
+	 * parent Block (possibly a lite stand-in), that bound, and the incoming one
+	 * it moves to at commit (replaceSharedBlockBoundary).
+	 */
+	bound: any[] | null;
 }
 
 /** The open root render's pending structure for `slot`, queued for its commit. */
@@ -4732,10 +4754,69 @@ function slotNext(slot: { next: SlotNext | null }): SlotNext {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	let next = slot.next;
 	if (next === null || next.tx !== tx) {
-		next = slot.next = { tx, out: [] };
+		next = slot.next = {
+			tx,
+			out: [],
+			frag: null,
+			parent: null,
+			before: null,
+			members: null,
+			owner: null,
+			follows: false,
+			bound: null,
+		};
 		tx.ops.push(applySlotNext, slot);
 	}
 	return next;
+}
+
+/**
+ * The fragment a slot builds its incoming content in during a root render
+ * that changes committed structure. Fresh descendants write straight into it;
+ * its commit inserts it into `parent` before `before`, after the slot's
+ * deletions, and rehomes what was created directly in it. A later swap in the
+ * same render reuses it and its insertion point.
+ */
+function slotFrontier(
+	slot: { next: SlotNext | null },
+	owner: Block,
+	parent: Node,
+	before: Node | null,
+): DocumentFragment {
+	const next = slotNext(slot);
+	let frag = next.frag;
+	if (frag === null) {
+		frag = next.frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+		(frag as any).$$next = next;
+		next.members = [];
+		next.parent = parent;
+		next.before = before;
+		next.owner = owningBlock(owner);
+	}
+	return frag;
+}
+
+/** Record what a frontier fragment's commit rehomes: anything created with it as its parent. */
+function noteFrontierMember(parent: Node, member: object): void {
+	const next: SlotNext | undefined = (parent as any).$$next;
+	if (next !== undefined) next.members!.push(member);
+}
+
+/**
+ * Whether a slot of `parentBlock` that changes structure in the open root
+ * render writes through a frontier: its owner is committed, so the DOM it
+ * would write into is live. Hydration records adopted structure instead.
+ */
+function usesFrontier(parentBlock: Block): boolean {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	return (
+		transaction !== null &&
+		!transaction.aborted &&
+		!ROOT_RENDER_ROLLBACK &&
+		transaction.hydrating !== true &&
+		!hydrating &&
+		!isCreatedInRootRender(transaction, owningBlock(parentBlock))
+	);
 }
 
 /** Retire a committed Block or lite arm and queue its range's deletion on `slot`. */
@@ -4749,10 +4830,83 @@ function queueSlotDeletion(
 	slotNext(slot).out.push(owner, first, last);
 }
 
+/**
+ * Apply a slot's pending structure: its deletions, then its frontier insert,
+ * then rehome what was created in the fragment onto the live parent.
+ */
 function applySlotNext(slot: { next: SlotNext | null }): void {
 	const next = slot.next;
 	slot.next = null;
-	if (next !== null) applyOutgoing(next.out);
+	if (next === null) return;
+	const out = next.out;
+	const parent = next.parent;
+	let before = next.before;
+	if (next.follows) {
+		const first: Node = out[1];
+		if ((STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === parent)
+			before = getNextSibling(out[2]);
+	}
+	applyOutgoing(out);
+	const frag = next.frag;
+	// A deletion cleanup can unmount the slot's owner before its content lands.
+	if (frag === null || next.owner!.disposed) return;
+	(STAGED_DOM ? STAGED_DOM.view(parent!) : parent!).insertBefore(frag, before);
+	const members = next.members!;
+	for (let i = 0; i < members.length; i++) rehomeMember(members[i], frag, parent!);
+	const bound = next.bound;
+	if (bound !== null) replaceSharedBlockBoundary(bound[0], bound[1], bound[2], bound[3], bound[4]);
+	if (process.env.NODE_ENV !== 'production')
+		for (let i = 0; i < members.length; i++) assertRehomed(members[i], frag);
+}
+
+/**
+ * Point what was created directly in a committed frontier at its live parent:
+ * a try slot's parent, or a Block's (or lite Scope's stand-in's) parent and
+ * the binding-bag fields its compiled body cached from it.
+ */
+function rehomeMember(member: any, frag: DocumentFragment, parent: Node): void {
+	if (member.__kind === 'trySlotSlot') {
+		if (member.domParent === frag) member.domParent = parent;
+		return;
+	}
+	if (member.__kind === 'portalSlotSlot') {
+		// Its content bubbles to its logical parent, stamped as it rendered.
+		if (member.host !== frag) return;
+		member.host = parent;
+		for (
+			let n = getNextSibling(member.start);
+			n !== null && n !== member.end;
+			n = getNextSibling(n)
+		)
+			if ((n as any).$$portalParent === frag) (n as any).$$portalParent = parent;
+		return;
+	}
+	const block = member.block;
+	if (block.parentNode === frag) block.parentNode = parent;
+	const bag = member.slots[0];
+	if (bag != null && bag[BINDING_BAG_ARITY] !== undefined)
+		for (const key in bag) if (bag[key] === frag) bag[key] = parent;
+}
+
+/** Development check: nothing below a committed frontier still names its fragment. */
+function assertRehomed(scope: any, frag: DocumentFragment): void {
+	if (scope.__kind === 'trySlotSlot' || scope.__kind === 'portalSlotSlot') {
+		if (scope.domParent === frag || scope.host === frag)
+			throw new Error('Octane: a slot was left in its fragment');
+		return;
+	}
+	if (scope.block.parentNode === frag) throw new Error('Octane: a Block was left in its fragment');
+	const bag = scope.slots[0];
+	if (bag != null && bag[BINDING_BAG_ARITY] !== undefined)
+		for (const key in bag)
+			if (bag[key] === frag) throw new Error('Octane: a binding bag kept its fragment');
+	const slots: any[] | null = scope._slots;
+	if (slots !== null)
+		for (let i = 0; i < slots.length; i++)
+			if (slots[i].__kind === 'trySlotSlot' && slots[i].domParent === frag)
+				throw new Error('Octane: a try slot was left in its fragment');
+	if (scope.block.disposed !== true)
+		forEachSubtreeChild(scope, (child) => assertRehomed(child, frag));
 }
 
 /** Queue outgoing content no slot record owns: one `out` entry of its own. */
@@ -8920,13 +9074,13 @@ function drainQueue(): { err: any } | null {
 	}
 	QUEUE.length = 0;
 	QUEUE_REINDEX_EPOCH++;
+	commitRootRenders();
 	// Several sibling setters can share one hidden range. Re-scan it once after
-	// the complete render wave, before refs or layout effects can observe it.
-	// No Activity update means no collection/allocation on the ordinary path.
+	// the wave's commit inserted its content, before refs or layout effects can
+	// observe it. No Activity update means no collection on the ordinary path.
 	if (activitiesToRehide !== null) {
 		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 	}
-	commitRootRenders();
 	NATIVE_TRANSITION_DRIVER?.flush();
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrainEnd();
@@ -12606,6 +12760,7 @@ function createBlock(
 		__profileBlockCreated();
 	if (parentBlock !== null && block.idState.renderOwner === ROOT_RENDER_TRANSACTION?.owner) {
 		createdInRootRender(block);
+		if (parentNode.nodeType === 11) noteFrontierMember(parentNode, block);
 	}
 	return block;
 }
@@ -13689,6 +13844,7 @@ export function componentSlotLite<P>(
 			else endMarker = hydration.parkAtHole((inPlace = anchor));
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
+		if (host.nodeType === 11) noteFrontierMember(host, scope);
 		if (process.env.NODE_ENV !== 'production') LITE_BODIES!.set(scope, comp as ComponentBody);
 		stampSignalInstance(scope, parentScope, invocationSite);
 		if (adoptedOpen !== null && adoptedClose !== null) {
@@ -33883,6 +34039,7 @@ function renderPortalState(
 			__profileTrackComponent(block, profilePortalComponent(rawBody, norm.body));
 		}
 		state = { __kind: 'portalSlotSlot', block, target, key, childType, host, start, end };
+		if (host.nodeType === 11) noteFrontierMember(host, state);
 		registerPortalEventRange(target, state);
 		activityPortalCreated?.(block);
 		// Portal target hosts handlers stamped via the same `el.$oclick = …`
@@ -42424,6 +42581,7 @@ export function tryBlock(
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
+		if (domParent.nodeType === 11) noteFrontierMember(domParent, newState);
 		state = newState;
 	} else {
 		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
@@ -43236,6 +43394,16 @@ function hideTryBlock(state: TrySlot): void {
 			for (const text of hidden.texts) releaseHiddenText(text);
 		});
 	}
+	hideBlockHostRange(block, hidden);
+	hideSuspensePortalRanges(block, hidden);
+	// Content this render's slots insert at commit joins the hidden range then.
+	ROOT_RENDER_TRANSACTION?.ops.push(rehideTryBlock, state);
+}
+
+function rehideTryBlock(state: TrySlot): void {
+	const hidden = state.hiddenDom;
+	const block = state.tryBlock;
+	if (hidden === null || !hidden.active || block === null || block.disposed) return;
 	hideBlockHostRange(block, hidden);
 	hideSuspensePortalRanges(block, hidden);
 }
@@ -45795,12 +45963,12 @@ function preservesCommittedSuspense(block: Block): boolean {
 	return false;
 }
 
-/** Count direct root slots, or retarget their provisional anchors to a durable end. */
+/** Count direct root slots, and retarget their provisional anchors to `end` when given. */
 function markerlessBranchRoots(
 	scope: Scope,
 	domParent: Node,
 	after: Node | null,
-	end: Comment | null = null,
+	end?: Node | null,
 ): number {
 	let roots = 0;
 	const slots = scope._slots;
@@ -45816,9 +45984,16 @@ function markerlessBranchRoots(
 					(slot.__kind === 'componentSlotSlot' && slot.block?.parentNode === domParent))
 			) {
 				roots++;
-				if (end !== null) {
+				if (end !== undefined) {
 					journalRootProperty(slot, 'anchor', slot.anchor);
 					slot.anchor = end;
+					// A single-root call that has not rendered its root yet inserts
+					// before its Block's end, which is the same anchor.
+					const block = slot.block;
+					if (block != null && block.endMarker === after) {
+						journalRootProperty(block, 'endMarker', block.endMarker);
+						block.endMarker = end;
+					}
 				}
 			}
 		}
@@ -45833,7 +46008,7 @@ function markerlessBranchRoots(
 			const block = child.block;
 			if (block !== scope.block && block.parentNode === domParent && block.endMarker === after) {
 				roots += markerlessBranchRoots(child, domParent, after, end) || 1;
-				if (end !== null) {
+				if (end !== undefined) {
 					journalRootProperty(block, 'endMarker', block.endMarker);
 					block.endMarker = end;
 				}
@@ -46084,6 +46259,217 @@ function sharesBlockBoundary(parent: Block | null, start: Node | null, end: Node
 }
 
 /**
+ * A branch swap in a root render over committed DOM (usesFrontier). The
+ * outgoing arm stays connected and untouched; its deletion is queued on the
+ * slot's commit entry. The incoming arm renders in the slot's frontier
+ * fragment and takes the outgoing arm's place at commit. If the incoming arm
+ * throws, its partial subtree leaves the fragment and the slot keeps the arm
+ * it had, so the boundary that catches the throw holds that screen.
+ *
+ * A slot with a pair (its own, a borrowed one, or a borrowed whole container)
+ * keeps it, and the incoming arm borrows it. A markerless slot's incoming arm
+ * bounds itself: a lone element self-marks, anything else gets a pair.
+ */
+function swapBranchFrontier(
+	parentScope: Scope,
+	state: BranchSlot,
+	domParent: Node,
+	next: number,
+	body: ComponentBody | null,
+	marker: string,
+	env: any[] | undefined,
+): void {
+	const parentBlock = parentScope.block;
+	const transaction = ROOT_RENDER_TRANSACTION!;
+	const oldScope: Scope | null = state.block ?? state.lite;
+	const old = oldScope === null ? null : oldScope.block;
+	if (old === null && body === null) {
+		journalRootProperty(state, 'branch', state.branch);
+		state.branch = next;
+		return;
+	}
+	journalObjectOnce(state);
+	// A fresh arm is an earlier swap's in this render: its content is in the fragment.
+	const fresh = state.block !== null && isCreatedInRootRender(transaction, state.block);
+	const paired = state.start !== null || state.borrowed;
+	const oldStart = old === null ? null : old.startMarker;
+	const oldEnd = old === null ? null : old.endMarker;
+	let first: Node | null = null;
+	let last: Node | null = null;
+	// Where the incoming content lands among the committed nodes.
+	let before: Node | null;
+	if (paired) {
+		before = state.end;
+		if (old !== null && !fresh) {
+			first = state.start === null ? getFirstChild(domParent) : getNextSibling(state.start);
+			if (first === state.end) first = null;
+			else
+				last =
+					state.end === null
+						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
+						: domNode(state.end).previousSibling;
+		}
+	} else if (fresh) {
+		before = state.next!.before;
+	} else if (old === null) {
+		before = state.anchor;
+	} else if (state.unfinalized) {
+		// A pending arm owns only what a resumed leaf inserted before its anchor.
+		before = oldEnd;
+		if (oldStart != null && oldStart !== before && domNode(oldStart).parentNode === domParent) {
+			first = oldStart;
+			last = domNode(before!).previousSibling;
+		}
+	} else {
+		// A self-marked root. A nested sole-root branch can replace it without
+		// refreshing `state.end`, so its Block holds the live bound.
+		first = oldStart;
+		last = oldEnd ?? state.end;
+		if (first === null) {
+			before = last;
+			last = null;
+		} else before = getNextSibling(last!);
+	}
+	const frag =
+		body !== null || fresh
+			? slotFrontier(state, parentBlock, domParent, before)
+			: state.next?.tx === transaction
+				? state.next.frag
+				: null;
+	// The slot's pair, already built in this render's fragment.
+	const pairInFrag =
+		frag !== null && paired && state.end !== null && domNode(state.end).parentNode === frag;
+	// The fragment's content before the incoming arm's: the fresh arm's, if any.
+	const mark = pairInFrag ? domNode(state.end!).previousSibling : (frag?.lastChild ?? null);
+	let arm: Block | null = null;
+	let suspended: unknown = null;
+	let pending = false;
+	if (body !== null) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
+		let end: Node;
+		if (pairInFrag) end = state.end!;
+		else {
+			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
+			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).appendChild(end);
+		}
+		arm = createBlock('control-flow', parentBlock, frag!, null, end, body, undefined, env);
+		try {
+			renderBlock(arm);
+		} catch (error) {
+			// A replacement that throws leaves the committed arm in place. A first
+			// arm that suspends stays the slot's pending arm, as an in-place mount
+			// does, so its retry resumes this Block and its state.
+			if (old !== null || !isSuspenseException(error)) {
+				unmountBlock(arm, false);
+				removeAfter(frag!, mark, pairInFrag ? end : null);
+				throw error;
+			}
+			suspended = error;
+		}
+		if (owningBlock(parentBlock).disposed) return;
+		const content = mark === null ? getFirstChild(frag!) : getNextSibling(mark);
+		if (pairInFrag) {
+			// The incoming arm borrows the pair this render built.
+			arm.startMarker = state.start;
+			arm.exclusiveMarkers = true;
+		} else if (paired) {
+			// A committed pair stays the slot's; the arm bounds its own content
+			// inside it, so discarding the arm never reaches committed nodes.
+			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
+			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
+			arm.startMarker = start;
+			arm.exclusiveMarkers = true;
+		} else if (
+			suspended !== null &&
+			content === end &&
+			!(state.next!.bound !== null || sharesBlockBoundary(parentBlock, oldStart, oldEnd))
+		) {
+			// A pending arm owns nothing yet; its anchor is where it will land.
+			markerlessBranchRoots(arm, frag!, end, before);
+			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).removeChild(end);
+			arm.endMarker = before;
+			pending = true;
+		} else if (
+			suspended === null &&
+			content !== end &&
+			content === (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling &&
+			content!.nodeType === 1 &&
+			markerlessBranchRoots(arm, frag!, end) <= 1
+		) {
+			// One element bounds the arm itself. A root slot that produced it
+			// inserts where the arm's content lands among the committed nodes.
+			markerlessBranchRoots(arm, frag!, end, before);
+			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).removeChild(end);
+			arm.startMarker = content;
+			arm.endMarker = content;
+		} else {
+			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
+			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
+			arm.startMarker = start;
+			arm.exclusiveMarkers = true;
+		}
+	}
+	if (fresh) {
+		// The earlier arm of this render leaves the fragment; a pair stays.
+		unmountBlock(old!, false);
+		if (mark !== null && mark !== state.start)
+			removeAfter(frag!, pairInFrag ? state.start : null, getNextSibling(mark));
+	} else if (oldScope !== null) queueSlotDeletion(state, oldScope, first, last);
+	if (owningBlock(parentBlock).disposed) return;
+	state.block = arm;
+	state.lite = null;
+	state.branch = next;
+	state.unfinalized = pending;
+	if (paired) {
+		if (suspended !== null) throw suspended;
+		return;
+	}
+	// A markerless slot's content takes the committed root's place at commit,
+	// and a sole-root ancestor that borrowed that root moves with it.
+	let bound = state.next?.tx === transaction ? state.next.bound : null;
+	if (!fresh && first !== null) {
+		const pending = slotNext(state);
+		pending.follows = true;
+		if (sharesBlockBoundary(parentBlock, oldStart, oldEnd))
+			bound = pending.bound = [parentBlock, oldStart, oldEnd, null, null];
+	}
+	if (pending) {
+		state.end = null;
+		state.anchor = before;
+	} else if (arm !== null) {
+		state.start = arm.startMarker === arm.endMarker ? null : (arm.startMarker as Comment);
+		state.end = arm.endMarker;
+	} else if (bound !== null) {
+		// Empty output cannot bound itself: the ancestor moves to a pair.
+		const pair = slotFrontier(state, parentBlock, domParent, before);
+		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
+		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
+		(STAGED_DOM ? STAGED_DOM.view(pair) : pair).append(start, end);
+		state.start = start;
+		state.end = end;
+	} else {
+		state.end = null;
+		state.anchor = before;
+	}
+	if (bound !== null) {
+		bound[3] = state.start ?? state.end;
+		bound[4] = state.end;
+	}
+	if (suspended !== null) throw suspended;
+}
+
+/** Remove a fragment's fresh nodes after `after` (or from its start) up to `until`. */
+function removeAfter(frag: DocumentFragment, after: Node | null, until: Node | null): void {
+	let node = after === null ? getFirstChild(frag) : getNextSibling(after);
+	while (node !== null && node !== until) {
+		const following = getNextSibling(node);
+		(STAGED_DOM ? STAGED_DOM.view(frag) : frag).removeChild(node);
+		node = following;
+	}
+}
+
+/**
  * The shared branch-swap core. When `next` differs from the mounted branch:
  * when a transition or committed Suspense primary must preserve the old arm,
  * render `body` off-screen and COMMIT it in place (adopting the WIP markers —
@@ -46121,6 +46507,10 @@ function renderBranchSlot(
 			state.branch !== -1
 		)
 			__profileArm(true);
+		if (usesFrontier(parentBlock)) {
+			swapBranchFrontier(parentScope, state, domParent, next, body, marker, env);
+			return;
+		}
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
 			// A lite arm's stand-in carries the bound an arm Block would.
 			const previousBlock = state.block ?? state.lite?.block ?? null;
@@ -46591,6 +46981,7 @@ function renderBranchSlot(
 				// stand-in starts with the bound an arm Block mounts with.
 				const scope = new ScopeImpl(parentScope, parentBlock);
 				arm = scope.block = new LiteBlockImpl(domParent, after, parentBlock) as unknown as Block;
+				if (domParent.nodeType === 11) noteFrontierMember(domParent, scope);
 				arm.startMarker = null;
 				state.lite = scope;
 				UNMOUNT_LITE_ARM ??= unmountLiteArm;
@@ -46988,6 +47379,13 @@ function hideActivityRange(state: ActivitySlot): void {
 }
 
 function rehideActivityAfterDescendantRender(state: ActivitySlot): void {
+	// The render's frontier inserts land at commit: hide the range after them.
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null) transaction.ops.push(rehideActivityRange, state);
+	else rehideActivityRange(state);
+}
+
+function rehideActivityRange(state: ActivitySlot): void {
 	const b = state.block;
 	if (b === null || !state.hidden || state.deactivationPending || blockSubtreeDisposed(b)) return;
 	// A pending visible→hidden commit intentionally keeps the DOM visible until
@@ -47328,7 +47726,7 @@ export function activityBlock(
 				queueActivityDeactivation(state, b, commitVersion);
 			}
 			renderHiddenActivity(state);
-			if (!state.deactivationPending) hideActivityRange(state);
+			rehideActivityAfterDescendantRender(state);
 		}
 	} else {
 		if (state.hidden) {
