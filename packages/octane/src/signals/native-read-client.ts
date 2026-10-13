@@ -8,6 +8,7 @@ import {
 import {
 	NATIVE_TRANSITION_CONSUMER,
 	setSignalDeclarationInvocation,
+	type NativeTransitionNotify,
 	type NativeReadRelease,
 	type NativeReadSource,
 } from './read-protocol.js';
@@ -19,9 +20,6 @@ interface NativeReadHost {
 	capture(): object | null;
 	cleanup(scope: Scope, dispose: () => void): void;
 	schedule(block: Block): void;
-	/** Candidate admission renders this exact subscribed owner without notifying it. */
-	prepare?(block: Block): void;
-	retire?(block: Block): void;
 	/** Reuse current ref manifests after a superseding root commits. */
 	replayRefs(capture: object, owner: PublicationOwner): boolean;
 	refDisposed(entry: object): boolean;
@@ -46,7 +44,7 @@ interface Consumer {
 
 /** Lets a release find the consumer behind a subscription (rebaseNativeRead). */
 const CONSUMER: unique symbol = Symbol();
-type ConsumerNotify = (() => void) & { [CONSUMER]?: Consumer };
+type ConsumerNotify = NativeTransitionNotify & { [CONSUMER]?: Consumer };
 
 interface Candidate extends NativeReadWitness {
 	consumer: Consumer;
@@ -173,7 +171,6 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	function disposeConsumer(consumer: Consumer): void {
 		if (consumer.disposed) return;
 		consumer.disposed = true;
-		host.retire?.(consumer.block);
 		if (consumer.committed !== null) release(consumer.committed);
 		consumer.committed = null;
 		for (const candidate of consumer.pending) release(candidate);
@@ -199,15 +196,10 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			};
 			consumers.set(scope, consumer);
 			const owned = consumer;
-			(owned.notify as ConsumerNotify)[CONSUMER] = owned;
-			if (host.prepare !== undefined) {
-				Object.assign(owned.notify, {
-					[NATIVE_TRANSITION_CONSUMER]: {
-						active: () => !owned.disposed && !owned.block.disposed,
-						prepare: () => host.prepare!(owned.block),
-					},
-				});
-			}
+			const notify = owned.notify as ConsumerNotify;
+			notify[CONSUMER] = owned;
+			// A transition that writes what this consumer reads renders its Block.
+			notify[NATIVE_TRANSITION_CONSUMER] = block;
 			host.cleanup(scope, () => disposeConsumer(owned));
 		}
 		return consumer;

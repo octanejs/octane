@@ -12,10 +12,8 @@ import type {
 	BindingSignalConnection,
 	BindingPreparedValue,
 } from './dom-binding-signals.js';
-import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import type { BindingControlPreview } from './signals/control-binding.js';
 import {
-	NATIVE_TRANSITION_CONSUMER,
 	forwardNativeTransitionConsumer,
 	type NativeTransitionNotify,
 	type NativeTransitionPresentation,
@@ -1069,12 +1067,6 @@ export function __adoptBindings<Props>(
 		dirty = true;
 		drain();
 	};
-	const owner = currentSignalOwner();
-	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
-	refresh[NATIVE_TRANSITION_CONSUMER] = {
-		active: () => !disposed,
-		prepare: () => run(() => drain(true)),
-	};
 	const handle: BindingHandle & Partial<BindingHandoffCapability> = { refresh, dispose };
 	if (descriptor.handoff === 'host') {
 		published = () => {
@@ -1436,12 +1428,6 @@ export function __adoptScalarBindings<Props>(
 		revision++;
 		dirty = true;
 		drain();
-	};
-	const owner = currentSignalOwner();
-	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
-	refresh[NATIVE_TRANSITION_CONSUMER] = {
-		active: () => !disposed,
-		prepare: () => run(() => drain(true)),
 	};
 	const handle: BindingHandle = { refresh, dispose };
 	if (signal?.aborted) {

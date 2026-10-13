@@ -306,12 +306,7 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 test('ordinary client roots tree-shake native transitions and require emitted-byte evidence', () => {
 	const ordinary = [source('runtime.ts'), source('signals/read-protocol.ts')];
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary);
-	for (const name of [
-		'signals/transition-candidate.ts',
-		'signals/transition-action.ts',
-		'signals/transition-coordinator.ts',
-		'signals/candidate-producers.ts',
-	]) {
+	for (const name of ['signals/pending.ts', 'signals/candidate-producers.ts']) {
 		verifyTransitionBoundary(scenario('ordinary-client'), [
 			...ordinary,
 			{ ...source(name), bytesInOutput: 0 },
@@ -398,20 +393,11 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 		),
 		'The independent engine control must retain its actual graph.',
 	);
-	verifyTransitionBoundary(scenario('engine'), engine.inputs);
 	assert.ok(
 		native.inputs.some(
-			(input) =>
-				input.path.endsWith('/src/signals/transition-candidate.ts') && input.bytesInOutput > 0,
+			(input) => input.path.endsWith('/src/signals/pending.ts') && input.bytesInOutput > 0,
 		),
-		'The compiled native-read control must retain the concrete transition implementation.',
-	);
-	assert.ok(
-		native.inputs.some(
-			(input) =>
-				input.path.endsWith('/src/signals/transition-coordinator.ts') && input.bytesInOutput > 0,
-		),
-		'The compiled signal Action control must retain its transition coordinator.',
+		'The compiled native-read control must retain pending signal state.',
 	);
 	for (const [label, closure] of [
 		['independent engine', engine],
@@ -462,12 +448,12 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary.inputs);
 });
 
-// Only the renderer consumes the signal Action frame and transition coordinator,
+// Only the renderer's transitions create pending signal state (pending.ts),
 // but no import edge loads code only when both renderer and graph are present.
 // package.json places it with the graph by default and with the renderer under
 // `octane-islands`, which documents that load signals without the renderer use.
-// The frame's candidate producers for resources and derived cells follow it:
-// by default the binding modules that create those cells carry them.
+// The candidate producers for resources and derived cells follow it: by
+// default the binding modules that create those cells carry them.
 test('the octane-islands condition moves signal Actions from signal bundles into the renderer', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const bundle = async (contents, conditions) => {
@@ -492,8 +478,7 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 				.reduce((total, [, input]) => total + input.bytesInOutput, 0);
 		return {
 			code: result.outputFiles[0].text,
-			action: bytes('transition-action'),
-			coordinator: bytes('transition-coordinator'),
+			pending: bytes('pending'),
 			producers: bytes('candidate-producers'),
 		};
 	};
@@ -512,19 +497,14 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 	for (const entry of signalBundles) {
 		const graphPlaced = await bundle(entrySource(entry));
 		assert.ok(
-			graphPlaced.action > 0 && graphPlaced.coordinator > 0,
+			graphPlaced.pending > 0,
 			`${entry.id}: the default build keeps signal Actions with the graph.`,
 		);
 		// The engine entry imports the module that creates resources but creates none.
 		if (entry.id === 'engine')
 			assert.equal(graphPlaced.producers, 0, 'engine: kept a producer for cells it never creates.');
 		const islands = await bundle(entrySource(entry), ['octane-islands']);
-		assert.equal(islands.action, 0, `${entry.id}: an islands signal bundle kept the Action frame.`);
-		assert.equal(
-			islands.coordinator,
-			0,
-			`${entry.id}: an islands signal bundle kept the transition coordinator.`,
-		);
+		assert.equal(islands.pending, 0, `${entry.id}: an islands signal bundle kept pending state.`);
 		assert.equal(
 			islands.producers,
 			0,
@@ -539,21 +519,15 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 	assert.equal((await bundle(cells, ['octane-islands'])).producers, 0);
 	const ordinary = entrySource(scenario('ordinary-client'));
 	const rendererOnly = await bundle(ordinary);
-	assert.deepEqual(
-		[rendererOnly.action, rendererOnly.coordinator, rendererOnly.producers],
-		[0, 0, 0],
-	);
+	assert.deepEqual([rendererOnly.pending, rendererOnly.producers], [0, 0]);
 	// A renderer that reaches no transition runs no Action, so neither placement
 	// carries the frame. The transition engine carries it in an islands build.
 	const islandsRendererOnly = await bundle(ordinary, ['octane-islands']);
-	assert.deepEqual(
-		[islandsRendererOnly.action, islandsRendererOnly.coordinator, islandsRendererOnly.producers],
-		[0, 0, 0],
-	);
+	assert.deepEqual([islandsRendererOnly.pending, islandsRendererOnly.producers], [0, 0]);
 	const transitions = `export { createRoot, startTransition } from 'octane';`;
 	const islandsRenderer = await bundle(transitions, ['octane-islands']);
 	assert.ok(
-		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0 && islandsRenderer.producers > 0,
+		islandsRenderer.pending > 0 && islandsRenderer.producers > 0,
 		'An islands build must carry signal Actions and their candidate producers with the renderer.',
 	);
 
@@ -687,18 +661,6 @@ test('independent engine rejects rendering, compiler, DevTools, and the old Alie
 		/graph source is missing/,
 	);
 	verifyBundleInputs(scenario('engine'), independent);
-	for (const entry of BUNDLE_CASES.filter((entry) => entry.id === 'engine' || entry.rendererFree)) {
-		verifyTransitionBoundary(entry, [source('signals/transition-state.ts')]);
-		for (const bytesInOutput of [0, 1]) {
-			assert.throws(
-				() =>
-					verifyTransitionBoundary(entry, [
-						{ ...source('signals/transition-candidate.ts'), bytesInOutput },
-					]),
-				/early entry reached transition orchestration/,
-			);
-		}
-	}
 	for (const filename of [
 		'runtime.ts',
 		'runtime.server.ts',
