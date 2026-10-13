@@ -2475,7 +2475,7 @@ function unpatchedStatics(
 	path: string,
 ): void {
 	if (!hydrationStaticMatches(server, template, partialStyles, path))
-		(hydration.unpatchedValues ??= new Map()).set(
+		(hydration.values!.unpatchedValues ??= new Map()).set(
 			`${loc ? loc + ': ' : ''}static attributes or markup of the server's ` +
 				describeHydrationNode(server),
 			server,
@@ -18228,8 +18228,10 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	const hydration =
 		preserved?.hydration ?? new HydrationCapability(block, getNextSibling(state.start), null);
 	// A suspended first attempt keeps its capability, so re-check each attempt.
-	if (!hydration.staleServerValues && hydrateServerValuesStale(state))
+	if (!hydration.staleServerValues && hydrateServerValuesStale(state)) {
 		hydration.staleServerValues = true;
+		hydration.values ??= new HydrationValueChecks();
+	}
 	if (preserved === undefined) {
 		if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
 		hydration.protectRootAnchor(state.end);
@@ -21493,15 +21495,14 @@ class HydrationCapability {
 	private rootCleanupBoundary: Node | null = null;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
-	/** Development, or stale captures: classes compared once the pass ends (settleValues). */
-	private classes: Map<Element, PendingHydrationClass> | null = null;
+	/**
+	 * Ordinary production hydration only keeps server attributes. Value checks
+	 * belong to development diagnostics or an activated Hydrate island with
+	 * changed captures. Each pass owns its diagnostics and final class writers.
+	 */
+	values = process.env.NODE_ENV !== 'production' ? new HydrationValueChecks() : null;
 	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
 	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
-	/**
-	 * DEV-only: the server values this pass kept where the client's differ, by
-	 * their warning line, with the node each belongs to (settleValues).
-	 */
-	unpatchedValues: Map<string, Node> | null = null;
 	/**
 	 * The first node of the adopted range whose claim is open (beginClaim),
 	 * until the template that renders that range's content adopts it.
@@ -23011,25 +23012,6 @@ class HydrationCapability {
 	}
 
 	/**
-	 * `el`, an adopted element, keeps the server's `what` (an attribute, its
-	 * class or style, or its raw HTML), `server`, where the client renders
-	 * `client`: as in React, hydration never patches it. Development lists the
-	 * difference in the pass's one warning (settleValues), unless `el`
-	 * suppresses hydration warnings. Stale server values do not match the
-	 * client render instead (staleServerValues).
-	 */
-	private unpatched(el: Element, what: string, server: unknown, client: unknown): void {
-		if (this.staleServerValues)
-			this.mismatch((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
-		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
-			(this.unpatchedValues ??= new Map()).set(
-				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
-					`the client ${JSON.stringify(client)}`,
-				el,
-			);
-	}
-
-	/**
 	 * Hydrating, the server rendered no node where `el`'s de-opt children render
 	 * `child`: as React does for a missing node, the nearest fallback owner
 	 * renders on the client. An element the client built holds client children
@@ -23061,20 +23043,7 @@ class HydrationCapability {
 	 * normalizers never reach a production bundle.
 	 */
 	adoptHTML(el: Element, next: string): void {
-		const script = el.localName === 'script';
-		const server = script
-			? ((STAGED_DOM ? STAGED_DOM.view(el) : el).textContent ?? '')
-			: (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML;
-		const expected =
-			process.env.NODE_ENV === 'production'
-				? this.staleServerValues
-					? next
-					: server
-				: script
-					? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
-					: normalizeHTMLForHydration(el, next);
-		if (server !== expected)
-			this.unpatched(el, '`dangerouslySetInnerHTML` content', server, expected);
+		this.values?.html(this, el, next);
 	}
 
 	/**
@@ -23874,23 +23843,7 @@ class HydrationCapability {
 	allowAttribute(el: Element, name: string, next: string | null): boolean {
 		if (el === null) this.missingElement();
 		if (this.isFresh(el)) return true;
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return false;
-		// Read through the prototype: a form's named control can shadow its method.
-		const ns = attrNamespace(name);
-		const server = ns
-			? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNS(
-					ns,
-					name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name,
-				)
-			: STAGED_DOM
-				? STAGED_DOM.view(el).getAttribute(name)
-				: Element.prototype.getAttribute.call(el, name);
-		if (
-			server !== next &&
-			domBindingClaims.get(el)?.get(name) !== server &&
-			!(next !== null && isAttributeParserNormalizedMatch(server, next))
-		)
-			this.unpatched(el, `attribute \`${name}\``, server, next);
+		this.values?.attribute(this, el, name, next);
 		return false;
 	}
 
@@ -23905,8 +23858,7 @@ class HydrationCapability {
 	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
 		if (el === null) this.missingElement();
 		if (this.isFresh(el)) return false;
-		if (process.env.NODE_ENV !== 'production' || this.staleServerValues)
-			(this.classes ??= new Map()).set(el, { next, absentIsEmpty });
+		this.values?.keepClass(el, next, absentIsEmpty);
 		return true;
 	}
 
@@ -23928,7 +23880,135 @@ class HydrationCapability {
 	): boolean {
 		if (el === null) this.missingElement();
 		if (this.isFresh(el)) return false;
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return true;
+		this.values?.style(this, el, value, staticCss, entries);
+		return true;
+	}
+
+	/**
+	 * A compiled walk of an adopted template found no server node where the
+	 * template has the element that a binding writes: the server rendered
+	 * fewer nodes there than the client.
+	 */
+	private missingElement(): never {
+		this.mismatch(undefined, () => 'an element', null);
+	}
+
+	/**
+	 * Runs once a pass adopted its content and its render-phase updates
+	 * settled. Compares the texts those updates rendered again (keepsText) and
+	 * the class each adopted element's last writer set (keepsClass), then
+	 * publishes development's one warning per pass, as React's, for the server
+	 * values the pass kept where the client's differ (unpatched). A boundary
+	 * whose body adopted a node and then threw to its catch arm has removed it
+	 * since, and it is not compared.
+	 */
+	settleValues(): void {
+		const root = domNode(this.rootBlock.parentNode);
+		const texts = this.pendingTexts;
+		if (texts !== null) {
+			this.pendingTexts = null;
+			for (const [node, { server, loc }] of texts) {
+				const text = (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!;
+				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
+					this.mismatch(
+						loc || (domNode(node).parentNode as any)?.__oct_loc,
+						() => `text ${JSON.stringify(text)}`,
+						(STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(server ?? ''),
+					);
+			}
+		}
+		this.values?.settle(this, root);
+	}
+}
+
+/**
+ * Per-pass attribute checks, only instantiated by Hydrate when server captures
+ * may be stale, or in development to report kept server values. Plain
+ * production hydrateRoot never needs to compare attributes, class, style or
+ * raw HTML; keeping this owner out of its capability lets bundlers drop those
+ * comparisons when Hydrate is absent.
+ */
+class HydrationValueChecks {
+	private classes: Map<Element, PendingHydrationClass> | null = null;
+	unpatchedValues: Map<string, Node> | null = null;
+
+	/** Suspense retries outside a stale island still need their own last writers. */
+	forPass(): HydrationValueChecks {
+		return new HydrationValueChecks();
+	}
+
+	/**
+	 * `el`, an adopted element, keeps the server's `what` (an attribute, its
+	 * class or style, or its raw HTML), `server`, where the client renders
+	 * `client`: as in React, hydration never patches it. Development lists the
+	 * difference in the pass's one warning (settleValues), unless `el`
+	 * suppresses hydration warnings. Stale server values do not match the
+	 * client render instead (staleServerValues).
+	 */
+	private unpatched(
+		hydration: HydrationCapability,
+		el: Element,
+		what: string,
+		server: unknown,
+		client: unknown,
+	): void {
+		if (hydration.staleServerValues)
+			hydration.mismatch((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
+		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
+			(this.unpatchedValues ??= new Map()).set(
+				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
+					`the client ${JSON.stringify(client)}`,
+				el,
+			);
+	}
+
+	html(hydration: HydrationCapability, el: Element, next: string): void {
+		const script = el.localName === 'script';
+		const server = script
+			? ((STAGED_DOM ? STAGED_DOM.view(el) : el).textContent ?? '')
+			: (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML;
+		const expected =
+			process.env.NODE_ENV === 'production'
+				? hydration.staleServerValues
+					? next
+					: server
+				: script
+					? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
+					: normalizeHTMLForHydration(el, next);
+		if (server !== expected)
+			this.unpatched(hydration, el, '`dangerouslySetInnerHTML` content', server, expected);
+	}
+
+	attribute(hydration: HydrationCapability, el: Element, name: string, next: string | null): void {
+		// Read through the prototype: a form's named control can shadow its method.
+		const ns = attrNamespace(name);
+		const server = ns
+			? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNS(
+					ns,
+					name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name,
+				)
+			: STAGED_DOM
+				? STAGED_DOM.view(el).getAttribute(name)
+				: Element.prototype.getAttribute.call(el, name);
+		if (
+			server !== next &&
+			domBindingClaims.get(el)?.get(name) !== server &&
+			!(next !== null && isAttributeParserNormalizedMatch(server, next))
+		)
+			this.unpatched(hydration, el, `attribute \`${name}\``, server, next);
+	}
+
+	keepClass(el: Element, next: string | null, absentIsEmpty: boolean): void {
+		(this.classes ??= new Map()).set(el, { next, absentIsEmpty });
+	}
+
+	style(
+		hydration: HydrationCapability,
+		el: HTMLElement | SVGElement,
+		value: any,
+		staticCss?: string,
+		entries?: readonly unknown[],
+	): void {
 		const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
 		const server = style.cssText;
 		const expectedStyle = domNode(
@@ -23967,43 +24047,10 @@ class HydrationCapability {
 			// So is a whole style that one published.
 			claims?.get('style') !== server
 		)
-			this.unpatched(el, 'style', server, expected);
-		return true;
+			this.unpatched(hydration, el, 'style', server, expected);
 	}
 
-	/**
-	 * A compiled walk of an adopted template found no server node where the
-	 * template has the element that a binding writes: the server rendered
-	 * fewer nodes there than the client.
-	 */
-	private missingElement(): never {
-		this.mismatch(undefined, () => 'an element', null);
-	}
-
-	/**
-	 * Runs once a pass adopted its content and its render-phase updates
-	 * settled. Compares the texts those updates rendered again (keepsText) and
-	 * the class each adopted element's last writer set (keepsClass), then
-	 * publishes development's one warning per pass, as React's, for the server
-	 * values the pass kept where the client's differ (unpatched). A boundary
-	 * whose body adopted a node and then threw to its catch arm has removed it
-	 * since, and it is not compared.
-	 */
-	settleValues(): void {
-		const root = domNode(this.rootBlock.parentNode);
-		const texts = this.pendingTexts;
-		if (texts !== null) {
-			this.pendingTexts = null;
-			for (const [node, { server, loc }] of texts) {
-				const text = (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!;
-				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
-					this.mismatch(
-						loc || (domNode(node).parentNode as any)?.__oct_loc,
-						() => `text ${JSON.stringify(text)}`,
-						(STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(server ?? ''),
-					);
-			}
-		}
+	settle(hydration: HydrationCapability, root: Node): void {
 		const classes = this.classes;
 		if (classes !== null) {
 			this.classes = null;
@@ -24014,7 +24061,7 @@ class HydrationCapability {
 					: Element.prototype.getAttribute.call(el, 'class');
 				const server = absentIsEmpty && raw === null ? '' : raw;
 				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
-					this.unpatched(el, 'attribute `class`', server, next);
+					this.unpatched(hydration, el, 'attribute `class`', server, next);
 			}
 		}
 		if (process.env.NODE_ENV === 'production') return;
@@ -42908,8 +42955,8 @@ interface InitialSuspenseHydration {
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
-	/** The captures changed before a dormant boundary activated; see staleServerValues. */
-	stale?: true;
+	/** A stale activation's value checks, retained while an arm waits outside it. */
+	stale?: HydrationValueChecks;
 }
 
 // Server metadata gives each resolved arm an independent adoption scope. The
@@ -43144,8 +43191,11 @@ function renderInitialSuspenseHydration(
 	hydration.protectRootAnchor(initial.end);
 	const previousHydration = currentHydration;
 	// Only the activation knows; a retry runs outside it, over the restored arm.
-	if (previousHydration?.staleServerValues || initial.stale)
-		hydration.staleServerValues = initial.stale = true;
+	if (previousHydration?.staleServerValues) initial.stale = previousHydration.values!;
+	if (initial.stale !== undefined) {
+		hydration.staleServerValues = true;
+		initial.stale = hydration.values = initial.stale.forPass();
+	}
 	if (previousHydration?.retryPresentation !== undefined)
 		hydration.retryPresentation = previousHydration.retryPresentation;
 	const previousCapture = WIP_CAPTURE;
