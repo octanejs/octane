@@ -401,10 +401,11 @@ async function linkChunks(chunks, entryChunk) {
 		plugins: [
 			{
 				name: 'octane-reachability-split-chunks',
+				// Chunk file names and their imports are POSIX on every platform.
 				resolveId(source, importer) {
-					const file = importer?.startsWith(prefix)
-						? path.posix.join(path.posix.dirname(importer.slice(prefix.length)), source)
-						: path.relative(directory, source);
+					if (source.startsWith(prefix)) return source;
+					if (!importer?.startsWith(prefix)) return null;
+					const file = path.posix.join(path.posix.dirname(importer.slice(prefix.length)), source);
 					return files.has(file) ? prefix + file : null;
 				},
 				load(id) {
@@ -417,7 +418,7 @@ async function linkChunks(chunks, entryChunk) {
 			minify: false,
 			target: 'esnext',
 			lib: { entry: entryChunk.fileName, formats: ['iife'], name: '__OCTANE_REACHABILITY__' },
-			rollupOptions: { treeshake: false },
+			rollupOptions: { input: prefix + entryChunk.fileName, treeshake: false },
 		},
 	});
 	const built = Array.isArray(result) ? result : [result];
