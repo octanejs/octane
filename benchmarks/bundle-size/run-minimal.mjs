@@ -11,6 +11,9 @@
 // default client minifier (`'oxc'`); Vite's `'esbuild'` mode would turn off
 // Rolldown's own minifier and the dead-code elimination that comes with it.
 // esbuild scenarios represent esbuild users and keep esbuild's `minify: true`.
+// The split-shell scenario builds a multi-chunk ESM application whose
+// `codeSplitting` groups put Octane's runtime and signal engine in chunks of
+// their own, and reports each group's chunk beside the whole application.
 process.env.NODE_ENV = 'production';
 
 import assert from 'node:assert/strict';
@@ -143,6 +146,7 @@ const bindingScenarios = [
 		forbidden: /\/packages\/usehooks-ts\/src\/timing\.ts$/,
 	},
 ];
+const splitShell = path.join(directory, 'fixtures/split-shell');
 const scenarios = [
 	...existingScenarios.map(([id, extension]) => ({
 		id,
@@ -150,6 +154,13 @@ const scenarios = [
 		extension,
 		bundler: 'vite',
 	})),
+	{
+		id: 'split-shell',
+		name: 'split-shell',
+		bundler: 'vite-split',
+		entry: path.join(splitShell, 'client.ts'),
+		server: path.join(splitShell, 'server.ts'),
+	},
 	...['vite', 'esbuild'].map((bundler) => ({
 		id: 'behavior-root',
 		name: `behavior-root-${bundler}`,
@@ -269,12 +280,32 @@ const effectControls = {
 	],
 };
 const effectDeclarations = Object.values(effectControls).flat();
+// The split shell uses neither ViewTransition nor Activity, so its runtime chunk
+// must drop their optional drivers as a single bundle does; renderBlockInner is
+// the control that proves the source-map oracle sees the chunk.
+const splitControls = {
+	dropped: [
+		'STAGED_DOM',
+		'VIEW_TRANSITION_DRIVER',
+		'DEFERRED_LAYOUT_DRIVER',
+		'STAGED_COMMIT_CAPTURE',
+		'activityRefState',
+		'renderHiddenActivity',
+		'rehideActivityAfterDescendantRender',
+	],
+	kept: ['renderBlockInner'],
+};
+const runtimeRanges = (names) =>
+	resolveDeclarationRanges(
+		(source) => fs.readFileSync(path.join(repository, 'packages/octane/src', source), 'utf8'),
+		(text, source) => parseAst(text, { lang: 'ts' }, source),
+		names.map((name) => ({ name, source: 'runtime.ts' })),
+	);
 const effectRanges = selectedScenarios.some(({ id }) => Object.hasOwn(effectControls, id))
-	? resolveDeclarationRanges(
-			(source) => fs.readFileSync(path.join(repository, 'packages/octane/src', source), 'utf8'),
-			(text, source) => parseAst(text, { lang: 'ts' }, source),
-			effectDeclarations.map((name) => ({ name, source: 'runtime.ts' })),
-		)
+	? runtimeRanges(effectDeclarations)
+	: [];
+const splitRanges = selectedScenarios.some(({ bundler }) => bundler === 'vite-split')
+	? runtimeRanges([...splitControls.dropped, ...splitControls.kept])
 	: [];
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
@@ -315,8 +346,8 @@ export function run(container) {
 // companion's `render()` runs from a production server build of the same
 // application modules, and its HTML is handed to the measured client bundle.
 // The server build itself is never measured.
-async function renderServerMarkup(id) {
-	const entry = path.join(fixtures, `${id}.server.ts`);
+async function renderServerMarkup({ id, server }) {
+	const entry = server ?? path.join(fixtures, `${id}.server.ts`);
 	if (!fs.existsSync(entry)) return undefined;
 	const result = await buildVite({
 		configFile: false,
@@ -331,7 +362,8 @@ async function renderServerMarkup(id) {
 			ssr: entry,
 			minify: false,
 			target: 'esnext',
-			rollupOptions: { output: { format: 'esm' } },
+			// A lazy route's chunk is inlined: the server bundle is one module.
+			rollupOptions: { output: { format: 'esm', codeSplitting: false } },
 		},
 	});
 	const built = Array.isArray(result) ? result : [result];
@@ -350,7 +382,128 @@ async function renderServerMarkup(id) {
 	}
 }
 
+// A production application's cache groups: the signal engine, then the rest of
+// the octane package. Everything else is application code.
+const splitGroups = [
+	{ name: 'octane-signals-engine', test: /\/packages\/octane\/src\/signals\//, priority: 2 },
+	{ name: 'octane-runtime', test: /\/packages\/octane\/src\//, priority: 1 },
+];
+
+// jsdom runs classic scripts only, so the emitted chunks are linked into one
+// script as they are, with no tree shaking or minification of their code.
+async function linkChunks(chunks, entryChunk) {
+	const prefix = '\0split-chunk:';
+	const files = new Map(chunks.map((chunk) => [chunk.fileName, chunk.code]));
+	const result = await buildVite({
+		configFile: false,
+		root: directory,
+		logLevel: 'error',
+		plugins: [
+			{
+				name: 'octane-reachability-split-chunks',
+				// Chunk file names and their imports are POSIX on every platform.
+				resolveId(source, importer) {
+					if (source.startsWith(prefix)) return source;
+					if (!importer?.startsWith(prefix)) return null;
+					const file = path.posix.join(path.posix.dirname(importer.slice(prefix.length)), source);
+					return files.has(file) ? prefix + file : null;
+				},
+				load(id) {
+					return id.startsWith(prefix) ? files.get(id.slice(prefix.length)) : null;
+				},
+			},
+		],
+		build: {
+			write: false,
+			minify: false,
+			target: 'esnext',
+			lib: { entry: entryChunk.fileName, formats: ['iife'], name: '__OCTANE_REACHABILITY__' },
+			rollupOptions: { input: prefix + entryChunk.fileName, treeshake: false },
+		},
+	});
+	const built = Array.isArray(result) ? result : [result];
+	const linked = built[0].output.filter((file) => file.type === 'chunk');
+	assert.equal(linked.length, 1, 'split-shell: the linked chunks must form one script');
+	return linked[0].code;
+}
+
+async function buildSplitScenario(scenario, entry) {
+	const result = await buildVite({
+		configFile: false,
+		root: directory,
+		mode: 'production',
+		logLevel: 'error',
+		plugins: [octane({ hmr: false })],
+		define: productionDefines,
+		build: {
+			write: false,
+			minify: 'oxc',
+			sourcemap: 'hidden',
+			target: 'esnext',
+			modulePreload: false,
+			rollupOptions: {
+				input: entry,
+				preserveEntrySignatures: 'exports-only',
+				output: { format: 'es', codeSplitting: { groups: splitGroups } },
+			},
+		},
+	});
+	const built = Array.isArray(result) ? result : [result];
+	const chunks = built[0].output.filter((file) => file.type === 'chunk');
+	const [runtime, signals] = ['octane-runtime', 'octane-signals-engine'].map((group) => {
+		const found = chunks.filter((chunk) => chunk.name === group);
+		assert.equal(found.length, 1, `${scenario.name}: expected one ${group} chunk`);
+		return found[0];
+	});
+	for (const chunk of chunks) {
+		if (chunk === runtime || chunk === signals) continue;
+		const octaneModule = Object.keys(chunk.modules).find((id) =>
+			id.includes('/packages/octane/src/'),
+		);
+		assert.equal(
+			octaneModule,
+			undefined,
+			`${scenario.name}: application chunk ${chunk.fileName} holds ${octaneModule}`,
+		);
+	}
+	const retained = retainedDeclarations(runtime.map, splitRanges);
+	assert.deepEqual(
+		[
+			...splitControls.dropped.filter((name) => retained.has(name)),
+			...splitControls.kept.filter((name) => !retained.has(name)),
+		],
+		[],
+		`${scenario.name}: the runtime chunk must drop unused optional drivers and keep its control`,
+	);
+	const entryChunk = chunks.find((chunk) => chunk.isEntry);
+	const modules = chunks.flatMap((chunk) => Object.keys(chunk.modules));
+	const runtimeModule = Object.keys(runtime.modules).find((id) =>
+		id.endsWith('/packages/octane/src/runtime.ts'),
+	);
+	const files = chunks.map((chunk) => chunk.code);
+	return {
+		code: files.join('\n'),
+		executable: await linkChunks(chunks, entryChunk),
+		rows: [
+			{ name: scenario.name, files },
+			{
+				name: `${scenario.name}-runtime`,
+				files: [runtime.code],
+				modules: Object.keys(runtime.modules),
+			},
+			{
+				name: `${scenario.name}-signals`,
+				files: [signals.code],
+				modules: Object.keys(signals.modules),
+			},
+		],
+		modules,
+		runtimeExports: runtime.modules[runtimeModule].renderedExports,
+	};
+}
+
 async function buildScenario(scenario, entry) {
+	if (scenario.bundler === 'vite-split') return buildSplitScenario(scenario, entry);
 	if (scenario.bundler === 'esbuild') {
 		const result = await buildEsbuild({
 			absWorkingDir: repository,
@@ -479,9 +632,11 @@ try {
 	for (const scenario of selectedScenarios) {
 		const { id, name } = scenario;
 		const serverScenario = id.startsWith('server-');
-		const entry = path.join(fixtures, `${id}.${scenario.extension}`);
+		const entry = scenario.entry ?? path.join(fixtures, `${id}.${scenario.extension}`);
 		const {
 			code,
+			executable = code,
+			rows = [{ name, files: [code] }],
 			modules,
 			emittedModules = modules,
 			runtimeExports,
@@ -677,36 +832,40 @@ try {
 			);
 		}
 
-		const snapshot = await verifyScenario(id, code, await renderServerMarkup(id));
-		const bytes = Buffer.from(code);
-		const measured = {
-			raw: bytes.length,
-			gzip: gzipSync(bytes, { level: zlib.Z_BEST_COMPRESSION }).length,
-			brotli: brotliCompressSync(bytes, {
-				params: { [zlib.BROTLI_PARAM_QUALITY]: zlib.BROTLI_MAX_QUALITY },
-			}).length,
-		};
-		payload.targets.push({
-			name,
-			ops: Object.fromEntries(
-				Object.entries(measured).map(([metric, value]) => [metric, stat(value)]),
-			),
-			meta: {
-				modules: modules.map((id) =>
-					id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
+		const snapshot = await verifyScenario(id, executable, await renderServerMarkup(scenario));
+		// A row's files are fetched separately, so each compresses on its own.
+		for (const row of rows) {
+			const measured = { raw: 0, gzip: 0, brotli: 0 };
+			for (const file of row.files) {
+				const bytes = Buffer.from(file);
+				measured.raw += bytes.length;
+				measured.gzip += gzipSync(bytes, { level: zlib.Z_BEST_COMPRESSION }).length;
+				measured.brotli += brotliCompressSync(bytes, {
+					params: { [zlib.BROTLI_PARAM_QUALITY]: zlib.BROTLI_MAX_QUALITY },
+				}).length;
+			}
+			payload.targets.push({
+				name: row.name,
+				ops: Object.fromEntries(
+					Object.entries(measured).map(([metric, value]) => [metric, stat(value)]),
 				),
-				hasRuntime,
-				hasServerRuntime,
-				hasVanillaStore,
-				...(scenario.package ? { bundler: scenario.bundler, package: scenario.package } : null),
-				...(id.startsWith('root-static') || id === 'cli-spa-starter' ? { runtimeExports } : null),
-				snapshot,
-			},
-		});
-		console.log(
-			`${name.padEnd(32)} raw ${String(measured.raw).padStart(6)}  ` +
-				`gzip ${String(measured.gzip).padStart(5)}  brotli ${String(measured.brotli).padStart(5)}`,
-		);
+				meta: {
+					modules: (row.modules ?? modules).map((id) =>
+						id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
+					),
+					hasRuntime,
+					hasServerRuntime,
+					hasVanillaStore,
+					...(scenario.package ? { bundler: scenario.bundler, package: scenario.package } : null),
+					...(id.startsWith('root-static') || id === 'cli-spa-starter' ? { runtimeExports } : null),
+					snapshot,
+				},
+			});
+			console.log(
+				`${row.name.padEnd(32)} raw ${String(measured.raw).padStart(6)}  ` +
+					`gzip ${String(measured.gzip).padStart(5)}  brotli ${String(measured.brotli).padStart(5)}`,
+			);
+		}
 	}
 } catch (error) {
 	payload.failed = error?.stack ?? String(error);
