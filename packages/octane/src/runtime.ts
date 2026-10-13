@@ -42823,10 +42823,10 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let scopedNativeRaw: string | undefined;
 	let hasScopedBoundary = false;
 	let freshBoundary = false;
-	const first = getNextSibling(state.start);
+	const start = state.start;
+	const first = getNextSibling(start);
 	const open = adopting
-		? (hydration!.bindingTryState(state.start) ??
-			(STAGED_DOM ? STAGED_DOM.view(state.start as Comment) : (state.start as Comment)).data)
+		? (hydration!.bindingTryState(start) ?? (STAGED_DOM ? STAGED_DOM.view(start) : start).data)
 		: '';
 	let streamedBoundaryId: string | null = null;
 	let unfinished: UnfinishedArm | null = null;
@@ -46263,13 +46263,11 @@ function renderBranchSlot(
 				let inner: Comment | null = null;
 				let innerEnd: Comment | null = null;
 				let first: Node | null = null;
+				const start = state.start as Comment;
 				if (
 					hydration !== null &&
-					(STAGED_DOM
-						? STAGED_DOM.view(state.start as Comment)
-						: (state.start as Comment)
-					).data.startsWith(BINDING_OPEN_PREFIX) &&
-					hydration.isOpen(getNextSibling(state.start))
+					(STAGED_DOM ? STAGED_DOM.view(start) : start).data.startsWith(BINDING_OPEN_PREFIX) &&
+					hydration.isOpen(getNextSibling(start))
 				) {
 					inner = getNextSibling(state.start) as Comment;
 					innerEnd = hydration.close(inner);
