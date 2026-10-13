@@ -14,4 +14,6 @@ write. A transition whose boundary shows its timeout fallback renders the rest
 of its work in the next task, after the fallback commits.
 
 Apps that use signals with transitions ship about 9.4 kB raw and 2.8 kB gzip
-less framework code.
+less framework code. Compiled DOM binding views and their controls drop the
+transition preview path that no transition reaches any more, and ship 0.3 to
+1.2 kB gzip less.

@@ -58,12 +58,6 @@ import type {
 	BindingControlPrepared,
 } from './dom-binding-controls.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
-import type { BindingControlPreview } from './signals/control-binding.js';
-import {
-	forwardNativeTransitionConsumer,
-	type NativeTransitionNotify,
-	type NativeTransitionPresentation,
-} from './signals/read-protocol.js';
 
 export { __methodDep } from './method-dep.js';
 
@@ -499,18 +493,6 @@ interface Transaction {
 	preparing?: boolean;
 	frame: number;
 	published?: () => void;
-	preview?: BindingPreview;
-	consumer?: NativeTransitionNotify;
-}
-
-interface BindingPreview {
-	receipts: NativeTransitionPresentation[];
-	controls: BindingControlPreview[];
-	fragments: Set<FragmentInstance>;
-	signals: Map<FragmentInstance, Map<number, BindingSignalConnection>>;
-	projections: Map<FragmentInstance, Map<number, BindingProjectionConnection>>;
-	text: Map<RegionInstance, BindingSignalConnection>;
-	disposals: Array<() => void>;
 }
 
 /** @internal Imported only by an artifact carrying the structural takeover proof. */
@@ -827,10 +809,7 @@ function resolveFragment(
 		activated: false,
 	};
 	transaction.all.add(instance);
-	if (fresh) {
-		transaction.candidates.add(instance);
-		transaction.preview?.fragments.add(instance);
-	}
+	if (fresh) transaction.candidates.add(instance);
 	const cursors = new Map<number, Node | null>([[-1, range.start.nextSibling]]);
 	const counts = new Map<number, number>();
 	const regions = new Map<number, BindingRegion>();
@@ -1051,7 +1030,7 @@ function projectValues(
 			: (instance.definition.signalIndices ?? []);
 		for (const index of indices) {
 			requireActive(transaction);
-			let connection = (transaction.preview?.signals.get(instance) ?? instance.signals)?.get(index);
+			let connection = instance.signals?.get(index);
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
 				const prepare = (): (() => void) => {
@@ -1069,9 +1048,7 @@ function projectValues(
 					}
 					return () => writeOperation(instance, index, value, group, transaction);
 				};
-				const notify = forwardNativeTransitionConsumer(transaction.consumer!, (): void =>
-					transaction.notifySignal!(prepare),
-				);
+				const notify = (): void => transaction.notifySignal!(prepare);
 				connection = style
 					? transaction.styles!.connect(
 							instance.nodes[operations[index]![0]] as Element,
@@ -1079,35 +1056,20 @@ function projectValues(
 							transaction.restoreStyles,
 						)
 					: transaction.signals!.connect(notify);
-				if (transaction.preview) {
-					let signals = transaction.preview.signals.get(instance);
-					if (!signals)
-						transaction.preview.signals.set(instance, (signals = new Map(instance.signals)));
-					signals.set(index, connection);
-					const created = connection;
-					transaction.preview.disposals.push(() => created.dispose(true));
-				} else (instance.signals ??= new Map()).set(index, connection);
+				(instance.signals ??= new Map()).set(index, connection);
 			}
 			if (connection) {
 				if (!copied) {
 					values = [...values];
 					copied = true;
 				}
-				if (transaction.preview) {
-					const receipt = connection.preview(values[index]);
-					transaction.preview.receipts.push(receipt);
-					(values as unknown[])[index] = receipt.value;
-				} else (values as unknown[])[index] = connection.read(values[index]);
+				(values as unknown[])[index] = connection.read(values[index]);
 			}
 		}
 	}
 	return values.map((value, index) => {
 		if (operations[index]![1] === 'control') {
-			const control = transaction.preview
-				? instance.controls!.get(index)!.preview(value)
-				: instance.controls!.get(index)!.prepare(value);
-			transaction.preview?.controls.push(control as BindingControlPreview);
-			controls!.set(index, control);
+			controls!.set(index, instance.controls!.get(index)!.prepare(value));
 			return null;
 		}
 		return __normalizeBinding(operations[index]!, value);
@@ -1187,7 +1149,7 @@ function prepareFragment(
 		controls,
 		adapters: instance.cleanup?.prepare?.(environment),
 	};
-	if (!transaction.preview && (instance.signals || instance.controls || instance.projections)) {
+	if (instance.signals || instance.controls || instance.projections) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
@@ -1208,7 +1170,7 @@ function prepareFragment(
 		if (descriptor.kind === 'text') {
 			let value = descriptor.read(environment);
 			if (descriptor.signal && transaction.signals) {
-				let connection = transaction.preview?.text.get(region) ?? region.signal;
+				let connection = region.signal;
 				if (!connection && transaction.signals.isSignal(value)) {
 					const prepare = (): (() => void) => {
 						if (
@@ -1225,27 +1187,14 @@ function prepareFragment(
 							if (!instance.disposed && !transaction.disposed) writeText(region, next);
 						};
 					};
-					connection = transaction.signals.connect(
-						forwardNativeTransitionConsumer(transaction.consumer!, () =>
-							transaction.notifySignal!(prepare),
-						),
+					connection = region.signal = transaction.signals.connect(() =>
+						transaction.notifySignal!(prepare),
 					);
-					if (transaction.preview) {
-						transaction.preview.text.set(region, connection);
-						const created = connection;
-						transaction.preview.disposals.push(() => created.dispose());
-					} else region.signal = connection;
 				}
 				if (connection) {
-					if (transaction.preview) {
-						const receipt = connection.preview(value);
-						transaction.preview.receipts.push(receipt);
-						value = receipt.value;
-					} else {
-						region.signalPlan = candidate;
-						region.signalFrame = transaction.frame;
-						value = connection.read(value);
-					}
+					region.signalPlan = candidate;
+					region.signalFrame = transaction.frame;
+					value = connection.read(value);
 				}
 			}
 			candidate.text = textValue(value, descriptor.generic);
@@ -1969,13 +1918,12 @@ function bindProgram<Props>(
 				drain();
 			}
 		};
-	const refresh: NativeTransitionNotify = (): void => {
+	const refresh = (): void => {
 		if (transaction.disposed) return;
 		revision++;
 		dirty = true;
 		drain();
 	};
-	transaction.consumer = refresh;
 	transaction.refresh = refresh;
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
@@ -2360,9 +2308,7 @@ function claimProgramControl(
 		transaction.controls.claim(
 			node,
 			instance.definition.bindings[index]![2] as 'value' | 'checked',
-			forwardNativeTransitionConsumer(transaction.consumer!, () =>
-				transaction.notifySignal!(prepare),
-			),
+			() => transaction.notifySignal!(prepare),
 		),
 	);
 }
@@ -2378,9 +2324,7 @@ function projectHostValues(
 		for (const group of instance.definition.projectionGroups) {
 			requireActive(transaction);
 			const first = group[0]![0];
-			let connection = (
-				transaction.preview?.projections.get(instance) ?? instance.projections
-			)?.get(first);
+			let connection = instance.projections?.get(first);
 			if (!connection) {
 				const prepare = (): (() => void) => {
 					if (
@@ -2413,29 +2357,13 @@ function projectHostValues(
 					group,
 					operations,
 					instance.nodes,
-					forwardNativeTransitionConsumer(transaction.consumer!, () =>
-						transaction.notifySignal!(prepare),
-					),
+					() => transaction.notifySignal!(prepare),
 					transaction.restoreStyles,
 				);
-				if (transaction.preview) {
-					let projections = transaction.preview.projections.get(instance);
-					if (!projections)
-						transaction.preview.projections.set(
-							instance,
-							(projections = new Map(instance.projections)),
-						);
-					for (const [index] of group) projections.set(index, connection);
-					const created = connection;
-					transaction.preview.disposals.push(() => created.dispose(true));
-				} else {
-					instance.projections ??= new Map();
-					for (const [index] of group) instance.projections.set(index, connection);
-				}
+				instance.projections ??= new Map();
+				for (const [index] of group) instance.projections.set(index, connection);
 			}
-			const receipt = transaction.preview ? connection.preview(values[first]) : undefined;
-			if (receipt) transaction.preview!.receipts.push(receipt);
-			const projected = receipt ? receipt.value : connection.read(values[first]);
+			const projected = connection.read(values[first]);
 			for (const [index] of group) (values as unknown[])[index] = projected[index];
 		}
 	}

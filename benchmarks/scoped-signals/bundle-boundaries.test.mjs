@@ -3604,15 +3604,15 @@ test('repeated opaque primitive attributes omit policy probes without hiding han
 				t.diagnostic(JSON.stringify(metrics));
 				assert.deepEqual(
 					result.steady,
-					{ helperEntries: 100 * attributeCount, policyEntries: 0 },
-					'The shared helper remains; equal defined scalars omit policy/handle probes.',
+					{ helperEntries: 0, policyEntries: 0 },
+					'A value equal to the committed one records nothing for the commit.',
 				);
 				for (const [phase, count] of [
 					['changed', 1],
 					['nan', 2],
-					['undefinedCalls', 2],
-					['objects', 2],
-					['functions', 2],
+					['undefinedCalls', 1],
+					['objects', 1],
+					['functions', 1],
 				]) {
 					assert.deepEqual(
 						result[phase],
@@ -3620,9 +3620,9 @@ test('repeated opaque primitive attributes omit policy probes without hiding han
 						`${phase}: the binding path remains available.`,
 					);
 				}
-				assert.equal(result.handles.helperEntries, 2 * attributeCount);
+				assert.equal(result.handles.helperEntries, attributeCount);
 				// The first real handle can re-enter once to establish stamped ownership.
-				assert.ok(result.handles.policyEntries >= 2 * attributeCount);
+				assert.ok(result.handles.policyEntries >= attributeCount);
 			}
 		}
 	}
