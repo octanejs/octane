@@ -21,6 +21,32 @@ import {
 // array regime and re-entering it later must keep working — repeatedly — and
 // the intermediate kind must render correctly too.
 describe('value hole kind round-trip', () => {
+	it('keeps an unrelated input between owned list rows when the sole-child list changes kind', () => {
+		const values = [
+			createElement('span', { key: 'a', 'data-owned': 'a' }, 'first'),
+			createElement('span', { key: 'b', 'data-owned': 'b' }, 'second'),
+		];
+		const r = mount(OnlyValue, { value: values });
+		const host = r.find('#value-host');
+		const owned = r.findAll('[data-owned]');
+		const foreign = document.createElement('input');
+		foreign.value = 'outside edit';
+		host.insertBefore(foreign, owned[1]!);
+		try {
+			r.update(OnlyValue, { value: 'ready' });
+			expect(host.textContent).toBe('ready');
+			expect(foreign.parentNode).toBe(host);
+			expect(foreign.value).toBe('outside edit');
+			expect(r.findAll('[data-owned]')).toEqual([]);
+			r.update(OnlyValue, { value: values });
+			expect(foreign.parentNode).toBe(host);
+			expect(foreign.value).toBe('outside edit');
+			expect(r.findAll('[data-owned]').map((row) => row.textContent)).toEqual(['first', 'second']);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('survives array -> text -> array on a sole-child hole', () => {
 		const r = mount(HoleKindRoundTrip);
 		expect(r.findAll('#host i').map((el) => el.textContent)).toEqual(['a', 'b']);

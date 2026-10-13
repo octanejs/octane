@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { Browser } from 'playwright';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
-import { openStagePage } from './harness.js';
+import { closeHostStateServer, openStagePage } from './harness.js';
 
 let browser: Browser;
 beforeAll(async () => {
@@ -9,208 +9,172 @@ beforeAll(async () => {
 });
 afterAll(async () => {
 	await browser?.close();
+	await closeHostStateServer();
 });
 
-it('reads committed scroll geometry until queued scrolling is published', async () => {
+it('preserves external form ownership, committed radios and raw HTML until its real renderer update', async () => {
 	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
 	try {
-		const observed = await page.evaluate(() => {
-			const host = document.createElement('div');
-			host.style.cssText = 'width:100px;height:100px;overflow:scroll';
-			host.innerHTML = '<div style="height:1000px;width:1000px">content</div>';
-			document.body.appendChild(host);
-			host.scrollTop = 120;
-			host.scrollLeft = 80;
-			const stage = new window.OctaneStage.DOMStage();
-			const prepared = stage.view(host);
-			prepared.scrollTop = 480;
-			prepared.scrollLeft = 360;
-			const before = [host.scrollTop, host.scrollLeft, prepared.scrollTop, prepared.scrollLeft];
-			stage.commit();
-			return { before, after: [host.scrollTop, host.scrollLeft] };
-		});
-		expect(observed.before).toEqual([120, 80, 120, 80]);
-		expect(observed.after).toEqual([480, 360]);
+		await page.evaluate(() =>
+			window.octaneHostState.mount('radio', { rows: ['a', 'b', 'c'], choice: 'a' }),
+		);
+		const form = await page.locator('form').elementHandle();
+		const survivor = await page.locator('[data-row="b"]').elementHandle();
+		const before = await page.locator('[data-raw] > b').elementHandle();
+		await page.evaluate(() =>
+			window.octaneHostState.update({ rows: ['d', 'b', 'c'], choice: 'external' }),
+		);
+		await page.waitForFunction(() => window.octaneHostState.prepared);
+		expect(await before!.evaluate((node) => node.isConnected)).toBe(true);
+		expect(await page.locator('input:checked').getAttribute('value')).toBe('a');
+		expect(await page.locator('section').getAttribute('class')).toBe('before');
+		expect(
+			await form!.evaluate((node) =>
+				[...(node as HTMLFormElement).elements].map((item) => (item as HTMLInputElement).value),
+			),
+		).toEqual(['a', 'b', 'c', 'external']);
+		await page.evaluate(() => window.octaneHostState.publish());
+		expect(await before!.evaluate((node) => node.isConnected)).toBe(false);
+		expect(
+			await survivor!.evaluate((node) => node === document.querySelector('[data-row="b"]')),
+		).toBe(true);
+		expect(
+			await form!.evaluate((node) => {
+				const external = document.querySelector<HTMLInputElement>('[data-external]')!;
+				return {
+					owner: external.form === node,
+					elements: [...(node as HTMLFormElement).elements].map(
+						(item) => (item as HTMLInputElement).value,
+					),
+					checked: [...(node as HTMLFormElement).elements]
+						.filter((item) => (item as HTMLInputElement).checked)
+						.map((item) => (item as HTMLInputElement).value),
+				};
+			}),
+		).toEqual({ owner: true, elements: ['d', 'b', 'c', 'external'], checked: ['external'] });
+		expect(await page.locator('[data-raw]').innerHTML()).toBe('<i>after</i>');
+		await page.locator('[data-external]').dispatchEvent('input');
+		expect(await page.evaluate(() => window.octaneHostState.events)).toEqual(['external']);
 	} finally {
+		await page.evaluate(() => window.octaneHostState.unmount());
 		await page.close();
 	}
 });
 
-it('keeps an external radio associated with the original form through projected changes', async () => {
+it('commits keyed multi-select choices while retaining control identity, draft, focus and selection', async () => {
 	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
 	try {
-		const observed = await page.evaluate(() => {
-			document.body.innerHTML =
-				'<form id="owner"><input type="radio" name="choice" checked></form><input type="radio" name="choice" form="owner">';
-			const form = document.querySelector('form')!;
-			const first = form.querySelector('input')!;
-			const external = document.body.lastElementChild as HTMLInputElement;
-			const stage = new window.OctaneStage.DOMStage();
-			stage.view(external).checked = true;
-			const prepared = {
-				owner: stage.view(external).form === form,
-				members: [...stage.view(form).elements].every(
-					(node, index) => node === [first, external][index],
-				),
-				selected: [stage.view(first).checked, stage.view(external).checked],
-			};
-			const before = [first.checked, external.checked];
-			stage.commit();
-			return { prepared, before, after: [first.checked, external.checked] };
-		});
-		expect(observed).toEqual({
-			prepared: { owner: true, members: true, selected: [false, true] },
-			before: [true, false],
-			after: [false, true],
-		});
-	} finally {
-		await page.close();
-	}
-});
-
-it('prepares independent multi-select choices across groups without publishing or replacing hosts', async () => {
-	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
-	try {
-		const observed = await page.evaluate(() => {
-			document.body.innerHTML =
-				'<form><select multiple><option value="a" selected>A</option><optgroup label="Other" disabled><option value="b">B</option><option value="c">C</option></optgroup></select><input value="draft"></form>';
-			const form = document.querySelector('form')!;
-			const select = form.querySelector('select')!;
-			const input = form.querySelector('input')!;
+		await page.evaluate(() =>
+			window.octaneHostState.mount('select', {
+				rows: ['a', 'b', 'c'],
+				values: ['a'],
+			}),
+		);
+		const select = await page.locator('select').elementHandle();
+		const survivor = await page.locator('option[value=c]').elementHandle();
+		const removed = await page.locator('option[value=b]').elementHandle();
+		const input = await page.locator('input').elementHandle();
+		await input!.evaluate((node) => {
+			const input = node as HTMLInputElement;
 			input.value = 'user draft';
-			const [a, b, c] = [...select.options];
-			const selected = (node: HTMLSelectElement) =>
-				[...node.selectedOptions].map((option) => option.value);
-			const stage = new window.OctaneStage.DOMStage();
-			stage.view(b!).selected = true;
-			stage.view(a!).selected = false;
-			stage.view(c!).selected = true;
-			const prepared = {
-				selection: selected(stage.view(select)),
-				flags: [a, b, c].map((option) => stage.view(option!).selected),
-				value: stage.view(select).value,
-				index: stage.view(select).selectedIndex,
-				identity: [...stage.view(select).selectedOptions].every(
-					(option, index) => option === [b, c][index],
-				),
-			};
-			const before = selected(select);
-			stage.commit();
-			const after = selected(select);
-			const identity = [...select.options].every((option, index) => option === [a, b, c][index]);
-			const draft = input.value;
-			form.reset();
-			const reset = selected(select);
-			const next = new window.OctaneStage.DOMStage();
-			const added = next.created(document.createElement('option'));
-			added.value = 'd';
-			const group = select.querySelector('optgroup')!;
-			next.view(group).insertBefore(added, c!);
-			next.view(group).removeChild(b!);
-			next.view(a!).selected = false;
-			next.view(added).selected = true;
-			const inserted = {
-				selection: selected(next.view(select)),
-				options: [...next.view(select).options].every(
-					(option, index) => option === [a, added, c][index],
-				),
-				before: selected(select),
-			};
-			next.commit();
-			return {
-				prepared,
-				before,
-				after,
-				identity,
-				draft,
-				reset,
-				inserted,
-				final: selected(select),
-				retained: select.options[2] === c,
-				removed: b!.parentNode === null,
-			};
+			input.focus();
+			input.setSelectionRange(2, 7, 'backward');
 		});
-		expect(observed).toEqual({
-			prepared: {
-				selection: ['b', 'c'],
-				flags: [false, true, true],
-				value: 'b',
-				index: 1,
-				identity: true,
-			},
-			before: ['a'],
-			after: ['b', 'c'],
-			identity: true,
-			draft: 'user draft',
-			reset: ['a'],
-			inserted: { selection: ['d'], options: true, before: ['a'] },
-			final: ['d'],
-			retained: true,
-			removed: true,
-		});
+		await page.evaluate(() =>
+			window.octaneHostState.update({
+				rows: ['a', 'b', 'c'],
+				values: ['b', 'c'],
+			}),
+		);
+		await page.waitForFunction(() => window.octaneHostState.prepared);
+		const selected = () =>
+			select!.evaluate((node) =>
+				[...(node as HTMLSelectElement).selectedOptions].map((option) => option.value),
+			);
+		expect(await selected()).toEqual(['a']);
+		await page.evaluate(() => window.octaneHostState.publish());
+		expect(await selected()).toEqual(['b', 'c']);
+		await page.evaluate(() =>
+			window.octaneHostState.update({
+				rows: ['a', 'd', 'c'],
+				values: ['d'],
+			}),
+		);
+		await page.waitForFunction(() => window.octaneHostState.prepared);
+		expect(await selected()).toEqual(['b', 'c']);
+		expect(await removed!.evaluate((node) => node.isConnected)).toBe(true);
+		await page.evaluate(() => window.octaneHostState.publish());
+		expect(await selected()).toEqual(['d']);
+		expect(
+			await select!.evaluate((node) => ({
+				retained: node === document.querySelector('select'),
+				value: (node as HTMLSelectElement).value,
+				index: (node as HTMLSelectElement).selectedIndex,
+				options: [...(node as HTMLSelectElement).options].map((option) => option.value),
+			})),
+		).toEqual({ retained: true, value: 'd', index: 1, options: ['a', 'd', 'c'] });
+		expect(
+			await survivor!.evaluate((node) => node === document.querySelector('option[value=c]')),
+		).toBe(true);
+		expect(await removed!.evaluate((node) => node.isConnected)).toBe(false);
+		expect(
+			await input!.evaluate((node) => {
+				const input = node as HTMLInputElement;
+				return {
+					focused: document.activeElement === input,
+					value: input.value,
+					selection: [input.selectionStart, input.selectionEnd, input.selectionDirection],
+				};
+			}),
+		).toEqual({ focused: true, value: 'user draft', selection: [2, 7, 'backward'] });
 	} finally {
+		await page.evaluate(() => window.octaneHostState.unmount());
 		await page.close();
 	}
 });
 
-it('keeps native select-wide writes and staged multiple changes consistent with option writes', async () => {
+it('publishes select multiple changes and fresh options with the accepted value as one update', async () => {
 	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
 	try {
-		const observed = await page.evaluate(() => {
-			const select = document.createElement('select');
-			select.multiple = true;
-			select.innerHTML =
-				'<option value="a" selected>A</option><option value="b">B</option><option value="c">C</option>';
-			const [a, b, c] = [...select.options];
-			const selected = (node: HTMLSelectElement) =>
-				[...node.selectedOptions].map((option) => option.value);
-			const stage = new window.OctaneStage.DOMStage();
-			const view = stage.view(select);
-			view.multiple = false;
-			stage.view(b!).selected = true;
-			const single = selected(view);
-			view.selectedIndex = 0;
-			view.multiple = true;
-			stage.view(c!).selected = true;
-			const multiple = selected(view);
-			view.value = 'b';
-			const byValue = selected(view);
-			stage.view(a!).selected = true;
-			const prepared = selected(view);
-			const before = selected(select);
-			stage.commit();
-			return { single, multiple, byValue, prepared, before, after: selected(select) };
-		});
-		expect(observed).toEqual({
-			single: ['b'],
-			multiple: ['a', 'c'],
-			byValue: ['b'],
-			prepared: ['a', 'b'],
-			before: ['a'],
-			after: ['a', 'b'],
-		});
+		await page.evaluate(() =>
+			window.octaneHostState.mount('select', {
+				rows: ['a', 'b', 'c'],
+				values: ['a', 'c'],
+			}),
+		);
+		const select = await page.locator('select').elementHandle();
+		const state = () =>
+			select!.evaluate((node) => {
+				const select = node as HTMLSelectElement;
+				return {
+					multiple: select.multiple,
+					selected: [...select.selectedOptions].map((option) => option.value),
+				};
+			});
+		await page.evaluate(() =>
+			window.octaneHostState.update({
+				rows: ['a', 'b', 'c'],
+				values: ['b'],
+				multiple: false,
+			}),
+		);
+		await page.waitForFunction(() => window.octaneHostState.prepared);
+		expect(await state()).toEqual({ multiple: true, selected: ['a', 'c'] });
+		await page.evaluate(() => window.octaneHostState.publish());
+		expect(await state()).toEqual({ multiple: false, selected: ['b'] });
+		await page.evaluate(() =>
+			window.octaneHostState.update({
+				rows: ['a', 'd', 'c'],
+				values: ['a', 'd'],
+				multiple: true,
+			}),
+		);
+		await page.waitForFunction(() => window.octaneHostState.prepared);
+		expect(await state()).toEqual({ multiple: false, selected: ['b'] });
+		await page.evaluate(() => window.octaneHostState.publish());
+		expect(await state()).toEqual({ multiple: true, selected: ['a', 'd'] });
 	} finally {
-		await page.close();
-	}
-});
-
-it('updates a fresh multi-select option after a select-wide staged write', async () => {
-	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
-	try {
-		const observed = await page.evaluate(() => {
-			const stage = new window.OctaneStage.DOMStage();
-			const select = stage.created(document.createElement('select'));
-			select.multiple = true;
-			select.innerHTML = '<option value="a">A</option><option value="b">B</option>';
-			stage.view(select).value = 'a';
-			stage.view(select.options[1]!).selected = true;
-			const prepared = [...stage.view(select).selectedOptions].map((option) => option.value);
-			const flags = [...select.options].map((option) => stage.view(option).selected);
-			stage.commit();
-			return { prepared, flags, after: [...select.selectedOptions].map((option) => option.value) };
-		});
-		expect(observed).toEqual({ prepared: ['a', 'b'], flags: [true, true], after: ['a', 'b'] });
-	} finally {
+		await page.evaluate(() => window.octaneHostState.unmount());
 		await page.close();
 	}
 });

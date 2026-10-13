@@ -155,7 +155,8 @@ describe.each([
 					},
 				}),
 			).toThrow('CSS coercion failed');
-			expect(seen).toEqual(['blue']);
+			// CSS coercion runs while the last accepted style is still visible.
+			expect(seen).toEqual(['red']);
 			expect([first.style.cssText, second.style.cssText]).toEqual(originals);
 		} finally {
 			root.unmount();
@@ -225,7 +226,7 @@ describe.each([
 					},
 				},
 			});
-			expect(seen).toEqual(['blue', 'white', '30px']);
+			expect(seen).toEqual(['red', 'black', '30px']);
 			expect(root.find('#target')).toBe(element);
 			expect(other.find('#target')).toBe(otherElement);
 			expect(style(element)).toEqual(style(otherElement));

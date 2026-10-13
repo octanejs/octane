@@ -110,7 +110,9 @@ describe('hydrateRoot — template-less use() reader rejected on the server', ()
 			resolved: pending<string>(),
 		});
 		expect(container.querySelector('.caught')).toBeNull();
-		expect((container.querySelector('b') as HTMLElement).style.display).toBe('none');
+		// This arm is a fresh client render: its unready primary was never
+		// presented, so only its fallback is published while the read suspends.
+		expect(container.querySelector('b')).toBeNull();
 		expect(container.querySelector('.value')).toBe(value);
 		expect(value.textContent).toBe('later');
 		expect(container.querySelector('em')?.textContent).toBe('first loading');

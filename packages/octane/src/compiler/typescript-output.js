@@ -240,9 +240,23 @@ export function prepareWebTypeScript(program, ctx, allocateName) {
 					const param = node.params[index];
 					if (param.typeAnnotation || param.type === 'AssignmentPattern') continue;
 					if (generated && param.type === 'Identifier' && param.name === '__s') {
-						params.set(param, annotate(param, scopeType(param), true));
-						const binding = lexical.resolveBinding(lexical.nodeScopes.get(node.body), '__s');
-						if (binding !== null) scopes.add(binding.scope);
+						// Public component calls omit their trailing scope/extra.
+						// Internal programs can require arguments after the scope
+						// (for example, the accepted event owner at commit).
+						const optional = node.params
+							.slice(index + 1)
+							.every(
+								(next) =>
+									next.optional ||
+									next.type === 'AssignmentPattern' ||
+									next.type === 'RestElement' ||
+									next.name === '__extra',
+							);
+						params.set(param, annotate(param, scopeType(param), optional));
+						if (optional) {
+							const binding = lexical.resolveBinding(lexical.nodeScopes.get(node.body), '__s');
+							if (binding !== null) scopes.add(binding.scope);
+						}
 					} else if (!(index === 0 && node._octaneContextualProps)) {
 						params.set(
 							param,

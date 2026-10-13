@@ -26,7 +26,6 @@ import type {
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
 import { domBindingClaims } from './dom-binding-claims.js';
-import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import type { BindingHandle } from './dom-bindings.js';
 import {
@@ -280,6 +279,8 @@ import type {
 import {
 	ADOPTION_CONTROL,
 	NativeAdoptionMiss,
+	nativeAdoptionMiss,
+	isNativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
 	nativeProducerPublication,
 	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
@@ -508,6 +509,8 @@ interface PendingEffectEvent {
 export interface Scope {
 	block: Block;
 	parent: Scope | null;
+	/** The rare early native-host lease still awaiting its complete template. */
+	presentation?: PresentationHydrationFrame;
 	/**
 	 * An event handler published this scope as its signal authority. Deletion then
 	 * records retirement for a scope that never resolved an owner, so a handler
@@ -687,7 +690,6 @@ function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 // copy keep the code, so a local copy that must stay is `D ? D : null`. Hence
 // these declarations sit here, away from their features. Read every optional
 // driver in this module that way, NATIVE_READ_DRIVER included.
-let STAGED_DOM: DOMStage | null = null;
 let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
 let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
@@ -1515,6 +1517,8 @@ interface NativeStyleBinding {
 	// style, which seeds the Block's cache if a structured value arrives later.
 	el: HTMLElement | SVGElement | null;
 	style: unknown;
+	snapshot?: ReturnType<typeof prepareTemplateStyle>;
+	native?: SlotPreparation;
 }
 
 function disposeNativeStyleBinding(binding: NativeStyleBinding): void {
@@ -1529,9 +1533,28 @@ function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, sc
 	const value = SIGNAL_BINDINGS_ENABLED
 		? runWithBlockSignalOwner(scope.parent, () => readNativeDomStyle(props.value))
 		: readNativeDomStyle(props.value);
-	setStyle(props.el, value, scope.slots[0]);
-	journalRootProperty(scope.slots, 0, scope.slots[0]);
-	scope.slots[0] = value;
+	const previous = scope.slots[1] as ReturnType<typeof prepareTemplateStyle> | undefined;
+	const next = prepareTemplateStyle(props.el, value, scope.slots[0], previous);
+	prepareSlot(scope, scope.slots, 'native', {
+		publish() {
+			// Presentation hydration seeds the existing raw style before this
+			// scheduled body owns the host for the first time.
+			commitTemplateStyle(
+				props.el,
+				next,
+				scope.slots[1] ??
+					(scope.slots[0] === undefined ? undefined : { value: scope.slots[0], kept: false }),
+			);
+			// If hydration claimed an early owner after this prepare, keep
+			// its actual style as the last applied value. The next client render
+			// must publish even when its authored input equals hydration's.
+			if (!next.kept || scope.slots[1] === previous) {
+				scope.slots[0] = next.raw;
+				scope.slots[1] = next;
+			}
+		},
+		discard() {},
+	});
 }
 
 /**
@@ -1579,7 +1602,7 @@ function writeScalarNativeStyle(
 	el: HTMLElement | SVGElement,
 	value: unknown,
 	// Presentation hydration prepares the takeover write instead.
-	write: (el: HTMLElement | SVGElement, value: unknown, previous: unknown) => void = setStyle,
+	write?: (el: HTMLElement | SVGElement, value: unknown, previous: unknown) => void,
 ): void {
 	if (binding === undefined) {
 		binding = {
@@ -1593,22 +1616,42 @@ function writeScalarNativeStyle(
 		if (owner.slots.length === 0) owner.slots.push(undefined);
 		owner.slots[slotIndex] = binding;
 		registerSlot(owner, binding);
-	} else if (binding.el !== el) {
-		// An incomplete template mount retries with a fresh clone, which must be
-		// written in full even when its values match the abandoned host.
-		if (TRANSITION_JOURNAL !== null) {
-			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'el', binding.el);
-			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-		}
-		binding.el = el;
-		binding.style = undefined;
 	}
-	write(el, value, binding.style);
-	if (TRANSITION_JOURNAL !== null)
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-	// A compiler literal is fresh per render and never escapes, and a primitive
-	// is immutable, so either is its own snapshot.
-	binding.style = value;
+	if (write !== undefined) {
+		// An early presentation owner already prepares under its own lease.
+		write(el, value, binding.el === el ? binding.style : undefined);
+		journalRootProperty(binding, 'el', binding.el);
+		journalRootProperty(binding, 'style', binding.style);
+		binding.el = el;
+		binding.style = value;
+		return;
+	}
+	const previous = binding.el === el ? binding.snapshot : undefined;
+	const next = prepareTemplateStyle(
+		el,
+		value,
+		binding.el === el ? binding.style : undefined,
+		previous,
+	);
+	const state = binding;
+	prepareSlot(owner, state, 'native', {
+		publish() {
+			commitTemplateStyle(
+				el,
+				next,
+				state.el === el
+					? (state.snapshot ??
+							(state.style === undefined ? undefined : { value: state.style, kept: false }))
+					: undefined,
+			);
+			state.el = el;
+			if (!next.kept || state.snapshot === previous) {
+				state.style = next.raw;
+				state.snapshot = next;
+			}
+		},
+		discard() {},
+	});
 }
 
 interface NativeProjectionProps {
@@ -1650,9 +1693,13 @@ function publishNativeProjection(
 
 function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
 	const values = prepareNativeProjection(props, scope);
-	publishNativeProjection(props, values, scope.slots[0] as unknown[] | undefined);
-	journalRootProperty(scope.slots, 0, scope.slots[0]);
-	scope.slots[0] = values;
+	prepareSlot(scope, scope.slots, 'native', {
+		publish() {
+			publishNativeProjection(props, values, scope.slots[0] as unknown[] | undefined);
+			scope.slots[0] = values;
+		},
+		discard() {},
+	});
 }
 
 function preparedNativeStyleBody(
@@ -1747,7 +1794,14 @@ function nativePresentationBinding(
 		// needs an owning Block, seeded with the style that host already carries.
 		const block = createBlock('control-flow', owner.block, el, null, null, body, props);
 		block.parent = owner;
-		if (binding.el === el) block.slots[0] = binding.style;
+		if (binding.native !== undefined) {
+			journalRootProperty(binding, 'native', binding.native);
+			binding.native = undefined;
+		}
+		if (binding.el === el) {
+			block.slots[0] = binding.style;
+			block.slots[1] = binding.snapshot;
+		}
 		journalRootProperty(binding, 'block', binding.block);
 		binding.block = block;
 	} else {
@@ -1757,8 +1811,10 @@ function nativePresentationBinding(
 			// must be applied even when the resolved values match the abandoned host.
 			journalRootProperty(block, 'parentNode', block.parentNode);
 			journalRootProperty(block.slots, 0, block.slots[0]);
+			journalRootProperty(block.slots, 1, block.slots[1]);
 			block.parentNode = el;
 			block.slots[0] = undefined;
+			block.slots[1] = undefined;
 		}
 		journalRootProperty(block, 'props', block.props);
 		block.props = props;
@@ -2137,16 +2193,16 @@ function releaseNativeAdoptions(): void {
 /**
  * Only the renderer-owned arm is replaced; surrounding adopted hosts survive.
  * So is an arm the server could not finish (CLIENT_RENDER_ARM_COMMENT), which
- * the boundary also reports (HydrationCapability.beginUnfinishedArm).
+ * the boundary also reports (hydration: beginUnfinishedArm).
  */
 function takeNativeFreshArm(
-	hydration: HydrationCapability | null,
+	hydration: HydrationAttempt | null,
 	cursor: Node | null,
 	end: Node,
 	ids: RootIdState,
 ): RootIdState | null {
 	if (hydration === null || cursor?.nodeType !== 8) return null;
-	const value = (STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data;
+	const value = (cursor as Comment).data;
 	if (
 		!value.startsWith(NATIVE_SIGNAL_FRESH_COMMENT) &&
 		!value.startsWith(CLIENT_RENDER_ARM_COMMENT)
@@ -2158,11 +2214,9 @@ function takeNativeFreshArm(
 	const count = Number(rawCount);
 	if (!Number.isSafeInteger(count)) return null;
 	reserveHydrationIds(ids, count);
-	// An attempt that is discarded, such as a root's that suspends, restores the
-	// server arm, so the page keeps showing it and the retry finds its marker.
-	hydration.save(domNode(cursor).parentNode!);
-	removeRange(cursor, end);
-	hydration.node = end;
+	// A fresh arm reserves its client IDs now, but keeps its visible server
+	// content and sentinel until the boundary's prepared replacement commits.
+	hydrationCursor.node = end;
 	return {
 		prefix: ids.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
 		next: 0,
@@ -2249,7 +2303,7 @@ function isHydrationSuppressed(el: Node | null): boolean {
  * How development reports a server value that hydration keeps at `el`:
  *   0 — not at all: production-compiled code records no source location.
  *   1 — not at all: the element suppresses hydration warnings.
- *   2 — in the pass's warning (HydrationCapability.settleValues).
+ *   2 — in the pass's warning (hydration: settleValues).
  */
 function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
 	if (isHydrationSuppressed(el)) return 1;
@@ -2262,7 +2316,7 @@ function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
  * threw is discarded. That is often the server's own catch arm, rendered because
  * the server's body threw the same way, and none of it is a mismatch. A body's
  * held diagnostics are dropped when it throws to its catch arm (see
- * HydrationCapability.renderTryBody); otherwise they pass to the enclosing hold,
+ * hydration: renderTryBody); otherwise they pass to the enclosing hold,
  * and publish once the outermost one is released. The array is allocated only
  * when a diagnostic is held.
  */
@@ -2271,7 +2325,7 @@ let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
 
 /**
  * Only-child text hosts that kept their server content under
- * suppressHydrationWarning (HydrationCapability.keepsServerContent). The
+ * suppressHydrationWarning (hydration: keepsServerContent). The
  * client's next text replaces all of it (childTextHole). Only hydration writes
  * it, so a client-only bundle reads it as null.
  */
@@ -2281,7 +2335,7 @@ let KEPT_TEXT_CONTENT: WeakSet<Node> | null = null;
 function clearKeptTextContent(kept: WeakSet<Node>, host: Node): void {
 	if (!kept.delete(host)) return;
 	for (let child = getFirstChild(host); child !== null; child = getFirstChild(host))
-		(STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(child);
+		host.removeChild(child);
 }
 
 /**
@@ -2296,9 +2350,9 @@ function clearKeptTextContent(kept: WeakSet<Node>, host: Node): void {
  */
 const NO_HYDRATION_THROW = {};
 let HYDRATION_THROWN: unknown = NO_HYDRATION_THROW;
-let HYDRATION_THROWN_BY: HydrationCapability | null = null;
+let HYDRATION_THROWN_BY: HydrationAttempt | null = null;
 
-function noteHydrationThrow(error: unknown, by: HydrationCapability | null): void {
+function noteHydrationThrow(error: unknown, by: HydrationAttempt | null): void {
 	HYDRATION_THROWN = error;
 	HYDRATION_THROWN_BY = by;
 }
@@ -2317,10 +2371,17 @@ function clearHydrationThrow(): void {
 function logHydrationMismatch(message: string): void {
 	if (
 		currentHydration?.staleServerValues === true ||
-		currentHydration?.holds(() => logHydrationMismatch(message)) === true
+		(currentHydration == null
+			? void 0
+			: hydrateHolds(currentHydration, () => logHydrationMismatch(message))) === true
 	)
 		return;
-	if (currentHydration?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
+	if (
+		(currentHydration == null
+			? void 0
+			: hydrateAwaitsCommit(currentHydration, () => console.error(message))) !== true
+	)
+		console.error(message);
 }
 
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
@@ -2328,7 +2389,7 @@ function describeHydrationNode(node: Node | null): string {
 	if (node === null) return 'nothing';
 	if (node.nodeType === 1) return `<${(node as Element).localName}>`;
 	if (node.nodeType === 3) {
-		const text = (STAGED_DOM ? STAGED_DOM.view(node as Text) : (node as Text)).nodeValue;
+		const text = (node as Text).nodeValue;
 		// An empty Text node stands for the server's empty text (newText).
 		return text ? `text ${JSON.stringify(text)}` : 'nothing';
 	}
@@ -2410,18 +2471,16 @@ function hydrationStaticMatches(
 	const s = server as Element;
 	const t = template as Element;
 	if (s.localName !== t.localName) return false;
-	const tAttrs = (STAGED_DOM ? STAGED_DOM.view(t) : t).attributes;
+	const tAttrs = t.attributes;
 	for (let i = 0; i < tAttrs.length; i++) {
 		const a = tAttrs[i];
 		// This optional compiler marker is not authored static structure. Actual
 		// writable bindings validate its identity before adopting their state.
-		if ((STAGED_DOM ? STAGED_DOM.view(a) : a).name === HYDRATE_INPUT_ATTR) continue;
+		if (a.name === HYDRATE_INPUT_ATTR) continue;
 		if (
-			(STAGED_DOM ? STAGED_DOM.view(s) : s).getAttribute(
-				(STAGED_DOM ? STAGED_DOM.view(a) : a).name,
-			) !== (STAGED_DOM ? STAGED_DOM.view(a) : a).value &&
+			s.getAttribute(a.name) !== a.value &&
 			!(
-				(STAGED_DOM ? STAGED_DOM.view(a) : a).name === 'style' &&
+				a.name === 'style' &&
 				partialStyles !== undefined &&
 				partialStyles.includes('|' + path + '|')
 			)
@@ -2466,7 +2525,7 @@ function hydrationStaticMatches(
  * drop it.
  */
 function unpatchedStatics(
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	server: Node,
 	template: Node,
 	loc: string | undefined,
@@ -2487,18 +2546,18 @@ function unpatchedStatics(
  * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
  * The first static element root after the leading `<!>` holes decides instead,
  * compared with the server node that the compiled walk reaches from the cursor
- * (HydrationCapability.sibling steps over each hole's server form). Otherwise
+ * (hydration: sibling steps over each hole's server form). Otherwise
  * another fragment's server nodes would stand for this one's: a hole's slot
  * would take one of them as its anchor, and the static roots would never be
  * built. Matches when no static element root follows the leading holes, and
- * under a passthrough root (HydrationCapability.passthroughRoot). Development
+ * under a passthrough root (hydration: passthroughRoot). Development
  * also lists the static differences of the root it compared
  * (unpatchedStatics), which never change the match.
  */
 function fragmentRootMatches(
 	server: Node,
 	fragment: Node,
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	loc: string | undefined,
 	partialStyles: string | undefined,
 ): boolean {
@@ -2509,7 +2568,7 @@ function fragmentRootMatches(
 		if (hydration.passthroughRoot) return true;
 		for (; root !== null && root.nodeType === 8; holes++) root = getNextSibling(root);
 		if (root === null || root.nodeType !== 1) return true;
-		at = hydration.sibling(server, holes);
+		at = hydrateSibling(hydration, server, holes);
 		if (at === null) return false;
 	}
 	if (!hydrationNodeMatches(at, root)) return false;
@@ -4008,7 +4067,6 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 	if (--TRANSITION_JOURNAL_DEPTH === 0) {
 		TRANSITION_JOURNAL = null;
 		TRANSITION_JOURNAL_BAGS = null;
-		flushParkedItems();
 	}
 	// A hold raised isPending over a render in this attempt that showed its
 	// falling edge (raiseTransitionHook). The unwind restored a render inside
@@ -4319,8 +4377,6 @@ function discardRootTransition(owner: RootRenderOwner): void {
 // re-projecting it on resume would be skipped as unchanged.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const JOURNAL_TEXT = 0;
-const JOURNAL_ATTR = 1;
 const JOURNAL_BAG = 2;
 const JOURNAL_PROP = 3;
 const JOURNAL_CREATED = 4;
@@ -4328,7 +4384,6 @@ const JOURNAL_RENDER = 5;
 const JOURNAL_UNDO = 6;
 const JOURNAL_RETIRED = 7;
 const JOURNAL_INPUTS = 8;
-const JOURNAL_EVENT_OWNER = 9;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
 let TRANSITION_JOURNAL: any[] | null = null;
 /** Bags already captured in the open window, so each is snapshotted once. */
@@ -4382,6 +4437,9 @@ interface RootRenderOwner {
 
 interface RootRenderTransaction {
 	owner: RootRenderOwner;
+	/** An interleaved root may flush while this one's user render is still running. */
+	openFrames: number;
+	commitWhenClosed: boolean;
 	log: any[];
 	bags: Map<object, number>;
 	capture: OffscreenCapture;
@@ -4390,9 +4448,7 @@ interface RootRenderTransaction {
 	bagWindow: number;
 	retainedCreated: Set<Block> | null;
 	retired: Set<Block> | null;
-	structures: Map<object, number> | null;
 	commit: Array<() => void> | null;
-	parked: ParkedItem[] | null;
 	aborted: boolean;
 	rootRequest: boolean;
 	hydrating?: boolean;
@@ -4409,7 +4465,7 @@ interface RootRenderTransaction {
 	 * independent island wrappers that no Hydrate in it has adopted yet
 	 * (keptHydrationIsland).
 	 */
-	keptIslands?: Element[];
+	keptIslands?: Array<Element | HydrateSlot>;
 }
 
 interface RootRenderFrame {
@@ -4420,16 +4476,14 @@ interface RootRenderFrame {
 	checkpoint: number;
 	bagWindow: number;
 	depth: number;
-	parked: ParkedItem[] | null;
 	capture: OffscreenCapture | null;
 	discardStamp: number;
 }
 
-// A root can discover its first suspension after any earlier sibling write.
-// Open an undo window before running user render code, but record only touched
-// bindings and changed structure. There is no subtree snapshot or preflight
-// render. Separate root-local logs/captures also isolate interleaved roots in a
-// scheduler drain; an aborted root cannot drop another root's commit work.
+// A root can discover suspension after any sibling prepares. Its capture
+// owns deferred template/slot commits; the log restores JS scope and hook state.
+// Interleaved roots own separate captures, so aborting one cannot drop another's
+// commit work.
 let ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;
 /**
  * The `createdStamp` of the Blocks the active root attempt discards whole on
@@ -4468,6 +4522,8 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		capture.rootTransaction = true;
 		transaction = {
 			owner,
+			openFrames: 0,
+			commitWhenClosed: false,
 			log: [],
 			bags: new Map(),
 			capture,
@@ -4476,15 +4532,14 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			bagWindow: ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW,
 			retainedCreated: null,
 			retired: null,
-			structures: null,
 			commit: null,
-			parked: null,
 			aborted: false,
 			rootRequest: false,
 		};
 		owner.transaction = transaction;
 		ROOT_RENDER_TRANSACTIONS.push(transaction);
 	}
+	transaction.openFrames++;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootEnter(transaction, owner);
 	const frame: RootRenderFrame = {
@@ -4495,7 +4550,6 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		checkpoint: TRANSITION_JOURNAL_CHECKPOINT,
 		bagWindow: TRANSITION_JOURNAL_BAG_WINDOW,
 		depth: TRANSITION_JOURNAL_DEPTH,
-		parked: PARKED_ITEMS,
 		capture: WIP_CAPTURE,
 		discardStamp: ROOT_DISCARD_STAMP,
 	};
@@ -4510,7 +4564,6 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	TRANSITION_JOURNAL_CHECKPOINT = 0;
 	TRANSITION_JOURNAL_BAG_WINDOW = transaction.bagWindow;
 	TRANSITION_JOURNAL_DEPTH = 1;
-	PARKED_ITEMS = transaction.parked;
 	WIP_CAPTURE = transaction.capture;
 	return frame;
 }
@@ -4519,7 +4572,6 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	if (frame === null) return;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootExit();
-	frame.transaction.parked = PARKED_ITEMS;
 	ROOT_RENDER_TRANSACTION = frame.previous;
 	ROOT_DISCARD_STAMP = frame.discardStamp;
 	TRANSITION_JOURNAL = frame.log;
@@ -4527,8 +4579,12 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	TRANSITION_JOURNAL_CHECKPOINT = frame.checkpoint;
 	TRANSITION_JOURNAL_BAG_WINDOW = frame.bagWindow;
 	TRANSITION_JOURNAL_DEPTH = frame.depth;
-	PARKED_ITEMS = frame.parked;
 	WIP_CAPTURE = frame.capture;
+	const transaction = frame.transaction;
+	if (--transaction.openFrames === 0 && transaction.commitWhenClosed) {
+		transaction.commitWhenClosed = false;
+		ROOT_RENDER_TRANSACTIONS.push(transaction);
+	}
 }
 
 function journalUndo(undo: () => void): void {
@@ -4540,114 +4596,11 @@ function journalRootProperty(target: object, key: PropertyKey, oldValue: unknown
 	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, oldValue);
 }
 
-/** Save only a structurally changed slot and its exact, shallow sibling range. */
-function journalRootSlot(
-	state: object,
-	parent: Node,
-	before: Node | null,
-	after: Node | null,
-): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
-		return;
-	const seen = TRANSITION_JOURNAL_BAGS!;
-	const at = seen.get(state) ?? -1;
-	// `seen` holds the snapshot's log index, plus one when the range was taken
-	// with it. A plain snapshot (journalObjectOnce) has no range, so take
-	// another with one; replay restores the older snapshot last.
-	if (at >= TRANSITION_JOURNAL_CHECKPOINT && (at & 1) !== 0) return;
-	seen.set(state, TRANSITION_JOURNAL!.length + 1);
-	TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
-	// Strict adoption prepares scopes, never an undo of the early owner's live DOM.
-	if (!hydrationStarted || PRESENTATION_HYDRATION?.revision === undefined)
-		journalRootRange(parent, before, after);
-}
-
-/** `parent`'s children after `before` (or from its first) up to, not including, `after`. */
-function collectRootRange(parent: Node, before: Node | null, after: Node | null): Node[] {
-	const nodes: Node[] = [];
-	for (
-		let node = before === null ? getFirstChild(parent) : getNextSibling(before);
-		node !== null && node !== after;
-		node = getNextSibling(node)
-	)
-		nodes.push(node);
-	return nodes;
-}
-
-/** Make the range collectRootRange read hold exactly `nodes` again, in order. */
-function restoreRootRange(
-	parent: Node,
-	before: Node | null,
-	after: Node | null,
-	nodes: Node[],
-): void {
-	// A newer undo can already have removed a speculative slot, including its
-	// markers. That bounded snapshot no longer owns a range in this parent;
-	// walking to a bound that is gone would erase unrelated committed siblings.
-	if (
-		(before !== null && (STAGED_DOM ? STAGED_DOM.view(before) : before).parentNode !== parent) ||
-		(after !== null && (STAGED_DOM ? STAGED_DOM.view(after) : after).parentNode !== parent)
-	)
-		return;
-	const retained = new Set(nodes);
-	let node = before === null ? getFirstChild(parent) : getNextSibling(before);
-	while (node !== null && node !== after) {
-		const next = getNextSibling(node);
-		if (!retained.has(node)) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
-		node = next;
-	}
-	restoreRootNodes(parent, nodes, after);
-}
-
-function journalRootRange(parent: Node, before: Node | null, after: Node | null): void {
-	const leases = ROOT_RENDER_TRANSACTION?.owner.bindingLeases;
-	const nodes = collectRootRange(parent, before, after);
-	journalUndo(() => {
-		let restore = nodes;
-		// An early owner can publish while renderer preparation is suspended.
-		// Never replay an older snapshot over its still-live interval.
-		for (const lease of leases ?? []) {
-			if (lease.end === undefined || !lease.active()) continue;
-			let ancestor: Node | null = parent;
-			while (ancestor !== null && ancestor.parentNode !== lease.root.parentNode)
-				ancestor = ancestor.parentNode;
-			for (let current: Node | null = lease.root; current !== null; current = current.nextSibling) {
-				if (current === ancestor) return;
-				if (current === lease.end) break;
-			}
-			const start = restore.indexOf(lease.root);
-			const end = restore.indexOf(lease.end);
-			if (start < 0 || end < start || lease.root.parentNode !== parent) continue;
-			const current: Node[] = [];
-			for (let node: Node | null = lease.root; node !== null; node = node.nextSibling) {
-				current.push(node);
-				if (node === lease.end) break;
-			}
-			restore = [...restore.slice(0, start), ...current, ...restore.slice(end + 1)];
-		}
-		restoreRootRange(parent, before, after, restore);
-	});
-}
-
-/** A de-opt parent is captured only when its child membership/order changes. */
-function journalRootChildren(parent: Node): void {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || ROOT_RENDER_ROLLBACK) return;
-	const structures = (transaction.structures ??= new Map());
-	if ((structures.get(parent) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) return;
-	structures.set(parent, TRANSITION_JOURNAL!.length);
-	journalUndo(() => {
-		structures.delete(parent);
-	});
-	journalRootRange(parent, null, null);
-}
-
 /**
  * Whether hydration runs in a root's hydrating attempt. An attempt that
- * suspends rolls back and retries over the server DOM, so what it changes
- * there joins the root journal and its diagnostics wait for its commit: the
- * attempt that commits reports them once. Strict presentation adoption never
- * undoes the early owner's live DOM (see journalRootSlot).
+ * suspends retries over the server DOM. Its diagnostics wait for commit:
+ * only the accepted attempt reports them. Presentation adoption reports to its
+ * early owner instead.
  */
 function inRootHydrationAttempt(): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
@@ -4658,25 +4611,6 @@ function inRootHydrationAttempt(): boolean {
 		!ROOT_RENDER_ROLLBACK &&
 		PRESENTATION_HYDRATION?.revision === undefined
 	);
-}
-
-/** Do not detach an unchanged focused host merely to restore its own position. */
-function restoreRootNodes(parent: Node, nodes: Node[], anchor: Node | null): void {
-	for (let i = nodes.length - 1; i >= 0; i--) {
-		const node = nodes[i];
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent ||
-			getNextSibling(node) !== anchor
-		) {
-			if (renderingFocus === null)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-			else {
-				captureFocusedMovement(parent, renderingFocus);
-				moveFocusedNodeBefore(parent, node, anchor, renderingFocus);
-			}
-		}
-		anchor = node;
-	}
 }
 
 /** A deferred deletion is already absent from this root's logical render tree. */
@@ -4758,9 +4692,7 @@ function deferRootRange(
 		// Retire the outgoing nodes before any cleanup can move focus off them.
 		nodes.forEach(retireEventHostTree);
 		cleanup?.();
-		for (const node of nodes)
-			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === parent)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
+		for (const node of nodes) if (node.parentNode === parent) parent.removeChild(node);
 		finalize?.();
 	});
 }
@@ -4780,16 +4712,15 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 		transaction,
 		block,
 		block.exclusiveMarkers || (!detachDom && block.startMarker !== block.endMarker),
-		detachDom,
 		unmountBlock as (scope: Scope, detachDom: boolean) => void,
 	);
 	return true;
 }
 
 /**
- * Hand a committed subtree's teardown to its root's commit. With `detachDom`
- * its range leaves the document now. Rollback restores the range, and the
- * commit reconnects it so `release`'s deletion cleanups observe connected DOM.
+ * Hand a committed subtree's teardown to its root's commit. Its range stays
+ * connected while a replacement prepares. Cleanups and event retirement run
+ * at admission before the old range is removed.
  * `scope` is a Block, or a lite arm's Scope whose stand-in carries the range; a
  * stand-in reads as neither a root nor disposed.
  */
@@ -4797,7 +4728,6 @@ function deferRootTeardown(
 	transaction: RootRenderTransaction,
 	scope: Scope,
 	exclusive: boolean,
-	detachDom: boolean,
 	release: (scope: Scope, detachDom: boolean) => void,
 ): void {
 	const block = scope.block;
@@ -4807,12 +4737,8 @@ function deferRootTeardown(
 	const nodes: Node[] = [];
 	let parent: Node | null = null;
 	let after: Node | null = null;
-	if (
-		start !== null &&
-		end !== null &&
-		(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode !== null
-	) {
-		parent = (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode;
+	if (start !== null && end !== null && start.parentNode !== null) {
+		parent = start.parentNode;
 		after = exclusive ? end : getNextSibling(end);
 		for (
 			let node: Node | null = exclusive ? getNextSibling(start) : start;
@@ -4828,24 +4754,11 @@ function deferRootTeardown(
 	let cancelled = false;
 	journalUndo(() => {
 		cancelled = true;
-		if (parent !== null) {
-			const anchor =
-				(STAGED_DOM ? STAGED_DOM.view(after) : after)?.parentNode === parent ? after : null;
-			restoreRootNodes(parent, nodes, anchor);
-		}
 	});
 	const suppressedRefs = REF_DETACH_SUPPRESSION;
 	(transaction.commit ??= []).push(() => {
 		if (cancelled || block.disposed) return;
-		// Deletion cleanups retain their connected-DOM observation. The old
-		// range is reconnected only for teardown, before incoming refs/effects.
-		if (parent !== null) {
-			const anchor =
-				(STAGED_DOM ? STAGED_DOM.view(after) : after)?.parentNode === parent ? after : null;
-			for (const node of nodes)
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent)
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-		}
+		nodes.forEach(retireEventHostTree);
 		const previousSuppression = REF_DETACH_SUPPRESSION;
 		REF_DETACH_SUPPRESSION = suppressedRefs;
 		try {
@@ -4854,12 +4767,8 @@ function deferRootTeardown(
 			REF_DETACH_SUPPRESSION = previousSuppression;
 		}
 		if (parent !== null)
-			for (const node of nodes)
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === parent)
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
+			for (const node of nodes) if (node.parentNode === parent) parent.removeChild(node);
 	});
-	if (detachDom && parent !== null)
-		for (const node of nodes) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
 }
 
 function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block): boolean {
@@ -4867,12 +4776,19 @@ function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block)
 }
 
 function undoCreatedInRootRender(block: Block, transaction: RootRenderTransaction): void {
-	const refCheckpoint = refDetachQueue.length;
-	unmountBlock(
-		block,
-		(!transaction.hydrating || block.kind === 'portal') && !transaction.retainedCreated?.has(block),
+	// A finished child can still be part of an unaccepted render. Its refs
+	// never attached. Suppress only those hosts, whether rollback runs in the
+	// root queue or inside a surrounding Suspense capture. An independent root
+	// unmounted during cleanup must still receive its own real detach.
+	const refs: SuspenseRefEntry[] = [];
+	collectVisibleSubtreeRefs(block, refs);
+	withRefDetachSuppression(refs, () =>
+		unmountBlock(
+			block,
+			(!transaction.hydrating || block.kind === 'portal') &&
+				!transaction.retainedCreated?.has(block),
+		),
 	);
-	refDetachQueue.length = refCheckpoint;
 }
 
 function createdInRootRender(block: Block): void {
@@ -4941,8 +4857,6 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
 				else if (transaction.log[i] === JOURNAL_RETIRED)
 					transaction.log[i + 1].delete(transaction.log[i + 2]);
-				else if (transaction.log[i] === JOURNAL_EVENT_OWNER)
-					transaction.log[i + 1].$$signalOwner = transaction.log[i + 2];
 			}
 			transaction.log.length = 0;
 		}
@@ -4954,11 +4868,6 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 				if (!created[i].disposed) undoCreatedInRootRender(created[i], transaction);
 		discardOffscreenCapture(transaction.capture);
 		transaction.commit = null;
-		// Restored rows have already left the parked list. Only speculative
-		// rows remain, and their ref attachments were never committed.
-		const checkpoint = refDetachQueue.length;
-		flushParkedItems();
-		refDetachQueue.length = checkpoint;
 	} finally {
 		ROOT_RENDER_ROLLBACK = previousRollback;
 		endRootRender(frame);
@@ -5036,6 +4945,13 @@ function commitRootRenders(): void {
 	ROOT_RENDER_TRANSACTIONS = [];
 	for (const transaction of transactions) {
 		const owner = transaction.owner;
+		// A user event can synchronously drain another root from inside render.
+		// Keep this candidate private until its last render frame has returned.
+		// endRootRender requeues it, so a reentrant drain can finish meanwhile.
+		if (transaction.openFrames !== 0) {
+			transaction.commitWhenClosed = true;
+			continue;
+		}
 		const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
 			? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
 			: undefined;
@@ -5071,7 +4987,7 @@ function commitRootRenders(): void {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileRootCommitted(transaction);
 			if (owner.transaction === transaction) owner.transaction = null;
-			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
+			if (STAGED_COMMIT_CAPTURE) {
 				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
 				STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
 			}
@@ -5094,17 +5010,17 @@ function commitRootRenders(): void {
 			// Irreversible deletions precede the incoming ref/layout publication.
 			const commits = transaction.commit;
 			if (commits !== null) {
-				for (const commit of commits) {
-					if (owner.disposed || owner.generation !== acceptedGeneration) break;
-					commit();
-				}
-			}
-			const parked = transaction.parked;
-			if (parked !== null) {
-				for (const item of parked) {
-					if (owner.disposed || owner.generation !== acceptedGeneration) break;
-					unmountParkedItem(item);
-				}
+				const publish = () => {
+					// A still-live staged owner may have had a same-component props
+					// refresh before its native callback. Guard against reentry during
+					// this publication, after the stage validated that receipt.
+					const publishingGeneration = owner.generation;
+					for (const commit of commits) {
+						if (owner.disposed || owner.generation !== publishingGeneration) break;
+						commit();
+					}
+				};
+				if (!STAGED_COMMIT_CAPTURE || !DEFERRED_LAYOUT_DRIVER!.stageAction(publish)) publish();
 			}
 			if (NATIVE_READ_DRIVER) {
 				if (
@@ -5211,47 +5127,6 @@ const BINDING_BAG_ARITY = Symbol();
 // Downstream minifiers may merge these sites; the optimization requires separate sites.
 // Spread preserves enumerable string and symbol values; rollback removes additions.
 
-function cloneBindingBag(bag: any, arity: number): object {
-	switch (arity) {
-		case 0:
-			return { ...bag };
-		case 1:
-			return { ...bag };
-		case 2:
-			return { ...bag };
-		case 3:
-			return { ...bag };
-		case 4:
-			return { ...bag };
-		case 5:
-			return { ...bag };
-		case 6:
-			return { ...bag };
-		case 7:
-			return { ...bag };
-		case 8:
-			return { ...bag };
-		case 9:
-			return { ...bag };
-		case 10:
-			return { ...bag };
-		case 11:
-			return { ...bag };
-		case 12:
-			return { ...bag };
-		case 13:
-			return { ...bag };
-		case 14:
-			return { ...bag };
-		case 15:
-			return { ...bag };
-		case 16:
-			return { ...bag };
-		default:
-			return { ...bag };
-	}
-}
-
 function journalBag(): void {
 	const scope = CURRENT_SCOPE;
 	if (scope === null) return;
@@ -5266,7 +5141,7 @@ function journalBag(): void {
 	if (arity !== undefined) {
 		const window = TRANSITION_JOURNAL_BAG_WINDOW;
 		if (bag.__journalWindow === window) return;
-		const snapshot = cloneBindingBag(bag, arity);
+		const snapshot = { ...bag };
 		TRANSITION_JOURNAL!.push(JOURNAL_BAG, bag, snapshot, null);
 		bag.__journalWindow = window;
 		return;
@@ -5288,624 +5163,61 @@ function journalObjectOnce(obj: object): void {
 }
 
 /** Defaults can move a pristine control's caret just like a live-value write. */
-function journalInputSelection(input: HTMLInputElement | HTMLTextAreaElement): void {
-	if (ROOT_RENDER_TRANSACTION !== null && input.ownerDocument.activeElement === input) {
-		const start = (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionStart;
-		const end = (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionEnd;
-		const direction = (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionDirection;
-		if (start !== null && end !== null)
-			journalUndo(() =>
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).setSelectionRange(
-					start,
-					end,
-					direction ?? undefined,
-				),
-			);
-	}
-}
-
-/**
- * A controlled input keeps three things in step: the live DOM property, the
- * default mirror used by form.reset()/SSR, and its last projected value record.
- * Capture all three after arming the element but before changing any of them.
- * Hydration never writes an `adopted` control's live value, and restoring it
- * through its setter would mark the control dirty, so its record leaves it out.
- */
-function journalControlled(
-	el: Element,
-	prop: string,
-	defaultProp: string,
-	adopted?: boolean,
-): void {
-	if (prop === 'value') journalInputSelection(el as HTMLInputElement | HTMLTextAreaElement);
-	const log = TRANSITION_JOURNAL!;
-	if (!adopted)
-		log.push(JOURNAL_PROP, el, prop, (STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[prop]);
-	log.push(
-		JOURNAL_PROP,
-		el,
-		defaultProp,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[defaultProp],
-	);
-	const ctrl = renderControlledState(el);
-	if (ctrl !== undefined) journalObjectOnce(ctrl);
-	const input = el as HTMLInputElement;
-	if (
-		prop === 'checked' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== ''
-	)
-		journalRadioCousins(input);
-	journalBag();
-}
-
-/** Restore defaults without making an untouched uncontrolled control dirty. */
-function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): void {
-	journalInputSelection(input);
-	if (input.localName === 'textarea') {
-		// defaultValue replaces textarea children. Keep the old text-node identity
-		// as well as its reset value when a root attempt is discarded.
-		if (ROOT_RENDER_TRANSACTION !== null) journalRootChildren(input);
-		else
-			TRANSITION_JOURNAL!.push(
-				JOURNAL_PROP,
-				input,
-				'defaultValue',
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue,
-			);
-		journalBag();
-	} else {
-		// Attribute absence matters too; assigning defaultValue='' on rollback
-		// would create a value attribute that was not previously present.
-		journalAttr(input, 'value');
-	}
-}
-
-/** Find a radio's native group in its document, shadow tree, or containing form. */
 function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
-	const form = (STAGED_DOM ? STAGED_DOM.view(input) : input).form;
-	if (form !== null) return (STAGED_DOM ? STAGED_DOM.view(form) : form).elements;
-	const root = (STAGED_DOM ? STAGED_DOM.view(input) : input).getRootNode();
+	const form = input.form;
+	if (form !== null) return form.elements;
+	const root = input.getRootNode();
 	// Document.getElementsByName is the common fast path; ShadowRoot and
 	// detached fragments need a tree-local lookup that includes their radios.
 	return root.nodeType === 9
-		? (STAGED_DOM ? STAGED_DOM.view(root as Document) : (root as Document)).getElementsByName(
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name,
-			)
-		: (STAGED_DOM
-				? STAGED_DOM.view(root as Element | DocumentFragment)
-				: (root as Element | DocumentFragment)
-			).querySelectorAll('input[type="radio"]');
+		? (root as Document).getElementsByName(input.name)
+		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
 }
 
-/**
- * Record the cousin a radio write is about to clear.
- *
- * Checking a radio makes the platform uncheck its same-name siblings as a side
- * effect, so a cousin cannot record its own prior state: by the time its binding
- * runs it has already been cleared, and an uncontrolled cousin never records at
- * all. Only a currently-checked cousin can be cleared, and a well-formed group
- * has at most one, so this scans the group but adds at most one entry.
- *
- * Group scope mirrors restoreRadioCousins: same non-empty name, same form owner
- * when there is one. Re-recording a cousin across several writes in one window
- * is harmless — the replay runs newest-first, so the earliest value is the one
- * left standing.
- */
-function journalRadioCousins(input: HTMLInputElement): void {
-	const name = (STAGED_DOM ? STAGED_DOM.view(input) : input).name;
-	const group = radioCousins(input);
-	for (let i = 0; i < group.length; i++) {
-		const other = group[i] as HTMLInputElement;
+/** An initial SSR/host adoption creates logical list ownership. Its DOM
+ * is already in place, so discard only scopes created by this attempt. Ordinary
+ * client list changes publish their desired order and never enter this path. */
+function checkpointAdoptedList(state: ForSlot): void {
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	const at = seen.get(state) ?? -1;
+	if (at >= TRANSITION_JOURNAL_CHECKPOINT) return;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const previous = {
+		items: state.items,
+		head: state.head,
+		tail: state.tail,
+		size: state.size,
+		inOrder: state.inOrder,
+		emptyBlock: state.emptyBlock,
+	};
+	seen.set(state, TRANSITION_JOURNAL!.length);
+	state.items = new Map(state.items);
+	journalUndo(() => {
+		for (const block of state.items.values()) {
+			if (previous.items.get(block.key) === block || block.disposed) continue;
+			if (transaction !== null) undoCreatedInRootRender(block, transaction);
+			else discardPreparedBlock(block);
+		}
 		if (
-			other === input ||
-			!(STAGED_DOM ? STAGED_DOM.view(other) : other).checked ||
-			other.localName !== 'input' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).type !== 'radio' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).name !== name ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).form !==
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).form
+			state.emptyBlock !== previous.emptyBlock &&
+			state.emptyBlock !== null &&
+			!state.emptyBlock.disposed
 		) {
-			continue;
+			if (transaction !== null) undoCreatedInRootRender(state.emptyBlock, transaction);
+			else discardPreparedBlock(state.emptyBlock);
 		}
-		TRANSITION_JOURNAL!.push(JOURNAL_PROP, other, 'checked', true);
-	}
+		Object.assign(state, previous);
+		seen.delete(state);
+	});
 }
 
-function journalControlledOption(option: HTMLOptionElement, withDefault: boolean): void {
-	TRANSITION_JOURNAL!.push(
-		JOURNAL_PROP,
-		option,
-		'selected',
-		(STAGED_DOM ? STAGED_DOM.view(option) : option).selected,
-	);
-	if (withDefault)
-		TRANSITION_JOURNAL!.push(
-			JOURNAL_PROP,
-			option,
-			'defaultSelected',
-			(STAGED_DOM ? STAGED_DOM.view(option) : option).defaultSelected,
-		);
-}
-
-/**
- * Item blocks a keyed list dropped while a hold was still possible.
- *
- * The key map and chain can drop a row before the render knows whether it will
- * suspend. Root transactions keep its DOM connected until commit: detaching a
- * focused input emits native events that rollback cannot undo. Existing
- * hold-only callers can park detached ranges, but both forms defer scope and
- * lifecycle teardown until success and return the original nodes on rollback.
- */
-interface ParkedItem {
-	block: Block;
-	/** Preserve the exact row range across later journal windows that can detach it. */
-	nodes: Node[];
-}
-let PARKED_ITEMS: ParkedItem[] | null = null;
-
-/** Top-level nodes belonging to an earlier, still-connected deletion of this list. */
-function retainedForSlotNodes(state: ForSlot, retained: Set<Node> | null): Set<Node> | null {
-	const parked = PARKED_ITEMS;
-	if (parked !== null) {
-		for (const item of parked) {
-			const previous = item.block;
-			if (
-				previous.forSlot !== state &&
-				!(
-					previous.exclusiveMarkers &&
-					previous.startMarker === state.start &&
-					previous.endMarker === state.end
-				)
-			)
-				continue;
-			for (const node of item.nodes) (retained ??= new Set()).add(node);
-		}
-	}
-	// Certified owned-list clears retire inert hosts without parking them.
-	const retired = ROOT_RENDER_TRANSACTION!.retired;
-	if (retired !== null) {
-		for (const row of retired) {
-			if (row.forSlot !== state) continue;
-			const start = row.startMarker;
-			if (start !== null && start === row.endMarker) (retained ??= new Set()).add(start);
-		}
-	}
-	return retained;
-}
-
-/** Retain an outgoing row's nodes and scope until its render can commit. */
-function parkItemForHold(block: Block, owningList?: ForSlot): void {
-	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileCount(ProfileCounter.ROW_PARK);
-	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
-	if (retainConnected) retireRootBlock(block);
-	// @empty borrows the list's markers. Its saved nodes must not overlap rows
-	// retired in an earlier window, or a prior parked @empty arm's own content.
-	const excluded =
-		owningList !== undefined && retainConnected ? retainedForSlotNodes(owningList, null) : null;
-	// A later nested window can sweep an already parked row out of the live
-	// DOM before this window rolls back. Retain the original nodes now, while
-	// the row is still attached; only detach on non-root holds. An @empty arm
-	// saves only nodes it owns, even though its markers span retired rows.
-	const nodes: Node[] = [];
-	const start = block.startMarker;
-	const end = block.endMarker;
-	if (start && end) {
-		const parent = (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode;
-		if (parent !== null) {
-			const exclusive = block.exclusiveMarkers;
-			let n: Node | null = exclusive ? getNextSibling(start) : start;
-			const stop = exclusive ? end : getNextSibling(end);
-			if (excluded === null) {
-				while (n !== null && n !== stop) {
-					const next: Node | null = getNextSibling(n);
-					if (!retainConnected) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
-					nodes.push(n);
-					n = next;
-				}
-			} else {
-				while (n !== null && n !== stop) {
-					const next: Node | null = getNextSibling(n);
-					if (!excluded.has(n)) {
-						if (!retainConnected) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
-						nodes.push(n);
-					}
-					n = next;
-				}
-			}
-		}
-	}
-	(PARKED_ITEMS ??= []).push({ block, nodes });
-}
-
-/** True while a keyed removal must be undoable rather than final. */
-function itemRemovalDefers(): boolean {
-	return TRANSITION_JOURNAL !== null;
-}
-
-/**
- * True when rows removed from `state` may defer their teardown for a possible
- * hold. Parking is only sound when this list's shape went into the journal:
- * restoreForSlot is the only thing that brings parked rows back, and it can
- * only find them through the list's structural undo entry. A caller tearing rows down
- * OUTSIDE the journal's knowledge — a value-position slot leaving array mode
- * discards the slot itself — must remove immediately, as it always did:
- * parking there would strand the rows as deferred-but-unrestorable and push
- * their cleanups past the rest of the attempt.
- */
-function forSlotParkable(state: ForSlot): boolean {
-	return TRANSITION_JOURNAL !== null && TRANSITION_JOURNAL_BAGS!.has(state);
-}
-
-/**
- * A keyed list's rollback record for one journal window. The full form copies
- * the chain, and the key Map's order where it differs, before a reconcile
- * relinks rows wholesale. The link form serves the shapes that relink a bounded
- * set of rows (inserts, removals, a small displacement): it keeps the old head
- * and the old `nextSibling` of each row whose `nextSibling` it rewrites, and
- * rollback walks the old chain forward through those links (fullForSlotRecord).
- * Restoring the chain rewrites every `prevSibling` and index from position, so
- * neither form records those. A wholesale change later in the same window, or
- * a record for an inner window, converts the link form to the full form first.
- *
- * A link record gets its `links` Map at its first relink. Until then only index
- * writes have run, and they change neither the chain nor the key Map, so
- * converting it copies the list as it stands, as the full form would have when
- * the record was taken. A reorder that falls through to the LIS path therefore
- * pays exactly the full form's copy.
- *
- * The record rides in the spare slot of its own undo entry, where `seen` (the
- * window's bag index) finds it again, so it lives exactly as long as its log:
- * a removed row it references goes when the committed log is dropped.
- */
-interface ForSlotRecord {
-	empty: Block | null;
-	/** The chain when the record was taken; null while it is in the link form. */
-	chain: Block[] | null;
-	mapOrder: Block[] | null;
-	head: Block | null;
-	/** Link form: each relinked row's old `nextSibling`, from the first relink on. */
-	links: Map<Block, Block | null> | null;
-	/** `state.inOrder` when the record was taken. */
-	inOrder: boolean;
-	/** The Map's order before a link-form removal, when not chain order. */
-	prior: Block[] | null;
-	/** Development only: the full form, checked against the link form. */
-	check?: Block[][];
-}
-
-/**
- * Record a keyed list's shape before a reconcile that may have to be undone.
- *
- * The list is restored as a whole rather than per operation: the chain, the key
- * map and the counts all move together, and rebuilding the DOM from the restored
- * chain puts moved survivors back as well as dropped rows. Once per list per
- * window — the first record is the pre-render one, which is the one to go back
- * to.
- *
- * Without `link`, the caller is about to relink rows wholesale, so the record
- * takes, or converts to, the full form. With `link`, the window's record comes
- * back, and a caller that relinks rows records the old `nextSibling` of each
- * row it rewrites in `forSlotLinks(record)` first (a full record needs none).
- * Null when hydration adoption journals the range instead. One call either
- * way, like the single snapshot function this replaces.
- */
+/** The actual parent of a live list; disposing the owner invalidates its range. */
 function forSlotParent(state: ForSlot): Node | null {
-	return state.ownerBlock.disposed ? null : (state.ownerHost ?? domNode(state.end!).parentNode);
+	return state.ownerBlock.disposed ? null : (state.ownerHost ?? state.end!.parentNode);
 }
 
 function forSlotFirst(state: ForSlot): Node | null {
 	return state.ownerHost !== null ? getFirstChild(state.ownerHost) : getNextSibling(state.start!);
-}
-
-function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
-	const seen = TRANSITION_JOURNAL_BAGS!;
-	const at = seen.get(state) ?? -1;
-	// The record rides in the spare slot of the list's undo entry; an entry without
-	// one (hydration adoption, an owned-list clear) holds null there.
-	const current: ForSlotRecord | null =
-		at >= 0 && TRANSITION_JOURNAL![at] === JOURNAL_UNDO ? TRANSITION_JOURNAL![at + 2] : null;
-	if (link && at >= TRANSITION_JOURNAL_CHECKPOINT) return current;
-	// A wholesale change converts this window's link record; an inner window's
-	// record stops an enclosing window's link record gathering links.
-	if (current !== null) fullForSlotRecord(state, current);
-	if (at >= TRANSITION_JOURNAL_CHECKPOINT) return null;
-	seen.set(state, TRANSITION_JOURNAL!.length);
-	if (
-		ROOT_RENDER_TRANSACTION !== null &&
-		((ROOT_RENDER_TRANSACTION.hydrating === true && hydrating && activeHydration() !== null) ||
-			state.adopt !== null)
-	) {
-		// The initial chain is empty even though its DOM is already owned: server
-		// nodes or raw hosts being upgraded to Blocks. A failed adoption discards
-		// fresh scopes, not those hosts, while restoring the original range.
-		journalUndo(() => {
-			seen.delete(state);
-		});
-		journalRootRange(forSlotParent(state)!, state.start, state.end);
-		// No chain record restores indices here, so rows that already exist keep
-		// theirs individually before reconcileKeyed moves them.
-		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
-			TRANSITION_JOURNAL!.push(JOURNAL_PROP, b, 'itemIndex', b.itemIndex);
-		return null;
-	}
-	const record: ForSlotRecord = {
-		empty: state.emptyBlock,
-		chain: null,
-		mapOrder: null,
-		head: state.head,
-		links: null,
-		inOrder: state.inOrder,
-		prior: null,
-	};
-	if (!link) fullForSlotRecord(state, record);
-	else if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
-	TRANSITION_JOURNAL!.push(
-		JOURNAL_UNDO,
-		() => {
-			fullForSlotRecord(state, record);
-			restoreForSlot(state, record, record.chain);
-			seen.delete(state);
-		},
-		record,
-		null,
-	);
-	return link ? record : null;
-}
-
-/**
- * Where a link-form relink records old `nextSibling`s; null without a record or
- * for a full one. The first relink allocates it even when it records nothing (a
- * head insert or removal), because from then on the list is no longer the
- * recorded one.
- */
-function forSlotLinks(record: ForSlotRecord | null): Map<Block, Block | null> | null {
-	return record !== null && record.chain === null ? (record.links ??= new Map()) : null;
-}
-
-/** Development check: the chain, and the Map's order where it differs. */
-function forSlotShape(state: ForSlot): Block[][] {
-	const chain: Block[] = [];
-	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
-	const keyOrder = [...state.items.values()];
-	return keyOrder.length === chain.length && keyOrder.every((block, i) => block === chain[i])
-		? [chain]
-		: [chain, keyOrder];
-}
-
-/**
- * Convert a link record to the full form: the shape when it was taken. A new
- * full record, and a link record nothing has relinked yet, copy the list as it
- * stands. A full record, or none, is left as it is.
- */
-function fullForSlotRecord(state: ForSlot, record: ForSlotRecord | null): void {
-	if (record === null || record.chain !== null) return;
-	const links = record.links;
-	record.links = null;
-	if (links === null) {
-		const chain: Block[] = [];
-		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
-		record.chain = chain;
-		// The key Map keeps insertion order through earlier reorders. Preserve that
-		// order for context refresh only when it differs from the linked DOM order.
-		// Spreading the values takes the engine's bulk copy; a list reordered before
-		// differs at its first rows, so the comparison usually stops at once.
-		const keyOrder = [...state.items.values()];
-		let mapOrder: Block[] | null = keyOrder.length === chain.length ? null : keyOrder;
-		for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
-			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
-		record.mapOrder = mapOrder;
-	} else {
-		// The old head and the recorded nextSiblings reach every old row: a row whose
-		// nextSibling was not rewritten still holds it.
-		const chain: Block[] = [];
-		for (let b = record.head; b !== null; b = links.has(b) ? links.get(b)! : b.nextSibling)
-			chain.push(b);
-		record.chain = chain;
-		// Without a removal the Map has only gained fresh rows' keys, which the old
-		// chain excludes; a removal from a Map out of chain order kept its order.
-		if (!record.inOrder) {
-			const kept = new Set(chain);
-			const mapOrder: Block[] = [];
-			for (const block of record.prior ?? state.items.values())
-				if (kept.has(block)) mapOrder.push(block);
-			record.mapOrder = mapOrder;
-		}
-	}
-	if (process.env.NODE_ENV !== 'production' && record.check !== undefined) {
-		const chain = record.chain!;
-		const [expectedChain, expectedMap = expectedChain] = record.check;
-		const restoredMap = record.mapOrder ?? chain;
-		if (
-			expectedChain.length !== chain.length ||
-			expectedChain.some((block, i) => block !== chain[i]) ||
-			expectedMap.length !== restoredMap.length ||
-			expectedMap.some((block, i) => block !== restoredMap[i])
-		)
-			throw new Error(formatClientError(343));
-	}
-}
-
-/**
- * Full clears leave the old item chain untouched. Retain its map and links by
- * reference for rollback, then give any same-attempt refill a fresh key map.
- * The generic journal still snapshots reordered/partially changed lists.
- */
-function journalForOwnedListClear(state: ForSlot): void {
-	const seen = TRANSITION_JOURNAL_BAGS!;
-	// An enclosing window's link record stops gathering links here.
-	const at = seen.get(state) ?? -1;
-	if (at >= 0)
-		fullForSlotRecord(
-			state,
-			TRANSITION_JOURNAL![at] === JOURNAL_UNDO ? TRANSITION_JOURNAL![at + 2] : null,
-		);
-	const oldItems = state.items;
-	seen.set(state, TRANSITION_JOURNAL!.length);
-	const snapshot = {
-		head: state.head,
-		tail: state.tail,
-		size: state.size,
-		empty: state.emptyBlock,
-		entries: oldItems,
-	};
-	journalUndo(() => {
-		restoreForSlot(state, snapshot, null);
-		seen.delete(state);
-	});
-	state.items = new Map();
-	state.inOrder = true;
-}
-
-/** Put a keyed list back the way it was, rows and order together. */
-function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): void {
-	// Rows the aborted attempt freshly mounted are not in the snapshot, so
-	// restoring the old chain would simply forget them. Their DOM goes with the
-	// unmatched-node removal below, but the scope has to go NOW, before the overwrite makes
-	// them unreachable: the disposed stamp is what keeps their queued mount
-	// effects and ref attaches from firing for a row that never reached the
-	// screen, and it runs the render-time cleanups they registered. Parked rows
-	// are never on the chain, so this reaches exactly the fresh mounts. For a
-	// map-swap clear the original chain cannot become live before its own undo:
-	// later windows undo first, and later fills use the replacement map.
-	const preservedMap: Map<any, Block> | null = chain === null ? snapshot.entries : null;
-	const kept: Set<Block> | null = chain === null ? null : new Set(chain);
-	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		if (preservedMap !== null || !kept!.has(b)) unmountBlock(b, state.ownerHost !== null);
-	}
-	// Those teardowns dispatch their cleanup errors immediately, and an error
-	// routed to the enclosing boundary flips it to @catch — disposing this
-	// slot's whole range out from under the restore. Same mid-render teardown
-	// invariant as renderReturnedValue's disposed check: stop here, and let
-	// flushParkedItems finish off whatever stayed parked.
-	if (forSlotParent(state) === null) return;
-	state.head = chain === null ? snapshot.head : (chain[0] ?? null);
-	state.tail = chain === null ? snapshot.tail : (chain[chain.length - 1] ?? null);
-	state.size = chain === null ? snapshot.size : chain.length;
-	if (preservedMap !== null) {
-		state.items = preservedMap;
-		state.inOrder = false;
-	} else {
-		const originalChain = chain!;
-		state.items.clear();
-		for (let i = 0; i < originalChain.length; i++) {
-			const block = originalChain[i];
-			block.nextSibling = originalChain[i + 1] ?? null;
-			block.prevSibling = originalChain[i - 1] ?? null;
-			block.itemIndex = i;
-		}
-		const keyOrder: Block[] = snapshot.mapOrder ?? originalChain;
-		for (let i = 0; i < keyOrder.length; i++) {
-			const block = keyOrder[i];
-			state.items.set(block.key, block);
-		}
-		state.inOrder = keyOrder === originalChain;
-	}
-	// Collect the committed ranges before removing speculative nodes. An
-	// earlier window may have parked rows that a later sweep detached, so use
-	// their saved node lists rather than reading their current DOM position.
-	const nodes: Node[] = [];
-	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		const parked = takeParkedItem(b);
-		if (parked !== null) for (const node of parked) nodes.push(node);
-		else if (b.startMarker !== null && b.startMarker === b.endMarker) {
-			// An inert owned-list clear can retain a single host without parking it.
-			// A later window may detach it before this snapshot is restored; the
-			// Block still holds its exact Node and can reinsert it here.
-			nodes.push(b.startMarker);
-		} else for (const node of collectBlockRange(b)) nodes.push(node);
-	}
-	// The @empty branch swaps with the rows, so it rolls back with them. A
-	// branch the aborted render mounted is scope-only torn down before the
-	// unmatched-node removal; one it parked comes back like a row.
-	if (state.emptyBlock !== snapshot.empty) {
-		if (state.emptyBlock !== null) unmountBlock(state.emptyBlock, false);
-		state.emptyBlock = snapshot.empty;
-	}
-	// The @empty teardown can dispose the range the same way the orphan walk can.
-	if (forSlotParent(state) === null) return;
-	if (snapshot.empty !== null) {
-		const range = takeParkedItem(snapshot.empty) ?? collectBlockRange(snapshot.empty);
-		for (const node of range) nodes.push(node);
-	}
-	const parent = forSlotParent(state)!;
-	// An inner boundary may restore the @empty snapshot while an outer root
-	// attempt still owns rows parked inside those borrowed markers. Leave those
-	// rows connected until the outer attempt commits or rolls back; they are not
-	// members of this snapshot and must not be reordered with its nodes.
-	const keptNodes = new Set(nodes);
-	if (ROOT_RENDER_TRANSACTION !== null) retainedForSlotNodes(state, keptNodes);
-	let current: Node | null = state.ownerHost === null ? forSlotFirst(state) : null;
-	while (current !== null && current !== state.end) {
-		const next: Node | null = getNextSibling(current);
-		if (!keptNodes.has(current))
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(current);
-		current = next;
-	}
-	// Do not detach already-correct survivors. Apart from preserving native focus
-	// events, this keeps the platform's input/composition state on the same nodes.
-	let anchor: Node | null = state.end;
-	for (let i = nodes.length - 1; i >= 0; i--) {
-		const node = nodes[i];
-		// The owner host also admits portals and imperative children. A foreign
-		// sibling after a row does not mean the row needs moving on rollback.
-		let next = getNextSibling(node);
-		if (state.ownerHost !== null)
-			while (next !== null && !keptNodes.has(next)) next = getNextSibling(next);
-		if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent || next !== anchor) {
-			if (renderingFocus !== null) moveFocusedNodeBefore(parent, node, anchor, renderingFocus);
-			else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-		}
-		anchor = node;
-	}
-}
-
-/** Remove and return a block's parked nodes, or null if it is not parked. */
-function takeParkedItem(block: Block): Node[] | null {
-	const parked = PARKED_ITEMS;
-	if (parked === null) return null;
-	for (let i = 0; i < parked.length; i++) {
-		if (parked[i].block === block) {
-			const nodes = parked[i].nodes;
-			parked.splice(i, 1);
-			return nodes;
-		}
-	}
-	return null;
-}
-
-/** The nodes a still-attached block currently owns, in order. */
-function collectBlockRange(block: Block): Node[] {
-	const nodes: Node[] = [];
-	const start = block.startMarker;
-	const end = block.endMarker;
-	if (!start || !end || (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === null)
-		return nodes;
-	const exclusive = block.exclusiveMarkers;
-	let n: Node | null = exclusive ? getNextSibling(start) : start;
-	const stop = exclusive ? end : getNextSibling(end);
-	while (n !== null && n !== stop) {
-		nodes.push(n);
-		n = getNextSibling(n);
-	}
-	return nodes;
-}
-
-function journalText(node: Text, previous: string | null): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, previous, null);
-	journalBag();
-}
-
-/** A namespaced attribute (`xlink:href`) journals its name as `[namespace, name]`. */
-function journalAttr(el: Element, name: string, ns?: string | null): void {
-	TRANSITION_JOURNAL!.push(
-		JOURNAL_ATTR,
-		el,
-		ns ? [ns, name] : name,
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name),
-	);
-	journalBag();
 }
 
 /**
@@ -5958,35 +5270,6 @@ function disarmTransitionJournal(checkpoint: number): void {
 	if (--TRANSITION_JOURNAL_DEPTH === 0) {
 		TRANSITION_JOURNAL = null;
 		TRANSITION_JOURNAL_BAGS = null;
-		flushParkedItems();
-	}
-}
-
-/**
- * Tear down the rows still parked when the last window closes. Anything a
- * rollback put back has already been taken off this list, so what is left is
- * genuinely gone and its cleanups are due. Root-retained ranges stay connected
- * through teardown; the saved nodes are removed after cleanup in either mode.
- */
-function flushParkedItems(): void {
-	const parked = PARKED_ITEMS;
-	if (parked === null) return;
-	PARKED_ITEMS = null;
-	for (let i = 0; i < parked.length; i++) unmountParkedItem(parked[i]);
-}
-
-/** Committed root deletions clean up against connected DOM before removing the range. */
-function unmountParkedItem(item: ParkedItem): void {
-	// Retire the row before any cleanup can move focus off it. Without focus in a
-	// drain, neither its removal nor a cleanup can blur it: an unfocused bulk
-	// removal stays free of per-row work.
-	if (renderingFocus !== null || !inFlush) for (const node of item.nodes) retireEventHostTree(node);
-	try {
-		unmountBlock(item.block, false);
-	} finally {
-		for (const node of item.nodes)
-			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== null)
-				domNode((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!).removeChild(node);
 	}
 }
 
@@ -6007,22 +5290,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 			const a = log[i + 2];
 			const b = log[i + 3];
 			switch (log[i]) {
-				case JOURNAL_TEXT:
-					(STAGED_DOM ? STAGED_DOM.view(target as Text) : (target as Text)).nodeValue = a;
-					break;
-				case JOURNAL_ATTR: {
-					const el = STAGED_DOM ? STAGED_DOM.view(target as Element) : (target as Element);
-					// Removal by qualified name also finds a namespaced attribute, but
-					// restoring one (`xlink:href`) must recreate it in its namespace.
-					const name = typeof a === 'string' ? a : a[1];
-					if (b === null) el.removeAttribute(name);
-					else if (name === a) el.setAttribute(name, b);
-					else el.setAttributeNS(a[0], name, b);
-					break;
-				}
 				case JOURNAL_PROP:
-					// DOM properties join the projected rollback; metadata stays ordinary.
-					(STAGED_DOM && target?.nodeType !== undefined ? STAGED_DOM.view(target) : target)[a] = b;
+					// Renderer-owned state, including expando metadata. Native writes
+					// belong to accepted template and slot programs, never to this log.
+					target[a] = b;
 					break;
 				case JOURNAL_INPUTS:
 					(target as Block).extra = b;
@@ -6041,9 +5312,6 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 					break;
 				case JOURNAL_UNDO:
 					target();
-					break;
-				case JOURNAL_EVENT_OWNER:
-					target.$$signalOwner = a;
 					break;
 				default:
 					// Spread snapshots include enumerable symbols as well as strings.
@@ -6081,9 +5349,9 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 // ─────────────────────────────────────────────────────────────────────────────
 // View Transitions (docs/view-transitions-plan.md, Phase 1).
 //
-// Ordinary renders mutate eagerly. ViewTransition alone prepares against a
-// logical host projection: existing DOM remains committed until the browser's
-// update callback publishes the ordered plan. Resolving the new boundary props
+// ViewTransition holds the ordinary owner commit programs until the browser's
+// update callback; existing DOM stays at the previous accepted render.
+// Resolving the new boundary props
 // before the old snapshot is essential for nested update="none": naming that
 // child speculatively would cut it out of its parent's old image.
 //
@@ -6335,6 +5603,7 @@ interface ViewTransitionBoundaryState {
 	instance: ViewTransitionInstance | null;
 	instanceScope: Element | null;
 	scopeHost: Element | null;
+	appliedScopeHost?: Element | null;
 }
 /** Optional boundary identities never add fields to ordinary component blocks. */
 const VT_BOUNDARIES = /* @__PURE__ */ new WeakMap<Block, ViewTransitionBoundaryState>();
@@ -6375,11 +5644,7 @@ function vtGetName(block: Block, props: ViewTransitionProps | null = vtProps(blo
 	if (props?.name != null && props.name !== 'auto') return props.name;
 	if (props?.scope === 'element') {
 		const host = vtScopeHost(block);
-		if (host !== null)
-			return vtScopeName(
-				host,
-				(STAGED_DOM ? STAGED_DOM.view(host as HTMLElement) : (host as HTMLElement)).style,
-			);
+		if (host !== null) return vtScopeName(host, (host as HTMLElement).style);
 	}
 	const state = vtBoundaryState(block);
 	if (state.autoName === '') state.autoName = '‹vt' + ++VT_NAME_SEQ + '›';
@@ -6403,11 +5668,7 @@ function vtScopeHost(block: Block): Element | null {
 		node !== null && node !== end;
 		node = getNextSibling(node)
 	) {
-		if (
-			node.nodeType === 3 &&
-			((STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue ?? '').trim() !== ''
-		)
-			return null;
+		if (node.nodeType === 3 && (node.nodeValue ?? '').trim() !== '') return null;
 	}
 	return els[0];
 }
@@ -6420,13 +5681,8 @@ function vtScopeHost(block: Block): Element | null {
  * "no scope" here or hydrated trees would capture differently from mounted ones.
  */
 function vtClosestScope(node: Node | null): Element | null {
-	for (; node !== null; node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode) {
-		if (
-			node.nodeType === 1 &&
-			(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element)).getAttribute(
-				'vt-scope',
-			) === 'element'
-		)
+	for (; node !== null; node = PREPARED_PARENTS.get(node) ?? node.parentNode) {
+		if (node.nodeType === 1 && (node as Element).getAttribute('vt-scope') === 'element')
 			return node as Element;
 	}
 	return null;
@@ -6439,17 +5695,14 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 		const host = vtScopeHost(ancestor);
 		if (host === null) return null;
 		if (ancestor !== block) {
-			const parent = block.parentNode;
-			if (parent !== host && !(STAGED_DOM ? STAGED_DOM.view(host) : host).contains(parent)) {
+			const parent = PREPARED_PARENTS.get(block.parentNode) ?? block.parentNode;
+			if (parent !== host && !host.contains(parent)) {
 				// A composite child may produce the scope host itself; its parent
 				// is outside the host even though its rendered range is owned here.
 				const elements = vtRangeElements(block);
 				if (
 					elements.length === 0 ||
-					elements.some(
-						(element) =>
-							element !== host && !(STAGED_DOM ? STAGED_DOM.view(host) : host).contains(element),
-					)
+					elements.some((element) => element !== host && !host.contains(element))
 				)
 					return null;
 			}
@@ -6457,7 +5710,7 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 		return host as VTOwner;
 	}
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const parent = current.parentNode;
+		const parent = PREPARED_PARENTS.get(current.parentNode) ?? current.parentNode;
 		const physical = vtClosestScope(parent);
 		if (physical !== null) return physical as VTOwner;
 		const owner = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
@@ -6492,14 +5745,14 @@ function vtInjectScopeStyle(host: Element): void {
 	const owner = host.ownerDocument;
 	if (VT_SCOPE_STYLED_DOCUMENTS.has(owner)) return;
 	if (
-		(STAGED_DOM ? STAGED_DOM.view(owner) : owner).querySelector(
+		owner.querySelector(
 			`style[data-octane="${VT_SCOPE_STYLE_ID}"],style[data-href~="octane-${VT_SCOPE_STYLE_ID}"]`,
 		) === null
 	) {
-		const style = (STAGED_DOM ? STAGED_DOM.view(owner) : owner).createElement('style');
-		(STAGED_DOM ? STAGED_DOM.view(style) : style).setAttribute('data-octane', VT_SCOPE_STYLE_ID);
-		(STAGED_DOM ? STAGED_DOM.view(style) : style).textContent = VT_SCOPE_CSS;
-		domNode(owner.head).appendChild(style);
+		const style = owner.createElement('style');
+		style.setAttribute('data-octane', VT_SCOPE_STYLE_ID);
+		style.textContent = VT_SCOPE_CSS;
+		owner.head.appendChild(style);
 	}
 	VT_SCOPE_STYLED_DOCUMENTS.add(owner);
 }
@@ -6511,15 +5764,43 @@ function vtReleaseScopeBoundary(block: Block): void {
 	const saved = VT_SCOPE_OWNERS.get(host);
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(state);
 	state.scopeHost = null;
-	if (saved === undefined) return;
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(saved);
-	saved.owners = saved.owners.filter((owner) => owner !== block);
-	if (saved.owners.length !== 0) return;
-	if (!VT_DRAIN) vtInterruptOwner(host as VTOwner);
-	if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
-	(STAGED_DOM ? STAGED_DOM.view(host) : host).removeAttribute('vt-scope');
-	if (TRANSITION_JOURNAL !== null) journalUndo(() => VT_SCOPE_OWNERS.set(host, saved));
-	VT_SCOPE_OWNERS.delete(host);
+	if (saved !== undefined) {
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(saved);
+		saved.owners = saved.owners.filter((owner) => owner !== block);
+		if (saved.owners.length === 0) {
+			if (TRANSITION_JOURNAL !== null) journalUndo(() => VT_SCOPE_OWNERS.set(host, saved));
+			VT_SCOPE_OWNERS.delete(host);
+		}
+	}
+	vtCommitScopeBoundary(block, state);
+}
+
+/** Discovery reads desired ownership, but CSS always describes accepted ownership. */
+function vtCommitScopeBoundary(block: Block, state: ViewTransitionBoundaryState): void {
+	if (WIP_CAPTURE === null) {
+		vtApplyScopeBoundary(state);
+	} else {
+		prepareSlot(block, state, 'scopePrepared', {
+			publish() {
+				vtApplyScopeBoundary(state);
+			},
+			discard() {},
+		});
+	}
+}
+
+function vtApplyScopeBoundary(state: ViewTransitionBoundaryState): void {
+	const old = state.appliedScopeHost;
+	const host = state.scopeHost;
+	state.appliedScopeHost = host;
+	if (old != null && old !== host && !VT_SCOPE_OWNERS.has(old)) {
+		if (!VT_DRAIN) vtInterruptOwner(old as VTOwner);
+		old.removeAttribute('vt-scope');
+	}
+	if (host !== null) {
+		if (host.getAttribute('vt-scope') !== 'element') host.setAttribute('vt-scope', 'element');
+		vtInjectScopeStyle(host);
+	}
 }
 
 /** Keep nested scopes isolated while leaving authored inline CSS in control. */
@@ -6530,6 +5811,18 @@ function vtPrepareScopeBoundary(block: Block): void {
 	const state = vtBoundaryState(block);
 	if (state.scopeHost !== null && state.scopeHost !== host) vtReleaseScopeBoundary(block);
 	if (host === null) {
+		if (WIP_CAPTURE !== null && !PREPARED_PARENTS.has(block.parentNode)) {
+			// Its descriptor or list children can still be prepared. Discover the
+			// real host when those scopes publish, before this boundary is observed
+			// by a later drain or a portal from an independent root.
+			prepareSlot(block, state, 'scopePrepared', {
+				publish() {
+					vtPrepareScopeBoundary(block);
+				},
+				discard() {},
+			});
+			return;
+		}
 		if (
 			process.env.NODE_ENV !== 'production' &&
 			props?.scope === 'element' &&
@@ -6555,11 +5848,7 @@ function vtPrepareScopeBoundary(block: Block): void {
 		saved.owners = [...saved.owners, block];
 		state.scopeHost = host;
 	}
-	if ((STAGED_DOM ? STAGED_DOM.view(host) : host).getAttribute('vt-scope') !== 'element') {
-		if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
-		(STAGED_DOM ? STAGED_DOM.view(host) : host).setAttribute('vt-scope', 'element');
-	}
-	vtInjectScopeStyle(host);
+	vtCommitScopeBoundary(block, state);
 }
 
 interface ViewTransitionScopeRef {
@@ -6584,7 +5873,7 @@ function vtScopeRefInstance(block: Block, scope: Element): ViewTransitionInstanc
 	if (previous?.scope === scope) return previous.instance;
 	let current: ViewTransitionInstance | null = null;
 	const resolve = (): ViewTransitionInstance => {
-		// Public reads must never expose the staged style projection before commit.
+		// A pending template style is private to its owner; read committed CSS.
 		const name = vtScopeName(scope);
 		if (current === null || current.name !== name) current = vtCreateInstance(name, scope);
 		return current;
@@ -6689,11 +5978,7 @@ function vtMarkDirtyFromCurrentBlock(): void {
 /** Whether a retained visibility boundary owns this host or one of its ancestors. */
 function vtHostVisible(element: Element): boolean {
 	if (hiddenDisplayNodes === 0) return true;
-	for (
-		let node: Node | null = element;
-		node !== null;
-		node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode
-	) {
+	for (let node: Node | null = element; node !== null; node = node.parentNode) {
 		if (node.nodeType === 1 && HIDDEN_DISPLAYS.has(node as HTMLElement)) return false;
 	}
 	return true;
@@ -6710,7 +5995,7 @@ function vtRangeElements(block: Block): Element[] {
 		}
 	} else {
 		// Whole-container regime (root / owns-parent): every element child.
-		const kids = domNode(block.parentNode as Element).children;
+		const kids = (block.parentNode as Element).children;
 		for (let i = 0; i < kids.length; i++) {
 			if (vtHostVisible(kids[i])) els.push(kids[i]);
 		}
@@ -6802,7 +6087,7 @@ function vtApplyStyles(rec: VtRec, cls: string): void {
 	rec.cls = cls === 'auto' || cls === 'none' ? '' : cls;
 	for (let i = 0; i < rec.els.length; i++) {
 		const el = rec.els[i] as HTMLElement;
-		const style = (STAGED_DOM ? STAGED_DOM.view(el) : el).style;
+		const style = el.style;
 		if (style === undefined) continue;
 		if (!rec.styles.has(el)) {
 			rec.styles.set(el, {
@@ -6834,7 +6119,7 @@ function vtRevertNames(recs: VtRec[]): void {
 	if (recs.length === 0) return;
 	const styles = recs[0].styles;
 	for (const [el, saved] of styles) {
-		const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+		const style = (el as HTMLElement).style;
 		style.setProperty('view-transition-name', saved.name, saved.namePriority);
 		style.setProperty('view-transition-class', saved.cls, saved.classPriority);
 	}
@@ -6981,12 +6266,9 @@ function vtObserveChanges(owner: Document, recs: VtRec[]): () => MutationRecord[
 	const controls = new Map<Element, string>();
 	for (const rec of recs) {
 		for (const el of rec.els) {
-			roots.add((STAGED_DOM ? STAGED_DOM.view(el) : el).getRootNode());
-			if ((STAGED_DOM ? STAGED_DOM.view(el) : el).matches('input,textarea,select'))
-				controls.set(el, vtControlValue(el));
-			for (const control of (STAGED_DOM ? STAGED_DOM.view(el) : el).querySelectorAll(
-				'input,textarea,select',
-			)) {
+			roots.add(el.getRootNode());
+			if (el.matches('input,textarea,select')) controls.set(el, vtControlValue(el));
+			for (const control of el.querySelectorAll('input,textarea,select')) {
 				controls.set(control, vtControlValue(control));
 			}
 		}
@@ -7021,11 +6303,7 @@ function vtObserveChanges(owner: Document, recs: VtRec[]): () => MutationRecord[
 			}
 		}
 		const dirty = (target: Node): void => {
-			for (
-				let node: Node | null = target;
-				node !== null;
-				node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode
-			) {
+			for (let node: Node | null = target; node !== null; node = node.parentNode) {
 				const block = hosts.get(node as Element);
 				if (block !== undefined) {
 					VT_DIRTY.add(block);
@@ -7036,11 +6314,7 @@ function vtObserveChanges(owner: Document, recs: VtRec[]): () => MutationRecord[
 		for (const mutation of mutations) dirty(mutation.target);
 		// Value/checked/selection properties do not produce mutation records.
 		for (const [control, before] of controls) {
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(control) : control).isConnected &&
-				vtControlValue(control) !== before
-			)
-				dirty(control);
+			if (control.isConnected && vtControlValue(control) !== before) dirty(control);
 		}
 		return mutations;
 	};
@@ -7050,18 +6324,10 @@ function vtControlValue(el: Element): string {
 	const control = el as HTMLInputElement;
 	if (el.localName === 'select') {
 		let selected = '';
-		for (const option of (STAGED_DOM
-			? STAGED_DOM.view(el as HTMLSelectElement)
-			: (el as HTMLSelectElement)
-		).options)
-			selected += (STAGED_DOM ? STAGED_DOM.view(option) : option).selected ? '1' : '0';
+		for (const option of (el as HTMLSelectElement).options) selected += option.selected ? '1' : '0';
 		return selected;
 	}
-	return (
-		(STAGED_DOM ? STAGED_DOM.view(control) : control).value +
-		'\0' +
-		(STAGED_DOM ? STAGED_DOM.view(control) : control).checked
-	);
+	return control.value + '\0' + control.checked;
 }
 
 /** Only resources introduced or changed by this commit may delay its snapshot. */
@@ -7075,12 +6341,8 @@ function vtWaitForResources(
 	const collect = (node: Node): void => {
 		if (node.nodeType !== 1) return;
 		const el = node as Element;
-		if ((STAGED_DOM ? STAGED_DOM.view(el) : el).matches('img,link[rel="stylesheet"]'))
-			candidates.add(el);
-		for (const child of (STAGED_DOM ? STAGED_DOM.view(el) : el).querySelectorAll(
-			'img,link[rel="stylesheet"]',
-		))
-			candidates.add(child);
+		if (el.matches('img,link[rel="stylesheet"]')) candidates.add(el);
+		for (const child of el.querySelectorAll('img,link[rel="stylesheet"]')) candidates.add(child);
 	};
 	for (const mutation of mutations) {
 		if (mutation.type === 'childList') for (const node of mutation.addedNodes) collect(node);
@@ -7098,7 +6360,7 @@ function vtWaitForResources(
 		if (owner.fonts?.status === 'loading') waits.push(owner.fonts.ready);
 	}
 	for (const el of candidates) {
-		if (!(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected) continue;
+		if (!el.isConnected) continue;
 		if (el.localName === 'img') {
 			// Images outside the participating native scopes cannot affect their
 			// snapshots. Fonts and stylesheets still affect document-wide layout.
@@ -7122,12 +6384,12 @@ function vtWaitForResources(
 		waits.push(
 			new Promise<void>((resolve) => {
 				const done = (): void => {
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener('load', done);
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener('error', done);
+					el.removeEventListener('load', done);
+					el.removeEventListener('error', done);
 					resolve();
 				};
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener('load', done);
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener('error', done);
+				el.addEventListener('load', done);
+				el.addEventListener('error', done);
 				release.push(done);
 			}),
 		);
@@ -7755,10 +7017,8 @@ interface OffscreenCapture {
 	stores: StoreInst<any>[];
 	/** Suspense visibility changes become recent only when this capture commits. */
 	suspenseCommits: Set<TrySlot> | undefined;
-	/** Speculative renderer transactions are released only after commit or discard. */
-	renderCleanups: Array<(discarded: boolean) => void> | undefined;
-	/** Completed template preparations. Each scope owns at most its latest entry. */
-	templates: PreparedTemplate[] | undefined;
+	/** Scope output and ownership release in render order, after admission only. */
+	renderCleanups: Array<PreparedTemplate | ((discarded: boolean) => void)> | undefined;
 	/** Only a structural binding lease records current-tree adoption receipts. */
 	presentations?: PresentationHydrationFrame[];
 }
@@ -7802,7 +7062,6 @@ function createOffscreenCapture(): OffscreenCapture {
 		stores: [],
 		suspenseCommits: undefined,
 		renderCleanups: undefined,
-		templates: undefined,
 	};
 }
 
@@ -7810,10 +7069,17 @@ interface PreparedTemplate {
 	scope: Scope;
 	bag: Record<string, any>;
 	values: Record<string, any>;
-	apply: (bag: Record<string, any>, values: Record<string, any>) => void;
+	apply: (
+		bag: Record<string, any>,
+		values: Record<string, any>,
+		scope: Scope,
+		eventOwner: SignalOwner | null,
+	) => void;
+	eventOwner: SignalOwner | null;
 	field: string;
 	capture: OffscreenCapture;
 	previous: PreparedTemplate | null;
+	presentation?: PresentationHydrationFrame;
 }
 
 /**
@@ -7828,6 +7094,13 @@ export function templateValues(scope: Scope, bag: Record<string, any>, field: st
 	return prepared !== null && prepared.capture === WIP_CAPTURE && prepared.scope === scope
 		? prepared.values
 		: bag;
+}
+
+/** The explicit authority for handlers authored by the current render. */
+export function templateEventOwner(): SignalOwner | null {
+	return activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+		? currentExplicitSignalOwner()
+		: null;
 }
 
 /**
@@ -7845,16 +7118,28 @@ export function commitTemplate(
 	field: string,
 ): void {
 	const capture = WIP_CAPTURE;
+	const eventOwner = templateEventOwner();
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
 	if (capture === null) {
-		apply(bag, values);
+		apply(bag, values, scope, eventOwner);
 		return;
 	}
 	const previous = bag[field] as PreparedTemplate | null;
-	const prepared: PreparedTemplate = { scope, bag, values, apply, field, capture, previous };
+	const prepared: PreparedTemplate = {
+		scope,
+		bag,
+		values,
+		apply,
+		eventOwner,
+		field,
+		capture,
+		previous,
+	};
+	if (hydrationStarted && scope.presentation !== undefined)
+		prepared.presentation = scope.presentation;
 	if (TRANSITION_JOURNAL !== null) TRANSITION_JOURNAL.push(JOURNAL_PROP, bag, field, previous);
 	bag[field] = prepared;
-	(capture.templates ??= []).push(prepared);
+	(capture.renderCleanups ??= []).push(prepared);
 }
 
 function publishTemplate(prepared: PreparedTemplate): void {
@@ -7863,7 +7148,91 @@ function publishTemplate(prepared: PreparedTemplate): void {
 	// Clear before invoking a DOM setter: it can synchronously start a newer
 	// render, whose independently owned candidate must not be erased on return.
 	bag[field] = null;
-	apply(bag, values);
+	// A native host's retirement can invoke user cleanup that destroys its
+	// adoption site. Its entire writer, including newly prepared refs, then
+	// loses authority; descendants carry their own independent receipts.
+	if (prepared.presentation !== undefined && !prepared.presentation.completed) return;
+	apply(bag, values, scope, prepared.eventOwner);
+}
+
+/**
+ * One preparation belongs to its structural owner (a ChildSlot, list item or
+ * Block). An inner successful capture transfers it to its parent; an inner
+ * failure must never publish it as part of an otherwise successful root.
+ * The candidate describes the desired tree, not the DOM operations to replay.
+ */
+interface SlotPreparation {
+	capture?: OffscreenCapture | null;
+	parent?: Node;
+	publish: () => void;
+	discard: () => void;
+}
+
+// Only fragments made for this renderer's unpublished ranges belong here.
+// A detached user root or portal host can still be observed by application code.
+const PREPARED_PARENTS = new WeakMap<Node, Node>();
+
+function prepareParent(parent: Node): DocumentFragment {
+	const doc = parent.ownerDocument ?? (parent as Document);
+	const fragment = doc.createDocumentFragment();
+	PREPARED_PARENTS.set(fragment, PREPARED_PARENTS.get(parent) ?? parent);
+	return fragment;
+}
+
+function retargetPreparedScope(scope: Scope, from: Node, to: Node): void {
+	if (scope.block.parentNode === from) scope.block.parentNode = to;
+	const slots = scope._slots;
+	if (slots !== null) {
+		for (const key in slots) {
+			const state = slots[key];
+			if (state.domParent === from) state.domParent = to;
+			if (state.__kind === 'childSlot' || state.__kind === 'forBlockSlot') {
+				if (state.ownerHost === from) state.ownerHost = to;
+				if (state.__kind === 'childSlot' && state.forSlot?.ownerHost === from)
+					state.forSlot.ownerHost = to;
+			}
+		}
+	}
+	forEachSubtreeChild(scope, (child) => retargetPreparedScope(child, from, to));
+}
+
+function discardPreparedBlock(block: Block): void {
+	const refs: SuspenseRefEntry[] = [];
+	collectVisibleSubtreeRefs(block, refs);
+	withRefDetachSuppression(refs, () => unmountBlock(block));
+}
+
+function prepareSlot(
+	scope: Scope,
+	owner: Record<string, any>,
+	field: string,
+	prepared: SlotPreparation,
+	beforeReplacements = false,
+): void {
+	const capture = WIP_CAPTURE;
+	prepared.capture = capture;
+	const previous = owner[field];
+	journalRootProperty(owner, field, previous);
+	owner[field] = prepared;
+	const finish = (discarded: boolean): void => {
+		const current = owner[field] === prepared;
+		if (current) owner[field] = discarded ? previous : undefined;
+		if (discarded || !current || owningBlock(scope.block).disposed) {
+			prepared.discard();
+		} else {
+			prepared.publish();
+		}
+	};
+	if (capture === null || PREPARED_PARENTS.has(prepared.parent ?? scope.block.parentNode))
+		finish(false);
+	else if (beforeReplacements && ROOT_RENDER_TRANSACTION?.capture === capture) {
+		// A parent portal may have to move its own delimiters around foreign
+		// portals before any child slot inserts a newly prepared range.
+		(ROOT_RENDER_TRANSACTION.commit ??= []).push(() => finish(false));
+		(capture.renderCleanups ??= []).push((discarded) => {
+			if (discarded) finish(true);
+		});
+	} else (capture.renderCleanups ??= []).push(finish);
 }
 
 // Active append targets for Effect Event render output. renderBlockInner takes
@@ -8732,6 +8101,8 @@ interface ScheduledVisibilityDriver {
 	reveal: typeof attemptHiddenReveal;
 	hidePending: typeof hideTryContentAndMountPending;
 	visible: typeof renderVisibleTry;
+	// Only installed while completed Suspense retries are waiting to publish.
+	flushRetries: typeof flushReadySuspenseRetries | null;
 	// A hidden Activity's re-hide and re-render, set by activityBlock
 	// (ensureActivityVisibilityDriver) before it hides one. A Suspense boundary
 	// reaches them only through a hidden Activity it found, so roots that never
@@ -8747,6 +8118,7 @@ function ensureScheduledVisibilityDriver(): void {
 		reveal: attemptHiddenReveal,
 		hidePending: hideTryContentAndMountPending,
 		visible: renderVisibleTry,
+		flushRetries: null,
 		rehide: null,
 		retryActivity: null,
 	};
@@ -8821,6 +8193,7 @@ function drainQueue(): { err: any } | null {
 		const rootTransaction = block.idState.renderOwner?.transaction;
 		if (rootTransaction?.aborted === true) continue;
 		const retired = rootTransaction?.retired;
+
 		if (retired !== null && retired !== undefined && retired.size !== 0) {
 			// Retained DOM is still connected for rollback and deletion cleanups,
 			// but queued descendants of a retired subtree must not render. Only
@@ -9068,9 +8441,7 @@ function activeElementForDocument(doc: Document): Element | null {
 function hasTextSelection(element: HTMLElement): boolean {
 	if (element.localName === 'textarea') return true;
 	if (element.localName !== 'input') return false;
-	switch (
-		(STAGED_DOM ? STAGED_DOM.view(element as HTMLInputElement) : (element as HTMLInputElement)).type
-	) {
+	switch ((element as HTMLInputElement).type) {
 		case 'text':
 		case 'search':
 		case 'tel':
@@ -9106,8 +8477,7 @@ function captureContentEditableSelection(
 				end = length + focusOffset;
 			}
 			if (start !== -1 && end !== -1) break selection;
-			if (node.nodeType === 3)
-				length += (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!.length;
+			if (node.nodeType === 3) length += node.nodeValue!.length;
 			const child = getFirstChild(node);
 			if (child === null) break;
 			parent = node;
@@ -9124,7 +8494,7 @@ function captureContentEditableSelection(
 				break;
 			}
 			node = parent!;
-			parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
+			parent = node.parentNode;
 		}
 	}
 
@@ -9139,22 +8509,19 @@ function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
 		const input = focused as HTMLInputElement | HTMLTextAreaElement;
 		return {
 			focused,
-			start: (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionStart ?? 0,
-			end: (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionEnd ?? 0,
+			start: input.selectionStart ?? 0,
+			end: input.selectionEnd ?? 0,
 			contentEditable: false,
 		};
 	}
-	if (
-		focused.contentEditable === 'true' ||
-		(STAGED_DOM ? STAGED_DOM.view(focused) : focused).getAttribute('contenteditable') === 'true'
-	) {
+	if (focused.contentEditable === 'true' || focused.getAttribute('contenteditable') === 'true') {
 		const selection = focused.ownerDocument.getSelection();
 		if (
 			selection !== null &&
 			selection.anchorNode !== null &&
 			selection.focusNode !== null &&
-			(STAGED_DOM ? STAGED_DOM.view(focused) : focused).contains(selection.anchorNode) &&
-			(STAGED_DOM ? STAGED_DOM.view(focused) : focused).contains(selection.focusNode)
+			focused.contains(selection.anchorNode) &&
+			focused.contains(selection.focusNode)
 		) {
 			const anchorNode = selection.anchorNode;
 			const focusNode = selection.focusNode;
@@ -9170,7 +8537,7 @@ function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
 				}
 				// Below 256 UTF-16 code units, one native prefix walk beats JS traversal;
 				// shared-node offset arithmetic also preserves selection direction.
-				if ((STAGED_DOM ? STAGED_DOM.view(anchorNode) : anchorNode).nodeValue!.length < 256) {
+				if (anchorNode.nodeValue!.length < 256) {
 					const range = focused.ownerDocument.createRange();
 					range.selectNodeContents(focused);
 					range.setEnd(anchorNode, selection.anchorOffset);
@@ -9202,26 +8569,20 @@ function contentEditablePosition(element: HTMLElement, offset: number): [Node, n
 	let node = walker.nextNode();
 	let last: Node | null = null;
 	while (node !== null) {
-		const length = (STAGED_DOM ? STAGED_DOM.view(node) : node).textContent?.length ?? 0;
+		const length = node.textContent?.length ?? 0;
 		if (offset <= length) return [node, offset];
 		offset -= length;
 		last = node;
 		node = walker.nextNode();
 	}
-	return last === null
-		? [element, 0]
-		: [last, (STAGED_DOM ? STAGED_DOM.view(last) : last).textContent?.length ?? 0];
+	return last === null ? [element, 0] : [last, last.textContent?.length ?? 0];
 }
 
 function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 	if (snapshot === null) return;
 	const { focused } = snapshot;
 	const doc = focused.ownerDocument;
-	if (
-		activeElementForDocument(doc) === focused ||
-		!(STAGED_DOM ? STAGED_DOM.view(focused) : focused).isConnected
-	)
-		return;
+	if (activeElementForDocument(doc) === focused || !focused.isConnected) return;
 	if (snapshot.start !== -1) {
 		if (snapshot.contentEditable) {
 			const selection = doc.getSelection();
@@ -9237,29 +8598,26 @@ function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 			}
 		} else {
 			const input = focused as HTMLInputElement | HTMLTextAreaElement;
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).setSelectionRange(
-				snapshot.start,
-				Math.min(snapshot.end, (STAGED_DOM ? STAGED_DOM.view(input) : input).value.length),
-			);
+			input.setSelectionRange(snapshot.start, Math.min(snapshot.end, input.value.length));
 		}
 	}
 	// Refocusing a moved control may scroll every containing element. Preserve
 	// those positions only on this cold, focus-was-actually-lost branch.
 	const ancestors: Array<{ element: HTMLElement; left: number; top: number }> = [];
-	let parent = (STAGED_DOM ? STAGED_DOM.view(focused) : focused).parentElement;
+	let parent = focused.parentElement;
 	while (parent !== null) {
 		ancestors.push({
 			element: parent,
-			left: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).scrollLeft,
-			top: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).scrollTop,
+			left: parent.scrollLeft,
+			top: parent.scrollTop,
 		});
-		parent = (STAGED_DOM ? STAGED_DOM.view(parent) : parent).parentElement;
+		parent = parent.parentElement;
 	}
-	(STAGED_DOM ? STAGED_DOM.view(focused) : focused).focus();
+	focused.focus();
 	for (let i = 0; i < ancestors.length; i++) {
 		const ancestor = ancestors[i];
-		domNode(ancestor.element).scrollLeft = ancestor.left;
-		domNode(ancestor.element).scrollTop = ancestor.top;
+		ancestor.element.scrollLeft = ancestor.left;
+		ancestor.element.scrollTop = ancestor.top;
 	}
 }
 
@@ -9351,8 +8709,8 @@ function restoreFocusedMovements(): void {
 		}
 		for (let j = 0; j < movement.ancestors.length; j++) {
 			const ancestor = movement.ancestors[j];
-			domNode(ancestor.element).scrollLeft = ancestor.left;
-			domNode(ancestor.element).scrollTop = ancestor.top;
+			ancestor.element.scrollLeft = ancestor.left;
+			ancestor.element.scrollTop = ancestor.top;
 		}
 	}
 }
@@ -9369,11 +8727,7 @@ function captureFocusedMovement(parent: Node, snapshots: Exclude<FocusSelectionB
 	} else if (snapshots.focused.ownerDocument === parent.ownerDocument) {
 		snapshot = snapshots;
 	}
-	if (
-		snapshot === null ||
-		!(STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(snapshot.focused)
-	)
-		return;
+	if (snapshot === null || !parent.contains(snapshot.focused)) return;
 	if (renderingFocusMoves !== null) {
 		for (let i = 0; i < renderingFocusMoves.length; i++) {
 			if (renderingFocusMoves[i].snapshot === snapshot) return;
@@ -9381,14 +8735,14 @@ function captureFocusedMovement(parent: Node, snapshots: Exclude<FocusSelectionB
 	}
 	const ancestors: Array<{ element: HTMLElement; left: number; top: number }> = [];
 	for (
-		let ancestor = domNode(snapshot.focused).parentElement;
+		let ancestor = snapshot.focused.parentElement;
 		ancestor !== null;
-		ancestor = (STAGED_DOM ? STAGED_DOM.view(ancestor) : ancestor).parentElement
+		ancestor = ancestor.parentElement
 	) {
 		ancestors.push({
 			element: ancestor,
-			left: (STAGED_DOM ? STAGED_DOM.view(ancestor) : ancestor).scrollLeft,
-			top: (STAGED_DOM ? STAGED_DOM.view(ancestor) : ancestor).scrollTop,
+			left: ancestor.scrollLeft,
+			top: ancestor.scrollTop,
 		});
 	}
 	(renderingFocusMoves ??= []).push({ snapshot, ancestors });
@@ -9488,9 +8842,7 @@ function vtCheckNames(group: VtGroup): void {
 	const names = new Map<string, Element>();
 	for (const rec of group.recs)
 		for (const el of rec.els) {
-			const name = (
-				STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)
-			).style?.getPropertyValue('view-transition-name');
+			const name = (el as HTMLElement).style?.getPropertyValue('view-transition-name');
 			if (!name || name === 'none' || name === 'auto') continue;
 			const other = names.get(name);
 			if (other !== undefined && other !== el && !group.warnedNames.has(name)) {
@@ -9709,18 +9061,13 @@ function vtFinalizeGroup(group: VtGroup, types: string[]): void {
 	const root = owner.documentElement;
 	if (
 		group.owner.nodeType === 9 &&
-		(STAGED_DOM ? STAGED_DOM.view(root) : root).style.getPropertyValue('view-transition-name') ===
-			'' &&
+		root.style.getPropertyValue('view-transition-name') === '' &&
 		typeof root.animate === 'function'
 	) {
-		(STAGED_DOM ? STAGED_DOM.view(root) : root).style.setProperty('view-transition-name', 'none');
+		root.style.setProperty('view-transition-name', 'none');
 		group.restoreRoot = () => {
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(root) : root).style.getPropertyValue(
-					'view-transition-name',
-				) === 'none'
-			)
-				(STAGED_DOM ? STAGED_DOM.view(root) : root).style.removeProperty('view-transition-name');
+			if (root.style.getPropertyValue('view-transition-name') === 'none')
+				root.style.removeProperty('view-transition-name');
 		};
 		cancelledAnimations.push(
 			root.animate(
@@ -9854,12 +9201,8 @@ function vtFlush(
 	});
 	// A native start may throw before returning a consumer of this promise.
 	updateResult.catch(() => {});
-	const stage = new DOMStage(captureStagedCommitGuard);
-	const stagedCommit = beginStagedCommitCapture((action, durable) =>
-		stage.enqueue(action, durable),
-	);
+	const stagedCommit = beginStagedCommitCapture();
 	const capture = vtBeginCapture(interrupt, stagedCommit);
-	STAGED_DOM = stage;
 	VT_DRAIN = true;
 	try {
 		work();
@@ -9901,15 +9244,15 @@ function vtFlush(
 			for (const group of groups.values()) {
 				if (
 					group.owner.nodeType !== 9 &&
-					(!domNode(group.owner).isConnected ||
-						domNode(group.owner as Element).getAttribute('vt-scope') !== 'element')
+					(!group.owner.isConnected ||
+						(group.owner as Element).getAttribute('vt-scope') !== 'element' ||
+						vtRetiredScopeHost(stagedCommit, group.owner))
 				)
 					group.valid = false;
 			}
 		} catch (error) {
 			drainError ??= { error };
 		} finally {
-			STAGED_DOM = null;
 			VT_DRAIN = false;
 			endStagedCommitCapture(stagedCommit);
 		}
@@ -9975,7 +9318,9 @@ function vtFlush(
 		try {
 			try {
 				rejectStagedPresentations(stagedCommit);
-				stage.commit();
+				const programs = stagedCommit.programs;
+				for (const program of programs) program();
+				programs.length = 0;
 			} finally {
 				publishStagedCommit(stagedCommit);
 			}
@@ -10248,6 +9593,30 @@ function vtFlush(
 	startCaptures();
 }
 
+/** A retiring descendant does not retire its scope, but replacing the host does. */
+function vtRetiredScopeHost(capture: StagedCommitCapture, host: VTOwner): boolean {
+	for (const receipt of capture.owners.values()) {
+		const retired = receipt.presentation?.retired;
+		if (retired == null) continue;
+		for (const block of retired) {
+			const start = block.startMarker;
+			const end = block.endMarker;
+			if (start === null || end === null) {
+				if (block.kind === 'root' && block.parentNode.contains(host)) return true;
+				continue;
+			}
+			const stop = block.exclusiveMarkers ? end : getNextSibling(end);
+			for (
+				let node: Node | null = block.exclusiveMarkers ? getNextSibling(start) : start;
+				node !== null && node !== stop;
+				node = getNextSibling(node)
+			)
+				if (node === host || node.contains(host)) return true;
+		}
+	}
+	return false;
+}
+
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
 	if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
@@ -10285,6 +9654,7 @@ export function flushSync<T>(fn: () => T): T {
 	// later drains an empty queue.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
+	const initialRenderStamp = NEXT_ROOT_RENDER_CREATED_STAMP;
 	syncFlush = true;
 	let result: T;
 	try {
@@ -10310,6 +9680,12 @@ export function flushSync<T>(fn: () => T): T {
 				pendingError = drainQueueWithFocus(focused);
 				if (focused !== null) restoreQueuedFocusSelection(focused);
 				commitEffects();
+				// A standalone public drain admits already-ready retries. If this
+				// flush rendered work, that update owns its commit and existing
+				// retry deadlines remain in force (including other roots'). Act's
+				// internal drain likewise must not publish retries from before act.
+				if (actScopeDepth === 0 && initialRenderStamp === NEXT_ROOT_RENDER_CREATED_STAMP)
+					SCHEDULED_VISIBILITY_DRIVER?.flushRetries?.();
 				// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
 				// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
 				// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
@@ -10438,7 +9814,8 @@ export function replaceRef(
 		if (Object.prototype.hasOwnProperty.call(target, '_currentRef'))
 			journalRootProperty(target, '_currentRef', (target as any)._currentRef);
 	}
-	if (previous != null) queueRefDetach(previous, target);
+	if (previous != null && !enclosingPrimaryDetachedRefs(scope.block))
+		queueRefDetach(previous, target);
 	if (next != null) queueRefAttach(scope, next, target);
 	return next;
 }
@@ -10728,7 +10105,8 @@ let DEFERRED_LAYOUT_HELD_WORK: Set<Block> | null = null;
 
 interface StagedCommitCapture {
 	parent: StagedCommitCapture | null;
-	enqueue: (action: () => void, durable?: boolean) => void;
+	/** Already prepared scope commits and lifecycle work awaiting native admission. */
+	programs: Array<() => void>;
 	queues: OffscreenCapture;
 	passiveUnmounts: Array<Cleanup | TryHandler | Block | null>;
 	adoptions: NativeAdoptionState[];
@@ -10738,7 +10116,6 @@ interface StagedCommitCapture {
 	autofocus: Element[];
 	bundles: Map<HandlerBundle, HandlerBundle>;
 	controls: Map<ControlledState, ControlledState>;
-	signalHosts?: Map<SignalHostPropSourcesBinding, SignalHostPropSourcesBinding>;
 	retiredHostTrees?: Node[];
 	owners: Map<
 		RootRenderOwner,
@@ -10811,20 +10188,22 @@ function stagedOwnerGuard(
 	return receipt.guard;
 }
 
-/** Host-plan entries keep the accepted preparation generation of their root. */
-function captureStagedCommitGuard(): (() => boolean) | undefined {
+/** A completed owner's program cannot publish after its attempt is discarded. */
+function captureStagedCommitGuard(durable = false): (() => boolean) | undefined {
 	const capture = STAGED_COMMIT_CAPTURE;
 	if (capture === null) return undefined;
 	if (ROOT_RENDER_ROLLBACK || TRANSITION_JOURNAL_REPLAYING) return () => false;
-	const ownerGuard = stagedOwnerGuard(
-		capture,
-		STAGED_COMMIT_OWNER ??
-			CURRENT_BLOCK?.idState.renderOwner ??
-			CURRENT_SCOPE?.block.idState.renderOwner,
-	);
+	const ownerGuard = durable
+		? undefined
+		: stagedOwnerGuard(
+				capture,
+				STAGED_COMMIT_OWNER ??
+					CURRENT_BLOCK?.idState.renderOwner ??
+					CURRENT_SCOPE?.block.idState.renderOwner,
+			);
 	if (TRANSITION_JOURNAL === null) return ownerGuard;
-	// Keep logical rollback writes in the projection but omit both the abandoned
-	// forward operation and its undo from the later native mutation log.
+	// Retirements survive a later generation of the same accepted root, but they
+	// still belong to this render attempt and must be dropped if it is aborted.
 	let cancelled = false;
 	journalUndo(() => {
 		cancelled = true;
@@ -10832,14 +10211,12 @@ function captureStagedCommitGuard(): (() => boolean) | undefined {
 	return () => !cancelled && ownerGuard?.() !== false;
 }
 
-/** Capture commit work while the host adapter prepares an ordered mutation plan. */
-function beginStagedCommitCapture(
-	enqueue: (action: () => void, durable?: boolean) => void,
-): StagedCommitCapture {
+/** Hold prepared owners until all participating native snapshot callbacks arrive. */
+function beginStagedCommitCapture(): StagedCommitCapture {
 	ensureDeferredLayoutDriver();
 	const capture: StagedCommitCapture = {
 		parent: STAGED_COMMIT_CAPTURE,
-		enqueue,
+		programs: [],
 		queues: createOffscreenCapture(),
 		passiveUnmounts: [],
 		adoptions: [],
@@ -10867,14 +10244,10 @@ function enqueueStagedAction(
 	action: () => void,
 	durable = false,
 ): void {
-	let cancelled = ROOT_RENDER_ROLLBACK || TRANSITION_JOURNAL_REPLAYING;
-	if (TRANSITION_JOURNAL !== null && !cancelled)
-		journalUndo(() => {
-			cancelled = true;
-		});
-	capture.enqueue(() => {
-		if (!cancelled) action();
-	}, durable);
+	const guard = captureStagedCommitGuard(durable);
+	capture.programs.push(() => {
+		if (guard?.() !== false) action();
+	});
 }
 
 function endStagedCommitCapture(capture: StagedCommitCapture): void {
@@ -10982,7 +10355,6 @@ function publishStagedCommit(capture: StagedCommitCapture): void {
 			0;
 	capture.bundles.clear();
 	capture.controls.clear();
-	capture.signalHosts?.clear();
 	commitEffects();
 }
 
@@ -11099,7 +10471,7 @@ function ensureDeferredLayoutDriver(): void {
 				let nodes = capture.retiredHostTrees;
 				if (nodes === undefined) {
 					const list: Node[] = (nodes = capture.retiredHostTrees = []);
-					capture.enqueue(() => list.forEach(retireEventHostTree), true);
+					enqueueStagedAction(capture, () => list.forEach(retireEventHostTree), true);
 				}
 				nodes.push(node);
 			},
@@ -11145,7 +10517,7 @@ function ensureDeferredLayoutDriver(): void {
 							capture.bundles.delete(bundle);
 						});
 					const next = projected;
-					capture.enqueue(() => {
+					enqueueStagedAction(capture, () => {
 						if (_dispatchDepth !== 0) preserveDispatchedBundle(bundle);
 						Object.assign(bundle, next);
 					});
@@ -11165,7 +10537,7 @@ function ensureDeferredLayoutDriver(): void {
 							capture.controls.delete(state);
 						});
 					const next = projected;
-					capture.enqueue(() => {
+					enqueueStagedAction(capture, () => {
 						// Composition/event state may advance while a native capture is
 						// pending. Publish only fields changed by the prepared binding.
 						for (const key of Object.keys(next)) {
@@ -12686,10 +12058,10 @@ export function renderBlock(block: Block): void {
 	// whose body must still read the server rejection seed before adopting a catch.
 	const rebuild =
 		hydration !== null &&
-		(!hydration.owns(block) ||
+		(!hydrateOwns(hydration, block) ||
 			(block.kind === 'dynamic' &&
 				block.endMarker !== null &&
-				hydration.rebuilds(block.endMarker)));
+				hydrateRebuilds(hydration, block.endMarker)));
 	let retryVisit: SignalRetryVisit | null = null;
 	// The synchronous owner this call replaced, or undefined when the block
 	// renders in its caller's owner frame.
@@ -12719,7 +12091,7 @@ export function renderBlock(block: Block): void {
 	if (rebuild) {
 		// The nested client build renders this block, so it takes the retry visit.
 		SIGNAL_RETRY_VISIT = retryVisit;
-		hydration!.suspend(() => renderBlock(block));
+		hydrateSuspend(hydration!, () => renderBlock(block));
 		return;
 	}
 	const previousOwner = renderPhaseOwner;
@@ -12738,7 +12110,7 @@ export function renderBlock(block: Block): void {
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
-		if (hydration !== null) hydration.settleUnclaimed(block);
+		if (hydration !== null) hydrateSettleUnclaimed(hydration, block);
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (
 			signalDocumentEnabled &&
@@ -13085,6 +12457,18 @@ function renderBlockInner(block: Block): true | undefined {
 		NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 		if (urgentTransitionRender !== null)
 			urgentTransitionDriver!.beginUrgent(block, urgentTransitionRender);
+		// Spill/custom compiler ABI bags may carry enumerable accessor, symbol,
+		// or array state used by event closures. Their state must revert when
+		// this scope aborts. Fixed-shape compiled bags prepare their own values.
+		const bag = block.slots[0];
+		if (
+			TRANSITION_JOURNAL !== null &&
+			bag !== null &&
+			typeof bag === 'object' &&
+			bag.__kind === undefined &&
+			bag[BINDING_BAG_ARITY] === undefined
+		)
+			journalBag();
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
 			block,
@@ -13214,16 +12598,11 @@ function returnSlotTail(block: Block, state: any): Node | null {
 		state?.hostNode,
 		state?.text,
 		block.endMarker,
-		domNode(block.parentNode).lastChild,
+		block.parentNode.lastChild,
 	];
 	for (let i = 0; i < candidates.length; i++) {
 		const node = candidates[i] as Node | null | undefined;
-		if (
-			node !== null &&
-			node !== undefined &&
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === block.parentNode
-		)
-			return node;
+		if (node !== null && node !== undefined && node.parentNode === block.parentNode) return node;
 	}
 	return null;
 }
@@ -13441,20 +12820,10 @@ function disposeReturnSlot(block: Block, state: any): void {
 			first === null
 				? null
 				: state.ownerHost != null || (borrowed && end === null)
-					? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
+					? parent.lastChild
 					: borrowed
-						? domNode(end).previousSibling
+						? end.previousSibling
 						: (end ?? arm?.endMarker ?? first);
-		journalRootSlot(
-			state,
-			parent,
-			borrowed
-				? state.start
-				: first !== null
-					? (STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling
-					: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild,
-			borrowed ? end : ((STAGED_DOM ? STAGED_DOM.view(last) : last)?.nextSibling ?? null),
-		);
 		const retiredBlock = state.block ?? state.portal?.block ?? state.lite?.block;
 		if (retiredBlock != null) retireRootBlock(retiredBlock);
 		if (state.forSlot != null) {
@@ -13463,9 +12832,25 @@ function disposeReturnSlot(block: Block, state: any): void {
 			}
 			if (state.forSlot.emptyBlock !== null) retireRootBlock(state.forSlot.emptyBlock);
 		}
-		// Keep the retired slot intact for connected-DOM cleanup. Only its
-		// registry entry changes while the new return shape renders alongside it.
-		deferRootRange(parent, first, last, () => unmountSlot(state, false));
+		// Keep the outgoing slot intact until the replacement is admitted. No
+		// published nodes change during preparation, including on hydration abort.
+		prepareSlot(block, state, 'disposePrepared', {
+			parent,
+			publish() {
+				const nodes: Node[] = [];
+				if (first !== null && last !== null) {
+					for (let node: Node | null = first; node !== null; node = getNextSibling(node)) {
+						if (node.parentNode !== parent) break;
+						nodes.push(node);
+						retireEventHostTree(node);
+						if (node === last) break;
+					}
+				}
+				unmountSlot(state, false);
+				for (const node of nodes) if (node.parentNode === parent) parent.removeChild(node);
+			},
+			discard() {},
+		});
 		journalRootProperty(block.slots, 0, block.slots[0]);
 		const registry = block._slots;
 		if (registry !== null) {
@@ -13490,10 +12875,10 @@ function disposeReturnSlot(block: Block, state: any): void {
 			state.forSlot = null;
 		}
 		// Fires the content's cleanups and sweeps the nodes between the markers.
-		clearChildContent(state);
+		clearChildContent(state, block);
 		if (!state.borrowed) {
-			domNode(state.start as ChildNode | null)?.remove();
-			domNode(end as ChildNode | null)?.remove();
+			(state.start as ChildNode | null)?.remove();
+			(end as ChildNode | null)?.remove();
 		}
 	} else {
 		// Component and native control-flow slots release their child lifetime.
@@ -13504,8 +12889,8 @@ function disposeReturnSlot(block: Block, state: any): void {
 			unmountSlot(state, true);
 		}
 		if (!state.inherited && !state.borrowed) {
-			domNode(state.start as ChildNode | null)?.remove?.();
-			domNode(end as ChildNode | null)?.remove?.();
+			(state.start as ChildNode | null)?.remove?.();
+			(end as ChildNode | null)?.remove?.();
 		}
 	}
 	const reg = block._slots;
@@ -13628,7 +13013,7 @@ export function componentSlotLite<P>(
 	// component path by suspending adoption only for this subtree.
 	if (
 		hydration !== null &&
-		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(host))
+		((anchor != null && hydrateIsFresh(hydration, anchor)) || hydrateIsFresh(hydration, host))
 	) {
 		suspendFreshLiteComponent(
 			hydration,
@@ -13663,17 +13048,17 @@ export function componentSlotLite<P>(
 		// than spilling out to the parent block's range. `parentBlock` keeps the
 		// context-walk Phase B chain pointing at the real ancestor Block.
 		let endMarker = anchor ?? null;
-		if (hydration !== null && hydration.isOpen(anchor ?? null)) {
+		if (hydration !== null && hydrateIsOpen(hydration, anchor ?? null)) {
 			// Hydration: the server wrapped this hookless component's output in a
 			// `<!--[-->…<!--]-->` range (anchor resolved to the `<!--[-->`). Point the
 			// cursor at the content so the body's clone() adopts the server DOM, and
 			// use `<!--]-->` as the insert anchor so the body's
 			// `insertBefore(content, endMarker)` is a no-op (content already there).
 			adoptedOpen = anchor as Comment;
-			endMarker = hydration.close(anchor as Node);
+			endMarker = hydrateClose(hydration, anchor as Node);
 			adoptedClose = endMarker;
-			hydration.node = getNextSibling(anchor as Node);
-		} else if (hydration !== null && !hydration.isOpen(anchor ?? null)) {
+			hydrationCursor.node = getNextSibling(anchor as Node);
+		} else if (hydration !== null && !hydrateIsOpen(hydration, anchor ?? null)) {
 			// Anchor-less (appended) component — the compiler dropped the `<!>`
 			// placeholder because every child of `host` is a component — OR the anchor
 			// is a non-open marker because this lite component is the SOLE hole of a
@@ -13683,15 +13068,14 @@ export function componentSlotLite<P>(
 			// the `<!--[-->`. The FIRST appended child finds the cursor parked AFTER the
 			// just-cloned (empty) host, so descend to host.firstChild; later siblings
 			// (and the sole-hole case) already have the cursor on the open marker.
-			let open: Node | null = hydration.node;
-			if (open === null || (STAGED_DOM ? STAGED_DOM.view(open) : open).parentNode !== host)
-				open = getFirstChild(host);
-			hydration.takeUnclaimed(open);
-			if (open !== null && hydration.isOpen(open)) {
+			let open: Node | null = hydrationCursor.node;
+			if (open === null || open.parentNode !== host) open = getFirstChild(host);
+			hydrateTakeUnclaimed(hydration, open);
+			if (open !== null && hydrateIsOpen(hydration, open)) {
 				adoptedOpen = open;
-				endMarker = hydration.close(open);
+				endMarker = hydrateClose(hydration, open);
 				adoptedClose = endMarker;
-				hydration.node = getNextSibling(open);
+				hydrationCursor.node = getNextSibling(open);
 			} else if (anchor === undefined) {
 				// The server frames an anchorless call (see componentSlotImpl), so the
 				// host's server content is something else, unless the client built it.
@@ -13701,7 +13085,7 @@ export function componentSlotLite<P>(
 			// node for this call's own placeholder: as React compares only the DOM,
 			// the call renders in place of that node and adopts it when it matches
 			// (parkAtHole), inserting before the node after it.
-			else endMarker = hydration.parkAtHole((inPlace = anchor));
+			else endMarker = hydrateParkAtHole(hydration, (inPlace = anchor));
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
 		if (process.env.NODE_ENV !== 'production') LITE_BODIES!.set(scope, comp as ComponentBody);
@@ -13769,7 +13153,7 @@ export function componentSlotLite<P>(
 	// The first node after the template that adopted the frame's content.
 	let claimed: Node | null | undefined;
 	const claim =
-		adoptedOpen === null ? null : hydration!.beginClaim(scope, getNextSibling(adoptedOpen));
+		adoptedOpen === null ? null : hydrateBeginClaim(hydration!, scope, getNextSibling(adoptedOpen));
 	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
@@ -13783,7 +13167,7 @@ export function componentSlotLite<P>(
 				comp(props, scope, undefined);
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
-		if (hydration !== null) hydration.settleUnclaimed(scope);
+		if (hydration !== null) hydrateSettleUnclaimed(hydration, scope);
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (scope.effectSlots !== null) finishEffectRender(scope);
 		if (!scope.mounted) scope.mounted = true;
@@ -13793,7 +13177,7 @@ export function componentSlotLite<P>(
 		profileThrown = error;
 		throw error;
 	} finally {
-		if (claim !== null) claimed = hydration!.endClaim(claim);
+		if (claim !== null) claimed = hydrateEndClaim(hydration!, claim);
 		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
@@ -13810,23 +13194,23 @@ export function componentSlotLite<P>(
 	// anchor. Mirrors componentSlot's post-render advance. First, check that the
 	// server rendered nothing in the frame after this component's content.
 	if (hydration !== null && adoptedClose !== null) {
-		hydration.settleClaim(adoptedClose, claimed, parentScope, slotKey);
-		hydration.parkPast(adoptedClose, parentScope);
+		hydrateSettleClaim(hydration, adoptedClose, claimed, parentScope, slotKey);
+		hydrateParkPast(hydration, adoptedClose, parentScope);
 	} else if (hydration !== null) {
 		// A hydrating replay, such as a suspended activation's resume, re-renders
 		// an adopted range without adopting it again; its new siblings still adopt
 		// from after it.
 		const range = hydration.liteRanges.get(scope);
-		if (range !== undefined) hydration.node = getNextSibling(range.end);
+		if (range !== undefined) hydrationCursor.node = getNextSibling(range.end);
 	}
 }
 
 // A lite call whose server range is missing, at `cursor` (see
-// HydrationCapability.unframedRoot): render it between fresh markers, framing
+// hydration: unframedRoot): render it between fresh markers, framing
 // the server node its body adopts in place. The body renders through
 // componentSlotLite again, which finds the registered scope.
 function mountUnframedLite<P>(
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	parentScope: Scope,
 	slotKey: number,
 	host: Node,
@@ -13836,16 +13220,21 @@ function mountUnframedLite<P>(
 	cursor: Node | null,
 	anchor: Node | null,
 ): void {
-	const root = hydration.unframedRoot(parentScope, cursor, anchor);
-	hydration.save(host);
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('comp');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/comp');
-	(STAGED_DOM ? STAGED_DOM.view(host) : host).insertBefore(start, root ?? anchor);
-	(STAGED_DOM ? STAGED_DOM.view(host) : host).insertBefore(end, root ?? anchor);
-	hydration.markFresh(start);
-	hydration.markFresh(end);
+	const root = hydrateUnframedRoot(hydration, parentScope, cursor, anchor);
+	const start = document.createComment('comp');
+	const end = document.createComment('/comp');
+	prepareHydrationFrame(
+		parentScope,
+		parentScope.slots[slotKey],
+		slotKey,
+		host,
+		start,
+		end,
+		root ?? anchor,
+	);
 	(parentScope.slots[slotKey] as Scope).block.endMarker = end;
-	hydration.renderUnframed(
+	hydrateRenderUnframed(
+		hydration,
 		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite),
 		undefined,
 		start,
@@ -13856,11 +13245,11 @@ function mountUnframedLite<P>(
 		parentScope,
 		slotKey,
 	);
-	hydration.node = getNextSibling(end);
+	hydrationCursor.node = getNextSibling(end);
 }
 
 // An anchored lite call without a server range, at the server node `root`: its
-// body may adopt that node in place (HydrationCapability.renderInPlace). The body
+// body may adopt that node in place (hydration: renderInPlace). The body
 // renders through componentSlotLite again, which finds the registered scope. A
 // separate function keeps the callback's captures out of ordinary lite dispatch.
 // When `root` is the element or text a template hole's walk found below a
@@ -13870,7 +13259,7 @@ function mountUnframedLite<P>(
 // (mountUnframedLite), as componentSlot renders a call it cannot prove
 // single-root.
 function renderLiteInPlace<P>(
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	parentScope: Scope,
 	slotKey: number,
 	host: Node,
@@ -13901,7 +13290,8 @@ function renderLiteInPlace<P>(
 	}
 	const positional = root === anchor && root.nodeType !== 8;
 	if (
-		hydration.renderInPlace(
+		hydrateRenderInPlace(
+			hydration,
 			() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
 			undefined,
 			root,
@@ -13910,14 +13300,15 @@ function renderLiteInPlace<P>(
 			slotKey,
 		)
 	)
-		hydration.parkInPlace(parentScope);
+		hydrateParkInPlace(hydration, parentScope);
 	// The walk found `root` for this call alone, which rendered nothing there.
-	else if (positional) hydration.slotMismatch(parentScope, slotKey, 'a component range', root);
+	else if (positional)
+		hydrateSlotMismatch(hydration, parentScope, slotKey, 'a component range', root);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
 function suspendFreshLiteComponent<P>(
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	parentScope: Scope,
 	slotKey: number,
 	host: Node,
@@ -13926,7 +13317,7 @@ function suspendFreshLiteComponent<P>(
 	invocationSite?: string,
 	anchor?: Node,
 ): void {
-	hydration.suspend(() =>
+	hydrateSuspend(hydration, () =>
 		componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
 	);
 }
@@ -14028,14 +13419,14 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		(block.kind === 'root' ||
 			(block.startMarker !== null &&
 				block.endMarker !== null &&
-				domNode(block.startMarker).parentNode !== null));
+				block.startMarker.parentNode !== null));
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom && !removesOwnDom);
 	if (NATIVE_READ_DRIVER && owner?.current === block) NATIVE_READ_DRIVER.clearDeferredRefs(owner);
 	if (!detachDom) return;
 	// Remove DOM range.
 	if (block.startMarker && block.endMarker) {
-		const parent = domNode(block.startMarker).parentNode;
+		const parent = block.startMarker.parentNode;
 		if (parent) {
 			// Borrowed (slot) markers stay put — remove only the content between
 			// them. Owned markers are removed inclusively with the content.
@@ -14044,7 +13435,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 			const stop = excl ? block.endMarker : getNextSibling(block.endMarker);
 			while (n && n !== stop) {
 				const next: Node | null = getNextSibling(n);
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
+				parent.removeChild(n);
 				n = next;
 			}
 		}
@@ -14052,7 +13443,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		// Root block — clear the whole container.
 		let c: Node | null;
 		while ((c = getFirstChild(block.parentNode)) !== null) {
-			domNode(block.parentNode).removeChild(c);
+			block.parentNode.removeChild(c);
 		}
 	}
 	// else: a non-root block with no markers produced no DOM (e.g. a singleRoot
@@ -14076,7 +13467,9 @@ function registerSlot(scope: Scope, slot: any): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && scope.mounted && !isCreatedInRootRender(transaction, scope.block)) {
 		journalUndo(() => {
-			unmountSlot(slot, true);
+			// A newly registered slot may already have adopted a server range.
+			// Foreign portals still detach through unmountSlot's portal ownership.
+			unmountSlot(slot, !transaction.hydrating && !transaction.retainedCreated?.has(slot.block));
 			const index = scope.slots.indexOf(slot);
 			if (index !== -1) scope.slots[index] = undefined;
 			if (slots === null) scope._slots = null;
@@ -16811,27 +16204,24 @@ function hasResettableHmrRange(block: Block): boolean {
 		);
 	}
 	if (start !== end) {
-		return (
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === block.parentNode &&
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === block.parentNode
-		);
+		return start.parentNode === block.parentNode && end.parentNode === block.parentNode;
 	}
 	// A sole-root control-flow or list-item ancestor can borrow this exact node.
 	// Promoting only the hot block would leave the borrowed boundary detached.
 	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
 		if (parent.startMarker === start && parent.endMarker === end) return false;
 	}
-	return (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === block.parentNode;
+	return start.parentNode === block.parentNode;
 }
 
 function promoteHmrBlockRange(block: Block): void {
 	const root = block.startMarker;
 	if (root === null || root !== block.endMarker) return;
 	const parent = block.parentNode;
-	const rangeStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('hmr');
-	const rangeEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/hmr');
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(rangeStart, root);
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(rangeEnd, getNextSibling(root));
+	const rangeStart = document.createComment('hmr');
+	const rangeEnd = document.createComment('/hmr');
+	parent.insertBefore(rangeStart, root);
+	parent.insertBefore(rangeEnd, getNextSibling(root));
 	block.startMarker = rangeStart;
 	block.endMarker = rangeEnd;
 	block.exclusiveMarkers = false;
@@ -17011,6 +16401,12 @@ type InternalHydrateProps = HydrateProps & {
 };
 
 interface HydrateSlot {
+	/** A root fallback has reserved this live independent island until admission. */
+	keptWrapper?: HTMLDivElement;
+	metadataPrepared?: SlotPreparation & {
+		seed: HTMLScriptElement | null;
+		nativeSeed: HTMLScriptElement | null;
+	};
 	__kind: 'hydrateBlockSlot';
 	__flags: typeof SLOT_FLAG_TEARDOWN;
 	__teardown: typeof teardownHydrateBoundary;
@@ -17066,7 +16462,7 @@ interface HydrateSlot {
 let hydrateStreamWaitCleanups: WeakMap<HydrateSlot, () => void> | null = null;
 
 interface PreservedHydrateActivation {
-	hydration: HydrationCapability;
+	hydration: HydrationAttempt;
 	thenable: TrackedThenable<unknown>;
 	generation: number;
 	capture: OffscreenCapture;
@@ -17232,7 +16628,7 @@ function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unkno
 
 function preserveSuspendedHydrateActivation(
 	state: HydrateSlot,
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	suspension: SuspenseException,
 ): void {
 	const thenable = suspension.thenable;
@@ -17246,7 +16642,7 @@ function preserveSuspendedHydrateActivation(
 		generation: state.activationGeneration,
 		capture: WIP_CAPTURE!,
 		source: suspendedBlock === state.block ? null : suspendedBlock,
-		cursor: hydration.node,
+		cursor: hydrationCursor.node,
 		fresh: hydration.freshSuspension === suspension,
 	};
 	hydration.freshSuspension = null;
@@ -17313,22 +16709,19 @@ function permanentStaticHydrationRangeEnd(
 	marker: Comment,
 	expectedStreamToken?: string,
 ): { end: Comment; idCount: number } | null {
-	const parsed = parsePermanentStaticHydrationMarker(
-		(STAGED_DOM ? STAGED_DOM.view(marker) : marker).data,
-	);
+	const parsed = parsePermanentStaticHydrationMarker(marker.data);
 	if (
 		parsed === null ||
 		(expectedStreamToken !== undefined && parsed.streamToken !== expectedStreamToken)
 	)
 		return null;
 	const childClose = rendererRangeClose(getNextSibling(marker));
-	const end = (STAGED_DOM ? STAGED_DOM.view(childClose) : childClose)?.nextSibling;
+	const end = childClose?.nextSibling;
 	const expectedEnd =
 		parsed.streamToken === null
 			? HYDRATE_STATIC_END
 			: HYDRATE_STATIC_END + ':' + parsed.streamToken;
-	return end?.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(end as Comment) : (end as Comment)).data === expectedEnd
+	return end?.nodeType === 8 && (end as Comment).data === expectedEnd
 		? { end: end as Comment, idCount: parsed.idCount }
 		: null;
 }
@@ -17336,14 +16729,14 @@ function permanentStaticHydrationRangeEnd(
 function preservePermanentStaticHydrationRange(scope: Scope): void {
 	const hydration = activeHydration();
 	if (hydration === null) return;
-	const marker = hydration.node;
+	const marker = hydrationCursor.node;
 	if (marker?.nodeType !== 8) return;
 	const range = permanentStaticHydrationRangeEnd(marker as Comment);
 	if (range === null) return;
 	reserveHydrationIds(scope.block.idState, range.idCount);
-	hydration.node = getNextSibling(marker);
-	(STAGED_DOM ? STAGED_DOM.view(marker as ChildNode) : (marker as ChildNode)).remove();
-	domNode(range.end).remove();
+	hydrationCursor.node = getNextSibling(marker);
+	(marker as ChildNode).remove();
+	range.end.remove();
 }
 
 function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
@@ -17446,7 +16839,7 @@ function createHydrateBoundaryBody(
 				throw error;
 			}
 			// The SSR arm is already the visible content. Let its adopted try block
-			// remain connected and retry adoption in the same hydration capability
+			// remain connected and retry adoption in the same hydration attempt
 			// once application data settles, without ever mounting a cloned fallback.
 			preserveSuspendedHydrateActivation(state, hydration, error);
 			return;
@@ -17622,6 +17015,17 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 }
 
 function teardownHydrateBoundary(state: HydrateSlot): void {
+	// Releasing an unpublished boundary makes its independent wrapper available
+	// to another arm in the same root attempt. The live island never moved.
+	const kept = state.keptWrapper;
+	const islands = ROOT_RENDER_TRANSACTION?.keptIslands;
+	if (kept !== undefined && islands !== undefined) {
+		const index = islands.indexOf(state);
+		if (index !== -1) {
+			journalRootProperty(islands, index, state);
+			islands[index] = kept;
+		}
+	}
 	const preserved = preservedHydrateActivations?.get(state);
 	if (preserved !== undefined) {
 		// Recursive teardown must recognize these refs as uncommitted even when
@@ -17650,19 +17054,17 @@ function teardownHydrateBoundary(state: HydrateSlot): void {
 }
 
 function resolveEventPath(root: Element, path: number[]): Element | null {
-	const streamToken = (STAGED_DOM ? STAGED_DOM.view(root) : root).getAttribute(
-		HYDRATE_STREAM_TOKEN_ATTR,
-	);
+	const streamToken = root.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
 	let node: Element = root;
 	for (let i = 0; i < path.length; i++) {
 		let index = path[i];
-		let next = (STAGED_DOM ? STAGED_DOM.view(node) : node).firstElementChild;
+		let next = node.firstElementChild;
 		while (next !== null) {
 			if (!isRendererStreamBoundaryTemplate(next, streamToken)) {
 				if (index === 0) break;
 				index--;
 			}
-			next = (STAGED_DOM ? STAGED_DOM.view(next) : next).nextElementSibling;
+			next = next.nextElementSibling;
 		}
 		if (next === null) return null;
 		node = next;
@@ -17671,12 +17073,10 @@ function resolveEventPath(root: Element, path: number[]): Element | null {
 }
 
 function hydrateMarkerInteractionEvents(marker: Element): ReadonlyArray<string> | null {
-	const when = (STAGED_DOM ? STAGED_DOM.view(marker) : marker).getAttribute(HYDRATE_WHEN_ATTR);
+	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
 	if (when === 'dynamic') return HYDRATE_SUPPORTED_INTERACTION_EVENTS;
 	if (when !== 'interaction') return null;
-	const custom = (STAGED_DOM ? STAGED_DOM.view(marker) : marker).getAttribute(
-		HYDRATE_INTERACTION_EVENTS_ATTR,
-	);
+	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
 	return custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
 }
 
@@ -17730,7 +17130,7 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		// whose strategy could not yet be evaluated. Resolved boundaries get none.
 		(state.delegatedDynamicIntent ? HYDRATE_SUPPORTED_INTERACTION_EVENTS : []);
 	const events = new Set<string>(ownEvents);
-	const descendants = domNode(state.wrapper).querySelectorAll(HYDRATE_MARKER_SELECTOR);
+	const descendants = state.wrapper.querySelectorAll(HYDRATE_MARKER_SELECTOR);
 	for (let i = 0; i < descendants.length; i++) {
 		const nestedEvents = hydrateMarkerInteractionEvents(descendants[i]);
 		if (nestedEvents !== null) {
@@ -17752,31 +17152,23 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 			rawTarget?.nodeType === 1
 				? (rawTarget as Element)
 				: rawTarget !== null
-					? (STAGED_DOM ? STAGED_DOM.view(rawTarget) : rawTarget).parentElement
+					? rawTarget.parentElement
 					: null;
-		let marker: Element | null =
-			(STAGED_DOM ? STAGED_DOM.view(target) : target)?.closest(HYDRATE_MARKER_SELECTOR) ??
-			state.wrapper;
+		let marker: Element | null = target?.closest(HYDRATE_MARKER_SELECTOR) ?? state.wrapper;
 		let matches = ownEvents.includes(event.type);
 		const delegatedDynamicMarkers: Element[] = [];
-		while (marker !== null && domNode(state.wrapper).contains(marker)) {
+		while (marker !== null && state.wrapper.contains(marker)) {
 			if (marker !== state.wrapper) {
 				const nestedEvents = hydrateMarkerInteractionEvents(marker);
 				if (nestedEvents?.includes(event.type)) {
 					matches = true;
-					if (
-						(STAGED_DOM ? STAGED_DOM.view(marker) : marker).getAttribute(HYDRATE_WHEN_ATTR) ===
-						'dynamic'
-					) {
+					if (marker.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic') {
 						delegatedDynamicMarkers.push(marker);
 					}
 				}
 			}
 			if (marker === state.wrapper) break;
-			marker =
-				domNode((STAGED_DOM ? STAGED_DOM.view(marker) : marker).parentElement)?.closest(
-					HYDRATE_MARKER_SELECTOR,
-				) ?? null;
+			marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
 		}
 		if (!matches) return;
 		for (let i = 0; i < delegatedDynamicMarkers.length; i++) {
@@ -17792,11 +17184,9 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		}
 		requestHydrateBoundary(state);
 	};
-	for (const eventName of events)
-		domNode(state.wrapper).addEventListener(eventName, onIntent, true);
+	for (const eventName of events) state.wrapper.addEventListener(eventName, onIntent, true);
 	return () => {
-		for (const eventName of events)
-			domNode(state.wrapper).removeEventListener(eventName, onIntent, true);
+		for (const eventName of events) state.wrapper.removeEventListener(eventName, onIntent, true);
 	};
 }
 
@@ -17808,13 +17198,10 @@ function isCanonicalHydrateIdCount(value: string | null): boolean {
 function isDormantServerHydrateOwner(element: Element, streamToken: string): boolean {
 	return (
 		element.localName === 'div' &&
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(HYDRATE_STREAM_TOKEN_ATTR) ===
-			streamToken &&
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).hasAttribute(HYDRATE_ID_ATTR) &&
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).hasAttribute(HYDRATE_WHEN_ATTR) &&
-		isCanonicalHydrateIdCount(
-			(STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(HYDRATE_ID_COUNT_ATTR),
-		) &&
+		element.getAttribute(HYDRATE_STREAM_TOKEN_ATTR) === streamToken &&
+		element.hasAttribute(HYDRATE_ID_ATTR) &&
+		element.hasAttribute(HYDRATE_WHEN_ATTR) &&
+		isCanonicalHydrateIdCount(element.getAttribute(HYDRATE_ID_COUNT_ATTR)) &&
 		rendererRangeClose(getFirstChild(element)) !== null
 	);
 }
@@ -17824,23 +17211,23 @@ function hydrateStreamBoundaryOwnedByState(
 	state: HydrateSlot,
 	streamToken: string,
 ): boolean {
-	let owner = (STAGED_DOM ? STAGED_DOM.view(boundary) : boundary).parentElement;
+	let owner = boundary.parentElement;
 	while (owner !== null && owner !== state.wrapper) {
 		// Only a complete token-bound server shape creates an ownership barrier.
 		// Authored lookalike data attributes remain ordinary descendants.
 		if (isDormantServerHydrateOwner(owner, streamToken)) return false;
-		owner = (STAGED_DOM ? STAGED_DOM.view(owner) : owner).parentElement;
+		owner = owner.parentElement;
 	}
 	return owner === state.wrapper;
 }
 
 function hasPendingHydrateStreamReveal(state: HydrateSlot): boolean {
-	const streamToken = domNode(state.wrapper).getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
+	const streamToken = state.wrapper.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
 	if (!isRendererStreamToken(streamToken)) return false;
 	// querySelector is the fast native rejection path for the overwhelmingly
 	// common non-streamed boundary. Only pay the ownership/range-aware JS walk
 	// after proving at least one renderer stream sentinel remains below it.
-	if (domNode(state.wrapper).querySelector(HYDRATE_STREAM_BOUNDARY_SELECTOR) === null) return false;
+	if (state.wrapper.querySelector(HYDRATE_STREAM_BOUNDARY_SELECTOR) === null) return false;
 	const walker = state.wrapper.ownerDocument.createTreeWalker(
 		state.wrapper,
 		HYDRATE_STREAM_SCAN_MASK,
@@ -17857,9 +17244,7 @@ function hasPendingHydrateStreamReveal(state: HydrateSlot): boolean {
 		const boundary = node as Element;
 		if (
 			isRendererStreamBoundaryTemplate(boundary, streamToken) &&
-			!(STAGED_DOM ? STAGED_DOM.view(boundary) : boundary).hasAttribute(
-				HYDRATE_STREAM_ERROR_ATTR,
-			) &&
+			!boundary.hasAttribute(HYDRATE_STREAM_ERROR_ATTR) &&
 			hydrateStreamBoundaryOwnedByState(boundary, state, streamToken)
 		)
 			return true;
@@ -18015,15 +17400,8 @@ function findHydrateSeedSidecar(
 	wrapper: ParentNode,
 	attribute = HYDRATE_SEED_ATTR,
 ): HTMLScriptElement | null {
-	for (
-		let node = (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).firstElementChild;
-		node !== null;
-		node = (STAGED_DOM ? STAGED_DOM.view(node) : node).nextElementSibling
-	) {
-		if (
-			node.localName === 'script' &&
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).hasAttribute(attribute)
-		) {
+	for (let node = wrapper.firstElementChild; node !== null; node = node.nextElementSibling) {
+		if (node.localName === 'script' && node.hasAttribute(attribute)) {
 			return node as HTMLScriptElement;
 		}
 	}
@@ -18044,39 +17422,35 @@ function createHydrateSlot(
 	// still owns it, whether or not it has activated.
 	const kept =
 		hydrationStarted && props.__independent !== undefined ? keptHydrationIsland(boundaryId) : null;
-	const expected = kept ?? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('div');
-	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
+	// Only the new parent's place for the island is built during render. In
+	// particular, neither taking its ID count nor a later suspension disconnects
+	// the independently active root or exposes its contents to this parent.
+	const expected = kept === null ? document.createElement('div') : kept.cloneNode(false);
+	const wrapper = (
+		hydration === null ? expected : hydrateClone(hydration, expected)
+	) as HTMLDivElement;
 	initializeHydrationEventCapture(wrapper.ownerDocument);
 	const serverPreserved =
 		kept !== null ||
 		(hydration !== null &&
-			!hydration.isFresh(wrapper) &&
-			(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).parentNode === parentNode);
-	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
-	else
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-			wrapper,
-			parentBlock.endMarker,
-		);
-	if (!(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).hasAttribute(HYDRATE_ID_ATTR))
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).setAttribute(HYDRATE_ID_ATTR, boundaryId);
-	if (!(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).hasAttribute(HYDRATE_WHEN_ATTR))
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).setAttribute(
-			HYDRATE_WHEN_ATTR,
-			hydrateStrategyType(props.when),
-		);
-	if (props.__independent !== undefined)
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
+			!hydrateIsFresh(hydration, wrapper) &&
+			wrapper.parentNode === parentNode);
+	if (hydration !== null) hydrateInsertRoot(hydration, wrapper, parentBlock);
+	else parentNode.insertBefore(wrapper, parentBlock.endMarker);
+	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
+	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
+		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
+	if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
 
 	let start: Comment | null = null;
 	let end: Comment | null = null;
 	let seedRaw: string | null = null;
 	let nativeSeedRaw: string | null = null;
+	let seed: HTMLScriptElement | null = null;
+	let nativeSeed: HTMLScriptElement | null = null;
 	let idState = parentBlock.idState;
 	if (serverPreserved) {
-		const rawCount = (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).getAttribute(
-			HYDRATE_ID_COUNT_ATTR,
-		);
+		const rawCount = wrapper.getAttribute(HYDRATE_ID_COUNT_ATTR);
 		const parsedCount = rawCount === null ? 0 : Number(rawCount);
 		const idCount = Number.isSafeInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
 		const rootIds = parentBlock.idState;
@@ -18090,29 +17464,22 @@ function createHydrateSlot(
 			overflow: rootIds,
 			renderOwner: rootIds.renderOwner,
 		};
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).removeAttribute(HYDRATE_ID_COUNT_ATTR);
-		// A rolled-back attempt restores the count, so the attempt that replaces
-		// it, a retry or the fallback's client render adopting an independent
-		// wrapper, reserves the same IDs.
-		TRANSITION_JOURNAL?.push(JOURNAL_ATTR, wrapper, HYDRATE_ID_COUNT_ATTR, rawCount);
 	}
 	// An independent root may already have compacted its server ranges. The
 	// parent reserves its IDs but owns only the wrapper, never its child list or
 	// seed sidecars, regardless of which root hydrates first.
 	if (props.__independent !== undefined) {
 		// No parent-owned content range.
-	} else if (serverPreserved && hydration!.isOpen(getFirstChild(wrapper))) {
+	} else if (serverPreserved && hydrateIsOpen(hydration!, getFirstChild(wrapper))) {
 		start = getFirstChild(wrapper) as Comment;
-		end = hydration!.close(start);
-		const seed = findHydrateSeedSidecar(wrapper);
+		end = hydrateClose(hydration!, start);
+		seed = findHydrateSeedSidecar(wrapper);
 		if (seed !== null) {
-			seedRaw = (STAGED_DOM ? STAGED_DOM.view(seed) : seed).textContent || '[]';
-			(STAGED_DOM ? STAGED_DOM.view(seed) : seed).remove();
+			seedRaw = seed.textContent || '[]';
 		}
-		const nativeSeed = findHydrateSeedSidecar(wrapper, NATIVE_SIGNAL_SEED_ATTR);
+		nativeSeed = findHydrateSeedSidecar(wrapper, NATIVE_SIGNAL_SEED_ATTR);
 		if (nativeSeed !== null) {
-			nativeSeedRaw = (STAGED_DOM ? STAGED_DOM.view(nativeSeed) : nativeSeed).textContent || '';
-			(STAGED_DOM ? STAGED_DOM.view(nativeSeed) : nativeSeed).remove();
+			nativeSeedRaw = nativeSeed.textContent || '';
 		}
 	} else {
 		// The server opens every ordinary wrapper with the boundary's own range. An
@@ -18130,11 +17497,11 @@ function createHydrateSlot(
 					block = block.parentBlock
 				)
 					loc = componentSourceLoc(block.body);
-			hydration!.mismatch(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
+			hydrateMismatch(hydration!, loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
 		}
-		start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('hydrate');
-		end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/hydrate');
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).append(start, end);
+		start = document.createComment('hydrate');
+		end = document.createComment('/hydrate');
+		wrapper.append(start, end);
 	}
 
 	const block = createBlock(
@@ -18161,8 +17528,7 @@ function createHydrateSlot(
 		parentBlock,
 		props,
 		contextChanged: false,
-		boundaryId:
-			(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
+		boundaryId: wrapper.getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
 		intentBoundary,
 		delegatedDynamicIntent: takeDelegatedDynamicHydrationIntent(wrapper),
 		serverPreserved,
@@ -18202,6 +17568,48 @@ function createHydrateSlot(
 	}
 	scope.slots[0] = state;
 	registerSlot(scope, state);
+	if (kept !== null) {
+		const islands = ROOT_RENDER_TRANSACTION!.keptIslands!;
+		const index = islands.indexOf(kept);
+		journalRootProperty(islands, index, kept);
+		state.keptWrapper = kept as HTMLDivElement;
+		islands[index] = state;
+	}
+	if (serverPreserved) {
+		// These sidecars are the island's input, outside its content range.
+		// Keep them readable through suspension for an independent retry; consume
+		// them only with the island reservation which owns their ID allocation.
+		const metadata: NonNullable<HydrateSlot['metadataPrepared']> = {
+			seed,
+			nativeSeed,
+			// The retained wrapper still belongs to an observable independent
+			// root, even when its new parent is being built privately.
+			parent: kept?.parentNode ?? undefined,
+			publish() {
+				const current = state.wrapper;
+				// An activation can already have adopted a range and suspended.
+				// Its saved remainder may point to these input sidecars; advance
+				// that exact claim while their real sibling links still exist.
+				const root = preservedHydrateActivations?.get(state)?.hydration.root;
+				if (root !== undefined) {
+					let remainder = root.next;
+					while (
+						remainder != null &&
+						(remainder === seed || remainder === nativeSeed) &&
+						remainder.parentNode === current
+					)
+						remainder = getNextSibling(remainder);
+					root.next = remainder;
+				}
+				current.removeAttribute(HYDRATE_ID_COUNT_ATTR);
+				if (seed !== null && seed.parentNode === current) current.removeChild(seed);
+				if (nativeSeed !== null && nativeSeed.parentNode === current)
+					current.removeChild(nativeSeed);
+			},
+			discard() {},
+		};
+		prepareSlot(scope, state, 'metadataPrepared', metadata);
+	}
 	if (!state.independent) registerHydrationIntentBoundary(wrapper, intentBoundary);
 	block.body = boundaryBody(state);
 	const initialStrategy = resolveHydrateStrategy(state);
@@ -18229,7 +17637,7 @@ function createHydrateSlot(
 function resumeFreshHydrateSource(source: Block): void {
 	const anchor = source.endMarker;
 	const parent = source.parentNode;
-	const before = anchor ? domNode(anchor).previousSibling : domNode(parent).lastChild;
+	const before = anchor ? anchor.previousSibling : parent.lastChild;
 	try {
 		renderBlock(source);
 	} finally {
@@ -18250,7 +17658,7 @@ function resumeFreshHydrateSource(source: Block): void {
 }
 
 // Only a <Hydrate> island's activation runs these, so they are module
-// functions rather than HydrationCapability methods: a hydrating bundle without
+// functions rather than hydration attempt methods: a hydrating bundle without
 // islands drops them with activateHydrateBoundary.
 
 /**
@@ -18258,11 +17666,11 @@ function resumeFreshHydrateSource(source: Block): void {
  * source whose first render into its adopted range suspended claims that
  * range again, as the render that suspended did.
  */
-function renderSuspended(hydration: HydrationCapability, source: Block): void {
+function renderSuspended(hydration: HydrationAttempt, source: Block): void {
 	const claim = hydration.suspendedClaims?.get(source);
 	if (claim !== undefined) {
 		hydration.suspendedClaims!.delete(source);
-		hydration.renderClaimed(source, claim[0], claim[1]);
+		hydrateRenderClaimed(hydration, source, claim[0], claim[1]);
 	} else renderBlock(source);
 }
 
@@ -18275,17 +17683,20 @@ function renderSuspended(hydration: HydrationCapability, source: Block): void {
  * sidecars. A root keeps the unmatched siblings in its container, as React
  * does, so only an island settles its remainder.
  */
-function finishRoot(hydration: HydrationCapability): void {
-	let remainder = hydration.rootRemainder === undefined ? hydration.node : hydration.rootRemainder;
+function finishRoot(hydration: HydrationAttempt, state: HydrateSlot): void {
+	let remainder = hydration.root.next === undefined ? hydrationCursor.node : hydration.root.next;
 	while (
 		remainder !== null &&
-		(remainder === hydration.rootCleanupBoundary ||
+		(remainder === hydration.root.limit ||
 			hydration.freshNodes.has(remainder) ||
+			remainder === state.metadataPrepared?.seed ||
+			remainder === state.metadataPrepared?.nativeSeed ||
 			isRendererHydrationStyle(remainder))
 	)
 		remainder = getNextSibling(remainder);
 	if (remainder === null) return;
-	hydration.mismatch(
+	hydrateMismatch(
+		hydration,
 		process.env.NODE_ENV !== 'production'
 			? componentSourceLoc(hydration.rootBlock.body)
 			: undefined,
@@ -18295,10 +17706,7 @@ function finishRoot(hydration: HydrationCapability): void {
 }
 
 /** An island's attempt completed: it keeps the server nodes it changed. */
-function keepChanges(hydration: HydrationCapability): void {
-	hydration.undoable = false;
-	hydration.saved = hydration.undo = null;
-}
+function keepChanges(hydration: HydrationAttempt): void {}
 
 function activateHydrateBoundary(state: HydrateSlot): void {
 	if (state.start === null || state.end === null) return;
@@ -18317,16 +17725,16 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		return;
 	}
 	const hydration =
-		preserved?.hydration ?? new HydrationCapability(block, getNextSibling(state.start), null);
+		preserved?.hydration ?? createHydrationAttempt(block, getNextSibling(state.start), null);
 	// A suspended first attempt keeps its capability, so re-check each attempt.
 	if (!hydration.staleServerValues && hydrateServerValuesStale(state)) {
 		hydration.staleServerValues = true;
 		hydration.values ??= new HydrationValueChecks();
 	}
 	if (preserved === undefined) {
-		if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
-		hydration.protectRootAnchor(state.end);
-		hydration.defers = hydration.undoable = true;
+		if (state.seedRaw !== null) hydration.seeds = hydrateParseSeeds(hydration, state.seedRaw);
+		hydrateProtectRootAnchor(hydration, state.end);
+		hydration.defers = true;
 		hydration.idStart = block.idState.next;
 	}
 	const previousHydration = currentHydration;
@@ -18360,9 +17768,9 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// A leaf that mounted inside DOM the client built has no server DOM to
 			// adopt and completes as a client render.
 			const source = preserved.source;
-			hydration.node = preserved.cursor;
+			hydrationCursor.node = preserved.cursor;
 			try {
-				if (preserved.fresh) hydration.suspend(() => resumeFreshHydrateSource(source));
+				if (preserved.fresh) hydrateSuspend(hydration, () => resumeFreshHydrateSource(source));
 				else renderSuspended(hydration, source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
@@ -18371,7 +17779,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			}
 		}
 		renderBlock(block);
-		if (hydration.deferred !== null) hydration.claimDeferred();
+		if (hydration.deferred !== null) hydrateClaimDeferred(hydration);
 		drainHydrationRenderPhaseUpdates(block, true);
 		// Suspended initial adoption intentionally leaves its real server arm and
 		// cursor untouched. Sweep only after that same arm eventually commits.
@@ -18383,14 +17791,14 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// suspended must not be skipped by an earlier fallback snapshot.
 			const adoptedSlot = block.slots[0] as TrySlot | undefined;
 			if (adoptedSlot?.__kind === 'trySlotSlot') {
-				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
+				hydrateClaimRootRemainder(hydration, getNextSibling(adoptedSlot.end));
 			}
-			hydration.settleValues();
-			finishRoot(hydration);
+			hydrateSettleValues(hydration);
+			finishRoot(hydration, state);
 			completed = true;
 		}
 	} catch (thrown) {
-		const error = hydration.failure(thrown);
+		const error = hydrateFailure(hydration, thrown);
 		// A rejected parked promise can throw while its unfinished source retries.
 		// Discard the same uncommitted work as an explicit boundary unmount before
 		// the enclosing error boundary tears down its partially mounted children.
@@ -18416,10 +17824,10 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		if (previousHydration === null) clearHydrationThrow();
 	}
 	if (restart !== undefined) {
-		// As a suspended Suspense arm does, the island keeps its server DOM, with
-		// nothing reported, and its retry adopts it afresh, seeding afresh too.
-		hydration.rollback();
-		hydration.discardSeeds();
+		// No island commit ran; the next attempt claims the same server DOM afresh.
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.ROLLBACK_HYDRATION);
+		hydrateDiscardSeeds(hydration);
 		discardHydratePresentation(state, capture);
 		block.idState.next = hydration.idStart;
 		const generation = state.activationGeneration;
@@ -18444,7 +17852,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		// legitimately differ from the server's, so its fallback reports nothing,
 		// as React reports nothing for an update that reaches a dehydrated
 		// boundary. Nor does one whose client render catches an error.
-		hydration.discardSeeds();
+		hydrateDiscardSeeds(hydration);
 		state.serverPreserved = false;
 		state.initialCaptures = null;
 		state.serverActivationStarted = false;
@@ -18459,6 +17867,14 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		const recoveryCapture = createOffscreenCapture();
 		const recoveryHydration = currentHydration;
 		const recoveryNative = setNativeAdoptionResolver(null);
+		const parent = block.parentNode;
+		const start = state.start;
+		const end = state.end;
+		const prepared = prepareParent(parent);
+		const preparedStart = document.createComment('hydrate');
+		const preparedEnd = document.createComment('/hydrate');
+		prepared.appendChild(preparedStart);
+		prepared.appendChild(preparedEnd);
 		swapHydration(null);
 		WIP_CAPTURE = recoveryCapture;
 		let caught = false;
@@ -18474,13 +17890,25 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// detaching them.
 			const refs: SuspenseRefEntry[] = [];
 			collectVisibleSubtreeRefs(block, refs);
-			withRefDetachSuppression(refs, () => resetScopeChildren(block));
+			const previousRollback = ROOT_RENDER_ROLLBACK;
+			ROOT_RENDER_ROLLBACK = true;
+			try {
+				withRefDetachSuppression(refs, () => resetScopeChildren(block, false));
+			} finally {
+				ROOT_RENDER_ROLLBACK = previousRollback;
+			}
 			block.deoptNode = null;
+			block.parentNode = prepared;
+			block.startMarker = preparedStart;
+			block.endMarker = preparedEnd;
 			caught = catchesInHydrationFallback(() => renderBlock(block));
 		} catch (error) {
 			discardOffscreenCapture(recoveryCapture);
 			throw error;
 		} finally {
+			block.parentNode = parent;
+			block.startMarker = start;
+			block.endMarker = end;
 			WIP_CAPTURE = previousCapture;
 			swapHydration(recoveryHydration);
 			setNativeAdoptionResolver(recoveryNative);
@@ -18490,12 +17918,24 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		if (!caught && !hydration.staleServerValues)
 			noteRecoverableHydrationError(() => nativeRecovery!, block);
 		spliceOffscreenCapture(recoveryCapture);
+		prepareSlot(state.parentBlock, state, 'activationPrepared', {
+			parent,
+			publish() {
+				removeRange(getNextSibling(start), end);
+				retargetPreparedScope(block, prepared, parent);
+				const first = getNextSibling(preparedStart);
+				const last = preparedEnd.previousSibling;
+				if (first !== null && first !== preparedEnd && last !== null)
+					placeRange(parent, first, last, end);
+			},
+			discard() {},
+		});
 		return;
 	}
 	if (completed) {
 		state.initialCaptures = null;
 		keepChanges(hydration);
-		hydration.passSeeds(previousHydration);
+		hydratePassSeeds(hydration, previousHydration);
 		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
 	}
@@ -18509,17 +17949,21 @@ function activateHydrateBoundary(state: HydrateSlot): void {
  */
 function discardHydrateTail(state: HydrateSlot): void {
 	const end = state.end!;
-	const wrapper = domNode(end).parentNode;
-	let node = getNextSibling(end);
-	if (wrapper === null || node === null) return;
-	journalRootChildren(wrapper);
-	markHydrationDiscard(state.block.idState.renderOwner, wrapper, node, null);
-	while (node !== null) {
-		const next = getNextSibling(node);
-		if (!isRendererHydrationStyle(node))
-			(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).removeChild(node);
-		node = next;
-	}
+	const wrapper = end.parentNode;
+	if (wrapper === null || getNextSibling(end) === null) return;
+	prepareSlot(state.block, state, 'tailPrepared', {
+		parent: wrapper,
+		publish() {
+			let node = getNextSibling(end);
+			markHydrationDiscard(state.block.idState.renderOwner, wrapper, node, null);
+			while (node !== null) {
+				const next = getNextSibling(node);
+				if (!isRendererHydrationStyle(node)) wrapper.removeChild(node);
+				node = next;
+			}
+		},
+		discard() {},
+	});
 }
 
 /** The speculative renderer owns scopes only until the early lease is accepted. */
@@ -18580,7 +18024,7 @@ function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 	// click instead of replaying the complete interaction once hydration commits.
 	cleanupHydrateInstallers(state);
 	state.props.onHydrated?.();
-	domNode(state.wrapper).removeAttribute(HYDRATE_WHEN_ATTR);
+	state.wrapper.removeAttribute(HYDRATE_WHEN_ATTR);
 	state.strategy?._o?.(state.boundaryId);
 	const replays = state.replays;
 	state.replays = [];
@@ -18602,7 +18046,7 @@ function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 			originalTarget !== null &&
 			typeof (originalTarget as Node).nodeType === 'number' &&
 			(originalTarget as Node).nodeType === 1 &&
-			domNode(state.wrapper).contains(originalTarget as Node)
+			state.wrapper.contains(originalTarget as Node)
 				? (originalTarget as Element)
 				: resolveEventPath(state.wrapper, replay.path);
 		if (target !== null) {
@@ -19489,7 +18933,7 @@ function getHydrationSeedFactory(thenable: TrackedThenable): HydrationSeedFactor
 /** Compiler-owned direct use() creations consult their server-proven site outcome first. */
 export function seedOrCreate<T>(site: string, factory: () => T): T {
 	const hydration = hydrating ? seedHydration() : null;
-	return hydration === null ? factory() : hydration.seedOrCreate(site, factory);
+	return hydration === null ? factory() : hydrateSeedOrCreate(hydration, site, factory);
 }
 
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
@@ -19511,7 +18955,7 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 		hydration.seedCursor < hydration.seeds.length &&
 		!hasExternalHydrationOwner(thenable)
 	) {
-		return hydration.useSeed(thenable, state, idx, replaceOnResume);
+		return hydrateUseSeed(hydration, thenable, state, idx, replaceOnResume);
 	}
 
 	const stored = state[idx];
@@ -20889,31 +20333,23 @@ export function useId(slot?: HookSlot): string {
 //    (delegateEvents / delegateCaptureEvents), the fixed set here.
 // ---------------------------------------------------------------------------
 
-// ViewTransition prepares against a logical DOM (STAGED_DOM) only while its
-// render runs. The class is reachable exclusively from the optional transition
-// driver; ordinary rendering retains native receivers and allocates no host
-// views. Local receivers test the stage inline, `STAGED_DOM ? STAGED_DOM.view(n)
-// : n`, so inactive rendering does not call an identity helper for every host
-// operation and bundles without ViewTransition drop the test. Keep complex
-// receivers on domNode: their getters/calls must run once, before reading the
-// active stage.
-
-function domNode<T extends Node | null | undefined>(node: T): T {
-	return !STAGED_DOM || node == null ? node : (STAGED_DOM.view(node) as T);
-}
-
 let firstChildGetter: ((this: Node) => ChildNode | null) | undefined;
 let nextSiblingGetter: ((this: Node) => ChildNode | null) | undefined;
 
 function getFirstChild(node: Node): ChildNode | null {
-	if (STAGED_DOM) return STAGED_DOM.view(node).firstChild;
 	// Fallback keeps DOM-less/uninitialized callers correct; the branch is a
 	// single well-predicted check once initDomOperations has run.
 	return firstChildGetter === undefined ? node.firstChild : firstChildGetter.call(node);
 }
 
 function getNextSibling(node: Node): ChildNode | null {
-	if (STAGED_DOM) return STAGED_DOM.view(node).nextSibling;
+	if (hydrating && node.nodeType === 8) {
+		const span = (node as HydrationFrameMarker)[HYDRATION_FRAME];
+		if (span !== undefined && !span.published && node.parentNode === null) {
+			if (node === span.end) return span.after as ChildNode | null;
+			return span.first as ChildNode | null;
+		}
+	}
 	return nextSiblingGetter === undefined ? node.nextSibling : nextSiblingGetter.call(node);
 }
 
@@ -20992,7 +20428,7 @@ interface LazyTemplateRecord {
 	parsed: Array<Node | null>;
 	/**
 	 * Lazily computed adoption-root descriptor for PROD hydration's parse-free
-	 * root check (see HydrationCapability.cloneLazy): 0 = not computed yet, a
+	 * root check (see hydration: cloneLazy): 0 = not computed yet, a
 	 * string = the root element's tag as written in `html`, 3 / 8 = a text /
 	 * comment-anchor root (nodeType-only match). Declared in the `template()`
 	 * literal so the record's hidden class never transitions.
@@ -21008,35 +20444,27 @@ const LAZY_TEMPLATE = Symbol('octane.lazy-template');
 // Custom elements keep the wrapper: their connectedCallback can synchronously
 // inspect which earlier siblings have already joined the live parent.
 function fragmentTemplate(wrapper: Element): Node {
-	for (const descendant of (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).querySelectorAll(
-		'*',
-	)) {
-		if (
-			descendant.localName.includes('-') ||
-			(STAGED_DOM ? STAGED_DOM.view(descendant) : descendant).hasAttribute('is')
-		) {
+	for (const descendant of wrapper.querySelectorAll('*')) {
+		if (descendant.localName.includes('-') || descendant.hasAttribute('is')) {
 			(wrapper as any).__oct_frag = true;
 			return wrapper;
 		}
 	}
-	const fragment = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	const fragment = document.createDocumentFragment();
 	let child: Node | null;
-	while ((child = getFirstChild(wrapper)) !== null)
-		(STAGED_DOM ? STAGED_DOM.view(fragment) : fragment).appendChild(child);
+	while ((child = getFirstChild(wrapper)) !== null) fragment.appendChild(child);
 	(fragment as any).__oct_frag = true;
 	return fragment;
 }
 
 function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	initDomOperations();
-	const t = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('template');
+	const t = document.createElement('template');
 	if (ns === 0) {
 		// Multi-root templates carry raw markup: an opaque one because its eventual
 		// namespace is unknown until clone time. Add the wrapper the HTML parser
 		// needs here. Markup that arrives already wrapped parses the same way.
-		(STAGED_DOM ? STAGED_DOM.view(t) : t).innerHTML = frag
-			? `<octane-frag>${html}</octane-frag>`
-			: html;
+		t.innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
 		const root = getFirstChild(t.content) as Element;
 		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
 		// wrapper never exists in the server DOM (the roots render bare), so stamp it
@@ -21054,7 +20482,7 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	// so the caller can drain its children — stamped like <octane-frag> above,
 	// since the synthetic wrapper has no server counterpart either.
 	const wrap = ns === 1 ? 'svg' : 'math';
-	(STAGED_DOM ? STAGED_DOM.view(t) : t).innerHTML = `<${wrap}>${html}</${wrap}>`;
+	t.innerHTML = `<${wrap}>${html}</${wrap}>`;
 	const wrapEl = getFirstChild(t.content) as Element;
 	if (frag) {
 		return fragmentTemplate(wrapEl);
@@ -21229,7 +20657,7 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 function lazyFragmentRootMatches(
 	server: Node,
 	lazy: LazyTemplateRecord,
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 ): boolean {
 	// A fixed-HTML fragment's roots follow its `<octane-frag>` wrapper.
 	const start = lazy.frag !== 0 ? 0 : 13;
@@ -21243,7 +20671,7 @@ function lazyFragmentRootMatches(
 	// Past the last root, the descriptor is a number too.
 	root = templateRootDescriptor(html, at);
 	if (typeof root === 'number') return true;
-	const node = hydration.sibling(server, (at - start) / 3);
+	const node = hydrateSibling(hydration, server, (at - start) / 3);
 	return node !== null && node.nodeType === 1 && (node as Element).localName === root;
 }
 
@@ -21269,40 +20697,22 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 }
 
 // ---------------------------------------------------------------------------
-// Hydration (SSR Phase 2). While a HydrationCapability is active, the compiled mount path ADOPTS the
-// server-rendered DOM instead of cloning a fresh template: `clone()` returns the
-// adopted server root, and `htext()` adopts the existing server text node rather
-// than creating one. Element/attribute/event/ref bindings are unchanged — their
-// template paths (`_root.firstChild.nextSibling…`) already align with the server
-// DOM, because text lives INSIDE elements and so doesn't shift element siblings.
+// Hydration. Compiled mount paths adopt matching server templates and text
+// through one active cursor. Hole-free leaf templates still use their direct
+// DOM path walks; child/sibling and slot frames advance the cursor around
+// control flow or dynamic children.
 //
-// Dead-code-elimination contract (mirrors Ripple/Svelte): the capability class is
-// instantiated ONLY by `hydrateRoot()`. Retained client helpers dispatch through
-// its methods; when `hydrateRoot` is unused the bundler can remove the class and
-// every hydration-only helper reachable exclusively from those methods.
+// The active cursor is process-local for the current synchronous render.
+// hydrateRoot creates an attempt with seeds and saved resume position. Switching
+// attempts saves/restores that position across foreign roots and deferred
+// boundaries. No attempt owns a parallel DOM view. Mismatches prepare private
+// candidates; only the admitted owner commits them and retires old server DOM.
+//
+// Hidden server Activities serialize as empty ranges. Defer their client mount
+// until server-rendered siblings have adopted, so useId consumption still
+// follows the server pass. Hydration entry points initialize all optional
+// presentation/stream support before swapping the cursor.
 // ---------------------------------------------------------------------------
-// The HYDRATION CURSOR (ported from Ripple's `hydrate_node`). While a capability is active,
-// this points at the server-rendered node the next adopt operation should claim.
-// `clone()` adopts the cursor as a template root; the compiler-emitted cursor
-// walk (`child`/`sibling` — used only for templates that contain control-flow /
-// component holes, whose server DOM no longer matches the raw template paths)
-// advances it node-by-node; block functions (forBlock/ifBlock/componentSlot/…)
-// adopt the server `<!--[-->`/`<!--]-->` markers off it. For hole-free leaf
-// templates the cursor is just the adopted root and the old raw path-walk
-// (`_root.firstChild.nextSibling…`) still resolves bindings correctly.
-// Hidden server Activities serialize as empty ranges. Their client trees must
-// mount only AFTER the server-rendered siblings finish hydrating: mounting one
-// inline would consume root-local useId counters ahead of those siblings even
-// though the server never visited the hidden tree. hydrateRoot drains this
-// root-local queue at the end of its synchronous adoption pass with hydration
-// suspended, still before returning the live Root.
-// Server-resolved `use(thenable)` values (SSR Phase 4), parsed from the inline
-// `<script data-octane-suspense>` in `hydrateRoot()` and consumed in render
-// order by `useThenable` so a hydrating boundary returns synchronously. They are
-// fields on the hydrateRoot-only capability, so client-only builds discard them.
-// Set while adopting a root when a matched range is physically wrapped by an
-// exactly-adjacent marker pair. The post-hydration ownership walk can only
-// remove comments in that shape, so roots without one skip the pass entirely.
 
 /**
  * Lite component calls deliberately allocate no CompSlot/Block range owner,
@@ -21333,17 +20743,22 @@ interface PendingHydrationText {
 // Client-reachable code reads this only behind the `hydrating` flag
 // (hydration-flag.ts), which is true exactly while it is set: write it only
 // through swapHydration.
-let currentHydration: HydrationCapability | null = null;
+let currentHydration: HydrationAttempt | null = null;
 
 /**
  * Make `next` the current hydration pass, keeping the `hydrating` flag in step,
  * and return the pass it replaces. Only hydration entry points and
- * HydrationCapability call it: a call from client-reachable code, even behind
+ * hydration attempt call it: a call from client-reachable code, even behind
  * a guard, would keep the flag and every guard in client-only bundles.
  */
-function swapHydration(next: HydrationCapability | null): HydrationCapability | null {
-	if (next !== null) installHydrationDriver();
+function swapHydration(next: HydrationAttempt | null): HydrationAttempt | null {
 	const previous = currentHydration;
+	if (previous !== null) {
+		previous.resumeNode = hydrationCursor.node;
+		previous.resumeClaim = hydrationCursor.claim;
+	}
+	hydrationCursor.node = next?.resumeNode ?? null;
+	hydrationCursor.claim = next?.resumeClaim ?? null;
 	currentHydration = next;
 	setHydrating(next !== null);
 	return previous;
@@ -21374,15 +20789,15 @@ function installHydrationDriver(): void {
 	};
 }
 
-function activeHydration(): HydrationCapability | null {
+function activeHydration(): HydrationAttempt | null {
 	const hydration = currentHydration;
-	return hydration !== null && hydration.isActive() ? hydration : null;
+	return hydration !== null && hydrateIsActive(hydration) ? hydration : null;
 }
 
 /** The hydration whose positional `use()` seeds the current render consumes. */
-function seedHydration(): HydrationCapability | null {
+function seedHydration(): HydrationAttempt | null {
 	const hydration = currentHydration;
-	return hydration !== null && hydration.consumesSeeds() ? hydration : null;
+	return hydration !== null && hydrateConsumesSeeds(hydration) ? hydration : null;
 }
 
 /** Direct-child scoped CSS resources are renderer-owned hydration sidecars. */
@@ -21390,14 +20805,14 @@ function isRendererHydrationStyle(node: Node): boolean {
 	return (
 		node.nodeType === 1 &&
 		(node as Element).localName === 'style' &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element)).hasAttribute('data-octane')
+		(node as Element).hasAttribute('data-octane')
 	);
 }
 
 /** A hoisted Float stylesheet, script, or resource hint the server stamped for dedupe. */
 function isFloatHeadResource(node: Node): boolean {
 	if (node.nodeType !== 1) return false;
-	const el = STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element);
+	const el = node as Element;
 	const tag = el.localName;
 	return (
 		(tag === 'link' || tag === 'style' || tag === 'script') &&
@@ -21430,25 +20845,116 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
 		const el = head !== null && node.nodeType === 8 ? getNextSibling(node) : null;
 		const end = el === null ? null : getNextSibling(el);
 		if (end === null || end.nodeType !== 8) return node;
-		const key = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
-		if (
-			!key.startsWith('rnh-') ||
-			(STAGED_DOM ? STAGED_DOM.view(end as Comment) : (end as Comment)).data !== '/' + key
-		)
-			return node;
+		const key = (node as Comment).data;
+		if (!key.startsWith('rnh-') || (end as Comment).data !== '/' + key) return node;
 		const next = getNextSibling(end);
-		(STAGED_DOM ? STAGED_DOM.view(head!) : head!).append(node, el!, end);
+		head!.append(node, el!, end);
 		node = next;
 	}
 	return null;
 }
 
-/**
- * Root-local hydration state and the dynamic dispatch boundary for hydration-only
- * code. The class is constructed only by hydrateRoot, so client-only bundles can
- * discard its methods together with the marker/mismatch/seed helper graph.
- */
-interface HydrationClaim {
+type HydrationClaim = HydrationRangeClaim | HydrationPlaceClaim | HydrationRootClaim;
+
+// A client frame owns a logical server span until its containing slot commits.
+// Only the new, detached markers refer to it: adopted server nodes never carry
+// speculative navigation or queued DOM writes.
+const HYDRATION_FRAME = /* @__PURE__ */ Symbol();
+interface HydrationFrame {
+	parent: Node;
+	start: Comment;
+	end: Comment;
+	first: Node | null;
+	after: Node | null;
+	outer: HydrationFrame | null;
+	published: boolean;
+}
+interface HydrationFrameMarker extends Comment {
+	[HYDRATION_FRAME]?: HydrationFrame;
+}
+
+function hydrationSourceLimit(end: Node): Node | null {
+	const frame = (end as HydrationFrameMarker)[HYDRATION_FRAME];
+	return frame !== undefined && !frame.published && end.parentNode === null ? frame.after : end;
+}
+
+function createHydrationFrame(
+	parent: Node,
+	start: Comment,
+	end: Comment,
+	first: Node | null,
+	after: Node | null,
+): HydrationFrame {
+	let outer: HydrationFrame | null = null;
+	for (let claim = hydrationCursor.claim; claim !== null; claim = claim.outer) {
+		if (claim.kind === 'place' && claim.frame?.parent === parent) {
+			outer = claim.frame;
+			break;
+		}
+	}
+	const frame: HydrationFrame = {
+		parent,
+		start,
+		end,
+		first,
+		after,
+		outer,
+		published: false,
+	};
+	(start as HydrationFrameMarker)[HYDRATION_FRAME] = frame;
+	(end as HydrationFrameMarker)[HYDRATION_FRAME] = frame;
+	return frame;
+}
+
+function prepareHydrationFrame(
+	scope: Scope,
+	owner: object,
+	slotKey: number,
+	parent: Node,
+	start: Comment,
+	end: Comment,
+	before: Node | null,
+): HydrationFrame {
+	const frame =
+		(start as HydrationFrameMarker)[HYDRATION_FRAME] ??
+		createHydrationFrame(parent, start, end, before, before);
+	prepareSlot(scope, owner, 'framePrepared', {
+		parent,
+		publish() {
+			if (
+				owner === scope
+					? scope.block.forSlot?.items.get(scope.block.key) !== scope
+					: scope.slots[slotKey] !== owner
+			)
+				return;
+			const host = parent;
+			// The frame was completed against this slot's immutable source span.
+			// Empty frames put both delimiters before the next unconsumed sibling.
+			const fence =
+				frame.outer?.published && frame.outer.after === frame.after ? frame.outer.end : frame.after;
+			const privateParent = start.parentNode;
+			if (privateParent !== null && PREPARED_PARENTS.has(privateParent)) {
+				// A lite slot owns the Scope itself; its .block is a lightweight
+				// DOM context, not another Scope. Structured slots own their Block.
+				const rendered =
+					'__kind' in owner ? ((owner as any).block as Block | null) : (owner as Scope);
+				if (rendered !== null) retargetPreparedScope(rendered, privateParent, parent);
+				placeRange(host, start, end, fence);
+			} else if (start === end) {
+				host.insertBefore(end, fence);
+			} else {
+				host.insertBefore(start, frame.first === frame.after ? fence : frame.first);
+				host.insertBefore(end, fence);
+			}
+			frame.published = true;
+		},
+		discard() {},
+	});
+	return frame;
+}
+
+interface HydrationRangeClaim {
+	kind: 'range';
 	owner: Scope;
 	/** Null after the owner's template claimed its complete root extent. */
 	first: Node | null;
@@ -21458,2154 +20964,2278 @@ interface HydrationClaim {
 	outer: HydrationClaim | null;
 }
 
-class HydrationCapability {
-	/**
-	 * Parent captures changed before this dormant boundary activated, so the
-	 * server HTML predates the client's state. Any difference from it, a text or
-	 * attribute value included (unpatched), does not match the client render,
-	 * and the boundary's fallback reports nothing (noteRecoverableHydrationError,
-	 * logHydrationMismatch).
-	 */
-	staleServerValues = false;
-	depth = 0;
-	/**
-	 * Depth of a render that continues after a deferred mismatch (adoptOrDefer):
-	 * it adopts nothing but still consumes positional seeds.
-	 */
-	replayDepth = -1;
-	seedCursor = 0;
-	readonly freshNodes = new WeakSet<Node>();
-	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
-	suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
-	/** The server node renderInPlace's body may adopt, until a template does. */
-	private inPlace: Node | null = null;
-	/** Whether inPlace stands after the fresh markers of renderUnframed's call. */
-	private inPlaceUnframed = false;
-	/** The named call that renders in place of inPlace: its scope and slot (rootMismatch). */
-	private inPlaceCall: Scope | null = null;
-	private inPlaceCallKey = 0;
-	/**
-	 * The server node an appended call left where it rendered nothing, for the
-	 * next call appended to the same host, with the scope whose template holds
-	 * that host and the call's slot (settleUnclaimed).
-	 */
-	private unclaimed: Node | null = null;
-	private unclaimedScope: Scope | null = null;
-	private unclaimedKey = 0;
-	/** Where the server nodes a template adopted at inPlace end; undefined until one does. */
-	private inPlaceEnd: Node | null | undefined = undefined;
-	/** The server node at the last root of a fragment adopted at inPlace, when that root is a hole. */
-	private inPlaceHole: Node | null = null;
-	/**
-	 * Whether the root's remainder or inPlace may still be claimed by a clone.
-	 * Both claims are rare, so adopt()'s common path tests only this flag.
-	 */
-	private pendingClaims = true;
-	/**
-	 * What a hydrating update built on the client where its slot had already
-	 * rendered: blocks (renderUpdate), and child slots whose list it built.
-	 * Allocated by the first such update.
-	 */
-	private updates: WeakSet<Block | ChildSlot> | null = null;
-	/** Pairs discovered while matching an outer range; released with this hydration pass. */
-	private matchingCloses: WeakMap<Node, Comment> | null = null;
-	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
-	rootRemainder: Node | null | undefined;
-	rootCleanupBoundary: Node | null = null;
-	readonly deferredActivities: Array<() => void> = [];
-	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
-	/**
-	 * Ordinary production hydration only keeps server attributes. Value checks
-	 * belong to development diagnostics or an activated Hydrate island with
-	 * changed captures. Each pass owns its diagnostics and final class writers.
-	 */
-	values = process.env.NODE_ENV !== 'production' ? new HydrationValueChecks() : null;
-	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
-	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
-	/** The innermost owned range being rendered. Nested ranges consume their
-	 * parent's cursor when they return, whether its owner is a lite body,
-	 * a component, or a control-flow arm. */
-	private claim: HydrationClaim | null = null;
-	/** The last suspension thrown out of a client-built subtree (suspend). */
-	freshSuspension: SuspenseException | null = null;
-	/**
-	 * Whether this attempt suspended in the body of a call without a server
-	 * range of its own (renderUnframed). A Hydrate island resumes an attempt
-	 * where it suspended, through the suspended block alone, which would render
-	 * that body without the node it adopts in place, or against server nodes
-	 * that are not there: such an attempt is discarded instead, and its retry
-	 * adopts afresh (DeferredHydrationSuspension), as React retries a
-	 * dehydrated boundary.
-	 */
-	unframedSuspended = false;
-	/**
-	 * Whether a template's adoption may defer the mismatch it finds
-	 * (adoptOrDefer): set by an owner that discards an attempt that suspends and
-	 * starts the next one afresh.
-	 */
-	defers = false;
-	/** Whether a template adoption is running (adoptOrDefer). */
-	private adopting = false;
-	/** The mismatch a template's adoption deferred; the attempt renders on the client meanwhile. */
-	deferred: HydrationMismatch | null = null;
-	/** Whether the client render since `deferred` started a template with a host (claimBefore). */
-	private deferredHost = false;
-	/** Skip component-frame adoption until the declared container owner. */
-	passthroughRanges = false;
-	/**
-	 * The root is a HYDRATION_RANGE_BOUNDARY passthrough root. Its owner adopts
-	 * the first server range in the container, so the owner's content can sit
-	 * one range level off its server nodes: a nested fragment's static roots
-	 * need not follow the server forms of its leading holes there.
-	 */
-	passthroughRoot = false;
+interface HydrationPlaceClaim {
+	kind: 'place';
+	first: Node | null;
+	next: Node | null | undefined;
+	outer: HydrationClaim | null;
+	unframed: boolean;
+	site: Scope | null;
+	key: number;
+	hole: Node | null;
+	frame: HydrationFrame | null;
+}
+
+interface HydrationRootClaim {
+	kind: 'root';
+	next: Node | null | undefined;
+	limit: Node | null;
+	outer: null;
+}
+
+function hydrationClaim(kind: 'range'): HydrationRangeClaim | null;
+function hydrationClaim(kind: 'place'): HydrationPlaceClaim | null;
+function hydrationClaim(kind: 'range' | 'place'): HydrationRangeClaim | HydrationPlaceClaim | null {
+	let claim = hydrationCursor.claim;
+	while (claim !== null && claim.kind !== kind) claim = claim.outer;
+	return claim as HydrationRangeClaim | HydrationPlaceClaim | null;
+}
+
+/** Data retained by a hydration attempt across suspension. DOM traversal belongs
+ * exclusively to hydrationCursor while the attempt is entered. */
+interface HydrationAttempt {
+	rootBlock: Block;
+	seeds: unknown[] | null;
+	resumeNode: Node | null;
+	resumeClaim: HydrationClaim | null;
+	root: HydrationRootClaim;
+	staleServerValues: boolean;
+	depth: number;
+	replayDepth: number;
+	seedCursor: number;
+	freshNodes: WeakSet<Node>;
+	suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null;
+	unclaimed: Node | null;
+	unclaimedScope: Scope | null;
+	unclaimedKey: number;
+	updates: WeakSet<Block | ChildSlot> | null;
+	matchingCloses: WeakMap<Node, Comment> | null;
+	deferredActivities: Array<() => void>;
+	liteRanges: WeakMap<Scope, HydratedLiteRange>;
+	values: HydrationValueChecks | null;
+	pendingTexts: Map<Text, PendingHydrationText> | null;
+	freshSuspension: SuspenseException | null;
+	unframedSuspended: boolean;
+	defers: boolean;
+	adopting: boolean;
+	deferred: HydrationMismatch | null;
+	deferredHost: boolean;
+	passthroughRanges: boolean;
+	passthroughRoot: boolean;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
-	/**
-	 * Whether this attempt is discarded if it suspends: the initial adoption of
-	 * a Suspense arm the server resolved, which keeps showing that server arm
-	 * until an attempt commits. It records the server nodes it changes (`save`),
-	 * so that a discarded attempt leaves the server arm as it was for the next
-	 * one. The attempt's diagnostics wait in its hold
-	 * (HYDRATION_DIAGNOSTIC_HOLDS) meanwhile.
-	 */
-	speculative = false;
-	/**
-	 * Whether a Hydrate island's attempt records the server nodes it changes
-	 * (`save`), as a speculative one does: one that suspends after a deferred
-	 * mismatch (adoptOrDefer) is discarded, and its retry adopts afresh.
-	 */
-	undoable = false;
-	/** The island's first ID, which a discarded attempt's retry starts from again. */
-	idStart = 0;
-	/** The parents whose children this attempt recorded. */
-	saved: Set<Node> | null = null;
-	/** Restores what this attempt changed in the server DOM, newest last. */
-	undo: (() => void)[] | null = null;
-	/**
-	 * Restores the outcomes that this attempt's seeds wrote to thenables, newest
-	 * last. A fallback renders from client data, so it discards them
-	 * (discardSeeds).
-	 */
-	private seeded: (() => void)[] | null = null;
+	idStart: number;
+	seeded: (() => void)[] | null;
+}
 
-	constructor(
-		public rootBlock: Block,
-		public node: Node | null,
-		public seeds: unknown[] | null,
-	) {
-		initialSuspenseHydrationRenderer = renderInitialSuspenseHydration;
+const hydrationCursor: { node: Node | null; claim: HydrationClaim | null } = {
+	node: null,
+	claim: null,
+};
+
+function createHydrationAttempt(
+	rootBlock: Block,
+	node: Node | null,
+	seeds: unknown[] | null,
+): HydrationAttempt {
+	initialSuspenseHydrationRenderer = renderInitialSuspenseHydration;
+	const root: HydrationRootClaim = { kind: 'root', next: undefined, limit: null, outer: null };
+	return {
+		rootBlock,
+		seeds,
+		resumeNode: node,
+		resumeClaim: root,
+		root,
+		staleServerValues: false,
+		depth: 0,
+		replayDepth: -1,
+		seedCursor: 0,
+		freshNodes: new WeakSet<Node>(),
+		suspendedClaims: null,
+		unclaimed: null,
+		unclaimedScope: null,
+		unclaimedKey: 0,
+		updates: null,
+		matchingCloses: null,
+		deferredActivities: [],
+		liteRanges: new WeakMap<Scope, HydratedLiteRange>(),
+		values: process.env.NODE_ENV !== 'production' ? new HydrationValueChecks() : null,
+		pendingTexts: null,
+		freshSuspension: null,
+		unframedSuspended: false,
+		defers: false,
+		adopting: false,
+		deferred: null,
+		deferredHost: false,
+		passthroughRanges: false,
+		passthroughRoot: false,
+		idStart: 0,
+		seeded: null,
+	};
+}
+
+/**
+ * Whether `publish`, a hydration diagnostic, waits for the commit of a root's
+ * hydrating attempt. A method, like `holds`, so that bundles which never
+ * hydrate do not retain it.
+ */
+function hydrateAwaitsCommit(attempt: HydrationAttempt, publish: () => void): boolean {
+	if (!inRootHydrationAttempt()) return false;
+	(ROOT_RENDER_TRANSACTION!.commit ??= []).push(publish);
+	return true;
+}
+
+/**
+ * Hand the seeded outcomes this attempt wrote to `outer`, the hydration it
+ * renders within, so that `outer`'s fallback discards them too.
+ */
+function hydratePassSeeds(attempt: HydrationAttempt, outer: HydrationAttempt | null): void {
+	const seeded = attempt.seeded;
+	attempt.seeded = null;
+	if (seeded !== null && outer !== null) (outer.seeded ??= []).push(...seeded);
+}
+
+/** Restore seeded thenables before a fallback renders from client data. */
+function hydrateDiscardSeeds(attempt: HydrationAttempt): void {
+	const seeded = attempt.seeded;
+	attempt.seeded = null;
+	if (seeded !== null) for (let i = seeded.length - 1; i >= 0; i--) seeded[i]();
+}
+
+function hydrateIsActive(attempt: HydrationAttempt): boolean {
+	return attempt.depth === 0;
+}
+
+function hydrateConsumesSeeds(attempt: HydrationAttempt): boolean {
+	return attempt.depth === 0 || attempt.depth === attempt.replayDepth;
+}
+
+/**
+ * Whether `block` renders under this hydration: it descends from the root
+ * block, and not from a block that a hydrating update built (renderUpdate).
+ */
+function hydrateOwns(attempt: HydrationAttempt, block: Block): boolean {
+	const updates = attempt.updates;
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if (current === attempt.rootBlock) return true;
+		if (updates !== null && updates.has(current)) return false;
 	}
+	return false;
+}
 
-	/**
-	 * Runs before hydration changes `parent`'s server children: fresh markers
-	 * that frame server content a call adopts in place, client children built
-	 * where the server rendered none, or a nested boundary's fallback. A root's
-	 * hydrating attempt journals them, so the rollback of an attempt that
-	 * suspends restores the server DOM its retry adopts. A speculative attempt
-	 * records them for its own rollback, once, within its arm's range when
-	 * `parent` is the arm's parent.
-	 */
-	save(parent: Node): void {
-		if (inRootHydrationAttempt()) journalRootChildren(parent);
-		if ((!this.speculative && !this.undoable) || (this.saved ??= new Set()).has(parent)) return;
-		this.saved.add(parent);
-		const arm = this.rootBlock;
-		const ranged = arm.startMarker !== null && parent === domNode(arm.startMarker).parentNode;
-		const before = ranged ? arm.startMarker : null;
-		const after = ranged ? arm.endMarker : null;
-		const nodes = collectRootRange(parent, before, after);
-		(this.undo ??= []).push(() => restoreRootRange(parent, before, after, nodes));
+function hydrateSuspend<T>(attempt: HydrationAttempt, fn: () => T): T {
+	attempt.depth++;
+	const previousNative = setNativeAdoptionResolver(null);
+	try {
+		return fn();
+	} catch (error) {
+		if (isSuspenseException(error)) attempt.freshSuspension = error;
+		throw error;
+	} finally {
+		setNativeAdoptionResolver(previousNative);
+		attempt.depth--;
 	}
+}
 
-	/**
-	 * Whether `publish`, a hydration diagnostic, waits for the commit of a root's
-	 * hydrating attempt. A method, like `holds`, so that bundles which never
-	 * hydrate do not retain it.
-	 */
-	awaitsCommit(publish: () => void): boolean {
-		if (!inRootHydrationAttempt()) return false;
-		(ROOT_RENDER_TRANSACTION!.commit ??= []).push(publish);
-		return true;
-	}
+/**
+ * Render `block`, which an update created in place of content its slot had
+ * already rendered, as a suspended deferred boundary's retry does after its
+ * captures changed. The server never rendered it, and the cursor belongs to
+ * other slots' server nodes, so it builds on the client without moving the
+ * cursor. So does every later render of it or its descendants under this
+ * hydration (owns), including a retry that resumes a block that suspended
+ * inside it. A method, so that the callback stays out of callers' frames.
+ */
+function hydrateRenderUpdate(attempt: HydrationAttempt, block: Block): void {
+	hydrateRecordUpdate(attempt, block);
+	hydrateSuspend(attempt, () => renderBlock(block));
+}
 
-	/**
-	 * The attempt commits with its arm. An enclosing speculative attempt can
-	 * still be discarded, so it inherits the record.
-	 */
-	settle(outer: HydrationCapability | null): void {
-		const undo = this.undo;
-		this.speculative = false;
-		this.saved = this.undo = null;
-		if (undo !== null && outer?.speculative) (outer.undo ??= []).push(...undo);
-		this.passSeeds(outer);
-	}
+/** Record that a hydrating update built `owner` on the client (see updates). */
+function hydrateRecordUpdate(attempt: HydrationAttempt, owner: Block | ChildSlot): void {
+	(attempt.updates ??= new WeakSet()).add(owner);
+}
 
-	/**
-	 * Hand the seeded outcomes this attempt wrote to `outer`, the hydration it
-	 * renders within, so that `outer`'s fallback discards them too.
-	 */
-	passSeeds(outer: HydrationCapability | null): void {
-		const seeded = this.seeded;
-		this.seeded = null;
-		if (seeded !== null && outer !== null) (outer.seeded ??= []).push(...seeded);
-	}
+/**
+ * Hold hydration diagnostics while a try body renders (see
+ * HYDRATION_DIAGNOSTIC_HOLDS). Returns the mark that releaseDiagnostics
+ * drops back to.
+ */
+function hydrateHoldDiagnostics(attempt: HydrationAttempt): number {
+	HYDRATION_DIAGNOSTIC_HOLDS++;
+	return HELD_HYDRATION_DIAGNOSTICS?.length ?? 0;
+}
 
-	/** Restore seeded thenables before a fallback renders from client data. */
-	discardSeeds(): void {
-		const seeded = this.seeded;
-		this.seeded = null;
-		if (seeded !== null) for (let i = seeded.length - 1; i >= 0; i--) seeded[i]();
-	}
+/**
+ * Hold a diagnostic's `publish` when a try body holds diagnostics. A method,
+ * so that bundles which never hydrate do not retain the hold.
+ */
+function hydrateHolds(attempt: HydrationAttempt, publish: () => void): boolean {
+	if (HYDRATION_DIAGNOSTIC_HOLDS === 0) return false;
+	(HELD_HYDRATION_DIAGNOSTICS ??= []).push(publish);
+	return true;
+}
 
-	/** The attempt is discarded: restore the server nodes it changed. */
-	rollback(): void {
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileCount(ProfileCounter.ROLLBACK_HYDRATION);
-		const undo = this.undo;
-		this.speculative = this.undoable = false;
-		this.saved = this.undo = null;
-		if (undo !== null) for (let i = undo.length - 1; i >= 0; i--) undo[i]();
-	}
+/**
+ * End a try body's hold. A body `caught` by its catch arm drops what it
+ * held; otherwise its diagnostics pass to the enclosing hold, or publish
+ * when none remains.
+ */
+function hydrateReleaseDiagnostics(attempt: HydrationAttempt, mark: number, caught: boolean): void {
+	HYDRATION_DIAGNOSTIC_HOLDS--;
+	const held = HELD_HYDRATION_DIAGNOSTICS;
+	if (held === null) return;
+	if (caught) held.length = mark;
+	if (HYDRATION_DIAGNOSTIC_HOLDS !== 0) return;
+	HELD_HYDRATION_DIAGNOSTICS = null;
+	for (let i = 0; i < held.length; i++) held[i]();
+}
 
-	isActive(): boolean {
-		return this.depth === 0;
-	}
-
-	consumesSeeds(): boolean {
-		return this.depth === 0 || this.depth === this.replayDepth;
-	}
-
-	/**
-	 * Whether `block` renders under this hydration: it descends from the root
-	 * block, and not from a block that a hydrating update built (renderUpdate).
-	 */
-	owns(block: Block): boolean {
-		const updates = this.updates;
-		for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-			if (current === this.rootBlock) return true;
-			if (updates !== null && updates.has(current)) return false;
+/**
+ * Render a hydrating try body under a diagnostic hold. When the boundary
+ * `catches` and the body throws an application error, the catch arm
+ * replaces the region, so the hold drops what the body reported.
+ *
+ * An error thrown while this hydration adopted the body's server DOM
+ * (HYDRATION_THROWN), where the server's body succeeded,
+ * fails the hydration of the nearest fallback owner, as React's does, even
+ * though the catch arm would catch it. That owner renders on the client,
+ * where a repeated throw reaches the catch arm.
+ */
+function hydrateRenderTryBody(attempt: HydrationAttempt, block: Block, catches: boolean): void {
+	const mark = hydrateHoldDiagnostics(attempt);
+	let caught = false;
+	try {
+		renderBlock(block);
+	} catch (error) {
+		caught =
+			catches &&
+			!isHostContextRequest(error) &&
+			!isSuspenseException(error) &&
+			!isAdoptionControl(error);
+		if (caught && attempt.deferred !== null) {
+			// A deferred mismatch's diagnostic is not the catch arm's to drop.
+			caught = false;
+			clearHydrationThrow();
+			throw hydrateFailure(attempt, error);
 		}
-		return false;
+		const failure = caught ? hydrateThrownWhileAdopting(attempt, error) : null;
+		if (failure !== null) throw failure;
+		throw error;
+	} finally {
+		hydrateReleaseDiagnostics(attempt, mark, caught);
 	}
+}
 
-	suspend<T>(fn: () => T): T {
-		this.depth++;
-		const previousNative = setNativeAdoptionResolver(null);
-		try {
-			return fn();
-		} catch (error) {
-			if (isSuspenseException(error)) this.freshSuspension = error;
-			throw error;
-		} finally {
-			setNativeAdoptionResolver(previousNative);
-			this.depth--;
+/**
+ * A call of `scope` found no server range of its own where it hydrates, but
+ * `cursor`, with the slot anchored at `anchor`. As React, which compares
+ * only the DOM, the call's body adopts the server nodes there in place when
+ * they match (renderUnframed): the node a template hole's walk found (the
+ * anchor, when it is an element or text), or else the cursor. Returns that
+ * node, before which the call's fresh markers go, or null when the server
+ * rendered nothing more there. A client-built `cursor` is an earlier
+ * sibling's, past the server nodes it adopted: the server rendered nothing
+ * more there either.
+ */
+function hydrateUnframedRoot(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	cursor: Node | null,
+	anchor: Node | null,
+): Node | null {
+	const root =
+		anchor !== null && anchor.nodeType !== 8 && anchor !== scope.block.endMarker ? anchor : cursor;
+	return root !== null && attempt.freshNodes.has(root) ? null : root;
+}
+
+/**
+ * Render, by `render(target)`, a call without a server range of its own
+ * whose fresh markers `start` and `end` stand before `root` (unframedRoot).
+ * Its body adopts `root` in place, with the server nodes after it that its
+ * template's other roots match, and `end` then moves past them, framing
+ * them as the server's range would have. A body that renders nothing
+ * leaves `root` to the next sibling at the cursor, as React does, but a
+ * template hole's walk found `root` for this call alone (`positional`):
+ * nothing else claims it. An appended call's next sibling is the next call
+ * appended to the same host, and when none claims `root` the host ends
+ * with server content the client never rendered (settleUnclaimed).
+ * Anything else that adopts nothing there, or
+ * anything at all where the server rendered nothing more (`root` null),
+ * does not match the server. The call's site names a root that does not
+ * match (`named`; rootMismatch). A body that suspends leaves this render
+ * to the retry, which must render it here again (unframedSuspended).
+ */
+function hydrateRenderUnframed<T>(
+	attempt: HydrationAttempt,
+	render: (target: T) => void,
+	target: T,
+	start: Node,
+	end: Node,
+	root: Node | null,
+	positional: boolean,
+	named: boolean,
+	scope: Scope,
+	slotKey: number,
+): void {
+	hydrationCursor.node = root;
+	const frame = (end as HydrationFrameMarker)[HYDRATION_FRAME]!;
+	// Returned children must compare with the offered server node. If the
+	// component claims nothing, its empty frame is restored below and leaves
+	// that node available to a following appended component.
+	if (root !== null) frame.after = getNextSibling(root);
+	try {
+		if (root === null) {
+			// No server source exists here. Speculative client output cannot
+			// use the unplaced closing delimiter as a live DOM anchor.
+			const prepared = prepareParent(frame.parent);
+			prepared.append(start, end);
+			(scope.slots[slotKey] as any).block.parentNode = prepared;
 		}
-	}
-
-	/**
-	 * Render `block`, which an update created in place of content its slot had
-	 * already rendered, as a suspended deferred boundary's retry does after its
-	 * captures changed. The server never rendered it, and the cursor belongs to
-	 * other slots' server nodes, so it builds on the client without moving the
-	 * cursor. So does every later render of it or its descendants under this
-	 * hydration (owns), including a retry that resumes a block that suspended
-	 * inside it. A method, so that the callback stays out of callers' frames.
-	 */
-	renderUpdate(block: Block): void {
-		this.recordUpdate(block);
-		this.suspend(() => renderBlock(block));
-	}
-
-	/** Record that a hydrating update built `owner` on the client (see updates). */
-	recordUpdate(owner: Block | ChildSlot): void {
-		(this.updates ??= new WeakSet()).add(owner);
-	}
-
-	/**
-	 * Hold hydration diagnostics while a try body renders (see
-	 * HYDRATION_DIAGNOSTIC_HOLDS). Returns the mark that releaseDiagnostics
-	 * drops back to.
-	 */
-	holdDiagnostics(): number {
-		HYDRATION_DIAGNOSTIC_HOLDS++;
-		return HELD_HYDRATION_DIAGNOSTICS?.length ?? 0;
-	}
-
-	/**
-	 * Hold a diagnostic's `publish` when a try body holds diagnostics. A method,
-	 * so that bundles which never hydrate do not retain the hold.
-	 */
-	holds(publish: () => void): boolean {
-		if (HYDRATION_DIAGNOSTIC_HOLDS === 0) return false;
-		(HELD_HYDRATION_DIAGNOSTICS ??= []).push(publish);
-		return true;
-	}
-
-	/**
-	 * End a try body's hold. A body `caught` by its catch arm drops what it
-	 * held; otherwise its diagnostics pass to the enclosing hold, or publish
-	 * when none remains.
-	 */
-	releaseDiagnostics(mark: number, caught: boolean): void {
-		HYDRATION_DIAGNOSTIC_HOLDS--;
-		const held = HELD_HYDRATION_DIAGNOSTICS;
-		if (held === null) return;
-		if (caught) held.length = mark;
-		if (HYDRATION_DIAGNOSTIC_HOLDS !== 0) return;
-		HELD_HYDRATION_DIAGNOSTICS = null;
-		for (let i = 0; i < held.length; i++) held[i]();
-	}
-
-	/**
-	 * Render a hydrating try body under a diagnostic hold. When the boundary
-	 * `catches` and the body throws an application error, the catch arm
-	 * replaces the region, so the hold drops what the body reported.
-	 *
-	 * An error thrown while this hydration adopted the body's server DOM
-	 * (HYDRATION_THROWN), where the server's body succeeded,
-	 * fails the hydration of the nearest fallback owner, as React's does, even
-	 * though the catch arm would catch it. That owner renders on the client,
-	 * where a repeated throw reaches the catch arm.
-	 */
-	renderTryBody(block: Block, catches: boolean): void {
-		const mark = this.holdDiagnostics();
-		let caught = false;
-		try {
-			renderBlock(block);
-		} catch (error) {
-			caught =
-				catches &&
-				!isHostContextRequest(error) &&
-				!isSuspenseException(error) &&
-				!isAdoptionControl(error);
-			if (caught && this.deferred !== null) {
-				// A deferred mismatch's diagnostic is not the catch arm's to drop.
-				caught = false;
-				clearHydrationThrow();
-				throw this.failure(error);
-			}
-			const failure = caught ? this.thrownWhileAdopting(error) : null;
-			if (failure !== null) throw failure;
-			throw error;
-		} finally {
-			this.releaseDiagnostics(mark, caught);
-		}
-	}
-
-	/**
-	 * A call of `scope` found no server range of its own where it hydrates, but
-	 * `cursor`, with the slot anchored at `anchor`. As React, which compares
-	 * only the DOM, the call's body adopts the server nodes there in place when
-	 * they match (renderUnframed): the node a template hole's walk found (the
-	 * anchor, when it is an element or text), or else the cursor. Returns that
-	 * node, before which the call's fresh markers go, or null when the server
-	 * rendered nothing more there. A client-built `cursor` is an earlier
-	 * sibling's, past the server nodes it adopted: the server rendered nothing
-	 * more there either.
-	 */
-	unframedRoot(scope: Scope, cursor: Node | null, anchor: Node | null): Node | null {
-		const root =
-			anchor !== null && anchor.nodeType !== 8 && anchor !== scope.block.endMarker
-				? anchor
-				: cursor;
-		return root !== null && this.freshNodes.has(root) ? null : root;
-	}
-
-	/**
-	 * Render, by `render(target)`, a call without a server range of its own
-	 * whose fresh markers `start` and `end` stand before `root` (unframedRoot).
-	 * Its body adopts `root` in place, with the server nodes after it that its
-	 * template's other roots match, and `end` then moves past them, framing
-	 * them as the server's range would have. A body that renders nothing
-	 * leaves `root` to the next sibling at the cursor, as React does, but a
-	 * template hole's walk found `root` for this call alone (`positional`):
-	 * nothing else claims it. An appended call's next sibling is the next call
-	 * appended to the same host, and when none claims `root` the host ends
-	 * with server content the client never rendered (settleUnclaimed).
-	 * Anything else that adopts nothing there, or
-	 * anything at all where the server rendered nothing more (`root` null),
-	 * does not match the server. The call's site names a root that does not
-	 * match (`named`; rootMismatch). A body that suspends leaves this render
-	 * to the retry, which must render it here again (unframedSuspended).
-	 */
-	renderUnframed<T>(
-		render: (target: T) => void,
-		target: T,
-		start: Node,
-		end: Node,
-		root: Node | null,
-		positional: boolean,
-		named: boolean,
-		scope: Scope,
-		slotKey: number,
-	): void {
-		this.node = root;
-		try {
-			if (root === null) render(target);
-			else if (this.renderInPlace(render, target, root, true, named ? scope : null, slotKey)) {
-				domNode(domNode(end).parentNode!).insertBefore(end, this.node);
-				return;
-			}
-		} catch (error) {
-			if (isSuspenseException(error)) this.unframedSuspended = true;
-			throw error;
-		}
-		if (positional || getNextSibling(start) !== end || this.node !== root)
-			this.slotMismatch(scope, slotKey, 'a component range', root);
-		if (named && root !== null) {
-			this.unclaimed = root;
-			this.unclaimedScope = scope;
-			this.unclaimedKey = slotKey;
-		}
-	}
-
-	/** A call appended to a host takes over `cursor`, the server node it hydrates from. */
-	takeUnclaimed(cursor: Node | null): void {
-		if (cursor === this.unclaimed) this.unclaimed = this.unclaimedScope = null;
-	}
-
-	/**
-	 * `scope`'s body rendered. A server node that an appended call in its
-	 * template left, and no later call appended to that host claimed, is server
-	 * content the client renders nothing for: as React finds when it completes
-	 * the host, the nearest fallback owner renders on the client.
-	 */
-	settleUnclaimed(scope: Scope): void {
-		const node = this.unclaimed;
-		if (node === null || this.unclaimedScope !== scope) return;
-		this.unclaimed = this.unclaimedScope = null;
-		this.slotMismatch(scope, this.unclaimedKey, 'a component range', node);
-	}
-
-	/**
-	 * Enter an owned server range while its ordinary body renders. The owner
-	 * consumes its template once; if it has no template, its children consume
-	 * their ranges on return. Its enclosing claim is preserved on suspension.
-	 */
-	beginClaim(owner: Scope, first: Node | null): HydrationClaim {
-		return (this.claim = { owner, first, next: undefined, slots: -1, outer: this.claim });
-	}
-
-	/**
-	 * Close a range even when the body threw. An unclaimed template tail takes
-	 * precedence over a child that parked the shared walking cursor inside it.
-	 */
-	endClaim(claim: HydrationClaim): Node | null | undefined {
-		this.claim = claim.outer;
-		return claim.first === null || claim.slots === claim.owner.slots.length
-			? claim.next
-			: undefined;
-	}
-
-	/**
-	 * First render of a component into the server range it adopted, `block`'s
-	 * own: its component frame, or the range of a renderable hole or list item
-	 * whose value it is. The server may have rendered another component there,
-	 * or more from this one, whose content starts with what the client renders:
-	 * anything left after the client's content is a mismatch (settleClaim). A
-	 * render that suspends leaves the claim to the resume of `block`
-	 * (renderSuspended).
-	 */
-	renderClaimed(block: Block, scope: Scope, slotKey: number, branch = false): void {
-		const first = getNextSibling(block.startMarker!);
-		const claim = this.beginClaim(block, first);
-		let from: Node | null | undefined;
-		try {
-			renderBlock(block);
-		} catch (error) {
-			if (!branch && isSuspenseException(error))
-				(this.suspendedClaims ??= new WeakMap()).set(block, [scope, slotKey]);
-			throw error;
-		} finally {
-			from = this.endClaim(claim);
-		}
-		if (!block.disposed)
-			this.settleClaim(block.endMarker!, from, scope, slotKey, branch ? first : undefined);
-	}
-
-	/**
-	 * After `owner` first rendered its content into an adopted server range
-	 * that ends at `end`, server content left after it, from `from` (endClaim),
-	 * is content the client renders nothing for: a mismatch. When no template
-	 * adopted the range's first node, the content is the owner's slots, and the
-	 * last one left the cursor past its range, or past the server nodes it
-	 * adopted in place. A cursor on `end` means nothing is left, and anything
-	 * less certain is left in place. The slot at `scope`'s `slotKey` owns the
-	 * range.
-	 */
-	settleClaim(
-		end: Node,
-		from: Node | null | undefined,
-		scope: Scope,
-		slotKey: number,
-		branchFirst?: Node | null,
-	): void {
-		if (branchFirst !== undefined) {
-			// Arms without their own template can render nothing, leaving an open
-			// server range at the cursor. That too is unclaimed branch content.
-			if (from != null) this.node = from;
-			else if (this.isOpen(this.node)) from = this.node;
-		}
-		const cursor = this.node;
-		if (cursor === end) return;
-		if (from === undefined) return;
-		if (from === null || from === end) return;
-		// Leave anything the client built, and a tail outside the range.
-		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
-			if (node === null || (branchFirst === undefined && this.freshNodes.has(node))) return;
-		}
-		if (branchFirst !== undefined)
-			this.slotMismatch(
-				scope,
-				slotKey,
-				from === branchFirst ? 'an empty branch' : 'the end of the branch',
-				from,
-			);
-		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? // A return slot or a list item has no site of its own: name the
-					// returning component, else the list's host.
-					siteLoc(scope, slotKey) ||
-						componentSourceLoc(scope.block.body) ||
-						(domNode(end).parentNode as any).__oct_loc
-				: undefined,
-			() => 'the end of the component',
-			from,
-		);
-	}
-
-	/**
-	 * First render, by `render(target)`, of a component call that found `root`
-	 * at the cursor instead of a server range of its own. Its template adopts
-	 * `root` in place when they match, and a template with several roots also
-	 * adopts the server nodes after `root` that its other roots match. clone()
-	 * leaves the cursor on the first root it adopts, and the roots' own holes
-	 * move it into their content, but the next sibling's server content starts
-	 * after the last root, so step past it. A body that rendered nothing there
-	 * leaves the cursor where it put it. `unframed` marks a call whose fresh
-	 * markers stand before `root` (renderUnframed). Returns whether the body
-	 * adopted `root`. A call in the body that renders in place of the same
-	 * `root`, before any template adopted it, adopts it for the enclosing call
-	 * too: its root is the enclosing call's. A call at a template hole whose
-	 * walk found `root`, or appended to a host whose children are all calls, is
-	 * `site`'s slot `slotKey`, whose site names a root that does not match
-	 * (rootMismatch), as the server frames such a call. Otherwise (`site`
-	 * null) the template that does not match names it.
-	 */
-	renderInPlace<T>(
-		render: (target: T) => void,
-		target: T,
-		root: Node,
-		unframed: boolean,
-		site: Scope | null,
-		slotKey: number,
-	): boolean {
-		const outer = this.inPlace;
-		const outerUnframed = this.inPlaceUnframed;
-		const outerEnd = this.inPlaceEnd;
-		const outerHole = this.inPlaceHole;
-		const outerCall = this.inPlaceCall;
-		const outerCallKey = this.inPlaceCallKey;
-		this.inPlace = root;
-		this.inPlaceUnframed = unframed;
-		this.inPlaceEnd = undefined;
-		this.inPlaceHole = null;
-		if (outer !== root) {
-			this.inPlaceCall = site;
-			this.inPlaceCallKey = slotKey;
-		}
-		this.pendingClaims = true;
-		let end: Node | null | undefined;
-		try {
-			render(target);
-			end = this.inPlaceEnd;
-		} finally {
-			this.inPlace = outer;
-			this.inPlaceUnframed = outerUnframed;
-			this.inPlaceEnd = outerEnd;
-			this.inPlaceHole = outerHole;
-			this.inPlaceCall = outerCall;
-			this.inPlaceCallKey = outerCallKey;
-			this.pendingClaims = outer !== null || this.rootRemainder === undefined;
-		}
-		if (end === undefined) return false;
-		this.node = end;
-		if (outer === root) {
-			this.inPlace = null;
-			this.inPlaceEnd = end;
-		}
-		return true;
-	}
-
-	/**
-	 * Park the cursor on `node`, the server node that a template hole's walk
-	 * found for a single-root call without a range of its own, and return where
-	 * the call inserts: before the node after `node`. Only below a passthrough
-	 * root: its owner adopts the first server range in its container, so the
-	 * ranges below it can sit one level off their calls, and the innermost call
-	 * finds its root where its range would be (passthroughRoot). On the client
-	 * the hole's own placeholder anchors the call, but the server rendered
-	 * none, and the call's root takes `node`'s place. `node` itself cannot
-	 * anchor the call: a branch or other slot that the body anchors at its
-	 * block's end would bound its content before that content. At a closing
-	 * marker the server rendered nothing for the hole, and the call inserts
-	 * before it.
-	 */
-	parkAtHole(node: Node): Node | null {
-		this.node = node;
-		return isBlockClose(node) ? node : getNextSibling(node);
-	}
-
-	/**
-	 * A slot of `scope` at `slotKey` found no server range of its own where it
-	 * hydrates, but `actual`, which the server rendered for something else.
-	 */
-	slotMismatch(scope: Scope, slotKey: number, expected: string, actual: Node | null): never {
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) || undefined : undefined,
-			() => expected,
-			actual,
-		);
-	}
-
-	/**
-	 * A template's roots do not match the server nodes at `cursor`, where the
-	 * template at `loc` expected `expected`. When `cursor` is the server node
-	 * that a named call without a server range renders in place of
-	 * (renderInPlace), the call's site names the mismatch: the server rendered
-	 * neither the call's range nor what the call renders there.
-	 */
-	private rootMismatch(
-		loc: string | undefined,
-		expected: () => string,
-		cursor: Node | null,
-	): never {
-		const call = this.inPlaceCall;
-		if (this.pendingClaims && cursor !== null && cursor === this.inPlace && call !== null)
-			this.slotMismatch(call, this.inPlaceCallKey, 'a component range', cursor);
-		this.mismatch(loc, expected, cursor);
-	}
-
-	/**
-	 * The open marker of the server range that a renderable hole adopts on its
-	 * first render, at `anchor`, where its compiled walk found the server node
-	 * for its own placeholder. Under a template adopted in place
-	 * (renderInPlace), what the server rendered there need not be framed, as it
-	 * frames every hole's value elsewhere, so frame it here. The walk counts one
-	 * server node for a hole, and matched each root after it, so the frame
-	 * holds `anchor`. A fragment's last root has no root after it
-	 * (inPlaceHole), so the frame holds `anchor` only when it is the kind of
-	 * node the value renders: text for a primitive, an element for an object.
-	 * Otherwise the server rendered nothing for the hole, and the fragment's
-	 * server nodes end before `anchor`. Returns `anchor` when it is the server's
-	 * open marker, and null for any other node outside such a template, or at a
-	 * placeholder the hole shares (`ownEnd` unset).
-	 */
-	holeOpen(anchor: Node | null | undefined, value: unknown, ownEnd?: boolean): Comment | null {
-		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
-		if (anchor == null || this.inPlaceEnd === undefined || !ownEnd) return null;
-		const last = anchor === this.inPlaceHole;
-		const object = value !== null && (typeof value === 'object' || typeof value === 'function');
-		const holds = !last || (anchor.nodeType === 3 ? !object : anchor.nodeType === 1 && object);
-		const parent = domNode(domNode(anchor).parentNode!);
-		const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
-		const start = doc.createComment(HYDRATION_START);
-		const end = doc.createComment(HYDRATION_END);
-		this.save(parent);
-		parent.insertBefore(start, anchor);
-		parent.insertBefore(end, holds ? getNextSibling(anchor) : anchor);
-		if (last) this.inPlaceEnd = getNextSibling(end);
-		return start;
-	}
-
-	/**
-	 * Whether the dynamic range that `end` closes was built on the client, so
-	 * its body builds rather than adopts. The fresh range renderUnframed placed
-	 * before the server node it renders in place of was not: its body adopts
-	 * that node.
-	 */
-	rebuilds(end: Node): boolean {
-		return (
-			this.freshNodes.has(end) &&
-			!(this.inPlaceUnframed && this.inPlace !== null && getNextSibling(end) === this.inPlace)
-		);
-	}
-
-	/**
-	 * A shell hydrated before its streamed segment swaps still has the template
-	 * sentinel instead of the seed comment. Its opaque id owns the same boundary
-	 * namespace even though there are no scoped seeds yet. Octane cannot
-	 * selectively hydrate that server fallback, so claim the boundary for the
-	 * client: remove the sentinel and its server-rendered fallback arm up to
-	 * `end`, before mountTry mounts a fresh try/pending block. Leaving either
-	 * behind would duplicate the fallback and allow a later stream swap to
-	 * overwrite client-owned DOM. Returns the boundary's id, or null when
-	 * `cursor` is not a renderer sentinel. A method so that client-only bundles
-	 * drop the stream-protocol validator with this class.
-	 */
-	claimStreamTemplate(cursor: Node | null, end: Node): string | null {
-		if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
-		const id = (STAGED_DOM ? STAGED_DOM.view(cursor as Element) : (cursor as Element)).getAttribute(
-			STREAM_BOUNDARY_ATTR,
-		)!;
-		this.save(domNode(cursor).parentNode!);
-		let stale: Node | null = cursor;
-		while (stale !== null && stale !== end) {
-			const next: Node | null = getNextSibling(stale);
-			(STAGED_DOM ? STAGED_DOM.view(stale as ChildNode) : (stale as ChildNode)).remove();
-			stale = next;
-		}
-		this.node = end;
-		return id;
-	}
-
-	/**
-	 * Start the client render of `state`'s arm, which `cursor` leads, when the
-	 * server could not finish it (CLIENT_RENDER_ARM_COMMENT). Returns what
-	 * endUnfinishedArm and reportUnfinishedArm need, or null for another fresh
-	 * arm. The boundary is dehydrated meanwhile (DEHYDRATED_TRY), and catches in
-	 * its render are its own (as catchesInHydrationFallback).
-	 */
-	beginUnfinishedArm(state: TrySlot, cursor: Node | null): UnfinishedArm | null {
 		if (
-			cursor?.nodeType !== 8 ||
-			!(STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data.startsWith(
-				CLIENT_RENDER_ARM_COMMENT,
+			hydrateRenderInPlace(
+				attempt,
+				render,
+				target,
+				root,
+				true,
+				named ? scope : null,
+				slotKey,
+				frame,
 			)
-		)
-			return null;
-		const arm: UnfinishedArm = {
-			state,
-			dehydrated: DEHYDRATED_TRY,
-			caughtBefore: ROOT_RENDER_TRANSACTION?.caught === true,
-			caught: false,
-		};
-		DEHYDRATED_TRY = state;
-		if (ROOT_RENDER_TRANSACTION !== null) ROOT_RENDER_TRANSACTION.caught = false;
-		return arm;
-	}
-
-	/** End the render that beginUnfinishedArm started, whether or not it threw. */
-	endUnfinishedArm(arm: UnfinishedArm): void {
-		DEHYDRATED_TRY = arm.dehydrated;
-		const transaction = ROOT_RENDER_TRANSACTION;
-		if (transaction === null) return;
-		arm.caught = transaction.caught === true;
-		transaction.caught = arm.caught || arm.caughtBefore;
-	}
-
-	/**
-	 * Report that the boundary of `arm`, which the server could not finish,
-	 * rendered on the client, as React reports a boundary its server marked
-	 * errored, unless a catch arm caught an error in that render, which React
-	 * reports alone.
-	 */
-	reportUnfinishedArm(arm: UnfinishedArm): void {
-		if (!arm.caught)
-			noteRecoverableHydrationError(() => new Error(formatClientError(341)), arm.state.parentBlock);
-	}
-
-	/**
-	 * The client rebuilt this slot's arm, adopting nothing inside it. Park the
-	 * cursor past its end, where the next sibling's server content starts, as
-	 * the boundary itself does after it renders.
-	 */
-	rebuiltSlot(end: Node): void {
-		this.node = getNextSibling(end);
-	}
-
-	isOpen(node: Node | null): node is Comment {
-		return isBlockOpen(node);
-	}
-
-	isClose(node: Node | null): node is Comment {
-		return isBlockClose(node);
-	}
-
-	close(open: Node): Comment {
-		const known = this.matchingCloses?.get(open);
-		return known ?? findMatchingClose(open, (this.matchingCloses ??= new WeakMap<Node, Comment>()));
-	}
-
-	/**
-	 * Adopt the text of a binding-view text hole whose server range `posNode`
-	 * opens: the range's one text node, or a new one when the server rendered it
-	 * empty. The text compares as any server text does (keepsText). Any other
-	 * range content does not match the template. Null when `posNode` opens no
-	 * range, so bindingText builds one.
-	 */
-	adoptBindingText(posNode: Node | null, text: string): Text | null {
-		if (!isBlockOpen(posNode)) return null;
-		const close = this.close(posNode);
-		const existing = getNextSibling(posNode);
-		const host = domNode(posNode).parentNode;
-		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
-			const server = (STAGED_DOM ? STAGED_DOM.view(existing) : existing).nodeValue;
-			if (!this.keepsText(host, existing, server, text, (host as any)?.__oct_loc))
-				(STAGED_DOM ? STAGED_DOM.view(existing) : existing).nodeValue = text;
-			return existing as Text;
+		) {
+			frame.after = hydrationCursor.node;
+			if (frame.published) frame.parent.insertBefore(end, frame.after);
+			return;
 		}
-		if (existing !== close) throw new TypeError(formatClientError(72));
-		// An empty range is the server's empty text.
-		const node = this.newText(host, text, (host as any)?.__oct_loc);
-		domNode((STAGED_DOM ? STAGED_DOM.view(close) : close).parentNode)!.insertBefore(node, close);
-		return node;
-	}
-
-	/**
-	 * The new Text node for the client's `text` where the server rendered no
-	 * text in `host`, its form of empty text: an empty node, which stands for
-	 * the server's and compares as any server text does (keepsText), and takes
-	 * the client's text where that is written. The caller inserts it.
-	 */
-	newText(host: Node | null, text: string, loc: string | undefined): Text {
-		const created = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode('');
-		if (!this.keepsText(host, created, '', text, loc))
-			(STAGED_DOM ? STAGED_DOM.view(created) : created).nodeValue = text;
-		return created;
-	}
-
-	resolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
-		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
-		let cursor = this.node;
-		if (cursor === null || (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode !== domParent)
-			cursor = getFirstChild(domParent);
-		return cursor !== null && isBlockOpen(cursor) ? (cursor as Comment) : null;
-	}
-
-	/**
-	 * The open marker of the server range that an `@if`/`@switch` slot or a
-	 * `@try`/ErrorBoundary boundary of `scope` adopts on its first render at
-	 * `anchor`, as resolveOpen finds it, or null inside a range the client built
-	 * (inFreshRange), whose slots build on the client. The server frames every
-	 * such slot, so anywhere else a missing range means the server rendered
-	 * something else there, such as another arm of an enclosing `@if`.
-	 */
-	branchOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment | null {
-		const open = this.resolveOpen(anchor, domParent);
-		if (open !== null || this.inFreshRange(anchor, domParent)) return open;
-		this.slotMismatch(
-			scope,
-			slotKey,
-			'a branch range',
-			anchor !== null && anchor !== scope.block.endMarker ? anchor : this.node,
-		);
-	}
-
-	markerState(node: Node): -1 | 0 | 1 {
-		return ssrForMarkerState(node);
-	}
-
-	/**
-	 * The server DOM at the cursor does not match the client render. Nothing is
-	 * repaired here: the nearest fallback owner discards its server DOM and
-	 * renders on the client (see HydrationMismatch), as React does.
-	 */
-	mismatch(loc: string | undefined, expected: () => string, actual: Node | null): never {
-		const error = new HydrationMismatch();
-		if (process.env.NODE_ENV !== 'production') {
-			// A mismatch that a template's adoption defers is reported only when the
-			// render reaches it (claimDeferred).
-			const message = warnHydrationStructuralMismatch(
-				loc || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
-				expected(),
-				describeHydrationNode(actual),
-				!this.adopting,
-			);
-			if (this.adopting) error.warning = message;
-			// A root's attempt publishes its diagnostics when it commits, which this
-			// mismatch prevents if the root is what falls back (hydrateRoot).
-			if (inRootHydrationAttempt() && !this.staleServerValues) error.diagnostic = message;
-		}
+	} catch (error) {
+		if (isSuspenseException(error)) attempt.unframedSuspended = true;
 		throw error;
 	}
-
-	/**
-	 * Before a child slot's first hydrating render of the server range
-	 * `start`…`end`, which it adopted or was lent, check that `value` can adopt
-	 * what the range holds. A host descriptor serializes as exactly one element
-	 * of its tag. A list (`list`, from prepareDeoptList) frames or self-delimits
-	 * each of its items, so it neither leaves the range empty nor opens it with
-	 * text, unless it has no items, and then the range is empty. A portal does
-	 * not open it with text either. Anything else is server content the client
-	 * cannot adopt: what the server rendered for another value, or invalid
-	 * nesting that the HTML parser repaired (`<p><div></div></p>` arrives as
-	 * `<p></p><div></div><p></p>`, all inside the range). Items that render
-	 * nothing differ from an empty range only in the frames the server would
-	 * have given them: returns true for those, and the caller builds them in
-	 * the range as a client mount would.
-	 */
-	claimRange(
-		scope: Scope,
-		slotKey: number,
-		start: Node,
-		end: Node,
-		value: unknown,
-		list: { items: readonly unknown[] } | null,
-	): boolean {
-		const type = list === null && isHostDescriptor(value) ? value.type : null;
-		// Other values, such as a component or text, check what they adopt as
-		// they render.
-		if (type === null && list === null && (value as any)?.$$kind !== PORTAL_TAG) return false;
-		const first = getNextSibling(start)!;
-		const matches =
-			type !== null &&
-			first !== end &&
-			first.nodeType === 1 &&
-			isHostElementOfType(first as Element, type);
-		if (
-			type !== null
-				? matches && getNextSibling(first) === end
-				: list !== null && first === end
-					? list.items.length === 0
-					: first.nodeType !== 3 && list?.items.length !== 0
-		)
-			return false;
-		if (
-			list !== null &&
-			first === end &&
-			!list.items.some((item) => item != null && typeof item !== 'boolean' && item !== '')
-		) {
-			this.save(domNode(end).parentNode!);
-			this.node = end;
-			return true;
-		}
-		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? // A return slot or a list item has no site of its own: name the
-					// returning component, else the list's host.
-					siteLoc(scope, slotKey) ||
-						componentSourceLoc(scope.block.body) ||
-						(domNode(end).parentNode as any)?.__oct_loc
-				: undefined,
-			() =>
-				type !== null
-					? matches
-						? `the end of <${type}>`
-						: `<${type}>`
-					: list?.items.length === 0
-						? 'nothing'
-						: list !== null
-							? 'a renderable list range'
-							: 'a portal',
-			matches ? getNextSibling(first) : first === end ? null : first,
-		);
+	frame.after = frame.first;
+	if (
+		positional ||
+		getNextSibling(start) !== hydrationSourceLimit(end) ||
+		hydrationCursor.node !== root
+	)
+		hydrateSlotMismatch(attempt, scope, slotKey, 'a component range', root);
+	if (named && root !== null) {
+		attempt.unclaimed = root;
+		attempt.unclaimedScope = scope;
+		attempt.unclaimedKey = slotKey;
 	}
+}
 
-	/**
-	 * A child slot's first hydrating render without a server range of its own,
-	 * such as a return slot's when its component's range holds server text. A
-	 * list, a fragment, a keyed or lone element, and a portal never serialize as
-	 * bare text, so a lone text node before `end` in `parent` is what the server
-	 * rendered for a primitive, which the value cannot adopt: a mismatch.
-	 */
-	rejectServerText(
-		scope: Scope,
-		slotKey: number,
-		parent: Node,
-		end: Node | null,
-		value: unknown,
-		list: boolean,
-	): void {
-		const text = this.node;
-		if (
-			text === null ||
-			text.nodeType !== 3 ||
-			!(list || (value as any)?.$$kind === PORTAL_TAG || isHostDescriptor(value)) ||
-			domNode(text).parentNode !== parent ||
-			getNextSibling(text) !== end
-		)
-			return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? siteLoc(scope, slotKey) ||
-						componentSourceLoc(scope.block.body) ||
-						(parent as any).__oct_loc
-				: undefined,
-			() =>
-				list
-					? 'a renderable list range'
-					: (value as any).$$kind === PORTAL_TAG
-						? 'a portal'
-						: `<${(value as ElementDescriptor).type as string}>`,
-			text,
-		);
+/** A call appended to a host takes over `cursor`, the server node it hydrates from. */
+function hydrateTakeUnclaimed(attempt: HydrationAttempt, cursor: Node | null): void {
+	if (cursor === attempt.unclaimed) attempt.unclaimed = attempt.unclaimedScope = null;
+}
+
+/**
+ * `scope`'s body rendered. A server node that an appended call in its
+ * template left, and no later call appended to that host claimed, is server
+ * content the client renders nothing for: as React finds when it completes
+ * the host, the nearest fallback owner renders on the client.
+ */
+function hydrateSettleUnclaimed(attempt: HydrationAttempt, scope: Scope): void {
+	const node = attempt.unclaimed;
+	if (node === null || attempt.unclaimedScope !== scope) return;
+	attempt.unclaimed = attempt.unclaimedScope = null;
+	hydrateSlotMismatch(attempt, scope, attempt.unclaimedKey, 'a component range', node);
+}
+
+/**
+ * Enter an owned server range while its ordinary body renders. The owner
+ * consumes its template once; if it has no template, its children consume
+ * their ranges on return. Its enclosing claim is preserved on suspension.
+ */
+function hydrateBeginClaim(
+	attempt: HydrationAttempt,
+	owner: Scope,
+	first: Node | null,
+): HydrationRangeClaim {
+	return (hydrationCursor.claim = {
+		kind: 'range',
+		owner,
+		first,
+		next: undefined,
+		slots: -1,
+		outer: hydrationCursor.claim,
+	});
+}
+
+/**
+ * Close a range even when the body threw. An unclaimed template tail takes
+ * precedence over a child that parked the shared walking cursor inside it.
+ */
+function hydrateEndClaim(
+	attempt: HydrationAttempt,
+	claim: HydrationRangeClaim,
+): Node | null | undefined {
+	hydrationCursor.claim = claim.outer;
+	return claim.first === null || claim.slots === claim.owner.slots.length ? claim.next : undefined;
+}
+
+/**
+ * First render of a component into the server range it adopted, `block`'s
+ * own: its component frame, or the range of a renderable hole or list item
+ * whose value it is. The server may have rendered another component there,
+ * or more from this one, whose content starts with what the client renders:
+ * anything left after the client's content is a mismatch (settleClaim). A
+ * render that suspends leaves the claim to the resume of `block`
+ * (renderSuspended).
+ */
+function hydrateRenderClaimed(
+	attempt: HydrationAttempt,
+	block: Block,
+	scope: Scope,
+	slotKey: number,
+	branch = false,
+): void {
+	const first = getNextSibling(block.startMarker!);
+	const claim = hydrateBeginClaim(attempt, block, first);
+	let from: Node | null | undefined;
+	try {
+		renderBlock(block);
+	} catch (error) {
+		if (!branch && isSuspenseException(error))
+			(attempt.suspendedClaims ??= new WeakMap()).set(block, [scope, slotKey]);
+		throw error;
+	} finally {
+		from = hydrateEndClaim(attempt, claim);
 	}
+	if (!block.disposed)
+		hydrateSettleClaim(attempt, block.endMarker!, from, scope, slotKey, branch ? first : undefined);
+}
 
-	/**
-	 * A list item's first hydrating render found server content at the cursor
-	 * that cannot be that item: the server rendered fewer items, a bare item
-	 * where this one needs a range of its own, or an item of another tag. The
-	 * list ends at `end`.
-	 */
-	itemMismatch(end: Node, expected: string): never {
-		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? (domNode(end).parentNode as any)?.__oct_loc
-				: undefined,
-			() => expected,
-			this.node,
-		);
+/**
+ * After `owner` first rendered its content into an adopted server range
+ * that ends at `end`, server content left after it, from `from` (endClaim),
+ * is content the client renders nothing for: a mismatch. When no template
+ * adopted the range's first node, the content is the owner's slots, and the
+ * last one left the cursor past its range, or past the server nodes it
+ * adopted in place. A cursor on `end` means nothing is left, and anything
+ * less certain is left in place. The slot at `scope`'s `slotKey` owns the
+ * range.
+ */
+function hydrateSettleClaim(
+	attempt: HydrationAttempt,
+	end: Node,
+	from: Node | null | undefined,
+	scope: Scope,
+	slotKey: number,
+	branchFirst?: Node | null,
+): void {
+	const limit = hydrationSourceLimit(end);
+	if (branchFirst !== undefined) {
+		// Arms without their own template can render nothing, leaving an open
+		// server range at the cursor. That too is unclaimed branch content.
+		if (from != null) hydrationCursor.node = from;
+		else if (hydrateIsOpen(attempt, hydrationCursor.node)) from = hydrationCursor.node;
 	}
-
-	/**
-	 * A list of `scope` at `slotKey` found the server's other arm on its first
-	 * hydrating render: items (`serverItems`) where the client renders its
-	 * @empty arm, or none where the client has items. The server's content
-	 * starts after `start`.
-	 */
-	listArmMismatch(scope: Scope, slotKey: number, start: Node, serverItems: boolean): never {
-		this.slotMismatch(
+	const cursor = hydrationCursor.node;
+	if (cursor === limit) return;
+	if (from === undefined) return;
+	if (from === null || from === limit) return;
+	// Leave anything the client built, and a tail outside the range.
+	for (let node: Node | null = from; node !== limit; node = getNextSibling(node)) {
+		if (node === null || (branchFirst === undefined && attempt.freshNodes.has(node))) return;
+	}
+	if (branchFirst !== undefined)
+		hydrateSlotMismatch(
+			attempt,
 			scope,
 			slotKey,
-			serverItems ? 'an empty list (@empty)' : 'a populated list',
-			getNextSibling(start),
-		);
-	}
-
-	/**
-	 * Whether a hydrating update of `slot`, whose list exists, builds that list
-	 * on the client: an earlier hydrating update built it (recordUpdate).
-	 * Otherwise the list adopts the server's items, and when it kept none, as
-	 * after a fill that threw, its first fill starts over from the first of them.
-	 */
-	buildsList(slot: ChildSlot): boolean {
-		if (this.updates?.has(slot) === true) return true;
-		const list = slot.forSlot!;
-		if (list.size === 0 && !(this.passthroughRanges && slot.borrowed) && this.isOpen(list.start))
-			this.node = getNextSibling(list.start);
-		return false;
-	}
-
-	/**
-	 * After a list's first fill adopted the client's items, before the list's
-	 * `end`: server content left between the cursor and `end` is items the
-	 * client does not render.
-	 */
-	settleItems(end: Node): void {
-		const from = this.node;
-		if (from === end) return;
-		let node = from;
-		while (node !== null && node !== end) node = getNextSibling(node);
-		if (node === null) return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? (domNode(end).parentNode as any)?.__oct_loc
-				: undefined,
-			() => 'the end of the list',
+			from === branchFirst ? 'an empty branch' : 'the end of the branch',
 			from,
 		);
-	}
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production'
+			? // A return slot or a list item has no site of its own: name the
+				// returning component, else the list's host.
+				siteLoc(scope, slotKey) ||
+					componentSourceLoc(scope.block.body) ||
+					(end.parentNode as any).__oct_loc
+			: undefined,
+		() => 'the end of the component',
+		from,
+	);
+}
 
-	/**
-	 * A slot of `parent` claimed the server range that `close` ends. Step the
-	 * cursor past it to the next sibling's server content. A parent that the
-	 * slot's render disposed, as a cleanup error an ancestor boundary caught
-	 * does, owns no server content any more: the cursor stays where that
-	 * boundary left it.
-	 */
-	parkPast(close: Node, parent: Scope): void {
-		if (parent.block.disposed) return;
-		this.node = getNextSibling(close);
-		this.parkInPlace(parent);
+/**
+ * First render, by `render(target)`, of a component call that found `root`
+ * at the cursor instead of a server range of its own. Its template adopts
+ * `root` in place when they match, and a template with several roots also
+ * adopts the server nodes after `root` that its other roots match. clone()
+ * leaves the cursor on the first root it adopts, and the roots' own holes
+ * move it into their content, but the next sibling's server content starts
+ * after the last root, so step past it. A body that rendered nothing there
+ * leaves the cursor where it put it. `unframed` marks a call whose fresh
+ * markers stand before `root` (renderUnframed). Returns whether the body
+ * adopted `root`. A call in the body that renders in place of the same
+ * `root`, before any template adopted it, adopts it for the enclosing call
+ * too: its root is the enclosing call's. A call at a template hole whose
+ * walk found `root`, or appended to a host whose children are all calls, is
+ * `site`'s slot `slotKey`, whose site names a root that does not match
+ * (rootMismatch), as the server frames such a call. Otherwise (`site`
+ * null) the template that does not match names it.
+ */
+function hydrateRenderInPlace<T>(
+	attempt: HydrationAttempt,
+	render: (target: T) => void,
+	target: T,
+	root: Node | null,
+	unframed: boolean,
+	site: Scope | null,
+	slotKey: number,
+	frame: HydrationFrame | null = null,
+): boolean {
+	const outer = hydrationClaim('place');
+	const same = outer !== null && outer.first === root && outer.next === undefined;
+	const claim: HydrationPlaceClaim = {
+		kind: 'place',
+		first: root,
+		next: undefined,
+		outer: hydrationCursor.claim,
+		unframed,
+		site: same ? outer.site : site,
+		key: same ? outer.key : slotKey,
+		hole: null,
+		frame,
+	};
+	hydrationCursor.claim = claim;
+	try {
+		render(target);
+	} finally {
+		hydrationCursor.claim = claim.outer;
 	}
-
-	/**
-	 * `slot` of `parent` adopted server nodes in place (renderInPlace), which
-	 * left the cursor on the next sibling's server content: one root's
-	 * sibling, or the node after a fragment's last root. Record it as parkPast
-	 * does, and for settleClaim, which slot parked the cursor there.
-	 */
-	parkInPlace(parent: Scope): void {
-		const claim = this.claim;
-		if (claim !== null && claim.owner === parent && claim.first !== null) {
-			claim.next = this.node;
-			claim.slots = parent.slots.length;
-		}
+	if (claim.next === undefined) return false;
+	hydrationCursor.node = claim.next;
+	if (same) {
+		outer.first = null;
+		outer.next = claim.next;
 	}
+	return true;
+}
 
-	/**
-	 * Whether the server's text `server` stays where the client renders `text`
-	 * in `host`, at `node`, the server's Text node, or the empty one that
-	 * stands for the server's empty text where it rendered none (newText). It
-	 * does when the two are equal once the HTML parser's normalization is
-	 * undone, and under the host's suppressHydrationWarning, as in React. False
-	 * when the client's text is written instead: in a host the client built,
-	 * which holds the client template, and in a `<textarea>`, whose text is its
-	 * default value, which React sets to the client's. Any other difference
-	 * does not match the client render, nor does any difference from stale
-	 * server values (staleServerValues). Unless a render-phase update renders
-	 * the text again before the pass ends: React renders a component that
-	 * updates itself while it renders again before it compares the output, so
-	 * the text that render settles on decides, equal or not (settleValues).
-	 * Meanwhile the node holds the client's text, and a discarded attempt
-	 * restores the server's. A method, so that bundles which never hydrate do
-	 * not retain it.
-	 */
-	keepsText(
-		host: Node | null,
-		node: Node | null,
-		server: string | null,
-		text: string,
-		loc: string | undefined,
-	): boolean {
-		const equal = server === text || isTextParserNormalizedMatch(server, text);
-		if (!equal) {
-			if (
-				host !== null &&
-				(this.freshNodes.has(host) ||
-					(host.nodeType === 1 && (host as Element).localName === 'textarea'))
-			)
-				return false;
-			if (!this.staleServerValues && isHydrationSuppressed(host)) return true;
-		}
-		// Every block with an update queued is in the queue, so an empty one spares
-		// the common pass rendersAgain's walk.
-		if (QUEUE.length !== 0 && node !== null && node.nodeType === 3 && this.rendersAgain()) {
-			const pending = (this.pendingTexts ??= new Map());
-			if (!pending.has(node as Text))
-				pending.set(node as Text, { server, loc, prepared: undefined });
-			if (inRootHydrationAttempt()) journalText(node as Text, server);
-			if (this.speculative || this.undoable)
-				(this.undo ??= []).push(() => {
-					(STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue = server;
-				});
-			return equal;
-		}
-		if (equal) return true;
-		this.mismatch(
-			loc || (host as any)?.__oct_loc,
-			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
-			node,
+/**
+ * Park the cursor on `node`, the server node that a template hole's walk
+ * found for a single-root call without a range of its own, and return where
+ * the call inserts: before the node after `node`. Only below a passthrough
+ * root: its owner adopts the first server range in its container, so the
+ * ranges below it can sit one level off their calls, and the innermost call
+ * finds its root where its range would be (passthroughRoot). On the client
+ * the hole's own placeholder anchors the call, but the server rendered
+ * none, and the call's root takes `node`'s place. `node` itself cannot
+ * anchor the call: a branch or other slot that the body anchors at its
+ * block's end would bound its content before that content. At a closing
+ * marker the server rendered nothing for the hole, and the call inserts
+ * before it.
+ */
+function hydrateParkAtHole(attempt: HydrationAttempt, node: Node): Node | null {
+	hydrationCursor.node = node;
+	return isBlockClose(node) ? node : getNextSibling(node);
+}
+
+/**
+ * A slot of `scope` at `slotKey` found no server range of its own where it
+ * hydrates, but `actual`, which the server rendered for something else.
+ */
+function hydrateSlotMismatch(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	slotKey: number,
+	expected: string,
+	actual: Node | null,
+): never {
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) || undefined : undefined,
+		() => expected,
+		actual,
+	);
+}
+
+/**
+ * A template's roots do not match the server nodes at `cursor`, where the
+ * template at `loc` expected `expected`. When `cursor` is the server node
+ * that a named call without a server range renders in place of
+ * (renderInPlace), the call's site names the mismatch: the server rendered
+ * neither the call's range nor what the call renders there.
+ */
+function hydrateRootMismatch(
+	attempt: HydrationAttempt,
+	loc: string | undefined,
+	expected: () => string,
+	cursor: Node | null,
+): never {
+	const claim = hydrationClaim('place');
+	if (claim !== null && cursor === claim.first && claim.next === undefined && claim.site !== null)
+		hydrateSlotMismatch(attempt, claim.site, claim.key, 'a component range', cursor);
+	hydrateMismatch(attempt, loc, expected, cursor);
+}
+
+/**
+ * The open marker of the server range that a renderable hole adopts on its
+ * first render, at `anchor`, where its compiled walk found the server node
+ * for its own placeholder. Under a template adopted in place
+ * (renderInPlace), what the server rendered there need not be framed, as it
+ * frames every hole's value elsewhere, so frame it here. The walk counts one
+ * server node for a hole, and matched each root after it, so the frame
+ * holds `anchor`. A fragment's last root has no root after it
+ * (inPlaceHole), so the frame holds `anchor` only when it is the kind of
+ * node the value renders: text for a primitive, an element for an object.
+ * Otherwise the server rendered nothing for the hole, and the fragment's
+ * server nodes end before `anchor`. Returns `anchor` when it is the server's
+ * open marker, and null for any other node outside such a template, or at a
+ * placeholder the hole shares (`ownEnd` unset).
+ */
+function hydrateHoleOpen(
+	attempt: HydrationAttempt,
+	anchor: Node | null | undefined,
+	value: unknown,
+	ownEnd?: boolean,
+): Comment | null {
+	if (isBlockOpen(anchor ?? null)) return anchor as Comment;
+	const claim = hydrationClaim('place');
+	if (anchor == null || claim?.next === undefined || !ownEnd) return null;
+	const last = anchor === claim.hole;
+	const object = value !== null && (typeof value === 'object' || typeof value === 'function');
+	const holds = !last || (anchor.nodeType === 3 ? !object : anchor.nodeType === 1 && object);
+	const parent = anchor.parentNode!;
+	const doc = document;
+	const start = doc.createComment(HYDRATION_START);
+	const end = doc.createComment(HYDRATION_END);
+	const after = holds ? getNextSibling(anchor) : anchor;
+	createHydrationFrame(parent, start, end, anchor, after);
+	if (last) claim.next = after;
+	return start;
+}
+
+/**
+ * Whether the dynamic range that `end` closes was built on the client, so
+ * its body builds rather than adopts. The fresh range renderUnframed placed
+ * before the server node it renders in place of was not: its body adopts
+ * that node.
+ */
+function hydrateRebuilds(attempt: HydrationAttempt, end: Node): boolean {
+	const claim = hydrationClaim('place');
+	return (
+		attempt.freshNodes.has(end) &&
+		!(claim?.unframed && claim.first !== null && getNextSibling(end) === claim.first)
+	);
+}
+
+/**
+ * A shell hydrated before its streamed segment swaps still has the template
+ * sentinel instead of the seed comment. Its opaque id owns the same boundary
+ * namespace even though there are no scoped seeds yet. Octane cannot
+ * selectively hydrate that server fallback, so claim the boundary for the
+ * client: remove the sentinel and its server-rendered fallback arm up to
+ * `end`, before mountTry mounts a fresh try/pending block. Leaving either
+ * behind would duplicate the fallback and allow a later stream swap to
+ * overwrite client-owned DOM. Returns the boundary's id, or null when
+ * `cursor` is not a renderer sentinel. A method so that client-only bundles
+ * drop the stream-protocol validator with this class.
+ */
+function hydrateClaimStreamTemplate(
+	attempt: HydrationAttempt,
+	cursor: Node | null,
+	end: Node,
+): string | null {
+	if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
+	const id = (cursor as Element).getAttribute(STREAM_BOUNDARY_ATTR)!;
+	hydrationCursor.node = end;
+	return id;
+}
+
+/**
+ * Start the client render of `state`'s arm, which `cursor` leads, when the
+ * server could not finish it (CLIENT_RENDER_ARM_COMMENT). Returns what
+ * endUnfinishedArm and reportUnfinishedArm need, or null for another fresh
+ * arm. The boundary is dehydrated meanwhile (DEHYDRATED_TRY), and catches in
+ * its render are its own (as catchesInHydrationFallback).
+ */
+function hydrateBeginUnfinishedArm(
+	attempt: HydrationAttempt,
+	state: TrySlot,
+	cursor: Node | null,
+): UnfinishedArm | null {
+	if (cursor?.nodeType !== 8 || !(cursor as Comment).data.startsWith(CLIENT_RENDER_ARM_COMMENT))
+		return null;
+	const arm: UnfinishedArm = {
+		state,
+		dehydrated: DEHYDRATED_TRY,
+		caughtBefore: ROOT_RENDER_TRANSACTION?.caught === true,
+		caught: false,
+	};
+	DEHYDRATED_TRY = state;
+	if (ROOT_RENDER_TRANSACTION !== null) ROOT_RENDER_TRANSACTION.caught = false;
+	return arm;
+}
+
+/** End the render that beginUnfinishedArm started, whether or not it threw. */
+function hydrateEndUnfinishedArm(attempt: HydrationAttempt, arm: UnfinishedArm): void {
+	DEHYDRATED_TRY = arm.dehydrated;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction === null) return;
+	arm.caught = transaction.caught === true;
+	transaction.caught = arm.caught || arm.caughtBefore;
+}
+
+/**
+ * Report that the boundary of `arm`, which the server could not finish,
+ * rendered on the client, as React reports a boundary its server marked
+ * errored, unless a catch arm caught an error in that render, which React
+ * reports alone.
+ */
+function hydrateReportUnfinishedArm(attempt: HydrationAttempt, arm: UnfinishedArm): void {
+	if (!arm.caught)
+		noteRecoverableHydrationError(() => new Error(formatClientError(341)), arm.state.parentBlock);
+}
+
+/**
+ * The client rebuilt this slot's arm, adopting nothing inside it. Park the
+ * cursor past its end, where the next sibling's server content starts, as
+ * the boundary itself does after it renders.
+ */
+function hydrateRebuiltSlot(attempt: HydrationAttempt, end: Node): void {
+	hydrationCursor.node = getNextSibling(end);
+}
+
+function hydrateIsOpen(attempt: HydrationAttempt, node: Node | null): node is Comment {
+	return isBlockOpen(node);
+}
+
+function hydrateIsClose(attempt: HydrationAttempt, node: Node | null): node is Comment {
+	return isBlockClose(node);
+}
+
+function hydrateClose(attempt: HydrationAttempt, open: Node): Comment {
+	const frame = (open as HydrationFrameMarker)[HYDRATION_FRAME];
+	if (frame !== undefined) return frame.end;
+	const known = attempt.matchingCloses?.get(open);
+	return (
+		known ?? findMatchingClose(open, (attempt.matchingCloses ??= new WeakMap<Node, Comment>()))
+	);
+}
+
+/**
+ * Adopt the text of a binding-view text hole whose server range `posNode`
+ * opens: the range's one text node, or a new one when the server rendered it
+ * empty. The text compares as any server text does (keepsText). Any other
+ * range content does not match the template. Null when `posNode` opens no
+ * range, so bindingText builds one.
+ */
+function hydrateAdoptBindingText(
+	attempt: HydrationAttempt,
+	posNode: Node | null,
+	text: string,
+): Text | null {
+	if (!isBlockOpen(posNode)) return null;
+	const close = hydrateClose(attempt, posNode);
+	const existing = getNextSibling(posNode);
+	const host = posNode.parentNode;
+	if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
+		const server = existing.nodeValue;
+		if (!hydrateKeepsText(attempt, host, existing, server, text, (host as any)?.__oct_loc))
+			existing.nodeValue = text;
+		return existing as Text;
+	}
+	if (existing !== close) throw new TypeError(formatClientError(72));
+	// An empty range is the server's empty text.
+	const node = hydrateNewText(attempt, host, text, (host as any)?.__oct_loc);
+	close.parentNode!.insertBefore(node, close);
+	return node;
+}
+
+/**
+ * The new Text node for the client's `text` where the server rendered no
+ * text in `host`, its form of empty text: an empty node, which stands for
+ * the server's and compares as any server text does (keepsText), and takes
+ * the client's text where that is written. The caller inserts it.
+ */
+function hydrateNewText(
+	attempt: HydrationAttempt,
+	host: Node | null,
+	text: string,
+	loc: string | undefined,
+): Text {
+	const created = document.createTextNode('');
+	if (!hydrateKeepsText(attempt, host, created, '', text, loc)) created.nodeValue = text;
+	return created;
+}
+
+function hydrateResolveOpen(
+	attempt: HydrationAttempt,
+	anchor: Node | null | undefined,
+	domParent: Node,
+): Comment | null {
+	if (isBlockOpen(anchor ?? null)) return anchor as Comment;
+	let cursor = hydrationCursor.node;
+	if (cursor === null || cursor.parentNode !== domParent) cursor = getFirstChild(domParent);
+	return cursor !== null && isBlockOpen(cursor) ? (cursor as Comment) : null;
+}
+
+/**
+ * The open marker of the server range that an `@if`/`@switch` slot or a
+ * `@try`/ErrorBoundary boundary of `scope` adopts on its first render at
+ * `anchor`, as resolveOpen finds it, or null inside a range the client built
+ * (inFreshRange), whose slots build on the client. The server frames every
+ * such slot, so anywhere else a missing range means the server rendered
+ * something else there, such as another arm of an enclosing `@if`.
+ */
+function hydrateBranchOpen(
+	attempt: HydrationAttempt,
+	anchor: Node | null,
+	domParent: Node,
+	scope: Scope,
+	slotKey: number,
+): Comment | null {
+	const open = hydrateResolveOpen(attempt, anchor, domParent);
+	if (open !== null || hydrateInFreshRange(attempt, anchor, domParent)) return open;
+	hydrateSlotMismatch(
+		attempt,
+		scope,
+		slotKey,
+		'a branch range',
+		anchor !== null && anchor !== scope.block.endMarker ? anchor : hydrationCursor.node,
+	);
+}
+
+function hydrateMarkerState(attempt: HydrationAttempt, node: Node): -1 | 0 | 1 {
+	return ssrForMarkerState(node);
+}
+
+/**
+ * The server DOM at the cursor does not match the client render. Nothing is
+ * repaired here: the nearest fallback owner discards its server DOM and
+ * renders on the client (see HydrationMismatch), as React does.
+ */
+function hydrateMismatch(
+	attempt: HydrationAttempt,
+	loc: string | undefined,
+	expected: () => string,
+	actual: Node | null,
+): never {
+	const error = createHydrationMismatch();
+	if (process.env.NODE_ENV !== 'production') {
+		// A mismatch that a template's adoption defers is reported only when the
+		// render reaches it (claimDeferred).
+		const message = warnHydrationStructuralMismatch(
+			loc || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
+			expected(),
+			describeHydrationNode(actual),
+			!attempt.adopting,
 		);
+		if (attempt.adopting) error.warning = message;
+		// A root's attempt publishes its diagnostics when it commits, which this
+		// mismatch prevents if the root is what falls back (hydrateRoot).
+		if (inRootHydrationAttempt() && !attempt.staleServerValues) error.diagnostic = message;
 	}
+	throw error;
+}
 
-	/** An update compares while the cursor is active; its writer may run later. */
-	prepareText(node: Text | null, host: Node | null, text: string): string | undefined {
-		if (node === null && host !== null) node = domNode(host).firstChild as Text | null;
-		if (host === null && node !== null) host = domNode(node).parentNode;
-		if (host !== null && !this.staleServerValues && isHydrationSuppressed(host)) return undefined;
-		const pending = node === null ? undefined : this.pendingTexts?.get(node);
-		if (pending !== undefined) {
-			// Replay settlement is render evidence, not a DOM write. An inner
-			// failed adoption must restore the enclosing attempt's evidence.
-			if (TRANSITION_JOURNAL !== null)
-				TRANSITION_JOURNAL.push(JOURNAL_PROP, pending, 'prepared', pending.prepared);
-			pending.prepared = text;
-		}
-		return text;
-	}
-
-	/**
-	 * Whether the block rendering now, or an ancestor of it in this pass, has an
-	 * update queued, which renders it again before the pass ends
-	 * (drainHydrationRenderPhaseUpdates). An update from another component's
-	 * render waits for the commit instead.
-	 */
-	private rendersAgain(): boolean {
-		for (let block = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
-			if (block.pending && !block.crossRenderUpdate) return true;
-			if (block === this.rootBlock) return false;
-		}
+/**
+ * Before a child slot's first hydrating render of the server range
+ * `start`…`end`, which it adopted or was lent, check that `value` can adopt
+ * what the range holds. A host descriptor serializes as exactly one element
+ * of its tag. A list (`list`, from prepareDeoptList) frames or self-delimits
+ * each of its items, so it neither leaves the range empty nor opens it with
+ * text, unless it has no items, and then the range is empty. A portal does
+ * not open it with text either. Anything else is server content the client
+ * cannot adopt: what the server rendered for another value, or invalid
+ * nesting that the HTML parser repaired (`<p><div></div></p>` arrives as
+ * `<p></p><div></div><p></p>`, all inside the range). Items that render
+ * nothing differ from an empty range only in the frames the server would
+ * have given them: returns true for those, and the caller builds them in
+ * the range as a client mount would.
+ */
+function hydrateClaimRange(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	slotKey: number,
+	start: Node,
+	end: Node,
+	value: unknown,
+	list: {
+		items: readonly unknown[];
+	} | null,
+): boolean {
+	const type = list === null && isHostDescriptor(value) ? value.type : null;
+	// Other values, such as a component or text, check what they adopt as
+	// they render.
+	if (type === null && list === null && (value as any)?.$$kind !== PORTAL_TAG) return false;
+	const first = getNextSibling(start);
+	const limit = hydrationSourceLimit(end);
+	const matches =
+		type !== null &&
+		first !== null &&
+		first !== limit &&
+		first.nodeType === 1 &&
+		isHostElementOfType(first as Element, type);
+	if (
+		type !== null
+			? matches && getNextSibling(first!) === limit
+			: list !== null && first === limit
+				? list.items.length === 0
+				: first !== null && first.nodeType !== 3 && list?.items.length !== 0
+	)
 		return false;
+	if (
+		list !== null &&
+		first === limit &&
+		!list.items.some((item) => item != null && typeof item !== 'boolean' && item !== '')
+	) {
+		hydrationCursor.node = end;
+		return true;
 	}
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production'
+			? // A return slot or a list item has no site of its own: name the
+				// returning component, else the list's host.
+				siteLoc(scope, slotKey) ||
+					componentSourceLoc(scope.block.body) ||
+					(end.parentNode as any)?.__oct_loc
+			: undefined,
+		() =>
+			type !== null
+				? matches
+					? `the end of <${type}>`
+					: `<${type}>`
+				: list?.items.length === 0
+					? 'nothing'
+					: list !== null
+						? 'a renderable list range'
+						: 'a portal',
+		matches ? getNextSibling(first!) : first === limit ? null : first,
+	);
+}
 
-	/**
-	 * Runs before the first hydrating render of a text or empty value `str` in a
-	 * child slot that adopted the server's `<!--[-->…<!--]-->` range. The value
-	 * serializes as at most one text node there, which the slot adopts when it
-	 * leads the range. Anything else in the range is server content the client
-	 * cannot adopt, such as an element or component the server rendered for a
-	 * value the client renders as text or nothing: a mismatch, as claimRange
-	 * finds for a host descriptor.
-	 */
-	settleTextRange(scope: Scope, slotKey: number, state: ChildSlot, str: string): void {
-		const end = state.end!;
-		const first = getNextSibling(state.start!)!;
-		const kept = str !== '' && first.nodeType === 3;
-		const stale = kept ? getNextSibling(first)! : first;
-		if (stale === end) return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) : undefined,
-			() => {
-				const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
-				return kept ? `the end of ${client}` : client;
-			},
-			stale,
-		);
+/**
+ * A child slot's first hydrating render without a server range of its own,
+ * such as a return slot's when its component's range holds server text. A
+ * list, a fragment, a keyed or lone element, and a portal never serialize as
+ * bare text, so a lone text node before `end` in `parent` is what the server
+ * rendered for a primitive, which the value cannot adopt: a mismatch.
+ */
+function hydrateRejectServerText(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	slotKey: number,
+	parent: Node,
+	end: Node | null,
+	value: unknown,
+	list: boolean,
+): void {
+	const text = hydrationCursor.node;
+	if (
+		text === null ||
+		text.nodeType !== 3 ||
+		!(list || (value as any)?.$$kind === PORTAL_TAG || isHostDescriptor(value)) ||
+		text.parentNode !== parent ||
+		getNextSibling(text) !== end
+	)
+		return;
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production'
+			? siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body) || (parent as any).__oct_loc
+			: undefined,
+		() =>
+			list
+				? 'a renderable list range'
+				: (value as any).$$kind === PORTAL_TAG
+					? 'a portal'
+					: `<${(value as ElementDescriptor).type as string}>`,
+		text,
+	);
+}
+
+/**
+ * A list item's first hydrating render found server content at the cursor
+ * that cannot be that item: the server rendered fewer items, a bare item
+ * where this one needs a range of its own, or an item of another tag. The
+ * list ends at `end`.
+ */
+function hydrateItemMismatch(attempt: HydrationAttempt, end: Node, expected: string): never {
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
+		() => expected,
+		hydrationCursor.node,
+	);
+}
+
+/**
+ * A list of `scope` at `slotKey` found the server's other arm on its first
+ * hydrating render: items (`serverItems`) where the client renders its
+ * @empty arm, or none where the client has items. The server's content
+ * starts after `start`.
+ */
+function hydrateListArmMismatch(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	slotKey: number,
+	start: Node,
+	serverItems: boolean,
+): never {
+	hydrateSlotMismatch(
+		attempt,
+		scope,
+		slotKey,
+		serverItems ? 'an empty list (@empty)' : 'a populated list',
+		getNextSibling(start),
+	);
+}
+
+/**
+ * Whether a hydrating update of `slot`, whose list exists, builds that list
+ * on the client: an earlier hydrating update built it (recordUpdate).
+ * Otherwise the list adopts the server's items, and when it kept none, as
+ * after a fill that threw, its first fill starts over from the first of them.
+ */
+function hydrateBuildsList(attempt: HydrationAttempt, slot: ChildSlot): boolean {
+	if (attempt.updates?.has(slot) === true) return true;
+	const list = slot.forSlot!;
+	if (
+		list.size === 0 &&
+		!(attempt.passthroughRanges && slot.borrowed) &&
+		hydrateIsOpen(attempt, list.start)
+	)
+		hydrationCursor.node = getNextSibling(list.start);
+	return false;
+}
+
+/**
+ * After a list's first fill adopted the client's items, before the list's
+ * `end`: server content left between the cursor and `end` is items the
+ * client does not render.
+ */
+function hydrateSettleItems(attempt: HydrationAttempt, end: Node): void {
+	const from = hydrationCursor.node;
+	const limit = hydrationSourceLimit(end);
+	if (from === limit) return;
+	let node = from;
+	while (node !== null && node !== limit) node = getNextSibling(node);
+	if (node !== limit) return;
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
+		() => 'the end of the list',
+		from,
+	);
+}
+
+/**
+ * A slot of `parent` claimed the server range that `close` ends. Step the
+ * cursor past it to the next sibling's server content. A parent that the
+ * slot's render disposed, as a cleanup error an ancestor boundary caught
+ * does, owns no server content any more: the cursor stays where that
+ * boundary left it.
+ */
+function hydrateParkPast(attempt: HydrationAttempt, close: Node, parent: Scope): void {
+	if (parent.block.disposed) return;
+	hydrationCursor.node = getNextSibling(close);
+	hydrateParkInPlace(attempt, parent);
+}
+
+/**
+ * `slot` of `parent` adopted server nodes in place (renderInPlace), which
+ * left the cursor on the next sibling's server content: one root's
+ * sibling, or the node after a fragment's last root. Record it as parkPast
+ * does, and for settleClaim, which slot parked the cursor there.
+ */
+function hydrateParkInPlace(attempt: HydrationAttempt, parent: Scope): void {
+	const claim = hydrationClaim('range');
+	if (claim !== null && claim.owner === parent && claim.first !== null) {
+		claim.next = hydrationCursor.node;
+		claim.slots = parent.slots.length;
 	}
+}
 
-	parseSeeds(raw: string): unknown[] | null {
-		return parseSeedJson(raw);
-	}
-
-	seedOrCreate<T>(site: string, factory: () => T): T {
-		if (this.seeds === null) return factory();
-		const events = (this.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
-		if (events === undefined) return factory();
-		const queue = events.queues.get(site);
-		if (queue === undefined) return factory();
-		const offset = events.offsets.get(site) ?? 0;
-		events.offsets.set(site, offset + 1);
-		const index = queue[offset];
-		if (index === undefined || index < this.seedCursor) return factory();
-
-		const record: HydrationSeedFactory = { index, factory };
-		const thenable: HydrationSeedThenable = {
-			[HYDRATION_SEED_FACTORY]: record,
-			then(onFulfilled, onRejected) {
-				if (thenable.status === 'fulfilled') {
-					return Promise.resolve(thenable.value).then(onFulfilled, onRejected);
-				}
-				if (thenable.status === 'rejected') {
-					return Promise.reject(thenable.reason).then(onFulfilled, onRejected);
-				}
-				return Promise.resolve(materializeHydrationSeedFactory(record)).then(
-					onFulfilled,
-					onRejected,
-				);
-			},
-		};
-		return thenable as T;
-	}
-
-	useSeed<T>(
-		thenable: TrackedThenable<T>,
-		state: TrackedThenable<any>[],
-		index: number,
-		replaceOnResume: boolean,
-	): T {
-		const factory = getHydrationSeedFactory(thenable);
-		if (factory !== undefined && factory.index !== this.seedCursor) {
-			// useThenable allocated the record before seeding this call.
-			CURRENT_BLOCK!.rare!.thenableIdx = index;
-			const usable = materializeHydrationSeedFactory(factory);
-			if (
-				replaceOnResume &&
-				usable !== null &&
-				usable !== undefined &&
-				typeof (usable as PromiseLike<T>).then === 'function'
-			) {
-				return useThenable(usable as TrackedThenable<T>, true);
-			}
-			return use(usable as PromiseLike<T>) as T;
-		}
-
-		const seed = this.seeds![this.seedCursor++];
-		if (factory === undefined) observeHydrationSeedThenable(thenable);
-		else factory.factory = null;
-		const { status, value: previous, reason } = thenable;
-		const restore = () => {
-			thenable.status = status;
-			thenable.value = previous;
-			thenable.reason = reason;
-		};
-		(this.seeded ??= []).push(restore);
-		// A root attempt that is discarded, by a suspension or a fallback,
-		// restores it too.
+/**
+ * Whether the server's text `server` stays where the client renders `text`
+ * in `host`, at `node`, the server's Text node, or the empty one that
+ * stands for the server's empty text where it rendered none (newText). It
+ * does when the two are equal once the HTML parser's normalization is
+ * undone, and under the host's suppressHydrationWarning, as in React. False
+ * when the client's text is written instead: in a host the client built,
+ * which holds the client template, and in a `<textarea>`, whose text is its
+ * default value, which React sets to the client's. Any other difference
+ * does not match the client render, nor does any difference from stale
+ * server values (staleServerValues). Unless a render-phase update renders
+ * the text again before the pass ends: React renders a component that
+ * updates itself while it renders again before it compares the output, so
+ * the text that render settles on decides, equal or not (settleValues).
+ * Meanwhile the node holds the client's text, and a discarded attempt
+ * restores the server's. A method, so that bundles which never hydrate do
+ * not retain it.
+ */
+function hydrateKeepsText(
+	attempt: HydrationAttempt,
+	host: Node | null,
+	node: Node | null,
+	server: string | null,
+	text: string,
+	loc: string | undefined,
+): boolean {
+	const equal = server === text || isTextParserNormalizedMatch(server, text);
+	if (!equal) {
 		if (
-			ROOT_RENDER_TRANSACTION !== null &&
-			ROOT_RENDER_TRANSACTION.hydrating === true &&
-			!ROOT_RENDER_TRANSACTION.aborted &&
-			!ROOT_RENDER_ROLLBACK
+			host !== null &&
+			(attempt.freshNodes.has(host) ||
+				(host.nodeType === 1 && (host as Element).localName === 'textarea'))
 		)
-			journalUndo(restore);
-		const value = seed as T;
-		thenable.status = 'fulfilled';
-		thenable.value = value;
-		state[index] = thenable;
-		return value;
+			return false;
+		if (!attempt.staleServerValues && isHydrationSuppressed(host)) return true;
 	}
-
-	/** Mark a client-built hydration replacement (and its descendants) as fresh DOM. */
-	markFresh(node: Node): void {
-		this.freshNodes.add(node);
-		let child = getFirstChild(node);
-		while (child !== null) {
-			this.markFresh(child);
-			child = getNextSibling(child);
+	// Every block with an update queued is in the queue, so an empty one spares
+	// the common pass rendersAgain's walk.
+	if (QUEUE.length !== 0 && node !== null && node.nodeType === 3 && hydrateRendersAgain(attempt)) {
+		const pending = (attempt.pendingTexts ??= new Map());
+		const previous = pending.get(node as Text);
+		if (previous === undefined) {
+			pending.set(node as Text, { server, loc, prepared: text });
+		} else {
+			journalRootProperty(previous, 'prepared', previous.prepared);
+			previous.prepared = text;
 		}
+		return true;
 	}
+	if (equal) return true;
+	hydrateMismatch(
+		attempt,
+		loc || (host as any)?.__oct_loc,
+		() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
+		node,
+	);
+}
 
-	isFresh(node: Node): boolean {
-		return this.freshNodes.has(node);
+/** An update compares while the cursor is active; its writer may run later. */
+function hydratePrepareText(
+	attempt: HydrationAttempt,
+	node: Text | null,
+	host: Node | null,
+	text: string,
+): string | undefined {
+	if (node === null && host !== null) node = host.firstChild as Text | null;
+	if (host === null && node !== null) host = node.parentNode;
+	if (host !== null && !attempt.staleServerValues && isHydrationSuppressed(host)) return undefined;
+	if (
+		host !== null &&
+		node !== null &&
+		domBindingClaims.get(host as Element)?.get('#text') === node.nodeValue
+	)
+		return undefined;
+	const pending = node === null ? undefined : attempt.pendingTexts?.get(node);
+	if (pending !== undefined) {
+		// Replay settlement is render evidence, not a DOM write. An inner
+		// failed adoption must restore the enclosing attempt's evidence.
+		if (TRANSITION_JOURNAL !== null)
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, pending, 'prepared', pending.prepared);
+		pending.prepared = text;
 	}
+	return text;
+}
 
-	/**
-	 * Hydrating, the server rendered no node where `el`'s de-opt children render
-	 * `child`: as React does for a missing node, the nearest fallback owner
-	 * renders on the client. An element the client built holds client children
-	 * only, and the parser keeps a `<noscript>`'s server content as text, which
-	 * React never hydrates. A method, so that bundles which never hydrate do not
-	 * retain it.
-	 */
-	missingDeoptChild(el: Element, child: unknown): void {
-		if (!this.isActive() || this.isFresh(el) || el.localName === 'noscript') return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
-			() =>
-				isHostDescriptor(child)
-					? `<${String((child as ElementDescriptor).type)}>`
-					: `text ${JSON.stringify(String(child))}`,
-			null,
-		);
+/**
+ * Whether the block rendering now, or an ancestor of it in this pass, has an
+ * update queued, which renders it again before the pass ends
+ * (drainHydrationRenderPhaseUpdates). An update from another component's
+ * render waits for the commit instead.
+ */
+function hydrateRendersAgain(attempt: HydrationAttempt): boolean {
+	for (let block = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
+		if (block.pending && !block.crossRenderUpdate) return true;
+		if (block === attempt.rootBlock) return false;
 	}
+	return false;
+}
 
-	/**
-	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. React 19 keeps the
-	 * server's content (unpatched) and records nothing, so the next render that
-	 * passes an `__html` object rewrites it, even with the same string (setHTML).
-	 * Production therefore compares nothing, unless the server values are stale
-	 * (staleServerValues), where the raw strings suffice: a spelling difference
-	 * only renders that rare pass on the client. Development compares only to
-	 * warn, and parses the client's HTML in the element's context, so that
-	 * spellings the parser canonicalizes compare equal, as in React. So the
-	 * normalizers never reach a production bundle.
-	 */
-	adoptHTML(el: Element, next: string): void {
-		this.values?.html(this, el, next);
-	}
+/**
+ * Runs before the first hydrating render of a text or empty value `str` in a
+ * child slot that adopted the server's `<!--[-->…<!--]-->` range. The value
+ * serializes as at most one text node there, which the slot adopts when it
+ * leads the range. Anything else in the range is server content the client
+ * cannot adopt, such as an element or component the server rendered for a
+ * value the client renders as text or nothing: a mismatch, as claimRange
+ * finds for a host descriptor.
+ */
+function hydrateSettleTextRange(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	slotKey: number,
+	state: ChildSlot,
+	str: string,
+): void {
+	const end = hydrationSourceLimit(state.end!);
+	const first = getNextSibling(state.start!);
+	const kept = str !== '' && first !== end && first?.nodeType === 3;
+	const stale = kept ? getNextSibling(first!) : first;
+	if (stale === end) return;
+	hydrateRootMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) : undefined,
+		() => {
+			// A template-less component returned this value where the server
+			// supplied no component range; name the missing owning range.
+			if (scope === RETURNED_OUTPUT_SCOPE && hydrationClaim('place')?.unframed)
+				return 'a component range';
+			const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
+			return kept ? `the end of ${client}` : client;
+		},
+		stale,
+	);
+}
 
-	/**
-	 * Whether a slot at `anchor` in `parent` sits inside a client-built
-	 * replacement. Such a slot has no server range of its own, while the cursor
-	 * still points at the server siblings that follow the replacement, so the
-	 * slot must mount as client DOM. Callers ask only once no server range was
-	 * found, which keeps the lookup off the adoption path.
-	 */
-	inFreshRange(anchor: Node | null | undefined, parent: Node): boolean {
-		return (anchor != null && this.freshNodes.has(anchor)) || this.freshNodes.has(parent);
-	}
+function hydrateParseSeeds(attempt: HydrationAttempt, raw: string): unknown[] | null {
+	return parseSeedJson(raw);
+}
 
-	/**
-	 * `node` anchors the root rather than being its content, so finishRoot does
-	 * not count it as a server sibling left over after the root's content.
-	 */
-	protectRootAnchor(node: Node): void {
-		this.rootCleanupBoundary = node;
-	}
-
-	/** Bound an unframed third-party component root so its returned host can adopt it. */
-	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
-		const parent = (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode!;
-		const remainder = getNextSibling(cursor);
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(start, cursor);
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(end, remainder);
-		this.protectRootAnchor(end);
-		this.claimRootRemainder(remainder);
-		return [start, end];
-	}
-
-	/** Record the first node outside a root-owned range exactly once. */
-	claimRootRemainder(node: Node | null): void {
-		if (this.rootRemainder !== undefined) return;
-		this.rootRemainder = node;
-		this.pendingClaims = this.inPlace !== null;
-	}
-
-	private fragmentRemainder(
-		template: Node,
-		cursor: Node | null,
-		// A fragment within an enclosing server range ends by that range's close.
-		bounded: boolean,
-		loc: string | undefined,
-		partialStyles: string | undefined,
-	): Node | null | undefined {
-		let expected = getFirstChild(template);
-		let actual = cursor;
-		for (let index = 0; expected !== null; index++) {
-			if (actual === null || (bounded && isBlockClose(actual))) return undefined;
-			// A template comment is a dynamic logical hole. Its server form may be
-			// text or a marker range, so only static text/element roots compare shape.
-			if (expected.nodeType !== 8) {
-				if (!hydrationNodeMatches(actual, expected)) return undefined;
-				if (process.env.NODE_ENV !== 'production')
-					unpatchedStatics(this, actual, expected, loc, partialStyles, String(index));
-			} else if (bounded && getNextSibling(expected) === null) {
-				// In place of another component's markup, the server may have
-				// rendered nothing for a last root that is a hole, and the node there
-				// follows the fragment. Only the hole's value tells (holeOpen).
-				this.inPlaceHole = actual;
+function hydrateSeedOrCreate<T>(attempt: HydrationAttempt, site: string, factory: () => T): T {
+	if (attempt.seeds === null) return factory();
+	const events = (attempt.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
+	if (events === undefined) return factory();
+	const queue = events.queues.get(site);
+	if (queue === undefined) return factory();
+	const offset = events.offsets.get(site) ?? 0;
+	events.offsets.set(site, offset + 1);
+	const index = queue[offset];
+	if (index === undefined || index < attempt.seedCursor) return factory();
+	const record: HydrationSeedFactory = { index, factory };
+	const thenable: HydrationSeedThenable = {
+		[HYDRATION_SEED_FACTORY]: record,
+		then(onFulfilled, onRejected) {
+			if (thenable.status === 'fulfilled') {
+				return Promise.resolve(thenable.value).then(onFulfilled, onRejected);
 			}
-			actual = this.sibling(actual, 1);
-			expected = getNextSibling(expected);
-		}
-		return actual;
-	}
-
-	/**
-	 * If a top-level cursor sits inside a server marker frame, return the first
-	 * sibling after that OUTERMOST frame. A clone can execute in a lite/provider
-	 * descendant while its DOM is still a direct child of the root container;
-	 * `cursor.nextSibling` would then be only the descendant's close marker.
-	 */
-	private framedRootRemainder(cursor: Node): Node | null | undefined {
-		const rootParent = this.rootBlock.parentNode;
-		let outerOpen: Node | null = null;
-		let depth = 0;
-		for (
-			let node = getFirstChild(rootParent);
-			node !== null && node !== cursor;
-			node = getNextSibling(node)
-		) {
-			if (this.isOpen(node)) {
-				if (depth === 0) outerOpen = node;
-				depth++;
-			} else if (this.isClose(node) && depth > 0) {
-				depth--;
-				if (depth === 0) outerOpen = null;
+			if (thenable.status === 'rejected') {
+				return Promise.reject(thenable.reason).then(onFulfilled, onRejected);
 			}
-		}
-		return outerOpen === null ? undefined : getNextSibling(this.close(outerOpen));
-	}
+			return Promise.resolve(materializeHydrationSeedFactory(record)).then(onFulfilled, onRejected);
+		},
+	};
+	return thenable as T;
+}
 
-	clone<T extends Node>(template: T, loc?: string, partialStyles?: string): T {
-		return (
-			this.defers
-				? this.adoptOrDefer(template, null, loc, partialStyles)
-				: this.adopt(template, null, loc, partialStyles)
-		) as T;
-	}
-
-	/**
-	 * PROD adoption entry for lazy compiler templates: the root check runs off
-	 * the template SOURCE (lazyRootMatches), so the happy path never forces the
-	 * parse — `adopt` resolves the parsed template on demand only on its cold
-	 * paths (a mismatch, client-side builds mid-hydration, fragment root
-	 * claims).
-	 */
-	cloneLazy(lazy: LazyTemplateRecord, loc?: string): Node {
-		return this.defers ? this.adoptOrDefer(null, lazy, loc) : this.adopt(null, lazy, loc);
-	}
-
-	/**
-	 * Adopt a template, or defer the mismatch its adoption finds.
-	 *
-	 * React runs a component's whole body, every expression of the JSX it
-	 * returns included, before it hydrates any host that JSX renders, so a body
-	 * that suspends keeps the server HTML even where that host would not have
-	 * matched. A compiled body adopts its template's roots first and evaluates
-	 * its holes after. So when the adoption fails, the body continues on the
-	 * client: it gets a fresh copy of the template and renders, with the rest of
-	 * this attempt, into detached DOM, until React's order would reach a host
-	 * (claimDeferred). A suspension before then wins, and the attempt keeps the
-	 * server DOM as any suspended attempt does; its retry meets the mismatch
-	 * again. Only an owner that discards a suspended attempt and starts the next
-	 * one afresh enables this (`defers`).
-	 */
-	private adoptOrDefer(
-		template: Node | null,
-		lazy: LazyTemplateRecord | null,
-		loc?: string,
-		partialStyles?: string,
-	): Node {
-		this.adopting = true;
-		try {
-			return this.adopt(template, lazy, loc, partialStyles);
-		} catch (error) {
-			if (!(error instanceof HydrationMismatch)) throw error;
-			const scope = CURRENT_SCOPE;
-			if (scope === null) {
-				if (process.env.NODE_ENV !== 'production' && error.warning !== undefined)
-					logHydrationMismatch(error.warning);
-				throw error;
-			}
-			const parsed = template ?? resolveLazyTemplate(lazy!);
-			this.deferred = error;
-			this.deferredHost = startsWithHost(parsed);
-			// The rest of the attempt renders on the client, reading its seeds as
-			// this hydration would.
-			this.replayDepth = ++this.depth;
-			// The body's DOM context: what it inserts lands in detached DOM, which
-			// the discarded attempt drops, never in the server's. A root render's
-			// rollback restores it.
-			const block = scope.block;
-			const parent = domNode(block.parentNode);
-			journalRootProperty(block, 'parentNode', block.parentNode);
-			journalRootProperty(block, 'endMarker', block.endMarker);
-			block.parentNode =
-				parent.nodeType === 1
-					? parent.cloneNode(false)
-					: (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
-			if (block.block === block) {
-				journalRootProperty(block, 'startMarker', block.startMarker);
-				block.startMarker = null;
-			}
-			block.endMarker = null;
-			return domNode(parsed).cloneNode(true);
-		} finally {
-			this.adopting = false;
-		}
-	}
-
-	/**
-	 * The client render that continues after a deferred mismatch reaches
-	 * `template`'s clone. React would have hydrated the host that the previous
-	 * template started with by now, and found the mismatch there.
-	 */
-	claimBefore(template: Node): void {
-		if (this.deferredHost) this.claimDeferred();
-		this.deferredHost = startsWithHost(template);
-	}
-
-	/** A template's holes ran after a deferred mismatch (commitBag); see claimBefore. */
-	claimAfterHoles(): void {
-		if (this.deferredHost) this.claimDeferred();
-	}
-
-	/** The render reached the deferred mismatch, or the attempt ended without suspending. */
-	claimDeferred(): never {
-		throw this.takeDeferred();
-	}
-
-	/** The deferred mismatch, now reported. */
-	private takeDeferred(): HydrationMismatch {
-		const error = this.deferred!;
-		this.deferred = null;
-		if (process.env.NODE_ENV !== 'production' && error.warning !== undefined)
-			logHydrationMismatch(error.warning);
-		return error;
-	}
-
-	/**
-	 * What fails the attempt when `error` escapes it, or a catch arm in it. Only
-	 * a suspension comes before a deferred mismatch: an application error that
-	 * the client render throws after it fails the fallback owner as the mismatch,
-	 * and that owner's client render throws it again, as React's does. An error
-	 * thrown while this hydration adopted server DOM fails it too
-	 * (thrownWhileAdopting).
-	 */
-	failure(error: unknown): unknown {
-		if (isSuspenseException(error) || isAdoptionControl(error) || isHostContextRequest(error))
-			return error;
-		return this.deferred !== null
-			? this.takeDeferred()
-			: (this.thrownWhileAdopting(error) ?? error);
-	}
-
-	/**
-	 * As React's throwException does, an error thrown while this hydration
-	 * adopted server DOM (HYDRATION_THROWN), such as a compiled walk that finds
-	 * no server node where the template has one, fails the hydration of the
-	 * nearest fallback owner, which renders on the client instead, where a
-	 * repeated throw is an ordinary render error. A seeded rejection is the
-	 * server's own error, not a hydration failure. Returns the failure, or null.
-	 */
-	private thrownWhileAdopting(error: unknown): HydrationMismatch | null {
-		if (HYDRATION_THROWN !== error || HYDRATION_THROWN_BY !== this) return null;
-		clearHydrationThrow();
-		const failure = new HydrationMismatch(formatClientError(340));
-		(failure as Error & { cause?: unknown }).cause = error;
-		return failure;
-	}
-
-	/** `template` is null only in prod lazy mode (then `lazy` is set) — every cold path resolves it. */
-	private adopt(
-		template: Node | null,
-		lazy: LazyTemplateRecord | null,
-		loc?: string,
-		partialStyles?: string,
-	): Node {
-		let cursor = this.node;
-		// The arm's own template: its roots may follow the arm's last claim.
-		const isFragment =
-			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
-		const pendingClaims = this.pendingClaims;
-		// Lite/no-template wrappers can render the logical root while sharing the
-		// public root Block, and return-based wrappers render it in a child Block.
-		// Identify the first top-level cursor by DOM ownership, then claim its
-		// remainder ONCE so later lite descendant clones cannot overwrite it.
-		const claimsRoot =
-			pendingClaims &&
-			this.rootRemainder === undefined &&
-			(cursor !== null
-				? (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode === this.rootBlock.parentNode
-				: CURRENT_BLOCK === this.rootBlock);
-		const framedRemainder =
-			claimsRoot && cursor !== null ? this.framedRootRemainder(cursor) : undefined;
-		let unframedRemainder = claimsRoot && cursor !== null ? getNextSibling(cursor) : undefined;
-		// A closing marker bounds an empty server range; it cannot be the first
-		// child of a newly populated fragment. Build fresh descendants without
-		// consuming that boundary, so its owner can advance the outer cursor.
-		if (isFragment && isBlockClose(cursor)) {
-			this.rootMismatch(loc, () => 'a non-empty fragment', cursor);
-		}
-		// A synthetic fragment wrapper has no server counterpart. At a root, compare
-		// its logical static roots before returning the virtual adoption view; otherwise
-		// arbitrary server markup could be mistaken for every fragment child at once.
-		// (Root claims happen once per hydrateRoot, so parsing here is cold.)
-		if (isFragment && claimsRoot) {
-			if (template === null) template = resolveLazyTemplate(lazy!);
-			const remainder = this.fragmentRemainder(template, cursor, false, loc, partialStyles);
-			if (remainder === undefined) {
-				const fragment = template;
-				this.mismatch(
-					process.env.NODE_ENV !== 'production'
-						? componentSourceLoc(this.rootBlock.body)
-						: undefined,
-					() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
-					cursor,
-				);
-			}
-			this.claimRootRemainder(framedRemainder === undefined ? remainder : framedRemainder);
-		}
-		if (cursor === null) {
-			this.mismatch(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
-		}
+function hydrateUseSeed<T>(
+	attempt: HydrationAttempt,
+	thenable: TrackedThenable<T>,
+	state: TrackedThenable<any>[],
+	index: number,
+	replaceOnResume: boolean,
+): T {
+	const factory = getHydrationSeedFactory(thenable);
+	if (factory !== undefined && factory.index !== attempt.seedCursor) {
+		// useThenable allocated the record before seeding this call.
+		CURRENT_BLOCK!.rare!.thenableIdx = index;
+		const usable = materializeHydrationSeedFactory(factory);
 		if (
-			!isFragment &&
-			(template !== null
-				? !hydrationNodeMatches(cursor, template)
-				: !lazyRootMatches(cursor, lazy!))
+			replaceOnResume &&
+			usable !== null &&
+			usable !== undefined &&
+			typeof (usable as PromiseLike<T>).then === 'function'
 		) {
-			const match = this.skipForeign(cursor, template, lazy);
-			if (match === null)
-				this.rootMismatch(
-					loc,
-					() => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)),
-					cursor,
-				);
-			this.node = cursor = match;
-			if (unframedRemainder !== undefined) unframedRemainder = getNextSibling(match);
+			return useThenable(usable as TrackedThenable<T>, true);
 		}
-		// The compiled walk descends into the root's children: where it would find
-		// no element, the server rendered fewer nodes than the template has.
-		if (!isFragment && rootWalkMisses(cursor, template, lazy))
-			this.rootMismatch(
-				loc,
-				() => describeHydrationNode(firstElementChild(template ?? resolveLazyTemplate(lazy!))),
-				getFirstChild(cursor),
-			);
-		if (isFragment) {
-			// In place of a server node, nothing frames the fragment's server nodes:
-			// compare every root to find where they end.
-			if (pendingClaims && cursor === this.inPlace) {
-				const fragment = template ?? resolveLazyTemplate(lazy!);
-				const remainder = this.fragmentRemainder(fragment, cursor, true, loc, partialStyles);
-				if (remainder === undefined)
-					this.rootMismatch(
-						loc,
-						() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
-						cursor,
-					);
-				this.inPlace = null;
-				this.inPlaceEnd = remainder;
-				if (cursor === this.claim?.first) this.claimRoots(cursor, fragment);
-				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
-			}
-			// A nested fragment has no server wrapper, so its first logical root must
-			// be the cursor itself, or follow the server forms of its leading holes.
-			// A root claim already compared every root above.
-			if (
-				claimsRoot ||
-				(template !== null
-					? fragmentRootMatches(cursor, template, this, loc, partialStyles)
-					: lazyFragmentRootMatches(cursor, lazy!, this))
-			) {
-				// A fragment that is a range's content must also fit in that range.
-				// Roots that outnumber what the server rendered there, such as holes
-				// with no static element root after them, belong to other content:
-				// a mismatch, from which the nearest boundary, or the root, falls back.
-				if (
-					cursor !== this.claim?.first ||
-					this.claimRoots(cursor, template ?? lazy!) ||
-					claimsRoot
-				)
-					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
-			}
-			const fragment = template ?? resolveLazyTemplate(lazy!);
-			this.mismatch(
-				loc,
+		return use(usable as PromiseLike<T>) as T;
+	}
+	const seed = attempt.seeds![attempt.seedCursor++];
+	if (factory === undefined) observeHydrationSeedThenable(thenable);
+	else factory.factory = null;
+	const { status, value: previous, reason } = thenable;
+	const restore = () => {
+		thenable.status = status;
+		thenable.value = previous;
+		thenable.reason = reason;
+	};
+	(attempt.seeded ??= []).push(restore);
+	// A root attempt that is discarded, by a suspension or a fallback,
+	// restores it too.
+	if (
+		ROOT_RENDER_TRANSACTION !== null &&
+		ROOT_RENDER_TRANSACTION.hydrating === true &&
+		!ROOT_RENDER_TRANSACTION.aborted &&
+		!ROOT_RENDER_ROLLBACK
+	)
+		journalUndo(restore);
+	const value = seed as T;
+	thenable.status = 'fulfilled';
+	thenable.value = value;
+	state[index] = thenable;
+	return value;
+}
+
+/** Mark a client-built hydration replacement (and its descendants) as fresh DOM. */
+function hydrateMarkFresh(attempt: HydrationAttempt, node: Node): void {
+	attempt.freshNodes.add(node);
+	let child = getFirstChild(node);
+	while (child !== null) {
+		hydrateMarkFresh(attempt, child);
+		child = getNextSibling(child);
+	}
+}
+
+function hydrateIsFresh(attempt: HydrationAttempt, node: Node): boolean {
+	return attempt.freshNodes.has(node);
+}
+
+/**
+ * Hydrating, the server rendered no node where `el`'s de-opt children render
+ * `child`: as React does for a missing node, the nearest fallback owner
+ * renders on the client. An element the client built holds client children
+ * only, and the parser keeps a `<noscript>`'s server content as text, which
+ * React never hydrates. A method, so that bundles which never hydrate do not
+ * retain it.
+ */
+function hydrateMissingDeoptChild(attempt: HydrationAttempt, el: Element, child: unknown): void {
+	if (!hydrateIsActive(attempt) || hydrateIsFresh(attempt, el) || el.localName === 'noscript')
+		return;
+	hydrateMismatch(
+		attempt,
+		process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
+		() =>
+			isHostDescriptor(child)
+				? `<${String((child as ElementDescriptor).type)}>`
+				: `text ${JSON.stringify(String(child))}`,
+		null,
+	);
+}
+
+/**
+ * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. React 19 keeps the
+ * server's content (unpatched) and records nothing, so the next render that
+ * passes an `__html` object rewrites it, even with the same string (setHTML).
+ * Production therefore compares nothing, unless the server values are stale
+ * (staleServerValues), where the raw strings suffice: a spelling difference
+ * only renders that rare pass on the client. Development compares only to
+ * warn, and parses the client's HTML in the element's context, so that
+ * spellings the parser canonicalizes compare equal, as in React. So the
+ * normalizers never reach a production bundle.
+ */
+function hydrateAdoptHTML(attempt: HydrationAttempt, el: Element, next: string): void {
+	attempt.values?.html(attempt, el, next);
+}
+
+/**
+ * Whether a slot at `anchor` in `parent` sits inside a client-built
+ * replacement. Such a slot has no server range of its own, while the cursor
+ * still points at the server siblings that follow the replacement, so the
+ * slot must mount as client DOM. Callers ask only once no server range was
+ * found, which keeps the lookup off the adoption path.
+ */
+function hydrateInFreshRange(
+	attempt: HydrationAttempt,
+	anchor: Node | null | undefined,
+	parent: Node,
+): boolean {
+	return (anchor != null && attempt.freshNodes.has(anchor)) || attempt.freshNodes.has(parent);
+}
+
+/**
+ * `node` anchors the root rather than being its content, so finishRoot does
+ * not count it as a server sibling left over after the root's content.
+ */
+function hydrateProtectRootAnchor(attempt: HydrationAttempt, node: Node): void {
+	attempt.root.limit = node;
+}
+
+/** Bound an unframed third-party component root so its returned host can adopt it. */
+function hydrateWrapUnframedRoot(
+	attempt: HydrationAttempt,
+	cursor: Node,
+): readonly [Comment, Comment] {
+	const parent = cursor.parentNode!;
+	const remainder = getNextSibling(cursor);
+	const start = document.createComment('');
+	const end = document.createComment('');
+	parent.insertBefore(start, cursor);
+	parent.insertBefore(end, remainder);
+	hydrateProtectRootAnchor(attempt, end);
+	hydrateClaimRootRemainder(attempt, remainder);
+	return [start, end];
+}
+
+/** Record the first node outside a root-owned range exactly once. */
+function hydrateClaimRootRemainder(attempt: HydrationAttempt, node: Node | null): void {
+	if (attempt.root.next !== undefined) return;
+	attempt.root.next = node;
+}
+
+function hydrateFragmentRemainder(
+	attempt: HydrationAttempt,
+	template: Node,
+	cursor: Node | null,
+	// A fragment within an enclosing server range ends by that range's close.
+	bounded: boolean,
+	loc: string | undefined,
+	partialStyles: string | undefined,
+): Node | null | undefined {
+	let expected = getFirstChild(template);
+	let actual = cursor;
+	for (let index = 0; expected !== null; index++) {
+		if (actual === null || (bounded && isBlockClose(actual))) return undefined;
+		// A template comment is a dynamic logical hole. Its server form may be
+		// text or a marker range, so only static text/element roots compare shape.
+		if (expected.nodeType !== 8) {
+			if (!hydrationNodeMatches(actual, expected)) return undefined;
+			if (process.env.NODE_ENV !== 'production')
+				unpatchedStatics(attempt, actual, expected, loc, partialStyles, String(index));
+		} else if (bounded && getNextSibling(expected) === null) {
+			// In place of another component's markup, the server may have
+			// rendered nothing for a last root that is a hole, and the node there
+			// follows the fragment. Only the hole's value tells (holeOpen).
+			const claim = hydrationClaim('place');
+			if (claim !== null) claim.hole = actual;
+		}
+		actual = hydrateSibling(attempt, actual, 1);
+		expected = getNextSibling(expected);
+	}
+	return actual;
+}
+
+/**
+ * If a top-level cursor sits inside a server marker frame, return the first
+ * sibling after that OUTERMOST frame. A clone can execute in a lite/provider
+ * descendant while its DOM is still a direct child of the root container;
+ * `cursor.nextSibling` would then be only the descendant's close marker.
+ */
+function hydrateFramedRootRemainder(
+	attempt: HydrationAttempt,
+	cursor: Node,
+): Node | null | undefined {
+	const rootParent = attempt.rootBlock.parentNode;
+	let outerOpen: Node | null = null;
+	let depth = 0;
+	for (
+		let node = getFirstChild(rootParent);
+		node !== null && node !== cursor;
+		node = getNextSibling(node)
+	) {
+		if (hydrateIsOpen(attempt, node)) {
+			if (depth === 0) outerOpen = node;
+			depth++;
+		} else if (hydrateIsClose(attempt, node) && depth > 0) {
+			depth--;
+			if (depth === 0) outerOpen = null;
+		}
+	}
+	return outerOpen === null ? undefined : getNextSibling(hydrateClose(attempt, outerOpen));
+}
+
+function hydrateClone<T extends Node>(
+	attempt: HydrationAttempt,
+	template: T,
+	loc?: string,
+	partialStyles?: string,
+): T {
+	return (
+		attempt.defers
+			? hydrateAdoptOrDefer(attempt, template, null, loc, partialStyles)
+			: hydrateAdopt(attempt, template, null, loc, partialStyles)
+	) as T;
+}
+
+/**
+ * PROD adoption entry for lazy compiler templates: the root check runs off
+ * the template SOURCE (lazyRootMatches), so the happy path never forces the
+ * parse — `adopt` resolves the parsed template on demand only on its cold
+ * paths (a mismatch, client-side builds mid-hydration, fragment root
+ * claims).
+ */
+function hydrateCloneLazy(attempt: HydrationAttempt, lazy: LazyTemplateRecord, loc?: string): Node {
+	return attempt.defers
+		? hydrateAdoptOrDefer(attempt, null, lazy, loc)
+		: hydrateAdopt(attempt, null, lazy, loc);
+}
+
+/**
+ * Adopt a template, or defer the mismatch its adoption finds.
+ *
+ * React runs a component's whole body, every expression of the JSX it
+ * returns included, before it hydrates any host that JSX renders, so a body
+ * that suspends keeps the server HTML even where that host would not have
+ * matched. A compiled body adopts its template's roots first and evaluates
+ * its holes after. So when the adoption fails, the body continues on the
+ * client: it gets a fresh copy of the template and renders, with the rest of
+ * this attempt, into detached DOM, until React's order would reach a host
+ * (claimDeferred). A suspension before then wins, and the attempt keeps the
+ * server DOM as any suspended attempt does; its retry meets the mismatch
+ * again. Only an owner that discards a suspended attempt and starts the next
+ * one afresh enables this (`defers`).
+ */
+function hydrateAdoptOrDefer(
+	attempt: HydrationAttempt,
+	template: Node | null,
+	lazy: LazyTemplateRecord | null,
+	loc?: string,
+	partialStyles?: string,
+): Node {
+	attempt.adopting = true;
+	try {
+		return hydrateAdopt(attempt, template, lazy, loc, partialStyles);
+	} catch (error) {
+		if (!isHydrationMismatch(error)) throw error;
+		const scope = CURRENT_SCOPE;
+		if (scope === null) {
+			if (process.env.NODE_ENV !== 'production' && error.warning !== undefined)
+				logHydrationMismatch(error.warning);
+			throw error;
+		}
+		const parsed = template ?? resolveLazyTemplate(lazy!);
+		attempt.deferred = error;
+		attempt.deferredHost = startsWithHost(parsed);
+		// The rest of the attempt renders on the client, reading its seeds as
+		// this hydration would.
+		attempt.replayDepth = ++attempt.depth;
+		// New content belongs to a private parent until this attempt commits.
+		// If it is discarded, restore only the block's logical parent and fence.
+		const block = scope.block;
+		const parent = block.parentNode;
+		journalRootProperty(block, 'parentNode', block.parentNode);
+		journalRootProperty(block, 'endMarker', block.endMarker);
+		block.parentNode =
+			parent.nodeType === 1 ? parent.cloneNode(false) : document.createDocumentFragment();
+		if (block.block === block) {
+			journalRootProperty(block, 'startMarker', block.startMarker);
+			block.startMarker = null;
+		}
+		block.endMarker = null;
+		return parsed.cloneNode(true);
+	} finally {
+		attempt.adopting = false;
+	}
+}
+
+/**
+ * The client render that continues after a deferred mismatch reaches
+ * `template`'s clone. React would have hydrated the host that the previous
+ * template started with by now, and found the mismatch there.
+ */
+function hydrateClaimBefore(attempt: HydrationAttempt, template: Node): void {
+	if (attempt.deferredHost) hydrateClaimDeferred(attempt);
+	attempt.deferredHost = startsWithHost(template);
+}
+
+/** A template's holes ran after a deferred mismatch (commitBag); see claimBefore. */
+function hydrateClaimAfterHoles(attempt: HydrationAttempt): void {
+	if (attempt.deferredHost) hydrateClaimDeferred(attempt);
+}
+
+/** The render reached the deferred mismatch, or the attempt ended without suspending. */
+function hydrateClaimDeferred(attempt: HydrationAttempt): never {
+	throw hydrateTakeDeferred(attempt);
+}
+
+/** The deferred mismatch, now reported. */
+function hydrateTakeDeferred(attempt: HydrationAttempt): HydrationMismatch {
+	const error = attempt.deferred!;
+	attempt.deferred = null;
+	if (process.env.NODE_ENV !== 'production' && error.warning !== undefined)
+		logHydrationMismatch(error.warning);
+	return error;
+}
+
+/**
+ * What fails the attempt when `error` escapes it, or a catch arm in it. Only
+ * a suspension comes before a deferred mismatch: an application error that
+ * the client render throws after it fails the fallback owner as the mismatch,
+ * and that owner's client render throws it again, as React's does. An error
+ * thrown while this hydration adopted server DOM fails it too
+ * (thrownWhileAdopting).
+ */
+function hydrateFailure(attempt: HydrationAttempt, error: unknown): unknown {
+	if (isSuspenseException(error) || isAdoptionControl(error) || isHostContextRequest(error))
+		return error;
+	return attempt.deferred !== null
+		? hydrateTakeDeferred(attempt)
+		: (hydrateThrownWhileAdopting(attempt, error) ?? error);
+}
+
+/**
+ * As React's throwException does, an error thrown while this hydration
+ * adopted server DOM (HYDRATION_THROWN), such as a compiled walk that finds
+ * no server node where the template has one, fails the hydration of the
+ * nearest fallback owner, which renders on the client instead, where a
+ * repeated throw is an ordinary render error. A seeded rejection is the
+ * server's own error, not a hydration failure. Returns the failure, or null.
+ */
+function hydrateThrownWhileAdopting(
+	attempt: HydrationAttempt,
+	error: unknown,
+): HydrationMismatch | null {
+	if (HYDRATION_THROWN !== error || HYDRATION_THROWN_BY !== attempt) return null;
+	clearHydrationThrow();
+	const failure = createHydrationMismatch(formatClientError(340));
+	(
+		failure as Error & {
+			cause?: unknown;
+		}
+	).cause = error;
+	return failure;
+}
+
+/** `template` is null only in prod lazy mode (then `lazy` is set) — every cold path resolves it. */
+function hydrateAdopt(
+	attempt: HydrationAttempt,
+	template: Node | null,
+	lazy: LazyTemplateRecord | null,
+	loc?: string,
+	partialStyles?: string,
+): Node {
+	let cursor = hydrationCursor.node;
+	// The arm's own template: its roots may follow the arm's last claim.
+	const isFragment =
+		template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
+	const place = hydrationClaim('place');
+	const range = hydrationClaim('range');
+	// Lite/no-template wrappers can render the logical root while sharing the
+	// public root Block, and return-based wrappers render it in a child Block.
+	// Identify the first top-level cursor by DOM ownership, then claim its
+	// remainder ONCE so later lite descendant clones cannot overwrite it.
+	const claimsRoot =
+		attempt.root.next === undefined &&
+		(cursor !== null
+			? cursor.parentNode === attempt.rootBlock.parentNode
+			: CURRENT_BLOCK === attempt.rootBlock);
+	const framedRemainder =
+		claimsRoot && cursor !== null ? hydrateFramedRootRemainder(attempt, cursor) : undefined;
+	let unframedRemainder = claimsRoot && cursor !== null ? getNextSibling(cursor) : undefined;
+	// A closing marker bounds an empty server range; it cannot be the first
+	// child of a newly populated fragment. Build fresh descendants without
+	// consuming that boundary, so its owner can advance the outer cursor.
+	if (isFragment && isBlockClose(cursor)) {
+		hydrateRootMismatch(attempt, loc, () => 'a non-empty fragment', cursor);
+	}
+	// A synthetic fragment wrapper has no server counterpart. At a root, compare
+	// its logical static roots before returning the virtual adoption view; otherwise
+	// arbitrary server markup could be mistaken for every fragment child at once.
+	// (Root claims happen once per hydrateRoot, so parsing here is cold.)
+	if (isFragment && claimsRoot) {
+		if (template === null) template = resolveLazyTemplate(lazy!);
+		const remainder = hydrateFragmentRemainder(
+			attempt,
+			template,
+			cursor,
+			false,
+			loc,
+			partialStyles,
+		);
+		if (remainder === undefined) {
+			const fragment = template;
+			hydrateMismatch(
+				attempt,
+				process.env.NODE_ENV !== 'production'
+					? componentSourceLoc(attempt.rootBlock.body)
+					: undefined,
 				() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
 				cursor,
 			);
 		}
-		if (process.env.NODE_ENV !== 'production' && template !== null)
-			unpatchedStatics(this, cursor, template, loc, partialStyles, '');
-		if (claimsRoot)
-			this.claimRootRemainder(
-				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
-			);
-		if (pendingClaims && cursor === this.inPlace) {
-			this.inPlace = null;
-			this.inPlaceEnd = getNextSibling(cursor);
-		}
-		if (cursor === this.claim?.first) this.claimRoots(cursor, null);
-		return cursor;
+		hydrateClaimRootRemainder(attempt, framedRemainder === undefined ? remainder : framedRemainder);
 	}
-
-	/**
-	 * Among the root container's children and those of `<html>`, `<head>` and
-	 * `<body>`, React skips server elements that do not match, which third-party
-	 * scripts and extensions insert there, and leaves them in place. It skips
-	 * every comment too but its own boundary markers, and range markers are
-	 * Octane's. A text node ends the search, as it ends React's. Returns the
-	 * first sibling element from `cursor` on that the template matches, or null.
-	 */
-	private skipForeign(
-		cursor: Node,
-		template: Node | null,
-		lazy: LazyTemplateRecord | null,
-	): Node | null {
-		const parent = domNode(cursor).parentNode;
-		if (
-			parent === null ||
-			!(
-				(parent === this.rootBlock.parentNode && this.rootBlock.kind === 'root') ||
-				isDocumentSingleton(parent)
-			)
-		)
-			return null;
-		for (let node: Node | null = cursor; node; node = getNextSibling(node)) {
-			if (node.nodeType === 1) {
-				if (template !== null ? hydrationNodeMatches(node, template) : lazyRootMatches(node, lazy!))
-					return node;
-			} else if (node.nodeType !== 8 || isBlockOpen(node) || isBlockClose(node)) return null;
-		}
-		return null;
-	}
-
-	/**
-	 * A template adopted `root`, the first node of the range whose claim is
-	 * open. When the template is that range's content, record the first node
-	 * after its roots: after `root`, or after the `fragment` template's roots,
-	 * stepped as the compiled walk steps them. The template is the content when
-	 * it renders in the range's owner: the block whose markers the range's are,
-	 * a component inheriting them, or the lite component that adopted the
-	 * range. A component that adopts `root` without a range of its own renders
-	 * in its own scope, and the slots after it claim the nodes after its root.
-	 * Returns false when the range ends before the template's roots do: every
-	 * root, a hole included, renders at least one server node, so the server
-	 * rendered other content there. Below a passthrough root, the range may
-	 * instead be one level inside the template's (passthroughRoot).
-	 */
-	private claimRoots(root: Node, fragment: Node | LazyTemplateRecord | null): boolean {
-		const open = domNode(root).previousSibling;
-		const scope = CURRENT_SCOPE;
-		if (
-			scope === null ||
-			open === null ||
-			(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)
-		)
-			return true;
-		const claim = this.claim!;
-		claim.first = null;
-		let node: Node | null = root;
-		// Step over each root's own range. A close marker first is the end of the
-		// claimed range, and nothing follows it.
-		for (let i = fragment === null ? 1 : templateRootCount(fragment); i > 1; i--) {
-			node = this.sibling(node, 1);
-			if (node === null || isBlockClose(node)) {
-				claim.next = node;
-				return this.passthroughRoot;
-			}
-		}
-		claim.next = getNextSibling(this.isOpen(node) ? this.close(node) : node);
-		return true;
-	}
-
-	/**
-	 * Commit a template's root to its block's parent. clone() returns an
-	 * adopted server root already in place, and moving it before the block's
-	 * end would reorder it after any trailing server sibling. Any other root
-	 * goes at its block's end.
-	 */
-	insertRoot(root: Node, block: Block): void {
-		const parent = block.parentNode;
-		if ((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode === parent) return;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, block.endMarker);
-	}
-
-	/**
-	 * Whether `el`, whose only child is a text value, keeps the server content
-	 * it holds: React compares such a host's text content as a whole, and under
-	 * its suppressHydrationWarning not at all, so whatever the server rendered
-	 * there stays, unreported, until the client next changes the text
-	 * (clearKeptTextContent). A lone server Text node, or none, or a text-only
-	 * frame, is the server's text itself, which the hole adopts (htext,
-	 * hempty). A textarea's text is its default value, which its value props
-	 * own. A method, so that bundles which never hydrate do not retain it.
-	 */
-	keepsServerContent(el: Node): boolean {
-		if (
-			!isHydrationSuppressed(el) ||
-			this.staleServerValues ||
-			this.freshNodes.has(el) ||
-			(el as Element).localName === 'textarea'
-		)
-			return false;
-		const first = getFirstChild(el);
-		if (
-			first === null ||
-			(first.nodeType === 3 && getNextSibling(first) === null) ||
-			this.textFrameEnd(first) !== null
-		)
-			return false;
-		(KEPT_TEXT_CONTENT ??= new WeakSet()).add(el);
-		return true;
-	}
-
-	/**
-	 * The close of the frame `first` opens, when it is an exact text-only or
-	 * empty `<!--[-->…<!--]-->` frame around all of its host's content: a sole
-	 * primitive the server framed (e.g. a spread or ternary child), which is
-	 * the host's text as a bare one is.
-	 */
-	private textFrameEnd(first: Node | null): Comment | null {
-		let outer: Comment | null = null;
-		let stop: Node | null = null;
-		// A component and its returned value each own a regular range. Follow
-		// nested frames only when every frame contains that same single child.
-		while (this.isOpen(first)) {
-			const end = this.close(first!);
-			if (getNextSibling(end) !== stop) return null;
-			outer ??= end;
-			stop = end;
-			first = getNextSibling(first!);
-		}
-		return first === stop || (first?.nodeType === 3 && getNextSibling(first) === stop)
-			? outer
-			: null;
-	}
-
-	/**
-	 * Whether the server framed `el`'s only child in a `<!--[-->…<!--]-->` range
-	 * holding something other than one text node or nothing. htext unwraps a
-	 * text-only frame; any other framed content belongs to a child slot.
-	 */
-	framesSlotContent(el: Node): boolean {
-		const first = getFirstChild(el);
-		return this.isOpen(first) && this.textFrameEnd(first) === null;
-	}
-
-	/**
-	 * Adopt the text of an only-child text hole of `el`: the server's one Text
-	 * node, which compares as keepsText decides, or a new one when the server
-	 * rendered `el` empty. What an early host binding published there is the
-	 * server's text now.
-	 */
-	htext(el: Node, text: string, loc?: string): Text {
-		const first = getFirstChild(el);
-		if (first !== null && first.nodeType === 3) {
-			const next = getNextSibling(first);
-			if (next !== null) this.unclaimedText(el, next, null, loc);
-			const server = (STAGED_DOM ? STAGED_DOM.view(first as Text) : (first as Text)).nodeValue;
-			// An equal text stays, and still compares again when a render-phase
-			// update renders it again (keepsText).
-			if (
-				(server === text || domBindingClaims.get(el as Element)?.get('#text') !== server) &&
-				!this.keepsText(el, first, server, text, loc)
-			)
-				(STAGED_DOM ? STAGED_DOM.view(first as Text) : (first as Text)).nodeValue = text;
-			return first as Text;
-		}
-		if (this.unframe(first)) return this.htext(el, text, loc);
-		if (first !== null) this.unclaimedText(el, first, text, loc);
-		const created = this.newText(el, text, loc);
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(created);
-		return created;
-	}
-
-	/**
-	 * Unwrap the text frame `first` opens (textFrameEnd), if any, so that the
-	 * text hole adopts, compares and suppresses as for bare text, without
-	 * child-slot state (htext, hempty). Whether it did.
-	 */
-	private unframe(first: Node | null): boolean {
-		const end = this.textFrameEnd(first);
-		if (end === null) return false;
-		(STAGED_DOM ? STAGED_DOM.view(first as Comment) : (first as Comment)).remove();
-		(STAGED_DOM ? STAGED_DOM.view(end) : end).remove();
-		return true;
-	}
-
-	/**
-	 * `from`, in `el`, an only-child text host, starts server content that is
-	 * not the one Text node the hole adopts: nothing the client renders, and a
-	 * structural difference that suppressHydrationWarning does not keep. The
-	 * client expected `text` there (nothing when it is '', or, when null, the
-	 * end of the Text node it adopted).
-	 */
-	private unclaimedText(el: Node, from: ChildNode, text: string | null, loc?: string): never {
-		this.mismatch(
-			loc || (el as any).__oct_loc,
-			() =>
-				text === null
-					? 'the end of the text element'
-					: text === ''
-						? 'nothing'
-						: `text ${JSON.stringify(text)}`,
-			// Name a server range by the content it frames.
-			(this.isOpen(from) ? getNextSibling(from) : null) ?? from,
+	if (cursor === null) {
+		hydrateRootMismatch(
+			attempt,
+			loc,
+			() => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)),
+			null,
 		);
 	}
-
-	/**
-	 * childTextHole's first hydrating render of `value`, an element, a
-	 * component, or a list. The server frames such a value in a
-	 * `<!--[-->…<!--]-->` range, which the hole's child slot adopts from the
-	 * cursor. Anything else in the host is what the server rendered for a
-	 * primitive value: its text, which none of these values can adopt, or
-	 * nothing for an empty one, where the value must render nothing too. Either
-	 * way a difference is a mismatch, as React finds where its render reaches
-	 * the host, and a component renders before it does (renderBeforeMismatch).
-	 * A textarea's text is its default value, which its value props own, and
-	 * the value builds after it. `render` is the hole's childSlot call into the
-	 * parent it is given, passed in so that hydration alone never retains the
-	 * child-slot graph.
-	 */
-	hydrateOnlyChild(
-		scope: Scope,
-		slotKey: number,
-		el: Node,
-		value: unknown,
-		render: (parent: Node) => void,
-	): void {
-		let stale = getFirstChild(el);
-		if (this.isOpen(stale)) {
-			this.node = stale;
-			render(el);
-			return;
-		}
-		const textarea = (el as Element).localName === 'textarea';
-		const loc =
-			process.env.NODE_ENV !== 'production'
-				? siteLoc(scope, slotKey) || (el as any).__oct_loc
-				: undefined;
-		if (stale !== null && !textarea) {
-			if (isElementDescriptor(value) && !isHostDescriptor(value))
-				this.renderBeforeMismatch(el, render);
-			this.mismatch(loc, () => 'a renderable range', stale);
-		}
-		if (stale !== null) stale = getNextSibling(stale);
-		this.save(el);
-		while (stale !== null) {
-			const next = getNextSibling(stale);
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeChild(stale);
-			stale = next;
-		}
-		this.suspend(() => render(el));
-		if (textarea) return;
-		// An element or text the value built is a node the server did not render.
-		for (let node = getFirstChild(el); node !== null; node = getNextSibling(node))
-			if (
-				node.nodeType === 1 ||
-				(node.nodeType === 3 && (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue)
-			)
-				this.mismatch(loc, () => 'a renderable range', null);
+	if (
+		!isFragment &&
+		(template !== null ? !hydrationNodeMatches(cursor, template) : !lazyRootMatches(cursor, lazy!))
+	) {
+		const match = hydrateSkipForeign(attempt, cursor, template, lazy);
+		if (match === null)
+			hydrateRootMismatch(
+				attempt,
+				loc,
+				() => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)),
+				cursor,
+			);
+		hydrationCursor.node = cursor = match;
+		if (unframedRemainder !== undefined) unframedRemainder = getNextSibling(match);
 	}
-
-	/**
-	 * Before hydrateOnlyChild's mismatch at `el`, render its component value on
-	 * the client into a detached copy of `el`: React renders a component before
-	 * it reaches the host the component renders, so a suspension in it comes
-	 * first and keeps the server HTML. Only an owner that discards a suspended
-	 * attempt (`defers`) lets it. Any other error gives way to the mismatch, and
-	 * the fallback's client render throws it again (see failure).
-	 */
-	private renderBeforeMismatch(el: Node, render: (parent: Node) => void): void {
-		if (!this.defers) return;
-		try {
-			this.suspend(() => render(domNode(el).cloneNode(false)));
-		} catch (error) {
-			if (isSuspenseException(error) || isAdoptionControl(error) || isHostContextRequest(error))
-				throw error;
-		}
-	}
-
-	/**
-	 * htext's counterpart for an only-child hole whose first hydrating value
-	 * renders nothing: `''` (`text`), or `null`, `undefined` or a boolean. The
-	 * server serializes that as no children, or as an empty `<!--[--><!--]-->`
-	 * frame. A lone server Text node, bare or in a text-only frame, which both
-	 * unwrap as in htext, is the server's text, and the hole adopts it. For
-	 * `''` it compares as keepsText decides, as React compares the text content
-	 * of a host whose child is a string. For any other value React hydrates no
-	 * child there, so the text compares without the host's
-	 * suppressHydrationWarning, which keeps no unhydrated child. Anything else
-	 * is server content the client renders no node for. A textarea's text is
-	 * its default value, which its value props own. Returns the Text node the
-	 * hole adopted, if any.
-	 */
-	hempty(el: Node, text: boolean, loc?: string): Text | null {
-		const first = getFirstChild(el);
-		if (first === null || (el as Element).localName === 'textarea' || this.freshNodes.has(el))
-			return null;
-		if (this.unframe(first)) return this.hempty(el, text, loc);
-		if (first.nodeType === 3 && getNextSibling(first) === null) {
-			// With no host, keepsText applies no suppressHydrationWarning, and the
-			// hole already ruled out a host it would write the client's text into.
-			if (
-				!this.keepsText(
-					text ? el : null,
-					first,
-					(STAGED_DOM ? STAGED_DOM.view(first) : first).nodeValue,
-					'',
+	// The compiled walk descends into the root's children: where it would find
+	// no element, the server rendered fewer nodes than the template has.
+	if (!isFragment && rootWalkMisses(cursor, template, lazy))
+		hydrateRootMismatch(
+			attempt,
+			loc,
+			() => describeHydrationNode(firstElementChild(template ?? resolveLazyTemplate(lazy!))),
+			getFirstChild(cursor),
+		);
+	if (isFragment) {
+		// In place of a server node, nothing frames the fragment's server nodes:
+		// compare every root to find where they end.
+		if (cursor === place?.first) {
+			const fragment = template ?? resolveLazyTemplate(lazy!);
+			const remainder = hydrateFragmentRemainder(
+				attempt,
+				fragment,
+				cursor,
+				true,
+				loc,
+				partialStyles,
+			);
+			if (remainder === undefined)
+				hydrateRootMismatch(
+					attempt,
 					loc,
-				)
+					() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+					cursor,
+				);
+			place.first = null;
+			place.next = remainder;
+			if (cursor === range?.first) hydrateClaimRoots(attempt, cursor, fragment);
+			return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+		}
+		// A nested fragment has no server wrapper, so its first logical root must
+		// be the cursor itself, or follow the server forms of its leading holes.
+		// A root claim already compared every root above.
+		if (
+			claimsRoot ||
+			(template !== null
+				? fragmentRootMatches(cursor, template, attempt, loc, partialStyles)
+				: lazyFragmentRootMatches(cursor, lazy!, attempt))
+		) {
+			// A fragment that is a range's content must also fit in that range.
+			// Roots that outnumber what the server rendered there, such as holes
+			// with no static element root after them, belong to other content:
+			// a mismatch, from which the nearest boundary, or the root, falls back.
+			if (
+				cursor !== range?.first ||
+				hydrateClaimRoots(attempt, cursor, template ?? lazy!) ||
+				claimsRoot
 			)
-				(STAGED_DOM ? STAGED_DOM.view(first) : first).nodeValue = '';
-			return first as Text;
+				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 		}
-		this.unclaimedText(el, first, '', loc);
+		const fragment = template ?? resolveLazyTemplate(lazy!);
+		hydrateMismatch(
+			attempt,
+			loc,
+			() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+			cursor,
+		);
 	}
-
-	htextSwap(posNode: Node | null, text: string): Text {
-		// The server's stand-in for an empty sibling hole (ssrTextSlot). Swap it for
-		// the hole's Text node, then compare against the server's '' like any text.
-		// Every compiled walk has already resolved its positions (htextSwap mounts
-		// run after them), so replacing the comment moves no later claim.
-		if (isEmptyTextSlot(posNode)) {
-			const empty = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode('');
-			domNode((STAGED_DOM ? STAGED_DOM.view(posNode) : posNode).parentNode!)!.replaceChild(
-				empty,
-				posNode,
-			);
-			posNode = empty;
-		}
-		const host = (STAGED_DOM ? STAGED_DOM.view(posNode) : posNode)?.parentNode ?? null;
-		// An element where the server's text belongs is a structural difference,
-		// which suppressHydrationWarning never keeps.
-		if (posNode !== null && posNode.nodeType === 1 && (host === null || !this.freshNodes.has(host)))
-			this.mismatch(
-				(host as any)?.__oct_loc,
-				() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
-				posNode,
-			);
-		if (posNode !== null && posNode.nodeType === 3) {
-			const server = (STAGED_DOM ? STAGED_DOM.view(posNode as Text) : (posNode as Text)).nodeValue;
-			// A client-built template's `<!>` reads as the server's empty slot,
-			// swapped for '' above, and takes the client's text.
-			if (!this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
-				(STAGED_DOM ? STAGED_DOM.view(posNode as Text) : (posNode as Text)).nodeValue = text;
-			return posNode as Text;
-		}
-		// No server text node stands here: the server rendered the hole empty. A
-		// host that keeps that installs an empty tracking node, which later
-		// commits update normally.
-		const created = this.newText(host, text, (host as any)?.__oct_loc);
-		if (posNode !== null && (STAGED_DOM ? STAGED_DOM.view(posNode) : posNode).parentNode !== null) {
-			domNode((STAGED_DOM ? STAGED_DOM.view(posNode) : posNode).parentNode!).insertBefore(
-				created,
-				posNode,
-			);
-		}
-		return created;
+	if (process.env.NODE_ENV !== 'production' && template !== null)
+		unpatchedStatics(attempt, cursor, template, loc, partialStyles, '');
+	if (claimsRoot)
+		hydrateClaimRootRemainder(
+			attempt,
+			framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
+		);
+	if (cursor === place?.first) {
+		place.first = null;
+		place.next = getNextSibling(cursor);
 	}
+	if (cursor === range?.first) hydrateClaimRoots(attempt, cursor, null);
+	return cursor;
+}
 
-	sibling(node: Node, count: number): Node | null {
-		let cursor: Node | null = node;
-		for (let i = 0; i < count; i++) {
-			if (cursor === null) return null;
-			if (isBlockOpen(cursor)) cursor = this.close(cursor);
-			if (isTextSeparator(cursor)) {
-				cursor = getNextSibling(cursor!);
-				continue;
-			}
-			cursor = getNextSibling(cursor!);
-			if (isTextSeparator(cursor)) {
-				const after: Node | null = getNextSibling(cursor!);
-				if (
-					after !== null &&
-					(after.nodeType === 3 || isTextSeparator(after) || isEmptyTextSlot(after))
-				)
-					cursor = after;
-			}
-		}
-		return cursor;
+/**
+ * Among the root container's children and those of `<html>`, `<head>` and
+ * `<body>`, React skips server elements that do not match, which third-party
+ * scripts and extensions insert there, and leaves them in place. It skips
+ * every comment too but its own boundary markers, and range markers are
+ * Octane's. A text node ends the search, as it ends React's. Returns the
+ * first sibling element from `cursor` on that the template matches, or null.
+ */
+function hydrateSkipForeign(
+	attempt: HydrationAttempt,
+	cursor: Node,
+	template: Node | null,
+	lazy: LazyTemplateRecord | null,
+): Node | null {
+	const parent = cursor.parentNode;
+	if (
+		parent === null ||
+		!(
+			(parent === attempt.rootBlock.parentNode && attempt.rootBlock.kind === 'root') ||
+			isDocumentSingleton(parent)
+		)
+	)
+		return null;
+	for (let node: Node | null = cursor; node; node = getNextSibling(node)) {
+		if (node.nodeType === 1) {
+			if (template !== null ? hydrationNodeMatches(node, template) : lazyRootMatches(node, lazy!))
+				return node;
+		} else if (node.nodeType !== 8 || isBlockOpen(node) || isBlockClose(node)) return null;
 	}
+	return null;
+}
 
-	/**
-	 * Whether a hydrating writer sets `el`'s attribute `name` to `next`. Only in
-	 * an element the client built. An adopted element keeps the server's value,
-	 * as in React (unpatched): development compares it, and production compares
-	 * nothing unless the server values are stale (staleServerValues). Values the
-	 * HTML parser normalized compare equal, and so does what an early host
-	 * binding published there.
-	 */
-	allowAttribute(el: Element, name: string, next: string | null): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return true;
-		this.values?.attribute(this, el, name, next);
+/**
+ * A template adopted `root`, the first node of the range whose claim is
+ * open. When the template is that range's content, record the first node
+ * after its roots: after `root`, or after the `fragment` template's roots,
+ * stepped as the compiled walk steps them. The template is the content when
+ * it renders in the range's owner: the block whose markers the range's are,
+ * a component inheriting them, or the lite component that adopted the
+ * range. A component that adopts `root` without a range of its own renders
+ * in its own scope, and the slots after it claim the nodes after its root.
+ * Returns false when the range ends before the template's roots do: every
+ * root, a hole included, renders at least one server node, so the server
+ * rendered other content there. Below a passthrough root, the range may
+ * instead be one level inside the template's (passthroughRoot).
+ */
+function hydrateClaimRoots(
+	attempt: HydrationAttempt,
+	root: Node,
+	fragment: Node | LazyTemplateRecord | null,
+): boolean {
+	const open = root.previousSibling;
+	const scope = CURRENT_SCOPE;
+	if (
+		scope === null ||
+		open === null ||
+		(scope.block.startMarker !== open && attempt.liteRanges.get(scope)?.start !== open)
+	)
+		return true;
+	const claim = hydrationClaim('range')!;
+	claim.first = null;
+	let node: Node | null = root;
+	// Step over each root's own range. A close marker first is the end of the
+	// claimed range, and nothing follows it.
+	for (let i = fragment === null ? 1 : templateRootCount(fragment); i > 1; i--) {
+		node = hydrateSibling(attempt, node, 1);
+		if (node === null || isBlockClose(node)) {
+			claim.next = node;
+			return attempt.passthroughRoot;
+		}
+	}
+	claim.next = getNextSibling(hydrateIsOpen(attempt, node) ? hydrateClose(attempt, node) : node);
+	return true;
+}
+
+/**
+ * Commit a template's root to its block's parent. clone() returns an
+ * adopted server root already in place, and moving it before the block's
+ * end would reorder it after any trailing server sibling. Any other root
+ * goes at its block's end.
+ */
+function hydrateInsertRoot(attempt: HydrationAttempt, root: Node, block: Block): void {
+	const parent = block.parentNode;
+	if (root.parentNode === parent) return;
+	parent.insertBefore(root, block.endMarker);
+}
+
+/**
+ * Whether `el`, whose only child is a text value, keeps the server content
+ * it holds: React compares such a host's text content as a whole, and under
+ * its suppressHydrationWarning not at all, so whatever the server rendered
+ * there stays, unreported, until the client next changes the text
+ * (clearKeptTextContent). A lone server Text node, or none, or a text-only
+ * frame, is the server's text itself, which the hole adopts (htext,
+ * hempty). A textarea's text is its default value, which its value props
+ * own. A method, so that bundles which never hydrate do not retain it.
+ */
+function hydrateKeepsServerContent(attempt: HydrationAttempt, el: Node): boolean {
+	if (
+		!isHydrationSuppressed(el) ||
+		attempt.staleServerValues ||
+		attempt.freshNodes.has(el) ||
+		(el as Element).localName === 'textarea'
+	)
 		return false;
-	}
+	const first = getFirstChild(el);
+	if (
+		first === null ||
+		(first.nodeType === 3 && getNextSibling(first) === null) ||
+		hydrateTextFrameEnd(attempt, first) !== null
+	)
+		return false;
+	(KEPT_TEXT_CONTENT ??= new WeakSet()).add(el);
+	return true;
+}
 
-	/**
-	 * Whether hydration keeps `el`'s server class where a writer sets `next`
-	 * (`absentIsEmpty`: an absent class attribute reads as ''). An adopted
-	 * element keeps it, as it keeps attributes (allowAttribute). A direct
-	 * binding and spreads can all write one element's class, and only the last
-	 * writer's value is the client's, so the comparison waits for the end of
-	 * the pass (settleValues).
-	 */
-	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return false;
-		this.values?.keepClass(el, next, absentIsEmpty);
-		return true;
+/**
+ * The close of the frame `first` opens, when it is an exact text-only or
+ * empty `<!--[-->…<!--]-->` frame around all of its host's content: a sole
+ * primitive the server framed (e.g. a spread or ternary child), which is
+ * the host's text as a bare one is.
+ */
+function hydrateTextFrameEnd(attempt: HydrationAttempt, first: Node | null): Comment | null {
+	let outer: Comment | null = null;
+	let stop: Node | null = null;
+	// A component and its returned value each own a regular range. Follow
+	// nested frames only when every frame contains that same single child.
+	while (hydrateIsOpen(attempt, first)) {
+		const end = hydrateClose(attempt, first!);
+		if (getNextSibling(end) !== stop) return null;
+		outer ??= end;
+		stop = end;
+		first = getNextSibling(first!);
 	}
+	return first === stop || (first?.nodeType === 3 && getNextSibling(first) === stop) ? outer : null;
+}
 
-	/**
-	 * Whether hydration keeps `el`'s server style where a writer sets the
-	 * complete style `value`, or the fixed declarations `entries`, after the
-	 * static declarations `staticCss`. An adopted element keeps it, as it keeps
-	 * attributes (allowAttribute). Comparing canonical cssText, through a
-	 * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
-	 * whitespace) as equal, while it still finds reordered, missing, added and
-	 * empty declarations. What an early host binding published there, single
-	 * declarations or the whole style, is the server's now.
-	 */
-	keepsStyle(
-		el: HTMLElement | SVGElement,
-		value: any,
-		staticCss?: string,
-		entries?: readonly unknown[],
-	): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return false;
-		this.values?.style(this, el, value, staticCss, entries);
-		return true;
+/**
+ * Whether the server framed `el`'s only child in a `<!--[-->…<!--]-->` range
+ * holding something other than one text node or nothing. htext unwraps a
+ * text-only frame; any other framed content belongs to a child slot.
+ */
+function hydrateFramesSlotContent(attempt: HydrationAttempt, el: Node): boolean {
+	const first = getFirstChild(el);
+	return hydrateIsOpen(attempt, first) && hydrateTextFrameEnd(attempt, first) === null;
+}
+
+/**
+ * Adopt the text of an only-child text hole of `el`: the server's one Text
+ * node, which compares as keepsText decides, or a new one when the server
+ * rendered `el` empty. What an early host binding published there is the
+ * server's text now.
+ */
+function hydrateHtext(attempt: HydrationAttempt, el: Node, text: string, loc?: string): Text {
+	let first = getFirstChild(el);
+	while (first !== null && first.nodeType !== 3 && hydrateUnframe(attempt, first)) {
+		first = getFirstChild(el);
 	}
-
-	/**
-	 * A compiled walk of an adopted template found no server node where the
-	 * template has the element that a binding writes: the server rendered
-	 * fewer nodes there than the client.
-	 */
-	private missingElement(): never {
-		this.mismatch(undefined, () => 'an element', null);
+	if (first !== null && first.nodeType === 3) {
+		const next = getNextSibling(first);
+		if (next !== null) hydrateUnclaimedText(attempt, el, next, null, loc);
+		const server = (first as Text).nodeValue;
+		// An equal text stays, and still compares again when a render-phase
+		// update renders it again (keepsText).
+		if (
+			(server === text || domBindingClaims.get(el as Element)?.get('#text') !== server) &&
+			!hydrateKeepsText(attempt, el, first, server, text, loc)
+		)
+			(first as Text).nodeValue = text;
+		return first as Text;
 	}
+	if (first !== null) hydrateUnclaimedText(attempt, el, first, text, loc);
+	const created = hydrateNewText(attempt, el, text, loc);
+	el.appendChild(created);
+	return created;
+}
 
-	/**
-	 * Runs once a pass adopted its content and its render-phase updates
-	 * settled. Compares the texts those updates rendered again (keepsText) and
-	 * the class each adopted element's last writer set (keepsClass), then
-	 * publishes development's one warning per pass, as React's, for the server
-	 * values the pass kept where the client's differ (unpatched). A boundary
-	 * whose body adopted a node and then threw to its catch arm has removed it
-	 * since, and it is not compared.
-	 */
-	settleValues(): void {
-		const root = domNode(this.rootBlock.parentNode);
-		const texts = this.pendingTexts;
-		if (texts !== null) {
-			this.pendingTexts = null;
-			for (const [node, { server, loc, prepared }] of texts) {
-				const text = prepared ?? (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!;
-				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
-					this.mismatch(
-						loc || (domNode(node).parentNode as any)?.__oct_loc,
-						() => `text ${JSON.stringify(text)}`,
-						(STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(server ?? ''),
-					);
-			}
+/**
+ * Unwrap the text frame `first` opens (textFrameEnd), if any, so that the
+ * text hole adopts, compares and suppresses as for bare text, without
+ * child-slot state (htext, hempty). Whether it did.
+ */
+function hydrateUnframe(attempt: HydrationAttempt, first: Node | null): boolean {
+	const end = hydrateTextFrameEnd(attempt, first);
+	if (end === null) return false;
+	(first as Comment).remove();
+	end.remove();
+	return true;
+}
+
+/**
+ * `from`, in `el`, an only-child text host, starts server content that is
+ * not the one Text node the hole adopts: nothing the client renders, and a
+ * structural difference that suppressHydrationWarning does not keep. The
+ * client expected `text` there (nothing when it is '', or, when null, the
+ * end of the Text node it adopted).
+ */
+function hydrateUnclaimedText(
+	attempt: HydrationAttempt,
+	el: Node,
+	from: ChildNode,
+	text: string | null,
+	loc?: string,
+): never {
+	hydrateMismatch(
+		attempt,
+		loc || (el as any).__oct_loc,
+		() =>
+			text === null
+				? 'the end of the text element'
+				: text === ''
+					? 'nothing'
+					: `text ${JSON.stringify(text)}`,
+		// Name a server range by the content it frames.
+		(hydrateIsOpen(attempt, from) ? getNextSibling(from) : null) ?? from,
+	);
+}
+
+/**
+ * childTextHole's first hydrating render of `value`, an element, a
+ * component, or a list. The server frames such a value in a
+ * `<!--[-->…<!--]-->` range, which the hole's child slot adopts from the
+ * cursor. Anything else in the host is what the server rendered for a
+ * primitive value: its text, which none of these values can adopt, or
+ * nothing for an empty one, where the value must render nothing too. Either
+ * way a difference is a mismatch, as React finds where its render reaches
+ * the host, and a component renders before it does (renderBeforeMismatch).
+ * A textarea's text is its default value, which its value props own, and
+ * the value builds after it. `render` is the hole's childSlot call into the
+ * parent it is given, passed in so that hydration alone never retains the
+ * child-slot graph.
+ */
+function hydrateHydrateOnlyChild(
+	attempt: HydrationAttempt,
+	scope: Scope,
+	slotKey: number,
+	el: Node,
+	value: unknown,
+	render: (parent: Node) => void,
+): void {
+	const stale = getFirstChild(el);
+	if (hydrateIsOpen(attempt, stale)) {
+		hydrationCursor.node = stale;
+		render(el);
+		return;
+	}
+	const textarea = (el as Element).localName === 'textarea';
+	const loc =
+		process.env.NODE_ENV !== 'production'
+			? siteLoc(scope, slotKey) || (el as any).__oct_loc
+			: undefined;
+	if (stale !== null && !textarea) {
+		if (isElementDescriptor(value) && !isHostDescriptor(value))
+			hydrateRenderBeforeMismatch(attempt, el, render);
+		hydrateMismatch(attempt, loc, () => 'a renderable range', stale);
+	}
+	// Empty server content can only adopt a component whose result is empty.
+	// Build on the renderer's prepared parent so all nested slot output can be
+	// inspected without ever publishing a speculative child to this host.
+	const target = prepareParent(el);
+	hydrateSuspend(attempt, () => render(target));
+	if (!textarea) {
+		for (let node = getFirstChild(target); node !== null; node = getNextSibling(node)) {
+			if (node.nodeType === 1 || (node.nodeType === 3 && node.nodeValue))
+				hydrateMismatch(attempt, loc, () => 'a renderable range', null);
 		}
-		this.values?.settle(this, this.rootBlock.parentNode);
 	}
+	const state = scope.slots[slotKey] as ChildSlot;
+	prepareSlot(scope, state, 'onlyChildPrepared', {
+		publish() {
+			retargetPreparedScope(scope, target, el);
+			const first = getFirstChild(target);
+			if (first !== null) placeRange(el, first, target.lastChild!, null);
+		},
+		discard() {},
+	});
+}
+
+/**
+ * Before hydrateOnlyChild's mismatch at `el`, render its component value on
+ * the client into a detached copy of `el`: React renders a component before
+ * it reaches the host the component renders, so a suspension in it comes
+ * first and keeps the server HTML. Only an owner that discards a suspended
+ * attempt (`defers`) lets it. Any other error gives way to the mismatch, and
+ * the fallback's client render throws it again (see failure).
+ */
+function hydrateRenderBeforeMismatch(
+	attempt: HydrationAttempt,
+	el: Node,
+	render: (parent: Node) => void,
+): void {
+	if (!attempt.defers) return;
+	try {
+		hydrateSuspend(attempt, () => render(el.cloneNode(false)));
+	} catch (error) {
+		if (isSuspenseException(error) || isAdoptionControl(error) || isHostContextRequest(error))
+			throw error;
+	}
+}
+
+/**
+ * htext's counterpart for an only-child hole whose first hydrating value
+ * renders nothing: `''` (`text`), or `null`, `undefined` or a boolean. The
+ * server serializes that as no children, or as an empty `<!--[--><!--]-->`
+ * frame. A lone server Text node, bare or in a text-only frame, which both
+ * unwrap as in htext, is the server's text, and the hole adopts it. For
+ * `''` it compares as keepsText decides, as React compares the text content
+ * of a host whose child is a string. For any other value React hydrates no
+ * child there, so the text compares without the host's
+ * suppressHydrationWarning, which keeps no unhydrated child. Anything else
+ * is server content the client renders no node for. A textarea's text is
+ * its default value, which its value props own. Returns the Text node the
+ * hole adopted, if any.
+ */
+function hydrateHempty(
+	attempt: HydrationAttempt,
+	el: Node,
+	text: boolean,
+	loc?: string,
+): Text | null {
+	if ((el as Element).localName === 'textarea' || attempt.freshNodes.has(el)) return null;
+	let first = getFirstChild(el);
+	while (first !== null && hydrateUnframe(attempt, first)) {
+		first = getFirstChild(el);
+	}
+	if (first === null) return null;
+	if (first.nodeType === 3 && getNextSibling(first) === null) {
+		// With no host, keepsText applies no suppressHydrationWarning, and the
+		// hole already ruled out a host it would write the client's text into.
+		if (!hydrateKeepsText(attempt, text ? el : null, first, first.nodeValue, '', loc))
+			first.nodeValue = '';
+		return first as Text;
+	}
+	hydrateUnclaimedText(attempt, el, first, '', loc);
+}
+
+function hydrateHtextSwap(attempt: HydrationAttempt, posNode: Node | null, text: string): Text {
+	// The server's stand-in for an empty sibling hole (ssrTextSlot). Swap it for
+	// the hole's Text node, then compare against the server's '' like any text.
+	// Every compiled walk has already resolved its positions (htextSwap mounts
+	// run after them), so replacing the comment moves no later claim.
+	if (isEmptyTextSlot(posNode)) {
+		const empty = document.createTextNode('');
+		posNode.parentNode!!.replaceChild(empty, posNode);
+		posNode = empty;
+	}
+	const host = posNode?.parentNode ?? null;
+	// An element where the server's text belongs is a structural difference,
+	// which suppressHydrationWarning never keeps.
+	if (
+		posNode !== null &&
+		posNode.nodeType === 1 &&
+		(host === null || !attempt.freshNodes.has(host))
+	)
+		hydrateMismatch(
+			attempt,
+			(host as any)?.__oct_loc,
+			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
+			posNode,
+		);
+	if (posNode !== null && posNode.nodeType === 3) {
+		const server = (posNode as Text).nodeValue;
+		// A client-built template's `<!>` reads as the server's empty slot,
+		// swapped for '' above, and takes the client's text.
+		if (!hydrateKeepsText(attempt, host, posNode, server, text, (host as any)?.__oct_loc))
+			(posNode as Text).nodeValue = text;
+		return posNode as Text;
+	}
+	// No server text node stands here: the server rendered the hole empty. A
+	// host that keeps that installs an empty tracking node, which later
+	// commits update normally.
+	const created = hydrateNewText(attempt, host, text, (host as any)?.__oct_loc);
+	if (posNode !== null && posNode.parentNode !== null) {
+		posNode.parentNode!.insertBefore(created, posNode);
+	}
+	return created;
+}
+
+function hydrateSibling(attempt: HydrationAttempt, node: Node, count: number): Node | null {
+	let cursor: Node | null = node;
+	for (let i = 0; i < count; i++) {
+		if (cursor === null) return null;
+		if (isBlockOpen(cursor)) cursor = hydrateClose(attempt, cursor);
+		if (isTextSeparator(cursor)) {
+			cursor = getNextSibling(cursor!);
+			continue;
+		}
+		cursor = getNextSibling(cursor!);
+		if (isTextSeparator(cursor)) {
+			const after: Node | null = getNextSibling(cursor!);
+			if (
+				after !== null &&
+				(after.nodeType === 3 || isTextSeparator(after) || isEmptyTextSlot(after))
+			)
+				cursor = after;
+		}
+	}
+	return cursor;
+}
+
+/**
+ * Whether a hydrating writer sets `el`'s attribute `name` to `next`. Only in
+ * an element the client built. An adopted element keeps the server's value,
+ * as in React (unpatched): development compares it, and production compares
+ * nothing unless the server values are stale (staleServerValues). Values the
+ * HTML parser normalized compare equal, and so does what an early host
+ * binding published there.
+ */
+function hydrateAllowAttribute(
+	attempt: HydrationAttempt,
+	el: Element,
+	name: string,
+	next: string | null,
+): boolean {
+	if (el === null) hydrateMissingElement(attempt);
+	if (hydrateIsFresh(attempt, el)) return true;
+	attempt.values?.attribute(attempt, el, name, next);
+	return false;
+}
+
+/**
+ * Whether hydration keeps `el`'s server class where a writer sets `next`
+ * (`absentIsEmpty`: an absent class attribute reads as ''). An adopted
+ * element keeps it, as it keeps attributes (allowAttribute). A direct
+ * binding and spreads can all write one element's class, and only the last
+ * writer's value is the client's, so the comparison waits for the end of
+ * the pass (settleValues).
+ */
+function hydrateKeepsClass(
+	attempt: HydrationAttempt,
+	el: Element,
+	next: string | null,
+	absentIsEmpty: boolean,
+): boolean {
+	if (el === null) hydrateMissingElement(attempt);
+	if (hydrateIsFresh(attempt, el)) return false;
+	attempt.values?.keepClass(el, next, absentIsEmpty);
+	return true;
+}
+
+/**
+ * Whether hydration keeps `el`'s server style where a writer sets the
+ * complete style `value`, or the fixed declarations `entries`, after the
+ * static declarations `staticCss`. An adopted element keeps it, as it keeps
+ * attributes (allowAttribute). Comparing canonical cssText, through a
+ * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
+ * whitespace) as equal, while it still finds reordered, missing, added and
+ * empty declarations. What an early host binding published there, single
+ * declarations or the whole style, is the server's now.
+ */
+function hydrateKeepsStyle(
+	attempt: HydrationAttempt,
+	el: HTMLElement | SVGElement,
+	value: any,
+	staticCss?: string,
+	entries?: readonly unknown[],
+): boolean {
+	if (el === null) hydrateMissingElement(attempt);
+	if (hydrateIsFresh(attempt, el)) return false;
+	attempt.values?.style(attempt, el, value, staticCss, entries);
+	return true;
+}
+
+/**
+ * A compiled walk of an adopted template found no server node where the
+ * template has the element that a binding writes: the server rendered
+ * fewer nodes there than the client.
+ */
+function hydrateMissingElement(attempt: HydrationAttempt): never {
+	hydrateMismatch(attempt, undefined, () => 'an element', null);
+}
+
+/**
+ * Runs once a pass adopted its content and its render-phase updates
+ * settled. Compares the texts those updates rendered again (keepsText) and
+ * the class each adopted element's last writer set (keepsClass), then
+ * publishes development's one warning per pass, as React's, for the server
+ * values the pass kept where the client's differ (unpatched). A boundary
+ * whose body adopted a node and then threw to its catch arm has removed it
+ * since, and it is not compared.
+ */
+function hydrateSettleValues(attempt: HydrationAttempt): void {
+	const root = attempt.rootBlock.parentNode;
+	const texts = attempt.pendingTexts;
+	if (texts !== null) {
+		attempt.pendingTexts = null;
+		for (const [node, { server, loc, prepared }] of texts) {
+			const text = prepared ?? node.nodeValue!;
+			if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
+				hydrateMismatch(
+					attempt,
+					loc || (node.parentNode as any)?.__oct_loc,
+					() => `text ${JSON.stringify(text)}`,
+					document.createTextNode(server ?? ''),
+				);
+		}
+	}
+	attempt.values?.settle(attempt, attempt.rootBlock.parentNode);
 }
 
 /**
@@ -23633,14 +23263,19 @@ class HydrationValueChecks {
 	 * client render instead (staleServerValues).
 	 */
 	private unpatched(
-		hydration: HydrationCapability,
+		hydration: HydrationAttempt,
 		el: Element,
 		what: string,
 		server: unknown,
 		client: unknown,
 	): void {
 		if (hydration.staleServerValues)
-			hydration.mismatch((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
+			hydrateMismatch(
+				hydration,
+				(el as any).__oct_loc,
+				() => `${what} ${JSON.stringify(client)}`,
+				el,
+			);
 		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
 			(this.unpatchedValues ??= new Map()).set(
 				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
@@ -23649,11 +23284,9 @@ class HydrationValueChecks {
 			);
 	}
 
-	html(hydration: HydrationCapability, el: Element, next: string): void {
+	html(hydration: HydrationAttempt, el: Element, next: string): void {
 		const script = el.localName === 'script';
-		const server = script
-			? ((STAGED_DOM ? STAGED_DOM.view(el) : el).textContent ?? '')
-			: (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML;
+		const server = script ? (el.textContent ?? '') : el.innerHTML;
 		const expected =
 			process.env.NODE_ENV === 'production'
 				? hydration.staleServerValues
@@ -23666,17 +23299,12 @@ class HydrationValueChecks {
 			this.unpatched(hydration, el, '`dangerouslySetInnerHTML` content', server, expected);
 	}
 
-	attribute(hydration: HydrationCapability, el: Element, name: string, next: string | null): void {
+	attribute(hydration: HydrationAttempt, el: Element, name: string, next: string | null): void {
 		// Read through the prototype: a form's named control can shadow its method.
 		const ns = attrNamespace(name);
 		const server = ns
-			? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNS(
-					ns,
-					name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name,
-				)
-			: STAGED_DOM
-				? STAGED_DOM.view(el).getAttribute(name)
-				: Element.prototype.getAttribute.call(el, name);
+			? el.getAttributeNS(ns, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
+			: Element.prototype.getAttribute.call(el, name);
 		if (
 			server !== next &&
 			domBindingClaims.get(el)?.get(name) !== server &&
@@ -23690,17 +23318,15 @@ class HydrationValueChecks {
 	}
 
 	style(
-		hydration: HydrationCapability,
+		hydration: HydrationAttempt,
 		el: HTMLElement | SVGElement,
 		value: any,
 		staticCss?: string,
 		entries?: readonly unknown[],
 	): void {
-		const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+		const style = (el as HTMLElement).style;
 		const server = style.cssText;
-		const expectedStyle = domNode(
-			(STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('div'),
-		).style;
+		const expectedStyle = document.createElement('div').style;
 		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
 		if (entries === undefined) applyStyleValue(el, expectedStyle, value, undefined);
 		else {
@@ -23729,29 +23355,22 @@ class HydrationValueChecks {
 		}
 		const expected = expectedStyle.cssText;
 		if (
-			(server !== expected ||
-				(!expected && !removed && (STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('style'))) &&
+			(server !== expected || (!expected && !removed && el.hasAttribute('style'))) &&
 			// So is a whole style that one published.
 			claims?.get('style') !== server
 		)
 			this.unpatched(hydration, el, 'style', server, expected);
 	}
 
-	settle(hydration: HydrationCapability, root: Node): void {
+	settle(hydration: HydrationAttempt, root: Node): void {
 		const classes = this.classes;
 		if (classes !== null) {
 			this.classes = null;
 			for (const [el, { next, absentIsEmpty }] of classes) {
 				// Read through the prototype: a form's named control can shadow its method.
-				const raw = STAGED_DOM
-					? STAGED_DOM.view(el).getAttribute('class')
-					: Element.prototype.getAttribute.call(el, 'class');
+				const raw = Element.prototype.getAttribute.call(el, 'class');
 				const server = absentIsEmpty && raw === null ? '' : raw;
-				if (
-					server !== next &&
-					domBindingClaims.get(el)?.get('class') !== raw &&
-					(STAGED_DOM ? STAGED_DOM.view(root) : root).contains(el)
-				)
+				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
 					this.unpatched(hydration, el, 'attribute `class`', server, next);
 			}
 		}
@@ -23760,8 +23379,7 @@ class HydrationValueChecks {
 		if (unpatched === null) return;
 		this.unpatchedValues = null;
 		const lines: string[] = [];
-		for (const [line, node] of unpatched)
-			if ((STAGED_DOM ? STAGED_DOM.view(root) : root).contains(node)) lines.push(line);
+		for (const [line, node] of unpatched) if (root.contains(node)) lines.push(line);
 		if (lines.length !== 0) warnHydrationUnpatched(lines);
 	}
 }
@@ -23863,8 +23481,7 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 		MAPPED_ITEM_ADOPTION.node = null;
 		const lazy =
 			(node as any).nodeType === undefined
-				? ((STAGED_DOM ? STAGED_DOM.view(node as any) : (node as any))[LAZY_TEMPLATE] as
-						LazyTemplateRecord | undefined)
+				? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 				: undefined;
 		const expected = lazy === undefined ? node : resolveLazyTemplate(lazy);
 		if (
@@ -23874,21 +23491,16 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 			for (let child = getFirstChild(adopted); child !== null; child = getNextSibling(child)) {
 				detachDeoptTreeRefs(child, null);
 			}
-			(STAGED_DOM ? STAGED_DOM.view(adopted as Element) : (adopted as Element)).replaceChildren();
+			(adopted as Element).replaceChildren();
 			for (let child = getFirstChild(expected); child !== null; child = getNextSibling(child)) {
-				(STAGED_DOM ? STAGED_DOM.view(adopted) : adopted).appendChild(
-					(STAGED_DOM ? STAGED_DOM.view(child) : child).cloneNode(true),
-				);
+				adopted.appendChild(child.cloneNode(true));
 			}
 			return adopted as T;
 		}
-		const replacement = (STAGED_DOM ? STAGED_DOM.view(expected) : expected).cloneNode(true);
+		const replacement = expected.cloneNode(true);
 		const block = CURRENT_SCOPE!.block;
 		detachDeoptTreeRefs(adopted, null);
-		domNode((STAGED_DOM ? STAGED_DOM.view(adopted) : adopted).parentNode!).replaceChild(
-			replacement,
-			adopted,
-		);
+		adopted.parentNode!.replaceChild(replacement, adopted);
 		if (block.startMarker === adopted) block.startMarker = replacement;
 		if (block.endMarker === adopted) block.endMarker = replacement;
 		block.deoptNode = null;
@@ -23899,8 +23511,7 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 	// Non-compiler callers can still hand clone() an ordinary DOM Node directly.
 	const lazy =
 		(node as any).nodeType === undefined
-			? ((STAGED_DOM ? STAGED_DOM.view(node as any) : (node as any))[LAZY_TEMPLATE] as
-					LazyTemplateRecord | undefined)
+			? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 			: undefined;
 	if (lazy !== undefined) {
 		const hydration = hydrating ? activeHydration() : null;
@@ -23910,20 +23521,21 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 		// parsing the template. Parsing then happens only on a mismatch and on
 		// genuine client-side mounts — both cold during hydration.
 		if (process.env.NODE_ENV === 'production' && hydration !== null) {
-			return hydration.cloneLazy(lazy, loc) as unknown as T;
+			return hydrateCloneLazy(hydration, lazy, loc) as unknown as T;
 		}
 		const parsed = resolveLazyTemplate(lazy);
-		if (hydration !== null) return hydration.clone(parsed, loc, partialStyles) as T;
+		if (hydration !== null) return hydrateClone(hydration, parsed, loc, partialStyles) as T;
 		// A template the client render after a deferred mismatch clones (adoptOrDefer).
-		if (hydrating && currentHydration!.deferred != null) currentHydration!.claimBefore(parsed);
-		return (STAGED_DOM ? STAGED_DOM.view(parsed) : parsed).cloneNode(true) as T;
+		if (hydrating && currentHydration!.deferred != null)
+			hydrateClaimBefore(currentHydration!, parsed);
+		return parsed.cloneNode(true) as T;
 	}
 	const hydration = hydrating ? currentHydration : null;
 	if (hydration !== null) {
-		if (hydration.isActive()) return hydration.clone(node, loc, partialStyles);
-		if (hydration.deferred !== null) hydration.claimBefore(node);
+		if (hydrateIsActive(hydration)) return hydrateClone(hydration, node, loc, partialStyles);
+		if (hydration.deferred !== null) hydrateClaimBefore(hydration, node);
 	}
-	return (STAGED_DOM ? STAGED_DOM.view(node) : node).cloneNode(true) as T;
+	return node.cloneNode(true) as T;
 }
 
 /** Whether a template starts with a host, an element or text, rather than a hole. */
@@ -23943,12 +23555,11 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 	if (hydrationStarted && PRESENTATION_HYDRATION?.revision !== undefined)
 		HYDRATION_DRIVER!.presentationMiss(false);
 	if (root.nodeType === 11) {
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, anchor);
+		parent.insertBefore(root, anchor);
 		return;
 	}
 	let c: Node | null;
-	while ((c = getFirstChild(root)) !== null)
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(c, anchor);
+	while ((c = getFirstChild(root)) !== null) parent.insertBefore(c, anchor);
 }
 
 /**
@@ -23970,13 +23581,13 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	const hydration = hydrating ? currentHydration : null;
 	// The body's holes ran after a deferred hydration mismatch (adoptOrDefer).
-	if (hydration !== null && hydration.deferred !== null) hydration.claimAfterHoles();
+	if (hydration !== null && hydration.deferred !== null) hydrateClaimAfterHoles(hydration);
 	if (root !== null) {
 		const block = scope.block;
-		if (hydration !== null && hydration.isActive()) hydration.insertRoot(root, block);
+		if (hydration !== null && hydrateIsActive(hydration)) hydrateInsertRoot(hydration, root, block);
 		else {
 			const parent = block.parentNode;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, block.endMarker);
+			parent.insertBefore(root, block.endMarker);
 		}
 	}
 	scope.slots[0] = bag;
@@ -24021,7 +23632,7 @@ export function prepareTemplateText(
 ): string | undefined {
 	const text = coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
-	return hydration === null ? text : hydration.prepareText(node, host, text);
+	return hydration === null ? text : hydratePrepareText(hydration, node, host, text);
 }
 
 let DEV_PLAIN_TEXT_HANDLE_WARNED = false;
@@ -24071,16 +23682,16 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
 	// the coercion in costs nothing on the hot update path.
 	const text = coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null) return hydration.htext(el, text);
+	if (hydration !== null) return hydrateHtext(hydration, el, text);
 	if (seeded === 1) {
 		const first = getFirstChild(el);
 		if (first !== null && first.nodeType === 3) {
-			(STAGED_DOM ? STAGED_DOM.view(first as Text) : (first as Text)).nodeValue = text;
+			(first as Text).nodeValue = text;
 			return first as Text;
 		}
 	}
-	const t = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(text);
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(t);
+	const t = document.createTextNode(text);
+	el.appendChild(t);
 	return t;
 }
 
@@ -24101,11 +23712,11 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	// Coerce here (see htext) so the call site stays a bare `htextSwap(pos, _v)`.
 	const text = coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null) return hydration.htextSwap(posNode, text);
+	if (hydration !== null) return hydrateHtextSwap(hydration, posNode, text);
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
-	const t = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(text);
-	const parent = (STAGED_DOM ? STAGED_DOM.view(posNode!) : posNode!).parentNode!;
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).replaceChild(t, posNode!);
+	const t = document.createTextNode(text);
+	const parent = posNode!.parentNode!;
+	parent.replaceChild(t, posNode!);
 	return t;
 }
 
@@ -24191,14 +23802,14 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 	}
 	// Only hydrateRoot constructs the capability, so client-only bundles drop the
 	// range-marker validator that adoption needs.
-	const adopted = hydration?.adoptBindingText(posNode, text);
+	const adopted = hydration == null ? void 0 : hydrateAdoptBindingText(hydration, posNode, text);
 	if (adopted) return adopted;
-	const parent = domNode(posNode)!.parentNode!;
-	const close = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(HYDRATION_END);
-	(STAGED_DOM ? STAGED_DOM.view(posNode as Comment) : (posNode as Comment)).data = marker;
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(close, getNextSibling(posNode!));
-	const node = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(text);
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, close);
+	const parent = posNode!.parentNode!;
+	const close = document.createComment(HYDRATION_END);
+	(posNode as Comment).data = marker;
+	parent.insertBefore(close, getNextSibling(posNode!));
+	const node = document.createTextNode(text);
+	parent.insertBefore(node, close);
 	return node;
 }
 
@@ -24228,7 +23839,7 @@ interface PresentationHydrationFrame {
 	revision?: number;
 	/** Installed only for structural/control/host receipts, not ordinary fixed presentations. */
 	current?: typeof currentPresentation;
-	hydration: HydrationCapability | null;
+	hydration: HydrationAttempt | null;
 }
 
 let PRESENTATION_HYDRATION: PresentationHydrationFrame | null = null;
@@ -24357,7 +23968,9 @@ function matchesClosedPresentationKeys(value: unknown, keys: readonly string[]):
 
 function hasClosedPresentationView(lease: BindingHandoff, scope: Scope, id: string): boolean {
 	try {
-		const root = scope.block.startMarker ?? (hydrating ? activeHydration()?.node : undefined);
+		const root =
+			scope.block.startMarker ??
+			(hydrating ? (activeHydration() == null ? void 0 : hydrationCursor.node) : undefined);
 		const proof = root == null ? undefined : lease.view?.(root);
 		return proof?.id === id && matchesClosedPresentationKeys(scope.block.props, proof.closedProps);
 	} catch {
@@ -24458,8 +24071,7 @@ function displacedWithin(
 function discardedByHydration(node: Node): boolean {
 	if (DISCARDED_HYDRATION_NODES === null) return false;
 	let root = node;
-	for (let parent = domNode(root).parentNode; parent !== null; parent = domNode(parent).parentNode)
-		root = parent;
+	for (let parent = root.parentNode; parent !== null; parent = parent.parentNode) root = parent;
 	return DISCARDED_HYDRATION_NODES.has(root);
 }
 
@@ -24498,13 +24110,14 @@ export function beginPresentationHydration(
 		(candidate) =>
 			candidate.id === id &&
 			(candidate.root === scope.block.startMarker ||
-				candidate.root === hydration?.node ||
-				(candidate.root.nodeType === 8 && candidate.root.nextSibling === hydration?.node) ||
+				candidate.root === (hydration == null ? void 0 : hydrationCursor.node) ||
+				(candidate.root.nodeType === 8 &&
+					candidate.root.nextSibling === (hydration == null ? void 0 : hydrationCursor.node)) ||
 				(candidate.host !== undefined &&
 					PRESENTATION_PREPARATIONS.get(candidate)?.scope === scope)),
 	);
 	if (lease === undefined) {
-		if (host && hydration !== null) supersedeDisplacedHost(owner, id, scope, hydration.node);
+		if (host && hydration !== null) supersedeDisplacedHost(owner, id, scope, hydrationCursor.node);
 		return null;
 	}
 	if (!lease.active()) throw new PresentationAdoptionMiss(lease, false);
@@ -24546,10 +24159,12 @@ export function beginPresentationHydration(
 		hydration,
 	};
 	PRESENTATION_HYDRATION = frame;
+	if (host) scope.presentation = frame;
 	if (revision !== undefined || frame.controls !== undefined) trackPresentationFrame(frame);
 	PRESENTATION_PREPARATIONS.set(lease, frame);
 	const hostRefs = host ? WIP_CAPTURE.refs : undefined;
 	(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
+		if (scope.presentation === frame) scope.presentation = undefined;
 		if (
 			discarded ||
 			!frame.completed ||
@@ -24625,6 +24240,7 @@ export function beginPresentationHydration(
 			// host. Revoke only this receipt's successor writers, never children.
 			if (frame.hostSuccessors !== undefined && (!published || lease.valid?.() === false)) {
 				published = false;
+				frame.completed = false;
 				// Successful receipts disappear. This failed, already-retired receipt
 				// fences only the same host scope until normal root disposal clears it.
 				owner.bindingLeases!.add(lease);
@@ -25000,6 +24616,7 @@ export function presentationWrite<T>(
 ): T {
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
 	if (frame === null) return writer(...args);
+	const preparing = kind.startsWith('prepareTemplate');
 	if (frame.lease.host !== undefined) {
 		// A host receipt proves native fields, never descendant or generic-spread
 		// ownership. Known provider projections must retain their exact field set.
@@ -25007,6 +24624,8 @@ export function presentationWrite<T>(
 		const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
 		const element =
 			kind === 'bindSignalAttribute' ||
+			kind === 'prepareTemplateSignalAttribute' ||
+			kind === 'prepareTemplateScalarSignalAttribute' ||
 			kind === 'nativeStyleBinding' ||
 			kind === 'nativeProjectionBinding'
 				? args[2]
@@ -25019,13 +24638,17 @@ export function presentationWrite<T>(
 							.filter((_: unknown, index: number) => index % 2 === 0)
 							.map((key: string) => 'style:' + key)
 					: [
-							kind === 'nativeStyleBinding' || kind === 'setStyle'
+							kind === 'nativeStyleBinding' ||
+							kind === 'setStyle' ||
+							kind === 'prepareTemplateStyle'
 								? 'style'
-								: kind === 'setStyleProperty'
+								: kind === 'setStyleProperty' || kind === 'prepareTemplateStyleProperty'
 									? 'style:' + args[1]
 									: kind.includes('Class')
 										? 'class'
-										: kind === 'bindSignalAttribute'
+										: kind === 'bindSignalAttribute' ||
+											  kind === 'prepareTemplateSignalAttribute' ||
+											  kind === 'prepareTemplateScalarSignalAttribute'
 											? args[3]
 											: args[changed ? 3 : 1],
 						];
@@ -25034,12 +24657,42 @@ export function presentationWrite<T>(
 			// Preserve authored names for diagnostics; receipts use native field names.
 			keys.some((key: string) => !channels.has(ATTRIBUTE_ALIASES.get(key) ?? key)) ||
 			kind === 'bindSignalValue' ||
+			kind === 'prepareTemplateSignalValue' ||
 			kind === 'setEventHandler' ||
 			kind === 'bindSignalText' ||
+			kind === 'prepareTemplateSignalText' ||
+			kind === 'prepareTemplateText' ||
 			kind === 'setText' ||
 			kind === 'markDangerouslySetInnerHTMLChildren'
 		)
 			presentationMiss(false);
+	}
+	if (preparing) {
+		// A takeover's signal ownership validates and acquires its successor
+		// before retiring the early lease. The scope's writer then accepts the
+		// prepared token without installing a second subscription.
+		if (
+			kind === 'prepareTemplateSignalText' ||
+			kind === 'prepareTemplateSignalAttribute' ||
+			kind === 'prepareTemplateScalarSignalAttribute' ||
+			kind === 'prepareTemplateSignalValue'
+		) {
+			const token =
+				kind === 'prepareTemplateSignalValue'
+					? preparePresentationSignalValue(args, frame)
+					: preparePresentationSignalBinding(args, frame, kind === 'prepareTemplateSignalText');
+			return { [PREPARED_DIRECT_SIGNAL]: true, presentation: true, token } as T;
+		}
+		// The frame validates an early owner's current receipt, not the original
+		// server value. Its admitted preparers only normalize values; they never
+		// claim nodes or invoke descendants while the server-value check is off.
+		const wasHydrating = hydrating;
+		setHydrating(false);
+		try {
+			return writer(...args);
+		} finally {
+			setHydrating(wasHydrating);
+		}
 	}
 	if (kind === 'queueNativeChangeDiagnostic') {
 		preparePresentationOperation(frame, args[0], 'nativeChangeDiagnostic', () => writer(...args));
@@ -25191,7 +24844,7 @@ function presentationRange(
 		range?.kind !== kind ||
 		range.end.parentNode !== start.parentNode ||
 		!hydrating ||
-		activeHydration()?.close(start) !== range.end
+		(activeHydration() == null ? void 0 : hydrateClose(activeHydration()!, start)) !== range.end
 	)
 		presentationMiss();
 	return range;
@@ -25210,7 +24863,7 @@ export function presentationStructure(
 	if (hydration === null) presentationMiss(false);
 	// ifBlock and the component writers (componentSlot/Void/Lite) all carry their
 	// anchor at argument 6; compiled calls may omit it as a trailing undefined.
-	const start = hydration.resolveOpen(args[6] ?? null, args[2]);
+	const start = hydrateResolveOpen(hydration, args[6] ?? null, args[2]);
 	if (kind === 'if') {
 		const arm = args[3] ? (args[4] === null ? -1 : 0) : args[5] === null ? -1 : 1;
 		const range = presentationRange(frame, start, marker + arm, kind);
@@ -25236,11 +24889,9 @@ export function setBindingClass(
 ): void {
 	const snapshot = [normalizeClass(values[0]), values[1].map(normalizeClass)] as const;
 	const classes = [snapshot[0], ...snapshot[1]].filter(Boolean).join(' ');
-	if ((STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute('class') !== classes)
-		setClassAttr(element, classes);
+	if (element.getAttribute('class') !== classes) setClassAttr(element, classes);
 	const serialized = JSON.stringify(snapshot);
-	if ((STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(receipt) !== serialized)
-		setStringData(element, receipt, serialized);
+	if (element.getAttribute(receipt) !== serialized) setStringData(element, receipt, serialized);
 }
 
 /** @internal Attribute-binding comparison ABI for the opt-in class receipt writer. */
@@ -25272,14 +24923,14 @@ export function setBindingClassIfChanged(
 /** True if `node` is a legacy or counted block-open marker. */
 function isBlockOpen(node: Node | null): node is Comment {
 	if (node === null || node.nodeType !== 8) return false;
-	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
+	const data = (node as Comment).data;
 	return hydrationMarkerMultiplicity(data, true) > 0;
 }
 
 /** True if `node` is a legacy or counted block-close marker. */
 function isBlockClose(node: Node | null): node is Comment {
 	if (node === null || node.nodeType !== 8) return false;
-	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
+	const data = (node as Comment).data;
 	return data === HYDRATION_END || hydrationMarkerMultiplicity(data, false) > 1;
 }
 
@@ -25289,20 +24940,12 @@ function isBlockClose(node: Node | null): node is Comment {
  * parser can't merge them into one node (see HYDRATION_TEXT_SEP, constants.ts).
  */
 function isTextSeparator(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data === HYDRATION_TEXT_SEP
-	);
+	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_TEXT_SEP;
 }
 
 /** The server's `<!---->` stand-in for an empty sibling-position text hole (ssrTextSlot). */
 function isEmptyTextSlot(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data === ''
-	);
+	return node !== null && node.nodeType === 8 && (node as Comment).data === '';
 }
 
 /**
@@ -25332,7 +24975,7 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 	let node: Node | null = getNextSibling(open);
 	while (node !== null) {
 		if (node.nodeType === 8) {
-			const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
+			const data = (node as Comment).data;
 			let close = data === HYDRATION_END;
 			let nestedOpen = data === HYDRATION_START;
 			if (!close && !nestedOpen && data.length > 1) {
@@ -25356,7 +24999,10 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 		}
 		node = getNextSibling(node);
 	}
-	throw new UnclosedHydrationRange();
+	// No guessed extent is safe when the parent ends before its server frame.
+	const error = createHydrationMismatch(formatClientError(338));
+	error.name = 'UnclosedHydrationRange';
+	throw error;
 }
 
 /**
@@ -25366,32 +25012,35 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
  * discards its attempt and its server DOM, renders on the client instead, and
  * reports this error once as recoverable. It is the native adoption miss
  * control flow, which application boundaries already pass through and every
- * hydration owner already recovers from, so client-only bundles are unchanged.
+ * hydration owner already recovers from. The hydration entry installs its
+ * error provider before any attempt. Using that same provider avoids making a
+ * second error class reachable from every client-side structural slot.
  */
-class HydrationMismatch extends NativeAdoptionMiss {
+type HydrationMismatch = NativeAdoptionMiss & {
 	/** DEV-only: the warning that a root's fallback publishes, as its attempt never commits. */
-	declare diagnostic: string | undefined;
+	diagnostic?: string;
 	/** DEV-only: the warning of a deferred mismatch, logged when the render reaches it. */
-	declare warning: string | undefined;
-	constructor(message = formatClientError(339)) {
-		super('', '');
-		this.name = 'HydrationMismatch';
-		this.message = message;
-	}
+	warning?: string;
+};
+
+function createHydrationMismatch(message = formatClientError(339)): HydrationMismatch {
+	const error = nativeAdoptionMiss('', '', 'value');
+	error.name = 'HydrationMismatch';
+	error.message = message;
+	return error;
 }
 
 /**
- * A server range has no closing marker. The server closes every range it
- * opens, so something changed its HTML after rendering, for example a
- * minifier or proxy that strips comments. No close in the parent can be
- * trusted then, and no extent guessed for the range is safe, so the nearest
- * intact owner falls back like any other mismatch.
+ * A missing frame close is a structural mismatch too. Check the internal
+ * brand first: an application's Error with either name remains its own error
+ * and cannot masquerade as hydration control flow.
  */
-class UnclosedHydrationRange extends HydrationMismatch {
-	constructor() {
-		super(formatClientError(338));
-		this.name = 'UnclosedHydrationRange';
-	}
+function isHydrationMismatch(error: unknown): error is HydrationMismatch {
+	return (
+		isNativeAdoptionMiss(error) &&
+		((error as Error).name === 'HydrationMismatch' ||
+			(error as Error).name === 'UnclosedHydrationRange')
+	);
 }
 
 /**
@@ -25413,7 +25062,7 @@ class DeferredHydrationSuspension extends NativeAdoptionMiss {
 /** -1 = legacy/general marker, 0 = server @empty, 1 = server items. */
 function ssrForMarkerState(node: Node): -1 | 0 | 1 {
 	if (node.nodeType !== 8) return -1;
-	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
+	const data = (node as Comment).data;
 	if (data === HYDRATION_FOR_EMPTY) return 0;
 	if (data === HYDRATION_FOR_ITEMS) return 1;
 	return isForBindingOpenComment(data)
@@ -25429,7 +25078,7 @@ export function child<T extends Node>(node: T): Node | null {
 	// stand-in — a plain object whose `firstChild` is a snapshot property (see
 	// adopt()) — and the native accessor throws on a non-Node receiver. Keep the
 	// plain read on the hydration branch; client mounts always hold a real Node.
-	if (hydrating) return (STAGED_DOM ? STAGED_DOM.view(node) : node).firstChild;
+	if (hydrating) return node.firstChild;
 	return getFirstChild(node);
 }
 
@@ -25440,7 +25089,7 @@ export function child<T extends Node>(node: T): Node | null {
  */
 export function sibling(node: Node, n: number = 1): Node | null {
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null) return hydration.sibling(node, n);
+	if (hydration !== null) return hydrateSibling(hydration, node, n);
 	let c: Node | null = node;
 	for (let i = 0; i < n; i++) {
 		// Over-walk (cursor already past the last node) → return null, don't throw.
@@ -25465,13 +25114,9 @@ let hiddenStyleWriter:
 
 function updateTextValue(node: Text, value: string): void {
 	if (hiddenTextWriter !== null && hiddenTextWriter(node, value)) return;
-	const previous = (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue;
+	const previous = node.nodeValue;
 	if (previous !== value) {
-		// Descriptor text updates participate in the same held-transition undo
-		// window as compiled text bindings. Reuse the live value just compared;
-		// an authored-value cache cannot restore a later external DOM edit.
-		if (TRANSITION_JOURNAL !== null) journalText(node, previous);
-		(STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue = value;
+		node.nodeValue = value;
 	}
 }
 
@@ -25490,28 +25135,25 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// that is not a Text means a translator replaced it.
 	if (host !== undefined) {
 		if (node === null) {
-			node = (STAGED_DOM ? STAGED_DOM.view(host) : host).firstChild as Text | null;
+			node = host.firstChild as Text | null;
 			if (node === null || node.nodeType !== 3) {
-				node = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode('');
+				node = document.createTextNode('');
 				resetOnlyChildHost(host, node);
 			}
-		} else if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== host)
-			resetOnlyChildHost(host, node);
+		} else if (node.parentNode !== host) resetOnlyChildHost(host, node);
 	}
 	const target = node as Text;
 	//
-	// View-transition dirty tracking and journaling remain at this write boundary.
+	// View-transition dirty tracking remains at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	if (TRANSITION_JOURNAL !== null)
-		journalText(target, (STAGED_DOM ? STAGED_DOM.view(target) : target).nodeValue);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
 	const text = typeof value === 'string' ? value : coerceText(value);
 	if (hiddenTextWriter !== null && hiddenTextWriter(target, text)) return;
-	(STAGED_DOM ? STAGED_DOM.view(target) : target).nodeValue = text;
+	target.nodeValue = text;
 }
 
 /**
@@ -25523,8 +25165,7 @@ export function setText(node: Text | null, value: any, host?: Node): void {
  * node stays valid.
  */
 function resetOnlyChildHost(host: Node, node: Text | null): void {
-	if (ROOT_RENDER_TRANSACTION !== null) journalRootRange(host, null, null);
-	const view = STAGED_DOM ? STAGED_DOM.view(host) : host;
+	const view = host;
 	view.textContent = '';
 	if (node !== null) view.appendChild(node);
 }
@@ -25544,9 +25185,7 @@ export function hydrateClaimedBindingCaches(
 	for (let i = 0; i < fields.length; i += 3) {
 		const field = fields[i]!;
 		const node = bag[fields[i + 1] as string] as Node;
-		const element = (
-			node.nodeType === 3 ? (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode : node
-		) as Element;
+		const element = (node.nodeType === 3 ? node.parentNode : node) as Element;
 		const claims = domBindingClaims.get(element);
 		if (claims === undefined) continue;
 		const channel = fields[i + 2] as string;
@@ -25569,20 +25208,21 @@ export function hydrateClaimedBindingCaches(
 		// A whole style must retain its actual CSS so null/removal can clear it;
 		// scalar raw-value caches instead need a value no authored scalar can equal.
 		const value =
-			channel === 'style'
-				? (STAGED_DOM ? STAGED_DOM.view(element as HTMLElement) : (element as HTMLElement)).style
-						.cssText
-				: CLAIMED_BINDING_VALUE;
+			channel === 'style' ? (element as HTMLElement).style.cssText : CLAIMED_BINDING_VALUE;
 		if (typeof field === 'number') {
 			// A scalar native style has no Block and caches its last write itself.
 			const binding = scope.slots[field] as NativeStyleBinding;
 			if (binding.block === null) {
 				journalRootProperty(binding, 'style', binding.style);
+				journalRootProperty(binding, 'snapshot', binding.snapshot);
 				binding.style = value;
+				binding.snapshot = { value, raw: value, kept: false };
 			} else {
 				const slots = binding.block.slots;
 				journalRootProperty(slots, 0, slots[0]);
+				journalRootProperty(slots, 1, slots[1]);
 				slots[0] = value;
+				slots[1] = { value, raw: value, kept: false };
 			}
 		} else {
 			const cached = bag[field];
@@ -25593,11 +25233,16 @@ export function hydrateClaimedBindingCaches(
 				// Scalar text keeps its adopted Text in the token field.
 				if (TRANSITION_JOURNAL !== null) journalBag();
 				bag[field] = value;
+				// A prepared whole-style writer diffs against normalized CSS as
+				// well as its authored value. The retained publication replaces both
+				// baselines so a later null/default clears the actually claimed CSS.
+				if (channel === 'style') bag['_value$' + field] = { value, raw: value, kept: false };
 				if (values !== undefined && values !== bag) {
 					// Never mutate a completed enclosing candidate on a nested
 					// claim. This scope submits the copy only if its body succeeds.
 					if (values === previous) values = { ...values };
 					values![field] = value;
+					if (channel === 'style') values!['_value$' + field] = bag['_value$' + field];
 				}
 			}
 		}
@@ -25612,20 +25257,25 @@ type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' 
 // Class composition is the one namespace-dependent writer, so it stays a tag.
 type DirectSignalAttributeWriter = (el: Element, name: string, value: unknown) => void;
 type DirectSignalAttributeKind = 'class' | DirectSignalAttributeWriter;
+type SignalAttributePrepare = (
+	el: Element,
+	name: string,
+	value: unknown,
+	kind: DirectSignalAttributeKind,
+) => unknown;
+type SignalAttributeCommit = (
+	el: Element,
+	name: string,
+	value: unknown,
+	scope: Scope,
+	kind: DirectSignalAttributeKind,
+) => void;
 
 // Shared renderer policies keep the subscription/lifetime path independent of
 // control adoption. Scalar bindings still use their existing cache tokens.
 interface DirectSignalBindingPolicy {
 	readonly kind: DirectSignalBindingKind;
 	readonly writeBinding: (binding: DirectSignalBinding, value: unknown) => void;
-	readonly write: (
-		target: Node,
-		value: unknown,
-		kind: DirectSignalBindingKind,
-		previous: unknown,
-		name?: string,
-		attributeKind?: DirectSignalAttributeKind,
-	) => unknown;
 	readonly control?: {
 		validateNew: (scope: Scope, target: Node, kind: DirectSignalBindingKind) => void;
 		snapshot: (target: Node, site: string) => ReturnType<typeof snapshotHydrationControl>;
@@ -25643,6 +25293,8 @@ interface DirectSignalBinding {
 	readonly site: string;
 	readonly name?: string;
 	readonly attributeKind?: DirectSignalAttributeKind;
+	readonly attributePrepare?: SignalAttributePrepare;
+	readonly attributeCommit?: SignalAttributeCommit;
 	readonly handle: SignalHandle<unknown> | null;
 	text?: Text;
 	value: unknown;
@@ -25650,7 +25302,376 @@ interface DirectSignalBinding {
 	input?: EventListener;
 	controlWriterCleanup?: () => void;
 	pendingControl?: boolean;
+	prepared?: SlotPreparation;
 	disposed: boolean;
+}
+
+const PREPARED_DIRECT_SIGNAL = /* @__PURE__ */ Symbol('octane.prepared-direct-signal');
+
+interface PreparedDirectSignal {
+	readonly [PREPARED_DIRECT_SIGNAL]: true;
+	readonly scope: Scope;
+	readonly target: Node;
+	readonly policy: DirectSignalBindingPolicy;
+	readonly name?: string;
+	readonly attributeKind?: DirectSignalAttributeKind;
+	readonly attributeCommit?: SignalAttributeCommit;
+	readonly token: unknown;
+	/** The last applied token, even after several prepares in this capture. */
+	readonly previous: unknown;
+	readonly value: unknown;
+	readonly prepared: unknown;
+	readonly controlSnapshot: ReturnType<typeof snapshotHydrationControl>;
+	readonly adopted: boolean;
+	readonly presentation?: true;
+}
+
+function directSignalToken(value: unknown): DirectSignalBinding | null {
+	return value !== null &&
+		typeof value === 'object' &&
+		(value as DirectSignalBinding)[DIRECT_SIGNAL_BINDING] === true
+		? (value as DirectSignalBinding)
+		: null;
+}
+
+/** Resolve all user reads and the hydration decision in the scope's render. */
+function prepareDirectSignal(
+	scope: Scope,
+	previous: unknown,
+	target: Node,
+	value: unknown,
+	site: string,
+	policy: DirectSignalBindingPolicy,
+	name?: string,
+	attributeKind?: DirectSignalAttributeKind,
+	seededText?: 1,
+	bindingMarker?: string,
+	attributePrepare?: SignalAttributePrepare,
+	attributeCommit?: SignalAttributeCommit,
+): PreparedDirectSignal {
+	const pending =
+		previous !== null &&
+		typeof previous === 'object' &&
+		(previous as PreparedDirectSignal)[PREPARED_DIRECT_SIGNAL] === true
+			? (previous as PreparedDirectSignal)
+			: null;
+	const token = pending === null ? previous : pending.token;
+	const accepted = pending === null ? previous : pending.previous;
+	const prior = directSignalToken(token);
+	const handle = isSignalHandle(value) ? value : null;
+	if (handle !== null && (!signalDocumentEnabled || currentSignalOwner() !== scope.signalOwner)) {
+		if (!signalDocumentEnabled) enableSignalBindings();
+		if (currentSignalOwner() !== scopeSignalOwner(scope))
+			return runWithBlockSignalOwner(scope, () =>
+				prepareDirectSignal(
+					scope,
+					previous,
+					target,
+					value,
+					site,
+					policy,
+					name,
+					attributeKind,
+					seededText,
+					bindingMarker,
+					attributePrepare,
+					attributeCommit,
+				),
+			);
+	}
+	const initial = handle === null ? value : readSignalBinding(handle);
+	const kind = policy.kind;
+	const textKind = kind === 'text' || kind === 'textOnlyChild';
+	let text = textKind
+		? (prior?.text ??
+			(token !== null && typeof token === 'object' && (token as Node).nodeType === 3
+				? (token as Text)
+				: undefined))
+		: undefined;
+	if (textKind && text === undefined) {
+		// Claim the address while this cursor is active. Fresh templates install
+		// their text in the unpublished clone; adopted text validates here.
+		text =
+			bindingMarker !== undefined
+				? bindingText(target, initial, bindingMarker)
+				: kind === 'textOnlyChild'
+					? htext(target, initial, seededText)
+					: htextSwap(target, initial);
+	}
+	const signalTarget = textKind ? (prior?.target ?? text!) : target;
+	const reusable =
+		prior !== null &&
+		!prior.disposed &&
+		prior.target === signalTarget &&
+		prior.policy === policy &&
+		prior.site === site &&
+		prior.name === name &&
+		prior.attributeKind === attributeKind &&
+		prior.handle === handle;
+	const hydration = hydrating ? activeHydration() : null;
+	const adopted = hydration !== null && !hydrateIsFresh(hydration, target);
+	let controlSnapshot: ReturnType<typeof snapshotHydrationControl> = null;
+	if (handle !== null && !reusable) {
+		policy.control?.validateNew(scope, target, kind);
+		controlSnapshot = policy.control?.snapshot(target, site) ?? null;
+	}
+	let prepared: unknown;
+	if (textKind) prepared = prepareTemplateText(text!, null, initial);
+	else if (kind === 'value') {
+		const element = target as Element;
+		if (hydrationStarted && scope.block.idState.renderOwner?.controlLeases?.has(element))
+			HYDRATION_DRIVER!.presentationMiss(false);
+		prepared =
+			initial == null
+				? null
+				: element.localName === 'select' && Array.isArray(initial)
+					? new Set(initial.map(toControlledString))
+					: toControlledString(initial);
+	} else if (kind === 'checked') prepared = initial == null ? null : !!initial;
+	else {
+		const element = target as Element;
+		if (handle === null && prior === null && token === value && !adopted) {
+			// A settled scalar keeps an omitted server attribute until the
+			// authored value actually changes. The initial adoption still checks.
+			prepared = undefined;
+		} else prepared = attributePrepare!(element, name!, initial, attributeKind!);
+	}
+	let next: unknown = textKind ? text : value;
+	if (handle !== null) {
+		const binding: DirectSignalBinding = reusable
+			? prior
+			: {
+					[DIRECT_SIGNAL_BINDING]: true,
+					scope,
+					policy,
+					target: signalTarget,
+					site,
+					name,
+					attributeKind,
+					attributePrepare,
+					attributeCommit,
+					handle,
+					text,
+					value: scope,
+					disposed: false,
+				};
+		if (!reusable) {
+			binding.pendingControl =
+				adopted &&
+				isWritableSignal(handle) &&
+				controlSnapshot !== null &&
+				(controlSnapshot.editRevision > 0 || policy.control!.restored(target, initial));
+			if (binding.pendingControl) binding.value = initial;
+		}
+		next = binding;
+	}
+	return {
+		[PREPARED_DIRECT_SIGNAL]: true,
+		scope,
+		target,
+		policy,
+		name,
+		attributeKind,
+		attributeCommit,
+		token: next,
+		previous: accepted,
+		value: initial,
+		prepared,
+		controlSnapshot,
+		adopted,
+	};
+}
+
+/** @internal The template owns one next value set, including its subscriptions. */
+export function prepareTemplateSignalText(
+	scope: Scope,
+	previous: unknown,
+	position: Node,
+	value: unknown,
+	site: string,
+	onlyChild = false,
+	_previousValue?: unknown,
+	seededText?: 1,
+	bindingMarker?: string,
+): PreparedDirectSignal {
+	return prepareDirectSignal(
+		scope,
+		previous,
+		position,
+		value,
+		site,
+		onlyChild ? DIRECT_SIGNAL_TEXT_ONLY_POLICY : DIRECT_SIGNAL_TEXT_POLICY,
+		undefined,
+		undefined,
+		seededText,
+		bindingMarker,
+	);
+}
+
+/** @internal Resolve signal or scalar attributes without activating a writer. */
+export function prepareTemplateSignalAttribute(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	name: string,
+	value: unknown,
+	site: string,
+	attributeKind: DirectSignalAttributeKind,
+): PreparedDirectSignal {
+	return prepareDirectSignal(
+		scope,
+		previous,
+		element,
+		value,
+		site,
+		DIRECT_SIGNAL_ATTRIBUTE_POLICY,
+		name,
+		attributeKind,
+		undefined,
+		undefined,
+		prepareGenericSignalAttribute,
+		commitGenericSignalAttribute,
+	);
+}
+
+/** @internal Statically named attributes retain just the compiled writer and
+ * its preparer. The subscription and cursor path is identical for all hosts. */
+export function prepareTemplateScalarSignalAttribute(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	name: string,
+	value: unknown,
+	site: string,
+	attributeKind: DirectSignalAttributeWriter,
+	prepare: SignalAttributePrepare,
+): PreparedDirectSignal {
+	return prepareDirectSignal(
+		scope,
+		previous,
+		element,
+		value,
+		site,
+		DIRECT_SIGNAL_ATTRIBUTE_POLICY,
+		name,
+		attributeKind,
+		undefined,
+		undefined,
+		prepare,
+		commitScalarSignalAttribute,
+	);
+}
+
+function prepareGenericSignalAttribute(
+	element: Element,
+	name: string,
+	value: unknown,
+	attributeKind: DirectSignalAttributeKind,
+): unknown {
+	if (attributeKind === 'class')
+		return prepareTemplateClass(element, value, element.namespaceURI !== HTML_NS);
+	if (attributeKind === setPlainAttribute) return prepareTemplatePlain(element, name, value);
+	if (attributeKind === setURLAttribute) return prepareTemplateURL(element, name, value);
+	if (attributeKind === setStringData) return prepareTemplateStringData(element, name, value);
+	if (attributeKind === setAriaAttribute) return prepareTemplateAria(element, name, value);
+	if (attributeKind === setBooleanAttribute) {
+		const present = prepareTemplateBoolean(element, name, value);
+		return present === null ? undefined : present;
+	}
+	return prepareTemplateAttribute(element, name, value);
+}
+
+function commitScalarSignalAttribute(
+	element: Element,
+	name: string,
+	prepared: unknown,
+	_scope: Scope,
+	kind: DirectSignalAttributeKind,
+): void {
+	(kind as DirectSignalAttributeWriter)(element, name, prepared);
+}
+
+function commitGenericSignalAttribute(
+	element: Element,
+	name: string,
+	prepared: unknown,
+	scope: Scope,
+	kind: DirectSignalAttributeKind,
+): void {
+	if (kind === setAttribute) {
+		const host = prepared as PreparedHostProps;
+		if (host.attributes !== null && Object.prototype.hasOwnProperty.call(host.attributes, name)) {
+			const attribute = host.attributes[name];
+			if (attribute !== undefined)
+				commitHostAttribute(
+					element,
+					isHtmlCustomElement(element) ? name : (ATTRIBUTE_ALIASES.get(name) ?? name),
+					attribute,
+				);
+		} else commitHostProps(element, host, undefined, scope);
+	} else writeDirectSignalAttribute(element, prepared, 'attribute', undefined, name, kind);
+}
+
+/** @internal Snapshot controls before accepting; retain raw values for IME. */
+export function prepareTemplateSignalValue(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	value: unknown,
+	site: string,
+): PreparedDirectSignal {
+	return prepareDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_VALUE_POLICY);
+}
+
+/** @internal Snapshot controlled checkedness without changing the radio group. */
+export function prepareTemplateSignalChecked(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	value: unknown,
+	site: string,
+): PreparedDirectSignal {
+	return prepareDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_CHECKED_POLICY);
+}
+
+/** @internal Called by the scope's one generated native writer on acceptance. */
+export function commitTemplateSignal(next: PreparedDirectSignal): unknown {
+	if (next.presentation) return next.token;
+	const binding = directSignalToken(next.token);
+	const prior = directSignalToken(next.previous);
+	if (prior !== null && prior !== binding) disposeDirectSignalBinding(prior);
+	const { scope, target, policy, value, prepared } = next;
+	if (binding?.pendingControl !== true && prepared !== undefined) {
+		const element = target as Element;
+		switch (policy.kind) {
+			case 'text':
+			case 'textOnlyChild':
+				setText((binding === null ? next.token : binding.text) as Text, prepared);
+				break;
+			case 'value':
+				if (element.localName === 'select')
+					setSelectValue(element, value, next.adopted, prepared as string | Set<string> | null);
+				else setValue(element, value, next.adopted, prepared as string | null);
+				break;
+			case 'checked':
+				setChecked(element, prepared, next.adopted);
+				break;
+			case 'attribute':
+				next.attributeCommit!(element, next.name!, prepared, scope, next.attributeKind!);
+				break;
+		}
+	}
+	if (binding !== null) {
+		binding.value = value;
+		if (prior !== binding) {
+			registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
+			runWithBlockSignalOwner(scope, () =>
+				activateDirectSignalBinding(binding, next.controlSnapshot?.revision),
+			);
+		}
+		if (binding.pendingControl) policy.control!.adopt(binding);
+	}
+	return next.token;
 }
 
 function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
@@ -25700,7 +25721,7 @@ function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
 		retireNativeTransitionBlock(binding.scope.block);
 		binding.controlWriterCleanup?.();
 		if (binding.input !== undefined) {
-			domNode(binding.target as Element).removeEventListener('input', binding.input);
+			(binding.target as Element).removeEventListener('input', binding.input);
 		}
 	}
 }
@@ -25714,9 +25735,9 @@ function directSignalControlValue(
 }
 
 function validateDirectSignalControl(element: Element, site: string): void {
-	const actual = (STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(HYDRATE_INPUT_ATTR);
+	const actual = element.getAttribute(HYDRATE_INPUT_ATTR);
 	if (actual === null && (!hydrating || activeHydration() === null)) {
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).setAttribute(HYDRATE_INPUT_ATTR, site);
+		element.setAttribute(HYDRATE_INPUT_ATTR, site);
 		return;
 	}
 	if (actual !== site) {
@@ -25725,7 +25746,6 @@ function validateDirectSignalControl(element: Element, site: string): void {
 }
 
 function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
 	binding.policy.writeBinding(binding, value);
 	binding.value = value;
 }
@@ -25765,21 +25785,6 @@ function writeDirectSignalBoundChecked(binding: DirectSignalBinding, value: unkn
 	setChecked(binding.target as Element, value);
 }
 
-function writeDirectSignalText(
-	target: Node,
-	value: unknown,
-	kind: DirectSignalBindingKind,
-	previous: unknown,
-): Text {
-	if (previous instanceof Text) {
-		setText(previous, value);
-		return previous;
-	}
-	// The compiler owns this distinction: an empty sibling text hole can
-	// point at the next element while hydrating, not an only-child parent.
-	return kind === 'textOnlyChild' ? htext(target, value) : htextSwap(target, value);
-}
-
 function writeDirectSignalAttribute(
 	target: Node,
 	value: unknown,
@@ -25797,39 +25802,17 @@ function writeDirectSignalAttribute(
 	return value;
 }
 
-function writeDirectSignalValue(
-	target: Node,
-	value: unknown,
-	_kind: DirectSignalBindingKind,
-	_previous: unknown,
-	_name?: string,
-	_attributeKind?: DirectSignalAttributeKind,
-): unknown {
-	const element = target as Element;
-	if (element.localName === 'select') setSelectValue(element, value);
-	else setValue(element, value);
-	return value;
-}
-
-function writeDirectSignalChecked(target: Node, value: unknown): unknown {
-	setChecked(target as Element, value);
-	return value;
-}
-
 const DIRECT_SIGNAL_TEXT_POLICY: DirectSignalBindingPolicy = {
 	kind: 'text',
 	writeBinding: writeDirectSignalBoundText,
-	write: writeDirectSignalText,
 };
 const DIRECT_SIGNAL_TEXT_ONLY_POLICY: DirectSignalBindingPolicy = {
 	kind: 'textOnlyChild',
 	writeBinding: writeDirectSignalBoundText,
-	write: writeDirectSignalText,
 };
 const DIRECT_SIGNAL_ATTRIBUTE_POLICY: DirectSignalBindingPolicy = {
 	kind: 'attribute',
 	writeBinding: writeDirectSignalBoundAttribute,
-	write: writeDirectSignalAttribute,
 };
 const DIRECT_SIGNAL_CONTROL_POLICY: NonNullable<DirectSignalBindingPolicy['control']> = {
 	validateNew(scope, target, kind) {
@@ -25855,13 +25838,11 @@ const DIRECT_SIGNAL_CONTROL_POLICY: NonNullable<DirectSignalBindingPolicy['contr
 const DIRECT_SIGNAL_VALUE_POLICY: DirectSignalBindingPolicy = {
 	kind: 'value',
 	writeBinding: writeDirectSignalBoundValue,
-	write: writeDirectSignalValue,
 	control: DIRECT_SIGNAL_CONTROL_POLICY,
 };
 const DIRECT_SIGNAL_CHECKED_POLICY: DirectSignalBindingPolicy = {
 	kind: 'checked',
 	writeBinding: writeDirectSignalBoundChecked,
-	write: writeDirectSignalChecked,
 	control: DIRECT_SIGNAL_CONTROL_POLICY,
 };
 
@@ -25875,15 +25856,43 @@ function updateDirectSignalBinding(binding: DirectSignalBinding): void {
 		return;
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
-			const value = readSignalBinding(binding.handle!);
-			if (!Object.is(binding.value, value)) writeDirectSignalBinding(binding, value);
-			if (process.env.NODE_ENV !== 'production' && !STAGED_DOM && binding.target.nodeType === 1)
+			const next = prepareDirectSignal(
+				binding.scope,
+				binding,
+				binding.target,
+				binding.handle,
+				binding.site,
+				binding.policy,
+				binding.name,
+				binding.attributeKind,
+				undefined,
+				undefined,
+				binding.attributePrepare,
+				binding.attributeCommit,
+			);
+			if (!Object.is(binding.value, next.value) || binding.prepared !== undefined) {
+				if (WIP_CAPTURE === null) commitTemplateSignal(next);
+				else
+					prepareSlot(binding.scope, binding, 'prepared', {
+						publish() {
+							// A render can replace this handle before its notification
+							// is published. Only the current owner may write the host.
+							if (!binding.disposed) commitTemplateSignal(next);
+						},
+						discard() {},
+					});
+			}
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				!STAGED_COMMIT_CAPTURE &&
+				binding.target.nodeType === 1
+			)
 				drainDevFormDiagnostics(binding.target as Element);
 		});
 	} catch {
 		// Pending/error reads re-enter the renderer so the nearest Suspense/error
 		// boundary, rather than this targeted DOM subscription, owns recovery.
-		scheduleRender(binding.scope.block);
+		scheduleRender(owningBlock(binding.scope.block));
 	}
 }
 
@@ -25905,7 +25914,7 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 		);
 	};
 	binding.input = input;
-	(STAGED_DOM ? STAGED_DOM.view(element) : element).addEventListener('input', input);
+	element.addEventListener('input', input);
 	binding.controlWriterCleanup = registerHydrationControlSignalWriter(
 		element,
 		binding.policy.kind === 'checked' ? 'checked' : 'value',
@@ -25966,164 +25975,6 @@ function activateDirectSignalBinding(
 	if (revision !== undefined) binding.policy.control!.activate(binding, revision);
 }
 
-function createDirectSignalBinding(
-	scope: Scope,
-	target: Node,
-	value: unknown,
-	site: string,
-	policy: DirectSignalBindingPolicy,
-	name?: string,
-	attributeKind?: DirectSignalAttributeKind,
-	text?: Text,
-): DirectSignalBinding {
-	policy.control?.validateNew(scope, target, policy.kind);
-	const handle = isSignalHandle(value) ? value : null;
-	const binding: DirectSignalBinding = {
-		[DIRECT_SIGNAL_BINDING]: true,
-		scope,
-		policy,
-		target,
-		site,
-		name,
-		attributeKind,
-		handle,
-		value: scope,
-		disposed: false,
-	};
-	// A previous text token has already gone through mount/hydration. Reuse
-	// it across capability changes; a raw SSR Text target still needs adoption.
-	if (text !== undefined) binding.text = text;
-	const controlSnapshot = policy.control?.snapshot(target, site) ?? null;
-	const initial = handle === null ? value : readSignalBinding(handle);
-	binding.pendingControl = hydrating
-		? activeHydration() !== null &&
-			isWritableSignal(handle) &&
-			controlSnapshot !== null &&
-			// Only control policies snapshot, so text/attribute bindings never retain
-			// the restored-textarea adoption graph.
-			(controlSnapshot.editRevision > 0 || policy.control!.restored(target, initial))
-		: false;
-	if (binding.pendingControl) binding.value = initial;
-	if (!binding.pendingControl) writeDirectSignalBinding(binding, initial);
-	if (STAGED_COMMIT_CAPTURE) {
-		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-			runWithBlockSignalOwner(scope, () =>
-				activateDirectSignalBinding(binding, controlSnapshot?.revision),
-			);
-			// A handle can advance while the old native tree is still visible.
-			updateDirectSignalBinding(binding);
-		});
-	} else activateDirectSignalBinding(binding, controlSnapshot?.revision);
-	if (binding.pendingControl) policy.control!.adopt(binding);
-	registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
-	return binding;
-}
-
-function bindDirectSignal(
-	scope: Scope,
-	previous: unknown,
-	target: Node,
-	value: unknown,
-	site: string,
-	policy: DirectSignalBindingPolicy,
-	name?: string,
-	attributeKind?: DirectSignalAttributeKind,
-): unknown {
-	const kind = policy.kind;
-	const prior =
-		typeof previous === 'object' &&
-		previous !== null &&
-		(previous as DirectSignalBinding)[DIRECT_SIGNAL_BINDING] === true
-			? (previous as DirectSignalBinding)
-			: null;
-	const handle = isSignalHandle(value) ? value : null;
-	if (handle !== null && (!signalDocumentEnabled || currentSignalOwner() !== scope.signalOwner)) {
-		// A prop/callback can reveal the first handle midway through a render.
-		// Enter its already-stamped scope for both the initial read and subscribe;
-		// the ambient render frame may have started before document activation.
-		if (!signalDocumentEnabled) enableSignalBindings();
-		if (currentSignalOwner() !== scopeSignalOwner(scope)) {
-			return runWithBlockSignalOwner(scope, () =>
-				bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
-			);
-		}
-	}
-	if (handle === null && prior === null) {
-		if (kind === 'attribute' && previous === value) {
-			// An undefined cache slot has not yet compared an adopted server attribute.
-			const hydration = value === undefined && hydrating ? activeHydration() : null;
-			if (hydration === null || hydration.isFresh(target)) return previous;
-		}
-		if (TRANSITION_JOURNAL !== null) journalBag();
-		const scalarTarget =
-			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
-		return policy.write(scalarTarget, value, kind, previous, name, attributeKind);
-	}
-	if (
-		prior !== null &&
-		!prior.disposed &&
-		prior.target === target &&
-		prior.policy === policy &&
-		prior.site === site &&
-		prior.name === name &&
-		prior.attributeKind === attributeKind &&
-		prior.handle === handle
-	) {
-		if (prior.pendingControl) {
-			// The preceding attempt's action may have been dropped by rollback.
-			policy.control!.adopt(prior);
-			return prior;
-		}
-		const next = readSignalBinding(handle!);
-		if (!Object.is(prior.value, next)) writeDirectSignalBinding(prior, next);
-		return prior;
-	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
-	if (handle === null) {
-		const scalarTarget =
-			kind === 'text' || kind === 'textOnlyChild'
-				? (prior?.text ?? prior?.target ?? target)
-				: target;
-		const token = policy.write(
-			scalarTarget,
-			value,
-			kind,
-			kind === 'text' || kind === 'textOnlyChild' ? prior?.text : (prior?.value ?? previous),
-			name,
-			attributeKind,
-		);
-		if (prior !== null) {
-			const finish = (discarded: boolean): void => {
-				if (!discarded) disposeDirectSignalBinding(prior);
-			};
-			if (WIP_CAPTURE === null) finish(false);
-			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
-		}
-		return token;
-	}
-	const signalTarget =
-		(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
-	const binding = createDirectSignalBinding(
-		scope,
-		signalTarget,
-		value,
-		site,
-		policy,
-		name,
-		attributeKind,
-		kind === 'text' || kind === 'textOnlyChild'
-			? (prior?.text ?? (previous instanceof Text ? previous : undefined))
-			: undefined,
-	);
-	if (prior !== null) {
-		const finish = (discarded: boolean): void =>
-			disposeDirectSignalBinding(discarded ? binding : prior);
-		if (WIP_CAPTURE === null) finish(false);
-		else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
-	}
-	return binding;
-}
-
 /**
  * @internal Compiler target for a direct signal/scalar text binding.
  *
@@ -26142,45 +25993,25 @@ export function bindSignalText(
 	seededText: 1 | undefined = undefined,
 	bindingMarker?: string,
 ): unknown {
-	// Keep the ordinary text cache in the compiler's existing binding bag. A
-	// signal token must still re-enter the read path even when its handle is
-	// unchanged, so pending/error recovery is not hidden by this scalar guard.
-	// A supplied previousValue may itself be undefined, so count arguments.
-	if (previous instanceof Text && !isSignalHandle(value)) {
-		if (arguments.length > 6 && previousValue === value) return previous;
-		// A scalar over the Text this hole already owns is bindDirectSignal's
-		// unbound scalar write without its policy dispatch. setText journals the
-		// text and this binding bag.
-		setText(previous, value);
-		return previous;
-	}
-	if (previous === undefined && bindingMarker !== undefined) {
-		const existing = hydrating && activeHydration() !== null ? getNextSibling(position) : null;
-		previous = bindingText(
-			position,
-			existing?.nodeType === 3 ? (STAGED_DOM ? STAGED_DOM.view(existing) : existing).nodeValue : '',
-			bindingMarker,
-		);
-	}
-	// Only the compiler's fresh native template placeholder is already owned.
-	// Hydration still goes through htext to adopt and advance the server cursor.
 	if (
-		previous === undefined &&
-		onlyChild &&
-		seededText === 1 &&
-		(!hydrating || activeHydration() === null)
-	) {
-		const text = getFirstChild(position);
-		if (text instanceof Text) previous = text;
-	}
-	const prior = previous as DirectSignalBinding | undefined;
-	return bindDirectSignal(
-		scope,
-		previous,
-		prior?.target ?? (previous instanceof Text ? previous : position),
-		value,
-		site,
-		onlyChild ? DIRECT_SIGNAL_TEXT_ONLY_POLICY : DIRECT_SIGNAL_TEXT_POLICY,
+		previous instanceof Text &&
+		!isSignalHandle(value) &&
+		arguments.length > 6 &&
+		previousValue === value
+	)
+		return previous;
+	return commitTemplateSignal(
+		prepareTemplateSignalText(
+			scope,
+			previous,
+			position,
+			value,
+			site,
+			onlyChild,
+			previousValue,
+			seededText,
+			bindingMarker,
+		),
 	);
 }
 
@@ -26202,15 +26033,8 @@ export function bindSignalAttribute(
 		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
 	)
 		return previous;
-	return bindDirectSignal(
-		scope,
-		previous,
-		element,
-		value,
-		site,
-		DIRECT_SIGNAL_ATTRIBUTE_POLICY,
-		name,
-		attributeKind,
+	return commitTemplateSignal(
+		prepareTemplateSignalAttribute(scope, previous, element, name, value, site, attributeKind),
 	);
 }
 
@@ -26222,7 +26046,7 @@ export function bindSignalValue(
 	value: unknown,
 	site: string,
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_VALUE_POLICY);
+	return commitTemplateSignal(prepareTemplateSignalValue(scope, previous, element, value, site));
 }
 
 /** @internal Compiler target for a direct signal/scalar checked binding. */
@@ -26233,7 +26057,7 @@ export function bindSignalChecked(
 	value: unknown,
 	site: string,
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_CHECKED_POLICY);
+	return commitTemplateSignal(prepareTemplateSignalChecked(scope, previous, element, value, site));
 }
 
 /**
@@ -26251,7 +26075,7 @@ function attributeUnchanged(previous: unknown, value: unknown, el: Element): boo
 	if (previous !== value) return false;
 	if (value !== undefined) return true;
 	const hydration = hydrating ? activeHydration() : null;
-	return hydration === null || hydration.isFresh(el);
+	return hydration === null || hydrateIsFresh(hydration, el);
 }
 
 export function setAttributeIfChanged(
@@ -26358,18 +26182,10 @@ export function updateFreshClassAttr(value: unknown, previous: unknown, el: Elem
 export function setScriptText(el: Element, value: any): void {
 	const text = value == null ? '' : String(value);
 	const first = getFirstChild(el);
-	if (
-		first !== null &&
-		first === (STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild &&
-		first.nodeType === 3
-	) {
+	if (first !== null && first === el.lastChild && first.nodeType === 3) {
 		updateTextValue(first as Text, text);
 	} else {
-		if (ROOT_RENDER_TRANSACTION !== null) {
-			journalBag();
-			journalRootRange(el, null, null);
-		}
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).textContent = text;
+		el.textContent = text;
 	}
 }
 
@@ -26406,22 +26222,22 @@ function normalizeHTMLForHydration(parent: Element, html: string): string {
 	const ns = parent.namespaceURI;
 	const testElement =
 		ns === 'http://www.w3.org/2000/svg' || ns === 'http://www.w3.org/1998/Math/MathML'
-			? (STAGED_DOM ? STAGED_DOM.view(doc) : doc).createElementNS(ns, parent.tagName)
-			: (STAGED_DOM ? STAGED_DOM.view(doc) : doc).createElement(parent.tagName);
-	(STAGED_DOM ? STAGED_DOM.view(testElement) : testElement).innerHTML = html;
-	return (STAGED_DOM ? STAGED_DOM.view(testElement) : testElement).innerHTML;
+			? doc.createElementNS(ns, parent.tagName)
+			: doc.createElement(parent.tagName);
+	testElement.innerHTML = html;
+	return testElement.innerHTML;
 }
 
 /**
  * React-compatible `dangerouslySetInnerHTML`. Hydration keeps an adopted
- * element's server content and records nothing (HydrationCapability.adoptHTML),
+ * element's server content and records nothing (hydration: adoptHTML),
  * so the next render that passes an `__html` object rewrites it.
  */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.isFresh(el)) {
-		hydration.adoptHTML(el, next);
+	if (hydration !== null && !hydrateIsFresh(hydration, el)) {
+		hydrateAdoptHTML(hydration, el, next);
 		return;
 	}
 	if (el.localName === 'script') {
@@ -26430,20 +26246,9 @@ export function setHTML(el: Element, value: any): void {
 	}
 	// Fresh wrappers must not replace identical children. Compare accepted authored
 	// HTML, including successful hydration adoption, before entering DOM staging.
-	const host = STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any);
+	const host = el as any;
 	if (host[DANGER_HTML_VALUE] === next) return;
-	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		journalBag();
-		journalRootRange(el, null, null);
-		// Raw HTML is a leaf: stage its genuine new nodes next to the outgoing
-		// ones so a later suspension cannot blur an input in the retained HTML.
-		deferRootRange(el, getFirstChild(el), (STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild);
-		const fresh = (STAGED_DOM ? STAGED_DOM.view(el) : el).cloneNode(false) as Element;
-		(STAGED_DOM ? STAGED_DOM.view(fresh) : fresh).innerHTML = next;
-		while (getFirstChild(fresh) !== null)
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(getFirstChild(fresh)!);
-	} else (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML = next;
+	el.innerHTML = next;
 	host[DANGER_HTML_VALUE] = next;
 }
 
@@ -26469,26 +26274,19 @@ function validateDangerouslySetInnerHTMLValue(value: unknown): void {
 }
 
 /** Complete validated write used by direct, spread, and html-only compiler paths. */
-export function setDangerouslySetInnerHTML(el: Element, value: any): void {
+export function setDangerouslySetInnerHTML(el: Element, value: any, adopted = false): void {
 	validateDangerouslySetInnerHTMLValue(value);
-	journalRootProperty(
-		el,
-		DANGER_HTML_ACTIVE,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE],
-	);
-	const wasActive =
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] === true;
+	const wasActive = (el as any)[DANGER_HTML_ACTIVE] === true;
 	if (value == null) {
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] = false;
+		(el as any)[DANGER_HTML_ACTIVE] = false;
 		// A nullish writer on a never-raw host is semantically absent and must not
 		// erase ordinary children. Transitioning away from an active writer clears
 		// the raw content it owned.
 		if (wasActive) {
-			setHTML(el, null);
-			const host = STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any);
+			if (!adopted) setHTML(el, null);
+			const host = el as any;
 			// Ordinary children can now replace the cached empty HTML.
 			if (host[DANGER_HTML_VALUE] !== undefined) {
-				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
 				host[DANGER_HTML_VALUE] = undefined;
 			}
 		}
@@ -26499,14 +26297,14 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 	}
 	if (
 		value != null &&
-		((STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_STATIC_CHILD] === true ||
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] != null)
+		((el as any)[DANGER_HTML_STATIC_CHILD] === true ||
+			(el as any)[DANGER_HTML_SPREAD_CHILD] != null)
 	) {
 		throw dangerHtmlChildrenError();
 	}
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] = true;
+	(el as any)[DANGER_HTML_ACTIVE] = true;
 	DANGER_HTML_EVER_ACTIVE = true;
-	setHTML(el, value.__html);
+	if (!adopted) setHTML(el, value.__html);
 }
 
 /** Resolve source-ordered direct/spread raw-HTML writers and apply only the winner. */
@@ -26559,6 +26357,15 @@ export function setDangerouslySetInnerHTMLSources(
 	}
 	const resolved = foundDanger && danger != null ? danger : null;
 	const resolvedChild = foundChild ? child : null;
+	commitDangerouslySetInnerHTMLSources(el, resolved, resolvedChild);
+}
+
+function commitDangerouslySetInnerHTMLSources(
+	el: Element,
+	resolved: any,
+	resolvedChild: unknown,
+	prepared?: PreparedHostProps,
+): void {
 	if (VOID_ELEMENTS.has(el.localName) && (resolved !== null || resolvedChild != null)) {
 		throw new Error(formatClientError(8, el.localName));
 	}
@@ -26566,47 +26373,28 @@ export function setDangerouslySetInnerHTMLSources(
 	validateDangerouslySetInnerHTMLValue(resolved);
 	if (
 		hasOwnProp.call(el, DANGER_HTML_RESOLVED_VALUE) &&
-		Object.is(
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_VALUE],
-			resolved,
-		) &&
-		Object.is(
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_CHILD],
-			resolvedChild,
-		)
+		Object.is((el as any)[DANGER_HTML_RESOLVED_VALUE], resolved) &&
+		Object.is((el as any)[DANGER_HTML_RESOLVED_CHILD], resolvedChild)
 	) {
 		return;
 	}
 	// Stamp only the FINAL child source. Spread-local validation runs too early:
 	// when a render transitions raw HTML -> ordinary children, the old raw-HTML
 	// active bit is still present until this commit disables it.
-	journalRootProperty(
+	(el as any)[DANGER_HTML_SPREAD_CHILD] = resolvedChild;
+	setDangerouslySetInnerHTML(
 		el,
-		DANGER_HTML_SPREAD_CHILD,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD],
+		prepared === undefined ? resolved : prepared.html,
+		prepared?.adopted,
 	);
-	journalRootProperty(
-		el,
-		DANGER_HTML_RESOLVED_VALUE,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_VALUE],
-	);
-	journalRootProperty(
-		el,
-		DANGER_HTML_RESOLVED_CHILD,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_CHILD],
-	);
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] = resolvedChild;
-	setDangerouslySetInnerHTML(el, resolved);
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_VALUE] = resolved;
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_CHILD] =
-		resolvedChild;
+	(el as any)[DANGER_HTML_RESOLVED_VALUE] = resolved;
+	(el as any)[DANGER_HTML_RESOLVED_CHILD] = resolvedChild;
 }
 
 /** Stamp a compiler-proven non-nullish child onto a potential raw-HTML host. */
 export function markDangerouslySetInnerHTMLChildren(el: Element): void {
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_STATIC_CHILD] = true;
-	if ((STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] === true)
-		throw dangerHtmlChildrenError();
+	(el as any)[DANGER_HTML_STATIC_CHILD] = true;
+	if ((el as any)[DANGER_HTML_ACTIVE] === true) throw dangerHtmlChildrenError();
 }
 
 /**
@@ -26614,13 +26402,41 @@ export function markDangerouslySetInnerHTMLChildren(el: Element): void {
  * Null/undefined are the only accepted coexisting values; callers skip normal
  * child reconciliation in that case so it cannot erase the raw HTML.
  */
-function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean {
+function dangerouslySetInnerHTMLOwnsChild(
+	parent: Node,
+	value: unknown,
+	prospectiveProps?: Record<string, unknown>,
+	scope?: Scope,
+	slotKey?: number,
+): boolean {
+	// A prepared host's child sees that same candidate, before its real DOM
+	// owner changes. Signal publications without a render see committed props.
+	if (prospectiveProps !== undefined) {
+		if (prospectiveProps.dangerouslySetInnerHTML == null) {
+			if (
+				scope !== undefined &&
+				DANGER_HTML_EVER_ACTIVE &&
+				parent.nodeType === 1 &&
+				(parent as any)[DANGER_HTML_ACTIVE] === true
+			) {
+				// A normal child owns this host only after the old raw content is
+				// released. Register before the child's preparation, so the host
+				// template cannot later erase that child's newly published nodes.
+				prepareSlot(scope, scope.slots, 'raw$' + slotKey, {
+					parent,
+					publish() {
+						setDangerouslySetInnerHTML(parent as Element, null);
+					},
+					discard() {},
+				});
+			}
+			return false;
+		}
+		if (value != null) throw dangerHtmlChildrenError();
+		return true;
+	}
 	if (!DANGER_HTML_EVER_ACTIVE) return false;
-	if (
-		parent.nodeType !== 1 ||
-		(STAGED_DOM ? STAGED_DOM.view(parent as any) : (parent as any))[DANGER_HTML_ACTIVE] !== true
-	)
-		return false;
+	if (parent.nodeType !== 1 || (parent as any)[DANGER_HTML_ACTIVE] !== true) return false;
 	if (value !== null && value !== undefined) throw dangerHtmlChildrenError();
 	return true;
 }
@@ -26901,7 +26717,7 @@ export class FragmentInstance {
 		if (portals === undefined || !portals.delete(portal)) return;
 		if (portals.size === 0) anchors!.delete(anchor);
 		if (anchors!.size === 0) this._portalAnchors = null;
-		let child: ChildNode | null = domNode(portal.start)?.nextSibling ?? null;
+		let child: ChildNode | null = portal.start?.nextSibling ?? null;
 		while (child !== null && child !== portal.end) {
 			const next = getNextSibling(child);
 			if (
@@ -26918,11 +26734,7 @@ export class FragmentInstance {
 	_attachChild(child: Element | Text): void {
 		if (this._listeners !== null) {
 			for (const entry of this._listeners) {
-				(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(
-					entry.type,
-					entry.listener,
-					entry.options,
-				);
+				child.addEventListener(entry.type, entry.listener, entry.options);
 			}
 		}
 		if (child.nodeType === 1 && this._observers !== null) {
@@ -26936,11 +26748,7 @@ export class FragmentInstance {
 	_detachChild(child: Element | Text): void {
 		if (this._listeners !== null) {
 			for (const entry of this._listeners) {
-				(STAGED_DOM ? STAGED_DOM.view(child) : child).removeEventListener(
-					entry.type,
-					entry.listener,
-					entry.options,
-				);
+				child.removeEventListener(entry.type, entry.listener, entry.options);
 			}
 		}
 		(child as (Element | Text) & { reactFragments?: Set<FragmentInstance> }).reactFragments?.delete(
@@ -27003,14 +26811,10 @@ export class FragmentInstance {
 	blur(): void {
 		if (this._destroyed) return;
 		for (const child of fragmentDirectChildren(this)) {
-			const root = (STAGED_DOM ? STAGED_DOM.view(child) : child).getRootNode() as
-				Document | ShadowRoot;
+			const root = child.getRootNode() as Document | ShadowRoot;
 			const active = root.activeElement;
-			if (
-				active &&
-				(child === active || (STAGED_DOM ? STAGED_DOM.view(child) : child).contains(active))
-			) {
-				(STAGED_DOM ? STAGED_DOM.view(active as HTMLElement) : (active as HTMLElement)).blur();
+			if (active && (child === active || child.contains(active))) {
+				(active as HTMLElement).blur();
 				return;
 			}
 		}
@@ -27068,7 +26872,7 @@ export class FragmentInstance {
 		listeners.push(entry);
 		snapshot.signal?.addEventListener('abort', entry.abort, { once: true });
 		for (const child of fragmentDirectNodes(this)) {
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(type, listener, snapshot);
+			child.addEventListener(type, listener, snapshot);
 		}
 	}
 
@@ -27093,11 +26897,7 @@ export class FragmentInstance {
 			if (entry.options.capture !== wantCapture) continue;
 			entry.options.signal?.removeEventListener('abort', entry.abort);
 			for (const child of fragmentDirectNodes(this)) {
-				(STAGED_DOM ? STAGED_DOM.view(child) : child).removeEventListener(
-					type,
-					listener,
-					entry.options,
-				);
+				child.removeEventListener(type, listener, entry.options);
 			}
 			this._listeners.splice(i, 1);
 			return;
@@ -27191,10 +26991,8 @@ export class FragmentInstance {
 	 */
 	getRootNode(options?: GetRootNodeOptions): Node | FragmentInstance {
 		if (this._destroyed) return this;
-		const parent = domNode(this._startMarker).parentNode;
-		return parent === null
-			? this
-			: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).getRootNode(options);
+		const parent = this._startMarker.parentNode;
+		return parent === null ? this : parent.getRootNode(options);
 	}
 
 	// ─── compareDocumentPosition / dispatchEvent (Stage 5) ──────────────
@@ -27205,7 +27003,7 @@ export class FragmentInstance {
 	 */
 	compareDocumentPosition(other: Node): number {
 		if (this._destroyed) return Node.DOCUMENT_POSITION_DISCONNECTED;
-		const parent = domNode(this._startMarker).parentNode;
+		const parent = this._startMarker.parentNode;
 		if (parent === null) return Node.DOCUMENT_POSITION_DISCONNECTED;
 
 		let first: Element | Text | null = null;
@@ -27213,12 +27011,8 @@ export class FragmentInstance {
 		for (const child of fragmentDirectNodes(this)) {
 			first ??= child;
 			last = child;
-			if (
-				child === other ||
-				(child.nodeType === 1 &&
-					(STAGED_DOM ? STAGED_DOM.view(child as Element) : (child as Element)).contains(other))
-			) {
-				return (STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(child)
+			if (child === other || (child.nodeType === 1 && (child as Element).contains(other))) {
+				return parent.contains(child)
 					? Node.DOCUMENT_POSITION_CONTAINED_BY
 					: Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 			}
@@ -27231,9 +27025,7 @@ export class FragmentInstance {
 			// children, including this Fragment's boundary comment.
 			const logicalParent =
 				(this._startMarker as Comment & { $$portalParent?: Node }).$$portalParent ?? parent;
-			let result = (
-				STAGED_DOM ? STAGED_DOM.view(logicalParent) : logicalParent
-			).compareDocumentPosition(other);
+			let result = logicalParent.compareDocumentPosition(other);
 			if (logicalParent === other) {
 				result = Node.DOCUMENT_POSITION_CONTAINS;
 			} else if ((result & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0) {
@@ -27241,23 +27033,19 @@ export class FragmentInstance {
 				result =
 					next !== null &&
 					(next === other ||
-						((STAGED_DOM ? STAGED_DOM.view(next) : next).compareDocumentPosition(other) &
-							Node.DOCUMENT_POSITION_FOLLOWING) !==
-							0)
+						(next.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
 						? Node.DOCUMENT_POSITION_FOLLOWING
 						: Node.DOCUMENT_POSITION_PRECEDING;
 			}
 			return result | Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 		}
 
-		const firstResult = (STAGED_DOM ? STAGED_DOM.view(first) : first).compareDocumentPosition(
-			other,
-		);
+		const firstResult = first.compareDocumentPosition(other);
 		if ((firstResult & Node.DOCUMENT_POSITION_DISCONNECTED) !== 0) return firstResult;
-		const lastResult = (STAGED_DOM ? STAGED_DOM.view(last) : last).compareDocumentPosition(other);
+		const lastResult = last.compareDocumentPosition(other);
 		if (
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(first) &&
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(last) &&
+			parent.contains(first) &&
+			parent.contains(last) &&
 			(firstResult & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
 			(lastResult & Node.DOCUMENT_POSITION_PRECEDING) !== 0
 		) {
@@ -27272,17 +27060,11 @@ export class FragmentInstance {
 			$$portalSourceAnchor?: Node;
 		};
 		const logicalParent = portalMarker.$$portalParent;
-		if (
-			logicalParent !== undefined &&
-			logicalParent !== parent &&
-			(STAGED_DOM ? STAGED_DOM.view(logicalParent) : logicalParent).contains(other)
-		) {
+		if (logicalParent !== undefined && logicalParent !== parent && logicalParent.contains(other)) {
 			const sourceAnchor = portalMarker.$$portalSourceAnchor;
 			if (sourceAnchor === undefined) return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 			const directionMask = Node.DOCUMENT_POSITION_PRECEDING | Node.DOCUMENT_POSITION_FOLLOWING;
-			const logicalDirection =
-				(STAGED_DOM ? STAGED_DOM.view(sourceAnchor) : sourceAnchor).compareDocumentPosition(other) &
-				directionMask;
+			const logicalDirection = sourceAnchor.compareDocumentPosition(other) & directionMask;
 			if ((firstResult & directionMask) !== logicalDirection) {
 				return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 			}
@@ -27296,38 +27078,29 @@ export class FragmentInstance {
 	 */
 	dispatchEvent(event: Event): boolean {
 		if (this._destroyed) return true;
-		const parent = domNode(this._startMarker).parentNode;
+		const parent = this._startMarker.parentNode;
 		if (!parent) return true;
 		const listeners = this._listeners;
 		if (event.bubbles && (listeners === null || listeners.length === 0)) {
 			return parent.dispatchEvent(event);
 		}
 
-		const target = domNode(parent.ownerDocument || document).createTextNode('');
+		const target = (parent.ownerDocument || document).createTextNode('');
 		if (listeners !== null) {
 			for (const entry of listeners) {
-				(STAGED_DOM ? STAGED_DOM.view(target) : target).addEventListener(
-					entry.type,
-					entry.listener,
-					entry.options,
-				);
+				target.addEventListener(entry.type, entry.listener, entry.options);
 			}
 		}
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(target);
+		parent.appendChild(target);
 		try {
 			return target.dispatchEvent(event);
 		} finally {
 			if (listeners !== null) {
 				for (const entry of listeners) {
-					(STAGED_DOM ? STAGED_DOM.view(target) : target).removeEventListener(
-						entry.type,
-						entry.listener,
-						entry.options,
-					);
+					target.removeEventListener(entry.type, entry.listener, entry.options);
 				}
 			}
-			if ((STAGED_DOM ? STAGED_DOM.view(target) : target).parentNode === parent)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(target);
+			if (target.parentNode === parent) parent.removeChild(target);
 		}
 	}
 
@@ -27348,7 +27121,7 @@ export class FragmentInstance {
 			const following = fragmentNearestSibling(this._endMarker, true);
 			const preceding = fragmentNearestSibling(this._startMarker, false);
 			const target = alignStart
-				? following || preceding || domNode(this._startMarker).parentNode
+				? following || preceding || this._startMarker.parentNode
 				: preceding || following;
 			if (target === null || target === undefined || target.nodeType === 9) return;
 			if (target.nodeType === 11) {
@@ -27412,7 +27185,7 @@ function* fragmentDirectNodes(fi: FragmentInstance): Generator<Element | Text> {
 				// Portals are physically outside Activity's hidden host range. Their
 				// logical Block ancestry, not their target DOM, determines visibility.
 				if (portal.block === null || findHiddenActivity(portal.block) !== null) continue;
-				let child: ChildNode | null = domNode(portal.start)?.nextSibling ?? null;
+				let child: ChildNode | null = portal.start?.nextSibling ?? null;
 				while (child !== null && child !== portal.end) {
 					const nextChild = getNextSibling(child);
 					if ((child.nodeType === 1 || child.nodeType === 3) && fragmentHostVisible(child)) {
@@ -27462,28 +27235,21 @@ function focusFragmentElement(node: Element, options?: FocusOptions): boolean {
 	const onFocus = () => {
 		focused = true;
 	};
-	(STAGED_DOM ? STAGED_DOM.view(owner) : owner).addEventListener('focus', onFocus, true);
+	owner.addEventListener('focus', onFocus, true);
 	try {
-		((STAGED_DOM ? STAGED_DOM.view(element) : element).focus || HTMLElement.prototype.focus).call(
-			element,
-			options,
-		);
+		(element.focus || HTMLElement.prototype.focus).call(element, options);
 	} finally {
-		(STAGED_DOM ? STAGED_DOM.view(owner) : owner).removeEventListener('focus', onFocus, true);
+		owner.removeEventListener('focus', onFocus, true);
 	}
 	return focused;
 }
 
 /** Skip implementation-only markers when locating an empty fragment's host sibling. */
 function fragmentNearestSibling(marker: Node, forward: boolean): Element | Text | null {
-	let sibling = forward
-		? getNextSibling(marker)
-		: (STAGED_DOM ? STAGED_DOM.view(marker) : marker).previousSibling;
+	let sibling = forward ? getNextSibling(marker) : marker.previousSibling;
 	while (sibling !== null) {
 		if (sibling.nodeType === 1 || sibling.nodeType === 3) return sibling as Element | Text;
-		sibling = forward
-			? getNextSibling(sibling)
-			: (STAGED_DOM ? STAGED_DOM.view(sibling) : sibling).previousSibling;
+		sibling = forward ? getNextSibling(sibling) : sibling.previousSibling;
 	}
 	return null;
 }
@@ -27584,6 +27350,7 @@ function inferTagNs(tag: string, inherited: string | undefined): string | undefi
 // SVG element but switches its children back to HTML; HTML is represented by an
 // undefined namespace because document.createElement is the fast/default path.
 function deoptChildNamespace(parent: Node): string | undefined {
+	parent = PREPARED_PARENTS.get(parent) ?? parent;
 	if (parent.nodeType !== 1) return undefined;
 	const el = parent as Element;
 	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
@@ -27603,7 +27370,13 @@ function attrNamespace(name: string): string | null {
 	return null;
 }
 
-export function setAttribute(el: Element, name: string, value: any): void {
+export function setAttribute(
+	el: Element,
+	name: string,
+	value: any,
+	adopting?: boolean,
+	normalized?: string | Set<string> | boolean | null,
+): void {
 	if (name === 'innerText' || name === 'textContent') return;
 	if (
 		process.env.NODE_ENV !== 'production' &&
@@ -27655,19 +27428,20 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		case 5:
 			if (name === 'value') {
 				const t = el.localName;
-				if (t === 'input' || t === 'textarea') return setValue(el, value);
-				if (t === 'select') return setSelectValue(el, value);
+				if (t === 'input' || t === 'textarea')
+					return setValue(el, value, adopting, normalized as string | null);
+				if (t === 'select')
+					return setSelectValue(el, value, adopting, normalized as string | Set<string> | null);
 			} else if (name === 'muted' && !isHtmlCustomElement(el)) {
 				// mustUseProperty (React parity): the muted ATTRIBUTE doesn't
 				// reflect to the live property post-creation — a dynamic write
 				// must set the property or a playing element never (un)mutes.
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).muted =
-					value && typeof value !== 'function' && typeof value !== 'symbol';
+				(el as any).muted = value && typeof value !== 'function' && typeof value !== 'symbol';
 				return;
 			}
 			break;
 		case 7:
-			if (name === 'checked' && el.localName === 'input') return setChecked(el, value);
+			if (name === 'checked' && el.localName === 'input') return setChecked(el, value, adopting);
 			break;
 		case 8:
 			if ((name === 'multiple' || name === 'selected') && !isHtmlCustomElement(el)) {
@@ -27675,13 +27449,12 @@ export function setAttribute(el: Element, name: string, value: any): void {
 					const hydration = hydrating ? activeHydration() : null;
 					// Adopt the user's pre-hydration selection. An armed select
 					// value still reasserts through its controlled commit queue.
-					if (hydration !== null && !hydration.isFresh(el)) return;
+					if (adopting ?? (hydration !== null && !hydrateIsFresh(hydration, el))) return;
 				}
 				// mustUseProperty like `muted`. `multiple` reflects back to the
 				// attribute; `selected` is live option state (the controlled
 				// <select> projection owns it when a select value is armed).
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[name] =
-					value && typeof value !== 'function' && typeof value !== 'symbol';
+				(el as any)[name] = value && typeof value !== 'function' && typeof value !== 'symbol';
 				return;
 			}
 			break;
@@ -27689,7 +27462,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			if (name === 'autoFocus' && !isHtmlCustomElement(el)) {
 				// React parity: never an attribute — the element is focused in
 				// the commit phase on mount (see setAutoFocus).
-				return setAutoFocus(el, value);
+				return setAutoFocus(el, value, adopting);
 			}
 			if (
 				process.env.NODE_ENV !== 'production' &&
@@ -27707,7 +27480,13 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			if (name === 'defaultValue') {
 				const t = el.localName;
 				if (t === 'input' || t === 'textarea' || t === 'select') {
-					return setDefaultValue(el, value);
+					return setDefaultValue(
+						el,
+						value,
+						undefined,
+						adopting,
+						normalized as string | Set<string> | null,
+					);
 				}
 			} else if (
 				process.env.NODE_ENV !== 'production' &&
@@ -27723,7 +27502,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			break;
 		case 14:
 			if (name === 'defaultChecked' && el.localName === 'input') {
-				return setDefaultChecked(el, value);
+				return setDefaultChecked(el, value, adopting);
 			}
 			if (
 				process.env.NODE_ENV !== 'production' &&
@@ -27759,17 +27538,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		const type = capture ? name.slice(2, -7) : name.slice(2);
 		const map: Record<string, EventListener> = ((el as any).$$ceListeners ??= {});
 		const prev = map[name];
-		if (prev !== undefined && prev !== value)
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener(type, prev, capture);
+		if (prev !== undefined && prev !== value) el.removeEventListener(type, prev, capture);
 		if (typeof value === 'function') {
-			if (prev !== value)
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(
-					type,
-					value as EventListener,
-					capture,
-				);
+			if (prev !== value) el.addEventListener(type, value as EventListener, capture);
 			map[name] = value as EventListener;
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name); // a listener prop never lands in the markup
+			el.removeAttribute(name); // a listener prop never lands in the markup
 			return;
 		}
 		delete map[name];
@@ -27799,18 +27572,18 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// An adopted element keeps its server attribute; development compares it with the final
 	// coerced value. The capability guard keeps that read out of ordinary client updates.
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydration !== null && !hydrateAllowAttribute(hydration, el, name, next)) return;
+	commitHostAttribute(el, name, next);
+}
+
+function commitHostAttribute(el: Element, name: string, next: string | null): void {
 	const ns = attrNamespace(name);
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name, ns);
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttributeNS(
-				ns,
-				colon >= 0 ? name.slice(colon + 1) : name,
-			);
+			el.removeAttributeNS(ns, colon >= 0 ? name.slice(colon + 1) : name);
 		} else {
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+			el.removeAttribute(name);
 		}
 		return;
 	}
@@ -27825,8 +27598,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	if (ns) (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttributeNS(ns, name, next);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (ns) el.setAttributeNS(ns, name, next);
+	else el.setAttribute(name, next);
 }
 
 // React's `warnedProperties` cache is module-global and keyed by prop name: once
@@ -27915,9 +27688,8 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 	if (process.env.NODE_ENV !== 'production') return setAttribute(el, name, value);
 	const next = prepareTemplatePlain(el, name, value);
 	if (next === undefined) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /**
@@ -27945,18 +27717,32 @@ export function prepareTemplatePlain(
 				: String(value);
 	}
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydration !== null && !hydrateAllowAttribute(hydration, el, name, next)) return;
 	return next;
 }
 
 /** Same scalar contract for a statically proven, unnamespaced native URL sink. */
 export function setURLAttribute(el: Element, name: string, value: unknown): void {
-	if (process.env.NODE_ENV !== 'production') return setAttribute(el, name, value);
+	const next = prepareTemplateURL(el, name, value);
+	if (next === undefined) return;
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
+}
+
+/** @internal Prepare compiler-admitted native URL sinks, including sanitization,
+ * before accepting DOM. undefined preserves an adopted server attribute. */
+export function prepareTemplateURL(
+	el: Element,
+	name: string,
+	value: unknown,
+): string | null | undefined {
 	const type = typeof value;
 	let next =
-		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
-			? null
-			: String(value);
+		process.env.NODE_ENV !== 'production'
+			? coerceAttrValue(el, name, value)
+			: value == null || type === 'boolean' || type === 'function' || type === 'symbol'
+				? null
+				: String(value);
 	if (next !== null) {
 		if (
 			next === '' &&
@@ -27968,10 +27754,8 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 		else next = sanitizeURL(next);
 	}
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (hydration !== null && !hydrateAllowAttribute(hydration, el, name, next)) return;
+	return next;
 }
 
 /**
@@ -27988,9 +27772,8 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 export function setStringData(el: Element, name: string, value: unknown): void {
 	const next = prepareTemplateStringData(el, name, value);
 	if (next === undefined) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /** @internal undefined means hydration retained the adopted server attribute. */
@@ -28022,7 +27805,7 @@ export function prepareTemplateStringData(
 		next = typeof value === 'string' ? value : String(value);
 	}
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydration !== null && !hydrateAllowAttribute(hydration, el, name, next)) return;
 	return next;
 }
 
@@ -28036,9 +27819,8 @@ export function prepareTemplateStringData(
 export function setBooleanAttribute(el: Element, name: string, value: unknown): void {
 	const present = prepareTemplateBoolean(el, name, value);
 	if (present === null) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (present) (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, '');
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+	if (present) el.setAttribute(name, '');
+	else el.removeAttribute(name);
 }
 
 /** @internal null means hydration retained the adopted server attribute. */
@@ -28050,7 +27832,7 @@ export function prepareTemplateBoolean(el: Element, name: string, value: unknown
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return null;
+	if (hydration !== null && !hydrateAllowAttribute(hydration, el, name, next)) return null;
 	return next !== null;
 }
 
@@ -28061,9 +27843,8 @@ export function prepareTemplateBoolean(el: Element, name: string, value: unknown
 export function setAriaAttribute(el: Element, name: string, value: unknown): void {
 	const next = prepareTemplateAria(el, name, value);
 	if (next === undefined) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /** @internal Snapshot fallible ARIA values during render, before queuing writes. */
@@ -28085,7 +27866,7 @@ export function prepareTemplateAria(
 			? null
 			: String(value);
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydration !== null && !hydrateAllowAttribute(hydration, el, name, next)) return;
 	return next;
 }
 
@@ -28278,12 +28059,27 @@ import {
 } from './css.js';
 export { normalizeClass };
 
+export function prepareTemplateClass(
+	el: Element,
+	value: unknown,
+	asAttribute: boolean,
+): string | null | undefined {
+	const normalized = normalizeClass(value);
+	const cls = value == null || value === false ? null : normalized;
+	const hydration = hydrating ? activeHydration() : null;
+	if (
+		hydration !== null &&
+		hydrateKeepsClass(hydration, el, asAttribute ? cls : normalized, !asAttribute)
+	)
+		return undefined;
+	return cls;
+}
+
 export function setClassName(el: Element, value: unknown, foreign?: boolean): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
-	const cls = normalizeClass(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsClass(el, cls, true)) return;
+	const cls = prepareTemplateClass(el, value, false);
+	if (cls === undefined) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -28293,44 +28089,21 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// distinction against React). Same raw-value rule as setClassAttr: composition
 	// erases the null-vs-'' difference, so the check must be on `value`.
 	// A host of a Block the root attempt discards needs no undo (setEventHandler).
-	if (
-		TRANSITION_JOURNAL !== null &&
-		(foreign === true ||
-			TRANSITION_JOURNAL_DEPTH !== 1 ||
-			CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
-	)
-		journalAttr(el, 'class');
-	if (value == null || value === false)
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('class');
-	else (STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).className = cls;
+	if (cls === null) el.removeAttribute('class');
+	else (el as any).className = cls;
 }
 
 // Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
 // `className` is a read-only SVGAnimatedString so the fast `setClassName` can't be
-// used), setDeoptClass's SVG arm, and setSpread's class arm all route here.
+// used) and setSpread's class arm route here.
 // clsx-composes the value; a nullish/false value REMOVES the attribute (parity with
 // the generic setAttribute this binding routed through before clsx composition
 // existed).
 export function setClassAttr(el: Element, value: unknown): void {
-	const cls = value == null || value === false ? null : normalizeClass(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsClass(el, cls, false)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
-	if (cls === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('class');
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('class', cls);
-}
-
-// SVG-safe class setter for the de-opt / hostComponent paths, which (unlike the
-// compiled template) can hit an SVGElement whose `className` is a read-only
-// SVGAnimatedString. Routes SVG through the attribute-based `setClassAttr` and keeps
-// HTML on the fast `setClassName`; both clsx-compose the value and share the same
-// hydration suppress/warn semantics.
-function setDeoptClass(el: Element, value: unknown): void {
-	if (el.namespaceURI === SVG_NS) {
-		setClassAttr(el, value);
-	} else {
-		setClassName(el, value, true);
-	}
+	const cls = prepareTemplateClass(el, value, true);
+	if (cls === undefined) return;
+	if (cls === null) el.removeAttribute('class');
+	else el.setAttribute('class', cls);
 }
 
 // ---------------------------------------------------------------------------
@@ -28361,16 +28134,105 @@ export function canSplitStyleProperties(): boolean {
 }
 
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
-	const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+	const style = (el as HTMLElement).style;
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, value)) return;
+	if (hydration !== null && hydrateKeepsStyle(hydration, el, value)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	applyStyleValue(el, style, value, prev);
+}
+
+/** Snapshot authored style getters and coercions while its render is executing. */
+export function prepareTemplateStyle(
+	el: HTMLElement | SVGElement,
+	value: any,
+	previousValue?: any,
+	previous?: { value: any; kept: boolean },
+	staticCss = '',
+	entries?: readonly unknown[],
+): { value: any; kept: boolean; raw: any } {
+	let next: any = value;
+	let raw: any = value;
+	if (entries !== undefined) {
+		next = Object.create(null) as Record<string, string | null>;
+		raw = Object.create(null) as Record<string, unknown>;
+		for (let i = 0; i < entries.length; i += 2) {
+			const name = entries[i] as string;
+			const entry = entries[i + 1];
+			raw[name] = entry;
+			next[name] =
+				previousValue && typeof previousValue === 'object' && entry === previousValue[name]
+					? (previous?.value?.[name] ?? null)
+					: entry == null || typeof entry === 'boolean'
+						? null
+						: coerceStyleProperty(el, name, entry);
+		}
+	} else if (value == null || value === false) next = null;
+	else if (typeof value !== 'string') {
+		next = Object.create(null) as Record<string, string | null>;
+		for (const name in value) {
+			const entry = value[name];
+			// Compare against the old authored getter now, in its render window.
+			// Equal raw values keep what was actually applied, even if a getter
+			// mutated the retained old object after its last declaration wrote.
+			next[name] =
+				previousValue && typeof previousValue === 'object' && entry === previousValue[name]
+					? (previous?.value?.[name] ?? null)
+					: entry == null || typeof entry === 'boolean'
+						? null
+						: coerceStyleProperty(el, name, entry);
+		}
+	}
+	const hydration = hydrating ? activeHydration() : null;
+	return {
+		value: next,
+		kept: hydration !== null && hydrateKeepsStyle(hydration, el, next, staticCss),
+		raw,
+	};
+}
+
+/** Apply only previously accepted and next normalized style snapshots. */
+export function commitTemplateStyle(
+	el: HTMLElement | SVGElement,
+	prepared: { value: any; kept: boolean },
+	previous: { value: any; kept: boolean } | undefined,
+): void {
+	if (prepared.kept) return;
+	const value = prepared.value;
+	const prev = previous?.value;
+	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
+	const style = (el as HTMLElement).style;
+	applyStyleValue(el, style, value, prev, true);
+}
+
+export function prepareTemplateStyleProperty(
+	el: HTMLElement | SVGElement,
+	name: string,
+	value: any,
+	staticCss: string,
+	previous: any,
+): string | null | undefined {
+	const hydration = hydrating ? activeHydration() : null;
+	if (hydration !== null && hydrateKeepsStyle(hydration, el, { [name]: value }, staticCss))
+		return undefined;
+	if (value == null || typeof value === 'boolean')
+		return previous === CURRENT_SCOPE ? undefined : null;
+	return coerceStyleProperty(el, name, value);
+}
+
+export function commitTemplateStyleProperty(
+	el: HTMLElement | SVGElement,
+	name: string,
+	value: string | null,
+	previous: unknown,
+): void {
+	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
+	const style = (el as HTMLElement).style;
+	if (value === null) style.removeProperty(styleName(name));
+	else applyPreparedStyleProperty(style, name, value);
 }
 
 /**
@@ -28387,29 +28249,13 @@ export function setStyleProperty(
 	previous: any,
 ): void {
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, { [name]: value }, staticCss)) return;
+	if (hydration !== null && hydrateKeepsStyle(hydration, el, { [name]: value }, staticCss)) return;
 	const remove = value == null || typeof value === 'boolean';
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
 	if (remove && previous === CURRENT_SCOPE) return;
-	if (TRANSITION_JOURNAL !== null) {
-		const log = TRANSITION_JOURNAL;
-		let tail = log.length - 4;
-		// A declaration snapshots its binding bag immediately after the style.
-		// Only that metadata record is transparent; other writes and savepoints
-		// still require their own live-browser snapshot.
-		if (log[tail] === JOURNAL_BAG && log[tail + 1] === CURRENT_SCOPE?.slots[0]) tail -= 4;
-		if (
-			tail < TRANSITION_JOURNAL_CHECKPOINT ||
-			log[tail] !== JOURNAL_ATTR ||
-			log[tail + 1] !== el ||
-			log[tail + 2] !== 'style'
-		)
-			journalAttr(el, 'style');
-		else journalBag();
-	}
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
-	const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
 }
@@ -28425,18 +28271,13 @@ export function setStyleProperties(
 	staticCss: string,
 ): void {
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, null, staticCss, entries)) return;
-	const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
-	let journaled = false;
+	if (hydration !== null && hydrateKeepsStyle(hydration, el, null, staticCss, entries)) return;
+	const style = (el as HTMLElement).style;
 	for (let i = 0; i < entries.length; i += 2) {
 		const value = entries[i + 1];
 		// No dynamic declaration exists yet. Removing a null or boolean value
 		// could erase a longhand supplied by the baked static prefix.
 		if (value == null || typeof value === 'boolean') continue;
-		if (!journaled && TRANSITION_JOURNAL !== null) {
-			journalAttr(el, 'style');
-			journaled = true;
-		}
 		const name = entries[i] as string;
 		if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, undefined, name)) continue;
 		applyStyleProperty(el, style, name, value);
@@ -28448,6 +28289,7 @@ function applyStyleValue(
 	style: CSSStyleDeclaration,
 	value: any,
 	prev: any,
+	prepared = false,
 ): void {
 	if (value == null || value === false || value === '') {
 		if (prev && typeof prev === 'object') {
@@ -28476,13 +28318,17 @@ function applyStyleValue(
 			// Booleans clear the property (React parity): `fontFamily: true` must not
 			// set the literal string "true" (a valid font name!).
 			if (v == null || typeof v === 'boolean') style.removeProperty(styleName(k));
+			else if (prepared) applyPreparedStyleProperty(style, k, v);
 			else applyStyleProperty(el, style, k, v);
 		}
 	} else {
 		if (typeof prev === 'string') style.cssText = '';
 		for (const k in value) {
 			const v = value[k];
-			if (v != null && typeof v !== 'boolean') applyStyleProperty(el, style, k, v);
+			if (v != null && typeof v !== 'boolean') {
+				if (prepared) applyPreparedStyleProperty(style, k, v);
+				else applyStyleProperty(el, style, k, v);
+			}
 		}
 	}
 }
@@ -28493,7 +28339,10 @@ function applyStyleProperty(
 	name: string,
 	value: any,
 ): void {
-	const prop = styleName(name);
+	applyPreparedStyleProperty(style, name, coerceStyleProperty(el, name, value));
+}
+
+function coerceStyleProperty(el: HTMLElement | SVGElement, name: string, value: unknown): string {
 	// React parity: a bare number gets `px` unless it's 0, a custom prop, or unitless.
 	let s: string;
 	if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
@@ -28507,6 +28356,11 @@ function applyStyleProperty(
 	} else {
 		s = cssStyleValue(name, value);
 	}
+	return s;
+}
+
+function applyPreparedStyleProperty(style: CSSStyleDeclaration, name: string, s: string): void {
+	const prop = styleName(name);
 	// CodeQL flagged the prior `/\s*!important\s*$/` test+replace combo as
 	// polynomial-regex-on-uncontrolled-input. Same job in linear time using
 	// built-in trimEnd() + endsWith() — no regex, no backtracking risk.
@@ -28622,8 +28476,7 @@ function eventSlot(name: string, el?: Element): ParsedEventSlot | null {
 // reconcile path's sole detach point) — see the call sites.
 function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	if (name === 'class' || name === 'className') {
-		if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('class');
+		el.removeAttribute('class');
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
 	} else if (name === 'dangerouslySetInnerHTML') {
@@ -28849,6 +28702,102 @@ export function setHostPropSources(
 	return resolved;
 }
 
+interface PreparedHostSources {
+	resolved: Record<string, unknown>;
+	values: PreparedHostProps;
+	writers: Map<string, HostPropWriter>;
+	sources: readonly HostPropSource[];
+	previous: PreparedHostProps | undefined;
+	hasNestedChildren: boolean;
+}
+
+export function prepareTemplateHostSources(
+	el: Element,
+	sources: readonly HostPropSource[],
+	previous: Pick<PreparedHostSources, 'values'> | undefined,
+	scope: Scope,
+	hasNestedChildren = false,
+	readStyle?: (value: unknown) => unknown,
+): PreparedHostSources {
+	const writers = new Map<string, HostPropWriter>();
+	const resolved = resolveHostPropSources(el, sources, writers, readStyle);
+	const values = prepareHostProps(
+		el,
+		resolved,
+		previous?.values,
+		scope,
+		hasNestedChildren,
+		true,
+		true,
+	);
+	return { resolved, values, writers, sources, previous: previous?.values, hasNestedChildren };
+}
+
+export function commitTemplateHostSources(
+	el: Element,
+	next: PreparedHostSources,
+	scope: Scope,
+	deferControl = false,
+): Record<string, unknown> {
+	const { writers } = next;
+	if (process.env.NODE_ENV !== 'production') {
+		const tag = el.localName;
+		if (
+			(tag === 'input' || tag === 'textarea' || tag === 'select') &&
+			hasDevFormDiagnosticContext(el, scope)
+		) {
+			const value = writers.get('value')?.value;
+			const defaultValue = writers.get('defaultValue')?.value;
+			const checked = writers.get('checked')?.value;
+			const defaultChecked = writers.get('defaultChecked')?.value;
+			if (
+				(value !== undefined && defaultValue !== undefined) ||
+				(tag === 'input' && checked !== undefined && defaultChecked !== undefined)
+			) {
+				ensureDevFormDiagnosticState(el).authoringProps = {
+					value,
+					defaultValue,
+					checked,
+					defaultChecked,
+					multiple: writers.get('multiple')?.value,
+				};
+				queueDevFormDiagnostic(el, scope, true);
+			}
+		}
+	}
+	const tag = el.localName;
+	const form = tag === 'input' || tag === 'textarea' || tag === 'select';
+	setSpread(
+		el,
+		next.values.props,
+		next.previous?.props,
+		scope,
+		true,
+		form,
+		next.values,
+		next.previous,
+	);
+	commitDangerouslySetInnerHTMLSources(
+		el,
+		next.resolved.dangerouslySetInnerHTML ?? null,
+		next.hasNestedChildren ? null : (next.resolved.children ?? null),
+		next.values,
+	);
+	if (form && !deferControl)
+		applyFormControlValues(
+			el,
+			tag,
+			next.writers.get('value')?.value,
+			next.writers.get('defaultValue')?.value,
+			next.writers.get('checked')?.value,
+			next.writers.get('defaultChecked')?.value,
+			next.writers.get('multiple')?.value,
+			next.hasNestedChildren || writers.has('children'),
+			next.values,
+		);
+	return next.resolved;
+}
+
 const SIGNAL_HOST_PROP_SOURCES = /* @__PURE__ */ Symbol('octane.signal-host-prop-sources');
 
 interface SignalHostPropSourcesBinding {
@@ -28860,6 +28809,7 @@ interface SignalHostPropSourcesBinding {
 	readonly readStyle: ((value: unknown) => unknown) | undefined;
 	sources: readonly HostPropSource[];
 	resolved: Record<string, unknown> | undefined;
+	values?: PreparedHostProps;
 	subscriptions: Map<SignalHandle<unknown>, () => void>;
 	controlWriters: Map<'value' | 'checked', () => void>;
 	input?: EventListener;
@@ -28971,16 +28921,18 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 	if (binding.disposed || binding.pendingControl || binding.scope.block.disposed) return;
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
-			const next = resolveSignalHostPropSources(binding.sources, binding.readStyle);
-			binding.resolved = setHostPropSources(
-				binding.element,
-				next.sources,
-				binding.resolved,
+			const next = prepareTemplateSignalHostSources(
 				binding.scope,
+				binding,
+				binding.element,
+				binding.sources,
+				binding.site,
 				binding.hasNestedChildren,
+				undefined,
 				binding.readStyle,
 			);
-			if (process.env.NODE_ENV !== 'production' && !STAGED_DOM)
+			commitTemplateSignalHostSources(binding.element, next, binding.scope);
+			if (process.env.NODE_ENV !== 'production' && !STAGED_COMMIT_CAPTURE)
 				drainDevFormDiagnostics(binding.element);
 		});
 	} catch {
@@ -29007,24 +28959,10 @@ function rebindSignalHostSubscriptions(
 		if (handles.has(handle)) continue;
 		unsubscribe();
 		binding.subscriptions.delete(handle);
-		if (TRANSITION_JOURNAL !== null) {
-			// The record snapshot restores source identity, but a canceled observer
-			// must actually be reattached to keep the committed DOM live.
-			journalUndo(() => {
-				if (binding.disposed || binding.scope.block.disposed) return;
-				runWithBlockSignalOwner(binding.scope, () => addSignalHostSubscription(binding, handle));
-			});
-		}
 	}
 	for (const handle of handles) {
 		if (binding.subscriptions.has(handle)) continue;
-		const unsubscribe = addSignalHostSubscription(binding, handle);
-		if (TRANSITION_JOURNAL !== null) {
-			journalUndo(() => {
-				unsubscribe();
-				binding.subscriptions.delete(handle);
-			});
-		}
+		addSignalHostSubscription(binding, handle);
 	}
 }
 
@@ -29059,41 +28997,17 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		}
 		cleanup();
 		binding.controlWriters.delete(channel);
-		if (TRANSITION_JOURNAL !== null) {
-			journalUndo(() => {
-				if (!binding.disposed && !binding.scope.block.disposed)
-					addSignalHostControlWriter(binding, channel);
-			});
-		}
 	}
 	if (isWritableSignal(value) && !binding.controlWriters.has('value')) {
-		const cleanup = addSignalHostControlWriter(binding, 'value');
-		if (TRANSITION_JOURNAL !== null) {
-			journalUndo(() => {
-				cleanup();
-				binding.controlWriters.delete('value');
-			});
-		}
+		addSignalHostControlWriter(binding, 'value');
 	}
 	if (isWritableSignal(checked) && !binding.controlWriters.has('checked')) {
-		const cleanup = addSignalHostControlWriter(binding, 'checked');
-		if (TRANSITION_JOURNAL !== null) {
-			journalUndo(() => {
-				cleanup();
-				binding.controlWriters.delete('checked');
-			});
-		}
+		addSignalHostControlWriter(binding, 'checked');
 	}
 	if (!writable) {
 		if (binding.input !== undefined) {
 			const input = binding.input;
-			(STAGED_DOM ? STAGED_DOM.view(element) : element).removeEventListener('input', input);
-			if (TRANSITION_JOURNAL !== null) {
-				journalUndo(() => {
-					if (!binding.disposed && !binding.scope.block.disposed)
-						(STAGED_DOM ? STAGED_DOM.view(element) : element).addEventListener('input', input);
-				});
-			}
+			element.removeEventListener('input', input);
 			binding.input = undefined;
 		}
 		return;
@@ -29117,11 +29031,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		);
 	};
 	binding.input = input;
-	(STAGED_DOM ? STAGED_DOM.view(element) : element).addEventListener('input', input);
-	if (TRANSITION_JOURNAL !== null)
-		journalUndo(() =>
-			(STAGED_DOM ? STAGED_DOM.view(element) : element).removeEventListener('input', input),
-		);
+	element.addEventListener('input', input);
 }
 
 function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): void {
@@ -29137,8 +29047,7 @@ function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): vo
 	binding.subscriptions.clear();
 	for (const cleanup of binding.controlWriters.values()) cleanup();
 	binding.controlWriters.clear();
-	if (binding.input !== undefined)
-		domNode(binding.element).removeEventListener('input', binding.input);
+	if (binding.input !== undefined) binding.element.removeEventListener('input', binding.input);
 	queueOwnRefDetach(binding.resolved, binding.element);
 }
 
@@ -29273,6 +29182,7 @@ function prepareSignalHostPropSources(
 					hasNestedChildren,
 					readStyle,
 				);
+		const values = prepareHostProps(element, prepared, undefined, scope);
 		let published = false;
 		return {
 			binding,
@@ -29291,6 +29201,7 @@ function prepareSignalHostPropSources(
 					);
 					binding.sources = sources;
 					binding.resolved = resolved;
+					binding.values = values;
 					rebindSignalHostSubscriptions(binding, next.handles);
 				});
 			},
@@ -29308,41 +29219,61 @@ export function bindSignalHostPropSources(
 	hasNestedChildren = false,
 	readStyle?: (value: unknown) => unknown,
 ): unknown {
-	let binding =
-		typeof previous === 'object' &&
-		previous !== null &&
-		(previous as SignalHostPropSourcesBinding)[SIGNAL_HOST_PROP_SOURCES] === true
-			? (previous as SignalHostPropSourcesBinding)
-			: undefined;
-	if (binding === undefined) {
-		binding = createSignalHostPropSourcesBinding(
-			scope,
-			element,
-			sources,
-			site,
-			hasNestedChildren,
-			readStyle,
-		);
-	} else if (!STAGED_COMMIT_CAPTURE) {
-		// The resolved props must roll back with the DOM; otherwise a retry
-		// mistakes discarded event/control writes for already committed values.
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
-		binding.sources = sources;
-	}
-	const committed = binding;
-	if (STAGED_COMMIT_CAPTURE) {
-		// Event and signal callbacks retain the committed binding while the host
-		// plan prepares. Only the render reads this projection; publishing it and
-		// switching subscriptions/writers happens after the corresponding writes.
-		const projections = (STAGED_COMMIT_CAPTURE.signalHosts ??= new Map());
-		binding = projections.get(committed);
-		if (binding === undefined) {
-			binding = { ...committed };
-			projections.set(committed, binding);
-			if (isRecordingTransitionJournal()) journalUndo(() => projections.delete(committed));
-		} else if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
-		binding.sources = sources;
-	}
+	// An opt-in presentation function may also render without an active receipt.
+	// It uses the same accepted host program as ordinary compiled scopes. Until
+	// publication, input events and subscriptions continue to see accepted sources.
+	const next = prepareTemplateSignalHostSources(
+		scope,
+		previous,
+		element,
+		sources,
+		site,
+		hasNestedChildren,
+		undefined,
+		readStyle,
+	);
+	prepareSlot(scope, next.binding, 'prepared', {
+		parent: element,
+		publish: () => {
+			commitTemplateSignalHostSources(element, next, scope);
+		},
+		discard() {},
+	});
+	return next.binding;
+}
+
+interface PreparedSignalHostSources extends PreparedHostSources {
+	binding: SignalHostPropSourcesBinding;
+	bindingSources: readonly HostPropSource[];
+	handles: Set<SignalHandle<unknown>>;
+	pendingControl: boolean;
+	controlSnapshot: ReturnType<typeof snapshotHydrationControl> | null;
+}
+
+export function prepareTemplateSignalHostSources(
+	scope: Scope,
+	previousBinding: unknown,
+	element: Element,
+	sources: readonly HostPropSource[],
+	site: string,
+	hasNestedChildren: boolean,
+	previous: PreparedSignalHostSources | undefined,
+	readStyle?: (value: unknown) => unknown,
+): PreparedSignalHostSources {
+	const binding =
+		previous?.binding ??
+		(typeof previousBinding === 'object' &&
+		previousBinding !== null &&
+		(previousBinding as SignalHostPropSourcesBinding)[SIGNAL_HOST_PROP_SOURCES] === true
+			? (previousBinding as SignalHostPropSourcesBinding)
+			: createSignalHostPropSourcesBinding(
+					scope,
+					element,
+					sources,
+					site,
+					hasNestedChildren,
+					readStyle,
+				));
 	const valueControl = winningSignalHostControl(sources, 'value');
 	if (
 		hydrationStarted &&
@@ -29355,47 +29286,54 @@ export function bindSignalHostPropSources(
 		isWritableSignal(valueControl) || isWritableSignal(checkedControl)
 			? snapshotHydrationControl(element)
 			: null;
+	let pendingControl = previous?.pendingControl ?? binding.pendingControl ?? false;
 	if (controlSnapshot !== null) {
 		validateDirectSignalControl(element, site);
-		binding.pendingControl ||= hydrating
-			? activeHydration() !== null &&
-				(controlSnapshot.editRevision > 0 ||
-					(isWritableSignal(valueControl) &&
-						isRestoredHydrationTextarea(element, readSignalBinding(valueControl))))
-			: false;
+		pendingControl ||=
+			hydrating &&
+			activeHydration() !== null &&
+			(controlSnapshot.editRevision > 0 ||
+				(isWritableSignal(valueControl) &&
+					isRestoredHydrationTextarea(element, readSignalBinding(valueControl))));
 	}
 	const next = resolveSignalHostPropSources(sources, readStyle);
-	binding.resolved = setHostPropSources(
+	const prepared = prepareTemplateHostSources(
 		element,
 		next.sources,
-		binding.resolved,
+		previous ?? (binding.values === undefined ? undefined : { values: binding.values }),
 		scope,
 		hasNestedChildren,
 		readStyle,
-		binding.pendingControl,
 	);
-	if (STAGED_COMMIT_CAPTURE) {
-		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-			if (committed.disposed) return;
-			committed.sources = binding.sources;
-			committed.resolved = binding.resolved;
-			committed.pendingControl = binding.pendingControl;
-			runWithBlockSignalOwner(scope, () => {
-				rebindSignalHostSubscriptions(committed, next.handles);
-				syncSignalHostControl(committed);
-			});
-			if (!committed.pendingControl && controlSnapshot !== null)
-				consumeHydrationControl(element, controlSnapshot.revision);
-			updateSignalHostPropSources(committed);
-		});
-	} else {
+	return {
+		...prepared,
+		bindingSources: sources,
+		binding,
+		handles: next.handles,
+		pendingControl,
+		controlSnapshot,
+	};
+}
+
+export function commitTemplateSignalHostSources(
+	element: Element,
+	next: PreparedSignalHostSources,
+	scope: Scope,
+): SignalHostPropSourcesBinding {
+	const binding = next.binding;
+	if (binding.disposed) return binding;
+	binding.sources = next.bindingSources;
+	binding.resolved = commitTemplateHostSources(element, next, scope, next.pendingControl);
+	binding.values = next.values;
+	binding.pendingControl = next.pendingControl;
+	runWithBlockSignalOwner(scope, () => {
 		rebindSignalHostSubscriptions(binding, next.handles);
 		syncSignalHostControl(binding);
-		if (!binding.pendingControl && controlSnapshot !== null)
-			consumeHydrationControl(element, controlSnapshot.revision);
-	}
-	if (binding.pendingControl) queueSignalHostControlAdoption(committed, binding.resolved?.value);
-	return committed;
+	});
+	if (!binding.pendingControl && next.controlSnapshot !== null)
+		consumeHydrationControl(element, next.controlSnapshot.revision);
+	if (binding.pendingControl) queueSignalHostControlAdoption(binding, binding.resolved.value);
+	return binding;
 }
 
 function isAggregatedFormControlProp(el: Element, name: string): boolean {
@@ -29415,6 +29353,207 @@ function isAggregatedFormControlProp(el: Element, name: string): boolean {
 	return false;
 }
 
+export interface PreparedHostProps {
+	props: Record<string, unknown> | null;
+	attributes: Record<string, string | null | undefined> | null;
+	style: ReturnType<typeof prepareTemplateStyle> | undefined;
+	classes: string | null | undefined;
+	controls: Record<string, ReturnType<typeof prepareTemplateControl>['normalized']> | null;
+	adopted: boolean;
+	eventOwner: SignalOwner | null;
+	html: { __html: string } | null;
+	/** Whole host ownership, rather than a single compiled attribute writer. */
+	complete: boolean;
+	/** Persistent descriptor hosts reassert outside DOM changes on each render. */
+	reassert: boolean;
+}
+
+/**
+ * One immutable value set per host. Children/ref/event identities stay authored;
+ * native attributes and CSS contain only values already coerced by the render.
+ * The caller can retain this alongside its accepted descriptor for the next diff.
+ */
+export function prepareHostProps(
+	el: Element,
+	props: Record<string, unknown> | null,
+	previous: PreparedHostProps | undefined,
+	scope?: Scope,
+	_hasNestedChildren?: boolean,
+	complete = true,
+	aggregateControls = false,
+	reassert = false,
+): PreparedHostProps {
+	let attributes: PreparedHostProps['attributes'] = null;
+	let style: PreparedHostProps['style'];
+	let classes: PreparedHostProps['classes'];
+	let html: PreparedHostProps['html'] = null;
+	let controls: PreparedHostProps['controls'] = null;
+	const hydration = hydrating ? activeHydration() : null;
+	const adopted = hydration !== null && !hydrateIsFresh(hydration, el);
+	const next = snapshotSpread(props);
+	if (process.env.NODE_ENV !== 'production' && next !== null) {
+		devValidateAriaProps(el, next);
+		devValidateHostProps(el, next);
+	}
+	if (next !== null) {
+		// Suppression must be visible to all comparisons regardless of JSX order.
+		if (complete) (el as any).__oct_suppress = next.suppressHydrationWarning === true;
+		if (!aggregateControls && next.dangerouslySetInnerHTML != null && next.children != null)
+			throw dangerHtmlChildrenError();
+		// A compiled input's final props cascade observes its default before value
+		// regardless of JSX key order. The normal descriptor loop retains key order.
+		if (
+			aggregateControls &&
+			el.localName === 'input' &&
+			Object.prototype.hasOwnProperty.call(next, 'defaultValue')
+		) {
+			controls = Object.create(null) as NonNullable<PreparedHostProps['controls']>;
+			controls.defaultValue = prepareTemplateControl(
+				scope,
+				el,
+				'defaultValue',
+				next.defaultValue,
+			).normalized;
+		}
+		for (const name of Object.keys(next)) {
+			const value = next[name];
+			const prior = previous?.props?.[name];
+			if (name === 'class' || name === 'className') {
+				classes =
+					value === prior && previous !== undefined && !reassert
+						? previous.classes
+						: prepareTemplateClass(el, value, true);
+			} else if (name === 'style') {
+				style = prepareTemplateStyle(el as HTMLElement, value, prior, previous?.style);
+			} else if (name !== 'multiple' && isAggregatedFormControlProp(el, name)) {
+				if (controls === null)
+					controls = Object.create(null) as NonNullable<PreparedHostProps['controls']>;
+				if (!Object.prototype.hasOwnProperty.call(controls, name))
+					controls[name] = prepareTemplateControl(scope, el, name, value).normalized;
+			} else if (name === 'dangerouslySetInnerHTML') {
+				validateDangerouslySetInnerHTMLValue(value);
+				if (value != null) {
+					if (VOID_ELEMENTS.has(el.localName)) throw new Error(formatClientError(7, el.localName));
+					// A compiled source group identity-skips its unchanged winning
+					// object. Raw descriptors reread __html on every render as before.
+					if (aggregateControls && value === prior && previous !== undefined) html = previous.html;
+					else {
+						const inner = (value as { __html: unknown }).__html;
+						html = { __html: inner == null ? '' : String(inner) };
+					}
+					if (adopted) hydrateAdoptHTML(hydration!, el, html!.__html);
+				}
+			} else if (formActionAttributeName(el, name) !== null) {
+				if (typeof value !== 'function') {
+					const normalizedName = formActionAttributeName(el, name)!;
+					let prepared = coerceAttrValue(el, normalizedName, value);
+					if (prepared !== null)
+						prepared = sanitizeURLAttribute(el.localName, normalizedName, prepared);
+					(attributes ??= Object.create(null))[name] =
+						hydration !== null && !hydrateAllowAttribute(hydration, el, normalizedName, prepared)
+							? undefined
+							: prepared;
+				}
+			} else if (
+				name === 'key' ||
+				isHostPropIdentityKey(name) ||
+				name === 'innerText' ||
+				name === 'textContent' ||
+				name === 'muted' ||
+				name === 'multiple' ||
+				name === 'selected' ||
+				(isHtmlCustomElement(el) && name.startsWith('on'))
+			) {
+				continue;
+			} else {
+				let normalizedName = name;
+				if (!isHtmlCustomElement(el)) normalizedName = ATTRIBUTE_ALIASES.get(name) ?? name;
+				let prepared = coerceAttrValue(el, normalizedName, value);
+				if (prepared !== null)
+					prepared = sanitizeURLAttribute(el.localName, normalizedName, prepared);
+				(attributes ??= Object.create(null))[name] =
+					hydration !== null && !hydrateAllowAttribute(hydration, el, normalizedName, prepared)
+						? undefined
+						: prepared;
+			}
+		}
+	}
+	const eventOwner =
+		activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+			? currentExplicitSignalOwner()
+			: null;
+	return {
+		props: next,
+		attributes,
+		style,
+		classes,
+		controls,
+		adopted,
+		eventOwner,
+		html,
+		complete,
+		reassert,
+	};
+}
+
+export function commitHostProps(
+	el: Element,
+	next: PreparedHostProps,
+	previous: PreparedHostProps | undefined,
+	scope?: Scope,
+): void {
+	setSpread(el, next.props, previous?.props, scope, false, false, next, previous);
+	// A fresh descriptor input owns its native state even without a checked
+	// writer. Freeze its live choice before a later defaultChecked can follow
+	// the browser's pristine-default cascade. Compiled single-attribute programs
+	// are partial and must not initialize a different binding's control.
+	if (
+		next.complete &&
+		previous === undefined &&
+		el.localName === 'input' &&
+		next.props?.checked == null &&
+		(next.props === null || !Object.prototype.hasOwnProperty.call(next.props, 'defaultChecked'))
+	) {
+		const input = el as HTMLInputElement;
+		input.checked = input.checked;
+		(input as any)[DEFAULT_CHECKED_INITIALIZED] = true;
+	}
+}
+
+export function prepareTemplateAttribute(
+	el: Element,
+	name: string,
+	value: unknown,
+): PreparedHostProps {
+	return prepareHostProps(el, { [name]: value }, undefined, undefined, undefined, false);
+}
+
+/** A compiled form writer always reasserts live control drift at commit. */
+export function prepareTemplateControl(
+	scope: Scope | undefined,
+	el: Element,
+	kind: string,
+	value: unknown,
+): { value: unknown; normalized: string | Set<string> | boolean | null; adopted: boolean } {
+	if (hydrationStarted && scope?.block.idState.renderOwner?.controlLeases?.has(el))
+		HYDRATION_DRIVER!.presentationMiss(false);
+	const hydration = hydrating ? activeHydration() : null;
+	const adopted = hydration !== null && !hydrateIsFresh(hydration, el);
+	let normalized: string | Set<string> | boolean | null;
+	if (value == null) normalized = null;
+	else if (
+		kind === 'checked' ||
+		kind === 'checkedCheckable' ||
+		kind === 'defaultChecked' ||
+		kind === 'autoFocus'
+	)
+		normalized = !!value;
+	else if (el.localName === 'select' && Array.isArray(value))
+		normalized = new Set(value.map(toControlledString));
+	else normalized = toControlledString(value);
+	return { value, normalized, adopted };
+}
+
 export function setSpread(
 	el: Element,
 	value: any,
@@ -29422,8 +29561,10 @@ export function setSpread(
 	mountScope?: Scope,
 	skipDangerouslySetInnerHTML = false,
 	skipFormControls = false,
+	prepared?: PreparedHostProps,
+	previousPrepared?: PreparedHostProps,
 ): void {
-	if (process.env.NODE_ENV !== 'production' && value != null) {
+	if (process.env.NODE_ENV !== 'production' && value != null && prepared === undefined) {
 		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
 		devValidateHostProps(el, Object(value) as Record<string, unknown>);
 	}
@@ -29461,11 +29602,12 @@ export function setSpread(
 	}
 	if (!skipDangerouslySetInnerHTML) {
 		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] =
-				value.children;
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = value.children;
 			if (
 				value.children != null &&
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] === true
+				(prepared !== undefined
+					? value.dangerouslySetInnerHTML != null
+					: (el as any)[DANGER_HTML_ACTIVE] === true)
 			) {
 				throw dangerHtmlChildrenError();
 			}
@@ -29473,7 +29615,7 @@ export function setSpread(
 			prev != null &&
 			Object.prototype.propertyIsEnumerable.call(Object(prev), 'children')
 		) {
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] = undefined;
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = undefined;
 		}
 	}
 	// Remove keys present in prev but absent in value (removeHostProp routes each to
@@ -29499,7 +29641,13 @@ export function setSpread(
 				continue;
 			}
 			if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), k)) continue;
-			removeHostProp(el, k, prev[k]);
+			if (k === 'style' && prepared !== undefined)
+				commitTemplateStyle(
+					el as HTMLElement,
+					{ value: null, kept: false },
+					previousPrepared?.style,
+				);
+			else removeHostProp(el, k, prev[k]);
 		}
 	}
 	if (value == null) {
@@ -29508,7 +29656,10 @@ export function setSpread(
 	}
 	// A fresh props cache is not a snapshot of attributes already present in SSR.
 	const hydration = prev === undefined && hydrating ? activeHydration() : null;
-	const initialHydration = hydration !== null && !hydration.isFresh(el);
+	const initialHydration =
+		prev === undefined &&
+		(prepared?.adopted ?? (hydration !== null && !hydrateIsFresh(hydration, el)));
+	const reassert = prepared?.reassert === true;
 	for (const k of Object.keys(Object(value))) {
 		if (k === 'key' || k === 'children') continue;
 		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
@@ -29535,41 +29686,43 @@ export function setSpread(
 		)
 			continue; // JS-only state stamped before the loops (see above)
 		if (k === 'class' || k === 'className') {
-			if (v === pv && !initialHydration) continue;
+			if (v === pv && !initialHydration && !reassert) continue;
 			// Hydration-aware + SVG-safe class write (suppress/warn parity with a
 			// direct class binding); nullish/false removes the attribute.
-			setClassAttr(el, v);
+			if (prepared === undefined) setClassAttr(el, v);
+			else if (prepared.classes !== undefined) commitHostAttribute(el, 'class', prepared.classes);
 			continue;
 		}
 		if (k === 'style') {
-			setStyle(el as HTMLElement, v, pv);
+			if (prepared === undefined) setStyle(el as HTMLElement, v, pv);
+			else if (prepared.style !== undefined)
+				commitTemplateStyle(el as HTMLElement, prepared.style, previousPrepared?.style);
 			continue;
 		}
 		// Presence matters for raw HTML: an own key whose value is undefined
 		// explicitly disables an earlier JSX writer. It must not be identity-skipped
 		// against the absent previous value on mount.
 		if (k === 'dangerouslySetInnerHTML') {
-			setDangerouslySetInnerHTML(el, v);
+			setDangerouslySetInnerHTML(el, prepared === undefined ? v : prepared.html, prepared?.adopted);
 			continue;
 		}
 		const actionName = formActionAttributeName(el, k);
 		if (actionName !== null) {
-			if (v === pv && !initialHydration) continue;
-			setFormAction(
-				el as HTMLFormElement | HTMLButtonElement | HTMLInputElement,
-				actionName,
-				v,
-				pv,
-			);
+			if (v === pv && !initialHydration && !reassert) continue;
+			if (typeof v !== 'function' && prepared !== undefined) {
+				(el as any).$$formAction = undefined;
+				const attribute = prepared.attributes?.[k];
+				if (attribute !== undefined) commitHostAttribute(el, actionName, attribute);
+			} else DESCRIPTOR_FORM_ACTION(el, actionName, v, pv);
 			continue;
 		}
 		// Styles/raw HTML above still need their setters for stable object values.
 		// Controlled fields reassert live DOM drift; other unchanged props need no
 		// event-name parsing or custom-element routing.
-		if (v === pv && !isControlledHostProp(el, k) && !initialHydration) continue;
+		if (v === pv && !isControlledHostProp(el, k) && !initialHydration && !reassert) continue;
 		const ev = eventSlot(k, el);
 		if (ev) {
-			if (v === pv) continue;
+			if (v === pv && !reassert) continue;
 			// Lazy-delegate any event we haven't seen — the compiler can't predict
 			// event names that arrive dynamically through spread. Capture-phase
 			// handlers (`onXxxCapture`) register their own capture-phase listener.
@@ -29584,13 +29737,25 @@ export function setSpread(
 				ev.key,
 				process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v,
 				true,
+				mountScope,
+				prepared?.eventOwner,
 			);
 			continue;
 		}
 		// React only honors autoFocus from the final props of the element's mount.
 		// An absent initial spread must not turn a later update into a mount.
 		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
-		setAttribute(el, k, v);
+		if (
+			prepared?.attributes !== null &&
+			prepared?.attributes !== undefined &&
+			Object.prototype.hasOwnProperty.call(prepared.attributes, k)
+		) {
+			const next = prepared.attributes[k];
+			if (next !== undefined) {
+				const name = isHtmlCustomElement(el) ? k : (ATTRIBUTE_ALIASES.get(k) ?? k);
+				commitHostAttribute(el, name, next);
+			}
+		} else setAttribute(el, k, v, prepared?.adopted, prepared?.controls?.[k]);
 	}
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
 }
@@ -29627,51 +29792,15 @@ interface HeadSlot {
 	attrNames?: string[];
 }
 
-// A shallow HeadSlot snapshot cannot undo mutations to its listener Map or the
-// native registrations. Snapshot once before the first change in a headBlock
-// pass: two different props can resolve to the same native event and handler,
-// which addEventListener deduplicates, so per-prop inverse operations are unsafe.
-function journalHeadEventListeners(state: HeadSlot): void {
-	const before = state.handlers === undefined ? null : new Map(state.handlers);
-	journalUndo(() => {
-		const handlers = state.handlers;
-		if (handlers !== undefined) {
-			for (const [name, listener] of handlers) {
-				const event = eventSlot(name)!;
-				domNode(state.el).removeEventListener(event.type, listener, event.capture);
-			}
-			handlers.clear();
-		}
-		if (before !== null) {
-			const restored = handlers ?? (state.handlers = new Map<string, EventListener>());
-			for (const [name, listener] of before) {
-				const event = eventSlot(name)!;
-				domNode(state.el).addEventListener(event.type, listener, event.capture);
-				restored.set(name, listener);
-			}
-		}
-	});
-}
-
-function removeHeadEventListeners(
-	state: HeadSlot,
-	attrs: Record<string, any> | null,
-	journalChanges = false,
-): boolean {
+function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | null): void {
 	const handlers = state.handlers;
-	if (handlers === undefined) return false;
-	let journaled = false;
+	if (handlers === undefined) return;
 	for (const [name, listener] of handlers) {
 		if (attrs !== null && name in attrs) continue;
-		if (journalChanges && !journaled) {
-			journalHeadEventListeners(state);
-			journaled = true;
-		}
 		const event = eventSlot(name)!;
-		domNode(state.el).removeEventListener(event.type, listener, event.capture);
+		state.el.removeEventListener(event.type, listener, event.capture);
 		handlers.delete(name);
 	}
-	return journaled;
 }
 
 // Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
@@ -29684,19 +29813,14 @@ function removeHeadEventListeners(
 function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Element | null {
 	const closeKey = '/' + key;
 	for (let n: Node | null = getFirstChild(head); n !== null; n = getNextSibling(n)) {
-		if (
-			n.nodeType === 8 &&
-			(STAGED_DOM ? STAGED_DOM.view(n as Comment) : (n as Comment)).data === key
-		) {
+		if (n.nodeType === 8 && (n as Comment).data === key) {
 			let candidate: Node | null = getNextSibling(n);
 			let match: Element | null = null;
 			let end: Comment | null = null;
 			let matches = 0;
 			while (candidate !== null) {
 				if (candidate.nodeType === 8) {
-					const marker = (
-						STAGED_DOM ? STAGED_DOM.view(candidate as Comment) : (candidate as Comment)
-					).data;
+					const marker = (candidate as Comment).data;
 					if (marker === closeKey) {
 						end = candidate as Comment;
 						break;
@@ -29711,9 +29835,9 @@ function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Ele
 				}
 				candidate = getNextSibling(candidate);
 			}
-			(STAGED_DOM ? STAGED_DOM.view(n as Comment) : (n as Comment)).remove();
+			(n as Comment).remove();
 			if (end === null) return null;
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).remove();
+			end.remove();
 			// Two same-tag candidates are as unprovable as none.
 			return matches === 1 ? match : null;
 		}
@@ -29726,33 +29850,9 @@ function rootIdentifierPrefix(block: Block): string {
 	return block.idState.prefix;
 }
 
-// Head attributes are reapplied even when an object-valued prop has the same
-// identity: its coercion may have changed, or outside code may have edited the
-// live head. Compare the final scalar value, retaining neither user objects nor
-// a stale authored-value cache. Common metadata names need no property, alias,
-// namespace, or URL routing, and equal values avoid native attribute mutation.
-function setHeadAttribute(el: Element, name: string, value: unknown): void {
-	switch (name) {
-		case 'name':
-		case 'content':
-		case 'lang':
-		case 'media':
-		case 'id':
-		case 'title':
-		case 'type':
-			break;
-		default:
-			return setAttribute(el, name, value);
-	}
-	const next = coerceAttrValue(el, name, value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
-	if ((STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name) === next) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
-}
-
+// Head props are re-normalized each render: callers can mutate a stable prop
+// object, and outside code may alter live metadata. The accepted HeadSlot only
+// keeps authored names and directly registered listeners, never user objects.
 export function headBlock(
 	scope: Scope,
 	slot: number,
@@ -29762,106 +29862,109 @@ export function headBlock(
 	text: unknown,
 ): void {
 	if (typeof document === 'undefined') return;
-	// State lives in the dense `slots` array (like every other slot) so the scope
-	// shape stays monomorphic; `key` is only the ownership hash used to adopt the
-	// matching server-rendered head element on hydration.
+	const parent = PREPARED_PARENTS.get(scope.block.parentNode) ?? scope.block.parentNode;
+	const ownerDocument = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
+	const head =
+		parent.nodeType === 1 && (parent as Element).localName === 'head'
+			? (parent as HTMLHeadElement)
+			: ownerDocument.head;
 	let state = scope.slots[slot] as HeadSlot | undefined;
 	if (state === undefined) {
-		const parent = scope.block.parentNode;
-		const ownerDocument = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
-		const head = ownerDocument.head;
-		let el = adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
+		let el =
+			head === null
+				? null
+				: adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		const adopted = el !== null;
-		if (el === null) {
-			el = (STAGED_DOM ? STAGED_DOM.view(ownerDocument) : ownerDocument).createElement(tag);
-			(STAGED_DOM ? STAGED_DOM.view(head) : head).appendChild(el);
-		}
-		// React 19 does not hydrate a hoisted head element in place: it claims the
-		// server's and sets the client's props on it (setInitialProperties), which
-		// keeps the attributes only the server rendered. Outside hydration, the
-		// client's attributes replace the server's.
+		if (el === null) el = ownerDocument.createElement(tag);
+		// A hydrated head entry claims the server node but installs client props,
+		// retaining attributes absent from the client as React does.
 		const hydration = adopted && hydrating ? activeHydration() : null;
-		if (hydration !== null) hydration.markFresh(el!);
+		if (hydration !== null) hydrateMarkFresh(hydration, el);
 		state = {
 			el,
-			attrNames:
-				adopted && hydration === null
-					? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNames()
-					: undefined,
+			attrNames: adopted && hydration === null ? el.getAttributeNames() : undefined,
 		};
 		scope.slots[slot] = state;
-		// Removed once, on the owning scope's unmount (NOT between re-renders) —
-		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
+		const owned = state;
 		(scope.cleanups ??= []).push(() => {
-			removeHeadEventListeners(state!, null);
-			domNode(state!.el).remove();
+			removeHeadEventListeners(owned, null);
+			owned.el.remove();
 			scope.slots[slot] = undefined;
 		});
 	}
-	const el = state.el;
-	if (TRANSITION_JOURNAL !== null) {
-		journalObjectOnce(state);
-		journalBag();
-	}
-	let journaledHandlers =
-		state.handlers !== undefined &&
-		removeHeadEventListeners(state, attrs, TRANSITION_JOURNAL !== null);
-	const previousNames = state.attrNames;
-	if (previousNames !== undefined) {
-		for (let i = 0; i < previousNames.length; i++) {
-			const name = previousNames[i];
-			if (attrs === null || !(name in attrs)) setAttribute(el, name, null);
-		}
-	}
-	if (attrs !== null) {
-		const names: string[] = [];
-		for (const k in attrs) {
-			// Hoisted head elements live in document.head — OUTSIDE every delegation
-			// root — and their load/error events don't bubble anyway, so on* props
-			// get DIRECT listeners here (`<link onLoad={…}>` must fire like React's).
-			const ev = k.length > 2 && k[0] === 'o' && k[1] === 'n' ? eventSlot(k) : null;
+	const owned = state;
+	const el = owned.el;
+	const values: Record<string, any> | null = attrs === null ? null : Object.create(null);
+	if (values !== null) {
+		for (const name in attrs) {
+			const v = attrs![name];
+			const ev = name.length > 2 && name[0] === 'o' && name[1] === 'n' ? eventSlot(name) : null;
 			if (ev !== null) {
-				const v = attrs[k];
-				const listener = process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v;
-				const hs = state.handlers;
-				const prevH = hs?.get(k);
-				if (prevH === listener) continue;
-				const nextH = typeof listener === 'function' ? (listener as EventListener) : undefined;
-				if (
-					TRANSITION_JOURNAL !== null &&
-					!journaledHandlers &&
-					(prevH !== undefined || nextH !== undefined)
-				) {
-					journalHeadEventListeners(state);
-					journaledHandlers = true;
-				}
-				if (prevH !== undefined)
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener(ev.type, prevH, ev.capture);
-				if (nextH !== undefined) {
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(ev.type, nextH, ev.capture);
-					(hs ?? (state.handlers = new Map<string, EventListener>())).set(k, nextH);
-				} else {
-					hs?.delete(k);
-				}
-				continue;
+				values[name] = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
+			} else {
+				const normalizedName = ATTRIBUTE_ALIASES.get(name) ?? name;
+				let prepared = coerceAttrValue(el, normalizedName, v);
+				if (prepared !== null)
+					prepared = sanitizeURLAttribute(el.localName, normalizedName, prepared);
+				const hydration = hydrating ? activeHydration() : null;
+				values[name] =
+					hydration !== null && !hydrateAllowAttribute(hydration, el, normalizedName, prepared)
+						? undefined
+						: prepared;
 			}
-			names.push(k);
-			setHeadAttribute(el, k, attrs[k]);
-		}
-		state.attrNames = names;
-	} else {
-		state.attrNames = undefined;
-	}
-	if (text != null || tag === 'title') {
-		const t = text == null ? '' : String(text);
-		if ((STAGED_DOM ? STAGED_DOM.view(el) : el).textContent !== t) {
-			// textContent replaces child nodes, even when only the text changes.
-			// Retain their identity when a later sibling suspends and this visible
-			// head entry belongs to the held transition boundary.
-			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).textContent = t;
 		}
 	}
+	const nextText = text != null || tag === 'title' ? (text == null ? '' : String(text)) : undefined;
+	prepareSlot(scope, owned, 'prepared', {
+		// The destination is foreign even if the owning branch is detached.
+		parent: ownerDocument,
+		publish() {
+			removeHeadEventListeners(owned, values);
+			const previousNames = owned.attrNames;
+			if (previousNames !== undefined) {
+				for (const name of previousNames) {
+					if (values === null || !(name in values)) setAttribute(el, name, null);
+				}
+			}
+			if (values !== null) {
+				const names: string[] = [];
+				for (const name in values) {
+					const ev = name.length > 2 && name[0] === 'o' && name[1] === 'n' ? eventSlot(name) : null;
+					const v = values[name];
+					if (ev !== null) {
+						const hs = owned.handlers;
+						const previous = hs?.get(name);
+						if (previous === v) continue;
+						if (previous !== undefined) el.removeEventListener(ev.type, previous, ev.capture);
+						if (typeof v === 'function') {
+							el.addEventListener(ev.type, v, ev.capture);
+							(hs ?? (owned.handlers = new Map<string, EventListener>())).set(name, v);
+						} else hs?.delete(name);
+						continue;
+					}
+					names.push(name);
+					if (v !== undefined) {
+						const normalizedName = ATTRIBUTE_ALIASES.get(name) ?? name;
+						if (el.getAttribute(normalizedName) !== v) commitHostAttribute(el, normalizedName, v);
+					}
+				}
+				owned.attrNames = names;
+			} else owned.attrNames = undefined;
+			if (nextText !== undefined && el.textContent !== nextText) el.textContent = nextText;
+			// A document root can prepare its replacement <head> in this same
+			// program. Never route metadata back into an obsolete head snapshot.
+			const destination = PREPARED_PARENTS.get(scope.block.parentNode) ?? scope.block.parentNode;
+			// Metadata authored in this document's explicit <head> belongs to
+			// that element even while its descriptor list is still being placed.
+			const target =
+				destination.nodeType === 1 && (destination as Element).localName === 'head'
+					? (destination as HTMLHeadElement)
+					: (destination.nodeType === 9 ? (destination as Document) : destination.ownerDocument!)
+							.head;
+			if (target !== null && el.parentNode !== target) target.appendChild(el);
+		},
+		discard() {},
+	});
 }
 
 interface NamespaceHeadProps {
@@ -29892,7 +29995,7 @@ export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementD
 		const state = scope.slots[slot] as HeadSlot | undefined;
 		if (state !== undefined) {
 			removeHeadEventListeners(state, null);
-			domNode(state.el).remove();
+			state.el.remove();
 			scope.slots[slot] = undefined;
 		}
 		return createElement(props.tag, props.attrs ?? undefined, props.text);
@@ -29936,9 +30039,7 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 		_injectedStyles.add(id);
 		return;
 	}
-	const existing = (
-		STAGED_DOM ? STAGED_DOM.view(document) : document
-	).querySelector<HTMLStyleElement>(`style[data-octane="${id}"]`);
+	const existing = document.querySelector<HTMLStyleElement>(`style[data-octane="${id}"]`);
 	if (existing !== null) {
 		// A scope hash derives from its first block's position and content, so an
 		// HMR re-evaluation after editing a later block of the same scope arrives
@@ -29946,8 +30047,7 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 		// already owns in place. A sheet seen for the first time was emitted by
 		// the server (its text may differ only in serialization) and is adopted.
 		if (_injectedStyles.has(id)) {
-			if ((STAGED_DOM ? STAGED_DOM.view(existing) : existing).textContent !== css)
-				(STAGED_DOM ? STAGED_DOM.view(existing) : existing).textContent = css;
+			if (existing.textContent !== css) existing.textContent = css;
 		} else {
 			_injectedStyles.add(id);
 		}
@@ -29963,20 +30063,16 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 	// append a duplicate <style>. React batches same-precedence resources into
 	// one tag whose data-href lists every key (`octane-a octane-b`), so the
 	// resource match is a whitespace-token match, not an exact one.
-	if (
-		(STAGED_DOM ? STAGED_DOM.view(document) : document).querySelector(
-			`style[data-href~="octane-${id}"]`,
-		)
-	) {
+	if (document.querySelector(`style[data-href~="octane-${id}"]`)) {
 		_injectedStyles.add(id);
 		return;
 	}
 	_injectedStyles.add(id);
-	const el = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('style');
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('data-octane', id);
-	if (nonce !== undefined) (STAGED_DOM ? STAGED_DOM.view(el) : el).nonce = nonce;
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).textContent = css;
-	domNode(document.head).appendChild(el);
+	const el = document.createElement('style');
+	el.setAttribute('data-octane', id);
+	if (nonce !== undefined) el.nonce = nonce;
+	el.textContent = css;
+	document.head.appendChild(el);
 }
 
 // ---------------------------------------------------------------------------
@@ -30121,33 +30217,24 @@ function retireHostRange(node: Node | null, last: Node | null): void {
 }
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
-export function setEventHandler(el: Element, key?: string, handler?: any, foreign?: boolean): void {
+export function setEventHandler(
+	el: Element,
+	key?: string,
+	handler?: any,
+	_foreign?: boolean,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): void {
 	if (key !== undefined) {
-		// A handler on a host of a Block the root attempt discards (ROOT_DISCARD_STAMP)
-		// needs no undo: compiled bindings write their own cloned hosts. `foreign`
-		// marks runtime callers that may write a host the current scope does not
-		// own, such as a signal-driven spread.
-		if (
-			TRANSITION_JOURNAL !== null &&
-			(foreign === true ||
-				TRANSITION_JOURNAL_DEPTH !== 1 ||
-				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
-		) {
-			TRANSITION_JOURNAL.push(
-				JOURNAL_PROP,
-				el,
-				key,
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[key],
-			);
-			journalBag();
-		}
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[key] = handler;
+		(el as any)[key] = handler;
 	}
 	// Explicit authority also applies to handlers in modules with no signal bindings.
 	const explicitOwner =
-		activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
-			? currentExplicitSignalOwner()
-			: null;
+		eventOwner !== undefined
+			? eventOwner
+			: activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+				? currentExplicitSignalOwner()
+				: null;
 	if (
 		SIGNAL_BINDINGS_ENABLED ||
 		signalDocumentEnabled ||
@@ -30158,11 +30245,11 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 		// module may arrive later. No owner or wrapper is allocated speculatively.
 		const owner =
 			explicitOwner ??
-			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
-				? CURRENT_SCOPE === null
+			(signalDocumentEnabled || scope?.block.idState.renderOwner?.signalOwner !== undefined
+				? scope === null
 					? currentSignalOwner()
-					: CURRENT_SCOPE.signalOwner || CURRENT_SCOPE
-				: CURRENT_SCOPE);
+					: scope.signalOwner || scope
+				: scope);
 		if (owner !== null) {
 			// Mark that a scope token escaped before queuing publication. A staged
 			// event may be followed by deletion in the same preparation; recording
@@ -30181,140 +30268,207 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 				});
 			else {
 				const previous = (el as any).$$signalOwner as SignalEventOwner | undefined;
-				if (previous !== owner) {
-					if (TRANSITION_JOURNAL !== null)
-						TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, el, previous, null);
-					(el as any).$$signalOwner = owner;
-				}
+				if (previous !== owner) (el as any).$$signalOwner = owner;
 			}
 		}
 	}
 }
 
-export function evt0(el: Element, key: string, fn: any): HandlerBundle {
+export function evt0(
+	el: Element,
+	key: string,
+	fn: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): HandlerBundle {
 	const d: HandlerBundle = { fn, args: EMPTY_ARGS, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	setEventHandler(el, key, d, undefined, scope, eventOwner);
 	return d;
 }
-export function evt0u(d: HandlerBundle, fn: any): void {
+export function evt0u(
+	d: HandlerBundle,
+	fn: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): void {
 	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 		d.fn = fn;
 	}
 	if (
-		(SIGNAL_BINDINGS_ENABLED ||
+		(eventOwner != null ||
+			SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
-		(activeSynchronousSignalOwner !== null ||
+		(eventOwner != null ||
+			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
-			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
+			scope?.block.idState.renderOwner?.signalOwner !== undefined ||
+			(d.el as any).$$signalOwner !== scope)
 	)
-		setEventHandler(d.el!);
+		setEventHandler(d.el!, undefined, undefined, undefined, scope, eventOwner);
 }
-export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
+export function evt1(
+	el: Element,
+	key: string,
+	fn: any,
+	a0: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): HandlerBundle {
 	const d: HandlerBundle = { fn, args: 1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	setEventHandler(el, key, d, undefined, scope, eventOwner);
 	return d;
 }
-export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
+export function evt1u(
+	d: HandlerBundle,
+	fn: any,
+	a0: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): void {
 	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn || !Object.is(d.a0, a0)) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 		d.fn = fn;
 		d.a0 = a0;
 	}
 	if (
-		(SIGNAL_BINDINGS_ENABLED ||
+		(eventOwner != null ||
+			SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
-		(activeSynchronousSignalOwner !== null ||
+		(eventOwner != null ||
+			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
-			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
+			scope?.block.idState.renderOwner?.signalOwner !== undefined ||
+			(d.el as any).$$signalOwner !== scope)
 	)
-		setEventHandler(d.el!);
+		setEventHandler(d.el!, undefined, undefined, undefined, scope, eventOwner);
 }
-export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
+export function evt2(
+	el: Element,
+	key: string,
+	fn: any,
+	a0: any,
+	a1: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): HandlerBundle {
 	const d: HandlerBundle = { fn, args: 2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	setEventHandler(el, key, d, undefined, scope, eventOwner);
 	return d;
 }
-export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
+export function evt2u(
+	d: HandlerBundle,
+	fn: any,
+	a0: any,
+	a1: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): void {
 	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn || !Object.is(d.a0, a0) || !Object.is(d.a1, a1)) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 		d.fn = fn;
 		d.a0 = a0;
 		d.a1 = a1;
 	}
 	if (
-		(SIGNAL_BINDINGS_ENABLED ||
+		(eventOwner != null ||
+			SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
-		(activeSynchronousSignalOwner !== null ||
+		(eventOwner != null ||
+			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
-			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
+			scope?.block.idState.renderOwner?.signalOwner !== undefined ||
+			(d.el as any).$$signalOwner !== scope)
 	)
-		setEventHandler(d.el!);
+		setEventHandler(d.el!, undefined, undefined, undefined, scope, eventOwner);
 }
 // Lifted block arrows receive the native event before their lexical captures.
 // Negative arities preserve the ordinary bundle's exact authored argument list
 // and reuse its field layout, update helpers, journal, and dispatch snapshot.
-export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle {
+export function evt1e(
+	el: Element,
+	key: string,
+	fn: any,
+	a0: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): HandlerBundle {
 	const d: HandlerBundle = { fn, args: -1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	setEventHandler(el, key, d, undefined, scope, eventOwner);
 	return d;
 }
-export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
+export function evt2e(
+	el: Element,
+	key: string,
+	fn: any,
+	a0: any,
+	a1: any,
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): HandlerBundle {
 	const d: HandlerBundle = { fn, args: -2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	setEventHandler(el, key, d, undefined, scope, eventOwner);
 	return d;
 }
-export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
+export function evtN(
+	el: Element,
+	key: string,
+	fn: any,
+	args: any[],
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): HandlerBundle {
 	const d: HandlerBundle = { fn, args, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	setEventHandler(el, key, d, undefined, scope, eventOwner);
 	return d;
 }
-export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
+export function evtNu(
+	d: HandlerBundle,
+	fn: any,
+	args: any[],
+	scope: Scope | null = CURRENT_SCOPE,
+	eventOwner?: SignalOwner | null,
+): void {
 	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn || d.args !== args) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 		d.fn = fn;
 		d.args = args;
 	}
 	if (
-		(SIGNAL_BINDINGS_ENABLED ||
+		(eventOwner != null ||
+			SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
-		(activeSynchronousSignalOwner !== null ||
+		(eventOwner != null ||
+			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
-			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
+			scope?.block.idState.renderOwner?.signalOwner !== undefined ||
+			(d.el as any).$$signalOwner !== scope)
 	)
-		setEventHandler(d.el!);
+		setEventHandler(d.el!, undefined, undefined, undefined, scope, eventOwner);
 }
 
 // Delegated event names registered by compiled modules' `delegateEvents([...])`
@@ -30855,19 +31009,14 @@ type PortalEventBoundary = Node & {
 };
 
 function resolvePortalEventOwner(node: DelegatedNode): void {
-	if (
-		node.$$portalParent != null ||
-		(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === null
-	)
-		return;
+	if (node.$$portalParent != null || node.parentNode === null) return;
 	// assignedSlot/composedPath can put a <slot> next, but a portal range belongs
 	// to the direct child's actual DOM container, not the slot it projects into.
-	const target = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!;
+	const target = node.parentNode!;
 	const ranges = _portalEventRanges.get(target);
 	if (ranges === undefined) return;
 	let owner: PortalSlot | undefined;
-	let previous = (STAGED_DOM ? STAGED_DOM.view(node) : node)
-		.previousSibling as PortalEventBoundary | null;
+	let previous = node.previousSibling as PortalEventBoundary | null;
 	let remainingSkips = ranges.size;
 	while (previous !== null) {
 		const closedStart = previous.$$portalEventStart;
@@ -30879,15 +31028,14 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 			ranges.has(closedRange) &&
 			closedRange.start === closedStart &&
 			closedRange.end === previous &&
-			(STAGED_DOM ? STAGED_DOM.view(closedStart) : closedStart).parentNode === target
+			closedStart.parentNode === target
 		) {
 			// Skip a completed foreign range, including all its content. A valid
 			// backward walk skips each active range at most once. Bounding jumps
 			// also prevents cycles if external DOM code reverses a marker pair;
 			// after that bound, ordinary previousSibling steps always make progress.
 			remainingSkips--;
-			previous = (STAGED_DOM ? STAGED_DOM.view(closedStart) : closedStart)
-				.previousSibling as PortalEventBoundary | null;
+			previous = closedStart.previousSibling as PortalEventBoundary | null;
 			continue;
 		}
 		const range = previous.$$portalEventRange;
@@ -30897,21 +31045,16 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 			ranges.has(range) &&
 			range.start === previous &&
 			end != null &&
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === target &&
-			((STAGED_DOM ? STAGED_DOM.view(previous) : previous).compareDocumentPosition(node) &
-				Node.DOCUMENT_POSITION_FOLLOWING) !==
-				0 &&
-			((STAGED_DOM ? STAGED_DOM.view(node) : node).compareDocumentPosition(end) &
-				Node.DOCUMENT_POSITION_FOLLOWING) !==
-				0
+			end.parentNode === target &&
+			(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
+			(node.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 		) {
 			// The first enclosing start encountered backwards is the innermost
 			// active owner, including foreign ranges interleaved in a Fragment.
 			owner = range;
 			break;
 		}
-		previous = (STAGED_DOM ? STAGED_DOM.view(previous) : previous)
-			.previousSibling as PortalEventBoundary | null;
+		previous = previous.previousSibling as PortalEventBoundary | null;
 	}
 	if (owner === undefined) return;
 	if (ROOT_RENDER_TRANSACTION !== null) {
@@ -30932,8 +31075,7 @@ function prepareRegisteredPortalEventOwners(path: EventTarget[], epoch: number):
 		let logical = node.$$portalParent as DelegatedNode | undefined;
 		while (logical != null && !isEventRoot(logical, epoch) && path.indexOf(logical) < 0) {
 			resolvePortalEventOwner(logical);
-			logical = (logical.$$portalParent ||
-				(STAGED_DOM ? STAGED_DOM.view(logical) : logical).parentNode) as DelegatedNode | undefined;
+			logical = (logical.$$portalParent || logical.parentNode) as DelegatedNode | undefined;
 		}
 	}
 }
@@ -31026,7 +31168,7 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 			} else {
 				// The logical portal host may not be on this native event's path.
 				// Do not force a hidden shadow-root -> host crossing here.
-				node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode as DelegatedNode | null;
+				node = node.parentNode as DelegatedNode | null;
 			}
 		}
 
@@ -31521,9 +31663,7 @@ function snapshotSubmitDispatch(form: HTMLFormElement, event: SubmitEvent): Subm
 	let submitter = event.submitter;
 	let action: unknown = (form as any).$$formAction;
 	if (submitter !== null && submitter !== undefined) {
-		const override =
-			(submitter as any).$$formAction ??
-			(STAGED_DOM ? STAGED_DOM.view(submitter) : submitter).getAttribute('formaction');
+		const override = (submitter as any).$$formAction ?? submitter.getAttribute('formaction');
 		if (override != null) {
 			action = override;
 			// An explicit formAction owns the action input; its submit button is
@@ -31563,9 +31703,7 @@ function publishRegisteredManualFormPending(rec: SubmitDispatchRec): void {
 		method: form.method || 'get',
 		// React reports the form's action PROP here; octane's equivalents are the
 		// intercept function ($$formAction) or the plain attribute.
-		action:
-			(fa.$$formAction as FormStatus['action']) ??
-			(STAGED_DOM ? STAGED_DOM.view(form) : form).getAttribute('action'),
+		action: (fa.$$formAction as FormStatus['action']) ?? form.getAttribute('action'),
 	});
 }
 
@@ -31643,9 +31781,10 @@ export function setFormAction(
 	name: string,
 	value: unknown,
 	_prev: unknown,
+	prepared?: PreparedHostProps,
 ): void {
 	if (typeof value === 'function') {
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$formAction = value;
+		(el as any).$$formAction = value;
 		if (process.env.NODE_ENV !== 'production') queueFormActionAuthoringDiagnostic(el);
 		if (!(el as any).$$formSubmitWired) {
 			(el as any).$$formSubmitWired = true;
@@ -31653,10 +31792,15 @@ export function setFormAction(
 			delegateEvents(['submit']);
 		}
 		// A function action implies a non-native submit; drop any stale attribute.
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+		el.removeAttribute(name);
 		return;
 	}
-	setFormActionAttribute(el, name, value);
+	if (prepared === undefined) setFormActionAttribute(el, name, value);
+	else {
+		(el as any).$$formAction = undefined;
+		const attribute = prepared.attributes?.[name];
+		if (attribute !== undefined) commitHostAttribute(el, name.toLowerCase(), attribute);
+	}
 }
 
 // A string or nullish action is the native attribute. Clearing the action must
@@ -31666,7 +31810,7 @@ function setFormActionAttribute(el: Element, name: string, value: unknown, _prev
 	// here (DESCRIPTOR_FORM_ACTION): a compiler classification gap.
 	if (process.env.NODE_ENV !== 'production' && typeof value === 'function')
 		throw new Error(formatClientError(342));
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$formAction = undefined;
+	(el as any).$$formAction = undefined;
 	setAttribute(el, name, value);
 }
 
@@ -31829,9 +31973,6 @@ interface ControlledState {
 	formSeen: boolean;
 	/** Previous final <select multiple> mode. */
 	formMultiple: boolean;
-	/** A textarea's children writer was present at the previous commit, so its
-	 *  live child binding may still own Text inside the element. */
-	formChildren: boolean;
 }
 
 const CONTROLLED_DELIVERY = /* @__PURE__ */ Symbol('octane.controlledDelivery');
@@ -31922,28 +32063,12 @@ function queueControlledCommit<T>(queue: T[], item: T): void {
 	)
 		DEFERRED_LAYOUT_DRIVER.recordStageEntry(item);
 	queue.push(item);
-	if (ROOT_RENDER_TRANSACTION !== null)
-		journalUndo(() => {
-			const index = queue.lastIndexOf(item);
-			if (index !== -1) queue.splice(index, 1);
-		});
 }
 
 function queueDevFormCheck(queue: Element[], el: Element): void {
 	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
 	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(el);
 	queue.push(el);
-	if (ROOT_RENDER_TRANSACTION !== null) {
-		const host = el as any;
-		const generation = DEV_FORM_CHECK_GENERATION;
-		journalUndo(() => {
-			const index = queue.lastIndexOf(el);
-			if (index !== -1) queue.splice(index, 1);
-			// The element can be retried in this same diagnostic generation. Roll back
-			// the stamp alongside the queue entry so that retry is not deduplicated.
-			if (host[DEV_FORM_CHECK_MARK] === generation) delete host[DEV_FORM_CHECK_MARK];
-		});
-	}
 }
 
 /** True when controlled commit work is queued (folds into hasPendingWork). */
@@ -31962,7 +32087,7 @@ function hasControlledSyncs(): boolean {
  * Server-rendered controls keep their existing autofocus attribute but are
  * never refocused during hydration; later updates are likewise ignored.
  */
-export function setAutoFocus(el: Element, value: unknown): void {
+export function setAutoFocus(el: Element, value: unknown, adopting?: boolean): void {
 	if ((el as any).$$afSeen !== undefined) return; // mount-only
 	(el as any).$$afSeen = true;
 	if (!value) return;
@@ -31976,7 +32101,7 @@ export function setAutoFocus(el: Element, value: unknown): void {
 			return;
 	}
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.isFresh(el)) return;
+	if (adopting ?? (hydration !== null && !hydrateIsFresh(hydration, el))) return;
 	queueControlledCommit(AUTOFOCUS_QUEUE, el);
 }
 
@@ -31984,7 +32109,7 @@ export function setAutoFocus(el: Element, value: unknown): void {
 function isTextEntry(el: Element): boolean {
 	if (el.localName === 'textarea') return true;
 	if (el.localName !== 'input') return false;
-	switch ((STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type) {
+	switch ((el as HTMLInputElement).type) {
 		case 'text':
 		case 'search':
 		case 'url':
@@ -32011,13 +32136,13 @@ function onCtrlCompositionStart(e: Event): void {
 		ctrl.compositionEndTask = null;
 	}
 	ctrl.composing = true;
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener('blur', onCtrlCompositionEnd);
+	el.addEventListener('blur', onCtrlCompositionEnd);
 }
 function onCtrlCompositionEnd(e: Event): void {
 	const el = e.currentTarget as Element;
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
 	if (ctrl === undefined) return;
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener('blur', onCtrlCompositionEnd);
+	el.removeEventListener('blur', onCtrlCompositionEnd);
 	if (ctrl.compositionEndTask !== undefined && ctrl.compositionEndTask !== null) {
 		clearTimeout(ctrl.compositionEndTask);
 	}
@@ -32040,8 +32165,7 @@ function onCtrlCompositionEnd(e: Event): void {
 
 /** Get-or-create the shared controlled-state record and restoration listeners. */
 function renderControlledState(el: Element): ControlledState | undefined {
-	const state = (STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$ctrl as
-		ControlledState | undefined;
+	const state = (el as any).$$ctrl as ControlledState | undefined;
 	return state === undefined
 		? undefined
 		: DEFERRED_LAYOUT_DRIVER
@@ -32072,9 +32196,8 @@ function armControlledBase(el: Element): ControlledState {
 			queued: false,
 			formSeen: false,
 			formMultiple: false,
-			formChildren: false,
 		};
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$ctrl = ctrl;
+		(el as any).$$ctrl = ctrl;
 		// The restore pass rides the delegated dispatchers — an armed control
 		// must hear its native edit events even when NO component listens
 		// (React attaches root listeners eagerly; octane delegates lazily).
@@ -32092,14 +32215,8 @@ function armControlled(el: Element): ControlledState {
 	// Recheck existing records so a dynamic date-to-text type change can arm IME.
 	if (ctrl.compositionEndTask === undefined && isTextEntry(el)) {
 		ctrl.compositionEndTask = null;
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(
-			'compositionstart',
-			onCtrlCompositionStart,
-		);
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(
-			'compositionend',
-			onCtrlCompositionEnd,
-		);
+		el.addEventListener('compositionstart', onCtrlCompositionStart);
+		el.addEventListener('compositionend', onCtrlCompositionEnd);
 	}
 	return ctrl;
 }
@@ -32120,18 +32237,16 @@ function toControlledString(v: unknown): string {
  * "" must write (value={0} means "show 0"). Everything else compares the
  * exact string.
  */
-function valueNeedsWrite(el: HTMLInputElement | HTMLTextAreaElement, raw: unknown): boolean {
-	if (
-		(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type ===
-		'number'
-	) {
+function valueNeedsWrite(
+	el: HTMLInputElement | HTMLTextAreaElement,
+	raw: unknown,
+	normalized?: string,
+): boolean {
+	if ((el as HTMLInputElement).type === 'number') {
 		// eslint-disable-next-line eqeqeq
-		return (
-			(raw === 0 && (STAGED_DOM ? STAGED_DOM.view(el) : el).value === '') ||
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).value != (raw as any)
-		);
+		return (raw === 0 && el.value === '') || el.value != (raw as any);
 	}
-	return (STAGED_DOM ? STAGED_DOM.view(el) : el).value !== toControlledString(raw);
+	return el.value !== (normalized ?? toControlledString(raw));
 }
 
 // DEV (gated on the dev-compile `__oct_loc` stamp, like the hydration
@@ -32207,10 +32322,7 @@ function hasPotentialFormDiagnostic(el: Element): boolean {
 	if (el.localName === 'select') return ctrl !== undefined && ctrl.sv !== null;
 	if (el.localName === 'input') {
 		const input = el as HTMLInputElement;
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'checkbox' ||
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio'
-		) {
+		if (input.type === 'checkbox' || input.type === 'radio') {
 			return ctrl !== undefined && ctrl.c !== -1;
 		}
 	}
@@ -32218,7 +32330,7 @@ function hasPotentialFormDiagnostic(el: Element): boolean {
 	return (
 		(ctrl !== undefined && ctrl.v !== UNCONTROLLED) ||
 		isUsableEventSlot((el as any).$ochange) ||
-		isUsableEventSlot((STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))['$ocapture:change'])
+		isUsableEventSlot((el as any)['$ocapture:change'])
 	);
 }
 
@@ -32236,7 +32348,7 @@ function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false): void
 		queueDevFormCheck(q, el);
 		if (q.length < DEV_FORM_CHECK_LINEAR_LIMIT) return;
 		for (let i = 0; i < q.length; i++) {
-			domNode(q[i] as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
+			(q[i] as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
 		}
 		return;
 	}
@@ -32304,7 +32416,12 @@ function setNativeChangeDiagnosticMetadata(el: Element, value: unknown): void {
  * attribute write never clobbers what the user typed, and it keeps SSR
  * output, form.reset() baselines, and differential byte-compares aligned.
  */
-export function setValue(el: Element, value: unknown): void {
+export function setValue(
+	el: Element,
+	value: unknown,
+	adopting?: boolean,
+	normalized?: string | null,
+): void {
 	// An unmatched scalar or spread is not permission to steal an offered control.
 	if (hydrationStarted && CURRENT_SCOPE?.block.idState.renderOwner?.controlLeases?.has(el))
 		HYDRATION_DRIVER!.presentationMiss(false);
@@ -32317,8 +32434,13 @@ export function setValue(el: Element, value: unknown): void {
 	// pre-hydration user input until the element's first real commit or
 	// discrete event. A fresh structural replacement is client-built and needs
 	// normal projection.
-	const adopted = hydrating && first ? activeHydration()?.isFresh(el) === false : false;
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue', adopted);
+	const adopted =
+		first &&
+		(adopting ??
+			(hydrating
+				? (activeHydration() == null ? void 0 : hydrateIsFresh(activeHydration()!, el)) === false
+				: false));
+
 	ctrl.sawV = true;
 	if (value == null) {
 		if (process.env.NODE_ENV !== 'production' && !first && ctrl.v !== UNCONTROLLED)
@@ -32329,7 +32451,7 @@ export function setValue(el: Element, value: unknown): void {
 			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 		return;
 	}
-	const s = toControlledString(value);
+	const s = normalized ?? toControlledString(value);
 	if (first) {
 		ctrl.v = value;
 		if (process.env.NODE_ENV !== 'production')
@@ -32338,11 +32460,10 @@ export function setValue(el: Element, value: unknown): void {
 			// PROPERTY first (React initInput order): the write marks the control
 			// DIRTY, so the attribute write below — and any later defaultValue
 			// binding — can never drag the live value along.
-			if ((STAGED_DOM ? STAGED_DOM.view(input) : input).value !== s)
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+			if (input.value !== s) input.value = s;
 			// The value ATTRIBUTE mirrors the controlled value (React's
 			// attribute-syncing cascade: value wins over defaultValue).
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+			input.defaultValue = s;
 			return;
 		}
 	} else {
@@ -32361,17 +32482,17 @@ export function setValue(el: Element, value: unknown): void {
 		// the reset button's default action, i.e. any script-dispatched click.
 		// IME: an UNCHANGED rendered value must not cancel an active composition;
 		// a genuinely changed one still wins (React: setState during composition).
-		if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+		if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value, s))
+			input.value = s;
 	}
-	if ((STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue !== s) {
+	if (input.defaultValue !== s) {
 		// Replacing textarea child text between edits splits native Undo groups.
 		// Keep its Text node while mirroring the controlled reset baseline.
 		// Staging owns the reflected defaultValue cache, so keep its property path.
-		const text = !STAGED_DOM && el.localName === 'textarea' ? getFirstChild(el) : null;
+		const text = el.localName === 'textarea' ? getFirstChild(el) : null;
 		if (text !== null && text.nodeType === 3 && getNextSibling(text) === null)
-			domNode(text as Text).data = s;
-		else (STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+			(text as Text).data = s;
+		else input.defaultValue = s;
 	}
 }
 
@@ -32380,7 +32501,12 @@ export function setValue(el: Element, value: unknown): void {
  * radio). Property-driven; the checked ATTRIBUTE mirrors only the INITIAL
  * state (React with attribute-syncing never updates it afterwards).
  */
-function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: ControlledState): void {
+function setCheckedState(
+	input: HTMLInputElement,
+	value: unknown,
+	ctrl: ControlledState,
+	adopting?: boolean,
+): void {
 	const first = !ctrl.sawC;
 	ctrl.sawC = true;
 	if (value == null) {
@@ -32402,12 +32528,14 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		// Hydration re-assigns the live (server or user) selection instead, as
 		// React's initInput does, which separates it from the server default,
 		// including for a later controlled → default flip.
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked =
-			hydrating && activeHydration()?.isFresh(input) === false
-				? (STAGED_DOM ? STAGED_DOM.view(input) : input).checked
+		input.checked =
+			(adopting ??
+			(hydrating
+				? (activeHydration() == null ? void 0 : hydrateIsFresh(activeHydration()!, input)) === false
+				: false))
+				? input.checked
 				: b;
-		if ((STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked !== b)
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked = b;
+		if (input.defaultChecked !== b) input.defaultChecked = b;
 		ctrl.sawDC = true;
 		return;
 	}
@@ -32424,11 +32552,7 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 	ctrl.c = b;
 	if (process.env.NODE_ENV !== 'production')
 		queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
-	if (
-		(changed || !inActivationWindow(input)) &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked !== b
-	)
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = b;
+	if ((changed || !inActivationWindow(input)) && input.checked !== b) input.checked = b;
 }
 
 /**
@@ -32441,23 +32565,19 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 	if (target === null) return false;
 	if (input === target) return true;
 	return (
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).type === 'radio' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== '' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).name ===
-			(STAGED_DOM ? STAGED_DOM.view(target) : target).name &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).form ===
-			(STAGED_DOM ? STAGED_DOM.view(target) : target).form &&
-		((STAGED_DOM ? STAGED_DOM.view(input) : input).form !== null ||
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).getRootNode() ===
-				(STAGED_DOM ? STAGED_DOM.view(target) : target).getRootNode())
+		input.type === 'radio' &&
+		target.type === 'radio' &&
+		input.name !== '' &&
+		input.name === target.name &&
+		input.form === target.form &&
+		(input.form !== null || input.getRootNode() === target.getRootNode())
 	);
 }
 
-export function setChecked(el: Element, value: unknown): void {
+export function setChecked(el: Element, value: unknown, adopting?: boolean): void {
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
-	setCheckedState(el as HTMLInputElement, value, ctrl);
+
+	setCheckedState(el as HTMLInputElement, value, ctrl, adopting);
 }
 
 /**
@@ -32465,10 +32585,10 @@ export function setChecked(el: Element, value: unknown): void {
  * type cannot be changed by a spread. It keeps the complete controlled record
  * and event restoration contract, but cannot need text-composition listeners.
  */
-export function setCheckedCheckable(el: Element, value: unknown): void {
+export function setCheckedCheckable(el: Element, value: unknown, adopting?: boolean): void {
 	const ctrl = armControlledBase(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
-	setCheckedState(el as HTMLInputElement, value, ctrl);
+
+	setCheckedState(el as HTMLInputElement, value, ctrl, adopting);
 }
 
 /**
@@ -32478,13 +32598,14 @@ export function setCheckedCheckable(el: Element, value: unknown): void {
  * render's @for/@if constructs, so the commit pass is what sees @for-built
  * options (React resolves selects post-mount the same way).
  */
-export function setSelectValue(el: Element, value: unknown): void {
+export function setSelectValue(
+	el: Element,
+	value: unknown,
+	adopting?: boolean,
+	normalized?: string | Set<string> | null,
+): void {
 	const sel = el as HTMLSelectElement;
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) {
-		journalObjectOnce(ctrl);
-		journalBag();
-	}
 	const first = !ctrl.sawV;
 	ctrl.sawV = true;
 	if (value == null) {
@@ -32497,7 +32618,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	}
 	if (process.env.NODE_ENV !== 'production' && !first && ctrl.sv === null)
 		devWarnControlledFlip(el, true);
-	if ((STAGED_DOM ? STAGED_DOM.view(sel) : sel).multiple) {
+	if (sel.multiple) {
 		if (!Array.isArray(value)) {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 				console.error(
@@ -32506,9 +32627,12 @@ export function setSelectValue(el: Element, value: unknown): void {
 			}
 			return;
 		}
-		const set = new Set<string>();
-		for (let i = 0; i < value.length; i++) set.add(toControlledString(value[i]));
-		ctrl.sv = set;
+		if (normalized instanceof Set) ctrl.sv = normalized;
+		else {
+			const set = new Set<string>();
+			for (let i = 0; i < value.length; i++) set.add(toControlledString(value[i]));
+			ctrl.sv = set;
+		}
 	} else {
 		if (Array.isArray(value)) {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
@@ -32518,7 +32642,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 			}
 			return;
 		}
-		ctrl.sv = toControlledString(value);
+		ctrl.sv = typeof normalized === 'string' ? normalized : toControlledString(value);
 	}
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 	// Hydration ADOPTS the server-emitted `selected` state — and must not
@@ -32526,7 +32650,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	// would clobber a pre-hydration user selection). A fresh replacement has no
 	// user state to preserve and follows the ordinary client-mount path.
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.isFresh(el)) return;
+	if (adopting ?? (hydration !== null && !hydrateIsFresh(hydration, el))) return;
 	projectSelectValue(sel, ctrl.sv, false);
 	if (!ctrl.queued) {
 		ctrl.queued = true;
@@ -32545,39 +32669,29 @@ function projectSelectValue(
 	sv: string | Set<string>,
 	setDefaultSelected: boolean,
 ): void {
-	const options = (STAGED_DOM ? STAGED_DOM.view(sel) : sel).options;
+	const options = sel.options;
 	// The selection lives on the options, not the select, so each one that can
 	// move has to be recorded before the projection walks over it.
-	if (TRANSITION_JOURNAL !== null) {
-		for (let i = 0; i < options.length; i++) {
-			journalControlledOption(options[i], setDefaultSelected);
-		}
-	}
 	if (typeof sv !== 'string') {
 		for (let i = 0; i < options.length; i++) {
 			const option = options[i];
-			const selected = sv.has((STAGED_DOM ? STAGED_DOM.view(option) : option).value);
-			if ((STAGED_DOM ? STAGED_DOM.view(option) : option).selected !== selected)
-				(STAGED_DOM ? STAGED_DOM.view(option) : option).selected = selected;
-			if (setDefaultSelected)
-				(STAGED_DOM ? STAGED_DOM.view(option) : option).defaultSelected = selected;
+			const selected = sv.has(option.value);
+			if (option.selected !== selected) option.selected = selected;
+			if (setDefaultSelected) option.defaultSelected = selected;
 		}
 		return;
 	}
 	let defaultOption: HTMLOptionElement | null = null;
 	for (let i = 0; i < options.length; i++) {
 		const option = options[i];
-		if ((STAGED_DOM ? STAGED_DOM.view(option) : option).value === sv) {
-			(STAGED_DOM ? STAGED_DOM.view(option) : option).selected = true;
-			if (setDefaultSelected)
-				(STAGED_DOM ? STAGED_DOM.view(option) : option).defaultSelected = true;
+		if (option.value === sv) {
+			option.selected = true;
+			if (setDefaultSelected) option.defaultSelected = true;
 			return;
 		}
-		if (defaultOption === null && !(STAGED_DOM ? STAGED_DOM.view(option) : option).disabled)
-			defaultOption = option;
+		if (defaultOption === null && !option.disabled) defaultOption = option;
 	}
-	if (defaultOption !== null)
-		(STAGED_DOM ? STAGED_DOM.view(defaultOption) : defaultOption).selected = true;
+	if (defaultOption !== null) defaultOption.selected = true;
 }
 
 /**
@@ -32586,25 +32700,28 @@ function projectSelectValue(
  * option defaultSelected), never the live value: a dirty control keeps what
  * the user typed. Re-synced on updates (React parity; attribute-only).
  */
-export function setDefaultValue(el: Element, value: unknown, initial?: boolean): void {
+export function setDefaultValue(
+	el: Element,
+	value: unknown,
+	initial?: boolean,
+	adopting?: boolean,
+	normalized?: string | Set<string> | null,
+): void {
 	const ctrl = armControlled(el);
 	const hydration = hydrating ? activeHydration() : null;
 	if (el.localName === 'select') {
 		const first = ctrl.dvv === UNCONTROLLED;
-		const multiple = (
-			STAGED_DOM ? STAGED_DOM.view(el as HTMLSelectElement) : (el as HTMLSelectElement)
-		).multiple;
+		const multiple = (el as HTMLSelectElement).multiple;
 		const changedMultiple = ctrl.formMultiple !== multiple;
 		if (first || changedMultiple) {
-			if (TRANSITION_JOURNAL !== null) {
-				journalObjectOnce(ctrl);
-				journalBag();
-			}
 			ctrl.dvv = value;
 			ctrl.formMultiple = multiple;
-			if (hydration !== null && !hydration.isFresh(el)) return;
+			if (adopting ?? (hydration !== null && !hydrateIsFresh(hydration, el))) return;
 			if (value != null)
-				queueControlledCommit(SELECT_DEFAULT_SYNCS, { el: el as HTMLSelectElement, value });
+				queueControlledCommit(SELECT_DEFAULT_SYNCS, {
+					el: el as HTMLSelectElement,
+					value: normalized instanceof Set ? [...normalized] : (normalized ?? value),
+				});
 			else if (changedMultiple)
 				projectSelectValue(el as HTMLSelectElement, multiple ? new Set<string>() : '', false);
 		}
@@ -32612,38 +32729,32 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	}
 	const first = initial ?? !ctrl.sawV;
 	const previousDefault = ctrl.dvv;
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(ctrl);
+
 	ctrl.sawV = true;
 	ctrl.dvv = value;
 	// Keep pre-hydration edits, but update the reset baseline through the native
 	// defaultValue setter. A dirty control does not follow that default write.
-	const adopted = hydration !== null && !hydration.isFresh(el);
+	const adopted = adopting ?? (hydration !== null && !hydrateIsFresh(hydration, el));
 	// A controlled `value` OWNS the attribute (React's cascade — the value
 	// binding syncs it every commit); the default only writes when uncontrolled.
 	if (ctrl.v !== UNCONTROLLED) return;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	if (value == null) {
 		if (previousDefault !== UNCONTROLLED && previousDefault != null) {
-			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-			if (el.localName === 'input')
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).removeAttribute('value');
-			else (STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = '';
+			if (el.localName === 'input') input.removeAttribute('value');
+			else input.defaultValue = '';
 		}
 		return;
 	}
-	const s = toControlledString(value);
-	if (first && !adopted && (STAGED_DOM ? STAGED_DOM.view(input) : input).value !== s) {
-		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+	const s = typeof normalized === 'string' ? normalized : toControlledString(value);
+	if (first && !adopted && input.value !== s) {
+		input.value = s;
 	}
 	if (
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue !== s ||
-		(s === '' &&
-			el.localName === 'input' &&
-			!(STAGED_DOM ? STAGED_DOM.view(input) : input).hasAttribute('value'))
+		input.defaultValue !== s ||
+		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
 	) {
-		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+		input.defaultValue = s;
 	}
 }
 
@@ -32655,99 +32766,65 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 const DEFAULT_VALUE_BASELINE = Symbol('octane.defaultValue');
 const DEFAULT_CHECKED_INITIALIZED = Symbol('octane.defaultCheckedInitialized');
 
-export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
+export function setDefaultValueUncontrolled(
+	el: Element,
+	value: unknown,
+	adopting?: boolean,
+	normalized?: string | null,
+): void {
 	const hydration = hydrating ? activeHydration() : null;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
-	const previous = (STAGED_DOM ? STAGED_DOM.view(input as any) : (input as any))[
-		DEFAULT_VALUE_BASELINE
-	] as string | null | undefined;
-	const s = value == null ? null : toControlledString(value);
-	if (TRANSITION_JOURNAL !== null)
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, input, DEFAULT_VALUE_BASELINE, previous);
-	(STAGED_DOM ? STAGED_DOM.view(input as any) : (input as any))[DEFAULT_VALUE_BASELINE] = s;
-	const adopted = hydration !== null && !hydration.isFresh(el);
+	const previous = (input as any)[DEFAULT_VALUE_BASELINE] as string | null | undefined;
+	const s = value == null ? null : (normalized ?? toControlledString(value));
+
+	(input as any)[DEFAULT_VALUE_BASELINE] = s;
+	const adopted = adopting ?? (hydration !== null && !hydrateIsFresh(hydration, el));
 	if (s === null) {
 		if (previous != null) {
-			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-			if (el.localName === 'input')
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).removeAttribute('value');
-			else (STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = '';
+			if (el.localName === 'input') input.removeAttribute('value');
+			else input.defaultValue = '';
 		}
 		return;
 	}
-	if (
-		previous === undefined &&
-		!adopted &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).value !== s
-	) {
-		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+	if (previous === undefined && !adopted && input.value !== s) {
+		input.value = s;
 	}
 	if (
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue !== s ||
-		(s === '' &&
-			el.localName === 'input' &&
-			!(STAGED_DOM ? STAGED_DOM.view(input) : input).hasAttribute('value'))
+		input.defaultValue !== s ||
+		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
 	) {
-		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+		input.defaultValue = s;
 	}
 }
 
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
-export function setDefaultChecked(el: Element, value: unknown): void {
+export function setDefaultChecked(el: Element, value: unknown, adopting?: boolean): void {
 	const ctrl = armControlled(el);
 	const input = el as HTMLInputElement;
-	const adopted = hydrating ? activeHydration()?.isFresh(el) === false : false;
+	const adopted =
+		adopting ??
+		(hydrating
+			? (activeHydration() == null ? void 0 : hydrateIsFresh(activeHydration()!, el)) === false
+			: false);
 	const first = !ctrl.sawDC;
 	if (first) {
-		if (TRANSITION_JOURNAL !== null) {
-			journalObjectOnce(ctrl);
-			journalBag();
-		}
 		ctrl.sawDC = true;
 	}
 	// Adopt the user's live choice, separated from the server's pristine default
 	// so the client baseline below (React's initInput) cannot drag it along.
-	if (adopted && first)
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = (
-			STAGED_DOM ? STAGED_DOM.view(input) : input
-		).checked;
+	if (adopted && first) input.checked = input.checked;
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
 	// React initInput marks the live checkedness dirty even when the initial
 	// default is absent. Otherwise, the browser would move a still-pristine
 	// checkbox whenever a later defaultChecked update changes its reset target.
 	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
-		if (TRANSITION_JOURNAL !== null) {
-			TRANSITION_JOURNAL.push(
-				JOURNAL_PROP,
-				input,
-				'checked',
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).checked,
-			);
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== '' &&
-				!!value
-			)
-				journalRadioCousins(input);
-		}
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked =
-			value == null ? (STAGED_DOM ? STAGED_DOM.view(input) : input).checked : !!value;
+		input.checked = value == null ? input.checked : !!value;
 	}
 	if (value == null) return;
 	const b = !!value;
-	if ((STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked !== b) {
-		if (TRANSITION_JOURNAL !== null) {
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== ''
-			)
-				journalRadioCousins(input);
-			journalAttr(input, 'checked');
-		}
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked = b;
+	if (input.defaultChecked !== b) {
+		input.defaultChecked = b;
 	}
 }
 
@@ -32821,14 +32898,11 @@ function applyFormControlValues(
 	defaultChecked: unknown,
 	multiple: unknown,
 	hasChildren = false,
+	prepared?: PreparedHostProps,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
 	const previousMultiple = ctrl.formMultiple;
-	if (TRANSITION_JOURNAL !== null) {
-		journalObjectOnce(ctrl);
-		journalBag();
-	}
 	ctrl.formSeen = true;
 	if (
 		process.env.NODE_ENV !== 'production' &&
@@ -32850,37 +32924,41 @@ function applyFormControlValues(
 		// though the controlled writer owns the final baseline. Preserve that
 		// observable coercion order, and reuse the normalized default when it is
 		// the uncontrolled fallback so a custom toString runs exactly once.
-		const defaultString = defaultValue == null ? null : toControlledString(defaultValue);
-		setValue(input, value);
+		const defaultString =
+			defaultValue == null
+				? null
+				: ((prepared?.controls?.defaultValue as string | undefined) ??
+					toControlledString(defaultValue));
+		setValue(input, value, prepared?.adopted, prepared?.controls?.value as string | null);
 		if (value == null) {
-			setDefaultValue(input, defaultString, first);
+			setDefaultValue(input, defaultString, first, prepared?.adopted, defaultString);
 		}
-		setChecked(input, checked);
+		setChecked(input, checked, prepared?.adopted);
 		if (checked == null && (defaultChecked != null || first))
-			setDefaultChecked(input, defaultChecked);
+			setDefaultChecked(input, defaultChecked, prepared?.adopted);
 		return;
 	}
 
 	if (tag === 'textarea') {
 		const textarea = el as HTMLTextAreaElement;
 		// Octane textarea children, whether authored, spread-held, or `children=`,
-		// are a live text binding that owns the default. It only holds DOM when a
-		// children writer rendered at the previous commit.
-		const childrenOwned = ctrl.formChildren;
-		ctrl.formChildren = hasChildren;
-		setValue(textarea, value);
+		// are a live text binding that owns the default. The host program runs
+		// after the accepted child program, so ownership is from this render.
+		setValue(textarea, value, prepared?.adopted, prepared?.controls?.value as string | null);
 		if (value == null) {
-			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
+			if (defaultValue != null)
+				setDefaultValue(
+					textarea,
+					defaultValue,
+					first,
+					prepared?.adopted,
+					prepared?.controls?.defaultValue as string | null,
+				);
 			// React resets the default here because its children only seed the
 			// initial value. Clearing it under a live child binding would detach
 			// that binding's Text node, and later updates would write outside the
 			// element.
-			else if (
-				!first &&
-				!childrenOwned &&
-				(STAGED_DOM ? STAGED_DOM.view(textarea) : textarea).defaultValue !== ''
-			)
-				(STAGED_DOM ? STAGED_DOM.view(textarea) : textarea).defaultValue = '';
+			else if (!first && !hasChildren && textarea.defaultValue !== '') textarea.defaultValue = '';
 		}
 		return;
 	}
@@ -32889,27 +32967,27 @@ function applyFormControlValues(
 	const multipleType = typeof multiple;
 	const nextMultiple = !!multiple && multipleType !== 'function' && multipleType !== 'symbol';
 	ctrl.formMultiple = nextMultiple;
-	if ((STAGED_DOM ? STAGED_DOM.view(select) : select).multiple !== nextMultiple) {
-		if (TRANSITION_JOURNAL !== null) {
-			// Switching to single selection can clear options before projection.
-			// Restore multiple first, then each option's prior selected state.
-			for (let i = 0; i < (STAGED_DOM ? STAGED_DOM.view(select) : select).options.length; i++)
-				journalControlledOption((STAGED_DOM ? STAGED_DOM.view(select) : select).options[i], false);
-			TRANSITION_JOURNAL.push(
-				JOURNAL_PROP,
-				select,
-				'multiple',
-				(STAGED_DOM ? STAGED_DOM.view(select) : select).multiple,
-			);
-		}
-		(STAGED_DOM ? STAGED_DOM.view(select) : select).multiple = nextMultiple;
+	if (select.multiple !== nextMultiple) {
+		select.multiple = nextMultiple;
 	}
 	if (!first && previousMultiple !== nextMultiple && value == null) {
 		if (defaultValue != null) ctrl.dvv = UNCONTROLLED;
 		else projectSelectValue(select, nextMultiple ? new Set<string>() : '', false);
 	}
-	setSelectValue(select, value);
-	if (defaultValue != null) setDefaultValue(select, defaultValue);
+	setSelectValue(
+		select,
+		value,
+		prepared?.adopted,
+		prepared?.controls?.value as string | Set<string> | null,
+	);
+	if (defaultValue != null)
+		setDefaultValue(
+			select,
+			defaultValue,
+			undefined,
+			prepared?.adopted,
+			prepared?.controls?.defaultValue as string | Set<string> | null,
+		);
 	else if (first) ctrl.dvv = undefined;
 }
 
@@ -32926,9 +33004,7 @@ function nativeTextChangeMessage(
 	const changeProp = hasBubbleChange ? 'onChange' : 'onChangeCapture';
 	const inputProp = hasBubbleChange ? 'onInput' : 'onInputCapture';
 	const host =
-		el.localName === 'textarea'
-			? '<textarea>'
-			: `<input type="${(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type}">`;
+		el.localName === 'textarea' ? '<textarea>' : `<input type="${(el as HTMLInputElement).type}">`;
 	const controlledHint = controlled
 		? ' Because this field is controlled, edits are restored before the later native ' +
 			'change can run; use `defaultValue` for editable commit-only behavior.'
@@ -32952,8 +33028,8 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	if (
 		host.readOnly === true ||
 		host.disabled === true ||
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('readonly') ||
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('disabled')
+		el.hasAttribute('readonly') ||
+		el.hasAttribute('disabled')
 	)
 		return null;
 	// An aria-hidden control is a form-interop MIRROR (AT-hidden and, by the
@@ -32961,7 +33037,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	// radix-style libraries render behind a custom control): users cannot reach
 	// it, so handler-less controlled props are the intended wiring, not the
 	// authoring mistake this diagnostic exists to catch.
-	if ((STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('aria-hidden') === 'true') return null;
+	if (el.getAttribute('aria-hidden') === 'true') return null;
 
 	const hasInput =
 		isUsableEventSlot(host.$oinput as EventSlot) ||
@@ -32980,13 +33056,13 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 				return null;
 			const phase = hasBubbleChange ? (hasCaptureChange ? 'both' : 'bubble') : 'capture';
 			return {
-				signature: `native-change:${el.localName}:${(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type}:${phase}:${controlled ? 'controlled' : 'uncontrolled'}`,
+				signature: `native-change:${el.localName}:${(el as HTMLInputElement).type}:${phase}:${controlled ? 'controlled' : 'uncontrolled'}`,
 				message: nativeTextChangeMessage(el, hasBubbleChange, controlled),
 			};
 		}
 		if (!controlled) return null;
 		return {
-			signature: `controlled-text-missing:${el.localName}:${(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type}`,
+			signature: `controlled-text-missing:${el.localName}:${(el as HTMLInputElement).type}`,
 			message:
 				'You provided a `value` prop to a form field without an `onInput` handler. This ' +
 				'will render a read-only field. If the field should be mutable use ' +
@@ -33014,9 +33090,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 
 	const input = el as HTMLInputElement;
 	const checkable =
-		input.localName === 'input' &&
-		((STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'checkbox' ||
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio');
+		input.localName === 'input' && (input.type === 'checkbox' || input.type === 'radio');
 	if (!checkable || ctrl === undefined || ctrl.c === -1) return null;
 	const hasClick =
 		isUsableEventSlot(host.$oclick as EventSlot) ||
@@ -33024,7 +33098,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	if (hasClick || hasInput || hasChange || hasHydrationControlSignalWriter(el, 'checked'))
 		return null;
 	return {
-		signature: `controlled-checkable-missing:${(STAGED_DOM ? STAGED_DOM.view(input) : input).type}`,
+		signature: `controlled-checkable-missing:${input.type}`,
 		message:
 			'You provided a `checked` prop to a checkbox or radio without an `onClick`, ' +
 			'`onInput`, or `onChange` handler. This will render a read-only field. Set a ' +
@@ -33071,27 +33145,23 @@ function drainDevFormDiagnostics(target?: Element): void {
 					...(submitter
 						? {
 								formAction: action,
-								type: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('type') ?? undefined,
-								name: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('name') ?? undefined,
-								formMethod:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('formmethod') ?? undefined,
-								formEncType:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('formenctype') ?? undefined,
-								formTarget:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('formtarget') ?? undefined,
+								type: el.getAttribute('type') ?? undefined,
+								name: el.getAttribute('name') ?? undefined,
+								formMethod: el.getAttribute('formmethod') ?? undefined,
+								formEncType: el.getAttribute('formenctype') ?? undefined,
+								formTarget: el.getAttribute('formtarget') ?? undefined,
 							}
 						: {
 								action,
-								method: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('method') ?? undefined,
-								encType:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('enctype') ?? undefined,
-								target: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('target') ?? undefined,
+								method: el.getAttribute('method') ?? undefined,
+								encType: el.getAttribute('enctype') ?? undefined,
+								target: el.getAttribute('target') ?? undefined,
 							}),
 				};
 			}
 			const children =
 				authoring.authoringChildren === 'textarea'
-					? (STAGED_DOM ? STAGED_DOM.view(el) : el).textContent
+					? el.textContent
 					: authoring.authoringChildren === 'option'
 						? {}
 						: undefined;
@@ -33128,7 +33198,7 @@ function drainQueuedControlledSyncs(): void {
 		for (let i = 0; i < q.length; i++) {
 			// Focus only if the commit actually connected the element (a caught
 			// mount error may have torn the subtree down before this drain).
-			if (domNode(q[i]).isConnected) domNode(q[i] as HTMLElement).focus();
+			if (q[i].isConnected) (q[i] as HTMLElement).focus();
 		}
 	}
 	if (SELECT_DEFAULT_SYNCS.length > 0) {
@@ -33139,7 +33209,7 @@ function drainQueuedControlledSyncs(): void {
 			const ctrl = (sel as any).$$ctrl as ControlledState | undefined;
 			if (ctrl !== undefined && ctrl.sv !== null) continue; // controlled value owns the selection
 			const v = q[i].value;
-			const sv = (STAGED_DOM ? STAGED_DOM.view(sel) : sel).multiple
+			const sv = sel.multiple
 				? Array.isArray(v)
 					? new Set<string>(v.map(toControlledString))
 					: null
@@ -33168,8 +33238,7 @@ function drainQueuedControlledSyncs(): void {
  */
 function restoreControlledElement(el: Element): void {
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
-	if (ctrl === undefined || ctrl.composing || !(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected)
-		return;
+	if (ctrl === undefined || ctrl.composing || !el.isConnected) return;
 	if (el.localName === 'select') {
 		if (ctrl.sv !== null) projectSelectValue(el as HTMLSelectElement, ctrl.sv, false);
 		return;
@@ -33179,48 +33248,37 @@ function restoreControlledElement(el: Element): void {
 		ctrl.v !== UNCONTROLLED &&
 		valueNeedsWrite(el as HTMLInputElement | HTMLTextAreaElement, ctrl.v)
 	) {
-		(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).value =
-			toControlledString(ctrl.v);
+		(el as HTMLInputElement).value = toControlledString(ctrl.v);
 	}
 }
 
 function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): void {
 	if (ctrl.c !== -1) {
-		if ((STAGED_DOM ? STAGED_DOM.view(input) : input).checked !== ctrl.c)
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = ctrl.c;
+		if (input.checked !== ctrl.c) input.checked = ctrl.c;
 		// A radio's drift flips its GROUP cousins too (checking one unchecks
 		// another) — restore every armed cousin to ITS rendered state
 		// (React's updateNamedCousins).
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== ''
-		)
-			restoreRadioCousins(input);
+		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
 	}
 }
 
 function restoreRadioCousins(input: HTMLInputElement): void {
-	const name = (STAGED_DOM ? STAGED_DOM.view(input) : input).name;
+	const name = input.name;
 	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
 			other === input ||
 			other.localName !== 'input' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).type !== 'radio' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).name !== name ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).form !==
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).form
+			other.type !== 'radio' ||
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
 		const octrl = (other as any).$$ctrl as ControlledState | undefined;
-		if (
-			octrl !== undefined &&
-			octrl.c !== -1 &&
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).checked !== octrl.c
-		) {
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).checked = octrl.c;
+		if (octrl !== undefined && octrl.c !== -1 && other.checked !== octrl.c) {
+			other.checked = octrl.c;
 		}
 	}
 }
@@ -33230,12 +33288,11 @@ function restoreControlledStates(): void {
 	if (pendingRestores.length === 0) return;
 	// A handler inside a render/commit cannot flush its own update. The ambient
 	// owner restores after its complete cascade.
-	// A prepared view transition owns projected control values until publication;
-	// restoring the physical snapshot now would overwrite that pending edit.
+	// A prepared View Transition restores only after its control commits.
 	// A first root render can be active without entering the scheduler's flush.
 	if (
 		inFlush ||
-		STAGED_DOM ||
+		STAGED_COMMIT_CAPTURE ||
 		_dispatchDepth !== 0 ||
 		ROOT_RENDER_TRANSACTION !== null ||
 		(DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.capturing())
@@ -33433,6 +33490,9 @@ interface PortalSlot {
 	fragmentAnchor?: Node;
 	sourceAnchor?: Node;
 	interleavedFragment?: FragmentInstance;
+	prepared?: SlotPreparation & { previous: PortalSlot | null };
+	/** Event delegation begins only once this range reaches its target. */
+	delegated?: boolean;
 }
 
 function registerPortalEventRange(target: Node, portal: PortalSlot): void {
@@ -33456,6 +33516,7 @@ function registerPortalEventRange(target: Node, portal: PortalSlot): void {
 	ranges.add(portal);
 	(portal.start as PortalEventBoundary).$$portalEventRange = portal;
 	(portal.end as PortalEventBoundary).$$portalEventStart = portal.start as PortalEventBoundary;
+	portal.delegated = true;
 }
 
 function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
@@ -33510,7 +33571,18 @@ export function portal(
 		prev !== undefined &&
 		prev.target === target
 	) {
-		prepareFragmentPortalInterleaving(prev);
+		// The foreign target remains live even when the source is unpublished.
+		prepareSlot(
+			parentScope,
+			prev,
+			'interleaving',
+			{
+				parent: target,
+				publish: () => prepareFragmentPortalInterleaving(prev),
+				discard() {},
+			},
+			true,
+		);
 	}
 	const state = renderPortalState(
 		prev ?? null,
@@ -33533,25 +33605,34 @@ export function portal(
 		if (prev === undefined) registerSlot(parentScope, state);
 		else replacePortalSlot(parentScope, prev, state);
 	}
-	if (fragmentOwners !== undefined && fragmentAnchor !== undefined) {
-		registerFragmentPortalOwners(state, fragmentOwners, fragmentAnchor);
-	} else if (fragmentAnchor !== undefined) {
-		// A Fragment ref rendered inside this portal belongs to its source-tree
-		// position, not the foreign target's physical position. Only the rare
-		// compiler-normalized root portal passes this ownerless source anchor.
-		state.sourceAnchor = fragmentAnchor;
-		let child: ChildNode | null = getNextSibling(state.start!);
-		while (child !== null && child !== state.end) {
-			if (child.nodeType === 8) {
-				const foreignEnd = (child as any).$$portalEnd as Node | undefined;
-				if (foreignEnd !== undefined) {
-					child = nodeAfterPortalRange(child, foreignEnd) as ChildNode | null;
-					continue;
+	if (fragmentAnchor !== undefined) {
+		prepareSlot(parentScope, state, 'fragmentPosition', {
+			parent: target,
+			publish() {
+				if (state.target !== target || state.block === null) return;
+				if (fragmentOwners !== undefined) {
+					registerFragmentPortalOwners(state, fragmentOwners, fragmentAnchor);
+					return;
 				}
-				(child as any).$$portalSourceAnchor = fragmentAnchor;
-			}
-			child = getNextSibling(child);
-		}
+				// A Fragment ref rendered inside this portal belongs to its source-tree
+				// position, not the foreign target's physical position. Only the rare
+				// compiler-normalized root portal passes this ownerless source anchor.
+				state.sourceAnchor = fragmentAnchor;
+				let child: ChildNode | null = getNextSibling(state.start!);
+				while (child !== null && child !== state.end) {
+					if (child.nodeType === 8) {
+						const foreignEnd = (child as any).$$portalEnd as Node | undefined;
+						if (foreignEnd !== undefined) {
+							child = nodeAfterPortalRange(child, foreignEnd) as ChildNode | null;
+							continue;
+						}
+						(child as any).$$portalSourceAnchor = fragmentAnchor;
+					}
+					child = getNextSibling(child);
+				}
+			},
+			discard() {},
+		});
 	}
 }
 
@@ -33593,7 +33674,7 @@ function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
 		for (const candidate of activeFragments) {
 			if (
 				candidate._ownerBlock === block &&
-				domNode(candidate._startMarker).previousSibling === start &&
+				candidate._startMarker.previousSibling === start &&
 				getNextSibling(candidate._endMarker) === end
 			) {
 				fragment = candidate;
@@ -33616,11 +33697,7 @@ function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
 	let after: ChildNode | null = firstForeign;
 	while (after !== null) {
 		const foreignEnd = (after as any).$$portalEnd as Node | undefined;
-		if (
-			foreignEnd === undefined ||
-			(STAGED_DOM ? STAGED_DOM.view(foreignEnd) : foreignEnd).parentNode !== target
-		)
-			break;
+		if (foreignEnd === undefined || foreignEnd.parentNode !== target) break;
 		foreignStarts.push(after);
 		after = getNextSibling(foreignEnd);
 	}
@@ -33629,7 +33706,7 @@ function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
 	let cursor: ChildNode | null = tail;
 	while (cursor !== null) {
 		const next: ChildNode | null = getNextSibling(cursor);
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).insertBefore(cursor, after);
+		target.insertBefore(cursor, after);
 		if (cursor === end) break;
 		cursor = next;
 	}
@@ -33647,21 +33724,12 @@ function evacuateInterleavedPortalRanges(portal: PortalSlot): void {
 	const start = portal.start;
 	const end = portal.end;
 	const target = portal.target;
-	if (
-		start === null ||
-		end === null ||
-		target === null ||
-		(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode !== target
-	)
-		return;
+	if (start === null || end === null || target === null || end.parentNode !== target) return;
 	const destination = getNextSibling(end);
 	let node: ChildNode | null = getNextSibling(start);
 	while (node !== null && node !== end) {
 		const foreignEnd = (node as any).$$portalEnd as Node | undefined;
-		if (
-			foreignEnd === undefined ||
-			(STAGED_DOM ? STAGED_DOM.view(foreignEnd) : foreignEnd).parentNode !== target
-		) {
+		if (foreignEnd === undefined || foreignEnd.parentNode !== target) {
 			node = getNextSibling(node);
 			continue;
 		}
@@ -33669,7 +33737,7 @@ function evacuateInterleavedPortalRanges(portal: PortalSlot): void {
 		let cursor: Node | null = node;
 		while (cursor !== null) {
 			const next: Node | null = getNextSibling(cursor);
-			(STAGED_DOM ? STAGED_DOM.view(target) : target).insertBefore(cursor, destination);
+			target.insertBefore(cursor, destination);
 			if (cursor === foreignEnd) break;
 			cursor = next;
 		}
@@ -33735,21 +33803,15 @@ function registerValuePortalFragmentOwners(
 	for (const fragment of activeFragments) {
 		const owner = fragment._ownerBlock;
 		if (owner !== parentBlock && !blockIsAncestorOf(owner, parentBlock)) continue;
+		if (fragment._startMarker.parentNode !== anchor.parentNode) continue;
 		if (
-			domNode(fragment._startMarker).parentNode !==
-			(STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).parentNode
-		)
-			continue;
-		if (
-			(domNode(fragment._startMarker).compareDocumentPosition(anchor) &
-				Node.DOCUMENT_POSITION_FOLLOWING) ===
+			(fragment._startMarker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) ===
 			0
 		) {
 			continue;
 		}
 		if (
-			(domNode(fragment._endMarker).compareDocumentPosition(anchor) &
-				Node.DOCUMENT_POSITION_PRECEDING) ===
+			(fragment._endMarker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_PRECEDING) ===
 			0
 		) {
 			continue;
@@ -33785,13 +33847,37 @@ function renderPortalState(
 ): PortalSlot {
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) {
-		return hydration.suspend(() =>
+		return hydrateSuspend(hydration, () =>
 			renderPortalState(prev, parentBlock, target, rawBody, rawProps, host, env, key),
 		);
 	}
+	// Event propagation belongs to the portal's eventual source parent. The
+	// fragment housing an uncommitted source range never receives native events.
+	host = PREPARED_PARENTS.get(host) ?? host;
 	const norm = normalizePortalBody(rawBody, rawProps);
 	const childType = portalChildType(rawBody, norm.body);
 	let state = prev;
+	// A -> B -> A within one accepted render must keep A's original range and
+	// subscriptions. Discard B's private range when its capture settles.
+	if (
+		state?.prepared !== undefined &&
+		state.prepared.capture === WIP_CAPTURE &&
+		(state.target !== target || state.key !== key || state.childType !== childType)
+	) {
+		const prepared = state.prepared;
+		journalRootProperty(state, 'prepared', prepared);
+		state.prepared = undefined;
+		state = prepared.previous;
+		if (
+			state?.block !== null &&
+			state?.block !== undefined &&
+			ROOT_RENDER_TRANSACTION?.retired?.delete(state.block)
+		) {
+			const transaction = ROOT_RENDER_TRANSACTION;
+			const restored = state.block;
+			journalUndo(() => transaction!.retired!.add(restored));
+		}
+	}
 	if (
 		state === null ||
 		state.target !== target ||
@@ -33800,16 +33886,20 @@ function renderPortalState(
 	) {
 		// First mount, changed key, a different child element type, or the portal
 		// moved to a different target → (re)build.
-		if (state !== null) teardownPortalState(state);
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('portal');
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/portal');
+		const previous = state;
+		if (previous?.block != null) retireRootBlock(previous.block);
+		// The target remains observable even if the source range is unpublished.
+		const fresh = prepareParent(target);
+		const doc = fresh.ownerDocument!;
+		const start = doc.createComment('portal');
+		const end = doc.createComment('/portal');
 		// Mark the range so the raw de-opt reconciler treats it as FOREIGN content:
 		// a portal may target an octane-managed element, and its nodes must survive
 		// the target owner's re-renders (React parity — portals coexist with the
 		// container's own children). See reconcileDeoptChildren.
 		(start as any).$$portalEnd = end;
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).appendChild(start);
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).appendChild(end);
+		fresh.appendChild(start);
+		fresh.appendChild(end);
 		// The portal owns its start/end markers (default exclusiveMarkers=false), so
 		// unmountBlock removes them WITH the content — toggling a portal on/off never
 		// leaves orphan `<!--portal-->` comments in a persistent target (e.g.
@@ -33817,7 +33907,7 @@ function renderPortalState(
 		const block = createBlock(
 			'portal',
 			parentBlock,
-			target,
+			fresh,
 			start,
 			end,
 			norm.body,
@@ -33829,18 +33919,34 @@ function renderPortalState(
 			__profileTrackComponent(block, profilePortalComponent(rawBody, norm.body));
 		}
 		state = { __kind: 'portalSlotSlot', block, target, key, childType, host, start, end };
-		registerPortalEventRange(target, state);
+		teardownPortalState = teardownRegisteredPortalState;
+		releasePortalTarget = releaseRegisteredPortalTarget;
 		activityPortalCreated?.(block);
 		// Portal target hosts handlers stamped via the same `el.$oclick = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
 		// Refcounted: a target hosting two portals attaches once, detaches when the
 		// last portal unmounts.
-		registerDelegationTarget(target);
-		if (ROOT_RENDER_TRANSACTION !== null) {
-			const created = state;
-			journalUndo(() => releasePortalTarget(created));
-		}
 		renderBlock(block);
+		const created = state;
+		const prepared: NonNullable<PortalSlot['prepared']> = {
+			previous,
+			parent: target,
+			publish() {
+				if (previous !== null) teardownRegisteredPortalState(previous);
+				if (block.disposed || parentBlock.disposed) return;
+				target.appendChild(fresh);
+				retargetPreparedScope(block, fresh, target);
+				registerDelegationTarget(target);
+				registerPortalEventRange(target, created);
+				stampPortalParent(created, host, target);
+			},
+			discard() {
+				if (!block.disposed) discardPreparedBlock(block);
+				created.block = null;
+				created.target = null;
+			},
+		};
+		prepareSlot(owningBlock(parentBlock), created, 'prepared', prepared);
 	} else {
 		if (state.host !== host) journalRootProperty(state, 'host', state.host);
 		state.host = host;
@@ -33856,7 +33962,19 @@ function renderPortalState(
 			__profileTrackComponent(state.block!, profilePortalComponent(rawBody, norm.body));
 		}
 		renderBlock(state.block!);
+		const rendered = state;
+		prepareSlot(owningBlock(parentBlock), rendered, 'position', {
+			parent: target,
+			publish() {
+				if (rendered.block !== null) stampPortalParent(rendered, host, target);
+			},
+			discard() {},
+		});
 	}
+	return state;
+}
+
+function stampPortalParent(state: PortalSlot, host: Node, target: Node): void {
 	// Stamp `$$portalParent` on every direct child the portal placed between its
 	// start/end markers. The dispatcher reads this when bubbling up: on reaching a
 	// stamped node it jumps to the logical parent's DOM context instead of
@@ -33881,7 +33999,6 @@ function renderPortalState(
 			n = getNextSibling(n);
 		}
 	}
-	return state;
 }
 
 // Tear a portal down: fire its body's cleanups, remove its DOM (incl. the owned
@@ -33919,8 +34036,11 @@ function teardownRegisteredPortalState(state: PortalSlot): void {
  */
 function releaseRegisteredPortalTarget(state: PortalSlot): void {
 	if (state.target) {
-		unregisterPortalEventRange(state.target, state);
-		unregisterDelegationTarget(state.target);
+		if (state.delegated) {
+			state.delegated = false;
+			unregisterPortalEventRange(state.target, state);
+			unregisterDelegationTarget(state.target);
+		}
 		state.target = null;
 	}
 }
@@ -35127,7 +35247,7 @@ function componentSlotImpl(
 	// suspending adoption only for this component subtree.
 	if (
 		hydration !== null &&
-		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(domParent))
+		((anchor != null && hydrateIsFresh(hydration, anchor)) || hydrateIsFresh(hydration, domParent))
 	) {
 		suspendFreshComponent(
 			hydration,
@@ -35149,7 +35269,7 @@ function componentSlotImpl(
 		return;
 	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
-	let hydrationCursor: Node | null = null;
+	let slotCursor: Node | null = null;
 	// Hydrating without the call's server range (`unframedCall`): the server
 	// node its body adopts in place, or null where the server rendered nothing
 	// more (unframedRoot).
@@ -35225,10 +35345,10 @@ function componentSlotImpl(
 		// by consulting the parked cursor (host.firstChild for the first appended
 		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
-		if (!inherited && hydration !== null && hydration.isOpen(anchor ?? null)) {
+		if (!inherited && hydration !== null && hydrateIsOpen(hydration, anchor ?? null)) {
 			open = anchor as Node;
-			hydrationCursor = open;
-		} else if (!inherited && hydration !== null && !hydration.isOpen(anchor ?? null)) {
+			slotCursor = open;
+		} else if (!inherited && hydration !== null && !hydrateIsOpen(hydration, anchor ?? null)) {
 			// The anchor is absent (an appended child: compiled calls omit it only when
 			// every child of the host is a component), null (a runtime caller's
 			// whole-container slot, or a compiled anchor walk that ran off the end of
@@ -35236,12 +35356,11 @@ function componentSlotImpl(
 			// control-flow arm, so its anchor is the arm's end marker). In these cases
 			// mountTry/renderBlock parked the cursor on the server range's `<!--[-->`;
 			// adopt from it, the same way childSlot's cursor branch does.
-			let c: Node | null = hydration.node;
-			if (c === null || (STAGED_DOM ? STAGED_DOM.view(c) : c).parentNode !== domParent)
-				c = getFirstChild(domParent);
-			hydrationCursor = c;
-			hydration.takeUnclaimed(c);
-			if (c !== null && hydration.isOpen(c)) open = c;
+			let c: Node | null = hydrationCursor.node;
+			if (c === null || c.parentNode !== domParent) c = getFirstChild(domParent);
+			slotCursor = c;
+			hydrateTakeUnclaimed(hydration, c);
+			if (c !== null && hydrateIsOpen(hydration, c)) open = c;
 		}
 		if (inherited) {
 			// Borrowed range resolved above; hydration adopts NOTHING — the cursor
@@ -35249,9 +35368,10 @@ function componentSlotImpl(
 		} else if (open !== null) {
 			// Adopt the server range: its comments become our markers, cursor → content.
 			start = open as Comment;
-			end = hydration!.close(open);
-			if (parentBlock === hydration!.rootBlock) hydration!.claimRootRemainder(getNextSibling(end));
-			hydration!.node = getNextSibling(start);
+			end = hydrateClose(hydration!, open);
+			if (parentBlock === hydration!.rootBlock)
+				hydrateClaimRootRemainder(hydration!, getNextSibling(end));
+			hydrationCursor.node = getNextSibling(start);
 			// A passthrough root's owner adopts whatever range the server rendered
 			// first in the container, so its own output need not fill that range.
 			adoptedFrame = !hydrationPassthrough;
@@ -35268,9 +35388,9 @@ function componentSlotImpl(
 			// cursor (see componentSlotLite's anchored call), and inserts before the
 			// node after it (parkAtHole).
 			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker) {
-				hydrationCursor = anchor;
+				slotCursor = anchor;
 				positionalRoot = anchor.nodeType !== 8;
-				anchor = hydration.parkAtHole(anchor);
+				anchor = hydrateParkAtHole(hydration, anchor);
 			}
 			start = null;
 			end = null;
@@ -35278,29 +35398,30 @@ function componentSlotImpl(
 			// A component that cannot self-delimit renders between markers. The
 			// server frames such a call; without that range, its body adopts the
 			// server nodes there in place when they match, between fresh markers
-			// that go where they stand (HydrationCapability.unframedRoot). So does
+			// that go where they stand (hydration: unframedRoot). So does
 			// an anchorless call that renders a single root: the single-root path
 			// would compare the body's template with the cursor, which may still
 			// sit on the host or an ancestor.
 			let before = anchor ?? null;
 			if (hydration !== null) {
-				unframed = hydration.unframedRoot(parentScope, hydrationCursor, before);
+				unframed = hydrateUnframedRoot(hydration, parentScope, slotCursor, before);
 				unframedCall = true;
 				unframedNamed = anchor === undefined || (unframed != null && unframed === anchor);
-				hydration.save(domParent);
 				if (unframed != null) before = unframed;
 			}
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('comp');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/comp');
+			start = document.createComment('comp');
+			end = document.createComment('/comp');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (e.g. when this slot lives in a multi-root template
 			// and must sit before its enclosing block's endMarker).
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, before);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, before);
+			if (hydration === null) {
+				domParent.insertBefore(start, before);
+				domParent.insertBefore(end, before);
+			}
 			if (hydration !== null) {
-				hydration.markFresh(start);
-				hydration.markFresh(end);
-				hydration.node = end;
+				// These delimiters frame server content still to be claimed.
+				// Only a root absent from the server renders fresh below.
+				hydrationCursor.node = end;
 			}
 		}
 		state = {
@@ -35317,59 +35438,135 @@ function componentSlotImpl(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+		if (unframedCall) {
+			prepareHydrationFrame(
+				parentScope,
+				state,
+				slotKey,
+				domParent,
+				start as Comment,
+				end as Comment,
+				unframed ?? anchor ?? null,
+			);
+		}
 	}
 	const nextKey = key === undefined ? NO_KEY : '' + key;
 	const keyChanged = key !== undefined && state.prevKey !== NO_KEY && nextKey !== state.prevKey;
 	const replacing = identity !== state.currentComp || keyChanged;
-	const journaledSlot = ROOT_RENDER_TRANSACTION !== null && state.block !== null && replacing;
-	if (journaledSlot) {
-		// Owned component markers belong to the replaced range; inherited markers
-		// do not. A self-marked component takes its range from its live Block.
-		if (state.inherited) {
-			journalRootSlot(state, domParent, state.start, state.end);
-		} else {
-			const first = state.start ?? state.block!.startMarker;
-			const last = state.end ?? state.block!.endMarker;
-			if (
-				first !== null &&
-				last !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === domParent &&
-				(STAGED_DOM ? STAGED_DOM.view(last) : last).parentNode === domParent
-			) {
-				journalRootSlot(
-					state,
-					domParent,
-					(STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling,
-					getNextSibling(last),
-				);
-			} else {
-				const after = state.anchor;
-				journalRootSlot(
-					state,
-					domParent,
-					after === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling,
-					after,
-				);
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (state.block !== null) {
+		const old = state.block;
+		if (!replacing) {
+			if ((state as any).prepared !== undefined) {
+				journalRootProperty(state, 'prepared', (state as any).prepared);
+				(state as any).prepared = undefined;
+				if (transaction?.retired?.delete(old)) journalUndo(() => transaction!.retired!.add(old));
 			}
+		} else {
+			const target = prepareParent(domParent);
+			const signalInstanceKey =
+				SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
+					? { parentScope, invocationSite, key, hasKey: key != null }
+					: undefined;
+			const retryLocation =
+				parentBlock.idState.renderOwner?.signalOwner === undefined
+					? undefined
+					: {
+							parent: parentScope,
+							slot: slotKey,
+							kind: state.__kind,
+							branch: undefined,
+							component: identity,
+							key: nextKey,
+						};
+			const mount = () =>
+				renderOffscreen(
+					parentBlock,
+					target,
+					null,
+					body,
+					renderProps,
+					outputHandler,
+					'dynamic',
+					undefined,
+					false,
+					signalInstanceKey,
+					retryLocation,
+				);
+			// This call already claimed its server range. A changed identity is a
+			// client update, so other slots retain the hydration cursor.
+			const result = hydration === null ? mount() : hydrateSuspend(hydration, mount);
+			if (result.failed || result.suspended !== null) {
+				disposeWip(result.wip);
+				if (result.failed) throw result.error;
+				throw new SuspenseException(result.suspended);
+			}
+			const wip = result.wip;
+			if (hydration !== null) hydrateRecordUpdate(hydration, wip.block);
+			wip.start.data = 'comp';
+			wip.end.data = '/comp';
+			spliceWipCapture(wip);
+			retireRootBlock(old);
+			prepareSlot(parentScope, state, 'prepared', {
+				publish() {
+					if (parentScope.slots[slotKey] !== state || state!.block !== old) {
+						disposeWip(wip);
+						return;
+					}
+					const inherited = state!.inherited;
+					let first = inherited
+						? state!.start === null
+							? getFirstChild(domParent)
+							: getNextSibling(state!.start)
+						: (state!.start ?? old.startMarker);
+					const after = inherited
+						? state!.end
+						: (state!.end ?? old.endMarker) === null
+							? state!.anchor
+							: getNextSibling((state!.end ?? old.endMarker)!);
+					if (first === after) first = null;
+					const nodes: Node[] = [];
+					for (let node = first; node !== null && node !== after; node = getNextSibling(node)) {
+						if (node.parentNode !== domParent) break;
+						nodes.push(node);
+						retireEventHostTree(node);
+					}
+					state!.start = wip.start;
+					state!.end = wip.end;
+					state!.singleRoot = false;
+					state!.inherited = false;
+					state!.block = wip.block;
+					state!.currentComp = identity;
+					state!.prevKey = nextKey;
+					state!.keyed ||= hasKey === true || key !== undefined;
+					if (!inherited)
+						replaceSharedBlockBoundary(
+							parentBlock,
+							old.startMarker,
+							old.endMarker,
+							wip.start,
+							wip.end,
+						);
+					// Install the admitted ownership and range before invoking user cleanup.
+					// A synchronous replacement can now locate this slot in the DOM.
+					const fence = first !== null && first.parentNode === domParent ? first : after;
+					retargetPreparedScope(wip.block, target, domParent);
+					placeRange(domParent, wip.start, wip.end, fence);
+					unmountBlock(old, false);
+					for (const node of nodes) if (node.parentNode === domParent) domParent.removeChild(node);
+				},
+				discard() {
+					if (!wip.block.disposed) disposeWip(wip);
+				},
+			});
+			return;
 		}
 	}
 	if ((hasKey === true || key !== undefined) && !state.keyed) {
-		if (!journaledSlot) journalRootProperty(state, 'keyed', state.keyed);
+		journalRootProperty(state, 'keyed', state.keyed);
 		state.keyed = true;
 	}
-	// Key-driven remount: when the compiler emitted a key arg AND its value
-	// changed since last render, force `comp !== state.currentComp` semantics
-	// even if the component identity is unchanged. Null out currentComp so the
-	// existing tear-down branch below fires; prevKey is updated after so we
-	// don't loop on the same key. `key === undefined` means "no key this
-	// render" and is a no-op so React-style optional-key callers don't pay.
-	if (keyChanged) {
-		state.currentComp = null;
-	}
-	if (!journaledSlot && !Object.is(state.prevKey, nextKey))
-		journalRootProperty(state, 'prevKey', state.prevKey);
+	if (!Object.is(state.prevKey, nextKey)) journalRootProperty(state, 'prevKey', state.prevKey);
 	state.prevKey = nextKey;
 	if (replacing) {
 		// Retained instances already carry their original invocation stamp. Only
@@ -35378,228 +35575,7 @@ function componentSlotImpl(
 			SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
 				? { parentScope, invocationSite, key, hasKey: key != null }
 				: undefined;
-		const retryLocation =
-			state.block === null ||
-			!state.block.mounted ||
-			parentBlock.idState.renderOwner?.signalOwner === undefined
-				? undefined
-				: {
-						parent: parentScope,
-						slot: slotKey,
-						kind: state.__kind,
-						branch: undefined,
-						component: identity,
-						key: nextKey,
-					};
-		const swapDriver = TRANSITION_SWAP_DRIVER ? TRANSITION_SWAP_DRIVER : null;
-		const transitionMode = parentBlock.currentRenderMode === 'transition';
-		const canSwapOffscreen =
-			swapDriver !== null && state.block !== null && state.block.mounted && hydration === null;
-		const committedSuspense = canSwapOffscreen && preservesCommittedSuspense(parentBlock);
-		// A root-owned replacement needs no probe: its transaction preserves the
-		// outgoing tree. An explicit boundary still owns its existing hide/hold
-		// policy, so preserve that boundary's replacement path.
-		const transitionSwap =
-			ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
-		const suspenseSwap = canSwapOffscreen && !transitionMode && committedSuspense;
-		const probeOnly = suspenseSwap && !transitionMode;
-		const rootTransaction = ROOT_RENDER_TRANSACTION;
-		if (
-			rootTransaction !== null &&
-			!committedSuspense &&
-			hydration === null &&
-			state.block !== null &&
-			state.block.mounted &&
-			!isCreatedInRootRender(rootTransaction, state.block)
-		) {
-			// Keep the committed range connected until the whole root succeeds.
-			// This is the incoming subtree's only render, not a probe: its captured
-			// work and owned pair become the slot after successful completion.
-			const oldBlock = state.block;
-			const oldStart = oldBlock.startMarker;
-			const oldEnd = oldBlock.endMarker;
-			const inherited = state.inherited;
-			let first = inherited
-				? state.start === null
-					? getFirstChild(domParent)
-					: getNextSibling(state.start)
-				: (state.start ?? oldStart);
-			if (inherited && first === state.end) first = null;
-			const last = inherited
-				? first === null
-					? null
-					: state.end === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: domNode(state.end).previousSibling
-				: (state.end ?? oldEnd);
-			// With borrowed markers, stage after the last CONTENT node, still
-			// inside the parent's pair. Exact-range retirement leaves the WIP alone
-			// and needs no commit-time move or change to the parent's boundary.
-			const stageAfter = first === null ? (inherited ? state.start : null) : last;
-			if (
-				stageAfter !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(stageAfter) : stageAfter).parentNode === domParent
-			) {
-				const r = renderOffscreen(
-					parentBlock,
-					domParent,
-					stageAfter,
-					body,
-					renderProps,
-					outputHandler,
-					'dynamic',
-					undefined,
-					false,
-					signalInstanceKey,
-					retryLocation,
-				);
-				if (r.suspended || r.failed) {
-					disposeWip(r.wip);
-					if (r.suspended !== null) throw new SuspenseException(r.suspended);
-					throw r.error;
-				}
-				domNode(r.wip.start).data = 'comp';
-				domNode(r.wip.end).data = '/comp';
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.singleRoot = false;
-				state.inherited = false;
-				state.block = r.wip.block;
-				state.currentComp = identity;
-				if (!inherited) {
-					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, r.wip.start, r.wip.end);
-				}
-				spliceWipCapture(r.wip);
-				deferRootReplacement(oldBlock, domParent, first, last);
-				return;
-			}
-		}
-		// Off-screen swap (React WIP model): a transition or fallback-capable
-		// committed Suspense primary replacing a DIFFERENT component renders the
-		// incoming tree first WITHOUT tearing down the old. Urgent Suspense uses the
-		// conservative probe path below; transitions can adopt a completed marked WIP.
-		if (transitionSwap !== null && canSwapOffscreen && (transitionMode || suspenseSwap)) {
-			if (!probeOnly && !state.singleRoot && !state.inherited && state.end !== null) {
-				// COMMIT the WIP (no double render): the off-screen block already owns a
-				// `<!--wip-->`/`<!--/wip-->` pair, which is EXACTLY componentSlot's non-
-				// singleRoot regime (the slot's start/end ARE the block's owned markers,
-				// exclusiveMarkers=false). On completion we adopt that pair as the slot's
-				// markers and rename it in place. The wip pair was inserted right after
-				// `state.end`, so once the old range (start..end inclusive) is unmounted the
-				// pair sits exactly where the old range was — no DOM move needed. We rename
-				// the comments rather than replacing them: descendant slots inside the WIP
-				// (e.g. a return-slot childSlot) may anchor on `wip.end`, so it must survive.
-				const r = transitionSwap.render(
-					parentBlock,
-					domParent,
-					state.end,
-					body,
-					renderProps,
-					outputHandler,
-					'dynamic',
-					undefined,
-					false,
-					signalInstanceKey,
-					retryLocation,
-				);
-				if (r.suspended || r.failed) {
-					transitionSwap.dispose(r.wip);
-					if (r.failed) throw r.error;
-					throw new SuspenseException(r.suspended);
-				}
-				domNode(r.wip.start).data = 'comp';
-				domNode(r.wip.end).data = '/comp';
-				// Old block owns state.start/state.end (exclusiveMarkers=false) → removed
-				// inclusive of its markers, leaving the (renamed) wip pair in position.
-				const oldBlock = state.block!;
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.block = r.wip.block;
-				state.currentComp = identity;
-				transitionSwap.splice(r.wip);
-				// Publish the incoming range before old-tree cleanups can synchronously
-				// unmount the owner. Reentrant teardown now discovers and disposes the WIP,
-				// and the captured lifecycle queues skip its disposed scope.
-				unmountBlock(oldBlock);
-				if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
-				return;
-			}
-			// singleRoot + INHERITED slots keep the PROBE + discard double render:
-			// singleRoot self-marks with a single root element (no comment markers), so
-			// committing a comment-marked WIP block would change the DOM shape and break
-			// the self-marking cascade an enclosing @if relies on; an inherited slot's
-			// markers BELONG to the parent block, so adopting a wip pair would change
-			// the parent's range shape. Probe off-screen to surface a suspend/error,
-			// discard, then fall through to the legacy swap below. (An inherited slot's
-			// probe anchor is the borrowed end marker — the wip renders after it,
-			// outside the parent's range, and is disposed before the swap.)
-			const probeAfter = state.end ?? state.anchor;
-			if (probeAfter !== null) {
-				const r = transitionSwap.render(
-					parentBlock,
-					domParent,
-					probeAfter,
-					body,
-					renderProps,
-					outputHandler,
-					'dynamic',
-					undefined,
-					false,
-					signalInstanceKey,
-					retryLocation,
-				);
-				transitionSwap.dispose(r.wip);
-				if (r.failed) throw r.error;
-				if (r.suspended) throw new SuspenseException(r.suspended);
-			}
-		}
-		// Hydrating, an update that replaces the component this slot already
-		// rendered, as a suspended deferred boundary's retry does after its
-		// captures changed. The server never rendered the replacement, and the
-		// cursor belongs to other slots' server nodes, so it builds as a client
-		// update would.
-		const replaced = hydration !== null && state.block !== null;
-		if (state.block) {
-			if (state.inherited) {
-				// Borrowed range (M3): the markers belong to the PARENT block —
-				// unmountBlock sweeps BETWEEN them (the block was created with
-				// exclusiveMarkers=true) and leaves them in place; whole-container
-				// mode (null markers) clears the container the parent owns (the
-				// root-block precedent — unmountBlock removes no DOM for a
-				// null-marker dynamic block). Never mint replacements: the remount
-				// below re-renders into the same borrowed range.
-				unmountBlock(state.block);
-				if (parentBlock.disposed) return;
-				if (state.start === null) {
-					while (getFirstChild(domParent))
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(
-							getFirstChild(domParent)!,
-						);
-				}
-			} else if (state.singleRoot) {
-				// Self-marked block — unmountBlock removes exactly the root element
-				// (block.startMarker === endMarker === it); nothing to recreate.
-				unmountBlock(state.block);
-				if (parentBlock.disposed) return;
-			} else {
-				// The slot's `state.start`/`state.end` markers ARE the previous block's
-				// range, so unmountBlock removes them along with the inner DOM. Capture
-				// the position just outside the slot (the node that came AFTER our end
-				// marker) so we can re-create fresh markers at the same logical
-				// location for the new comp to mount into. `after` may be `null` when
-				// the slot was at the end of `domParent` — insertBefore treats it as
-				// appendChild.
-				const after = getNextSibling(state.end!);
-				unmountBlock(state.block);
-				if (parentBlock.disposed) return;
-				const newStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('comp');
-				const newEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/comp');
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(newStart, after);
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(newEnd, after);
-				state.start = newStart;
-				state.end = newEnd;
-			}
-		}
+		const retryLocation = undefined;
 		state.currentComp = identity;
 		if (state.singleRoot) {
 			// Client singleRoot self-mark (mirrors mountItem): render with
@@ -35609,9 +35585,7 @@ function componentSlotImpl(
 			// or THROW during render (e.g. `use(rejectedPromise)`): then it inserts
 			// nothing, so we leave start/end null and unmountBlock no-ops for it
 			// (rather than capturing a stale sibling).
-			const before = state.anchor
-				? domNode(state.anchor).previousSibling
-				: (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+			const before = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
 			const b = createBlock(
 				'dynamic',
 				parentBlock,
@@ -35635,17 +35609,15 @@ function componentSlotImpl(
 			// place; undefined when the render threw.
 			let adopted: boolean | undefined;
 			try {
-				if (replaced) {
-					hydration!.renderUpdate(b);
-					adopted = false;
-				} else if (hydrationCursor === null) {
+				if (slotCursor === null) {
 					renderBlock(b);
 					adopted = false;
 				} else
-					adopted = hydration!.renderInPlace(
+					adopted = hydrateRenderInPlace(
+						hydration!,
 						renderBlock,
 						b,
-						hydrationCursor,
+						slotCursor,
 						false,
 						positionalRoot ? parentScope : null,
 						slotKey,
@@ -35658,18 +35630,15 @@ function componentSlotImpl(
 				// later return-shape switch can then unmount that host normally. A
 				// render that threw keeps this stamp. A closing marker bounds the
 				// enclosing range: a root is never adopted from it.
-				const last = state.anchor
-					? domNode(state.anchor).previousSibling
-					: (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+				const last = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
 				if (
 					adopted !== false &&
-					hydrationCursor !== null &&
-					(STAGED_DOM ? STAGED_DOM.view(hydrationCursor) : hydrationCursor).parentNode ===
-						domParent &&
-					!hydration!.isClose(hydrationCursor)
+					slotCursor !== null &&
+					slotCursor.parentNode === domParent &&
+					!hydrateIsClose(hydration!, slotCursor)
 				) {
-					b.startMarker = hydrationCursor;
-					b.endMarker = hydrationCursor;
+					b.startMarker = slotCursor;
+					b.endMarker = slotCursor;
 				} else if (last !== null && last !== before) {
 					b.startMarker = last;
 					b.endMarker = last;
@@ -35677,11 +35646,11 @@ function componentSlotImpl(
 			}
 			// renderInPlace stepped the cursor past the adopted root. An arm or a
 			// range that ends with this root cannot tell that from the cursor alone.
-			if (adopted) hydration!.parkInPlace(parentScope);
+			if (adopted) hydrateParkInPlace(hydration!, parentScope);
 			// The walk found the server node for this call alone, which rendered
 			// nothing there.
-			else if (positionalRoot && !replaced)
-				hydration!.slotMismatch(parentScope, slotKey, 'a component range', hydrationCursor);
+			else if (positionalRoot)
+				hydrateSlotMismatch(hydration!, parentScope, slotKey, 'a component range', slotCursor);
 		} else {
 			const b = createBlock(
 				'dynamic',
@@ -35706,7 +35675,8 @@ function componentSlotImpl(
 			if (state.inherited) b.exclusiveMarkers = true;
 			state.block = b;
 			if (unframedCall)
-				hydration!.renderUnframed(
+				hydrateRenderUnframed(
+					hydration!,
 					renderBlock,
 					b,
 					b.startMarker!,
@@ -35718,8 +35688,7 @@ function componentSlotImpl(
 					slotKey,
 				);
 			// The server may have rendered more in the frame, for another component.
-			else if (adoptedFrame) hydration!.renderClaimed(b, parentScope, slotKey);
-			else if (replaced) hydration!.renderUpdate(b);
+			else if (adoptedFrame) hydrateRenderClaimed(hydration!, b, parentScope, slotKey);
 			else renderBlock(b);
 		}
 	} else if (state.block) {
@@ -35742,13 +35711,13 @@ function componentSlotImpl(
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
 	if (hydration !== null && !state.inherited && state.end !== null)
-		hydration.parkPast(state.end, parentScope);
+		hydrateParkPast(hydration, state.end, parentScope);
 }
 
 // Keep the fresh-subtree callback out of componentSlotImpl: a closure there
 // captures every parameter, so each mount and update would allocate a context.
 function suspendFreshComponent(
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 	outputHandler: OutputHandler | null,
 	parentScope: Scope,
 	slotKey: number,
@@ -35764,7 +35733,7 @@ function suspendFreshComponent(
 	hasKey: boolean | undefined,
 	invocationSite: string | undefined,
 ): void {
-	hydration.suspend(() =>
+	hydrateSuspend(hydration, () =>
 		componentSlotImpl(
 			outputHandler,
 			parentScope,
@@ -35898,7 +35867,7 @@ function coerceChildText(v: unknown): string {
 function renderOffscreen(
 	parentBlock: Block,
 	domParent: Node,
-	afterNode: Node,
+	afterNode: Node | null,
 	body: ComponentBody,
 	props: any,
 	outputHandler: OutputHandler | null,
@@ -35914,11 +35883,11 @@ function renderOffscreen(
 	signalInstanceKey?: SignalInstanceKey,
 	retryLocation?: SignalRetryLocation,
 ): { wip: OffscreenWip; suspended: any; error: any; failed: boolean } {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('wip');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/wip');
-	const ref = getNextSibling(afterNode);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, ref);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, ref);
+	const start = document.createComment('wip');
+	const end = document.createComment('/wip');
+	const ref = afterNode === null ? null : getNextSibling(afterNode);
+	domParent.insertBefore(start, ref);
+	domParent.insertBefore(end, ref);
 	const capture = createOffscreenCapture();
 	const refDetachCheckpoint = refDetachQueue.length;
 	const prev = WIP_CAPTURE;
@@ -35963,6 +35932,10 @@ function renderOffscreen(
 		WIP_CAPTURE = prev;
 	}
 	const wip: OffscreenWip = { block, start, end, capture, domParent, refDetachCheckpoint };
+	// A suspended replacement will be disposed before its boundary retries.
+	// Return real memo occurrences to the same warm episode, just as a failed
+	// first-mount list/root does, without making accepted sibling entries reusable.
+	if (suspended !== null) retainDiscardedWarmMemos(block);
 	if (suspended !== null && retryLocation !== undefined) {
 		const owner = parentBlock.idState.renderOwner;
 		const boundary = signalRetryBoundary(parentBlock);
@@ -35991,77 +35964,52 @@ function renderOffscreen(
 // (which adopt the WIP's markers in place, so no DOM move is needed).
 
 function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAcceptance = false): void {
-	if (capture.presentations !== undefined && WIP_CAPTURE !== null)
-		(WIP_CAPTURE.presentations ??= []).push(...capture.presentations);
+	// A discrete event can finish one root while another is still rendering.
+	// Accepted root work belongs to the commit queues, never that other capture.
+	const targetCapture = capture.rootTransaction ? null : WIP_CAPTURE;
+	if (capture.presentations !== undefined && targetCapture !== null)
+		(targetCapture.presentations ??= []).push(...capture.presentations);
 	// A staged root has queued native acceptance but has not published it yet.
 	// Keep that candidate on its original capture for the publication guard;
 	// there is no enclosing speculative capture to transfer it into here.
-	if (NATIVE_READ_DRIVER && (WIP_CAPTURE !== null || !deferredNativeAcceptance))
-		NATIVE_READ_DRIVER.spliceCapture(capture, WIP_CAPTURE);
-	const templates = capture.templates;
-	if (templates !== undefined) {
-		capture.templates = undefined;
-		// A completed root is its own publication boundary. A discrete event
-		// can commit it while another root's first render is still on the stack;
-		// transferring to that ambient capture can strand the completed writers.
-		if (WIP_CAPTURE !== null && !capture.rootTransaction) {
-			const target = (WIP_CAPTURE.templates ??= []);
-			for (const prepared of templates) {
-				prepared.capture = WIP_CAPTURE;
-				target.push(prepared);
-			}
-		} else {
-			for (const prepared of templates) {
-				if (
-					DEFERRED_LAYOUT_DRIVER &&
-					DEFERRED_LAYOUT_DRIVER.stageAction(() => publishTemplate(prepared))
-				)
-					continue;
-				// Validate at acceptance, not when a deferred writer is queued.
-				// The deferred path repeats this guard in publishTemplate when it runs.
-				const { scope, bag, values, apply, field } = prepared;
-				if (bag[field] !== prepared || scope.block.disposed || scope.slots[0] !== bag) continue;
-				bag[field] = null;
-				apply(bag, values);
-			}
-		}
-	}
+	if (NATIVE_READ_DRIVER && (targetCapture !== null || !deferredNativeAcceptance))
+		NATIVE_READ_DRIVER.spliceCapture(capture, targetCapture);
 	const rendered = capture.renderedBlocks;
 	capture.renderedBlocks = null;
 	capture.renderRoot = null;
-	if (rendered !== null && WIP_CAPTURE !== null) {
+	if (rendered !== null && targetCapture !== null) {
 		// An inner success is still speculative until its enclosing capture commits.
-		for (const block of rendered) recordCapturedRender(WIP_CAPTURE, block);
+		for (const block of rendered) recordCapturedRender(targetCapture, block);
 	}
 	for (let p = 0 as Phase; p < 3; p++) {
 		const src = capture.effects[p];
-		const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[p] : effectQueues[p];
+		const target = targetCapture !== null ? targetCapture.effects[p] : effectQueues[p];
 		for (let i = 0; i < src.length; i++) {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileQueueWork(src[i]);
 			target.push(src[i]);
 		}
 	}
-	const eventTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.events : effectEventQueue;
+	const eventTarget = targetCapture !== null ? targetCapture.events : effectEventQueue;
 	for (let i = 0; i < capture.events.length; i++) {
 		eventTarget.push(capture.events[i]);
 	}
 	const eventActionTarget =
-		WIP_CAPTURE !== null ? WIP_CAPTURE.eventActions : effectEventCommitActions;
+		targetCapture !== null ? targetCapture.eventActions : effectEventCommitActions;
 	for (let i = 0; i < capture.eventActions.length; i++) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileQueueWork(capture.eventActions[i]);
 		eventActionTarget.push(capture.eventActions[i]);
 	}
-	const refTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue;
+	const refTarget = targetCapture !== null ? targetCapture.refs : refAttachQueue;
 	for (let i = 0; i < capture.refs.length; i++) refTarget.push(capture.refs[i]);
 	if (capture.detaches !== undefined) {
-		const target = WIP_CAPTURE === null ? refDetachQueue : (WIP_CAPTURE.detaches ??= []);
+		const target = targetCapture === null ? refDetachQueue : (targetCapture.detaches ??= []);
 		for (const entry of capture.detaches) target.push(entry);
 	}
 	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
 	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
-	const storeTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue;
+	const storeTarget = targetCapture !== null ? targetCapture.stores : storeSyncQueue;
 	for (let i = 0; i < capture.stores.length; i++) storeTarget.push(capture.stores[i]);
 	if (capture.suspenseCommits !== undefined) {
 		for (const state of capture.suspenseCommits) PUBLISH_SUSPENSE_COMMIT!(state);
@@ -36069,13 +36017,23 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	const cleanups = capture.renderCleanups;
 	if (cleanups !== undefined) {
 		capture.renderCleanups = undefined;
-		if (WIP_CAPTURE !== null) {
-			const target = (WIP_CAPTURE.renderCleanups ??= []);
-			for (const cleanup of cleanups) target.push(cleanup);
+		if (targetCapture !== null) {
+			const target = (targetCapture.renderCleanups ??= []);
+			for (const cleanup of cleanups) {
+				if (typeof cleanup !== 'function') cleanup.capture = targetCapture;
+				target.push(cleanup);
+			}
 		} else {
 			for (const cleanup of cleanups) {
-				if (!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.stageAction(() => cleanup(false)))
-					cleanup(false);
+				if (typeof cleanup === 'function') {
+					if (!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.stageAction(() => cleanup(false)))
+						cleanup(false);
+				} else if (
+					!DEFERRED_LAYOUT_DRIVER ||
+					!DEFERRED_LAYOUT_DRIVER.stageAction(() => publishTemplate(cleanup))
+				) {
+					publishTemplate(cleanup);
+				}
 			}
 		}
 	}
@@ -36091,15 +36049,6 @@ function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCaptureDiscarded(capture);
 	if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.discardCapture(capture);
-	const templates = capture.templates;
-	if (templates !== undefined) {
-		capture.templates = undefined;
-		for (let i = templates.length - 1; i >= 0; i--) {
-			const prepared = templates[i]!;
-			if (prepared.bag[prepared.field] === prepared)
-				prepared.bag[prepared.field] = prepared.previous;
-		}
-	}
 	const rendered = capture.renderedBlocks;
 	const owner = capture.renderRoot;
 	capture.renderedBlocks = null;
@@ -36114,7 +36063,14 @@ function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	const cleanups = capture.renderCleanups;
 	if (cleanups !== undefined) {
 		capture.renderCleanups = undefined;
-		for (const cleanup of cleanups) cleanup(true);
+		// Restore nested same-scope preparations newest first, before lifetime
+		// cleanups examine their owners. Callbacks keep their established order.
+		for (let i = cleanups.length - 1; i >= 0; i--) {
+			const prepared = cleanups[i]!;
+			if (typeof prepared !== 'function' && prepared.bag[prepared.field] === prepared)
+				prepared.bag[prepared.field] = prepared.previous;
+		}
+		for (const cleanup of cleanups) if (typeof cleanup === 'function') cleanup(true);
 	}
 }
 
@@ -36124,7 +36080,7 @@ function moveOffscreenRange(wip: OffscreenWip, beforeNode: Node): void {
 	let n: Node | null = wip.start;
 	while (n !== null) {
 		const next: Node | null = getNextSibling(n);
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(n, beforeNode);
+		parent.insertBefore(n, beforeNode);
 		if (n === wip.end) break;
 		n = next;
 	}
@@ -36153,12 +36109,56 @@ function disposeWip(wip: OffscreenWip): void {
 // Remove the slot's current content (Block, Text, or pure-host node) while
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
-function clearChildContent(state: ChildSlot): void {
+function childListNodes(state: ChildSlot, parent: Node): Node[] {
+	const list = state.forSlot!;
+	const nodes: Node[] = [];
+	if (state.ownerHost !== null && list.start?.parentNode === parent) nodes.push(list.start);
+	const collect = (block: Block): void => {
+		const first = block.startMarker;
+		const last = block.endMarker;
+		if (first === null || last === null || first.parentNode !== parent) return;
+		let node: Node | null = first;
+		while (node !== null && node.parentNode === parent) {
+			const foreignEnd = (node as any).$$portalEnd as Node | undefined;
+			if (foreignEnd !== undefined) {
+				node = nodeAfterPortalRange(node, foreignEnd);
+				continue;
+			}
+			nodes.push(node);
+			if (node === last) break;
+			node = getNextSibling(node);
+		}
+	};
+	for (let item = list.head; item !== null; item = item.nextSibling) collect(item);
+	if (list.emptyBlock !== null) collect(list.emptyBlock);
+	if (state.ownerHost !== null && list.end?.parentNode === parent) nodes.push(list.end);
+	return nodes;
+}
+
+function setChildContentRetired(state: ChildSlot, retiring: boolean): void {
+	const visit = (block: Block): void => {
+		if (retiring) retireRootBlock(block);
+		else {
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (transaction?.retired?.delete(block)) journalUndo(() => transaction.retired!.add(block));
+		}
+	};
+	if (state.block !== null) visit(state.block);
+	const list = state.forSlot;
+	if (list !== null) {
+		for (let item = list.head; item !== null; item = item.nextSibling) visit(item);
+		if (list.emptyBlock !== null) visit(list.emptyBlock);
+	}
+}
+
+function clearChildContent(state: ChildSlot, scope: Scope): void {
+	const prepared = (state as any).prepared;
+	if (prepared !== undefined) {
+		journalRootProperty(state, 'prepared', prepared);
+		(state as any).prepared = undefined;
+	}
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
-		// A previous mode exit can already have retired the content while
-		// retaining its nodes for rollback. A second clear must not sweep those
-		// nodes or detach the anchor for the incoming subtree.
 		if (
 			state.block === null &&
 			state.forSlot === null &&
@@ -36168,65 +36168,68 @@ function clearChildContent(state: ChildSlot): void {
 			return;
 		const parent =
 			state.ownerHost ??
-			domNode(state.start)?.parentNode ??
-			domNode(state.text)?.parentNode ??
-			domNode(state.hostNode)?.parentNode ??
+			state.start?.parentNode ??
+			state.text?.parentNode ??
+			state.hostNode?.parentNode ??
 			state.block?.parentNode ??
 			null;
 		if (parent !== null) {
-			journalRootChildShape(state, parent);
-			let first =
-				state.ownerHost !== null || (state.borrowed && state.start === null)
-					? getFirstChild(parent)
-					: state.start !== null
-						? getNextSibling(state.start)
-						: (state.text ?? state.hostNode);
+			const first =
+				state.ownerHost !== null
+					? state.block === null && state.forSlot === null
+						? (state.text ?? state.hostNode)
+						: getFirstChild(parent)
+					: state.borrowed && state.start === null
+						? getFirstChild(parent)
+						: state.start?.parentNode === parent
+							? getNextSibling(state.start)
+							: (state.text ?? state.hostNode);
 			const after =
 				state.ownerHost !== null
-					? null
-					: state.start !== null || state.borrowed
+					? state.block === null && state.forSlot === null
+						? (first?.nextSibling ?? null)
+						: null
+					: state.start?.parentNode === parent || state.borrowed
 						? state.end
-						: ((STAGED_DOM ? STAGED_DOM.view(first) : first)?.nextSibling ?? null);
-			if (first === after) first = null;
-			const last =
-				first === null
-					? null
-					: after === null
-						? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
-						: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling;
+						: (first?.nextSibling ?? null);
 			const oldBlock = state.block;
 			const oldList = state.forSlot;
 			const oldHost = state.hostNode;
-			if (oldBlock !== null) {
-				deferRootReplacement(oldBlock, parent, first, last);
-			} else {
-				if (oldList !== null) {
-					for (let item = oldList.head; item !== null; item = item.nextSibling) {
-						retireRootBlock(item);
-					}
-					if (oldList.emptyBlock !== null) retireRootBlock(oldList.emptyBlock);
-				}
-				deferRootRange(parent, first, last, () => {
-					if (oldList !== null) {
-						for (let item = oldList.head; item !== null; item = item.nextSibling)
-							unmountBlock(item, false);
-						if (oldList.emptyBlock !== null) unmountBlock(oldList.emptyBlock, false);
-					} else if (oldHost !== null) {
-						detachDeoptTreeRefs(oldHost, null);
-					}
-				});
-			}
-			// Logical ownership changes now; saved committed nodes remain connected
-			// until the root outcome is known. Incoming content mounts beside them.
+			setChildContentRetired(state, true);
+			const nodes = oldList === null ? [] : childListNodes(state, parent);
+			if (oldList === null)
+				for (let node = first; node !== null && node !== after; node = getNextSibling(node))
+					nodes.push(node);
+			// Empty is one desired slot value; applied DOM stays until acceptance.
+			journalRootProperty(state, 'block', state.block);
+			journalRootProperty(state, 'forSlot', state.forSlot);
+			journalRootProperty(state, 'text', state.text);
+			journalRootProperty(state, 'hostNode', state.hostNode);
+			journalRootProperty(state, 'currentComp', state.currentComp);
 			state.block = null;
 			state.forSlot = null;
 			state.text = null;
 			state.hostNode = null;
 			state.currentComp = null;
 			if (state.ownerHost !== null) {
+				journalRootProperty(state, 'start', state.start);
+				journalRootProperty(state, 'end', state.end);
 				state.start = null;
 				state.end = null;
 			}
+			prepareSlot(scope, state, 'clearPrepared', {
+				parent,
+				publish() {
+					if (oldBlock !== null) unmountBlock(oldBlock, false);
+					if (oldList !== null) {
+						for (let item = oldList.head; item !== null; item = item.nextSibling)
+							unmountBlock(item, false);
+						if (oldList.emptyBlock !== null) unmountBlock(oldList.emptyBlock, false);
+					} else if (oldHost !== null) detachDeoptTreeRefs(oldHost, null);
+					for (const node of nodes) if (node.parentNode === parent) parent.removeChild(node);
+				},
+				discard() {},
+			});
 			return;
 		}
 	}
@@ -36246,7 +36249,7 @@ function clearChildContent(state: ChildSlot): void {
 		while (n !== null) {
 			const next: Node | null = getNextSibling(n);
 			if (!hadBlock) detachDeoptTreeRefs(n, null);
-			(STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(n);
+			host.removeChild(n);
 			n = next;
 		}
 		// An owns-parent slot has no markers in any value regime EXCEPT a live
@@ -36264,13 +36267,13 @@ function clearChildContent(state: ChildSlot): void {
 		// (unmountBlock's deoptNode hook + the slot walk), so detach here only on
 		// the blockless path — the pure-host node (or hydrated leftovers), whose
 		// subtree may carry stamped refs.
-		const parent = domNode(state.start).parentNode;
+		const parent = state.start.parentNode;
 		if (parent !== null) {
 			let n: Node | null = getNextSibling(state.start);
 			while (n !== null && n !== state.end) {
 				const next: Node | null = getNextSibling(n);
 				if (!hadBlock) detachDeoptTreeRefs(n, null);
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
+				parent.removeChild(n);
 				n = next;
 			}
 		}
@@ -36279,14 +36282,14 @@ function clearChildContent(state: ChildSlot): void {
 		// (A MARKED pure-host node never appears here: the marked host branch of
 		// childSlot mints `start` before it ever sets `hostNode`, so a live marked
 		// hostNode is always swept by the marker-range branch above.)
-		domNode(state.text).remove();
-	} else if (state.hostNode !== null && domNode(state.hostNode).parentNode !== null) {
+		state.text.remove();
+	} else if (state.hostNode !== null && state.hostNode.parentNode !== null) {
 		// ANCHORLESS pure-host slot (end === null, no markers): remove the
 		// self-delimiting node directly — the marker sweep above has nothing to
 		// anchor on. Reached via disposeReturnSlot's kind-flip teardown; childSlot's
 		// own mode flips promote to markers before ever clearing.
 		detachDeoptTreeRefs(state.hostNode, null);
-		domNode(domNode(state.hostNode).parentNode!).removeChild(state.hostNode);
+		state.hostNode.parentNode!.removeChild(state.hostNode);
 	}
 	state.text = null;
 	state.currentComp = null;
@@ -36301,43 +36304,22 @@ function clearChildContent(state: ChildSlot): void {
  * WIP. Keeping this separate from clearChildContent prevents old-tree user cleanup
  * from hiding the WIP from a reentrant owning-root unmount.
  */
-function clearReplacedChildBlock(state: ChildSlot, oldBlock: Block): void {
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		const parent = state.ownerHost ?? domNode(state.start)?.parentNode ?? oldBlock.parentNode;
-		let first =
-			state.ownerHost !== null
-				? getFirstChild(parent)
-				: (domNode(state.start)?.nextSibling ?? null);
-		const after = state.ownerHost !== null ? null : state.end;
-		if (first === after) first = null;
-		const last =
-			first === null
-				? null
-				: after === null
-					? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
-					: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling;
-		deferRootReplacement(oldBlock, parent, first, last);
-		return;
-	}
-	unmountBlock(oldBlock, false);
-	if (state.ownerHost !== null) {
-		let node: Node | null = getFirstChild(state.ownerHost);
-		while (node !== null) {
-			const next = getNextSibling(node);
-			domNode(state.ownerHost).removeChild(node);
-			node = next;
-		}
-	} else if (state.start !== null) {
-		const parent = domNode(state.start).parentNode;
-		if (parent !== null) {
-			let node: Node | null = getNextSibling(state.start);
-			while (node !== null && node !== state.end) {
-				const next = getNextSibling(node);
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
-				node = next;
-			}
-		}
-	}
+function clearReplacedChildBlock(scope: Scope, state: ChildSlot, oldBlock: Block): void {
+	const parent = state.ownerHost ?? state.start?.parentNode ?? oldBlock.parentNode;
+	const first =
+		state.ownerHost !== null ? getFirstChild(parent) : (state.start?.nextSibling ?? null);
+	const after = state.ownerHost !== null ? null : state.end;
+	const previous: Node[] = [];
+	for (let node = first; node !== null && node !== after; node = getNextSibling(node))
+		previous.push(node);
+	prepareSlot(scope, state, 'replacementPrepared', {
+		parent,
+		publish() {
+			unmountBlock(oldBlock, false);
+			for (const node of previous) if (node.parentNode === parent) parent.removeChild(node);
+		},
+		discard() {},
+	});
 }
 
 // ---------------------------------------------------------------------------
@@ -36441,42 +36423,6 @@ function noteDeoptRef(block: Block): void {
 	}
 }
 
-// Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
-// setAttribute + `$o<type>` delegated-event slots + deferred ref attach).
-function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
-	const actionName = formActionAttributeName(el, name);
-	if (actionName !== null) {
-		DESCRIPTOR_FORM_ACTION(el, actionName, v, undefined);
-		return;
-	}
-	if (name === 'ref') {
-		if (v != null) {
-			noteDeoptRef(ownerBlock);
-			queueRefAttach(ownerBlock, v, el);
-		}
-	} else if (name === 'className' || name === 'class') {
-		setDeoptClass(el, v);
-	} else if (name === 'style') {
-		setStyle(el as HTMLElement, v, undefined);
-	} else {
-		// eventSlot returns non-null exactly for `on<Upper>` delegated-handler names
-		// (the same classification setSpread/applyHostProps use).
-		const ev = eventSlot(name, el);
-		if (ev !== null) {
-			setEventHandler(
-				el,
-				ev.key,
-				process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v,
-			);
-			if (ev.capture) {
-				if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
-			} else if (!_delegated.has(ev.type)) delegateEvents([ev.type]);
-		} else {
-			setAttribute(el, name, v);
-		}
-	}
-}
-
 // React contract: `dangerouslySetInnerHTML` and `children` are mutually exclusive —
 // the raw HTML owns the element's content. When present, the de-opt paths must SKIP
 // child reconciliation entirely: applyDeoptProps/patchDeoptProps already wrote
@@ -36501,95 +36447,6 @@ function hasHostPropContent(descriptor: ElementDescriptor): boolean {
 		(isTextareaTag(descriptor.type as string) &&
 			(descriptor.props?.value != null || descriptor.props?.defaultValue != null))
 	);
-}
-
-// Route a host descriptor's props onto a FRESH element (first build).
-function markInputCheckedness(input: HTMLInputElement): void {
-	// React initializes even an input with no checked/defaultChecked prop. Mark
-	// its live property dirty so a baseline added on a reused host stays a reset
-	// target rather than changing the user's current choice.
-	(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = (
-		STAGED_DOM ? STAGED_DOM.view(input) : input
-	).checked;
-	(STAGED_DOM ? STAGED_DOM.view(input as any) : (input as any))[DEFAULT_CHECKED_INITIALIZED] = true;
-}
-
-function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
-	if (props == null) {
-		if (el.localName === 'input') markInputCheckedness(el as HTMLInputElement);
-		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
-		return;
-	}
-	let needsCheckedInitialization = el.localName === 'input';
-	for (const name in props) {
-		if (name === 'key' || name === 'children') continue;
-		// `suppressHydrationWarning`: a JS flag (read by the hydration-mismatch paths), never
-		// a DOM attribute.
-		if (name === 'suppressHydrationWarning') {
-			(el as any).__oct_suppress = props[name] === true;
-			continue;
-		}
-		const value = props[name];
-		if (
-			needsCheckedInitialization &&
-			(name === 'defaultChecked' || (name === 'checked' && value != null))
-		)
-			needsCheckedInitialization = false;
-		applyDeoptProp(el, name, value, ownerBlock);
-	}
-	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
-	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
-}
-
-// Diff prev → next props on a REUSED element (the reconcile path): remove props that
-// disappeared, set new/changed ones. Unchanged props are skipped, so an unchanged
-// `ref` is not re-attached and an unchanged handler is not re-bound.
-function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock: Block): void {
-	// ref lifecycle on a REUSED node: detach the previous ref if it was removed or its identity
-	// changed (the apply loop below re-attaches a changed one via applyDeoptProp). Without this a
-	// removed/swapped `ref={obj}` keeps pointing at this element. The prev-loop below skips
-	// `ref`, so this is the sole detach point for the reconcile path (the detach passes the
-	// element so a callback ref shared across elements releases its per-element cleanup).
-	// Queued for commit — the re-attach is queued too (applyDeoptProp), and detaches drain
-	// first, so a ref hopping between elements never ends null (React mutation→layout order).
-	const prevRef = prevProps != null ? prevProps.ref : undefined;
-	const nextRef = nextProps != null ? nextProps.ref : undefined;
-	if (prevRef != null && prevRef !== nextRef) queueRefDetach(prevRef, el);
-	if (prevProps != null) {
-		for (const name in prevProps) {
-			// `ref` was handled above; everything else routes through the shared removal
-			// path — including `suppressHydrationWarning`, whose disappearance must reset
-			// the element's `__oct_suppress` flag (parity with applyHostProps' prev-loop).
-			if (name === 'key' || name === 'children' || name === 'ref') continue;
-			if (nextProps == null || !(name in nextProps)) removeHostProp(el, name, prevProps[name]);
-		}
-	}
-	if (nextProps != null) {
-		for (const name in nextProps) {
-			if (name === 'key' || name === 'children') continue;
-			if (name === 'suppressHydrationWarning') {
-				(el as any).__oct_suppress = nextProps[name] === true;
-				continue;
-			}
-			const nv = nextProps[name];
-			// Controlled `value`/`checked` bypass the prev-diff skip (reassert
-			// on every commit; the helper's DOM-diff keeps the call cheap).
-			if (prevProps == null || prevProps[name] !== nv || isControlledHostProp(el, name)) {
-				// This path always reuses an existing host; autoFocus is mount-only.
-				if (name === 'autoFocus' && !isHtmlCustomElement(el)) continue;
-				// `applyDeoptProp` is the FRESH-element helper — its style arm passes
-				// prev=undefined, which on a REUSED element leaves declarations dropped
-				// from the style object stale (applyStyleValue can only remove keys it
-				// can diff against). Thread the real previous style here.
-				if (name === 'style') {
-					setStyle(el as HTMLElement, nv, prevProps != null ? prevProps.style : undefined);
-				} else {
-					applyDeoptProp(el, name, nv, ownerBlock);
-				}
-			}
-		}
-	}
-	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 }
 
 interface HostComponentSlot {
@@ -36636,9 +36493,7 @@ export function hostComponent(
 		// hostStringTagBody does for a component tag that resolves to a host string.
 		const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
 		const el =
-			elNs !== undefined
-				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
-				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
+			elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
 		state = {
@@ -36660,7 +36515,7 @@ export function hostComponent(
 			scope: childScope,
 			at: scope._slots === null ? 0 : scope._slots.length,
 		});
-		domNode(block.parentNode).insertBefore(el, anchor ?? block.endMarker);
+		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
 		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
 	}
 	const el = state.el;
@@ -36693,122 +36548,18 @@ export function hostComponent(
 	return el;
 }
 
-// Like applyDeoptProps but for a PERSISTENT element (re-applied each render): the
-// ref is attached once and only re-attached when it changes (not every render),
-// while className/style/events/attributes are idempotently re-set.
+// A hostComponent returns its native node immediately for imperative consumers,
+// while publication of its owned props belongs to the surrounding render.
 function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
-	const prev = state.props;
-	const compareLive =
-		prev !== undefined && (!hydrating || activeHydration() === null) && !isHtmlCustomElement(el);
-	let needsCheckedInitialization = prev === undefined && el.localName === 'input';
-	if (ROOT_RENDER_TRANSACTION !== null && prev !== props) journalObjectOnce(state);
-	// REMOVE props/events present last render but gone now, via the shared removeHostProp
-	// (parity with setSpread / patchDeoptProps) — a reused element must not keep stale
-	// props/listeners. `ref` stays here (not in removeHostProp) because this path also
-	// clears the persistent `state.ref` alongside the detach.
-	if (prev != null) {
-		for (const k in prev) {
-			if (k === 'key' || k === 'children') continue;
-			if (props != null && k in props) continue;
-			if (k === 'ref') {
-				if (prev.ref != null) {
-					queueRefDetach(prev.ref, el);
-					if (state.ref === prev.ref) state.ref = undefined;
-				}
-				continue;
-			}
-			removeHostProp(el, k, prev[k]);
-		}
-	}
-	state.props = props;
-	if (props == null) {
-		if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
-		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
-		return;
-	}
-	for (const name in props) {
-		if (name === 'key' || name === 'children') continue;
-		const v = props[name];
-		if (
-			needsCheckedInitialization &&
-			(name === 'defaultChecked' || (name === 'checked' && v != null))
-		)
-			needsCheckedInitialization = false;
-		const actionName = formActionAttributeName(el, name);
-		if (actionName !== null) {
-			DESCRIPTOR_FORM_ACTION(el, actionName, v, prev?.[name]);
-			continue;
-		}
-		if (name === 'suppressHydrationWarning') {
-			(el as any).__oct_suppress = v === true;
-			continue;
-		}
-		if (name === 'ref') {
-			if (v !== state.ref) {
-				// Detach + attach both land at commit (detaches drain first), so a
-				// ref hopping between elements in one render cycles old → null → new
-				// regardless of which element's props apply first (React's
-				// mutation→layout phasing; see queueRefDetach).
-				if (state.ref != null) queueRefDetach(state.ref, el);
-				if (v != null) queueRefAttach(scope, v, el);
-				state.ref = v;
-			}
-		} else if (name === 'className' || name === 'class') {
-			// Compare the current target, not a same-named previous prop: another
-			// alias can have won or disappeared, and foreign code can edit the DOM.
-			// Mutable class arrays/objects still pass through normalization.
-			if (
-				!compareLive ||
-				typeof v !== 'string' ||
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('class') !== v
-			) {
-				setDeoptClass(el, v);
-			}
-		} else if (name === 'style') {
-			setStyle(el as HTMLElement, v, prev != null ? prev.style : undefined);
-		} else {
-			// Use `eventSlot` (NOT a hand-rolled `on<Upper>` parse) so capture-phase handlers
-			// resolve to the CAPTURE key + register a capture-phase listener — `onClickCapture`
-			// was previously mis-delegated as a bubbling `clickcapture` event.
-			const ev = eventSlot(name, el);
-			if (ev) {
-				if (ev.capture) {
-					if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
-				} else if (!_delegated.has(ev.type)) {
-					delegateEvents([ev.type]);
-				}
-				const handler = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
-				if (
-					!compareLive ||
-					(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[ev.key] !== handler
-				)
-					setEventHandler(el, ev.key, handler);
-			} else if (prev === undefined || name !== 'autoFocus' || isHtmlCustomElement(el)) {
-				// These string attributes have no coercion, property projection, or
-				// URL policy. Matching live values need neither a write nor an undo
-				// snapshot. The remaining attributes retain their complete setter.
-				if (
-					compareLive &&
-					(process.env.NODE_ENV === 'production' || (el as any).__oct_loc === undefined) &&
-					typeof v === 'string' &&
-					(name === 'id' ||
-						name === 'title' ||
-						name === 'role' ||
-						name === 'for' ||
-						name === 'htmlFor' ||
-						name.startsWith('data-') ||
-						name.startsWith('aria-')) &&
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(
-						name === 'htmlFor' ? 'for' : name,
-					) === v
-				)
-					continue;
-				setAttribute(el, name, v);
-			}
-		}
-	}
-	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
-	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
+	const next = prepareHostProps(el, props, state.props, scope, undefined, true, false, true);
+	prepareSlot(scope, state, 'prepared', {
+		publish: () => {
+			commitHostProps(el, next, state.props, scope);
+			state.props = next;
+			state.ref = next.props?.ref;
+		},
+		discard: () => {},
+	});
 }
 
 // The descriptor that last produced a de-opt host element is stashed on the element
@@ -36845,9 +36596,7 @@ interface DeoptStamped {
 	[DEOPT_DESC]?: ElementDescriptor;
 }
 function getDeoptDesc(n: Node): ElementDescriptor | undefined {
-	return (STAGED_DOM ? STAGED_DOM.view(n as Node & DeoptStamped) : (n as Node & DeoptStamped))[
-		DEOPT_DESC
-	];
+	return (n as Node & DeoptStamped)[DEOPT_DESC];
 }
 function sameDeoptDesc(
 	previous: ElementDescriptor | undefined,
@@ -36901,9 +36650,7 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	if (TRANSITION_JOURNAL !== null) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, getDeoptDesc(el));
 	}
-	(STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as Element & DeoptStamped))[
-		DEOPT_DESC
-	] = record;
+	(el as Element & DeoptStamped)[DEOPT_DESC] = record;
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';
@@ -36956,37 +36703,26 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 		const hydration = hydrating ? activeHydration() : null;
 		let start: Comment;
 		let end: Comment;
-		const opening = hydration?.node;
-		if (
-			opening?.nodeType === 8 &&
-			(STAGED_DOM ? STAGED_DOM.view(opening as Comment) : (opening as Comment)).data === 'frag'
-		) {
+		const opening = hydration == null ? void 0 : hydrationCursor.node;
+		if (opening?.nodeType === 8 && (opening as Comment).data === 'frag') {
 			start = opening as Comment;
 			let depth = 1;
 			let cursor: Node | null = getNextSibling(start);
 			while (cursor !== null) {
 				if (cursor.nodeType === 8) {
-					if (
-						(STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data === 'frag'
-					)
-						depth++;
-					else if (
-						(STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data ===
-							'/frag' &&
-						--depth === 0
-					)
-						break;
+					if ((cursor as Comment).data === 'frag') depth++;
+					else if ((cursor as Comment).data === '/frag' && --depth === 0) break;
 				}
 				cursor = getNextSibling(cursor);
 			}
 			if (cursor === null) throw new Error(formatClientError(50));
 			end = cursor as Comment;
-			hydration!.node = getNextSibling(start);
+			hydrationCursor.node = getNextSibling(start);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('frag');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/frag');
-			domNode(block.parentNode).insertBefore(start, block.endMarker);
-			domNode(block.parentNode).insertBefore(end, block.endMarker);
+			start = document.createComment('frag');
+			end = document.createComment('/frag');
+			block.parentNode.insertBefore(start, block.endMarker);
+			block.parentNode.insertBefore(end, block.endMarker);
 		}
 		instance = mountFragmentRef(scope, start, end, descriptor.ref);
 		block.slots[0] = { a: instance };
@@ -37001,7 +36737,7 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 
 	childSlot(scope, 2, block.parentNode, descriptor.children, instance._endMarker);
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null) hydration.node = getNextSibling(instance._endMarker);
+	if (hydration !== null) hydrationCursor.node = getNextSibling(instance._endMarker);
 }
 
 function deoptWrapperKind(value: any[]): DeoptWrapperKind {
@@ -37242,35 +36978,60 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 	);
 }
 
-// Reconcile a runtime value into a DOM node, REUSING `prev` when it's compatible
+interface DeoptOutput {
+	node: Node;
+	value: string | ElementDescriptor;
+	children: DeoptChildren | null;
+	props?: PreparedHostProps;
+	key?: any;
+}
+
+interface DeoptChildren {
+	owned: Node[];
+	next: DeoptOutput[];
+	hasForeign: boolean;
+	singleton: boolean;
+	adopt: boolean;
+}
+
+// Prepare a runtime value, REUSING `prev` when it's compatible
 // (same Text node, or same-tag element) so DOM-resident state survives a re-render.
 // `prev` is the node currently occupying this position — pass the existing node to
 // reuse/adopt it, or null to build fresh (first client mount). Pure host/text only:
 // component descendants are handled by the Block path (hostElementBody/componentSlot),
 // never here. Returns the node to occupy this position (reused or freshly built), or
 // null for an empty value.
-function reconcileDeoptNode(
+function prepareDeoptNode(
 	prev: Node | null,
 	value: any,
 	ownerBlock: Block,
 	ns?: string,
-): Node | null {
+	includeChildren = true,
+	reassert = false,
+): DeoptOutput | null {
 	if (value == null || value === false || value === true || value === '') return null;
 	const t = typeof value;
 	if (t === 'string' || t === 'number' || t === 'bigint') {
 		const s = String(value);
 		if (prev !== null && prev.nodeType === 3 /* Text */) {
 			const hydration = hydrating ? activeHydration() : null;
-			if (
-				hydration !== null &&
-				!hydration.isFresh((STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!)
-			) {
-				return hydration.htextSwap(prev, s);
+			if (hydration !== null && !hydrateIsFresh(hydration, prev.parentNode!)) {
+				const host = prev.parentNode;
+				const value = hydrateKeepsText(
+					hydration,
+					host,
+					prev,
+					prev.nodeValue,
+					s,
+					(host as any)?.__oct_loc,
+				)
+					? prev.nodeValue!
+					: s;
+				return { node: prev, value, children: null };
 			}
-			updateTextValue(prev as Text, s);
-			return prev;
+			return { node: prev, value: s, children: null };
 		}
-		return (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(s);
+		return { node: document.createTextNode(s), value: s, children: null };
 	}
 	if (isHostDescriptor(value)) {
 		// `<svg>` opens the SVG namespace; descendants inherit it (a `foreignObject`
@@ -37287,28 +37048,45 @@ function reconcileDeoptNode(
 			isHostElementOfType(prev as Element, value.type) &&
 			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
 		) {
-			// REUSE the existing element — patch props in place instead of rebuilding.
 			el = prev as Element;
-			patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, value.props, ownerBlock);
 		} else {
 			el =
 				elNs !== undefined
-					? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, value.type)
-					: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(value.type);
-			if (hydrating) activeHydration()?.markFresh(el);
-			applyDeoptProps(el, value.props, ownerBlock);
+					? document.createElementNS(elNs, value.type)
+					: document.createElement(value.type);
+			if (hydrating) activeHydration() == null ? void 0 : hydrateMarkFresh(activeHydration()!, el);
 		}
-		setDeoptDesc(el, value);
-		if (!hasHostPropContent(value)) {
-			reconcileDeoptChildren(
-				el,
-				isHtmlTextareaType(value.type, elNs)
-					? textareaChildText(value.children, rejectTextareaChild)
-					: value.children,
-				ownerBlock,
-			);
-		}
-		return el;
+		const preparedProps = prepareHostProps(
+			el,
+			value.props,
+			(el as any).$$deoptProps,
+			ownerBlock,
+			value.children != null,
+			true,
+			false,
+			reassert,
+		);
+		// Resolve scoped shells while the render owner is active. Commit and ref
+		// teardown must never invoke a deferred descriptor resolver.
+		const descriptor: ElementDescriptor = {
+			$$kind: ELEMENT_TAG,
+			type: value.type,
+			key: value.key,
+			ref: value.ref,
+			props: preparedProps.props,
+			children: value.children,
+		};
+		const children =
+			includeChildren && !hasHostPropContent(descriptor)
+				? prepareDeoptChildren(
+						el,
+						isHtmlTextareaType(value.type, elNs)
+							? textareaChildText(descriptor.children, rejectTextareaChild)
+							: descriptor.children,
+						ownerBlock,
+					)
+				: null;
+		return { node: el, value: descriptor, props: preparedProps, children };
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
 	// descNeedsBlocks() and route component-bearing subtrees through Blocks.
@@ -37323,7 +37101,7 @@ function reconcileDeoptNode(
 // children match by `key`, unkeyed children match positionally (React-shape). Nodes
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
-function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+function prepareDeoptChildren(el: Element, children: any, ownerBlock: Block): DeoptChildren | null {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
@@ -37339,19 +37117,15 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			(first as any).$$deoptKey === 0 &&
 			(first as any).$$portalEnd == null
 		) {
-			const hydration = hydrating ? activeHydration() : null;
-			if (hydration !== null && !hydration.isFresh(el)) {
-				hydration.htextSwap(first, String(children));
-			} else {
-				updateTextValue(first as Text, String(children));
-			}
-			return;
+			const output = prepareDeoptNode(first, children, ownerBlock)!;
+			output.key = 0;
+			return { owned: [first], next: [output], hasForeign: false, singleton: false, adopt: false };
 		}
 	}
 	// Empty scalar children on an already empty host need no reconciliation
 	// scratch arrays. Existing DOM must still take the ownership/clearing path.
 	if ((children == null || type === 'boolean' || children === '') && getFirstChild(el) === null)
-		return;
+		return null;
 	// The element that owns these children is authoritative. This matters when a
 	// component or dynamic tag made the lexical namespace unknowable, and when an
 	// SVG foreignObject resets its descendants to HTML.
@@ -37360,28 +37134,21 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	const nextKeys: any[] = [];
 	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
 	const firstChild = getFirstChild(el);
-	const journal =
-		ROOT_RENDER_TRANSACTION !== null &&
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).parentNode !== null &&
-		(ownerBlock.mounted ||
-			ROOT_RENDER_TRANSACTION.hydrating ||
-			ROOT_RENDER_TRANSACTION.retainedCreated?.has(ownerBlock));
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (firstChild === null) {
 		// Hydrating, an adopted host with no server children cannot hold these.
-		if (next.length !== 0 && hydrating) currentHydration!.missingDeoptChild(el, next[0]);
-		saveDeoptChildren(el);
+		if (next.length !== 0 && hydrating) hydrateMissingDeoptChild(currentHydration!, el, next[0]);
+		const outputs: DeoptOutput[] = [];
 		for (let i = 0; i < next.length; i++) {
-			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
-			if (node !== null) {
-				if (journal) journalRootChildren(el);
-				(node as any).$$deoptKey = nextKeys[i];
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
+			const output = prepareDeoptNode(null, next[i], ownerBlock, childNs);
+			if (output !== null) {
+				output.key = nextKeys[i];
+				outputs.push(output);
 			}
 		}
-		return;
+		return { owned: [], next: outputs, hasForeign: false, singleton: false, adopt: false };
 	}
 	// Nothing to render, and we have never put children here: every node present came from
 	// somewhere else, so leave it alone rather than reconciling against an empty list and
@@ -37389,7 +37156,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// Hydration is excluded: the children present are the server's, which this reconcile is
 	// adopting, so a client descriptor that renders none must still clear them.
 	if (next.length === 0 && (!hydrating || activeHydration() === null) && !hasDeoptOwnedChild(el)) {
-		return;
+		return null;
 	}
 	// Collect only children this reconciler owns. Portal ranges and unstamped
 	// imperatively streamed nodes may coexist with our children; neither belongs
@@ -37438,10 +37205,10 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		scan = getNextSibling(scan);
 	}
 	let up = 0;
-	const result: Node[] = [];
+	const result: DeoptOutput[] = [];
 	// Hydrating `<html>`, `<head>` or `<body>`, React skips server elements of
 	// another tag, and comments, and leaves them, and what follows the client's
-	// children, in place (HydrationCapability.skipForeign). Host descriptor
+	// children, in place (hydration: skipForeign). Host descriptor
 	// children render no range markers, so every comment here is foreign, and
 	// isHostElementOfType matches no comment.
 	const singleton = hydrating ? hydrationOwnsUnstamped === true && isDocumentSingleton(el) : false;
@@ -37463,7 +37230,8 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 				at++;
 			if (at < unstamped.length && unstamped[at].nodeType === 1) up = at;
 			else if (up < unstamped.length)
-				activeHydration()!.mismatch(
+				hydrateMismatch(
+					activeHydration()!,
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `<${child.type as string}>`,
 					unstamped[up],
@@ -37473,16 +37241,16 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			if (up < unstamped.length) prev = unstamped[up++];
 			// The server rendered fewer children than the client.
 			else if (hydrating && hydrationOwnsUnstamped === true && !singleton)
-				currentHydration!.missingDeoptChild(el, child);
+				hydrateMissingDeoptChild(currentHydration!, el, child);
 		}
-		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
-		if (node !== null) {
-			(node as any).$$deoptKey = key;
-			result.push(node);
+		const output = prepareDeoptNode(prev, child, ownerBlock, childNs);
+		if (output !== null) {
+			output.key = key;
+			result.push(output);
 		}
 	}
 	// Remove OWNED children not reused (foreign portal ranges stay untouched).
-	const keep = result.length > 0 ? new Set<Node>(result) : null;
+	const keep = result.length > 0 ? new Set<Node>(result.map((output) => output.node)) : null;
 	for (let i = owned.length - 1; i >= 0; i--) {
 		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
@@ -37495,38 +37263,62 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 				hydration !== null &&
 				(n as any).$$deoptKey === undefined &&
 				el.localName !== 'noscript' &&
-				!hydration.isFresh(el)
+				!hydrateIsFresh(hydration, el)
 			)
-				hydration.mismatch(
+				hydrateMismatch(
+					hydration,
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `the end of <${el.localName}>`,
 					n,
 				);
-			// A speculative attempt's own record restores this removal if the
-			// attempt is discarded; a deferred removal would still run at commit.
-			if (journal && hydration?.speculative !== true) {
-				journalRootChildren(el);
-				deferRootRange(el, n, n, () => detachDeoptTreeRefs(n, null));
-			} else {
-				detachDeoptTreeRefs(n, null);
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).removeChild(n);
-			}
+		}
+	}
+	return { owned, next: result, hasForeign, singleton, adopt: hydrationOwnsUnstamped === true };
+}
+
+function commitDeoptNode(output: DeoptOutput, ownerBlock: Block): boolean {
+	const { node, value, children } = output;
+	if (typeof value === 'string') {
+		updateTextValue(node as Text, value);
+		return true;
+	}
+	const el = node as Element;
+	const owner = ownerBlock.idState.renderOwner;
+	const generation = owner?.generation;
+	if (output.props!.props?.ref != null) noteDeoptRef(ownerBlock);
+	commitHostProps(el, output.props!, (el as any).$$deoptProps, ownerBlock);
+	// A custom property setter may replace or unmount the owning root. Stop
+	// this host tree before publishing stamps or connecting any of its children.
+	if (owningBlock(ownerBlock).disposed || owner?.generation !== generation) return false;
+	(el as any).$$deoptProps = output.props;
+	setDeoptDesc(el, value);
+	if (children === null) return true;
+	const { owned, next, singleton, hasForeign, adopt } = children;
+	const keep = new Set(next.map((child) => child.node));
+	for (let i = owned.length - 1; i >= 0; i--) {
+		const old = owned[i];
+		if (!keep.has(old) && !(singleton && (old as any).$$deoptKey === undefined)) {
+			detachDeoptTreeRefs(old, null);
+			if (old.parentNode === el) el.removeChild(old);
 		}
 	}
 	// Advance through owned live children once. Indexed childNodes reads restart
 	// native list walks after each insertion; foreign ranges also must not make
 	// every survivor rescan the preceding siblings.
 	let cursor: Node | null = getFirstChild(el);
-	for (let i = 0; i < result.length; i++) {
-		const want = result[i];
-		const at =
-			hasForeign || singleton
-				? nextDeoptOwnedChild(cursor, hydrationOwnsUnstamped === true && !singleton)
-				: cursor;
+	for (let i = 0; i < next.length; i++) {
+		const child = next[i];
+		const want = child.node;
+		// An updated custom element may move itself to another container. Keep
+		// this parent's insertion fence across that call, before native sibling
+		// reads start referring to its new container.
+		const after = cursor === want ? getNextSibling(want) : cursor;
+		if (!commitDeoptNode(child, ownerBlock)) return false;
+		(want as any).$$deoptKey = child.key;
+		if (cursor === want && want.parentNode !== el) cursor = after;
+		const at = hasForeign || singleton ? nextDeoptOwnedChild(cursor, adopt && !singleton) : cursor;
 		if (at !== want) {
-			saveDeoptChildren(el);
-			if (journal) journalRootChildren(el);
-			if (renderingFocus === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).insertBefore(want, at);
+			if (renderingFocus === null) el.insertBefore(want, at);
 			else {
 				captureFocusedMovement(el, renderingFocus);
 				moveFocusedNodeBefore(el, want, at, renderingFocus);
@@ -37536,16 +37328,44 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		// detaching want. Read its successor only after that movement completes.
 		cursor = getNextSibling(want);
 	}
+	return true;
 }
 
-/**
- * Before reconcileDeoptChildren inserts or moves children of a server host it
- * is hydrating: a speculative attempt records them, so that one which suspends
- * leaves the server's children as they were (HydrationCapability.save).
- */
-function saveDeoptChildren(el: Element): void {
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.isFresh(el)) hydration.save(el);
+// A generic host with component descendants prepares the same host values as
+// a pure descriptor tree. Its child scope owns the descendant render output.
+function prepareDeoptHost(
+	block: Block,
+	el: Element,
+	descriptor: ElementDescriptor,
+	reassert = false,
+): ElementDescriptor {
+	const output = prepareDeoptNode(
+		el,
+		descriptor,
+		block,
+		deoptChildNamespace(block.parentNode),
+		false,
+		reassert,
+	)!;
+	const prepared = {
+		output,
+		publish: () => {
+			if (!commitDeoptNode(output, block)) return;
+			settleDeoptVisibility(block);
+		},
+		discard: () => {},
+	};
+	prepareSlot(block, block, 'deoptPrepared', prepared);
+	return output.value as ElementDescriptor;
+}
+
+// Activity may have hidden the applied content before generic output admitted
+// its nodes. Its existing visibility owner must see the final accepted tree.
+function settleDeoptVisibility(block: Block): void {
+	if (SCHEDULED_VISIBILITY_DRIVER && SCHEDULED_VISIBILITY_DRIVER.rehide) {
+		const hidden = findHiddenActivity(block);
+		if (hidden !== null) SCHEDULED_VISIBILITY_DRIVER.rehide(hidden);
+	}
 }
 
 // Resume point of an owned-children walk after a foreign portal range: the first
@@ -37594,23 +37414,14 @@ function promoteSelfMarkedItem(block: Block): void {
 		sm === null ||
 		sm !== block.endMarker ||
 		sm.nodeType === 8 /* COMMENT_NODE — i.e. already a pair */ ||
-		(STAGED_DOM ? STAGED_DOM.view(sm) : sm).parentNode === null
+		sm.parentNode === null
 	)
 		return;
-	const p = (STAGED_DOM ? STAGED_DOM.view(sm) : sm).parentNode!;
-	if (ROOT_RENDER_TRANSACTION !== null) {
-		journalRootRange(
-			p,
-			(STAGED_DOM ? STAGED_DOM.view(sm) : sm).previousSibling,
-			getNextSibling(sm),
-		);
-		journalRootProperty(block, 'startMarker', block.startMarker);
-		journalRootProperty(block, 'endMarker', block.endMarker);
-	}
-	const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-	const e = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
-	(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(s, sm);
-	(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(e, getNextSibling(sm));
+	const p = sm.parentNode!;
+	const s = document.createComment('it');
+	const e = document.createComment('/it');
+	p.insertBefore(s, sm);
+	p.insertBefore(e, getNextSibling(sm));
 	block.startMarker = s;
 	block.endMarker = e;
 }
@@ -37635,7 +37446,6 @@ function deoptItemBody(item: any, scope: Scope): void {
 			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
 		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
-	if (needsBlocks || !hostItem) promoteSelfMarkedItem(block);
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
 	// for hooks/reconciliation, which the raw host reconciler can't give it. Delegate to a
@@ -37648,61 +37458,22 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// (raw) — so each branch tears down the other's residue on a switch (previously
 	// the pure path left a toggled-off component's Blocks + DOM in the range forever).
 	if (needsBlocks) {
-		// Switching pure → Blocks. If the raw node the pure path left in the range
-		// is a SAME-TAG element for the incoming host-with-components descriptor,
-		// don't drop it — TRANSFER it to the nested childSlot as its pure-host
-		// reuse candidate, so childSlot's pure-host → blocks upgrade branch adopts
-		// the element (and, recursively, its children) in place. Anything else
-		// (tag change, non-element, or an already-established nested slot) keeps
-		// the old teardown.
+		// The item lends its applied output to the generic slot. For an old
+		// self-marked node the node itself is the extent; no speculative markers
+		// need to surround it before a replacement has been accepted.
 		const stale = block.deoptNode;
-		let transfer: Node | null = null;
-		if (stale != null) {
-			journalRootProperty(block, 'deoptNode', block.deoptNode);
-			if (
-				scope.slots[0] === undefined &&
-				stale.nodeType === 1 /* Element */ &&
-				hostItem &&
-				isHostElementOfType(stale as Element, itemType as string) &&
-				(STAGED_DOM ? STAGED_DOM.view(stale) : stale).parentNode === block.parentNode
-			) {
-				transfer = stale;
-			} else if ((STAGED_DOM ? STAGED_DOM.view(stale) : stale).parentNode === block.parentNode) {
-				if (ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(
-						block.parentNode,
-						(STAGED_DOM ? STAGED_DOM.view(stale) : stale).previousSibling,
-						getNextSibling(stale),
-					);
-					deferRootRange(block.parentNode, stale, stale, () => detachDeoptTreeRefs(stale, null));
-				} else {
-					detachDeoptTreeRefs(stale, null);
-					const parent = block.parentNode;
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(stale);
-				}
-			}
-			block.deoptNode = null;
-		}
-		// Marker-elision M2: on a CLIENT mount, the nested childSlot BORROWS the
-		// item block's own `<!--it-->` pair as its range instead of minting a
-		// second inner pair (end anchor + lazy start) — the item's markers bound
-		// exactly the content this slot manages. clearChildContent sweeps BETWEEN
-		// markers (never removes them), and the item block still OWNS the pair
-		// (teardown removes it inclusive). Only when the item is comment-marked —
-		// a de-opt list always is (reconcileKeyed runs with singleRoot=false).
+		const selfMarked = stale !== null && block.startMarker === stale && block.endMarker === stale;
 		if (
 			hydration === null &&
 			scope.slots[0] === undefined &&
 			block.startMarker !== null &&
 			block.endMarker !== null &&
-			block.startMarker !== block.endMarker &&
-			block.startMarker.nodeType === 8 /* COMMENT_NODE */ &&
-			block.endMarker.nodeType === 8
+			(selfMarked || (block.startMarker.nodeType === 8 && block.endMarker.nodeType === 8))
 		) {
 			const borrowed: ChildSlot = {
 				__kind: 'childSlot',
-				start: block.startMarker as Comment,
-				end: block.endMarker as Comment,
+				start: selfMarked ? null : (block.startMarker as Comment),
+				end: selfMarked ? null : (block.endMarker as Comment),
 				ownerHost: null,
 				borrowed: true,
 				compactable: false,
@@ -37711,22 +37482,23 @@ function deoptItemBody(item: any, scope: Scope): void {
 				currentComp: null,
 				currentIsBodyFn: false,
 				forSlot: null,
-				// Pure → Blocks transfer: the raw element becomes the slot's reuse
-				// candidate — childSlot's upgrade branch adopts it in place.
-				hostNode: transfer,
+				hostNode: stale,
 				portal: null,
 			};
+			journalBag();
 			scope.slots[0] = borrowed;
 			registerSlot(scope, borrowed);
 		} else if (
-			transfer !== null &&
-			(STAGED_DOM ? STAGED_DOM.view(transfer) : transfer).parentNode !== null
+			stale !== null &&
+			existingChild?.__kind === 'childSlot' &&
+			existingChild.block === null &&
+			existingChild.forSlot === null &&
+			existingChild.hostNode === null
 		) {
-			// The borrowed-slot preconditions didn't hold (no marker pair) — the
-			// transfer has no receiving slot; fall back to the old teardown.
-			detachDeoptTreeRefs(transfer, null);
-			const parent = (STAGED_DOM ? STAGED_DOM.view(transfer) : transfer).parentNode!;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(transfer);
+			// A former component slot may be empty while the item's raw path
+			// owns the current node. Transfer that applied output back to it too.
+			journalRootProperty(existingChild, 'hostNode', null);
+			existingChild.hostNode = stale;
 		}
 		// The surrounding list already consumed this descriptor's key. Suppress
 		// the keyed-single list normalization in the nested slot or the same
@@ -37742,6 +37514,15 @@ function deoptItemBody(item: any, scope: Scope): void {
 			undefined,
 			false,
 		);
+		if (stale !== null) {
+			prepareSlot(scope, block, 'deoptPrepared', {
+				parent: block.parentNode,
+				publish() {
+					block.deoptNode = null;
+				},
+				discard() {},
+			});
+		}
 		return;
 	}
 	// Switching Blocks → pure: unmount the childSlot content the Blocks path mounted
@@ -37764,62 +37545,32 @@ function deoptItemBody(item: any, scope: Scope): void {
 		prev = startM != null ? getNextSibling(startM) : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
-	if (node !== prev) {
-		journalRootProperty(block, 'deoptNode', block.deoptNode);
-		// Built a fresh node (first mount, or a tag/type change) — insert it at
-		// the old node's position, THEN drop the old one. Insert-before-remove
-		// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
-		// marker, so removing it first would leave `endM` detached and the
-		// insert would throw.
-		if (
-			prev != null &&
-			prev !== node &&
-			(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode === block.parentNode
-		) {
-			if (ROOT_RENDER_TRANSACTION !== null)
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(prev) : prev).previousSibling,
-					getNextSibling(prev),
-				);
-			if (node !== null) {
+	const output = prepareDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
+	const node = output?.node ?? null;
+	const prepared = {
+		output,
+		publish: () => {
+			if (!hostItem) promoteSelfMarkedItem(block);
+			if (output !== null && !commitDeoptNode(output, block)) return;
+			if (node !== prev) {
 				const parent = block.parentNode;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
+				if (prev !== null && prev.parentNode === parent) {
+					if (node !== null) parent.insertBefore(node, prev);
+					detachDeoptTreeRefs(prev, null);
+					parent.removeChild(prev);
+				} else if (node !== null) parent.insertBefore(node, endM);
+				// Replacing a self-marked element replaces the complete range.
+				if (prev !== null && block.startMarker === prev) {
+					block.startMarker = node;
+					block.endMarker = node;
+				}
 			}
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				const retired = prev;
-				deferRootRange(block.parentNode, retired, retired, () =>
-					detachDeoptTreeRefs(retired, null),
-				);
-			} else {
-				detachDeoptTreeRefs(prev, null);
-				const parent = block.parentNode;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev);
-			}
-		} else if (node !== null) {
-			if (ROOT_RENDER_TRANSACTION !== null && block.mounted) {
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(endM) : endM)?.previousSibling ??
-						domNode(block.parentNode).lastChild,
-					endM,
-				);
-			}
-			const parent = block.parentNode;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, endM);
-		}
-		// Self-marked item rebuilt: the replaced element WAS the range — re-point
-		// both markers at the replacement. (A non-host new value never reaches
-		// here self-marked — the promotion above minted a pair first.)
-		if (prev !== null && block.startMarker === prev) {
-			journalRootProperty(block, 'startMarker', block.startMarker);
-			journalRootProperty(block, 'endMarker', block.endMarker);
-			block.startMarker = node;
-			block.endMarker = node;
-		}
-	}
-	block.deoptNode = node;
+			block.deoptNode = node;
+			settleDeoptVisibility(block);
+		},
+		discard: () => {},
+	};
+	prepareSlot(scope, block, 'deoptPrepared', prepared);
 }
 
 // A de-opt list item reaches its component through the item's own render,
@@ -37900,24 +37651,46 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 		if (state === undefined || state.__kind === 'componentSlotSlot') {
 			const stale = block.deoptNode;
 			if (stale !== null) {
-				// A self-marked host node is the item's whole range; mint the pair
-				// the component renders into before that node is retired.
-				promoteSelfMarkedItem(block);
-				journalRootProperty(block, 'deoptNode', stale);
-				const attached =
-					(STAGED_DOM ? STAGED_DOM.view(stale) : stale).parentNode === block.parentNode;
-				if (attached && ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(
-						block.parentNode,
-						(STAGED_DOM ? STAGED_DOM.view(stale) : stale).previousSibling,
-						getNextSibling(stale),
-					);
-					deferRootRange(block.parentNode, stale, stale, () => detachDeoptTreeRefs(stale, null));
-				} else {
-					detachDeoptTreeRefs(stale, null);
-					if (attached) domNode(block.parentNode).removeChild(stale);
-				}
-				block.deoptNode = null;
+				const parent = block.parentNode;
+				const target = prepareParent(parent);
+				const fence = document.createComment('');
+				target.appendChild(fence);
+				componentSlot(
+					// The item's applied bounds belong to its live parent. Only the
+					// private fence can delimit this replacement while it prepares.
+					scope,
+					0,
+					target,
+					item.type,
+					item.props,
+					item.__octaneInvocationSite,
+					fence,
+					true,
+					false,
+				);
+				prepareSlot(scope, block, 'deoptPrepared', {
+					parent,
+					publish() {
+						const first = getFirstChild(target);
+						if (first !== null) {
+							const last = target.lastChild!;
+							retargetPreparedScope(scope, target, parent);
+							placeRange(
+								parent,
+								first,
+								last,
+								stale.parentNode === parent ? stale : block.endMarker,
+							);
+							if (block.startMarker === stale && block.endMarker === stale)
+								replaceSharedBlockBoundary(block, stale, stale, first, last);
+						}
+						detachDeoptTreeRefs(stale, null);
+						if (stale.parentNode === parent) parent.removeChild(stale);
+						block.deoptNode = null;
+					},
+					discard() {},
+				});
+				return;
 			}
 			componentSlot(
 				scope,
@@ -37941,19 +37714,33 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 			root !== null &&
 			root === block.endMarker &&
 			root.nodeType !== 8 &&
-			(STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode !== null
+			root.parentNode !== null
 		) {
-			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-			const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
-			domNode((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode!).insertBefore(start, root);
-			domNode((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode!).insertBefore(
-				end,
-				getNextSibling(root),
-			);
+			const start = document.createComment('it');
+			const end = document.createComment('/it');
+			const parent = root.parentNode!;
+			journalRootProperty(block, 'startMarker', block.startMarker);
+			journalRootProperty(block, 'endMarker', block.endMarker);
 			block.startMarker = start;
 			block.endMarker = end;
+			prepareSlot(scope, block, 'promotedBounds', {
+				parent,
+				publish() {
+					if (
+						block.forSlot?.items.get(block.key) !== block ||
+						block.startMarker !== start ||
+						block.endMarker !== end ||
+						root.parentNode !== parent
+					)
+						return;
+					parent.insertBefore(start, root);
+					parent.insertBefore(end, getNextSibling(root));
+				},
+				discard() {},
+			});
 		}
 		disposeReturnSlot(block, state);
+		journalRootProperty(block, 'deoptNode', block.deoptNode);
 		block.deoptNode = null;
 	}
 	deoptItemBody(item, scope);
@@ -38092,39 +37879,42 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	if (
 		el === null &&
 		hydration !== null &&
-		hydration.node !== null &&
-		hydration.node.nodeType === 1 &&
-		isHostElementOfType(hydration.node as Element, d.type as string) &&
-		(elNs === undefined || (hydration.node as Element).namespaceURI === elNs)
+		hydrationCursor.node !== null &&
+		hydrationCursor.node.nodeType === 1 &&
+		isHostElementOfType(hydrationCursor.node as Element, d.type as string) &&
+		(elNs === undefined || (hydrationCursor.node as Element).namespaceURI === elNs)
 	) {
-		el = hydration.node as Element;
+		el = hydrationCursor.node as Element;
 		block.deoptNode = el;
-		applyDeoptProps(el, d.props, block);
-		setDeoptDesc(el, d);
-		const savedCursor = getNextSibling(hydration.node);
+		d = prepareDeoptHost(block, el, d, true);
+		const savedCursor = getNextSibling(hydrationCursor.node);
 		if (!hasHostPropContent(d)) {
-			hydration.node = getFirstChild(el);
+			hydrationCursor.node = getFirstChild(el);
 			deoptHostChildren(block, el, d, elNs, true);
 		}
-		hydration.node = savedCursor;
+		hydrationCursor.node = savedCursor;
 		return;
 	}
 	if (
 		el === null &&
 		hydration !== null &&
-		(hydration.node !== null || !hydration.isFresh(block.parentNode))
+		(hydrationCursor.node !== null || !hydrateIsFresh(hydration, block.parentNode))
 	) {
 		// STRUCTURAL mismatch: the server rendered something other than this host element at
 		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …), or
 		// nothing at all.
-		hydration.mismatch(
+		hydrateMismatch(
+			// STRUCTURAL mismatch: the server rendered something other than this host element at
+			// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …), or
+			// nothing at all.
+			hydration,
 			process.env.NODE_ENV !== 'production'
-				? (hydration.node === null
+				? (hydrationCursor.node === null
 						? (block.parentNode as any).__oct_loc
-						: (domNode(hydration.node).parentNode as any)?.__oct_loc) || runtimeHostSiteLoc(block)
+						: (hydrationCursor.node.parentNode as any)?.__oct_loc) || runtimeHostSiteLoc(block)
 				: undefined,
 			() => `<${String(d.type)}>`,
-			hydration.node,
+			hydrationCursor.node,
 		);
 	}
 	if (
@@ -38132,59 +37922,47 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		!isHostElementOfType(el, d.type as string) ||
 		(elNs !== undefined && el.namespaceURI !== elNs)
 	) {
-		// First render, or the host tag changed at this slot — (re)create the element.
-		if (el !== null) {
-			const retired = el;
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(retired) : retired).previousSibling,
-					getNextSibling(retired),
-				);
-				journalRootProperty(block, 'deoptNode', block.deoptNode);
-			}
-			// This Block keeps rendering, so the replaced element retires on its own,
-			// before its children leave it and can take focus with them.
-			if (ROOT_RENDER_TRANSACTION !== null)
-				deferRootRange(block.parentNode, null, null, () => retireEventHostTree(retired));
-			else retireEventHostTree(retired);
-			// The children slot's live content — markers included — sat inside the
-			// removed element, so a preserved slot would keep rendering into the
-			// detached node. Run the subtree's cleanups and drop the slot state so
-			// the children REMOUNT into the fresh element: React parity, where a
-			// host tag change remounts the entire subtree.
-			const childState = block.slots[0] as ChildSlot | undefined;
+		// Keep the old host and its child scopes applied until this whole
+		// replacement has rendered. A tag change remounts its child lifetime.
+		const retired = el;
+		const childState = retired === null ? undefined : (block.slots[0] as ChildSlot | undefined);
+		if (retired !== null) {
+			journalRootProperty(block, 'deoptNode', retired);
 			if (childState !== undefined) {
-				disposeReturnSlot(block, childState);
-			}
-			const detach = () => {
-				const ref = getDeoptDesc(retired)?.props?.ref;
-				if (ref != null) queueRefDetach(ref, retired);
-			};
-			if (ROOT_RENDER_TRANSACTION !== null)
-				deferRootRange(block.parentNode, retired, retired, detach);
-			else {
-				detach();
-				(STAGED_DOM ? STAGED_DOM.view(retired) : retired).remove();
+				journalRootProperty(block.slots, '0', childState);
+				block.slots[0] = undefined;
 			}
 		}
 		el =
 			elNs !== undefined
-				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(
-						elNs,
-						d.type as string,
-					)
-				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(d.type as string);
-		if (hydration !== null) hydration.markFresh(el);
+				? document.createElementNS(elNs, d.type as string)
+				: document.createElement(d.type as string);
+		if (hydration !== null) hydrateMarkFresh(hydration, el);
 		block.deoptNode = el;
+		const next = el;
 		const parent = block.parentNode;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
-		applyDeoptProps(el, d.props, block);
-	} else {
-		// REUSE the existing element — diff props in place (no rebuild).
-		patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, d.props, block);
+		prepareSlot(block, block, 'deoptHostPrepared', {
+			parent,
+			publish() {
+				if (retired !== null) {
+					retireEventHostTree(retired);
+					if (childState !== undefined) {
+						unmountSlot(childState, false);
+						const registered = block._slots?.indexOf(childState) ?? -1;
+						if (registered !== -1) block._slots!.splice(registered, 1);
+					}
+					const ref = getDeoptDesc(retired)?.props?.ref;
+					if (ref != null) queueRefDetach(ref, retired);
+				}
+				if (block.disposed || block.deoptNode !== next) return;
+				const anchor = retired?.parentNode === parent ? retired : block.endMarker;
+				parent.insertBefore(next, anchor);
+				if (retired?.parentNode === parent) parent.removeChild(retired);
+			},
+			discard() {},
+		});
 	}
-	setDeoptDesc(el, d);
+	d = prepareDeoptHost(block, el, d, true);
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
@@ -38218,55 +37996,52 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	if (el === null) {
 		if (
 			hydration !== null &&
-			hydration.node !== null &&
-			hydration.node.nodeType === 1 &&
-			isHostElementOfType(hydration.node as Element, tag) &&
-			(elNs === undefined || (hydration.node as Element).namespaceURI === elNs)
+			hydrationCursor.node !== null &&
+			hydrationCursor.node.nodeType === 1 &&
+			isHostElementOfType(hydrationCursor.node as Element, tag) &&
+			(elNs === undefined || (hydrationCursor.node as Element).namespaceURI === elNs)
 		) {
 			// Hydration first render: ADOPT the server-rendered element at the cursor,
 			// then point the cursor at its first child so the children fn's clone()
 			// adopts the server content DIRECTLY (it self-bounds on the element — the
 			// server emitted no inner markers).
-			el = hydration.node as Element;
+			el = hydrationCursor.node as Element;
 			block.deoptNode = el;
-			applyDeoptProps(el, d.props, block);
-			setDeoptDesc(el, d);
-			const savedCursor = getNextSibling(hydration.node);
+			d = prepareDeoptHost(block, el, d, true);
+			const savedCursor = getNextSibling(hydrationCursor.node);
 			if (!hasHostPropContent(d)) {
-				hydration.node = getFirstChild(el);
+				hydrationCursor.node = getFirstChild(el);
 				renderHostTagChildren(d, block, el);
 			}
-			hydration.node = savedCursor;
+			hydrationCursor.node = savedCursor;
 			return;
 		}
-		if (hydration !== null && (hydration.node !== null || !hydration.isFresh(block.parentNode))) {
+		if (
+			hydration !== null &&
+			(hydrationCursor.node !== null || !hydrateIsFresh(hydration, block.parentNode))
+		) {
 			// STRUCTURAL mismatch, as in hostElementBody.
-			hydration.mismatch(
+			hydrateMismatch(
+				// STRUCTURAL mismatch, as in hostElementBody.
+				hydration,
 				process.env.NODE_ENV !== 'production'
-					? hydration.node === null
+					? hydrationCursor.node === null
 						? (block.parentNode as any).__oct_loc
-						: (domNode(hydration.node).parentNode as any)?.__oct_loc
+						: (hydrationCursor.node.parentNode as any)?.__oct_loc
 					: undefined,
 				() => `<${tag}>`,
-				hydration.node,
+				hydrationCursor.node,
 			);
 		}
 		// Client mount. (The tag is FIXED for this block's life — componentSlot
 		// tears down + remounts on a tag change — so no localName re-check.)
-		el =
-			elNs !== undefined
-				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
-				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
-		if (hydration !== null) hydration.markFresh(el);
+		el = elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
+		if (hydration !== null) hydrateMarkFresh(hydration, el);
 		block.deoptNode = el;
 		const parent = block.parentNode;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
-		applyDeoptProps(el, d.props, block);
-	} else {
-		// Re-render, same tag — diff props in place against the stamped descriptor.
-		patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, d.props, block);
+		parent.insertBefore(el, block.endMarker);
 	}
-	setDeoptDesc(el, d);
+	d = prepareDeoptHost(block, el, d, true);
 	if (!hasHostPropContent(d)) renderHostTagChildren(d, block, el);
 }
 
@@ -38338,7 +38113,7 @@ let DEOPT_UPGRADE: { block: Block; children: any } | null = null;
 // Only raw-host upgrades need this walk. The retained array structure supplies
 // positional boundaries, while each raw node supplies its accepted descriptor:
 // a deferred leaf's live key/type may already belong to the next Provider value.
-function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node }): any {
+function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node | null }): any {
 	if (Array.isArray(value)) {
 		// A plain cold-path copy avoids invoking an authored slice/species and
 		// reads indexed accessors only once before preparing the accepted keys.
@@ -38354,7 +38129,7 @@ function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node
 	const type = typeof value;
 	const element = isElementDescriptor(value);
 	if (!element && type !== 'string' && type !== 'number' && type !== 'bigint') return value;
-	const node = cursor.node;
+	const node = nextDeoptOwnedChild(cursor.node, false);
 	if (node === null || node === cursor.end) return value;
 	cursor.node = getNextSibling(node);
 	return element ? (getDeoptDesc(node) ?? value) : value;
@@ -38368,17 +38143,17 @@ function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node
 // node/value mismatch (defensive; unpaired nodes are swept after the render).
 function buildDeoptAdoptQueue(
 	oldChildren: any,
-	start: Comment,
-	end: Comment,
+	first: Node | null,
+	end: Node | null,
 ): Array<{ key: any; node: Node }> {
 	// SAME flatten + keying as the childSlot array path (incl. compound
 	// slot-scoped keys for nested arrays) — the queue's keys must match the
 	// keys the incoming items will get, or nothing adopts.
-	const accepted = adoptedDeoptChildren(oldChildren, { node: getNextSibling(start), end });
+	const accepted = adoptedDeoptChildren(oldChildren, { node: first, end });
 	const prepared = prepareDeoptList(accepted, true)!;
 	const { items, keys } = prepared;
 	const queue: Array<{ key: any; node: Node }> = [];
-	let cursor: Node | null = getNextSibling(start);
+	let cursor: Node | null = nextDeoptOwnedChild(first, false);
 	for (let i = 0; i < items.length; i++) {
 		const v = items[i];
 		if (v == null || v === false || v === true || v === '') continue; // rendered nothing
@@ -38392,7 +38167,7 @@ function buildDeoptAdoptQueue(
 				: false;
 		if (!compatible) break;
 		queue.push({ key: keys[i], node: cursor });
-		cursor = getNextSibling(cursor);
+		cursor = nextDeoptOwnedChild(getNextSibling(cursor), false);
 	}
 	return queue;
 }
@@ -38731,44 +38506,14 @@ export function mapSlot(
 // List-only reconciliation is separate from childSlot's text/function path so
 // its first-use compilation can remain deferred until a list value reaches it.
 // Slot registration and upgrade ownership have already been established.
-function journalRootChildShape(state: ChildSlot, parent: Node): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
-		return;
-	// Compiled holes cache their input after this helper returns. A structural
-	// clear can be the parent's only binding write, so restore that cache too.
-	journalBag();
-	if (state.ownerHost !== null) {
-		journalRootSlot(state, state.ownerHost, null, null);
-	} else if (state.start !== null) {
-		journalRootSlot(
-			state,
-			parent,
-			state.borrowed ? state.start : domNode(state.start).previousSibling,
-			state.borrowed ? state.end : (domNode(state.end)?.nextSibling ?? null),
-		);
-	} else if (state.borrowed && state.block !== null && state.block.startMarker === null) {
-		journalRootSlot(state, parent, null, state.end);
-	} else {
-		const first = state.text ?? state.hostNode ?? state.block?.startMarker ?? state.end;
-		const last = state.end ?? state.block?.endMarker ?? first;
-		const after = (STAGED_DOM ? STAGED_DOM.view(last) : last)?.nextSibling ?? null;
-		journalRootSlot(
-			state,
-			parent,
-			first !== null
-				? (STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling
-				: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild,
-			after,
-		);
-	}
-}
 
 function renderPreparedChildList(
 	state: ChildSlot,
-	parentBlock: Block,
+	parentScope: Scope,
+	slotKey: number,
 	domParent: Node,
 	preparedList: { items: any[]; keys: any[] | null },
-	hydration: HydrationCapability | null,
+	hydration: HydrationAttempt | null,
 	upgradeArmed: boolean,
 	upgradeChildren: any,
 	compiledMapBody?: (item: any, scope: Scope) => void,
@@ -38777,17 +38522,17 @@ function renderPreparedChildList(
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
 ): void {
+	const parentBlock = parentScope.block;
 	const passthroughList = hydrating
 		? hydration?.passthroughRanges === true && state.borrowed
 		: false;
-	let passthroughStart: Comment | null = null;
-	let passthroughEnd: Comment | null = null;
+	let passthroughFrame: HydrationFrame | null = null;
 	if (preparedList.items.length === 0 && hydration === null && state.ownerHost !== null) {
 		// An owns-parent slot needs no list anchors while empty. This also lets
 		// an upgraded host retain its element after its last component disappears,
 		// without leaving an otherwise empty element framed by list comments.
 		if (state.forSlot !== null && ROOT_RENDER_TRANSACTION === null) teardownChildForSlot(state);
-		clearChildContent(state);
+		clearChildContent(state, parentScope);
 		return;
 	}
 	if (state.forSlot === null) {
@@ -38798,74 +38543,84 @@ function renderPreparedChildList(
 		// hydrateNode chain) the de-opt list is about to adopt. The pure-host →
 		// blocks upgrade adopts the SAME way (the element's raw children ARE the
 		// incoming items), so it must not sweep either.
-		if (hydration === null && !upgradeArmed) clearChildContent(state);
+		if (hydration === null && !upgradeArmed) clearChildContent(state, parentScope);
 		// A text-mode sole-child write wiped the host wholesale and took the
 		// minted markers with it. Anchoring the new list on those detached
 		// comments would insert into a null parent — drop them and re-mint.
-		if (state.end !== null && domNode(state.end).parentNode === null) {
+		// An unpublished hydration frame still owns its immutable server source;
+		// absence from the live DOM is required until that adoption commits.
+		const source =
+			hydrating && hydration !== null && state.end !== null
+				? (state.end as HydrationFrameMarker)[HYDRATION_FRAME]
+				: undefined;
+		if (
+			state.end !== null &&
+			state.end.parentNode === null &&
+			(source === undefined || source.published)
+		) {
 			state.end = null;
 			state.start = null;
 		}
 		// Compiled map bodies still find their single root relative to the list
 		// anchor. Keep that anchor until compiled creation returns the root itself.
-		const marked =
-			state.ownerHost === null || upgradeArmed || passthroughList || compiledMapBody !== undefined;
-		if (state.end === null && marked) {
-			// OWNS-PARENT slot entering array mode: ForSlot requires a real
-			// marker pair (reconcileKeyed anchors on it) — mint it lazily,
-			// appended at the element's tail. One-way, like the promotion above.
-			state.end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+		const marked = state.ownerHost === null || passthroughList || compiledMapBody !== undefined;
+		if (passthroughList) {
 			let anchor: Node | null = null;
-			if (passthroughList) {
-				for (let owner: Block | null = parentBlock; owner !== null; owner = owner.parentBlock) {
-					if (
-						owner.forSlot !== null &&
-						owner.endMarker !== null &&
-						domNode(owner.endMarker).parentNode === domParent
-					) {
-						anchor = owner.endMarker;
+			let outer: HydrationFrame | undefined;
+			for (let owner: Block | null = parentBlock; owner !== null; owner = owner.parentBlock) {
+				if (owner.forSlot !== null && owner.endMarker !== null) {
+					const frame = (owner.endMarker as HydrationFrameMarker)[HYDRATION_FRAME];
+					if (owner.endMarker.parentNode === domParent || frame?.parent === domParent) {
+						anchor = hydrationSourceLimit(owner.endMarker);
+						outer = frame;
 						break;
 					}
 				}
-				if (anchor === null) {
-					let node = (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
-					while (node !== null && isRendererHydrationStyle(node)) {
-						anchor = node;
-						node = (STAGED_DOM ? STAGED_DOM.view(node) : node).previousSibling;
-					}
+			}
+			if (anchor === null) {
+				let node = domParent.lastChild;
+				while (node !== null && isRendererHydrationStyle(node)) {
+					anchor = node;
+					node = node.previousSibling;
 				}
 			}
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(state.end, anchor);
-			if (passthroughList) {
-				hydration!.markFresh(state.end);
-				passthroughEnd = state.end;
-				if (TRANSITION_JOURNAL !== null) {
-					const end = state.end;
-					journalUndo(() => (STAGED_DOM ? STAGED_DOM.view(end) : end).remove());
-				}
-			}
+			const cursor = hydrationCursor.node;
+			const first = cursor !== null && cursor.parentNode === domParent ? cursor : anchor;
+			state.start = document.createComment('');
+			state.end = document.createComment('');
+			passthroughFrame = createHydrationFrame(domParent, state.start, state.end, first, anchor);
+			if (outer !== undefined) passthroughFrame.outer = outer;
+			prepareHydrationFrame(parentScope, state, slotKey, domParent, state.start, state.end, first);
+		} else if (state.end === null && marked) {
+			// A marked list's children are mounted into a renderer preparation
+			// parent, then its owning child slot admits that whole range.
+			state.end = document.createComment('');
+			domParent.appendChild(state.end);
 		}
 		if (state.start === null && marked) {
-			state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-			// Upgrade adoption: the element's existing raw children must sit
-			// INSIDE [start, end] (they become the items) — mint start before
-			// the first of them, not at the tail.
-			const cursor = passthroughList ? hydration!.node : null;
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
-				state.start,
-				upgradeArmed
-					? getFirstChild(domParent)
-					: cursor !== null && domNode(cursor).parentNode === domParent
-						? cursor
-						: state.end,
-			);
-			if (passthroughList) {
-				hydration!.markFresh(state.start);
-				passthroughStart = state.start;
-				if (TRANSITION_JOURNAL !== null) {
-					const start = state.start;
-					journalUndo(() => (STAGED_DOM ? STAGED_DOM.view(start) : start).remove());
-				}
+			state.start = document.createComment('');
+			if (source !== undefined && !source.published) {
+				const first = hydrationCursor.node;
+				createHydrationFrame(
+					domParent,
+					state.start,
+					state.end!,
+					first,
+					hydrationSourceLimit(state.end!),
+				);
+				prepareHydrationFrame(
+					parentScope,
+					state,
+					slotKey,
+					domParent,
+					state.start,
+					state.end!,
+					first,
+				);
+			} else {
+				// Upgrade adoption: the existing raw children sit inside the
+				// bounds as they become list items.
+				domParent.insertBefore(state.start, upgradeArmed ? getFirstChild(domParent) : state.end);
 			}
 		}
 		state.forSlot = {
@@ -38890,12 +38645,18 @@ function renderPreparedChildList(
 			signalSite: undefined,
 		};
 		if (upgradeArmed) {
-			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start!, state.end!);
+			state.forSlot.adopt = buildDeoptAdoptQueue(
+				upgradeChildren,
+				state.start === null ? getFirstChild(domParent) : getNextSibling(state.start),
+				state.end,
+			);
 		}
 	}
 	const { items, keys } = preparedList;
 	const markerlessMappedFallback =
-		mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
+		mappedFallback === true &&
+		hydration !== null &&
+		!hydrateIsOpen(hydration, hydrationCursor.node);
 	const keySource = compiledMapKey || keys!;
 	const normalizeKey = !!compiledMapKey;
 	const wasMappedNative = state.forSlot.mappedNative === true;
@@ -39024,19 +38785,17 @@ function renderPreparedChildList(
 				passthroughList,
 			);
 		} catch (error) {
-			if (passthroughStart !== null) {
-				(STAGED_DOM ? STAGED_DOM.view(passthroughStart) : passthroughStart).remove();
+			if (passthroughFrame !== null) {
 				state.start = null;
-			}
-			if (passthroughEnd !== null) {
-				(STAGED_DOM ? STAGED_DOM.view(passthroughEnd) : passthroughEnd).remove();
 				state.end = null;
+				state.forSlot = null;
+				(state as ChildSlot & { framePrepared?: SlotPreparation }).framePrepared = undefined;
 			}
-			if (passthroughStart !== null || passthroughEnd !== null) state.forSlot = null;
 			throw error;
 		}
 		// Only first-fill adoption consumes unowned server items, as in forBlock.
-		if (hydration !== null && !passthroughList) hydration.settleItems(state.forSlot.end!);
+		if (hydrating && hydration !== null && !passthroughList)
+			hydrateSettleItems(hydration, state.forSlot.end!);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -39058,25 +38817,42 @@ function renderPreparedChildList(
 	// sweep them now.
 	if (state.forSlot.adopt !== null) {
 		const leftovers = state.forSlot.adopt;
-		for (let i = 0; i < leftovers.length; i++) {
-			const n = leftovers[i].node;
-			if ((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode !== null) {
-				if (ROOT_RENDER_TRANSACTION !== null) {
-					deferRootRange((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode!, n, n, () =>
-						detachDeoptTreeRefs(n, null),
-					);
-				} else {
-					detachDeoptTreeRefs(n, null);
-					domNode((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode!).removeChild(n);
+		const list = state.forSlot;
+		prepareSlot(parentBlock, state, 'upgradePrepared', {
+			parent: domParent,
+			publish: () => {
+				for (const entry of leftovers) {
+					const n = entry.node;
+					if (n.parentNode === domParent) {
+						detachDeoptTreeRefs(n, null);
+						domParent.removeChild(n);
+					}
 				}
-			}
-		}
-		state.forSlot.adopt = null;
+				let anchor: Node | null = list.end;
+				for (let block = list.tail; block !== null; block = block.prevSibling) {
+					const first = block.startMarker;
+					const last = block.endMarker;
+					if (first !== null && last !== null && last.parentNode !== null) {
+						const source = last.parentNode;
+						if (source !== domParent) {
+							if (!PREPARED_PARENTS.has(source)) continue;
+							retargetPreparedScope(block, source, domParent);
+						}
+						if (source !== domParent || getNextSibling(last) !== anchor)
+							placeRange(domParent, first, last, anchor);
+						anchor = first;
+					}
+				}
+				list.adopt = null;
+			},
+			discard: () => {},
+		});
 	}
-	if (passthroughList && !hydration!.passthroughRanges) {
-		// Once this list consumed the selected owner, its containing item must
-		// end after the entire list, including its own closing marker.
-		hydration!.node = getNextSibling(state.forSlot.end!);
+	if (passthroughFrame !== null) {
+		const next = hydrationCursor.node;
+		passthroughFrame.after =
+			next !== null && next.parentNode === domParent ? next : passthroughFrame.after;
+		if (!hydration!.passthroughRanges) hydrationCursor.node = passthroughFrame.after;
 	}
 	return;
 }
@@ -39154,13 +38930,22 @@ export function bindSignalChild(
 	// Compiler proof that this hole owns the host's markerless only-child ABI.
 	onlyChild?: boolean,
 	bindingMarker?: string,
+	prospectiveProps?: Record<string, unknown>,
 ): unknown {
+	if (previous !== null && typeof previous === 'object' && 'publish' in previous) {
+		const pendingText = previous as PreparedChildText;
+		previous = pendingText.accepted ? pendingText.tokenValue : pendingText.text;
+	}
 	// A markerless only-child hole keeps its last written primitive as the token
 	// (see below), whose Text node is the host's first child. An unchanged
 	// primitive then does nothing, as childTextHoleUpdate's raw-value guard does,
 	// without a DOM read. Raw HTML still claims the host first.
 	const textToken = onlyChild && previous != null && typeof previous !== 'object';
-	if (textToken && previous === value && !dangerouslySetInnerHTMLOwnsChild(domParent, value))
+	if (
+		textToken &&
+		previous === value &&
+		!dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey)
+	)
 		return value;
 	const prior =
 		typeof previous === 'object' &&
@@ -39174,7 +38959,6 @@ export function bindSignalChild(
 		// A page translator can replace the token's Text with its own nodes (see
 		// resetOnlyChildHost); clear them so the hole writes a fresh Text.
 		if (first !== null && first.nodeType === 3) cachedText = first as Text;
-		else resetOnlyChildHost(domParent, null);
 	}
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
@@ -39201,17 +38985,59 @@ export function bindSignalChild(
 				state!.hostNode === null &&
 				state!.portal === null &&
 				state!.implicitSignal === undefined &&
-				!dangerouslySetInnerHTMLOwnsChild(domParent, value)
+				!dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey)
 			) {
-				if (previous !== value) setText(node, value === true ? '' : value);
+				if (previous !== value)
+					prepareChildText(parentScope, state!, domParent, coerceChildText(value), node);
+				// Only accepted text may become an identity-skip token. If this
+				// preparation suspends, the next pass must visit the slot again.
+				const pendingText = (state as ChildSlot & { prepared?: PreparedChildText }).prepared;
+				if (pendingText !== undefined) {
+					pendingText.tokenValue = value;
+					return pendingText;
+				}
 				return value;
 			}
 		}
 		const text = onlyChild
-			? childTextHole(parentScope, slotKey, domParent, value, cachedText)
+			? childTextHole(
+					parentScope,
+					slotKey,
+					domParent,
+					value,
+					cachedText,
+					prospectiveProps,
+					textToken,
+				)
 			: (bindingMarker === undefined
-					? childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, ownsHost, compactable)
-					: bindingChildSlot(parentScope, slotKey, domParent, value, bindingMarker, anchor, ownEnd),
+					? childSlot(
+							parentScope,
+							slotKey,
+							domParent,
+							value,
+							anchor,
+							ownEnd,
+							ownsHost,
+							compactable,
+							true,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							prospectiveProps,
+						)
+					: bindingChildSlot(
+							parentScope,
+							slotKey,
+							domParent,
+							value,
+							bindingMarker,
+							anchor,
+							ownEnd,
+							prospectiveProps,
+						),
 				null);
 		if (prior !== null) {
 			if (TRANSITION_JOURNAL !== null) journalBag();
@@ -39221,19 +39047,43 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		if (primitiveToken) return value;
+		if (primitiveToken) {
+			const pendingText = (
+				parentScope.slots[slotKey] as ChildSlot & {
+					prepared?: PreparedChildText;
+				}
+			)?.prepared;
+			if (pendingText !== undefined && 'text' in pendingText) {
+				pendingText.tokenValue = value;
+				return pendingText;
+			}
+			return value;
+		}
 		// A primitive whose Text node is the host's first child becomes the token.
 		// A previous token or a client mount's empty template proves that position;
 		// otherwise compare once, because hydration can keep unclaimed server
 		// content ahead of the node it adopted. A staged ViewTransition render has
 		// not placed the node yet.
+		if (
+			text !== null &&
+			type !== 'object' &&
+			type !== 'function' &&
+			parentScope.slots[slotKey] === undefined
+		) {
+			const pendingText = (parentScope.slots as any)['text$' + slotKey] as
+				PreparedChildText | undefined;
+			if (pendingText !== undefined) {
+				pendingText.tokenValue = value;
+				return pendingText;
+			}
+		}
 		return text !== null &&
 			type !== 'object' &&
 			type !== 'function' &&
 			parentScope.slots[slotKey] === undefined &&
-			!STAGED_DOM &&
+			!STAGED_COMMIT_CAPTURE &&
 			(textToken ||
-				(previous === null && !parentScope.mounted && !hydrating) ||
+				(previous == null && !parentScope.mounted && !hydrating) ||
 				getFirstChild(domParent) === text)
 			? value
 			: text;
@@ -39241,20 +39091,81 @@ export function bindSignalChild(
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(prior);
-		if (onlyChild) prior.text = childTextHole(parentScope, slotKey, domParent, next, cachedText);
+		if (onlyChild)
+			prior.text = childTextHole(
+				parentScope,
+				slotKey,
+				domParent,
+				next,
+				cachedText,
+				prospectiveProps,
+			);
 		else if (bindingMarker !== undefined)
-			bindingChildSlot(parentScope, slotKey, domParent, next, bindingMarker, anchor, ownEnd);
-		else childSlot(parentScope, slotKey, domParent, next, anchor, ownEnd, ownsHost, compactable);
+			bindingChildSlot(
+				parentScope,
+				slotKey,
+				domParent,
+				next,
+				bindingMarker,
+				anchor,
+				ownEnd,
+				prospectiveProps,
+			);
+		else
+			childSlot(
+				parentScope,
+				slotKey,
+				domParent,
+				next,
+				anchor,
+				ownEnd,
+				ownsHost,
+				compactable,
+				true,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				prospectiveProps,
+			);
 		prior.value = next;
 		prior.state = parentScope.slots[slotKey] as ChildSlot | undefined;
 		return prior;
 	}
 	const initial = readSignalBinding(value);
 	const text = onlyChild
-		? childTextHole(parentScope, slotKey, domParent, initial, cachedText)
+		? childTextHole(parentScope, slotKey, domParent, initial, cachedText, prospectiveProps)
 		: (bindingMarker === undefined
-				? childSlot(parentScope, slotKey, domParent, initial, anchor, ownEnd, ownsHost, compactable)
-				: bindingChildSlot(parentScope, slotKey, domParent, initial, bindingMarker, anchor, ownEnd),
+				? childSlot(
+						parentScope,
+						slotKey,
+						domParent,
+						initial,
+						anchor,
+						ownEnd,
+						ownsHost,
+						compactable,
+						true,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						prospectiveProps,
+					)
+				: bindingChildSlot(
+						parentScope,
+						slotKey,
+						domParent,
+						initial,
+						bindingMarker,
+						anchor,
+						ownEnd,
+						prospectiveProps,
+					),
 			null);
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	const binding: DirectSignalChildBinding = {
@@ -39289,6 +39200,7 @@ export function bindingChildSlot(
 	marker: string,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	prospectiveProps?: Record<string, unknown>,
 ): void {
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
 	if (frame?.revision !== undefined) {
@@ -39296,7 +39208,11 @@ export function bindingChildSlot(
 		// names the range validator, so that client-only bundles drop it.
 		const driver: HydrationDriver = HYDRATION_DRIVER!;
 		const start =
-			(hydrating ? activeHydration()?.resolveOpen(anchor ?? null, domParent) : null) ?? null;
+			(hydrating
+				? activeHydration() == null
+					? void 0
+					: hydrateResolveOpen(activeHydration()!, anchor ?? null, domParent)
+				: null) ?? null;
 		const range = driver.presentationRange(frame, start, marker, 'slot');
 		if (
 			value == null
@@ -39324,6 +39240,7 @@ export function bindingChildSlot(
 		undefined,
 		undefined,
 		marker,
+		prospectiveProps,
 	);
 }
 
@@ -39356,6 +39273,7 @@ export function childSlot(
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
 	bindingMarker?: string,
+	prospectiveProps?: Record<string, unknown>,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
@@ -39395,6 +39313,7 @@ export function childSlot(
 						compactable,
 						undefined,
 						bindingMarker,
+						prospectiveProps,
 					),
 				);
 			} finally {
@@ -39419,7 +39338,8 @@ export function childSlot(
 	) {
 		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}
-	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return;
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey))
+		return;
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	// A placeholder in client-built DOM is an insertion anchor, not server DOM to
@@ -39427,9 +39347,9 @@ export function childSlot(
 	// remains live for later server-owned siblings.
 	if (
 		hydration !== null &&
-		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(domParent))
+		((anchor != null && hydrateIsFresh(hydration, anchor)) || hydrateIsFresh(hydration, domParent))
 	) {
-		hydration.suspend(() =>
+		hydrateSuspend(hydration, () =>
 			childSlot(
 				parentScope,
 				slotKey,
@@ -39474,7 +39394,10 @@ export function childSlot(
 			? (value as ComponentBody)
 			: typeof elementType === 'function'
 				? (elementType as ComponentBody)
-				: null;
+				: activityDescriptorDispatch !== null &&
+					  (elementType as unknown) === activityDescriptorDispatch.type
+					? activityDescriptorDispatch.body
+					: null;
 	const hydrationTransparent =
 		hydration?.passthroughRanges === true &&
 		(
@@ -39501,6 +39424,40 @@ export function childSlot(
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
 	// mode flip out of that regime, and the classifier to route the value.
 	let state = parentScope.slots[slotKey] as ChildSlot | undefined;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (
+		state === undefined &&
+		hydration === null &&
+		transaction !== null &&
+		!transaction.aborted &&
+		!ROOT_RENDER_ROLLBACK &&
+		parentScope.mounted &&
+		!isCreatedInRootRender(transaction, parentBlock) &&
+		!PREPARED_PARENTS.has(domParent)
+	) {
+		// This mounted scope has not produced a child before. Its applied output
+		// is empty at the caller's fence; the ordinary slot preparation below can
+		// publish its first host, list or component without inserting into live DOM.
+		journalBag();
+		state = {
+			__kind: 'childSlot',
+			start: null,
+			end: (anchor ?? null) as Comment | null,
+			ownerHost: ownsHost ?? null,
+			borrowed: ownEnd !== true && ownsHost === undefined,
+			compactable: compactable === true,
+			block: null,
+			text: null,
+			currentComp: null,
+			currentIsBodyFn: false,
+			forSlot: null,
+			hostNode: null,
+			portal: null,
+			implicitSignal: undefined,
+		};
+		parentScope.slots[slotKey] = state;
+		registerSlot(parentScope, state);
+	}
 	// Once a host gains component children, keep its reconciled Block while it
 	// remains a host descriptor. Dropping back to the raw path would recreate
 	// the host and every surviving input when the last component is removed.
@@ -39511,7 +39468,6 @@ export function childSlot(
 		typeof elementType === 'string' &&
 		state?.currentComp !== (hostElementBody as unknown as ComponentBody) &&
 		!descNeedsBlocks((value as ElementDescriptor).children);
-	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =
 			pureHost || preparedList !== null
@@ -39525,11 +39481,7 @@ export function childSlot(
 			component !== null &&
 			(component === state.currentComp || (typeof value === 'function' && state.currentIsBodyFn));
 		const unchangedHost =
-			pureHost &&
-			state.hostNode !== null &&
-			state.block === null &&
-			state.hostNode.nodeType === 1 &&
-			isHostElementOfType(state.hostNode as Element, elementType as string);
+			pureHost && state.hostNode !== null && state.block === null && state.hostNode.nodeType === 1;
 		const primitive = value == null || (typeof value !== 'object' && typeof value !== 'function');
 		const text = primitive ? coerceChildText(value) : null;
 		const unchangedText =
@@ -39539,35 +39491,196 @@ export function childSlot(
 			state.hostNode === null &&
 			state.portal === null &&
 			(state.text === null) === (text === '');
-		if (!unchangedList && !unchangedComponent && !unchangedHost && !unchangedText) {
-			journalRootChildShape(state, domParent);
-			rootShapeChanged = true;
+		if (unchangedList || unchangedComponent || unchangedHost || unchangedText) {
+			if ((state as any).prepared?.next !== undefined) {
+				journalRootProperty(state, 'prepared', (state as any).prepared);
+				(state as any).prepared = undefined;
+				setChildContentRetired(state, false);
+			}
+		} else {
+			// A same-tag raw host becoming component-bearing transfers its existing
+			// host and keyed children. Its adoption path below owns that reuse.
+			const adoptHost =
+				component === (hostElementBody as unknown as ComponentBody) &&
+				state.block === null &&
+				state.hostNode?.nodeType === 1 &&
+				isHostElementOfType(state.hostNode as Element, elementType as string) &&
+				!hasDangerHTML((value as ElementDescriptor).props) &&
+				!hasDangerHTML(getDeoptDesc(state.hostNode)?.props ?? null);
+			if (
+				hydration === null &&
+				!adoptHost &&
+				(value as any)?.$$kind !== PORTAL_TAG &&
+				!PREPARED_PARENTS.has(domParent)
+			) {
+				const applied = state;
+				const target = prepareParent(domParent);
+				const stagedAnchor = ownsHost === undefined ? document.createComment('') : null;
+				if (stagedAnchor !== null) target.appendChild(stagedAnchor);
+				let incoming: ChildSlot | undefined;
+				parentScope.slots[slotKey] = undefined;
+				try {
+					childSlot(
+						parentScope,
+						slotKey,
+						target,
+						value,
+						stagedAnchor,
+						stagedAnchor !== null,
+						ownsHost === undefined ? undefined : (target as unknown as Element),
+						compactable,
+						includeKeyedSingle,
+						compiledMapBody,
+						compiledMapKey,
+						compiledMapFlags,
+						compiledMapDeps,
+						mappedFallback,
+						bindingMarker,
+						prospectiveProps,
+					);
+					incoming = parentScope.slots[slotKey] as ChildSlot;
+				} finally {
+					parentScope.slots[slotKey] = applied;
+					if (incoming !== undefined && parentScope._slots !== null) {
+						const registered = parentScope._slots.lastIndexOf(incoming);
+						if (registered !== -1) parentScope._slots.splice(registered, 1);
+					}
+				}
+				const next = incoming!;
+				const prepared = {
+					parent: domParent,
+					next,
+					publish() {
+						if (parentScope.slots[slotKey] !== applied) {
+							unmountSlot(next, true);
+							return;
+						}
+						// A markerless only-child Text may have been replaced by a
+						// page translator. Retire its displayed replacement on commit,
+						// just as a subsequent text update would reset that host.
+						const translatedText =
+							applied.ownerHost !== null &&
+							applied.text !== null &&
+							applied.text.parentNode !== domParent;
+						const first =
+							applied.ownerHost !== null
+								? applied.block === null && applied.forSlot === null && !translatedText
+									? (applied.text ?? applied.hostNode)
+									: getFirstChild(domParent)
+								: applied.start !== null
+									? getNextSibling(applied.start)
+									: (applied.text ?? applied.hostNode ?? applied.block?.startMarker ?? applied.end);
+						const after =
+							applied.ownerHost !== null
+								? applied.block === null && applied.forSlot === null && !translatedText
+									? (first?.nextSibling ?? null)
+									: null
+								: (applied.end ??
+									(applied.hostNode === null ? null : getNextSibling(applied.hostNode)));
+						const nodes = applied.forSlot === null ? [] : childListNodes(applied, domParent);
+						if (applied.forSlot === null)
+							for (let node = first; node !== null && node !== after; node = getNextSibling(node)) {
+								if (node.parentNode !== domParent) break;
+								nodes.push(node);
+							}
+						parentScope.slots[slotKey] = next;
+						const registered = parentScope._slots?.indexOf(applied) ?? -1;
+						if (registered !== -1) parentScope._slots![registered] = next;
+						else registerSlot(parentScope, next);
+						retargetPreparedScope(parentScope, target, domParent);
+						if (
+							applied.borrowed &&
+							next.block === null &&
+							next.forSlot === null &&
+							next.hostNode === null &&
+							next.text === null
+						) {
+							// Empty output borrows the item's existing bounds. Its temporary
+							// staging fence is not a third list-item marker.
+							stagedAnchor?.remove();
+							next.start = applied.start;
+							next.end = applied.end;
+							next.borrowed = true;
+						}
+						const start = getFirstChild(target);
+						const fence = first !== null && first.parentNode === domParent ? first : after;
+						if (start !== null) placeRange(domParent, start, target.lastChild!, fence);
+						if (
+							applied.borrowed &&
+							applied.hostNode !== null &&
+							parentScope === parentBlock &&
+							parentBlock.forSlot !== null &&
+							parentBlock.startMarker === applied.hostNode &&
+							parentBlock.endMarker === applied.hostNode &&
+							next.start !== null &&
+							next.end !== null
+						) {
+							replaceSharedBlockBoundary(
+								parentBlock,
+								applied.hostNode,
+								applied.hostNode,
+								next.start,
+								next.end,
+							);
+							next.borrowed = true;
+							if (next.block !== null) next.block.exclusiveMarkers = true;
+						}
+						if (
+							applied.borrowed &&
+							next.start !== applied.start &&
+							parentScope === parentBlock &&
+							parentBlock.forSlot !== null &&
+							next.start !== null &&
+							next.end !== null &&
+							sharesBlockBoundary(parentBlock, applied.start, applied.end)
+						) {
+							const oldStart = applied.start;
+							const oldEnd = applied.end;
+							replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, next.start, next.end);
+							next.borrowed = true;
+							if (next.block !== null) next.block.exclusiveMarkers = true;
+							if (oldStart?.parentNode === domParent) domParent.removeChild(oldStart);
+							if (oldEnd?.parentNode === domParent) domParent.removeChild(oldEnd);
+						}
+						unmountSlot(applied, false);
+						for (const node of nodes)
+							if (node.parentNode === domParent) domParent.removeChild(node);
+						settleDeoptVisibility(parentBlock);
+					},
+					discard() {
+						unmountSlot(next, true);
+					},
+				};
+				setChildContentRetired(applied, true);
+				prepareSlot(parentScope, applied, 'prepared', prepared);
+				return;
+			}
 		}
 	}
 	const unframedComponentRoot =
 		state === undefined &&
 		hydration !== null &&
 		parentBlock === hydration.rootBlock &&
-		hydration.node !== null &&
-		domNode(hydration.node).parentNode === domParent &&
+		hydrationCursor.node !== null &&
+		hydrationCursor.node.parentNode === domParent &&
 		preparedList === null &&
 		typeof elementType === 'function' &&
-		!hydration.isOpen(anchor ?? null) &&
-		!hydration.isOpen(hydration.node);
+		!hydrateIsOpen(hydration, anchor ?? null) &&
+		!hydrateIsOpen(hydration, hydrationCursor.node);
 	if (
 		state === undefined &&
 		hydration !== null &&
 		!hydrationTransparent &&
 		parentBlock === hydration.rootBlock &&
-		!hydration.isOpen(anchor ?? null) &&
-		!hydration.isOpen(hydration.node)
+		!hydrateIsOpen(hydration, anchor ?? null) &&
+		!hydrateIsOpen(hydration, hydrationCursor.node)
 	) {
 		// Generic root returns normally serialize as one hydratable range. Plain
 		// strings/null are the two unframed root forms; accept their matching DOM.
 		// A root that renders nothing claims nothing: as React skips the root
 		// container's children that do not match, it leaves them in place.
 		// Arbitrary other markup does not match the client render.
-		const cursor = hydration.node;
+		const cursor = hydrationCursor.node;
 		const unframedMatch =
 			value == null ||
 			value === '' ||
@@ -39575,7 +39688,8 @@ export function childSlot(
 			(typeof value === 'string' && cursor?.nodeType === 3) ||
 			unframedComponentRoot;
 		if (!unframedMatch) {
-			hydration.mismatch(
+			hydrateMismatch(
+				hydration,
 				process.env.NODE_ENV !== 'production' ? componentSourceLoc(parentBlock.body) : undefined,
 				() => (preparedList === null ? 'a renderable root' : 'a renderable list range'),
 				cursor,
@@ -39595,7 +39709,6 @@ export function childSlot(
 	// nodes, so content this update creates builds as a client update would.
 	let hydratingUpdate = false;
 	if (state === undefined) {
-		const transaction = ROOT_RENDER_TRANSACTION;
 		if (
 			transaction !== null &&
 			!transaction.aborted &&
@@ -39603,18 +39716,8 @@ export function childSlot(
 			parentScope.mounted &&
 			!isCreatedInRootRender(transaction, parentBlock)
 		) {
-			// A stable component may have returned undefined until now, so no
-			// previous slot owns this first insertion. Keep the original anchor
-			// outside the undo range; newly minted markers/raw DOM belong inside.
+			// Snapshot only the scope's logical slot registration on hydration.
 			journalBag();
-			const after = ownsHost === undefined ? (anchor ?? null) : null;
-			const before =
-				ownsHost === undefined
-					? after === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling
-					: null;
-			journalRootRange(domParent, before, after);
 		}
 		let start: Comment | null;
 		let end: Comment | null;
@@ -39625,16 +39728,17 @@ export function childSlot(
 			start = null;
 			end = null;
 		} else if (unframedComponentRoot) {
-			[start, end] = hydration!.wrapUnframedRoot(hydration!.node!);
-		} else if (hydration !== null && (start = hydration.holeOpen(anchor, value, ownEnd))) {
+			[start, end] = hydrateWrapUnframedRoot(hydration!, hydrationCursor.node!);
+		} else if (hydration !== null && (start = hydrateHoleOpen(hydration, anchor, value, ownEnd))) {
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
 			// server's `<!--[-->`. Adopt that `<!--[-->…<!--]-->` range as our markers
 			// and point the cursor at the first content node for the Block's clone()
 			// / the text adopt below. In a template adopted in place, holeOpen frames
 			// the server's node as the server would have.
-			end = hydration.close(start);
-			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
-			hydration.node = getNextSibling(start);
+			end = hydrateClose(hydration, start);
+			if (parentBlock === hydration.rootBlock)
+				hydrateClaimRootRemainder(hydration, getNextSibling(end));
+			hydrationCursor.node = getNextSibling(start);
 			adoptedRange = true;
 		} else if (
 			hydration !== null &&
@@ -39642,47 +39746,46 @@ export function childSlot(
 			parentBlock !== hydration.rootBlock &&
 			parentBlock.startMarker !== null &&
 			parentBlock.endMarker === anchor &&
-			hydration.node === getNextSibling(parentBlock.startMarker) &&
-			!hydration.isOpen(hydration.node)
+			hydrationCursor.node === getNextSibling(parentBlock.startMarker) &&
+			!hydrateIsOpen(hydration, hydrationCursor.node)
 		) {
 			// The server rendered a primitive or empty range where this client
 			// renders a chain of components. Give the return value an ordinary
 			// owned range, so its normal claim checks all the server content.
 			// Matching text remains the same Text node through every wrapper.
-			const parent = domNode(domParent);
-			const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
-			hydration.save(parent);
+			const doc = document;
 			start = doc.createComment(HYDRATION_START);
 			end = doc.createComment(HYDRATION_END);
-			parent.insertBefore(start, hydration.node);
-			parent.insertBefore(end, anchor ?? null);
-			hydration.node = getNextSibling(start);
+			createHydrationFrame(
+				domParent,
+				start,
+				end,
+				hydrationCursor.node,
+				anchor == null ? null : hydrationSourceLimit(anchor),
+			);
+			hydrationCursor.node = getNextSibling(start);
 			adoptedRange = true;
-		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
+		} else if (hydration !== null && hydrateIsOpen(hydration, hydrationCursor.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
 			// anchor is the block's end-marker (not a `<!--[-->`), but the CURSOR sits
 			// on the server's range-open. Adopt from the cursor. This is what lets a
 			// component whose only body root is `{children}` hydrate as single-root.
-			start = hydration.node as Comment;
-			end = hydration.close(hydration.node as Node);
+			start = hydrationCursor.node as Comment;
+			end = hydrateClose(hydration, hydrationCursor.node as Node);
 			if (parentBlock === hydration.rootBlock) {
-				hydration.protectRootAnchor(end);
-				hydration.claimRootRemainder(getNextSibling(end));
+				hydrateProtectRootAnchor(hydration, end);
+				hydrateClaimRootRemainder(hydration, getNextSibling(end));
 			}
-			hydration.node = getNextSibling(start);
+			hydrationCursor.node = getNextSibling(start);
 			adoptedRange = true;
 		} else if (bindingMarker !== undefined) {
 			// An authored binding value retains its ordinary child-slot lifecycle,
 			// but its range must remain addressable even while empty or primitive.
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(bindingMarker);
-			end =
-				ownEnd && anchor != null
-					? (anchor as Comment)
-					: (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(HYDRATION_END);
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).data = HYDRATION_END;
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			if (end !== anchor)
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			start = document.createComment(bindingMarker);
+			end = ownEnd && anchor != null ? (anchor as Comment) : document.createComment(HYDRATION_END);
+			end.data = HYDRATION_END;
+			domParent.insertBefore(start, anchor ?? null);
+			if (end !== anchor) domParent.insertBefore(end, anchor ?? null);
 		} else if (ownEnd && anchor != null) {
 			// Client mount, dedicated placeholder: reuse the slot's own `<!>` as the end
 			// marker — content inserts before it just the same. Saves a comment + an
@@ -39714,7 +39817,8 @@ export function childSlot(
 			// back restores. A compiled map's rows are the compiler's to frame.
 			if (hydration !== null) {
 				if (ownsHost === undefined)
-					hydration.rejectServerText(
+					hydrateRejectServerText(
+						hydration,
 						parentScope,
 						slotKey,
 						domParent,
@@ -39722,12 +39826,16 @@ export function childSlot(
 						value,
 						preparedList !== null && compiledMapBody === undefined && mappedFallback !== true,
 					);
-				else hydration.save(ownsHost);
 			}
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			end = document.createComment('');
+			if (hydration !== null && ownsHost !== undefined) {
+				const after = anchor == null ? null : hydrationSourceLimit(anchor);
+				createHydrationFrame(domParent, end, end, after, after);
+			} else {
+				domParent.insertBefore(end, anchor ?? null);
+			}
 			if (hydration !== null && parentBlock === hydration.rootBlock)
-				hydration.protectRootAnchor(end);
+				hydrateProtectRootAnchor(hydration, end);
 		}
 		state = {
 			__kind: 'childSlot',
@@ -39747,11 +39855,25 @@ export function childSlot(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+		if (end !== null) {
+			const frame = ((start ?? end) as HydrationFrameMarker)[HYDRATION_FRAME];
+			if (frame !== undefined && !frame.published)
+				prepareHydrationFrame(
+					parentScope,
+					state,
+					slotKey,
+					domParent,
+					start ?? end,
+					end,
+					frame.first,
+				);
+		}
 	} else if (hydration !== null) {
 		hydratingUpdate = true;
 	}
 	if (adoptedRange)
-		rebuild = hydration!.claimRange(
+		rebuild = hydrateClaimRange(
+			hydration!,
 			parentScope,
 			slotKey,
 			state.start!,
@@ -39771,9 +39893,6 @@ export function childSlot(
 		DEOPT_UPGRADE.block === parentScope.block &&
 		ownsHost !== undefined
 	) {
-		// These children predate their new logical Blocks. Capture them before
-		// list markers or a single-child replacement alter their ownership.
-		if (ROOT_RENDER_TRANSACTION !== null) journalRootChildren(domParent);
 		upgradeChildren = DEOPT_UPGRADE.children;
 		upgradeArmed = true;
 		DEOPT_UPGRADE = null;
@@ -39786,22 +39905,37 @@ export function childSlot(
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
 	if (state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+		const start = document.createComment('');
+		const end = document.createComment('');
 		const host = state.hostNode;
-		if (host !== null && (STAGED_DOM ? STAGED_DOM.view(host) : host).parentNode !== null) {
-			const p = (STAGED_DOM ? STAGED_DOM.view(host) : host).parentNode!;
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(start, host);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(end, getNextSibling(host));
-			replaceSharedBlockBoundary(parentBlock, host, host, start, end);
+		journalRootProperty(state, 'start', state.start);
+		journalRootProperty(state, 'end', state.end);
+		state.start = start;
+		state.end = end;
+		if (host !== null && host.parentNode !== null) {
+			const p = host.parentNode!;
+			prepareSlot(parentScope, state, 'promotedBounds', {
+				parent: p,
+				publish() {
+					if (
+						parentScope.slots[slotKey] !== state ||
+						state.start !== start ||
+						state.end !== end ||
+						host.parentNode !== p
+					)
+						return;
+					p.insertBefore(start, host);
+					p.insertBefore(end, getNextSibling(host));
+					replaceSharedBlockBoundary(parentBlock, host, host, start, end);
+				},
+				discard() {},
+			});
 		} else {
 			// Defensive — anchorless is only entered after a successful pure-host
 			// render, so a live host should always exist. Pin at the call's anchor.
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
-		state.start = start;
-		state.end = end;
 	}
 
 	// Portal descriptor → render its body into a foreign target; the slot's own
@@ -39813,17 +39947,20 @@ export function childSlot(
 			: null;
 	if (portalDesc === null && state.portal != null) {
 		teardownPortalState(state.portal);
+		journalRootProperty(state, 'portal', state.portal);
 		state.portal = null;
 	}
 	if (portalDesc !== null) {
 		if (state.forSlot !== null) {
-			if (ROOT_RENDER_TRANSACTION !== null && hydration === null) clearChildContent(state);
+			if (ROOT_RENDER_TRANSACTION !== null && hydration === null)
+				clearChildContent(state, parentScope);
 			else teardownChildForSlot(state);
 		}
 		if (state.block !== null || state.text !== null || state.hostNode !== null) {
-			clearChildContent(state);
+			clearChildContent(state, parentScope);
 		}
-		state.portal = renderPortalState(
+		const previousPortal = state.portal;
+		const portalState = renderPortalState(
 			state.portal,
 			parentBlock,
 			portalDesc.target,
@@ -39834,6 +39971,10 @@ export function childSlot(
 			undefined,
 			portalDesc.key,
 		);
+		if (portalState !== previousPortal) {
+			journalRootProperty(state, 'portal', previousPortal);
+		}
+		state.portal = portalState;
 		// Conditional portals and portals inside directive helpers use childSlot
 		// rather than the compiler's direct portal helper. Their retained end anchor
 		// still locates the authored position inside any enclosing Fragment refs.
@@ -39849,14 +39990,18 @@ export function childSlot(
 	if (preparedList !== null) {
 		// A hydrating update builds a list that replaces other content, or one an
 		// earlier hydrating update built, on the client.
-		if (rebuild || (hydratingUpdate && (state.forSlot === null || hydration!.buildsList(state)))) {
-			if (hydratingUpdate) hydration!.recordUpdate(state);
+		if (
+			rebuild ||
+			(hydratingUpdate && (state.forSlot === null || hydrateBuildsList(hydration!, state)))
+		) {
+			if (hydratingUpdate) hydrateRecordUpdate(hydration!, state);
 			// Mount each item rather than look for server items that are not there.
 			const slot = state;
-			hydration!.suspend(() =>
+			hydrateSuspend(hydration!, () =>
 				renderPreparedChildList(
 					slot,
-					parentBlock,
+					parentScope,
+					slotKey,
 					domParent,
 					preparedList,
 					null,
@@ -39868,7 +40013,8 @@ export function childSlot(
 		}
 		renderPreparedChildList(
 			state,
-			parentBlock,
+			parentScope,
+			slotKey,
 			domParent,
 			preparedList,
 			hydration,
@@ -39884,7 +40030,8 @@ export function childSlot(
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
 	if (state.forSlot !== null) {
-		if (ROOT_RENDER_TRANSACTION !== null && hydration === null) clearChildContent(state);
+		if (ROOT_RENDER_TRANSACTION !== null && hydration === null)
+			clearChildContent(state, parentScope);
 		else teardownChildForSlot(state);
 	}
 	// Upgrade adoption, single-child form: the new children value is a lone
@@ -39902,18 +40049,23 @@ export function childSlot(
 		) {
 			state.hostNode = first;
 		} else {
-			let n: Node | null = getFirstChild(domParent);
-			while (n !== null) {
-				const next: Node | null = getNextSibling(n);
-				if (ROOT_RENDER_TRANSACTION !== null) {
-					const outgoing = n;
-					deferRootRange(domParent, outgoing, outgoing, () => detachDeoptTreeRefs(outgoing, null));
-				} else {
-					detachDeoptTreeRefs(n, null);
-					(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(n);
-				}
-				n = next;
+			const previous: Node[] = [];
+			for (let node = getFirstChild(domParent); node !== null; node = getNextSibling(node)) {
+				if ((node as any).$$deoptKey !== undefined || getDeoptDesc(node) !== undefined)
+					previous.push(node);
 			}
+			prepareSlot(parentScope, state, 'upgradePrepared', {
+				parent: domParent,
+				publish() {
+					for (const node of previous) {
+						if (node.parentNode === domParent) {
+							detachDeoptTreeRefs(node, null);
+							domParent.removeChild(node);
+						}
+					}
+				},
+				discard() {},
+			});
 		}
 	}
 	// Classify the value. A host descriptor whose subtree contains component
@@ -39938,76 +40090,43 @@ export function childSlot(
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
 			// tears that down (also nulls a stale hostNode).
-			if (state.block !== null || state.text !== null) clearChildContent(state);
-			if (state.end === null) {
-				// ANCHORLESS: no markers — the element self-delimits, so reconcile
-				// straight against the tracked node. A same-tag value patches it in
-				// place; an incompatible one is rebuilt at the old node's position
-				// (first render inserts at the call's anchor). `reconcileDeoptNode`
-				// always yields a node for a host descriptor; the null checks are
-				// shape-parity with the marked path below.
-				const prev = state.hostNode;
-				const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
-				if (node !== prev) {
-					if (prev !== null && (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode !== null) {
-						const parent = (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!;
-						if (ROOT_RENDER_TRANSACTION !== null) {
-							journalRootChildShape(state, parent);
-							deferRootRange(parent, prev, prev, () => detachDeoptTreeRefs(prev, null));
-							if (node !== null)
-								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
-						} else {
-							if (node !== null)
-								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
-							detachDeoptTreeRefs(prev, null);
-							(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev);
-						}
-					} else if (node !== null) {
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
-							node,
-							anchor ?? null,
-						);
-					}
-				}
-				state.hostNode = node;
-				return;
-			}
-			if (state.start === null) {
-				state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(state.start, state.end);
-			}
+			if (state.block !== null || state.text !== null) clearChildContent(state, parentScope);
 			// First render: adopt the server node during hydration, else reuse the
 			// prior built node, else build fresh. claimRange checked that a server
 			// range holds that node and nothing else.
 			let prev = state.hostNode;
-			if (prev === null && hydration !== null) {
+			if (prev === null && hydration !== null && state.start !== null) {
 				prev = getNextSibling(state.start);
 				if (prev === state.end) prev = null;
 			}
-			const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
-			if (node !== prev) {
-				if (
-					prev != null &&
-					prev !== node &&
-					(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode !== null
-				) {
-					if (ROOT_RENDER_TRANSACTION !== null) {
-						journalRootChildShape(state, domParent);
-						const outgoing = prev;
-						deferRootRange(
-							(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!,
-							prev,
-							prev,
-							() => detachDeoptTreeRefs(outgoing, null),
-						);
-					} else {
-						detachDeoptTreeRefs(prev, null);
-						domNode((STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!).removeChild(prev);
+			const output = prepareDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent))!;
+			prepareSlot(parentScope, state, 'prepared', {
+				parent: domParent,
+				publish: () => {
+					const node = output.node;
+					if (!commitDeoptNode(output, parentBlock)) return;
+					// Custom setters may synchronously dispose or replace this owner.
+					// Only the still-current host program may connect its prepared node.
+					if (owningBlock(parentBlock).disposed || parentScope.slots[slotKey] !== state) return;
+					if (state.end !== null && state.start === null) {
+						state.start = document.createComment('');
+						domParent.insertBefore(state.start, state.end);
 					}
-				}
-				if (node !== null) domNode(domNode(state.start).parentNode!).insertBefore(node, state.end);
-			}
-			state.hostNode = node;
+					if (node !== prev) {
+						if (prev !== null && prev.parentNode !== null) {
+							const parent = prev.parentNode;
+							parent.insertBefore(node, prev);
+							detachDeoptTreeRefs(prev, null);
+							parent.removeChild(prev);
+						} else {
+							domParent.insertBefore(node, state.end ?? anchor ?? null);
+						}
+					}
+					state.hostNode = node;
+					settleDeoptVisibility(parentBlock);
+				},
+				discard: () => {},
+			});
 			return;
 		}
 		comp = hostElementBody as unknown as ComponentBody;
@@ -40017,12 +40136,10 @@ export function childSlot(
 		comp = value as ComponentBody;
 		isBodyFn = true;
 	} else if (isElementDescriptor(value)) {
-		const dispatch = activityDescriptorDispatch;
-		const activity = dispatch !== null && (elementType as unknown) === dispatch.type;
-		if (!activity && typeof elementType !== 'function') {
+		if (valueComponent === null) {
 			throw invalidElementTypeError(elementType);
 		}
-		comp = activity ? dispatch!.body : (elementType as ComponentBody);
+		comp = valueComponent;
 		props = value.props;
 		componentDescriptor = value;
 	}
@@ -40199,7 +40316,7 @@ export function childSlot(
 				state.currentComp = comp;
 				state.currentIsBodyFn = isBodyFn;
 				transitionSwap.splice(r.wip);
-				clearReplacedChildBlock(state, oldBlock);
+				clearReplacedChildBlock(parentScope, state, oldBlock);
 				if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
 				moveOffscreenRange(r.wip, state.end!);
 				return;
@@ -40231,9 +40348,6 @@ export function childSlot(
 			!hasDangerHTML(getDeoptDesc(state.hostNode)?.props ?? null)
 		) {
 			const el = state.hostNode as Element;
-			state.hostNode = null;
-			state.currentComp = comp;
-			state.currentIsBodyFn = false;
 			const b = createBlock(
 				'dynamic',
 				parentBlock,
@@ -40251,104 +40365,25 @@ export function childSlot(
 			b.$$implicitBail = true;
 			b.memoInChain = true;
 			b.deoptNode = el;
-			state.block = b;
 			DEOPT_UPGRADE = { block: b, children: getDeoptDesc(el)?.children };
 			try {
 				renderBlock(b);
 			} finally {
 				DEOPT_UPGRADE = null;
 			}
+			prepareSlot(parentScope, state, 'prepared', {
+				parent: domParent,
+				publish() {
+					state.hostNode = null;
+					state.currentComp = comp;
+					state.currentIsBodyFn = false;
+					state.block = b;
+				},
+				discard() {
+					unmountBlock(b, false);
+				},
+			});
 			return;
-		}
-		if (
-			ROOT_RENDER_TRANSACTION !== null &&
-			rootShapeChanged &&
-			(parentScope.mounted || ROOT_RENDER_TRANSACTION.retainedCreated?.has(parentBlock)) &&
-			!committedSuspense &&
-			hydration === null
-		) {
-			const stageAfter =
-				state.ownerHost !== null || (state.borrowed && state.start === null)
-					? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-					: state.end !== null
-						? domNode(state.end).previousSibling
-						: (state.block?.endMarker ?? state.text ?? state.hostNode);
-			if (
-				stageAfter !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(stageAfter) : stageAfter).parentNode === domParent
-			) {
-				// Capture the outgoing content before the WIP is inserted. Clearing
-				// changes only slot ownership during a root transaction, leaving the
-				// old focused range connected beside the genuine new subtree.
-				clearChildContent(state);
-				const implicitBail = !isBodyFn || isChildrenBlock(comp);
-				const r =
-					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-					__OCTANE_PROFILE_ENABLED__ &&
-					isBodyFn &&
-					!__profileHasComponentMetadata(comp)
-						? withProfileComponentOverride(comp, null, () =>
-								renderOffscreen(
-									parentBlock,
-									domParent,
-									stageAfter,
-									comp!,
-									props,
-									renderReturnedValue,
-									'dynamic',
-									undefined,
-									implicitBail,
-									signalInstanceKey,
-									retryLocation,
-								),
-							)
-						: renderOffscreen(
-								parentBlock,
-								domParent,
-								stageAfter,
-								comp,
-								props,
-								renderReturnedValue,
-								'dynamic',
-								undefined,
-								implicitBail,
-								signalInstanceKey,
-								retryLocation,
-							);
-				if (r.suspended || r.failed) {
-					disposeWip(r.wip);
-					if (r.suspended !== null) throw new SuspenseException(r.suspended);
-					throw r.error;
-				}
-				if (
-					parentScope === parentBlock &&
-					parentBlock.forSlot !== null &&
-					!parentBlock.exclusiveMarkers &&
-					state.borrowed &&
-					sharesBlockBoundary(parentBlock, state.start, state.end)
-				) {
-					// A de-opt item owns its pair directly: promote that ownership to
-					// the genuine WIP pair, preserving one pair per item. Other borrowed
-					// ranges may have enclosing slot owners and cannot be retargeted here.
-					const oldStart = state.start!;
-					const oldEnd = state.end!;
-					state.start = r.wip.start;
-					state.end = r.wip.end;
-					journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
-					r.wip.block.exclusiveMarkers = true;
-					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, state.start, state.end);
-					deferRootRange(domParent, oldStart, oldStart);
-					deferRootRange(domParent, oldEnd, oldEnd);
-				}
-				if (state.start === null && state.ownerHost === null && !state.borrowed) {
-					state.start = r.wip.start;
-				}
-				state.block = r.wip.block;
-				state.currentComp = comp;
-				state.currentIsBodyFn = isBodyFn;
-				spliceWipCapture(r.wip);
-				return;
-			}
 		}
 		// New component (first render, or identity swap from text / another comp).
 		// While hydrating the FIRST render adopts the server content between our
@@ -40359,7 +40394,7 @@ export function childSlot(
 		// hydration identity swap runs with hydrating=false and clears normally,
 		// as does a hydrating update, whose earlier render took the server content.)
 		if (hydration === null || hydratingUpdate) {
-			clearChildContent(state);
+			clearChildContent(state, parentScope);
 			if (parentBlock.disposed) return;
 		}
 		state.currentComp = comp;
@@ -40368,8 +40403,31 @@ export function childSlot(
 			// First component in this slot — mint the lower-bound marker now so
 			// clearChildContent can sweep a (possibly multi-node) component body.
 			// (An OWNS-PARENT slot needs neither bound: clears sweep the element.)
-			state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(state.start, state.end);
+			state.start = document.createComment('');
+			const frame =
+				state.end === null ? undefined : (state.end as HydrationFrameMarker)[HYDRATION_FRAME];
+			if (hydration !== null && frame !== undefined && !frame.published) {
+				// An end-only slot within an adopted host has no server delimiter.
+				// Its component owns the whole unframed source up to that fence.
+				createHydrationFrame(
+					domParent,
+					state.start,
+					state.end!,
+					getFirstChild(domParent),
+					hydrationSourceLimit(state.end!),
+				);
+				prepareHydrationFrame(
+					parentScope,
+					state,
+					slotKey,
+					domParent,
+					state.start,
+					state.end!,
+					getFirstChild(domParent),
+				);
+			} else {
+				domParent.insertBefore(state.start, state.end);
+			}
 		}
 		const b = createBlock(
 			'dynamic',
@@ -40404,7 +40462,7 @@ export function childSlot(
 		}
 		state.block = b;
 		if (hydratingUpdate) {
-			hydration!.renderUpdate(b);
+			hydrateRenderUpdate(hydration!, b);
 		} else if (
 			adoptedRange &&
 			!passthroughOwner &&
@@ -40412,7 +40470,14 @@ export function childSlot(
 		) {
 			// The server may have rendered more in the range, for another value.
 			// (claimRange already settled a host's.)
-			hydration!.renderClaimed(b, parentScope, slotKey);
+			hydrateRenderClaimed(
+				// The server may have rendered more in the range, for another value.
+				// (claimRange already settled a host's.)
+				hydration!,
+				b,
+				parentScope,
+				slotKey,
+			);
 		} else {
 			renderBlock(b);
 		}
@@ -40420,7 +40485,7 @@ export function childSlot(
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
 		// (Hydration always adopts a marker pair, so `state.end` is non-null here.)
 		if (hydration !== null && !state.borrowed && state.end !== null) {
-			hydration.parkPast(state.end, parentScope);
+			hydrateParkPast(hydration, state.end, parentScope);
 		}
 		return;
 	}
@@ -40428,58 +40493,88 @@ export function childSlot(
 	// Text / empty.
 	if (value !== null && typeof value === 'object') throw invalidChildError(value);
 	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
-	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
+	if (state.block !== null || state.hostNode !== null) clearChildContent(state, parentScope);
 	const str = coerceChildText(value);
-	if (adoptedRange) hydration!.settleTextRange(parentScope, slotKey, state, str);
+	if (adoptedRange) hydrateSettleTextRange(hydration!, parentScope, slotKey, state, str);
 	if (str === '') {
 		// `null` / `undefined` / `false` / `true` / `''` render NOTHING — not even
 		// an empty text node — matching React/Octane. The server emits an empty
 		// `<!--[--><!--]-->` range for these, so the marker pair stays content-less
 		// on both sides. Drop a text node left over from a prior non-empty render.
-		if (state.text !== null) {
-			if (ROOT_RENDER_TRANSACTION !== null) clearChildContent(state);
-			else {
-				domNode(state.text).remove();
-				state.text = null;
-			}
-		}
+		prepareChildText(parentScope, state, domParent, '', null);
 		return;
 	}
 	if (state.text !== null) {
-		updateTextValue(state.text, str);
+		prepareChildText(parentScope, state, domParent, str, state.text);
 		return;
 	}
 	if (hydration !== null && !hydratingUpdate) {
 		// Adopt the server text sitting between our adopted markers. (An empty hole
 		// has no text node, but `str !== ''` here means the server emitted one.)
-		const n = hydration.node;
+		const n = hydrationCursor.node;
 		const loc = process.env.NODE_ENV !== 'production' ? siteLoc(parentScope, slotKey) : undefined;
 		if (n !== null && n !== state.end && n.nodeType === 3) {
+			// The server node is already this slot's applied output. A deferred
+			// retry needs that ownership even when its first preparation suspends.
 			state.text = n as Text;
-			hydration.node = getNextSibling(n);
-			if (
-				!hydration.keepsText(
-					domParent,
-					n,
-					(STAGED_DOM ? STAGED_DOM.view(n) : n).nodeValue,
-					str,
-					loc,
-				)
-			)
-				updateTextValue(n as Text, str);
+			hydrationCursor.node = getNextSibling(n);
+			const kept = hydrateKeepsText(hydration, domParent, n, n.nodeValue, str, loc);
+			prepareChildText(parentScope, state, domParent, kept ? n.nodeValue! : str, n as Text);
 			return;
 		}
 		// An adopted range without text is what the server rendered for empty text.
 		if (adoptedRange && getNextSibling(state.start!) === state.end) {
-			const tn = hydration.newText(domParent, str, loc);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
-			state.text = tn;
+			const tn = hydrateNewText(hydration, domParent, str, loc);
+			prepareChildText(parentScope, state, domParent, tn.data, tn);
 			return;
 		}
 	}
-	const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
-	state.text = tn;
+	prepareChildText(parentScope, state, domParent, str, null);
+}
+
+interface PreparedChildText extends SlotPreparation {
+	text: Text | null;
+	tokenValue?: unknown;
+	accepted: boolean;
+}
+
+function prepareChildText(
+	scope: Scope,
+	state: ChildSlot,
+	parent: Node,
+	value: string,
+	node: Text | null,
+): Text | null {
+	const text = value === '' ? null : (node ?? document.createTextNode(value));
+	const prepared: PreparedChildText = {
+		text,
+		parent,
+		accepted: false,
+		publish: () => {
+			const old = state.text;
+			if (text === null) {
+				if (old !== null && state.ownerHost === parent) removeOnlyChildText(parent, old);
+				else if (old?.parentNode === parent) parent.removeChild(old);
+			} else {
+				if (text.data !== value) text.data = value;
+				if (text.parentNode !== parent) {
+					if (state.ownerHost === parent && old !== null) resetOnlyChildHost(parent, text);
+					else parent.insertBefore(text, state.end);
+				}
+			}
+			state.text = text;
+			prepared.accepted = true;
+			// A compiled token may retain this result until the next render, but
+			// it no longer needs the enclosing attempt or its other captured work.
+			prepared.capture = null;
+			settleDeoptVisibility(scope.block);
+		},
+		discard: () => {
+			prepared.capture = null;
+		},
+	};
+	prepareSlot(scope, state, 'prepared', prepared);
+	return text;
 }
 
 // A `{expr}` value-hole slot whose value is USUALLY a primitive (text) — what the
@@ -40531,15 +40626,7 @@ export function textSlot(
 	// Hot path: primitive into a text/empty slot (markerless single Text node).
 	const str =
 		vt === 'string' ? (value as string) : vt === 'boolean' || value == null ? '' : String(value);
-	if (state.text !== null) {
-		updateTextValue(state.text, str);
-		return;
-	}
-	if (str === '') return;
-	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state, domParent);
-	const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
-	state.text = tn;
+	prepareChildText(parentScope, state, domParent, str, state.text);
 }
 
 // General path for a compiled renderable binding. The shared textHoleUpdate
@@ -40554,12 +40641,36 @@ export function textHole(
 	anchor?: Node | null,
 	ownEnd?: boolean,
 	compactable?: boolean,
+	prospectiveProps?: Record<string, unknown>,
 ): Text | null {
-	childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
-	const state = parentScope.slots[slotKey] as ChildSlot;
-	return state.block === null && state.forSlot === null && state.hostNode === null
-		? state.text
-		: null;
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey))
+		return null;
+	childSlot(
+		parentScope,
+		slotKey,
+		domParent,
+		value,
+		anchor,
+		ownEnd,
+		undefined,
+		compactable,
+		true,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		prospectiveProps,
+	);
+	return childSlotText(parentScope.slots[slotKey] as ChildSlot);
+}
+
+function childSlotText(applied: ChildSlot): Text | null {
+	const state = ((applied as any).prepared?.next ?? applied) as ChildSlot;
+	if (state.block !== null || state.forSlot !== null || state.hostNode !== null) return null;
+	const prepared = (state as any).prepared;
+	return prepared !== undefined && 'text' in prepared ? prepared.text : state.text;
 }
 
 /**
@@ -40579,16 +40690,28 @@ export function textHoleUpdate(
 	anchor?: Node | null,
 	ownEnd?: boolean,
 	compactable?: boolean,
+	prospectiveProps?: Record<string, unknown>,
 ): Text | null {
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey))
+		return null;
 	const complex = value !== null && (typeof value === 'object' || typeof value === 'function');
 	if (!complex) {
 		if (previous === value) return cachedNode;
 		if (cachedNode != null && value !== null) {
-			setText(cachedNode, value === true ? '' : value);
-			return cachedNode;
+			const state = parentScope.slots[slotKey] as ChildSlot;
+			return prepareChildText(parentScope, state, domParent, coerceChildText(value), cachedNode);
 		}
 	}
-	return textHole(parentScope, slotKey, domParent, value, anchor, ownEnd, compactable);
+	return textHole(
+		parentScope,
+		slotKey,
+		domParent,
+		value,
+		anchor,
+		ownEnd,
+		compactable,
+		prospectiveProps,
+	);
 }
 
 export function childTextHoleUpdate(
@@ -40603,18 +40726,52 @@ export function childTextHoleUpdate(
 	if (!complex) {
 		if (previous === value) return cachedNode;
 		if (cachedNode != null && value !== null) {
-			setText(cachedNode, value === true ? '' : value, domParent);
-			return cachedNode;
+			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+			return state === undefined
+				? prepareOnlyChildText(parentScope, slotKey, domParent, coerceChildText(value), cachedNode)
+				: prepareChildText(parentScope, state, domParent, coerceChildText(value), cachedNode);
 		}
 	}
 	return childTextHole(parentScope, slotKey, domParent, value, cachedNode);
+}
+
+function prepareOnlyChildText(
+	scope: Scope,
+	slotKey: number,
+	parent: Node,
+	value: string,
+	previous: Text | null,
+): Text | null {
+	const text = value === '' ? null : (previous ?? document.createTextNode(value));
+	const prepared: PreparedChildText = {
+		text,
+		parent,
+		accepted: false,
+		publish() {
+			if (text === null) {
+				if (previous !== null) removeOnlyChildText(parent, previous);
+				else if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, parent);
+			} else {
+				if (text.parentNode !== parent) resetOnlyChildHost(parent, text);
+				if (text.data !== value) text.data = value;
+			}
+			prepared.accepted = true;
+			prepared.capture = null;
+			settleDeoptVisibility(scope.block);
+		},
+		discard() {
+			prepared.capture = null;
+		},
+	};
+	prepareSlot(scope, scope.slots, 'text$' + slotKey, prepared);
+	return text;
 }
 
 // The markerless Text leaves an only-child hole. When a translator already took
 // it out, its replacement is what the host shows; clear that, as React resets a
 // host's text content.
 function removeOnlyChildText(host: Node, node: Text): void {
-	const view = STAGED_DOM ? STAGED_DOM.view(node) : node;
+	const view = node;
 	if (view.parentNode === host) view.remove();
 	else resetOnlyChildHost(host, null);
 }
@@ -40636,6 +40793,8 @@ export function childTextHole(
 	domParent: Node,
 	value: unknown,
 	cachedNode: Text | null,
+	prospectiveProps?: Record<string, unknown>,
+	previousTextToken = false,
 ): Text | null {
 	if (
 		domParent.nodeType === 1 &&
@@ -40645,7 +40804,8 @@ export function childTextHole(
 	) {
 		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}
-	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return null;
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey))
+		return null;
 	let vt = typeof value;
 	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
 	// A <textarea>'s children are text (see textareaText); a `children` prop from
@@ -40662,11 +40822,6 @@ export function childTextHole(
 		value = textareaChildText(value, rejectTextareaChild);
 		vt = 'string';
 	}
-	if (ROOT_RENDER_TRANSACTION !== null && state === undefined && parentScope.mounted) {
-		journalBag();
-		journalRootRange(domParent, null, null);
-		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
-	}
 	// `null` is a primitive here too: ssrChildText serializes every empty value
 	// alike, and childSlot's adoption would misread the host's markerless content.
 	if (state === undefined && (value === null || (vt !== 'object' && vt !== 'function'))) {
@@ -40681,36 +40836,28 @@ export function childTextHole(
 			if (cachedNode === null) {
 				const hydration = hydrating ? activeHydration() : null;
 				if (hydration === null) {
-					if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, domParent);
-					return null;
+					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null);
 				}
 				// React treats a host whose child is a string or number as text content.
-				if ((vt === 'string' || vt === 'number') && hydration.keepsServerContent(domParent))
+				if ((vt === 'string' || vt === 'number') && hydrateKeepsServerContent(hydration, domParent))
 					return null;
-				return hydration.hempty(domParent, vt === 'string', siteLoc(parentScope, slotKey));
+				return hydrateHempty(hydration, domParent, vt === 'string', siteLoc(parentScope, slotKey));
 			}
-			removeOnlyChildText(domParent, cachedNode);
-			return null;
+			return prepareOnlyChildText(parentScope, slotKey, domParent, '', cachedNode);
 		}
 		if (cachedNode !== null) {
-			if ((STAGED_DOM ? STAGED_DOM.view(cachedNode) : cachedNode).parentNode !== domParent)
-				resetOnlyChildHost(domParent, cachedNode);
-			updateTextValue(cachedNode, str);
-			return cachedNode;
+			return prepareOnlyChildText(parentScope, slotKey, domParent, str, cachedNode);
 		}
 		const hydration = hydrating ? activeHydration() : null;
 		if (hydration === null) {
-			if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, domParent);
-			const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).appendChild(tn);
-			return tn;
+			return prepareOnlyChildText(parentScope, slotKey, domParent, str, null);
 		}
-		if (hydration.keepsServerContent(domParent)) return null;
+		if (hydrateKeepsServerContent(hydration, domParent)) return null;
 		// A server range around an element, component, or list is slot content
 		// markerless text cannot adopt: childSlot below adopts that range and
 		// discards what the text cannot use.
-		if (!hydration.framesSlotContent(domParent))
-			return hydration.htext(domParent, str, siteLoc(parentScope, slotKey));
+		if (!hydrateFramesSlotContent(hydration, domParent))
+			return hydrateHtext(hydration, domParent, str, siteLoc(parentScope, slotKey));
 	}
 	// Object/function value (or already in slot mode, or text the server framed
 	// slot content around on its first hydrating render): hand off to childSlot in
@@ -40722,15 +40869,76 @@ export function childTextHole(
 	// server's `<!--[-->` range (ownsHost is ignored under hydration: server-pair
 	// adoption wins, as in M2), or builds the value as a client mount would when
 	// the server rendered text or nothing there.
-	if (state === undefined && cachedNode !== null) removeOnlyChildText(domParent, cachedNode);
+	if (state === undefined && (cachedNode !== null || previousTextToken)) {
+		// A primitive token owns the only-child position even if a translator
+		// replaced its Text before we switch to a component or element.
+		// Transfer that displayed node to the slot; acceptance retires it.
+		const applied: ChildSlot = {
+			__kind: 'childSlot',
+			start: null,
+			end: null,
+			ownerHost: domParent as Element,
+			borrowed: false,
+			compactable: false,
+			block: null,
+			text: cachedNode,
+			currentComp: null,
+			currentIsBodyFn: false,
+			forSlot: null,
+			hostNode: cachedNode === null ? getFirstChild(domParent) : null,
+			portal: null,
+		};
+		parentScope.slots[slotKey] = applied;
+		registerSlot(parentScope, applied);
+		const field = 'text$' + slotKey;
+		const pending = (parentScope.slots as any)[field];
+		if (pending !== undefined) {
+			journalRootProperty(parentScope.slots, field, pending);
+			(parentScope.slots as any)[field] = undefined;
+		}
+	}
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && state === undefined)
-		hydration.hydrateOnlyChild(parentScope, slotKey, domParent, value, (parent) =>
-			childSlot(parentScope, slotKey, parent, value, null, false, parent as Element),
+		hydrateHydrateOnlyChild(hydration, parentScope, slotKey, domParent, value, (parent) =>
+			childSlot(
+				parentScope,
+				slotKey,
+				parent,
+				value,
+				null,
+				false,
+				parent as Element,
+				false,
+				true,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				prospectiveProps,
+			),
 		);
-	else childSlot(parentScope, slotKey, domParent, value, null, false, domParent as Element);
-	const s = parentScope.slots[slotKey] as ChildSlot;
-	return s.block === null && s.forSlot === null && s.hostNode === null ? s.text : null;
+	else
+		childSlot(
+			parentScope,
+			slotKey,
+			domParent,
+			value,
+			null,
+			false,
+			domParent as Element,
+			false,
+			true,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			prospectiveProps,
+		);
+	return childSlotText(parentScope.slots[slotKey] as ChildSlot);
 }
 
 // True if any context the block read last render has since changed value
@@ -41420,7 +41628,10 @@ function releaseSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void
 	SUSPENSE_RETRIES.delete(root);
 	// No extra root walk on ordinary scheduled renders once the last pending
 	// retry commits or is canceled. The existing visibility driver owns the hook.
-	if (SUSPENSE_RETRIES.size === 0) SCHEDULED_VISIBILITY_DRIVER!.find = findScheduledVisibilityOwner;
+	if (SUSPENSE_RETRIES.size === 0) {
+		SCHEDULED_VISIBILITY_DRIVER!.find = findScheduledVisibilityOwner;
+		SCHEDULED_VISIBILITY_DRIVER!.flushRetries = null;
+	}
 }
 
 function cancelSuspenseRetry(state: TrySlot): void {
@@ -41458,9 +41669,17 @@ function queueSuspenseRetry(state: TrySlot, error?: SuspenseRetryError): void {
 		batch = { states: new Map(), timer: null, queued: false, flushing: false };
 		SUSPENSE_RETRIES.set(root, batch);
 		SCHEDULED_VISIBILITY_DRIVER!.find = findHiddenOwnerWithSuspenseRetries;
+		SCHEDULED_VISIBILITY_DRIVER!.flushRetries = flushReadySuspenseRetries;
 	}
 	batch.states.set(state, error ?? state.stagedCapture);
 	scheduleSuspenseRetryBatch(root, batch);
+}
+
+/** Admit only retries that already finished; resolving resources is never forced. */
+function flushReadySuspenseRetries(): void {
+	for (const [root, batch] of [...SUSPENSE_RETRIES]) {
+		if (!batch.flushing) flushSuspenseRetryBatch(root, batch);
+	}
 }
 
 function findHiddenOwnerWithSuspenseRetries(
@@ -41608,11 +41827,7 @@ function releaseHiddenActivityNode(node: Node): void {
 function fragmentHostVisible(node: Node): boolean {
 	if (hiddenActivityNodeOwners === 0) return true;
 	const hidden = HIDDEN_ACTIVITY_NODES!;
-	for (
-		let current: Node | null = node;
-		current !== null;
-		current = (STAGED_DOM ? STAGED_DOM.view(current) : current).parentNode
-	) {
+	for (let current: Node | null = node; current !== null; current = current.parentNode) {
 		if (hidden.has(current)) return false;
 	}
 	return true;
@@ -41621,7 +41836,7 @@ function fragmentHostVisible(node: Node): boolean {
 function enforceHiddenDisplay(el: HTMLElement): void {
 	const hidden = HIDDEN_DISPLAYS.get(el);
 	const priority = hidden !== undefined && hidden.importantOwners > 0 ? 'important' : '';
-	const style = (STAGED_DOM ? STAGED_DOM.view(el) : el).style;
+	const style = el.style;
 	if (
 		style.getPropertyValue('display') !== 'none' ||
 		style.getPropertyPriority('display') !== priority
@@ -41630,15 +41845,9 @@ function enforceHiddenDisplay(el: HTMLElement): void {
 }
 
 function restoreHiddenDisplayValue(el: HTMLElement | SVGElement, display: HiddenDisplay): void {
-	if (display.value === '') (STAGED_DOM ? STAGED_DOM.view(el) : el).style.removeProperty('display');
-	else
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).style.setProperty(
-			'display',
-			display.value,
-			display.priority,
-		);
-	if (!display.hadStyle && (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('style') === '')
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('style');
+	if (display.value === '') el.style.removeProperty('display');
+	else el.style.setProperty('display', display.value, display.priority);
+	if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
 }
 
 /** Apply an authored style against its real previous value, underneath the hide. */
@@ -41668,15 +41877,14 @@ function writeHiddenStyle(
 	}
 	restoreHiddenDisplayValue(el, hidden);
 	try {
-		if (property === undefined)
-			applyStyleValue(el, (STAGED_DOM ? STAGED_DOM.view(el) : el).style, value, previous);
+		if (property === undefined) applyStyleValue(el, el.style, value, previous);
 		else if (value == null || typeof value === 'boolean')
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).style.removeProperty(styleName(property));
-		else applyStyleProperty(el, (STAGED_DOM ? STAGED_DOM.view(el) : el).style, property, value);
+			el.style.removeProperty(styleName(property));
+		else applyStyleProperty(el, el.style, property, value);
 	} finally {
-		hidden.value = (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyValue('display');
-		hidden.priority = (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyPriority('display');
-		hidden.hadStyle = (STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('style');
+		hidden.value = el.style.getPropertyValue('display');
+		hidden.priority = el.style.getPropertyPriority('display');
+		hidden.hadStyle = el.hasAttribute('style');
 		enforceHiddenDisplay(el as HTMLElement);
 	}
 	return true;
@@ -41699,9 +41907,9 @@ function retainHiddenDisplay(el: HTMLElement, important: boolean): void {
 		HIDDEN_DISPLAYS.set(el, {
 			owners: 1,
 			importantOwners: important ? 1 : 0,
-			value: (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyValue('display'),
-			priority: (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyPriority('display'),
-			hadStyle: (STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('style'),
+			value: el.style.getPropertyValue('display'),
+			priority: el.style.getPropertyPriority('display'),
+			hadStyle: el.hasAttribute('style'),
 		});
 	} else {
 		existing.owners++;
@@ -41724,8 +41932,7 @@ function releaseHiddenDisplay(el: HTMLElement, important: boolean, restore = tru
 }
 
 function enforceHiddenText(text: Text): void {
-	if ((STAGED_DOM ? STAGED_DOM.view(text) : text).data !== '')
-		(STAGED_DOM ? STAGED_DOM.view(text) : text).data = '';
+	if (text.data !== '') text.data = '';
 }
 
 function retainHiddenText(text: Text): void {
@@ -41733,7 +41940,7 @@ function retainHiddenText(text: Text): void {
 	if (existing === undefined) {
 		hiddenTextNodes++;
 		hiddenTextWriter = writeHiddenText;
-		HIDDEN_TEXTS.set(text, { owners: 1, data: (STAGED_DOM ? STAGED_DOM.view(text) : text).data });
+		HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
 	} else existing.owners++;
 }
 
@@ -41743,7 +41950,7 @@ function releaseHiddenText(text: Text, restore = true): void {
 	if (--saved.owners === 0) {
 		HIDDEN_TEXTS.delete(text);
 		if (--hiddenTextNodes === 0) hiddenTextWriter = null;
-		if (restore) (STAGED_DOM ? STAGED_DOM.view(text) : text).data = saved.data;
+		if (restore) text.data = saved.data;
 	} else {
 		enforceHiddenText(text);
 	}
@@ -41808,6 +42015,7 @@ interface TrySlot {
 	tryBlock: Block | null;
 	/** Connected host content hidden during suspend; restored on resume. */
 	hiddenDom: SuspenseHiddenDom | null;
+	visibility?: SlotPreparation & { previous: SuspenseHiddenDom | null };
 	tryBody: ComponentBody;
 	catchBody: ComponentBody | null;
 	pendingBody: ComponentBody | null;
@@ -41909,19 +42117,68 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 	setTryBranch(state, -1);
 }
 
-/** Detached retry/error callbacks still publish through the owning root journal. */
+/** Detached retry/error callbacks still publish through their owning root. */
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		if (
-			domNode(state.start).parentNode === state.domParent &&
-			domNode(state.end).parentNode === state.domParent
-		)
-			journalRootSlot(state, state.domParent, state.start, state.end);
-		else journalObjectOnce(state);
-	}
+	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) journalObjectOnce(state);
 	return frame;
+}
+
+/** A fallback owns its candidate range; the accepted arm survives until it is ready. */
+function prepareBoundaryArm(
+	state: TrySlot | ErrorSlot,
+	body: ComponentBody,
+	props: any,
+	marker: string,
+	rebuild: HydrationAttempt | null = null,
+): Block {
+	const passthrough = state.passthrough;
+	const parent = passthrough ? state.domParent : prepareParent(state.domParent);
+	const start = passthrough ? null : document.createComment(marker);
+	const end = passthrough ? null : document.createComment('/' + marker);
+	if (start !== null && end !== null) {
+		parent.appendChild(start);
+		parent.appendChild(end);
+		if (rebuild !== null) {
+			hydrateMarkFresh(rebuild, start);
+			hydrateMarkFresh(rebuild, end);
+		}
+	}
+	// Only an aborted adoption has server hosts without client blocks to retire.
+	// The cursor can advance now; the actual owned range is replaced on admission.
+	const replacingServer = hydrationStarted
+		? rebuild !== null && !passthrough && hydrateIsClose(rebuild, state.end)
+		: false;
+	if (replacingServer) hydrateRebuiltSlot(rebuild!, state.end);
+	const arm = createBlock(
+		'control-flow',
+		state.parentBlock,
+		parent,
+		start,
+		end,
+		body,
+		props,
+		state.env,
+	);
+	arm.idState = state.idState;
+	state.block = arm;
+	if (!passthrough)
+		prepareSlot(owningBlock(state.parentBlock), state, 'preparedArm', {
+			parent: state.domParent,
+			publish() {
+				if (state.block !== arm || arm.disposed) return;
+				if (replacingServer) removeRange(getNextSibling(state.start), state.end);
+				retargetPreparedScope(arm, parent, state.domParent);
+				placeRange(state.domParent, start!, end!, state.end);
+				settleDeoptVisibility(arm);
+			},
+			discard() {
+				if (state.block === arm) state.block = null;
+				if (!arm.disposed) discardPreparedBlock(arm);
+			},
+		});
+	return arm;
 }
 
 function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
@@ -41980,17 +42237,22 @@ function mountPassthroughCatch(
 	error: unknown,
 	reportInline = false,
 	freshFallback = false,
+	sourceFirst: Node | null = null,
 ): void {
 	if (isAdoptionControl(error)) throw error;
+	const hydration = hydrating ? activeHydration() : null;
+	const sourceAfter = freshFallback ? hydrationCursor.node : null;
 	clearPassthroughTry(state);
 	state.pendingThenable = null;
 	setTryBranch(state, 0);
 	state.err = error;
 	if (state.catchBody === null) throw error;
+	const target =
+		freshFallback && hydration !== null ? prepareParent(state.domParent) : state.domParent;
 	const block = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		target,
 		null,
 		null,
 		state.catchBody,
@@ -41999,19 +42261,38 @@ function mountPassthroughCatch(
 	);
 	state.block = block;
 	try {
-		const hydration = hydrating ? activeHydration() : null;
 		if (freshFallback && hydration !== null) {
 			const parent = state.domParent;
-			const last = (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild;
-			hydration.suspend(() => renderBlock(block));
-			let node = last !== null ? getNextSibling(last) : getFirstChild(parent);
-			while (node !== null) {
-				hydration.markFresh(node);
-				node = getNextSibling(node);
-			}
+			prepareSlot(owningBlock(state.parentBlock), state, 'preparedArm', {
+				parent,
+				publish() {
+					if (state.block !== block || block.disposed) return;
+					// This boundary owns only the source its failed primary selected.
+					// Do not discard that span until its replacement fallback is ready.
+					if (sourceFirst?.parentNode === parent) {
+						markHydrationDiscard(block.idState.renderOwner, parent, sourceFirst, sourceAfter);
+						let node: Node | null = sourceFirst;
+						while (node !== null && node !== sourceAfter) {
+							const next = getNextSibling(node);
+							if (!isRendererHydrationStyle(node)) parent.removeChild(node);
+							node = next;
+						}
+					}
+					retargetPreparedScope(block, target, parent);
+					const first = getFirstChild(target);
+					const after = sourceAfter?.parentNode === parent ? sourceAfter : null;
+					if (first !== null) placeRange(parent, first, target.lastChild!, after);
+					settleDeoptVisibility(block);
+				},
+				discard() {
+					if (state.block === block) state.block = null;
+					if (!block.disposed) discardPreparedBlock(block);
+				},
+			});
+			hydrateSuspend(hydration, () => renderBlock(block));
 		} else renderBlock(block);
 	} finally {
-		if (reportInline && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
+		if (ROOT_ERROR_HANDLERS && reportInline) registeredEnqueueInlineCaughtError(state);
 	}
 }
 
@@ -42095,8 +42376,9 @@ function renderPassthroughTry(state: TrySlot): void {
 	}
 	const hydration = hydrating ? activeHydration() : null;
 	const beforeOwner = hydration?.passthroughRanges === true;
+	const sourceFirst = beforeOwner ? hydrationCursor.node : null;
 	try {
-		if (hydration !== null) hydration.renderTryBody(block, state.catchBody !== null);
+		if (hydration !== null) hydrateRenderTryBody(hydration, block, state.catchBody !== null);
 		else renderBlock(block);
 		state.hasResolved = true;
 	} catch (error) {
@@ -42104,7 +42386,13 @@ function renderPassthroughTry(state: TrySlot): void {
 			if (state.propagateSuspense || (beforeOwner && !hydration!.passthroughRanges)) throw error;
 			mountPassthroughPending(state, error.thenable);
 		} else {
-			mountPassthroughCatch(state, error, true, beforeOwner && !hydration!.passthroughRanges);
+			mountPassthroughCatch(
+				state,
+				error,
+				true,
+				beforeOwner && !hydration!.passthroughRanges,
+				sourceFirst,
+			);
 		}
 	}
 }
@@ -42135,24 +42423,26 @@ export function errorBlock(
 		// unless the client built the range around the slot (branchOpen).
 		const open = passthrough
 			? null
-			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
+			: ((hydration == null
+					? void 0
+					: hydrateBranchOpen(hydration, anchor ?? null, domParent, parentScope, slotKey)) ?? null);
 		let start: Comment;
 		let end: Comment;
 		if (passthrough) {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('passthrough-try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/passthrough-try');
+			start = document.createComment('passthrough-try');
+			end = document.createComment('/passthrough-try');
 		} else if (open !== null) {
 			start = open;
-			end = hydration!.close(open);
+			end = hydrateClose(hydration!, open);
 		} else if (hydration !== null) {
-			return hydration.suspend(() =>
+			return hydrateSuspend(hydration, () =>
 				errorBlock(parentScope, slotKey, domParent, tryBody, catchBody, anchor, env),
 			);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			start = document.createComment('try');
+			end = document.createComment('/try');
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
 		let newState: ErrorSlot;
 		newState = {
@@ -42188,17 +42478,23 @@ export function errorBlock(
 	}
 
 	if (state.branch === 0) {
-		const caught = state.block!;
-		caught.body = state.catchBody;
-		caught.props = { err: state.err, reset: state.reset };
-		caught.extra = state.env;
-		renderBlock(caught);
+		const caught = state.block;
+		if (caught === null || caught.disposed) {
+			// The error remains caught when an enclosing Suspense discarded an
+			// unpublished fallback. Prepare a new fallback for that same error.
+			switchErrorToCatch(state, state.err, true);
+		} else {
+			caught.body = state.catchBody;
+			caught.props = { err: state.err, reset: state.reset };
+			caught.extra = state.env;
+			renderBlock(caught);
+		}
 	} else if (state.branch === 1 && state.block !== null) {
 		const current = state.block;
 		current.body = state.tryBody;
 		current.extra = state.env;
 		try {
-			if (hydration !== null) hydration.renderTryBody(current, true);
+			if (hydration !== null) hydrateRenderTryBody(hydration, current, true);
 			else renderBlock(current);
 		} catch (error) {
 			if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
@@ -42208,12 +42504,13 @@ export function errorBlock(
 	} else mountErrorBoundary(state, hydration);
 	// Hydration: park past the boundary's range, as every slot does, so a
 	// following sibling adopts its own server content.
-	if (!state.passthrough) hydration?.parkPast(state.end, parentScope);
+	if (!state.passthrough)
+		hydration == null ? void 0 : hydrateParkPast(hydration, state.end, parentScope);
 	return state.reset;
 }
 
 /** Mount the boundary's try body, or its catch arm when the body throws. */
-function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | null): void {
+function mountErrorBoundary(state: ErrorSlot, hydration: HydrationAttempt | null): void {
 	if (state.block !== null) {
 		const previous = state.block;
 		state.block = null;
@@ -42223,27 +42520,59 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	setTryBranch(state, 1);
 	let start: Node | null = null;
 	let end: Node | null = null;
-	let freshBoundary = false;
 	if (!state.passthrough) {
 		let cursor = getNextSibling(state.start);
 		const freshIds = takeNativeFreshArm(hydration, cursor, state.end, state.idState);
 		if (freshIds !== null) {
 			state.idState = freshIds;
-			freshBoundary = true;
-			cursor = state.end;
+			const parent = state.domParent;
+			const originalStart = state.start;
+			const originalEnd = state.end;
+			const prepared = prepareParent(parent);
+			const preparedStart = document.createComment('try');
+			const preparedEnd = document.createComment('/try');
+			prepared.append(preparedStart, preparedEnd);
+			state.domParent = prepared;
+			state.start = preparedStart;
+			state.end = preparedEnd;
+			try {
+				hydrateSuspend(hydration!, () => mountErrorBoundary(state, null));
+			} finally {
+				state.domParent = parent;
+				state.start = originalStart;
+				state.end = originalEnd;
+				hydrationCursor.node = getNextSibling(originalEnd);
+			}
+			const visible = state.block as Block | null;
+			prepareSlot(owningBlock(state.parentBlock), state, 'preparedFresh', {
+				parent,
+				publish() {
+					if (state.block !== visible || visible === null) return;
+					removeRange(getNextSibling(originalStart), originalEnd);
+					retargetPreparedScope(visible, prepared, parent);
+					const first = getNextSibling(preparedStart);
+					const last = preparedEnd.previousSibling;
+					if (first !== null && first !== preparedEnd && last !== null)
+						placeRange(parent, first, last, originalEnd);
+				},
+				discard() {
+					if (visible !== null && !visible.disposed) discardPreparedBlock(visible);
+				},
+			});
+			return;
 		}
-		if (hydration !== null && hydration.isOpen(cursor)) {
+		if (hydration !== null && hydrateIsOpen(hydration, cursor)) {
 			start = cursor;
-			end = hydration.close(cursor);
-			hydration.node = getNextSibling(start);
+			end = hydrateClose(hydration, cursor);
+			hydrationCursor.node = getNextSibling(start);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-			domNode(state.domParent).insertBefore(start, state.end);
-			domNode(state.domParent).insertBefore(end, state.end);
+			start = document.createComment('try-b');
+			end = document.createComment('/try-b');
+			state.domParent.insertBefore(start, state.end);
+			state.domParent.insertBefore(end, state.end);
 			if (hydration !== null) {
-				hydration.markFresh(start);
-				hydration.markFresh(end);
+				hydrateMarkFresh(hydration, start);
+				hydrateMarkFresh(hydration, end);
 			}
 		}
 	}
@@ -42263,19 +42592,14 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		return state.block;
 	};
 	state.block = body;
-	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
-	if (freshBoundary) hydration!.depth++;
 	try {
-		if (hydration !== null) hydration.renderTryBody(body, true);
+		if (hydration !== null) hydrateRenderTryBody(hydration, body, true);
 		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
 		if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
 			throw error;
 		switchErrorToCatch(state, error, true);
-	} finally {
-		if (freshBoundary) hydration!.depth--;
-		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 	}
 }
 
@@ -42303,37 +42627,17 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	state.hasResolved = false;
 	setTryBranch(state, 0);
 	state.err = error;
-	let start: Node | null = null;
-	let end: Node | null = null;
-	if (!state.passthrough) {
-		start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
-		end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
-		if (hydration !== null) {
-			if (hydration.isClose(state.end)) {
-				removeRange(getNextSibling(state.start), state.end);
-				hydration.rebuiltSlot(state.end);
-			}
-			hydration.markFresh(start);
-			hydration.markFresh(end);
-		}
-		domNode(state.domParent).insertBefore(start, state.end);
-		domNode(state.domParent).insertBefore(end, state.end);
-	}
-	const caught = createBlock(
-		'control-flow',
-		state.parentBlock,
-		state.domParent,
-		start,
-		end,
+	const caught = prepareBoundaryArm(
+		state,
 		state.catchBody,
 		{ err: error, reset: state.reset },
-		state.env,
+		'catch-b',
+		hydration,
 	);
-	caught.idState = state.idState;
-	state.block = caught;
 	let control = false;
 	try {
-		if (!state.passthrough && hydration !== null) hydration.suspend(() => renderBlock(caught));
+		if (!state.passthrough && hydration !== null)
+			hydrateSuspend(hydration, () => renderBlock(caught));
 		else renderBlock(caught);
 	} catch (nextError) {
 		if (forwardFallbackSuspension(caught, nextError)) return;
@@ -42350,7 +42654,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 		if (parent !== null) parent(nextError);
 		else console.error('catch body threw, no outer tryBlock:', nextError);
 	} finally {
-		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
+		if (ROOT_ERROR_HANDLERS && reportInline && !control) registeredEnqueueInlineCaughtError(state);
 	}
 }
 
@@ -42413,15 +42717,17 @@ export function tryBlock(
 		// unless the client built the range around the slot (branchOpen).
 		const open = passthrough
 			? null
-			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
+			: ((hydration == null
+					? void 0
+					: hydrateBranchOpen(hydration, anchor ?? null, domParent, parentScope, slotKey)) ?? null);
 		if (passthrough) {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('passthrough-try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/passthrough-try');
+			start = document.createComment('passthrough-try');
+			end = document.createComment('/passthrough-try');
 		} else if (open !== null) {
 			start = open;
-			end = hydration!.close(open);
+			end = hydrateClose(hydration!, open);
 		} else if (hydration !== null) {
-			return hydration.suspend(() =>
+			return hydrateSuspend(hydration, () =>
 				tryBlock(
 					parentScope,
 					slotKey,
@@ -42435,13 +42741,13 @@ export function tryBlock(
 				),
 			);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try');
+			start = document.createComment('try');
+			end = document.createComment('/try');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (e.g. when this slot lives in a mixed-children
 			// template and must sit before its in-template static-sibling anchor).
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
 		let newState: TrySlot;
 		newState = {
@@ -42518,11 +42824,17 @@ export function tryBlock(
 		renderPassthroughTry(s);
 		return s.reset;
 	} else if (s.branch === 0) {
-		// Already showing catch — re-render with current err (props identity unchanged).
-		s.block!.body = s.catchBody!;
-		s.block!.props = { err: s.err, reset: s.reset };
-		s.block!.extra = s.env;
-		renderBlock(s.block!);
+		const caught = s.block;
+		if (caught === null || caught.disposed) {
+			// A failed outer retry disposed the fallback candidate but did not
+			// reset this boundary. Publish the same caught error on its next arm.
+			switchToCatch(s, s.err, true);
+		} else {
+			caught.body = s.catchBody!;
+			caught.props = { err: s.err, reset: s.reset };
+			caught.extra = s.env;
+			renderBlock(caught);
+		}
 	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.hiddenDom) {
 		// Changed parent inputs replace an uncommitted primary; unchanged inputs
 		// retry its preserved tree and native query owners without restarting them.
@@ -42544,7 +42856,17 @@ export function tryBlock(
 	}
 	// Hydration: whichever arm rendered, park past the boundary's range, as every
 	// slot does, so a following sibling adopts its own server content.
-	hydration?.parkPast(s.end, parentScope);
+	// Hydration: whichever arm rendered, park past the boundary's range, as every
+	// slot does, so a following sibling adopts its own server content.
+	hydration == null
+		? void 0
+		: hydrateParkPast(
+				// Hydration: whichever arm rendered, park past the boundary's range, as every
+				// slot does, so a following sibling adopts its own server content.
+				hydration,
+				s.end,
+				parentScope,
+			);
 	return s.reset;
 }
 
@@ -42591,7 +42913,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	const hydration = hydrating ? activeHydration() : null;
 	if (capture !== null) WIP_CAPTURE = capture;
 	try {
-		if (hydration !== null) hydration.renderTryBody(block, state.catchBody !== null);
+		if (hydration !== null) hydrateRenderTryBody(hydration, block, state.catchBody !== null);
 		else renderBlock(block);
 	} catch (error) {
 		didThrow = true;
@@ -42625,11 +42947,11 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 }
 
-function createTryBody(state: TrySlot, start: Node, end: Node): Block {
+function createTryBody(state: TrySlot, start: Node, end: Node, parent = state.domParent): Block {
 	const block = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		parent,
 		start,
 		end,
 		state.tryBody,
@@ -42673,14 +42995,28 @@ function restartUncommittedTry(state: TrySlot): Block | null {
 
 /** A new primary can render speculatively without destroying its visible fallback. */
 function mountHiddenTryBody(state: TrySlot): Block {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-	const anchor = state.block?.startMarker ?? state.end;
-	domNode(state.domParent).insertBefore(start, anchor);
-	domNode(state.domParent).insertBefore(end, anchor);
-	const block = createTryBody(state, start, end);
+	const start = document.createComment('try-b');
+	const end = document.createComment('/try-b');
+	const parent = prepareParent(state.domParent);
+	parent.appendChild(start);
+	parent.appendChild(end);
+	const block = createTryBody(state, start, end, parent);
 	state.detachedRefs = [];
 	hideTryBlock(state);
+	prepareSlot(owningBlock(state.parentBlock), state, 'preparedPrimary', {
+		parent: state.domParent,
+		publish() {
+			if (state.tryBlock !== block || block.disposed || state.hiddenDom !== null) return;
+			const fallback = state.block === block ? null : state.block?.startMarker;
+			const anchor =
+				fallback != null && fallback.parentNode === state.domParent ? fallback : state.end;
+			retargetPreparedScope(block, parent, state.domParent);
+			placeRange(state.domParent, start, end, anchor);
+		},
+		discard() {
+			if (!block.disposed) discardPreparedBlock(block);
+		},
+	});
 	return block;
 }
 
@@ -42710,7 +43046,7 @@ let initialStreamedPayloads: WeakMap<
 	}
 > | null = null;
 
-// Initialized by the hydration capability so client-only Suspense cannot make
+// Initialized when hydration starts so client-only Suspense cannot make
 // the hydrator and its seed parser reachable in the shipped bundle.
 let initialSuspenseHydrationRenderer: typeof renderInitialSuspenseHydration | null = null;
 
@@ -42730,16 +43066,16 @@ let TRY_OPS: TryOps | null = null;
 
 function takeInitialSuspenseHydration(
 	state: TrySlot,
-	hydration: HydrationCapability,
+	hydration: HydrationAttempt,
 ): InitialSuspenseHydration | null {
 	const marker = getNextSibling(state.start);
 	if (marker?.nodeType !== 8) return null;
-	const text = (STAGED_DOM ? STAGED_DOM.view(marker as Comment) : (marker as Comment)).data;
+	const text = (marker as Comment).data;
 	if (text.startsWith(STREAM_SEED_COMMENT)) {
 		const boundaryId = text.slice(STREAM_SEED_COMMENT.length);
 		const start = getNextSibling(marker);
-		if (!hydration.isOpen(start)) return null;
-		const end = hydration.close(start);
+		if (!hydrateIsOpen(hydration, start)) return null;
+		const end = hydrateClose(hydration, start);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		const owner = marker as Comment;
 		let payload = initialStreamedPayloads?.get(owner);
@@ -42788,18 +43124,17 @@ function takeInitialSuspenseHydration(
 		const script = cursor as Element;
 		if (
 			script.localName !== 'script' ||
-			(STAGED_DOM ? STAGED_DOM.view(script) : script).getAttribute('type') !== 'application/json' ||
-			!(STAGED_DOM ? STAGED_DOM.view(script) : script).hasAttribute(attr)
+			script.getAttribute('type') !== 'application/json' ||
+			!script.hasAttribute(attr)
 		)
 			continue;
-		if (attr === SUSPENSE_RESOLVED_SEED_ATTR)
-			seedRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
-		else nativeRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
+		if (attr === SUSPENSE_RESOLVED_SEED_ATTR) seedRaw = script.textContent;
+		else nativeRaw = script.textContent;
 		sidecars.push(script);
 		cursor = getNextSibling(script);
 	}
-	if (!hydration.isOpen(cursor)) return null;
-	const end = hydration.close(cursor);
+	if (!hydrateIsOpen(hydration, cursor)) return null;
+	const end = hydrateClose(hydration, cursor);
 	const rootIds = state.idState;
 	const idStart = rootIds.next;
 	reserveHydrationIds(rootIds, count);
@@ -42821,7 +43156,7 @@ function takeInitialSuspenseHydration(
 }
 
 function finishInitialSuspenseHydration(initial: InitialSuspenseHydration): void {
-	for (const node of initial.metadata) (STAGED_DOM ? STAGED_DOM.view(node) : node).remove();
+	for (const node of initial.metadata) node.remove();
 	initial.consume?.();
 }
 
@@ -42867,39 +43202,94 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
 	}
 }
 
-/**
- * Discard the server DOM of a Suspense arm whose hydration failed or was
- * overtaken by an update, and render the arm on the client, as React does for
- * a dehydrated boundary. Returns whether a catch arm caught an error in that
- * render (renderDehydratedTry).
- */
-function clientRenderDehydratedTry(state: TrySlot, outer: HydrationCapability | null): boolean {
+/** Replace a dehydrated arm only after its client primary or fallback is ready. */
+function clientRenderDehydratedTry(
+	state: TrySlot,
+	outer: HydrationAttempt | null,
+	failedHydration = true,
+): boolean {
 	initialSuspenseHydrations?.delete(state);
-	const parent = domNode(state.domParent);
-	journalRootChildren(parent);
-	outer?.save(parent);
-	markHydrationDiscard(
-		state.parentBlock.idState.renderOwner,
-		parent,
-		getNextSibling(state.start),
-		state.end,
-	);
-	// This removes the arm's metadata too. Leave a streamed payload with its
-	// weak marker owner: a discarded enclosing attempt restores the marker
-	// and hydrates the arm from it again, and a commit drops both together.
-	removeRange(getNextSibling(state.start), state.end);
+	const parent = state.domParent;
+	const start = state.start;
+	const end = state.end;
+	// A failed adoption invalidates intent aimed at its discarded server arm.
+	// A still-pending renderer stream has never offered a primary to adopt:
+	// preserve intent for its logical replacement when the client finishes it.
+	if (failedHydration)
+		markHydrationDiscard(state.parentBlock.idState.renderOwner, parent, getNextSibling(start), end);
 	swapHydration(null);
+	// The server did not finish this arm. As in hydrateSuspend, a fresh
+	// render can read live signals absent from the server's adopted values.
+	const previousNative = setNativeAdoptionResolver(null);
 	try {
-		return renderDehydratedTry(state, true);
+		return prepareTryMount(state, () => renderDehydratedTry(state, true));
 	} finally {
+		setNativeAdoptionResolver(previousNative);
 		swapHydration(outer);
 		// Outside any hydration, an error that escaped the client render ends here.
-		if (outer !== null) outer.node = getNextSibling(state.end);
+		if (outer !== null) hydrationCursor.node = getNextSibling(end);
 		else clearHydrationThrow();
 		// Owners that the client render did not claim retire, unless it suspended
 		// and retains its own for the retry.
 		if (state.branch !== 2 && state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	}
+}
+
+/** Ordinary client mount and dehydrated recovery own the same private successor.
+ * Only the dehydrated caller above changes hydration and native seed context. */
+function prepareTryMount(state: TrySlot, render: () => boolean): boolean {
+	const parent = state.domParent;
+	const start = state.start;
+	const end = state.end;
+	const prepared = prepareParent(parent);
+	const preparedStart = document.createComment('try');
+	const preparedEnd = document.createComment('/try');
+	prepared.appendChild(preparedStart);
+	prepared.appendChild(preparedEnd);
+	state.domParent = prepared;
+	state.start = preparedStart;
+	state.end = preparedEnd;
+	let caught: boolean;
+	try {
+		caught = render();
+	} finally {
+		state.domParent = parent;
+		state.start = start;
+		state.end = end;
+	}
+	const primary = state.tryBlock;
+	const visible = state.block;
+	prepareSlot(owningBlock(state.parentBlock), state, 'preparedDehydrated', {
+		parent,
+		publish() {
+			if (state.block !== visible || state.tryBlock !== primary) return;
+			// Metadata belongs to the old server arm too. A failed enclosing
+			// render leaves it and its weak streamed payload owner in place.
+			removeRange(getNextSibling(start), end);
+			if (state.branch === 2 && primary !== null && visible !== null && visible !== primary) {
+				// This primary has never been presented. Keep its partially rendered
+				// hosts in their private parent until the retry actually commits.
+				// Only the ready fallback replaces the live server arm.
+				retargetPreparedScope(visible, prepared, parent);
+				placeRange(parent, visible.startMarker!, visible.endMarker!, end);
+				settleDeoptVisibility(state.parentBlock);
+				return;
+			}
+			if (primary !== null) retargetPreparedScope(primary, prepared, parent);
+			if (visible !== null && visible !== primary) retargetPreparedScope(visible, prepared, parent);
+			const first = getNextSibling(preparedStart);
+			const last = preparedEnd.previousSibling;
+			if (first !== null && first !== preparedEnd && last !== null)
+				placeRange(parent, first, last, end);
+			settleDeoptVisibility(state.parentBlock);
+		},
+		discard() {
+			if (primary !== null && !primary.disposed) discardPreparedBlock(primary);
+			if (visible !== null && visible !== primary && !visible.disposed)
+				discardPreparedBlock(visible);
+		},
+	});
+	return caught;
 }
 
 function renderInitialSuspenseHydration(
@@ -42920,12 +43310,16 @@ function renderInitialSuspenseHydration(
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
-	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
-	hydration.speculative = hydration.defers = true;
-	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
+	const hydration = createHydrationAttempt(block, getNextSibling(initial.start), null);
+	hydration.defers = true;
+	if (initial.seedRaw !== null) hydration.seeds = hydrateParseSeeds(hydration, initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
-	hydration.claimRootRemainder(initial.end);
-	hydration.protectRootAnchor(initial.end);
+	hydrateClaimRootRemainder(
+		// This capability owns one exact arm, never the surrounding root siblings.
+		hydration,
+		initial.end,
+	);
+	hydrateProtectRootAnchor(hydration, initial.end);
 	const previousHydration = currentHydration;
 	// Only the activation knows; a retry runs outside it, over the restored arm.
 	if (previousHydration?.staleServerValues) initial.stale = previousHydration.values!;
@@ -42940,7 +43334,7 @@ function renderInitialSuspenseHydration(
 	swapHydration(hydration);
 	WIP_CAPTURE = capture;
 	const previousNative = setNativeAdoptionResolver(null);
-	const diagnostics = hydration.holdDiagnostics();
+	const diagnostics = hydrateHoldDiagnostics(hydration);
 	let suspended: TrackedThenable<unknown> | null = null;
 	let failed = false;
 	let failure: unknown;
@@ -42950,18 +43344,18 @@ function renderInitialSuspenseHydration(
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
 		renderBlock(block);
-		if (hydration.deferred !== null) hydration.claimDeferred();
+		if (hydration.deferred !== null) hydrateClaimDeferred(hydration);
 		drainHydrationRenderPhaseUpdates(block, true);
-		hydration.settleValues();
-		hydration.settle(previousHydration);
+		hydrateSettleValues(hydration);
+		hydratePassSeeds(hydration, previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
 		failed = true;
-		failure = hydration.failure(error);
+		failure = hydrateFailure(hydration, error);
 		if (isSuspenseException(error)) suspended = error.thenable;
-		// The next attempt, or the server catch arm adopted below, finds the
-		// server arm as the server rendered it: undo this attempt's changes.
-		hydration.rollback();
+		// The server range still belongs to the uncommitted arm.
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.ROLLBACK_HYDRATION);
 		// None of this attempt's refs or effects committed. Dispose its scopes
 		// without detaching the actual server nodes that the next attempt adopts.
 		const refs: SuspenseRefEntry[] = [];
@@ -42970,7 +43364,7 @@ function renderInitialSuspenseHydration(
 		// A retry, or the client render that replaces a mismatched attempt, claims
 		// the attempt's query owners rather than loading them again.
 		if (
-			(suspended !== null || failure instanceof HydrationMismatch) &&
+			(suspended !== null || isHydrationMismatch(failure)) &&
 			state.parentBlock.idState.renderOwner?.signalOwner !== undefined
 		) {
 			retainSignalRetryScope(block, block, state, true);
@@ -42993,16 +43387,23 @@ function renderInitialSuspenseHydration(
 		// The attempt that commits, or the catch arm that replaces this one,
 		// reports what it finds. An attempt that found a mismatch is final: the
 		// arm renders on the client, and its diagnostics describe why.
-		hydration.releaseDiagnostics(diagnostics, failed && !(failure instanceof HydrationMismatch));
+		hydrateReleaseDiagnostics(
+			// The attempt that commits, or the catch arm that replaces this one,
+			// reports what it finds. An attempt that found a mismatch is final: the
+			// arm renders on the client, and its diagnostics describe why.
+			hydration,
+			diagnostics,
+			failed && !isHydrationMismatch(failure),
+		);
 		// The arm's client render reads client data, and a retry seeds afresh.
 		// Seeds an attempt that a catch arm replaces settled stay with the
 		// enclosing hydration, whose own fallback discards them.
-		if (failure instanceof HydrationMismatch || suspended !== null) hydration.discardSeeds();
-		else if (failed) hydration.passSeeds(previousHydration);
+		if (isHydrationMismatch(failure) || suspended !== null) hydrateDiscardSeeds(hydration);
+		else if (failed) hydratePassSeeds(hydration, previousHydration);
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		swapHydration(previousHydration);
-		if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
+		if (previousHydration !== null) hydrationCursor.node = getNextSibling(state.end);
 		else clearHydrationThrow();
 	}
 	if (!failed) {
@@ -43032,7 +43433,7 @@ function renderInitialSuspenseHydration(
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
-	if (failure instanceof HydrationMismatch) {
+	if (isHydrationMismatch(failure)) {
 		// The arm's own close matched before this attempt, so the mismatch lies
 		// inside it: as React does for a Suspense boundary, discard its server DOM
 		// and render it on the client rather than fail a root that may have
@@ -43049,7 +43450,7 @@ function renderInitialSuspenseHydration(
 		(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
 			if (!discarded) finishInitialSuspenseHydration(initial);
 		});
-	if (currentHydration !== null) currentHydration.node = getNextSibling(state.end);
+	if (currentHydration !== null) hydrationCursor.node = getNextSibling(state.end);
 }
 
 /** A boundary arm that the server could not finish, while it renders on the client. */
@@ -43114,25 +43515,20 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		hydration !== null &&
 		adoptCursor !== null &&
 		adoptCursor.nodeType === 8 &&
-		(STAGED_DOM
-			? STAGED_DOM.view(adoptCursor as Comment)
-			: (adoptCursor as Comment)
-		).data.startsWith(STREAM_SEED_COMMENT)
+		(adoptCursor as Comment).data.startsWith(STREAM_SEED_COMMENT)
 	) {
 		hasScopedBoundary = true;
-		streamedBoundaryId = (
-			STAGED_DOM ? STAGED_DOM.view(adoptCursor as Comment) : (adoptCursor as Comment)
-		).data.slice(STREAM_SEED_COMMENT.length);
+		streamedBoundaryId = (adoptCursor as Comment).data.slice(STREAM_SEED_COMMENT.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
-		if (typeof raw === 'string') scopedSeeds = hydration.parseSeeds(raw);
+		if (typeof raw === 'string') scopedSeeds = hydrateParseSeeds(hydration, raw);
 		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
 		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		adoptCursor = getNextSibling(adoptCursor);
 	} else if (hydration !== null) {
 		// A shell hydrated before its streamed segment swaps: the client claims
 		// the boundary, mounting a fresh try/pending block in the cleared range.
-		streamedBoundaryId = hydration.claimStreamTemplate(adoptCursor, state.end);
+		streamedBoundaryId = hydrateClaimStreamTemplate(hydration, adoptCursor, state.end);
 		if (streamedBoundaryId !== null) {
 			hasScopedBoundary = true;
 			freshBoundary = true;
@@ -43150,35 +43546,63 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	const freshIds = takeNativeFreshArm(hydration, adoptCursor, state.end, state.idState);
 	let unfinished: UnfinishedArm | null = null;
 	if (freshIds !== null) {
-		unfinished = hydration!.beginUnfinishedArm(state, adoptCursor);
+		unfinished = hydrateBeginUnfinishedArm(hydration!, state, adoptCursor);
 		state.idState = freshIds;
 		freshBoundary = true;
 		adoptCursor = state.end;
 		scopedSeeds = null;
 		scopedNativeRaw = undefined;
 	}
-	if (hydration !== null && hydration.isOpen(adoptCursor)) {
+	if (
+		freshBoundary ||
+		(hydration === null &&
+			DEHYDRATED_TRY !== state &&
+			!state.hasResolved &&
+			!PREPARED_PARENTS.has(state.domParent))
+	) {
+		// Use the same private successor as a dehydrated mismatch. In particular,
+		// do not remove the live streaming sentinel before an enclosing render
+		// has admitted this fresh primary (or its pending/catch arm).
+		try {
+			// Only a hydrated stream offers a fresh server boundary. Starting
+			// hydration is owned by hydrateRoot, not by a client @try mount.
+			const caught =
+				hydrationStarted && freshBoundary
+					? clientRenderDehydratedTry(state, hydration, false)
+					: prepareTryMount(state, () => {
+							mountTry(state, claimsRetryOwners);
+							return false;
+						});
+			if (unfinished !== null) unfinished.caught = caught;
+		} finally {
+			if (unfinished !== null) hydrateEndUnfinishedArm(hydration!, unfinished);
+		}
+		if (unfinished !== null) hydrateReportUnfinishedArm(hydration!, unfinished);
+		if (wasPending && state.branch === 1) recordSuspenseCommit(state);
+		return;
+	}
+	if (hydration !== null && hydrateIsOpen(hydration, adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
 		// see ifBlock). The seeded use() values let the try body render its success
 		// arm and adopt the server DOM.
 		bStart = adoptCursor as Comment;
-		bEnd = hydration.close(bStart);
-		hydration.node = getNextSibling(bStart);
+		bEnd = hydrateClose(hydration, bStart);
+		hydrationCursor.node = getNextSibling(bStart);
 	} else {
 		scopedSeeds = null;
-		bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
-		bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
+		bStart = document.createComment('try-b');
+		bEnd = document.createComment('/try-b');
+		state.domParent.insertBefore(bStart, state.end);
+		state.domParent.insertBefore(bEnd, state.end);
 		if (hydration !== null) {
-			hydration.markFresh(bStart);
-			hydration.markFresh(bEnd);
+			hydrateMarkFresh(hydration, bStart);
+			hydrateMarkFresh(hydration, bEnd);
 		}
 	}
 	const b = createTryBody(state, bStart, bEnd);
 	state.block = b;
 	let nativeAdoption: NativeAdoptionState | undefined;
-	if (hydrating && scopedNativeRaw !== undefined && !freshBoundary) {
+	if (hydrating && scopedNativeRaw !== undefined) {
 		const boundaryId = streamedBoundaryId!;
 		nativeAdoption = ownNativeAdoption(b, scopedNativeRaw, () => {
 			const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
@@ -43195,15 +43619,11 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		hydration!.seeds = scopedSeeds;
 		hydration!.seedCursor = 0;
 	}
-	const previousNative =
-		hasScopedBoundary || freshBoundary
-			? setNativeAdoptionResolver(nativeAdoption?.resolve ?? null)
-			: undefined;
-	// The entire newly mounted arm, including its pending/catch path, is outside
-	// adoption. A live child must not borrow an ancestor's historical data.
-	if (freshBoundary) hydration!.depth++;
+	const previousNative = hasScopedBoundary
+		? setNativeAdoptionResolver(nativeAdoption?.resolve ?? null)
+		: undefined;
 	try {
-		if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
+		if (hydration !== null) hydrateRenderTryBody(hydration, b, state.catchBody !== null);
 		else renderBlock(b);
 		state.hasResolved = true;
 		if (wasPending) recordSuspenseCommit(state);
@@ -43216,15 +43636,12 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 			switchToCatch(state, err, true);
 		}
 	} finally {
-		if (freshBoundary) hydration!.depth--;
 		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 		if (hasScopedBoundary) {
 			hydration!.seeds = prevSeeds;
 			hydration!.seedCursor = prevSeedCursor;
 		}
-		if (unfinished !== null) hydration!.endUnfinishedArm(unfinished);
 	}
-	if (unfinished !== null) hydration!.reportUnfinishedArm(unfinished);
 }
 
 /**
@@ -43272,50 +43689,70 @@ function hideSuspensePortalRanges(scope: Scope, hidden: SuspenseHiddenDom): void
 function hideTryBlock(state: TrySlot): void {
 	const block = state.tryBlock;
 	if (block === null || state.hiddenDom !== null) return;
-	const hidden: SuspenseHiddenDom = {
+	const previous = state.visibility?.previous ?? null;
+	const hidden: SuspenseHiddenDom = previous ?? {
 		displays: new Set(),
 		texts: new Set(),
-		active: true,
+		active: false,
 	};
+	journalRootProperty(state, 'hiddenDom', state.hiddenDom);
 	state.hiddenDom = hidden;
-	if (TRANSITION_JOURNAL !== null) {
-		journalUndo(() => {
-			if (state.hiddenDom === hidden) state.hiddenDom = null;
-			if (!hidden.active) return;
-			hidden.active = false;
-			for (const el of hidden.displays) releaseHiddenDisplay(el, true);
-			for (const text of hidden.texts) releaseHiddenText(text);
-		});
-	}
-	hideBlockHostRange(block, hidden);
-	hideSuspensePortalRanges(block, hidden);
+	const visibility: NonNullable<TrySlot['visibility']> = {
+		parent: state.domParent,
+		previous,
+		publish() {
+			if (state.tryBlock !== block || state.hiddenDom !== hidden || block.disposed) return;
+			hidden.active = true;
+			hideBlockHostRange(block, hidden);
+			hideSuspensePortalRanges(block, hidden);
+		},
+		discard() {},
+	};
+	prepareSlot(owningBlock(state.parentBlock), state, 'visibility', visibility);
 }
 
 /** Restore the host display/text state captured by hideTryBlock. */
 function showTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	if (hidden === null) return;
+	const block = state.tryBlock;
+	const previous = state.visibility;
+	const fallback = state.block === state.tryBlock ? null : state.block;
+	journalRootProperty(state, 'hiddenDom', hidden);
 	state.hiddenDom = null;
-	if (TRANSITION_JOURNAL !== null) {
-		journalUndo(() => {
-			state.hiddenDom = hidden;
-			if (hidden.active) return;
-			hidden.active = true;
-			for (const el of hidden.displays) retainHiddenDisplay(el, true);
-			for (const text of hidden.texts) {
-				retainHiddenText(text);
-				enforceHiddenText(text);
+	const visibility: NonNullable<TrySlot['visibility']> = {
+		parent: state.domParent,
+		previous: state.visibility === undefined ? hidden : state.visibility.previous,
+		publish() {
+			if (!hidden.active) return;
+			if (block !== null && state.tryBlock === block && !block.disposed) {
+				const parent = block.startMarker!.parentNode;
+				if (parent !== null && parent !== state.domParent && PREPARED_PARENTS.has(parent)) {
+					retargetPreparedScope(block, parent, state.domParent);
+					placeRange(state.domParent, block.startMarker!, block.endMarker!, state.end);
+				}
 			}
-		});
-	}
-	if (!hidden.active) return;
-	hidden.active = false;
-	for (const el of hidden.displays) {
-		releaseHiddenDisplay(el, true);
-	}
-	for (const text of hidden.texts) {
-		releaseHiddenText(text);
-	}
+			hidden.active = false;
+			for (const el of hidden.displays) releaseHiddenDisplay(el, true);
+			for (const text of hidden.texts) releaseHiddenText(text);
+		},
+		discard() {
+			// A completed retry can be superseded while held by an enclosing
+			// Suspense. Its JS body finished, but its reveal did not. Leave that
+			// primary discoverably hidden for the next attempt.
+			if (hidden.active && state.hiddenDom === null && state.visibility === previous) {
+				state.hiddenDom = hidden;
+				if (state.block === state.tryBlock && state.tryBlock !== null) {
+					state.block = fallback?.disposed ? null : fallback;
+					setTryBranch(state, 2);
+				}
+			}
+		},
+	};
+	const owner = owningBlock(state.parentBlock);
+	// Real teardown can reach this after the enclosing block was disposed.
+	if (owner.disposed) visibility.publish();
+	else prepareSlot(owner, state, 'visibility', visibility);
 }
 
 /**
@@ -43561,7 +43998,7 @@ function hideTryContentAndMountPendingInner(
 		unmountBlock(abandonedTry);
 		state.tryBlock = null;
 		if (state.block === abandonedTry) state.block = null;
-		hydration.node = state.end;
+		hydrationCursor.node = state.end;
 	} else {
 		hideTryBlock(state);
 	}
@@ -43657,6 +44094,9 @@ function deactivateSuspensePrimary(
 		return;
 	if (state.detachedRefs === null) {
 		state.detachedRefs = [];
+		// Accepted template programs can enqueue their first refs after render's
+		// cancellation pass. Include those before deciding what ever attached.
+		discardSubtreeRefAttaches(persistent, uncommittedRefs);
 		// Nested hidden primaries already own their detach. Current visible arms
 		// and the canceled-attach index prevent double detaches or phantom refs.
 		detachSubtreeRefs(persistent, state.detachedRefs, true, false, uncommittedRefs);
@@ -43674,23 +44114,8 @@ function deactivateSuspensePrimary(
 /** Mount the current @pending helper without changing the preserved try body. */
 function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
-		const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('pend-b');
-		const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/pend-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
-		const b = createBlock(
-			'control-flow',
-			state.parentBlock,
-			state.domParent,
-			bStart,
-			bEnd,
-			state.pendingBody,
-			undefined,
-			state.env,
-		);
-		b.idState = state.idState;
+		const b = prepareBoundaryArm(state, state.pendingBody, undefined, 'pend-b');
 		blockRare(b).trySlot = state;
-		state.block = b;
 		try {
 			renderBlock(b);
 		} catch (err) {
@@ -43827,7 +44252,11 @@ function commitResumeInner(state: TrySlot): void {
 					// Publish that no visible fallback is owned before its cleanup can
 					// synchronously unmount or replace this boundary.
 					state.block = null;
-					unmountBlock(fallback);
+					if (
+						!DEFERRED_LAYOUT_DRIVER ||
+						!DEFERRED_LAYOUT_DRIVER.stageAction(() => unmountBlock(fallback), true)
+					)
+						unmountBlock(fallback);
 					if (
 						state.parentBlock.disposed ||
 						tryBlock.disposed ||
@@ -44280,14 +44709,23 @@ function renderWithEffectReconnect(
  * and attach exactly the refs in the subtree's current visible branches.
  */
 function queueCurrentHiddenRefs(state: TrySlot): void {
-	if (state.detachedRefs === null || state.tryBlock === null) return;
-	state.detachedRefs = null;
-	const refs: SuspenseRefEntry[] = [];
-	collectVisibleSubtreeRefs(state.tryBlock, refs);
-	for (let i = 0; i < refs.length; i++) {
-		const entry = refs[i];
-		queueRefAttach(entry.scope, entry.ref, entry.el);
-	}
+	const primary = state.tryBlock;
+	if (state.detachedRefs === null || primary === null) return;
+	prepareSlot(owningBlock(state.parentBlock), state, 'preparedRevealRefs', {
+		parent: state.domParent,
+		publish() {
+			if (state.detachedRefs === null || state.tryBlock !== primary || state.hiddenDom !== null)
+				return;
+			// Read the newly accepted manifests, not the previous render's bag.
+			// Template commits may also have enqueued an attach while revealing.
+			discardSubtreeRefAttaches(primary);
+			state.detachedRefs = null;
+			const refs: SuspenseRefEntry[] = [];
+			collectVisibleSubtreeRefs(primary, refs);
+			for (const entry of refs) queueRefAttach(entry.scope, entry.ref, entry.el);
+		},
+		discard() {},
+	});
 }
 
 function attemptHiddenReveal(
@@ -44387,7 +44825,6 @@ function attemptHiddenRevealInner(
 			effectDeps.clear();
 		}
 	}
-	showTryBlock(state);
 	tryBlock.body = state.tryBody;
 	tryBlock.extra = state.env;
 	tryBlock.inactive = false;
@@ -44408,6 +44845,9 @@ function attemptHiddenRevealInner(
 	let didThrow = false;
 	let thrown: unknown = null;
 	try {
+		// A hidden retry can be held for an async sibling or a retry budget.
+		// Keep its visibility in the same capture as its template and bindings.
+		showTryBlock(state);
 		renderWithEffectReconnect(tryBlock, hiddenCapture);
 	} catch (err) {
 		didThrow = true;
@@ -44571,7 +45011,7 @@ function flushStagedRevealsIfReady(): void {
 
 function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
 	if (a === b) return 0;
-	const position = domNode(a.start).compareDocumentPosition(b.start);
+	const position = a.start.compareDocumentPosition(b.start);
 	if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
 	if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
 	return 0;
@@ -45100,12 +45540,10 @@ function findAncestorForm(block: Block): HTMLFormElement | null {
 	// Start above the range: a single-root Block's start is its own root element,
 	// which may be the <form> this component renders.
 	const start = block.startMarker;
-	let n: Node | null = start
-		? (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode
-		: (block.parentNode ?? null);
+	let n: Node | null = start ? start.parentNode : (block.parentNode ?? null);
 	while (n) {
 		if ((n as any).nodeName === 'FORM') return n as HTMLFormElement;
-		n = (STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode;
+		n = n.parentNode;
 	}
 	return null;
 }
@@ -45610,36 +46048,16 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 	}
 	setTryBranch(state, 0);
 	state.err = err;
-	const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
-	const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
-	if (hydration !== null) {
-		// Discard an aborted client adoption of the server primary before the
-		// fresh catch mounts; following siblings continue at their own cursor.
-		if (hydration.isClose(state.end)) {
-			removeRange(getNextSibling(state.start), state.end);
-			hydration.rebuiltSlot(state.end);
-		}
-		hydration.markFresh(bStart);
-		hydration.markFresh(bEnd);
-	}
-	domNode(state.domParent).insertBefore(bStart, state.end);
-	domNode(state.domParent).insertBefore(bEnd, state.end);
-	const reset = () => requestReset(state);
-	const b = createBlock(
-		'control-flow',
-		state.parentBlock,
-		state.domParent,
-		bStart,
-		bEnd,
+	const b = prepareBoundaryArm(
+		state,
 		state.catchBody,
-		{ err, reset },
-		state.env,
+		{ err, reset: state.reset },
+		'catch-b',
+		hydration,
 	);
-	b.idState = state.idState;
-	state.block = b;
 	let control = false;
 	try {
-		if (hydration !== null) hydration.suspend(() => renderBlock(b));
+		if (hydration !== null) hydrateSuspend(hydration, () => renderBlock(b));
 		else renderBlock(b);
 	} catch (e2) {
 		if (forwardFallbackSuspension(b, e2)) return;
@@ -45657,7 +46075,7 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 		if (parent) parent(e2);
 		else console.error('catch body threw, no outer tryBlock:', e2);
 	} finally {
-		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
+		if (ROOT_ERROR_HANDLERS && reportInline && !control) registeredEnqueueInlineCaughtError(state);
 	}
 }
 
@@ -45774,6 +46192,230 @@ interface BranchSlot {
 	 * starts on the arm block's `startMarker` instead (pendingArmBefore).
 	 */
 	unfinalized: boolean;
+	/** Allocated only for an admitted arm change; the other fields remain applied. */
+	prepared?: PreparedBranch;
+}
+
+interface PreparedBranch {
+	transaction: RootRenderTransaction;
+	next: BranchSlot;
+	wip: OffscreenWip | null;
+}
+
+/**
+ * A flat native arm owns every host it can update except its Block's insertion
+ * parent. Render that arm in a private range. Its capture participates in native
+ * validation now; references and effects still drain only after root admission.
+ */
+function prepareBranch(
+	parentScope: Scope,
+	slotKey: number,
+	state: BranchSlot,
+	domParent: Node,
+	branch: number,
+	body: ComponentBody | null,
+	marker: string,
+	env: any[] | undefined,
+): void {
+	const transaction = ROOT_RENDER_TRANSACTION!;
+	let wip: OffscreenWip | null = null;
+	if (body !== null) {
+		const parent = prepareParent(domParent);
+		const render = renderOffscreen(
+			parentScope.block,
+			parent,
+			null,
+			body,
+			undefined,
+			null,
+			'control-flow',
+			env,
+			false,
+			undefined,
+			parentScope.block.idState.renderOwner?.signalOwner === undefined
+				? undefined
+				: {
+						parent: parentScope,
+						slot: slotKey,
+						kind: state.__kind,
+						branch,
+						component: undefined,
+						key: undefined,
+					},
+		);
+		if (render.failed || render.suspended !== null) {
+			disposeWip(render.wip);
+			if (render.failed) throw render.error;
+			throw new SuspenseException(render.suspended);
+		}
+		wip = render.wip;
+		wip.start.data = marker;
+		wip.end.data = '/' + marker;
+		wip.block.exclusiveMarkers = true;
+		spliceWipCapture(wip);
+	}
+	const next: BranchSlot = {
+		__kind: state.__kind,
+		anchor: state.anchor,
+		start: wip?.start ?? state.start,
+		end: wip?.end ?? state.end,
+		borrowed: false,
+		branch,
+		block: wip?.block ?? null,
+		lite: null,
+		unfinalized: false,
+	};
+	const prepared: PreparedBranch = { transaction, next, wip };
+	journalRootProperty(state, 'prepared', state.prepared);
+	state.prepared = prepared;
+	// The applied arm remains visible, but it has already left this render.
+	// Queued descendants must not suspend a ready replacement.
+	const applied = state.block ?? state.lite?.block ?? null;
+	if (applied !== null) retireRootBlock(applied);
+	// Earlier committed cleanup can supersede the entire root, in which case
+	// the rest of its commit list never runs. Release this slot only if its
+	// candidate still belongs to that discarded capture.
+	(WIP_CAPTURE!.renderCleanups ??= []).push((discard) => {
+		if (discard && state.prepared === prepared) {
+			state.prepared = undefined;
+			if (wip !== null && !wip.block.disposed) {
+				wip.refDetachCheckpoint = refDetachQueue.length;
+				disposeWip(wip);
+			}
+		}
+	});
+	(transaction.commit ??= []).push(() => {
+		if (
+			state.prepared !== prepared ||
+			transaction.owner.disposed ||
+			owningBlock(parentScope.block).disposed ||
+			parentScope.slots[slotKey] !== state
+		) {
+			// Earlier accepted slots can have queued real ref detaches since this
+			// candidate rendered. Discard only the never-published candidate's refs.
+			if (wip !== null && !wip.block.disposed) {
+				wip.refDetachCheckpoint = refDetachQueue.length;
+				disposeWip(wip);
+			}
+			return;
+		}
+		const oldBlock = state.block;
+		const oldLite = state.lite;
+		const oldArm = oldBlock ?? oldLite?.block ?? null;
+		const oldStart = state.start;
+		const borrowed = state.borrowed;
+		const oldFirst = oldArm?.startMarker ?? null;
+		const oldLast = oldArm?.endMarker ?? null;
+		const pending = state.unfinalized;
+		const first =
+			oldStart !== null ? getNextSibling(oldStart) : borrowed ? getFirstChild(domParent) : oldFirst;
+		// A markerless arm can have been re-bounded by a descendant swap.
+		// Only its Block follows that shared boundary; the slot's cached end
+		// still names the former host.
+		const last =
+			oldStart !== null || borrowed
+				? state.end === null
+					? domParent.lastChild
+					: state.end.previousSibling
+				: pending
+					? oldLast === null
+						? null
+						: oldLast.previousSibling
+					: oldLast;
+		const after =
+			oldStart !== null || borrowed
+				? state.end
+				: pending
+					? oldLast
+					: last !== null
+						? getNextSibling(last)
+						: state.anchor;
+		const generation = transaction.owner.generation;
+		const nodes: Node[] = [];
+		if (first !== null && first !== after && last !== null && first.parentNode === domParent) {
+			const stop = getNextSibling(last);
+			for (
+				let node: Node | null = first;
+				node !== stop && node !== null;
+				node = getNextSibling(node)
+			) {
+				nodes.push(node);
+				retireEventHostTree(node);
+			}
+		}
+		// Publish ownership before old-tree cleanup: an unmount from user code
+		// must be able to find and dispose the candidate before it is attached.
+		state.branch = next.branch;
+		state.block = next.block;
+		state.lite = null;
+		state.unfinalized = false;
+		state.prepared = undefined;
+		if (wip !== null) {
+			// Preserve the slot's existing borrowed or owned bounds. A markerless
+			// slot still owns only its arm: emptying it later leaves its original
+			// compiler anchor, not an unnecessary replacement pair.
+			if (oldStart === null && !borrowed) {
+				state.end = wip.end;
+				replaceSharedBlockBoundary(parentScope.block, oldFirst, oldLast, wip.start, wip.end);
+			}
+		} else if (oldStart === null && !borrowed) {
+			state.end = null;
+			// A later sibling can itself disappear before this arm reappears.
+			// Keep our source position only when it differs from the insertion
+			// anchor we were given; a sole/trailing arm still needs no marker.
+			if (after !== null && after !== state.anchor) {
+				const vacant = document.createComment('');
+				domParent.insertBefore(vacant, first?.parentNode === domParent ? first : after);
+				state.anchor = vacant;
+			} else state.anchor = after;
+			// A sole-root ancestor borrowing the removed arm still needs a bound.
+			// Use the durable source position, not another arm's former host.
+			if (sharesBlockBoundary(parentScope.block, oldFirst, oldLast) && state.anchor !== null)
+				replaceSharedBlockBoundary(
+					parentScope.block,
+					oldFirst,
+					oldLast,
+					state.anchor,
+					state.anchor,
+				);
+		}
+		if (oldBlock !== null) unmountBlock(oldBlock, false);
+		else if (oldLite !== null) releaseLiteArm(oldLite);
+		if (
+			transaction.owner.disposed ||
+			owningBlock(parentScope.block).disposed ||
+			parentScope.slots[slotKey] !== state
+		)
+			return;
+		// Insert at this slot's own old range while it still exists. Adjacent
+		// swaps never depend on a preceding slot's already-retired trailing node.
+		if (wip !== null) {
+			if (wip.block.disposed || state.block !== wip.block) return;
+			if (transaction.owner.generation !== generation) {
+				// Cleanup can schedule a new root request after A has already
+				// unmounted. Leave a vacant slot at A's source position: B's
+				// exclusive pair survives its disposal, but none of its hosts or
+				// refs were ever admitted. The retry mounts its own arm here.
+				wip.refDetachCheckpoint = refDetachQueue.length;
+				disposeWip(wip);
+				state.block = null;
+				state.branch = -1;
+			}
+			const fence = first !== null && first.parentNode === domParent ? first : after;
+			if (fence !== null && fence.parentNode !== domParent) return;
+			retargetPreparedScope(wip.block, wip.block.parentNode, domParent);
+			placeRange(domParent, wip.start, wip.end, fence);
+		}
+		// An empty result can retain its durable pair. Otherwise retire exactly
+		// the old range; unrelated siblings are never included in this sweep.
+		for (const node of nodes) if (node.parentNode === domParent) domParent.removeChild(node);
+		// The earlier render wave could only hide the applied arm. Rescan a
+		// hidden Activity after the accepted range is actually in its DOM.
+		if (SCHEDULED_VISIBILITY_DRIVER && SCHEDULED_VISIBILITY_DRIVER.rehide) {
+			const hidden = findHiddenActivity(parentScope.block);
+			if (hidden !== null) SCHEDULED_VISIBILITY_DRIVER.rehide(hidden);
+		}
+	});
 }
 
 /**
@@ -45795,12 +46437,12 @@ export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node
 	const hydration = hydrating ? activeHydration() : null;
 	if (
 		scope.slots[slotKey] !== undefined ||
-		(hydration !== null && !hydration.inFreshRange(anchor, parent)) ||
+		(hydration !== null && !hydrateInFreshRange(hydration, anchor, parent)) ||
 		(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
 	)
 		return anchor;
-	const own = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(own, anchor);
+	const own = document.createComment('');
+	parent.insertBefore(own, anchor);
 	return own;
 }
 
@@ -45889,9 +46531,7 @@ function finalizeMarkerlessBranch(
 	state.unfinalized = false;
 	if (state.borrowed && state.start === null) return;
 	const first = before ? getNextSibling(before) : getFirstChild(domParent);
-	const last = after
-		? (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling
-		: (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+	const last = after ? after.previousSibling : domParent.lastChild;
 	// One current element is not a sole root when an empty sibling slot can
 	// later produce more output at the same provisional insertion anchor.
 	if (
@@ -45916,8 +46556,8 @@ function finalizeMarkerlessBranch(
  */
 function pendingArmBefore(block: Block, domParent: Node): Node | null {
 	const first = block.startMarker;
-	const node = first !== null && domNode(first).parentNode === domParent ? first : block.endMarker;
-	return node ? domNode(node).previousSibling : domNode(domParent).lastChild;
+	const node = first !== null && first.parentNode === domParent ? first : block.endMarker;
+	return node ? node.previousSibling : domParent.lastChild;
 }
 
 /**
@@ -45960,10 +46600,10 @@ function delimitMarkerlessBranch(
 	first: Node | null,
 	after: Node | null,
 ): void {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, first ?? after);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, after);
+	const start = document.createComment(marker);
+	const end = document.createComment('/' + marker);
+	domParent.insertBefore(start, first ?? after);
+	domParent.insertBefore(end, after);
 	const block = scope.block;
 	block.startMarker = start;
 	block.endMarker = end;
@@ -46044,7 +46684,7 @@ let UNMOUNT_LITE_ARM: ((state: BranchSlot, detachDom: boolean) => void) | null =
  * Remove a slot's lite arm: its Scope and, with `detachDom`, its DOM. A pair
  * that delimits the arm stays for the slot's next arm, as an arm Block's
  * borrowed markers do. When a root render that did not create the arm removes
- * it, the release waits for the commit and rollback restores the nodes, as
+ * it, release waits for commit and discarded preparation leaves the DOM in place, as
  * deferRootUnmount does for a committed Block.
  */
 function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
@@ -46061,14 +46701,14 @@ function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
 		arm.idState.renderOwner === transaction.owner &&
 		!isCreatedInRootRender(transaction, owningBlock(arm))
 	) {
-		deferRootTeardown(transaction, scope, exclusive, detachDom, releaseLiteArm);
+		deferRootTeardown(transaction, scope, exclusive, releaseLiteArm);
 		return;
 	}
 	const start = arm.startMarker;
 	const end = arm.endMarker;
 	releaseLiteArm(scope);
 	// As unmountBlock does, remove the range after its cleanups ran.
-	if (detachDom && start !== null && end !== null && domNode(start).parentNode !== null)
+	if (detachDom && start !== null && end !== null && start.parentNode !== null)
 		removeRange(exclusive ? getNextSibling(start) : start, exclusive ? end : getNextSibling(end));
 }
 
@@ -46138,9 +46778,49 @@ function renderBranchSlot(
 	env?: any[],
 	// The compiler proved this arm hookless (ifBlock/switchBlock's lite mask).
 	lite?: boolean,
+	flatNative = false,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const applied = state.block ?? state.lite?.block ?? null;
+	const prepared = state.prepared;
+	if (prepared !== undefined && prepared.transaction === transaction) {
+		if (next === prepared.next.branch) {
+			if (prepared.wip !== null)
+				renderBranchSlot(
+					parentScope,
+					slotKey,
+					prepared.next,
+					prepared.wip.domParent,
+					next,
+					body,
+					marker,
+					env,
+					false,
+					false,
+				);
+			return;
+		}
+		// Do not dispose B while preparing A or C: an inner checkpoint can
+		// restore this exact B. Its guarded commit releases it if it stays stale.
+		journalRootProperty(state, 'prepared', prepared);
+		state.prepared = undefined;
+		if (applied !== null && transaction!.retired?.delete(applied))
+			journalUndo(() => {
+				transaction!.retired!.add(applied);
+			});
+	}
+	if (
+		transaction !== null &&
+		hydration === null &&
+		next !== state.branch &&
+		state.branch !== -1 &&
+		(applied === null || !isCreatedInRootRender(transaction, owningBlock(applied)))
+	) {
+		prepareBranch(parentScope, slotKey, state, domParent, next, body, marker, env);
+		return;
+	}
 	if (next !== state.branch) {
 		if (
 			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
@@ -46148,57 +46828,10 @@ function renderBranchSlot(
 			state.branch !== -1
 		)
 			__profileArm(true);
-		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
-			// A lite arm's stand-in carries the bound an arm Block would.
-			const previousBlock = state.block ?? state.lite?.block ?? null;
-			if (state.unfinalized && previousBlock !== null) {
-				// A client arm without a bound owns only its own range before its
-				// anchor; the content in front of that belongs to its siblings.
-				journalRootSlot(
-					state,
-					domParent,
-					pendingArmBefore(previousBlock, domParent),
-					previousBlock.endMarker,
-				);
-			} else if (state.start !== null) {
-				// An owned pair can itself be replaced by an explicit boundary's
-				// completed WIP; borrowed parent markers stay outside this range.
-				journalRootSlot(
-					state,
-					domParent,
-					state.borrowed ? state.start : domNode(state.start).previousSibling,
-					state.borrowed ? state.end : (domNode(state.end)?.nextSibling ?? null),
-				);
-			} else if (state.borrowed && previousBlock?.startMarker == null) {
-				journalRootSlot(state, domParent, null, null);
-			} else {
-				const first = previousBlock?.startMarker ?? null;
-				const last = previousBlock?.endMarker ?? null;
-				if (
-					first !== null &&
-					last !== null &&
-					(STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === domParent &&
-					(STAGED_DOM ? STAGED_DOM.view(last) : last).parentNode === domParent
-				) {
-					journalRootSlot(
-						state,
-						domParent,
-						(STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling,
-						getNextSibling(last),
-					);
-				} else {
-					const after = state.anchor;
-					journalRootSlot(
-						state,
-						domParent,
-						after === null
-							? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-							: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling,
-						after,
-					);
-				}
-			}
-		}
+		// This is an initial/adopting arm, or an unpublished arm in this
+		// attempt. Existing accepted arms go through prepareBranch above.
+		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null))
+			journalObjectOnce(state);
 		const swapDriver = TRANSITION_SWAP_DRIVER ? TRANSITION_SWAP_DRIVER : null;
 		const transitionMode = parentBlock.currentRenderMode === 'transition';
 		const committedSuspense =
@@ -46231,8 +46864,7 @@ function renderBranchSlot(
 			if (owningBlock(parentBlock).disposed) return;
 			while (node !== null && node !== provisionalAfter) {
 				const nextNode = getNextSibling(node);
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === domParent)
-					(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(node);
+				if (node.parentNode === domParent) domParent.removeChild(node);
 				node = nextNode;
 			}
 		} else if (state.unfinalized && state.lite !== null) {
@@ -46255,123 +46887,6 @@ function renderBranchSlot(
 			armBlock.endMarker !== null
 				? armBlock.endMarker
 				: state.end;
-		const rootTransaction = ROOT_RENDER_TRANSACTION;
-		if (
-			rootTransaction !== null &&
-			!committedSuspense &&
-			hydration === null &&
-			(state.block !== null
-				? state.block.mounted && !isCreatedInRootRender(rootTransaction, state.block)
-				: state.lite !== null &&
-					!isCreatedInRootRender(rootTransaction, owningBlock(state.lite.block)))
-		) {
-			const oldBlock = state.block;
-			const oldLite = state.lite;
-			const oldStart = armBlock!.startMarker;
-			const oldEnd = armBlock!.endMarker;
-			const borrowed = state.borrowed;
-			let first = borrowed
-				? state.start === null
-					? getFirstChild(domParent)
-					: getNextSibling(state.start)
-				: (state.start ?? oldStart);
-			if (borrowed && first === state.end) first = null;
-			let last = borrowed
-				? first === null
-					? null
-					: state.end === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: domNode(state.end).previousSibling
-				: liveEnd;
-			if (body === null) {
-				// A deletion has no candidate to render. Retain any durable slot pair
-				// and retire only its old content after root success; rollback then
-				// restores metadata without detaching the focused outgoing subtree.
-				if (state.start !== null) {
-					first = getNextSibling(state.start);
-					if (first === state.end) first = null;
-					last = first === null ? null : domNode(state.end!).previousSibling;
-				} else {
-					const after = last === null ? state.anchor : getNextSibling(last);
-					if (sharesBlockBoundary(parentBlock, oldStart, oldEnd)) {
-						const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-						const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(
-							'/' + marker,
-						);
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, after);
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, after);
-						state.start = start;
-						state.end = end;
-						state.borrowed = false;
-						replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, start, end);
-					} else {
-						state.anchor = after;
-						state.end = null;
-					}
-				}
-				state.block = null;
-				state.lite = null;
-				state.branch = next;
-				deferRootArmReplacement(oldBlock, oldLite, domParent, first, last);
-				return;
-			}
-			const stageAfter = first === null ? (borrowed ? state.start : null) : last;
-			if (
-				stageAfter !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(stageAfter) : stageAfter).parentNode === domParent
-			) {
-				// Render the genuine new arm once beside the still-connected old
-				// content. Borrowed parent pairs stay in place; owned/self-marked
-				// ranges adopt the incoming pair and update their exact borrowers.
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-					__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
-				const r = renderOffscreen(
-					parentBlock,
-					domParent,
-					stageAfter,
-					body,
-					undefined,
-					null,
-					'control-flow',
-					env,
-					false,
-					undefined,
-					parentBlock.idState.renderOwner?.signalOwner === undefined
-						? undefined
-						: {
-								parent: parentScope,
-								slot: slotKey,
-								kind: state.__kind,
-								branch: next,
-								component: undefined,
-								key: undefined,
-							},
-				);
-				if (r.suspended || r.failed) {
-					disposeWip(r.wip);
-					if (r.suspended !== null) throw new SuspenseException(r.suspended);
-					throw r.error;
-				}
-				domNode(r.wip.start).data = marker;
-				domNode(r.wip.end).data = '/' + marker;
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.borrowed = false;
-				state.block = r.wip.block;
-				state.lite = null;
-				state.branch = next;
-				if (!borrowed) {
-					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, r.wip.start, r.wip.end);
-				}
-				// The slot now owns this pair. Undo ownership before created-block
-				// disposal so a failed root also removes the speculative comments.
-				journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
-				r.wip.block.exclusiveMarkers = true;
-				spliceWipCapture(r.wip);
-				deferRootArmReplacement(oldBlock, oldLite, domParent, first, last);
-				return;
-			}
-		}
 		// Off-screen swap (React WIP model): when a transition or committed Suspense
 		// primary swaps to a new branch that may suspend, render it off-screen FIRST
 		// without tearing down the old branch. If it
@@ -46438,8 +46953,8 @@ function renderBranchSlot(
 				if (state.borrowed) {
 					transitionSwap.dispose(r.wip);
 				} else {
-					domNode(r.wip.start).data = marker;
-					domNode(r.wip.end).data = '/' + marker;
+					r.wip.start.data = marker;
+					r.wip.end.data = '/' + marker;
 					// Tear down the old branch. A borrowed-marker branch (exclusiveMarkers=true)
 					// keeps oldStart/oldEnd; a self-marked branch removes its element. The wip
 					// pair was inserted after `probeAfter` (state.end/anchor) and stays put.
@@ -46467,11 +46982,8 @@ function renderBranchSlot(
 					// Orphaned old slot markers (borrowed regime) — nothing references them once
 					// the old block is dead; remove so only the adopted wip pair bounds the slot.
 					if (oldStart !== null) {
-						(STAGED_DOM ? STAGED_DOM.view(oldStart) : oldStart).remove();
-						(STAGED_DOM
-							? STAGED_DOM.view(oldEnd as ChildNode | null)
-							: (oldEnd as ChildNode | null)
-						)?.remove();
+						oldStart.remove();
+						(oldEnd as ChildNode | null)?.remove();
 					}
 					if (
 						owningBlock(parentBlock).disposed ||
@@ -46505,10 +47017,10 @@ function renderBranchSlot(
 			// own boundary. Publish a durable replacement before rendering the
 			// incoming arm: a nested Suspense may otherwise observe that removed
 			// host and pass a detached insertion anchor to its try block.
-			const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-			const e = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(s, after);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(e, after);
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
+			domParent.insertBefore(s, after);
+			domParent.insertBefore(e, after);
 			state.start = s;
 			state.end = e;
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
@@ -46524,15 +47036,20 @@ function renderBranchSlot(
 				let rebuild = false;
 				let inner: Comment | null = null;
 				let innerEnd: Comment | null = null;
-				if (hydration !== null && hydration.isOpen(getNextSibling(state.start))) {
+				if (hydration !== null && hydrateIsOpen(hydration, getNextSibling(state.start))) {
 					inner = getNextSibling(state.start) as Comment;
-					innerEnd = hydration.close(inner);
+					innerEnd = hydrateClose(hydration, inner);
 					if (innerEnd !== state.end && getNextSibling(innerEnd) !== state.end) {
 						// The first nested pair does not SPAN the slot's adopted range, so it
 						// cannot be this branch's own range: the server encoded this slot
 						// differently, such as a value-hole list's outer pair with one pair
 						// per item.
-						hydration.slotMismatch(
+						hydrateSlotMismatch(
+							// The first nested pair does not SPAN the slot's adopted range, so it
+							// cannot be this branch's own range: the server encoded this slot
+							// differently, such as a value-hole list's outer pair with one pair
+							// per item.
+							hydration,
 							parentScope,
 							slotKey,
 							'a single branch range',
@@ -46543,7 +47060,7 @@ function renderBranchSlot(
 				if (inner !== null) {
 					bStart = inner;
 					bEnd = innerEnd as Comment;
-					hydration!.node = getNextSibling(inner);
+					hydrationCursor.node = getNextSibling(inner);
 				} else {
 					bStart = state.start;
 					bEnd = state.end as Node;
@@ -46555,7 +47072,8 @@ function renderBranchSlot(
 					// minted (a swap) holds client content only: build the branch into it
 					// as client DOM.
 					if (hydration !== null) {
-						if (hydration.isOpen(state.start)) hydration.node = getNextSibling(state.start);
+						if (hydrateIsOpen(hydration, state.start))
+							hydrationCursor.node = getNextSibling(state.start);
 						else rebuild = true;
 					}
 				}
@@ -46576,10 +47094,17 @@ function renderBranchSlot(
 					// adoption (e.g. a keyed list's markerless item path) client-builds
 					// instead of claiming server nodes, then park the cursor after the slot
 					// for the next sibling.
-					hydration!.suspend(() => renderBlock(b));
-					hydration!.node = getNextSibling(state.end as Node);
+					hydrateSuspend(
+						// Suspend hydration for the whole branch subtree so cursor-greedy
+						// adoption (e.g. a keyed list's markerless item path) client-builds
+						// instead of claiming server nodes, then park the cursor after the slot
+						// for the next sibling.
+						hydration!,
+						() => renderBlock(b),
+					);
+					hydrationCursor.node = getNextSibling(state.end as Node);
 				} else if (inner !== null) {
-					hydration!.renderClaimed(b, parentScope, slotKey, true);
+					hydrateRenderClaimed(hydration!, b, parentScope, slotKey, true);
 				} else {
 					renderBlock(b);
 				}
@@ -46587,7 +47112,11 @@ function renderBranchSlot(
 				// An empty client branch, but the server rendered content in this slot
 				// (e.g. an `@else` with content on the server, an empty `@if` on the
 				// client).
-				hydration.slotMismatch(
+				hydrateSlotMismatch(
+					// An empty client branch, but the server rendered content in this slot
+					// (e.g. an `@else` with content on the server, an empty `@if` on the
+					// client).
+					hydration,
 					parentScope,
 					slotKey,
 					'an empty branch',
@@ -46642,10 +47171,10 @@ function renderBranchSlot(
 			// An enclosing sole-root block borrowed the old element. Empty output
 			// cannot self-delimit, so promote both the slot and every exact borrower
 			// to one shared pair rather than leaving an ancestor on a detached node.
-			const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-			const e = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(s, after);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(e, after);
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
+			domParent.insertBefore(s, after);
+			domParent.insertBefore(e, after);
 			state.start = s;
 			state.end = e;
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
@@ -46672,7 +47201,7 @@ function renderBranchSlot(
 	// following sibling @if/@switch adopts its own markers instead of seeing this
 	// slot's close marker and mounting fresh DOM at the enclosing anchor.
 	if (hydration !== null && !state.borrowed && state.end !== null) {
-		hydration.parkPast(state.end, parentScope);
+		hydrateParkPast(hydration, state.end, parentScope);
 	}
 }
 
@@ -46707,6 +47236,7 @@ export function ifBlock(
 	env?: any[],
 	// Arms the compiler proved hookless: 1 for then, 2 for else (renderBranchSlot).
 	lite?: number,
+	prepared?: number,
 ): void {
 	// Evaluating this call's or an earlier slot's arguments can queue the
 	// component's own update, and the render then replays. Leave the slot to the
@@ -46741,14 +47271,30 @@ export function ifBlock(
 		// anchor is the arm's END marker and the cursor is parked on the @if's open.
 		const open = passthrough
 			? null
-			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
+			: ((hydration == null
+					? void 0
+					: hydrateBranchOpen(hydration, anchor ?? null, domParent, parentScope, slotKey)) ?? null);
 		if (open !== null) {
 			start = open;
-			end = hydration!.close(open);
+			end = hydrateClose(hydration!, open);
 		} else if (hydration !== null && !passthrough) {
 			// Inside a range the client built (branchOpen).
-			hydration.suspend(() =>
-				ifBlock(parentScope, slotKey, domParent, cond, thenBody, elseBody, anchor, env, lite),
+			hydrateSuspend(
+				// Inside a range the client built (branchOpen).
+				hydration,
+				() =>
+					ifBlock(
+						parentScope,
+						slotKey,
+						domParent,
+						cond,
+						thenBody,
+						elseBody,
+						anchor,
+						env,
+						lite,
+						prepared,
+					),
 			);
 			return;
 		}
@@ -46777,6 +47323,7 @@ export function ifBlock(
 		'if',
 		env,
 		lite !== undefined && (lite & (next ? 1 : 2)) !== 0,
+		prepared !== undefined && (prepared & (next ? 1 : 2)) !== 0,
 	);
 }
 
@@ -47236,20 +47783,22 @@ export function activityBlock(
 		// Hydration: visible Activities carry their server-rendered body inside one
 		// generic block range; hidden Activities carry the same EMPTY range because
 		// their body was intentionally skipped on the server. Adopt either shape.
-		const open = hydration?.resolveOpen(anchor ?? null, domParent) ?? null;
+		const open =
+			(hydration == null ? void 0 : hydrateResolveOpen(hydration, anchor ?? null, domParent)) ??
+			null;
 		if (open !== null) {
 			bStart = open;
-			bEnd = hydration!.close(open);
-		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
-			hydration.suspend(() =>
+			bEnd = hydrateClose(hydration!, open);
+		} else if (hydration !== null && hydrateInFreshRange(hydration, anchor, domParent)) {
+			hydrateSuspend(hydration, () =>
 				activityBlock(parentScope, slotKey, domParent, mode, body, anchor, env),
 			);
 			return;
 		} else {
-			bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('activity');
-			bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/activity');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(bStart, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(bEnd, anchor ?? null);
+			bStart = document.createComment('activity');
+			bEnd = document.createComment('/activity');
+			domParent.insertBefore(bStart, anchor ?? null);
+			domParent.insertBefore(bEnd, anchor ?? null);
 		}
 		const b = createBlock(
 			'control-flow',
@@ -47284,7 +47833,7 @@ export function activityBlock(
 		registerSlot(parentScope, state);
 		const adopted = open !== null;
 		const serverRangeEmpty = adopted && getNextSibling(bStart) === bEnd;
-		if (adopted && !serverRangeEmpty) hydration!.node = getNextSibling(bStart);
+		if (adopted && !serverRangeEmpty) hydrationCursor.node = getNextSibling(bStart);
 		// A hidden server Activity has no body to hydrate. Mount its client tree
 		// freshly between the adopted markers with hydration suspended; this builds
 		// preserved state/DOM without making descendants consume unrelated server
@@ -47295,10 +47844,12 @@ export function activityBlock(
 			if (wantHidden) setActivitySuspenseHandler(state, true);
 			hydration.deferredActivities.push(() => {
 				if (b.disposed) return;
-				hydration.suspend(() => (state!.hidden ? renderHiddenActivity(state!) : renderBlock(b)));
+				hydrateSuspend(hydration, () =>
+					state!.hidden ? renderHiddenActivity(state!) : renderBlock(b),
+				);
 				if (state!.hidden) hideActivityRange(state!);
 			});
-			hydration.parkPast(bEnd, parentScope);
+			hydrateParkPast(hydration, bEnd, parentScope);
 			return;
 		}
 		if (wantHidden) {
@@ -47312,7 +47863,7 @@ export function activityBlock(
 		} else {
 			renderBlock(b);
 		}
-		if (adopted) hydration!.parkPast(bEnd, parentScope);
+		if (adopted) hydrateParkPast(hydration!, bEnd, parentScope);
 		return;
 	}
 
@@ -47676,6 +48227,7 @@ export function switchBlock(
 	env?: any[],
 	// Arms the compiler proved hookless: bit 0 for the default, bit i + 1 for case i.
 	lite?: number,
+	prepared?: number,
 ): void {
 	// Leave the slot to a pending replay, as ifBlock does.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
@@ -47704,24 +48256,30 @@ export function switchBlock(
 		// END marker while the hydration cursor sits on the switch range's open.
 		const open = passthrough
 			? null
-			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
+			: ((hydration == null
+					? void 0
+					: hydrateBranchOpen(hydration, anchor ?? null, domParent, parentScope, slotKey)) ?? null);
 		if (open !== null) {
 			start = open;
-			end = hydration!.close(open);
+			end = hydrateClose(hydration!, open);
 		} else if (hydration !== null && !passthrough) {
 			// Inside a range the client built (branchOpen).
-			hydration.suspend(() =>
-				switchBlock(
-					parentScope,
-					slotKey,
-					domParent,
-					discriminant,
-					cases,
-					defaultBody,
-					anchor,
-					env,
-					lite,
-				),
+			hydrateSuspend(
+				// Inside a range the client built (branchOpen).
+				hydration,
+				() =>
+					switchBlock(
+						parentScope,
+						slotKey,
+						domParent,
+						discriminant,
+						cases,
+						defaultBody,
+						anchor,
+						env,
+						lite,
+						prepared,
+					),
 			);
 			return;
 		}
@@ -47760,6 +48318,7 @@ export function switchBlock(
 		env,
 		// Only the first 30 cases have lite bits, and a shift count wraps at 32.
 		lite !== undefined && nextIdx < 30 && (lite & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
+		prepared !== undefined && nextIdx < 30 && (prepared & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
 	);
 }
 
@@ -47836,6 +48395,8 @@ interface ForSlot {
 	// Set only when the compiler proved a keyed equality selection. Identity
 	// gates the two-row update without retaining extra state on ordinary lists.
 	selectionItems: ArrayLike<any> | undefined;
+	prepared?: SlotPreparation;
+	emptyPrepared?: SlotPreparation;
 }
 
 export function forBlock<T>(
@@ -47877,18 +48438,18 @@ export function forBlock<T>(
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
-		if (hydration !== null && hydration.isOpen(anchor ?? null)) {
+		if (hydration !== null && hydrateIsOpen(hydration, anchor ?? null)) {
 			// Hydration: the server wrapped the whole @for in a `<!--[-->…<!--]-->`
 			// range (anchor resolved to the outer `<!--[-->`). Adopt it as the slot
 			// markers and point the cursor at the first item's `<!--[-->` so the
 			// empty→fill mount below adopts each item via mountItem.
 			start = anchor as Comment;
-			end = hydration.close(anchor as Node);
-			hydration.node = getNextSibling(start);
+			end = hydrateClose(hydration, anchor as Node);
+			hydrationCursor.node = getNextSibling(start);
 		} else if (
 			hydration !== null &&
-			hydration.isOpen(hydration.node) &&
-			domNode(hydration.node).parentNode === domParent
+			hydrateIsOpen(hydration, hydrationCursor.node) &&
+			hydrationCursor.node.parentNode === domParent
 		) {
 			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
 			// owning body (e.g. a `@try { @for }` arm or a component whose body is a
@@ -47896,11 +48457,11 @@ export function forBlock<T>(
 			// parked the CURSOR on the server's `<!--[-->`. Adopt from the cursor, the
 			// same way childSlot does for a sole renderable hole. A cursor outside
 			// `domParent` belongs to another range (resolveOpen applies the same rule).
-			start = hydration.node as Comment;
-			end = hydration.close(hydration.node as Node);
-			hydration.node = getNextSibling(start);
-		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
-			hydration.suspend(() =>
+			start = hydrationCursor.node as Comment;
+			end = hydrateClose(hydration, hydrationCursor.node as Node);
+			hydrationCursor.node = getNextSibling(start);
+		} else if (hydration !== null && hydrateInFreshRange(hydration, anchor, domParent)) {
+			hydrateSuspend(hydration, () =>
 				forBlock(
 					parentScope,
 					slotKey,
@@ -47921,20 +48482,26 @@ export function forBlock<T>(
 			// The server frames every list, so a hydrating list without its range
 			// finds what the server rendered for something else.
 			if (hydration !== null)
-				hydration.slotMismatch(parentScope, slotKey, 'a list range', anchor ?? hydration.node);
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('for');
+				hydrateSlotMismatch(
+					hydration,
+					parentScope,
+					slotKey,
+					'a list range',
+					anchor ?? hydrationCursor.node,
+				);
+			start = document.createComment('for');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (when a static sibling follows this @for in mixed
 			// children, the compiler emits a `<!>` anchor at the @for's source-order
 			// index and threads it here so the markers land BEFORE the sibling).
 			if (ownEnd === true && anchor?.nodeType === 8) {
 				end = anchor as Comment;
-				(STAGED_DOM ? STAGED_DOM.view(end) : end).data = '/for';
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, end);
+				end.data = '/for';
+				domParent.insertBefore(start, end);
 			} else {
-				end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/for');
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+				end = document.createComment('/for');
+				domParent.insertBefore(start, anchor ?? null);
+				domParent.insertBefore(end, anchor ?? null);
 			}
 		}
 		state = {
@@ -47968,11 +48535,12 @@ export function forBlock<T>(
 	// outer open marker. First-fill adoption always starts inside that range,
 	// including a zero-item list that already has a retained slot, or one that
 	// kept no items after a fill threw.
-	if (hydration !== null && state.size === 0) hydration.node = getNextSibling(state.start);
+	if (hydration !== null && state.size === 0) hydrationCursor.node = getNextSibling(state.start);
 	// New direct-host list output carries its server-selected arm on the existing
 	// outer open comment. Legacy/general list ranges return -1 and retain the
 	// content-shape checks used before markerless SSR items existed.
-	const serverMarkerState = hydration?.markerState(state.start) ?? -1;
+	const serverMarkerState =
+		(hydration == null ? void 0 : hydrateMarkerState(hydration, state.start)) ?? -1;
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
@@ -47999,21 +48567,50 @@ export function forBlock<T>(
 			state.emptyBlock.body = emptyBody;
 			state.emptyBlock.extra = state.env;
 			renderBlock(state.emptyBlock);
+		} else if (hydration === null) {
+			const target = prepareParent(domParent);
+			const result = renderOffscreen(
+				parentBlock,
+				target,
+				null,
+				emptyBody,
+				undefined,
+				null,
+				'control-flow',
+				state.env,
+			);
+			if (result.failed || result.suspended !== null) {
+				disposeWip(result.wip);
+				if (result.failed) throw result.error;
+				throw new SuspenseException(result.suspended);
+			}
+			const wip = result.wip;
+			spliceWipCapture(wip);
+			prepareSlot(parentScope, state, 'emptyPrepared', {
+				publish() {
+					state!.emptyBlock = wip.block;
+					retargetPreparedScope(wip.block, target, domParent);
+					placeRange(domParent, wip.start, wip.end, state!.end);
+				},
+				discard() {
+					if (!wip.block.disposed) disposeWip(wip);
+				},
+			});
 		} else {
-			if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+			if (TRANSITION_JOURNAL !== null) checkpointAdoptedList(state);
 			if (hydration !== null) {
 				// The server rendered a populated list where the client renders @empty:
 				// the content inside the @for range is item blocks (`<!--[-->`), not the
 				// @empty body.
 				if (
 					serverMarkerState === 1 ||
-					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start)))
+					(serverMarkerState === -1 && hydrateIsOpen(hydration, getNextSibling(state.start)))
 				)
-					hydration.listArmMismatch(parentScope, slotKey, state.start, true);
+					hydrateListArmMismatch(hydration, parentScope, slotKey, state.start, true);
 				// The server already rendered the @empty content directly inside the
 				// adopted outer range. The empty body borrows that range and adopts from
 				// its first child; no redundant inner pair is necessary.
-				hydration.node = getNextSibling(state.start);
+				hydrationCursor.node = getNextSibling(state.start);
 			}
 			const b = createBlock(
 				'control-flow',
@@ -48039,22 +48636,29 @@ export function forBlock<T>(
 		}
 		// Advance the cursor past the whole @for so the next sibling's clone()
 		// doesn't read a position left inside this consumed range.
-		hydration?.parkPast(state.end, parentScope);
+		if (hydration !== null) hydrateParkPast(hydration, state.end, parentScope);
 		return;
 	}
 	// We have items (or no empty body). If an empty branch was previously
 	// mounted, tear it down before reconciling so its DOM doesn't sit alongside
 	// the freshly-mounted items.
 	if (state.emptyBlock) {
-		// While a hold is possible the swap has to be reversible, exactly like a
-		// row removal: keep the branch's nodes and defer its teardown.
-		if (itemRemovalDefers()) {
-			journalForSlot(state);
-			parkItemForHold(state.emptyBlock, state);
-		} else unmountBlock(state.emptyBlock);
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileCount(ProfileCounter.FOR_EMPTY_UNMOUNT);
-		state.emptyBlock = null;
+		const empty = state.emptyBlock;
+		retireRootBlock(empty);
+		prepareSlot(parentScope, state, 'emptyPrepared', {
+			publish() {
+				if (state!.emptyBlock === empty) {
+					state!.emptyBlock = null;
+					unmountBlock(empty);
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileCount(ProfileCounter.FOR_EMPTY_UNMOUNT);
+				}
+			},
+			discard() {},
+		});
+	} else if (state.emptyPrepared !== undefined) {
+		journalRootProperty(state, 'emptyPrepared', state.emptyPrepared);
+		state.emptyPrepared = undefined;
 	}
 	// Hydrating, the server rendered no items (its open marker says so, or, on a legacy
 	// marker, the node right after `start` is not an item's `<!--[-->` but @empty content)
@@ -48067,9 +48671,9 @@ export function forBlock<T>(
 				((flags || 0) & 16) === 0 &&
 				getNextSibling(state.start) !== null &&
 				getNextSibling(state.start) !== state.end &&
-				!hydration.isOpen(getNextSibling(state.start))))
+				!hydrateIsOpen(hydration, getNextSibling(state.start))))
 	) {
-		hydration.listArmMismatch(parentScope, slotKey, state.start, false);
+		hydrateListArmMismatch(hydration, parentScope, slotKey, state.start, false);
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
@@ -48087,9 +48691,8 @@ export function forBlock<T>(
 	if ((f & 4) !== 0 && deps !== undefined) {
 		const requiresScope = (f & 32) !== 0;
 		if (requiresScope && TRANSITION_JOURNAL !== null && ROOT_RENDER_TRANSACTION === null) {
-			// The list journal restores membership and DOM, not this dependency
-			// snapshot. A suspended attempt must never leave a rolled-back list
-			// believing that its uncommitted dependencies are still current.
+			// An isolated transition attempt cannot publish its dependency cache
+			// until it has resolved; disable the pure-row skip during this attempt.
 			state.cachedDeps = null;
 			pure = false;
 		} else {
@@ -48120,7 +48723,7 @@ export function forBlock<T>(
 		// Only first-fill adoption consumes unowned server items. Survivor
 		// reconciliation can leave the cursor inside an already-owned item, which
 		// is no server item left over when a pending child replays hydration.
-		if (hydration !== null) hydration.settleItems(state.end);
+		if (hydration !== null) hydrateSettleItems(hydration, state.end);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -48140,7 +48743,7 @@ export function forBlock<T>(
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
-	hydration?.parkPast(state.end, parentScope);
+	if (hydration !== null) hydrateParkPast(hydration, state.end, parentScope);
 }
 
 // A pure row skip bypasses the row's render, and with it the context work its
@@ -48200,15 +48803,7 @@ export function keyedForBlock<T>(
 		state !== undefined &&
 		(!hydrating || activeHydration() === null) &&
 		state.cachedDeps !== null &&
-		tryUpdateKeyedSelection(
-			state,
-			items,
-			itemBody,
-			state.cachedDeps,
-			deps,
-			flags >>> 6,
-			selectionBody,
-		)
+		tryUpdateKeyedSelection(state, items, itemBody, state.cachedDeps, deps, flags >>> 6)
 	) {
 		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentScope.block);
 		return;
@@ -48236,288 +48831,9 @@ export function keyedForBlock<T>(
 	}
 }
 
-// Keep the certified host-only mounting path off common small lists.
-const FAST_HOST_LIST_MIN_ITEMS = 16;
-
-/** Select an existing, empty compiler-certified list for direct host mounting. */
-function fastHostListParent(
-	state: ForSlot | null | undefined,
-	items: ArrayLike<any>,
-	flags: number | undefined,
-): Node | null {
-	if (
-		state === undefined ||
-		state === null ||
-		state.ownerHost !== null ||
-		state.size !== 0 ||
-		state.emptyBlock !== null ||
-		state.adopt !== null ||
-		((flags || 0) & 2) === 0 ||
-		!Array.isArray(items) ||
-		items.length < FAST_HOST_LIST_MIN_ITEMS ||
-		(hydrating && activeHydration() !== null) ||
-		domNode(state.end!).parentNode === null ||
-		domNode(state.start!).parentNode !== domNode(state.end!).parentNode
-	) {
-		return null;
-	}
-	return domNode(state.end!).parentNode;
-}
-
-/** Mount certified host-only rows without the full component render machinery. */
-function mountFastHostItems<T>(
-	parentScope: Scope,
-	state: ForSlot,
-	parentNode: Node,
-	items: ArrayLike<T>,
-	getKey: (item: T, index: number) => any,
-	itemBody: (item: T, scope: Scope) => void,
-	flags: number | undefined,
-	deps: any[] | undefined,
-	mapped: boolean,
-): void {
-	const parentBlock = parentScope.block;
-	const renderMode = parentBlock.currentRenderMode ?? 'urgent';
-	const deferred = parentBlock.currentRenderDeferred;
-	const previousScope = CURRENT_SCOPE;
-	const previousBlock = CURRENT_BLOCK;
-	let previous: Block | null = null;
-	let current: Block | null = null;
-	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
-	if (ROOT_RENDER_TRANSACTION !== null && state.env !== deps)
-		journalRootProperty(state, 'env', state.env);
-	state.env = deps;
-	if (((flags || 0) & 4) !== 0 && deps !== undefined) {
-		if (ROOT_RENDER_TRANSACTION !== null && state.cachedDeps !== deps)
-			journalRootProperty(state, 'cachedDeps', state.cachedDeps);
-		state.cachedDeps = deps;
-	}
-	if (mapped) {
-		if (state.mappedNative !== true) journalRootProperty(state, 'mappedNative', state.mappedNative);
-		state.mappedNative = true;
-	}
-	try {
-		for (let index = 0; index < items.length; index++) {
-			const item = items[index];
-			const sourceKey = getKey(item, index);
-			const key = mapped ? 'k' + String(sourceKey) : sourceKey;
-			const block = createBlock(
-				'control-flow',
-				parentBlock,
-				parentNode,
-				null,
-				state.end,
-				itemBody as ComponentBody,
-				item,
-				deps,
-				null,
-			);
-			current = block;
-			block.forSlot = state;
-			block.key = key;
-			block.itemIndex = index;
-			block.currentRenderMode = renderMode;
-			block.currentRenderDeferred = deferred;
-			CURRENT_SCOPE = block;
-			CURRENT_BLOCK = block;
-			// Give each row the native frame renderBlock would. A native row body
-			// otherwise opens one implicitly that nothing closes, leaving the
-			// signal write guard active after the render returns.
-			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.beginRender(block);
-			(itemBody as any)(item, block, deps);
-			CURRENT_SCOPE = previousScope;
-			CURRENT_BLOCK = previousBlock;
-			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.endRender(block, true, false);
-			block.mounted = true;
-			const end = state.end!;
-			const root = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling!;
-			block.startMarker = root;
-			block.endMarker = root;
-			state.items.set(key, block);
-			block.prevSibling = previous;
-			if (previous !== null) previous.nextSibling = block;
-			else state.head = block;
-			previous = block;
-			current = null;
-		}
-		state.tail = previous;
-		state.size = items.length;
-	} catch (error) {
-		CURRENT_SCOPE = previousScope;
-		CURRENT_BLOCK = previousBlock;
-		if (current !== null) {
-			if (NATIVE_READ_DRIVER)
-				NATIVE_READ_DRIVER.endRender(current, false, isSuspenseException(error));
-			// A value-position child can throw or suspend after commitBag inserted
-			// its host. The still-unregistered row owns that host and any nested
-			// child scopes, so dispose it before unwinding the completed prefix.
-			if (current.slots[0] !== undefined) {
-				const end = state.end!;
-				const root = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling;
-				if (root !== null && root !== state.start) {
-					current.startMarker = root;
-					current.endMarker = root;
-				}
-			}
-			unmountBlock(current, true);
-		}
-		while (previous !== null) {
-			const block = previous;
-			previous = block.prevSibling;
-			state.items.delete(block.key);
-			unmountBlock(block, true);
-		}
-		state.head = null;
-		state.tail = null;
-		state.size = 0;
-		throw error;
-	}
-}
-
-/** Compiler-only direct host-row entry; ordinary list bundles do not retain it. */
-export function fastForBlock<T>(
-	parentScope: Scope,
-	slotKey: number,
-	domParent: Node,
-	items: ArrayLike<T>,
-	getKey: (item: T, index: number) => any,
-	itemBody: (item: T, scope: Scope) => void,
-	flags?: number,
-	deps?: any[],
-	emptyBody?: ComponentBody | null,
-	anchor?: Node | null,
-	ownEnd?: boolean,
-): void {
-	const state = parentScope.slots[slotKey] as ForSlot | undefined;
-	const parent = fastHostListParent(state, items, flags);
-	if (parent === null) {
-		forBlock(
-			parentScope,
-			slotKey,
-			domParent,
-			items,
-			getKey,
-			itemBody,
-			flags,
-			deps,
-			emptyBody,
-			anchor,
-			ownEnd,
-		);
-		return;
-	}
-	mountFastHostItems(parentScope, state!, parent, items, getKey, itemBody, flags, deps, false);
-}
-
-/** Direct host-row mounts composed with the independent keyed-selection proof. */
-export function fastKeyedForBlock<T>(
-	parentScope: Scope,
-	slotKey: number,
-	domParent: Node,
-	items: ArrayLike<T>,
-	getKey: (item: T, index: number) => any,
-	itemBody: (item: T, scope: Scope) => void,
-	flags: number,
-	deps: any[],
-	emptyBody?: ComponentBody | null,
-	anchor?: Node | null,
-	ownEnd?: boolean,
-	selectionBody?: ComponentBody<T, any[]>,
-): void {
-	const state = parentScope.slots[slotKey] as ForSlot | undefined;
-	const parent = fastHostListParent(state, items, flags);
-	if (parent === null) {
-		keyedForBlock(
-			parentScope,
-			slotKey,
-			domParent,
-			items,
-			getKey,
-			itemBody,
-			flags,
-			deps,
-			emptyBody,
-			anchor,
-			ownEnd,
-			selectionBody,
-		);
-		return;
-	}
-	mountFastHostItems(parentScope, state!, parent, items, getKey, itemBody, flags, deps, false);
-	if (state!.selectionItems !== items)
-		journalRootProperty(state!, 'selectionItems', state!.selectionItems);
-	state!.selectionItems = items;
-}
-
-/** Direct host-row mounts for compiler-proven, guarded native JSX map rows. */
-export function fastMapSlot(
-	scopeOrItems: any,
-	slotOrMethod: any,
-	domParent?: Node,
-	items?: any,
-	method?: any,
-	native?: boolean | ((...args: any[]) => any),
-	callback?: (...args: any[]) => any,
-	getKey?: (item: any, index: number) => any,
-	itemBody?: (item: any, scope: Scope) => void,
-	flags?: number,
-	deps?: any[],
-	anchor?: Node | null,
-	ownEnd?: boolean | 1,
-): boolean | void {
-	if (arguments.length === 2) return mapSlot(scopeOrItems, slotOrMethod);
-	// Compact map calls carry the callback in place of the native answer. Mirror
-	// mapSlot's normalization so custom receivers execute exactly one guard and
-	// retain their complete observable map callback/species/getter behavior.
-	if (typeof native === 'function') {
-		ownEnd = anchor as boolean | 1 | undefined;
-		anchor = deps as Node | null | undefined;
-		deps = flags as any[] | undefined;
-		flags = itemBody as unknown as number | undefined;
-		itemBody = getKey as unknown as (item: any, scope: Scope) => void;
-		getKey = callback as (item: any, index: number) => any;
-		callback = native;
-		native = mapSlot(items, method) as boolean;
-	}
-	const slot = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined;
-	const state = slot?.forSlot;
-	const parent = native === true ? fastHostListParent(state, items, flags) : null;
-	if (parent === null) {
-		return mapSlot(
-			scopeOrItems,
-			slotOrMethod,
-			domParent,
-			items,
-			method,
-			native,
-			callback,
-			getKey,
-			itemBody,
-			flags,
-			deps,
-			anchor,
-			ownEnd,
-		);
-	}
-	if (
-		slotOrMethod === 0 &&
-		scopeOrItems !== RETURNED_OUTPUT_SCOPE &&
-		(slot as any).returnedOutput === true
-	) {
-		setReturnedOutputOwner(slot, false);
-	}
-	mountFastHostItems(
-		scopeOrItems as Scope,
-		state!,
-		parent,
-		items,
-		getKey!,
-		itemBody!,
-		flags,
-		deps,
-		true,
-	);
-}
+// Certified host-only lists share the same prepare/commit ordering as every
+// other list. Keep the compiler entry names for consumers compiled with them.
+export { forBlock as fastForBlock, keyedForBlock as fastKeyedForBlock, mapSlot as fastMapSlot };
 
 /**
  * Remove every sibling from `from` (inclusive) up to but NOT including `end`.
@@ -48532,7 +48848,7 @@ function removeRange(from: Node | null, end: Node | null): void {
 	let n: Node | null = from;
 	while (n !== null && n !== end) {
 		const next: Node | null = getNextSibling(n);
-		(STAGED_DOM ? STAGED_DOM.view(n as ChildNode) : (n as ChildNode)).remove();
+		(n as ChildNode).remove();
 		n = next;
 	}
 }
@@ -48562,7 +48878,6 @@ function tryUpdateKeyedSelection<T>(
 	previousDeps: any[],
 	deps: any[],
 	selectionIndex: number,
-	selectionBody: ComponentBody<T, any[]> | undefined,
 ): boolean {
 	if (
 		state.selectionItems !== items ||
@@ -48601,26 +48916,14 @@ function tryUpdateKeyedSelection<T>(
 		if (first.extra !== deps) journalRootProperty(first, 'extra', first.extra);
 		first.body = itemBody as ComponentBody;
 		first.extra = deps;
-		// A separately certified host row can update just its class binding. Raw
-		// object/function children register child slots, however, and must still
-		// reconcile on the ordinary body path even when their identity is stable.
-		// Primitive-only child holes retain no slots, so they pay no extra cache.
-		if (selectionBody !== undefined && first._slots === null) {
-			renderLiteListItem(first, selectionBody, deps);
-		} else {
-			renderLiteListItem(first, itemBody as ComponentBody, deps);
-		}
+		renderLiteListItem(first, itemBody as ComponentBody, deps);
 	}
 	if (second !== undefined) {
 		if (second.body !== itemBody) journalRootProperty(second, 'body', second.body);
 		if (second.extra !== deps) journalRootProperty(second, 'extra', second.extra);
 		second.body = itemBody as ComponentBody;
 		second.extra = deps;
-		if (selectionBody !== undefined && second._slots === null) {
-			renderLiteListItem(second, selectionBody, deps);
-		} else {
-			renderLiteListItem(second, itemBody as ComponentBody, deps);
-		}
+		renderLiteListItem(second, itemBody as ComponentBody, deps);
 	}
 	return true;
 }
@@ -48660,7 +48963,6 @@ const _disp = new Int32Array(K_DISP);
 // Oversized lists use disposable buffers instead of retaining their backing
 // stores. The two capped caches can retain at most 128 KiB between renders.
 const MAX_KEYED_REORDER_SCRATCH = 16_384;
-let keyedReorderSources: Int32Array | null = null;
 let keyedLisPredecessors: Int32Array | null = null;
 
 /**
@@ -48711,6 +49013,8 @@ function updateSurvivor<T>(
 	// takes it before the first survivor index write.
 	const journal = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
 	if (journal && block.body !== itemBody) journalRootProperty(block, 'body', block.body);
+	if (journal && block.itemIndex !== newIdx)
+		journalRootProperty(block, 'itemIndex', block.itemIndex);
 	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
 		block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
@@ -48796,6 +49100,22 @@ function mountItemsLinear<T>(
 	passthroughList: boolean = false,
 ): void {
 	const newLen = items.length;
+	if (!passthroughList && state.adopt === null && (!hydrating || activeHydration() === null)) {
+		reconcileKeyed(
+			parentBlock,
+			state,
+			items,
+			keySource,
+			itemBody,
+			false,
+			singleRoot,
+			false,
+			false,
+			ssrMarkerless,
+			normalizeKey,
+		);
+		return;
+	}
 	const observeKey =
 		parentBlock.idState.renderOwner?.signalOwner !== undefined
 			? trackSignalRetryListKeys(parentBlock, state, newLen, keySource)
@@ -48810,10 +49130,14 @@ function mountItemsLinear<T>(
 	// shape to go back to: a fill during a render that may yet hold must come
 	// back out — rows, scopes and queued effects together — or the held boundary
 	// shows fresh rows with their bindings half rolled back underneath them.
-	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+	if (TRANSITION_JOURNAL !== null) checkpointAdoptedList(state);
 	const oldItems = state.items;
+	const source =
+		hydrating && state.end !== null
+			? (state.end as HydrationFrameMarker)[HYDRATION_FRAME]
+			: undefined;
 	const parentNode = (
-		state.ownerBlock.disposed ? null : (state.ownerHost ?? domNode(state.end!).parentNode)
+		state.ownerBlock.disposed ? null : (state.ownerHost ?? state.end!.parentNode ?? source?.parent)
 	)!;
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
 	// element's existing raw children, keyed like the incoming items. This cold
@@ -48839,31 +49163,31 @@ function mountItemsLinear<T>(
 			let adoptNode: Node | null = null;
 			let anchor: Node | null = state.end;
 			if (adoptByKey !== null) {
-				anchor = (prev === null ? getNextSibling(state.start!) : getNextSibling(prev.endMarker!))!;
+				anchor =
+					prev === null
+						? state.ownerHost !== null
+							? getFirstChild(state.ownerHost)
+							: getNextSibling(state.start!)
+						: getNextSibling(prev.endMarker!);
 				const candidate = adoptByKey.get(key);
 				if (candidate !== undefined) {
 					adoptNode = candidate.node;
 					adoptByKey.delete(key);
 					(adoptedNodes ??= new Set()).add(adoptNode);
-					if (adoptNode !== anchor) {
-						if (renderingFocus !== null) {
-							captureFocusedMovement(parentNode, renderingFocus);
-							moveFocusedNodeBefore(parentNode, adoptNode, anchor, renderingFocus);
-						} else
-							(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-								adoptNode,
-								anchor,
-							);
-					}
 				}
 			}
+			// Unmatched upgrade children have no live source to adopt. Prepare them
+			// privately; the existing list admission below places the ordered rows.
+			const fresh =
+				adoptByKey !== null && adoptNode === null && (!hydrating || activeHydration() === null);
+			const target = fresh ? prepareParent(parentNode) : parentNode;
 			const block: Block =
 				hydrating && passthroughList
 					? mountPassthroughListItem(parentBlock, parentNode, anchor, item, i, key, itemBody, state)
 					: mountItem(
 							parentBlock,
-							parentNode,
-							anchor,
+							target,
+							fresh ? null : anchor,
 							item,
 							i,
 							key,
@@ -48895,20 +49219,17 @@ function mountItemsLinear<T>(
 			const block = prev;
 			prev = block.prevSibling;
 			oldItems.delete(block.key);
-			const start = passthroughList ? block.startMarker : null;
-			const end = passthroughList ? block.endMarker : null;
-			const discardOwnedDom =
-				passthroughList &&
-				!isSuspenseException(error) &&
-				!isHostContextRequest(error) &&
-				!isAdoptionControl(error);
-			if (discardOwnedDom && start !== null && domNode(start).parentNode !== null)
-				journalRootChildren(domNode(start).parentNode!);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			if (block.idState.renderOwner?.signalOwner !== undefined)
 				discardSignalRetryItem(block, error);
-			else unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
-			if (start !== null && end !== null) removePassthroughItemRange(start, end, discardOwnedDom);
+			else
+				unmountBlock(
+					block,
+					!passthroughList &&
+						(!hydrating || activeHydration() === null) &&
+						!ROOT_RENDER_TRANSACTION?.hydrating &&
+						!ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block),
+				);
 		}
 		state.head = null;
 		state.tail = null;
@@ -48939,22 +49260,20 @@ function mountPassthroughListItem<T>(
 	forSlot: ForSlot,
 ): Block {
 	const hydration = activeHydration()!;
-	const cursor = hydration.node;
-	const before = cursor !== null && domNode(cursor).parentNode === parentNode ? cursor : anchor;
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
-	(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(start, before);
-	(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(end, anchor);
-	if (TRANSITION_JOURNAL !== null) {
-		journalUndo(() => {
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).remove();
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).remove();
-		});
-	}
+	const cursor = hydrationCursor.node;
+	const limit = anchor === null ? null : hydrationSourceLimit(anchor);
+	const before = cursor !== null && cursor.parentNode === parentNode ? cursor : limit;
+	const start = document.createComment('it');
+	const end = document.createComment('/it');
+	const fresh = cursor === null || cursor === limit || hydrateIsFresh(hydration, cursor);
+	// Siblings without server output render into their own detached extent. A
+	// selected owner reads the untouched source span under the real parent.
+	const target = fresh ? prepareParent(parentNode) : parentNode;
+	if (fresh) (target as DocumentFragment).append(start, end);
 	const block = createBlock(
 		'control-flow',
 		parentBlock,
-		parentNode,
+		target,
 		start,
 		end,
 		body as ComponentBody,
@@ -48965,61 +49284,28 @@ function mountPassthroughListItem<T>(
 	block.key = key;
 	block.itemIndex = index;
 	preserveRootCreatedDom(block);
-	const fresh = cursor === null || cursor === anchor || hydration.isFresh(cursor);
+	const frame = createHydrationFrame(parentNode, start, end, before, limit);
+	const outer = anchor === null ? undefined : (anchor as HydrationFrameMarker)[HYDRATION_FRAME];
+	if (outer !== undefined) frame.outer = outer;
+	prepareHydrationFrame(block, block, 0, parentNode, start, end, before);
 	const previousPassthrough = hydration.passthroughRanges;
 	hydration.passthroughRanges = true;
 	try {
-		if (fresh) hydration.suspend(() => renderBlock(block));
+		if (fresh) hydrateSuspend(hydration, () => renderBlock(block));
 		else renderBlock(block);
 	} catch (error) {
 		if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
-		const discardOwnedDom =
-			previousPassthrough &&
-			!hydration.passthroughRanges &&
-			!isSuspenseException(error) &&
-			!isHostContextRequest(error) &&
-			!isAdoptionControl(error);
-		if (discardOwnedDom) journalRootChildren(parentNode);
 		unmountBlock(block, false);
-		removePassthroughItemRange(start, end, discardOwnedDom);
 		throw error;
 	} finally {
 		hydration.passthroughRanges = previousPassthrough && hydration.passthroughRanges;
 	}
-	const next = hydration.node;
-	(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-		end,
-		next !== null && domNode(next).parentNode === parentNode ? next : anchor,
-	);
-	// The owner can advance the cursor to this item's provisional end. The
-	// following logical sibling must start after that end, not inside the item.
-	hydration.node = getNextSibling(end);
-	hydration.markFresh(start);
-	hydration.markFresh(end);
-	// A client-only item's content is not server content left unclaimed.
-	if (fresh)
-		for (
-			let node = getNextSibling(start);
-			node !== null && node !== end;
-			node = getNextSibling(node)
-		)
-			hydration.markFresh(node);
+	const next = hydrationCursor.node;
+	frame.after = fresh ? before : next !== null && next.parentNode === parentNode ? next : limit;
+	// The next sibling starts at the source left by this item. Its detached
+	// provisional end must never become a server cursor.
+	hydrationCursor.node = frame.after;
 	return block;
-}
-
-function removePassthroughItemRange(start: Node, end: Node, discardContents: boolean): void {
-	if (!discardContents) {
-		(STAGED_DOM ? STAGED_DOM.view(start as ChildNode) : (start as ChildNode)).remove();
-		(STAGED_DOM ? STAGED_DOM.view(end as ChildNode) : (end as ChildNode)).remove();
-		return;
-	}
-	for (let node: Node | null = start; node !== null;) {
-		const next = getNextSibling(node);
-		if (!isRendererHydrationStyle(node))
-			(STAGED_DOM ? STAGED_DOM.view(node as ChildNode) : (node as ChildNode)).remove();
-		if (node === end) break;
-		node = next;
-	}
 }
 
 function reconcileKeyed<T>(
@@ -49029,39 +49315,17 @@ function reconcileKeyed<T>(
 	keySource: ListKeySource<T>,
 	itemBody: (item: T, scope: Scope) => void,
 	pure: boolean,
-	// true / false = compiler-static (compiled @for); 2 = de-opt per-item
-	// self-marking sentinel, resolved by mountItem against each item VALUE.
 	singleRoot: boolean | 2,
 	lite: boolean = false,
 	indexIndependent: boolean = false,
-	// The matching server compiler proved a direct host root and omitted the
-	// item's hydration pair. Kept separate from singleRoot because sole-component
-	// and conditional roots are markerless only on fresh client mounts today.
 	ssrMarkerless: boolean = false,
 	normalizeKey: boolean = false,
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_RECONCILE);
-	const oldItems = state.items;
-	const oldSize = state.size;
-	const newLen = items.length;
-	const parentNode = (
-		state.ownerBlock.disposed ? null : (state.ownerHost ?? domNode(state.end!).parentNode)
-	)!;
-	// Scalar survivor updates journal their own bindings. Capture the chain and
-	// key map only if reconciliation actually changes membership or order, so
-	// unchanged lists do not allocate a second O(N) representation every render.
-	// A survivor's index moves only with that order, so the first index write
-	// takes the capture too, which restores every row's index on rollback.
-	// Index writes and the bounded relinks (inserts, removals, a small
-	// displacement) take the link form and record the rows they relink; a
-	// wholesale relink takes the full form (journalForSlot).
-	let journalShape = TRANSITION_JOURNAL !== null;
-	let record: ForSlotRecord | null = null;
-
-	// Fast path: empty → fill — the linear first-fill pass (callers on the
-	// first-mount path dispatch to it directly and skip this function entirely).
-	if (oldSize === 0) {
+	// Initial adoption consumes the SSR cursor. A subsequent change is a
+	// prepared client render; unvisited SSR nodes still belong to the cursor.
+	if (state.size === 0 && hydrating && activeHydration() !== null) {
 		mountItemsLinear(
 			parentBlock,
 			state,
@@ -49074,246 +49338,84 @@ function reconcileKeyed<T>(
 		);
 		return;
 	}
-	const observeKey =
+	const n = items.length;
+	const observe =
 		parentBlock.idState.renderOwner?.signalOwner !== undefined
-			? trackSignalRetryListKeys(parentBlock, state, newLen, keySource)
+			? trackSignalRetryListKeys(parentBlock, state, n, keySource)
 			: undefined;
 	if (process.env.NODE_ENV !== 'production') {
 		keySource = checkedListKey(keySource, normalizeKey);
 		normalizeKey = false;
 	}
-	// Fast path: clear all.
-	if (newLen === 0) {
-		const ownedRootClear = journalShape && canDeferRootOwnedListClear(state);
+	const parent = state.ownerHost ?? state.end!.parentNode!;
+	let current = state.head;
+	let i = 0;
+	let firstKey: any;
+	// Stable lists retain the allocation-free scan. Only the first structural
+	// difference creates a desired order. The failed key read is carried into
+	// that order, since a key expression can have observable reads.
+	for (; i < n && current !== null; i++) {
+		const item = items[i];
+		const key = readListKey(keySource, item, i, normalizeKey);
+		if (observe !== undefined) observe(i, key);
 		if (
-			ownedRootClear &&
-			(TRANSITION_JOURNAL_BAGS!.get(state) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
-		)
-			journalForOwnedListClear(state);
-		else if (journalShape) journalForSlot(state);
-		batchClearItems(state, ownedRootClear ? state.items : oldItems, ownedRootClear);
-		state.head = null;
-		state.tail = null;
-		state.size = 0;
-		state.inOrder = true;
-		return;
-	}
-
-	// ── Prefix walk: advance head cursor while keys match new[i] at position i.
-	let oldFirst: Block | null = state.head;
-	let prefixLen = 0;
-	while (oldFirst !== null && prefixLen < newLen) {
-		const newItem = items[prefixLen];
-		const newKey = readListKey(keySource, newItem, prefixLen, normalizeKey);
-		if (oldFirst.key !== newKey) break;
-		if (observeKey !== undefined) observeKey(prefixLen, newKey);
-		const block = oldFirst;
-		// Stable-survivor skip: updateSurvivor writes itemIndex/body only when
-		// they differ, journals only on a difference, and renders only when the
-		// item (or index, for an index-reading body) changed. A pure body whose
-		// item ref, body, and position all match is a provable no-op call — on a
-		// mostly-stable list that is one call per row per update. Skip it; the
-		// key read above already ran, so dev-mode duplicate-key checks are
-		// unchanged. The env tuple is never consumed by the pure branch, and a
-		// non-pure body still enters updateSurvivor for its renderBlock.
-		if (
-			!pure ||
-			block.props !== newItem ||
-			block.body !== itemBody ||
-			block.itemIndex !== prefixLen
+			current.disposed ||
+			(key !== current.key && !(key !== key && current.key !== current.key))
 		) {
-			if (journalShape && block.itemIndex !== prefixLen) {
-				record = journalForSlot(state, true);
-				journalShape = false;
-			}
-			updateSurvivor(block, newItem, prefixLen, itemBody, pure, lite, indexIndependent, state.env);
+			firstKey = key;
+			break;
 		}
-		oldFirst = block.nextSibling!;
-		prefixLen++;
-	}
-
-	// Both lists fully consumed by prefix? Identical → done.
-	if (prefixLen === newLen && oldFirst === null) return;
-
-	// ── Suffix walk: retreat tail cursor while keys match new[newEnd].
-	let oldLast: Block | null = state.tail;
-	let newEnd = newLen - 1;
-	let oldRemain = oldSize - prefixLen;
-	while (oldLast !== null && oldRemain > 0 && newEnd >= prefixLen) {
-		const newItem = items[newEnd];
-		const newKey = readListKey(keySource, newItem, newEnd, normalizeKey);
-		if (oldLast.key !== newKey) break;
-		if (observeKey !== undefined) observeKey(newEnd, newKey);
-		const block = oldLast;
-		// Same stable-survivor skip as the prefix walk (see above).
-		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd) {
-			if (journalShape && block.itemIndex !== newEnd) {
-				record = journalForSlot(state, true);
-				journalShape = false;
-			}
-			// Mirror updateSurvivor's pure branch when its body is also unchanged.
-			// Keep profiling and index bookkeeping aligned with that branch.
-			if (pure && indexIndependent && block.props === newItem && block.body === itemBody) {
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-					__profileCount(ProfileCounter.LIST_UPDATE);
-				block.itemIndex = newEnd;
-			} else {
-				updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
-			}
+		if (ROOT_RENDER_TRANSACTION?.retired?.delete(current)) {
+			const retired = ROOT_RENDER_TRANSACTION.retired;
+			const block = current;
+			journalUndo(() => retired!.add(block));
 		}
-		oldLast = block.prevSibling!;
-		newEnd--;
-		oldRemain--;
+		if (!pure || current.props !== item || current.body !== itemBody || current.itemIndex !== i)
+			updateSurvivor(current, item, i, itemBody, pure, lite, indexIndependent, state.env);
+		current = current.nextSibling;
 	}
-
-	// Boundaries of the OLD middle in the linked list.
-	//   beforeMiddle = last prefix-matched block (or null if prefix empty)
-	//   afterMiddle  = first suffix-matched block (or null if suffix empty)
-	// When oldRemain === 0, the OLD middle is empty — oldFirst is either null
-	// (prefix consumed all of old) or it points at the first suffix-matched block.
-	let beforeMiddle: Block | null;
-	let afterMiddle: Block | null;
-	if (oldRemain === 0) {
-		afterMiddle = oldFirst;
-		beforeMiddle = afterMiddle ? afterMiddle.prevSibling! : state.tail;
-	} else {
-		beforeMiddle = oldFirst!.prevSibling!;
-		afterMiddle = oldLast!.nextSibling!;
+	if (i === n && current === null) {
+		// A -> B -> A in one capture cancels an unpublished B order.
+		if (state.prepared !== undefined) {
+			journalRootProperty(state, 'prepared', state.prepared);
+			state.prepared = undefined;
+		}
+		return;
 	}
-
-	// Case: old middle empty, new middle non-empty → only inserts.
-	if (oldRemain === 0) {
-		if (journalShape) record = journalForSlot(state, true);
-		// Only `beforeMiddle` gets a new nextSibling; new keys append to the Map,
-		// which a middle insert leaves out of chain order.
-		const links = forSlotLinks(record);
-		if (links !== null && beforeMiddle !== null && !links.has(beforeMiddle))
-			links.set(beforeMiddle, beforeMiddle.nextSibling);
-		if (afterMiddle !== null) state.inOrder = false;
-		const anchor: Node | null = afterMiddle ? afterMiddle.startMarker! : state.end;
-		let prev: Block | null = beforeMiddle;
-		for (let i = prefixLen; i <= newEnd; i++) {
+	const prefix = i;
+	const order: Block[] = [];
+	const positions = new Int32Array(n);
+	positions.fill(-1);
+	const nextItems = new Map<any, Block>();
+	// itemIndex is the input to a row's prepared render, including a suspended
+	// one retained for retry. Only the applied sibling chain describes DOM order.
+	const appliedPositions = new Map<Block, number>();
+	for (let old = state.head, index = 0; old !== null; old = old.nextSibling, index++)
+		appliedPositions.set(old, index);
+	for (let old = state.head, index = 0; index < prefix; index++) {
+		order.push(old!);
+		positions[index] = index;
+		nextItems.set(old!.key, old!);
+		old = old!.nextSibling;
+	}
+	const fresh = prepareParent(parent);
+	// New markerless rows require a stable before-node while their root is
+	// created. It is private to the preparation and never reaches live DOM.
+	const fence = fresh.ownerDocument!.createComment('');
+	fresh.appendChild(fence);
+	const created: Block[] = [];
+	try {
+		for (; i < n; i++) {
 			const item = items[i];
-			const key = readListKey(keySource, item, i, normalizeKey);
-			if (observeKey !== undefined) observeKey(i, key);
-			const block = mountItem(
-				parentBlock,
-				parentNode,
-				anchor,
-				item,
-				i,
-				key,
-				itemBody,
-				state,
-				singleRoot,
-				ssrMarkerless,
-				null,
-				true,
-			);
-			oldItems.set(key, block);
-			block.prevSibling = prev;
-			block.nextSibling = afterMiddle;
-			if (prev) prev.nextSibling = block;
-			else state.head = block;
-			prev = block;
-		}
-		if (afterMiddle) afterMiddle.prevSibling = prev;
-		else state.tail = prev;
-		state.size += newEnd - prefixLen + 1;
-		return;
-	}
-
-	// Case: new middle empty, old middle non-empty → only removes.
-	if (prefixLen > newEnd) {
-		if (journalShape) record = journalForSlot(state, true);
-		// The removed run keeps its own links; only `beforeMiddle` gets a new
-		// nextSibling. Deleted keys go back to their Map positions by chain order,
-		// or by the Map's order kept here when that differs.
-		const links = forSlotLinks(record);
-		if (links !== null) {
-			if (!record!.inOrder) record!.prior ??= [...oldItems.values()];
-			if (beforeMiddle !== null && !links.has(beforeMiddle))
-				links.set(beforeMiddle, beforeMiddle.nextSibling);
-		}
-		let cur: Block | null = oldFirst;
-		let removed = 0;
-		while (cur !== afterMiddle) {
-			const next: Block | null = cur!.nextSibling!;
-			if (itemRemovalDefers()) parkItemForHold(cur!);
-			else unmountBlock(cur!);
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileCount(ProfileCounter.LIST_REMOVE);
-			oldItems.delete(cur!.key);
-			cur = next;
-			removed++;
-		}
-		if (beforeMiddle) beforeMiddle.nextSibling = afterMiddle;
-		else state.head = afterMiddle;
-		if (afterMiddle) afterMiddle.prevSibling = beforeMiddle;
-		else state.tail = beforeMiddle;
-		state.size -= removed;
-		return;
-	}
-
-	// ── General case: both middles non-empty. Partition + LIS-move.
-	const newMidLen = newEnd - prefixLen + 1;
-	const newKeys: any[] = [];
-	const newKeysToIdx = new Map<any, number>(); // key → MIDDLE-RELATIVE index (0..newMidLen-1)
-	// Equal-length middles can match unchanged positions directly. Keep only
-	// the other keys in the lookup map; local swaps then avoid indexing every
-	// untouched row between the moved ones. NaN retains Map's equality semantics.
-	// A fresh first key commonly starts a full replacement, where the extra
-	// chain walk earns nothing. Select the strategy from the first middle key,
-	// without keeping another value live across the prefix/suffix fast paths.
-	let keyCursor = oldRemain === newMidLen ? oldFirst : null;
-	let hasStableKeys = false;
-	for (let i = 0; i < newMidLen; i++) {
-		const key = readListKey(keySource, items[prefixLen + i], prefixLen + i, normalizeKey);
-		newKeys[i] = key;
-		if (i === 0 && keyCursor !== null && !oldItems.has(key)) keyCursor = null;
-		if (keyCursor !== null) {
-			if (keyCursor.key === key) hasStableKeys = true;
-			else newKeysToIdx.set(key, i);
-			keyCursor = keyCursor.nextSibling;
-		} else newKeysToIdx.set(key, i);
-		if (observeKey !== undefined) observeKey(prefixLen + i, key);
-	}
-
-	// Full-replace fast path — when prefix/suffix are empty AND no old items
-	// survive, batch-clear with `textContent = ''` (one DOM op vs N removeChild)
-	// and mass-mount. Detect "no survivors" by checking just the first old block
-	// (the loop in the original code exits after one hit too).
-	if (
-		!hasStableKeys &&
-		beforeMiddle === null &&
-		afterMiddle === null &&
-		!newKeysToIdx.has(oldFirst!.key)
-	) {
-		// Quick scan: confirm no survivor before committing to batch-clear.
-		let anySurvivors = false;
-		let cur: Block | null = oldFirst!.nextSibling!;
-		while (cur !== null) {
-			if (newKeysToIdx.has(cur.key)) {
-				anySurvivors = true;
-				break;
-			}
-			cur = cur.nextSibling!;
-		}
-		if (!anySurvivors) {
-			if (journalShape || record !== null) journalForSlot(state);
-			batchClearItems(state, oldItems);
-			state.inOrder = true;
-			state.head = null;
-			state.tail = null;
-			state.size = 0;
-			let prev: Block | null = null;
-			for (let i = 0; i < newLen; i++) {
-				const item = items[i];
-				const key = newKeys[i]; // prefixLen === 0, so newKeys spans the full list
-				const block = mountItem(
+			const usedFirstKey = i === prefix && current !== null;
+			const key = usedFirstKey ? firstKey : readListKey(keySource, item, i, normalizeKey);
+			if (!usedFirstKey && observe !== undefined) observe(i, key);
+			let block = state.items.get(key);
+			if (block === undefined || block.disposed) {
+				block = mountItem(
 					parentBlock,
-					parentNode,
-					state.end,
+					fresh,
+					fence,
 					item,
 					i,
 					key,
@@ -49324,444 +49426,107 @@ function reconcileKeyed<T>(
 					null,
 					true,
 				);
-				oldItems.set(key, block);
-				block.prevSibling = prev;
-				block.nextSibling = null;
-				if (prev) prev.nextSibling = block;
-				else state.head = block;
-				prev = block;
+				created.push(block);
+			} else {
+				positions[i] = appliedPositions.get(block)!;
+				if (ROOT_RENDER_TRANSACTION?.retired?.delete(block)) {
+					const retired = ROOT_RENDER_TRANSACTION.retired;
+					const kept = block;
+					journalUndo(() => retired!.add(kept));
+				}
+				if (!pure || block.props !== item || block.body !== itemBody || block.itemIndex !== i)
+					updateSurvivor(block, item, i, itemBody, pure, lite, indexIndependent, state.env);
 			}
-			state.tail = prev;
-			state.size = newLen;
-			return;
+			order.push(block);
+			nextItems.set(key, block);
+		}
+	} catch (error) {
+		for (const block of created) {
+			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+			if (!block.disposed) discardPreparedBlock(block);
+		}
+		throw error;
+	}
+	const seq = lis(positions, n);
+	const removed: Block[] = [];
+	for (let old = state.head; old !== null; old = old.nextSibling) {
+		if (!nextItems.has(old.key)) {
+			removed.push(old);
+			retireRootBlock(old);
 		}
 	}
-
-	// sources[i] = old middle-relative index for new[prefixLen + i], or -1 if new.
-	const cachedSources = keyedReorderSources;
-	let sources: Int32Array;
-	if (cachedSources !== null && cachedSources.length >= newMidLen) {
-		keyedReorderSources = null;
-		sources = cachedSources;
-	} else {
-		sources = new Int32Array(newMidLen);
-	}
-	try {
-		for (let i = 0; i < newMidLen; i++) sources[i] = -1;
-
-		let moved = false;
-		let lastIdx = 0;
-		let patched = 0;
-
-		// Walk old middle (linked-list traversal): re-render survivors, unmount removed.
-		let cur: Block | null = oldFirst;
-		let oldIdx = 0;
-		while (cur !== afterMiddle) {
-			const next: Block | null = cur!.nextSibling!;
-			const newRelIdx =
-				hasStableKeys && newKeys[oldIdx] === cur!.key ? oldIdx : newKeysToIdx.get(cur!.key);
-			if (newRelIdx === undefined) {
-				if (journalShape || record !== null) {
-					journalForSlot(state);
-					journalShape = false;
-					record = null;
+	const prepared: SlotPreparation = {
+		parent,
+		publish() {
+			const owner = parentBlock.idState.renderOwner;
+			const generation = owner?.generation;
+			const previousItems = state.items;
+			// All removed rows leave in this admission. Retire their event hosts
+			// before any earlier row's cleanup can focus a still-connected sibling.
+			if (renderingFocus !== null || !inFlush) {
+				for (const block of removed) {
+					if (
+						block.startMarker !== null &&
+						block.endMarker !== null &&
+						block.startMarker.parentNode === parent
+					)
+						retireHostRange(block.startMarker, block.endMarker);
 				}
-				if (itemRemovalDefers()) parkItemForHold(cur!);
-				else unmountBlock(cur!);
+			}
+			for (const block of removed) {
+				if (!block.disposed) unmountBlock(block);
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileCount(ProfileCounter.LIST_REMOVE);
-				oldItems.delete(cur!.key);
-				state.size--;
-			} else {
-				sources[newRelIdx] = oldIdx;
-				if (newRelIdx < lastIdx) moved = true;
-				else lastIdx = newRelIdx;
-				patched++;
-				const newIdx = prefixLen + newRelIdx;
-				const newItem = items[newIdx];
-				// Same stable-survivor skip as the prefix walk (see above).
-				if (
-					!pure ||
-					cur!.props !== newItem ||
-					cur!.body !== itemBody ||
-					cur!.itemIndex !== newIdx
-				) {
-					if (journalShape && cur!.itemIndex !== newIdx) {
-						record = journalForSlot(state, true);
-						journalShape = false;
-					}
-					updateSurvivor(cur!, newItem, newIdx, itemBody, pure, lite, indexIndependent, state.env);
-				}
 			}
-			cur = next;
-			oldIdx++;
-		}
-
-		// Fast bail: all survivors AND no moves AND no mounts → old middle is the
-		// same shape & order as new middle.
-		if (!moved && patched === newMidLen) {
-			// If the survivor walk did NOT unmount anything (oldRemain ===
-			// patched), the linked-list pointers are still correct end-to-end
-			// and we can return without touching them. But if blocks were
-			// unmounted BETWEEN survivors, the survivors' .prevSibling /
-			// .nextSibling pointers still reference now-disposed blocks AND
-			// state.head / state.tail may also point at disposed blocks. The
-			// next reconcile would then walk those stale pointers, decrement
-			// state.size for blocks that no longer exist, and ultimately
-			// crash with a null-pointer access in the prefix/suffix walk.
-			//
-			// Relink the entire middle chain so its prev/next pointers — and
-			// the boundary into beforeMiddle / afterMiddle / state.head /
-			// state.tail — accurately reflect the post-unmount topology.
-			// O(newMidLen); only fires when survivors and removes are mixed.
-			// Surfaced by fuzz-keyed-list seed=-2060211668 action 9 (a
-			// replace-all 13 → 2 where both survivors are in original order).
-			if (oldRemain !== patched) {
-				let prev: Block | null = beforeMiddle;
-				for (let i = 0; i < newMidLen; i++) {
-					const block = oldItems.get(newKeys[i])!;
-					block.prevSibling = prev;
-					if (prev) prev.nextSibling = block;
-					else state.head = block;
-					prev = block;
-				}
-				prev!.nextSibling = afterMiddle;
-				if (afterMiddle) afterMiddle.prevSibling = prev;
-				else state.tail = prev;
-			}
-			return;
-		}
-
-		// The remaining middle needs a move or an insertion. Pure survivor
-		// updates above may have completed first, but have not changed the chain.
-		state.inOrder = false;
-
-		// ── Small-displacement shortcut. When every old item survived AND only a
-		// small number of positions actually changed (≤ K_DISP), we can compute
-		// the exact move set in O(K_DISP) instead of paying the LIS path's O(N)
-		// allocation + back-walk that rewrites every prev/next pointer. This is
-		// a general property of permutations — when survivors are stable and the
-		// permutation has few fixed-point misses, LIS does provably wasted work.
-		//
-		// Real shapes this covers:
-		//   - drag-and-drop reorder (swap two rows, rotate three)
-		//   - undo/redo of a recent local edit
-		//   - animated swap / sort transitions
-		//   - A/B variant toggle that flips a small set of cells
-		//   - any benchmark or test fixture that mutates exactly K positions
-		//
-		// Bail cost on a true large-shuffle permutation: K_DISP + 1 source
-		// compares before falling through to the LIS path, which is sub-µs.
-		if (moved && patched === newMidLen) {
-			let dCount = 0;
-			for (let i = 0; i < newMidLen; i++) {
-				if (sources[i] !== i) {
-					if (dCount === K_DISP) {
-						dCount = K_DISP + 1;
-						break;
-					}
-					_disp[dCount++] = i;
-				}
-			}
-			if (dCount <= K_DISP) {
-				if (journalShape) record = journalForSlot(state, true);
-				// Before the first write, record each row whose nextSibling this
-				// shortcut rewrites: every displaced row and the row it lands after,
-				// the new middle's last row, and `beforeMiddle`.
-				const links = forSlotLinks(record);
-				if (links !== null) {
-					const touched: (Block | null)[] = [beforeMiddle, oldItems.get(newKeys[newMidLen - 1])!];
-					for (let j = 0; j < dCount; j++) {
-						const i = _disp[j];
-						touched.push(oldItems.get(newKeys[i])!, i > 0 ? oldItems.get(newKeys[i - 1])! : null);
-					}
-					for (const b of touched) if (b !== null && !links.has(b)) links.set(b, b.nextSibling);
-				}
-				const endAnchor: Node | null = afterMiddle ? afterMiddle.startMarker! : state.end;
-				// Move right-to-left. Positions to the right of the rightmost
-				// displaced index are identity-mapped and have stable startMarkers;
-				// each moved block becomes the next iteration's anchor.
-				for (let j = dCount - 1; j >= 0; j--) {
-					const i = _disp[j];
-					const block = oldItems.get(newKeys[i])!;
-					const anchor: Node | null =
-						i + 1 < newMidLen ? oldItems.get(newKeys[i + 1])!.startMarker! : endAnchor;
-					moveBlockBefore(block, anchor);
-				}
-				// Relink prev/next around each displaced position. Non-displaced
-				// neighbours of displaced blocks get their boundary pointers updated
-				// here too; non-displaced blocks BETWEEN two displaced positions keep
-				// their internal pointers (they were never touched by the survivor
-				// walk and the moves above don't reorder them).
-				for (let j = 0; j < dCount; j++) {
-					const i = _disp[j];
-					const block = oldItems.get(newKeys[i])!;
-					const prev = i > 0 ? oldItems.get(newKeys[i - 1])! : beforeMiddle;
-					const next = i + 1 < newMidLen ? oldItems.get(newKeys[i + 1])! : afterMiddle;
-					block.prevSibling = prev;
-					block.nextSibling = next;
-					if (prev) prev.nextSibling = block;
-					else state.head = block;
-					if (next) next.prevSibling = block;
-					else state.tail = block;
-				}
-				// Boundary patch: the first and last block of the NEW middle may be
-				// identity-mapped (not in _disp), in which case the displacement
-				// loop never touched them — they still carry their pre-reconcile
-				// neighbour pointers, which can be stale (e.g. pointing at a block
-				// that the survivor walk just unmounted, or at a prior-reconcile
-				// neighbour that has since shifted). Always re-pin the boundary
-				// pointers so state.head / state.tail / beforeMiddle.next /
-				// afterMiddle.prev are correct for the next reconcile.
-				//
-				// Repro for why this matters: surfaced by fuzz-keyed-list seed
-				// -1491785866 — a `replace-all` that shrinks the list (e.g. 6 → 3)
-				// where the last survivor is identity-mapped. Without the patch,
-				// state.tail keeps pointing at the prior-tail block (now deleted)
-				// and the surviving last block's .nextSibling still points at the
-				// removed sibling. The next reconcile then stops its old-middle
-				// walk early (at the stale nextSibling) and re-mounts the
-				// last survivor as a NEW block, producing a duplicate row.
-				const newMidFirst = oldItems.get(newKeys[0])!;
-				const newMidLast = oldItems.get(newKeys[newMidLen - 1])!;
-				newMidFirst.prevSibling = beforeMiddle;
-				newMidLast.nextSibling = afterMiddle;
-				if (beforeMiddle) beforeMiddle.nextSibling = newMidFirst;
-				else state.head = newMidFirst;
-				if (afterMiddle) afterMiddle.prevSibling = newMidLast;
-				else state.tail = newMidLast;
+			// All admitted deletions must finish, including after a cleanup
+			// reenters this root. Until then only the applied list is discoverable:
+			// a reentrant render cannot treat privately prepared nodes as survivors.
+			if (
+				parentBlock.disposed ||
+				owner?.generation !== generation ||
+				state.items !== previousItems
+			) {
+				for (const block of created) if (!block.disposed) discardPreparedBlock(block);
 				return;
 			}
-		}
-
-		if (journalShape || record !== null) journalForSlot(state);
-		// Place survivors first, then mount new rows in authored order. Reversing
-		// mounts reverses their ref/layout/effect order even when the DOM is right.
-		const middleEndAnchor: Node | null = afterMiddle ? afterMiddle.startMarker! : state.end;
-		if (patched === newMidLen) {
-			// A pure reorder has no mount callbacks to sequence. Move and relink
-			// in one backward walk, keeping the established reorder cost.
-			const seq = lis(sources, newMidLen);
-			let seqIdx = seq.length - 1;
-			let nextBlock = afterMiddle;
-			for (let i = newMidLen - 1; i >= 0; i--) {
-				const block = oldItems.get(newKeys[i])!;
-				if (seqIdx < 0 || i !== seq[seqIdx]) {
-					moveBlockBefore(block, nextBlock ? nextBlock.startMarker! : middleEndAnchor);
-				} else seqIdx--;
-				block.nextSibling = nextBlock;
-				if (nextBlock) nextBlock.prevSibling = block;
-				else state.tail = block;
-				nextBlock = block;
+			state.items = nextItems;
+			state.head = order[0] ?? null;
+			state.tail = order[n - 1] ?? null;
+			state.size = n;
+			state.inOrder = true;
+			for (let k = 0; k < n; k++) {
+				const block = order[k];
+				block.prevSibling = order[k - 1] ?? null;
+				block.nextSibling = order[k + 1] ?? null;
+				block.itemIndex = k;
 			}
-			nextBlock!.prevSibling = beforeMiddle;
-			if (beforeMiddle) beforeMiddle.nextSibling = nextBlock;
-			else state.head = nextBlock;
-			return;
-		}
-		if (moved) {
-			const seq = lis(sources, newMidLen);
-			let seqIdx = seq.length - 1;
-			let anchor = middleEndAnchor;
-			for (let i = newMidLen - 1; i >= 0; i--) {
-				if (sources[i] === -1) continue;
-				const block = oldItems.get(newKeys[i])!;
-				if (seqIdx < 0 || i !== seq[seqIdx]) moveBlockBefore(block, anchor);
-				else seqIdx--;
-				anchor = block.startMarker!;
-			}
-		}
-		let previous = beforeMiddle;
-		let nextSurvivor = 0;
-		for (let i = 0; i < newMidLen; i++) {
-			const key = newKeys[i];
-			let block: Block;
-			if (sources[i] === -1) {
-				if (nextSurvivor <= i) {
-					nextSurvivor = i + 1;
-					while (nextSurvivor < newMidLen && sources[nextSurvivor] === -1) nextSurvivor++;
+			let anchor: Node | null = state.end;
+			let last = seq.length - 1;
+			for (let k = n - 1; k >= 0; k--) {
+				const block = order[k];
+				if (block.disposed || state.items !== nextItems) return;
+				if (positions[k] === -1) {
+					retargetPreparedScope(block, fresh, parent);
+					placeRange(parent, block.startMarker!, block.endMarker!, anchor);
+				} else if (last >= 0 && seq[last] === k) {
+					last--;
+				} else {
+					moveBlockBefore(block, anchor);
 				}
-				const anchor =
-					nextSurvivor < newMidLen
-						? oldItems.get(newKeys[nextSurvivor])!.startMarker!
-						: middleEndAnchor;
-				const targetIdx = i + prefixLen;
-				block = mountItem(
-					parentBlock,
-					parentNode,
-					anchor,
-					items[targetIdx],
-					targetIdx,
-					key,
-					itemBody,
-					state,
-					singleRoot,
-					ssrMarkerless,
-					null,
-					true,
-				);
-				oldItems.set(key, block);
-				state.size++;
-			} else block = oldItems.get(key)!;
-			block.prevSibling = previous;
-			if (previous) previous.nextSibling = block;
-			else state.head = block;
-			previous = block;
-		}
-		previous!.nextSibling = afterMiddle;
-		if (afterMiddle) afterMiddle.prevSibling = previous;
-		else state.tail = previous;
-	} finally {
-		if (
-			sources.length <= MAX_KEYED_REORDER_SCRATCH &&
-			(keyedReorderSources === null || keyedReorderSources.length < sources.length)
-		) {
-			keyedReorderSources = sources;
-		}
-	}
+				anchor = block.startMarker;
+			}
+			// Newly prepared rows have only now joined a hidden Activity's live
+			// DOM, including rows in foreign portal targets.
+			settleDeoptVisibility(parentBlock);
+		},
+		discard() {
+			for (const block of created) if (!block.disposed) discardPreparedBlock(block);
+		},
+	};
+	prepareSlot(owningBlock(parentBlock), state, 'prepared', prepared);
 }
 
-/**
- * How many items a SHARED-parent clear needs before the scoped Range beats
- * walking the marker span. Measured in Chromium (Playwright, 101 trials per
- * point, alternating order, batched above the 100us clock clamp), clearing
- * 4-node items out of a 3000-node document:
- *
- *   items      10     25     50    100-600    1000    2000
- *   range/walk 2.21x  1.58x  1.34x  ~1.0x     0.88x   0.92x
- *
- * The walk wins outright while Range's fixed setup dominates, the two are
- * within run-to-run noise across the middle band (the ratio flips between
- * runs there; Range's absolute times are stable, the walk's are not), and
- * Range pulls reproducibly ahead by ~8-12% once the per-node call overhead
- * dominates. The boundary sits at the TOP of the noise band rather than the
- * bottom: nothing measurable is given up in a browser either way, while the
- * walk is worth far more everywhere else — jsdom's `deleteContents` decides
- * containment with a boundary-point comparison per candidate node, each of
- * which can walk the whole document, so the Range path costs
- * O(items x document) there (266x the walk at 100 items in a 3400-node
- * document, and it grows with PAGE size, not list size).
- */
 const RANGE_CLEAR_MIN_ITEMS = 512;
-
-/**
- * Keep an owned list's inert rows connected until the root accepts its render,
- * then release their scopes and remove their host nodes in one DOM operation.
- * Rows with lifecycle work stay on the ordinary parked-item path so their
- * cleanup order and connected-DOM observations remain unchanged.
- */
-function canDeferRootOwnedListClear(state: ForSlot): boolean {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (state.ownerHost !== null) return false;
-	const parent = domNode(state.start!).parentNode;
-	if (
-		transaction === null ||
-		transaction.aborted ||
-		ROOT_RENDER_ROLLBACK ||
-		transaction.hydrating === true ||
-		state.adopt !== null ||
-		state.size < 16 ||
-		parent === null ||
-		(parent.nodeType !== 1 && parent.nodeType !== 11) ||
-		domNode(state.end!).parentNode !== parent ||
-		domNode(state.start!).previousSibling !== null ||
-		getNextSibling(state.end!) !== null
-	)
-		return false;
-	const oldHead = state.head;
-	for (let block = oldHead; block !== null; block = block.nextSibling) {
-		if (
-			!block.mounted ||
-			block.idState.renderOwner !== transaction.owner ||
-			block.startMarker === null ||
-			block.startMarker !== block.endMarker ||
-			block.hooks !== null ||
-			block.effectSlots !== null ||
-			block.cleanups !== null ||
-			block.children !== null ||
-			block._slots !== null ||
-			block.refFields !== null ||
-			block.deoptNode !== null ||
-			(block.rare !== null && block.rare.vt !== null)
-		)
-			return false;
-	}
-	return true;
-}
-
-function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): boolean {
-	if (!certified && !canDeferRootOwnedListClear(state)) return false;
-	const transaction = ROOT_RENDER_TRANSACTION!;
-	const parent = domNode(state.start!).parentNode!;
-	const oldHead = state.head;
-	const retired = (transaction.retired ??= new Set<Block>());
-	const newlyRetired: Block[] = [];
-	for (let block = oldHead; block !== null; block = block.nextSibling) {
-		if (!retired.has(block)) {
-			retired.add(block);
-			newlyRetired.push(block);
-		}
-		if (block.pending) {
-			journalRootProperty(block, 'pending', block.pending);
-			block.pending = false;
-		}
-	}
-	let cancelled = false;
-	journalUndo(() => {
-		cancelled = true;
-		for (let i = 0; i < newlyRetired.length; i++) retired.delete(newlyRetired[i]);
-	});
-	const start = state.start!;
-	const end = state.end!;
-	(transaction.commit ??= []).push(() => {
-		if (cancelled) return;
-		// A later render may have inserted new rows, or outside code may have
-		// changed this parent. Only clear wholesale while these exact old nodes
-		// still occupy its complete content between the original two markers.
-		let wholeParent =
-			state.size === 0 &&
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === parent &&
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === parent &&
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).previousSibling === null &&
-			getNextSibling(end) === null;
-		if (wholeParent) {
-			// This walk visits every cleared row: read the native getter directly
-			// instead of calling getNextSibling per row, unless a stage is active.
-			const read = STAGED_DOM ? undefined : nextSiblingGetter;
-			let node = getNextSibling(start);
-			for (let block = oldHead; block !== null; block = block.nextSibling) {
-				if (node === null || node !== block.startMarker) {
-					wholeParent = false;
-					break;
-				}
-				node = read !== undefined ? read.call(node) : getNextSibling(node);
-			}
-			if (node !== end) wholeParent = false;
-		}
-		for (let block = oldHead; block !== null; block = block.nextSibling) block.disposed = true;
-		// Inert rows run no cleanup, so only removing a focused row can dispatch at
-		// one. Every child of this owned parent is an outgoing row: retire the one
-		// holding the focus the scheduler captured for this pass, not every row. A
-		// drain over several focused documents (an array) retires none; an inert
-		// row's handler belongs to its live list owner.
-		let row: Node | null | undefined = (renderingFocus as FocusSelectionSnapshot | null)?.focused;
-		while (row != null && domNode(row).parentNode !== parent)
-			row = domNode(row).parentNode ?? (row as ShadowRoot).host;
-		if (row != null) retireEventHostTree(row);
-		if (wholeParent) {
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).textContent = '';
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(start);
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(end);
-		} else {
-			for (let block = oldHead; block !== null; block = block.nextSibling) {
-				const node = block.startMarker!;
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== null)
-					domNode((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!).removeChild(node);
-			}
-		}
-	});
-	return true;
-}
 
 /**
  * Bulk-clear a forBlock's items. When the forBlock owns its parent (markers
@@ -49786,23 +49551,6 @@ function batchClearItems(
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_REMOVE, state.size);
-	// An immediate bulk DOM removal cannot be undone after a suspended render.
-	// A journaled clear remains undoable until the attempt commits. Root-owned
-	// inert rows can stay connected and clear together at commit; all other
-	// rows park individually so their cleanup and ref behavior stays intact.
-	if (forSlotParkable(state)) {
-		if (deferRootOwnedListClear(state, ownedRootClear)) {
-			oldItems.clear();
-			return;
-		}
-		let next: Block | null;
-		for (let b: Block | null = state.head; b !== null; b = next) {
-			next = b.nextSibling;
-			parkItemForHold(b);
-		}
-		oldItems.clear();
-		return;
-	}
 	// One teardown bracket spans the items and their DOM, as in unmountBlock: a
 	// cleanup error dispatches to its boundary only after the list is cleared, so a
 	// boundary re-render cannot dispose the list while this still writes through it.
@@ -49847,19 +49595,17 @@ function batchClearItems(
 				b.disposed = true;
 			}
 		}
-		const p = domNode(state.start!).parentNode!;
-		if (domNode(state.start!).previousSibling === null && getNextSibling(state.end!) === null) {
+		const p = state.start!.parentNode!;
+		if (state.start!.previousSibling === null && getNextSibling(state.end!) === null) {
 			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
-			(STAGED_DOM ? STAGED_DOM.view(p as Element) : (p as Element)).textContent = '';
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.start!);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.end!);
+			(p as Element).textContent = '';
+			p.appendChild(state.start!);
+			p.appendChild(state.end!);
 		} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
 			// Shared parent (other JSX interleaved) — detach the marker span directly.
 			// Each removal takes a whole item subtree, so this is one call per ITEM,
 			// not per node.
 			removeRange(getNextSibling(state.start!), state.end!);
-		} else if (STAGED_DOM) {
-			STAGED_DOM.clearBetween(state.start!, state.end!);
 		} else {
 			// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
 			const range = document.createRange();
@@ -49910,10 +49656,10 @@ function mountItem<T>(
 		// changed, is one the server never rendered, and the cursor belongs to
 		// other blocks' server nodes: it builds as a client mount would, below.
 		if (!inserted) {
-			const node = hydration.node;
+			const node = hydrationCursor.node;
 			if (
 				ssrMarkerless &&
-				!hydration.isOpen(node) &&
+				!hydrateIsOpen(hydration, node) &&
 				(singleRoot !== 2 ||
 					!forSlot.plainDeopt ||
 					(isHostDescriptor(item) && !descNeedsBlocks(item)))
@@ -49927,7 +49673,7 @@ function mountItem<T>(
 					(singleRoot !== 2 ||
 						!forSlot.plainDeopt ||
 						(node.nodeType === 1 &&
-							domNode(node).parentNode === parentNode &&
+							node.parentNode === parentNode &&
 							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
 				) {
 					const block = createBlock(
@@ -49945,16 +49691,16 @@ function mountItem<T>(
 					block.itemIndex = index;
 					if (singleRoot === 2 && forSlot.plainDeopt) block.deoptNode = node;
 					renderBlock(block);
-					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
+					hydrationCursor.node = block.endMarker?.nextSibling ?? getNextSibling(node);
 					return block;
 				}
-			} else if (hydration.isOpen(node)) {
+			} else if (hydrateIsOpen(hydration, node)) {
 				// Hydration: the server wraps each GENERAL-SHAPE item in its own
 				// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
 				// when a current direct-host client could have adopted markerlessly, which
 				// keeps mixed-version/dev hydration recoverable.
-				const itemEnd = hydration.close(node as Node);
-				hydration.node = getNextSibling(node!);
+				const itemEnd = hydrateClose(hydration, node as Node);
+				hydrationCursor.node = getNextSibling(node!);
 				const block = createBlock(
 					'control-flow',
 					parentBlock,
@@ -49969,12 +49715,15 @@ function mountItem<T>(
 				block.key = key;
 				block.itemIndex = index;
 				renderBlock(block);
-				hydration.node = getNextSibling(itemEnd);
+				hydrationCursor.node = getNextSibling(itemEnd);
 				return block;
 			}
 			// The server rendered fewer items than the client, or at the cursor an item
 			// that cannot be this one.
-			hydration.itemMismatch(
+			hydrateItemMismatch(
+				// The server rendered fewer items than the client, or at the cursor an item
+				// that cannot be this one.
+				hydration,
 				forSlot.end!,
 				process.env.NODE_ENV !== 'production'
 					? forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
@@ -49983,7 +49732,7 @@ function mountItem<T>(
 					: '',
 			);
 		}
-		const block = hydration.suspend(() =>
+		const block = hydrateSuspend(hydration, () =>
 			mountItem(
 				parentBlock,
 				parentNode,
@@ -49999,12 +49748,19 @@ function mountItem<T>(
 		);
 		// Like a block renderUpdate builds, every later render of the row stays on
 		// the client, including a retry that resumes a block suspended inside it.
-		hydration.recordUpdate(block);
+		hydrateRecordUpdate(
+			// Like a block renderUpdate builds, every later render of the row stays on
+			// the client, including a retry that resumes a block suspended inside it.
+			hydration,
+			block,
+		);
 		return block;
 	}
 	if (
 		singleRoot === true ||
-		(singleRoot === 2 && isHostDescriptor(item) && !descNeedsBlocks(item))
+		(singleRoot === 2 &&
+			isHostDescriptor(item) &&
+			(adoptNode?.nodeType === 1 || !descNeedsBlocks(item)))
 	) {
 		// Compiler verified the body emits exactly one Element root (true) — or,
 		// on the de-opt sentinel (2), the ITEM VALUE is a pure single-element
@@ -50062,25 +49818,24 @@ function mountItem<T>(
 		// actual element (so subsequent body re-renders insert nothing — the
 		// update path mutates the cached _b._el$N refs directly).
 		const root =
-			block.deoptNode ?? (STAGED_DOM ? STAGED_DOM.view(anchor!) : anchor!).previousSibling!;
+			block.deoptNode ??
+			(block as any).deoptPrepared?.output?.node ??
+			(anchor === null ? parentNode.lastChild : anchor.previousSibling);
 		block.startMarker = root;
 		block.endMarker = root;
 		return block;
 	}
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
+	const start = document.createComment('it');
+	const end = document.createComment('/it');
 	if (adoptNode !== null) {
 		// Adoption: wrap the existing raw node in this item's markers where it
 		// already sits (identity/focus/input state survive) instead of building
 		// at the anchor.
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(start, adoptNode);
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-			end,
-			getNextSibling(adoptNode),
-		);
+		parentNode.insertBefore(start, adoptNode);
+		parentNode.insertBefore(end, getNextSibling(adoptNode));
 	} else {
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(start, anchor);
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(end, anchor);
+		parentNode.insertBefore(start, anchor);
+		parentNode.insertBefore(end, anchor);
 	}
 	const block = createBlock(
 		'control-flow',
@@ -50122,8 +49877,7 @@ function discardThrownItem(block: Block, error: unknown, selfMarked: boolean): v
 	const bag = block.slots[0];
 	if (selfMarked && bag != null && (bag as any).__kind === undefined) {
 		const anchor = block.endMarker;
-		const root =
-			anchor === null ? domNode(block.parentNode).lastChild : domNode(anchor).previousSibling;
+		const root = anchor === null ? block.parentNode.lastChild : anchor.previousSibling;
 		block.startMarker = root;
 		block.endMarker = root;
 	}
@@ -50134,9 +49888,12 @@ function discardThrownItem(block: Block, error: unknown, selfMarked: boolean): v
 function moveBlockBefore(block: Block, anchor: Node | null): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_MOVE);
-	const parent = domNode(block.startMarker!).parentNode!;
-	const end = block.endMarker!;
-	let n: Node | null = block.startMarker!;
+	placeRange(block.startMarker!.parentNode!, block.startMarker!, block.endMarker!, anchor);
+}
+
+/** Place exactly this range; the fence can belong to another parent. */
+function placeRange(parent: Node, first: Node, end: Node, anchor: Node | null): void {
+	let n: Node | null = first;
 	if (renderingFocus !== null) {
 		captureFocusedMovement(parent, renderingFocus);
 		moveFocusedBlockBefore(parent, n, end, anchor, renderingFocus);
@@ -50154,7 +49911,7 @@ function moveBlockBefore(block: Block, anchor: Node | null): void {
 	while (n) {
 		const isEnd = n === end;
 		const next: Node | null = getNextSibling(n);
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(n, anchor);
+		parent.insertBefore(n, anchor);
 		if (isEnd) break;
 		n = next;
 	}
@@ -50194,81 +49951,13 @@ function moveFocusedNodeBefore(
 	} else if (snapshots.focused.ownerDocument === node.ownerDocument) {
 		snapshot = snapshots;
 	}
-	if (!STAGED_DOM) {
-		moveNativeNodeBefore(
-			parent,
-			node,
-			anchor,
-			snapshot?.focused ?? null,
-			snapshot?.contentEditable ?? false,
-		);
-		return;
-	}
-	const focused = snapshot?.focused ?? null;
-	let containsFocused = node === focused;
-	if (!containsFocused && focused !== null && node.nodeType === 1) {
-		let candidate: Element | undefined = focused;
-		do {
-			if (STAGED_DOM.view(node as Element).contains(candidate)) {
-				containsFocused = true;
-				break;
-			}
-			candidate = (STAGED_DOM.view(candidate).getRootNode() as ShadowRoot).host;
-		} while (candidate !== undefined);
-	}
-	if (!containsFocused) {
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-		return;
-	}
-
-	const moveBefore = (
-		STAGED_DOM
-			? STAGED_DOM.view(parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-			: (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-	).moveBefore;
-	// Chromium's state-preserving move keeps input composition alive but still
-	// collapses live Range selections inside a moved content-editable subtree.
-	if (!snapshot!.contentEditable && typeof moveBefore === 'function') {
-		moveBefore.call(parent, node, anchor);
-		return;
-	}
-
-	// Rotate only siblings of the same projected parent. Restoration can move
-	// an editing node across parents, which requires inserting that node itself.
-	if (
-		STAGED_DOM.view(node).parentNode !== parent ||
-		(anchor !== null && STAGED_DOM.view(anchor).parentNode !== parent)
-	) {
-		STAGED_DOM.view(parent).insertBefore(node, anchor);
-		return;
-	}
-
-	// insertBefore detaches an existing node, which ends a trusted keyboard
-	// composition even when the commit later restores focus. Older Chromium,
-	// Samsung Internet, and editable Range selections instead keep the focused
-	// node attached and rotate only its intervening siblings around it.
-	if (node === anchor || getNextSibling(node) === anchor) return;
-	if (
-		anchor === null ||
-		((STAGED_DOM ? STAGED_DOM.view(node) : node).compareDocumentPosition(anchor) &
-			Node.DOCUMENT_POSITION_FOLLOWING) !==
-			0
-	) {
-		let cursor = getNextSibling(node);
-		while (cursor !== anchor) {
-			const next = getNextSibling(cursor!);
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(cursor!, node);
-			cursor = next;
-		}
-	} else {
-		const end = getNextSibling(node);
-		let cursor: Node | null = anchor;
-		while (cursor !== node) {
-			const next: Node | null = getNextSibling(cursor!);
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(cursor!, end);
-			cursor = next;
-		}
-	}
+	moveNativeNodeBefore(
+		parent,
+		node,
+		anchor,
+		snapshot?.focused ?? null,
+		snapshot?.contentEditable ?? false,
+	);
 }
 
 /**
@@ -50439,7 +50128,7 @@ function registerEnabledRootErrorHandlers(root: Block, options: RootOptions | un
 }
 
 function rootErrorHandlersFor(block: Block | null): RootErrorHandlers | null {
-	if (ROOT_ERROR_HANDLERS === null || block === null) return null;
+	if (!ROOT_ERROR_HANDLERS || block === null) return null;
 	let b: Block = block;
 	while (b.parentBlock !== null) b = b.parentBlock;
 	return ROOT_ERROR_HANDLERS.get(b) ?? null;
@@ -50528,7 +50217,7 @@ function inlineCaughtErrorOwner(block: Block): ScheduledVisibilityOwner | null {
 
 /** Inline boundary catches have no scheduled-error caller to report for them. */
 function registeredEnqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
-	if (ROOT_ERROR_HANDLERS === null || state.branch !== 0) return;
+	if (!ROOT_ERROR_HANDLERS || state.branch !== 0) return;
 	const block = state.block;
 	if (block === null) return;
 	const handler = rootErrorHandlersFor(block)?.onCaughtError;
@@ -50606,13 +50295,19 @@ function registeredReportUncaughtError(block: Block | null, err: unknown): boole
  * client's state is not a mismatch, so it reports nothing.
  */
 function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
-	if (ROOT_ERROR_HANDLERS === null || currentHydration?.staleServerValues === true) return;
+	if (!ROOT_ERROR_HANDLERS || currentHydration?.staleServerValues === true) return;
 	const from = block ?? CURRENT_BLOCK;
-	if (currentHydration?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
+	if (
+		currentHydration == null
+			? void 0
+			: hydrateHolds(currentHydration, () => noteRecoverableHydrationError(makeError, from))
+	)
+		return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
 	if (h === undefined) return;
 	const report = () => queueMicrotask(() => invokeRootErrorHandler(h, makeError()));
-	if (currentHydration?.awaitsCommit(report) !== true) report();
+	if ((currentHydration == null ? void 0 : hydrateAwaitsCommit(currentHydration, report)) !== true)
+		report();
 }
 
 // One live public root owns a container at a time. React still returns a second
@@ -50656,10 +50351,7 @@ function isDocumentResource(node: Node): boolean {
 	return (
 		name === 'script' ||
 		name === 'style' ||
-		(name === 'link' &&
-			(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element))
-				.getAttribute('rel')
-				?.toLowerCase() === 'stylesheet')
+		(name === 'link' && (node as Element).getAttribute('rel')?.toLowerCase() === 'stylesheet')
 	);
 }
 
@@ -50688,48 +50380,73 @@ function hydrationFallbackNodes(container: RootContainer): Node[] {
 	return nodes;
 }
 
-/**
- * Take island `boundaryId`'s server wrapper for the client render replacing a
- * failed hydration, which moves it into place. A rollback of that render puts
- * it back where the server DOM had it. The island lives on its own root, so
- * the render adopts it as hydration would have, and only an island the render
- * no longer has is discarded with the server DOM (installHydrationFallback).
- */
+/** Find an unreserved independently owned wrapper in a root's server tree. */
 function keptHydrationIsland(boundaryId: string): Element | null {
 	const islands = ROOT_RENDER_TRANSACTION?.keptIslands;
-	const index =
-		islands?.findIndex((island) => domNode(island).getAttribute(HYDRATE_ID_ATTR) === boundaryId) ??
-		-1;
-	if (index < 0) return null;
-	const wrapper = islands!.splice(index, 1)[0];
-	const parent = domNode(wrapper).parentNode!;
-	const next = domNode(wrapper).nextSibling;
-	journalUndo(() => domNode(parent).insertBefore(wrapper, next));
-	return wrapper;
+	if (islands !== undefined)
+		for (const island of islands)
+			if (
+				(island as Element).nodeType === 1 &&
+				(island as Element).getAttribute(HYDRATE_ID_ATTR) === boundaryId
+			)
+				return island as Element;
+	return null;
+}
+
+/** Install one accepted island before retiring its old root ancestry. */
+function commitKeptHydrationIsland(state: HydrateSlot): boolean {
+	const wrapper = state.keptWrapper;
+	const placeholder = state.wrapper;
+	const parent = placeholder.parentNode;
+	if (wrapper === undefined || parent === null || blockSubtreeDisposed(state.parentBlock))
+		return false;
+	state.keptWrapper = undefined;
+	state.wrapper = wrapper;
+	state.block.parentNode = wrapper;
+	replaceSharedBlockBoundary(state.parentBlock, placeholder, placeholder, wrapper, wrapper);
+	parent.replaceChild(wrapper, placeholder);
+	// Suspense/Activity can have hidden the private primary's placeholder.
+	// Transfer only an actual owner of that placeholder to the admitted wrapper;
+	// the independent root's authored display value remains its own.
+	if (HIDDEN_DISPLAYS.has(placeholder)) {
+		for (let block: Block | null = state.parentBlock; block !== null; block = block.parentBlock) {
+			const primary = block.rare?.trySlot;
+			if (primary?.hiddenDom?.displays.delete(placeholder)) {
+				primary.hiddenDom.displays.add(wrapper);
+				releaseHiddenDisplay(placeholder, true, false);
+				retainHiddenDisplay(wrapper, true);
+			}
+			const activity = block.rare?.activitySlot;
+			if (activity?.hiddenDom?.displays.delete(placeholder)) {
+				activity.hiddenDom.displays.add(wrapper);
+				releaseHiddenActivityNode(placeholder);
+				releaseHiddenDisplay(placeholder, true, false);
+				retainHiddenActivityNode(wrapper);
+				retainHiddenDisplay(wrapper, true);
+			}
+		}
+	}
+	return true;
 }
 
 /** Remove each of `nodes` that is still attached. */
 function removeNodes(nodes: readonly Node[]): void {
 	for (const node of nodes) {
-		const parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
-		if (parent !== null) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
+		const parent = node.parentNode;
+		if (parent !== null) parent.removeChild(node);
 	}
 }
 
 function clearRootContainer(container: RootContainer): void {
 	if (container.nodeType !== 9) {
-		(STAGED_DOM
-			? STAGED_DOM.view(container as Element | DocumentFragment)
-			: (container as Element | DocumentFragment)
-		).textContent = '';
+		(container as Element | DocumentFragment).textContent = '';
 		return;
 	}
 	// A document's textContent setter is a no-op. Preserve its doctype while
 	// releasing renderer-owned content, so future roots keep the document mode.
 	for (let child = getFirstChild(container); child !== null;) {
 		const next = getNextSibling(child);
-		if (child.nodeType !== 10)
-			(STAGED_DOM ? STAGED_DOM.view(container) : container).removeChild(child);
+		if (child.nodeType !== 10) container.removeChild(child);
 		child = next;
 	}
 }
@@ -50832,7 +50549,7 @@ export function devHtmlNesting(
 						(slot.head?.startMarker as Element & { __oct_loc?: string })?.__oct_loc ===
 							childLocation
 					) {
-						parent = domNode(slot.start).parentNode;
+						parent = slot.start.parentNode;
 						break;
 					}
 				}
@@ -50848,7 +50565,7 @@ export function devHtmlNesting(
 						? invalidHtmlNestingWithParent(childTag, element.localName, childLocation, location)
 						: invalidHtmlNestingWithAncestor(childTag, actualAncestors, childLocation, location);
 				if (message !== null) break;
-				parent = (STAGED_DOM ? STAGED_DOM.view(element) : element).parentNode;
+				parent = element.parentNode;
 			}
 		} else {
 			message =
@@ -50893,13 +50610,13 @@ function validateRootHtmlNesting(container: RootContainer, body: ComponentBody):
 		) {
 			return;
 		}
-		const root = (STAGED_DOM ? STAGED_DOM.view(container) : container).firstElementChild;
+		const root = container.firstElementChild;
 		if (root === null) return;
 		if (invalidHtmlNestingWithParent(root.localName, element.localName) !== null) {
 			devHtmlNesting(root.localName, [element.localName]);
 			return;
 		}
-		let child = (STAGED_DOM ? STAGED_DOM.view(root) : root).firstElementChild;
+		let child = root.firstElementChild;
 		const ancestors = [root.localName, element.localName];
 		while (child !== null && child.namespaceURI === 'http://www.w3.org/1999/xhtml') {
 			if (invalidHtmlNestingWithAncestor(child.localName, ancestors) !== null) {
@@ -50907,7 +50624,7 @@ function validateRootHtmlNesting(container: RootContainer, body: ComponentBody):
 				return;
 			}
 			ancestors.splice(ancestors.length - 1, 0, child.localName);
-			child = (STAGED_DOM ? STAGED_DOM.view(child) : child).firstElementChild;
+			child = child.firstElementChild;
 		}
 	}
 }
@@ -51030,13 +50747,18 @@ function makeRoot(
 		const previousBody = currentBody;
 		const previousKey = currentKey;
 		const staged =
-			container.nodeType !== 9 &&
 			previousRoot !== null &&
 			previousRoot.mounted &&
 			!previousRoot.disposed &&
 			!isCreatedInRootRender(renderOwner.transaction!, previousRoot);
+		const fallback = renderOwner.hydrationFallback !== undefined;
+		// Replacements retain the old document until admission. The Document
+		// first mount also needs an unpublished parent because its parser allows
+		// only one documentElement.
+		const target =
+			staged || fallback || container.nodeType === 9 ? prepareParent(container) : container;
 		const oldFirst = staged ? getFirstChild(container) : null;
-		const oldLast = staged ? (STAGED_DOM ? STAGED_DOM.view(container) : container).lastChild : null;
+		const oldLast = staged ? container.lastChild : null;
 		journalUndo(() => {
 			rootBlock = previousRoot;
 			currentBody = previousBody;
@@ -51057,18 +50779,18 @@ function makeRoot(
 			if (staged) {
 				// A genuine root identity change mounts once beside the outgoing
 				// screen. Keep its focused hosts connected until the new tree succeeds.
-				start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('root');
-				end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/root');
-				(STAGED_DOM ? STAGED_DOM.view(container) : container).append(start, end);
+				start = document.createComment('root');
+				end = document.createComment('/root');
+				target.append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				renderOwner.hydrationFallback(false);
-			} else {
+			} else if (target === container) {
 				clearRootContainer(container);
 			}
 			rootBlock = createBlock(
 				'root',
 				null,
-				container,
+				target,
 				start,
 				end,
 				body,
@@ -51081,10 +50803,35 @@ function makeRoot(
 			rootBlock.idState = idState;
 			renderOwner.current = rootBlock;
 			createdInRootRender(rootBlock);
-			// The root shares its container with a failed hydration's server DOM
-			// until it commits. A rollback must not clear the container: the
-			// fallback's journal restores exactly the server nodes instead.
-			if (renderOwner.hydrationFallback !== undefined) preserveRootCreatedDom(rootBlock);
+			// Install the root only after its render and every native read have
+			// succeeded. Document roots obey the same admission point: a second
+			// documentElement is never inserted while the old one remains.
+			if (target !== container) {
+				const incoming = rootBlock;
+				if (staged) retireRootBlock(previousRoot!);
+				prepareSlot(incoming, renderOwner, 'prepared', {
+					parent: container,
+					publish() {
+						if (renderOwner.current !== incoming || incoming.disposed) return;
+						const outgoing: Node[] = [];
+						if (staged && oldFirst !== null && oldLast !== null) {
+							for (let node: Node | null = oldFirst; node !== null; node = getNextSibling(node)) {
+								if (container.nodeType !== 9 || node.nodeType !== 10) {
+									outgoing.push(node);
+									retireEventHostTree(node);
+								}
+								if (node === oldLast) break;
+							}
+							unmountBlock(previousRoot!, false);
+							removeNodes(outgoing);
+						}
+						if (!staged && !fallback) clearRootContainer(container);
+						retargetPreparedScope(incoming, target, container);
+						container.appendChild(target);
+					},
+					discard() {},
+				});
+			}
 			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
@@ -51143,7 +50890,6 @@ function makeRoot(
 				if (renderOwner.wakeable === null) root.unmount();
 				return;
 			}
-			if (staged) deferRootReplacement(previousRoot!, container, oldFirst, oldLast);
 			// First render commits effects on next microtask flush.
 			if (!syncFlush && !scheduled) {
 				scheduled = true;
@@ -51447,10 +51193,8 @@ export function __voidRootProps(type: ComponentBody, props: any): any {
  * or that a newer root render replaces, leaves the server DOM exactly as it
  * was. A render that throws to a catch arm commits without the report, and
  * one that ends in an uncaught error discards the server DOM unreported, both
- * as React's do. A document cannot hold a second root element, nor an
- * `<html>` container a second `<head>` or `<body>`, so their render removes
- * the server nodes up front, and a rollback restores them. The head entries
- * that render places in `document.head` then land in the client's `<head>`.
+ * as React's do. Roots build in a prepared parent, so a document's existing
+ * html element stays attached until its replacement is admitted.
  * Each attempt restarts the root's IDs at `idSeed`, as the server's render
  * started them, so the independent islands it keeps match by boundary id.
  */
@@ -51471,18 +51215,21 @@ function installHydrationFallback(
 			return;
 		}
 		const transaction = ROOT_RENDER_TRANSACTION!;
-		const islands = Array.from(
-			(STAGED_DOM ? STAGED_DOM.view(container) : container).querySelectorAll(
-				'[' + HYDRATE_INDEPENDENT_ATTR + ']',
-			),
-		);
-		const unadopted = (transaction.keptIslands = islands.slice());
+		const islands = Array.from(container.querySelectorAll('[' + HYDRATE_INDEPENDENT_ATTR + ']'));
+		const unadopted: Array<Element | HydrateSlot> = islands.slice();
+		transaction.keptIslands = unadopted;
 		ids.next = idSeed;
-		// Rolling back a render that never commits restores exactly these nodes.
-		journalRootRange(container, null, null);
-		if (container.nodeType === 9 || (container as Element).localName === 'html') removeNodes(nodes);
 		(transaction.commit ??= []).push(() => {
 			owner.hydrationFallback = undefined;
+			// At root admission the reservations become real placements, before
+			// deleting server ancestors or retiring their event host trees.
+			for (let index = 0; index < unadopted.length; index++) {
+				const island = unadopted[index];
+				if ((island as Element).nodeType === 1) continue;
+				const state = island as HydrateSlot;
+				const kept = state.keptWrapper!;
+				if (!commitKeptHydrationIsland(state)) unadopted[index] = kept;
+			}
 			// An island the client render adopted belongs to its tree now.
 			const discarded = nodes.filter(
 				(node) => !islands.includes(node as Element) || unadopted.includes(node as Element),
@@ -51503,7 +51250,7 @@ function installHydrationFallback(
  * clearing the container and cloning fresh DOM, the compiled mount ADOPTS the
  * existing server DOM: `clone()` returns the server root, `htext()` adopts
  * server text nodes, and event handlers / update bindings are stamped on the
- * adopted nodes (active hydration capability, see clone/htext). The seeded prev-values make
+ * adopted nodes (an entered hydration cursor, see clone/htext). The seeded prev-values make
  * the first update a no-op when the client matches the server (no mismatch
  * re-render).
  *
@@ -51637,10 +51384,7 @@ function hydrateRootWithOutputHandler(
 					)
 				: (snapshotSignalValue(rootOptions.initialDocumentSignals) as ScopeSeed);
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
-	const nativeRaw =
-		nativeSidecar === null
-			? undefined
-			: (STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar).textContent || '';
+	const nativeRaw = nativeSidecar === null ? undefined : nativeSidecar.textContent || '';
 	const nativeManifest =
 		nativeRaw !== undefined && NATIVE_SIGNAL_HYDRATION
 			? materializeNativeSignalManifest(
@@ -51648,7 +51392,7 @@ function hydrateRootWithOutputHandler(
 					initialDocumentSignals,
 				)
 			: nativeRaw;
-	(STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar)?.remove();
+	nativeSidecar?.remove();
 	const ownerToken = claimRootContainer(container);
 	registerDelegationTarget(container, true);
 	let rootBlock = createBlock(
@@ -51685,28 +51429,17 @@ function hydrateRootWithOutputHandler(
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
 	// inline data <script> (and remove it, so it isn't taken for a hydratable
 	// node) and stage them for useThenable to consume in render order.
-	const seedScript = (STAGED_DOM ? STAGED_DOM.view(container) : container).querySelector(
-		'script[' + SUSPENSE_SCRIPT_ATTR + ']',
-	);
+	const seedScript = container.querySelector('script[' + SUSPENSE_SCRIPT_ATTR + ']');
 	if (seedScript !== null) {
-		seeds = parseSeedJson(
-			(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).textContent || '[]',
-		);
-		(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).remove();
+		seeds = parseSeedJson(seedScript.textContent || '[]');
+		seedScript.remove();
 	}
 	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
 	// are protocol sidecars rather than authored component output, so remove only
 	// direct children carrying the renderer-owned marker before root adoption.
-	for (
-		let child = (STAGED_DOM ? STAGED_DOM.view(container) : container).firstElementChild;
-		child !== null;
-	) {
-		const next = (STAGED_DOM ? STAGED_DOM.view(child) : child).nextElementSibling;
-		if (
-			child.localName === 'script' &&
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).hasAttribute(STREAM_SCRIPT_ATTR)
-		)
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).remove();
+	for (let child = container.firstElementChild; child !== null;) {
+		const next = child.nextElementSibling;
+		if (child.localName === 'script' && child.hasAttribute(STREAM_SCRIPT_ATTR)) child.remove();
 		child = next;
 	}
 	const root = makeRoot(
@@ -51766,7 +51499,7 @@ function hydrateRootWithOutputHandler(
 		// the root-local ID and seed cursors together on the next attempt.
 		idState.next = rootOptions?.identifierSeed ?? 0;
 		const firstNode = skipFoldedHeadPrefix(container, getFirstChild(container));
-		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
+		const hydration = createHydrationAttempt(rootBlock, firstNode, seeds);
 		// A suspended attempt rolls back, and its retry adopts afresh.
 		hydration.defers = true;
 		if (bindingLeases?.length) {
@@ -51804,7 +51537,7 @@ function hydrateRootWithOutputHandler(
 			}
 			if (
 				firstNode?.nodeType === 8 &&
-				(STAGED_DOM ? STAGED_DOM.view(firstNode as Comment) : (firstNode as Comment)).data ===
+				(firstNode as Comment).data ===
 					(body as ComponentBody & { [BINDING_VIEW_ROOT]?: string })[BINDING_VIEW_ROOT]
 			) {
 				// A marked entry view has one compiler-owned root pair, even when its
@@ -51812,25 +51545,30 @@ function hydrateRootWithOutputHandler(
 				// it: an unmarked parent may begin with a marked child's own range. Its
 				// close is matched inside the attempt, which recovers a missing one.
 				rootBlock.startMarker = firstNode;
-				rootBlock.endMarker = hydration.close(firstNode);
+				rootBlock.endMarker = hydrateClose(hydration, firstNode);
 				// The entry's own pair bounds the root's content, so no clone inside
 				// it claims the root.
-				hydration.claimRootRemainder(getNextSibling(rootBlock.endMarker));
-				hydration.node = getNextSibling(firstNode);
+				hydrateClaimRootRemainder(
+					// The entry's own pair bounds the root's content, so no clone inside
+					// it claims the root.
+					hydration,
+					getNextSibling(rootBlock.endMarker),
+				);
+				hydrationCursor.node = getNextSibling(firstNode);
 			}
 			renderBlock(rootBlock);
-			if (hydration.deferred !== null) hydration.claimDeferred();
+			if (hydration.deferred !== null) hydrateClaimDeferred(hydration);
 			drainHydrationRenderPhaseUpdates(rootBlock, true);
 			// Mount empty server Activities only after every adopted sibling has
 			// consumed its server ID and seed positions.
 			if (hydration.deferredActivities.length !== 0)
-				hydration.suspend(() => {
+				hydrateSuspend(hydration, () => {
 					for (const activate of hydration.deferredActivities) activate();
 				});
-			hydration.settleValues();
+			hydrateSettleValues(hydration);
 			completed = true;
 		} catch (thrown) {
-			const error = hydration.failure(thrown);
+			const error = hydrateFailure(hydration, thrown);
 			if (error instanceof PresentationAdoptionMiss) {
 				rollbackRootRender(owner.transaction!);
 				const refs: SuspenseRefEntry[] = [];
@@ -51875,7 +51613,7 @@ function hydrateRootWithOutputHandler(
 				owner,
 				container,
 				nativeRecovery,
-				process.env.NODE_ENV !== 'production' && nativeRecovery instanceof HydrationMismatch
+				process.env.NODE_ENV !== 'production' && isHydrationMismatch(nativeRecovery)
 					? nativeRecovery.diagnostic
 					: undefined,
 				// A root's server output never predates its client state
@@ -52032,9 +51770,9 @@ function hasHeadHint(key: string): boolean {
 	// SSR dedupe: compare exact attribute VALUES rather than interpolating an
 	// href-derived key into a CSS selector. Quotes/brackets are valid URL text;
 	// treating them as selector syntax could throw before the hint is inserted.
-	const existing = domNode(document.head).querySelectorAll('[data-oct-hint]');
+	const existing = document.head.querySelectorAll('[data-oct-hint]');
 	for (let i = 0; i < existing.length; i++) {
-		if (domNode(existing[i]).getAttribute('data-oct-hint') === key) {
+		if (existing[i].getAttribute('data-oct-hint') === key) {
 			_resourceHints.add(key);
 			return true;
 		}
@@ -52045,8 +51783,8 @@ function hasHeadHint(key: string): boolean {
 function insertHeadHint(key: string, build: () => Element): void {
 	if (typeof document === 'undefined' || hasHeadHint(key)) return;
 	const el = build();
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('data-oct-hint', key);
-	domNode(document.head).appendChild(el);
+	el.setAttribute('data-oct-hint', key);
+	document.head.appendChild(el);
 	// Publish dedupe state only after every DOM operation succeeds, so a failed
 	// build/append cannot poison the key and suppress a later valid retry.
 	_resourceHints.add(key);
@@ -52112,10 +51850,7 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 		if (v == null || v === false) continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
 		const value = v === true ? '' : String(v);
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(
-			name,
-			sanitizeURLAttribute(el.localName, name, value),
-		);
+		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, value));
 	}
 }
 
@@ -52152,10 +51887,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	// on this uncommon identity collision and compare attribute values directly:
 	// href text may contain quotes or other CSS-selector metacharacters.
 	if (as === 'style' && resourceState().sheets.has(rawHref)) {
-		const styles = domNode(document.head).querySelectorAll('style[data-precedence]');
+		const styles = document.head.querySelectorAll('style[data-precedence]');
 		let hasInlineStyle = false;
 		for (let i = 0; i < styles.length; i++) {
-			if (domNode(styles[i]).getAttribute('data-href') === rawHref) {
+			if (styles[i].getAttribute('data-href') === rawHref) {
 				hasInlineStyle = true;
 				break;
 			}
@@ -52173,11 +51908,11 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	const safeHref = sanitizeURL(rawHref);
 	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
 	insertHeadHint(key, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'preload';
+		const l = document.createElement('link');
+		l.rel = 'preload';
 		// A responsive image preload matches on imagesrcset/imagesizes; the
 		// fallback href would double-fetch, so React (and Octane) omit it.
-		if (!omitHref) (STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		if (!omitHref) l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -52232,9 +51967,9 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 	const corsMode =
 		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
 	insertHeadHint('preconnect:' + corsMode + ':' + rawHref, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'preconnect';
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		const l = document.createElement('link');
+		l.rel = 'preconnect';
+		l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -52250,9 +51985,9 @@ export function prefetchDNS(href: string): void {
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('dns-prefetch:' + rawHref, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'dns-prefetch';
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		const l = document.createElement('link');
+		l.rel = 'dns-prefetch';
+		l.href = safeHref;
 		return l;
 	});
 }
@@ -52277,9 +52012,9 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 	if (hasHeadHint('module:' + rawHref) || resourceState().scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('modulepreload:' + rawHref, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'modulepreload';
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		const l = document.createElement('link');
+		l.rel = 'modulepreload';
+		l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -52308,11 +52043,10 @@ export function preinitModule(
 	if (state.scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('module:' + rawHref, () => {
-		const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('script');
-		(STAGED_DOM ? STAGED_DOM.view(s) : s).type = 'module';
-		(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).src =
-			safeHref;
-		(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).async = true;
+		const s = document.createElement('script');
+		s.type = 'module';
+		(s as HTMLScriptElement).src = safeHref;
+		(s as HTMLScriptElement).async = true;
 		applyHintAttrs(s, options ? { ...options, as: undefined } : undefined);
 		return s;
 	});
@@ -52359,31 +52093,24 @@ function resourceState(): ResourceState {
 		// Stylesheet links and style resources share one identity namespace and
 		// one precedence-group ordering; querySelectorAll returns document order,
 		// so tails/lastTail land on each group's last member.
-		const sheets = (STAGED_DOM ? STAGED_DOM.view(document) : document).querySelectorAll(
+		const sheets = document.querySelectorAll(
 			'link[rel="stylesheet"][data-precedence], style[data-precedence]',
 		);
 		for (let i = 0; i < sheets.length; i++) {
 			const el = sheets[i];
-			const href =
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('href') ??
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-href');
+			const href = el.getAttribute('href') ?? el.getAttribute('data-href');
 			if (href !== null) state.sheets.add(href);
-			state.tails.set(
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-precedence') as string,
-				el,
-			);
+			state.tails.set(el.getAttribute('data-precedence') as string, el);
 			state.lastTail = el;
 		}
 		// One executable identity per src: classic Float scripts (data-oct-res)
 		// AND preinitModule scripts (data-oct-hint "module:…") share the set.
-		const scripts = (STAGED_DOM ? STAGED_DOM.view(document) : document).querySelectorAll(
-			'script[data-oct-res], script[data-oct-hint]',
-		);
+		const scripts = document.querySelectorAll('script[data-oct-res], script[data-oct-hint]');
 		for (let i = 0; i < scripts.length; i++) {
 			const el = scripts[i];
-			const hint = (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-oct-hint');
+			const hint = el.getAttribute('data-oct-hint');
 			if (hint !== null && !hint.startsWith('module:')) continue;
-			const src = (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('src');
+			const src = el.getAttribute('src');
 			if (src !== null) state.scripts.add(src);
 		}
 		// Streaming SSR can deliver Float sheets AFTER this state seeded (a late
@@ -52394,15 +52121,9 @@ function resourceState(): ResourceState {
 		// DOM seeding above adopts what it placed.
 		if (typeof window !== 'undefined') {
 			(window as any).$OCTFR = (el: Element): void => {
-				const href =
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('href') ??
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-href');
+				const href = el.getAttribute('href') ?? el.getAttribute('data-href');
 				if (href === null || state.sheets.has(href)) return;
-				insertPrecedenced(
-					state,
-					el,
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-precedence') ?? '',
-				);
+				insertPrecedenced(state, el, el.getAttribute('data-precedence') ?? '');
 				state.sheets.add(href);
 			};
 		}
@@ -52413,17 +52134,17 @@ function resourceState(): ResourceState {
 /** Insert a sheet-family resource into its precedence group (shared ordering). */
 function insertPrecedenced(state: ResourceState, el: Element, precedence: string): void {
 	const tail = state.tails.get(precedence);
-	if (tail !== undefined && (STAGED_DOM ? STAGED_DOM.view(tail) : tail).isConnected) {
+	if (tail !== undefined && tail.isConnected) {
 		// Existing group: append after its current tail.
-		(STAGED_DOM ? STAGED_DOM.view(tail) : tail).after(el);
+		tail.after(el);
 		if (state.lastTail === tail) state.lastTail = el;
-	} else if (state.lastTail !== null && domNode(state.lastTail).isConnected) {
+	} else if (state.lastTail !== null && state.lastTail.isConnected) {
 		// New group: starts after the last existing group, keeping groups
 		// contiguous in first-encounter order.
-		domNode(state.lastTail).after(el);
+		state.lastTail.after(el);
 		state.lastTail = el;
 	} else {
-		domNode(document.head).appendChild(el);
+		document.head.appendChild(el);
 		state.lastTail = el;
 	}
 	state.tails.set(precedence, el);
@@ -52438,10 +52159,7 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 		const v = (attrs as any)[k];
 		if (v == null || v === false || typeof v === 'function') continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(
-			name,
-			sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)),
-		);
+		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)));
 	}
 }
 
@@ -52479,10 +52197,10 @@ export function stylesheetResource(
 	// resource identity (later differing props do not retarget a live sheet).
 	if (state.sheets.has(href)) return;
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
-	const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-	(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'stylesheet';
-	(STAGED_DOM ? STAGED_DOM.view(l) : l).href = sanitizeURL(href);
-	(STAGED_DOM ? STAGED_DOM.view(l) : l).setAttribute('data-precedence', precedence);
+	const l = document.createElement('link');
+	l.rel = 'stylesheet';
+	l.href = sanitizeURL(href);
+	l.setAttribute('data-precedence', precedence);
 	applyResourceAttrs(l, attrs);
 	insertPrecedenced(state, l, precedence);
 	state.sheets.add(href);
@@ -52526,11 +52244,11 @@ export function styleResource(
 				'Load it as a stylesheet link instead.',
 		);
 	}
-	const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('style');
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).setAttribute('data-precedence', precedence);
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).setAttribute('data-href', href);
+	const s = document.createElement('style');
+	s.setAttribute('data-precedence', precedence);
+	s.setAttribute('data-href', href);
 	applyResourceAttrs(s, attrs);
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).textContent = css;
+	s.textContent = css;
 	insertPrecedenced(state, s, precedence);
 	state.sheets.add(href);
 }
@@ -52553,12 +52271,11 @@ export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof src !== 'string' || src === '') return;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
-	const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('script');
-	(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).src =
-		sanitizeURL(src);
-	(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).async = true;
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).setAttribute('data-oct-res', '');
+	const s = document.createElement('script');
+	(s as HTMLScriptElement).src = sanitizeURL(src);
+	(s as HTMLScriptElement).async = true;
+	s.setAttribute('data-oct-res', '');
 	applyResourceAttrs(s, attrs);
-	domNode(document.head).appendChild(s);
+	document.head.appendChild(s);
 	state.scripts.add(src);
 }

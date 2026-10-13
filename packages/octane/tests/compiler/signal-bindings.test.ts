@@ -240,8 +240,9 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			'/src/signal-prop.tsrx',
 			{ hmr: false },
 		);
-		expect(code).toContain('bindSignalAttribute');
-		expect(code).toContain('bindSignalText');
+		expect(code).toContain('prepareTemplateScalarSignalAttribute');
+		expect(code).toContain('prepareTemplateSignalText');
+		expect(code).toContain('commitTemplateSignal');
 		expect(code).not.toContain('enableSignalBindings(1)');
 	});
 
@@ -256,7 +257,9 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		}`;
 		for (const dev of [false, true]) {
 			const client = compile(source, '/src/plain-holes.tsrx', { dev, hmr: false }).code;
-			expect(client).not.toMatch(/bindSignal|enableSignalBindings|data-octane-input/);
+			expect(client).not.toMatch(
+				/bindSignal|prepareTemplate(?:Scalar)?Signal|enableSignalBindings|data-octane-input/,
+			);
 			const server = compile(source, '/src/plain-holes.tsrx', {
 				dev,
 				hmr: false,
@@ -270,14 +273,14 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			'/src/typed-holes.tsrx',
 			{ hmr: false },
 		).code;
-		expect(typed).toContain('bindSignalText');
-		expect(typed).toContain('bindSignalAttribute');
+		expect(typed).toContain('prepareTemplateSignalText');
+		expect(typed).toContain('prepareTemplateSignalAttribute');
 		const opaque = compile(source, '/src/plain-holes.tsrx', {
 			hmr: false,
 			opaqueSignalHandles: true,
 		}).code;
-		expect(opaque).toContain('bindSignalText');
-		expect(opaque).toContain('bindSignalAttribute');
+		expect(opaque).toContain('prepareTemplateSignalText');
+		expect(opaque).toContain('prepareTemplateSignalAttribute');
 		expect(
 			compile(source, '/src/plain-holes.tsrx', {
 				hmr: false,
@@ -290,8 +293,8 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			<label title={props.label$}>{(props.fallback ?? props.count$) as string}</label>
 		}`;
 		const client = compile(suffixed, '/src/suffixed-holes.tsrx', { hmr: false }).code;
-		expect(client).toContain('bindSignalAttribute');
-		expect(client).toContain('bindSignalText');
+		expect(client).toContain('prepareTemplateScalarSignalAttribute');
+		expect(client).toContain('prepareTemplateSignalText');
 		// Any type-only wrapper around nested `$` syntax keeps the binding.
 		for (const wrapped of ['satisfies string', 'as string']) {
 			const code = compile(
@@ -299,7 +302,7 @@ export function App() @{ <input value={draft$.get()} /> }`,
 				'/src/wrapped-holes.tsrx',
 				{ hmr: false },
 			).code;
-			expect(code, wrapped).toContain('bindSignalAttribute');
+			expect(code, wrapped).toContain('prepareTemplateScalarSignalAttribute');
 		}
 		const server = compile(suffixed, '/src/suffixed-holes.tsrx', {
 			hmr: false,
@@ -314,15 +317,15 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			<a title={props.label} href={props.href} data-id={props.id} aria-label={props.label} hidden={props.hidden}>{'x'}</a>
 		}`;
 		const prod = compile(source, '/src/signal-writer.tsrx', { dev: false, hmr: false }).code;
-		expect(prod).toMatch(/'title',[^)]*_\$setPlainAttribute\)/);
-		expect(prod).toMatch(/'href',[^)]*_\$setURLAttribute\)/);
-		expect(prod).toMatch(/'data-id',[^)]*_\$setStringData\)/);
-		expect(prod).toMatch(/'aria-label',[^)]*_\$setAriaAttribute\)/);
+		expect(prod).toMatch(/'title',[^)]*_\$setPlainAttribute,\s*_\$prepareTemplatePlain\)/);
+		expect(prod).toMatch(/'href',[^)]*_\$setURLAttribute,\s*_\$prepareTemplateURL\)/);
+		expect(prod).toMatch(/'data-id',[^)]*_\$setStringData,\s*_\$prepareTemplateStringData\)/);
+		expect(prod).toMatch(/'aria-label',[^)]*_\$setAriaAttribute,\s*_\$prepareTemplateAria\)/);
 		expect(prod).toMatch(/'hidden',[^)]*_\$setBooleanAttribute\)/);
 		// Production never reaches the generic writer for a statically admitted name.
 		expect(prod).not.toContain('_$setAttribute');
 		const dev = compile(source, '/src/signal-writer.tsrx', { dev: true, hmr: false }).code;
-		expect(dev).toMatch(/'title',[^)]*_\$setAttribute\)/);
+		expect(dev).toMatch(/'title',[^)]*_\$setAttribute,\s*_\$prepareTemplatePlain\)/);
 	});
 
 	it('routes a non-suffixed writable alias through runtime capability validation', () => {
@@ -336,7 +339,8 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			'/src/signal-alias.tsrx',
 			{ hmr: false },
 		);
-		expect(code).toContain('bindSignalValue');
+		expect(code).toContain('prepareTemplateSignalValue');
+		expect(code).toContain('commitTemplateSignal');
 		expect(code).toContain('data-octane-input');
 	});
 
@@ -371,7 +375,8 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			mode: 'server',
 			hmr: false,
 		}).code;
-		expect(client).toContain('bindSignalHostPropSources');
+		expect(client).toContain('prepareTemplateSignalHostSources');
+		expect(client).toContain('commitTemplateSignalHostSources');
 		expect(client).toContain('snapshotSpread');
 		expect(client).toContain('data-octane-input');
 		expect(server).toContain('ssrSnapshotSpread');

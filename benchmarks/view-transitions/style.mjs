@@ -91,7 +91,7 @@ try {
 			.filter((asset) => asset.type === 'chunk');
 		const code = assets.map((asset) => asset.code).join('\n');
 		const driverReachable = Number(/\bfunction vtFlush\s*\(/.test(code));
-		const stagingReachable = Number(/\bDOMStage\b/.test(code));
+		const stagingReachable = Number(/\bbeginStagedCommitCapture\b/.test(code));
 		assert.equal(driverReachable, 0, 'Ordinary styles must exclude the optional transition driver');
 		assert.equal(stagingReachable, 0, 'Ordinary styles must exclude DOM staging');
 		metadata.artifacts[mode] = {

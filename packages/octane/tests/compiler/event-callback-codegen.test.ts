@@ -1,5 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
+import { parseModule } from '@tsrx/core';
+
+// A template has one shared prepare body. Stable handlers are created inside
+// the bag's mount branch; changing handlers and source groups must remain live
+// on update. Bundle callbacks are installed/updated in the hoisted writer.
+function rewritesOnUpdate(code: string): boolean {
+	let live = false;
+	const visit = (node: any, mounting = false): void => {
+		if (node === null || typeof node !== 'object') return;
+		if (
+			node.type === 'IfStatement' &&
+			node.test.type === 'BinaryExpression' &&
+			node.test.operator === '===' &&
+			node.test.left.type === 'Identifier' &&
+			node.test.left.name === '_b' &&
+			node.test.right.type === 'Identifier' &&
+			node.test.right.name === 'undefined'
+		) {
+			visit(node.consequent, true);
+			visit(node.alternate, false);
+			return;
+		}
+		if (node.type === 'CallExpression' && node.callee.type === 'Identifier') {
+			const name = node.callee.name;
+			if (
+				/^_\$evt(?:\d+|N)u$/.test(name) ||
+				(!mounting && (name === 'setLog' || name === 'setN' || name === 'ev'))
+			)
+				live = true;
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent') continue;
+			if (Array.isArray(value)) value.forEach((child) => visit(child, mounting));
+			else visit(value, mounting);
+		}
+	};
+	visit(parseModule(code, 'compiled.js'));
+	return live;
+}
 
 const SOURCE = `
   import { useState } from 'octane';
@@ -179,12 +218,6 @@ describe('compiler-owned native event callbacks', () => {
 				'inline-handler-lifetime.tsrx',
 				options,
 			).code;
-		// Shape-independent: a handler the update path rewrites is EMITTED twice
-		// (mount + update), whichever lowering carries it — closure assignment,
-		// the bundle's `evtNu` helper, or a spread's source resolver.
-		const emitCount = (code: string) => (code.match(/setLog\(|setN\(|ev\(\)/g) || []).length;
-		const rewritesOnUpdate = (code: string) => /_\$evt\d+u\(/.test(code) || emitCount(code) > 1;
-
 		const installedOnce = (body: string) => !rewritesOnUpdate(compileBody(body));
 
 		// Nothing changeable is reachable: module function, useState setter,
@@ -291,9 +324,11 @@ describe('compiler-owned native event callbacks', () => {
 
 		const rowBody = code.slice(code.indexOf('function __item'));
 		expect(rowBody).toContain('function __item');
-		// `item.label` is a member path, so the row takes the bundle lowering;
-		// the update helper is the proof its slot still follows the item.
-		expect(rowBody).toMatch(/_\$evt\d+u\(/);
+		// The row captures its current item, then submits its hoisted bundle
+		// writer. The update itself must remain reachable from the compiled code.
+		expect(rowBody).toContain('item.label');
+		expect(rowBody).toContain('_$commitTemplate(');
+		expect(code).toMatch(/_\$evt\d+u\(/);
 	});
 
 	it('retains an Effect Event mount wrapper only for an unshared native event slot', () => {
@@ -318,9 +353,12 @@ describe('compiler-owned native event callbacks', () => {
 		// native slot needs no per-render write. A spread can overwrite that slot,
 		// therefore the final source resolver remains live on mount and update to
 		// reassert JSX source order.
-		// Count the authored declaration and its uses, independent of whether the
-		// write is represented by a direct assignment or a runtime operation.
+		// Both single prepare bodies read the authored handler once. The spread
+		// must still resolve and publish its sources on every accepted render.
 		expect(authoredHandlerReferences(mountOnly)).toBe(2);
-		expect(authoredHandlerReferences(spreadShared)).toBe(3);
+		expect(authoredHandlerReferences(spreadShared)).toBe(2);
+		expect(mountOnly).not.toMatch(/_\$prepareTemplate(?:Signal)?HostSources\(/);
+		expect(spreadShared).toMatch(/_\$prepareTemplate(?:Signal)?HostSources\(/);
+		expect(spreadShared).toMatch(/_\$commitTemplate(?:Signal)?HostSources\(/);
 	});
 });

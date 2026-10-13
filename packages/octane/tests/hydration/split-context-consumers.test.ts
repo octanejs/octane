@@ -67,6 +67,7 @@ describe('Context providers across split hydration', { timeout: 15_000 }, () => 
 		expect(value.textContent).toBe('first');
 		input.value = 'typed';
 		await act(() => button.click());
+		expect(button.textContent).toBe('1');
 		await act(() => root!.render(client.App, { ...props, value: 'second', outer: 'changed' }));
 		expect(host.querySelector('#split-context-value')).toBe(value);
 		expect(value.textContent).toBe('second');

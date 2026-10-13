@@ -13,6 +13,7 @@ import {
 	hostComponent,
 	hydrateRoot,
 	use,
+	useLayoutEffect,
 	type ComponentBody,
 	type OctaneNode,
 } from '../src/index.js';
@@ -2064,7 +2065,7 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
-	it('keeps render-time row methods able to observe previously connected rows', () => {
+	it('keeps new rows private while their render-time methods run', () => {
 		const items = makeRows().map((row) => ({
 			id: row.id,
 			read: () =>
@@ -2076,7 +2077,7 @@ describe('large keyed list fills', () => {
 		const r = mount(FastHostRenderCallList, { items: [] });
 		r.update(FastHostRenderCallList, { items });
 		expect(r.findAll('.fast-host-render-call-row').map((row) => row.textContent)).toEqual(
-			items.map((_, index) => String(index)),
+			items.map(() => '0'),
 		);
 		r.unmount();
 	});
@@ -2097,7 +2098,7 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
-	it('renders dynamic mapped component values after each row connects', () => {
+	it('prepares dynamic mapped values in context and connects rows before refs', () => {
 		const renderRows: number[] = [];
 		const renderValues: string[] = [];
 		const attached: boolean[] = [];
@@ -2115,7 +2116,7 @@ describe('large keyed list fills', () => {
 		const r = mount(FastMappedRenderableList, { items: [], value: 'inside' });
 
 		r.update(FastMappedRenderableList, { items, value: 'inside' });
-		expect(renderRows).toEqual(items.map((_, index) => index + 1));
+		expect(renderRows).toEqual(items.map(() => 0));
 		expect(renderValues).toEqual(items.map(() => 'inside'));
 		expect(attached).toEqual(items.map(() => true));
 		expect(r.findAll('.fast-renderable-row').map((row) => row.textContent)).toEqual(
@@ -2127,15 +2128,19 @@ describe('large keyed list fills', () => {
 	it('disposes a throwing dynamic child together with every completed row', () => {
 		let shouldThrow = true;
 		const attached: boolean[] = [];
-		const onRender = (connectedRows: number) => {
-			if (connectedRows === 12 && shouldThrow) throw new Error('child failed');
-		};
+		const observedRows: number[] = [];
 		const onRef = (element: HTMLSpanElement | null) => {
 			if (element !== null) attached.push(element.isConnected);
 		};
 		const items = makeRows().map(({ id }) => ({
 			id,
-			content: createElement(FastRenderableProbe, { onRender, onRef }),
+			content: createElement(FastRenderableProbe, {
+				onRender: (connectedRows: number) => {
+					observedRows.push(connectedRows);
+					if (id === 12 && shouldThrow) throw new Error('child failed');
+				},
+				onRef,
+			}),
 		}));
 		const r = mount(FastMappedBoundaryList, { items: [], value: 'inside' });
 
@@ -2143,6 +2148,7 @@ describe('large keyed list fills', () => {
 		expect(r.findAll('.fast-renderable-row')).toHaveLength(0);
 		expect(r.find('#fast-mapped-renderable-retry').textContent).toBe('child failed');
 		expect(attached).toEqual([]);
+		expect(observedRows).toEqual(Array.from({ length: 12 }, () => 0));
 
 		shouldThrow = false;
 		r.click('#fast-mapped-renderable-retry');
@@ -2248,17 +2254,13 @@ describe('large keyed list fills', () => {
 		try {
 			r.update(FastSuspendingGetterList, { items });
 			expect(r.find('#fast-suspending-getter-retry').textContent).toBe('key failed');
-			expect(abortedPrefixes[0]).toHaveLength(2);
-			expect(abortedPrefixes[0]!.every((row) => !row.isConnected)).toBe(true);
-			expect(abortedPrefixes[0]!.every((row) => row.parentNode === null)).toBe(true);
+			expect(abortedPrefixes[0]).toEqual([]);
 			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
 
 			failKey = false;
 			r.click('#fast-suspending-getter-retry');
 			expect(r.find('#fast-suspending-getter-pending').textContent).toBe('loading');
-			expect(abortedPrefixes[1]).toHaveLength(2);
-			expect(abortedPrefixes[1]!.every((row) => !row.isConnected)).toBe(true);
-			expect(abortedPrefixes[1]!.every((row) => row.parentNode === null)).toBe(true);
+			expect(abortedPrefixes[1]).toEqual([]);
 			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
 
 			await act(() => resolve('resolved row 3'));
@@ -2909,4 +2911,48 @@ describe.each([
 			r.unmount();
 		}
 	});
+});
+
+it('finishes accepted keyed row deletions when the first cleanup replaces the list again', () => {
+	const lifecycle: string[] = [];
+	const effectSlot = Symbol('row lifecycle');
+	let onRemoved: (id: string) => void = () => {};
+	function ReentrantRow(props: { id: string }) {
+		useLayoutEffect(
+			() => {
+				lifecycle.push('mount ' + props.id);
+				return () => {
+					lifecycle.push('remove ' + props.id);
+					onRemoved(props.id);
+				};
+			},
+			[props.id],
+			effectSlot,
+		);
+		return createElement('input', { 'data-row': props.id, defaultValue: props.id });
+	}
+	function ReentrantList(props: { ids: string[] }) {
+		return createElement('section', {
+			children: props.ids.map((id) => createElement(ReentrantRow, { key: id, id })),
+		});
+	}
+	const r = mount(ReentrantList, { ids: ['a', 'b', 'keep'] });
+	const kept = r.find('[data-row="keep"]') as HTMLInputElement;
+	kept.value = 'unsaved';
+	try {
+		onRemoved = (id) => {
+			if (id === 'a') r.update(ReentrantList, { ids: ['z', 'keep'] });
+		};
+		r.update(ReentrantList, { ids: ['private', 'keep'] });
+		expect(r.findAll('input').map((el) => el.getAttribute('data-row'))).toEqual(['z', 'keep']);
+		expect(r.find('[data-row="keep"]')).toBe(kept);
+		expect(kept.value).toBe('unsaved');
+		expect(lifecycle.filter((event) => event === 'remove a')).toHaveLength(1);
+		expect(lifecycle.filter((event) => event === 'remove b')).toHaveLength(1);
+		expect(lifecycle).not.toContain('mount private');
+		expect(lifecycle).not.toContain('remove private');
+	} finally {
+		onRemoved = () => {};
+		r.unmount();
+	}
 });

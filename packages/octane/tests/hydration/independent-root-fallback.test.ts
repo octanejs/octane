@@ -34,12 +34,13 @@ export function Widget() @{
 function serveIslands(source: string, dev: boolean, tag: string, islands: number) {
 	const mounted = vi.fn();
 	const unmounted = vi.fn();
-	const gate: { thrown?: Promise<void> } = {};
+	const gate: { thrown?: Promise<void>; observe?: () => void } = {};
 	const serverActions = { mounted() {}, unmounted() {}, read: (value: string) => value };
 	const clientActions = {
 		mounted,
 		unmounted,
 		read(value: string) {
+			gate.observe?.();
 			if (gate.thrown !== undefined) throw gate.thrown;
 			return value;
 		},
@@ -152,6 +153,109 @@ const scenarios: Scenario[] = [
 // whether it activated before the fallback or activates after it. Until the
 // client render commits, the islands stay where the server DOM has them.
 describe('independent islands across a root hydration fallback', () => {
+	it.each([false, true].flatMap((dev) => [false, true].map((activated) => ({ dev, activated }))))(
+		'retains a kept island throughout a suspending client fallback render (%j)',
+		async ({ dev, activated }) => {
+			const page = serveIslands(
+				`import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { read } from './actions';
+import { Widget } from './widgets';
+function Header(props) @{
+  @if (props.title === 'Server') { <header>Server</header> }
+  @else { <nav>Client</nav> }
+}
+function Footer(props) @{
+  <p>{read(props.footer) as string}</p>
+}
+export function App(props) @{
+  <main>
+    <Header title={props.title} />
+    <Hydrate independent when={interaction()}><Widget /></Hydrate>
+    <Footer footer={props.footer} />
+  </main>
+}`,
+				dev,
+				`retained-in-render-${dev}-${activated}`,
+				1,
+			);
+			const { container, gate, wrappers, inputs, buttons } = page;
+			const [wrapper] = wrappers;
+			const [input] = inputs;
+			const originalParent = wrapper.parentNode;
+			const originalNext = wrapper.nextSibling;
+			const observations: Array<[Node | null, Node | null, boolean, Element | null, string]> = [];
+			let root: Root | undefined;
+			let resolve!: () => void;
+			try {
+				if (activated) await page.activate(0);
+				input.value = 'live draft';
+				input.focus();
+				input.setSelectionRange(1, 5, 'backward');
+				gate.thrown = new Promise<void>((done) => {
+					resolve = done;
+				});
+				gate.observe = () =>
+					observations.push([
+						wrapper.parentNode,
+						wrapper.nextSibling,
+						wrapper.isConnected,
+						document.activeElement,
+						input.value,
+					]);
+				const reports: unknown[] = [];
+				root = hydrateRoot(
+					container,
+					page.client.App,
+					{ title: 'Client', footer: 'Ready' },
+					{
+						onRecoverableError(error) {
+							reports.push(error);
+						},
+					},
+				);
+				await settle();
+				expect(observations.length).toBeGreaterThan(0);
+				for (const [parent, next, connected, focused, value] of observations) {
+					expect(parent).toBe(originalParent);
+					expect(next).toBe(originalNext);
+					expect(connected).toBe(true);
+					expect(focused).toBe(input);
+					expect(value).toBe('live draft');
+				}
+				expectSameNodes(
+					[wrapper.parentNode, wrapper.nextSibling],
+					[originalParent!, originalNext!],
+				);
+				expect(reports).toEqual([]);
+				gate.observe = undefined;
+				gate.thrown = undefined;
+				resolve();
+				await settle();
+				await Promise.resolve();
+				expect(container.querySelector('nav')?.textContent).toBe('Client');
+				expect(container.querySelector('p')?.textContent).toBe('Ready');
+				expectSameNodes([...container.querySelectorAll(`[${HYDRATE_INDEPENDENT_ATTR}]`)], wrappers);
+				expectSameNodes(
+					[wrapper.querySelector('input'), wrapper.querySelector('button')],
+					[input, buttons[0]],
+				);
+				expect(input.value).toBe('live draft');
+				expect(reports).toHaveLength(1);
+				expect(page.errors).toEqual([]);
+				// Focusing the input may itself activate a dormant interaction
+				// island. Either way the original button remains live exactly once.
+				flushSync(() => buttons[0].click());
+				await settle();
+				expect(buttons[0].textContent).toBe(activated ? '2' : '1');
+				expect(page.mounted).toHaveBeenCalledTimes(1);
+			} finally {
+				root?.unmount();
+				page.dispose();
+			}
+		},
+	);
+
 	it.each(
 		[false, true].flatMap((dev) =>
 			[true, false].flatMap((activated) =>

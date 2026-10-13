@@ -1,6 +1,6 @@
 # DOM work without forced layout
 
-The commit is meant to be write-only. Rendering writes the DOM; geometry is read
+The commit is meant to be write-only. Preparation retains committed DOM; geometry is read
 in layout effects, in a batched measure phase, or after paint. Cite symbols, not
 line numbers: `runtime.ts` moves daily.
 
@@ -16,12 +16,12 @@ line numbers: `runtime.ts` moves daily.
   `runtime.ts` measures every ViewTransition participant in one loop before any
   name or style is applied. A layout effect that measures and then updates state
   should measure every target, then update once.
-- Never read geometry in the render walk or per node. The ViewTransition stage
-  keeps geometry, scrolling, selection, and resource readiness reading the
-  committed host while writes are prepared (`dom-stage.ts`,
-  `PROJECTED_PROPERTIES`). `scripts/check-staged-dom.mjs` lists those native
-  reads in `NATIVE_READS` and fails on an unclassified native operation in
-  `runtime.ts`.
+- Never read geometry in the render walk or per node. During ViewTransition
+  preparation, geometry, scrolling, selection, and resource readiness read the
+  committed host. Prepared component values publish in the native update
+  callback; `vtMeasureElements` remains the dedicated geometry phase. Verify
+  host behavior at that boundary in the native browser tests, including retained
+  form values and custom element callbacks.
 - `getComputedStyle()` after a style write forces a style recalculation even for
   values that need no layout. Read it before writing, or once per commit.
 

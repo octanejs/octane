@@ -1,4 +1,13 @@
-import { Activity, createElement, createPortal, useEffect, useReducer, useState } from 'octane';
+import {
+	Activity,
+	createElement,
+	createPortal,
+	use,
+	useEffect,
+	useLayoutEffect,
+	useReducer,
+	useState,
+} from 'octane';
 
 type Props = { log: (value: string) => void; rejectZero?: boolean };
 
@@ -167,4 +176,118 @@ export function UnchangedAfterHostReplay(props: { revision: number; observe: () 
 			props.observe();
 		}
 	</section>
+}
+
+type BranchAdmissionProps = {
+	choice: 'A' | 'B' | 'empty';
+	observe: (choice: 'A' | 'B' | 'empty') => void;
+	armRef: (node: Element | null) => void;
+	promise?: Promise<string>;
+};
+
+function LaterBranchReader(props: Pick<BranchAdmissionProps, 'choice' | 'observe' | 'promise'>) @{
+	props.observe(props.choice);
+	const value = props.promise ? use(props.promise) : 'ready';
+	<footer>{value as string}</footer>
+}
+
+export function BranchAdmission(props: BranchAdmissionProps) @{
+	<main>
+		@if (props.choice === 'A') {
+			<section data-arm="A" ref={props.armRef}>
+				<input aria-label="draft" defaultValue="A" />
+				<output>A</output>
+			</section>
+		} @else {
+			<section data-arm="B" ref={props.armRef}>
+				<input aria-label="draft" defaultValue="B" />
+				<output>B</output>
+			</section>
+		}
+		<LaterBranchReader choice={props.choice} observe={props.observe} promise={props.promise} />
+	</main>
+}
+
+export function EmptyBranchAdmission(props: BranchAdmissionProps) @{
+	<main>
+		@if (props.choice === 'A') {
+			<section data-arm="A" ref={props.armRef}>
+				<input aria-label="draft" defaultValue="A" />
+				<output>A</output>
+			</section>
+		}
+		<LaterBranchReader choice={props.choice} observe={props.observe} promise={props.promise} />
+	</main>
+}
+
+export function SuspenseBranchAdmission(props: BranchAdmissionProps) @{
+	@try {
+		<BranchAdmission
+			choice={props.choice}
+			observe={props.observe}
+			armRef={props.armRef}
+			promise={props.promise}
+		/>
+	} @pending {
+		<aside data-waiting>waiting</aside>
+	}
+}
+
+export function BranchSiblingAdmission(props: {
+	removeFirst: boolean;
+	alternate: boolean;
+	firstRef: (node: Element | null) => void;
+	laterRef: (node: Element | null) => void;
+}) @{
+	<main>
+		@if (!props.removeFirst) {
+			<span data-first ref={props.firstRef}>
+				first
+			</span>
+		}
+		@if (props.alternate) {
+			<section data-later ref={props.laterRef}>
+				B
+			</section>
+		} @else {
+			<section data-later ref={props.laterRef}>
+				A
+			</section>
+		}
+	</main>
+}
+
+function CleanupBranchArm(props: { cleanup: () => void; armRef: (node: Element | null) => void }) @{
+	useLayoutEffect(() => props.cleanup, []);
+	<section data-arm="A" ref={props.armRef}>
+		A
+	</section>
+}
+
+export function BranchCleanupReentry(props: {
+	choice: 'A' | 'B' | 'C';
+	cleanup: () => void;
+	armRef: (node: Element | null) => void;
+}) @{
+	<article>
+		@switch (props.choice) {
+			@case 'A': {
+				<CleanupBranchArm cleanup={props.cleanup} armRef={props.armRef} />
+			}
+			@case 'B': {
+				<section data-arm="B" ref={props.armRef}>
+					B
+				</section>
+			}
+			@default: {
+				<section data-arm="C" ref={props.armRef}>
+					C
+				</section>
+			}
+		}
+		<footer>
+			<input aria-label="independent draft" defaultValue="draft" />
+			permanent
+		</footer>
+	</article>
 }

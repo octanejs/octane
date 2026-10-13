@@ -17468,6 +17468,17 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	const proof = node._octanePresentationHydration;
 	if (!proof || ctx.mode === 'server' || ctx._universalRuntimeUnit != null) return body;
 	const writers = new Set([
+		'prepareTemplatePlain',
+		'prepareTemplateURL',
+		'prepareTemplateStringData',
+		'prepareTemplateBoolean',
+		'prepareTemplateAria',
+		'prepareTemplateClass',
+		'prepareTemplateStyle',
+		'prepareTemplateStyleProperty',
+		'prepareTemplateSignalAttribute',
+		'prepareTemplateScalarSignalAttribute',
+		'prepareTemplateSignalValue',
 		'bindSignalAttribute',
 		'bindSignalValue',
 		'queueNativeChangeDiagnostic',
@@ -17490,6 +17501,8 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 		'nativeProjectionBinding',
 	]);
 	if (proof.structural) {
+		writers.add('prepareTemplateText');
+		writers.add('prepareTemplateSignalText');
 		writers.add('setText');
 		writers.add('bindSignalText');
 		writers.add('markDangerouslySetInnerHTMLChildren');
@@ -17498,6 +17511,11 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 		if (name.startsWith('set')) writers.add(`${name}IfChanged`);
 	}
 	const preparation = new Set([
+		'templateValues',
+		'commitTemplate',
+		'templateEventOwner',
+		'hookMemoEqual',
+		'normalizeClass',
 		'clone',
 		'devHtmlNesting',
 		'devEventListener',
@@ -18094,8 +18112,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			options?.inlineBindingGuards === true,
 			options?.mappedItem === true,
 			options?.inheritedEnvNames ?? null,
+			options?.armInfo != null,
 		);
 	}
+	if (options?.armInfo != null) options.armInfo.flatNative = plan?.flatNative === true;
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	ctx.currentDirtyBindingStates = prevDirtyBindingStates;
@@ -27786,8 +27806,7 @@ function emitAutoMemoRegion(
 
 // Certified repeated host rows keep these guards in their body so stable
 // primitives perform neither a wrapper call nor cache-field publication.
-// Complex children still reconcile at stable identity, and writers run before caches
-// change so held-transition journaling observes the previous binding state.
+// Complex children still reconcile at stable identity.
 function inlineRenderableValueDeclarations(valueExpr) {
 	const V = () => b.id('_v');
 	return [
@@ -27807,32 +27826,14 @@ function inlineRenderableValueDeclarations(valueExpr) {
 	];
 }
 
-// `host` is given for an only-child hole: setText restores its Text there when a
-// page translator took it out (see the runtime's resetOnlyChildHost).
-function emitInlineRenderableUpdate(previous, cachedNode, slowCall, host = null) {
+// A changed row must reach the slot's prepared output even when it already has
+// a Text node. Directly mutating that node would expose an unfinished render.
+function emitInlineRenderableUpdate(previous, cachedNode, updateCall) {
 	const V = () => b.id('_v');
 	return b.if(
 		b.logical('||', b.id('_o'), b.binary('!==', previous(), V())),
 		b.block([
-			b.const('_t', cachedNode()),
-			b.if(
-				andChain([
-					b.binary('!=', b.id('_t'), b.literal(null)),
-					b.unary('!', b.id('_o')),
-					b.binary('!==', V(), b.literal(null)),
-				]),
-				b.stmt(
-					b.call(
-						'_$setText',
-						b.id('_t'),
-						// Bare renderable booleans are empty; explicit text bindings
-						// retain their ordinary coercion through setText.
-						b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V()),
-						...(host === null ? [] : [host()]),
-					),
-				),
-				b.stmt(b.assignment('=', cachedNode(), slowCall)),
-			),
+			b.stmt(b.assignment('=', cachedNode(), updateCall)),
 			b.stmt(b.assignment('=', previous(), V())),
 		]),
 		null,
@@ -27851,6 +27852,7 @@ function planJsx(
 	inlineBindingGuards = false,
 	mappedItem = false,
 	inheritedEnvNames = null,
+	prepareArm = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -28103,6 +28105,7 @@ function planJsx(
 
 	let elementVars;
 	let ensureVar;
+	let templateNamespace = null;
 	if (!noTemplate) {
 		ctx.runtimeNeeded.add('template');
 		ctx.runtimeNeeded.add('clone');
@@ -28161,6 +28164,7 @@ function planJsx(
 				tplNs = resolved === null ? 'html' : resolved;
 			}
 		}
+		templateNamespace = tplNs;
 		// Binding planning precedes the final template namespace. An inherited
 		// opaque namespace can now use the same concrete namespace as clone(),
 		// including HTML's faster className property. Preserve explicit foreign
@@ -28430,19 +28434,71 @@ function planJsx(
 	// suppressHydrationWarning) before writing, but still run before insertion.
 	const postWalkMounts = [];
 	let nativeStyleSlots = 0;
+	const preparedSourceBindings = new Set();
+	const preparedHostPaths = new Set();
+	if (!noTemplate && ctx.presentationHydration == null) {
+		for (const binding of elementBindings) {
+			if (binding.kind === 'hostCommit') {
+				preparedSourceBindings.add(binding);
+				preparedHostPaths.add(binding.path.join(','));
+				for (const source of binding.sources) preparedSourceBindings.add(source.binding);
+			}
+		}
+	}
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
-		// A presentation view already has an explicit writer receipt and a host
-		// frame. Its audited writes must execute in that frame to transfer leases.
-		// Ordinary template preparation cannot defer them beyond its lifetime.
-		b.preparedTemplate =
+		// Diagnostic metadata observes only the accepted form's final props.
+		// Keep it with its template writer rather than the ingress DOM walk.
+		if (
 			!noTemplate &&
 			ctx.presentationHydration == null &&
+			(b.kind === 'formDiagnostic' ||
+				b.kind === 'nativeChangeStatic' ||
+				b.kind === 'nativeChangeRuntime')
+		) {
+			b.mountOnly = false;
+			b.deferred = true;
+		}
+		// Presentation host spreads already own their source-level commit program.
+		// Individual fields, including binding text, join their template's writer.
+		// Host sources can carry suppressHydrationWarning. Their normalization
+		// must run before the same host's typed text claim validates server text.
+		const claimedAfterHost =
+			preparedHostPaths.has(b.path.join(',')) && (b.kind === 'text' || b.kind === 'textOnlyChild');
+		b.preparedTemplate =
+			!noTemplate &&
 			!b.mountOnly &&
-			!b.signalDirect &&
-			!b.sharesSpreadHost &&
+			(!b.sharesSpreadHost || preparedSourceBindings.has(b) || claimedAfterHost) &&
 			!b.beforeConnect &&
-			preparedTemplateValueHelper(b) !== null;
+			(directSignalBindingHelper(b) !== null ||
+				preparedTemplateValueHelper(b) !== null ||
+				b.kind === 'event' ||
+				b.kind === 'event-bundle' ||
+				b.kind === 'ref' ||
+				b.kind === 'formDiagnostic' ||
+				b.kind === 'nativeChangeStatic' ||
+				b.kind === 'nativeChangeRuntime' ||
+				preparedSourceBindings.has(b));
+		// Ref cleanups and delegated listeners always describe accepted output.
+		// Mount a host field now, then publish these bindings with the template.
+		if (
+			b.preparedTemplate &&
+			(b.signalDirect ||
+				b.kind === 'event' ||
+				b.kind === 'event-bundle' ||
+				b.kind === 'ref' ||
+				b.kind === 'formAction' ||
+				b.kind === 'htmlOnlyChild' ||
+				b.kind === 'formDiagnostic' ||
+				b.kind === 'nativeChangeStatic' ||
+				b.kind === 'nativeChangeRuntime' ||
+				(b.kind === 'attr' && b.name === 'dangerouslySetInnerHTML') ||
+				CONTROLLED_KIND_HELPERS[b.kind] !== undefined ||
+				preparedSourceBindings.has(b) ||
+				claimedAfterHost)
+		)
+			b.deferred = true;
+		b.claimAfterHost = b.preparedTemplate && !b.signalDirect && claimedAfterHost;
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
 		// (the `<!>` placeholder / server text node) via the full path INCLUDING the
 		// childIndex — so the hole-aware child/sibling walk adopts the correct server
@@ -28457,10 +28513,13 @@ function planJsx(
 		else if (_locStamped) stampHostLoc(ensureVar(b.path), b.path, undefined);
 		const signalHelper = directSignalBindingHelper(b);
 		if (signalHelper !== null) {
-			ctx.runtimeNeeded.add(signalHelper);
-			registerAttrLoweringOrigin(ctx, b.nameOrigin, signalHelper, b.name);
+			const helper = b.preparedTemplate ? preparedSignalBindingHelper(b) : signalHelper;
+			ctx.runtimeNeeded.add(helper);
+			registerAttrLoweringOrigin(ctx, b.nameOrigin, helper, b.name);
 			if (signalHelper === 'bindSignalAttribute' && b.kind !== 'class')
 				ctx.runtimeNeeded.add(attrBindingHelper(b));
+			if (helper === 'prepareTemplateScalarSignalAttribute')
+				ctx.runtimeNeeded.add(preparedTemplateValueHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
 			ctx.runtimeNeeded.add('setText');
@@ -28473,7 +28532,11 @@ function planJsx(
 		// a mount-only import for deferred writes.
 		const attrHelper = b.signalDirect ? null : attrBindingHelper(b);
 		if (attrHelper !== null) {
-			if (b.kind === 'class' && b.fresh && (!b.deferred || (!b.mountOnly && inlineBindingGuards)))
+			if (
+				b.kind === 'class' &&
+				b.fresh &&
+				(!b.deferred || (!b.mountOnly && (inlineBindingGuards || b.preparedTemplate)))
+			)
 				ctx.runtimeNeeded.add('normalizeClass');
 			if (!b.deferred) {
 				ctx.runtimeNeeded.add(attrHelper);
@@ -28523,6 +28586,7 @@ function planJsx(
 			const arity = b.argExprs.length <= 2 ? String(b.argExprs.length) : 'N';
 			ctx.runtimeNeeded.add(`evt${arity}${b.event ? 'e' : ''}`);
 			if (!b.mountOnly) ctx.runtimeNeeded.add(`evt${arity}u`);
+			if (b.preparedTemplate) ctx.runtimeNeeded.add('hookMemoEqual');
 		}
 		if (b.kind === 'styleProperties') {
 			ctx.runtimeNeeded.add('setStyleProperty');
@@ -28576,7 +28640,7 @@ function planJsx(
 			c.elVar = elVar;
 			const org = c.origin ?? planOrigin;
 			const key = `_${hostKey}$${c.id}`;
-			if (!noTemplate && bag.host(key, elVar)) {
+			if (!noTemplate && bag.host(key, elVar, true)) {
 				mountLines.push(
 					inheritOriginLoc(
 						b.stmt(b.assignment('=', b.id(bag.local(key)), hostVarNode(elVar))),
@@ -28633,6 +28697,9 @@ function planJsx(
 	// Keep candidate ownership on the stable bag; it must be registered before
 	// the mount factory is emitted. Only bodies with migrated writers pay a slot.
 	const templateBindings = elementBindings.filter((binding) => binding.preparedTemplate);
+	const templateHasEvents = templateBindings.some(
+		(binding) => binding.kind === 'event' || binding.kind === 'event-bundle',
+	);
 	const templateTextHoles =
 		noTemplate || ctx.presentationHydration != null
 			? []
@@ -28645,6 +28712,10 @@ function planJsx(
 				);
 	if (templateBindings.length || templateTextHoles.length) {
 		bag.constField('_preparedTemplate', 'null');
+	}
+	if (templateHasEvents) {
+		bag.constField('_eventOwner', 'undefined');
+		ctx.runtimeNeeded.add('templateEventOwner');
 	}
 
 	if (!noTemplate) {
@@ -28796,7 +28867,29 @@ function planJsx(
 		ctx.runtimeNeeded.add('commitTemplate');
 		ctx.runtimeNeeded.add('templateValues');
 		for (const binding of templateBindings) {
-			ctx.runtimeNeeded.add(preparedTemplateValueHelper(binding));
+			if (binding.signalDirect) {
+				ctx.runtimeNeeded.add('commitTemplateSignal');
+				continue;
+			}
+			const valueHelper = preparedTemplateValueHelper(binding);
+			if (valueHelper !== null) ctx.runtimeNeeded.add(valueHelper);
+			if (binding.kind === 'style' || binding.kind === 'styleProperties')
+				ctx.runtimeNeeded.add('commitTemplateStyle');
+			if (binding.kind === 'styleProperty') ctx.runtimeNeeded.add('commitTemplateStyleProperty');
+			if (valueHelper === 'prepareTemplateAttribute')
+				ctx.runtimeNeeded.add(binding.kind === 'formAction' ? 'setFormAction' : 'commitHostProps');
+			if (binding.kind === 'hostCommit') {
+				ctx.runtimeNeeded.add(
+					binding.signalHostSources
+						? 'prepareTemplateSignalHostSources'
+						: 'prepareTemplateHostSources',
+				);
+				ctx.runtimeNeeded.add(
+					binding.signalHostSources
+						? 'commitTemplateSignalHostSources'
+						: 'commitTemplateHostSources',
+				);
+			}
 		}
 		if (templateTextHoles.length) {
 			ctx.runtimeNeeded.add('prepareTemplateText');
@@ -28831,7 +28924,7 @@ function planJsx(
 			inheritOriginLoc(
 				b.function_declaration(
 					b.id(templateCommit),
-					[b.id('_b'), b.id('_p')],
+					[b.id('_b'), b.id('_p'), b.id('__s'), b.id('__eventOwner')],
 					b.block([
 						...templateBindings.map((binding) => emitPreparedBindingCommit(binding, bag)),
 						...templateTextHoles.map((cc) => {
@@ -28861,6 +28954,17 @@ function planJsx(
 								cc.origin ?? planOrigin,
 							);
 						}),
+						...(templateHasEvents
+							? [
+									b.stmt(
+										b.assignment(
+											'=',
+											bagFieldNode(bag, '_eventOwner'),
+											b.member(b.id('_p'), bag.letter('_eventOwner')),
+										),
+									),
+								]
+							: []),
 					]),
 				),
 				planOrigin,
@@ -28868,10 +28972,15 @@ function planJsx(
 		);
 	}
 	for (const binding of elementBindings) {
-		const updateEmit = templateBindings.includes(binding)
+		const emitted = templateBindings.includes(binding)
 			? emitPreparedBinding(binding, bag)
 			: emitBindingUpdate(binding, bag, inlineBindingGuards);
-		if (!updateEmit) continue;
+		if (!emitted) continue;
+		// This proof covers every preparer, including signal and control paths
+		// that return before the ordinary attribute lowering.
+		const updateEmit = binding.presentationUnbound
+			? { ...emitted, _octanePresentationUnbound: true }
+			: emitted;
 		if (binding.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
 	}
@@ -28937,24 +29046,6 @@ function planJsx(
 					planOrigin,
 				),
 			);
-		}
-	}
-	if (keyedSelection !== null && single && !noTemplate) {
-		// Reuse the ordinary root-class write and its exact bag fields. Updating
-		// only the DOM would leave the normal row diff's previous value stale.
-		const classes = elementBindings.filter(
-			(binding) => binding.kind === 'class' && binding.path.length === 0,
-		);
-		if (
-			classes.length === 1 &&
-			!classes[0].fresh &&
-			!classes[0].mountOnly &&
-			collectFreeIdentifiers(classes[0].expr, [
-				keyedSelection.itemName,
-				keyedSelection.selectedName,
-			]).size === 0
-		) {
-			keyedSelection.update = emitBindingUpdate(classes[0], bag, inlineBindingGuards);
 		}
 	}
 
@@ -29043,7 +29134,9 @@ function planJsx(
 	// Host expression for a construct's slot call — the bag-stashed host element,
 	// or the block's own parentNode for bagless (control-flow-only) bodies.
 	const hostNodeFor = (key) =>
-		noTemplate ? b.member(b.id('__block'), 'parentNode') : bagFieldNode(bag, key);
+		noTemplate || bag.isBlockParent(key)
+			? b.member(b.id('__block'), 'parentNode')
+			: bagFieldNode(bag, key);
 	// Phase 2: a construct's env argument — the captured-locals tuple its
 	// hoisted helpers destructure from `__extra`. Folded records carry a
 	// pre-built `props.hN` reference (the fold threads the values through the
@@ -29342,9 +29435,10 @@ function planJsx(
 			continue;
 		}
 		const structural = ctx.presentationHydration?.structural && ic.bindingSite;
-		if (ic.liteMask && !structural) {
+		if ((ic.liteMask || ic.preparedMask) && !structural) {
 			while (trailing.length < 2) trailing.push(undefinedNode());
 			trailing.push(b.literal(ic.liteMask));
+			if (ic.preparedMask) trailing.push(b.literal(ic.preparedMask));
 		}
 		ctx.runtimeNeeded.add('ifBlock');
 		registerDirectiveOrigin(ctx, org, ['_$ifBlock', ic.thenHelper, ic.elseHelper]);
@@ -29375,11 +29469,18 @@ function planJsx(
 		const slotIndex = cc.slotIndex;
 		const org = cc.origin ?? planOrigin;
 		const hostExpr = () => hostNodeFor(`_compHost$${cc.id}`);
+		let prospectiveHostProps = null;
 		if (cc.hostChildrenBinding != null) {
 			const props = () => {
-				const host = bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
-				return cc.hostChildrenBinding.signalHostSources ? b.member(host, 'resolved') : host;
+				const binding = cc.hostChildrenBinding;
+				const host = binding.preparedTemplate
+					? b.member(b.id('_p'), bag.letter(`_host$${binding.id}`))
+					: bagFieldNode(bag, `_host$${binding.id}`);
+				return binding.signalHostSources || binding.preparedTemplate
+					? b.member(host, 'resolved')
+					: host;
 			};
+			if (cc.hostChildrenBinding.preparedTemplate) prospectiveHostProps = props;
 			cc.valueExpr = b.conditional(
 				propertyIsEnumerableCall(props(), 'children'),
 				b.member(props(), 'children'),
@@ -29387,6 +29488,17 @@ function planJsx(
 			);
 		} else if (cc.directChildrenBinding != null) {
 			cc.valueExpr = bagFieldNode(bag, `_prev$${cc.directChildrenBinding.id}`);
+		}
+		if (prospectiveHostProps === null && cc.prospectiveHostBinding?.preparedTemplate) {
+			const binding = cc.prospectiveHostBinding;
+			prospectiveHostProps =
+				binding.kind === 'hostCommit'
+					? () => b.member(b.member(b.id('_p'), bag.letter(`_host$${binding.id}`)), 'resolved')
+					: () =>
+							b.member(
+								b.member(b.id('_p'), `_value$${bag.letter(`_prev$${binding.id}`)}`),
+								'props',
+							);
 		}
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
@@ -29440,6 +29552,8 @@ function planJsx(
 									null,
 									cc.coalesceRange ? b.literal(true) : null,
 									cc.onlyChildText ? b.literal(true) : null,
+									null,
+									prospectiveHostProps === null ? null : prospectiveHostProps(),
 								),
 							),
 						),
@@ -29506,6 +29620,7 @@ function planJsx(
 										hostExpr(),
 										V(),
 										chv(),
+										...(prospectiveHostProps === null ? [] : [prospectiveHostProps()]),
 									),
 								),
 							),
@@ -29514,22 +29629,21 @@ function planJsx(
 					);
 					continue;
 				}
-				ctx.runtimeNeeded.add(inlineBindingGuards ? 'childTextHole' : 'childTextHoleUpdate');
-				if (inlineBindingGuards) ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add('childTextHoleUpdate');
 				const updateHole = () =>
 					inlineBindingGuards
 						? emitInlineRenderableUpdate(
 								chp,
 								chv,
 								b.call(
-									'_$childTextHole',
+									'_$childTextHoleUpdate',
 									b.id('__s'),
 									b.literal(slotIndex),
 									hostExpr(),
 									V(),
-									b.id('_t'),
+									chv(),
+									chp(),
 								),
-								hostExpr,
 							)
 						: b.block([
 								b.stmt(
@@ -29674,6 +29788,10 @@ function planJsx(
 					if (!cc.anchorVar) args.push(undefinedNode());
 					args.push(b.literal(true));
 				}
+				if (prospectiveHostProps !== null) {
+					while (args.length < (updating ? 9 : 7)) args.push(undefinedNode());
+					args.push(prospectiveHostProps());
+				}
 				return b.call(updating ? '_$textHoleUpdate' : '_$textHole', ...args);
 			};
 			if (cc.potentialDangerouslySetInnerHTML) {
@@ -29690,21 +29808,19 @@ function planJsx(
 				continue;
 			}
 			if (inlineBindingGuards) {
-				ctx.runtimeNeeded.add('textHole');
-				ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add('textHoleUpdate');
 				pushAfterStmt(
 					cc.id,
 					org,
 					b.block([
 						...inlineRenderableValueDeclarations(cc.valueExpr),
-						emitInlineRenderableUpdate(chp, chv, textHoleCall(V())),
+						emitInlineRenderableUpdate(chp, chv, textHoleCall(V(), true)),
 					]),
 				);
 				continue;
 			}
 			ctx.runtimeNeeded.add('textHoleUpdate');
-			// Publish the raw value after the helper: setText must journal the old
-			// binding bag before a held transition can roll the DOM write back.
+			// Publish the raw value only after the helper has prepared this slot.
 			pushAfterStmt(
 				cc.id,
 				org,
@@ -29966,9 +30082,10 @@ function planJsx(
 		if (switchAnchor) trailing.push(switchAnchor);
 		else if (swEnv) trailing.push(undefinedNode());
 		if (swEnv) trailing.push(swEnv);
-		if (sc.liteMask) {
+		if (sc.liteMask || sc.preparedMask) {
 			while (trailing.length < 2) trailing.push(undefinedNode());
 			trailing.push(b.literal(sc.liteMask));
+			if (sc.preparedMask) trailing.push(b.literal(sc.preparedMask));
 		}
 		pushAfterStmt(
 			sc.id,
@@ -30009,6 +30126,29 @@ function planJsx(
 		// A whole body publishes one prepared snapshot after all of its child
 		// slots succeed. Never register an unfinished parent or clone its bag
 		// once per text hole: all eligible bindings share the same lazy copy.
+		if (templateHasEvents) {
+			const pending = () => b.member(b.id('_p'), bag.letter('_eventOwner'));
+			afterStatements.push(
+				inheritOriginLoc(
+					b.block([
+						b.const('_e', b.call('_$templateEventOwner')),
+						b.if(
+							b.binary('!==', pending(), b.id('_e')),
+							b.block([
+								b.if(
+									b.binary('===', b.id('_p'), b.id('_pv')),
+									b.stmt(b.assignment('=', b.id('_p'), b.object([b.spread(b.id('_pv'))]))),
+									null,
+								),
+								b.stmt(b.assignment('=', pending(), b.id('_e'))),
+							]),
+							null,
+						),
+					]),
+					planOrigin,
+				),
+			);
+		}
 		afterStatements.push(
 			inheritOriginLoc(
 				b.if(
@@ -30035,6 +30175,36 @@ function planJsx(
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
+		// A detached arm may retain only hosts in its own cloned template.
+		// The emitted after array also carries scalar commitTemplate work, so
+		// classify real constructs before emission rather than counting statements.
+		flatNative:
+			prepareArm &&
+			!noTemplate &&
+			// Opaque templates resolve against their actual insertion parent.
+			// A detached fragment has no SVG/MathML destination to consult.
+			templateNamespace !== 'opaque' &&
+			ctx.presentationHydration == null &&
+			allConstructs.length === 0 &&
+			headEmit.head.length === 0 &&
+			headEmit.resources.length === 0 &&
+			elementBindings.every(
+				(binding) =>
+					(single || binding.path.length > 0) &&
+					!binding.beforeConnect &&
+					!(typeof binding.name === 'string' && binding.name.toLowerCase() === 'is') &&
+					((!['class', 'style', 'styleProperty', 'styleProperties'].includes(binding.kind) &&
+						preparedTemplateValueHelper(binding) !== null &&
+						preparedTemplateValueHelper(binding) !== 'prepareTemplateAttribute' &&
+						preparedTemplateValueHelper(binding) !== 'prepareTemplateControl') ||
+						binding.kind === 'ref' ||
+						binding.kind === 'event' ||
+						binding.kind === 'event-bundle' ||
+						binding.kind === 'nativeStyle' ||
+						binding.kind === 'nativeProjection' ||
+						(binding.kind === 'defaultValueUncontrolled' && binding.expr.type === 'Literal')),
+			) &&
+			templateHasOnlyLocalNativeHosts(rootTemplate.parts),
 		mount: mountLines,
 		update: updateLines,
 		everyRender: everyRenderLines,
@@ -30048,6 +30218,25 @@ function planJsx(
 		// DevTools element→source layer. Keyed by the slot index the runtime already uses.
 		locs: ctx.dev ? buildLocsLiteral(allConstructs, planOrigin) : null,
 	};
+}
+
+// Static customized built-ins have no dynamic binding, so a binding-only proof
+// misses them. Inspect the already-lowered template rather than authored AST:
+// nested compiler transformations and non-DOM directives have been resolved.
+function templateHasOnlyLocalNativeHosts(parts) {
+	for (const part of parts) {
+		if (part.type !== 'TemplateElement') continue;
+		if (
+			part.tag.includes('-') ||
+			part.tag === 'html' ||
+			part.tag === 'head' ||
+			part.tag === 'body' ||
+			part.attributes.some((attr) => /^\s+is(?:\s|=|$)/i.test(attr.value)) ||
+			!templateHasOnlyLocalNativeHosts(part.children)
+		)
+			return false;
+	}
+	return true;
 }
 
 /** Build the dev `__s.locs` object-literal NODE from constructs carrying a `.loc` (else null). */
@@ -30115,6 +30304,7 @@ function makeBag() {
 	const fields = [];
 	const byKey = new Map();
 	const byHost = new Map();
+	const blockParents = new Set();
 	const reg = (key, constExpr) => {
 		let r = byKey.get(key);
 		if (r === undefined) {
@@ -30148,7 +30338,13 @@ function makeBag() {
 		 * Register one immutable DOM-host field; aliases reuse its first mount write.
 		 * Returns true when the caller must emit `local(key) = host`.
 		 */
-		host: (key, host) => {
+		host: (key, host, construct = false) => {
+			// Multi-root construct hosts are the block's current owner, not a
+			// template node. A prepared arm retargets it on acceptance.
+			if (construct && host === '__block.parentNode') {
+				blockParents.add(key);
+				return false;
+			}
 			const existing = byHost.get(host);
 			if (existing !== undefined) {
 				byKey.set(key, existing);
@@ -30167,7 +30363,9 @@ function makeBag() {
 			return true;
 		},
 		/** Whether a field for `key` was registered. */
-		has: (key) => byKey.has(key),
+		has: (key) => byKey.has(key) || blockParents.has(key),
+		/** Whether this construct host follows its block when an arm is retargeted. */
+		isBlockParent: (key) => blockParents.has(key),
 		/** Whether a DOM-host field already holds `host`. */
 		hasHost: (host) => byHost.has(host),
 		/** Seed `key` with a constant expression (no local, no mount write). */
@@ -30386,6 +30584,109 @@ function completeStyleSpread(bind, spread, valueOf, needsFull) {
 // undefined must reach hydration validation before its writer can be skipped.
 // Other writers retain their existing freshly-cloned-element no-op behavior.
 function emitDeferredMount(bind, elVar, bag) {
+	if (bind.claimAfterHost) {
+		bag.constField(`_prev$${bind.id}`, 'unset');
+		bag.constField(`_txt$${bind.id}`, 'null');
+		const hostKey = `_el$${bind.id}`;
+		if (!bag.host(hostKey, elVar)) return null;
+		return inheritOriginLoc(
+			b.stmt(b.assignment('=', b.id(bag.local(hostKey)), hostVarNode(elVar))),
+			bindingOrigin(bind),
+		);
+	}
+	if (
+		bind.preparedTemplate &&
+		!bind.signalDirect &&
+		CONTROLLED_KIND_HELPERS[bind.kind] !== undefined
+	) {
+		bag.constField(`_prev$${bind.id}`, 'unset');
+		const hostKey = `_el$${bind.id}`;
+		if (!bag.host(hostKey, elVar)) return null;
+		return inheritOriginLoc(
+			b.stmt(b.assignment('=', b.id(bag.local(hostKey)), hostVarNode(elVar))),
+			bindingOrigin(bind),
+		);
+	}
+	if (bind.kind === 'formDiagnostic') {
+		if (bind.preparedTemplate) bag.constField(`_prev$${bind.id}`, 'unset');
+		const hostKey = `_el$${bind.id}`;
+		if (!bag.host(hostKey, elVar)) return null;
+		return inheritOriginLoc(
+			b.stmt(b.assignment('=', b.id(bag.local(hostKey)), hostVarNode(elVar))),
+			bindingOrigin(bind),
+		);
+	}
+	if (bind.preparedTemplate && bind.signalDirect) {
+		bag.constField(`_sig$${bind.id}`, 'undefined');
+		if (bind.kind === 'text' || bind.kind === 'textOnlyChild')
+			bag.constField(`_prev$${bind.id}`, 'unset');
+		const hostKey = `_el$${bind.id}`;
+		if (!bag.host(hostKey, elVar)) return null;
+		return inheritOriginLoc(
+			b.stmt(b.assignment('=', b.id(bag.local(hostKey)), hostVarNode(elVar))),
+			bindingOrigin(bind),
+		);
+	}
+	if (bind.preparedTemplate && (bind.kind === 'hostValue' || bind.kind === 'hostSpread')) {
+		bag.constField(`${bind.kind === 'hostSpread' ? '_sp' : '_prev'}$${bind.id}`, 'unset');
+		return null;
+	}
+	if (bind.preparedTemplate && bind.kind === 'hostCommit') {
+		const hostKey = `_el$${bind.id}`;
+		const lines = [];
+		if (bag.host(hostKey, elVar)) {
+			lines.push(b.stmt(b.assignment('=', b.id(bag.local(hostKey)), hostVarNode(elVar))));
+		}
+		bag.constField(`_host$${bind.id}`, 'undefined');
+		if (!bind.signalHostSources) {
+			lines.push(
+				cleanupsPush(
+					b.arrow(
+						[],
+						b.call(
+							'_$queueOwnRefDetach',
+							bagFieldNode(bag, `_host$${bind.id}`),
+							bagFieldNode(bag, hostKey),
+						),
+					),
+				),
+			);
+		}
+		return inheritOriginLoc(b.block(lines), bindingOrigin(bind));
+	}
+	if (
+		bind.preparedTemplate &&
+		(bind.kind === 'event' || bind.kind === 'event-bundle' || bind.kind === 'ref')
+	) {
+		const hostKey = `_el$${bind.id}`;
+		const lines = [];
+		if (bag.host(hostKey, elVar)) {
+			lines.push(b.stmt(b.assignment('=', b.id(bag.local(hostKey)), hostVarNode(elVar))));
+		}
+		if (bind.kind === 'ref') {
+			bag.constField(`_ref$${bind.id}`, 'null');
+			lines.push(
+				cleanupsPush(
+					b.arrow(
+						[],
+						b.call(
+							'_$queueRefDetach',
+							bagFieldNode(bag, `_ref$${bind.id}`),
+							bagFieldNode(bag, hostKey),
+						),
+					),
+				),
+			);
+		} else {
+			bag.constField(`_prev$${bind.id}`, 'unset');
+			if (bind.kind === 'event-bundle') {
+				bag.constField(`_ev$${bind.id}`, 'null');
+				for (let i = 0; i < bind.argExprs.length; i++)
+					bag.constField(`_arg$${bind.id}_${i}`, 'unset');
+			}
+		}
+		return lines.length ? inheritOriginLoc(b.block(lines), bindingOrigin(bind)) : null;
+	}
 	// Whole-object and spread-prefix styles diff on `_sty`; other grouped styles
 	// use it only as a first-render marker. Each trailing property keeps a scalar.
 	bag.constField(
@@ -30427,6 +30728,17 @@ function directSignalBindingHelper(bind) {
 	return 'bindSignalAttribute';
 }
 
+function preparedSignalBindingHelper(bind) {
+	const scalar = preparedTemplateValueHelper(bind);
+	return directSignalBindingHelper(bind) === 'bindSignalAttribute' &&
+		(scalar === 'prepareTemplatePlain' ||
+			scalar === 'prepareTemplateURL' ||
+			scalar === 'prepareTemplateStringData' ||
+			scalar === 'prepareTemplateAria')
+		? 'prepareTemplateScalarSignalAttribute'
+		: directSignalBindingHelper(bind).replace('bindSignal', 'prepareTemplateSignal');
+}
+
 function directSignalBindingArgs(bind, host, previous, value = bind.expr, previousValue) {
 	const common = [b.id('__s'), previous, host];
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
@@ -30441,7 +30753,8 @@ function directSignalBindingArgs(bind, host, previous, value = bind.expr, previo
 			b.literal(bind.kind === 'textOnlyChild'),
 			...optionalCallArgs(
 				previousValue ?? null,
-				bind.seededText && (previousValue === undefined || bind.bindingMarker)
+				bind.seededText &&
+					(bind.preparedTemplate || previousValue === undefined || bind.bindingMarker)
 					? b.literal(1)
 					: null,
 				bind.bindingMarker ? b.literal(bind.bindingMarker) : null,
@@ -30454,12 +30767,12 @@ function directSignalBindingArgs(bind, host, previous, value = bind.expr, previo
 		bind.kind === 'checked' ||
 		bind.kind === 'checkedCheckable'
 	) {
-		return [...common, bind.expr, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
+		return [...common, value, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
 	}
 	return [
 		...common,
 		attrLoweringToken(b.literal(bind.name), bind),
-		bind.expr,
+		value,
 		b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 		directSignalAttributeWriter(bind),
 	];
@@ -31036,6 +31349,7 @@ function emitBindingMount(bind, elVar, bag) {
 // a held A -> B -> A pass must supersede B even though A is still on screen.
 // Only a changed raw input copies that frame; no new snapshot for no-op renders.
 function preparedTemplateValueHelper(bind) {
+	if (CONTROLLED_KIND_HELPERS[bind.kind] !== undefined) return 'prepareTemplateControl';
 	switch (bind.kind) {
 		case 'text':
 		case 'textOnlyChild':
@@ -31046,11 +31360,23 @@ function preparedTemplateValueHelper(bind) {
 			return 'prepareTemplateStringData';
 		case 'ariaAttr':
 			return 'prepareTemplateAria';
+		case 'class':
+			return 'prepareTemplateClass';
+		case 'style':
+		case 'styleProperties':
+			return 'prepareTemplateStyle';
+		case 'styleProperty':
+			return 'prepareTemplateStyleProperty';
+		case 'formAction':
+		case 'htmlOnlyChild':
+			return 'prepareTemplateAttribute';
 		case 'attr':
 			// The static native-name admission selects this same data writer even
 			// when an opaque expression did not receive a text type proof.
 			if (bind.preparedAttributeHelper === 'setStringData') return 'prepareTemplateStringData';
 			if (bind.preparedAttributeHelper === 'setPlainAttribute') return 'prepareTemplatePlain';
+			if (attrBindingHelper(bind) === 'setURLAttribute') return 'prepareTemplateURL';
+			if (attrBindingHelper(bind) === 'setAttribute') return 'prepareTemplateAttribute';
 			return null;
 		default:
 			return null;
@@ -31059,9 +31385,20 @@ function preparedTemplateValueHelper(bind) {
 
 function emitPreparedBinding(bind, bag) {
 	const org = bindingOrigin(bind);
-	const field = bag.letter(`_prev$${bind.id}`);
+	const prefix = bind.signalDirect
+		? '_sig'
+		: bind.kind === 'ref'
+			? '_ref'
+			: bind.kind === 'hostCommit'
+				? '_host'
+				: bind.kind === 'hostSpread'
+					? '_sp'
+					: bind.kind === 'style' || bind.kind === 'styleProperties'
+						? '_sty'
+						: '_prev';
+	const field = bag.letter(`${prefix}$${bind.id}`);
 	const pending = () => b.member(b.id('_p'), field);
-	const expr = resolveKnownAttributeSource(bind.expr, (source) =>
+	let expr = resolveKnownAttributeSource(bind.expr, (source) =>
 		b.member(b.id('_p'), bag.letter(`_prev$${source.binding.id}`)),
 	);
 	const changes = [
@@ -31071,16 +31408,301 @@ function emitPreparedBinding(bind, bag) {
 			null,
 		),
 	];
+	if (
+		bind.kind === 'formDiagnostic' ||
+		bind.kind === 'nativeChangeStatic' ||
+		bind.kind === 'nativeChangeRuntime'
+	) {
+		changes.push(b.stmt(b.assignment('=', pending(), b.literal(true))));
+		return inheritOriginLoc(
+			b.if(b.binary('!==', pending(), b.literal(true)), b.block(changes), null),
+			org,
+		);
+	}
+	if (!bind.signalDirect && CONTROLLED_KIND_HELPERS[bind.kind] !== undefined) {
+		return inheritOriginLoc(
+			b.block([
+				b.const('_v', expr),
+				...changes,
+				b.stmt(
+					b.assignment(
+						'=',
+						pending(),
+						b.call(
+							'_$prepareTemplateControl',
+							b.id('__s'),
+							bagFieldNode(bag, `_el$${bind.id}`),
+							b.literal(bind.kind),
+							b.id('_v'),
+						),
+					),
+				),
+			]),
+			org,
+		);
+	}
+	if (bind.signalDirect) {
+		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
+		const previous = text ? b.member(b.id('_p'), bag.letter(`_prev$${bind.id}`)) : undefined;
+		const helper = preparedSignalBindingHelper(bind);
+		const prepare = b.call(
+			attrLoweringToken(b.id(`_$${helper}`), bind),
+			...directSignalBindingArgs(
+				bind,
+				bagFieldNode(bag, `_el$${bind.id}`),
+				pending(),
+				b.id('_v'),
+				previous,
+			),
+			...(helper === 'prepareTemplateScalarSignalAttribute'
+				? [b.id(`_$${preparedTemplateValueHelper(bind)}`)]
+				: []),
+		);
+		changes.push(b.stmt(b.assignment('=', pending(), prepare)));
+		if (text) changes.push(b.stmt(b.assignment('=', previous, b.id('_v'))));
+		const readsHandle = b.logical(
+			'&&',
+			b.binary('!==', b.id('_v'), nullNode()),
+			orChain([
+				b.binary('===', b.unary('typeof', b.id('_v')), b.literal('object')),
+				b.binary('===', b.unary('typeof', b.id('_v')), b.literal('function')),
+			]),
+		);
+		return inheritOriginLoc(
+			b.block([
+				b.const('_v', expr),
+				...(text
+					? [
+							b.if(
+								orChain([b.binary('!==', previous, b.id('_v')), readsHandle]),
+								b.block(changes),
+								null,
+							),
+						]
+					: changes),
+			]),
+			org,
+		);
+	}
+	if (bind.kind === 'hostCommit') {
+		const sources = commitSourceRows(bind.sources, (binding, spread) =>
+			b.member(b.id('_p'), bag.letter(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
+		);
+		const previous = b.member(b.id('_p'), `_value$${field}`);
+		const host = bagFieldNode(bag, `_el$${bind.id}`);
+		const call = bind.signalHostSources
+			? b.call(
+					'_$prepareTemplateSignalHostSources',
+					b.id('__s'),
+					bagFieldNode(bag, `_host$${bind.id}`),
+					host,
+					sources,
+					b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+					b.literal(bind.hasNestedChildren === true),
+					previous,
+					...(bind.readStyle ? [b.id(bind.readStyle)] : []),
+				)
+			: b.call(
+					'_$prepareTemplateHostSources',
+					host,
+					sources,
+					previous,
+					b.id('__s'),
+					b.literal(bind.hasNestedChildren === true),
+					...(bind.readStyle ? [b.id(bind.readStyle)] : []),
+				);
+		return inheritOriginLoc(
+			b.block([
+				...changes,
+				b.stmt(b.assignment('=', pending(), call)),
+				b.stmt(b.assignment('=', b.member(b.id('_p'), `_value$${field}`), pending())),
+			]),
+			org,
+		);
+	}
+	if (bind.kind === 'hostSpread') expr = b.call('_$snapshotSpread', expr);
+	if (bind.kind === 'hostValue' || bind.kind === 'hostSpread') {
+		return inheritOriginLoc(
+			b.block([
+				b.const('_v', expr),
+				b.if(
+					b.binary('!==', pending(), b.id('_v')),
+					b.block([...changes, b.stmt(b.assignment('=', pending(), b.id('_v')))]),
+					null,
+				),
+			]),
+			org,
+		);
+	}
+	if (bind.kind === 'styleProperties') {
+		const valueName = (i) => bind.valueNames?.[i] ?? `_v${i}`;
+		const valueOf = (property) => b.id(valueName(property.evaluationIndex));
+		const previous = bind.properties.map((_, i) =>
+			b.member(b.id('_p'), bag.letter(`_prev$${bind.id}_${i}`)),
+		);
+		const spread = bind.spread ? b.id(bind.spreadName) : nullNode();
+		const entries = b.array(
+			bind.properties.flatMap((property) => [
+				inheritOriginLoc(b.literal(property.name), property.key),
+				valueOf(property),
+			]),
+		);
+		const value = bind.spread ? styleSpreadObject(bind, spread, valueOf) : nullNode();
+		return inheritOriginLoc(
+			b.block([
+				...(bind.spread ? [b.const(bind.spreadName, bind.spread)] : []),
+				...bind.evaluations.map((value, i) => b.const(valueName(i), value)),
+				b.if(
+					orChain([
+						b.binary('!==', pending(), spread),
+						...previous.map((prev, i) => b.binary('!==', prev, valueOf(bind.properties[i]))),
+					]),
+					b.block([
+						...changes,
+						b.stmt(
+							b.assignment(
+								'=',
+								b.member(b.id('_p'), `_value$${field}`),
+								b.call(
+									'_$prepareTemplateStyle',
+									bagFieldNode(bag, `_el$${bind.id}`),
+									value,
+									b.conditional(
+										b.binary('===', b.member(b.id('_p'), `_value$${field}`), undefinedNode()),
+										undefinedNode(),
+										b.member(b.member(b.id('_p'), `_value$${field}`), 'raw'),
+									),
+									b.member(b.id('_p'), `_value$${field}`),
+									b.literal(bind.staticCss ?? ''),
+									...(bind.spread ? [] : [entries]),
+								),
+							),
+						),
+						b.stmt(b.assignment('=', pending(), spread)),
+						...previous.map((prev, i) =>
+							b.stmt(b.assignment('=', prev, valueOf(bind.properties[i]))),
+						),
+					]),
+					null,
+				),
+			]),
+			org,
+		);
+	}
+	if (bind.kind === 'event-bundle') {
+		const args = bind.argExprs.map((_, i) =>
+			b.member(b.id('_p'), bag.letter(`_arg$${bind.id}_${i}`)),
+		);
+		return inheritOriginLoc(
+			b.block([
+				b.const('_v', bind.fnExpr),
+				...bind.argExprs.map((arg, i) => b.const(`_a${i}`, arg)),
+				b.if(
+					orChain([
+						b.binary('!==', pending(), b.id('_v')),
+						...args.map((arg, i) => b.unary('!', b.call('_$hookMemoEqual', arg, b.id(`_a${i}`)))),
+					]),
+					b.block([
+						...changes,
+						b.stmt(b.assignment('=', pending(), b.id('_v'))),
+						...args.map((arg, i) => b.stmt(b.assignment('=', arg, b.id(`_a${i}`)))),
+					]),
+					null,
+				),
+			]),
+			org,
+		);
+	}
+	if (bind.kind === 'event' && bind.dev)
+		expr = b.call('_$devEventListener', b.literal(bind.name), expr);
+	if (bind.kind === 'class' && bind.fresh) expr = b.call('_$normalizeClass', expr);
+	if (bind.kind === 'event' || bind.kind === 'ref') {
+		changes.push(b.stmt(b.assignment('=', pending(), b.id('_v'))));
+		return inheritOriginLoc(
+			b.block([
+				b.const('_v', expr),
+				b.if(b.binary('!==', pending(), b.id('_v')), b.block(changes), null),
+			]),
+			org,
+		);
+	}
 	let prepared;
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
-		const node = bag.has(`_txt$${bind.id}`) ? bagFieldNode(bag, `_txt$${bind.id}`) : nullNode();
+		const node = bind.claimAfterHost
+			? b.member(b.id('_p'), bag.letter(`_txt$${bind.id}`))
+			: bag.has(`_txt$${bind.id}`)
+				? bagFieldNode(bag, `_txt$${bind.id}`)
+				: nullNode();
 		const host = bind.kind === 'textOnlyChild' ? bagFieldNode(bag, `_el$${bind.id}`) : nullNode();
 		prepared = b.call('_$prepareTemplateText', node, host, b.id('_v'));
+		if (bind.claimAfterHost) {
+			const position = bagFieldNode(bag, `_el$${bind.id}`);
+			const mount =
+				bind.kind === 'textOnlyChild'
+					? b.call('_$htext', position, b.id('_v'), ...(bind.seededText ? [b.literal(1)] : []))
+					: b.call(
+							bind.bindingMarker ? '_$bindingText' : '_$htextSwap',
+							position,
+							b.id('_v'),
+							...(bind.bindingMarker ? [b.literal(bind.bindingMarker)] : []),
+						);
+			changes.push(
+				b.if(
+					b.binary('===', node, nullNode()),
+					b.block([
+						b.stmt(b.assignment('=', node, mount)),
+						// htext already coerced and validated this first value; SSR
+						// suppression must not be followed by a second write.
+						b.stmt(b.assignment('=', b.member(b.id('_p'), `_value$${field}`), undefinedNode())),
+					]),
+					b.stmt(b.assignment('=', b.member(b.id('_p'), `_value$${field}`), prepared)),
+				),
+			);
+			changes.push(b.stmt(b.assignment('=', pending(), b.id('_v'))));
+			return inheritOriginLoc(
+				b.block([
+					b.const('_v', expr),
+					b.if(b.binary('!==', pending(), b.id('_v')), b.block(changes), null),
+				]),
+				org,
+			);
+		}
+	} else if (bind.kind === 'class') {
+		prepared = b.call(
+			'_$prepareTemplateClass',
+			bagFieldNode(bag, `_el$${bind.id}`),
+			b.id('_v'),
+			b.literal(attrBindingHelper(bind) === 'setClassAttr'),
+		);
+	} else if (bind.kind === 'style') {
+		prepared = b.call(
+			'_$prepareTemplateStyle',
+			bagFieldNode(bag, `_el$${bind.id}`),
+			b.id('_v'),
+			pending(),
+			b.member(b.id('_p'), `_value$${field}`),
+		);
+	} else if (bind.kind === 'styleProperty') {
+		prepared = b.call(
+			'_$prepareTemplateStyleProperty',
+			bagFieldNode(bag, `_el$${bind.id}`),
+			inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
+			b.id('_v'),
+			inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
+			pending(),
+		);
 	} else {
 		prepared = b.call(
 			attrLoweringToken(b.id(`_$${preparedTemplateValueHelper(bind)}`), bind),
 			bagFieldNode(bag, `_el$${bind.id}`),
-			attrLoweringToken(b.literal(bind.preparedAttributeName ?? bind.name), bind),
+			attrLoweringToken(
+				b.literal(
+					bind.kind === 'htmlOnlyChild'
+						? 'dangerouslySetInnerHTML'
+						: (bind.preparedAttributeName ?? bind.name),
+				),
+				bind,
+			),
 			b.id('_v'),
 		);
 	}
@@ -31095,22 +31717,284 @@ function emitPreparedBinding(bind, bag) {
 		]),
 		org,
 	);
-	return bind.presentationUnbound ? { ...emitted, _octanePresentationUnbound: true } : emitted;
+	return emitted;
 }
 
 function emitPreparedBindingCommit(bind, bag) {
 	const org = bindingOrigin(bind);
 	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
-	const field = bag.letter(`_prev$${bind.id}`);
+	const prefix = bind.signalDirect
+		? '_sig'
+		: bind.kind === 'ref'
+			? '_ref'
+			: bind.kind === 'hostCommit'
+				? '_host'
+				: bind.kind === 'hostSpread'
+					? '_sp'
+					: bind.kind === 'style' || bind.kind === 'styleProperties'
+						? '_sty'
+						: '_prev';
+	const field = bag.letter(`${prefix}$${bind.id}`);
 	const pending = () => b.member(b.id('_p'), field);
 	const prepared = () => b.member(b.id('_p'), `_value$${field}`);
 	let write;
+	if (
+		bind.kind === 'formDiagnostic' ||
+		bind.kind === 'nativeChangeStatic' ||
+		bind.kind === 'nativeChangeRuntime'
+	) {
+		const args = [F('_el')];
+		let helper;
+		if (bind.kind === 'formDiagnostic') {
+			helper = '_$queueFormAuthoringDiagnostic';
+			args.push(b.literal(bind.diagnosticKind));
+			if (bind.selectedBinding !== undefined) {
+				const selected = bind.selectedBinding;
+				args.push(
+					b.arrow(
+						[],
+						bagFieldNode(bag, `${selected.signalDirect ? '_sig' : '_prev'}$${selected.id}`),
+					),
+				);
+			}
+		} else
+			helper =
+				bind.kind === 'nativeChangeStatic'
+					? '_$markNativeChangeDiagnosticStatic'
+					: '_$queueNativeChangeDiagnostic';
+		return inheritOriginLoc(
+			b.block([b.stmt(b.call(helper, ...args)), b.stmt(b.assignment('=', F('_prev'), pending()))]),
+			org,
+		);
+	}
+	if (!bind.signalDirect && CONTROLLED_KIND_HELPERS[bind.kind] !== undefined) {
+		const raw = b.member(pending(), 'value');
+		const adopted = b.member(pending(), 'adopted');
+		const normalized = b.member(pending(), 'normalized');
+		const args = [F('_el')];
+		if (bind.kind === 'value' || bind.kind === 'selectValue') args.push(raw, adopted, normalized);
+		else if (bind.kind === 'defaultValue') args.push(raw, undefinedNode(), adopted, normalized);
+		else if (bind.kind === 'defaultValueUncontrolled') args.push(raw, adopted, normalized);
+		else args.push(normalized, adopted);
+		return inheritOriginLoc(
+			b.block([
+				b.stmt(b.call(attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind), ...args)),
+				b.stmt(b.assignment('=', F('_prev'), pending())),
+			]),
+			org,
+		);
+	}
+	if (bind.signalDirect) {
+		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
+		return inheritOriginLoc(
+			b.if(
+				b.binary('!==', F('_sig'), pending()),
+				b.block([
+					b.stmt(b.assignment('=', F('_sig'), b.call('_$commitTemplateSignal', pending()))),
+					...(text
+						? [
+								b.stmt(
+									b.assignment(
+										'=',
+										F('_prev'),
+										b.member(b.id('_p'), bag.letter(`_prev$${bind.id}`)),
+									),
+								),
+							]
+						: []),
+				]),
+				null,
+			),
+			org,
+		);
+	}
+	if (bind.kind === 'hostCommit') {
+		return inheritOriginLoc(
+			b.block([
+				b.stmt(
+					b.assignment(
+						'=',
+						F('_host'),
+						b.call(
+							bind.signalHostSources
+								? '_$commitTemplateSignalHostSources'
+								: '_$commitTemplateHostSources',
+							F('_el'),
+							pending(),
+							b.id('__s'),
+						),
+					),
+				),
+				b.stmt(b.assignment('=', b.member(b.id('_b'), `_value$${field}`), prepared())),
+			]),
+			org,
+		);
+	}
+	if (bind.kind === 'hostValue' || bind.kind === 'hostSpread') {
+		return inheritOriginLoc(b.stmt(b.assignment('=', F(prefix), pending())), org);
+	}
+	if (bind.kind === 'styleProperties') {
+		const fields = bind.properties.map((_, i) => bag.letter(`_prev$${bind.id}_${i}`));
+		const normalized = () => b.member(b.id('_b'), `_value$${field}`);
+		return inheritOriginLoc(
+			b.if(
+				orChain([
+					b.binary('!==', F('_sty'), pending()),
+					...fields.map((key) =>
+						b.binary('!==', b.member(b.id('_b'), key), b.member(b.id('_p'), key)),
+					),
+				]),
+				b.block([
+					b.stmt(b.call('_$commitTemplateStyle', F('_el'), prepared(), normalized())),
+					b.stmt(b.assignment('=', normalized(), prepared())),
+					b.stmt(b.assignment('=', F('_sty'), pending())),
+					...fields.map((key) =>
+						b.stmt(b.assignment('=', b.member(b.id('_b'), key), b.member(b.id('_p'), key))),
+					),
+				]),
+				null,
+			),
+			org,
+		);
+	}
+	if (bind.kind === 'event-bundle') {
+		const n = bind.argExprs.length;
+		const fields = bind.argExprs.map((_, i) => bag.letter(`_arg$${bind.id}_${i}`));
+		const args = fields.map((field) => b.member(b.id('_p'), field));
+		const values = n <= 2 ? args : [b.array(args)];
+		const arity = n <= 2 ? String(n) : 'N';
+		return inheritOriginLoc(
+			b.if(
+				orChain([
+					b.binary('!==', F('_prev'), pending()),
+					b.binary(
+						'!==',
+						bagFieldNode(bag, '_eventOwner'),
+						b.member(b.id('_p'), bag.letter('_eventOwner')),
+					),
+					...fields.map((field) =>
+						b.unary(
+							'!',
+							b.call('_$hookMemoEqual', b.member(b.id('_b'), field), b.member(b.id('_p'), field)),
+						),
+					),
+				]),
+				b.block([
+					b.if(
+						b.binary('===', F('_ev'), nullNode()),
+						b.stmt(
+							b.assignment(
+								'=',
+								F('_ev'),
+								b.call(
+									`_$evt${arity}${bind.event ? 'e' : ''}`,
+									F('_el'),
+									slotKeyLiteral(bind),
+									pending(),
+									...values,
+									b.id('__s'),
+									b.id('__eventOwner'),
+								),
+							),
+						),
+						b.stmt(
+							b.call(
+								`_$evt${arity}u`,
+								F('_ev'),
+								pending(),
+								...values,
+								b.id('__s'),
+								b.id('__eventOwner'),
+							),
+						),
+					),
+					b.stmt(b.assignment('=', F('_prev'), pending())),
+					...fields.map((field) =>
+						b.stmt(b.assignment('=', b.member(b.id('_b'), field), b.member(b.id('_p'), field))),
+					),
+				]),
+				null,
+			),
+			org,
+		);
+	}
+	if (bind.kind === 'event' || bind.kind === 'ref') {
+		write =
+			bind.kind === 'event'
+				? b.call(
+						'_$setEventHandler',
+						F('_el'),
+						slotKeyLiteral(bind),
+						pending(),
+						undefinedNode(),
+						b.id('__s'),
+						b.id('__eventOwner'),
+					)
+				: b.call('_$replaceRef', b.id('__s'), F('_ref'), pending(), F('_el'));
+		return inheritOriginLoc(
+			b.if(
+				orChain([
+					b.binary('!==', F(prefix), pending()),
+					...(bind.kind === 'event'
+						? [
+								b.binary(
+									'!==',
+									bagFieldNode(bag, '_eventOwner'),
+									b.member(b.id('_p'), bag.letter('_eventOwner')),
+								),
+							]
+						: []),
+				]),
+				b.block([b.stmt(write), b.stmt(b.assignment('=', F(prefix), pending()))]),
+				null,
+			),
+			org,
+		);
+	}
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
 		write = b.call(
 			'_$setText',
 			bag.has(`_txt$${bind.id}`) ? F('_txt') : nullNode(),
 			prepared(),
 			...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
+		);
+	} else if (bind.kind === 'class') {
+		write = b.call(
+			attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind),
+			F('_el'),
+			prepared(),
+		);
+	} else if (bind.kind === 'style') {
+		write = b.call(
+			'_$commitTemplateStyle',
+			F('_el'),
+			prepared(),
+			b.member(b.id('_b'), `_value$${field}`),
+		);
+	} else if (bind.kind === 'styleProperty') {
+		write = b.call(
+			'_$commitTemplateStyleProperty',
+			F('_el'),
+			inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
+			prepared(),
+			F('_prev'),
+		);
+	} else if (bind.kind === 'formAction') {
+		write = b.call(
+			'_$setFormAction',
+			F('_el'),
+			attrLoweringToken(b.literal(bind.name), bind),
+			pending(),
+			F('_prev'),
+			prepared(),
+		);
+	} else if (preparedTemplateValueHelper(bind) === 'prepareTemplateAttribute') {
+		write = b.call(
+			'_$commitHostProps',
+			F('_el'),
+			prepared(),
+			b.member(b.id('_b'), `_value$${field}`),
+			b.id('__s'),
 		);
 	} else {
 		write = b.call(
@@ -31125,10 +32009,27 @@ function emitPreparedBindingCommit(bind, bag) {
 	const retained = bind.kind === 'booleanAttr' ? nullNode() : undefinedNode();
 	return inheritOriginLoc(
 		b.if(
-			b.binary('!==', F('_prev'), pending()),
+			b.binary('!==', F(prefix), pending()),
 			b.block([
+				...(bind.claimAfterHost
+					? [
+							b.stmt(
+								b.assignment('=', F('_txt'), b.member(b.id('_p'), bag.letter(`_txt$${bind.id}`))),
+							),
+						]
+					: []),
 				b.if(b.binary('!==', prepared(), retained), b.stmt(write), null),
-				b.stmt(b.assignment('=', F('_prev'), pending())),
+				...(bind.kind === 'style' ||
+				preparedTemplateValueHelper(bind) === 'prepareTemplateAttribute'
+					? [
+							b.if(
+								b.binary('!==', prepared(), undefinedNode()),
+								b.stmt(b.assignment('=', b.member(b.id('_b'), `_value$${field}`), prepared())),
+								null,
+							),
+						]
+					: []),
+				b.stmt(b.assignment('=', F(prefix), pending())),
 			]),
 			null,
 		),
@@ -31210,6 +32111,19 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		);
 	}
 	switch (bind.kind) {
+		case 'formDiagnostic': {
+			const args = [F('_el'), b.literal(bind.diagnosticKind)];
+			if (bind.selectedBinding !== undefined) {
+				const selected = bind.selectedBinding;
+				args.push(
+					b.arrow(
+						[],
+						bagFieldNode(bag, `${selected.signalDirect ? '_sig' : '_prev'}$${selected.id}`),
+					),
+				);
+			}
+			return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
+		}
 		case 'nativeProjection': {
 			return st(
 				b.stmt(
@@ -32222,6 +33136,7 @@ function emitElementHtml(
 	const hostClientSources = [];
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
+	let directDangerClientBinding = null;
 	const hasNestedJsxChildren =
 		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
 	const resolveDangerouslySetInnerHTMLAcrossSpreads = firstSpreadIdx !== -1;
@@ -32556,7 +33471,7 @@ function emitElementHtml(
 				});
 				continue;
 			}
-			bindings.push({
+			const binding = {
 				id: bindings.length,
 				kind: 'attr',
 				name: 'dangerouslySetInnerHTML',
@@ -32564,7 +33479,9 @@ function emitElementHtml(
 				path,
 				ns: hostNs,
 				nameOrigin: attr.name,
-			});
+			};
+			bindings.push(binding);
+			directDangerClientBinding = binding;
 			continue;
 		}
 
@@ -33046,6 +33963,17 @@ function emitElementHtml(
 		}
 	}
 	if (resolveHostPropsAcrossSources) {
+		// An aggregated source can carry an action only on these native hosts.
+		// Keep the submit driver absent from every other generic host writer.
+		if (
+			(hostNs === 'html' || hostNs === 'opaque') &&
+			(tag === 'form' || tag === 'button' || tag === 'input') &&
+			(firstSpreadIdx !== -1 ||
+				directPropNames.has('action') ||
+				directPropNames.has('formAction') ||
+				directPropNames.has('formaction'))
+		)
+			addDescriptorCapability(ctx, 'enableDescriptorFormActions');
 		const signalHostSources =
 			firstSpreadIdx !== -1 ||
 			hasDirectSignalStyle ||
@@ -33325,6 +34253,7 @@ function emitElementHtml(
 			ch.hostPath = path;
 			ch.onlyChildText = true;
 			ch.potentialDangerouslySetInnerHTML = potentialDangerouslySetInnerHTML;
+			ch.prospectiveHostBinding = hostCommitClientBinding ?? directDangerClientBinding;
 			compCalls.push(ch);
 		}
 	} else {
@@ -33731,6 +34660,7 @@ function emitElementHtml(
 					ch.hostPath = path;
 					ch.anchorPath = [...path, childIdx];
 					ch.potentialDangerouslySetInnerHTML = potentialDangerouslySetInnerHTML;
+					ch.prospectiveHostBinding = hostCommitClientBinding ?? directDangerClientBinding;
 					compCalls.push(ch);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
@@ -33882,6 +34812,7 @@ function hoistBodyHelper(
 	keyedSelection = null,
 	inlineBindingGuards = false,
 	mappedItem = false,
+	armInfo = null,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -33951,6 +34882,7 @@ function hoistBodyHelper(
 		keyedSelection,
 		inlineBindingGuards,
 		mappedItem,
+		armInfo,
 		// Only names materialized as this helper's own const captures may ride
 		// the original tuple into a nested arm. A union-only name can instead
 		// name an authored local shadow and must get a fresh environment.
@@ -33988,35 +34920,6 @@ function hoistBodyHelper(
 	// Module-scope placement: the compiled helper joins the module AST as a
 	// hoisted statement node (M2 AST emit).
 	ctx.hoistedHelpers.push(helperFn);
-	if (keyedSelection?.update != null) {
-		const selectionName = allocCompilerName(ctx, `__select$${ctx.nextHelperId++}`);
-		const origin = keyedSelection.update;
-		const selectionBody = [
-			inheritOriginLoc(
-				b.const(
-					keyedSelection.selectedName,
-					b.member(b.id('__extra'), b.literal(keyedSelection.selectedIndex), true),
-				),
-				origin,
-			),
-			inheritOriginLoc(
-				b.const('_b', b.member(b.member(b.id('__s'), 'slots'), b.literal(0), true)),
-				origin,
-			),
-			keyedSelection.update,
-		];
-		ctx.hoistedHelpers.push(
-			inheritOriginLoc(
-				b.function_declaration(
-					b.id(selectionName, idOrigin ?? fakeOrigin ?? undefined),
-					[...params, b.id('__s'), b.id('__extra')],
-					b.block(selectionBody),
-				),
-				fakeOrigin,
-			),
-		);
-		keyedSelection.helper = selectionName;
-	}
 	return helperName;
 }
 
@@ -34115,6 +35018,8 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		thenStmts && { stmts: thenStmts, params: [] },
 		elseStmts && { stmts: elseStmts, params: [] },
 	]);
+	const thenInfo = { flatNative: false };
+	const elseInfo = { flatNative: false };
 	const thenHelperName = thenStmts
 		? hoistBodyHelper(
 				ctx,
@@ -34126,6 +35031,10 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 				cssHash,
 				envNames,
 				directiveKeywordOrigin(ctx, node),
+				null,
+				false,
+				false,
+				thenInfo,
 			)
 		: null;
 
@@ -34141,6 +35050,10 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 			cssHash,
 			envNames,
 			node.alternateKeyword ?? null,
+			null,
+			false,
+			false,
+			elseInfo,
 		);
 	}
 
@@ -34158,6 +35071,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		liteMask:
 			(thenStmts !== null && controlFlowArmIsLite(thenStmts) ? 1 : 0) |
 			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0),
+		preparedMask: (thenInfo.flatNative ? 1 : 0) | (elseInfo.flatNative ? 2 : 0),
 		// `@else`'s own keyword — the clause is a BlockStatement starting at `{`.
 		alternateKeyword: node.alternateKeyword ?? null,
 		hostPath: null,
@@ -35320,11 +36234,13 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	);
 	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
 	let liteMask = 0;
+	let preparedMask = 0;
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
 		if ((isDefault || caseRecords.length < 30) && stmts.length > 0 && controlFlowArmIsLite(stmts))
 			liteMask |= isDefault ? 1 : 2 << caseRecords.length;
+		const armInfo = { flatNative: false };
 		const helperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -35335,7 +36251,13 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 			cssHash,
 			envNames,
 			c.keyword ?? null,
+			null,
+			false,
+			false,
+			armInfo,
 		);
+		if ((isDefault || caseRecords.length < 30) && armInfo.flatNative)
+			preparedMask |= isDefault ? 1 : 2 << caseRecords.length;
 		if (isDefault) {
 			defaultHelper = helperName;
 			defaultKeyword = c.keyword ?? null;
@@ -35369,6 +36291,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		defaultHelper,
 		defaultKeyword,
 		liteMask,
+		preparedMask,
 		hostPath: null,
 	};
 }

@@ -55,35 +55,21 @@ those measurements do not establish that preparation is free.
 
 ## Architecture
 
-ViewTransition prepares its next tree before the native old capture. An optional
-DOM plan projects structural reads and host writes without changing existing
-native nodes. The finished boundary props select old-capture participation and classes, so a
-nested `update="none"` remains inside its parent's snapshot. Each snapshot
-retains its own name.
-The native update callback publishes the ordered plan once, preserving survivor
-identity and connected deletion cleanup. Ordinary rendering keeps its eager
-native DOM path; host views and mutation plans are allocated only while a
-ViewTransition prepares.
+ViewTransition prepares next component values before the native old capture.
+The boundary's finished props select old-capture participation and classes, so
+a nested `update="none"` remains inside its parent's snapshot. Each snapshot
+retains its own name. All preparation reads committed native hosts. Templates
+store their next binding values in their component's scope; structural changes
+prepare private candidate subtrees. The native update callback admits each
+participating owner's prepared scopes and retires replaced ranges. This keeps
+survivor identity and connected deletion cleanup, including when a newer
+request interrupts an earlier transition.
 
-The structural read seam is `getFirstChild` / `getNextSibling`; these use cached
-native getters normally and the staged view during preparation. Other host
-operations use typed `domNode` views. `pnpm staged-dom:check` resolves DOM members
-through TypeScript (including traceable aliases and casts) and rejects raw host
-operations outside a small, operation-specific native allowlist. The guard and
-mutation tests run in the existing CI workflow tests. Committed geometry,
-resource readiness, imperative public handles, and eager event registration are
-explicit native exceptions. This is static enforcement for typed or traceable
-host receivers, not a proof about arbitrary untyped application code.
-Unchecked `any`, reflective writes such as `Reflect.set`, and destructured
-members can escape that analysis and still require manual review.
-
-`initDomOperations` previously initialized only the two traversal getters. It
-was not a complete read/write operations table. Replacing projected form,
-selector, property and CSSOM semantics with a new table would require a broader
-host API migration. This change consolidates structural access and adds the
-missing enforcement while retaining the tested projection adapter. A future
-operations-table migration must preserve projected form ownership, result
-identity, native scroll geometry, controlled state and rollback contracts.
+Ordinary rendering uses the same prepare/commit contract. Only transitions
+allocate the optional capture that delays owner commits to the native update
+callback. Geometry, scrolling, selection, and resource readiness always read
+committed hosts. The native browser tests exercise controlled forms, selection,
+child collections, custom elements, and cleanup at the capture boundary.
 
 DOM observation and controlled-property snapshots during native commits detect
 updates from compiled templates and returned descriptors. A layout capture

@@ -38,6 +38,29 @@ describe('anchorless lone pure-host value', () => {
 		r.unmount();
 	});
 
+	it.each([false, true])(
+		'does not connect a pure host after its property setter unmounts the root (nested: %s)',
+		(nested) => {
+			let dispose: (() => void) | undefined;
+			let calls = 0;
+			class DisposingElement extends HTMLElement {
+				static observedAttributes = ['data-dispose'];
+				attributeChangedCallback() {
+					calls++;
+					dispose?.();
+				}
+			}
+			const tag = nested ? 'anchorless-nested-disposer' : 'anchorless-root-disposer';
+			customElements.define(tag, DisposingElement);
+			const r = mount(Pass, { children: createElement('div', undefined, 'previous') });
+			dispose = () => r.unmount();
+			const next = createElement(tag, { 'data-dispose': 'true' }, 'obsolete');
+			r.update(Pass, { children: nested ? createElement('div', undefined, next) : next });
+			expect(calls).toBe(1);
+			expect(r.container.childNodes).toHaveLength(0);
+		},
+	);
+
 	it('attaches the ref on mount and detaches it when the value flips away', () => {
 		const ref: { current: Element | null } = { current: null };
 		const r = mount(Pass, { children: createElement('div', { ref }) });

@@ -64,7 +64,7 @@ const output = {
 		chromium: browser.version(),
 		bundleSha256: hash(bundle),
 		fixtureSha256: hash(fixture),
-		adapterSha256: hash(fs.readFileSync(path.join(source.packageRoot, 'src/dom-stage.ts'))),
+		runtimeSha256: hash(fs.readFileSync(path.join(source.packageRoot, 'src/runtime.ts'))),
 		measurement:
 			'Native importNode(option) calls and selected getter calls, from scheduled update through native transition completion; excludes mount, assertions and teardown. Counts delegate unchanged to native operations.',
 	},

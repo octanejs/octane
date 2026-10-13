@@ -74,7 +74,7 @@ function renderChangedBranchSlot(
 	next: number,
 	body: ComponentBody | null,
 	marker: string,
-	hydration: HydrationCapability | null,
+	hydration: HydrationAttempt | null,
 	env?: any[],
 ): void {
 	const parentBlock = parentScope.block;

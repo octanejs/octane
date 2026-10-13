@@ -497,14 +497,13 @@ Independent, individually-measurable items, roughly by value:
   uses, unstable captures, duplicate writers, and any setup escape keep the
   original declaration and hook lowering. Observable callback identities are
   therefore unchanged.
-- **3l. Hydration capability isolation — LANDED 2026-07-15.** Adoption cursor,
-  mismatch recovery, seeded previous values, and hydration-aware DOM writes now
-  live behind a `HydrationCapability` constructed only by `hydrateRoot`.
-  Shared DOM helpers make a nullable capability dispatch, but an ordinary
-  `createRoot` bundle no longer roots the hydration implementation graph and a
-  production bundler can eliminate it. Hydration state remains scoped across
-  nested/foreign-root re-entry, and hydration-specific behavior continues
-  through the same capability boundary rather than being weakened for size.
+- **3l. Hydration capability isolation — LANDED 2026-07-15; SUPERSEDED.**
+  The original implementation isolated adoption behind a root-only object.
+  Hydration now uses one active cursor with parked positions per root for nested
+  and deferred re-entry. Components prepare values and private replacements;
+  commit publishes accepted DOM. A hydration-free bundle must omit genuine
+  hydration entry and optional feature paths. Both bundlers' complete JavaScript
+  totals and retained code are measured by the bundle-size benchmarks.
 - **3m. Compiler-proven void output paths — LANDED 2026-07-15.** Blocks now
   carry a nullable output handler. Generic `createRoot`, `hydrateRoot`, and
   component sites install the handler that reconciles arbitrary JavaScript

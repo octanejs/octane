@@ -1,20 +1,27 @@
-import { setAttribute, setText, use, useState } from 'octane';
+import { use, useLayoutEffect, useState } from 'octane';
 
-function NewRow(props) @{
+function NewRow(props: { label: string; external: HTMLElement }) @{
 	const [clicks, setClicks] = useState(0);
-	setText(props.external.firstChild as Text, 'external:' + props.label);
-	setAttribute(props.external, 'data-state', props.label);
+	useLayoutEffect(() => {
+		(props.external.firstChild as Text).data = 'external:' + props.label;
+		props.external.setAttribute('data-state', props.label);
+	}, [props.external, props.label]);
 	<button id="new-row" title={'row:' + props.label} onClick={() => setClicks(clicks + 1)}>
 		{'row:' + props.label + ':' + clicks}
 	</button>
 }
 
-function Reader(props) @{
+function Reader(props: { promise: Promise<string> }) @{
 	const value = use(props.promise);
 	<output id="root-read">{value as string}</output>
 }
 
-export function FreshRootScopeHold(props) @{
+export function FreshRootScopeHold(props: {
+	show: boolean;
+	label: string;
+	external: HTMLElement;
+	promise: Promise<string>;
+}) @{
 	<main>
 		@if (props.show) {
 			<NewRow label={props.label} external={props.external} />

@@ -120,7 +120,7 @@ try {
 		const snapshot = await verifyScenario(scenario, minified);
 		// Reachability is a benchmark diagnostic; executable output is the semantic control.
 		const reachable = Number(/\bfunction vtFlush\s*\(/.test(code));
-		const stagingReachable = Number(/\bDOMStage\b/.test(code));
+		const stagingReachable = Number(/\bbeginStagedCommitCapture\b/.test(code));
 		assert.equal(reachable, 0, 'Ordinary apps must not retain the optional View Transition driver');
 		assert.equal(
 			stagingReachable,
@@ -320,7 +320,7 @@ try {
 			{
 				...byteMetrics(minified),
 				driver_reachable: 1,
-				staging_reachable: Number(/\bDOMStage\b/.test(code)),
+				staging_reachable: Number(/\bbeginStagedCommitCapture\b/.test(code)),
 			},
 			{
 				browser: browser.version(),

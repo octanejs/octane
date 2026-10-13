@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { bagOf, clone, setText, template, type Scope } from '../src/index.js';
+import {
+	bagOf,
+	clone,
+	commitTemplate,
+	prepareTemplateText,
+	setText,
+	template,
+	type Scope,
+} from '../src/index.js';
 import { act, mount } from './_helpers.js';
 
 function pending() {
@@ -8,6 +16,13 @@ function pending() {
 		resolve = accept;
 	});
 	return { promise, resolve };
+}
+
+// This hand-written bag integration publishes owned DOM through the same
+// completed writer ABI as compiled templates. Its own unusual JS bag fields
+// below remain the integration's state, observed through a native event.
+function applyText(bindings: Record<string, any>, values: Record<string, any>) {
+	if (values.text !== undefined) setText(bindings.text, values.text);
 }
 
 describe('root snapshot values', () => {
@@ -29,6 +44,7 @@ describe('root snapshot values', () => {
 				const output = host.querySelector('output')!;
 				bindings = {
 					text: host.querySelector('p')!.firstChild,
+					prepared: null,
 					[value]: 'initial',
 					[removed]: 'kept',
 				};
@@ -45,7 +61,15 @@ describe('root snapshot values', () => {
 				});
 				bagOf(scope, host, bindings);
 			}
-			setText(bindings.text, props.label);
+			commitTemplate(
+				scope,
+				bindings,
+				{
+					text: prepareTemplateText(bindings.text, null, props.label),
+				},
+				applyText,
+				'prepared',
+			);
 			bindings[value] = props.label;
 			if (props.suspend) {
 				delete bindings[removed];
@@ -92,6 +116,7 @@ describe('root snapshot values', () => {
 					let value = 'initial';
 					bindings = Object.create({ inherited: 'outside' });
 					bindings.text = host.querySelector('p')!.firstChild;
+					bindings.prepared = null;
 					bindings.removed = 'kept';
 					Object.defineProperty(bindings, field, {
 						enumerable: true,
@@ -112,7 +137,15 @@ describe('root snapshot values', () => {
 					});
 					bagOf(scope, host, bindings);
 				}
-				setText(bindings.text, props.label);
+				commitTemplate(
+					scope,
+					bindings,
+					{
+						text: prepareTemplateText(bindings.text, null, props.label),
+					},
+					applyText,
+					'prepared',
+				);
 				bindings[field] = props.label;
 				if (props.suspend) {
 					delete bindings.removed;
@@ -148,12 +181,21 @@ describe('root snapshot values', () => {
 				const output = host.querySelector('output')!;
 				bindings = ['initial', 'kept'];
 				bindings.text = host.querySelector('p')!.firstChild;
+				bindings.prepared = null;
 				host.querySelector('button')!.addEventListener('click', () => {
 					output.textContent = bindings.join(':');
 				});
 				bagOf(scope, host, bindings);
 			}
-			setText(bindings.text, props.label);
+			commitTemplate(
+				scope,
+				bindings,
+				{
+					text: prepareTemplateText(bindings.text, null, props.label),
+				},
+				applyText,
+				'prepared',
+			);
 			bindings[0] = props.label;
 			if (props.suspend) {
 				bindings.length = 1;

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { flushEffects, mount } from './_helpers';
-import { createRoot, hydrateRoot } from '../src/index.js';
+import { act, flushEffects, mount } from './_helpers';
+import { createRoot, hydrateRoot, startTransition } from '../src/index.js';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture';
 import {
 	BranchSelfUpdate,
+	BranchAdmission,
+	BranchCleanupReentry,
+	BranchSiblingAdmission,
+	EmptyBranchAdmission,
 	DirectSelfUpdate,
 	InlineSelfUpdate,
 	InlineHostForSelfUpdate,
@@ -20,6 +24,7 @@ import {
 	ReducerSelfUpdate,
 	ReturnedSelfUpdate,
 	UnchangedAfterHostReplay,
+	SuspenseBranchAdmission,
 } from './_fixtures/render-phase-child.tsrx';
 
 const cases = [
@@ -34,6 +39,251 @@ const cases = [
 ] as const;
 
 describe('children of render-phase state updates', () => {
+	it.each(['B', 'empty'] as const)(
+		'keeps the applied branch visible to a later sibling until a successful %s commits',
+		(choice) => {
+			const Component = choice === 'empty' ? EmptyBranchAdmission : BranchAdmission;
+			const refs: Array<Element | null> = [];
+			const observed: Array<{
+				arm: Element | null;
+				draft: string | undefined;
+				refs: Array<Element | null>;
+				sections: number;
+				text: string | null;
+			}> = [];
+			let inspect = false;
+			const props = {
+				choice: 'A' as const,
+				armRef: (node: Element | null) => refs.push(node),
+				observe() {
+					if (!inspect) return;
+					const arm = root.container.querySelector('[data-arm]');
+					observed.push({
+						arm,
+						draft: arm?.querySelector('input')?.value,
+						refs: [...refs],
+						sections: root.container.querySelectorAll('section').length,
+						text: root.container.textContent,
+					});
+				},
+			};
+			const root = mount(Component, props);
+			try {
+				flushEffects();
+				const arm = root.find('[data-arm="A"]');
+				arm.querySelector('input')!.value = 'unsaved A';
+				const committed = {
+					arm,
+					draft: 'unsaved A',
+					refs: [...refs],
+					sections: root.container.querySelectorAll('section').length,
+					text: root.container.textContent,
+				};
+				expect(committed.sections).toBe(1);
+				expect(committed.text).toBe('Aready');
+				expect(committed.refs).toEqual([arm]);
+				inspect = true;
+				root.update(Component, { ...props, choice });
+				expect(observed.length).toBeGreaterThan(0);
+				for (const view of observed) expect(view).toEqual(committed);
+				flushEffects();
+				expect(root.container.querySelector('[data-arm="A"]')).toBeNull();
+				expect(arm.isConnected).toBe(false);
+				if (choice === 'B') {
+					const next = root.find('[data-arm="B"]');
+					expect(next.querySelector('input')?.value).toBe('B');
+					expect(refs).toEqual([arm, null, next]);
+				} else {
+					expect(root.container.querySelector('[data-arm]')).toBeNull();
+					expect(refs).toEqual([arm, null]);
+				}
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('cancels a suspended empty branch without unmounting its applied arm, even after a late resolve', async () => {
+		const refs: Array<Element | null> = [];
+		const observed: Array<{
+			arm: Element | null;
+			draft: string | undefined;
+			refs: Array<Element | null>;
+		}> = [];
+		let inspect = false;
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const props = {
+			choice: 'A' as const,
+			armRef: (node: Element | null) => refs.push(node),
+			observe() {
+				if (!inspect) return;
+				const arm = root.container.querySelector('[data-arm]');
+				observed.push({
+					arm,
+					draft: arm?.querySelector('input')?.value,
+					refs: [...refs],
+				});
+			},
+		};
+		const root = mount(EmptyBranchAdmission, props);
+		try {
+			flushEffects();
+			const arm = root.find('[data-arm="A"]');
+			const input = arm.querySelector('input')!;
+			input.value = 'still editing A';
+			const committed = { arm, draft: 'still editing A', refs: [...refs] };
+			inspect = true;
+			await act(() =>
+				root.root.render(EmptyBranchAdmission, { ...props, choice: 'empty', promise }),
+			);
+			expect(observed.length).toBeGreaterThan(0);
+			for (const view of observed) expect(view).toEqual(committed);
+			expect(root.find('[data-arm="A"]')).toBe(arm);
+			expect(refs).toEqual(committed.refs);
+			inspect = false;
+			await act(() => root.root.render(EmptyBranchAdmission, props));
+			expect(root.find('[data-arm="A"]')).toBe(arm);
+			expect(arm.querySelector('input')).toBe(input);
+			expect(input.value).toBe('still editing A');
+			await act(() => resolve('discarded'));
+			expect(root.find('[data-arm="A"]')).toBe(arm);
+			expect(root.find('footer').textContent).toBe('ready');
+			expect(refs).toEqual([arm]);
+		} finally {
+			root.unmount();
+		}
+		expect(refs).toEqual([expect.any(Element), null]);
+	});
+
+	it('admits a suspended else arm and its ref lifetime only when a later sibling finishes', async () => {
+		const refs: Array<Element | null> = [];
+		const observed: Array<{
+			arm: Element | null;
+			draft: string | undefined;
+			refs: Array<Element | null>;
+		}> = [];
+		let inspect = false;
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const props = {
+			choice: 'A' as const,
+			armRef: (node: Element | null) => refs.push(node),
+			observe() {
+				if (!inspect) return;
+				const arm = root.container.querySelector('[data-arm]');
+				observed.push({
+					arm,
+					draft: arm?.querySelector('input')?.value,
+					refs: [...refs],
+				});
+			},
+		};
+		const root = mount(SuspenseBranchAdmission, props);
+		try {
+			flushEffects();
+			const arm = root.find('[data-arm="A"]');
+			arm.querySelector('input')!.value = 'private draft';
+			const committed = { arm, draft: 'private draft', refs: [...refs] };
+			inspect = true;
+			await act(() =>
+				startTransition(() =>
+					root.root.render(SuspenseBranchAdmission, { ...props, choice: 'B', promise }),
+				),
+			);
+			expect(observed.length).toBeGreaterThan(0);
+			for (const view of observed) expect(view).toEqual(committed);
+			expect(root.find('[data-arm="A"]')).toBe(arm);
+			expect(root.container.querySelector('[data-waiting]')).toBeNull();
+			expect(refs).toEqual(committed.refs);
+			inspect = false;
+			await act(() => resolve('done'));
+			const next = root.find('[data-arm="B"]');
+			expect(root.container.querySelector('[data-arm="A"]')).toBeNull();
+			expect(arm.isConnected).toBe(false);
+			expect(next.querySelector('input')?.value).toBe('B');
+			expect(root.find('footer').textContent).toBe('done');
+			expect(refs).toEqual([arm, null, next]);
+		} finally {
+			root.unmount();
+		}
+		expect(refs).toEqual([expect.any(Element), null, expect.any(Element), null]);
+	});
+
+	it('releases a deleted sibling ref even when a later new arm supersedes itself during commit', () => {
+		const firstRefs: Array<Element | null> = [];
+		const laterRefs: Array<Element | null> = [];
+		const props = {
+			removeFirst: false,
+			alternate: false,
+			firstRef: (node: Element | null) => firstRefs.push(node),
+			laterRef(node: Element | null) {
+				laterRefs.push(node);
+				if (node?.textContent === 'B') {
+					root.root.render(BranchSiblingAdmission, {
+						...props,
+						removeFirst: true,
+						alternate: false,
+					});
+				}
+			},
+		};
+		const root = mount(BranchSiblingAdmission, props);
+		try {
+			const first = root.find('[data-first]');
+			const initialLater = root.find('[data-later]');
+			expect(firstRefs).toEqual([first]);
+			expect(laterRefs).toEqual([initialLater]);
+			root.update(BranchSiblingAdmission, { ...props, removeFirst: true, alternate: true });
+			expect(root.container.querySelector('[data-first]')).toBeNull();
+			expect(first.isConnected).toBe(false);
+			expect(firstRefs).toEqual([first, null]);
+			const latest = root.find('[data-later]');
+			expect(root.findAll('section')).toEqual([latest]);
+			expect(latest.textContent).toBe('A');
+			expect(laterRefs.at(-1)).toBe(latest);
+		} finally {
+			root.unmount();
+		}
+		expect(firstRefs).toHaveLength(2);
+		expect(laterRefs.at(-1)).toBeNull();
+	});
+
+	it('places the newest arm before a permanent sibling when outgoing layout cleanup supersedes the replacement', () => {
+		const refs: Array<Element | null> = [];
+		const props = {
+			choice: 'A' as const,
+			armRef: (node: Element | null) => refs.push(node),
+			cleanup() {
+				root.root.render(BranchCleanupReentry, { ...props, choice: 'C' });
+			},
+		};
+		const root = mount(BranchCleanupReentry, props);
+		try {
+			const original = root.find('[data-arm="A"]');
+			const footer = root.find('footer');
+			const input = footer.querySelector('input')!;
+			input.value = 'independent edit';
+			expect(refs).toEqual([original]);
+			root.update(BranchCleanupReentry, { ...props, choice: 'B' });
+			expect(root.container.querySelector('[data-arm="A"]')).toBeNull();
+			expect(root.container.querySelector('[data-arm="B"]')).toBeNull();
+			const latest = root.find('[data-arm="C"]');
+			expect([...root.find('article').children]).toEqual([latest, footer]);
+			expect(original.isConnected).toBe(false);
+			expect(footer.querySelector('input')).toBe(input);
+			expect(input.value).toBe('independent edit');
+			expect(refs).toEqual([original, null, latest]);
+		} finally {
+			root.unmount();
+		}
+		expect(refs).toEqual([expect.any(Element), null, expect.any(Element), null]);
+	});
+
 	it('does not publish an intermediate host answer when a replay returns to the committed value', () => {
 		const seen = new Set<string>();
 		let inspect = false;

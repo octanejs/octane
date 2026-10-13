@@ -1,10 +1,10 @@
 // The hydration flags. This module imports nothing, so a bundler places it
-// ahead of every reader, and only hydration code calls its setters: the entry
-// points `hydrateRoot`, a `<Hydrate>` island's activation and a streamed
-// Suspense arm's resumed hydration, and the passes they start (runtime.ts
-// `swapHydration` and `installHydrationDriver`).
+// ahead of every reader. Only the hydrateRoot entry initializes the sticky
+// flag; later island activations and streamed Suspense arms switch a pass
+// created by that entry. A presentation writer may temporarily suppress and
+// restore the transient flag without starting hydration.
 //
-// A client that only calls createRoot never reaches a setter, so both flags
+// A client that only calls createRoot never starts hydration, so both flags
 // stay `false` for its whole lifetime. Rolldown with Vite's default minifier
 // then folds every guard and drops the hydration code behind it, but only
 // while every reader follows these rules:
@@ -16,9 +16,8 @@
 //   both are the same. Write `hydrating ? x : false`, never a bare
 //   `hydrating && x` value.
 // - Never call a setter from client-reachable code, even behind a guard.
-// esbuild never folds a module flag. For it, hydration bodies live on
-// HydrationCapability or on the driver hydrateRoot installs, which client code
-// never references.
+// esbuild never folds a module flag; measure both bundlers when changing the
+// hydration entry point or a shared client primitive.
 
 /**
  * Whether a hydration pass is on the stack. It is `true` exactly while
@@ -36,10 +35,9 @@ export let hydrating = false;
  */
 export let hydrationStarted = false;
 
-/** Hydration entry points only. */
+/** Switch or temporarily suppress an already-owned hydration pass. */
 export function setHydrating(value: boolean): void {
 	hydrating = value;
-	if (value) hydrationStarted = true;
 }
 
 /** Hydration entry points only: about to create hydration state that outlives a pass. */

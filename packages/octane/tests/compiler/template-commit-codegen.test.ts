@@ -54,17 +54,9 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 		);
 	});
 
-	it('keeps scalar shell writers out of static, SSR and unsupported host plans', () => {
+	it('keeps template writers out of static and SSR plans', () => {
 		const sources = [
 			`export function Static() @{<section><h1>Heading</h1><p>content</p></section>}`,
-			`export function Foreign(p) @{
-				<a href={p.href}>
-					<octane-input title={p.title}/>
-					<input value={p.value}/>
-					<button is="fancy-button" title={p.title}>go</button>
-				</a>
-			}`,
-			`export function Spread(p) @{<div title={p.first} {...p.rest}>child</div>}`,
 		];
 		for (const source of sources) {
 			const result = compiled(source, dev);
@@ -78,6 +70,36 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 		);
 		expect(ssr.writers).toHaveLength(0);
 		expect(ssr.imports).not.toContain('commitTemplate');
+	});
+
+	it('resolves spread sources during render and publishes them from the same template writer', () => {
+		const { imports, writers, code } = compiled(
+			`export function Spread(p) @{
+				<div title={p.first} {...p.rest} aria-label={p.label}>child</div>
+			}`,
+			dev,
+		);
+		expect(writers).toHaveLength(1);
+		expect(imports).toContain('prepareTemplateSignalHostSources');
+		expect(imports).toContain('commitTemplateSignalHostSources');
+		expect(code.slice(writers[0].start, writers[0].end)).not.toMatch(/\bp\.(first|rest|label)\b/);
+	});
+
+	it('prepares URL and custom attributes without capturing render-local props in commit', () => {
+		const { imports, writers, code } = compiled(
+			`export function Foreign(p) @{
+				<a href={p.href}>
+					<octane-input title={p.title}/>
+					<input value={p.value}/>
+					<button is="fancy-button" title={p.title}>go</button>
+				</a>
+			}`,
+			dev,
+		);
+		expect(writers).toHaveLength(1);
+		expect(imports).toContain('prepareTemplateAttribute');
+		expect(imports).toContain('commitHostProps');
+		expect(code.slice(writers[0].start, writers[0].end)).not.toMatch(/\bp\.(href|title|value)\b/);
 	});
 
 	it('keeps a bare renderable generic when it can change to empty or structural content', () => {

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync } from '../../src/index.js';
+import { act, createElement, createRoot, hydrateRoot, flushSync, use } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { MappedFallbackList } from './_fixtures/mapped-fallback-list.tsx';
 
@@ -117,4 +117,66 @@ describe('hydrateRoot — mapped-fallback keyed list', () => {
 		expect(compiled.map((row) => row.textContent)).toEqual(['a', 'b', 'c']);
 		root.unmount();
 	});
+
+	it.each(['hydrate', 'client', 'custom'] as const)(
+		'holds an exotic map host replacement until its new descendant can commit (%s)',
+		async (mode) => {
+			if (mode === 'hydrate')
+				container.innerHTML = ServerRT.renderToString(server.MappedFallbackList, {
+					items: ITEMS,
+				}).html;
+			const root =
+				mode === 'hydrate'
+					? hydrateRoot(container, MappedFallbackList, { items: ITEMS })
+					: createRoot(container);
+			if (mode !== 'hydrate')
+				root.render(MappedFallbackList, {
+					items: mode === 'client' ? ITEMS : accessorArray(ITEMS),
+				});
+			flushSync(() => {});
+			try {
+				const list = container.querySelector('ul')!;
+				const rows = [...list.children];
+				const original = list.innerHTML;
+				const observed: string[] = [];
+				let resolve!: (value: string) => void;
+				const ready = new Promise<string>((done) => {
+					resolve = done;
+				});
+				let inspect = true;
+				function Late() {
+					if (inspect) observed.push(list.innerHTML);
+					return createElement('output', null, use(ready));
+				}
+				const items = [...ITEMS];
+				Object.defineProperty(items, 'map', {
+					value(callback: (item: (typeof ITEMS)[number], index: number) => unknown) {
+						return ITEMS.map((item, index) =>
+							index === 0
+								? createElement(
+										'li',
+										{ key: item.id, 'data-id': item.id },
+										createElement(Late, null),
+									)
+								: callback(item, index),
+						);
+					},
+				});
+				await act(() => root.render(MappedFallbackList, { items }));
+				expect(observed.length).toBeGreaterThan(0);
+				for (const during of observed) expect(during).toBe(original);
+				expect(list.innerHTML).toBe(original);
+				expect([...list.children]).toEqual(rows);
+				inspect = false;
+				await act(() => resolve('ready'));
+				expect(list.querySelector('output')?.textContent).toBe('ready');
+				expect(list.querySelector('[data-id="1"]')).not.toBe(rows[0]);
+				expect(list.querySelector('[data-id="2"]')).toBe(rows[1]);
+				expect(list.querySelector('[data-id="3"]')).toBe(rows[2]);
+			} finally {
+				root.unmount();
+			}
+			expect(container.childNodes).toHaveLength(0);
+		},
+	);
 });

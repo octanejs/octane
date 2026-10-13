@@ -282,12 +282,8 @@ describe('descriptor list state and lifecycle', () => {
  root.unmount();return {initial,attempted,held,accepted,stale,identity,events};`),
 		).toEqual({
 			initial: { labels: [], values: [], state: [], inputs: [] },
-			attempted: {
-				labels: ['A1', 'B0'],
-				values: ['1', '0'],
-				state: ['0', '0'],
-				inputs: ['draft', 'draft'],
-			},
+			// A later sibling reads the committed DOM while this list prepares.
+			attempted: { labels: [], values: [], state: [], inputs: [] },
 			held: { labels: [], values: [], state: [], inputs: [] },
 			accepted: {
 				labels: ['A1', 'B1'],

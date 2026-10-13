@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // never-written module flag (Rolldown with Vite's default minifier) can drop it;
 // esbuild never folds that flag, so esbuild bundles are checked for every other
 // entry: the hydration bodies, which must live where client code cannot reach
-// them (HydrationCapability methods, or an installed driver).
+// them (hydration entry points or installed optional drivers).
 //
 // Each entry is hydration-only by construction, not by its name alone:
 // drainHydrationRenderPhaseUpdates (the first mount drains render-phase
@@ -34,9 +34,9 @@ import assert from 'node:assert/strict';
 // adoptHTML's HTML normalizers, are absent too: no production bundle retains
 // them, so no hydrating control could prove the oracle sees them.
 export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
-	// The root-local hydration capability. Only hydration entry points construct
-	// it; it is the dispatch boundary for adoption code.
-	{ name: 'HydrationCapability', source: 'runtime.ts' },
+	// Only hydration entry points create an adoption attempt and position the
+	// shared cursor; client roots must not retain this initialization path.
+	{ name: 'createHydrationAttempt', source: 'runtime.ts' },
 	// The current hydration pass and its readers. Only hydration entry points
 	// assign it, so a client-only bundle can only read it as null.
 	{ name: 'currentHydration', source: 'runtime.ts', foldOnly: true },

@@ -1,6 +1,6 @@
-// Deliberately invalid alternatives demonstrate why the root journal cannot be
-// armed after the first raw throw or restored from a previous binding cache.
-// They exist only in in-memory bundles; authored runtime source stays untouched.
+// Public root hold contract: a suspended update must preserve immediately
+// visible DOM, including edits made by the user or another owner. Exercise the
+// unmodified runtime and report native reads for compiled and descriptor paths.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -22,76 +22,7 @@ const output = join(repo, 'node_modules/.cache/root-contracts');
 await mkdir(output, { recursive: true });
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 
-function replaceOnce(source, previous, next) {
-	assert.equal(source.split(previous).length - 1, 1, `Expected exactly one ${previous}`);
-	return source.replace(previous, next);
-}
-
-function instrument(variant) {
-	let source = runtimeSource;
-	if (variant === 'native') return source;
-	if (variant === 'delayed-driver') {
-		source = replaceOnce(
-			source,
-			'let ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;',
-			'let AUDIT_ROOT_DRIVER = false;\nlet ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;',
-		);
-		source = replaceOnce(
-			source,
-			'WIP_CAPTURE = transaction.capture;\n\treturn frame;',
-			`WIP_CAPTURE = transaction.capture;
-	// Keep only the owner shell required by existing root request entry points.
-	// A real nullable driver would also omit this shell; it cannot recover writes
-	// that happened before installation any more than this idealized version can.
-	if (!AUDIT_ROOT_DRIVER && owner.current?.mounted) {
-		ROOT_RENDER_TRANSACTION = null;
-		TRANSITION_JOURNAL = null;
-		TRANSITION_JOURNAL_BAGS = null;
-		TRANSITION_JOURNAL_DEPTH = 0;
-		WIP_CAPTURE = null;
-	}
-	return frame;`,
-		);
-		const signature = `function suspendRootRender(
-	block: Block,
-	wakeable: PromiseLike<unknown>,
-	attempt: TransitionAttempt | null,
-): boolean {`;
-		source = replaceOnce(source, signature, signature + '\n\tAUDIT_ROOT_DRIVER = true;');
-	}
-	const reads = variant === 'binding-cache' ? 'cached' : 'live';
-	if (source.includes('function journalText(node: Text, previous: string | null)')) {
-		// setText journals the staged view's value when a staged DOM is active;
-		// the audit substitutes its own read for that previous value. The pattern
-		// accepts any spelling of the staged-view read.
-		source = replaceOnce(
-			source,
-			/journalText\(target, \(STAGED_DOM.*\)\.nodeValue\);/,
-			`journalText(target, globalThis.__rootContractAudit.${reads}Text(target));`,
-		);
-	} else {
-		source = replaceOnce(
-			source,
-			'TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, node.nodeValue, null);',
-			`TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, globalThis.__rootContractAudit.${reads}Text(node), null);`,
-		);
-	}
-	source = source.includes('function journalAttr(el: Element, name: string, ns?: string | null)')
-		? replaceOnce(
-				source,
-				'(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name),\n\t);',
-				`globalThis.__rootContractAudit.${reads}Attr(el, name),\n\t);`,
-			)
-		: replaceOnce(
-				source,
-				'TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));',
-				`TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, globalThis.__rootContractAudit.${reads}Attr(el, name));`,
-			);
-	return source;
-}
-
-async function bundle(variant, dev) {
-	const source = instrument(variant);
+async function bundle(dev) {
 	const built = await build({
 		stdin: {
 			contents: `export {RawRootSuspensionAfterSiblingApp as App, DescriptorRootSuspensionAfterSiblingApp as DescriptorApp} from ${JSON.stringify(fixtureFile)};
@@ -119,9 +50,6 @@ export {createRoot, flushSync, act} from 'octane';`,
 					builder.onResolve({ filter: /^octane\/internal\/client$/ }, () => ({
 						path: join(sourceRoot, 'packages/octane/src/internal/client.ts'),
 					}));
-					builder.onLoad({ filter: /\/runtime\.ts$/ }, ({ path }) => {
-						if (path === runtimeFile) return { contents: source, loader: 'ts' };
-					});
 					builder.onLoad({ filter: /\.tsrx$/ }, ({ path }) => {
 						assert.equal(path, fixtureFile);
 						return {
@@ -134,7 +62,7 @@ export {createRoot, flushSync, act} from 'octane';`,
 		],
 	});
 	const code = built.outputFiles[0].text;
-	const path = join(output, `${variant}-${dev ? 'dev' : 'prod'}-${hash(code)}.mjs`);
+	const path = join(output, `${dev ? 'dev' : 'prod'}-${hash(code)}.mjs`);
 	await writeFile(path, code);
 	return path;
 }
@@ -154,26 +82,6 @@ async function exercise(path, scenario) {
 	])
 		globalThis[name] = window[name];
 	globalThis.window = window;
-	const textCache = new WeakMap();
-	const attrCache = new WeakMap();
-	const reads = { text: 0, attribute: 0 };
-	const isTarget = (el) => el?.id === 'raw-root-suspension-label';
-	globalThis.__rootContractAudit = {
-		liveText(node) {
-			if (isTarget(node.parentNode)) reads.text++;
-			return node.nodeValue;
-		},
-		liveAttr(el, name) {
-			if (isTarget(el) && name === 'title') reads.attribute++;
-			return el.getAttribute(name);
-		},
-		cachedText(node) {
-			return textCache.has(node) ? textCache.get(node) : this.liveText(node);
-		},
-		cachedAttr(el, name) {
-			return attrCache.get(el)?.has(name) ? attrCache.get(el).get(name) : this.liveAttr(el, name);
-		},
-	};
 	const runtime = await import(pathToFileURL(path).href + '?scenario=' + scenario);
 	const container = document.createElement('main');
 	document.body.appendChild(container);
@@ -191,8 +99,6 @@ async function exercise(path, scenario) {
 		const label = container.querySelector('#raw-root-suspension-label');
 		const text = label.firstChild;
 		const reader = container.querySelector('#raw-root-suspension-reader');
-		textCache.set(text, text.nodeValue);
-		attrCache.set(label, new Map([['title', label.getAttribute('title')]]));
 		let expectedText = 'original';
 		let expectedTitle = 'original';
 		if (scenario !== 'first-raw-throw') {
@@ -207,8 +113,6 @@ async function exercise(path, scenario) {
 			if (expectedTitle === null) label.removeAttribute('title');
 			else label.setAttribute('title', expectedTitle);
 		}
-		reads.text = 0;
-		reads.attribute = 0;
 		value = null;
 		runtime.flushSync(() => root.render(runtime.App, { label: 'replacement', read }));
 		const held = {
@@ -227,7 +131,6 @@ async function exercise(path, scenario) {
 			reader: 'resource:A',
 			identity: true,
 		};
-		const holdReads = { ...reads };
 		value = 'B';
 		await runtime.act(() => resolvePending('ready'));
 		assert.equal(label.textContent, 'replacement');
@@ -238,14 +141,12 @@ async function exercise(path, scenario) {
 			held,
 			expected,
 			preserved: JSON.stringify(held) === JSON.stringify(expected),
-			reads: holdReads,
 		};
 	} finally {
 		root.unmount();
 		assert.equal(container.childNodes.length, 0);
 		container.remove();
 		await window.happyDOM.close();
-		delete globalThis.__rootContractAudit;
 	}
 }
 
@@ -314,25 +215,26 @@ async function exerciseReads(path, appName) {
 
 const results = [];
 const reads = [];
-const nativeArtifact = await bundle('native', false);
+const nativeArtifact = await bundle(false);
 for (const app of ['App', 'DescriptorApp']) reads.push(await exerciseReads(nativeArtifact, app));
 for (const dev of process.argv.includes('--reads-only') ? [] : [true, false]) {
-	for (const variant of ['live', 'delayed-driver', 'binding-cache']) {
-		const artifact = await bundle(variant, dev);
-		const scenarios =
-			variant === 'delayed-driver'
-				? ['first-raw-throw']
-				: ['first-raw-throw', 'external-attribute', 'absent-attribute', 'empty-attribute'];
-		for (const scenario of scenarios) {
-			const result = await exercise(artifact, scenario);
-			assert.equal(
-				result.preserved,
-				variant === 'live' || (variant === 'binding-cache' && scenario === 'first-raw-throw'),
-			);
-			results.push({ mode: dev ? 'development' : 'production', variant, scenario, ...result });
-		}
+	const artifact = dev ? await bundle(true) : nativeArtifact;
+	for (const scenario of [
+		'first-raw-throw',
+		'external-attribute',
+		'absent-attribute',
+		'empty-attribute',
+	]) {
+		const result = await exercise(artifact, scenario);
+		assert.deepEqual(
+			result.held,
+			result.expected,
+			`${dev ? 'dev' : 'prod'} ${scenario}: visible DOM changed during a suspended render`,
+		);
+		results.push({ mode: dev ? 'development' : 'production', scenario, ...result });
 	}
 }
+
 const report = {
 	suite: 'root-transactions',
 	sourceRoot,

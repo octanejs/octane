@@ -36,6 +36,76 @@ import {
 import type { SignalOwner } from '../../src/signals/types.js';
 
 describe('opaque host attribute updates', () => {
+	it.each([false, true])(
+		'keeps applied bindings observable while preparing and discarding a new handle (dev=%s)',
+		async (dev) => {
+			const id = `/src/direct-binding-retention-${dev}.tsrx`;
+			const client = loadCompiledFixtureSource(
+				`export function App(props) @{
+					<section title={props.value}>
+						<input value={props.value} />
+						<span>{props.value as string}</span>
+						<footer>{props.finish?.() as string}</footer>
+					</section>
+				}`,
+				{ id, mode: 'client', compileOptions: { opaqueSignalHandles: true, dev, hmr: false } },
+			);
+			const owner = createScope({ scopeKey: id });
+			const a$ = owner.signal$('accepted', 'accepted');
+			const b$ = owner.signal$('prepared', 'uncommitted');
+			const container = document.createElement('div');
+			document.body.append(container);
+			const root = createRoot(container, { signalOwner: owner });
+			try {
+				root.render(client.App, { value: a$ });
+				const section = container.querySelector('section')!;
+				const input = container.querySelector('input')!;
+				const text = container.querySelector('span')!;
+				const seen: string[][] = [];
+				const pending = new Promise<never>(() => {});
+				flushSync(() =>
+					root.render(client.App, {
+						value: b$,
+						finish: () => {
+							seen.push([section.title, input.value, text.textContent!]);
+							throw pending;
+						},
+					}),
+				);
+				expect(seen).toEqual([['accepted', 'accepted', 'accepted']]);
+				expect([section.title, input.value, text.textContent]).toEqual(seen[0]);
+				// The still-visible control keeps the old writer while suspended.
+				await act(() => {
+					input.value = 'platform edit';
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+				});
+				expect(owner.get(a$)).toBe('platform edit');
+				expect(owner.get(b$)).toBe('uncommitted');
+				expect([section.title, input.value, text.textContent]).toEqual([
+					'platform edit',
+					'platform edit',
+					'platform edit',
+				]);
+				flushSync(() => root.render(client.App, { value: b$ }));
+				expect([section.title, input.value, text.textContent]).toEqual([
+					'uncommitted',
+					'uncommitted',
+					'uncommitted',
+				]);
+				await act(() => owner.set(a$, 'obsolete'));
+				expect([section.title, input.value, text.textContent]).toEqual([
+					'uncommitted',
+					'uncommitted',
+					'uncommitted',
+				]);
+			} finally {
+				root.unmount();
+				owner.dispose();
+				container.remove();
+			}
+		},
+	);
+
 	it.each(
 		[false, true].flatMap((dev) =>
 			['tsrx', 'tsx'].flatMap((ext) =>

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 import * as ServerRuntime from 'octane/server';
 import { compile } from 'octane/compiler';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
-import { hasRuntimeValueArgument } from './_compiler-value-arguments.js';
 
 // RFC tsrx-org/RFCs#1: `apply` stamps a theme on every element of a scope;
 // reading `theme.$class` is the selective form. Assigned blocks keep every
@@ -81,8 +81,22 @@ describe('$class opt-in — theme rules apply to class carriers', () => {
 
 	it('client: the opted-in element reads theme.$class at runtime', () => {
 		const code = compiled('client');
-		expect(hasRuntimeValueArgument(code, 'theme.$class')).toBe(true);
-		expect(hasRuntimeValueArgument(code, 'theme.card')).toBe(true);
+		const ast = ts.createSourceFile(ID, code, ts.ScriptTarget.Latest, true);
+		const accesses: string[] = [];
+		const visit = (node: ts.Node, inFunction: boolean): void => {
+			if (
+				inFunction &&
+				ts.isPropertyAccessExpression(node) &&
+				node.expression.getText(ast) === 'theme'
+			)
+				accesses.push(node.name.text);
+			ts.forEachChild(node, (child) => visit(child, inFunction || ts.isFunctionLike(node)));
+		};
+		visit(ast, false);
+		// Reads must stay inside component execution; the real client test below
+		// verifies which native elements receive each class and the resulting CSS.
+		expect(accesses).toContain('$class');
+		expect(accesses).toContain('card');
 		expect(code).toContain("Card, { 'parentClass': theme.$class }");
 	});
 

@@ -149,6 +149,61 @@ function expectNamespaceClasses(
 }
 
 describe('de-opt SVG namespace', () => {
+	it('resolves an ambiguous conditional in its actual SVG, MathML, or foreignObject destination after a swap', () => {
+		const { App } = loadCompiledFixtureSource(
+			`export function App({ next, label }) @{
+				<>
+					<a data-stable="sibling">kept</a>
+					@if (next) {
+						<a data-active="next" title={label}>{label as string}</a>
+					} @else {
+						<a data-active="initial">initial</a>
+					}
+				</>
+			}`,
+			{
+				id: 'ambiguous-branch-namespace.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false },
+			},
+		);
+		for (const [tag, namespace, childNamespace] of [
+			['svg', SVG_NS, SVG_NS],
+			['math', MATHML_NS, MATHML_NS],
+			['foreignObject', SVG_NS, HTML_NS],
+		]) {
+			const container = document.createElementNS(namespace, tag);
+			document.body.appendChild(container);
+			const root = createRoot(container);
+			try {
+				root.render(App, { next: false, label: 'initial' });
+				const sibling = container.querySelector('[data-stable]')!;
+				const initial = container.querySelector('[data-active]')!;
+				expect(initial.namespaceURI, tag).toBe(childNamespace);
+				expect(sibling.namespaceURI, tag).toBe(childNamespace);
+
+				flushSync(() => root.render(App, { next: true, label: 'first' }));
+				const active = container.querySelector('[data-active]')!;
+				expect(active.namespaceURI, tag).toBe(childNamespace);
+				expect(active.getAttribute('title'), tag).toBe('first');
+				expect(active.textContent, tag).toBe('first');
+				expect(container.querySelector('[data-stable]'), tag).toBe(sibling);
+				expect(initial.isConnected, tag).toBe(false);
+
+				flushSync(() => root.render(App, { next: true, label: 'updated' }));
+				expect(container.querySelector('[data-active]'), tag).toBe(active);
+				expect(active.getAttribute('title'), tag).toBe('updated');
+				expect(active.textContent, tag).toBe('updated');
+				flushSync(() => root.render(App, { next: false, label: 'initial' }));
+				expect(container.querySelector('[data-active]')?.namespaceURI, tag).toBe(childNamespace);
+				expect(container.querySelector('[data-stable]'), tag).toBe(sibling);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		}
+	});
+
 	it('reuses an ambiguous template after first mounting in MathML, then SVG and HTML', () => {
 		const { App } = loadCompiledFixtureSource(
 			`export function App({ label }) @{ <a data-label={label}>{label as string}</a> }`,

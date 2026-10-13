@@ -99,7 +99,7 @@ const output = {
 		gzipBytes: gzipSync(minified, { level: 9 }).length,
 		sha256: hash(minified),
 		driverReachable: Number(/\bfunction vtFlush\s*\(/.test(code)),
-		stagingReachable: Number(/\bDOMStage\b/.test(code)),
+		stagingReachable: Number(/\bbeginStagedCommitCapture\b/.test(code)),
 	},
 	cases: {},
 };

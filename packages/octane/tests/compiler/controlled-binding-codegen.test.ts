@@ -31,7 +31,8 @@ describe('controlled binding specialization', () => {
 			}
 		`);
 		expect(imports).toContain('setDefaultValueUncontrolled');
-		expect(imports).toContain('bindSignalChecked');
+		expect(imports).toContain('prepareTemplateSignalChecked');
+		expect(imports).toContain('commitTemplateSignal');
 		expect(imports).not.toContain('setCheckedCheckable');
 		expect(imports).not.toContain('setDefaultValue');
 		expect(imports).not.toContain('setChecked');
@@ -51,8 +52,10 @@ describe('controlled binding specialization', () => {
 			}
 		`);
 		expect(imports).toContain('setDefaultValue');
-		expect(imports).toContain('bindSignalChecked');
-		expect(imports).toContain('bindSignalHostPropSources');
+		expect(imports).toContain('prepareTemplateSignalChecked');
+		expect(imports).toContain('commitTemplateSignal');
+		expect(imports).toContain('prepareTemplateSignalHostSources');
+		expect(imports).toContain('commitTemplateSignalHostSources');
 		expect(imports).not.toContain('setDefaultValueUncontrolled');
 		expect(imports).not.toContain('setCheckedCheckable');
 	});

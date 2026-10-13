@@ -177,6 +177,45 @@ describe.each([
 		});
 	});
 
+	it.each(['retry', 'cancel'] as const)(
+		'keeps an unframed server host untouched while its list replacement waits for a sibling (%s)',
+		async (outcome) => {
+			const serverProps = { kind: 'list', server: true, v: 'q', Tail: server.Tail };
+			container.innerHTML = ServerRT.renderToString(server.RootRetry, serverProps).html;
+			const serverHost = container.querySelector('#host')!;
+			const serverMarkup = container.innerHTML;
+			const serverChildren = [...serverHost.childNodes];
+			let deliver!: (module: { default: typeof client.Tail }) => void;
+			const Tail = lazy(
+				() =>
+					new Promise<{ default: typeof client.Tail }>((done) => {
+						deliver = done;
+					}),
+			);
+			const props = { ...serverProps, server: false, Tail };
+			root = hydrateRoot(container, client.RootRetry, props);
+			await act(async () => {});
+			expect(container.querySelector('#host')).toBe(serverHost);
+			expect([...serverHost.childNodes]).toEqual(serverChildren);
+			expect(container.innerHTML).toBe(serverMarkup);
+			if (outcome === 'cancel')
+				await act(() => root!.render(client.RootRetry, { ...serverProps, Tail: client.Tail }));
+			await act(() => deliver({ default: client.Tail }));
+			const accepted = container.querySelector('#host')!;
+			expect(accepted.textContent).toBe(outcome === 'cancel' ? 'hello' : 'qx');
+			expect(container.querySelector('section')?.textContent).toBe(
+				outcome === 'cancel' ? 'hellotail' : 'qxtail',
+			);
+			expect(markup(container)).toBe(
+				clientMarkup('RootRetry', {
+					...serverProps,
+					server: outcome === 'cancel',
+					Tail: client.Tail,
+				}),
+			);
+		},
+	);
+
 	// The boundary's client render shows its pending arm while the sibling
 	// loads, as React shows a client-rendered Suspense boundary's fallback; the
 	// root around the boundary keeps its server element.

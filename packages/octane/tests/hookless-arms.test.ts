@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { act, createLog, flushEffects, mount } from './_helpers';
 import { flushSync, startTransition, type ComponentBody } from '../src/index.js';
 import { compile } from 'octane/compiler';
+import { parseModule } from '@tsrx/core';
+import { walkAst } from './_profile-output.js';
 import {
 	ActivityHooked,
 	ActivityPlain,
@@ -203,8 +205,34 @@ describe('hookless control-flow arms', () => {
 	});
 });
 
-// The compiler marks an arm hookless with a trailing lite mask on its ifBlock
-// call. Anything that may run a hook while the arm renders must keep it off.
+// ifBlock and switchBlock share the lite mask at argument 8. A separately
+// proven native arm can carry a later preparation mask without being hookless.
+function liteMask(source: string, helper: 'ifBlock' | 'switchBlock'): number {
+	const program = parseModule(compile(source, 'arm.tsrx').code, 'compiled-arm.js');
+	let binding: string | undefined;
+	for (const statement of program.body) {
+		if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'octane') continue;
+		for (const specifier of statement.specifiers) {
+			if (specifier.type === 'ImportSpecifier' && specifier.imported.name === helper)
+				binding = specifier.local.name;
+		}
+	}
+	const masks: number[] = [];
+	walkAst(program, (node) => {
+		if (!binding || node.type !== 'CallExpression' || node.callee?.name !== binding) return;
+		const mask = node.arguments[8];
+		if (mask === undefined) {
+			masks.push(0);
+		} else {
+			expect(mask).toMatchObject({ type: 'Literal', value: expect.any(Number) });
+			masks.push(mask.value);
+		}
+	});
+	expect(masks).toHaveLength(1);
+	return masks[0];
+}
+
+// Anything that may run a hook while the arm renders must keep the lite bit off.
 function armIsLite(arm: string): boolean {
 	const source = `import { useCallback, useRef, useState } from 'octane';
 function helper() { return 'x'; }
@@ -216,8 +244,7 @@ export function App(props: any) @{
 		}
 	</div>
 }`;
-	const call = /ifBlock\(([^;]*)\)/s.exec(compile(source, 'arm.tsrx').code)![1];
-	return /,\s*1\s*$/.test(call);
+	return (liteMask(source, 'ifBlock') & 1) !== 0;
 }
 
 describe('hookless control-flow arm proof', () => {
@@ -253,9 +280,8 @@ describe('hookless control-flow arm proof', () => {
 		}
 	</div>
 }`;
-		const mask = /switchBlock\([^;]*,\s*(\d+)\s*\)/s.exec(compile(source, 'switch.tsrx').code)![1];
 		// Bit i + 1 marks case i, so cases 30 and later keep a Block.
-		expect(Number(mask)).toBe(2 ** 31 - 2);
+		expect(liteMask(source, 'switchBlock')).toBe(2 ** 31 - 2);
 	});
 
 	it('runs a hooked @switch case past case 31 with its own state and effects', () => {

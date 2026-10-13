@@ -95,7 +95,7 @@ describe('FragmentInstance — future children', () => {
 		r.unmount();
 	});
 
-	it('removes eager DOM fragment handles when a later sibling aborts the render', () => {
+	it('keeps fragment handles and children private when a later sibling aborts the render', () => {
 		const captured: FragmentHostElement[] = [];
 		const attached: FragmentInstance[] = [];
 		const r = mount(AbortedFragmentOwnership, {
@@ -106,10 +106,12 @@ describe('FragmentInstance — future children', () => {
 		});
 		expect(r.find('#aborted-fragment-fallback').textContent).toBe('fallback');
 		expect(attached).toEqual([]);
-		expect(captured).toHaveLength(1);
-		expect(captured[0].reactFragments).toBeInstanceOf(Set);
-		expect(Array.from(captured[0].reactFragments!)).toEqual([]);
+		// The throwing sibling queries during render. Neither the new host nor
+		// its imperative Fragment handle belongs to the document before commit.
+		expect(captured).toEqual([]);
+		expect(r.findAll('#aborted-fragment-child')).toHaveLength(0);
 		r.unmount();
+		expect(attached).toEqual([]);
 	});
 
 	// Per ReactDOMFragmentRefs-test.js:867.
@@ -505,8 +507,12 @@ describe('FragmentInstance — portaled children', () => {
 describe('FragmentInstance — changing ref expression (update path)', () => {
 	it('detaches the old fragment ref and attaches the new one on a ref change', () => {
 		const log: string[] = [];
-		const a = (fi: any) => log.push(fi ? 'a:attach' : 'a:null');
-		const b = (fi: any) => log.push(fi ? 'b:attach' : 'b:null');
+		const a = (fi: any) => {
+			log.push(fi ? 'a:attach' : 'a:null');
+		};
+		const b = (fi: any) => {
+			log.push(fi ? 'b:attach' : 'b:null');
+		};
 
 		const r = mount(FragmentRefUpdate, { pick: a });
 		expect(log).toEqual(['a:attach']);

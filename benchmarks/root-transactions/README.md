@@ -58,8 +58,12 @@ node benchmarks/root-transactions/bags.mjs
 ```
 
 The unified suite enforces operation ratios with clean/observed output, native
-event, node identity, and cleanup controls. The contract script additionally
-requires its deliberately incorrect alternatives to fail their hold checks.
+event, node identity, and cleanup controls. The current contract runner tests the unmodified runtime in development and
+production. A first raw suspension must retain text, attributes (including
+absent and empty), external edits and reader identity, then publish when ready.
+It also measures native reads for changing and equal compiled and descriptor
+text updates. The tables above describe the older issue #981 audit only; the
+renderer now publishes prepared scopes and has no DOM undo log.
 
 ## Lifecycle and validation
 

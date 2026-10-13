@@ -99,9 +99,11 @@ export function flushEffects(): void {
 }
 
 /** Older name kept for tests that read more naturally with it. */
-export function nextPaint(): Promise<void> {
+export async function nextPaint(): Promise<void> {
+	// A browser reaches paint only after already-queued promise reactions.
+	// Let them enqueue their render/ready retry before the single test flush.
+	await Promise.resolve();
 	flushEffects();
-	return Promise.resolve();
 }
 
 // Captured at load so a test that stubs MessageChannel cannot break the helper.

@@ -2026,7 +2026,8 @@ describe('Strong hookful lite edges', () => {
 		const strong = await runSuspenseScenario('strong');
 		expect(strong).toEqual(await runSuspenseScenario('default'));
 		expect(strong).toEqual([
-			'suspended mount | count:0 inner | ',
+			// A first primary is kept private until its controls and effects can commit.
+			'suspended mount | inner | ',
 			'revealed | count:0 first=ready | layout:0 effect:0 read:first',
 			'own update | count:1 first=ready | layout-cleanup:0 layout:1 cleanup:0 effect:1',
 			're-suspended | count:1 first=ready inner | layout-cleanup:1',

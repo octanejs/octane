@@ -285,7 +285,7 @@ const effectDeclarations = Object.values(effectControls).flat();
 // the control that proves the source-map oracle sees the chunk.
 const splitControls = {
 	dropped: [
-		'STAGED_DOM',
+		'beginStagedCommitCapture',
 		'VIEW_TRANSITION_DRIVER',
 		'DEFERRED_LAYOUT_DRIVER',
 		'STAGED_COMMIT_CAPTURE',
@@ -295,12 +295,42 @@ const splitControls = {
 	],
 	kept: ['renderBlockInner'],
 };
-const runtimeRanges = (names) =>
+const declarationRanges = (source, names) =>
 	resolveDeclarationRanges(
 		(source) => fs.readFileSync(path.join(repository, 'packages/octane/src', source), 'utf8'),
 		(text, source) => parseAst(text, { lang: 'ts' }, source),
-		names.map((name) => ({ name, source: 'runtime.ts' })),
+		names.map((name) => ({ name, source })),
 	);
+const runtimeRanges = (names) => declarationRanges('runtime.ts', names);
+// Rolldown may inline a validator and then remove its exported name. Measure
+// its original source range in the same production map used for effects.
+const streamRanges = selectedScenarios.some(
+	({ id }) => streamClaimFreeClientScenarios.has(id) || id === 'deferred-hydration',
+)
+	? declarationRanges('stream-protocol.ts', ['isRendererStreamBoundaryTemplate'])
+	: [];
+// This module also contains the marker prefix used when CSR prepares a list.
+// Only the native SSR validators must disappear; measure the final minified
+// output and prove that both validators are detected in the hydrating frame.
+const bindingMarkerDeclarations = ['isBindingOpenComment', 'isForBindingOpenComment'];
+const bindingMarkerRanges = selectedScenarios.some(
+	({ id }) => markerFreeClientScenarios.has(id) || id === 'hydrate-frame',
+)
+	? declarationRanges('dom-binding-protocol.ts', bindingMarkerDeclarations)
+	: [];
+const genericDomTables = [
+	'BOOLEAN_ATTR_PROPS',
+	'MUST_USE_PROPERTY_PROPS',
+	'POSITIVE_NUMERIC_ATTR_PROPS',
+	'SVG_ONLY_TAGS',
+	'HTML_ONLY_TAGS',
+	'MATHML_ONLY_TAGS',
+	'ATTRIBUTE_ALIASES',
+	'isEnumeratedBooleanAttr',
+];
+const domTableRanges = selectedScenarios.some(({ id }) => id === 'prop-attributes')
+	? declarationRanges('dom-tables.js', genericDomTables)
+	: [];
 const effectRanges = selectedScenarios.some(({ id }) => Object.hasOwn(effectControls, id))
 	? runtimeRanges(effectDeclarations)
 	: [];
@@ -505,9 +535,16 @@ async function buildSplitScenario(scenario, entry) {
 async function buildScenario(scenario, entry) {
 	if (scenario.bundler === 'vite-split') return buildSplitScenario(scenario, entry);
 	if (scenario.bundler === 'esbuild') {
+		const checkMarkers = markerFreeClientScenarios.has(scenario.id);
 		const result = await buildEsbuild({
 			absWorkingDir: repository,
 			entryPoints: [entry],
+			...(checkMarkers
+				? {
+						outfile: path.join(directory, '.minimal', `${scenario.name}.js`),
+						sourcemap: 'external',
+					}
+				: {}),
 			bundle: true,
 			write: false,
 			format: 'iife',
@@ -554,13 +591,22 @@ async function buildScenario(scenario, entry) {
 				},
 			],
 		});
-		assert.equal(result.outputFiles.length, 1, `${scenario.name}: unexpected executable outputs`);
-		const output = Object.values(result.metafile.outputs);
+		const executable = result.outputFiles.filter((file) => !file.path.endsWith('.map'));
+		assert.equal(executable.length, 1, `${scenario.name}: unexpected executable outputs`);
+		const output = Object.entries(result.metafile.outputs)
+			.filter(([file]) => !file.endsWith('.map'))
+			.map(([, entry]) => entry);
 		assert.equal(output.length, 1, `${scenario.name}: unexpected production dependency outputs`);
 		const modules = Object.entries(output[0].inputs)
 			.filter(([, input]) => input.bytesInOutput > 0)
 			.map(([id]) => path.resolve(repository, id));
-		return { code: result.outputFiles[0].text, modules, runtimeExports: [] };
+		const map = result.outputFiles.find((file) => file.path.endsWith('.map'));
+		return {
+			code: executable[0].text,
+			modules,
+			runtimeExports: [],
+			bindingMarkers: map ? retainedDeclarations(JSON.parse(map.text), bindingMarkerRanges) : null,
+		};
 	}
 
 	const result = await buildVite({
@@ -576,7 +622,14 @@ async function buildScenario(scenario, entry) {
 		build: {
 			write: false,
 			minify: 'oxc',
-			sourcemap: Object.hasOwn(effectControls, scenario.id) ? 'hidden' : false,
+			sourcemap:
+				Object.hasOwn(effectControls, scenario.id) ||
+				streamClaimFreeClientScenarios.has(scenario.id) ||
+				markerFreeClientScenarios.has(scenario.id) ||
+				scenario.id === 'deferred-hydration' ||
+				scenario.id === 'hydrate-frame'
+					? 'hidden'
+					: false,
 			target: 'esnext',
 			lib: {
 				entry,
@@ -610,7 +663,6 @@ async function buildScenario(scenario, entry) {
 	const serverRuntimeModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/runtime.server.ts'),
 	);
-	const streamModule = modules.find((id) => id.endsWith('/packages/octane/src/stream-protocol.ts'));
 	const hookPathModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
 	);
@@ -622,7 +674,9 @@ async function buildScenario(scenario, entry) {
 		serverRuntimeExports: serverRuntimeModule
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
-		streamExports: streamModule ? chunk.modules[streamModule].renderedExports : [],
+		stream: chunk.map ? retainedDeclarations(chunk.map, streamRanges) : null,
+		bindingMarkers: chunk.map ? retainedDeclarations(chunk.map, bindingMarkerRanges) : null,
+		domTables: chunk.map ? retainedDeclarations(chunk.map, domTableRanges) : null,
 		hookPathExports: hookPathModule ? chunk.modules[hookPathModule].renderedExports : [],
 		effects: chunk.map ? retainedDeclarations(chunk.map, effectRanges) : null,
 	};
@@ -641,7 +695,9 @@ try {
 			emittedModules = modules,
 			runtimeExports,
 			serverRuntimeExports = [],
-			streamExports = [],
+			stream,
+			bindingMarkers,
+			domTables,
 			hookPathExports = [],
 			effects,
 		} = await buildScenario(scenario, entry);
@@ -679,35 +735,36 @@ try {
 				`${name}: signal-free client retained the concrete native transition implementation`,
 			);
 		}
-		// hydrate-root is the control: a hydrating client keeps the validator, so
-		// its export name still identifies it.
-		if (streamClaimFreeClientScenarios.has(id) || id === 'hydrate-root') {
+		// A deferred hydrating root is the positive control: the validator's source
+		// must appear even when an optimized build inlines it.
+		if (streamClaimFreeClientScenarios.has(id) || id === 'deferred-hydration') {
 			assert.equal(
-				streamExports.includes('isRendererStreamBoundaryTemplate'),
-				id === 'hydrate-root',
-				id === 'hydrate-root'
-					? `${name}: the streamed-boundary validator was renamed; update this reachability check`
+				stream.has('isRendererStreamBoundaryTemplate'),
+				id === 'deferred-hydration',
+				id === 'deferred-hydration'
+					? `${name}: the hydrating control must retain the streamed-boundary validator`
 					: `${name}: a client that never hydrates retained the streamed-boundary validator`,
 			);
 		}
 		if (id === 'prop-attributes') {
+			assert.ok(domTables, `${name}: missing generic DOM table reachability map`);
 			assert.deepEqual(
-				emittedModules.filter((module) =>
-					/\/packages\/octane\/src\/(?:dom-tables\.js|hydration\/control-capture\.ts)$/.test(
-						module,
-					),
-				),
+				[...domTables],
 				[],
 				`${name}: statically named attribute bindings retained the generic attribute or control-restore writers`,
 			);
-		}
-		if (markerFreeClientScenarios.has(id)) {
 			assert.deepEqual(
-				emittedModules.filter((module) =>
-					module.endsWith('/packages/octane/src/dom-binding-protocol.ts'),
-				),
+				emittedModules.filter((module) => module.endsWith('/hydration/control-capture.ts')),
 				[],
-				`${name}: a client that never hydrates retained the binding-marker validator`,
+				`${name}: statically named attributes retained control restoration`,
+			);
+		}
+		if (markerFreeClientScenarios.has(id) || id === 'hydrate-frame') {
+			assert.ok(bindingMarkers, `${name}: missing binding-marker reachability map`);
+			assert.deepEqual(
+				bindingMarkerDeclarations.filter((name) => bindingMarkers.has(name)),
+				id === 'hydrate-frame' ? bindingMarkerDeclarations : [],
+				`${name}: native SSR binding validators must follow hydration use`,
 			);
 		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));

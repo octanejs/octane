@@ -218,14 +218,9 @@ describe.each([
 		at(`cls + '!'`, 0, `cls + '!'`);
 		at(`items.length + 10`, 0, `items.length + 10`);
 		at(`cls + '-key'`, 0, `cls + '-key'`);
-		// Event bundle: the callee and each argument map as separate pastes in
-		// the mount (`_$evt1`) and update (`_$evt1u`) emits alike. Args may
-		// print parenthesized (string emit) or bare (AST emit).
-		if (code.includes(`(setCls), (cls + '?')`)) {
-			at(`(setCls), (cls + '?')`, 1, `setCls(cls + '?')`);
-		} else {
-			at(`setCls, cls + '?'`, 0, `setCls(cls + '?')`);
-		}
+		// The callee and captured argument are authored expressions evaluated in
+		// prepare. Check their own tokens; the commit writer only reads the bag.
+		at('const _v = setCls', 'const _v = '.length, `setCls(cls + '?')`);
 		at(`cls + '?'`, 0, `cls + '?'`);
 	});
 });

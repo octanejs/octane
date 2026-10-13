@@ -27,8 +27,7 @@ import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 const SOURCE = resolve(import.meta.dirname, '../src');
 const PACKAGE_ROOT = resolve(import.meta.dirname, '..');
 const OPTIONAL_DECLARATIONS = [
-	// ViewTransition's staged DOM and the drivers that prepare a staged commit.
-	'STAGED_DOM',
+	// Drivers that prepare and admit a ViewTransition commit.
 	'VIEW_TRANSITION_DRIVER',
 	'DEFERRED_LAYOUT_DRIVER',
 	'STAGED_COMMIT_CAPTURE',
