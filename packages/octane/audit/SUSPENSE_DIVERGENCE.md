@@ -108,10 +108,14 @@ more than the node: the `default*` mirror and the per-element record of what was
 projected go back with it, or the record would believe the new value had already landed and
 skip re-projecting it on resume.
 
-**Remaining limitation — general transition-wide work in progress.** Outside the supported
-single-origin staged-state path, content patched outside a suspended boundary, or a
-structural change above it, can still commit early. These were originally filed as separate
-gaps. The following investigation motivated the staged-state implementation described below:
+**Remaining limitation — transitions not driven by hook state.** A transition render that
+folded queued hook updates (`useState`, `useReducer`, `useLinkedState`) and suspends into a
+hold drops its whole root transaction, so nothing it patched commits early, whatever its
+origins (#2029 step 4). A transition driven only by something else, such as an external
+store, still holds per boundary: content patched outside a suspended boundary, or a
+structural change above it, can commit early there. These were originally filed as
+separate gaps. The following investigation motivated the staged-state implementation
+that the update queues later replaced:
 
 1. _Reveal scope._ Reverting content outside the boundary strands it. The reveal path
    re-renders the try block only, so a restored bag outside it is never re-patched and the
@@ -167,9 +171,11 @@ transitions. Design and phases: [docs/transition-deferred-commit-plan.md](../../
 Single-origin synchronous state staging subsequently shipped with cell rollback and an
 old-input pending-cue render; see
 [P1 landed](../../../docs/transition-deferred-commit-plan.md#p1-landed-2026-07-30-design-a--harvest).
-Root-owned holds in #10 now use that staging contract too. This is not a general
-multi-origin or external-store work-in-progress tree. Fallback-visible retries are
-capture-safe and never had this limitation.
+#2029 step 4 replaced it with React's update queues: a held transition is updates no
+render has processed, so there is nothing to revert, re-render or promote, and holds
+cover multi-origin transitions. An urgent update now rebases over a held transition,
+as in React, where the staging model discarded it. External-store transitions remain
+per boundary. Fallback-visible retries are capture-safe and never had this limitation.
 Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---

@@ -221,6 +221,7 @@ import { BINDING_OPEN_PREFIX, bindingRootMarker } from './dom-binding-protocol.j
 import {
 	BOUNDARY_CLIENT,
 	BOUNDARY_CLIENT_ERROR,
+	BOUNDARY_CLIENT_NATIVE,
 	BOUNDARY_CLIENT_SUSPENDED,
 	BOUNDARY_CONTENT,
 	BOUNDARY_STREAMED,
@@ -231,6 +232,9 @@ import {
 	HYDRATION_PROTOCOL_VERSION,
 	HYDRATE_MARKER_SELECTOR,
 	isRangeOpen,
+	NATIVE_SIGNAL_FRESH_COMMENT,
+	STREAM_SEED_COMMENT,
+	SUSPENSE_RESOLVED_COMMENT,
 } from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
@@ -1883,7 +1887,7 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 		stage.settled = true;
 		for (const callback of callbacks) callback(discarded);
 	};
-	// A held transition attempt unwinds its render while the capture survives.
+	// A boundary hold or a dropped transition unwinds its render while the capture survives.
 	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
 	(capture.renderCleanups ??= []).push(finish);
 	if (invocation !== undefined) invocation.invocationData = stage;
@@ -2073,8 +2077,7 @@ function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
 					return;
 				owner.wakeable = null;
 				owner.generation++;
-				if (owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.retryRoot(owner))
-					owner.retry();
+				if (!TRANSITION_ROOT_DRIVER || !TRANSITION_ROOT_DRIVER.retry(owner)) owner.retry();
 			});
 		});
 		owner.nativeRetry = retry = next;
@@ -2160,7 +2163,9 @@ function takeNativeFreshArm(
 	ids: RootIdState,
 ): RootIdState | null {
 	if (hydration === null) return null;
-	const value = (STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data;
+	const value =
+		hydration.bindingTryState(open) ??
+		(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data;
 	const count = value.startsWith(BOUNDARY_CLIENT) ? boundaryIdCount(value) : -1;
 	if (count < 0) return null;
 	reserveHydrationIds(ids, count);
@@ -2980,40 +2985,29 @@ function ensureOffscreenSwapDriver(): void {
 }
 
 /**
- * Transition attempts, root holds and held state updates. Every path that can
- * create transition-priority work runs through startTransition(), which
- * installs this driver before raising TRANSITION_DEPTH. Until then no render
- * runs at transition priority, so a missing driver means what an installed one
- * would report: no attempt, no root hold and no held update. A Suspense-only
- * application therefore does not retain it. Hook setters read the driver again
- * after evaluating authored updaters: an updater can start the first Action,
- * so staging must observe that newly installed transition capability.
+ * Transition holds and cue scheduling. Every path that can create
+ * transition-priority work runs through startTransition(), which installs this
+ * driver before raising TRANSITION_DEPTH. Until then no render runs at
+ * transition priority and no hook update carries a batch, so a missing driver
+ * means what an installed one would report: nothing held and nothing to drop.
+ * A Suspense-only application therefore does not retain it.
  */
 interface TransitionRootDriver {
-	begin: typeof beginTransitionAttempt;
-	end: typeof endTransitionAttempt;
-	beginUrgent: typeof beginUrgentTransitionRender;
-	endUrgent: typeof endUrgentTransitionRender;
+	fold: typeof foldTransitionUpdate;
+	queue: typeof queueTransitionUpdate;
+	memoCells: typeof transitionMemoCells;
+	keep: typeof keepTransitionWork;
 	splitCue: typeof splitTransitionCue;
 	splitsCue: typeof splitsTransitionCue;
 	armFalls: typeof armTransitionFalls;
 	settleFalls: typeof settleTransitionFalls;
 	cancelFall: typeof cancelTransitionFall;
-	holdRoot: typeof holdRootTransition;
-	retryRoot: typeof retryRootTransition;
-	commitRoot: typeof commitRootTransition;
-	discardRoot: typeof discardRootTransition;
-	keepsRoot: typeof keepsRootTransition;
-	cancelEqual: typeof cancelHeldTransitionUpdate;
-	hasHeld: typeof hasHeldTransitionUpdate;
-	heldUpdate: typeof getHeldTransitionUpdate;
-	rebaseHeld: typeof rebaseHeldTransitionUpdate;
-	stagedValue: typeof stagedTransitionValue;
-	stageValue: typeof stageTransitionValue;
-	readQueued: typeof readQueuedTransition;
-	captureQueue: typeof captureTransitionHookQueue;
-	recordUrgent: typeof recordUrgentActionUpdate;
-	finishQueued: typeof finishQueuedTransition;
+	drop: typeof dropTransitionRender;
+	retry: typeof retryTransitionHolder;
+	unsuspend: typeof unsuspendTransitionHolder;
+	holdsUnrendered: typeof holdsUnrenderedTransition;
+	wake: typeof wakeHeldTransitions;
+	discard: typeof discardHeldRoot;
 }
 
 function ensureTransitionSwapDriver(): void {
@@ -3025,30 +3019,21 @@ function ensureTransitionSwapDriver(): void {
 		splice: spliceWipCapture,
 	};
 	TRANSITION_ROOT_DRIVER ??= {
-		begin: beginTransitionAttempt,
-		end: endTransitionAttempt,
-		beginUrgent: beginUrgentTransitionRender,
-		endUrgent: endUrgentTransitionRender,
+		fold: foldTransitionUpdate,
+		queue: queueTransitionUpdate,
+		memoCells: transitionMemoCells,
+		keep: keepTransitionWork,
 		splitCue: splitTransitionCue,
 		splitsCue: splitsTransitionCue,
 		armFalls: armTransitionFalls,
 		settleFalls: settleTransitionFalls,
 		cancelFall: cancelTransitionFall,
-		holdRoot: holdRootTransition,
-		retryRoot: retryRootTransition,
-		commitRoot: commitRootTransition,
-		discardRoot: discardRootTransition,
-		keepsRoot: keepsRootTransition,
-		cancelEqual: cancelHeldTransitionUpdate,
-		hasHeld: hasHeldTransitionUpdate,
-		heldUpdate: getHeldTransitionUpdate,
-		rebaseHeld: rebaseHeldTransitionUpdate,
-		stagedValue: stagedTransitionValue,
-		stageValue: stageTransitionValue,
-		readQueued: readQueuedTransition,
-		captureQueue: captureTransitionHookQueue,
-		recordUrgent: recordUrgentActionUpdate,
-		finishQueued: finishQueuedTransition,
+		drop: dropTransitionRender,
+		retry: retryTransitionHolder,
+		unsuspend: unsuspendTransitionHolder,
+		holdsUnrendered: holdsUnrenderedTransition,
+		wake: wakeHeldTransitions,
+		discard: discardHeldRoot,
 	};
 	TRANSITION_TASK_DRIVER ??= {
 		queue: queueTransitionBlock,
@@ -3057,43 +3042,59 @@ function ensureTransitionSwapDriver(): void {
 	};
 }
 
-interface TransitionActionSlot<T> {
-	value: T;
-	renderTransition?: { value: T };
-	pendingActionBatch?: TransitionActionBatch;
-	pendingActionValue?: T;
+/**
+ * One queued hook-cell update. An urgent update (`batch` null) applies in every
+ * render; a transition update applies only in a transition render once its
+ * batch is ready (transitionBatchReady).
+ */
+interface HookUpdate {
+	batch: TransitionActionBatch | null;
+	action: unknown;
+	next: HookUpdate | null;
 }
 
-interface TransitionActionUpdate<T = unknown> {
-	/** An urgent replacement can cancel a held value even when its base is equal. */
-	superseded?: boolean;
-	/** Retained after its block rendered it (queueTransitionBlock); its value is committed. */
-	rendered?: boolean;
-	state?: StateSlot<T>;
-	/** Already queued work precedes this batch; later urgent work stays on the cell. */
-	previous?: TransitionActionUpdate<T>;
-	next?: TransitionActionUpdate<T>;
-	stateUpdates?: Array<T | ((previous: T) => T)>;
-	reducerActions?: any[];
-	replayBaseValue?: T;
-	urgentOperations?: number[];
-	batch?: TransitionActionBatch;
-	reducer?: ReducerSlot<T, any>;
-	slot: TransitionActionSlot<T>;
-	block: Block;
-	operations: Array<(value: T) => T>;
-	baseValue: T;
-	value: T;
-	forceRender: boolean;
-	profileType?: 'state' | 'reducer';
-	profileSlot?: HookSlot;
+/**
+ * React's update-queue model on one tree. `value` is what the last committed
+ * render showed. `queue` holds every update that render did not fold into
+ * `base`, oldest first: from the first update it skipped onward, applied or
+ * not, updates stay queued so a later render rebases them over `base` in
+ * order (processUpdateQueue). An empty queue means `base` equals `value`.
+ * A render folds into the root transaction (foldHookQueue) and the commit
+ * publishes the result (commitHookCells); a dropped render publishes nothing,
+ * so a held transition is simply updates that have not been processed yet.
+ */
+interface QueuedCell {
+	value: any;
+	base: any;
+	queue: HookUpdate | null;
+	last: HookUpdate | null;
+	/** The root transaction holding this cell's uncommitted fold, and its offset there. */
+	stamp: number;
+	at: number;
 }
 
 interface TransitionActionBatch {
-	updates: Map<object, TransitionActionUpdate<any>>;
+	/** Blocks whose hook cells queued this batch's updates; they render when it is ready. */
+	blocks: Block[];
 	pendingActions: number;
 	closed: boolean;
 	flushed: boolean;
+	/** The root transaction and drained origin that last folded this batch (noteTransitionBatch). */
+	stamp: number;
+	origin: Block | null;
+	/** Whether a dropped render held this batch before (dropTransitionRender). */
+	held: boolean;
+	/** The batch this one entangled into by sharing a hook cell, and its own members. */
+	merged: TransitionActionBatch | null;
+	members: TransitionActionBatch[] | null;
+	/** Members not yet flushed: the batch cannot render without them. */
+	waiting: number;
+	/** Set once its work and every hold are over (finishTransitionHookBatch). */
+	finished: boolean;
+	/** Holds keeping it from rendering (TransitionHold.suspends). */
+	suspended: number;
+	/** Profile builds only: queued updates as (cell, block, cause, slot) quadruples. */
+	profile?: unknown[];
 	/**
 	 * Only hook-started actions own pending indicators. Nearly every batch has
 	 * exactly one starting hook, so the first is a plain field and only a second
@@ -3116,16 +3117,11 @@ interface TransitionActionBatch {
 	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
 }
 
-type NativeTransitionUpdate =
-	TransitionActionBatch['updates'] extends Map<object, infer U> ? U : never;
-
 /** Associate neutral coordinator ports with the renderer's actual object types. */
 interface NativeTransitionTypes {
 	Block: Block;
 	Owner: RootRenderOwner;
 	Transaction: RootRenderTransaction;
-	Attempt: TransitionAttempt;
-	Update: NativeTransitionUpdate;
 	Hook: TransitionHookSlot;
 	Batch: TransitionActionBatch;
 	Boundary: TrySlot;
@@ -3133,8 +3129,6 @@ interface NativeTransitionTypes {
 	Suspense: SuspenseException;
 	Capture: OffscreenCapture;
 	RootFrame: RootRenderFrame;
-	MemoSwap: TransitionMemoSwap;
-	Value: NativeTransitionUpdate['slot']['value'];
 }
 
 let NATIVE_TRANSITION_DRIVER: SignalTransitionCoordinator<NativeTransitionTypes> | null = null;
@@ -3165,10 +3159,10 @@ function scheduleNativeTransitionFlush(): void {
  * Ordinary state updates dispatched during the synchronous slice of an async
  * transition Action must not become committed UI before the Action settles.
  * React renders those updates in a transition lane while an urgent render
- * exposes `isPending` against the last committed state. Octane has one live
- * tree, so stage the cells here and promote them together when the returned
- * promise settles. Synchronous transitions flush their batch before returning
- * and therefore keep their existing scheduling behavior.
+ * exposes `isPending` against the last committed state. Their hook updates are
+ * queued under this batch, which no render folds until the returned promise
+ * settles (transitionBatchReady). Synchronous transitions flush their batch
+ * before returning and therefore keep their existing scheduling behavior.
  *
  * `useOptimistic` deliberately does not use this batch: optimistic values are
  * the explicit in-flight surface and must remain visible while the Action is
@@ -3211,15 +3205,12 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFra
 			schedule: scheduleNativeTransitionFlush,
 			beginRoot: beginRootRender,
 			endRoot: endRootRender,
-			beginAttempt: beginTransitionAttempt,
-			endAttempt: endTransitionAttempt,
 			invalidate: invalidateRender,
 			render: renderBlock,
 			journal: journalObjectOnce,
 			journalProperty: journalRootProperty,
 			isSuspense: isSuspenseException,
 			releaseHookHolder: releaseTransitionHookHolder,
-			rebaseUpdate: rebaseTransitionActionUpdate,
 			flushBatch: flushTransitionActionBatch,
 			currentPresentations: (capture) =>
 				!hydrationStarted || HYDRATION_DRIVER!.currentPresentations(capture as OffscreenCapture),
@@ -3227,8 +3218,10 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFra
 				!NATIVE_READ_DRIVER || NATIVE_READ_DRIVER.validateCapture(capture),
 			acceptCapture: acceptNativeCapture,
 			commitRoots: commitRootRenders,
-			rollbackRoot: rollbackRootRender,
-			applyMemoSwap: applyTransitionMemoSwap,
+			rollbackRoot: (transaction) => {
+				restoreTransitionMemos(transaction, false);
+				rollbackRootRender(transaction);
+			},
 			handleError: handleResumeError,
 			reportError: reportTransitionError,
 			unsupportedError: () => new TypeError(formatClientError(79)),
@@ -3260,10 +3253,18 @@ function resolveTransitionNativeCandidate(): SignalActionFrame | undefined {
 
 function createTransitionActionBatch(): TransitionActionBatch {
 	return {
-		updates: new Map(),
+		blocks: [],
 		pendingActions: 0,
 		closed: false,
 		flushed: false,
+		stamp: 0,
+		origin: null,
+		held: false,
+		merged: null,
+		members: null,
+		waiting: 0,
+		finished: false,
+		suspended: 0,
 		hook: null,
 		hooks: null,
 		hooksPending: false,
@@ -3295,72 +3296,71 @@ function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
 }
 
-function rebaseTransitionActionUpdate<T>(update: TransitionActionUpdate<T>): T {
-	// Hook queues retain their original base and chronological operations. Their
-	// approximate eager value never replaces the owner's render-time replay.
-	if (update.state !== undefined || update.reducer !== undefined) return update.value;
-	if (Object.is(update.baseValue, update.slot.value)) return update.value;
-	let value = update.slot.value;
-	for (const operation of update.operations) value = operation(value);
-	update.baseValue = update.slot.value;
-	update.value = value;
-	if (update.slot.pendingActionBatch !== undefined) update.slot.pendingActionValue = value;
-	return value;
+/**
+ * A transition render folds a batch once its synchronous callback has returned
+ * and its Actions have settled, unless a dropped render holds it waiting for
+ * data (dropTransitionRender): React's suspended lanes. A native candidate
+ * folds its own batch while it prepares.
+ */
+function transitionBatchReady(batch: TransitionActionBatch): boolean {
+	batch = rootTransitionBatch(batch);
+	return batch.flushed
+		? batch.waiting === 0 && batch.suspended === 0
+		: NATIVE_TRANSITION_ATTEMPT !== null && NATIVE_TRANSITION_ATTEMPT.batch === batch;
 }
 
-function stagedTransitionValue<T>(slot: TransitionActionSlot<T>, block?: Block): T {
-	const batch = transitionActionBatchForUpdate();
-	if (batch === null) return slot.value;
-	const update = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
-	if (update !== undefined) return rebaseTransitionActionUpdate(update);
-	if (slot.renderTransition !== undefined) return slot.renderTransition.value;
-	const held =
-		block === undefined || !TRANSITION_ROOT_DRIVER
-			? undefined
-			: TRANSITION_ROOT_DRIVER.heldUpdate(slot, block);
-	return held === undefined ? slot.value : held.value;
+/** Record a Block whose render must process this batch's queued work. */
+function noteTransitionBlock(batch: TransitionActionBatch, block: Block): void {
+	if (batch.blocks.indexOf(block) === -1) batch.blocks.push(block);
 }
 
-function stageTransitionValue<T>(
-	slot: TransitionActionSlot<T>,
-	block: Block,
-	operation: T | ((value: T) => T),
-	value: T,
-	forceRender = false,
-): TransitionActionUpdate<T> | null {
-	// Select after the caller evaluates its updater: user code can open an Action.
-	const batch = transitionActionBatchForUpdate();
-	if (batch === null) return null;
-	// Replacement values need a replay closure only when an Action actually
-	// stages the update. Ordinary useState setters stay allocation-free here.
-	const replay = typeof operation === 'function' ? (operation as (value: T) => T) : () => operation;
-	let current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
-	if (current === undefined) {
-		current = {
-			batch,
-			slot,
-			block,
-			operations: [replay],
-			baseValue: slot.value,
-			value,
-			forceRender,
-		};
-		batch.updates.set(slot, current);
-	} else {
-		current.operations.push(replay);
-		current.value = value;
-		current.forceRender ||= forceRender;
+/**
+ * Batches whose renders the current flush scheduled, newest last, for decisions
+ * about those renders (hasQueuedTransitionCells). CONSUMED_TRANSITION_BLOCKS
+ * records the list length when a Block's own render consumed every earlier one.
+ * Both are cleared when a flush completes with no transition render waiting.
+ */
+const FLUSHED_TRANSITION_BATCHES: TransitionActionBatch[] = [];
+let CONSUMED_TRANSITION_BLOCKS: Map<Block, number> | null = null;
+
+/** Render a ready batch's blocks at transition priority. */
+function clearFlushedTransitions(): void {
+	FLUSHED_TRANSITION_BATCHES.length = 0;
+	CONSUMED_TRANSITION_BLOCKS = null;
+}
+
+function scheduleTransitionBatch(batch: TransitionActionBatch): void {
+	if (batch.blocks.length === 0) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		// A queued update that settles on the committed value is not a cause.
+		const profile = batch.profile;
+		if (profile !== undefined) {
+			for (let i = 0; i < profile.length; i += 4) {
+				const cell = profile[i] as QueuedCell;
+				if (profile[i + 2] === 'reducer' || !Object.is(latestHookValue(cell, null), cell.value))
+					__profileSchedule(
+						profile[i + 1] as Block,
+						profile[i + 2] as string,
+						profile[i + 3] as HookSlot,
+					);
+			}
+		}
 	}
-	slot.pendingActionBatch = batch;
-	slot.pendingActionValue = value;
-	return current;
+	for (const block of batch.blocks) {
+		if (block.disposed) continue;
+		scheduleRender(block);
+		// A block already queued for its pending cue keeps this update for the task.
+		if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.upgrade(block, 'transition');
+	}
+	// After scheduling: those renders have not consumed this batch yet.
+	FLUSHED_TRANSITION_BATCHES.push(batch);
 }
 
 function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 	if (batch.flushed) return;
 	if (batch.native !== undefined) {
 		if (batch.native.hasWrites()) {
-			holdTransitionHookBatch(batch, batch);
+			holdTransitionBatch(batch, batch, false);
 			queueNativeTransition(batch);
 			if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
 			return;
@@ -3370,65 +3370,13 @@ function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 		batch.native = undefined;
 	}
 	batch.flushed = true;
-	for (const update of batch.updates.values()) {
-		const { slot, block, forceRender } = update;
-		const value =
-			update.state === undefined && update.reducer === undefined
-				? rebaseTransitionActionUpdate(update)
-				: update.value;
-		if (slot.pendingActionBatch === batch) {
-			slot.pendingActionBatch = undefined;
-			slot.pendingActionValue = undefined;
-		}
-		if (block.disposed) continue;
-		const state = update.state;
-		const reducer = update.reducer;
-		const previous = state?.renderTransition ?? reducer?.renderTransition;
-		if (state !== undefined || reducer !== undefined) {
-			update.baseValue = previous === undefined ? slot.value : previous.baseValue;
-			if (state !== undefined) {
-				state.updates = undefined;
-			} else if (reducer !== undefined) {
-				reducer.renderPhaseActions = undefined;
-			}
-		}
-		const changed = !Object.is(slot.value, value);
-		if (!changed && !forceRender && update.previous === undefined) continue;
-		if (changed) slot.value = value;
-		if (update.reducer !== undefined) update.reducer.renderTransition = update;
-		if (update.state !== undefined) update.state.renderTransition = update;
-		// Queue replay can still be required after an urgent replacement already
-		// published the staged value. That bookkeeping is not a state-change cause;
-		// reducers retain their explicit forced-render cause.
-		if (
-			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-			__OCTANE_PROFILE_ENABLED__ &&
-			(changed || update.profileType !== 'state')
-		)
-			__profileSchedule(
-				block,
-				update.profileType ?? (forceRender ? 'reducer' : 'state'),
-				update.profileSlot,
-			);
-		scheduleRender(block);
-		// A block already queued for its pending cue keeps this update for the task.
-		if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.upgrade(block, 'transition');
-	}
-	// Retain the applied updates for the drain this flush schedules: a render
-	// that suspends into a hold reverts these cells to their baseValues and
-	// promotes them when the data arrives (deferred transition commit, P1).
-	// Consumed by endTransitionAttempt; cleared when the flush completes.
-	if (batch.updates.size > 0) {
-		const retained: Array<TransitionActionUpdate<any>> = [];
-		for (const update of batch.updates.values()) {
-			if (!update.block.disposed) retained.push(update);
-		}
-		if (retained.length > 0) FLUSHED_TRANSITION_UPDATES.push(retained);
-	}
-	batch.updates.clear();
 	if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) {
 		IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
 	}
+	// An entangled batch renders once the batch it joined has every member.
+	const root = rootTransitionBatch(batch);
+	if (root !== batch) root.waiting--;
+	if (transitionBatchReady(root)) scheduleTransitionBatch(root);
 }
 
 function flushTransitionActionBatchIfReady(batch: TransitionActionBatch): void {
@@ -3451,7 +3399,17 @@ let DEFERRED_SPAWN = false;
  */
 let TRANSITION_PENDING_COUNT = 0;
 const TRANSITION_LISTENERS = new Set<() => void>();
-let TRANSITION_HOOK_HOLDERS: WeakMap<object, Set<TransitionActionBatch>> | null = null;
+/**
+ * Batches each holder keeps waiting: a Suspense boundary or root whose
+ * dropped render suspended on them (dropTransitionRender), or a native
+ * candidate's own batch. A held batch keeps its hooks pending and no render
+ * folds it until its holder retries it (retryTransitionHolder).
+ */
+let TRANSITION_HOLDERS: Map<object, TransitionHold> | null = null;
+/** Holders a new update woke, retried in the transition task once that update committed. */
+let WOKEN_TRANSITION_HOLDERS: Set<object> | null = null;
+/** Released batches waiting for that task, as (batch, render, fall) triples (retryTransitionBatch). */
+let RETRIED_TRANSITION_BATCHES: Array<TransitionActionBatch | boolean> | null = null;
 
 /**
  * Count `batch` toward `hook`'s pending indicator. Idempotent per batch: a hook
@@ -3493,49 +3451,116 @@ function publishTransitionHookBatch(batch: TransitionActionBatch): void {
 
 function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 	if (!batch.workComplete || batch.pendingActions !== 0 || (batch.pendingHolds ?? 0) !== 0) return;
-	if (!batch.hooksPending) return;
-	batch.hooksPending = false;
-	const hook = batch.hook!;
-	if (--hook.pendingBatches === 0) hook.publish(false);
-	const hooks = batch.hooks;
-	if (hooks !== null) {
-		for (let i = 0; i < hooks.length; i++) {
-			if (--hooks[i].pendingBatches === 0) hooks[i].publish(false);
+	// An entangled batch finishes with the batch it joined.
+	if (batch.merged !== null && !rootTransitionBatch(batch).finished) return;
+	batch.finished = true;
+	if (batch.hooksPending) {
+		batch.hooksPending = false;
+		const hook = batch.hook!;
+		if (--hook.pendingBatches === 0) hook.publish(false);
+		const hooks = batch.hooks;
+		if (hooks !== null) {
+			for (let i = 0; i < hooks.length; i++) {
+				if (--hooks[i].pendingBatches === 0) hooks[i].publish(false);
+			}
 		}
 	}
+	const members = batch.members;
+	if (members !== null)
+		for (let i = 0; i < members.length; i++) finishTransitionHookBatch(members[i]);
 }
 
-function holdTransitionHookBatch(holder: object, batch: TransitionActionBatch): void {
-	if (batch.hook === null) return;
-	const holders = (TRANSITION_HOOK_HOLDERS ??= new WeakMap());
-	let batches = holders.get(holder);
-	if (batches === undefined) holders.set(holder, (batches = new Set()));
-	if (batches.has(batch)) return;
-	batches.add(batch);
+/**
+ * A hold keeps its batches' hooks pending. While it `suspends`, it also keeps
+ * them from rendering (transitionBatchReady): a native candidate's hold of its
+ * own batch, and a boundary showing its timeout fallback, only keep isPending.
+ */
+interface TransitionHold {
+	batches: Set<TransitionActionBatch>;
+	suspends: boolean;
+}
+
+function holdTransitionBatch(holder: object, batch: TransitionActionBatch, suspends = true): void {
+	const holders = (TRANSITION_HOLDERS ??= new Map());
+	let hold = holders.get(holder);
+	if (hold === undefined) holders.set(holder, (hold = { batches: new Set(), suspends }));
+	else if (suspends && !hold.suspends) {
+		// The holder suspended its retried work again.
+		hold.suspends = true;
+		for (const held of hold.batches) held.suspended++;
+	}
+	if (hold.batches.has(batch)) return;
+	hold.batches.add(batch);
 	batch.pendingHolds = (batch.pendingHolds ?? 0) + 1;
-	// The drain rendering this batch's work held it: isPending stays raised.
-	if (batch.falling) TRANSITION_ROOT_DRIVER!.cancelFall(batch);
-	// A finished batch that a later round re-holds becomes pending again.
-	publishTransitionHookBatch(batch);
+	if (hold.suspends) batch.suspended++;
+	raiseHeldTransitionBatch(batch);
 }
 
-function releaseTransitionHookHolder(holder: object): void {
-	const batches = TRANSITION_HOOK_HOLDERS?.get(holder);
-	if (batches === undefined) return;
-	TRANSITION_HOOK_HOLDERS!.delete(holder);
-	for (const batch of batches) {
-		batch.pendingHolds!--;
-		finishTransitionHookBatch(batch);
+/** A held batch and the batches entangled into it stay pending until it finishes. */
+function raiseHeldTransitionBatch(batch: TransitionActionBatch): void {
+	batch.finished = false;
+	if (batch.hook !== null) {
+		// The drain rendering this batch's work held it: isPending stays raised.
+		if (batch.falling) TRANSITION_ROOT_DRIVER!.cancelFall(batch);
+		// A finished batch that a later round re-holds becomes pending again.
+		publishTransitionHookBatch(batch);
 	}
+	const members = batch.members;
+	if (members !== null)
+		for (let i = 0; i < members.length; i++) raiseHeldTransitionBatch(members[i]);
 }
 
-function holdTransitionHooksForBlock(holder: object, block: Block): void {
-	for (const entries of FLUSHED_TRANSITION_UPDATES) {
-		for (const entry of entries) {
-			if (entry.batch !== undefined && blockIsAncestor(entry.block, block))
-				holdTransitionHookBatch(holder, entry.batch);
+/**
+ * End `holder`'s holds, returning whether it held anything. Work a suspending
+ * hold kept back renders again at transition priority with its falling edge,
+ * or is abandoned (`retry` false, a discarded root). Work that already
+ * rendered lets its batch finish now.
+ */
+function releaseTransitionHookHolder(holder: object, retry = true): boolean {
+	const hold = TRANSITION_HOLDERS?.get(holder);
+	if (hold === undefined) return false;
+	TRANSITION_HOLDERS!.delete(holder);
+	for (const batch of hold.batches) {
+		const unblocked = hold.suspends && --batch.suspended === 0;
+		const settled = --batch.pendingHolds! === 0;
+		if (hold.suspends && retry) {
+			// isPending falls with the retried work, not before it renders.
+			if (unblocked || settled) retryTransitionBatch(batch, unblocked, settled);
+		} else if (settled) finishTransitionHookBatch(batch);
+	}
+	return true;
+}
+
+/**
+ * Render a batch a hold released, and queue its falling edge with that render.
+ * Inside a render or flush, the urgent work there commits first: the retry
+ * waits for the transition task, as React renders the transition lane later.
+ */
+function retryTransitionBatch(batch: TransitionActionBatch, render: boolean, fall: boolean): void {
+	if (inFlush || CURRENT_BLOCK !== null) {
+		(RETRIED_TRANSITION_BATCHES ??= []).push(batch, render, fall);
+		scheduleTransitionTask();
+		return;
+	}
+	TRANSITION_DEPTH++;
+	try {
+		if (render && transitionBatchReady(batch)) {
+			if (TRANSITION_CELL_HARVEST !== null) reapplyTransitionMemoCells();
+			scheduleTransitionBatch(batch);
 		}
+		if (fall) queueTransitionFall(batch, undefined);
+	} finally {
+		TRANSITION_DEPTH--;
 	}
+}
+
+/** A boundary that shows its timeout fallback lets the held work commit around it. */
+function unsuspendTransitionHolder(holder: object): void {
+	const hold = TRANSITION_HOLDERS?.get(holder);
+	if (hold === undefined || !hold.suspends) return;
+	hold.suspends = false;
+	for (const batch of hold.batches)
+		if (--batch.suspended === 0) retryTransitionBatch(batch, true, false);
 }
 // useTransition/useOptimistic listeners are runtime-owned publication work.
 // When a transition boundary changes the pending count while another component
@@ -3566,302 +3591,55 @@ let flushingStagedReveals = false;
 let deferringStagedRevealEffects = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Deferred transition commit (docs/transition-deferred-commit-plan.md, P1).
+// Transition holds (#2029).
 //
-// A synchronous transition stages its setters into a TransitionActionBatch and
-// flushes it before startTransition returns, so by the time the drain renders,
-// the cells already hold the new values. If that render suspends into a hold,
-// the screen must stay whole — including everything OUTSIDE the boundary the
-// same render patched on the way past. The attempt makes the render undoable:
-// journal window over the origin's whole render, live-queue checkpoints for the
-// work it enqueued, the flushed cells reverted to the recorded baseValues, and
-// the hook-map and inline memo entries it replaced swapped back.
+// A transition render folds its ready batches' hook updates into the root
+// transaction (foldHookQueue). When it suspends into a hold, a Suspense boundary
+// keeping committed content or a root with no boundary, the whole transaction
+// is dropped once that origin's render returns (dropTransitionRender): the
+// journal restores DOM and renderer state, the folded cells are discarded, and
+// the updates simply stay queued. The boundaries or root that held become the
+// batches' holders. A held batch keeps its hooks pending and no render folds it
+// (React's suspended lanes) until a holder retries it: its data settled, or a
+// new update reached its root (React's markRootUpdated). The retry renders the
+// batches' blocks at transition priority and commits the whole screen in one
+// flush, or suspends again and goes around.
 //
-// The pending cue needs no special treatment: `slotRef.isPending` was flipped
-// by the listener pass and survives the unwind. Re-rendering the origin at
-// urgent priority with the reverted cells re-publishes exactly the cue-derived
-// bindings — every other binding no-ops on its restored bag guard, and old
-// cells render previously committed (cached) content, so it cannot suspend.
+// Memo state gets a second copy for a dropped render only. The hook-map entries
+// and inline memo cells a transition render replaces are recorded on its
+// transaction. A drop restores the committed copies, so a render of the
+// committed inputs still hits them, and harvests the dropped copies, so the
+// retry adopts the requests the dropped render already started instead of
+// creating them again (adoptWarmEntry, adoptHarvestedCells). Warm-walk creations
+// join the same harvest, because each round mints a fresh warm episode.
 //
-// On settle the hold PROMOTES: memo entries swap forward, cells write
-// forward, and an ordinary transition drain commits the whole screen in one
-// flush — or suspends on a later dependency and goes around again. Warm-walk
-// creations are carried on the hold as an episode-agnostic HARVEST, because
-// each round's drain mints a fresh warm episode and could otherwise never
-// adopt the fetches the attempt already started.
-//
-// P1 scope: single-origin transitions (every flushed update targets the block
-// the attempt wrapped). A flush whose updates span several blocks — or one
-// whose transition is driven by state the batch never staged, like an external
-// store — falls back to today's per-boundary behavior untouched.
+// Urgent work rendered in a dropped transaction is lost with it: a pending cue
+// rendered together with its transition (flushSync, act(), a discrete event),
+// or an unrelated urgent origin. The drop renders the drain's urgent origins
+// again, and on a batch's first hold every origin, so the committed screen
+// shows the cue.
 // ─────────────────────────────────────────────────────────────────────────────
-
-type TransitionMemoSwap =
-	| [kind: 0, hooks: Map<HookSlot, unknown>, slot: HookSlot, previous: unknown, next: unknown]
-	| [kind: 1, cells: any[], base: number, previous: any[], next: any[]];
-
-interface TransitionAttempt {
-	origin: Block;
-	capture: OffscreenCapture | null;
-	journalCheckpoint: number;
-	effects: [number, number, number];
-	effectEvents: number;
-	effectEventActions: number;
-	stores: number;
-	refAttach: number;
-	refDetach: number;
-	effectDeps: EffectDepsSnapshot | null;
-	heldSlots: Set<TrySlot> | null;
-	/** Hook-map entries and inline memo-cell ranges: undone on hold, redone on promotion. */
-	memoSwaps: TransitionMemoSwap[] | null;
-	/** Hooks whose falling edge this render showed before a hold (raiseTransitionHook). */
-	raised: TransitionHookSlot[] | null;
-}
-
-let ACTIVE_TRANSITION_ATTEMPT: TransitionAttempt | null = null;
-
-/** Flushed sync-transition updates retained for the drain, one group per batch. */
-let FLUSHED_TRANSITION_UPDATES: Array<Array<TransitionActionUpdate<any>>> = [];
 
 interface WarmHarvestEntry {
 	slot: HookSlot;
 	deps: any[];
 	value: any;
 	taken: boolean;
+	/** Only the held root's own later renders adopt it. */
+	owner: RootRenderOwner | undefined;
 	nativeWitness?: NativeReadWitness | null;
 }
 
-/** The same single-origin staged cells as P1, owned by a root rather than a TrySlot. */
-interface RootTransitionHold {
-	/** Coalesce retries when an urgent action changes the retained forward value. */
-	replayScheduled?: boolean;
-	origin: Block;
-	entries: Array<TransitionActionUpdate<any>>;
-	memoSwaps: TransitionMemoSwap[] | null;
-	warmHarvest: WarmHarvestEntry[] | null;
-	/** Promotion releases the pending count; a later suspension reacquires it. */
-	promoted: boolean;
-	/** Publish the old-input pending cue only after the aborted queue wave drains. */
-	cue: boolean;
-}
+/** The scheduled Block drainQueue is rendering, while transitions are in use. */
+let TRANSITION_ORIGIN: Block | null = null;
 
-/** The reverted state of a held transition, waiting for promotion on settle. */
-let HELD_SYNC_TRANSITION: {
-	replayScheduled?: boolean;
-	origin: Block;
-	entries: Array<TransitionActionUpdate<any>>;
-	memoSwaps: TransitionMemoSwap[] | null;
-	/** Values the attempt's warm walk created, adoptable in ANY later round's
-	 * episode. `taken` resets on each re-revert so every round can adopt. */
-	warmHarvest: WarmHarvestEntry[] | null;
-	holders: Set<TrySlot>;
-} | null = null;
+/** Values dropped transition renders created, adoptable by a later transition render. */
+let TRANSITION_HARVEST: WarmHarvestEntry[] | null = null;
+/** Inline memo cells a dropped render published: (cells, base, published, restored). */
+let TRANSITION_CELL_HARVEST: any[] | null = null;
 
-function urgentTransitionCellUpdate(block: Block): boolean {
-	return (
-		TRANSITION_DEPTH === 0 &&
-		!(CURRENT_BLOCK === block && block.currentRenderMode === 'transition') &&
-		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0 || inCommitCallback())
-	);
-}
-
-function latestHeldTransitionUpdate(
-	entry: TransitionActionUpdate<any>,
-): TransitionActionUpdate<any> {
-	// Later batches can be linked before their async Action settles. Only a
-	// flushed successor is part of the rendered work being held here.
-	while (entry.next?.batch?.flushed === true && !entry.next.superseded) entry = entry.next;
-	return entry;
-}
-
-function findHeldTransitionUpdate(
-	slot: TransitionActionSlot<unknown>,
-	block: Block,
-): TransitionActionUpdate<any> | undefined {
-	if (!urgentTransitionCellUpdate(block)) return;
-	return getHeldTransitionUpdate(slot, block);
-}
-
-function getHeldTransitionUpdate(
-	slot: TransitionActionSlot<unknown>,
-	block: Block,
-): TransitionActionUpdate<any> | undefined {
-	if (block.disposed) return;
-	const rootHeld = block.idState.renderOwner?.transition;
-	if (
-		HELD_SYNC_TRANSITION === null &&
-		rootHeld === undefined &&
-		FLUSHED_TRANSITION_UPDATES.length === 0
-	)
-		return;
-	const groups = [HELD_SYNC_TRANSITION?.entries, rootHeld?.entries];
-	for (const entries of groups) {
-		if (entries === undefined) continue;
-		for (let i = entries.length - 1; i >= 0; i--) {
-			const entry = entries[i];
-			if (entry.slot === slot && !entry.superseded && Object.is(slot.value, entry.baseValue))
-				return latestHeldTransitionUpdate(entry);
-		}
-	}
-	// An urgent ancestor can temporarily expose the base of a queued child
-	// transition. Its entries have not reached a Suspense/root hold yet.
-	for (let i = FLUSHED_TRANSITION_UPDATES.length - 1; i >= 0; i--) {
-		const entries = FLUSHED_TRANSITION_UPDATES[i];
-		for (let j = entries.length - 1; j >= 0; j--) {
-			const entry = entries[j];
-			if (
-				entry.slot === slot &&
-				!entry.superseded &&
-				Object.is(slot.value, entry.baseValue) &&
-				// A completed hook render clears this pointer before the flush's
-				// retained-entry list is released. Returning to an old base value
-				// must not turn that completed update into pending work again.
-				((entry.state === undefined && entry.reducer === undefined) ||
-					slot.renderTransition !== undefined)
-			)
-				return latestHeldTransitionUpdate(entry);
-		}
-	}
-}
-
-function hasHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Block): boolean {
-	return findHeldTransitionUpdate(slot, block) !== undefined;
-}
-
-function cancelHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Block): boolean {
-	if (!urgentTransitionCellUpdate(block)) return false;
-	const rootHeld = block.idState.renderOwner?.transition;
-	if (
-		HELD_SYNC_TRANSITION === null &&
-		rootHeld === undefined &&
-		FLUSHED_TRANSITION_UPDATES.length === 0
-	)
-		return false;
-	let cancelled = false;
-	const cancel = (entries: Array<TransitionActionUpdate<any>> | undefined): void => {
-		if (entries === undefined) return;
-		for (const entry of entries) {
-			if (entry.slot === slot && !entry.superseded) {
-				entry.superseded = true;
-				cancelled = true;
-			}
-		}
-	};
-	cancel(HELD_SYNC_TRANSITION?.entries);
-	cancel(rootHeld?.entries);
-	for (const entries of FLUSHED_TRANSITION_UPDATES) cancel(entries);
-	return cancelled;
-}
-
-/** Replay equal urgent actions against held inputs only from the rendering hook. */
-function rebaseHeldTransitionUpdate<T, A = T | ((previous: T) => T)>(
-	slot: TransitionActionSlot<T>,
-	block: Block,
-	actions: readonly A[],
-	reducer?: (value: T, action: A) => T,
-): void {
-	const entry = findHeldTransitionUpdate(slot, block);
-	if (entry === undefined) return;
-	// The queued Action already records this urgent operation after its own
-	// updates. Replaying it on an earlier held record would apply it twice and
-	// move it before that Action's updates.
-	if (slot.pendingActionBatch?.flushed === false) return;
-	let value = entry.value as T;
-	for (const action of actions) {
-		value = reducer
-			? reducer(value, action)
-			: typeof action === 'function'
-				? (action as (previous: T) => T)(value)
-				: (action as unknown as T);
-	}
-	if (Object.is(value, entry.baseValue)) {
-		cancelHeldTransitionUpdate(slot, block);
-		return;
-	}
-	const changed = !Object.is(value, entry.value);
-	for (
-		let current: TransitionActionUpdate<T> | undefined = entry;
-		current;
-		current = current.previous
-	)
-		current.value = value;
-	for (const action of actions) {
-		entry.operations.push(
-			reducer
-				? (previous: T) => reducer(previous, action)
-				: typeof action === 'function'
-					? (action as (previous: T) => T)
-					: () => action as unknown as T,
-		);
-	}
-	if (changed) scheduleHeldTransitionReplay(entry, block);
-}
-
-function scheduleHeldTransitionReplay(entry: TransitionActionUpdate<any>, block: Block): void {
-	const held = HELD_SYNC_TRANSITION;
-	if (held !== null && held.entries.includes(entry)) {
-		if (held.replayScheduled) return;
-		held.replayScheduled = true;
-		queueMicrotask(() => {
-			if (HELD_SYNC_TRANSITION !== held) return;
-			held.replayScheduled = false;
-			promoteHeldSyncTransition();
-		});
-		return;
-	}
-	const owner = block.idState.renderOwner;
-	const rootHeld = owner?.transition;
-	if (rootHeld === undefined || !rootHeld.entries.includes(entry) || rootHeld.replayScheduled)
-		return;
-	rootHeld.replayScheduled = true;
-	queueMicrotask(() => {
-		if (owner!.transition !== rootHeld) return;
-		rootHeld.replayScheduled = false;
-		retryRootTransition(owner!);
-	});
-}
-
-/**
- * Swaps a promotion applied forward, pending the promoted round's outcome. A
- * held transition can take several rounds — each settle promotes, renders, and
- * may suspend on a LATER dependency. Earlier publications remain available to
- * the continuing rounds, which do not need another old-input cue render. This
- * carrier both retains those values and identifies a continuing attempt.
- * Cleared when a promoted round commits or the transition is discarded.
- */
-let PROMOTED_MEMO_SWAPS: TransitionMemoSwap[] | null = null;
-/** The harvest survives promotion the same way, for the round after next. */
-let PROMOTED_WARM_HARVEST: WarmHarvestEntry[] | null = null;
-
-function takeSingleOriginTransitionUpdates(origin: Block): Array<TransitionActionUpdate<any>> {
-	const entries: Array<TransitionActionUpdate<any>> = [];
-	for (let i = FLUSHED_TRANSITION_UPDATES.length - 1; i >= 0; i--) {
-		const group = FLUSHED_TRANSITION_UPDATES[i];
-		let single = true;
-		for (let k = 0; k < group.length; k++) {
-			if (group[k].block !== origin) {
-				single = false;
-				break;
-			}
-		}
-		if (!single) continue;
-		for (let k = 0; k < group.length; k++) {
-			// The hold reverts and later re-applies the cell, whatever rendered it before.
-			group[k].rendered = undefined;
-			entries.push(group[k]);
-		}
-		FLUSHED_TRANSITION_UPDATES.splice(i, 1);
-	}
-	return entries;
-}
-
-function harvestTransitionWarmValues(
-	origin: Block,
-	warmHarvest: WarmHarvestEntry[] | null,
-): WarmHarvestEntry[] | null {
-	if (warmHarvest !== null) {
-		for (let i = 0; i < warmHarvest.length; i++) warmHarvest[i].taken = false;
-	}
+function harvestTransitionWarmValues(origin: Block): void {
+	const owner = origin.idState.renderOwner;
 	const harvest = (scope: Scope): void => {
 		const cache = scope.block.rare?.warmCache;
 		if (cache !== undefined) {
@@ -3874,9 +3652,10 @@ function harvestTransitionWarmValues(
 							deps: entry.deps,
 							value: entry.value,
 							taken: false,
+							owner,
 						};
 						if (entry.nativeWitness !== undefined) harvested.nativeWitness = entry.nativeWitness;
-						(warmHarvest ??= []).push(harvested);
+						(TRANSITION_HARVEST ??= []).push(harvested);
 					}
 				}
 			}
@@ -3884,409 +3663,291 @@ function harvestTransitionWarmValues(
 		forEachSubtreeChild(scope, harvest);
 	};
 	harvest(origin);
-	return warmHarvest;
 }
 
-function beginTransitionAttempt(block: Block): TransitionAttempt | null {
-	const owner = block.idState.renderOwner;
-	// An urgent driving-cell edit supersedes a root hold. Publish the falling
-	// pending edge before the body renders its ready replacement and effects.
-	if (
-		owner?.transition !== undefined &&
-		!owner.transition.promoted &&
-		!rootTransitionCellsIntact(owner.transition)
-	)
-		discardRootTransition(owner);
-	if (block.pendingMode !== 'transition' || ACTIVE_TRANSITION_ATTEMPT) return null;
-	TRANSITION_JOURNAL ??= [];
-	TRANSITION_JOURNAL_BAGS ??= new Map();
-	TRANSITION_JOURNAL_WINDOWS.push(TRANSITION_JOURNAL_CHECKPOINT);
-	TRANSITION_JOURNAL_BAG_WINDOWS.push(TRANSITION_JOURNAL_BAG_WINDOW);
-	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL.length;
-	TRANSITION_JOURNAL_BAG_WINDOW = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
-	TRANSITION_JOURNAL_DEPTH++;
-	const capture = WIP_CAPTURE;
-	const effects = capture?.effects ?? effectQueues;
-	const attempt: TransitionAttempt = {
-		origin: block,
-		capture,
-		journalCheckpoint: TRANSITION_JOURNAL.length,
-		effects: [effects[0].length, effects[1].length, effects[2].length],
-		effectEvents: (capture?.events ?? effectEventQueue).length,
-		effectEventActions: (capture?.eventActions ?? effectEventCommitActions).length,
-		stores: (capture?.stores ?? storeSyncQueue).length,
-		refAttach: (capture?.refs ?? refAttachQueue).length,
-		refDetach: capture === null ? refDetachQueue.length : (capture.detaches?.length ?? 0),
-		effectDeps: ROOT_RENDER_TRANSACTION === null ? snapshotSubtreeEffectDeps(block) : null,
-		heldSlots: null,
-		memoSwaps: null,
-		raised: null,
-	};
-	// After journalCheckpoint: unwinding the attempt replays this mark too.
-	openOpsWindow();
-	ACTIVE_TRANSITION_ATTEMPT = attempt;
-	return attempt;
-}
-
-function endTransitionAttempt(attempt: TransitionAttempt | null): void {
-	if (attempt === null) return;
-	ACTIVE_TRANSITION_ATTEMPT = null;
-	const held = attempt.heldSlots;
-	// A promoted round that ran to commit makes its forward state canon.
-	if (held === null || held.size === 0) {
-		PROMOTED_MEMO_SWAPS = null;
-		PROMOTED_WARM_HARVEST = null;
-	}
-	// The unwind is only sound when the driving cells can be reverted with it:
-	// single-origin groups from the flushed batch (P1). A transition driven by
-	// something the batch never staged — an external store, or updates spanning
-	// several blocks — keeps today's per-boundary behavior untouched, because
-	// unwinding the render without reverting its inputs would erase the pending
-	// cue with no way to re-publish it.
-	let entries: Array<TransitionActionUpdate<any>> | null = null;
-	if (held !== null && held.size > 0) {
-		entries = takeSingleOriginTransitionUpdates(attempt.origin);
-	}
-	let unwind = false;
-	if (held !== null && held.size > 0 && entries !== null && entries.length > 0) {
-		unwind = true;
-		// Unwind everything the attempt did: bindings and structure via the
-		// journal, then the work it queued, then the effect cells it advanced.
-		rollbackTransitionJournal(attempt.journalCheckpoint, attempt.origin);
-		const capture = attempt.capture;
-		const effects = capture?.effects ?? effectQueues;
-		for (let phase = 0; phase < 3; phase++) {
-			effects[phase].length = attempt.effects[phase];
-		}
-		(capture?.events ?? effectEventQueue).length = attempt.effectEvents;
-		(capture?.eventActions ?? effectEventCommitActions).length = attempt.effectEventActions;
-		const stores = capture?.stores ?? storeSyncQueue;
-		for (let i = attempt.stores; i < stores.length; i++) {
-			stores[i].queued = false;
-		}
-		stores.length = attempt.stores;
-		(capture?.refs ?? refAttachQueue).length = attempt.refAttach;
-		if (capture === null) refDetachQueue.length = attempt.refDetach;
-		else if (capture.detaches !== undefined) capture.detaches.length = attempt.refDetach;
-		if (attempt.effectDeps !== null) restoreSubtreeEffectDeps(attempt.origin, attempt.effectDeps);
-		// FIRST hold of a transition: swap the memo entries back so the
-		// cue re-render dep-hits the old creations instead of re-fetching them,
-		// and schedule that cue re-render below. A CONTINUING round (a promoted
-		// render suspending on a later dependency) needs neither: the old screen
-		// and the cue bindings were re-established in round one and the journal
-		// rollback above just restored them — so the memo entries stay
-		// monotonically FORWARD, and every later round dep-hits them outright.
-		const continuing = PROMOTED_MEMO_SWAPS !== null || PROMOTED_WARM_HARVEST !== null;
-		let memoSwaps = attempt.memoSwaps;
-		if (continuing) {
-			if (PROMOTED_MEMO_SWAPS !== null) {
-				memoSwaps =
-					memoSwaps === null ? PROMOTED_MEMO_SWAPS : PROMOTED_MEMO_SWAPS.concat(memoSwaps);
-				PROMOTED_MEMO_SWAPS = null;
-			}
-		} else if (memoSwaps !== null) {
-			for (let i = memoSwaps.length - 1; i >= 0; i--) applyTransitionMemoSwap(memoSwaps[i], false);
-		}
-		for (let i = 0; i < entries.length; i++) {
-			entries[i].slot.value = entries[i].baseValue;
-		}
-		// Harvest the warm walk's creations off this round's episode caches
-		// (block-attached, so they outlive the plans), carrying earlier rounds'
-		// harvest forward with availability reset: the fetches are in flight and
-		// must be adopted — never re-created — by every later round's render,
-		// whatever episode it mints.
-		const warmHarvest = harvestTransitionWarmValues(attempt.origin, PROMOTED_WARM_HARVEST);
-		PROMOTED_WARM_HARVEST = null;
-		HELD_SYNC_TRANSITION = {
-			origin: attempt.origin,
-			entries,
-			memoSwaps,
-			warmHarvest,
-			holders: new Set(held),
-		};
-		// Re-publish the cue on the FIRST hold: the origin re-renders at urgent
-		// priority in this same drain. Cells and bags both hold the old values,
-		// so only the isPending-derived bindings actually write. Continuing
-		// rounds re-established nothing cue-visible, so they skip it.
-		if (!continuing) scheduleRender(attempt.origin);
-	}
-	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL_WINDOWS.pop()!;
-	TRANSITION_JOURNAL_BAG_WINDOW = TRANSITION_JOURNAL_BAG_WINDOWS.pop()!;
-	closeOpsWindow();
-	if (--TRANSITION_JOURNAL_DEPTH === 0) {
-		TRANSITION_JOURNAL = null;
-		TRANSITION_JOURNAL_BAGS = null;
-		flushParkedItems();
-	}
-	// A hold raised isPending over a render in this attempt that showed its
-	// falling edge (raiseTransitionHook). The unwind restored a render inside
-	// it; any other renders the cue, now that it has left the stack.
-	const raised = attempt.raised;
-	if (raised !== null) {
-		for (let i = 0; i < raised.length; i++) {
-			const hook = raised[i];
-			if (unwind && blockIsAncestor(attempt.origin, hook.block)) {
-				hook.tentative = false;
-				hook.isPending = true;
-			} else hook.publish(true);
-		}
-	}
-}
-
-/**
- * Record a hook-map memo entry the attempt replaces, with both directions.
- * The cue re-render renders the OLD inputs and must dep-hit the old entries —
- * a miss would re-create old-version requests against data sources that have
- * moved on. The PROMOTED render renders the NEW inputs and must dep-hit the
- * entries the attempt already created. Publish sites replace the entry object
- * wholesale, so swapping references swaps deps and value together.
- * Attempt-owned: the per-boundary journal windows predate this and keep their
- * pinned replay behavior.
- */
-function journalMemoEntry(scope: Scope, slot: HookSlot, next: unknown): void {
-	const attempt = ACTIVE_TRANSITION_ATTEMPT;
-	if (attempt === null) return;
-	const hooks = ensureHooks(scope);
-	(attempt.memoSwaps ??= []).push([0, hooks, slot, hooks.get(slot), next]);
-}
-
-/** Inline memos publish immediately too, but hold/promotion must restore each
- * complete entry rather than leaving its deps and value from different renders. */
-function journalHookMemoCells(cells: any[], base: number, next: any[]): void {
-	const attempt = ACTIVE_TRANSITION_ATTEMPT;
-	if (attempt === null) return;
-	(attempt.memoSwaps ??= []).push([1, cells, base, cells.slice(base, base + next.length), next]);
-}
-
-function applyTransitionMemoSwap(swap: TransitionMemoSwap, forward: boolean): void {
-	if (swap[0] === 0) {
-		const value = forward ? swap[4] : swap[3];
-		if (!forward && value === undefined) swap[1].delete(swap[2]);
-		else swap[1].set(swap[2], value);
-		return;
-	}
-	const values = forward ? swap[4] : swap[3];
-	for (let i = 0; i < values.length; i++) swap[1][swap[2] + i] = values[i];
-}
-
-/** True while the held cells are untouched — an in-place boundary success under
- * a held sync transition is then the cue re-render, not an urgent supersede. */
-function heldSyncCellsIntact(state: TrySlot): boolean {
-	const held = HELD_SYNC_TRANSITION;
-	if (held === null || !held.holders.has(state)) return false;
-	for (let i = 0; i < held.entries.length; i++) {
-		const entry = held.entries[i];
-		if (entry.superseded || !Object.is(entry.slot.value, entry.baseValue)) return false;
-	}
-	return true;
-}
-
-/** A later Action on the same cell owns its next complete publication. */
-function heldTransitionHasPendingAction(entries: Array<TransitionActionUpdate<any>>): boolean {
-	for (const entry of entries) {
-		if (!entry.superseded && entry.slot.pendingActionBatch?.flushed === false) return true;
-	}
-	return false;
-}
-
-/** Write the held transition forward, returning whether a render was scheduled. */
-function promoteHeldSyncTransition(): boolean {
-	const held = HELD_SYNC_TRANSITION;
-	if (held === null || heldTransitionHasPendingAction(held.entries)) return false;
-	HELD_SYNC_TRANSITION = null;
-	const promoted: Array<TransitionActionUpdate<any>> = [];
-	for (let i = 0; i < held.entries.length; i++) {
-		const entry = held.entries[i];
-		// A cell an urgent write superseded keeps the urgent value.
-		if (entry.superseded || !Object.is(entry.slot.value, entry.baseValue)) continue;
-		entry.slot.value = entry.value;
-		if (!entry.block.disposed) promoted.push(entry);
-	}
-	if (promoted.length === 0) {
-		// There is no promoted render to resume these boundaries or consume its
-		// memo entries. Keep the latest urgent inputs and use the normal reveal.
-		PROMOTED_MEMO_SWAPS = null;
-		PROMOTED_WARM_HARVEST = null;
-		return false;
-	}
-	// Swap the attempt's memo entries forward BEFORE the renders run,
-	// so the promoted pass dep-hits everything the attempt already started.
-	const memoSwaps = held.memoSwaps;
-	if (memoSwaps !== null) {
-		for (let i = 0; i < memoSwaps.length; i++) applyTransitionMemoSwap(memoSwaps[i], true);
-		PROMOTED_MEMO_SWAPS =
-			PROMOTED_MEMO_SWAPS === null ? memoSwaps : PROMOTED_MEMO_SWAPS.concat(memoSwaps);
-	}
-	// The harvest stays adoptable for this round's renders and, via the
-	// carrier, for the round after a re-suspend.
-	PROMOTED_WARM_HARVEST = held.warmHarvest;
-	TRANSITION_DEPTH++;
-	try {
-		for (let i = 0; i < promoted.length; i++) scheduleRender(promoted[i].block);
-	} finally {
-		TRANSITION_DEPTH--;
-	}
-	// The promoted round is itself an attempt: if it suspends on a LATER
-	// dependency, the hold must revert these same cells back to the
-	// still-committed old screen (baseValue is untouched) and go around again.
-	FLUSHED_TRANSITION_UPDATES.push(promoted);
-	return true;
-}
-
-/** Drop a held sync transition when its last holder stops holding. */
-function discardHeldSyncTransition(state: TrySlot): void {
-	const held = HELD_SYNC_TRANSITION;
-	if (held === null || !held.holders.delete(state)) return;
-	if (held.holders.size === 0) {
-		HELD_SYNC_TRANSITION = null;
-		PROMOTED_MEMO_SWAPS = null;
-		PROMOTED_WARM_HARVEST = null;
-	}
-}
-
-function rootTransitionCellsIntact(held: RootTransitionHold): boolean {
-	for (let i = 0; i < held.entries.length; i++) {
-		const entry = held.entries[i];
-		if (entry.superseded || !Object.is(entry.slot.value, entry.baseValue)) return false;
-	}
-	return true;
-}
-
-function keepsRootTransition(owner: RootRenderOwner, includePromoted = false): boolean {
-	const held = owner.transition;
+/** Whether a memo write belongs to a transition render that a hold may drop. */
+function inTransitionRender(): boolean {
 	return (
-		held !== undefined &&
-		!held.origin.disposed &&
-		(held.promoted ? includePromoted : rootTransitionCellsIntact(held))
+		ROOT_RENDER_TRANSACTION !== null &&
+		CURRENT_BLOCK !== null &&
+		CURRENT_BLOCK.currentRenderMode === 'transition'
 	);
 }
 
-/** A no-boundary hold reuses P1's staged inputs without inventing a TrySlot. */
-function holdRootTransition(
-	owner: RootRenderOwner,
-	transaction: RootRenderTransaction,
-	attempt: TransitionAttempt | null,
-): boolean {
-	const previous = owner.transition;
-	if (
-		attempt === null ||
-		!attempt.origin.mounted ||
-		attempt.origin.disposed ||
-		isCreatedInRootRender(transaction, attempt.origin) ||
-		(attempt.heldSlots !== null && attempt.heldSlots.size !== 0)
-	) {
-		if (previous !== undefined && !rootTransitionCellsIntact(previous))
-			discardRootTransition(owner);
-		return false;
+/** Publish a hook-map memo entry, keeping the committed one for a dropped render. */
+function setMemoEntry(scope: Scope, slot: HookSlot, entry: unknown): void {
+	const hooks = ensureHooks(scope);
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		(ROOT_RENDER_TRANSACTION!.memos ??= []).push(hooks, slot, hooks.get(slot));
+	hooks.set(slot, entry);
+}
+
+/** The compiled inline-memo ABI publishes `length` cells from `base` (see Transition holds). */
+function transitionMemoCells(cells: any[], base: number, length: number): void {
+	(ROOT_RENDER_TRANSACTION!.memos ??= []).push(cells, base, cells.slice(base, base + length));
+}
+
+/**
+ * A retry publishes the inline memo cells its dropped round computed again,
+ * oldest first, wherever no later render replaced the restored values: the
+ * compiled cache check computes before it publishes, so these cells cannot be
+ * adopted on a miss the way hook-map entries are.
+ */
+function reapplyTransitionMemoCells(): void {
+	const harvest = TRANSITION_CELL_HARVEST!;
+	TRANSITION_CELL_HARVEST = null;
+	for (let i = harvest.length - 4; i >= 0; i -= 4) {
+		const cells = harvest[i] as any[];
+		const base = harvest[i + 1] as number;
+		const published = harvest[i + 2] as any[];
+		const restored = harvest[i + 3] as any[];
+		let unchanged = true;
+		for (let j = 0; unchanged && j < restored.length; j++)
+			unchanged = Object.is(cells[base + j], restored[j]);
+		if (unchanged) for (let j = 0; j < published.length; j++) cells[base + j] = published[j];
 	}
-	const continuing = previous?.promoted === true;
-	const origin = continuing ? previous.origin : attempt.origin;
-	if (origin.idState.renderOwner !== owner || !blockIsAncestor(attempt.origin, origin))
-		return false;
-	const entries = takeSingleOriginTransitionUpdates(origin);
-	if (entries.length === 0) {
-		if (previous !== undefined && !rootTransitionCellsIntact(previous))
-			discardRootTransition(owner);
-		return false;
-	}
-	rollbackRootRender(transaction);
-	if (owner.disposed || origin.disposed) {
-		discardRootTransition(owner);
-		return true;
-	}
-	let memoSwaps = attempt.memoSwaps;
-	if (continuing) {
-		if (previous.memoSwaps !== null) {
-			memoSwaps = memoSwaps === null ? previous.memoSwaps : previous.memoSwaps.concat(memoSwaps);
+}
+
+/** Restore the memo entries and cells a transaction replaced, newest first. */
+function restoreTransitionMemos(transaction: RootRenderTransaction, harvest: boolean): void {
+	const memos = transaction.memos;
+	if (memos === null) return;
+	transaction.memos = null;
+	for (let i = memos.length - 3; i >= 0; i -= 3) {
+		const target = memos[i];
+		const key = memos[i + 1];
+		const previous = memos[i + 2];
+		if (Array.isArray(target)) {
+			if (harvest)
+				(TRANSITION_CELL_HARVEST ??= []).push(
+					target,
+					key,
+					target.slice(key, key + previous.length),
+					previous,
+				);
+			for (let j = 0; j < previous.length; j++) target[key + j] = previous[j];
+			continue;
 		}
-	} else if (memoSwaps !== null) {
-		for (let i = memoSwaps.length - 1; i >= 0; i--) applyTransitionMemoSwap(memoSwaps[i], false);
+		const published = target.get(key) as MemoHookEntry | undefined;
+		if (harvest && published !== undefined && published.deps !== undefined) {
+			const harvested: WarmHarvestEntry = {
+				slot: key,
+				deps: published.deps,
+				value: published.value,
+				taken: false,
+				owner: transaction.owner,
+			};
+			if (published.nativeWitness !== undefined) harvested.nativeWitness = published.nativeWitness;
+			(TRANSITION_HARVEST ??= []).push(harvested);
+			WARM_EVER = true;
+		}
+		if (previous === undefined) target.delete(key);
+		else target.set(key, previous);
 	}
-	for (let i = 0; i < entries.length; i++) entries[i].slot.value = entries[i].baseValue;
-	owner.transition = {
-		origin,
-		entries,
-		memoSwaps,
-		warmHarvest: harvestTransitionWarmValues(origin, continuing ? previous.warmHarvest : null),
-		promoted: false,
-		cue: !continuing,
-	};
-	for (const entry of entries) {
-		if (entry.batch !== undefined) holdTransitionHookBatch(owner, entry.batch);
-	}
-	if (previous === undefined || previous.promoted) tickTransitionCount(+1);
-	// Keep owner.transaction aborted until commitRootRenders finishes this wave.
-	// Earlier queued siblings still belong to the discarded attempt, not the cue.
+}
+
+/** The batch a transition update's batch entangled into (entangleTransitionBatches). */
+function rootTransitionBatch(batch: TransitionActionBatch): TransitionActionBatch {
+	while (batch.merged !== null) batch = batch.merged;
+	return batch;
+}
+
+/**
+ * Two batches that update one hook cell commit together, as React entangles
+ * transitions that share an update queue: `from` folds, holds and schedules as
+ * part of `into`, and its hooks stay pending until `into` finishes.
+ */
+function entangleTransitionBatches(into: TransitionActionBatch, from: TransitionActionBatch): void {
+	from.merged = into;
+	(into.members ??= []).push(from);
+	if (!from.flushed) into.waiting++;
+	for (const block of from.blocks) noteTransitionBlock(into, block);
+}
+
+/**
+ * Whether a render folds a queued transition update (see foldHookQueue). A
+ * transaction that folds it holds its batch if a hold drops that transaction.
+ */
+function foldTransitionUpdate(
+	batch: TransitionActionBatch,
+	transition: boolean,
+	transaction: RootRenderTransaction | null,
+): boolean {
+	if (
+		!transitionBatchReady(batch) ||
+		(!transition &&
+			CUE_RENDERS.length !== 0 &&
+			CUE_RENDERS[CUE_RENDERS.length - 1] === CURRENT_BLOCK)
+	)
+		return false;
+	if (transaction !== null) noteTransitionBatch(transaction, rootTransitionBatch(batch));
 	return true;
 }
 
-function retryRootTransition(owner: RootRenderOwner): boolean {
-	const held = owner.transition;
-	if (held === undefined) return false;
-	if (held.origin.disposed || !rootTransitionCellsIntact(held)) {
-		discardRootTransition(owner);
-		return false;
+/**
+ * A transition update joined `cell`'s queue (enqueueHookUpdate). Every batch
+ * with an update in one queue commits as one (entangleTransitionBatches), and
+ * the batch renders `block` when it is ready.
+ */
+function queueTransitionUpdate(
+	cell: QueuedCell,
+	batch: TransitionActionBatch,
+	block: Block,
+	type: 'state' | 'reducer',
+	slot: HookSlot,
+): void {
+	let into = rootTransitionBatch(batch);
+	for (let update: HookUpdate | null = cell.queue; update !== null; update = update.next) {
+		if (update.batch === null) continue;
+		const earlier = rootTransitionBatch(update.batch);
+		if (earlier === into) continue;
+		entangleTransitionBatches(earlier, into);
+		into = earlier;
 	}
-	// The Action's flush schedules the next complete state. Consuming an older
-	// wakeup must not publish the earlier held value or abandon its ownership.
-	if (heldTransitionHasPendingAction(held.entries)) return true;
-	held.promoted = true;
-	held.cue = false;
-	if (held.memoSwaps !== null) {
-		for (let i = 0; i < held.memoSwaps.length; i++)
-			applyTransitionMemoSwap(held.memoSwaps[i], true);
+	noteTransitionBlock(into, block);
+	// A transition reports its cause when its work renders (scheduleTransitionBatch).
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		(into.profile ??= []).push(cell, block, type, slot);
+}
+
+/** A transaction that folds a batch's updates holds the batch if it is dropped. */
+function noteTransitionBatch(
+	transaction: RootRenderTransaction,
+	batch: TransitionActionBatch,
+): void {
+	batch.origin = TRANSITION_ORIGIN;
+	if (batch.stamp === transaction.createdStamp) return;
+	batch.stamp = transaction.createdStamp;
+	(transaction.batches ??= []).push(batch);
+}
+
+/**
+ * Drop a transaction whose transition render suspended into a hold (see
+ * Transition holds). Returns false when there is nothing to hold: no hook work
+ * was folded, or every holder already stopped holding, and the transaction
+ * then commits as before, with any boundary holding on its own.
+ */
+function dropTransitionRender(transaction: RootRenderTransaction): boolean {
+	const holders = transaction.holders!;
+	transaction.holders = null;
+	// A drained origin holds the batches its own render folded; other
+	// transitions in the drain render again and can still commit.
+	const origin = TRANSITION_ORIGIN;
+	const batches =
+		origin === null
+			? transaction.batches
+			: (transaction.batches?.filter((batch) => batch.origin === origin) ?? null);
+	if (batches === null || batches.length === 0 || transaction.owner.disposed) return false;
+	let live = false;
+	for (const holder of holders)
+		if ((holder as TrySlot).__kind !== 'trySlotSlot' || (holder as TrySlot).transitionHeld)
+			live = true;
+	if (!live) return false;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.ROLLBACK_TRANSITION);
+	const owner = transaction.owner;
+	if (TRANSITION_HARVEST !== null)
+		for (let i = 0; i < TRANSITION_HARVEST.length; i++) TRANSITION_HARVEST[i].taken = false;
+	restoreTransitionMemos(transaction, true);
+	if (!transaction.aborted) rollbackRootRender(transaction);
+	// Later origins in this drain render, and commit, in a transaction of their own.
+	if (owner.transaction === transaction) owner.transaction = null;
+	let first = false;
+	for (const batch of batches) {
+		if (!batch.held) first = batch.held = true;
 	}
+	// The scheduled Blocks this drain rendered in the dropped transaction.
+	for (let i = 0, end = QUEUE.length; i < end; i++) {
+		const origin = QUEUE[i];
+		if (origin.drainStamp !== DRAIN_ID || origin.disposed || origin.idState.renderOwner !== owner)
+			continue;
+		harvestTransitionWarmValues(origin);
+		if (first || origin.currentRenderMode === 'urgent') scheduleRender(origin);
+	}
+	for (const holder of holders) {
+		if ((holder as TrySlot).__kind === 'trySlotSlot') {
+			if (!(holder as TrySlot).transitionHeld) continue;
+		} else if (TRANSITION_HOLDERS?.has(holder) !== true) tickTransitionCount(+1);
+		for (const batch of batches) holdTransitionBatch(holder, batch);
+	}
+	return true;
+}
+
+/**
+ * Render the work `holder` held at transition priority, publishing its falling
+ * edge with it: a render that suspends again holds it again. A root also
+ * retries its latest request, which the held state may sit below. Returns
+ * whether `holder` held anything.
+ */
+function retryTransitionHolder(holder: TrySlot | RootRenderOwner): boolean {
+	if (TRANSITION_HOLDERS?.has(holder) !== true) return false;
+	if ((holder as TrySlot).__kind === 'trySlotSlot') return releaseTransitionHookHolder(holder);
+	tickTransitionCount(-1);
+	releaseTransitionHookHolder(holder);
 	TRANSITION_DEPTH++;
 	try {
-		// Publish the falling edge in the same render as the promoted data. If
-		// that render suspends again, holdRootTransition reacquires the count
-		// and its journal restores the already-visible pending cue.
-		tickTransitionCount(-1);
-		releaseTransitionHookHolder(owner);
-		for (let i = 0; i < held.entries.length; i++) {
-			const entry = held.entries[i];
-			entry.slot.value = entry.value;
-			if (!entry.block.disposed) scheduleRender(entry.block);
-		}
-		FLUSHED_TRANSITION_UPDATES.push(held.entries);
-		// The original state origin may be below a pending public root request.
-		// Retry the owner's latest props as well as promoting its staged cells.
-		owner.retry();
+		(holder as RootRenderOwner).retry();
 	} finally {
 		TRANSITION_DEPTH--;
 	}
 	return true;
 }
 
-function commitRootTransition(owner: RootRenderOwner, transaction: RootRenderTransaction): void {
-	const held = owner.transition;
-	if (held === undefined) return;
-	if (owner.disposed || held.origin.disposed) {
-		discardRootTransition(owner);
-		return;
+/**
+ * A new update can unblock a held transition (React's markRootUpdated). Render
+ * it again in the transition task, after the update commits on its own. A
+ * boundary keeps isPending until it commits that work.
+ */
+function wakeHeldTransitions(block: Block): void {
+	const owner = block.idState.renderOwner;
+	for (const holder of TRANSITION_HOLDERS!.keys()) {
+		if (
+			(holder as TrySlot).__kind === 'trySlotSlot'
+				? (holder as TrySlot).parentBlock.idState.renderOwner === owner
+				: holder === owner
+		)
+			(WOKEN_TRANSITION_HOLDERS ??= new Set()).add(holder);
 	}
-	if (transaction.aborted) {
-		if (held.cue && owner.transaction === null) {
-			held.cue = false;
-			scheduleRender(held.origin);
-		}
-		return;
-	}
-	// A cue or an independent update to the retained screen has old driving
-	// cells and must not cancel the still-pending root request or its wakeup.
-	if (held.promoted || !rootTransitionCellsIntact(held)) discardRootTransition(owner);
+	if (WOKEN_TRANSITION_HOLDERS !== null) scheduleTransitionTask();
 }
 
-function discardRootTransition(owner: RootRenderOwner): void {
-	const held = owner.transition;
-	if (held === undefined) return;
-	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileCount(ProfileCounter.ROLLBACK_TRANSITION);
-	owner.transition = undefined;
-	owner.wakeable = null;
-	owner.generation++;
-	if (!held.promoted) tickTransitionCount(-1);
-	releaseTransitionHookHolder(owner);
+/** The transition task renders the work held back while urgent work committed. */
+function retryWokenTransitions(): void {
+	const woken = WOKEN_TRANSITION_HOLDERS;
+	WOKEN_TRANSITION_HOLDERS = null;
+	if (woken !== null) {
+		for (const holder of woken) {
+			if ((holder as TrySlot).__kind === 'trySlotSlot') unsuspendTransitionHolder(holder);
+			else retryTransitionHolder(holder as RootRenderOwner);
+		}
+	}
+	const retried = RETRIED_TRANSITION_BATCHES;
+	RETRIED_TRANSITION_BATCHES = null;
+	if (retried !== null) {
+		for (let i = 0; i < retried.length; i += 3)
+			retryTransitionBatch(
+				retried[i] as TransitionActionBatch,
+				retried[i + 1] as boolean,
+				retried[i + 2] as boolean,
+			);
+	}
+}
+
+/** Whether a boundary holds transition work that the render in progress did not fold. */
+function holdsUnrenderedTransition(state: TrySlot): boolean {
+	const hold = TRANSITION_HOLDERS?.get(state);
+	if (hold === undefined) return false;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	for (const batch of hold.batches)
+		if (transaction === null || batch.stamp !== transaction.createdStamp) return true;
+	return false;
+}
+
+/** A replaced or unmounted root abandons what it held. */
+function discardHeldRoot(owner: RootRenderOwner): void {
+	if (TRANSITION_HOLDERS?.has(owner) !== true) return;
+	tickTransitionCount(-1);
+	releaseTransitionHookHolder(owner, false);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4307,11 +3968,10 @@ function discardRootTransition(owner: RootRenderOwner): void {
 // rollback, only a boundary that never split.
 //
 // An explicit boundary replays its own checkpoint; writes outside that window
-// remain unless a P1 transition attempt also holds its staged driving cells.
-// If no boundary owns the suspension, the root instead replays its whole queued
-// render wave. A single-origin staged transition then renders its pending cue
-// with the old inputs, after the aborted wave has drained. These change-local
-// journals preserve committed output and lifecycle; they are not a separate
+// remain unless the render folded queued hook work, which drops the whole root
+// transaction (Transition holds). If no boundary owns the suspension, the root
+// instead replays its whole queued render wave. These change-local journals
+// preserve committed output and lifecycle; they are not a separate
 // render/commit phase for every eager native host mutation.
 //
 // Compiled bindings guard on a cached copy of the last value (`if (_b.d !== _v)`)
@@ -4545,8 +4205,6 @@ interface RootRenderOwner {
 	/** Only roots participating in a native candidate retain cancellation ownership. */
 	nativeTransitions?: Set<TransitionActionBatch>;
 	transaction: RootRenderTransaction | null;
-	/** Installed only when a single-origin transition suspends at this root. */
-	transition?: RootTransitionHold;
 	disposed: boolean;
 }
 
@@ -4565,6 +4223,14 @@ interface RootRenderTransaction {
 	/** Commit ops, `(fn, target)` pairs run in render order (runCommitOps). */
 	ops: any[];
 	parked: ParkedItem[] | null;
+	/** Hook-cell folds published at commit, five slots each (foldHookQueue). */
+	cells: any[] | null;
+	/** Transition batches folded into this transaction (noteTransitionBatch). */
+	batches: TransitionActionBatch[] | null;
+	/** Boundaries or the root that held a transition render; it drops at the origin's end. */
+	holders: Array<TrySlot | RootRenderOwner> | null;
+	/** Memo entries and cells transition renders replaced, three slots each (setMemoEntry). */
+	memos: any[] | null;
 	aborted: boolean;
 	rootRequest: boolean;
 	hydrating?: boolean;
@@ -4653,6 +4319,10 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			commit: null,
 			ops: [],
 			parked: null,
+			cells: null,
+			batches: null,
+			holders: null,
+			memos: null,
 			aborted: false,
 			rootRequest: false,
 		};
@@ -5096,6 +4766,8 @@ function preserveRootCreatedDom(block: Block): void {
 function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
+	// Its hook-cell folds never publish: their updates stay queued.
+	transaction.cells = null;
 	if (
 		transaction.owner.retrySignalOwners !== undefined &&
 		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
@@ -5220,9 +4892,11 @@ function commitRootRenders(): void {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileRootEnter(transaction, owner);
 		try {
+			// A hold reached outside a drained origin (dropTransitionRender).
+			if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
+				TRANSITION_ROOT_DRIVER.drop(transaction);
 			if (transaction.aborted || owner.disposed) {
 				if (owner.transaction === transaction) owner.transaction = null;
-				if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 				continue;
 			}
 			// This is the native acceptance point. Validate before any deletion,
@@ -5253,10 +4927,8 @@ function commitRootRenders(): void {
 				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
 				STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
 			}
-			if (
-				transaction.rootRequest &&
-				(owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.keepsRoot(owner))
-			) {
+			// The root request committed, unless a held transition keeps it waiting.
+			if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
 				owner.wakeable = null;
 				owner.generation++;
 			}
@@ -5268,6 +4940,13 @@ function commitRootRenders(): void {
 				if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
 			}
 			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
+			if (transaction.cells !== null) commitHookCells(transaction.cells);
+			// Values dropped rounds created were for work that has now committed.
+			if (
+				transaction.batches !== null &&
+				(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
+			)
+				TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
 			const acceptedGeneration = owner.generation;
 			// Irreversible deletions precede the incoming ref/layout publication.
 			if (transaction.ops.length !== 0) runCommitOps(transaction.ops);
@@ -5308,9 +4987,6 @@ function commitRootRenders(): void {
 				)
 					driver.retireDetachedBindingLeases(owner);
 			}
-			// Outgoing cleanup may have removed the state origin of a held root
-			// transition. Inspect its lifetime after those deletions have completed.
-			if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 		} finally {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileRootExit();
@@ -5319,40 +4995,34 @@ function commitRootRenders(): void {
 	}
 }
 
-function suspendRootRender(
-	block: Block,
-	wakeable: PromiseLike<unknown>,
-	attempt: TransitionAttempt | null,
-): boolean {
+function suspendRootRender(block: Block, wakeable: PromiseLike<unknown>): boolean {
 	const owner = block.idState.renderOwner;
 	if (owner === undefined || owner.disposed) return false;
 	const transaction = owner.transaction;
 	if (transaction === null) return false;
-	if (!TRANSITION_ROOT_DRIVER || !TRANSITION_ROOT_DRIVER.holdRoot(owner, transaction, attempt)) {
-		if (WARM_EVER && transaction.created !== null) {
-			// Only fresh subtrees are destroyed by this rollback. Their warm
-			// occurrences remain owned by the root's continuing retry token.
-			for (const created of transaction.created) {
-				if (
-					created.parentBlock === null ||
-					!isCreatedInRootRender(transaction, created.parentBlock)
-				)
-					retainDiscardedWarmMemos(created);
-			}
+	// A transition render holds its batches at the root; the origin's end drops it.
+	if (block.currentRenderMode === 'transition' && transaction.batches !== null)
+		(transaction.holders ??= []).push(owner);
+	if (WARM_EVER && transaction.created !== null) {
+		// Only fresh subtrees are destroyed by this rollback. Their warm
+		// occurrences remain owned by the root's continuing retry token.
+		for (const created of transaction.created) {
+			if (created.parentBlock === null || !isCreatedInRootRender(transaction, created.parentBlock))
+				retainDiscardedWarmMemos(created);
 		}
-		const previousRetainedOwners = RETAINED_SIGNAL_OWNERS;
-		const rootBlock = owner.current;
-		if (rootBlock !== null && transaction.created !== null && owner.signalOwner !== undefined) {
-			for (const created of transaction.created) {
-				if (!created.disposed) retainSignalRetryScope(created, rootBlock, owner);
-			}
-			RETAINED_SIGNAL_OWNERS = owner.retrySignalOwners;
+	}
+	const previousRetainedOwners = RETAINED_SIGNAL_OWNERS;
+	const rootBlock = owner.current;
+	if (rootBlock !== null && transaction.created !== null && owner.signalOwner !== undefined) {
+		for (const created of transaction.created) {
+			if (!created.disposed) retainSignalRetryScope(created, rootBlock, owner);
 		}
-		try {
-			rollbackRootRender(transaction);
-		} finally {
-			RETAINED_SIGNAL_OWNERS = previousRetainedOwners;
-		}
+		RETAINED_SIGNAL_OWNERS = owner.retrySignalOwners;
+	}
+	try {
+		rollbackRootRender(transaction);
+	} finally {
+		RETAINED_SIGNAL_OWNERS = previousRetainedOwners;
 	}
 	owner.wakeable = wakeable;
 	const generation = ++owner.generation;
@@ -5365,8 +5035,7 @@ function suspendRootRender(
 		queueMicrotask(() => {
 			if (owner.disposed || owner.generation !== generation || owner.wakeable !== wakeable) return;
 			owner.wakeable = null;
-			if (owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.retryRoot(owner))
-				owner.retry();
+			if (!TRANSITION_ROOT_DRIVER || !TRANSITION_ROOT_DRIVER.retry(owner)) owner.retry();
 		});
 	};
 	resumeOnSettle(wakeable, ping);
@@ -7576,18 +7245,10 @@ function queueAllTransition(): boolean {
 	if (!cue || work || NATIVE_TRANSITION_DRIVER?.hasWork() === true) return true;
 	// The separate task queue can hold sibling work while this cue drains.
 	// Only receipts belonging to this drain make the cue share a capture.
-	for (const entries of FLUSHED_TRANSITION_UPDATES) {
-		for (const entry of entries) {
-			if (
-				!entry.superseded &&
-				!entry.block.disposed &&
-				entry.block.pending &&
-				QUEUE.includes(entry.block) &&
-				(entry.state !== undefined || entry.reducer !== undefined
-					? entry.slot.renderTransition === entry
-					: !Object.is(entry.slot.value, entry.baseValue))
-			)
-				return true;
+	for (const batch of FLUSHED_TRANSITION_BATCHES) {
+		if (!transitionBatchReady(batch)) continue;
+		for (const block of batch.blocks) {
+			if (!block.disposed && block.pending && QUEUE.includes(block)) return true;
 		}
 	}
 	return false;
@@ -8346,13 +8007,10 @@ function scheduleRender(
  * priority (markTransitionCue).
  */
 function queueTransitionBlock(block: Block, cue?: boolean): boolean {
-	// The block is not queued, so a render consumed every update retained for it.
-	// Those values are committed: a later cue must not expose their bases.
-	if (FLUSHED_TRANSITION_UPDATES.length !== 0 && CURRENT_BLOCK !== block) {
-		for (const entries of FLUSHED_TRANSITION_UPDATES) {
-			for (const entry of entries) if (entry.block === block) entry.rendered = true;
-		}
-	}
+	// The block is not queued, so a render consumed the work of every batch
+	// flushed so far (hasQueuedTransitionCells).
+	if (FLUSHED_TRANSITION_BATCHES.length !== 0 && CURRENT_BLOCK !== block)
+		(CONSUMED_TRANSITION_BLOCKS ??= new Map()).set(block, FLUSHED_TRANSITION_BATCHES.length);
 	if (syncFlush || inFlush || CURRENT_BLOCK !== null || cue || TRANSITION_TASK_ACTIVE) return false;
 	TRANSITION_QUEUE.push(block);
 	scheduleTransitionTask();
@@ -8406,11 +8064,11 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
  * Whether a queued block renders only its pending cue now, at urgent priority,
  * apart from any transition work. A pure cue (TRANSITION_CUES) has no transition
  * work of its own. A cue whose block also has transition work waiting in the
- * task queue (upgradeTransitionBlock) renders alone when that work holds staged
- * cells it can show at their committed values. A Suspense or Activity boundary
- * that owns the render, or a pending root request, keeps the combined render at
- * transition priority, as does work without staged cells. View Transition
- * routing asks this too, since a split cue is urgent work.
+ * task queue (upgradeTransitionBlock) renders alone when that work is queued
+ * hook updates, which the cue's urgent render leaves queued. A Suspense or
+ * Activity boundary that owns the render, or a pending root request, keeps the
+ * combined render at transition priority, as does work that is not hook state.
+ * View Transition routing asks this too, since a split cue is urgent work.
  */
 function splitsTransitionCue(block: Block): boolean {
 	if (syncFlush || TRANSITION_TASK_ACTIVE || block.pendingMode !== 'transition') return false;
@@ -8420,7 +8078,7 @@ function splitsTransitionCue(block: Block): boolean {
 		(TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH || TRANSITION_CUES.indexOf(block) === -1)
 	)
 		return false;
-	// A pure cue that gained staged cells from transition work scheduled in this
+	// A pure cue that gained queued hook work from a transition scheduled in this
 	// flush renders that work with it.
 	if (hasQueuedTransitionCells(block) !== waiting) return false;
 	const owner = block.idState.renderOwner;
@@ -8482,36 +8140,32 @@ function keepTransitionPending(block: Block): void {
 	block.pendingMode = 'transition';
 }
 
-/** Staged cells of this block's flushed transitions that no render has consumed yet. */
+/** Whether a ready batch flushed since this block's last render queued hook work for it. */
 function hasQueuedTransitionCells(block: Block): boolean {
-	for (const entries of FLUSHED_TRANSITION_UPDATES) {
-		for (const update of entries) {
-			if (update.block !== block || update.superseded || update.rendered) continue;
-			const cell = update.state ?? update.reducer;
-			if (cell === undefined || cell.renderTransition !== undefined) return true;
-		}
+	const batches = FLUSHED_TRANSITION_BATCHES;
+	for (let i = CONSUMED_TRANSITION_BLOCKS?.get(block) ?? 0; i < batches.length; i++) {
+		if (batches[i].blocks.indexOf(block) !== -1 && transitionBatchReady(batches[i])) return true;
 	}
 	return false;
 }
 
 /**
- * Render a split pending cue (splitTransitionCue) over the block's committed
- * cells, as an urgent ancestor renders a child whose transition is queued, then
- * leave the block pending at transition priority for the task. React likewise
- * renders `isPending` in an urgent lane and the transition's own updates later.
+ * Render a split pending cue (splitTransitionCue) at urgent priority, which
+ * folds only the block's urgent updates, as an urgent ancestor renders a child
+ * whose transition is queued, then leave the block pending at transition
+ * priority for the task. React likewise renders `isPending` in an urgent lane
+ * and the transition's own updates later.
  */
 function renderTransitionCue(block: Block): void {
-	const render: UrgentTransitionRender = {
-		pendingDeferred: block.pendingDeferred,
-		queueEpoch: QUEUE_REINDEX_EPOCH,
-		cells: [],
-	};
+	const pendingDeferred = block.pendingDeferred;
+	const queueEpoch = QUEUE_REINDEX_EPOCH;
 	block.pendingDeferred = false;
-	beginUrgentTransitionRender(block, render);
+	CUE_RENDERS.push(block);
 	try {
 		renderBlock(block);
 	} finally {
-		endUrgentTransitionRender(block, render);
+		CUE_RENDERS.pop();
+		keepTransitionWork(block, pendingDeferred, queueEpoch);
 	}
 }
 
@@ -8522,6 +8176,7 @@ function scheduleTransitionTask(): void {
 		if (transitionTask !== id) return;
 		TRANSITION_TASK_ACTIVE = true;
 		try {
+			if (WOKEN_TRANSITION_HOLDERS || RETRIED_TRANSITION_BATCHES) retryWokenTransitions();
 			adoptTransitionQueue(true);
 			flush();
 		} finally {
@@ -8547,6 +8202,8 @@ function adoptTransitionQueue(drain?: boolean): void {
 		if (drain === true) TRANSITION_ROOT_DRIVER!.armFalls();
 		else scheduleTransitionTask();
 	}
+	// Woken holds retry in a task of their own, after this drain's commit.
+	if (WOKEN_TRANSITION_HOLDERS || RETRIED_TRANSITION_BATCHES) scheduleTransitionTask();
 }
 
 /**
@@ -8641,14 +8298,11 @@ function cancelTransitionFall(batch: TransitionActionBatch): void {
 function raiseTransitionHook(hook: TransitionHookSlot): void {
 	if (!hook.tentative) return;
 	// A queued render reads the raised value. A render that already showed the
-	// falling edge renders the cue again once it leaves the stack, unless the
-	// attempt rendering it unwinds it instead (endTransitionAttempt).
-	const attempt = ACTIVE_TRANSITION_ATTEMPT;
+	// falling edge renders the cue again.
 	if (hook.block.pending) {
 		hook.tentative = false;
 		hook.isPending = true;
-	} else if (attempt !== null) (attempt.raised ??= []).push(hook);
-	else hook.publish(true);
+	} else hook.publish(true);
 }
 
 /**
@@ -8960,7 +8614,6 @@ function drainQueue(): { err: any } | null {
 			} else hiddenActivity = visibilityOwner;
 		}
 		const rootFrame = beginRootRender(block.idState.renderOwner);
-		let attempt: TransitionAttempt | null = null;
 		try {
 			// A first render scheduled by startTransition runs after makeRoot's
 			// construction window. Its hooks and partial DOM still belong to this
@@ -9000,34 +8653,30 @@ function drainQueue(): { err: any } | null {
 				SCHEDULED_VISIBILITY_DRIVER!.retryActivity!(hiddenActivity, true);
 				continue;
 			}
-			// A render can start the first transition and install the driver. Pair
-			// both hooks with the same captured driver rather than rereading it after
-			// render.
-			const transitionRoot = TRANSITION_ROOT_DRIVER ? TRANSITION_ROOT_DRIVER : null;
-			attempt = transitionRoot === null ? null : transitionRoot.begin(block);
-			try {
-				if (hiddenActivity !== null)
-					SCHEDULED_VISIBILITY_DRIVER!.retryActivity!(hiddenActivity, false, block);
-				else if (visibleTry !== null) SCHEDULED_VISIBILITY_DRIVER!.visible(visibleTry, block);
-				else {
-					const owner = block.idState.renderOwner;
-					if (owner !== undefined && owner.current === block && owner.request !== null) {
-						const request = owner.request;
-						owner.request = null;
-						const mode = block.pendingMode ?? 'urgent';
-						block.pendingMode = null;
-						request(mode);
-					} else render(block);
-				}
-			} finally {
-				if (transitionRoot !== null) transitionRoot.end(attempt);
+			// A hold drops the transaction for the batches this origin folds.
+			if (TRANSITION_ROOT_DRIVER) TRANSITION_ORIGIN = block;
+			if (hiddenActivity !== null)
+				SCHEDULED_VISIBILITY_DRIVER!.retryActivity!(hiddenActivity, false, block);
+			else if (visibleTry !== null) SCHEDULED_VISIBILITY_DRIVER!.visible(visibleTry, block);
+			else {
+				const owner = block.idState.renderOwner;
+				if (owner !== undefined && owner.current === block && owner.request !== null) {
+					const request = owner.request;
+					owner.request = null;
+					const mode = block.pendingMode ?? 'urgent';
+					block.pendingMode = null;
+					request(mode);
+				} else render(block);
 			}
 		} catch (err) {
 			try {
-				handleRenderError(block, err, attempt);
+				handleRenderError(block, err);
 			} catch (unhandled) {
 				const transaction = block.idState.renderOwner?.transaction;
-				if (transaction != null) rollbackRootRender(transaction);
+				if (transaction != null) {
+					rollbackRootRender(transaction);
+					transaction.holders = null;
+				}
 				// No tryBlock claimed this error. Don't let it abandon the rest of
 				// the queue or skip commit — that would strand unrelated roots
 				// batched into the same flush and drop their already-rendered
@@ -9070,6 +8719,12 @@ function drainQueue(): { err: any } | null {
 				}
 			}
 		} finally {
+			// A transition render that suspended into a hold drops its transaction
+			// before the drain settles its completions (dropTransitionRender).
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (TRANSITION_ROOT_DRIVER && transaction !== null && transaction.holders !== null)
+				TRANSITION_ROOT_DRIVER.drop(transaction);
+			TRANSITION_ORIGIN = null;
 			endRootRender(rootFrame);
 			// A descendant render can replace an Activity's direct host root. The
 			// Activity itself did not render, so reapply its visual hide after the
@@ -9114,7 +8769,7 @@ function flush(): void {
 		refDetachQueue.length === 0 &&
 		refAttachQueue.length === 0 &&
 		activeFragments.size === 0 &&
-		FLUSHED_TRANSITION_UPDATES.length === 0 &&
+		FLUSHED_TRANSITION_BATCHES.length === 0 &&
 		!VIEW_TRANSITION_DRIVER
 	) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -9547,11 +9202,9 @@ function flushWork(): void {
 		inFlush = true;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileFlush();
-		// Any retained sync-transition updates belong to the drain below. Whatever
-		// a hold did not consume is finished with once the flush completes, unless
-		// their renders still wait for the transition task: an urgent flush before
-		// it must leave them for that render's hold.
-		const clearRetainedTransitionUpdates = FLUSHED_TRANSITION_UPDATES.length > 0;
+		// Batches flushed so far belong to the drain below, unless their renders
+		// still wait for the transition task (FLUSHED_TRANSITION_BATCHES).
+		const flushedTransitions = FLUSHED_TRANSITION_BATCHES.length > 0;
 		// addTransitionType types belong to the transition batch this drain commits:
 		// an UNWRAPPED drain (no boundary, no startViewTransition, flushSync) that
 		// contains transition work consumes them too — they must not leak into a
@@ -9580,10 +9233,10 @@ function flushWork(): void {
 		} finally {
 			inFlush = false;
 			if (
-				(clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0) &&
+				(flushedTransitions || FLUSHED_TRANSITION_BATCHES.length > 0) &&
 				TRANSITION_QUEUE.length === 0
 			)
-				FLUSHED_TRANSITION_UPDATES.length = 0;
+				clearFlushedTransitions();
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();
 			if (clearViewTransitionTypes) VIEW_TRANSITION_DRIVER!.clearTypes();
@@ -10437,7 +10090,7 @@ export function flushSync<T>(fn: () => T): T {
 			} finally {
 				inFlush = false;
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.endCue();
-				FLUSHED_TRANSITION_UPDATES.length = 0;
+				clearFlushedTransitions();
 				CURRENT_EFFECT_PHASE = effectPhase;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__devtoolsNotifyFlush();
@@ -12769,26 +12422,50 @@ function createBlock(
 	return block;
 }
 
-type RenderPhaseCell = {
-	value: unknown;
-	updates?: unknown[];
-	renderPhaseActions?: unknown[];
-};
+/** A cell before its first render-phase update, restored when that render throws. */
 type RenderPhaseSnapshot = {
 	value: unknown;
-	queue: unknown[] | undefined;
-	key: 'updates' | 'renderPhaseActions';
+	base: unknown;
+	last: HookUpdate | null;
 };
 let renderPhaseOwner: Block | null = null;
-let renderPhaseUpdates: Map<RenderPhaseCell, RenderPhaseSnapshot> | null = null;
+let renderPhaseUpdates: Map<QueuedCell, RenderPhaseSnapshot> | null = null;
 // Advances when an outermost render starts. Only render code runs within one
 // pass, and render code cannot move a live import, so compilerMemoWitness reads
 // each proof once per pass.
 let compilerMemoPass = 0;
 
-function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapshot['key']): void {
+function captureRenderPhaseUpdate(cell: QueuedCell): void {
 	const updates = (renderPhaseUpdates ??= new Map());
-	if (!updates.has(cell)) updates.set(cell, { value: cell.value, queue: cell[key]?.slice(), key });
+	if (!updates.has(cell))
+		updates.set(cell, { value: cell.value, base: cell.base, last: cell.last });
+}
+
+/** The abandoned render's folds of these cells must not publish at commit either. */
+function discardHookFolds(updates: Map<QueuedCell, RenderPhaseSnapshot>): void {
+	const cells = ROOT_RENDER_TRANSACTION?.cells;
+	if (cells === null || cells === undefined) return;
+	let kept = 0;
+	for (let i = 0; i < cells.length; i += 5) {
+		const cell = cells[i] as QueuedCell;
+		if (updates.has(cell)) {
+			cell.stamp = 0;
+			continue;
+		}
+		for (let j = 0; j < 5; j++) cells[kept + j] = cells[i + j];
+		cell.at = kept;
+		kept += 5;
+	}
+	cells.length = kept;
+}
+
+function restoreRenderPhaseUpdate(cell: QueuedCell, snapshot: RenderPhaseSnapshot): void {
+	cell.value = snapshot.value;
+	cell.base = snapshot.base;
+	const last = snapshot.last;
+	if (last === null) cell.queue = null;
+	else last.next = null;
+	cell.last = last;
 }
 
 export function renderBlock(block: Block): void {
@@ -12860,7 +12537,7 @@ export function renderBlock(block: Block): void {
 			clearSignalRetryOwners(block.rare.trySlot);
 		// Completed descendants still belong to their enclosing render attempt.
 		// A nested independent root commits separately and does not transfer state.
-		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
+		const updates = renderPhaseUpdates as Map<QueuedCell, RenderPhaseSnapshot> | null;
 		if (updates !== null && previousOwner !== null && blockIsAncestorOf(previousOwner, block)) {
 			previousUpdates ??= new Map();
 			for (const [cell, snapshot] of updates) {
@@ -12871,12 +12548,10 @@ export function renderBlock(block: Block): void {
 		// The innermost block an error unwinds through while hydrating records
 		// whether it was thrown while adopting server DOM (HYDRATION_THROWN).
 		if (hydrating && HYDRATION_THROWN !== error) noteHydrationThrow(error, hydration);
-		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
+		const updates = renderPhaseUpdates as Map<QueuedCell, RenderPhaseSnapshot> | null;
 		if (updates !== null) {
-			for (const [cell, snapshot] of updates) {
-				cell.value = snapshot.value;
-				cell[snapshot.key] = snapshot.queue;
-			}
+			for (const [cell, snapshot] of updates) restoreRenderPhaseUpdate(cell, snapshot);
+			discardHookFolds(updates);
 			if (!block.crossRenderUpdate) block.pending = false;
 		}
 		// Prune before a discarded item retains this attempt's owners.
@@ -12944,74 +12619,20 @@ function recordCapturedRender(capture: OffscreenCapture, block: Block): void {
 	}
 }
 
-interface UrgentTransitionRender {
-	pendingDeferred: boolean;
-	queueEpoch: number;
-	cells: Array<{
-		update: TransitionActionUpdate<any>;
-		baseValue: unknown;
-		value: unknown;
-		hook: ReturnType<typeof beginUrgentTransitionCell> | undefined;
-	}>;
-}
-
-/** Expose committed cells while an urgent ancestor traverses queued transition work. */
-function beginUrgentTransitionRender(block: Block, render: UrgentTransitionRender): void {
-	const cells = render.cells;
-	for (const entries of FLUSHED_TRANSITION_UPDATES) {
-		for (const update of entries) {
-			if (update.block !== block || update.superseded || update.rendered) continue;
-			// A block has few staged cells, so a scan beats allocating a slot index.
-			let previous = 0;
-			while (previous < cells.length && cells[previous].update.slot !== update.slot) previous++;
-			if (previous < cells.length) {
-				// State/reducer entries retain their preceding operation chain. Plain
-				// deferred cells still need the earliest committed value below.
-				cells[previous].update = update;
-			} else {
-				cells.push({
-					update,
-					baseValue: update.baseValue,
-					value: update.slot.value,
-					hook: undefined,
-				});
-			}
-		}
-	}
-	for (const cell of render.cells) {
-		const hook = beginUrgentTransitionCell(cell.update);
-		// A render already consumed this hook queue, so its value is committed.
-		if (hook === null && (cell.update.state !== undefined || cell.update.reducer !== undefined))
-			continue;
-		cell.hook = hook;
-		if (hook === null) cell.update.slot.value = cell.baseValue;
-	}
-}
-
-/** Leave the queued transition intact unless urgent work superseded it. */
-function endUrgentTransitionRender(block: Block, render: UrgentTransitionRender): void {
-	for (let i = render.cells.length - 1; i >= 0; i--) {
-		const cell = render.cells[i];
-		if (cell.hook === undefined) continue;
-		if (cell.hook !== null) endUrgentTransitionCell(cell.hook);
-		else if (
-			!block.disposed &&
-			!cell.update.superseded &&
-			Object.is(cell.update.slot.value, cell.baseValue)
-		)
-			cell.update.slot.value = cell.value;
-	}
+/**
+ * An urgent render folds only urgent hook updates, so a Block whose transition
+ * work waits keeps that work queued through it: an urgent ancestor rendering the
+ * Block, or its split pending cue. Leave the Block pending at transition priority.
+ */
+function keepTransitionWork(block: Block, pendingDeferred: boolean, queueEpoch: number): void {
 	if (block.disposed || (block.pending && block.pendingMode === 'urgent')) return;
-	let live = render.cells.length === 0;
-	for (let i = 0; !live && i < render.cells.length; i++) live = !render.cells[i].update.superseded;
-	if (!live) return;
 	block.pending = true;
 	block.pendingMode = 'transition';
-	block.pendingDeferred = render.pendingDeferred;
+	block.pendingDeferred = pendingDeferred;
 	// A nested flush can consume/reindex the queue while this urgent body runs.
 	// Its old queue position is otherwise retained, so ordinary cascades need no
 	// membership scan or extra queue entry.
-	if (render.queueEpoch !== QUEUE_REINDEX_EPOCH && !QUEUE.includes(block)) QUEUE.push(block);
+	if (queueEpoch !== QUEUE_REINDEX_EPOCH && !QUEUE.includes(block)) QUEUE.push(block);
 	// This render published the pending cue of a block whose transition waits for
 	// the task, so the block's own queue entry in this drain need not render it again.
 	if (TRANSITION_QUEUE.length !== 0 && TRANSITION_QUEUE.indexOf(block) !== -1) {
@@ -13064,10 +12685,10 @@ function renderBlockInner(block: Block): true | undefined {
 	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
 	CURRENT_EFFECT_REACHED = 0;
 	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
-	// An urgent ancestor must observe this child's committed cells, even when
-	// the child already queued a transition. Preserve that queue entry so its
-	// later owned pass gets the transition's boundary journal and reveal policy.
-	const urgentTransitionDriver =
+	// An urgent ancestor renders this child's urgent updates only, even when the
+	// child already queued a transition. Preserve that queue entry so its later
+	// owned pass gets the transition's boundary journal and reveal policy.
+	const keepsTransition =
 		TRANSITION_ROOT_DRIVER &&
 		block.pending &&
 		block.pendingMode === 'transition' &&
@@ -13075,10 +12696,8 @@ function renderBlockInner(block: Block): true | undefined {
 		prevBlock!.currentRenderMode === 'urgent'
 			? TRANSITION_ROOT_DRIVER
 			: null;
-	const urgentTransitionRender: UrgentTransitionRender | null =
-		urgentTransitionDriver === null
-			? null
-			: { pendingDeferred: block.pendingDeferred, queueEpoch: QUEUE_REINDEX_EPOCH, cells: [] };
+	const keptDeferred = block.pendingDeferred;
+	const keptEpoch = QUEUE_REINDEX_EPOCH;
 	if (!continuesParentTree) {
 		// A true Suspense retry enters from no ambient block and resumes its saved
 		// episode. A synchronously nested independent root has an ambient block but
@@ -13100,7 +12719,7 @@ function renderBlockInner(block: Block): true | undefined {
 	// to the old inputs, and a shifted call would otherwise take another call's
 	// thenable. An urgent pass over a queued transition reads committed cells and
 	// leaves the update queued, so it still replays.
-	const replayUpdate = RESUME_REPLAY && block.pending && urgentTransitionRender === null;
+	const replayUpdate = RESUME_REPLAY && block.pending && keepsTransition === null;
 	if (replayUpdate) RESUME_REPLAY = false;
 	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
 	// gets re-rendered here; a block reached as a descendant of some OTHER queued
@@ -13166,14 +12785,14 @@ function renderBlockInner(block: Block): true | undefined {
 	// if, for, comp slots) called synchronously inside an outer body should
 	// run at the outer body's priority so transitions propagate down naturally.
 	block.currentRenderMode =
-		urgentTransitionRender !== null
+		keepsTransition !== null
 			? 'urgent'
 			: (block.pendingMode ?? prevBlock?.currentRenderMode ?? 'urgent');
 	// The deferred bit rides the same channel: explicit when this block was
 	// scheduled with a mode (pendingMode set), otherwise inherited from the
 	// enclosing render so it reaches components mounting inside a deferred pass.
 	block.currentRenderDeferred =
-		urgentTransitionRender !== null
+		keepsTransition !== null
 			? false
 			: block.pendingMode !== null
 				? block.pendingDeferred
@@ -13193,10 +12812,9 @@ function renderBlockInner(block: Block): true | undefined {
 	try {
 		// Setup can throw too, if only by exhausting the native stack. The finally
 		// must still restore this render's state before a caller catches the error.
+		if (keepsTransition !== null) CUE_RENDERS.push(block);
 		if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.beginRender(block);
 		NATIVE_BLOCK_RETRIES?.get(block)?.clear();
-		if (urgentTransitionRender !== null)
-			urgentTransitionDriver!.beginUrgent(block, urgentTransitionRender);
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
 			block,
@@ -13299,8 +12917,10 @@ function renderBlockInner(block: Block): true | undefined {
 			if (NATIVE_READ_DRIVER)
 				NATIVE_READ_DRIVER.endRender(block, renderCompleted, isSuspenseException(profileThrown));
 		} finally {
-			if (urgentTransitionRender !== null)
-				urgentTransitionDriver!.endUrgent(block, urgentTransitionRender);
+			if (keepsTransition !== null) {
+				CUE_RENDERS.pop();
+				keepsTransition.keep(block, keptDeferred, keptEpoch);
+			}
 		}
 	}
 }
@@ -14142,7 +13762,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		owner.generation++;
 		owner.wakeable = null;
 		owner.request = null;
-		if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(owner);
+		if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.discard(owner);
 	}
 	// An installed ViewTransition driver unregisters eagerly (its wrapped flush
 	// also prunes lazily; the disposed stamp above drives exit detection).
@@ -14625,30 +14245,181 @@ export function nativeLocalHook<T>(
 	return cell.nativeValue;
 }
 
-interface StateSlot<T> {
+interface StateSlot<T> extends QueuedCell {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
-	/** Queued functional work is evaluated in the owner's next render. */
-	updates: Array<T | ((previous: T) => T)> | undefined;
-	/** Promoted transition work folds with the inputs of the rendering owner. */
-	renderTransition: TransitionActionUpdate<T> | undefined;
-	/** An urgent ancestor reads queued urgent operations without consuming the transition. */
-	urgentTransition: boolean | undefined;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter: (() => T) | undefined;
-	pendingActionBatch: TransitionActionBatch | undefined;
-	pendingActionValue: T | undefined;
 }
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [T, StateSetter<T>, () => T];
+
+type HookReducer = ((state: any, action: any) => any) | null;
+
+function applyHookUpdate(state: unknown, action: unknown, reducer: HookReducer): unknown {
+	return reducer !== null
+		? reducer(state, action)
+		: typeof action === 'function'
+			? (action as (previous: unknown) => unknown)(state)
+			: action;
+}
+
+/**
+ * Fold `cell`'s queue for the Block rendering it. Urgent updates always apply,
+ * and so do ready transition batches: an urgent update to a component whose
+ * transition is waiting renders that work with it. A pending cue (CUE_RENDERS)
+ * leaves it for the transition render, and nothing folds a held batch until
+ * its holder retries it. From the first skipped update on, every update stays
+ * queued over the base state before it, so a later render rebases them in
+ * order (React's processUpdateQueue). Inside a root transaction the result is
+ * published at commit (commitHookCells), so a dropped render leaves the queue
+ * as it was.
+ */
+function foldHookQueue(cell: QueuedCell, reducer: HookReducer): any {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const transition = CURRENT_BLOCK!.currentRenderMode === 'transition';
+	let value = cell.base;
+	let start = cell.queue;
+	// A cell this transaction already folded continues from that fold, as if it
+	// had committed: a render-phase retry reduces only its new actions, with the
+	// reducer of the pass that queued them (React's rerenderReducer).
+	const prior = transaction !== null && cell.stamp === transaction.createdStamp ? cell.at : -1;
+	if (prior !== -1) {
+		const cells = transaction!.cells!;
+		const priorSkipped = cells[prior + 3] as HookUpdate | null;
+		start = priorSkipped ?? (cells[prior + 4] as HookUpdate).next;
+		if (start === null) return cells[prior + 1];
+		value = cells[priorSkipped === null ? prior + 1 : prior + 2];
+	}
+	let base = value;
+	let skipped: HookUpdate | null = null;
+	let seen = start!;
+	for (let update: HookUpdate | null = seen; update !== null; update = update.next) {
+		seen = update;
+		const batch = update.batch;
+		if (
+			batch === null ||
+			(TRANSITION_ROOT_DRIVER && TRANSITION_ROOT_DRIVER.fold(batch, transition, transaction))
+		) {
+			value = applyHookUpdate(value, update.action, reducer);
+			if (skipped === null) base = value;
+		} else skipped ??= update;
+	}
+	if (transaction === null) publishHookCell(cell, value, base, skipped, seen);
+	else if (prior !== -1) {
+		const cells = transaction.cells!;
+		cells[prior + 1] = value;
+		cells[prior + 2] = base;
+		cells[prior + 3] = skipped;
+		cells[prior + 4] = seen;
+	} else {
+		const cells = (transaction.cells ??= []);
+		cell.stamp = transaction.createdStamp;
+		cell.at = cells.length;
+		cells.push(cell, value, base, skipped, seen);
+	}
+	return value;
+}
+
+/**
+ * Blocks rendering a pending cue at urgent priority, innermost last: an urgent
+ * ancestor's render of a child whose transition waits, or a split cue. Their
+ * own hook cells show the committed state without the waiting transition work
+ * (keepTransitionWork).
+ */
+const CUE_RENDERS: Block[] = [];
+
+/** Commit one fold: `seen` is its newest update, so later updates stay queued. */
+function publishHookCell(
+	cell: QueuedCell,
+	value: unknown,
+	base: unknown,
+	skipped: HookUpdate | null,
+	seen: HookUpdate,
+): void {
+	cell.value = value;
+	cell.base = base;
+	const queue = skipped ?? seen.next;
+	cell.queue = queue;
+	if (queue === null) cell.last = null;
+}
+
+/** A committed transaction publishes its folds in render order, so the last wins. */
+function commitHookCells(cells: any[]): void {
+	for (let i = 0; i < cells.length; i += 5)
+		publishHookCell(cells[i], cells[i + 1], cells[i + 2], cells[i + 3], cells[i + 4]);
+}
+
+/** The latest scheduled state: every queued update, whatever its batch. */
+function latestHookValue(cell: QueuedCell, reducer: HookReducer): any {
+	if (cell.queue === null) return cell.value;
+	let value = cell.base;
+	let start: HookUpdate | null = cell.queue;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && cell.stamp === transaction.createdStamp) {
+		// Continue from this transaction's fold (foldHookQueue).
+		const cells = transaction.cells!;
+		const skipped = cells[cell.at + 3] as HookUpdate | null;
+		start = skipped ?? (cells[cell.at + 4] as HookUpdate).next;
+		value = cells[skipped === null ? cell.at + 1 : cell.at + 2];
+	}
+	for (let update = start; update !== null; update = update.next)
+		value = applyHookUpdate(value, update.action, reducer);
+	return value;
+}
+
+function enqueueHookUpdate(
+	cell: QueuedCell,
+	batch: TransitionActionBatch | null,
+	action: unknown,
+): void {
+	const update: HookUpdate = { batch, action, next: null };
+	const last = cell.last;
+	if (last === null) {
+		cell.queue = update;
+		cell.base = cell.value;
+	} else last.next = update;
+	cell.last = update;
+}
+
+/**
+ * Queue an update the owner's render computes. Urgent work schedules that
+ * render now; transition work renders when its batch is ready.
+ */
+function queueHookUpdate(
+	cell: QueuedCell,
+	block: Block,
+	batch: TransitionActionBatch | null,
+	action: unknown,
+	type: 'state' | 'reducer',
+	slot: HookSlot,
+): void {
+	if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(cell);
+	enqueueHookUpdate(cell, batch, action);
+	if (batch === null) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileSchedule(block, type, slot);
+		scheduleRender(block);
+	} else TRANSITION_ROOT_DRIVER!.queue(cell, batch, block, type, slot);
+	markRootUpdated(block);
+}
+
+/** A user update outside render can unblock a held transition (wakeHeldTransitions). */
+function markRootUpdated(block: Block): void {
+	if (TRANSITION_HOLDERS && TRANSITION_HOLDERS.size !== 0 && CURRENT_BLOCK === null)
+		TRANSITION_ROOT_DRIVER!.wake(block);
+}
 
 export function useState<T = undefined>(): StateTuple<T | undefined>;
 export function useState<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T>;
 export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTuple<T> {
 	const s = readStateHook(initial, slot, arguments.length === 1);
 	// The compiler selects the getter variant only when the third member is observed.
-	return [s.value, s.setter] as unknown as StateTuple<T>;
+	return [
+		s.queue === null ? s.value : foldHookQueue(s, null),
+		s.setter,
+	] as unknown as StateTuple<T>;
 }
 
 /** Both tuple forms consume the same resolved cell without a second hook lookup. */
@@ -14680,261 +14451,78 @@ function readStateHook<T>(
 		const initVal = typeof initial === 'function' ? (initial as () => T)() : (initial as T);
 		s = {
 			value: initVal,
+			base: initVal,
+			queue: null,
+			last: null,
+			stamp: 0,
+			at: 0,
 			setter: (next) => {
 				if (block.disposed) return;
-				if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
-					TRANSITION_ROOT_DRIVER!.recordUrgent(s!, next);
-				// Preserve the idle eager bailout. Once work is already queued, a
-				// functional update must observe the next render's inputs instead.
-				if (
-					(s!.updates !== undefined ||
-						s!.renderTransition !== undefined ||
-						(typeof next === 'function' &&
-							TRANSITION_PENDING_COUNT > 0 &&
-							TRANSITION_ROOT_DRIVER &&
-							TRANSITION_ROOT_DRIVER.hasHeld(s!, block)) ||
-						(block.pending && typeof next === 'function')) &&
-					transitionActionBatchForUpdate() === null
-				) {
-					if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'updates');
-					(s!.updates ??= []).push(next);
-					scheduleRender(block);
-					return;
-				}
-				const previous = TRANSITION_ROOT_DRIVER
-					? TRANSITION_ROOT_DRIVER.stagedValue(s!, block)
-					: s!.value;
-				let computed: T;
-				let failed = false;
-				try {
-					computed = typeof next === 'function' ? (next as (p: T) => T)(previous) : next;
-				} catch {
-					// An eager computation is only an optimization. Retry a failure in
-					// render so the component's error boundary owns the exception. An
-					// Action keeps the failure staged until the Action itself settles.
-					if (transitionActionBatchForUpdate() === null) {
-						if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'updates');
-						(s!.updates ??= []).push(next);
-						scheduleRender(block);
+				const cell = s!;
+				// The idle eager path: compute now, bail when equal, and write an urgent
+				// value directly. Once work is queued, a functional update must observe
+				// the next render's inputs instead.
+				if (cell.queue === null && !(block.pending && typeof next === 'function')) {
+					let computed: T;
+					try {
+						computed = typeof next === 'function' ? (next as (p: T) => T)(cell.value) : next;
+					} catch {
+						// An eager computation is only an optimization. Retry a failure in
+						// render so the component's error boundary owns the exception.
+						queueHookUpdate(cell, block, stateUpdateBatch(block), next, 'state', slot);
 						return;
 					}
-					computed = previous;
-					failed = true;
-				}
-				const forceRender =
-					failed ||
-					s!.updates !== undefined ||
-					s!.renderTransition !== undefined ||
-					s!.pendingActionBatch !== undefined ||
-					(block.pending && typeof next === 'function');
-				if (Object.is(computed, previous) && !forceRender) {
-					if (
-						typeof next !== 'function' &&
-						TRANSITION_ROOT_DRIVER &&
-						TRANSITION_ROOT_DRIVER.cancelEqual(s!, block)
-					) {
+					// Select after evaluating the updater: user code can open an Action.
+					const batch = stateUpdateBatch(block);
+					if (Object.is(computed, cell.value)) return;
+					if (batch === null) {
+						if (collectingRefStateUpdates && REF_CALLBACK_DEPTH > 0) {
+							const updates = (refStateUpdates ??= new Map());
+							const state = cell as StateSlot<unknown>;
+							if (!updates.has(state)) {
+								const update: RefStateUpdate = { block, previous: cell.value };
+								if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+									update.profileSlot = slot;
+								updates.set(state, update);
+							}
+							cell.value = computed;
+							return;
+						}
+						if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(cell);
+						cell.value = computed;
+						if (
+							!block.disposed &&
+							typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+							__OCTANE_PROFILE_ENABLED__
+						)
+							__profileSchedule(block, 'state', slot);
 						scheduleRender(block);
+						markRootUpdated(block);
+						return;
 					}
+					queueHookUpdate(cell, block, batch, next, 'state', slot);
 					return;
 				}
-				const update = TRANSITION_ROOT_DRIVER
-					? TRANSITION_ROOT_DRIVER.stageValue(s!, block, next, computed, forceRender)
-					: null;
-				if (update !== null) {
-					if (update.state === undefined) {
-						update.state = s!;
-						TRANSITION_ROOT_DRIVER!.captureQueue(update, s!);
-					}
-					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						update.profileType = 'state';
-						update.profileSlot = slot;
-					}
-					return;
-				}
-				if (collectingRefStateUpdates && REF_CALLBACK_DEPTH > 0 && !forceRender) {
-					const updates = (refStateUpdates ??= new Map());
-					const state = s! as StateSlot<unknown>;
-					if (!updates.has(state)) {
-						const update: RefStateUpdate = { block, previous: s!.value };
-						if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-							update.profileSlot = slot;
-						updates.set(state, update);
-					}
-					s!.value = computed;
-					return;
-				}
-				if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'updates');
-				s!.value = computed;
-				if (
-					!block.disposed &&
-					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-					__OCTANE_PROFILE_ENABLED__
-				)
-					__profileSchedule(block, 'state', slot);
-				scheduleRender(block);
+				queueHookUpdate(cell, block, stateUpdateBatch(block), next, 'state', slot);
 			},
-			updates: undefined,
-			renderTransition: undefined,
-			urgentTransition: undefined,
 			getter: undefined,
-			pendingActionBatch: undefined,
-			pendingActionValue: undefined,
 		};
 		ensureHooks(scope).set(slot, s);
-	}
-	if (s.renderTransition !== undefined || s.updates !== undefined) {
-		const value = readQueuedState(s);
-		if (
-			TRANSITION_ROOT_DRIVER &&
-			!s.urgentTransition &&
-			s.updates !== undefined &&
-			Object.is(value, s.value)
-		)
-			TRANSITION_ROOT_DRIVER.rebaseHeld(s, block, s.updates);
-		s.value = value;
-		if (!s.urgentTransition) {
-			if (s.renderTransition !== undefined) {
-				TRANSITION_ROOT_DRIVER!.finishQueued(s.renderTransition, s.value);
-				s.renderTransition = undefined;
-			}
-			s.updates = undefined;
-		}
 	}
 	return s;
 }
 
-function readQueuedState<T>(state: StateSlot<T>): T {
-	const transition = state.renderTransition;
-	let value =
-		transition === undefined
-			? state.value
-			: TRANSITION_ROOT_DRIVER!.readQueued(transition, state.urgentTransition === true);
-	if (state.updates !== undefined) {
-		for (const update of state.updates)
-			value = typeof update === 'function' ? (update as (previous: T) => T)(value) : update;
-	}
-	return value;
-}
-
-/** Follow the existing batch records instead of allocating another per-update queue. */
-function readQueuedTransition<T>(
-	last: TransitionActionUpdate<T>,
-	urgent: boolean,
-	reducer?: (value: T, action: any) => T,
-): T {
-	let first = last;
-	while (first.previous !== undefined) first = first.previous;
-	let value = first.replayBaseValue as T;
-	for (let entry = first; ; entry = entry.next!) {
-		if (entry.stateUpdates !== undefined) {
-			for (const update of entry.stateUpdates)
-				value = typeof update === 'function' ? (update as (previous: T) => T)(value) : update;
-		}
-		if (entry.reducerActions !== undefined) {
-			for (const action of entry.reducerActions) value = reducer!(value, action);
-		}
-		if ((urgent || entry.superseded) && entry.urgentOperations !== undefined) {
-			for (const index of entry.urgentOperations) value = entry.operations[index](value);
-		} else if (!urgent && !entry.superseded) {
-			for (const operation of entry.operations) value = operation(value);
-		}
-		if (entry === last) return value;
-	}
-}
-
-function captureTransitionHookQueue<T>(
-	update: TransitionActionUpdate<T>,
-	cell: StateSlot<T> | ReducerSlot<T, any>,
-): void {
-	update.replayBaseValue = cell.value;
-	const previous =
-		cell.renderTransition ??
-		(TRANSITION_ROOT_DRIVER ? TRANSITION_ROOT_DRIVER.heldUpdate(cell, update.block) : undefined);
-	if (previous !== undefined) {
-		update.previous = previous;
-		previous.next = update;
-	}
-	// A still-awaiting Action can overlap an urgent render which consumes the
-	// cell queue. Snapshot only an existing prefix; ordinary transition updates
-	// need no additional queue allocation.
-	if (update.state !== undefined) update.stateUpdates = update.state.updates?.slice();
-	else update.reducerActions = update.reducer!.renderPhaseActions?.slice();
-}
-
-function recordUrgentActionUpdate<T>(
-	cell: StateSlot<T> | ReducerSlot<T, any>,
-	operation: T | ((value: T) => T),
-): void {
-	const update = cell.pendingActionBatch!.updates.get(cell) as
-		TransitionActionUpdate<T> | undefined;
-	if (update === undefined) return;
-	(update.urgentOperations ??= []).push(update.operations.length);
-	update.operations.push(
-		typeof operation === 'function' ? (operation as (value: T) => T) : () => operation,
-	);
-	update.forceRender = true;
-}
-
-function finishQueuedTransition<T>(last: TransitionActionUpdate<T>, value: T): void {
-	// Consecutive batches can drive the same cell. They share one final value
-	// and committed base so holding/promoting any retained batch cannot resurrect
-	// an intermediate value from the middle of that sequence.
-	for (let entry: TransitionActionUpdate<T> | undefined = last; entry; entry = entry.previous) {
-		entry.value = value;
-		// A later Action can replace a held change with its committed base.
-		// Retire that predecessor while leaving this render's successor active.
-		if (entry !== last && Object.is(value, entry.baseValue)) entry.superseded = true;
-	}
-}
-
-function beginUrgentTransitionCell(update: TransitionActionUpdate<any>): {
-	update: TransitionActionUpdate<any>;
-	cell: StateSlot<any> | ReducerSlot<any, any>;
-} | null {
-	const cell = update.state ?? update.reducer;
-	if (
-		update.block.disposed ||
-		update.superseded ||
-		cell === undefined ||
-		cell.renderTransition === undefined
-	)
-		return null;
-	cell.urgentTransition = true;
-	cell.value = update.baseValue;
-	return { update, cell };
-}
-
-function endUrgentTransitionCell(
-	snapshot: NonNullable<ReturnType<typeof beginUrgentTransitionCell>>,
-): void {
-	const { update, cell } = snapshot;
-	cell.urgentTransition = false;
-	if (update.block.disposed || update.superseded) {
-		cell.renderTransition = undefined;
-		return;
-	}
-	// The urgent render has published these inputs. Keep its committed result
-	// as the rollback value while the original ordered operations remain queued
-	// for their independent transition pass.
-	for (let entry: TransitionActionUpdate<any> | undefined = update; entry; entry = entry.previous)
-		entry.baseValue = cell.value;
+/** A render-phase update belongs to the render processing it, never to an Action. */
+function stateUpdateBatch(block: Block): TransitionActionBatch | null {
+	return CURRENT_BLOCK === block ? null : transitionActionBatchForUpdate();
 }
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T>;
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T> {
 	const s = readStateHook(initial, slot, arguments.length === 1);
-	const getter =
-		s.getter ??
-		(s.getter = () => {
-			const batch = s.pendingActionBatch;
-			if (batch === undefined) return readQueuedState(s);
-			const update = batch.updates.get(s) as TransitionActionUpdate<T> | undefined;
-			return update === undefined
-				? readQueuedState(s)
-				: TRANSITION_ROOT_DRIVER!.readQueued(update, false);
-		});
-	return [s.value, s.setter, getter];
+	const getter = (s.getter ??= () => latestHookValue(s, null));
+	return [s.queue === null ? s.value : foldHookQueue(s, null), s.setter, getter];
 }
 
 /** The last successfully published source and its locally editable value. */
@@ -14949,14 +14537,12 @@ export interface LinkedStateOptions<Source, Value> {
 	valueEqual?: (previous: Value, next: Value) => boolean;
 }
 
-interface LinkedStateSlot<Source, Value> {
+interface LinkedStateSlot<Source, Value> extends QueuedCell {
 	source: Source;
 	value: Value;
 	setter: StateSetter<Value>;
 	getter?: () => Value;
 	valueEqual?: (previous: Value, next: Value) => boolean;
-	pendingActionBatch?: TransitionActionBatch;
-	pendingActionValue?: Value;
 	/** A source draft is visible to its rendering owner, never to committed readers. */
 	renderPending?: boolean;
 	renderSource?: Source;
@@ -15110,6 +14696,11 @@ export function useLinkedState<Source, Value>(
 		state = {
 			source,
 			value,
+			base: value,
+			queue: null,
+			last: null,
+			stamp: 0,
+			at: 0,
 			valueEqual: equalValue,
 			setter: (next) => {
 				const renderingDraft = CURRENT_BLOCK === block && state!.renderPending === true;
@@ -15133,12 +14724,9 @@ export function useLinkedState<Source, Value>(
 				const updatingDraft = renderingDraft || updatingParkedDraft;
 				const previous = updatingDraft
 					? (state!.renderValue as Value)
-					: TRANSITION_ROOT_DRIVER
-						? TRANSITION_ROOT_DRIVER.stagedValue(state!)
-						: state!.value;
-				const operation =
-					typeof next === 'function' ? (next as (value: Value) => Value) : () => next;
-				const computed = operation(previous);
+					: (latestHookValue(state!, null) as Value);
+				const computed =
+					typeof next === 'function' ? (next as (value: Value) => Value)(previous) : next;
 				const equal = updatingDraft ? state!.renderValueEqual : state!.valueEqual;
 				if ((equal ?? Object.is)(previous, computed)) return;
 				if (updatingDraft) {
@@ -15148,24 +14736,21 @@ export function useLinkedState<Source, Value>(
 					else scheduleRender(block);
 					return;
 				}
-				const update = TRANSITION_ROOT_DRIVER
-					? TRANSITION_ROOT_DRIVER.stageValue(state!, block, operation, computed)
-					: null;
-				if (update !== null) {
-					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						update.profileType = 'state';
-						update.profileSlot = slot;
-					}
+				// Select after evaluating the updater: user code can open an Action.
+				const batch = stateUpdateBatch(block);
+				if (batch !== null || state!.queue !== null) {
+					queueHookUpdate(state!, block, batch, next, 'state', slot);
 					return;
 				}
-				state!.value = computed;
 				if (
 					!block.disposed &&
 					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 					__OCTANE_PROFILE_ENABLED__
 				)
 					__profileSchedule(block, 'state', slot);
+				state!.value = computed;
 				scheduleRender(block);
+				markRootUpdated(block);
 			},
 		};
 		ensureHooks(scope).set(slot, state);
@@ -15179,6 +14764,7 @@ export function useLinkedState<Source, Value>(
 		state.renderUpdated === true &&
 		state.renderSourceChanged === sourceChanged &&
 		equalSource(state.renderSource as Source, source);
+	const committed: Value = state.queue === null ? state.value : foldHookQueue(state, null);
 	if (!reuseUpdatedDraft && !sourceChanged && state.valueEqual === equalValue) {
 		// A previous failed render can have left a private draft behind. It was
 		// never published, so a committed-source replay must discard it explicitly.
@@ -15188,15 +14774,15 @@ export function useLinkedState<Source, Value>(
 		state.renderParked = false;
 		state.renderNeedsRefresh = false;
 		state.renderPublish = undefined;
-		return [state.value, state.setter] as unknown as LinkedStateTuple<Value>;
+		return [committed, state.setter] as unknown as LinkedStateTuple<Value>;
 	}
 
 	const reuseParkedDraft = reuseUpdatedDraft && state.renderParked === true;
-	let value = reuseUpdatedDraft ? (state.renderValue as Value) : state.value;
+	let value = reuseUpdatedDraft ? (state.renderValue as Value) : committed;
 	if (sourceChanged && !reuseUpdatedDraft) {
-		const previous = { source: state.source, value: state.value };
+		const previous = { source: state.source, value: committed };
 		const reconciled = reconcile(source, previous);
-		if (!(equalValue ?? Object.is)(state.value, reconciled)) value = reconciled;
+		if (!(equalValue ?? Object.is)(committed, reconciled)) value = reconciled;
 	}
 	state.renderPending = true;
 	state.renderSource = reuseUpdatedDraft
@@ -15219,16 +14805,12 @@ export function useLinkedState<Source, Value>(
 	const publish = () => {
 		if (current.renderPending !== true || current.renderVersion !== version || block.disposed)
 			return;
-		// A setter staged for the old source belongs to its previous generation.
-		// Discard it before parking too: otherwise it can flush into the committed
-		// value while Suspense still hides the replacement source.
-		if (sourceChanged) {
-			const pendingBatch = current.pendingActionBatch;
-			if (pendingBatch !== undefined) {
-				pendingBatch.updates.delete(current);
-				current.pendingActionBatch = undefined;
-				current.pendingActionValue = undefined;
-			}
+		// Updates still queued for the old source belong to its previous generation.
+		// Discard them before parking too: otherwise they can fold into the
+		// committed value while Suspense still hides the replacement source.
+		if (sourceChanged && current.queue !== null) {
+			current.queue = current.last = null;
+			current.base = current.value;
 		}
 		const hiddenBoundary = findSuspenseHiddenTry(block);
 		if (hiddenBoundary !== null) {
@@ -15281,27 +14863,18 @@ export function __useLinkedStateWithGetter<Source, Value>(
 			if (CURRENT_BLOCK === block && state.renderPending === true) {
 				return state.renderValue as Value;
 			}
-			const batch = state.pendingActionBatch;
-			if (batch === undefined) return state.value;
-			const update = batch.updates.get(state) as TransitionActionUpdate<Value> | undefined;
-			return update === undefined ? state.value : rebaseTransitionActionUpdate(update);
+			return latestHookValue(state, null);
 		});
 	return [pair[0], pair[1], getter];
 }
 
-interface ReducerSlot<S, A> {
+interface ReducerSlot<S, A> extends QueuedCell {
 	value: S;
 	dispatch: (action: A) => void;
+	/** Queued actions are reduced by the reducer of the render that folds them. */
 	reducer: (state: S, action: A) => S;
-	/** Render-phase actions are reduced by the reducer from the replaying render. */
-	renderPhaseActions: A[] | undefined;
-	/** A promoted Action is reduced with this render's reducer before publication. */
-	renderTransition: TransitionActionUpdate<S> | undefined;
-	urgentTransition: boolean | undefined;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter: (() => S) | undefined;
-	pendingActionBatch: TransitionActionBatch | undefined;
-	pendingActionValue: S | undefined;
 }
 
 type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
@@ -15319,7 +14892,10 @@ export function useReducer<S, A, I = S>(
 	slot?: HookSlot,
 ): ReducerTuple<S, A> {
 	const s = readReducerHook(reducer, initialArg, initOrSlot, slot);
-	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
+	return [
+		s.queue === null ? s.value : foldHookQueue(s, reducer),
+		s.dispatch,
+	] as unknown as ReducerTuple<S, A>;
 }
 
 function readReducerHook<S, A, I>(
@@ -15354,99 +14930,30 @@ function readReducerHook<S, A, I>(
 		const initVal = init !== undefined ? init(initialArg) : (initialArg as unknown as S);
 		s = {
 			value: initVal,
+			base: initVal,
+			queue: null,
+			last: null,
+			stamp: 0,
+			at: 0,
 			reducer,
 			// React parity: unlike useState's setter, dispatch does NOT eagerly bail
 			// when the reducer returns the same state — a no-op action still renders
 			// the component once (children then bail as usual). Per
-			// ReactHooksWithNoopRenderer-test.js:3889.
+			// ReactHooksWithNoopRenderer-test.js:3889. The render reduces every
+			// queued action with its own reducer, so a reducer that changes alongside
+			// state applies to the actions it receives.
 			dispatch: (action) => {
 				if (block.disposed) return;
-				// React queues a render-phase reducer action and applies it with the
-				// reducer supplied by the replaying render. Reducing eagerly here uses
-				// the previous pass's reducer when that reducer changes alongside state.
-				if (CURRENT_BLOCK === block || transitionActionBatchForUpdate() === null) {
-					if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'renderPhaseActions');
-					if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
-						TRANSITION_ROOT_DRIVER!.recordUrgent(s!, (value) => s!.reducer(value, action));
-					const actions = (s!.renderPhaseActions ??= []);
-					actions.push(action);
-					scheduleRender(block);
-					return;
-				}
-				const previous = TRANSITION_ROOT_DRIVER!.stagedValue(s!, block);
-				const operation = (value: S) => s!.reducer(value, action);
-				let computed = previous;
-				try {
-					computed = operation(previous);
-				} catch {
-					/* Re-evaluate in render. */
-				}
-				const update = TRANSITION_ROOT_DRIVER!.stageValue(s!, block, operation, computed, true);
-				if (update !== null) {
-					if (update.reducer === undefined) {
-						update.reducer = s!;
-						TRANSITION_ROOT_DRIVER!.captureQueue(update, s!);
-					}
-					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						update.profileType = 'reducer';
-						update.profileSlot = slot;
-					}
-					return;
-				}
-				s!.value = computed;
-				if (
-					!block.disposed &&
-					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-					__OCTANE_PROFILE_ENABLED__
-				)
-					__profileSchedule(block, 'reducer', slot);
-				scheduleRender(block);
+				queueHookUpdate(s!, block, stateUpdateBatch(block), action, 'reducer', slot);
 			},
-			renderPhaseActions: undefined,
-			renderTransition: undefined,
-			urgentTransition: undefined,
 			getter: undefined,
-			pendingActionBatch: undefined,
-			pendingActionValue: undefined,
 		};
 		ensureHooks(scope).set(slot, s);
 	} else {
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
-		if (s.renderTransition !== undefined || s.renderPhaseActions !== undefined) {
-			const value = readQueuedReducer(s);
-			if (
-				TRANSITION_ROOT_DRIVER &&
-				!s.urgentTransition &&
-				s.renderPhaseActions !== undefined &&
-				Object.is(value, s.value)
-			)
-				TRANSITION_ROOT_DRIVER.rebaseHeld(s, block, s.renderPhaseActions, reducer);
-			s.value = value;
-			if (!s.urgentTransition) {
-				if (s.renderTransition !== undefined) {
-					TRANSITION_ROOT_DRIVER!.finishQueued(s.renderTransition, s.value);
-					s.renderTransition = undefined;
-				}
-				s.renderPhaseActions = undefined;
-			}
-		}
 	}
 	return s;
-}
-
-function readQueuedReducer<S, A>(state: ReducerSlot<S, A>): S {
-	let value =
-		state.renderTransition === undefined
-			? state.value
-			: TRANSITION_ROOT_DRIVER!.readQueued(
-					state.renderTransition,
-					state.urgentTransition === true,
-					state.reducer,
-				);
-	if (state.renderPhaseActions !== undefined)
-		for (const action of state.renderPhaseActions) value = state.reducer(value, action);
-	return value;
 }
 
 /** Compiler-emitted useReducer variant for a tuple whose third member is observable. */
@@ -15463,17 +14970,8 @@ export function __useReducerWithGetter<S, A, I = S>(
 	slot?: HookSlot,
 ): ReducerTuple<S, A> {
 	const s = readReducerHook(reducer, initialArg, initOrSlot, slot);
-	const getter =
-		s.getter ??
-		(s.getter = () => {
-			const batch = s.pendingActionBatch;
-			if (batch === undefined) return readQueuedReducer(s);
-			const update = batch.updates.get(s) as TransitionActionUpdate<S> | undefined;
-			return update === undefined
-				? readQueuedReducer(s)
-				: TRANSITION_ROOT_DRIVER!.readQueued(update, false, s.reducer);
-		});
-	return [s.value, s.dispatch, getter];
+	const getter = (s.getter ??= () => latestHookValue(s, s.reducer));
+	return [s.queue === null ? s.value : foldHookQueue(s, reducer), s.dispatch, getter];
 }
 
 function depsChanged(prev: any[] | undefined, next: any[] | undefined, hook = false): boolean {
@@ -15831,8 +15329,7 @@ function adoptMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[]): MemoHookE
 		warmRecord: undefined,
 		nativeWitness: undefined,
 	};
-	if (ACTIVE_TRANSITION_ATTEMPT) journalMemoEntry(scope, slot, entry);
-	ensureHooks(scope).set(slot, entry);
+	setMemoEntry(scope, slot, entry);
 	claimWarmMemoRecord(adopted, entry);
 	return entry;
 }
@@ -15849,9 +15346,9 @@ function readMemoEntry<T>(
 		return memoEntryHit(slot, prev);
 	}
 	// Parallel-use warming: before recomputing, adopt a prefetched creation for
-	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
-	// the fetch is already in flight. Only compiler-warmed slots can hit;
-	// WARM_EVER keeps the ancestor walk off apps that never warm.
+	// this slot (started by warmMemo during a suspended ancestor's warm walk, or
+	// by a dropped transition render) — the fetch is already in flight. WARM_EVER
+	// keeps the lookup off apps that never warm or drop a transition.
 	return WARM_EVER && deps !== undefined ? adoptMemoEntry(scope, slot, deps) : null;
 }
 
@@ -15869,11 +15366,7 @@ function publishMemoEntry<T>(
 		warmRecord: undefined,
 		nativeWitness,
 	};
-	// The attempt records the replacement both ways: the cue re-render must
-	// dep-hit the old entry (never re-create old-version requests), and the
-	// promoted render must dep-hit this one (never create twice).
-	if (ACTIVE_TRANSITION_ATTEMPT) journalMemoEntry(scope, slot, entry);
-	ensureHooks(scope).set(slot, entry);
+	setMemoEntry(scope, slot, entry);
 	if (deps !== undefined && recordRealWarmMemo(slot, deps, entry)) {
 		entry.warmEpisode = CURRENT_WARM_EPISODE;
 	}
@@ -16031,18 +15524,21 @@ export function hookMemoCreate(size: number): any[] {
 }
 
 /** Compiler ABI: publish a successful inline memo computation immediately.
- * History is needed only while an attempt can hold the prior screen; ordinary
- * suspend/replay continues to see the just-published cells. Fixed arities keep
- * ordinary cache misses free of a rest-parameter dependency array. */
+ * Only a transition render, which a hold can drop, keeps the committed cells
+ * (transitionMemoCells); ordinary suspend/replay continues to see the
+ * just-published cells. Fixed arities keep ordinary cache misses free of a
+ * rest-parameter dependency array. */
 export function hookMemoPublish0<T>(cells: any[], base: number, value: T): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) journalHookMemoCells(cells, base, [true, value]);
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 2);
 	cells[base + 1] = value;
 	cells[base] = true;
 	return value;
 }
 
 export function hookMemoPublish1<T>(cells: any[], base: number, value: T, d0: any): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) journalHookMemoCells(cells, base, [true, d0, value]);
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 3);
 	cells[base + 2] = value;
 	cells[base + 1] = d0;
 	cells[base] = true;
@@ -16050,7 +15546,8 @@ export function hookMemoPublish1<T>(cells: any[], base: number, value: T, d0: an
 }
 
 export function hookMemoPublish2<T>(cells: any[], base: number, value: T, d0: any, d1: any): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) journalHookMemoCells(cells, base, [true, d0, d1, value]);
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 4);
 	cells[base + 3] = value;
 	cells[base + 1] = d0;
 	cells[base + 2] = d1;
@@ -16066,9 +15563,8 @@ export function hookMemoPublish3<T>(
 	d1: any,
 	d2: any,
 ): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) {
-		journalHookMemoCells(cells, base, [true, d0, d1, d2, value]);
-	}
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 5);
 	cells[base + 4] = value;
 	cells[base + 1] = d0;
 	cells[base + 2] = d1;
@@ -16086,9 +15582,8 @@ export function hookMemoPublish4<T>(
 	d2: any,
 	d3: any,
 ): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) {
-		journalHookMemoCells(cells, base, [true, d0, d1, d2, d3, value]);
-	}
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 6);
 	cells[base + 5] = value;
 	cells[base + 1] = d0;
 	cells[base + 2] = d1;
@@ -16100,9 +15595,8 @@ export function hookMemoPublish4<T>(
 
 /** Larger dependency lists retain the compact variadic publication fallback. */
 export function hookMemoPublish<T>(cells: any[], base: number, value: T, ...deps: any[]): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) {
-		journalHookMemoCells(cells, base, [true, ...deps, value]);
-	}
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, deps.length + 2);
 	cells[base + deps.length + 1] = value;
 	for (let i = 0; i < deps.length; i++) cells[base + i + 1] = deps[i];
 	cells[base] = true;
@@ -16111,7 +15605,8 @@ export function hookMemoPublish<T>(cells: any[], base: number, value: T, ...deps
 
 /** One-cell form for compiler-owned lifetime-invariant callback values. */
 export function hookMemoPublishInvariant<T>(cells: any[], base: number, value: T): T {
-	if (ACTIVE_TRANSITION_ATTEMPT) journalHookMemoCells(cells, base, [value]);
+	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 1);
 	cells[base] = value;
 	return value;
 }
@@ -18450,7 +17945,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	const block = state.block;
 	let preserved = preservedHydrateActivations?.get(state);
 	if (preserved !== undefined && !currentPresentations(preserved.capture)) {
-		discardHydratePresentation(state, preserved.capture);
+		discardHydratePresentation(state, preserved.capture, preserved.hydration);
 		preserved = undefined;
 	}
 	const activationSlot = block.slots[0] as TrySlot | undefined;
@@ -18478,7 +17973,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (block.idState.renderOwner?.bindingLeases?.size) {
 		hydration.retryPresentation = () => {
 			if (block.disposed) return;
-			discardHydratePresentation(state, capture);
+			discardHydratePresentation(state, capture, hydration);
 			scheduleRender(state.parentBlock);
 		};
 	}
@@ -18541,7 +18036,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		discardOffscreenCapture(capture);
 		state.block.mounted = false;
 		if (error instanceof PresentationAdoptionMiss) {
-			discardHydratePresentation(state, capture);
+			discardHydratePresentation(state, capture, hydration);
 			if (error.retry && error.lease?.active()) {
 				retryPresentationMiss(error, () => {
 					if (!block.disposed) scheduleRender(state.parentBlock);
@@ -18561,9 +18056,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (restart !== undefined) {
 		// As a suspended Suspense arm does, the island keeps its server DOM, with
 		// nothing reported, and its retry adopts it afresh, seeding afresh too.
-		hydration.rollback();
 		hydration.discardSeeds();
-		discardHydratePresentation(state, capture);
+		discardHydratePresentation(state, capture, hydration);
 		block.idState.next = hydration.idStart;
 		const generation = state.activationGeneration;
 		resumeOnSettle(restart.thenable, () => {
@@ -18665,8 +18159,17 @@ function discardHydrateTail(state: HydrateSlot): void {
 	}
 }
 
-/** The speculative renderer owns scopes only until the early lease is accepted. */
-function discardHydratePresentation(state: HydrateSlot, capture: OffscreenCapture): void {
+/**
+ * The speculative renderer owns scopes only until the early lease is accepted.
+ * The attempt's retry adopts afresh, so restore the server DOM it changed, such
+ * as the arm markers it put inside a boundary's range.
+ */
+function discardHydratePresentation(
+	state: HydrateSlot,
+	capture: OffscreenCapture,
+	hydration: HydrationCapability,
+): void {
+	hydration.rollback();
 	const refs: SuspenseRefEntry[] = [];
 	collectVisibleSubtreeRefs(state.block, refs);
 	discardOffscreenCapture(capture);
@@ -20179,23 +19682,18 @@ export function warmMemo(
 		CURRENT_WARM_CLAIMS?.add(entry);
 		return;
 	}
-	// A promoted transition starts a fresh warm episode, but its earlier
-	// speculative values remain in the episode-agnostic harvest. Claim the
-	// matching occurrence for this plan without consuming it: the real memo
-	// still owns adoption, and an already-adopted entry remains a tombstone for
-	// that occurrence when a later sibling suspends in the same round.
-	const held = CURRENT_BLOCK?.idState.renderOwner?.transition ?? HELD_SYNC_TRANSITION;
-	const harvest = held?.warmHarvest ?? PROMOTED_WARM_HARVEST;
-	const owner = held?.origin ?? ACTIVE_TRANSITION_ATTEMPT?.origin;
-	if (
-		harvest !== null &&
-		harvest !== undefined &&
-		owner !== undefined &&
-		blockIsAncestor(owner, CURRENT_BLOCK!)
-	) {
+	// A retried transition starts a fresh warm episode, but values its dropped
+	// rounds created remain in the episode-agnostic harvest. Claim the matching
+	// occurrence for this plan without consuming it: the real memo still owns
+	// adoption, and an already-adopted entry remains a tombstone for that
+	// occurrence when a later sibling suspends in the same round.
+	const harvest = TRANSITION_HARVEST;
+	if (harvest !== null) {
+		const owner = CURRENT_BLOCK?.idState.renderOwner;
 		for (let i = 0; i < harvest.length; i++) {
 			const entry = harvest[i];
 			if (
+				entry.owner !== owner ||
 				entry.slot !== slot ||
 				depsChanged(entry.deps, deps) ||
 				CURRENT_WARM_CLAIMS?.has(entry) ||
@@ -20325,21 +19823,18 @@ function adoptWarmEntry(
 		const entry = adoptWarmCacheEntry(retryCache, slot, deps, accept);
 		if (entry !== WARM_MISS) return entry;
 	}
-	// Held-transition fallback: the attempt's harvest is episode-agnostic, so a
-	// later round's render (whatever episode it minted) still adopts the fetch
-	// the warm walk already started instead of creating it again. Consulted for
-	// the round in flight via the promoted carrier as well as the live hold.
-	const rootHeld = CURRENT_BLOCK?.idState.renderOwner?.transition;
-	const rootHarvest =
-		rootHeld?.warmHarvest != null && blockIsAncestor(rootHeld.origin, CURRENT_BLOCK!)
-			? rootHeld.warmHarvest
-			: null;
-	const harvestList = rootHarvest ?? HELD_SYNC_TRANSITION?.warmHarvest ?? PROMOTED_WARM_HARVEST;
-	if (harvestList !== null && harvestList !== undefined) {
+	// Held-transition fallback: a dropped round's harvest is episode-agnostic, so
+	// a later transition render (whatever episode it minted) still adopts the
+	// fetch that round already started instead of creating it again. An urgent
+	// render never adopts the uncommitted work of a held transition.
+	const harvestList = TRANSITION_HARVEST;
+	if (harvestList !== null && CURRENT_BLOCK?.currentRenderMode === 'transition') {
+		const owner = CURRENT_BLOCK.idState.renderOwner;
 		for (let i = 0; i < harvestList.length; i++) {
 			const entry = harvestList[i];
 			if (
 				!entry.taken &&
+				entry.owner === owner &&
 				entry.slot === slot &&
 				!depsChanged(entry.deps, deps) &&
 				(accept === undefined || accept(entry))
@@ -20491,8 +19986,7 @@ function adoptNativeMemoEntry(scope: Scope, slot: HookSlot, deps: any[]): MemoHo
 		warmRecord: undefined,
 		nativeWitness: adopted.nativeWitness,
 	};
-	if (ACTIVE_TRANSITION_ATTEMPT) journalMemoEntry(scope, slot, entry);
-	ensureHooks(scope).set(slot, entry);
+	setMemoEntry(scope, slot, entry);
 	claimWarmMemoRecord(adopted, entry);
 	replayNativeReadWitness(entry.nativeWitness);
 	return entry;
@@ -22412,9 +21906,17 @@ class HydrationCapability {
 	 * content directly inside its one range (hydration-protocol.ts), while the
 	 * client renders the arm in a range of its own inside the boundary's, where
 	 * it can hide the arm beside a fallback. An attempt that is discarded
-	 * restores the server's range.
+	 * restores the server's range. A presentation-binding view's arm keeps the
+	 * range of its own that opens at `first` (bindingTryState).
 	 */
-	armRange(first: Node | null, end: Node): [Comment, Comment] {
+	armRange(open: Node, first: Node | null, end: Node): [Comment, Comment] {
+		if (
+			(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data.startsWith(
+				BINDING_OPEN_PREFIX,
+			) &&
+			this.isOpen(first)
+		)
+			return [first, this.close(first)];
 		const parent = domNode(domNode(end).parentNode!);
 		const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
 		const start = doc.createComment('try-b');
@@ -22423,6 +21925,42 @@ class HydrationCapability {
 		parent.insertBefore(start, first);
 		parent.insertBefore(close, end);
 		return [start, close];
+	}
+
+	/**
+	 * What a presentation-binding view's `@try` range holds, spelled as a
+	 * boundary's open (hydration-protocol.ts), or null for any other range.
+	 * The view keeps its own shape: its open records the arm, the node after
+	 * the open may say what the server rendered, and the arm has a range of its
+	 * own (armRange).
+	 */
+	bindingTryState(open: Node): string | null {
+		if (
+			!(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data.startsWith(
+				BINDING_OPEN_PREFIX,
+			)
+		)
+			return null;
+		const lead = getNextSibling(open);
+		if (lead?.nodeType === 1) {
+			const sentinel = STAGED_DOM ? STAGED_DOM.view(lead as Element) : (lead as Element);
+			return isRendererStreamBoundaryTemplate(sentinel)
+				? BOUNDARY_STREAMED + sentinel.getAttribute(STREAM_BOUNDARY_ATTR)
+				: HYDRATION_START;
+		}
+		const data =
+			lead?.nodeType === 8
+				? (STAGED_DOM ? STAGED_DOM.view(lead as Comment) : (lead as Comment)).data
+				: '';
+		return data.startsWith(SUSPENSE_RESOLVED_COMMENT)
+			? BOUNDARY_CONTENT + data.slice(SUSPENSE_RESOLVED_COMMENT.length)
+			: data.startsWith(STREAM_SEED_COMMENT)
+				? BOUNDARY_STREAMED + data.slice(STREAM_SEED_COMMENT.length)
+				: data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)
+					? BOUNDARY_CLIENT +
+						BOUNDARY_CLIENT_NATIVE +
+						data.slice(NATIVE_SIGNAL_FRESH_COMMENT.length)
+					: HYDRATION_START;
 	}
 
 	/**
@@ -41957,8 +41495,8 @@ function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 		});
 		state.tryBlock = null;
 	}
-	// Disposal releases the pending cue and held synchronous cells as well as
-	// group membership. Removing only the member strands later transitions.
+	// Disposal releases the pending cue and the transition work it held as well
+	// as group membership. Removing only the member strands later transitions.
 	releaseHeldTransition(state);
 	setTryBranch(state, -1);
 	state.block = null;
@@ -42416,7 +41954,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 			freshBoundary = true;
 		}
 		if (adopting && !freshBoundary) {
-			[start, end] = hydration!.armRange(getNextSibling(state.start), state.end);
+			[start, end] = hydration!.armRange(state.start, getNextSibling(state.start), state.end);
 			hydration!.node = getNextSibling(start);
 		} else {
 			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
@@ -42682,15 +42220,9 @@ export function tryBlock(
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
 		state.propagateSuspense = propagateSuspense;
-		// The boundary's own hold must keep these candidate inputs for retry.
-		// A whole-origin unwind instead restores its driving cells; restore the
-		// matching environment before a queued descendant can retry this primary,
-		// rather than waiting for the origin's later pending-cue render to do it.
-		if (state.env !== env) {
-			if (ACTIVE_TRANSITION_ATTEMPT)
-				TRANSITION_JOURNAL!.push(JOURNAL_PROP, state, 'env', state.env);
-			else journalRootProperty(state, 'env', state.env);
-		}
+		// The boundary's own hold must keep these candidate inputs for retry. A
+		// dropped transition restores the environment with the rest of its root.
+		if (state.env !== env) journalRootProperty(state, 'env', state.env);
 		state.env = env;
 	}
 	const s = state;
@@ -42795,13 +42327,13 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 			if (isHostContextRequest(renderError) || isAdoptionControl(renderError)) throw renderError;
 			if (isSuspenseException(renderError)) {
 				if (state.propagateSuspense) throw renderError;
-				handleSuspense(state, renderError.thenable, block, journalCheckpoint, source ?? block);
+				handleSuspense(state, renderError.thenable, block, journalCheckpoint);
 			} else switchToCatch(state, renderError, true);
 		} else {
 			if (capture !== null) spliceOffscreenCapture(capture);
-			// Ready content supersedes the old wakeable. A cue render using held
-			// driving cells is still the prior screen and must retain its hold.
-			if (!heldSyncCellsIntact(state)) {
+			// Ready content supersedes the old wakeable. A render that skipped the
+			// batches this boundary holds is still the prior screen and keeps the hold.
+			if (!TRANSITION_ROOT_DRIVER || !TRANSITION_ROOT_DRIVER.holdsUnrendered(state)) {
 				releaseHeldTransition(state);
 				state.pendingThenable = null;
 			}
@@ -42920,8 +42452,15 @@ function takeInitialSuspenseHydration(
 ): InitialSuspenseHydration | null {
 	// The boundary's open says what its server range holds (hydration-protocol.ts).
 	const open = state.start as Comment;
-	const text = (STAGED_DOM ? STAGED_DOM.view(open) : open).data;
+	const binding = hydration.bindingTryState(open);
+	const text = binding ?? (STAGED_DOM ? STAGED_DOM.view(open) : open).data;
 	let cursor = getNextSibling(open);
+	const metadata: ChildNode[] = [];
+	// A binding view's comment that says what the server rendered leads its arm.
+	if (binding !== null && cursor?.nodeType === 8) {
+		metadata.push(cursor);
+		cursor = getNextSibling(cursor);
+	}
 	if (text.startsWith(BOUNDARY_STREAMED)) {
 		// A sentinel still leads a pending boundary, which mountTry claims.
 		if (
@@ -42954,9 +42493,9 @@ function takeInitialSuspenseHydration(
 			renderOwner: state.parentBlock.idState.renderOwner,
 			signalState: state.parentBlock.idState.signalState,
 		};
-		const [start, end] = hydration.armRange(cursor, state.end);
+		const [start, end] = hydration.armRange(open, cursor, state.end);
 		return {
-			metadata: [],
+			metadata,
 			start,
 			end,
 			idStart: 0,
@@ -42970,7 +42509,6 @@ function takeInitialSuspenseHydration(
 	if (count < 0) return null;
 	let seedRaw: string | null = null;
 	let nativeRaw: string | null = null;
-	const sidecars: Element[] = [];
 	for (const attr of [SUSPENSE_RESOLVED_SEED_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR]) {
 		if (cursor?.nodeType !== 1) continue;
 		const script = cursor as Element;
@@ -42983,10 +42521,10 @@ function takeInitialSuspenseHydration(
 		if (attr === SUSPENSE_RESOLVED_SEED_ATTR)
 			seedRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
 		else nativeRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
-		sidecars.push(script);
+		metadata.push(script);
 		cursor = getNextSibling(script);
 	}
-	const [start, end] = hydration.armRange(cursor, state.end);
+	const [start, end] = hydration.armRange(open, cursor, state.end);
 	const rootIds = state.idState;
 	const idStart = rootIds.next;
 	reserveHydrationIds(rootIds, count);
@@ -42998,7 +42536,7 @@ function takeInitialSuspenseHydration(
 		renderOwner: rootIds.renderOwner,
 	};
 	return {
-		metadata: sidecars,
+		metadata,
 		start,
 		end,
 		idStart,
@@ -43301,7 +42839,8 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let freshBoundary = false;
 	const first = getNextSibling(state.start);
 	const open = adopting
-		? (STAGED_DOM ? STAGED_DOM.view(state.start as Comment) : (state.start as Comment)).data
+		? (hydration!.bindingTryState(state.start) ??
+			(STAGED_DOM ? STAGED_DOM.view(state.start as Comment) : (state.start as Comment)).data)
 		: '';
 	let streamedBoundaryId: string | null = null;
 	let unfinished: UnfinishedArm | null = null;
@@ -43339,7 +42878,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	if (adopting && !freshBoundary) {
 		// ADOPT the server's content, which the seeded use() values let the try
 		// body render its success arm over.
-		[bStart, bEnd] = hydration!.armRange(first, state.end);
+		[bStart, bEnd] = hydration!.armRange(state.start, first, state.end);
 		hydration!.node = getNextSibling(bStart);
 	} else {
 		scopedSeeds = null;
@@ -43510,14 +43049,12 @@ function showTryBlock(state: TrySlot): void {
  * No-op if no hold is currently held.
  */
 function releaseHeldTransition(state: TrySlot): void {
-	// An urgent supersede (or error/unmount) ends this boundary's hold; when the
-	// last holder goes, the reverted cells stay reverted and the staged values
-	// are dropped — the pinned synchronous discard semantics.
-	discardHeldSyncTransition(state);
 	if (state.transitionHeld) {
 		state.transitionHeld = false;
 		tickTransitionCount(-1);
-		releaseTransitionHookHolder(state);
+		// An urgent supersede, error or unmount ends this boundary's hold. Its
+		// transition work stays queued, and renders again without it.
+		if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.retry(state);
 	}
 	// This boundary stopped holding without a normal reveal (urgent supersede): drop it
 	// from the entangled group so siblings staged behind it aren't left waiting.
@@ -43539,10 +43076,6 @@ function handleSuspense(
 	// every caller that renders outside an armed window (a fresh mount or a
 	// retry, neither of which has committed content to keep whole).
 	journalCheckpoint = -1,
-	// Independent descendant updates render through their boundary's journal
-	// window. That boundary supplies render priority, but the descendant remains
-	// the owner whose Action batch must keep its useTransition cue pending.
-	transitionOrigin = sourceBlock,
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BOUNDARY_SUSPEND);
@@ -43590,12 +43123,10 @@ function handleSuspense(
 		// the render and this undo are the same synchronous flush — so the
 		// boundary simply never shows half of the new screen.
 		rollbackTransitionJournal(journalCheckpoint, state.tryBlock ?? sourceBlock);
-		// A whole-drain attempt is in flight: this hold makes it unwind, and the
-		// boundary joins the held set so promotion and discard can find it.
-		if (ACTIVE_TRANSITION_ATTEMPT) {
-			(ACTIVE_TRANSITION_ATTEMPT.heldSlots ??= new Set()).add(state);
-		}
-		holdTransitionHooksForBlock(state, transitionOrigin);
+		// The hold drops the root transaction when its render folded transition
+		// hook work: this boundary then holds those batches (dropTransitionRender).
+		if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK)
+			(ROOT_RENDER_TRANSACTION.holders ??= []).push(state);
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -43931,12 +43462,10 @@ function refreshPendingBody(state: TrySlot): void {
 function swapToPendingFallback(state: TrySlot): void {
 	if (!state.pendingBody || state.branch !== 1 || !state.tryBlock) return;
 	// Once the fallback shows, the held-whole contract is over for this
-	// boundary: write the staged screen forward now so the shell commits the
-	// new values alongside the opted-in fallback, and the hidden primary retries
-	// against the data in flight.
-	if (HELD_SYNC_TRANSITION !== null && HELD_SYNC_TRANSITION.holders.has(state)) {
-		promoteHeldSyncTransition();
-	}
+	// boundary: render the held transition now so the shell commits the new
+	// values alongside the opted-in fallback, and the hidden primary retries
+	// against the data in flight. isPending stays raised until it reveals.
+	if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.unsuspend(state);
 	hideTryContentAndMountPending(state);
 }
 
@@ -44774,21 +44303,15 @@ function rebaseOffscreenEffectSeq(capture: OffscreenCapture): void {
 
 function flushStagedReveals(): void {
 	if (flushingStagedReveals) return; // re-entrancy guard (a reveal may abandon a sibling)
-	// Deferred commit: when the barrier is satisfied for a held sync transition
-	// whose boundaries are all still visible, the reveal IS the promotion — the
-	// staged screen writes forward and ordinary transition renders re-drive the
-	// origin and every held boundary in one flush. A boundary the timeout
-	// already hid keeps the existing hidden-retry path instead.
-	if (HELD_SYNC_TRANSITION !== null) {
-		let allVisible = true;
-		for (const holder of HELD_SYNC_TRANSITION.holders) {
-			if (holder.hiddenDom !== null) {
-				allVisible = false;
-				break;
-			}
-		}
-		if (allVisible && heldTransitionHasPendingAction(HELD_SYNC_TRANSITION.entries)) return;
-		if (allVisible && promoteHeldSyncTransition()) {
+	// A boundary holding a dropped transition reveals by rendering it again:
+	// the batches' Blocks re-render at transition priority and reach every held
+	// boundary in one flush. A boundary the timeout already hid keeps the
+	// hidden-retry path instead.
+	if (TRANSITION_ROOT_DRIVER) {
+		let retried = false;
+		for (const state of STAGED_REVEALS)
+			if (state.hiddenDom === null && TRANSITION_ROOT_DRIVER.retry(state)) retried = true;
+		if (retried) {
 			STAGED_REVEALS.clear();
 			flush();
 			return;
@@ -45475,11 +44998,14 @@ export function useOptimistic<S, V = S>(
 // keeps the prior DOM mounted instead of flashing a fallback.
 // ---------------------------------------------------------------------------
 
-interface DeferredSlot<T> extends TransitionActionSlot<T> {
+interface DeferredSlot<T> {
 	value: T; // committed value (what we return)
 	next: T; // latest pending value
 	scheduled: boolean;
 	block: Block;
+	/** The transition of the last swap, and the value it renders (hasHeldDeferredSwap). */
+	swap: TransitionActionBatch | null;
+	swapValue: T | undefined;
 	/** Profile-build-only hook source; the assignment is erased in normal bundles. */
 	profileSlot?: HookSlot;
 	/**
@@ -45557,7 +45083,11 @@ function swapDeferredValue<T>(s: DeferredSlot<T>): void {
 	startTransition(() => {
 		DEFERRED_SPAWN = true;
 		try {
-			TRANSITION_ROOT_DRIVER!.stageValue(s, s.block, s.next, s.next, true);
+			// A hold of this transition renders the swap again when it retries.
+			const batch = ACTIVE_TRANSITION_ACTION_BATCH!;
+			noteTransitionBlock(rootTransitionBatch(batch), s.block);
+			s.swap = batch;
+			s.swapValue = s.next;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 				__profileSchedule(s.block, 'deferred-value', s.profileSlot);
 				scheduleRender(s.block);
@@ -45568,14 +45098,13 @@ function swapDeferredValue<T>(s: DeferredSlot<T>): void {
 	});
 }
 
+/** A held swap of the current value renders again when it retries; do not spawn another. */
 function hasHeldDeferredSwap(slot: DeferredSlot<unknown>): boolean {
-	const entries =
-		HELD_SYNC_TRANSITION?.entries ?? slot.block.idState.renderOwner?.transition?.entries;
-	if (entries === undefined) return false;
-	for (const entry of entries) {
-		if (entry.slot === slot && Object.is(entry.value, slot.next)) return true;
-	}
-	return false;
+	return (
+		slot.swap !== null &&
+		rootTransitionBatch(slot.swap).suspended !== 0 &&
+		Object.is(slot.swapValue, slot.next)
+	);
 }
 
 export function useDeferredValue<T>(value: T, ...rest: any[]): T;
@@ -45610,6 +45139,8 @@ export function useDeferredValue<T>(
 				next: value,
 				scheduled: false,
 				block,
+				swap: null,
+				swapValue: undefined,
 				wasHidden: hidden,
 			};
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -45622,13 +45153,21 @@ export function useDeferredValue<T>(
 		// where the OUTER preview already covered the loading state, so the final
 		// value is adopted directly (React's anti-waterfall: only the first
 		// useDeferredValue level defers — ReactDeferredValue-test.js:564).
-		s = { value: value, next: value, scheduled: false, block, wasHidden: hidden };
+		s = {
+			value: value,
+			next: value,
+			scheduled: false,
+			block,
+			swap: null,
+			swapValue: undefined,
+			wasHidden: hidden,
+		};
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			s.profileSlot = slot;
 		ensureHooks(scope).set(slot, s);
 		return value;
 	}
-	if (ACTIVE_TRANSITION_ATTEMPT) journalObjectOnce(s);
+	if (inTransitionRender()) journalObjectOnce(s);
 	s.next = value;
 	const wasHidden = s.wasHidden;
 	s.wasHidden = hidden;
@@ -45653,6 +45192,9 @@ export function useDeferredValue<T>(
 	// not defer during a transition` semantics — both Original and Deferred
 	// values update in the same paint.
 	if (block.currentRenderMode === 'transition') {
+		// The swap's own render: a hold of it holds the swap's transition.
+		if (s.swap !== null && Object.is(s.swapValue, value) && ROOT_RENDER_TRANSACTION !== null)
+			noteTransitionBatch(ROOT_RENDER_TRANSACTION, rootTransitionBatch(s.swap));
 		s.value = value;
 		return value;
 	}
@@ -45892,7 +45434,7 @@ function findTryHandler(block: Block | null): TryHandler | null {
  * everything else goes to `rare.tryHandler`. An unowned suspension retries through
  * its client root; an unclaimed application error is rethrown to the caller.
  */
-function handleRenderError(block: Block, err: any, attempt: TransitionAttempt | null = null): void {
+function handleRenderError(block: Block, err: any): void {
 	if (isAdoptionControl(err)) throw err;
 	// §6.3 HostContextRequest: a foreign-context read the owner could not
 	// satisfy synchronously. This is a hosted-root control signal, NOT an
@@ -45919,7 +45461,7 @@ function handleRenderError(block: Block, err: any, attempt: TransitionAttempt | 
 			external(err.thenable);
 			return;
 		}
-		if (suspendRootRender(block, err.thenable, attempt)) return;
+		if (suspendRootRender(block, err.thenable)) return;
 		throw err;
 	}
 	const h = findTryHandler(block);
@@ -51417,16 +50959,15 @@ function makeRoot(
 			}
 			// A same-component props refresh can update the retained screen while
 			// its state transition still waits. Keep that wakeup, but retry it using
-			// the new props below. Identity changes discard the old staged state.
+			// the new props below. Identity changes discard the old held state.
 			const keepTransition =
-				renderOwner.transition !== undefined &&
+				TRANSITION_HOLDERS?.has(renderOwner) === true &&
 				rootBlock !== null &&
 				!rootBlock.disposed &&
 				currentBody === body &&
-				Object.is(currentKey, nextKey) &&
-				TRANSITION_ROOT_DRIVER!.keepsRoot(renderOwner, true);
+				Object.is(currentKey, nextKey);
 			if (!keepTransition) {
-				if (renderOwner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(renderOwner);
+				if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.discard(renderOwner);
 				renderOwner.generation++;
 				renderOwner.wakeable = null;
 			}
@@ -51502,7 +51043,7 @@ function makeRoot(
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
-			if (renderOwner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(renderOwner);
+			if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.discard(renderOwner);
 			renderOwner.generation++;
 			renderOwner.wakeable = null;
 			renderOwner.request = null;

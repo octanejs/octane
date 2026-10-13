@@ -50,12 +50,12 @@ const ROOT_ERROR_DECLARATIONS = [
 ];
 const CAPTURE_DECLARATIONS = ['finishCaptureDispatch'];
 const TRANSITION_HOOK_DECLARATIONS = [
-	'stagedTransitionValue',
-	'stageTransitionValue',
-	'readQueuedTransition',
-	'captureTransitionHookQueue',
-	'recordUrgentActionUpdate',
-	'finishQueuedTransition',
+	'foldTransitionUpdate',
+	'queueTransitionUpdate',
+	'transitionMemoCells',
+	'dropTransitionRender',
+	'retryTransitionHolder',
+	'keepTransitionWork',
 ];
 const COMMIT_DECLARATIONS = ['drainQueuedEffectEventUpdates', 'drainQueuedStoreSyncs'];
 const FORM_COMMIT_DECLARATIONS = [

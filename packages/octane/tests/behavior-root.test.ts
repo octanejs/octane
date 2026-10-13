@@ -9814,19 +9814,25 @@ export function Answer() @{
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
 
-				// A server @catch arm is adopted in place when the client read fails too.
+				// As in React, the server never renders @catch: a failed read ships the
+				// @pending fallback, and the client rebuilds the arm, whose read fails
+				// too and shows @catch until reset retries.
 				generation$.set(6);
 				request(6).reject(new Error('server failure'));
 				await settle();
 				const failed = fixture();
 				container.innerHTML = failed.html;
-				const serverRetry = container.querySelector('button')!;
-				expect(serverRetry.textContent).toBe('Error: server failure');
-				const failedHandle = failed.attach(container.querySelector('section')!, failed.state);
-				expect(container.querySelector('button')).toBe(serverRetry);
+				expect(container.querySelector('[data-pending]')!.textContent).toBe('waiting');
+				expect(container.querySelector('button')).toBeNull();
+				const failedSection = container.querySelector('section')!;
+				const failedHandle = failed.attach(failedSection, failed.state);
+				expect(container.querySelector('section')).toBe(failedSection);
+				const clientRetry = container.querySelector('button')!;
+				expect(clientRetry.textContent).toBe('Error: server failure');
+				expect(container.querySelector('[data-pending]')).toBeNull();
 				generation$.set(7);
 				request(7).resolve('seventh');
-				serverRetry.click();
+				clientRetry.click();
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('seventh');
 				failedHandle.dispose();
@@ -9882,7 +9888,9 @@ export function Answer() @{
 		});
 
 		// A binding view stays an ordinary component: hydrateRoot adopts the same
-		// server @try output, whichever settled arm the server rendered.
+		// server @try output, whichever settled arm the server rendered. As in
+		// React, the server never renders @catch: a failed read ships @pending,
+		// and the client renders the boundary, where the read fails again.
 		it(`hydrates a binding view's settled @try arms with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
 			const source = `import { answer$ } from './island-state';
 export function Answer() @{
@@ -9914,18 +9922,160 @@ export function Answer() @{
 				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 				try {
 					container.innerHTML = fixture.html;
-					const server = container.querySelector('section p')!;
-					hydratedRoot = hydrateRoot(container, fixture.loadClient().Answer, {});
+					const section = container.querySelector('section')!;
+					const server = section.querySelector('p')!;
+					expect(server.textContent).toBe(outcome === 'error' ? 'waiting' : 'ready');
+					const caught: unknown[] = [];
+					const recoverable: unknown[] = [];
+					hydratedRoot = hydrateRoot(
+						container,
+						fixture.loadClient().Answer,
+						{},
+						{
+							onCaughtError: (value) => caught.push(value),
+							onRecoverableError: (value) => recoverable.push(value),
+						},
+					);
 					await act(async () => {
 						for (let index = 0; index < 4; index++) await Promise.resolve();
 					});
-					expect(container.querySelector('section p')).toBe(server);
-					expect(server.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
+					expect(container.querySelector('section')).toBe(section);
+					if (outcome === 'ready') {
+						expect(section.querySelector('p')).toBe(server);
+						expect(server.textContent).toBe('ready');
+						expect(caught).toEqual([]);
+					} else {
+						expect(section.querySelector('p[data-error]')!.textContent).toBe('Error: failed');
+						expect(section.querySelector('[data-pending]')).toBeNull();
+						expect(caught).toEqual([expect.objectContaining({ message: 'failed' })]);
+					}
+					expect(recoverable).toEqual([]);
 					expect(error).not.toHaveBeenCalled();
 				} finally {
 					error.mockRestore();
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
+					scope.dispose();
+				}
+			}
+		});
+
+		// A boundary without @pending keeps its content in the arm's own range too.
+		it(`hydrates a binding view's @try without a fallback with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { label$ } from './island-state';
+export function Label() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <p>{label$.get() as string}</p>
+    } @catch (error) {
+      <p data-error>{String(error) as string}</p>
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-hydrate-catch-only-${dev}` });
+			const label$ = scope.signal$('label', 'server');
+			const fixture = authoredPresentation('Label', {}, dev, source, {
+				'./island-state': { label$ },
+			});
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				container.innerHTML = fixture.html;
+				const paragraph = container.querySelector('section p')!;
+				const recoverable: unknown[] = [];
+				hydratedRoot = hydrateRoot(
+					container,
+					fixture.loadClient().Label,
+					{},
+					{ onRecoverableError: (value) => recoverable.push(value) },
+				);
+				await act(async () => {});
+				expect(container.querySelector('section p')).toBe(paragraph);
+				await act(() => label$.set('client'));
+				expect(paragraph.textContent).toBe('client');
+				expect(recoverable).toEqual([]);
+				expect(error).not.toHaveBeenCalled();
+			} finally {
+				error.mockRestore();
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				scope.dispose();
+			}
+		});
+
+		// So does a streamed boundary: hydrateRoot adopts content whose segment
+		// swapped in first, and claims a boundary whose segment has not arrived, so
+		// the late segment cannot replace the client's arm.
+		it(`hydrates a binding view's streamed @try with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$ } from './island-state';
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <p data-answer>{answer$.get() as string}</p>
+    } @pending {
+      <p data-pending>waiting</p>
+    }
+  </section>
+}`;
+			for (const swapped of [true, false]) {
+				const scope = createScope({ scopeKey: `island-hydrate-stream-${swapped}-${dev}` });
+				const answer = deferred<string>();
+				const loadAnswer = query(
+					`island-hydrate-stream-${swapped}`,
+					(_argument: undefined) => answer.promise,
+				);
+				const answer$ = createResource(scope, 'answer', () => loadAnswer(undefined));
+				const fixture = authoredPresentation('Answer', {}, dev, source, {
+					'./island-state': { answer$ },
+				});
+				const collector = createPipeableCollector();
+				renderToPipeableStream(fixture.server.Answer, {}).pipe(collector.destination);
+				for (let index = 0; index < 20 && collector.chunks.length === 0; index++)
+					await new Promise((resolve) => setTimeout(resolve, 0));
+				const shell = collector.chunks.join('');
+				expect(shell).toContain('data-pending');
+				const appendRest = async () => {
+					const tail = document.createElement('div');
+					tail.innerHTML = (await collector.ended).slice(shell.length);
+					container.append(...tail.childNodes);
+					activateStreamedMarkup(container);
+				};
+				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+				try {
+					container.innerHTML = shell;
+					activateStreamedMarkup(container);
+					if (swapped) {
+						answer.resolve('streamed');
+						await appendRest();
+					}
+					const section = container.querySelector('section')!;
+					const server = section.querySelector('p')!;
+					expect(server.textContent).toBe(swapped ? 'streamed' : 'waiting');
+					const recoverable: unknown[] = [];
+					hydratedRoot = hydrateRoot(
+						container,
+						fixture.loadClient().Answer,
+						{},
+						{ onRecoverableError: (value) => recoverable.push(value) },
+					);
+					await act(async () => {});
+					if (!swapped) {
+						answer.resolve('streamed');
+						await act(async () => {});
+						await appendRest();
+					}
+					expect(container.querySelector('section')).toBe(section);
+					expect(section.querySelectorAll('p')).toHaveLength(1);
+					expect(section.querySelector('[data-answer]')!.textContent).toBe('streamed');
+					if (swapped) expect(section.querySelector('p')).toBe(server);
+					expect(recoverable).toEqual([]);
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					error.mockRestore();
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					resetStreamRuntimeGlobals();
 					scope.dispose();
 				}
 			}
