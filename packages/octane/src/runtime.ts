@@ -18209,6 +18209,57 @@ function resumeFreshHydrateSource(source: Block): void {
 	}
 }
 
+// Only a <Hydrate> island's activation runs these, so they are module
+// functions rather than HydrationCapability methods: a hydrating bundle without
+// islands drops them with activateHydrateBoundary.
+
+/**
+ * Resume `source`, the block that a preserved activation suspended in. A
+ * source whose first render into its adopted range suspended claims that
+ * range again, as the render that suspended did.
+ */
+function renderSuspended(hydration: HydrationCapability, source: Block): void {
+	const claim = hydration.suspendedClaims?.get(source);
+	if (claim !== undefined) {
+		hydration.suspendedClaims!.delete(source);
+		hydration.renderClaimed(source, claim[0], claim[1]);
+	} else renderBlock(source);
+}
+
+/**
+ * After a Hydrate island's content adopted its server range, a server
+ * sibling left after the island's complete client shape is content the
+ * client renders nothing for: a mismatch, which the island falls back from.
+ * Cursor-based adoption may stop on an owned range marker, and the client
+ * may have built nodes there, so look past both, and past renderer style
+ * sidecars. A root keeps the unmatched siblings in its container, as React
+ * does, so only an island settles its remainder.
+ */
+function finishRoot(hydration: HydrationCapability): void {
+	let remainder = hydration.rootRemainder === undefined ? hydration.node : hydration.rootRemainder;
+	while (
+		remainder !== null &&
+		(remainder === hydration.rootCleanupBoundary ||
+			hydration.freshNodes.has(remainder) ||
+			isRendererHydrationStyle(remainder))
+	)
+		remainder = getNextSibling(remainder);
+	if (remainder === null) return;
+	hydration.mismatch(
+		process.env.NODE_ENV !== 'production'
+			? componentSourceLoc(hydration.rootBlock.body)
+			: undefined,
+		() => 'the end of the root',
+		remainder,
+	);
+}
+
+/** An island's attempt completed: it keeps the server nodes it changed. */
+function keepChanges(hydration: HydrationCapability): void {
+	hydration.undoable = false;
+	hydration.saved = hydration.undo = null;
+}
+
 function activateHydrateBoundary(state: HydrateSlot): void {
 	if (state.start === null || state.end === null) return;
 	const block = state.block;
@@ -18270,7 +18321,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			hydration.node = preserved.cursor;
 			try {
 				if (preserved.fresh) hydration.suspend(() => resumeFreshHydrateSource(source));
-				else hydration.renderSuspended(source);
+				else renderSuspended(hydration, source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
 				preserveSuspendedHydrateActivation(state, hydration, error);
@@ -18293,7 +18344,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
 			}
 			hydration.settleValues();
-			hydration.finishRoot();
+			finishRoot(hydration);
 			completed = true;
 		}
 	} catch (thrown) {
@@ -18401,7 +18452,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	if (completed) {
 		state.initialCaptures = null;
-		hydration.keepChanges();
+		keepChanges(hydration);
 		hydration.passSeeds(previousHydration);
 		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
@@ -21452,10 +21503,10 @@ class HydrationCapability {
 	 */
 	replayDepth = -1;
 	seedCursor = 0;
-	private readonly freshNodes = new WeakSet<Node>();
+	readonly freshNodes = new WeakSet<Node>();
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
-	private suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
+	suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
 	/** The server node renderInPlace's body may adopt, until a template does. */
 	private inPlace: Node | null = null;
 	/** Whether inPlace stands after the fresh markers of renderUnframed's call. */
@@ -21489,8 +21540,8 @@ class HydrationCapability {
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
-	private rootRemainder: Node | null | undefined;
-	private rootCleanupBoundary: Node | null = null;
+	rootRemainder: Node | null | undefined;
+	rootCleanupBoundary: Node | null = null;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	/** Development, or stale captures: classes compared once the pass ends (settleValues). */
@@ -21585,9 +21636,9 @@ class HydrationCapability {
 	/** The island's first ID, which a discarded attempt's retry starts from again. */
 	idStart = 0;
 	/** The parents whose children this attempt recorded. */
-	private saved: Set<Node> | null = null;
+	saved: Set<Node> | null = null;
 	/** Restores what this attempt changed in the server DOM, newest last. */
-	private undo: (() => void)[] | null = null;
+	undo: (() => void)[] | null = null;
 	/**
 	 * Restores the outcomes that this attempt's seeds wrote to thenables, newest
 	 * last. A fallback renders from client data, so it discards them
@@ -21679,12 +21730,6 @@ class HydrationCapability {
 		this.speculative = this.undoable = false;
 		this.saved = this.undo = null;
 		if (undo !== null) for (let i = undo.length - 1; i >= 0; i--) undo[i]();
-	}
-
-	/** An island's attempt completed: it keeps the server nodes it changed. */
-	keepChanges(): void {
-		this.undoable = false;
-		this.saved = this.undo = null;
 	}
 
 	isActive(): boolean {
@@ -21896,19 +21941,6 @@ class HydrationCapability {
 		if (node === null || this.unclaimedScope !== scope) return;
 		this.unclaimed = this.unclaimedScope = null;
 		this.slotMismatch(scope, this.unclaimedKey, 'a component range', node);
-	}
-
-	/**
-	 * Resume `source`, the block that a preserved activation suspended in. A
-	 * source whose first render into its adopted range suspended claims that
-	 * range again, as the render that suspended did.
-	 */
-	renderSuspended(source: Block): void {
-		const claim = this.suspendedClaims?.get(source);
-		if (claim !== undefined) {
-			this.suspendedClaims!.delete(source);
-			this.renderClaimed(source, claim[0], claim[1]);
-		} else renderBlock(source);
 	}
 
 	/**
@@ -23543,32 +23575,6 @@ class HydrationCapability {
 		const parent = block.parentNode;
 		if ((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode === parent) return;
 		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, block.endMarker);
-	}
-
-	/**
-	 * After a Hydrate island's content adopted its server range, a server
-	 * sibling left after the island's complete client shape is content the
-	 * client renders nothing for: a mismatch, which the island falls back from.
-	 * Cursor-based adoption may stop on an owned range marker, and the client
-	 * may have built nodes there, so look past both, and past renderer style
-	 * sidecars. A root keeps the unmatched siblings in its container, as React
-	 * does, so only an island settles its remainder.
-	 */
-	finishRoot(): void {
-		let remainder = this.rootRemainder === undefined ? this.node : this.rootRemainder;
-		while (
-			remainder !== null &&
-			(remainder === this.rootCleanupBoundary ||
-				this.freshNodes.has(remainder) ||
-				isRendererHydrationStyle(remainder))
-		)
-			remainder = getNextSibling(remainder);
-		if (remainder === null) return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? componentSourceLoc(this.rootBlock.body) : undefined,
-			() => 'the end of the root',
-			remainder,
-		);
 	}
 
 	/**

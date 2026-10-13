@@ -392,3 +392,21 @@ export function StaticBranch(props: { server?: boolean }) @{
 		</section>
 	</div>
 }
+
+function Held(props: { server?: boolean; gate: Promise<string> }) @{
+	if (!props.server) use(props.gate);
+	<p>{'z'}</p>
+}
+
+// The client's call suspends inside the island, in its own adopted range,
+// before its template adopts the server's element.
+export function HeldBranch(props: { server?: boolean; gate: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				<Held server={props.server} gate={props.gate} />
+				<Em />
+			</section>
+		</Hydrate>
+	</div>
+}
