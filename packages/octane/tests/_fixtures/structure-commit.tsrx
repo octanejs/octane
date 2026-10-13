@@ -99,3 +99,47 @@ export function BranchProbeApp(props: { show: boolean; probe: () => void }) @{
 		<Probe probe={props.probe} />
 	</main>
 }
+
+function Row(props: { id: string; onCleanup: CleanupReport }) @{
+	const ref = useRef<HTMLElement | null>(null);
+	useLayoutEffect(() => {
+		const node = ref.current!;
+		return () => props.onCleanup(props.id, node.isConnected);
+	});
+	<li id={props.id} ref={ref}>
+		{props.id}
+	</li>
+}
+
+export interface ListProps {
+	rows: string[];
+	gate?: PromiseLike<unknown>;
+	probe: () => void;
+	onCleanup: CleanupReport;
+}
+
+// Two keyed lists: rows bounded by a pair (a component root), with an @empty
+// arm, and self-marked host rows between static siblings. The probe renders
+// after both lists reconcile.
+export function ListProbeApp(props: ListProps) @{
+	<main>
+		<ul id="paired">
+			@for (const row of props.rows; key row) {
+				<Row id={'row-' + row} onCleanup={props.onCleanup} />
+			} @empty {
+				<li id="empty">{'empty'}</li>
+			}
+		</ul>
+		<ol id="plain">
+			<li>{'first'}</li>
+			@for (const row of props.rows; key row) {
+				<li class="plain">{row as string}</li>
+			}
+			<li>{'last'}</li>
+		</ol>
+		<Probe probe={props.probe} />
+		@if (props.gate) {
+			<Gate gate={props.gate} />
+		}
+	</main>
+}

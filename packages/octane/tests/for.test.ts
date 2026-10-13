@@ -2065,7 +2065,7 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
-	it('keeps render-time row methods able to observe previously connected rows', () => {
+	it('renders every row before any of them connects, as React does', () => {
 		const items = makeRows().map((row) => ({
 			id: row.id,
 			read: () =>
@@ -2077,7 +2077,7 @@ describe('large keyed list fills', () => {
 		const r = mount(FastHostRenderCallList, { items: [] });
 		r.update(FastHostRenderCallList, { items });
 		expect(r.findAll('.fast-host-render-call-row').map((row) => row.textContent)).toEqual(
-			items.map((_, index) => String(index)),
+			items.map(() => '0'),
 		);
 		r.unmount();
 	});
@@ -2098,7 +2098,7 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
-	it('renders dynamic mapped component values after each row connects', () => {
+	it('renders dynamic mapped component values before their rows connect', () => {
 		const renderRows: number[] = [];
 		const renderValues: string[] = [];
 		const attached: boolean[] = [];
@@ -2116,7 +2116,8 @@ describe('large keyed list fills', () => {
 		const r = mount(FastMappedRenderableList, { items: [], value: 'inside' });
 
 		r.update(FastMappedRenderableList, { items, value: 'inside' });
-		expect(renderRows).toEqual(items.map((_, index) => index + 1));
+		// Rows connect at commit, so no render sees one; refs attach after.
+		expect(renderRows).toEqual(items.map(() => 0));
 		expect(renderValues).toEqual(items.map(() => 'inside'));
 		expect(attached).toEqual(items.map(() => true));
 		expect(r.findAll('.fast-renderable-row').map((row) => row.textContent)).toEqual(
@@ -2127,9 +2128,10 @@ describe('large keyed list fills', () => {
 
 	it('disposes a throwing dynamic child together with every completed row', () => {
 		let shouldThrow = true;
+		let renders = 0;
 		const attached: boolean[] = [];
-		const onRender = (connectedRows: number) => {
-			if (connectedRows === 12 && shouldThrow) throw new Error('child failed');
+		const onRender = () => {
+			if (++renders === 12 && shouldThrow) throw new Error('child failed');
 		};
 		const onRef = (element: HTMLSpanElement | null) => {
 			if (element !== null) attached.push(element.isConnected);
@@ -2249,14 +2251,14 @@ describe('large keyed list fills', () => {
 		try {
 			r.update(FastSuspendingGetterList, { items });
 			expect(r.find('#fast-suspending-getter-retry').textContent).toBe('key failed');
-			expect(abortedPrefixes[0]).toHaveLength(2);
-			expect(abortedPrefixes[0]!.every((row) => !row.isConnected)).toBe(true);
-			expect(abortedPrefixes[0]!.every((row) => row.parentNode === null)).toBe(true);
+			// The completed prefix renders off-document and never connects.
+			expect(abortedPrefixes[0]).toHaveLength(0);
 			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
 
 			failKey = false;
 			r.click('#fast-suspending-getter-retry');
 			expect(r.find('#fast-suspending-getter-pending').textContent).toBe('loading');
+			// The retry builds a fresh body, whose discarded prefix leaves with it.
 			expect(abortedPrefixes[1]).toHaveLength(2);
 			expect(abortedPrefixes[1]!.every((row) => !row.isConnected)).toBe(true);
 			expect(abortedPrefixes[1]!.every((row) => row.parentNode === null)).toBe(true);

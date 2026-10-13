@@ -3,7 +3,9 @@ import { createRoot, startTransition } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
 import {
 	BranchProbeApp,
+	ListProbeApp,
 	StructureApp,
+	type ListProps,
 	type StructureProps,
 } from './_fixtures/structure-commit.tsrx';
 
@@ -160,4 +162,109 @@ describe('structural deletions commit with their render', () => {
 			container.remove();
 		}
 	});
+});
+
+describe('keyed lists change their structure at commit', () => {
+	function setupList(rows: string[]) {
+		const log: string[] = [];
+		let observing = false;
+		let during: MutationRecord[] | null = null;
+		// Every record the lists produce, delivered or still queued.
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		const mutations = () => {
+			records.push(...observer.takeRecords());
+			return records.splice(0);
+		};
+		const initial: ListProps = {
+			rows,
+			probe: () => {
+				if (observing) during = mutations();
+			},
+			onCleanup: (id, connected) => log.push(`${id}:${connected}`),
+		};
+		const app = mount(ListProbeApp, initial);
+		observer.observe(app.find('main'), {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			characterData: true,
+		});
+		const render = async (props: Partial<ListProps>, priority: Priority) => {
+			mutations();
+			observing = true;
+			during = null;
+			try {
+				await act(() => {
+					const next = () => app.root.render(ListProbeApp, { ...initial, ...props });
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			} finally {
+				observing = false;
+			}
+			return during;
+		};
+		return { app, log, observer, mutations, render };
+	}
+
+	const lists = (app: MountResult) => app.findAll('ul, ol').map((list) => [...list.childNodes]);
+	const sameNodes = (a: Node[][], b: Node[][]) =>
+		a.length === b.length &&
+		a.every((nodes, i) => nodes.length === b[i].length && nodes.every((n, j) => n === b[i][j]));
+	const labels = (app: MountResult) => [
+		app.findAll('#paired li').map((node) => node.id),
+		app.findAll('.plain').map((node) => node.textContent),
+	];
+
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`a dropped ${priority} render leaves the old rows connected, in order, and untouched`, async () => {
+			const { app, log, observer, mutations, render } = setupList(['a', 'b', 'c', 'd']);
+			const before = lists(app);
+			const survivors = ['#row-a', '#row-b', '#row-d'].map((id) => app.find(id));
+			const plain = () => app.findAll('.plain').filter((node) => node.textContent !== 'x');
+			const plainSurvivors = plain().filter((node) => node.textContent !== 'c');
+			try {
+				// Removes c, inserts x and moves d first while a sibling suspends.
+				await render({ rows: ['d', 'x', 'b', 'a'], gate: new Promise(() => {}) }, priority);
+				expect(mutations()).toEqual([]);
+				expect(sameNodes(lists(app), before)).toBe(true);
+				expect(log).toEqual([]);
+
+				// The render that completes lands the same change, keeping survivors.
+				await render({ rows: ['d', 'x', 'b', 'a'] }, priority);
+				expect(labels(app)).toEqual([
+					['row-d', 'row-x', 'row-b', 'row-a'],
+					['d', 'x', 'b', 'a'],
+				]);
+				['#row-a', '#row-b', '#row-d'].forEach((id, i) => expect(app.find(id)).toBe(survivors[i]));
+				// d, b, a: the same nodes in their new order.
+				const moved = plain();
+				[2, 1, 0].forEach((old, i) => expect(moved[i]).toBe(plainSurvivors[old]));
+				expect(log).toEqual(['row-c:true']);
+			} finally {
+				observer.disconnect();
+				app.unmount();
+			}
+		});
+
+		it(`builds rows off-document and lands them at commit (${priority})`, async () => {
+			const { app, observer, render } = setupList(['a', 'b']);
+			try {
+				for (const rows of [['b', 'c', 'a'], [], ['z'], ['y', 'z'], ['z', 'w', 'y']]) {
+					// Nothing reached the committed DOM while the lists reconciled.
+					expect(await render({ rows }, priority)).toEqual([]);
+					expect(labels(app)).toEqual([
+						rows.length === 0 ? ['empty'] : rows.map((row) => 'row-' + row),
+						rows,
+					]);
+					expect(app.find('#plain').firstElementChild!.textContent).toBe('first');
+					expect(app.find('#plain').lastElementChild!.textContent).toBe('last');
+				}
+			} finally {
+				observer.disconnect();
+				app.unmount();
+			}
+		});
+	}
 });

@@ -4207,7 +4207,6 @@ interface RootRenderTransaction {
 	ops: any[];
 	/** Open render frames; a nested flushSync must not commit a render still running. */
 	rendering: number;
-	parked: ParkedItem[] | null;
 	/** Hook-cell folds published at commit, five slots each (foldHookQueue). */
 	cells: any[] | null;
 	/** Transition batches folded into this transaction (noteTransitionBatch). */
@@ -4243,7 +4242,6 @@ interface RootRenderFrame {
 	checkpoint: number;
 	bagWindow: number;
 	depth: number;
-	parked: ParkedItem[] | null;
 	capture: OffscreenCapture | null;
 	discardStamp: number;
 	opsCheckpoint: number;
@@ -4303,7 +4301,6 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			structures: null,
 			ops: [],
 			rendering: 0,
-			parked: null,
 			cells: null,
 			batches: null,
 			holders: null,
@@ -4325,7 +4322,6 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		checkpoint: TRANSITION_JOURNAL_CHECKPOINT,
 		bagWindow: TRANSITION_JOURNAL_BAG_WINDOW,
 		depth: TRANSITION_JOURNAL_DEPTH,
-		parked: PARKED_ITEMS,
 		capture: WIP_CAPTURE,
 		discardStamp: ROOT_DISCARD_STAMP,
 		opsCheckpoint: OPS_CHECKPOINT,
@@ -4342,7 +4338,6 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	TRANSITION_JOURNAL_BAG_WINDOW = transaction.bagWindow;
 	TRANSITION_JOURNAL_DEPTH = 1;
 	OPS_CHECKPOINT = 0;
-	PARKED_ITEMS = transaction.parked;
 	WIP_CAPTURE = transaction.capture;
 	return frame;
 }
@@ -4352,7 +4347,6 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	frame.transaction.rendering--;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootExit();
-	frame.transaction.parked = PARKED_ITEMS;
 	ROOT_RENDER_TRANSACTION = frame.previous;
 	ROOT_DISCARD_STAMP = frame.discardStamp;
 	TRANSITION_JOURNAL = frame.log;
@@ -4361,7 +4355,6 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	TRANSITION_JOURNAL_BAG_WINDOW = frame.bagWindow;
 	TRANSITION_JOURNAL_DEPTH = frame.depth;
 	OPS_CHECKPOINT = frame.opsCheckpoint;
-	PARKED_ITEMS = frame.parked;
 	WIP_CAPTURE = frame.capture;
 }
 
@@ -4651,10 +4644,13 @@ function openFrontier(
 	return frag;
 }
 
-/** Record what a frontier fragment's commit rehomes: anything created with it as its parent. */
+/**
+ * Record what a frontier fragment's commit rehomes: anything created with it
+ * as its parent, paired with that fragment (a list's runs each have their own).
+ */
 function noteFrontierMember(parent: Node, member: object): void {
 	const next: SlotNext | undefined = (parent as any).$$next;
-	if (next !== undefined) next.members!.push(member);
+	if (next !== undefined) next.members!.push(member, parent);
 }
 
 /**
@@ -4675,8 +4671,9 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	const owner = owningBlock(parentBlock);
 	if (isCreatedInRootRender(transaction, owner) && !transaction.retainedCreated?.has(owner))
 		return false;
-	// A lite Scope this render created carries its owner's stamp but fresh DOM.
-	if (owner === parentBlock) return true;
+	// A committed Block can still render a slot into fresh DOM, as can a lite
+	// Scope this render created under one: a frontier, which commit inserts.
+	if ((STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).isConnected) return true;
 	let node = domParent;
 	for (
 		let parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
@@ -4710,57 +4707,61 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 
 function applyNext(next: SlotNext): void {
 	const out = next.out;
-	const parent = next.parent;
+	const parent = next.parent!;
 	let before = next.before;
 	if (next.follows && out.length !== 0) {
 		const first: Node | null = out[out.length - 2];
 		if (first !== null && (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === parent)
 			before = getNextSibling(out[out.length - 1]);
 	}
-	applyOutgoing(out);
-	const frag = next.frag;
+	applyOutgoing(out, parent);
+	const members = next.members;
 	// A deletion cleanup can unmount the slot's owner before its content lands.
-	if (frag === null || next.owner!.disposed) return;
-	(STAGED_DOM ? STAGED_DOM.view(parent!) : parent!).insertBefore(frag, before);
-	const members = next.members!;
-	for (let i = 0; i < members.length; i++) rehomeMember(members[i], frag, parent!);
+	if (members === null || next.owner!.disposed) return;
+	const frag = next.frag;
+	if (frag !== null) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(frag, before);
+	for (let i = 0; i < members.length; i += 2) {
+		const member = members[i];
+		const from = members[i + 1];
+		if (member.__kind !== undefined) {
+			rehomeSlot(member, from, parent);
+			continue;
+		}
+		// A Block or a lite Scope's stand-in, and the binding-bag fields its body
+		// cached from the fragment. A lone root node has no root-level hole to
+		// cache its parent for. Inline: a fresh run rehomes one Block per row.
+		const block = member.block;
+		if (block.parentNode === from) block.parentNode = parent;
+		const bag = member.slots[0];
+		if (
+			bag != null &&
+			bag[BINDING_BAG_ARITY] !== undefined &&
+			(block.startMarker === null || block.startMarker !== block.endMarker)
+		)
+			for (const key in bag) if (bag[key] === from) bag[key] = parent;
+	}
 	const bound = next.bound;
 	if (bound !== null) replaceSharedBlockBoundary(bound[0], bound[1], bound[2], bound[3], bound[4]);
 	if (process.env.NODE_ENV !== 'production')
-		for (let i = 0; i < members.length; i++) assertRehomed(members[i], frag);
+		for (let i = 0; i < members.length; i += 2) assertRehomed(members[i], members[i + 1]);
+	if (frag === null) return;
 	(frag as any).$$next = undefined;
 	// Nothing names a committed frontier any more (assertRehomed).
 	if (!STAGED_DOM && SPARE_FRONTIERS.length < 64 && getFirstChild(frag) === null)
 		SPARE_FRONTIERS.push(frag);
 }
 
-/**
- * Point what was created directly in a committed frontier at its live parent:
- * a try slot's parent, or a Block's (or lite Scope's stand-in's) parent and
- * the binding-bag fields its compiled body cached from it.
- */
-function rehomeMember(member: any, frag: DocumentFragment, parent: Node): void {
-	if (member.__kind === 'trySlotSlot' || member.__kind === 'errorSlotSlot') {
+/** Point a try, error or portal slot created directly in a committed frontier at its live parent. */
+function rehomeSlot(member: any, frag: DocumentFragment, parent: Node): void {
+	if (member.__kind !== 'portalSlotSlot') {
 		if (member.domParent === frag) member.domParent = parent;
 		return;
 	}
-	if (member.__kind === 'portalSlotSlot') {
-		// Its content bubbles to its logical parent, stamped as it rendered.
-		if (member.host !== frag) return;
-		member.host = parent;
-		for (
-			let n = getNextSibling(member.start);
-			n !== null && n !== member.end;
-			n = getNextSibling(n)
-		)
-			if ((n as any).$$portalParent === frag) (n as any).$$portalParent = parent;
-		return;
-	}
-	const block = member.block;
-	if (block.parentNode === frag) block.parentNode = parent;
-	const bag = member.slots[0];
-	if (bag != null && bag[BINDING_BAG_ARITY] !== undefined)
-		for (const key in bag) if (bag[key] === frag) bag[key] = parent;
+	// Its content bubbles to its logical parent, stamped as it rendered.
+	if (member.host !== frag) return;
+	member.host = parent;
+	for (let n = getNextSibling(member.start); n !== null && n !== member.end; n = getNextSibling(n))
+		if ((n as any).$$portalParent === frag) (n as any).$$portalParent = parent;
 }
 
 /** Development check: nothing below a committed frontier still names its fragment. */
@@ -4798,34 +4799,47 @@ function queueRootDeletion(owner: unknown, first: Node | null, last: Node | null
  * Each range's hosts retire first, so no cleanup can move focus off them while
  * they still dispatch. Its owner's cleanups then run against connected DOM, and
  * only then do the nodes leave. The range is read here, at commit, not in render.
+ *
+ * A list's log (listNext) also holds its moves and its fresh runs, in render
+ * order, so each lands against the DOM the render saw: a survivor moves before
+ * its anchor, and a run's fragment goes into `parent` before its anchor.
  */
-function applyOutgoing(out: any[]): void {
+function applyOutgoing(out: any[], parent?: Node): void {
 	for (let i = 0; i < out.length; i += 3) {
+		const kind = out[i];
+		if (kind === moveBlockBefore || kind === placeRun) {
+			// A deletion cleanup can unmount the list before the rest of its log.
+			const anchor: Node = out[i + 2];
+			if ((STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).parentNode === parent) {
+				if (kind === placeRun) placeRun(parent!, out[i + 1], anchor);
+				else if (!out[i + 1].disposed) moveBlockBefore(out[i + 1], anchor);
+			}
+			continue;
+		}
 		const first: Node | null = out[i + 1];
 		const last: Node | null = out[i + 2];
-		const parent = first === null ? null : (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode;
-		if (first === last && parent !== null) {
+		const host = first === null ? null : (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode;
+		if (first === last && host !== null) {
 			// A self-marked root: one node, no range to collect.
 			retireEventHostTree(first!);
-			if (out[i] !== null) releaseOutgoing(out[i]);
-			if ((STAGED_DOM ? STAGED_DOM.view(first!) : first!).parentNode === parent)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(first!);
+			if (kind !== null) releaseOutgoing(kind);
+			if ((STAGED_DOM ? STAGED_DOM.view(first!) : first!).parentNode === host)
+				(STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(first!);
 			continue;
 		}
 		const nodes: Node[] = [];
-		if (parent !== null) {
+		if (host !== null) {
 			for (let node: Node | null = first; node !== null; node = getNextSibling(node)) {
 				nodes.push(node);
 				if (node === last) break;
 			}
 		}
 		for (let j = 0; j < nodes.length; j++) retireEventHostTree(nodes[j]);
-		const owner = out[i];
-		if (owner !== null) releaseOutgoing(owner);
+		if (kind !== null) releaseOutgoing(kind);
 		for (let j = 0; j < nodes.length; j++) {
 			const node = nodes[j];
-			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === parent)
-				(STAGED_DOM ? STAGED_DOM.view(parent!) : parent!).removeChild(node);
+			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === host)
+				(STAGED_DOM ? STAGED_DOM.view(host!) : host!).removeChild(node);
 		}
 	}
 }
@@ -4882,7 +4896,7 @@ function defersRootUnmount(block: Block): boolean {
  * Block, or a lite arm's Scope whose stand-in carries the range; a stand-in
  * reads as neither a root nor disposed. An `exclusive` range keeps its pair.
  */
-function queueRootUnmount(scope: Scope, exclusive: boolean): void {
+function queueRootUnmount(scope: Scope, exclusive: boolean, out?: any[]): void {
 	const block = scope.block;
 	retireRootBlock(block);
 	const start = block.startMarker;
@@ -4908,7 +4922,7 @@ function queueRootUnmount(scope: Scope, exclusive: boolean): void {
 	}
 	// A teardown inside an aborted mount keeps that mount's ref suppression.
 	const suppressed = REF_DETACH_SUPPRESSION;
-	queueRootDeletion(
+	const owner =
 		suppressed === null
 			? scope
 			: () => {
@@ -4919,10 +4933,73 @@ function queueRootUnmount(scope: Scope, exclusive: boolean): void {
 					} finally {
 						REF_DETACH_SUPPRESSION = previous;
 					}
-				},
-		first,
-		last,
-	);
+				};
+	if (out === undefined) queueRootDeletion(owner, first, last);
+	else {
+		// A list row (or @empty) whose deletion waits for the list's commit.
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.ROW_PARK);
+		out.push(owner, first, last);
+	}
+}
+
+/**
+ * A keyed list's pending structure in the open root render, or null when the
+ * list writes its DOM as it renders: outside a root render, for a fresh list,
+ * or while hydration adopts server rows. Its `out` is a log of the rows' DOM
+ * work in render order (row deletions, survivor moves, and fresh runs, each a
+ * fragment of rows that lands before one anchor), replayed by its commit
+ * entry. The entry takes `at`, where the reconcile began in the commit queue,
+ * so the list's deletions run before its survivors' value commits.
+ */
+function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | null {
+	const tx = ROOT_RENDER_TRANSACTION;
+	if (tx === null) return null;
+	let next = state.next;
+	if (next !== null && next.tx === tx) {
+		// A nested window that drops restores the log it grew.
+		if (TRANSITION_JOURNAL_DEPTH > 1) journalObjectOnce(next.out);
+		return next;
+	}
+	const parent = domNode(state.end).parentNode!;
+	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
+	next = state.next = {
+		tx,
+		out: [],
+		frag: null,
+		parent,
+		before: null,
+		members: [],
+		owner: owningBlock(parentBlock),
+		follows: false,
+		bound: null,
+	};
+	const ops = tx.ops;
+	if (at >= ops.length) ops.push(applySlotNext, state);
+	else ops.splice(at, 0, applySlotNext, state);
+	return next;
+}
+
+/** The fragment fresh rows that land before `anchor` render into: the log's last run, or a new one. */
+function listRun(next: SlotNext, anchor: Node): DocumentFragment {
+	const out = next.out;
+	const n = out.length;
+	if (n !== 0 && out[n - 3] === placeRun && out[n - 1] === anchor) return out[n - 2];
+	const frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	(frag as any).$$next = next;
+	out.push(placeRun, frag, anchor);
+	return frag;
+}
+
+/**
+ * Land a fresh run's rows, whose members applyNext then rehomes. Each node
+ * goes in on its own, as React places each new row: a custom element in a
+ * row connects before the next row arrives.
+ */
+function placeRun(parent: Node, frag: DocumentFragment, anchor: Node): void {
+	for (let node = getFirstChild(frag); node !== null; node = getFirstChild(frag))
+		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
+	(frag as any).$$next = undefined;
 }
 
 function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block): boolean {
@@ -5018,11 +5095,6 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 			for (let i = created.length - 1; i >= 0; i--)
 				if (!created[i].disposed) undoCreatedInRootRender(created[i], transaction);
 		discardOffscreenCapture(transaction.capture);
-		// Restored rows have already left the parked list. Only speculative
-		// rows remain, and their ref attachments were never committed.
-		const checkpoint = refDetachQueue.length;
-		flushParkedItems();
-		refDetachQueue.length = checkpoint;
 	} finally {
 		ROOT_RENDER_ROLLBACK = previousRollback;
 		endRootRender(frame);
@@ -5169,13 +5241,6 @@ function commitRootRenders(): void {
 			const acceptedGeneration = owner.generation;
 			// The mutation phase precedes the incoming ref/layout publication.
 			if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
-			const parked = transaction.parked;
-			if (parked !== null) {
-				for (const item of parked) {
-					if (owner.disposed || owner.generation !== acceptedGeneration) break;
-					unmountParkedItem(item);
-				}
-			}
 			if (NATIVE_READ_DRIVER) {
 				if (
 					!DEFERRED_LAYOUT_DRIVER ||
@@ -5489,116 +5554,6 @@ function journalControlledOption(option: HTMLOptionElement, withDefault: boolean
 }
 
 /**
- * Item blocks a keyed list dropped while a hold was still possible.
- *
- * The key map and chain can drop a row before the render knows whether it will
- * suspend. Root transactions keep its DOM connected until commit: detaching a
- * focused input emits native events that rollback cannot undo. Existing
- * hold-only callers can park detached ranges, but both forms defer scope and
- * lifecycle teardown until success and return the original nodes on rollback.
- */
-interface ParkedItem {
-	block: Block;
-	/** Preserve the exact row range across later journal windows that can detach it. */
-	nodes: Node[];
-}
-let PARKED_ITEMS: ParkedItem[] | null = null;
-
-/** Top-level nodes belonging to an earlier, still-connected deletion of this list. */
-function retainedForSlotNodes(state: ForSlot, retained: Set<Node> | null): Set<Node> | null {
-	const parked = PARKED_ITEMS;
-	if (parked !== null) {
-		for (const item of parked) {
-			const previous = item.block;
-			if (
-				previous.forSlot !== state &&
-				!(
-					previous.exclusiveMarkers &&
-					previous.startMarker === state.start &&
-					previous.endMarker === state.end
-				)
-			)
-				continue;
-			for (const node of item.nodes) (retained ??= new Set()).add(node);
-		}
-	}
-	// Certified owned-list clears retire inert hosts without parking them.
-	const retired = ROOT_RENDER_TRANSACTION!.retired;
-	if (retired !== null) {
-		for (const row of retired) {
-			if (row.forSlot !== state) continue;
-			const start = row.startMarker;
-			if (start !== null && start === row.endMarker) (retained ??= new Set()).add(start);
-		}
-	}
-	return retained;
-}
-
-/** Retain an outgoing row's nodes and scope until its render can commit. */
-function parkItemForHold(block: Block, owningList?: ForSlot): void {
-	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileCount(ProfileCounter.ROW_PARK);
-	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
-	if (retainConnected) retireRootBlock(block);
-	// @empty borrows the list's markers. Its saved nodes must not overlap rows
-	// retired in an earlier window, or a prior parked @empty arm's own content.
-	const excluded =
-		owningList !== undefined && retainConnected ? retainedForSlotNodes(owningList, null) : null;
-	// A later nested window can sweep an already parked row out of the live
-	// DOM before this window rolls back. Retain the original nodes now, while
-	// the row is still attached; only detach on non-root holds. An @empty arm
-	// saves only nodes it owns, even though its markers span retired rows.
-	const nodes: Node[] = [];
-	const start = block.startMarker;
-	const end = block.endMarker;
-	if (start && end) {
-		const parent = (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode;
-		if (parent !== null) {
-			const exclusive = block.exclusiveMarkers;
-			let n: Node | null = exclusive ? getNextSibling(start) : start;
-			const stop = exclusive ? end : getNextSibling(end);
-			if (excluded === null) {
-				while (n !== null && n !== stop) {
-					const next: Node | null = getNextSibling(n);
-					if (!retainConnected) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
-					nodes.push(n);
-					n = next;
-				}
-			} else {
-				while (n !== null && n !== stop) {
-					const next: Node | null = getNextSibling(n);
-					if (!excluded.has(n)) {
-						if (!retainConnected) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
-						nodes.push(n);
-					}
-					n = next;
-				}
-			}
-		}
-	}
-	(PARKED_ITEMS ??= []).push({ block, nodes });
-}
-
-/** True while a keyed removal must be undoable rather than final. */
-function itemRemovalDefers(): boolean {
-	return TRANSITION_JOURNAL !== null;
-}
-
-/**
- * True when rows removed from `state` may defer their teardown for a possible
- * hold. Parking is only sound when this list's shape went into the journal:
- * restoreForSlot is the only thing that brings parked rows back, and it can
- * only find them through the list's structural undo entry. A caller tearing rows down
- * OUTSIDE the journal's knowledge — a value-position slot leaving array mode
- * discards the slot itself — must remove immediately, as it always did:
- * parking there would strand the rows as deferred-but-unrestorable and push
- * their cleanups past the rest of the attempt.
- */
-function forSlotParkable(state: ForSlot): boolean {
-	return TRANSITION_JOURNAL !== null && TRANSITION_JOURNAL_BAGS!.has(state);
-}
-
-/**
  * A keyed list's rollback record for one journal window. The full form copies
  * the chain, and the key Map's order where it differs, before a reconcile
  * relinks rows wholesale. The link form serves the shapes that relink a bounded
@@ -5810,17 +5765,20 @@ function journalForOwnedListClear(state: ForSlot): void {
 	state.inOrder = true;
 }
 
-/** Put a keyed list back the way it was, rows and order together. */
+/**
+ * Put a keyed list's rows and order back. A root render left the list's DOM
+ * as it was (listNext), so only its records move.
+ */
 function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): void {
 	// Rows the aborted attempt freshly mounted are not in the snapshot, so
 	// restoring the old chain would simply forget them. Their DOM goes with the
-	// unmatched-node removal below, but the scope has to go NOW, before the overwrite makes
-	// them unreachable: the disposed stamp is what keeps their queued mount
-	// effects and ref attaches from firing for a row that never reached the
-	// screen, and it runs the render-time cleanups they registered. Parked rows
-	// are never on the chain, so this reaches exactly the fresh mounts. For a
-	// map-swap clear the original chain cannot become live before its own undo:
-	// later windows undo first, and later fills use the replacement map.
+	// dropped run, but the scope has to go NOW, before the overwrite makes them
+	// unreachable: the disposed stamp is what keeps their queued mount effects
+	// and ref attaches from firing for a row that never reached the screen, and
+	// it runs the render-time cleanups they registered. Removed rows are never
+	// on the chain, so this reaches exactly the fresh mounts. For a map-swap
+	// clear the original chain cannot become live before its own undo: later
+	// windows undo first, and later fills use the replacement map.
 	const preservedMap: Map<any, Block> | null = chain === null ? snapshot.entries : null;
 	const kept: Set<Block> | null = chain === null ? null : new Set(chain);
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
@@ -5829,8 +5787,7 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	// Those teardowns dispatch their cleanup errors immediately, and an error
 	// routed to the enclosing boundary flips it to @catch — disposing this
 	// slot's whole range out from under the restore. Same mid-render teardown
-	// invariant as renderReturnedValue's disposed check: stop here, and let
-	// flushParkedItems finish off whatever stayed parked.
+	// invariant as renderReturnedValue's disposed check: stop here.
 	if (domNode(state.end).parentNode === null) return;
 	state.head = chain === null ? snapshot.head : (chain[0] ?? null);
 	state.tail = chain === null ? snapshot.tail : (chain[chain.length - 1] ?? null);
@@ -5854,92 +5811,12 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 		}
 		state.inOrder = keyOrder === originalChain;
 	}
-	// Collect the committed ranges before removing speculative nodes. An
-	// earlier window may have parked rows that a later sweep detached, so use
-	// their saved node lists rather than reading their current DOM position.
-	const nodes: Node[] = [];
-	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		const parked = takeParkedItem(b);
-		if (parked !== null) for (const node of parked) nodes.push(node);
-		else if (b.startMarker !== null && b.startMarker === b.endMarker) {
-			// An inert owned-list clear can retain a single host without parking it.
-			// A later window may detach it before this snapshot is restored; the
-			// Block still holds its exact Node and can reinsert it here.
-			nodes.push(b.startMarker);
-		} else for (const node of collectBlockRange(b)) nodes.push(node);
-	}
 	// The @empty branch swaps with the rows, so it rolls back with them. A
-	// branch the aborted render mounted is scope-only torn down before the
-	// unmatched-node removal; one it parked comes back like a row.
+	// branch the aborted render mounted is scope-only torn down.
 	if (state.emptyBlock !== snapshot.empty) {
 		if (state.emptyBlock !== null) unmountBlock(state.emptyBlock, false);
 		state.emptyBlock = snapshot.empty;
 	}
-	// The @empty teardown can dispose the range the same way the orphan walk can.
-	if (domNode(state.end).parentNode === null) return;
-	if (snapshot.empty !== null) {
-		const range = takeParkedItem(snapshot.empty) ?? collectBlockRange(snapshot.empty);
-		for (const node of range) nodes.push(node);
-	}
-	const parent = domNode(state.end).parentNode!;
-	// An inner boundary may restore the @empty snapshot while an outer root
-	// attempt still owns rows parked inside those borrowed markers. Leave those
-	// rows connected until the outer attempt commits or rolls back; they are not
-	// members of this snapshot and must not be reordered with its nodes.
-	const keptNodes = new Set(nodes);
-	if (ROOT_RENDER_TRANSACTION !== null) retainedForSlotNodes(state, keptNodes);
-	let current: Node | null = getNextSibling(state.start);
-	while (current !== null && current !== state.end) {
-		const next: Node | null = getNextSibling(current);
-		if (!keptNodes.has(current))
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(current);
-		current = next;
-	}
-	// Do not detach already-correct survivors. Apart from preserving native focus
-	// events, this keeps the platform's input/composition state on the same nodes.
-	let anchor: Node = state.end;
-	for (let i = nodes.length - 1; i >= 0; i--) {
-		const node = nodes[i];
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent ||
-			getNextSibling(node) !== anchor
-		) {
-			if (renderingFocus !== null) moveFocusedNodeBefore(parent, node, anchor, renderingFocus);
-			else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-		}
-		anchor = node;
-	}
-}
-
-/** Remove and return a block's parked nodes, or null if it is not parked. */
-function takeParkedItem(block: Block): Node[] | null {
-	const parked = PARKED_ITEMS;
-	if (parked === null) return null;
-	for (let i = 0; i < parked.length; i++) {
-		if (parked[i].block === block) {
-			const nodes = parked[i].nodes;
-			parked.splice(i, 1);
-			return nodes;
-		}
-	}
-	return null;
-}
-
-/** The nodes a still-attached block currently owns, in order. */
-function collectBlockRange(block: Block): Node[] {
-	const nodes: Node[] = [];
-	const start = block.startMarker;
-	const end = block.endMarker;
-	if (!start || !end || (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === null)
-		return nodes;
-	const exclusive = block.exclusiveMarkers;
-	let n: Node | null = exclusive ? getNextSibling(start) : start;
-	const stop = exclusive ? end : getNextSibling(end);
-	while (n !== null && n !== stop) {
-		nodes.push(n);
-		n = getNextSibling(n);
-	}
-	return nodes;
 }
 
 function journalText(node: Text, previous: string | null): void {
@@ -6011,35 +5888,6 @@ function disarmTransitionJournal(checkpoint: number): void {
 	if (--TRANSITION_JOURNAL_DEPTH === 0) {
 		TRANSITION_JOURNAL = null;
 		TRANSITION_JOURNAL_BAGS = null;
-		flushParkedItems();
-	}
-}
-
-/**
- * Tear down the rows still parked when the last window closes. Anything a
- * rollback put back has already been taken off this list, so what is left is
- * genuinely gone and its cleanups are due. Root-retained ranges stay connected
- * through teardown; the saved nodes are removed after cleanup in either mode.
- */
-function flushParkedItems(): void {
-	const parked = PARKED_ITEMS;
-	if (parked === null) return;
-	PARKED_ITEMS = null;
-	for (let i = 0; i < parked.length; i++) unmountParkedItem(parked[i]);
-}
-
-/** Committed root deletions clean up against connected DOM before removing the range. */
-function unmountParkedItem(item: ParkedItem): void {
-	// Retire the row before any cleanup can move focus off it. Without focus in a
-	// drain, neither its removal nor a cleanup can blur it: an unfocused bulk
-	// removal stays free of per-row work.
-	if (renderingFocus !== null || !inFlush) for (const node of item.nodes) retireEventHostTree(node);
-	try {
-		unmountBlock(item.block, false);
-	} finally {
-		for (const node of item.nodes)
-			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== null)
-				domNode((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!).removeChild(node);
 	}
 }
 
@@ -12611,7 +12459,11 @@ function createBlock(
 		__profileBlockCreated();
 	if (parentBlock !== null && block.idState.renderOwner === ROOT_RENDER_TRANSACTION?.owner) {
 		createdInRootRender(block);
-		if (parentNode.nodeType === 11) noteFrontierMember(parentNode, block);
+		// noteFrontierMember, inlined: a fresh run creates one Block per row.
+		if (parentNode.nodeType === 11) {
+			const next: SlotNext | undefined = (parentNode as any).$$next;
+			if (next !== undefined) next.members!.push(block, parentNode);
+		}
 	}
 	return block;
 }
@@ -38610,6 +38462,7 @@ function renderPreparedChildList(
 			mappedNative: undefined,
 			selectionItems: undefined,
 			signalSite: undefined,
+			next: null,
 		};
 		if (upgradeArmed) {
 			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
@@ -45883,18 +45736,7 @@ function swapBranchFrontier(
 	if (body !== null) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
-		let end: Node;
-		// An end the arm keeps carries its marker; a reused sentinel may not yet.
-		let sentinel = false;
-		if (pairInFrag) end = state.end!;
-		else {
-			sentinel = SPARE_SENTINEL !== null;
-			end =
-				SPARE_SENTINEL ??
-				(STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-			SPARE_SENTINEL = null;
-			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).appendChild(end);
-		}
+		const end: Node = pairInFrag ? state.end! : frontierSentinel(frag!, '/' + marker);
 		arm = createBlock('control-flow', parentBlock, frag!, null, end, body, undefined, env);
 		const retryLocation: SignalRetryLocation | undefined =
 			parentBlock.idState.renderOwner?.signalOwner === undefined
@@ -45932,7 +45774,6 @@ function swapBranchFrontier(
 			// inside it, so discarding the arm never reaches committed nodes.
 			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
-			if (sentinel) domNode(end as Comment).data = '/' + marker;
 			arm.startMarker = start;
 			arm.exclusiveMarkers = true;
 		} else if (
@@ -45941,9 +45782,7 @@ function swapBranchFrontier(
 			!(state.next!.bound !== null || sharesBlockBoundary(parentBlock, oldStart, oldEnd))
 		) {
 			// A pending arm owns nothing yet; its anchor is where it will land.
-			markerlessBranchRoots(arm, frag!, end, before);
-			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).removeChild(end);
-			SPARE_SENTINEL = end as Comment;
+			releaseFrontierSentinel(arm, frag!, end as Comment, before);
 			arm.endMarker = before;
 			pending = true;
 		} else if (
@@ -45955,16 +45794,12 @@ function swapBranchFrontier(
 		) {
 			// One element bounds the arm itself. A root slot that produced it
 			// inserts where the arm's content lands among the committed nodes.
-			markerlessBranchRoots(arm, frag!, end, before);
-			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).removeChild(end);
-			// Nothing names the sentinel now: the next arm can stand on it.
-			SPARE_SENTINEL = end as Comment;
+			releaseFrontierSentinel(arm, frag!, end as Comment, before);
 			arm.startMarker = content;
 			arm.endMarker = content;
 		} else {
 			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
-			if (sentinel) domNode(end as Comment).data = '/' + marker;
 			arm.startMarker = start;
 			arm.exclusiveMarkers = true;
 		}
@@ -46019,11 +45854,36 @@ function swapBranchFrontier(
 }
 
 /**
- * The end sentinel a self-marked frontier arm removed (swapBranchFrontier).
- * Nothing names it once its root slots are retargeted, so the next arm reuses
- * it rather than minting and collecting a comment per swap.
+ * The end sentinel a frontier render last released (releaseFrontierSentinel).
+ * Nothing names it once its root slots are retargeted, so the next render
+ * reuses it rather than minting and collecting a comment per swap.
  */
 let SPARE_SENTINEL: Comment | null = null;
+
+/** Append an end sentinel to `frag`, reusing the spare one; its data is `data`. */
+function frontierSentinel(frag: DocumentFragment, data: string): Comment {
+	let end = SPARE_SENTINEL;
+	SPARE_SENTINEL = null;
+	if (end === null) end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(data);
+	else domNode(end).data = data;
+	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(end);
+	return end;
+}
+
+/**
+ * Retire a frontier sentinel once `scope` rendered before it: the root slots
+ * anchored on it insert before `before` instead, where the content lands.
+ */
+function releaseFrontierSentinel(
+	scope: Scope,
+	frag: DocumentFragment,
+	end: Comment,
+	before: Node | null,
+): void {
+	markerlessBranchRoots(scope, frag, end, before);
+	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).removeChild(end);
+	SPARE_SENTINEL = end;
+}
 
 /** Remove a fragment's fresh nodes after `after` (or from its start) up to `until`. */
 function removeAfter(frag: DocumentFragment, after: Node | null, until: Node | null): void {
@@ -47541,6 +47401,11 @@ interface ForSlot {
 	// Set only when the compiler proved a keyed equality selection. Identity
 	// gates the two-row update without retaining extra state on ordinary lists.
 	selectionItems: ArrayLike<any> | undefined;
+	/**
+	 * The open root render's pending structure (listNext): its `out` is the
+	 * rows' DOM work in render order, which the commit replays.
+	 */
+	next: SlotNext | null;
 }
 
 export function forBlock<T>(
@@ -47662,6 +47527,7 @@ export function forBlock<T>(
 			mappedNative: undefined,
 			selectionItems: undefined,
 			signalSite,
+			next: null,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -47681,6 +47547,8 @@ export function forBlock<T>(
 	if (ROOT_RENDER_TRANSACTION !== null && state.env !== deps)
 		journalRootProperty(state, 'env', state.env);
 	state.env = deps;
+	// Where the list's commit entry goes if this render changes its structure.
+	const at = ROOT_RENDER_TRANSACTION === null ? 0 : ROOT_RENDER_TRANSACTION.ops.length;
 	// `@empty` arm: when `items.length === 0` and the compiler emitted an
 	// empty-body helper, mount that body in place of the (empty) item list. We
 	// also tear down any previously-mounted items so transitioning items → 0 →
@@ -47717,12 +47585,23 @@ export function forBlock<T>(
 				// its first child; no redundant inner pair is necessary.
 				hydration.node = getNextSibling(state.start);
 			}
+			const next = listNext(state, parentBlock, at);
+			// A committed list's @empty renders off-document, in a run of its own
+			// before the list's end, and takes the list's markers as it lands.
+			let frag: DocumentFragment | null = null;
+			let sentinel: Comment | null = null;
+			if (next !== null) {
+				frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+				(frag as any).$$next = next;
+				next.out.push(placeRun, frag, state.end);
+				sentinel = frontierSentinel(frag, '/for');
+			}
 			const b = createBlock(
 				'control-flow',
 				parentBlock,
-				domParent,
-				state.start,
-				state.end,
+				frag ?? domParent,
+				frag === null ? state.start : null,
+				sentinel ?? state.end,
 				emptyBody,
 				undefined,
 				state.env,
@@ -47738,6 +47617,12 @@ export function forBlock<T>(
 				__profileCount(ProfileCounter.FOR_EMPTY_MOUNT);
 			state.emptyBlock = b;
 			renderBlock(b);
+			if (sentinel !== null) {
+				// Its root slots insert where its content lands; its bound is the list's.
+				releaseFrontierSentinel(b, frag!, sentinel, state.end);
+				b.startMarker = state.start;
+				b.endMarker = state.end;
+			}
 		}
 		// Advance the cursor past the whole @for so the next sibling's clone()
 		// doesn't read a position left inside this consumed range.
@@ -47748,12 +47633,18 @@ export function forBlock<T>(
 	// mounted, tear it down before reconciling so its DOM doesn't sit alongside
 	// the freshly-mounted items.
 	if (state.emptyBlock) {
-		// While a hold is possible the swap has to be reversible, exactly like a
-		// row removal: keep the branch's nodes and defer its teardown.
-		if (itemRemovalDefers()) {
-			journalForSlot(state);
-			parkItemForHold(state.emptyBlock, state);
-		} else unmountBlock(state.emptyBlock);
+		// A committed list deletes the branch at commit, like a row; one this
+		// render built leaves its run now.
+		const empty = state.emptyBlock;
+		if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+		const next = listNext(state, parentBlock, at);
+		if (next === null) unmountBlock(empty);
+		else if (!isCreatedInRootRender(next.tx, empty)) queueRootUnmount(empty, true, next.out);
+		else {
+			const run = empty.parentNode;
+			unmountBlock(empty, false);
+			if (run.nodeType === 11) removeAfter(run as DocumentFragment, null, null);
+		}
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.FOR_EMPTY_UNMOUNT);
 		state.emptyBlock = null;
@@ -47997,6 +47888,13 @@ function mountFastHostItems<T>(
 		if (state.mappedNative !== true) journalRootProperty(state, 'mappedNative', state.mappedNative);
 		state.mappedNative = true;
 	}
+	// A committed list's rows render off-document, in one run before its end.
+	const next =
+		ROOT_RENDER_TRANSACTION === null
+			? null
+			: listNext(state, parentBlock, ROOT_RENDER_TRANSACTION.ops.length);
+	const host = next === null ? parentNode : listRun(next, state.end);
+	const anchor = next === null ? state.end : null;
 	try {
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index];
@@ -48005,9 +47903,9 @@ function mountFastHostItems<T>(
 			const block = createBlock(
 				'control-flow',
 				parentBlock,
-				parentNode,
+				host,
 				null,
-				state.end,
+				anchor,
 				itemBody as ComponentBody,
 				item,
 				deps,
@@ -48030,8 +47928,7 @@ function mountFastHostItems<T>(
 			CURRENT_BLOCK = previousBlock;
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.endRender(block, true, false);
 			block.mounted = true;
-			const end = state.end;
-			const root = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling!;
+			const root = lastBefore(host, anchor)!;
 			block.startMarker = root;
 			block.endMarker = root;
 			state.items.set(key, block);
@@ -48053,8 +47950,7 @@ function mountFastHostItems<T>(
 			// its host. The still-unregistered row owns that host and any nested
 			// child scopes, so dispose it before unwinding the completed prefix.
 			if (current.slots[0] !== undefined) {
-				const end = state.end;
-				const root = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling;
+				const root = lastBefore(host, anchor);
 				if (root !== null && root !== state.start) {
 					current.startMarker = root;
 					current.endMarker = root;
@@ -48514,6 +48410,12 @@ function mountItemsLinear<T>(
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
 	const parentNode = domNode(state.end).parentNode!;
+	// A committed list's rows render off-document, in one run before its end.
+	const next =
+		ROOT_RENDER_TRANSACTION === null || passthroughList
+			? null
+			: listNext(state, parentBlock, ROOT_RENDER_TRANSACTION.ops.length);
+	const host = next === null ? parentNode : listRun(next, state.end);
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
 	// element's existing raw children, keyed like the incoming items. This cold
 	// map preserves later survivors after a removed/changed key, and reorders
@@ -48536,7 +48438,7 @@ function mountItemsLinear<T>(
 			const key = readListKey(keySource, item, i, normalizeKey);
 			if (observeKey !== undefined) observeKey(i, key);
 			let adoptNode: Node | null = null;
-			let anchor: Node = state.end;
+			let anchor: Node | null = next === null ? state.end : null;
 			if (adoptByKey !== null) {
 				anchor = (prev === null ? getNextSibling(state.start!) : getNextSibling(prev.endMarker!))!;
 				const candidate = adoptByKey.get(key);
@@ -48556,12 +48458,21 @@ function mountItemsLinear<T>(
 					}
 				}
 			}
-			const block =
+			const block: Block =
 				hydrating && passthroughList
-					? mountPassthroughListItem(parentBlock, parentNode, anchor, item, i, key, itemBody, state)
-					: mountItem(
+					? mountPassthroughListItem(
 							parentBlock,
 							parentNode,
+							anchor!,
+							item,
+							i,
+							key,
+							itemBody,
+							state,
+						)
+					: mountItem(
+							parentBlock,
+							host,
 							anchor,
 							item,
 							i,
@@ -48746,6 +48657,10 @@ function reconcileKeyed<T>(
 	const oldSize = state.size;
 	const newLen = items.length;
 	const parentNode = domNode(state.end).parentNode!;
+	// Where this reconcile's commit entry goes if it changes the list's structure
+	// (listNext), and that entry's pending structure once it does.
+	const at = ROOT_RENDER_TRANSACTION === null ? 0 : ROOT_RENDER_TRANSACTION.ops.length;
+	let next: SlotNext | null | undefined;
 	// Scalar survivor updates journal their own bindings. Capture the chain and
 	// key map only if reconciliation actually changes membership or order, so
 	// unchanged lists do not allocate a second O(N) representation every render.
@@ -48782,14 +48697,15 @@ function reconcileKeyed<T>(
 	}
 	// Fast path: clear all.
 	if (newLen === 0) {
-		const ownedRootClear = journalShape && canQueueOwnedListClear(state);
+		next = listNext(state, parentBlock, at);
+		const ownedRootClear = next !== null && canQueueOwnedListClear(state);
 		if (
 			ownedRootClear &&
 			(TRANSITION_JOURNAL_BAGS!.get(state) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
 		)
 			journalForOwnedListClear(state);
 		else if (journalShape) journalForSlot(state);
-		batchClearItems(state, ownedRootClear ? state.items : oldItems, ownedRootClear);
+		batchClearItems(state, ownedRootClear ? state.items : oldItems, next, ownedRootClear);
 		state.head = null;
 		state.tail = null;
 		state.size = 0;
@@ -48889,6 +48805,9 @@ function reconcileKeyed<T>(
 			links.set(beforeMiddle, beforeMiddle.nextSibling);
 		if (afterMiddle !== null) state.inOrder = false;
 		const anchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
+		next = listNext(state, parentBlock, at);
+		// Fresh rows render into a run that lands before the anchor at commit.
+		const host = next === null ? parentNode : listRun(next, anchor);
 		let prev: Block | null = beforeMiddle;
 		for (let i = prefixLen; i <= newEnd; i++) {
 			const item = items[i];
@@ -48896,8 +48815,8 @@ function reconcileKeyed<T>(
 			if (observeKey !== undefined) observeKey(i, key);
 			const block = mountItem(
 				parentBlock,
-				parentNode,
-				anchor,
+				host,
+				next === null ? anchor : null,
 				item,
 				i,
 				key,
@@ -48933,16 +48852,18 @@ function reconcileKeyed<T>(
 			if (beforeMiddle !== null && !links.has(beforeMiddle))
 				links.set(beforeMiddle, beforeMiddle.nextSibling);
 		}
+		next = listNext(state, parentBlock, at);
 		let cur: Block | null = oldFirst;
 		let removed = 0;
 		while (cur !== afterMiddle) {
-			const next: Block | null = cur!.nextSibling!;
-			if (itemRemovalDefers()) parkItemForHold(cur!);
+			const following: Block | null = cur!.nextSibling!;
+			// A committed list deletes the row at commit, after its cleanups.
+			if (next !== null) queueRootUnmount(cur!, false, next.out);
 			else unmountBlock(cur!);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileCount(ProfileCounter.LIST_REMOVE);
 			oldItems.delete(cur!.key);
-			cur = next;
+			cur = following;
 			removed++;
 		}
 		if (beforeMiddle) beforeMiddle.nextSibling = afterMiddle;
@@ -48999,19 +48920,21 @@ function reconcileKeyed<T>(
 		}
 		if (!anySurvivors) {
 			if (journalShape || record !== null) journalForSlot(state);
-			batchClearItems(state, oldItems);
+			next = listNext(state, parentBlock, at);
+			batchClearItems(state, oldItems, next);
 			state.inOrder = true;
 			state.head = null;
 			state.tail = null;
 			state.size = 0;
+			const host = next === null ? parentNode : listRun(next, state.end);
 			let prev: Block | null = null;
 			for (let i = 0; i < newLen; i++) {
 				const item = items[i];
 				const key = newKeys[i]; // prefixLen === 0, so newKeys spans the full list
 				const block = mountItem(
 					parentBlock,
-					parentNode,
-					state.end,
+					host,
+					next === null ? state.end : null,
 					item,
 					i,
 					key,
@@ -49055,7 +48978,7 @@ function reconcileKeyed<T>(
 		let cur: Block | null = oldFirst;
 		let oldIdx = 0;
 		while (cur !== afterMiddle) {
-			const next: Block | null = cur!.nextSibling!;
+			const following: Block | null = cur!.nextSibling!;
 			const newRelIdx =
 				hasStableKeys && newKeys[oldIdx] === cur!.key ? oldIdx : newKeysToIdx.get(cur!.key);
 			if (newRelIdx === undefined) {
@@ -49064,7 +48987,8 @@ function reconcileKeyed<T>(
 					journalShape = false;
 					record = null;
 				}
-				if (itemRemovalDefers()) parkItemForHold(cur!);
+				if (next === undefined) next = listNext(state, parentBlock, at);
+				if (next !== null) queueRootUnmount(cur!, false, next.out);
 				else unmountBlock(cur!);
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileCount(ProfileCounter.LIST_REMOVE);
@@ -49091,7 +49015,7 @@ function reconcileKeyed<T>(
 					updateSurvivor(cur!, newItem, newIdx, itemBody, pure, lite, indexIndependent, state.env);
 				}
 			}
-			cur = next;
+			cur = following;
 			oldIdx++;
 		}
 
@@ -49176,6 +49100,7 @@ function reconcileKeyed<T>(
 					for (const b of touched) if (b !== null && !links.has(b)) links.set(b, b.nextSibling);
 				}
 				const endAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
+				if (next === undefined) next = listNext(state, parentBlock, at);
 				// Move right-to-left. Positions to the right of the rightmost
 				// displaced index are identity-mapped and have stable startMarkers;
 				// each moved block becomes the next iteration's anchor.
@@ -49184,7 +49109,8 @@ function reconcileKeyed<T>(
 					const block = oldItems.get(newKeys[i])!;
 					const anchor: Node =
 						i + 1 < newMidLen ? oldItems.get(newKeys[i + 1])!.startMarker! : endAnchor;
-					moveBlockBefore(block, anchor);
+					if (next === null) moveBlockBefore(block, anchor);
+					else next.out.push(moveBlockBefore, block, anchor);
 				}
 				// Relink prev/next around each displaced position. Non-displaced
 				// neighbours of displaced blocks get their boundary pointers updated
@@ -49233,6 +49159,7 @@ function reconcileKeyed<T>(
 		}
 
 		if (journalShape || record !== null) journalForSlot(state);
+		if (next === undefined) next = listNext(state, parentBlock, at);
 		// Place survivors first, then mount new rows in authored order. Reversing
 		// mounts reverses their ref/layout/effect order even when the DOM is right.
 		const middleEndAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
@@ -49245,7 +49172,9 @@ function reconcileKeyed<T>(
 			for (let i = newMidLen - 1; i >= 0; i--) {
 				const block = oldItems.get(newKeys[i])!;
 				if (seqIdx < 0 || i !== seq[seqIdx]) {
-					moveBlockBefore(block, nextBlock ? nextBlock.startMarker! : middleEndAnchor);
+					const anchor = nextBlock ? nextBlock.startMarker! : middleEndAnchor;
+					if (next === null) moveBlockBefore(block, anchor);
+					else next.out.push(moveBlockBefore, block, anchor);
 				} else seqIdx--;
 				block.nextSibling = nextBlock;
 				if (nextBlock) nextBlock.prevSibling = block;
@@ -49264,8 +49193,10 @@ function reconcileKeyed<T>(
 			for (let i = newMidLen - 1; i >= 0; i--) {
 				if (sources[i] === -1) continue;
 				const block = oldItems.get(newKeys[i])!;
-				if (seqIdx < 0 || i !== seq[seqIdx]) moveBlockBefore(block, anchor);
-				else seqIdx--;
+				if (seqIdx < 0 || i !== seq[seqIdx]) {
+					if (next === null) moveBlockBefore(block, anchor);
+					else next.out.push(moveBlockBefore, block, anchor);
+				} else seqIdx--;
 				anchor = block.startMarker!;
 			}
 		}
@@ -49286,8 +49217,8 @@ function reconcileKeyed<T>(
 				const targetIdx = i + prefixLen;
 				block = mountItem(
 					parentBlock,
-					parentNode,
-					anchor,
+					next === null ? parentNode : listRun(next, anchor),
+					next === null ? anchor : null,
 					items[targetIdx],
 					targetIdx,
 					key,
@@ -49345,8 +49276,8 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
 /**
  * Keep an owned list's inert rows connected until the root accepts its render,
  * then release their scopes and remove their host nodes in one DOM operation.
- * Rows with lifecycle work stay on the ordinary parked-item path so their
- * cleanup order and connected-DOM observations remain unchanged.
+ * Rows with lifecycle work clear through batchClearItems' commit entry, so
+ * their cleanup order and connected-DOM observations remain unchanged.
  */
 function canQueueOwnedListClear(state: ForSlot): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
@@ -49386,7 +49317,7 @@ function canQueueOwnedListClear(state: ForSlot): boolean {
 	return true;
 }
 
-function queueOwnedListClear(state: ForSlot, certified: boolean = false): boolean {
+function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = false): boolean {
 	if (!certified && !canQueueOwnedListClear(state)) return false;
 	const transaction = ROOT_RENDER_TRANSACTION!;
 	const parent = domNode(state.start).parentNode!;
@@ -49402,12 +49333,11 @@ function queueOwnedListClear(state: ForSlot, certified: boolean = false): boolea
 	}
 	const start = state.start;
 	const end = state.end;
-	transaction.ops.push(() => {
-		// A later render may have inserted new rows, or outside code may have
-		// changed this parent. Only clear wholesale while these exact old nodes
-		// still occupy its complete content between the original two markers.
+	// The list's log runs this before its later runs land. Outside code may have
+	// changed this parent, so only clear wholesale while these exact old nodes
+	// still occupy its complete content between the original two markers.
+	const clear = () => {
 		let wholeParent =
-			state.size === 0 &&
 			(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === parent &&
 			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === parent &&
 			(STAGED_DOM ? STAGED_DOM.view(start) : start).previousSibling === null &&
@@ -49447,7 +49377,8 @@ function queueOwnedListClear(state: ForSlot, certified: boolean = false): boolea
 					domNode((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!).removeChild(node);
 			}
 		}
-	}, null);
+	};
+	out.push(clear, null, null);
 	return true;
 }
 
@@ -49460,41 +49391,53 @@ function queueOwnedListClear(state: ForSlot, certified: boolean = false): boolea
  * (RANGE_CLEAR_MIN_ITEMS).
  *
  * Every item still gets a disposal pass: items whose scope carries cleanups,
- * child scopes, or slot-stashed Blocks (a cross-module `<Row/>` lives on the
- * item's `_slots` as a componentSlot, NOT on `.children`) tear down through
- * `unmountBlock(b, false)` — full scope walk incl. `_slots`, portal
- * self-detach from foreign targets, and trySlot bookkeeping — with the DOM
- * skipped because the batch clear already removed the whole range. Plain
- * template rows (the common bulk-clear case) hit only the three-field guard.
+ * hooks, effects, refs, child scopes, or slot-stashed Blocks (a cross-module
+ * `<Row/>` lives on the item's `_slots` as a componentSlot, NOT on `.children`)
+ * tear down through `unmountBlock(b, false)` — full scope walk incl. `_slots`,
+ * portal self-detach from foreign targets, and trySlot bookkeeping — with the
+ * DOM skipped because the batch clear already removed the whole range. Plain
+ * template rows (the common bulk-clear case) hit only the field guard. A
+ * committed list does all of this at its commit (clearItems).
  */
 function batchClearItems(
 	state: ForSlot,
 	oldItems: Map<any, Block>,
+	next: SlotNext | null = null,
 	ownedRootClear: boolean = false,
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_REMOVE, state.size);
-	// An immediate bulk DOM removal cannot be undone after a suspended render.
-	// A journaled clear remains undoable until the attempt commits. Root-owned
-	// inert rows can stay connected and clear together at commit; all other
-	// rows park individually so their cleanup and ref behavior stays intact.
-	if (forSlotParkable(state)) {
-		if (queueOwnedListClear(state, ownedRootClear)) {
-			oldItems.clear();
-			return;
-		}
-		let next: Block | null;
-		for (let b: Block | null = state.head; b !== null; b = next) {
-			next = b.nextSibling;
-			parkItemForHold(b);
+	// A committed list's rows stay connected until its commit, which clears
+	// them, inert ones in one DOM operation, before its later runs land.
+	if (next !== null) {
+		if (!queueOwnedListClear(state, next.out, ownedRootClear)) {
+			const head = state.head;
+			const start = state.start;
+			const end = state.end;
+			const size = oldItems.size;
+			// retireRootBlock, inlined: this visits every row of a bulk clear.
+			const retired = (next.tx.retired ??= new Set<Block>());
+			for (let block = head; block !== null; block = block.nextSibling) {
+				retired.add(block);
+				if (block.pending) {
+					journalRootProperty(block, 'pending', block.pending);
+					block.pending = false;
+				}
+			}
+			next.out.push(() => clearItems(head, start, end, size), null, null);
 		}
 		oldItems.clear();
 		return;
 	}
+	clearItems(state.head, state.start, state.end, oldItems.size);
+	oldItems.clear();
+}
+
+/** Dispose a list's rows from `first` on, then remove everything between its markers. */
+function clearItems(first: Block | null, start: Comment, end: Comment, size: number): void {
 	// One teardown bracket spans the items and their DOM, as in unmountBlock: a
 	// cleanup error dispatches to its boundary only after the list is cleared, so a
 	// boundary re-render cannot dispose the list while this still writes through it.
-	const first = state.head;
 	if (first !== null && TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER = findTryHandler(first.parentBlock) ?? rendererRegionTryHandler(first);
 		TEARDOWN_BLOCK = first;
@@ -49502,17 +49445,23 @@ function batchClearItems(
 	TEARDOWN_DEPTH++;
 	try {
 		// Retire every row before any row's cleanup can move focus off another: the
-		// whole span between the list's markers leaves below. As for parked rows,
-		// only captured focus (or no capture at all) can make a row dispatch.
-		if (renderingFocus !== null || !inFlush)
-			retireHostRange(getNextSibling(state.start), state.end);
+		// whole span between the list's markers leaves below. Only captured focus
+		// (or no capture at all) can make a row dispatch.
+		if (renderingFocus !== null || !inFlush) retireHostRange(getNextSibling(start), end);
 		// Dispose the items before their DOM leaves, like every other deletion:
 		// cleanups observe attached hosts. Walk the intrusive item chain (head →
 		// nextSibling) rather than the Map's iterator: zero allocation and a
-		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
-		// so the chain still covers exactly the old items here.
-		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-			if (b.cleanups !== null || b.children !== null || b._slots !== null) {
+		// monomorphic pointer chase. A cleared row keeps its links, so the chain
+		// still covers exactly the old items here.
+		for (let b: Block | null = first; b !== null; b = b.nextSibling) {
+			if (
+				b.cleanups !== null ||
+				b.children !== null ||
+				b._slots !== null ||
+				b.hooks !== null ||
+				b.effectSlots !== null ||
+				b.refFields !== null
+			) {
 				unmountBlock(b, false);
 			} else {
 				// Pure-host de-opt item (deoptItemBody with no component descendants):
@@ -49524,27 +49473,28 @@ function batchClearItems(
 				b.disposed = true;
 			}
 		}
-		const p = domNode(state.start).parentNode!;
-		if (domNode(state.start).previousSibling === null && getNextSibling(state.end) === null) {
+		// A commit's earlier deletion cleanup can have unmounted the list itself.
+		const p = domNode(start).parentNode;
+		if (p === null) return;
+		if (domNode(start).previousSibling === null && getNextSibling(end) === null) {
 			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
 			(STAGED_DOM ? STAGED_DOM.view(p as Element) : (p as Element)).textContent = '';
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.start);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.end);
-		} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
+			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(start);
+			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(end);
+		} else if (size < RANGE_CLEAR_MIN_ITEMS) {
 			// Shared parent (other JSX interleaved) — detach the marker span directly.
 			// Each removal takes a whole item subtree, so this is one call per ITEM,
 			// not per node.
-			removeRange(getNextSibling(state.start), state.end);
+			removeRange(getNextSibling(start), end);
 		} else if (STAGED_DOM) {
-			STAGED_DOM.clearBetween(state.start, state.end);
+			STAGED_DOM.clearBetween(start, end);
 		} else {
 			// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
 			const range = document.createRange();
-			range.setStartAfter(state.start);
-			range.setEndBefore(state.end);
+			range.setStartAfter(start);
+			range.setEndBefore(end);
 			range.deleteContents();
 		}
-		oldItems.clear();
 	} finally {
 		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
 	}
@@ -49553,7 +49503,8 @@ function batchClearItems(
 function mountItem<T>(
 	parentBlock: Block,
 	parentNode: Node,
-	anchor: Node,
+	// Null appends: a committed list's fresh run (listRun).
+	anchor: Node | null,
 	item: T,
 	index: number,
 	key: unknown,
@@ -49730,7 +49681,7 @@ function mountItem<T>(
 		try {
 			renderBlock(block);
 		} catch (error) {
-			discardThrownItem(block, error, anchor);
+			discardThrownItem(block, error, parentNode, anchor);
 			throw error;
 		}
 		// Body inserted ONE node right before `anchor` via
@@ -49738,7 +49689,7 @@ function mountItem<T>(
 		// and promote it to start === end. From now on `block.endMarker` is the
 		// actual element (so subsequent body re-renders insert nothing — the
 		// update path mutates the cached _b._el$N refs directly).
-		const root = (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling!;
+		const root = lastBefore(parentNode, anchor)!;
 		block.startMarker = root;
 		block.endMarker = root;
 		return block;
@@ -49778,7 +49729,7 @@ function mountItem<T>(
 	try {
 		renderBlock(block);
 	} catch (error) {
-		discardThrownItem(block, error, null);
+		discardThrownItem(block, error, null, null);
 		throw error;
 	}
 	return block;
@@ -49787,23 +49738,34 @@ function mountItem<T>(
 /**
  * The caller cannot receive or register an item Block whose initial render
  * threw, so remove its owned DOM and hook scopes now; a Suspense retry mounts
- * it afresh as part of the list transaction. A self-marked item has no range
- * yet, but its body may already have inserted its one root before
- * `selfMarkedAnchor` when a child suspended. commitBag stores the template bag
+ * it afresh as part of the list transaction. A self-marked item (`parent`
+ * given) has no range yet, but its body may already have inserted its one root
+ * before `anchor` when a child suspended. commitBag stores the template bag
  * in slot 0 only after that insert, so a bag there proves the node before the
  * anchor is this item's root. A sole component or `@if` root lives in a nested
  * slot instead, whose own Block owns and removes its element.
  */
-function discardThrownItem(block: Block, error: unknown, selfMarkedAnchor: Node | null): void {
+function discardThrownItem(
+	block: Block,
+	error: unknown,
+	parent: Node | null,
+	anchor: Node | null,
+): void {
 	const bag = block.slots[0];
-	if (selfMarkedAnchor !== null && bag != null && (bag as any).__kind === undefined) {
-		const root = (STAGED_DOM ? STAGED_DOM.view(selfMarkedAnchor) : selfMarkedAnchor)
-			.previousSibling;
+	if (parent !== null && bag != null && (bag as any).__kind === undefined) {
+		const root = lastBefore(parent, anchor);
 		block.startMarker = root;
 		block.endMarker = root;
 	}
 	if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 	unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
+}
+
+/** The node before `anchor` in `parent`, or its last child for a null anchor. */
+function lastBefore(parent: Node, anchor: Node | null): ChildNode | null {
+	return anchor === null
+		? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
+		: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling;
 }
 
 function moveBlockBefore(block: Block, anchor: Node): void {
