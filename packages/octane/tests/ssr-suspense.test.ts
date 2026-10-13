@@ -45,7 +45,7 @@ const m = evalServer(
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
 const seed = (json: string) =>
-	`<script type="application/json" data-octane-suspense>${json}</script>`;
+	`<script type="application/json" data-octane-suspense="2">${json}</script>`;
 
 function expectSeededHydration(
 	html: string,
@@ -1383,7 +1383,7 @@ export function App(props) @{
 		// Body text is HTML-escaped as usual…
 		expect(out.html).toContain('<div id="leaf">&lt;/script&gt;&lt;x&gt;</div>');
 		// …and the JSON payload escapes every `<` to < (no literal `<` in it).
-		const json = out.html.match(/data-octane-suspense>(.*?)<\/script>$/)![1];
+		const json = out.html.match(/data-octane-suspense="2">(.*?)<\/script>$/)![1];
 		expect(json).not.toContain('<');
 		expect(JSON.parse(json)).toEqual(['</script><x>']);
 	});

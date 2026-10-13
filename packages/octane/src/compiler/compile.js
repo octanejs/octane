@@ -2720,54 +2720,6 @@ function styleObjectNeedsNativeBinding(node) {
 	});
 }
 
-const STATIC_HOST_COMPONENT_NODES = new Set([
-	'JSXElement',
-	'JSXOpeningElement',
-	'JSXClosingElement',
-	'JSXFragment',
-	'JSXOpeningFragment',
-	'JSXClosingFragment',
-	'JSXAttribute',
-	'JSXIdentifier',
-	'JSXNamespacedName',
-	'JSXText',
-	'JSXExpressionContainer',
-	'JSXEmptyExpression',
-	'Literal',
-	'TemplateLiteral',
-	'TemplateElement',
-]);
-
-/**
- * A component that evaluates no authored expression cannot perform a native
- * read, so a native-read module need not bracket its render. The proof is an
- * allowlist: no setup statements, no destructured or defaulted parameters, only
- * lowercase host elements (component tags invoke authored code), and only
- * literal attribute and child values. Any other node keeps the bracket.
- */
-function isStaticHostComponent(node) {
-	if (node?.body?.type !== 'JSXCodeBlock' || (node.body.body?.length ?? 0) !== 0) return false;
-	if (!(node.params ?? []).every((param) => param.type === 'Identifier')) return false;
-	const visit = (value) => {
-		if (value === null || typeof value !== 'object') return true;
-		if (Array.isArray(value)) return value.every(visit);
-		// Plain records such as a template quasi's { raw, cooked } hold no code.
-		if (value.type === undefined)
-			return Object.values(value).every((item) => item === null || typeof item !== 'object');
-		if (!STATIC_HOST_COMPONENT_NODES.has(value.type)) return false;
-		if (value.type === 'JSXOpeningElement' && !/^[a-z]/.test(value.name?.name ?? '')) return false;
-		if (value.type === 'Literal' && value.regex !== undefined) return false;
-		if (value.type === 'TemplateLiteral' && value.expressions.length !== 0) return false;
-		for (const key in value) {
-			if (key === 'loc' || key === 'metadata' || key === 'parent' || key === 'range') continue;
-			const child = value[key];
-			if (child !== null && typeof child === 'object' && !visit(child)) return false;
-		}
-		return true;
-	};
-	return node.body.render != null && visit(node.body.render);
-}
-
 // A fresh object literal whose properties are all plain data: enumerating it
 // runs no accessor, and nothing else can mutate it. nativeStyleBinding can then
 // check its values at runtime and skip the owning Block while all are scalar.
@@ -16242,10 +16194,12 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 		thenSub ? thenSub.fnName : null,
 		elseFnName,
 	]);
-	// A guaranteed direct host in every arm can borrow the outer slot range;
-	// otherwise retain the inner branch range required by opaque/multi-node arms.
+	// An arm renders directly inside the slot's one range (hydration-protocol.ts).
+	// A presentation-binding view keeps a range of its own around an arm that is
+	// not a guaranteed direct host.
 	const borrowBranchRange =
-		canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts);
+		!node._octaneBindingSite ||
+		(canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts));
 	const thenCall = thenSub
 		? ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)
 		: null;
@@ -16591,9 +16545,6 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
 	const cases = node.cases || [];
-	const borrowBranchRange =
-		cases.some((arm) => arm.test == null) &&
-		cases.every((arm) => canBorrowSsrHostBranchRange(arm.consequent));
 	const arms = [];
 	let defaultCall = ssrHtmlTemplate([], node, ctx);
 	let caseIndex = 0;
@@ -16612,17 +16563,11 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 		// itself starts before it, so anchor the arm on the keyword when known.
 		const armOrigin = c.keyword ?? c;
 		registerClauseOrigin(ctx, c.keyword, [sub.fnName]);
-		// Direct-host cases can borrow the outer slot range, just like @if arms.
+		// A case renders directly inside the slot's one range, like an @if arm.
 		const armCall = ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin);
 		const renderedArm = ssrCall(
 			'ssrArm',
-			[
-				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
-				ssrThunk(
-					borrowBranchRange ? armCall : ssrCall('ssrBlock', [armCall], armOrigin),
-					armOrigin,
-				),
-			],
+			[b.literal(c.test == null ? 'default' : `case:${caseIndex}`), ssrThunk(armCall, armOrigin)],
 			armOrigin,
 		);
 		if (c.test == null) defaultCall = renderedArm;
@@ -16661,9 +16606,8 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(trySub.fn);
-	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
-	// client adopts it as the boundary's branch range during hydration without
-	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
+	// ssrTry renders the boundary as one range whose open records which arm the
+	// server rendered (hydration-protocol.ts).
 	let pendFn = inheritOriginLoc(b.literal(null), node); // no @pending → empty slot
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(
@@ -18382,14 +18326,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	);
 	ctx.scalarBindingClaims = previousScalarBindingClaims;
 	ctx.presentationHydration = previousPresentationHydration;
-	const scopedBody =
-		ctx.nativeReads && !isStaticHostComponent(node)
-			? wrapNativeReadScope(presentationBody, b.id('__s'), nativeReadNames(ctx))
-			: presentationBody;
+	// A native-read module needs no bracket here: every renderer path that runs
+	// a compiled body already collects reads for `__s` (renderBlockInner for a
+	// Block, componentSlotLite and renderLiteListItem for a lite scope), and the
+	// module's activation installs that collection before any body can run.
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
 		fnParams,
-		b.block([...paramBindings, ...scopedBody]),
+		b.block([...paramBindings, ...presentationBody]),
 		false,
 		ctx.typescriptWeb ? node.typeParameters : undefined,
 	);
@@ -24995,7 +24939,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		const attrName = attr.name.name || attr.name;
 		// `key` is KEPT in props — `createElement` lifts it into `descriptor.key`,
 		// which the de-opt list path keys on. `ref` also flows through (the de-opt
-		// renderer's applyDeoptProps attaches it).
+		// renderer's setHostProps attaches it).
 		let valNode;
 		if (attr.value == null) {
 			valNode = inheritOriginLoc(b.literal(true), attr);

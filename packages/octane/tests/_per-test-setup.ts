@@ -10,3 +10,5 @@ import { drainPassiveEffects } from '../src/index.js';
 afterEach(() => {
 	drainPassiveEffects();
 });
+
+if (process.env.OCTANE_HYDRATION_PROBE_AUDIT) await import('./_hydration-probe-audit.js');

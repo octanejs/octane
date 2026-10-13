@@ -9,7 +9,7 @@ import {
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
 	isHydrationLifecycleEvent,
 } from './interaction-config.js';
-import { HYDRATE_INDEPENDENT_ATTR } from '../hydration-markers.js';
+import { HYDRATE_INDEPENDENT_ATTR } from '../hydration-protocol.js';
 import { hasBindingHandoffEvent } from '../dom-binding-handoff.js';
 import {
 	getNativeHydrationCapture,
@@ -31,7 +31,7 @@ export {
 	type HydrationControlSnapshot,
 } from './control-capture.js';
 import { HYDRATE_STREAM_TOKEN_ATTR, isRendererStreamBoundaryTemplate } from '../stream-protocol.js';
-import { HYDRATE_MARKER_SELECTOR, HYDRATE_WHEN_ATTR } from '../hydration-markers.js';
+import { HYDRATE_MARKER_SELECTOR, HYDRATE_WHEN_ATTR } from '../hydration-protocol.js';
 
 // DOM constructors are realm-specific. Capture can be installed for an iframe
 // document, so use the platform nodeType contract instead of the ambient

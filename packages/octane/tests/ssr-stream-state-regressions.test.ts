@@ -690,7 +690,7 @@ describe('SSR stream state regressions', () => {
 		resetStreamRuntimeGlobals();
 	});
 
-	it('retires unresolved content descendants omitted by an outer catch segment', async () => {
+	it('retires unresolved content descendants of an errored outer boundary', async () => {
 		const outer = deferred<string>();
 		const inner = deferred<string>();
 		const output = collector();
@@ -701,13 +701,18 @@ describe('SSR stream state regressions', () => {
 			{ timeoutMs: 80, onError },
 		).pipe(output.destination);
 
+		// The outer content errors while an inner boundary in it is still pending.
+		// As in React, the server reports the error and leaves the outer fallback
+		// for a client render; the inner boundary is unreachable, so the stream
+		// ends without waiting for its data.
 		outer.reject(new Error('outer failed'));
 		await output.ended;
 		const container = activateChunks(output.chunks);
-		expect(container.querySelector('.outer-catch')!.textContent).toBe('outer failed');
-		expect(container.querySelector('.outer-pending')).toBeNull();
+		expect(container.querySelector('.outer-pending')!.textContent).toBe('outer pending');
+		expect(container.querySelector('.outer-catch')).toBeNull();
 		expect(container.querySelector('.content-inner-pending')).toBeNull();
-		expect(onError).not.toHaveBeenCalled();
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toMatchObject({ message: 'outer failed' });
 		container.remove();
 		resetStreamRuntimeGlobals();
 	});

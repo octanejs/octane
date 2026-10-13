@@ -95,6 +95,15 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		portalCleaned: true,
 		cleaned: true,
 	},
+	'split-shell': {
+		adopted: true,
+		greeting: 'welcome',
+		likes: '1',
+		menu: 'account',
+		settings: 'guest',
+		menuCleaned: true,
+		cleaned: true,
+	},
 	'suspense-transition': {
 		pending: 'loading',
 		resolved: 'ready',
@@ -117,6 +126,12 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		auxclickRegistered: false,
 		retainedStyle: true,
 		unusedStyle: false,
+		cleaned: true,
+	},
+	'descriptor-children': {
+		before: 'ab',
+		after: 'bc',
+		survivor: true,
 		cleaned: true,
 	},
 	'binding-vanilla': {

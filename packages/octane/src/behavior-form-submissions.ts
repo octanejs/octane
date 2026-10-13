@@ -18,7 +18,7 @@ import {
 	HYDRATE_ID_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	HYDRATE_WHEN_ATTR,
-} from './hydration-markers.js';
+} from './hydration-protocol.js';
 import {
 	EARLY_HYDRATION_INTENTS_KEY,
 	HYDRATE_INTERACTION_EVENTS_ATTR,

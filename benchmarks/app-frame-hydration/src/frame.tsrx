@@ -2,8 +2,8 @@ import { useContext } from 'octane';
 import 'octane/signals';
 import { Composer, Suggestions } from './composer.tsrx';
 import { Header } from './header.tsrx';
-import { Button, Disclosure, Icon, IconButton, Tooltip } from './primitives.tsrx';
-import { Sidebar } from './sidebar.tsrx';
+import { Button, Disclosure, Icon, IconButton, Settled, Tooltip } from './primitives.tsrx';
+import { BoundedSidebar, Sidebar } from './sidebar.tsrx';
 import { searchOpen$, StringsContext, type FrameData } from './state';
 
 function Footer() @{
@@ -105,6 +105,73 @@ export function AppFrame(props: {
 				</Disclosure>
 			</div>
 			<Footer />
+		</main>
+	</div>
+}
+
+/**
+ * The same frame with its sections in Suspense boundaries, the units React
+ * hydrates after the shell and Octane can hydrate in later host tasks.
+ */
+export function BoundedAppFrame(props: {
+	data: FrameData;
+	activeId: string | null;
+	signedIn: boolean;
+}) @{
+	<div class="frame">
+		@try {
+			<>
+				<ActivityRail />
+				<Settled />
+			</>
+		} @pending {
+			<div class="pending" />
+		}
+		<BoundedSidebar
+			projects={props.data.projects}
+			history={props.data.history}
+			tools={props.data.tools}
+			activeId={props.activeId}
+		/>
+		<main class="frame-main">
+			@try {
+				<>
+					<Header signedIn={props.signedIn} />
+					<Settled />
+				</>
+			} @pending {
+				<div class="pending" />
+			}
+			<div class="frame-content">
+				<h1 class="frame-title">What can I help with?</h1>
+				@try {
+					<>
+						<Composer toolbarGroups={props.data.toolbarGroups} liveSections={false} />
+						<Settled />
+					</>
+				} @pending {
+					<div class="pending" />
+				}
+				@try {
+					<>
+						<Suggestions items={props.data.suggestions} />
+						<Settled />
+					</>
+				} @pending {
+					<div class="pending" />
+				}
+				<Disclosure open$={searchOpen$}>
+					<SearchDialog />
+				</Disclosure>
+			</div>
+			@try {
+				<>
+					<Footer />
+					<Settled />
+				</>
+			} @pending {
+				<div class="pending" />
+			}
 		</main>
 	</div>
 }

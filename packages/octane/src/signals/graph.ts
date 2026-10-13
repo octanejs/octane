@@ -22,6 +22,7 @@ import {
 	getNativeAdoptionResolver,
 	isNativeAdoptionMiss,
 	isNativeWriteGuarded,
+	nativeReadSerializer,
 	reportNativeRead,
 	setNativeAdoptionResolver,
 	setNativeReadObserver,
@@ -54,10 +55,6 @@ export interface GraphOwner {
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState?: boolean;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
-	serializeRead(
-		node: ScopedNode,
-		read: SignalReadMode,
-	): readonly NativeSerializedScope[] | undefined;
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void;
 }
 
@@ -83,6 +80,8 @@ export { CandidateUnsupportedError } from './transition-state.js';
 export type { SignalCandidateFrame, CandidatePreparation } from './transition-candidate.js';
 
 export type SignalReadMode = 'value' | 'latest' | 'snapshot';
+
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
 // Dependency graph algorithms adapted from Alien Signals 3.2.1 (MIT), Johnson Chu.
 // Upstream: stackblitz/alien-signals@8734d386d925025d0e99419bd9161c17b112c5ee, src/system.ts.
@@ -509,15 +508,15 @@ export function readyState<T>(
 		requestKey?: string;
 	} = noActivity,
 ): NodeState<T> {
+	const refreshing = activity.refreshing ?? false;
+	const connection = activity.connection ?? 'none';
+	const complete = activity.complete ?? true;
+	const requestKey = activity.requestKey;
 	return {
-		snapshot: {
-			status: 'ready',
-			value,
-			refreshing: activity.refreshing ?? false,
-			connection: activity.connection ?? 'none',
-			complete: activity.complete ?? true,
-			...(activity.requestKey === undefined ? {} : { requestKey: activity.requestKey }),
-		},
+		snapshot:
+			requestKey === undefined
+				? { status: 'ready', value, refreshing, connection, complete }
+				: { status: 'ready', value, refreshing, connection, complete, requestKey },
 	};
 }
 
@@ -628,8 +627,8 @@ function releaseRetainedOwners(node: ScopedNode): void {
 
 export function releaseRetention(node: ScopedNode): void {
 	if (node.lastState?.owners) releaseRetainedOwners(node);
-	node.last = undefined;
 	node.lastState = undefined;
+	node.last = undefined;
 	node.hasLast = false;
 }
 
@@ -708,20 +707,74 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	subsTail: ReactiveNode['subsTail'];
 	flags: ReactiveFlags;
 	revision = 0;
-	state: NodeState<T> | undefined;
+	/**
+	 * A node whose state is plain and ready is value-only: a writable cell, or a
+	 * computation whose result has no dependency activity or foreign owners.
+	 * `last` holds its value, and its current state, which is also its retained
+	 * state, is the plain ready state of that value. Writes, plain results and
+	 * value reads never build that state; `state` and `lastState` build it once
+	 * on demand. Assigning either stores explicit states, as a pending, failed
+	 * or async node holds, so assign them before changing `last`.
+	 */
+	valueOnly = false;
+	storedState: NodeState<T> | undefined = undefined;
+	storedLastState: NodeState<T> | undefined = undefined;
 	compute: ((target: ScopedNode<T>) => NodeState<T>) | undefined;
 	invalidateAttempt: (() => void) | undefined;
-	last: T | undefined;
-	lastState: NodeState<T> | undefined;
+	last: T | undefined = undefined;
 	hasLast = false;
 	evaluating = false;
 	wakeup: Wakeup | undefined;
 	nativeSource: NativeReadSource | undefined;
 	nativeLatestSource: NativeReadSource | undefined;
 	nativeSnapshotSource: NativeReadSource | undefined;
-	retry(_options?: { pending?: boolean }): void {
+	/** A resource's retry. Kept in a field so an async node keeps the shared layout. */
+	retryRequest: ((options?: { pending?: boolean }) => void) | undefined = undefined;
+
+	get state(): NodeState<T> | undefined {
+		if (this.valueOnly && this.storedState === undefined) this.buildState();
+		return this.storedState;
+	}
+
+	set state(state: NodeState<T> | undefined) {
+		if (this.valueOnly) this.storeStates();
+		this.storedState = state;
+	}
+
+	get lastState(): NodeState<T> | undefined {
+		return this.valueOnly ? this.state : this.storedLastState;
+	}
+
+	set lastState(state: NodeState<T> | undefined) {
+		if (this.valueOnly) this.storeStates();
+		this.storedLastState = state;
+	}
+
+	private buildState(): void {
+		this.storedState = this.storedLastState = readyState(this.last as T);
+	}
+
+	/** Leave value-only: the built states become ordinary stored states. */
+	private storeStates(): void {
+		if (this.storedState === undefined) this.buildState();
+		this.valueOnly = false;
+	}
+
+	retry(options?: { pending?: boolean }): void {
 		assertAlive(this.owner);
-		throw new TypeError(formatClientError(163));
+		if (this.retryRequest === undefined) throw new TypeError(formatClientError(163));
+		this.retryRequest(options);
+	}
+
+	/** This node's native read channel for `read`, created on first use. */
+	nativeReadSource(read: SignalReadMode): NativeReadSource {
+		const field =
+			read === 'value'
+				? 'nativeSource'
+				: read === 'latest'
+					? 'nativeLatestSource'
+					: 'nativeSnapshotSource';
+		return (this[field] ??= createNativeSource(this, read));
 	}
 
 	constructor(
@@ -733,7 +786,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	}
 
 	get(): T {
-		return strictValue(readNode(this), this.key);
+		return readValue(this);
 	}
 
 	[SIGNAL_BINDING_READ](): T {
@@ -776,8 +829,10 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			candidate.run(() => candidate.write(this, value));
 			return;
 		}
-		signalBatch(() => {
-			const previous = strictValue(refreshNode(this), this.key);
+		startSignalBatch();
+		try {
+			refresh(this);
+			const previous = this.valueOnly ? (this.last as T) : strictValue(this.state!, this.key);
 			const next =
 				typeof value === 'function'
 					? untrack(() => pure(() => (value as (previous: T) => T)(previous)))
@@ -787,13 +842,15 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			const releases = candidateHooks.urgentWrite?.(this, value);
 			try {
 				if (!Object.is(previous, next)) {
-					publishNode(this, readyState(next));
+					writeValue(this, next);
 					this.owner.trace('write', this);
 				}
 			} finally {
 				if (releases) for (const release of releases) release();
 			}
-		});
+		} finally {
+			endSignalBatch();
+		}
 	}
 
 	latest(): T | undefined;
@@ -858,22 +915,69 @@ export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): Nativ
 }
 
 function createNativeSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
-	const view = declarationViews?.get(node);
-	return view === undefined ? createGraphSource(node, read) : createViewSource(node, view, read);
+	return new GraphReadSource(node, read, declarationViews?.get(node));
 }
 
-function createGraphSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
-	return {
-		getVersion: () => (activeCandidate && !activeCandidate.observes(node) ? NaN : node.revision),
-		subscribe: (notify) => {
-			assertAlive(node.owner);
-			return attachObserver(node, notify, true);
-		},
-		serialize: (revision) =>
-			node.revision === revision ? node.owner.serializeRead(node, read) : undefined,
-		inspect: () => inspectNativeNode(node, read),
-	};
+/**
+ * A node's native read channel for one read mode (ScopedNode.nativeReadSource).
+ * A declaration view's channel forwards to its canonical cell's once promoted,
+ * so witnesses taken during the render stay valid. The view and its canonical
+ * cell share one owner.
+ */
+class GraphReadSource implements NativeReadSource {
+	/** DevTools metadata, installed on the prototype only in profiling builds. */
+	declare inspect?: () => NativeReadInspection;
+
+	constructor(
+		readonly node: ScopedNode,
+		readonly read: SignalReadMode,
+		readonly view: DeclarationView | undefined,
+	) {}
+
+	/** The promoted view's canonical channel, or undefined while this one is live. */
+	canonicalSource(): NativeReadSource | undefined {
+		const view = this.view;
+		return view?.promoted ? view.canonical.nativeReadSource(this.read) : undefined;
+	}
+
+	getVersion(): number {
+		const view = this.view;
+		if (view !== undefined) {
+			const canonical = this.canonicalSource();
+			if (canonical)
+				return canonical.getVersion() === view.canonicalRevision ? view.viewRevision : NaN;
+			if (view.retired) return NaN;
+		}
+		const node = this.node;
+		return activeCandidate && !activeCandidate.observes(node) ? NaN : node.revision;
+	}
+
+	subscribe(notify: () => void): () => void {
+		const canonical = this.canonicalSource();
+		if (canonical) return canonical.subscribe(notify);
+		assertAlive(this.node.owner);
+		return attachObserver(this.node, notify, true);
+	}
+
+	serialize(revision: number): readonly NativeSerializedScope[] | undefined {
+		const canonical = this.canonicalSource();
+		if (canonical)
+			return revision === this.view!.viewRevision
+				? canonical.serialize?.(this.view!.canonicalRevision)
+				: undefined;
+		const node = this.node;
+		return node.revision === revision ? nativeReadSerializer!(node, this.read) : undefined;
+	}
+
+	retired(): boolean {
+		return this.node.owner.retired;
+	}
 }
+
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	GraphReadSource.prototype.inspect = function (this: GraphReadSource) {
+		return this.canonicalSource()?.inspect!() ?? inspectNativeNode(this.node, this.read);
+	};
 
 export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value'): NodeState<T> {
 	assertAlive(node.owner);
@@ -885,28 +989,89 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 		const frame = getNativeAdoptionResolver()?.(node.owner);
 		if (frame) return frame.run(() => readNode(node, read));
 	}
-	const state = refreshNode(node);
+	refresh(node);
+	return observeRead(node, read, candidate);
+}
+
+/** readNode after its node is current: track the read and present its state. */
+function observeRead<T>(
+	node: ScopedNode<T>,
+	read: SignalReadMode,
+	candidate: SignalCandidateFrame | undefined,
+): NodeState<T> {
+	const state = node.state!;
 	const observed =
 		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
-	if (activeNode) linkDependency(node, activeNode, trackingCycle);
-	if (getNativeReadObserver()) {
-		const field =
-			read === 'value'
-				? 'nativeSource'
-				: read === 'latest'
-					? 'nativeLatestSource'
-					: 'nativeSnapshotSource';
-		const source = (node[field] ??= createNativeSource(node, read));
-		reportNativeRead(
-			candidate ? candidate.nativeSource(node, read, source) : source,
-			node.revision,
-		);
-	}
+	trackRead(node, read, candidate);
 	// Retirement marks the owner before invoking user cancellation callbacks.
 	// A reentrant read must not expose its old value before graph teardown runs.
 	if (observed.owners) for (const owner of observed.owners) assertAlive(owner);
 	if (activeNode) recordOwners(node, observed);
 	return observed;
+}
+
+function trackRead(
+	node: ScopedNode,
+	read: SignalReadMode,
+	candidate: SignalCandidateFrame | undefined,
+): void {
+	if (activeNode) linkDependency(node, activeNode, trackingCycle);
+	if (getNativeReadObserver()) {
+		const source = node.nativeReadSource(read);
+		reportNativeRead(
+			candidate ? candidate.nativeSource(node, read, source) : source,
+			node.revision,
+		);
+	}
+}
+
+/**
+ * strictValue(readNode(node), node.key) that never builds a value-only node's
+ * state. Candidate, historical and adoption reads take readNode itself.
+ */
+function readValue<T>(node: ScopedNode<T>): T {
+	if (activeCandidate || historicalReader || (node.owner.seedable && getNativeAdoptionResolver()))
+		return strictValue(readNode(node), node.key);
+	refresh(node);
+	if (!node.valueOnly) return strictValue(observeRead(node, 'value', undefined), node.key);
+	trackRead(node, 'value', undefined);
+	// A plain ready state carries no owners of its own.
+	if (activeNode && node.owner !== activeNode.owner) (activeOwners ??= new Set()).add(node.owner);
+	return node.last as T;
+}
+
+/** A new writable cell's initial value, retained as its latest value too. */
+export function initializeValue<T>(node: ScopedNode<T>, value: T): void {
+	node.valueOnly = true;
+	node.last = value;
+	node.hasLast = true;
+}
+
+/** commitState(node, readyState(value)) for a value-only node: no state to settle. */
+function storeValue(node: ScopedNode, value: unknown): void {
+	node.last = value;
+	node.storedState = node.storedLastState = undefined;
+	node.revision++;
+}
+
+/** After committing a plain ready state, keep only its value. */
+function dropStates(node: ScopedNode): void {
+	node.valueOnly = true;
+	node.storedState = node.storedLastState = undefined;
+}
+
+/** publishNode(node, readyState(value)) for a writable cell, which stays value-only. */
+function writeValue<T>(node: ScopedNode<T>, value: T): void {
+	if (!node.valueOnly) {
+		publishNode(node, readyState(value));
+		dropStates(node);
+		return;
+	}
+	storeValue(node, value);
+	if (node.subs) {
+		propagate(node.subs, executionDepth !== 0);
+		shallowPropagate(node.subs);
+	}
 }
 
 export function strictValue<T>(state: NodeState<T>, key = 'idle'): T {
@@ -972,12 +1137,17 @@ export function unchangedLiveRead(
 	)
 		return undefined;
 	return {
-		live: (node[nativeSourceField(read)] ??= createNativeSource(node, read)),
+		live: node.nativeReadSource(read),
 		version: node.revision,
 	};
 }
 
 export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
+	refresh(node);
+	return node.state!;
+}
+
+function refresh(node: ScopedNode): void {
 	assertAlive(node.owner);
 	if (node.evaluating) throw new SignalCycleError(node.key);
 	// Dirty dependency checks may execute an async description and its loader
@@ -1002,7 +1172,6 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 			node.flags &= ~REACTIVE_RECURSED;
 			break;
 		}
-		return node.state!;
 	} finally {
 		if (guarded) pureDepth--;
 	}
@@ -1049,7 +1218,8 @@ function evaluate(node: ScopedNode): boolean {
 		}
 	} finally {
 		executionDepth--;
-		owners = activeOwners;
+		// compute() reassigned activeOwners, which this function narrowed to undefined.
+		owners = activeOwners as Set<GraphOwner> | undefined;
 		activeOwners = previousOwners;
 		activeNode = previousNode;
 		setNativeReadObserver(previousObserver);
@@ -1058,6 +1228,25 @@ function evaluate(node: ScopedNode): boolean {
 		const tail = (node as ReactiveNode).depsTail;
 		let obsolete = tail ? tail.nextDep : node.deps;
 		while (obsolete) obsolete = unlink(obsolete, node);
+	}
+	// Only foreign provenance keeps a plain result in a stored state.
+	const plain = next === PLAIN_RESULT && !owners?.size;
+	if (next === PLAIN_RESULT) {
+		const value = plainValue;
+		plainValue = undefined;
+		// A first result, like a value-only node's, has no stored state to settle.
+		if (plain && (node.valueOnly || node.storedState === undefined)) {
+			if (node.valueOnly) {
+				if (Object.is(node.last, value)) return false;
+			} else {
+				if (node.storedLastState?.owners) releaseRetainedOwners(node);
+				node.valueOnly = true;
+				node.hasLast = true;
+			}
+			storeValue(node, value);
+			return true;
+		}
+		next = readyState(value);
 	}
 	next = withOwners(next, owners);
 	// A pending/error branch cannot make a revoked retained value usable again.
@@ -1071,6 +1260,7 @@ function evaluate(node: ScopedNode): boolean {
 	}
 	if (sameState(node.state, next)) return false;
 	commitState(node, next);
+	if (plain) dropStates(node);
 	return true;
 }
 
@@ -1185,7 +1375,7 @@ export function linkReads(node: ScopedNode, reads: readonly ScopedNode[]): void 
 export function reevaluateNode(node: ScopedNode): void {
 	const revision = node.revision;
 	node.flags |= REACTIVE_DIRTY;
-	refreshNode(node);
+	refresh(node);
 	if (node.revision !== revision && node.subs) {
 		propagate(node.subs, executionDepth !== 0);
 		shallowPropagate(node.subs);
@@ -1195,7 +1385,27 @@ export function reevaluateNode(node: ScopedNode): void {
 export function derivedState<T>(node: ScopedNode<T>, read: () => T): NodeState<T> {
 	const value = pure(read);
 	if (isThenable(value)) throw new TypeError(formatClientError(166));
-	return derivedValueState(node, value);
+	return derivedResult(node, value);
+}
+
+/** Returned by a computation, through evaluate(), for a plain ready `plainValue`. */
+const PLAIN_RESULT = {} as NodeState;
+let plainValue: unknown;
+
+/**
+ * derivedValueState(node, value) for a computation's result, which only
+ * evaluate() receives: with no dependency activity, the node stays value-only.
+ */
+export function derivedResult<T>(node: ScopedNode<T>, value: T): NodeState<T> {
+	for (let link = node.deps; link && node.depsTail; link = link.nextDep) {
+		const dep = link.dep as ScopedNode;
+		const snapshot = dep.valueOnly ? undefined : dep.state?.snapshot;
+		if (snapshot && (snapshot.refreshing || !snapshot.complete || snapshot.connection !== 'none'))
+			return derivedValueState(node, value);
+		if (link === node.depsTail) break;
+	}
+	plainValue = value;
+	return PLAIN_RESULT as NodeState<T>;
 }
 
 export function derivedValueState<T>(
@@ -1213,7 +1423,9 @@ export function derivedValueState<T>(
 		connection = activity.connection;
 	}
 	for (let link = node.deps; link && node.depsTail; link = link.nextDep) {
-		const dependency = (link.dep as ScopedNode).state?.snapshot;
+		// A value-only cell is plain and ready, so it adds no activity.
+		const dep = link.dep as ScopedNode;
+		const dependency = dep.valueOnly ? undefined : dep.state?.snapshot;
 		if (dependency) {
 			refreshing ||= dependency.refreshing;
 			complete &&= dependency.complete;
@@ -1226,7 +1438,7 @@ export function derivedValueState<T>(
 	}
 	if (additionalDependencies) {
 		for (const node of additionalDependencies) {
-			const dependency = node.state?.snapshot;
+			const dependency = node.valueOnly ? undefined : node.state?.snapshot;
 			if (!dependency) continue;
 			refreshing ||= dependency.refreshing;
 			complete &&= dependency.complete;
@@ -1316,42 +1528,6 @@ export type DeclarationViewFork = (
 ) => CandidateProducer | undefined;
 
 let declarationViews: WeakMap<ScopedNode, DeclarationView> | undefined;
-
-function nativeSourceField(read: SignalReadMode) {
-	return read === 'value'
-		? ('nativeSource' as const)
-		: read === 'latest'
-			? ('nativeLatestSource' as const)
-			: ('nativeSnapshotSource' as const);
-}
-
-function createViewSource(
-	view: ScopedNode,
-	record: DeclarationView,
-	read: SignalReadMode,
-): NativeReadSource {
-	const own = createGraphSource(view, read);
-	const canonical = (): NativeReadSource =>
-		(record.canonical[nativeSourceField(read)] ??= createNativeSource(record.canonical, read));
-	return {
-		getVersion: () =>
-			record.promoted
-				? canonical().getVersion() === record.canonicalRevision
-					? record.viewRevision
-					: NaN
-				: record.retired
-					? NaN
-					: own.getVersion(),
-		subscribe: (notify) => (record.promoted ? canonical() : own).subscribe(notify),
-		serialize: (version) =>
-			record.promoted
-				? version === record.viewRevision
-					? canonical().serialize?.(record.canonicalRevision)
-					: undefined
-				: own.serialize?.(version),
-		inspect: () => (record.promoted ? canonical() : own).inspect!(),
-	};
-}
 
 export function createDeclarationView<T>(
 	canonical: ScopedNode<T>,
@@ -1575,12 +1751,14 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			node.wakeup?.resolve();
 			node.wakeup = undefined;
 			node.revision++;
-			node.state?.resolveWaiting?.();
+			// A value-only node has no waiter to settle and retains nothing else.
+			if (node.valueOnly) node.valueOnly = false;
+			else node.state?.resolveWaiting?.();
 			node.state = errorState(retirementError);
 			releaseRetention(node);
 			node.compute = undefined;
 			node.invalidateAttempt = undefined;
-			if (node.kind === 'async') node.retry = ScopedNode.prototype.retry;
+			node.retryRequest = undefined;
 			if (node.subs) {
 				propagate(node.subs, executionDepth !== 0);
 				shallowPropagate(node.subs);
@@ -1629,7 +1807,6 @@ registerCandidateGraph({
 	releaseRetainedOwners,
 	retainOwners,
 	releaseRetention,
-	createNativeSource,
 	attachObserver,
 	declarationViewFork,
 });

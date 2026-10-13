@@ -646,7 +646,7 @@
     },
     {
       "name": "@octanejs/mdx",
-      "version": "0.1.62",
+      "version": "0.1.63",
       "category": "Content",
       "upstream": { "package": "@mdx-js/mdx", "version": "3.1.1" },
       "surface": "The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context. The octane website runs on it.",
@@ -1935,7 +1935,7 @@
     "23": {
       "message": "Server-rendered use() rejected",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "24": {
       "message": "Element type is invalid: expected a string (for a built-in element) or a function (for a component), but got: %s.",
@@ -2037,7 +2037,7 @@
     "45": {
       "message": "Server-rendered use() rejected (function)",
       "runtime": ["server"],
-      "status": "active"
+      "status": "retired"
     },
     "46": {
       "message": "Expected %s listener to be a function, instead got a value of `%s` type.",
@@ -3522,6 +3522,16 @@
     },
     "343": {
       "message": "A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "344": {
+      "message": "The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "345": {
+      "message": "Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
       "runtime": ["client"],
       "status": "active"
     }

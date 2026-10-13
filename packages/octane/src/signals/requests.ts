@@ -579,7 +579,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 				? this.compute()
 				: pending(() => this.compute());
 		};
-		node.retry = (options) => this.retry(options);
+		node.retryRequest = (options) => this.retry(options);
 	}
 
 	private request(describe = this.describe!): Request<T> | typeof skip {

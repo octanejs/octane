@@ -5,14 +5,13 @@ import type {
 	GraphOwner,
 	ScopedNode,
 	NodeState,
-	SignalReadMode,
 	SignalGraph,
 } from './graph.js';
 import type { ResourceBinding } from './requests.js';
 import type { SignalActionFrame } from './transition-action.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { SignalTransitionCoordinatorFactory } from './transition-coordinator.js';
-import { setNativeCandidateResolver, type NativeReadSource } from './read-protocol.js';
+import { setNativeCandidateResolver } from './read-protocol.js';
 
 /** Shared state keeps model registration separate from optional native presentation. */
 interface CandidateGraph {
@@ -35,7 +34,6 @@ interface CandidateGraph {
 	releaseRetainedOwners(node: ScopedNode): void;
 	retainOwners(node: ScopedNode): void;
 	releaseRetention(node: ScopedNode): void;
-	createNativeSource(node: ScopedNode, mode: SignalReadMode): NativeReadSource;
 	attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void;
 	declarationViewFork(node: ScopedNode): DeclarationViewFork | undefined;
 }

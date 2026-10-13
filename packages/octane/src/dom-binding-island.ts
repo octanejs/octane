@@ -23,7 +23,7 @@ import type {
 	IndependentHydrateActivator,
 } from './hydration/independent-island.js';
 import { cloneHydrationReplayEvent } from './hydration/replay-event.js';
-import { HYDRATION_START } from './hydration-markers.js';
+import { HYDRATION_START } from './hydration-protocol.js';
 import { captureSignalOwner } from './signals/owner-context.js';
 import type { SignalRendererOwnerIdentity } from './signals/types.js';
 import { rendererRangeClose } from './stream-protocol.js';

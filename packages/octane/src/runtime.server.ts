@@ -35,21 +35,20 @@ import type {
 	LayoutSnapshotOptions,
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
+import { bindingRootMarker, encodeBindingKey, type BindingKey } from './dom-binding-protocol.js';
 import {
-	BINDING_OPEN_TAIL_SOURCE,
-	bindingRootMarker,
-	encodeBindingKey,
-	isBindingOpenComment,
-	type BindingKey,
-} from './dom-binding-protocol.js';
-import {
-	CLIENT_ERROR_ARM_COMMENT,
-	CLIENT_RENDER_ARM_COMMENT,
+	BOUNDARY_CLIENT,
+	BOUNDARY_CLIENT_ERROR,
+	BOUNDARY_CLIENT_NATIVE,
+	BOUNDARY_CLIENT_SUSPENDED,
+	BOUNDARY_CONTENT,
+	BOUNDARY_STREAMED,
 	formatUseId,
-	HYDRATION_FOR_EMPTY,
-	HYDRATION_FOR_ITEMS,
+	HYDRATION_PROTOCOL_VERSION,
 	HYDRATION_START,
-} from './hydration-markers.js';
+	isRangeOpen,
+	RANGE_OPEN_SOURCE,
+} from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
 	// Children-block tagging shares the client's key so identity holds across
@@ -2380,9 +2379,7 @@ export function ssrBindingChild(value: unknown, scope: SSRScope, marker: string)
 	const openingEnd = html.indexOf('-->');
 	const framed =
 		html.startsWith(BLOCK_OPEN) ||
-		(html.startsWith('<!--') &&
-			openingEnd !== -1 &&
-			isBindingOpenComment(html.slice(4, openingEnd)));
+		(html.startsWith('<!--') && openingEnd !== -1 && isRangeOpen(html.slice(4, openingEnd)));
 	const content =
 		framed && html.endsWith(BLOCK_CLOSE) ? html.slice(openingEnd + 3, -BLOCK_CLOSE.length) : html;
 	return ssrBindingBlock(content, marker);
@@ -8574,6 +8571,10 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
 	}).replace(/</g, '\\u003c');
 }
 
+// The root seed script's marker attribute names the hydration protocol
+// version the server rendered (hydration-protocol.ts).
+const ROOT_SEED_ATTR = SUSPENSE_SCRIPT_ATTR + '="' + HYDRATION_PROTOCOL_VERSION + '"';
+
 /**
  * Serialize the resolved `use(thenable)` values (in render order) into an inline
  * data `<script>` the client reads during hydration. `<` is escaped to
@@ -8583,7 +8584,7 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
 function serializeSuspenseSeeds(
 	values: unknown[],
 	nonceAttr: string,
-	attr = SUSPENSE_SCRIPT_ATTR,
+	attr = ROOT_SEED_ATTR,
 ): string {
 	// Encode `undefined` (which JSON drops/nulls) through the seed wire escape so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
@@ -10291,9 +10292,8 @@ export function renderToStaticMarkup(
 // errored: its fallback stays and `$OCTRX` tells hydration to render it fresh.
 //
 // Hydration: `$OCTRC` stashes the boundary's seed JSON on `window.$OCTS[id]`
-// and leaves a `<!--oct-seed:id-->` comment where the template was; the client
-// `mountTry` sees the comment, scopes that boundary's seeds, and adopts the
-// swapped-in DOM byte-for-byte. A boundary still pending when the stream ends
+// and removes the template; the client sees the boundary's `[$?id` open
+// without it, scopes that boundary's seeds, and adopts the swapped-in DOM. A boundary still pending when the stream ends
 // (abort/error) keeps its template: hydration client-renders that boundary, as
 // React does for a boundary the server could not finish (the standard degraded
 // path).
@@ -10501,25 +10501,41 @@ function pruneStreamBoundariesAbsentFromShell(
 	}
 }
 
-// A presentation-binding view labels a @try boundary's own range with the arm
-// it rendered (0 content, 1 pending). The label replaces the plain open marker,
-// so renderer hydration still sees one balanced range. Module scope keeps
-// ssrTry, which runs once per boundary per pass, free of a per-call closure.
-function ssrTryArm(content: string, arm: 0 | 1, bindingMarker: string | undefined): string {
-	return bindingMarker === undefined || !MARKERS
-		? ssrBlock(content)
-		: '<!--' + bindingMarker + arm + '-->' + content + BLOCK_CLOSE;
+// A boundary is one range whose opening comment, `open`, carries its state
+// (hydration-protocol.ts). A presentation-binding view labels the range with
+// the arm it rendered (0 content, 1 pending) instead, and its arm keeps a range
+// of its own (ssrTryBody). Module scope keeps ssrTry, which runs once per
+// boundary per pass, free of a per-call closure.
+function ssrTryArm(
+	content: string,
+	open: string,
+	arm: 0 | 1,
+	bindingMarker: string | undefined,
+): string {
+	return MARKERS
+		? '<!--' +
+				(bindingMarker === undefined ? open : bindingMarker + arm) +
+				'-->' +
+				content +
+				BLOCK_CLOSE
+		: content;
+}
+
+/** An arm's content: directly inside its boundary's range, or a binding view's own arm range. */
+function ssrTryBody(content: string, bindingMarker: string | undefined): string {
+	return bindingMarker === undefined ? String(content) : ssrBlock(content);
 }
 
 /**
  * Compiled `@try` / JSX `<Suspense>` boundary. `siteKey` is the compiler's
  * source-position hash; combined with the frame path + per-frame occurrence it
- * identifies THIS boundary instance stably across streaming passes. Byte-parity
- * contract with the old inline emit (hydration compatibility):
- *   success            → ssrBlock(ssrBlock(tryHtml))
- *   suspend, @pending  → ssrBlock(ssrBlock(pendingHtml))
- *   suspend, no arm    → ssrBlock('')
- *   error, @pending    → the suspend form, marked for a client render
+ * identifies THIS boundary instance stably across streaming passes. It renders
+ * one range (hydration-protocol.ts):
+ *   success, @pending  → `[$:N` seed scripts, tryHtml
+ *   success, no arm    → `[` tryHtml
+ *   suspend, streaming → `[$?id` the sentinel, pendingHtml
+ *   suspend, buffered  → `[$!sN` pendingHtml, for a client render
+ *   error, @pending    → the suspend form, `[$!eN` when buffered
  *   error, no @pending → rethrow
  * React's server never runs an error boundary, so a `@catch` arm renders only
  * on the client. A Suspense boundary reports the error (onError) and ships its
@@ -10639,19 +10655,11 @@ export function ssrTry(
 	};
 	if (entry !== undefined) enterBoundaryIds(0);
 	let nativeFresh = false;
-	// A fresh arm's marker. The client reports once an arm the server could not
-	// finish because it suspended or threw.
-	let freshArm = NATIVE_SIGNAL_FRESH_COMMENT;
+	// Why the client renders an arm the server could not finish: it read values
+	// that cannot be sent, which the client does not report, or it suspended or
+	// threw, which the client reports once.
+	let freshReason = BOUNDARY_CLIENT_NATIVE;
 	const nativeFailureStart = NATIVE_SERVER_FAILURES;
-	const nativeFreshArm = (inner: string): string => {
-		if (!MARKERS || !nativeFresh) return inner;
-		// This body cannot be replayed from ready values alone. Remove its
-		// positional seeds too; the fresh client body must not shift a sibling's
-		// use() cursor. Its original useId range remains reserved by the marker.
-		rewindSerial(serialStart);
-		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
-		return '<!--' + freshArm + idCount + '-->' + inner;
-	};
 	const pendingForm = (): string => {
 		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
 		// reveals — claim its vt-exit candidate (see vtSsrClaimArm).
@@ -10662,7 +10670,9 @@ export function ssrTry(
 			let completed = false;
 			try {
 				const fallback = withPendingArm(() =>
-					pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '',
+					pendFn !== null
+						? vtSsrClaimArm(ssrTryBody(pendFn(undefined, scope), bindingMarker), 'exit')
+						: '',
 				);
 				completed = true;
 				return fallback;
@@ -10767,11 +10777,26 @@ export function ssrTry(
 		if (entry !== undefined) {
 			return ssrTryArm(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
+				BOUNDARY_STREAMED + entry.id,
 				1,
 				bindingMarker,
 			);
 		}
-		return ssrTryArm(nativeFreshArm(pendFn !== null ? fallback : ''), 1, bindingMarker);
+		if (pendFn === null) fallback = '';
+		if (!MARKERS || !nativeFresh) return ssrTryArm(fallback, HYDRATION_START, 1, bindingMarker);
+		// This body cannot be replayed from ready values alone. Remove its
+		// positional seeds too; the fresh client body must not shift a sibling's
+		// use() cursor. Its original useId range remains reserved by the marker.
+		rewindSerial(serialStart);
+		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
+		return bindingMarker === undefined
+			? ssrTryArm(fallback, BOUNDARY_CLIENT + freshReason + idCount, 1, bindingMarker)
+			: ssrTryArm(
+					'<!--' + NATIVE_SIGNAL_FRESH_COMMENT + idCount + '-->' + fallback,
+					HYDRATION_START,
+					1,
+					bindingMarker,
+				);
 	};
 	try {
 		try {
@@ -10783,7 +10808,13 @@ export function ssrTry(
 			let nativeReads: NativeSeedReads | null = null;
 			let inner: string;
 			try {
-				inner = vtSsrClaimArm(ssrBlock(withContentArm(() => tryFn(undefined, scope))), 'enter');
+				inner = vtSsrClaimArm(
+					ssrTryBody(
+						withContentArm(() => tryFn(undefined, scope)),
+						bindingMarker,
+					),
+					'enter',
+				);
 			} finally {
 				nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 			}
@@ -10830,20 +10861,23 @@ export function ssrTry(
 					nativeReads,
 					RESOLVED?.initialDocumentSignals,
 				);
-				return ssrTryArm(
-					`<!--${SUSPENSE_RESOLVED_COMMENT}${idCount}-->` +
-						(seeds.length === 0
-							? ''
-							: serializeSuspenseSeeds(seeds, NONCE_ATTR, SUSPENSE_RESOLVED_SEED_ATTR)) +
-						(native === undefined
-							? ''
-							: serializeNativeSignalSeeds(native, NONCE_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR)) +
-						inner,
-					0,
-					bindingMarker,
-				);
+				const sidecars =
+					(seeds.length === 0
+						? ''
+						: serializeSuspenseSeeds(seeds, NONCE_ATTR, SUSPENSE_RESOLVED_SEED_ATTR)) +
+					(native === undefined
+						? ''
+						: serializeNativeSignalSeeds(native, NONCE_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR));
+				return bindingMarker === undefined
+					? ssrTryArm(sidecars + inner, BOUNDARY_CONTENT + idCount, 0, bindingMarker)
+					: ssrTryArm(
+							'<!--' + SUSPENSE_RESOLVED_COMMENT + idCount + '-->' + sidecars + inner,
+							HYDRATION_START,
+							0,
+							bindingMarker,
+						);
 			}
-			return ssrTryArm(inner, 0, bindingMarker);
+			return ssrTryArm(inner, HYDRATION_START, 0, bindingMarker);
 		} catch (e) {
 			nativeFresh = NATIVE_SERVER_FAILURES !== nativeFailureStart;
 			e = normalizeThrownServerThenable(e);
@@ -10884,7 +10918,7 @@ export function ssrTry(
 					// marks a boundary it could not finish (`<!--$!-->`). A
 					// presentation-binding view adopts its pending arm instead.
 					nativeFresh = true;
-					freshArm = CLIENT_RENDER_ARM_COMMENT;
+					freshReason = BOUNDARY_CLIENT_SUSPENDED;
 				}
 				return pendingForm();
 			}
@@ -10940,7 +10974,7 @@ export function ssrTry(
 				const reports = RESOLVED?.bufferedErrors ?? (RESOLVED!.bufferedErrors = new Map());
 				if (!reports.has(key)) reports.set(key, { error: e, reported: false });
 				nativeFresh = true;
-				if (bindingMarker === undefined) freshArm = CLIENT_ERROR_ARM_COMMENT;
+				if (bindingMarker === undefined) freshReason = BOUNDARY_CLIENT_ERROR;
 				return pendingForm();
 			}
 			throw e;
@@ -10954,8 +10988,9 @@ export function ssrTry(
 // The inline client swap runtime, emitted ONCE (before the first segment).
 // $OCTRC(id, namespaceCarrier): stash the segment's seed JSON on window.$OCTS, remove the
 // fallback (template's siblings up to the balanced block close), move the
-// segment's children into place, and replace the template with the
-// `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
+// segment's children into place, and remove the template, whose boundary's
+// `[$?id` open now scopes the seeds (a binding view's range gets an
+// `<!--oct-seed:id-->` scoping comment instead). `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
 // boundary errored (hydration client-renders that boundary, as React does). Error
@@ -10968,19 +11003,12 @@ let STREAM_RUNTIME_JS: string | undefined;
 function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
 		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
-		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
-		// for safe integer N >= 2. An open may also carry an @for arm or a
-		// presentation-binding receipt, each closed by a plain `]`; a fallback
-		// that renders a list directly must count those opens too. Keep this in
-		// sync with hydrationMarkerMultiplicity.
-		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
-		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s||c==="["&&/^(' +
-		HYDRATION_FOR_EMPTY.slice(HYDRATION_START.length) +
-		'|' +
-		HYDRATION_FOR_ITEMS.slice(HYDRATION_START.length) +
-		'|' +
-		BINDING_OPEN_TAIL_SOURCE +
-		')$/.test(s);};' +
+		// The range grammar (hydration-protocol.ts): `]` closes, and isRangeOpen
+		// as RANGE_OPEN_SOURCE opens, including the @for, binding and boundary
+		// kinds a fallback can render directly.
+		'var M=function(v,c){return c==="]"?v===c:/' +
+		RANGE_OPEN_SOURCE +
+		'/.test(v)};' +
 		// Share parser/range rules with the optional driver; the base swap owns
 		// transport even when animation prepares its carrier before insertion.
 		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
@@ -11011,7 +11039,11 @@ function streamRuntimeJs(): string {
 		'n.parentNode.removeChild(n);n=x;}' +
 		'var p=t.parentNode;' +
 		'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
-		'p.replaceChild(d.createComment("' +
+		// A boundary's own open names it (`[$?id`). A binding view's range
+		// records its arm instead, so it scopes its seeds by a comment.
+		'if(t.previousSibling.data.charAt(1)==="' +
+		BOUNDARY_STREAMED.charAt(1) +
+		'")p.removeChild(t);else p.replaceChild(d.createComment("' +
 		STREAM_SEED_COMMENT +
 		'"+id),t);' +
 		's.parentNode.removeChild(s);if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
