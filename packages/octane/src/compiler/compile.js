@@ -19378,10 +19378,18 @@ function isPropCreationExpr(expr, ctx, includesLiteral = false) {
 				return;
 			}
 			if (FN_TYPES.has(n.type)) {
-				// A regular function can mutate its receiver even if it never names
-				// the literal binding. Keep receiver-owning methods/accessors fresh.
-				// Arrow properties cannot acquire the literal as their `this`.
-				if (includesLiteral && n.type !== 'ArrowFunctionExpression') blocked = true;
+				// A regular function can mutate a containing literal via its receiver,
+				// or retain per-render state on its own function object. Reuse the
+				// callback movement proof before stabilizing either kind of identity.
+				if (
+					includesLiteral &&
+					n.type !== 'ArrowFunctionExpression' &&
+					(!isMovableHookCallback(n) ||
+						hasInlineMemoDirectEval(n) ||
+						(n.id && collectFreeIdentifiers({ ...n, id: null }, []).has(n.id.name)))
+				) {
+					blocked = true;
+				}
 				return; // does not run during render
 			}
 			// Same render-time-call inventory as containsRenderCall: plain and
