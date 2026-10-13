@@ -825,7 +825,9 @@ describe('profile commit and work attribution', () => {
 		expect(view.container.textContent).toBe('7');
 		expect(profiler.counters()['for.empty.mount']).toBeGreaterThan(0);
 		expect(profiler.counters()['for.empty.unmount']).toBeGreaterThan(0);
-		expect(profiler.counters()['row.park']).toBeGreaterThan(0);
+		// Accepted rows remain in place until the new order is committed. No
+		// rollback parking happens; moves and deletions above are still measured.
+		expect(profiler.counters()['row.park']).toBe(0);
 		expect(
 			profiler.summary().find((entry) => entry.component === 'ProfileList')?.counters[
 				'list.insert'

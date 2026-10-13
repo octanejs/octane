@@ -118,29 +118,27 @@ export function mount(parent,props) {
 		id: String(index),
 		label: 'Row ' + index,
 	}));
-	const originalSet = Map.prototype.set;
+	const originalAdd = window.EventTarget.prototype.addEventListener;
+	const originalRemove = window.EventTarget.prototype.removeEventListener;
 	let records = 0;
 	const count = (callback) => {
 		records = 0;
-		// Observe journal Map insertions for the existing nominal native bundles.
-		// Each insertion snapshots that bundle once in the current journal window.
-		// This is operation evidence; callback correctness is checked separately.
-		Map.prototype.set = function (key, value) {
-			if (
-				key !== null &&
-				typeof key === 'object' &&
-				typeof key.fn === 'function' &&
-				key.el instanceof window.Element &&
-				Object.hasOwn(key, 'args')
-			)
-				records++;
-			return Reflect.apply(originalSet, this, [key, value]);
+		// The public native event contract includes stable delegation while captures
+		// change. Measure listener work on the real hosts, independent of bookkeeping.
+		window.EventTarget.prototype.addEventListener = function (...args) {
+			records++;
+			return Reflect.apply(originalAdd, this, args);
+		};
+		window.EventTarget.prototype.removeEventListener = function (...args) {
+			records++;
+			return Reflect.apply(originalRemove, this, args);
 		};
 		try {
 			callback();
 			return records;
 		} finally {
-			Map.prototype.set = originalSet;
+			window.EventTarget.prototype.addEventListener = originalAdd;
+			window.EventTarget.prototype.removeEventListener = originalRemove;
 		}
 	};
 	try {
@@ -151,7 +149,7 @@ export function mount(parent,props) {
 		const input = first.querySelector('input');
 		input.value = 'typed before reorder';
 		const buttons = Array.from(first.querySelectorAll('button'));
-		const unchanged = count(() => {
+		const unchangedListenerWrites = count(() => {
 			for (let iteration = 0; iteration < updates; iteration++) {
 				const next = items.map((item) => ({
 					...item,
@@ -171,7 +169,7 @@ export function mount(parent,props) {
 		});
 		for (const button of buttons) button.click();
 		assert.deepEqual(seen.splice(0), [[], ['0'], ['0', 'first'], ['click', '0']]);
-		const changed = count(() => mounted.update({ items, invoke, other: 'second' }));
+		const changedListenerWrites = count(() => mounted.update({ items, invoke, other: 'second' }));
 		assert.equal(first.querySelector('button[data-kind="two"]'), buttons[2]);
 		buttons[2].click();
 		assert.deepEqual(seen.splice(0), [['0', 'second']]);
@@ -182,8 +180,8 @@ export function mount(parent,props) {
 			dev,
 			rows,
 			updates,
-			unchanged,
-			changed,
+			unchangedListenerWrites,
+			changedListenerWrites,
 			raw: Buffer.byteLength(code),
 			gzip: gzipSync(code).length,
 			hashes: {
@@ -194,7 +192,8 @@ export function mount(parent,props) {
 			},
 		};
 	} finally {
-		Map.prototype.set = originalSet;
+		window.EventTarget.prototype.addEventListener = originalAdd;
+		window.EventTarget.prototype.removeEventListener = originalRemove;
 		mounted?.dispose();
 		host.remove();
 		window.close();

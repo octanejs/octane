@@ -31650,7 +31650,16 @@ function emitPreparedBinding(bind, bag) {
 				b.if(
 					b.binary('===', node, nullNode()),
 					b.block([
-						b.stmt(b.assignment('=', node, mount)),
+						// The placeholder is consumed even if a later descendant
+						// suspends. Keep its resolved node on the retained clone;
+						// only the raw value and writer belong to this candidate.
+						b.stmt(
+							b.assignment(
+								'=',
+								node,
+								b.assignment('=', bagFieldNode(bag, `_txt$${bind.id}`), mount),
+							),
+						),
 						// htext already coerced and validated this first value; SSR
 						// suppression must not be followed by a second write.
 						b.stmt(b.assignment('=', b.member(b.id('_p'), `_value$${field}`), undefinedNode())),

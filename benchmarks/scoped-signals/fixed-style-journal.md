@@ -1,5 +1,16 @@
 # Fixed-key style rollback snapshots
 
+## Current guard
+
+The file name and results below document an earlier optimization. The runtime
+now prepares style values and publishes the accepted declarations without
+reading a whole style for rollback. Both fixed and opaque consumers must
+perform only the six Happy DOM declaration setters' internal reads per row.
+The guard continues to require matching CSS, retained hosts and input drafts,
+and complete unmount cleanup in development and production.
+
+## Historical design and measurements
+
 This isolates issue #1130 §2.6. Updating six changed declarations in an inline
 style object used to snapshot the host's entire live `style` attribute six times.
 The equivalent opaque style object snapshots it once. Both consumers still write

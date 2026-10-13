@@ -10,6 +10,11 @@ const adapters = new Set([
 	'bindSignalAttribute',
 	'bindSignalValue',
 	'bindSignalChecked',
+	'prepareTemplateSignalText',
+	'prepareTemplateSignalAttribute',
+	'prepareTemplateScalarSignalAttribute',
+	'prepareTemplateSignalValue',
+	'prepareTemplateSignalChecked',
 	'ssrSignalValue',
 	'ssrSignalControlValue',
 ]);

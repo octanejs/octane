@@ -2061,7 +2061,7 @@
       "message": "A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     }
   }
 }

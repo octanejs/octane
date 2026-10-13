@@ -3,7 +3,7 @@ import test from 'node:test';
 import { measureFixedStyleJournal } from './fixed-style-journal.mjs';
 
 for (const dev of [false, true]) {
-	test(`fixed style updates reuse the whole-style snapshot (${dev ? 'dev' : 'prod'})`, async () => {
+	test(`fixed and opaque styles update without extra whole-style reads (${dev ? 'dev' : 'prod'})`, async () => {
 		const { scenarios, rows } = await measureFixedStyleJournal({ dev });
 		const [fixed, opaque] = scenarios;
 		// Happy DOM also reads the attribute once inside each declaration setter.
@@ -11,8 +11,8 @@ for (const dev of [false, true]) {
 		assert.equal(
 			fixed.styleReads,
 			opaque.styleReads,
-			'Fixed declarations must not take more whole-style snapshots than their opaque-object control.',
+			'Fixed declarations must not read more whole styles than their opaque-object control.',
 		);
-		assert.equal(opaque.styleReads, rows * 7);
+		assert.equal(opaque.styleReads, rows * 6, 'Only the six declaration setters may read style.');
 	});
 }

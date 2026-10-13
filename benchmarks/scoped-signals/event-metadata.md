@@ -1,5 +1,20 @@
 # Unchanged native callback bookkeeping
 
+## Current guard
+
+`event-metadata.mjs` observes real native listener installation and removal
+during updates. Both unchanged and changed captures must use the existing
+delegated listeners. The same compiled keyed view still checks the delivered
+arguments, text and title updates, input draft and host identity through
+reorders, and unmount cleanup. It reports these counts as
+`unchangedListenerWrites` and `changedListenerWrites`.
+
+The results below are historical measurements of the previous journal-based
+implementation. The current runtime prepares captures before committing them
+and has no object-snapshot journal.
+
+## Historical design and measurements
+
 The consumer contract is unchanged: native callbacks receive the latest authored
 captures, event ordering uses phase snapshots, and handler publication refreshes
 authority even when callback data stays equal. Failed or abandoned rendering

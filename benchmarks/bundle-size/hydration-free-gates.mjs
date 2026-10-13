@@ -216,15 +216,21 @@ for (let index = 0; index < BASE64.length; index++) BASE64_VALUES[BASE64.charCod
  * originalColumn] of every segment that has a source. Lines and columns are
  * 0-based.
  */
-export function* mappedSourcePositions(mappings) {
+export function* mappedSourcePositions(mappings, includeGenerated = false) {
 	let sourceIndex = 0;
 	let originalLine = 0;
 	let originalColumn = 0;
+	let generatedLine = 0;
+	let generatedColumn = 0;
 	let index = 0;
 	const fields = [0, 0, 0, 0, 0];
 	while (index < mappings.length) {
 		const char = mappings.charCodeAt(index);
 		if (char === 59 /* ; */ || char === 44 /* , */) {
+			if (char === 59) {
+				generatedLine++;
+				generatedColumn = 0;
+			}
 			index++;
 			continue;
 		}
@@ -243,11 +249,14 @@ export function* mappedSourcePositions(mappings) {
 			} while (digit & 32);
 			fields[count++] = value & 1 ? -(value >>> 1) : value >>> 1;
 		}
+		generatedColumn += fields[0];
 		if (count >= 4) {
 			sourceIndex += fields[1];
 			originalLine += fields[2];
 			originalColumn += fields[3];
-			yield [sourceIndex, originalLine, originalColumn];
+			yield includeGenerated
+				? [sourceIndex, originalLine, originalColumn, generatedLine, generatedColumn]
+				: [sourceIndex, originalLine, originalColumn];
 		}
 	}
 }

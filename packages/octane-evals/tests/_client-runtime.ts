@@ -5,13 +5,15 @@
 // private runtime to submissions. Keep its existing public surface and add only
 // the helpers the client compiler routes to `octane/internal/client` when Vitest
 // compiles a submission or an allowed binding package. That compile is Vite's
-// dev/HMR mode, which never emits the production-only hook-memo or compiled-
-// context helpers, and native signal reads need an `octane/signals` import that
-// submissions cannot make.
+// dev/HMR mode. The equality intrinsic also protects native event captures in
+// dev; the production-only hook-memo and compiled-context helpers remain
+// excluded. Native signal reads need an `octane/signals` import that submissions
+// cannot make.
 export * from '../../octane/src/index.js';
 export {
 	__delegateEvents,
 	__delegateCaptureEvents,
+	hookMemoEqual,
 	enableSignalBindings,
 	createElementAt,
 	createElementFromConfig,

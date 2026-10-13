@@ -20,6 +20,7 @@ import {
 	TransitionChildWipReentrantUnmountApp,
 	TransitionComponentWipReentrantUnmountApp,
 	SuspensePreservationApp,
+	SpreadHostMetaSuspension,
 	RootSuspensionAfterSiblingApp,
 	RawRootSuspensionAfterSiblingApp,
 	RetainedResults,
@@ -43,6 +44,27 @@ function deferred<T>() {
 function fulfilled<T>(value: T): PromiseLike<T> {
 	return { then() {}, status: 'fulfilled', value } as any;
 }
+
+it('keeps spread-host text positions while a fresh primary waits for its descendant', async () => {
+	const gate = deferred<string>();
+	const root = mount(SpreadHostMetaSuspension, { label: 'A', promise: gate.promise });
+	expect(root.container.querySelector('#spread-meta-pending')?.textContent).toBe(
+		'Loading comments',
+	);
+	root.update(SpreadHostMetaSuspension, { label: 'B', promise: gate.promise });
+	expect(root.container.querySelector('#spread-meta-pending')?.textContent).toBe(
+		'Loading comments',
+	);
+	await act(() => gate.resolve('ready'));
+	expect(root.container.querySelector('#spread-meta-pending')).toBeNull();
+	const meta = root.container.querySelector('p');
+	expect(meta?.textContent).toBe('story Bcomments');
+	expect(meta?.title).toBe('B');
+	const score = root.container.querySelector('output');
+	expect(score?.textContent).toBe('score B');
+	expect(score?.getAttribute('aria-label')).toBe('B');
+	root.unmount();
+});
 
 function makeStore() {
 	let value = 0;

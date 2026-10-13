@@ -4,6 +4,7 @@ import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import {
 	createElement,
 	descriptorChildren,
+	memo,
 	useEffect,
 	useId,
 	useInsertionEffect,
@@ -46,6 +47,19 @@ const ACTIVITY_SLOT = Symbol('octane.react-compat.activity');
 const PUBLISH_SLOT = Symbol('octane.react-compat.publish');
 const SENTINEL_COMMENT = 'react-compat';
 const SENTINEL = Object.freeze({ __html: `<!--${SENTINEL_COMMENT}-->` });
+
+// The initial wrapper tells Octane which server range React will own. Once
+// mounted, only the React controller may reconcile the children of that host.
+// The controller and ref are stable across its prop/context/visibility updates.
+const ReactIslandHost = memo(({ controller }: { controller: ReactIslandController }) =>
+	createElement('div', {
+		'data-react-compat': '',
+		style: 'display: contents',
+		ref: controller.ref,
+		suppressHydrationWarning: true,
+		dangerouslySetInnerHTML: SENTINEL,
+	}),
+);
 
 function equalProps(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
 	const keys = Object.keys(a);
@@ -271,13 +285,7 @@ function ReactCompatImpl(
 		ACTIVITY_SLOT,
 	);
 	useLayoutEffect(() => controller.commit(child, contexts, identifierPrefix), null, PUBLISH_SLOT);
-	return createElement('div', {
-		'data-react-compat': '',
-		style: 'display: contents',
-		ref: controller.ref,
-		suppressHydrationWarning: true,
-		dangerouslySetInnerHTML: SENTINEL,
-	});
+	return createElement(ReactIslandHost, { controller });
 }
 
 /** Host one React component under Octane, with real React hooks and events. */

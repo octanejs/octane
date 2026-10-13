@@ -11,6 +11,36 @@ const Host: ComponentBody<{ tag?: string; props: Record<string, unknown>; read?:
 };
 
 describe('persistent descriptor host properties', () => {
+	it.each([null, undefined])(
+		'keeps the last native nullish alias %s on mount and update',
+		(empty) => {
+			const r = mount(Host, { tag: 'label', props: { htmlFor: 'first', for: empty } });
+			try {
+				const label = r.find('label');
+				expect(label.getAttribute('for')).toBeNull();
+				r.update(Host, { tag: 'label', props: { htmlFor: 'first', for: empty } });
+				expect(label.getAttribute('for')).toBeNull();
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each([null, undefined])(
+		'keeps the last camel nullish alias %s on mount and update',
+		(empty) => {
+			const r = mount(Host, { tag: 'label', props: { for: 'first', htmlFor: empty } });
+			try {
+				const label = r.find('label');
+				expect(label.getAttribute('for')).toBeNull();
+				r.update(Host, { tag: 'label', props: { for: 'first', htmlFor: empty } });
+				expect(label.getAttribute('for')).toBeNull();
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
 	it('keeps the last class and label target through alias removal and reordering', () => {
 		const r = mount(Host, {
 			tag: 'label',

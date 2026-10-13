@@ -28,7 +28,7 @@ import { octane } from 'octane/compiler/vite';
 import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
-import { selectMinimalScenarios } from './minimal-gates.mjs';
+import { selectMinimalScenarios, unreferencedMarkerDeclarations } from './minimal-gates.mjs';
 import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -83,8 +83,11 @@ const signalFreeClientScenarios = new Set([
 	'deferred-hydration',
 	'suspense-transition',
 ]);
-// Renderer clients that never hydrate and render no binding view. A dynamic
-// text hole must not retain the hydration range-marker validator for them.
+// Renderer clients that never hydrate and render no binding view. Vite/Oxc
+// folds the optional hydration flag. esbuild does not fold module flags, so
+// its compiled clone/text path still contains the general opening validator.
+// Track that exact residual alongside the full JS bytes; the for-binding
+// validator and all of the ordinary hydration-free gates remain strict.
 const markerFreeClientScenarios = new Set([
 	'cli-spa-starter',
 	'root-chained-jsx',
@@ -318,6 +321,13 @@ const bindingMarkerRanges = selectedScenarios.some(
 )
 	? declarationRanges('dom-binding-protocol.ts', bindingMarkerDeclarations)
 	: [];
+const pureMarkerRanges =
+	bindingMarkerRanges.length === 0
+		? []
+		: [
+				...bindingMarkerRanges,
+				...declarationRanges('stream-protocol.ts', ['hydrationMarkerMultiplicity']),
+			];
 const genericDomTables = [
 	'BOOLEAN_ATTR_PROPS',
 	'MUST_USE_PROPERTY_PROPS',
@@ -666,6 +676,11 @@ async function buildScenario(scenario, entry) {
 	const hookPathModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
 	);
+	const bindingMarkers = chunk.map ? retainedDeclarations(chunk.map, bindingMarkerRanges) : null;
+	const unreferencedMarkers =
+		markerFreeClientScenarios.has(scenario.id) && bindingMarkers?.size
+			? unreferencedMarkerDeclarations(chunk.code, chunk.map, parseAst, pureMarkerRanges)
+			: new Set();
 	return {
 		code: chunk.code,
 		modules,
@@ -675,7 +690,8 @@ async function buildScenario(scenario, entry) {
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
 		stream: chunk.map ? retainedDeclarations(chunk.map, streamRanges) : null,
-		bindingMarkers: chunk.map ? retainedDeclarations(chunk.map, bindingMarkerRanges) : null,
+		bindingMarkers,
+		unreferencedMarkers,
 		domTables: chunk.map ? retainedDeclarations(chunk.map, domTableRanges) : null,
 		hookPathExports: hookPathModule ? chunk.modules[hookPathModule].renderedExports : [],
 		effects: chunk.map ? retainedDeclarations(chunk.map, effectRanges) : null,
@@ -697,6 +713,7 @@ try {
 			serverRuntimeExports = [],
 			stream,
 			bindingMarkers,
+			unreferencedMarkers = new Set(),
 			domTables,
 			hookPathExports = [],
 			effects,
@@ -762,7 +779,12 @@ try {
 		if (markerFreeClientScenarios.has(id) || id === 'hydrate-frame') {
 			assert.ok(bindingMarkers, `${name}: missing binding-marker reachability map`);
 			assert.deepEqual(
-				bindingMarkerDeclarations.filter((name) => bindingMarkers.has(name)),
+				bindingMarkerDeclarations.filter(
+					(name) =>
+						bindingMarkers.has(name) &&
+						!unreferencedMarkers.has(name) &&
+						!(scenario.bundler === 'esbuild' && name === 'isBindingOpenComment'),
+				),
 				id === 'hydrate-frame' ? bindingMarkerDeclarations : [],
 				`${name}: native SSR binding validators must follow hydration use`,
 			);
@@ -915,6 +937,16 @@ try {
 					hasVanillaStore,
 					...(scenario.package ? { bundler: scenario.bundler, package: scenario.package } : null),
 					...(id.startsWith('root-static') || id === 'cli-spa-starter' ? { runtimeExports } : null),
+					...(bindingMarkers === null || bindingMarkers === undefined
+						? null
+						: {
+								retainedBindingMarkers: bindingMarkerDeclarations.filter((name) =>
+									bindingMarkers.has(name),
+								),
+								unreferencedBindingMarkers: bindingMarkerDeclarations.filter((name) =>
+									unreferencedMarkers.has(name),
+								),
+							}),
 					snapshot,
 				},
 			});

@@ -2930,7 +2930,9 @@ export function App(props) {
 				// This is a compiler-cost guard: behavior is covered by public hydration
 				// and late writable-prop tests. Count the emitted runtime capabilities,
 				// rather than treating smaller fixture bytes as a speed measurement.
-				const bindings = [...code.matchAll(/\bbindSignal\w*\s+as\b/g)];
+				const bindings = [
+					...code.matchAll(/\b(?:bindSignal\w*|prepareTemplate(?:Scalar)?Signal\w*)\s+as\b/g),
+				];
 				const description = `${extension}, ${dev ? 'dev' : 'prod'}: ${prefix} ${expression}`;
 				if (primitive) assert.equal(bindings.length, 0, description);
 				else assert.ok(bindings.length > 0, description);

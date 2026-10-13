@@ -276,6 +276,25 @@ function AsyncRoute(props) @{
 	<main id="preserved-route">{'route:' + value}</main>
 }
 
+function SpreadHostMeta(props: { label: string; promise: PromiseLike<string> }) @{
+	<section>
+		<p {...{ title: props.label }}>
+			{('story ' + props.label) as string}
+			<span>comments</span>
+		</p>
+		<output {...{ 'aria-label': props.label }}>{('score ' + props.label) as string}</output>
+		<AsyncRoute promise={props.promise} />
+	</section>
+}
+
+export function SpreadHostMetaSuspension(props: { label: string; promise: PromiseLike<string> }) @{
+	@try {
+		<SpreadHostMeta label={props.label} promise={props.promise} />
+	} @pending {
+		<i id="spread-meta-pending">Loading comments</i>
+	}
+}
+
 function RouteA() @{
 	<main id="preserved-route">{'route:A'}</main>
 }

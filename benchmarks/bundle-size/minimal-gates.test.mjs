@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import path from 'node:path';
 import { build } from 'esbuild';
+import { parseAst } from 'vite';
 import { bundleScenarios } from '../activity/bundle-scenarios.mjs';
-import { selectMinimalScenarios } from './minimal-gates.mjs';
+import { selectMinimalScenarios, unreferencedMarkerDeclarations } from './minimal-gates.mjs';
 import { verifyScenario } from './verify-reachability.mjs';
 
 const scenarios = [
@@ -27,6 +28,80 @@ test('invalid scenario arguments fail instead of silently skipping builds', () =
 		);
 	}
 	assert.throws(() => selectMinimalScenarios([], []), /At least one minimal-import scenario/);
+});
+
+test('late-folded marker declarations require a closed unused lexical group', () => {
+	// Identity source map for the final output of a small bundle. The two
+	// original ranges stand in for the narrow validators the gate audits.
+	const map = {
+		sources: ['/repo/packages/octane/src/protocol.ts'],
+		mappings: 'AAAA;AACA;AACA;AACA;AACA',
+	};
+	const ranges = [
+		{
+			name: 'marker',
+			source: 'protocol.ts',
+			startLine: 1,
+			startColumn: 0,
+			endLine: 1,
+			endColumn: 1000,
+		},
+		{
+			name: 'multiplicity',
+			source: 'protocol.ts',
+			startLine: 2,
+			startColumn: 0,
+			endLine: 2,
+			endColumn: 1000,
+		},
+	];
+	const prove = (application) =>
+		unreferencedMarkerDeclarations(
+			`(function(){
+function m(value){return value==="["}
+function g(value){return m(value)?1:0}
+${application}
+})();`,
+			map,
+			parseAst,
+			ranges,
+		);
+	assert.deepEqual(prove('globalThis.run=()=>42'), new Set(['marker', 'multiplicity']));
+	// Minifiers reuse short names across lexical scopes; an actual shadow must
+	// not prevent the proof. The outer binding must still be detected.
+	assert.deepEqual(
+		prove('globalThis.run=function(g){return g("[")}'),
+		new Set(['marker', 'multiplicity']),
+	);
+	for (const application of [
+		'globalThis.run=()=>g("[")',
+		'globalThis.run=g',
+		'globalThis.run={g}',
+		'globalThis.run=()=>{const alias=g;return alias("[")}',
+		'globalThis.run=()=>({call:m}).call("[")',
+		'globalThis.run=function(g){return m(g)}',
+		'globalThis.run=()=>eval("g")',
+	])
+		assert.deepEqual(prove(application), new Set(), application);
+});
+
+test('an inlined validator cannot receive unused-declaration credit', () => {
+	const map = {
+		sources: ['/repo/packages/octane/src/protocol.ts'],
+		mappings: 'AAAA;AACA;AACA',
+	};
+	const ranges = [
+		{
+			name: 'marker',
+			source: 'protocol.ts',
+			startLine: 1,
+			startColumn: 0,
+			endLine: 1,
+			endColumn: 1000,
+		},
+	];
+	const code = '(function(){\nglobalThis.run=value=>value==="["\n})();';
+	assert.deepEqual(unreferencedMarkerDeclarations(code, map, parseAst, ranges), new Set());
 });
 
 test('the Activity descriptor audit retains its distinct public output contract', async () => {

@@ -3,17 +3,17 @@ import test from 'node:test';
 import { measureEventMetadata } from './event-metadata.mjs';
 
 for (const dev of [false, true]) {
-	test(`unchanged lifted handlers skip data snapshots without losing native behavior (${dev ? 'dev' : 'prod'})`, async () => {
+	test(`lifted handlers preserve delegation and publish changed captures (${dev ? 'dev' : 'prod'})`, async () => {
 		const result = await measureEventMetadata({ dev });
 		assert.equal(
-			result.unchanged,
+			result.unchangedListenerWrites,
 			0,
-			'Unchanged native bundles must not enter the object-snapshot journal.',
+			'Unchanged callbacks must not reinstall native listeners while their rows reorder.',
 		);
 		assert.equal(
-			result.changed,
-			result.rows,
-			'Only the changed two-capture handler requires a snapshot.',
+			result.changedListenerWrites,
+			0,
+			'Changed captures must reach the existing delegated listeners.',
 		);
 	});
 }

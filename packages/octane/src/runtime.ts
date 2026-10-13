@@ -509,8 +509,6 @@ interface PendingEffectEvent {
 export interface Scope {
 	block: Block;
 	parent: Scope | null;
-	/** The rare early native-host lease still awaiting its complete template. */
-	presentation?: PresentationHydrationFrame;
 	/**
 	 * An event handler published this scope as its signal authority. Deletion then
 	 * records retirement for a scope that never resolved an owner, so a handler
@@ -2001,19 +1999,17 @@ function inspectDevtoolsName(scope: import('./devtools-hook.js').DevtoolsScopeLi
 function acceptNativeCapture(
 	capture: OffscreenCapture,
 	owner: RootRenderOwner | undefined,
-	replayRootRefs = false,
 ): boolean {
 	if (!NATIVE_READ_DRIVER) return false;
 	const driver = NATIVE_READ_DRIVER;
 	if (
 		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => acceptNativeCapture(capture, owner, replayRootRefs))
+		DEFERRED_LAYOUT_DRIVER.stageAction(() => acceptNativeCapture(capture, owner))
 	)
 		return true;
 	const native = driver.acceptCapture(capture);
 	if (owner === undefined) return false;
-	const replays = replayRootRefs && driver.replayDeferredRefs(capture, owner);
-	if (native || replays || driver.hasPublication(owner)) {
+	if (native || driver.hasPublication(owner)) {
 		driver.stampPublication(owner, [
 			capture.effects[INSERTION],
 			capture.effects[LAYOUT],
@@ -2031,17 +2027,20 @@ function replayNativeUnpublishedRefs(capture: OffscreenCapture, owner: RootRende
 	const pending = driver.deferredRefEntries(owner);
 	if (pending === undefined || owner.current === null || owner.disposed) return false;
 	const queued = new Set(capture.refs.map((entry) => entry.el));
+	for (const entry of refAttachQueue) queued.add(entry.el);
 	const current: SuspenseRefEntry[] = [];
 	collectVisibleSubtreeRefs(owner.current, current);
 	for (const entry of current) {
 		const skipped = pending.get(entry.el) as RefAttach | undefined;
 		if (skipped === undefined || queued.has(entry.el) || blockSubtreeDisposed(entry.scope.block))
 			continue;
-		capture.refs.push({
+		const replay: RefAttach = {
 			ref: skipped.ref === attachLiveFragmentRef ? attachLiveFragmentRef : entry.ref,
 			el: entry.el,
 			block: entry.scope.block,
-		});
+		};
+		driver.stampQueuedPublication(owner, replay);
+		refAttachQueue.push(replay);
 		queued.add(entry.el);
 	}
 	for (const [target, receipt] of pending) {
@@ -2371,15 +2370,11 @@ function clearHydrationThrow(): void {
 function logHydrationMismatch(message: string): void {
 	if (
 		currentHydration?.staleServerValues === true ||
-		(currentHydration == null
-			? void 0
-			: hydrateHolds(currentHydration, () => logHydrationMismatch(message))) === true
+		(currentHydration == null ? void 0 : hydrateHolds(() => logHydrationMismatch(message))) === true
 	)
 		return;
 	if (
-		(currentHydration == null
-			? void 0
-			: hydrateAwaitsCommit(currentHydration, () => console.error(message))) !== true
+		(currentHydration == null ? void 0 : hydrateAwaitsCommit(() => console.error(message))) !== true
 	)
 		console.error(message);
 }
@@ -4634,41 +4629,6 @@ function retireRootBlock(block: Block): void {
 	}
 }
 
-/** Retire only an outgoing range, after its genuine replacement has succeeded. */
-function deferRootReplacement(
-	block: Block,
-	parent: Node,
-	first: Node | null,
-	last: Node | null,
-	finalize?: () => void,
-): void {
-	retireRootBlock(block);
-	deferRootRange(
-		parent,
-		first,
-		last,
-		() => {
-			if (!block.disposed) unmountBlock(block, false);
-		},
-		finalize,
-	);
-}
-
-/** Retire an outgoing arm, a Block or a lite arm's Scope, once its root commits. */
-function deferRootArmReplacement(
-	block: Block | null,
-	lite: Scope | null,
-	parent: Node,
-	first: Node | null,
-	last: Node | null,
-): void {
-	if (block !== null) deferRootReplacement(block, parent, first, last);
-	else {
-		retireRootBlock(lite!.block);
-		deferRootRange(parent, first, last, () => releaseLiteArm(lite!));
-	}
-}
-
 function deferRootRange(
 	parent: Node,
 	first: Node | null,
@@ -5005,7 +4965,7 @@ function commitRootRenders(): void {
 				// an earlier pending attempt have no continuing consumer.
 				if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
 			}
-			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
+			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner);
 			const acceptedGeneration = owner.generation;
 			// Irreversible deletions precede the incoming ref/layout publication.
 			const commits = transaction.commit;
@@ -5022,18 +4982,21 @@ function commitRootRenders(): void {
 				};
 				if (!STAGED_COMMIT_CAPTURE || !DEFERRED_LAYOUT_DRIVER!.stageAction(publish)) publish();
 			}
-			if (NATIVE_READ_DRIVER) {
-				if (
-					!DEFERRED_LAYOUT_DRIVER ||
-					!DEFERRED_LAYOUT_DRIVER.stageAction(() => NATIVE_READ_DRIVER!.pruneDeferredRefs(owner))
-				)
-					NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
-			}
 			if (owner.disposed || owner.generation !== acceptedGeneration) {
 				discardOffscreenCapture(transaction.capture);
 				continue;
 			}
 			spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
+			if (NATIVE_READ_DRIVER) {
+				const finishNativeRefs = () => {
+					// Generated writers install their refs at commit. Only replay
+					// skipped refs after those writers made their new identities live.
+					NATIVE_READ_DRIVER!.pruneDeferredRefs(owner);
+					NATIVE_READ_DRIVER!.replayDeferredRefs(transaction.capture, owner);
+				};
+				if (!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.stageAction(finishNativeRefs))
+					finishNativeRefs();
+			}
 			if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
 				// A successful replacement may remove a still-dormant leased view.
 				// Inspect native containment only after staged DOM publication. Retiring
@@ -5209,15 +5172,6 @@ function checkpointAdoptedList(state: ForSlot): void {
 		Object.assign(state, previous);
 		seen.delete(state);
 	});
-}
-
-/** The actual parent of a live list; disposing the owner invalidates its range. */
-function forSlotParent(state: ForSlot): Node | null {
-	return state.ownerBlock.disposed ? null : (state.ownerHost ?? state.end!.parentNode);
-}
-
-function forSlotFirst(state: ForSlot): Node | null {
-	return state.ownerHost !== null ? getFirstChild(state.ownerHost) : getNextSibling(state.start!);
 }
 
 /**
@@ -5777,7 +5731,12 @@ function vtReleaseScopeBoundary(block: Block): void {
 
 /** Discovery reads desired ownership, but CSS always describes accepted ownership. */
 function vtCommitScopeBoundary(block: Block, state: ViewTransitionBoundaryState): void {
-	if (WIP_CAPTURE === null) {
+	if (block.disposed) {
+		// A retirement cannot use its disposed scope's prepared-slot guard.
+		// Keep its CSS release with accepted native work if a VT owns this drain.
+		if (!DEFERRED_LAYOUT_DRIVER?.stageAction(() => vtApplyScopeBoundary(state), true))
+			vtApplyScopeBoundary(state);
+	} else if (WIP_CAPTURE === null) {
 		vtApplyScopeBoundary(state);
 	} else {
 		prepareSlot(block, state, 'scopePrepared', {
@@ -5811,7 +5770,11 @@ function vtPrepareScopeBoundary(block: Block): void {
 	const state = vtBoundaryState(block);
 	if (state.scopeHost !== null && state.scopeHost !== host) vtReleaseScopeBoundary(block);
 	if (host === null) {
-		if (WIP_CAPTURE !== null && !PREPARED_PARENTS.has(block.parentNode)) {
+		if (
+			props?.scope === 'element' &&
+			WIP_CAPTURE !== null &&
+			!PREPARED_PARENTS.has(block.parentNode)
+		) {
 			// Its descriptor or list children can still be prepared. Discover the
 			// real host when those scopes publish, before this boundary is observed
 			// by a later drain or a portal from an independent root.
@@ -7135,8 +7098,7 @@ export function commitTemplate(
 		capture,
 		previous,
 	};
-	if (hydrationStarted && scope.presentation !== undefined)
-		prepared.presentation = scope.presentation;
+	if (hydrationStarted) prepared.presentation = PRESENTATION_HOSTS.get(scope);
 	if (TRANSITION_JOURNAL !== null) TRANSITION_JOURNAL.push(JOURNAL_PROP, bag, field, previous);
 	bag[field] = prepared;
 	(capture.renderCleanups ??= []).push(prepared);
@@ -8633,14 +8595,14 @@ let renderingFocusMoves: Array<{
 }> | null = null;
 
 /** A global scheduler drain may contain independently focused documents. */
-function captureQueuedFocusSelection(): FocusSelectionBatch {
-	if (QUEUE.length === 0) return null;
-	const firstDocument = QUEUE[0].parentNode.ownerDocument;
+function captureQueuedFocusSelection(blocks: readonly Block[] = QUEUE): FocusSelectionBatch {
+	if (blocks.length === 0) return null;
+	const firstDocument = blocks[0].parentNode.ownerDocument;
 	if (firstDocument === null) return null;
 	let snapshots: FocusSelectionBatch = captureFocusSelection(firstDocument);
 	let documents: Document[] | null = null;
-	for (let i = 1; i < QUEUE.length; i++) {
-		const doc = QUEUE[i].parentNode.ownerDocument;
+	for (let i = 1; i < blocks.length; i++) {
+		const doc = blocks[i].parentNode.ownerDocument;
 		if (doc === null || doc === firstDocument || documents?.includes(doc)) continue;
 		(documents ??= [firstDocument]).push(doc);
 		const snapshot = captureFocusSelection(doc);
@@ -9316,12 +9278,27 @@ function vtFlush(
 		inFlush = true;
 		beginStagedCommitPublication(stagedCommit);
 		try {
+			// The queued bodies ran earlier, but this is where their accepted DOM
+			// actually moves. Read focus now so user input during native capture
+			// keeps authority, including selections in independent frame documents.
+			const focused = captureQueuedFocusSelection(queuedBlocks);
+			const previousFocus = renderingFocus;
+			const previousMoves = renderingFocusMoves;
+			renderingFocus = focused;
+			renderingFocusMoves = null;
 			try {
 				rejectStagedPresentations(stagedCommit);
 				const programs = stagedCommit.programs;
 				for (const program of programs) program();
 				programs.length = 0;
 			} finally {
+				try {
+					restoreFocusedMovements();
+					if (focused !== null) restoreQueuedFocusSelection(focused);
+				} finally {
+					renderingFocusMoves = previousMoves;
+					renderingFocus = previousFocus;
+				}
 				publishStagedCommit(stagedCommit);
 			}
 		} catch (error) {
@@ -9685,7 +9662,7 @@ export function flushSync<T>(fn: () => T): T {
 				// retry deadlines remain in force (including other roots'). Act's
 				// internal drain likewise must not publish retries from before act.
 				if (actScopeDepth === 0 && initialRenderStamp === NEXT_ROOT_RENDER_CREATED_STAMP)
-					SCHEDULED_VISIBILITY_DRIVER?.flushRetries?.();
+					if (SCHEDULED_VISIBILITY_DRIVER) SCHEDULED_VISIBILITY_DRIVER.flushRetries?.();
 				// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
 				// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
 				// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
@@ -10163,7 +10140,7 @@ function rejectStagedPresentations(capture: StagedCommitCapture): void {
 			owner.transaction = pending;
 		}
 		owner.generation++;
-		HYDRATION_DRIVER!.retryPresentations(transaction.capture);
+		if (hydrationStarted) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
 		// Rollback restored the preceding root props as well as child scopes.
 		// Reapply this still-current public request, including its hydration gate.
 		if (transaction.rootRequest) owner.retry();
@@ -13048,7 +13025,7 @@ export function componentSlotLite<P>(
 		// than spilling out to the parent block's range. `parentBlock` keeps the
 		// context-walk Phase B chain pointing at the real ancestor Block.
 		let endMarker = anchor ?? null;
-		if (hydration !== null && hydrateIsOpen(hydration, anchor ?? null)) {
+		if (hydration !== null && hydrateIsOpen(anchor ?? null)) {
 			// Hydration: the server wrapped this hookless component's output in a
 			// `<!--[-->…<!--]-->` range (anchor resolved to the `<!--[-->`). Point the
 			// cursor at the content so the body's clone() adopts the server DOM, and
@@ -13058,7 +13035,7 @@ export function componentSlotLite<P>(
 			endMarker = hydrateClose(hydration, anchor as Node);
 			adoptedClose = endMarker;
 			hydrationCursor.node = getNextSibling(anchor as Node);
-		} else if (hydration !== null && !hydrateIsOpen(hydration, anchor ?? null)) {
+		} else if (hydration !== null && !hydrateIsOpen(anchor ?? null)) {
 			// Anchor-less (appended) component — the compiler dropped the `<!>`
 			// placeholder because every child of `host` is a component — OR the anchor
 			// is a non-open marker because this lite component is the SOLE hole of a
@@ -13071,7 +13048,7 @@ export function componentSlotLite<P>(
 			let open: Node | null = hydrationCursor.node;
 			if (open === null || open.parentNode !== host) open = getFirstChild(host);
 			hydrateTakeUnclaimed(hydration, open);
-			if (open !== null && hydrateIsOpen(hydration, open)) {
+			if (open !== null && hydrateIsOpen(open)) {
 				adoptedOpen = open;
 				endMarker = hydrateClose(hydration, open);
 				adoptedClose = endMarker;
@@ -13085,7 +13062,7 @@ export function componentSlotLite<P>(
 			// node for this call's own placeholder: as React compares only the DOM,
 			// the call renders in place of that node and adopts it when it matches
 			// (parkAtHole), inserting before the node after it.
-			else endMarker = hydrateParkAtHole(hydration, (inPlace = anchor));
+			else endMarker = hydrateParkAtHole((inPlace = anchor));
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
 		if (process.env.NODE_ENV !== 'production') LITE_BODIES!.set(scope, comp as ComponentBody);
@@ -13152,8 +13129,7 @@ export function componentSlotLite<P>(
 	const nativeToken = !NATIVE_READ_DRIVER ? -1 : beginActiveNativeReadScope(scope);
 	// The first node after the template that adopted the frame's content.
 	let claimed: Node | null | undefined;
-	const claim =
-		adoptedOpen === null ? null : hydrateBeginClaim(hydration!, scope, getNextSibling(adoptedOpen));
+	const claim = adoptedOpen === null ? null : hydrateBeginClaim(scope, getNextSibling(adoptedOpen));
 	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
@@ -13177,7 +13153,7 @@ export function componentSlotLite<P>(
 		profileThrown = error;
 		throw error;
 	} finally {
-		if (claim !== null) claimed = hydrateEndClaim(hydration!, claim);
+		if (claim !== null) claimed = hydrateEndClaim(claim);
 		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
@@ -13195,7 +13171,7 @@ export function componentSlotLite<P>(
 	// server rendered nothing in the frame after this component's content.
 	if (hydration !== null && adoptedClose !== null) {
 		hydrateSettleClaim(hydration, adoptedClose, claimed, parentScope, slotKey);
-		hydrateParkPast(hydration, adoptedClose, parentScope);
+		hydrateParkPast(adoptedClose, parentScope);
 	} else if (hydration !== null) {
 		// A hydrating replay, such as a suspended activation's resume, re-renders
 		// an adopted range without adopting it again; its new siblings still adopt
@@ -13291,7 +13267,6 @@ function renderLiteInPlace<P>(
 	const positional = root === anchor && root.nodeType !== 8;
 	if (
 		hydrateRenderInPlace(
-			hydration,
 			() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
 			undefined,
 			root,
@@ -13300,7 +13275,7 @@ function renderLiteInPlace<P>(
 			slotKey,
 		)
 	)
-		hydrateParkInPlace(hydration, parentScope);
+		hydrateParkInPlace(parentScope);
 	// The walk found `root` for this call alone, which rendered nothing there.
 	else if (positional)
 		hydrateSlotMismatch(hydration, parentScope, slotKey, 'a component range', root);
@@ -17435,7 +17410,7 @@ function createHydrateSlot(
 		(hydration !== null &&
 			!hydrateIsFresh(hydration, wrapper) &&
 			wrapper.parentNode === parentNode);
-	if (hydration !== null) hydrateInsertRoot(hydration, wrapper, parentBlock);
+	if (hydration !== null) hydrateInsertRoot(wrapper, parentBlock);
 	else parentNode.insertBefore(wrapper, parentBlock.endMarker);
 	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
 	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
@@ -17470,7 +17445,7 @@ function createHydrateSlot(
 	// seed sidecars, regardless of which root hydrates first.
 	if (props.__independent !== undefined) {
 		// No parent-owned content range.
-	} else if (serverPreserved && hydrateIsOpen(hydration!, getFirstChild(wrapper))) {
+	} else if (serverPreserved && hydrateIsOpen(getFirstChild(wrapper))) {
 		start = getFirstChild(wrapper) as Comment;
 		end = hydrateClose(hydration!, start);
 		seed = findHydrateSeedSidecar(wrapper);
@@ -17705,9 +17680,6 @@ function finishRoot(hydration: HydrationAttempt, state: HydrateSlot): void {
 	);
 }
 
-/** An island's attempt completed: it keeps the server nodes it changed. */
-function keepChanges(hydration: HydrationAttempt): void {}
-
 function activateHydrateBoundary(state: HydrateSlot): void {
 	if (state.start === null || state.end === null) return;
 	const block = state.block;
@@ -17726,13 +17698,14 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	const hydration =
 		preserved?.hydration ?? createHydrationAttempt(block, getNextSibling(state.start), null);
-	// A suspended first attempt keeps its capability, so re-check each attempt.
+	// Suspension retains this attempt's seeds; external server values can
+	// become stale before the next attempt resumes.
 	if (!hydration.staleServerValues && hydrateServerValuesStale(state)) {
 		hydration.staleServerValues = true;
 		hydration.values ??= new HydrationValueChecks();
 	}
 	if (preserved === undefined) {
-		if (state.seedRaw !== null) hydration.seeds = hydrateParseSeeds(hydration, state.seedRaw);
+		if (state.seedRaw !== null) hydration.seeds = hydrateParseSeeds(state.seedRaw);
 		hydrateProtectRootAnchor(hydration, state.end);
 		hydration.defers = true;
 		hydration.idStart = block.idState.next;
@@ -17934,7 +17907,6 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	if (completed) {
 		state.initialCaptures = null;
-		keepChanges(hydration);
 		hydratePassSeeds(hydration, previousHydration);
 		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
@@ -21080,7 +21052,7 @@ function createHydrationAttempt(
  * hydrating attempt. A method, like `holds`, so that bundles which never
  * hydrate do not retain it.
  */
-function hydrateAwaitsCommit(attempt: HydrationAttempt, publish: () => void): boolean {
+function hydrateAwaitsCommit(publish: () => void): boolean {
 	if (!inRootHydrationAttempt()) return false;
 	(ROOT_RENDER_TRANSACTION!.commit ??= []).push(publish);
 	return true;
@@ -21162,7 +21134,7 @@ function hydrateRecordUpdate(attempt: HydrationAttempt, owner: Block | ChildSlot
  * HYDRATION_DIAGNOSTIC_HOLDS). Returns the mark that releaseDiagnostics
  * drops back to.
  */
-function hydrateHoldDiagnostics(attempt: HydrationAttempt): number {
+function hydrateHoldDiagnostics(): number {
 	HYDRATION_DIAGNOSTIC_HOLDS++;
 	return HELD_HYDRATION_DIAGNOSTICS?.length ?? 0;
 }
@@ -21171,7 +21143,7 @@ function hydrateHoldDiagnostics(attempt: HydrationAttempt): number {
  * Hold a diagnostic's `publish` when a try body holds diagnostics. A method,
  * so that bundles which never hydrate do not retain the hold.
  */
-function hydrateHolds(attempt: HydrationAttempt, publish: () => void): boolean {
+function hydrateHolds(publish: () => void): boolean {
 	if (HYDRATION_DIAGNOSTIC_HOLDS === 0) return false;
 	(HELD_HYDRATION_DIAGNOSTICS ??= []).push(publish);
 	return true;
@@ -21182,7 +21154,7 @@ function hydrateHolds(attempt: HydrationAttempt, publish: () => void): boolean {
  * held; otherwise its diagnostics pass to the enclosing hold, or publish
  * when none remains.
  */
-function hydrateReleaseDiagnostics(attempt: HydrationAttempt, mark: number, caught: boolean): void {
+function hydrateReleaseDiagnostics(mark: number, caught: boolean): void {
 	HYDRATION_DIAGNOSTIC_HOLDS--;
 	const held = HELD_HYDRATION_DIAGNOSTICS;
 	if (held === null) return;
@@ -21204,7 +21176,7 @@ function hydrateReleaseDiagnostics(attempt: HydrationAttempt, mark: number, caug
  * where a repeated throw reaches the catch arm.
  */
 function hydrateRenderTryBody(attempt: HydrationAttempt, block: Block, catches: boolean): void {
-	const mark = hydrateHoldDiagnostics(attempt);
+	const mark = hydrateHoldDiagnostics();
 	let caught = false;
 	try {
 		renderBlock(block);
@@ -21224,7 +21196,7 @@ function hydrateRenderTryBody(attempt: HydrationAttempt, block: Block, catches: 
 		if (failure !== null) throw failure;
 		throw error;
 	} finally {
-		hydrateReleaseDiagnostics(attempt, mark, caught);
+		hydrateReleaseDiagnostics(mark, caught);
 	}
 }
 
@@ -21293,18 +21265,7 @@ function hydrateRenderUnframed<T>(
 			prepared.append(start, end);
 			(scope.slots[slotKey] as any).block.parentNode = prepared;
 		}
-		if (
-			hydrateRenderInPlace(
-				attempt,
-				render,
-				target,
-				root,
-				true,
-				named ? scope : null,
-				slotKey,
-				frame,
-			)
-		) {
+		if (hydrateRenderInPlace(render, target, root, true, named ? scope : null, slotKey, frame)) {
 			frame.after = hydrationCursor.node;
 			if (frame.published) frame.parent.insertBefore(end, frame.after);
 			return;
@@ -21350,11 +21311,7 @@ function hydrateSettleUnclaimed(attempt: HydrationAttempt, scope: Scope): void {
  * consumes its template once; if it has no template, its children consume
  * their ranges on return. Its enclosing claim is preserved on suspension.
  */
-function hydrateBeginClaim(
-	attempt: HydrationAttempt,
-	owner: Scope,
-	first: Node | null,
-): HydrationRangeClaim {
+function hydrateBeginClaim(owner: Scope, first: Node | null): HydrationRangeClaim {
 	return (hydrationCursor.claim = {
 		kind: 'range',
 		owner,
@@ -21369,10 +21326,7 @@ function hydrateBeginClaim(
  * Close a range even when the body threw. An unclaimed template tail takes
  * precedence over a child that parked the shared walking cursor inside it.
  */
-function hydrateEndClaim(
-	attempt: HydrationAttempt,
-	claim: HydrationRangeClaim,
-): Node | null | undefined {
+function hydrateEndClaim(claim: HydrationRangeClaim): Node | null | undefined {
 	hydrationCursor.claim = claim.outer;
 	return claim.first === null || claim.slots === claim.owner.slots.length ? claim.next : undefined;
 }
@@ -21394,7 +21348,7 @@ function hydrateRenderClaimed(
 	branch = false,
 ): void {
 	const first = getNextSibling(block.startMarker!);
-	const claim = hydrateBeginClaim(attempt, block, first);
+	const claim = hydrateBeginClaim(block, first);
 	let from: Node | null | undefined;
 	try {
 		renderBlock(block);
@@ -21403,7 +21357,7 @@ function hydrateRenderClaimed(
 			(attempt.suspendedClaims ??= new WeakMap()).set(block, [scope, slotKey]);
 		throw error;
 	} finally {
-		from = hydrateEndClaim(attempt, claim);
+		from = hydrateEndClaim(claim);
 	}
 	if (!block.disposed)
 		hydrateSettleClaim(attempt, block.endMarker!, from, scope, slotKey, branch ? first : undefined);
@@ -21432,7 +21386,7 @@ function hydrateSettleClaim(
 		// Arms without their own template can render nothing, leaving an open
 		// server range at the cursor. That too is unclaimed branch content.
 		if (from != null) hydrationCursor.node = from;
-		else if (hydrateIsOpen(attempt, hydrationCursor.node)) from = hydrationCursor.node;
+		else if (hydrateIsOpen(hydrationCursor.node)) from = hydrationCursor.node;
 	}
 	const cursor = hydrationCursor.node;
 	if (cursor === limit) return;
@@ -21483,7 +21437,6 @@ function hydrateSettleClaim(
  * null) the template that does not match names it.
  */
 function hydrateRenderInPlace<T>(
-	attempt: HydrationAttempt,
 	render: (target: T) => void,
 	target: T,
 	root: Node | null,
@@ -21534,7 +21487,7 @@ function hydrateRenderInPlace<T>(
  * marker the server rendered nothing for the hole, and the call inserts
  * before it.
  */
-function hydrateParkAtHole(attempt: HydrationAttempt, node: Node): Node | null {
+function hydrateParkAtHole(node: Node): Node | null {
 	hydrationCursor.node = node;
 	return isBlockClose(node) ? node : getNextSibling(node);
 }
@@ -21593,7 +21546,6 @@ function hydrateRootMismatch(
  * placeholder the hole shares (`ownEnd` unset).
  */
 function hydrateHoleOpen(
-	attempt: HydrationAttempt,
 	anchor: Node | null | undefined,
 	value: unknown,
 	ownEnd?: boolean,
@@ -21640,11 +21592,7 @@ function hydrateRebuilds(attempt: HydrationAttempt, end: Node): boolean {
  * `cursor` is not a renderer sentinel. A method so that client-only bundles
  * drop the stream-protocol validator with this class.
  */
-function hydrateClaimStreamTemplate(
-	attempt: HydrationAttempt,
-	cursor: Node | null,
-	end: Node,
-): string | null {
+function hydrateClaimStreamTemplate(cursor: Node | null, end: Node): string | null {
 	if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
 	const id = (cursor as Element).getAttribute(STREAM_BOUNDARY_ATTR)!;
 	hydrationCursor.node = end;
@@ -21658,11 +21606,7 @@ function hydrateClaimStreamTemplate(
  * arm. The boundary is dehydrated meanwhile (DEHYDRATED_TRY), and catches in
  * its render are its own (as catchesInHydrationFallback).
  */
-function hydrateBeginUnfinishedArm(
-	attempt: HydrationAttempt,
-	state: TrySlot,
-	cursor: Node | null,
-): UnfinishedArm | null {
+function hydrateBeginUnfinishedArm(state: TrySlot, cursor: Node | null): UnfinishedArm | null {
 	if (cursor?.nodeType !== 8 || !(cursor as Comment).data.startsWith(CLIENT_RENDER_ARM_COMMENT))
 		return null;
 	const arm: UnfinishedArm = {
@@ -21677,7 +21621,7 @@ function hydrateBeginUnfinishedArm(
 }
 
 /** End the render that beginUnfinishedArm started, whether or not it threw. */
-function hydrateEndUnfinishedArm(attempt: HydrationAttempt, arm: UnfinishedArm): void {
+function hydrateEndUnfinishedArm(arm: UnfinishedArm): void {
 	DEHYDRATED_TRY = arm.dehydrated;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction === null) return;
@@ -21691,7 +21635,7 @@ function hydrateEndUnfinishedArm(attempt: HydrationAttempt, arm: UnfinishedArm):
  * errored, unless a catch arm caught an error in that render, which React
  * reports alone.
  */
-function hydrateReportUnfinishedArm(attempt: HydrationAttempt, arm: UnfinishedArm): void {
+function hydrateReportUnfinishedArm(arm: UnfinishedArm): void {
 	if (!arm.caught)
 		noteRecoverableHydrationError(() => new Error(formatClientError(341)), arm.state.parentBlock);
 }
@@ -21701,15 +21645,15 @@ function hydrateReportUnfinishedArm(attempt: HydrationAttempt, arm: UnfinishedAr
  * cursor past its end, where the next sibling's server content starts, as
  * the boundary itself does after it renders.
  */
-function hydrateRebuiltSlot(attempt: HydrationAttempt, end: Node): void {
+function hydrateRebuiltSlot(end: Node): void {
 	hydrationCursor.node = getNextSibling(end);
 }
 
-function hydrateIsOpen(attempt: HydrationAttempt, node: Node | null): node is Comment {
+function hydrateIsOpen(node: Node | null): node is Comment {
 	return isBlockOpen(node);
 }
 
-function hydrateIsClose(attempt: HydrationAttempt, node: Node | null): node is Comment {
+function hydrateIsClose(node: Node | null): node is Comment {
 	return isBlockClose(node);
 }
 
@@ -21768,11 +21712,7 @@ function hydrateNewText(
 	return created;
 }
 
-function hydrateResolveOpen(
-	attempt: HydrationAttempt,
-	anchor: Node | null | undefined,
-	domParent: Node,
-): Comment | null {
+function hydrateResolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
 	if (isBlockOpen(anchor ?? null)) return anchor as Comment;
 	let cursor = hydrationCursor.node;
 	if (cursor === null || cursor.parentNode !== domParent) cursor = getFirstChild(domParent);
@@ -21794,7 +21734,7 @@ function hydrateBranchOpen(
 	scope: Scope,
 	slotKey: number,
 ): Comment | null {
-	const open = hydrateResolveOpen(attempt, anchor, domParent);
+	const open = hydrateResolveOpen(anchor, domParent);
 	if (open !== null || hydrateInFreshRange(attempt, anchor, domParent)) return open;
 	hydrateSlotMismatch(
 		attempt,
@@ -21805,7 +21745,7 @@ function hydrateBranchOpen(
 	);
 }
 
-function hydrateMarkerState(attempt: HydrationAttempt, node: Node): -1 | 0 | 1 {
+function hydrateMarkerState(node: Node): -1 | 0 | 1 {
 	return ssrForMarkerState(node);
 }
 
@@ -22001,11 +21941,7 @@ function hydrateListArmMismatch(
 function hydrateBuildsList(attempt: HydrationAttempt, slot: ChildSlot): boolean {
 	if (attempt.updates?.has(slot) === true) return true;
 	const list = slot.forSlot!;
-	if (
-		list.size === 0 &&
-		!(attempt.passthroughRanges && slot.borrowed) &&
-		hydrateIsOpen(attempt, list.start)
-	)
+	if (list.size === 0 && !(attempt.passthroughRanges && slot.borrowed) && hydrateIsOpen(list.start))
 		hydrationCursor.node = getNextSibling(list.start);
 	return false;
 }
@@ -22037,10 +21973,10 @@ function hydrateSettleItems(attempt: HydrationAttempt, end: Node): void {
  * does, owns no server content any more: the cursor stays where that
  * boundary left it.
  */
-function hydrateParkPast(attempt: HydrationAttempt, close: Node, parent: Scope): void {
+function hydrateParkPast(close: Node, parent: Scope): void {
 	if (parent.block.disposed) return;
 	hydrationCursor.node = getNextSibling(close);
-	hydrateParkInPlace(attempt, parent);
+	hydrateParkInPlace(parent);
 }
 
 /**
@@ -22049,7 +21985,7 @@ function hydrateParkPast(attempt: HydrationAttempt, close: Node, parent: Scope):
  * sibling, or the node after a fragment's last root. Record it as parkPast
  * does, and for settleClaim, which slot parked the cursor there.
  */
-function hydrateParkInPlace(attempt: HydrationAttempt, parent: Scope): void {
+function hydrateParkInPlace(parent: Scope): void {
 	const claim = hydrationClaim('range');
 	if (claim !== null && claim.owner === parent && claim.first !== null) {
 		claim.next = hydrationCursor.node;
@@ -22192,7 +22128,7 @@ function hydrateSettleTextRange(
 	);
 }
 
-function hydrateParseSeeds(attempt: HydrationAttempt, raw: string): unknown[] | null {
+function hydrateParseSeeds(raw: string): unknown[] | null {
 	return parseSeedJson(raw);
 }
 
@@ -22416,10 +22352,10 @@ function hydrateFramedRootRemainder(
 		node !== null && node !== cursor;
 		node = getNextSibling(node)
 	) {
-		if (hydrateIsOpen(attempt, node)) {
+		if (hydrateIsOpen(node)) {
 			if (depth === 0) outerOpen = node;
 			depth++;
-		} else if (hydrateIsClose(attempt, node) && depth > 0) {
+		} else if (hydrateIsClose(node) && depth > 0) {
 			depth--;
 			if (depth === 0) outerOpen = null;
 		}
@@ -22809,7 +22745,7 @@ function hydrateClaimRoots(
 			return attempt.passthroughRoot;
 		}
 	}
-	claim.next = getNextSibling(hydrateIsOpen(attempt, node) ? hydrateClose(attempt, node) : node);
+	claim.next = getNextSibling(hydrateIsOpen(node) ? hydrateClose(attempt, node) : node);
 	return true;
 }
 
@@ -22819,7 +22755,7 @@ function hydrateClaimRoots(
  * end would reorder it after any trailing server sibling. Any other root
  * goes at its block's end.
  */
-function hydrateInsertRoot(attempt: HydrationAttempt, root: Node, block: Block): void {
+function hydrateInsertRoot(root: Node, block: Block): void {
 	const parent = block.parentNode;
 	if (root.parentNode === parent) return;
 	parent.insertBefore(root, block.endMarker);
@@ -22865,7 +22801,7 @@ function hydrateTextFrameEnd(attempt: HydrationAttempt, first: Node | null): Com
 	let stop: Node | null = null;
 	// A component and its returned value each own a regular range. Follow
 	// nested frames only when every frame contains that same single child.
-	while (hydrateIsOpen(attempt, first)) {
+	while (hydrateIsOpen(first)) {
 		const end = hydrateClose(attempt, first!);
 		if (getNextSibling(end) !== stop) return null;
 		outer ??= end;
@@ -22882,7 +22818,7 @@ function hydrateTextFrameEnd(attempt: HydrationAttempt, first: Node | null): Com
  */
 function hydrateFramesSlotContent(attempt: HydrationAttempt, el: Node): boolean {
 	const first = getFirstChild(el);
-	return hydrateIsOpen(attempt, first) && hydrateTextFrameEnd(attempt, first) === null;
+	return hydrateIsOpen(first) && hydrateTextFrameEnd(attempt, first) === null;
 }
 
 /**
@@ -22952,7 +22888,7 @@ function hydrateUnclaimedText(
 					? 'nothing'
 					: `text ${JSON.stringify(text)}`,
 		// Name a server range by the content it frames.
-		(hydrateIsOpen(attempt, from) ? getNextSibling(from) : null) ?? from,
+		(hydrateIsOpen(from) ? getNextSibling(from) : null) ?? from,
 	);
 }
 
@@ -22979,7 +22915,7 @@ function hydrateHydrateOnlyChild(
 	render: (parent: Node) => void,
 ): void {
 	const stale = getFirstChild(el);
-	if (hydrateIsOpen(attempt, stale)) {
+	if (hydrateIsOpen(stale)) {
 		hydrationCursor.node = stale;
 		render(el);
 		return;
@@ -23584,7 +23520,7 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	if (hydration !== null && hydration.deferred !== null) hydrateClaimAfterHoles(hydration);
 	if (root !== null) {
 		const block = scope.block;
-		if (hydration !== null && hydrateIsActive(hydration)) hydrateInsertRoot(hydration, root, block);
+		if (hydration !== null && hydrateIsActive(hydration)) hydrateInsertRoot(root, block);
 		else {
 			const parent = block.parentNode;
 			parent.insertBefore(root, block.endMarker);
@@ -23800,8 +23736,7 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 		});
 		return existing as Text;
 	}
-	// Only hydrateRoot constructs the capability, so client-only bundles drop the
-	// range-marker validator that adoption needs.
+	// Consult the shared cursor only inside an active hydration pass.
 	const adopted = hydration == null ? void 0 : hydrateAdoptBindingText(hydration, posNode, text);
 	if (adopted) return adopted;
 	const parent = posNode!.parentNode!;
@@ -23847,6 +23782,9 @@ const PRESENTATION_PREPARATIONS = /* @__PURE__ */ new WeakMap<
 	BindingHandoff,
 	PresentationHydrationFrame
 >();
+// Only early native hosts need to bridge from a completed host frame to the
+// writer registered after its descendants. Ordinary scopes keep their shape.
+const PRESENTATION_HOSTS = /* @__PURE__ */ new WeakMap<Scope, PresentationHydrationFrame>();
 
 /** A refused takeover leaves the early owner active; it is not a client remount request. */
 class PresentationAdoptionMiss extends Error {
@@ -24159,12 +24097,12 @@ export function beginPresentationHydration(
 		hydration,
 	};
 	PRESENTATION_HYDRATION = frame;
-	if (host) scope.presentation = frame;
+	if (host) PRESENTATION_HOSTS.set(scope, frame);
 	if (revision !== undefined || frame.controls !== undefined) trackPresentationFrame(frame);
 	PRESENTATION_PREPARATIONS.set(lease, frame);
 	const hostRefs = host ? WIP_CAPTURE.refs : undefined;
 	(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
-		if (scope.presentation === frame) scope.presentation = undefined;
+		if (host && PRESENTATION_HOSTS.get(scope) === frame) PRESENTATION_HOSTS.delete(scope);
 		if (
 			discarded ||
 			!frame.completed ||
@@ -24863,7 +24801,7 @@ export function presentationStructure(
 	if (hydration === null) presentationMiss(false);
 	// ifBlock and the component writers (componentSlot/Void/Lite) all carry their
 	// anchor at argument 6; compiled calls may omit it as a trailing undefined.
-	const start = hydrateResolveOpen(hydration, args[6] ?? null, args[2]);
+	const start = hydrateResolveOpen(args[6] ?? null, args[2]);
 	if (kind === 'if') {
 		const arm = args[3] ? (args[4] === null ? -1 : 0) : args[5] === null ? -1 : 1;
 		const range = presentationRange(frame, start, marker + arm, kind);
@@ -24914,10 +24852,9 @@ export function setBindingClassIfChanged(
 // a whole `<!--[-->…<!--]-->` block as ONE logical sibling, which exactly matches
 // the single `<!>` placeholder the template uses for that hole — so octane's
 // existing path+childIndex binding resolution keeps working unchanged on the
-// server DOM. The capability cursor is set by each block call (forBlock /
+// server DOM. The single hydration cursor is set by each block call (forBlock /
 // ifBlock / componentSlot, to its content start) for the child's `clone()` to
-// adopt. Without an active capability these are trivial DOM reads; hydration-only
-// navigation stays behind methods that client-only builds discard.
+// adopt. Outside an active hydration pass these are trivial DOM reads.
 // ---------------------------------------------------------------------------
 
 /** True if `node` is a legacy or counted block-open marker. */
@@ -25349,6 +25286,35 @@ function prepareDirectSignal(
 	attributePrepare?: SignalAttributePrepare,
 	attributeCommit?: SignalAttributeCommit,
 ): PreparedDirectSignal {
+	// Only a settled, defined scalar token can equal this value directly.
+	// A prepared candidate is an object, so held B and a return to accepted A
+	// still take the full path below. Retired handles, mutable/coercible objects,
+	// undefined and NaN must likewise recheck their policy on every render.
+	if (
+		policy.kind === 'attribute' &&
+		!hydrating &&
+		previous === value &&
+		value !== undefined &&
+		value !== null &&
+		typeof value !== 'object' &&
+		typeof value !== 'function'
+	) {
+		return {
+			[PREPARED_DIRECT_SIGNAL]: true,
+			scope,
+			target,
+			policy,
+			name,
+			attributeKind,
+			attributeCommit,
+			token: value,
+			previous: value,
+			value,
+			prepared: undefined,
+			controlSnapshot: null,
+			adopted: false,
+		};
+	}
 	const pending =
 		previous !== null &&
 		typeof previous === 'object' &&
@@ -27708,6 +27674,10 @@ export function prepareTemplatePlain(
 			const warning = hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
 			if (warning !== null) devWarnAttributeOnce(el, name, warning);
 		}
+		// The development compiler keeps some authored JSX names for diagnostics
+		// (tabIndex, htmlFor). Claim and compare their native attribute identities,
+		// just as the general setAttribute path does after warning.
+		name = ATTRIBUTE_ALIASES.get(name) ?? name;
 		next = coerceAttrValue(el, name, value);
 	} else {
 		const type = typeof value;
@@ -27765,9 +27735,8 @@ export function prepareTemplateURL(
  * string` assertion or an external typed value is inaccurate at runtime. The
  * compiler restricts this helper to lowercase data names, which are applied as
  * unnamespaced attributes in HTML, SVG, and MathML, so it needs none of the
- * generic attribute alias/property routing tables. Hydration still goes through
- * the capability boundary, so the server value and `suppressHydrationWarning`
- * behave as in setAttribute.
+ * generic attribute alias/property routing tables. Preparation checks the server
+ * value and `suppressHydrationWarning` as in setAttribute before committing.
  */
 export function setStringData(el: Element, name: string, value: unknown): void {
 	const next = prepareTemplateStringData(el, name, value);
@@ -28075,7 +28044,7 @@ export function prepareTemplateClass(
 	return cls;
 }
 
-export function setClassName(el: Element, value: unknown, foreign?: boolean): void {
+export function setClassName(el: Element, value: unknown, _foreign?: boolean): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = prepareTemplateClass(el, value, false);
@@ -28088,7 +28057,6 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// an empty STRING still writes `class=""` — the differential rig pins that
 	// distinction against React). Same raw-value rule as setClassAttr: composition
 	// erases the null-vs-'' difference, so the check must be on `value`.
-	// A host of a Block the root attempt discards needs no undo (setEventHandler).
 	if (cls === null) el.removeAttribute('class');
 	else (el as any).className = cls;
 }
@@ -28565,6 +28533,21 @@ function normalizedHostProp(el: Element, rawName: string): string {
 	const actionName = formActionAttributeName(el, rawName);
 	if (actionName !== null) return actionName;
 	return isHtmlCustomElement(el) ? rawName : (ATTRIBUTE_ALIASES.get(rawName) ?? rawName);
+}
+
+function hasEarlierPreparedAttributeAlias(
+	el: Element,
+	prepared: PreparedHostProps,
+	name: string,
+): boolean {
+	const channel = normalizedHostProp(el, name);
+	// These keys and their values were captured during prepare. Only an earlier
+	// attribute writer can make an unchanged null winner necessary at commit.
+	for (const prior in prepared.attributes) {
+		if (prior === name) return false;
+		if (normalizedHostProp(el, prior) === channel) return true;
+	}
+	return false;
 }
 
 /**
@@ -29719,7 +29702,16 @@ export function setSpread(
 		// Styles/raw HTML above still need their setters for stable object values.
 		// Controlled fields reassert live DOM drift; other unchanged props need no
 		// event-name parsing or custom-element routing.
-		if (v === pv && !isControlledHostProp(el, k) && !initialHydration && !reassert) continue;
+		if (
+			v === pv &&
+			!isControlledHostProp(el, k) &&
+			!initialHydration &&
+			(!reassert ||
+				(v == null &&
+					!isHtmlCustomElement(el) &&
+					!hasEarlierPreparedAttributeAlias(el, prepared!, k)))
+		)
+			continue;
 		const ev = eventSlot(k, el);
 		if (ev) {
 			if (v === pv && !reassert) continue;
@@ -35345,10 +35337,10 @@ function componentSlotImpl(
 		// by consulting the parked cursor (host.firstChild for the first appended
 		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
-		if (!inherited && hydration !== null && hydrateIsOpen(hydration, anchor ?? null)) {
+		if (!inherited && hydration !== null && hydrateIsOpen(anchor ?? null)) {
 			open = anchor as Node;
 			slotCursor = open;
-		} else if (!inherited && hydration !== null && !hydrateIsOpen(hydration, anchor ?? null)) {
+		} else if (!inherited && hydration !== null && !hydrateIsOpen(anchor ?? null)) {
 			// The anchor is absent (an appended child: compiled calls omit it only when
 			// every child of the host is a component), null (a runtime caller's
 			// whole-container slot, or a compiled anchor walk that ran off the end of
@@ -35360,7 +35352,7 @@ function componentSlotImpl(
 			if (c === null || c.parentNode !== domParent) c = getFirstChild(domParent);
 			slotCursor = c;
 			hydrateTakeUnclaimed(hydration, c);
-			if (c !== null && hydrateIsOpen(hydration, c)) open = c;
+			if (c !== null && hydrateIsOpen(c)) open = c;
 		}
 		if (inherited) {
 			// Borrowed range resolved above; hydration adopts NOTHING — the cursor
@@ -35390,7 +35382,7 @@ function componentSlotImpl(
 			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker) {
 				slotCursor = anchor;
 				positionalRoot = anchor.nodeType !== 8;
-				anchor = hydrateParkAtHole(hydration, anchor);
+				anchor = hydrateParkAtHole(anchor);
 			}
 			start = null;
 			end = null;
@@ -35575,7 +35567,6 @@ function componentSlotImpl(
 			SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
 				? { parentScope, invocationSite, key, hasKey: key != null }
 				: undefined;
-		const retryLocation = undefined;
 		state.currentComp = identity;
 		if (state.singleRoot) {
 			// Client singleRoot self-mark (mirrors mountItem): render with
@@ -35614,7 +35605,6 @@ function componentSlotImpl(
 					adopted = false;
 				} else
 					adopted = hydrateRenderInPlace(
-						hydration!,
 						renderBlock,
 						b,
 						slotCursor,
@@ -35635,7 +35625,7 @@ function componentSlotImpl(
 					adopted !== false &&
 					slotCursor !== null &&
 					slotCursor.parentNode === domParent &&
-					!hydrateIsClose(hydration!, slotCursor)
+					!hydrateIsClose(slotCursor)
 				) {
 					b.startMarker = slotCursor;
 					b.endMarker = slotCursor;
@@ -35646,7 +35636,7 @@ function componentSlotImpl(
 			}
 			// renderInPlace stepped the cursor past the adopted root. An arm or a
 			// range that ends with this root cannot tell that from the cursor alone.
-			if (adopted) hydrateParkInPlace(hydration!, parentScope);
+			if (adopted) hydrateParkInPlace(parentScope);
 			// The walk found the server node for this call alone, which rendered
 			// nothing there.
 			else if (positionalRoot)
@@ -35711,7 +35701,7 @@ function componentSlotImpl(
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
 	if (hydration !== null && !state.inherited && state.end !== null)
-		hydrateParkPast(hydration, state.end, parentScope);
+		hydrateParkPast(state.end, parentScope);
 }
 
 // Keep the fresh-subtree callback out of componentSlotImpl: a closure there
@@ -36220,6 +36210,7 @@ function clearChildContent(state: ChildSlot, scope: Scope): void {
 			prepareSlot(scope, state, 'clearPrepared', {
 				parent,
 				publish() {
+					for (const node of nodes) if (node.parentNode === parent) retireEventHostTree(node);
 					if (oldBlock !== null) unmountBlock(oldBlock, false);
 					if (oldList !== null) {
 						for (let item = oldList.head; item !== null; item = item.nextSibling)
@@ -36234,6 +36225,10 @@ function clearChildContent(state: ChildSlot, scope: Scope): void {
 		}
 	}
 	const hadBlock = state.block !== null;
+	if (state.ownerHost !== null) retireHostRange(getFirstChild(state.ownerHost), null);
+	else if (state.start !== null && state.start.parentNode !== null)
+		retireHostRange(getNextSibling(state.start), state.end);
+	else if (state.hostNode !== null) retireEventHostTree(state.hostNode);
 	if (state.block !== null) {
 		// Fire the subtree's cleanups but DON'T let unmountBlock strip the DOM —
 		// it would take our markers with it. We remove the content nodes by hand.
@@ -36315,6 +36310,7 @@ function clearReplacedChildBlock(scope: Scope, state: ChildSlot, oldBlock: Block
 	prepareSlot(scope, state, 'replacementPrepared', {
 		parent,
 		publish() {
+			for (const node of previous) if (node.parentNode === parent) retireEventHostTree(node);
 			unmountBlock(oldBlock, false);
 			for (const node of previous) if (node.parentNode === parent) parent.removeChild(node);
 		},
@@ -37298,6 +37294,7 @@ function commitDeoptNode(output: DeoptOutput, ownerBlock: Block): boolean {
 	for (let i = owned.length - 1; i >= 0; i--) {
 		const old = owned[i];
 		if (!keep.has(old) && !(singleton && (old as any).$$deoptKey === undefined)) {
+			if (old.parentNode === el) retireEventHostTree(old);
 			detachDeoptTreeRefs(old, null);
 			if (old.parentNode === el) el.removeChild(old);
 		}
@@ -37555,6 +37552,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 			if (node !== prev) {
 				const parent = block.parentNode;
 				if (prev !== null && prev.parentNode === parent) {
+					retireEventHostTree(prev);
 					if (node !== null) parent.insertBefore(node, prev);
 					detachDeoptTreeRefs(prev, null);
 					parent.removeChild(prev);
@@ -37671,6 +37669,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 				prepareSlot(scope, block, 'deoptPrepared', {
 					parent,
 					publish() {
+						if (stale.parentNode === parent) retireEventHostTree(stale);
 						const first = getFirstChild(target);
 						if (first !== null) {
 							const last = target.lastChild!;
@@ -38654,9 +38653,7 @@ function renderPreparedChildList(
 	}
 	const { items, keys } = preparedList;
 	const markerlessMappedFallback =
-		mappedFallback === true &&
-		hydration !== null &&
-		!hydrateIsOpen(hydration, hydrationCursor.node);
+		mappedFallback === true && hydration !== null && !hydrateIsOpen(hydrationCursor.node);
 	const keySource = compiledMapKey || keys!;
 	const normalizeKey = !!compiledMapKey;
 	const wasMappedNative = state.forSlot.mappedNative === true;
@@ -38824,6 +38821,7 @@ function renderPreparedChildList(
 				for (const entry of leftovers) {
 					const n = entry.node;
 					if (n.parentNode === domParent) {
+						retireEventHostTree(n);
 						detachDeoptTreeRefs(n, null);
 						domParent.removeChild(n);
 					}
@@ -39211,7 +39209,7 @@ export function bindingChildSlot(
 			(hydrating
 				? activeHydration() == null
 					? void 0
-					: hydrateResolveOpen(activeHydration()!, anchor ?? null, domParent)
+					: hydrateResolveOpen(anchor ?? null, domParent)
 				: null) ?? null;
 		const range = driver.presentationRange(frame, start, marker, 'slot');
 		if (
@@ -39583,6 +39581,11 @@ export function childSlot(
 								if (node.parentNode !== domParent) break;
 								nodes.push(node);
 							}
+						for (const node of nodes) retireEventHostTree(node);
+						// The owning return body marks the applied slot after preparation.
+						// Retain that mark across a kind change so a later undefined return
+						// still clears the accepted output.
+						if ((applied as any).returnedOutput === true) setReturnedOutputOwner(next, true);
 						parentScope.slots[slotKey] = next;
 						const registered = parentScope._slots?.indexOf(applied) ?? -1;
 						if (registered !== -1) parentScope._slots![registered] = next;
@@ -39665,15 +39668,15 @@ export function childSlot(
 		hydrationCursor.node.parentNode === domParent &&
 		preparedList === null &&
 		typeof elementType === 'function' &&
-		!hydrateIsOpen(hydration, anchor ?? null) &&
-		!hydrateIsOpen(hydration, hydrationCursor.node);
+		!hydrateIsOpen(anchor ?? null) &&
+		!hydrateIsOpen(hydrationCursor.node);
 	if (
 		state === undefined &&
 		hydration !== null &&
 		!hydrationTransparent &&
 		parentBlock === hydration.rootBlock &&
-		!hydrateIsOpen(hydration, anchor ?? null) &&
-		!hydrateIsOpen(hydration, hydrationCursor.node)
+		!hydrateIsOpen(anchor ?? null) &&
+		!hydrateIsOpen(hydrationCursor.node)
 	) {
 		// Generic root returns normally serialize as one hydratable range. Plain
 		// strings/null are the two unframed root forms; accept their matching DOM.
@@ -39729,7 +39732,7 @@ export function childSlot(
 			end = null;
 		} else if (unframedComponentRoot) {
 			[start, end] = hydrateWrapUnframedRoot(hydration!, hydrationCursor.node!);
-		} else if (hydration !== null && (start = hydrateHoleOpen(hydration, anchor, value, ownEnd))) {
+		} else if (hydration !== null && (start = hydrateHoleOpen(anchor, value, ownEnd))) {
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
 			// server's `<!--[-->`. Adopt that `<!--[-->…<!--]-->` range as our markers
 			// and point the cursor at the first content node for the Block's clone()
@@ -39747,7 +39750,7 @@ export function childSlot(
 			parentBlock.startMarker !== null &&
 			parentBlock.endMarker === anchor &&
 			hydrationCursor.node === getNextSibling(parentBlock.startMarker) &&
-			!hydrateIsOpen(hydration, hydrationCursor.node)
+			!hydrateIsOpen(hydrationCursor.node)
 		) {
 			// The server rendered a primitive or empty range where this client
 			// renders a chain of components. Give the return value an ordinary
@@ -39765,7 +39768,7 @@ export function childSlot(
 			);
 			hydrationCursor.node = getNextSibling(start);
 			adoptedRange = true;
-		} else if (hydration !== null && hydrateIsOpen(hydration, hydrationCursor.node)) {
+		} else if (hydration !== null && hydrateIsOpen(hydrationCursor.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
 			// anchor is the block's end-marker (not a `<!--[-->`), but the CURSOR sits
 			// on the server's range-open. Adopt from the cursor. This is what lets a
@@ -40059,6 +40062,7 @@ export function childSlot(
 				publish() {
 					for (const node of previous) {
 						if (node.parentNode === domParent) {
+							retireEventHostTree(node);
 							detachDeoptTreeRefs(node, null);
 							domParent.removeChild(node);
 						}
@@ -40115,6 +40119,7 @@ export function childSlot(
 					if (node !== prev) {
 						if (prev !== null && prev.parentNode !== null) {
 							const parent = prev.parentNode;
+							retireEventHostTree(prev);
 							parent.insertBefore(node, prev);
 							detachDeoptTreeRefs(prev, null);
 							parent.removeChild(prev);
@@ -40485,7 +40490,7 @@ export function childSlot(
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
 		// (Hydration always adopts a marker pair, so `state.end` is non-null here.)
 		if (hydration !== null && !state.borrowed && state.end !== null) {
-			hydrateParkPast(hydration, state.end, parentScope);
+			hydrateParkPast(state.end, parentScope);
 		}
 		return;
 	}
@@ -40741,6 +40746,7 @@ function prepareOnlyChildText(
 	parent: Node,
 	value: string,
 	previous: Text | null,
+	previousTextToken = false,
 ): Text | null {
 	const text = value === '' ? null : (previous ?? document.createTextNode(value));
 	const prepared: PreparedChildText = {
@@ -40750,6 +40756,7 @@ function prepareOnlyChildText(
 		publish() {
 			if (text === null) {
 				if (previous !== null) removeOnlyChildText(parent, previous);
+				else if (previousTextToken) resetOnlyChildHost(parent, null);
 				else if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, parent);
 			} else {
 				if (text.parentNode !== parent) resetOnlyChildHost(parent, text);
@@ -40836,7 +40843,7 @@ export function childTextHole(
 			if (cachedNode === null) {
 				const hydration = hydrating ? activeHydration() : null;
 				if (hydration === null) {
-					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null);
+					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null, previousTextToken);
 				}
 				// React treats a host whose child is a string or number as text content.
 				if ((vt === 'string' || vt === 'number') && hydrateKeepsServerContent(hydration, domParent))
@@ -41977,7 +41984,11 @@ function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 			suppressedRefs = [];
 			collectVisibleSubtreeRefs(hiddenTry, suppressedRefs);
 		}
-		showTryBlock(state);
+		// Teardown releases any display suppression, but it must not publish a
+		// primary that was prepared privately and never shown. Its original host
+		// may already have been cleared by an imperative owner.
+		releaseSuspenseHiddenDom(state.hiddenDom);
+		state.hiddenDom = null;
 		withRefDetachSuppression(suppressedRefs, () => {
 			unmountBlock(hiddenTry, true);
 		});
@@ -42148,9 +42159,9 @@ function prepareBoundaryArm(
 	// Only an aborted adoption has server hosts without client blocks to retire.
 	// The cursor can advance now; the actual owned range is replaced on admission.
 	const replacingServer = hydrationStarted
-		? rebuild !== null && !passthrough && hydrateIsClose(rebuild, state.end)
+		? rebuild !== null && !passthrough && hydrateIsClose(state.end)
 		: false;
-	if (replacingServer) hydrateRebuiltSlot(rebuild!, state.end);
+	if (replacingServer) hydrateRebuiltSlot(state.end);
 	const arm = createBlock(
 		'control-flow',
 		state.parentBlock,
@@ -42504,8 +42515,7 @@ export function errorBlock(
 	} else mountErrorBoundary(state, hydration);
 	// Hydration: park past the boundary's range, as every slot does, so a
 	// following sibling adopts its own server content.
-	if (!state.passthrough)
-		hydration == null ? void 0 : hydrateParkPast(hydration, state.end, parentScope);
+	if (!state.passthrough) hydration == null ? void 0 : hydrateParkPast(state.end, parentScope);
 	return state.reset;
 }
 
@@ -42561,7 +42571,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationAttempt | null
 			});
 			return;
 		}
-		if (hydration !== null && hydrateIsOpen(hydration, cursor)) {
+		if (hydration !== null && hydrateIsOpen(cursor)) {
 			start = cursor;
 			end = hydrateClose(hydration, cursor);
 			hydrationCursor.node = getNextSibling(start);
@@ -42863,7 +42873,6 @@ export function tryBlock(
 		: hydrateParkPast(
 				// Hydration: whichever arm rendered, park past the boundary's range, as every
 				// slot does, so a following sibling adopts its own server content.
-				hydration,
 				s.end,
 				parentScope,
 			);
@@ -43074,7 +43083,7 @@ function takeInitialSuspenseHydration(
 	if (text.startsWith(STREAM_SEED_COMMENT)) {
 		const boundaryId = text.slice(STREAM_SEED_COMMENT.length);
 		const start = getNextSibling(marker);
-		if (!hydrateIsOpen(hydration, start)) return null;
+		if (!hydrateIsOpen(start)) return null;
 		const end = hydrateClose(hydration, start);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		const owner = marker as Comment;
@@ -43133,7 +43142,7 @@ function takeInitialSuspenseHydration(
 		sidecars.push(script);
 		cursor = getNextSibling(script);
 	}
-	if (!hydrateIsOpen(hydration, cursor)) return null;
+	if (!hydrateIsOpen(cursor)) return null;
 	const end = hydrateClose(hydration, cursor);
 	const rootIds = state.idState;
 	const idStart = rootIds.next;
@@ -43312,7 +43321,7 @@ function renderInitialSuspenseHydration(
 	TRY_OPS!.setBranch(state, 1);
 	const hydration = createHydrationAttempt(block, getNextSibling(initial.start), null);
 	hydration.defers = true;
-	if (initial.seedRaw !== null) hydration.seeds = hydrateParseSeeds(hydration, initial.seedRaw);
+	if (initial.seedRaw !== null) hydration.seeds = hydrateParseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
 	hydrateClaimRootRemainder(
 		// This capability owns one exact arm, never the surrounding root siblings.
@@ -43334,7 +43343,7 @@ function renderInitialSuspenseHydration(
 	swapHydration(hydration);
 	WIP_CAPTURE = capture;
 	const previousNative = setNativeAdoptionResolver(null);
-	const diagnostics = hydrateHoldDiagnostics(hydration);
+	const diagnostics = hydrateHoldDiagnostics();
 	let suspended: TrackedThenable<unknown> | null = null;
 	let failed = false;
 	let failure: unknown;
@@ -43391,7 +43400,6 @@ function renderInitialSuspenseHydration(
 			// The attempt that commits, or the catch arm that replaces this one,
 			// reports what it finds. An attempt that found a mismatch is final: the
 			// arm renders on the client, and its diagnostics describe why.
-			hydration,
 			diagnostics,
 			failed && !isHydrationMismatch(failure),
 		);
@@ -43521,14 +43529,14 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		streamedBoundaryId = (adoptCursor as Comment).data.slice(STREAM_SEED_COMMENT.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
-		if (typeof raw === 'string') scopedSeeds = hydrateParseSeeds(hydration, raw);
+		if (typeof raw === 'string') scopedSeeds = hydrateParseSeeds(raw);
 		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
 		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		adoptCursor = getNextSibling(adoptCursor);
 	} else if (hydration !== null) {
 		// A shell hydrated before its streamed segment swaps: the client claims
 		// the boundary, mounting a fresh try/pending block in the cleared range.
-		streamedBoundaryId = hydrateClaimStreamTemplate(hydration, adoptCursor, state.end);
+		streamedBoundaryId = hydrateClaimStreamTemplate(adoptCursor, state.end);
 		if (streamedBoundaryId !== null) {
 			hasScopedBoundary = true;
 			freshBoundary = true;
@@ -43546,7 +43554,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	const freshIds = takeNativeFreshArm(hydration, adoptCursor, state.end, state.idState);
 	let unfinished: UnfinishedArm | null = null;
 	if (freshIds !== null) {
-		unfinished = hydrateBeginUnfinishedArm(hydration!, state, adoptCursor);
+		unfinished = hydrateBeginUnfinishedArm(state, adoptCursor);
 		state.idState = freshIds;
 		freshBoundary = true;
 		adoptCursor = state.end;
@@ -43575,13 +43583,13 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 						});
 			if (unfinished !== null) unfinished.caught = caught;
 		} finally {
-			if (unfinished !== null) hydrateEndUnfinishedArm(hydration!, unfinished);
+			if (unfinished !== null) hydrateEndUnfinishedArm(unfinished);
 		}
-		if (unfinished !== null) hydrateReportUnfinishedArm(hydration!, unfinished);
+		if (unfinished !== null) hydrateReportUnfinishedArm(unfinished);
 		if (wasPending && state.branch === 1) recordSuspenseCommit(state);
 		return;
 	}
-	if (hydration !== null && hydrateIsOpen(hydration, adoptCursor)) {
+	if (hydration !== null && hydrateIsOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
 		// see ifBlock). The seeded use() values let the try body render its success
 		// arm and adopt the server DOM.
@@ -43711,6 +43719,13 @@ function hideTryBlock(state: TrySlot): void {
 	prepareSlot(owningBlock(state.parentBlock), state, 'visibility', visibility);
 }
 
+function releaseSuspenseHiddenDom(hidden: SuspenseHiddenDom | null): void {
+	if (hidden === null || !hidden.active) return;
+	hidden.active = false;
+	for (const el of hidden.displays) releaseHiddenDisplay(el, true);
+	for (const text of hidden.texts) releaseHiddenText(text);
+}
+
 /** Restore the host display/text state captured by hideTryBlock. */
 function showTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
@@ -43732,9 +43747,7 @@ function showTryBlock(state: TrySlot): void {
 					placeRange(state.domParent, block.startMarker!, block.endMarker!, state.end);
 				}
 			}
-			hidden.active = false;
-			for (const el of hidden.displays) releaseHiddenDisplay(el, true);
-			for (const text of hidden.texts) releaseHiddenText(text);
+			releaseSuspenseHiddenDom(hidden);
 		},
 		discard() {
 			// A completed retry can be superseded while held by an enclosing
@@ -46218,6 +46231,10 @@ function prepareBranch(
 	env: any[] | undefined,
 ): void {
 	const transaction = ROOT_RENDER_TRANSACTION!;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__profileArm(true);
+		if (body !== null) __profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
+	}
 	let wip: OffscreenWip | null = null;
 	if (body !== null) {
 		const parent = prepareParent(domParent);
@@ -46778,7 +46795,6 @@ function renderBranchSlot(
 	env?: any[],
 	// The compiler proved this arm hookless (ifBlock/switchBlock's lite mask).
 	lite?: boolean,
-	flatNative = false,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
@@ -46797,7 +46813,6 @@ function renderBranchSlot(
 					body,
 					marker,
 					env,
-					false,
 					false,
 				);
 			return;
@@ -47036,7 +47051,7 @@ function renderBranchSlot(
 				let rebuild = false;
 				let inner: Comment | null = null;
 				let innerEnd: Comment | null = null;
-				if (hydration !== null && hydrateIsOpen(hydration, getNextSibling(state.start))) {
+				if (hydration !== null && hydrateIsOpen(getNextSibling(state.start))) {
 					inner = getNextSibling(state.start) as Comment;
 					innerEnd = hydrateClose(hydration, inner);
 					if (innerEnd !== state.end && getNextSibling(innerEnd) !== state.end) {
@@ -47072,8 +47087,7 @@ function renderBranchSlot(
 					// minted (a swap) holds client content only: build the branch into it
 					// as client DOM.
 					if (hydration !== null) {
-						if (hydrateIsOpen(hydration, state.start))
-							hydrationCursor.node = getNextSibling(state.start);
+						if (hydrateIsOpen(state.start)) hydrationCursor.node = getNextSibling(state.start);
 						else rebuild = true;
 					}
 				}
@@ -47201,7 +47215,7 @@ function renderBranchSlot(
 	// following sibling @if/@switch adopts its own markers instead of seeing this
 	// slot's close marker and mounting fresh DOM at the enclosing anchor.
 	if (hydration !== null && !state.borrowed && state.end !== null) {
-		hydrateParkPast(hydration, state.end, parentScope);
+		hydrateParkPast(state.end, parentScope);
 	}
 }
 
@@ -47323,7 +47337,6 @@ export function ifBlock(
 		'if',
 		env,
 		lite !== undefined && (lite & (next ? 1 : 2)) !== 0,
-		prepared !== undefined && (prepared & (next ? 1 : 2)) !== 0,
 	);
 }
 
@@ -47784,8 +47797,7 @@ export function activityBlock(
 		// generic block range; hidden Activities carry the same EMPTY range because
 		// their body was intentionally skipped on the server. Adopt either shape.
 		const open =
-			(hydration == null ? void 0 : hydrateResolveOpen(hydration, anchor ?? null, domParent)) ??
-			null;
+			(hydration == null ? void 0 : hydrateResolveOpen(anchor ?? null, domParent)) ?? null;
 		if (open !== null) {
 			bStart = open;
 			bEnd = hydrateClose(hydration!, open);
@@ -47849,7 +47861,7 @@ export function activityBlock(
 				);
 				if (state!.hidden) hideActivityRange(state!);
 			});
-			hydrateParkPast(hydration, bEnd, parentScope);
+			hydrateParkPast(bEnd, parentScope);
 			return;
 		}
 		if (wantHidden) {
@@ -47863,7 +47875,7 @@ export function activityBlock(
 		} else {
 			renderBlock(b);
 		}
-		if (adopted) hydrateParkPast(hydration!, bEnd, parentScope);
+		if (adopted) hydrateParkPast(bEnd, parentScope);
 		return;
 	}
 
@@ -48318,7 +48330,6 @@ export function switchBlock(
 		env,
 		// Only the first 30 cases have lite bits, and a shift count wraps at 32.
 		lite !== undefined && nextIdx < 30 && (lite & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
-		prepared !== undefined && nextIdx < 30 && (prepared & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
 	);
 }
 
@@ -48438,7 +48449,7 @@ export function forBlock<T>(
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
-		if (hydration !== null && hydrateIsOpen(hydration, anchor ?? null)) {
+		if (hydration !== null && hydrateIsOpen(anchor ?? null)) {
 			// Hydration: the server wrapped the whole @for in a `<!--[-->…<!--]-->`
 			// range (anchor resolved to the outer `<!--[-->`). Adopt it as the slot
 			// markers and point the cursor at the first item's `<!--[-->` so the
@@ -48448,7 +48459,7 @@ export function forBlock<T>(
 			hydrationCursor.node = getNextSibling(start);
 		} else if (
 			hydration !== null &&
-			hydrateIsOpen(hydration, hydrationCursor.node) &&
+			hydrateIsOpen(hydrationCursor.node) &&
 			hydrationCursor.node.parentNode === domParent
 		) {
 			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
@@ -48539,8 +48550,7 @@ export function forBlock<T>(
 	// New direct-host list output carries its server-selected arm on the existing
 	// outer open comment. Legacy/general list ranges return -1 and retain the
 	// content-shape checks used before markerless SSR items existed.
-	const serverMarkerState =
-		(hydration == null ? void 0 : hydrateMarkerState(hydration, state.start)) ?? -1;
+	const serverMarkerState = (hydration == null ? void 0 : hydrateMarkerState(state.start)) ?? -1;
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
@@ -48591,6 +48601,8 @@ export function forBlock<T>(
 					state!.emptyBlock = wip.block;
 					retargetPreparedScope(wip.block, target, domParent);
 					placeRange(domParent, wip.start, wip.end, state!.end);
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileCount(ProfileCounter.FOR_EMPTY_MOUNT);
 				},
 				discard() {
 					if (!wip.block.disposed) disposeWip(wip);
@@ -48604,7 +48616,7 @@ export function forBlock<T>(
 				// @empty body.
 				if (
 					serverMarkerState === 1 ||
-					(serverMarkerState === -1 && hydrateIsOpen(hydration, getNextSibling(state.start)))
+					(serverMarkerState === -1 && hydrateIsOpen(getNextSibling(state.start)))
 				)
 					hydrateListArmMismatch(hydration, parentScope, slotKey, state.start, true);
 				// The server already rendered the @empty content directly inside the
@@ -48636,7 +48648,7 @@ export function forBlock<T>(
 		}
 		// Advance the cursor past the whole @for so the next sibling's clone()
 		// doesn't read a position left inside this consumed range.
-		if (hydration !== null) hydrateParkPast(hydration, state.end, parentScope);
+		if (hydration !== null) hydrateParkPast(state.end, parentScope);
 		return;
 	}
 	// We have items (or no empty body). If an empty branch was previously
@@ -48671,7 +48683,7 @@ export function forBlock<T>(
 				((flags || 0) & 16) === 0 &&
 				getNextSibling(state.start) !== null &&
 				getNextSibling(state.start) !== state.end &&
-				!hydrateIsOpen(hydration, getNextSibling(state.start))))
+				!hydrateIsOpen(getNextSibling(state.start))))
 	) {
 		hydrateListArmMismatch(hydration, parentScope, slotKey, state.start, false);
 	}
@@ -48743,7 +48755,7 @@ export function forBlock<T>(
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
-	if (hydration !== null) hydrateParkPast(hydration, state.end, parentScope);
+	if (hydration !== null) hydrateParkPast(state.end, parentScope);
 }
 
 // A pure row skip bypasses the row's render, and with it the context work its
@@ -48782,7 +48794,7 @@ export function keyedForBlock<T>(
 	emptyBody?: ComponentBody | null,
 	anchor?: Node | null,
 	ownEnd?: boolean,
-	selectionBody?: ComponentBody<T, any[]>,
+	_selectionBody?: ComponentBody<T, any[]>,
 	signalSite?: string,
 ): void {
 	// forBlock may skip discarded output before it creates the list slot.
@@ -48945,23 +48957,8 @@ function renderLiteListItem(block: Block, body: ComponentBody, env: any[] | unde
 	}
 }
 
-// Cutoff for the small-displacement shortcut in reconcileKeyed. When fewer
-// than this many positions change between renders (and every item survives),
-// we compute the move set directly in O(K_DISP) instead of paying the LIS
-// path's O(N) alloc + back-walk. Covers single drag-and-drop, undo/redo of a
-// recent edit, animated swap transitions, A/B variant toggles, etc. Above
-// this threshold the LIS path wins. The module-level buffer is safely reused
-// across calls: reconcileKeyed CAN re-enter (a nested @for inside an item body
-// re-enters via renderBlock), but never between _disp's fill and consume — no
-// user code runs in that window — so the buffer is never clobbered while live.
-const K_DISP = 4;
-const _disp = new Int32Array(K_DISP);
-
-// Keep at most one numeric source buffer and one LIS predecessor buffer. Source
-// buffers stay live across user rendering, so taking one removes it from the
-// cache until reconciliation finishes; nested lists must receive their own.
-// Oversized lists use disposable buffers instead of retaining their backing
-// stores. The two capped caches can retain at most 128 KiB between renders.
+// Keep one bounded LIS predecessor buffer. Oversized lists use a disposable
+// buffer instead of retaining its backing store between renders.
 const MAX_KEYED_REORDER_SCRATCH = 16_384;
 let keyedLisPredecessors: Int32Array | null = null;
 
@@ -49443,7 +49440,11 @@ function reconcileKeyed<T>(
 	} catch (error) {
 		for (const block of created) {
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
-			if (!block.disposed) discardPreparedBlock(block);
+			if (!block.disposed) {
+				if (block.idState.renderOwner?.signalOwner !== undefined)
+					discardSignalRetryItem(block, error);
+				else discardPreparedBlock(block);
+			}
 		}
 		throw error;
 	}
@@ -49544,11 +49545,7 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  * skipped because the batch clear already removed the whole range. Plain
  * template rows (the common bulk-clear case) hit only the three-field guard.
  */
-function batchClearItems(
-	state: ForSlot,
-	oldItems: Map<any, Block>,
-	ownedRootClear: boolean = false,
-): void {
+function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_REMOVE, state.size);
 	// One teardown bracket spans the items and their DOM, as in unmountBlock: a
@@ -49659,7 +49656,7 @@ function mountItem<T>(
 			const node = hydrationCursor.node;
 			if (
 				ssrMarkerless &&
-				!hydrateIsOpen(hydration, node) &&
+				!hydrateIsOpen(node) &&
 				(singleRoot !== 2 ||
 					!forSlot.plainDeopt ||
 					(isHostDescriptor(item) && !descNeedsBlocks(item)))
@@ -49694,7 +49691,7 @@ function mountItem<T>(
 					hydrationCursor.node = block.endMarker?.nextSibling ?? getNextSibling(node);
 					return block;
 				}
-			} else if (hydrateIsOpen(hydration, node)) {
+			} else if (hydrateIsOpen(node)) {
 				// Hydration: the server wraps each GENERAL-SHAPE item in its own
 				// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
 				// when a current direct-host client could have adopted markerlessly, which
@@ -50300,14 +50297,13 @@ function noteRecoverableHydrationError(makeError: () => Error, block: Block | nu
 	if (
 		currentHydration == null
 			? void 0
-			: hydrateHolds(currentHydration, () => noteRecoverableHydrationError(makeError, from))
+			: hydrateHolds(() => noteRecoverableHydrationError(makeError, from))
 	)
 		return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
 	if (h === undefined) return;
 	const report = () => queueMicrotask(() => invokeRootErrorHandler(h, makeError()));
-	if ((currentHydration == null ? void 0 : hydrateAwaitsCommit(currentHydration, report)) !== true)
-		report();
+	if ((currentHydration == null ? void 0 : hydrateAwaitsCommit(report)) !== true) report();
 }
 
 // One live public root owns a container at a time. React still returns a second
@@ -50635,8 +50631,8 @@ function validateRootHtmlNesting(container: RootContainer, body: ComponentBody):
 // lazily on the first `.render()`), while `hydrateRoot` passes in the
 // already-hydrated block + its body so the FIRST post-hydration `.render()`
 // with the SAME component hits the same-body fast path (props update) and never
-// wipes the adopted server DOM. This factory NEVER touches the hydration-only
-// capability state — that runs once, inside `hydrateRoot`. Keeping that state out
+// wipes the adopted server DOM. This factory NEVER installs the hydration driver
+// — that runs once, inside `hydrateRoot`. Keeping that state out
 // of this shared factory preserves client-only dead-code elimination.
 function makeRoot(
 	container: RootContainer,

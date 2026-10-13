@@ -52,17 +52,22 @@ export function mount(parent) {
 		}
 	}
 	const runtime = await readFile(path.join(source, 'runtime.ts'), 'utf8');
-	const declaration = /export function bindSignalAttribute\([\s\S]*?\): unknown \{/;
-	assert.equal(runtime.match(new RegExp(declaration.source, 'g'))?.length, 1);
+	const declaration =
+		/export function prepareTemplate(?:Scalar)?SignalAttribute\([\s\S]*?\): PreparedDirectSignal \{/g;
+	assert.equal(runtime.match(declaration)?.length, 2);
 	let observedRuntime = runtime.replace(
 		declaration,
 		'$&\n globalThis.__opaqueAttributeWork.calls++;',
 	);
-	const policyDeclaration = /function bindDirectSignal\([\s\S]*?\): unknown \{/;
+	// A settled attribute can now return from the shared preparer before its
+	// policy processing. Observe that same cost boundary, including resolving
+	// a preceding candidate and probing for handles, after the scalar exit.
+	const policyDeclaration =
+		/(function prepareDirectSignal\([\s\S]*?\): PreparedDirectSignal \{[\s\S]*?)(\n\tconst pending =)/;
 	assert.equal(runtime.match(new RegExp(policyDeclaration.source, 'g'))?.length, 1);
 	observedRuntime = observedRuntime.replace(
 		policyDeclaration,
-		'$&\n if (policy.kind === "attribute") globalThis.__opaqueAttributeWork.policies++;',
+		'$1\n if (policy.kind === "attribute") globalThis.__opaqueAttributeWork.policies++;$2',
 	);
 	const bundle = async (observed) => {
 		const result = await build({

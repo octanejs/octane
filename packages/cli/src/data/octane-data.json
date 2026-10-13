@@ -3523,7 +3523,7 @@
     "343": {
       "message": "A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     }
   },
   "strongDiagnostics": {

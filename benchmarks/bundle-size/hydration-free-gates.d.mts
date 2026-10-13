@@ -31,6 +31,10 @@ export function resolveDeclarationRanges(
 	denied?: readonly DeniedDeclaration[],
 ): DeclarationRange[];
 export function mappedSourcePositions(mappings: string): Generator<[number, number, number]>;
+export function mappedSourcePositions(
+	mappings: string,
+	includeGenerated: true,
+): Generator<[number, number, number, number, number]>;
 export function retainedDeclarations(
 	map: SourceMapLike,
 	ranges: readonly DeclarationRange[],
