@@ -1171,10 +1171,12 @@ for (const fixture of fixtures) {
 				result.unmount();
 			});
 
-			it(`${exportName} server-renders its nearest error fallback`, () => {
-				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
-				expect(html).toContain('data-fallback="inner"');
-				expect(html).not.toContain('data-fallback="outer"');
+			// As in React, the server never runs an error boundary, so with no
+			// Suspense boundary above it the error fails the server render.
+			it(`${exportName} fails the server render without a Suspense boundary`, () => {
+				expect(() => ServerRuntime.renderToString(fixture.server[exportName])).toThrow(
+					/^scoped (?:getter )?failure$/,
+				);
 			});
 		}
 

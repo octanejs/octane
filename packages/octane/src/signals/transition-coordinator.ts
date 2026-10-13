@@ -6,8 +6,6 @@ export interface SignalTransitionTypes {
 	Block: SignalTransitionBlock<this>;
 	Owner: SignalTransitionOwner<this>;
 	Transaction: SignalTransitionTransaction<this>;
-	Attempt: SignalTransitionAttempt<this>;
-	Update: SignalTransitionUpdate<this>;
 	Hook: SignalTransitionHook<this>;
 	Batch: SignalTransitionBatch<this>;
 	Boundary: SignalTransitionBoundary<this>;
@@ -15,12 +13,6 @@ export interface SignalTransitionTypes {
 	Suspense: SignalTransitionSuspense<this>;
 	Capture: object;
 	RootFrame: object;
-	MemoSwap: object;
-	Value: unknown;
-}
-
-interface SignalTransitionAttempt<T extends SignalTransitionTypes> {
-	memoSwaps: T['MemoSwap'][] | null;
 }
 
 interface SignalTransitionHook<T extends SignalTransitionTypes> {
@@ -63,19 +55,9 @@ interface SignalTransitionTransaction<T extends SignalTransitionTypes> {
 	nativeAdmitted?: boolean;
 }
 
-interface SignalTransitionUpdate<T extends SignalTransitionTypes> {
-	block: T['Block'];
-	slot: {
-		value: T['Value'];
-		pendingActionBatch?: T['Batch'];
-		pendingActionValue?: T['Value'];
-	};
-	state?: { renderTransition?: T['Update']; updates?: unknown };
-	reducer?: { renderTransition?: T['Update']; renderPhaseActions?: unknown };
-}
-
 interface SignalTransitionBatch<T extends SignalTransitionTypes> {
-	updates: Map<object, T['Update']>;
+	/** Blocks whose hook cells queued this batch's updates. */
+	blocks: T['Block'][];
 	flushed: boolean;
 	hook: T['Hook'] | null;
 	hooks: T['Hook'][] | null;
@@ -97,9 +79,10 @@ interface SignalTransitionBoundary<T extends SignalTransitionTypes> {
 }
 
 export interface NativeTransitionAttempt<T extends SignalTransitionTypes> {
+	/** The batch being prepared: its renders fold its queued hook updates. */
+	batch: T['Batch'];
 	blocks: Set<T['Block']>;
 	transactions: Set<T['Transaction']>;
-	attempts: T['Attempt'][];
 	presentations: NativeTransitionPresentation[];
 	suspensions: Map<T['Boundary'], T['Thenable']>;
 	errorBlock?: T['Block'];
@@ -118,22 +101,19 @@ export interface SignalTransitionRuntime<T extends SignalTransitionTypes> {
 	schedule(): void;
 	beginRoot(owner: T['Owner'] | undefined): T['RootFrame'] | null;
 	endRoot(frame: T['RootFrame'] | null): void;
-	beginAttempt(block: T['Block']): T['Attempt'] | null;
-	endAttempt(attempt: T['Attempt'] | null): void;
 	invalidate(block: T['Block'], owner: T['Block']): void;
 	render(block: T['Block']): void;
 	journal(value: object): void;
 	journalProperty(value: object, key: PropertyKey, previous: unknown): void;
 	isSuspense(error: unknown): error is T['Suspense'];
 	releaseHookHolder(holder: object): void;
-	rebaseUpdate(update: T['Update']): T['Value'];
 	flushBatch(batch: T['Batch']): void;
 	currentPresentations(capture: T['Capture']): boolean;
 	validateCapture(capture: T['Capture']): boolean;
 	acceptCapture(capture: T['Capture'], owner: T['Owner'], replayRefs: boolean): boolean;
 	commitRoots(): void;
+	/** Also restores the memo entries its transition renders replaced. */
 	rollbackRoot(transaction: T['Transaction']): void;
-	applyMemoSwap(swap: T['MemoSwap'], forward: boolean): void;
 	handleError(block: T['Block'], error: unknown): void;
 	reportError(error: unknown, hook?: T['Hook']): void;
 	unsupportedError(): TypeError;
@@ -183,8 +163,6 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 		admission.transactions.add(owner.transaction!);
 		const mode = block.pendingMode;
 		block.pendingMode = 'transition';
-		const attempt = runtime.beginAttempt(block);
-		if (attempt !== null) admission.attempts.push(attempt);
 		try {
 			runtime.invalidate(block, block);
 			if (hidden?.nativeTransition !== undefined) {
@@ -212,7 +190,6 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 			admission.errorBlock ??= block;
 			throw error;
 		} finally {
-			runtime.endAttempt(attempt);
 			block.pendingMode = mode;
 			runtime.endRoot(root);
 		}
@@ -246,32 +223,6 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 			// Retiring demand revokes that presentation, not the model write. The
 			// next preparation discovers only the surviving subscriber frontier.
 			queueNativeTransition(batch);
-		}
-	}
-
-	function prepareNativeTransitionUpdates(batch: TransitionActionBatch): void {
-		for (const update of batch.updates.values()) {
-			const { block, slot, state, reducer } = update;
-			const owner = block.idState.renderOwner;
-			if (block.disposed || owner === undefined || owner.disposed) continue;
-			const frame = runtime.beginRoot(owner);
-			runtime.attempt!.transactions.add(owner.transaction!);
-			try {
-				runtime.journal(slot);
-				if (state !== undefined) {
-					state.renderTransition = update;
-					state.updates = undefined;
-				} else if (reducer !== undefined) {
-					reducer.renderTransition = update;
-					reducer.renderPhaseActions = undefined;
-				} else slot.value = runtime.rebaseUpdate(update);
-				if (slot.pendingActionBatch === batch) {
-					slot.pendingActionBatch = undefined;
-					slot.pendingActionValue = undefined;
-				}
-			} finally {
-				runtime.endRoot(frame);
-			}
 		}
 	}
 
@@ -319,9 +270,9 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 				continue;
 			}
 			const admission: NativeTransitionAttempt<T> = {
+				batch,
 				blocks: new Set(),
 				transactions: new Set(),
-				attempts: [],
 				presentations: [],
 				suspensions: new Map(),
 			};
@@ -329,12 +280,9 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 			let outcome;
 			try {
 				outcome = candidate.prepare([
-					() => prepareNativeTransitionUpdates(batch),
 					...(batch.hook === null ? [] : [() => prepareNativeTransitionHook(batch, batch.hook!)]),
 					...(batch.hooks ?? []).map((hook) => () => prepareNativeTransitionHook(batch, hook)),
-					...[...batch.updates.values()].map(
-						(update) => () => prepareNativeTransitionBlock(update.block),
-					),
+					...batch.blocks.map((block) => () => prepareNativeTransitionBlock(block)),
 					...candidate
 						.consumers()
 						.filter((consumer) => consumer.active())
@@ -371,7 +319,6 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 						runtime.acceptCapture(transaction.capture, transaction.owner, true);
 					}
 					batch.flushed = true;
-					batch.updates.clear();
 					finishNativeTransition(batch);
 					for (const presentation of admission.presentations) presentation.commit();
 					runtime.commitRoots();
@@ -381,11 +328,6 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 			}
 			for (const transaction of admission.transactions) runtime.rollbackRoot(transaction);
 			for (const presentation of admission.presentations) presentation.discard();
-			for (let i = admission.attempts.length - 1; i >= 0; i--) {
-				const swaps = admission.attempts[i].memoSwaps;
-				if (swaps !== null)
-					for (let j = swaps.length - 1; j >= 0; j--) runtime.applyMemoSwap(swaps[j], false);
-			}
 			runtime.commitRoots();
 			if (outcome.status === 'pending') {
 				for (const state of batch.nativeBoundaries?.keys() ?? []) {
@@ -428,14 +370,8 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 			} else {
 				candidate.discard();
 				finishNativeTransition(batch);
-				for (const update of batch.updates.values()) {
-					if (update.slot.pendingActionBatch === batch) {
-						update.slot.pendingActionBatch = undefined;
-						update.slot.pendingActionValue = undefined;
-					}
-				}
-				batch.updates.clear();
-				batch.flushed = true;
+				// Its hook updates render without the native writes.
+				runtime.flushBatch(batch);
 				if (outcome.status === 'error') {
 					if (admission.errorBlock !== undefined && !admission.errorBlock.disposed)
 						runtime.handleError(admission.errorBlock, outcome.error);

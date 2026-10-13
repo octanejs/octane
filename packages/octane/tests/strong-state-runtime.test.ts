@@ -83,7 +83,7 @@ describe('state updaters and reducers can run more than once', () => {
 			}
 		});
 
-		it(`evaluates a transition ${kind} eagerly and again when the transition renders`, async () => {
+		it(`evaluates a held transition ${kind} again when the transition retries`, async () => {
 			let controls!: EqualityControls;
 			const wait = deferred();
 			const root = mount(TransitionUrgentEquality, {
@@ -102,6 +102,11 @@ describe('state updaters and reducers can run more than once', () => {
 						return value + 1;
 					}) as unknown as number),
 				);
+				// The held render folded it once; the retry folds the same update again.
+				await act(async () => {
+					wait.resolve();
+					await wait.promise;
+				});
 				expect(calls).toBeGreaterThan(1);
 			} finally {
 				wait.resolve();
