@@ -4630,13 +4630,18 @@ function queueFrontier(owner: Block | null, parent: Node, before: Node | null): 
 	return openFrontier(next, owner, parent, before);
 }
 
+/** Committed frontiers, empty again: the next renders reuse them (applyNext). */
+const SPARE_FRONTIERS: DocumentFragment[] = [];
+
 function openFrontier(
 	next: SlotNext,
 	owner: Block | null,
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
-	const frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	const frag =
+		(!STAGED_DOM && SPARE_FRONTIERS.pop()) ||
+		(STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
 	(frag as any).$$next = next;
 	next.frag = frag;
 	next.members = [];
@@ -4723,6 +4728,10 @@ function applyNext(next: SlotNext): void {
 	if (bound !== null) replaceSharedBlockBoundary(bound[0], bound[1], bound[2], bound[3], bound[4]);
 	if (process.env.NODE_ENV !== 'production')
 		for (let i = 0; i < members.length; i++) assertRehomed(members[i], frag);
+	(frag as any).$$next = undefined;
+	// Nothing names a committed frontier any more (assertRehomed).
+	if (!STAGED_DOM && SPARE_FRONTIERS.length < 64 && getFirstChild(frag) === null)
+		SPARE_FRONTIERS.push(frag);
 }
 
 /**
@@ -4793,10 +4802,18 @@ function queueRootDeletion(owner: unknown, first: Node | null, last: Node | null
 function applyOutgoing(out: any[]): void {
 	for (let i = 0; i < out.length; i += 3) {
 		const first: Node | null = out[i + 1];
+		const last: Node | null = out[i + 2];
 		const parent = first === null ? null : (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode;
+		if (first === last && parent !== null) {
+			// A self-marked root: one node, no range to collect.
+			retireEventHostTree(first!);
+			if (out[i] !== null) releaseOutgoing(out[i]);
+			if ((STAGED_DOM ? STAGED_DOM.view(first!) : first!).parentNode === parent)
+				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(first!);
+			continue;
+		}
 		const nodes: Node[] = [];
 		if (parent !== null) {
-			const last: Node | null = out[i + 2];
 			for (let node: Node | null = first; node !== null; node = getNextSibling(node)) {
 				nodes.push(node);
 				if (node === last) break;
@@ -5083,111 +5100,110 @@ function commitRootRenders(): void {
 	ROOT_RENDER_TRANSACTIONS = [];
 	for (const transaction of transactions) {
 		// A root still rendering (a nested flushSync) commits when its render ends.
-		if (transaction.rendering !== 0) ROOT_RENDER_TRANSACTIONS.push(transaction);
-		else commitRootRender(transaction);
-	}
-}
-
-function commitRootRender(transaction: RootRenderTransaction): void {
-	const owner = transaction.owner;
-	const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
-		? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
-		: undefined;
-	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileRootEnter(transaction, owner);
-	try {
-		// A hold reached outside a drained origin (dropTransitionRender).
-		if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
-			TRANSITION_ROOT_DRIVER.drop(transaction);
-		if (transaction.aborted || owner.disposed) {
-			if (owner.transaction === transaction) owner.transaction = null;
-			return;
+		if (transaction.rendering !== 0) {
+			ROOT_RENDER_TRANSACTIONS.push(transaction);
+			continue;
 		}
-		// This is the native acceptance point. Validate before any deletion,
-		// ref, or effect callback can observe the candidate. A later callback
-		// write starts another transaction and does not revoke this snapshot.
-		if (
-			!transaction.nativeAdmitted &&
-			((hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
-				(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
-		) {
-			const presentationChanged = hydrationStarted
-				? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
-				: false;
-			rollbackRootRender(transaction);
+		const owner = transaction.owner;
+		const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
+			? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
+			: undefined;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileRootEnter(transaction, owner);
+		try {
+			// A hold reached outside a drained origin (dropTransitionRender).
+			if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
+				TRANSITION_ROOT_DRIVER.drop(transaction);
+			if (transaction.aborted || owner.disposed) {
+				if (owner.transaction === transaction) owner.transaction = null;
+				continue;
+			}
+			// This is the native acceptance point. Validate before any deletion,
+			// ref, or effect callback can observe the candidate. A later callback
+			// write starts another transaction and does not revoke this snapshot.
+			if (
+				!transaction.nativeAdmitted &&
+				((hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
+					(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
+			) {
+				const presentationChanged = hydrationStarted
+					? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
+					: false;
+				rollbackRootRender(transaction);
+				if (owner.transaction === transaction) owner.transaction = null;
+				if (!owner.disposed) {
+					owner.wakeable = null;
+					owner.generation++;
+					if (presentationChanged) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
+					else owner.retry();
+				}
+				continue;
+			}
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootCommitted(transaction);
 			if (owner.transaction === transaction) owner.transaction = null;
-			if (!owner.disposed) {
+			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
+				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
+				STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
+			}
+			// The root request committed, unless a held transition keeps it waiting.
+			if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
 				owner.wakeable = null;
 				owner.generation++;
-				if (presentationChanged) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
-				else owner.retry();
 			}
-			return;
-		}
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileRootCommitted(transaction);
-		if (owner.transaction === transaction) owner.transaction = null;
-		if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
-			stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
-			STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
-		}
-		// The root request committed, unless a held transition keeps it waiting.
-		if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
-			owner.wakeable = null;
-			owner.generation++;
-		}
-		if (owner.wakeable === null) {
-			owner.retryKey = null;
-			owner.nativeRetry?.clear();
-			// Claimed owners belong to accepted scopes. Unvisited branches from
-			// an earlier pending attempt have no continuing consumer.
-			if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
-		}
-		const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
-		if (transaction.cells !== null) commitHookCells(transaction.cells);
-		// Values dropped rounds created were for work that has now committed.
-		if (
-			transaction.batches !== null &&
-			(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
-		)
-			TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
-		const acceptedGeneration = owner.generation;
-		// The mutation phase precedes the incoming ref/layout publication.
-		if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
-		const parked = transaction.parked;
-		if (parked !== null) {
-			for (const item of parked) {
-				if (owner.disposed || owner.generation !== acceptedGeneration) break;
-				unmountParkedItem(item);
+			if (owner.wakeable === null) {
+				owner.retryKey = null;
+				owner.nativeRetry?.clear();
+				// Claimed owners belong to accepted scopes. Unvisited branches from
+				// an earlier pending attempt have no continuing consumer.
+				if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
 			}
-		}
-		if (NATIVE_READ_DRIVER) {
+			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
+			if (transaction.cells !== null) commitHookCells(transaction.cells);
+			// Values dropped rounds created were for work that has now committed.
 			if (
-				!DEFERRED_LAYOUT_DRIVER ||
-				!DEFERRED_LAYOUT_DRIVER.stageAction(() => NATIVE_READ_DRIVER!.pruneDeferredRefs(owner))
+				transaction.batches !== null &&
+				(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
 			)
-				NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
+				TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
+			const acceptedGeneration = owner.generation;
+			// The mutation phase precedes the incoming ref/layout publication.
+			if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
+			const parked = transaction.parked;
+			if (parked !== null) {
+				for (const item of parked) {
+					if (owner.disposed || owner.generation !== acceptedGeneration) break;
+					unmountParkedItem(item);
+				}
+			}
+			if (NATIVE_READ_DRIVER) {
+				if (
+					!DEFERRED_LAYOUT_DRIVER ||
+					!DEFERRED_LAYOUT_DRIVER.stageAction(() => NATIVE_READ_DRIVER!.pruneDeferredRefs(owner))
+				)
+					NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
+			}
+			if (owner.disposed || owner.generation !== acceptedGeneration) {
+				discardOffscreenCapture(transaction.capture);
+				continue;
+			}
+			spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
+			if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
+				// A successful replacement may remove a still-dormant leased view.
+				// Inspect native containment only after staged DOM publication. Retiring
+				// against projected removal would stop still-visible early interactions.
+				const driver = HYDRATION_DRIVER!;
+				if (
+					!DEFERRED_LAYOUT_DRIVER ||
+					!DEFERRED_LAYOUT_DRIVER.stageAction(() => driver.retireDetachedBindingLeases(owner))
+				)
+					driver.retireDetachedBindingLeases(owner);
+			}
+		} finally {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootExit();
+			finishStagedOwner?.();
 		}
-		if (owner.disposed || owner.generation !== acceptedGeneration) {
-			discardOffscreenCapture(transaction.capture);
-			return;
-		}
-		spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
-		if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
-			// A successful replacement may remove a still-dormant leased view.
-			// Inspect native containment only after staged DOM publication. Retiring
-			// against projected removal would stop still-visible early interactions.
-			const driver = HYDRATION_DRIVER!;
-			if (
-				!DEFERRED_LAYOUT_DRIVER ||
-				!DEFERRED_LAYOUT_DRIVER.stageAction(() => driver.retireDetachedBindingLeases(owner))
-			)
-				driver.retireDetachedBindingLeases(owner);
-		}
-	} finally {
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileRootExit();
-		finishStagedOwner?.();
 	}
 }
 
@@ -45868,9 +45884,15 @@ function swapBranchFrontier(
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
 		let end: Node;
+		// An end the arm keeps carries its marker; a reused sentinel may not yet.
+		let sentinel = false;
 		if (pairInFrag) end = state.end!;
 		else {
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
+			sentinel = SPARE_SENTINEL !== null;
+			end =
+				SPARE_SENTINEL ??
+				(STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
+			SPARE_SENTINEL = null;
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).appendChild(end);
 		}
 		arm = createBlock('control-flow', parentBlock, frag!, null, end, body, undefined, env);
@@ -45910,6 +45932,7 @@ function swapBranchFrontier(
 			// inside it, so discarding the arm never reaches committed nodes.
 			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
+			if (sentinel) domNode(end as Comment).data = '/' + marker;
 			arm.startMarker = start;
 			arm.exclusiveMarkers = true;
 		} else if (
@@ -45920,6 +45943,7 @@ function swapBranchFrontier(
 			// A pending arm owns nothing yet; its anchor is where it will land.
 			markerlessBranchRoots(arm, frag!, end, before);
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).removeChild(end);
+			SPARE_SENTINEL = end as Comment;
 			arm.endMarker = before;
 			pending = true;
 		} else if (
@@ -45933,11 +45957,14 @@ function swapBranchFrontier(
 			// inserts where the arm's content lands among the committed nodes.
 			markerlessBranchRoots(arm, frag!, end, before);
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).removeChild(end);
+			// Nothing names the sentinel now: the next arm can stand on it.
+			SPARE_SENTINEL = end as Comment;
 			arm.startMarker = content;
 			arm.endMarker = content;
 		} else {
 			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
 			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
+			if (sentinel) domNode(end as Comment).data = '/' + marker;
 			arm.startMarker = start;
 			arm.exclusiveMarkers = true;
 		}
@@ -45990,6 +46017,13 @@ function swapBranchFrontier(
 	}
 	if (suspended !== null) throw suspended;
 }
+
+/**
+ * The end sentinel a self-marked frontier arm removed (swapBranchFrontier).
+ * Nothing names it once its root slots are retargeted, so the next arm reuses
+ * it rather than minting and collecting a comment per swap.
+ */
+let SPARE_SENTINEL: Comment | null = null;
 
 /** Remove a fragment's fresh nodes after `after` (or from its start) up to `until`. */
 function removeAfter(frag: DocumentFragment, after: Node | null, until: Node | null): void {
