@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createElement, createRoot, startTransition, use } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
 import {
+	ActivityApp,
 	BranchProbeApp,
 	ListProbeApp,
 	OutsideApp,
 	StructureApp,
+	type ActivityProps,
 	type ListProps,
 	type OutsideProps,
 	type StructureProps,
@@ -411,5 +413,57 @@ describe('content outside the container lands at commit', () => {
 			}
 			expect(titles()).toHaveLength(0);
 		});
+	}
+});
+
+describe('Activity visibility changes at commit', () => {
+	for (const priority of ['urgent', 'transition'] as const) {
+		for (const [from, to] of [
+			['hidden', 'visible'],
+			['visible', 'hidden'],
+		] as const) {
+			it(`a dropped ${priority} render leaves a ${from} Activity ${from} (${to} requested)`, async () => {
+				const log: string[] = [];
+				const initial: ActivityProps = { mode: from, label: 'a', log: (entry) => log.push(entry) };
+				const app = mount(ActivityApp, initial);
+				const leaf = app.find('#activity-leaf') as HTMLElement;
+				const records: MutationRecord[] = [];
+				const observer = new MutationObserver((batch) => records.push(...batch));
+				observer.observe(app.container, {
+					childList: true,
+					subtree: true,
+					attributes: true,
+					characterData: true,
+				});
+				const shown = () => leaf.style.display !== 'none';
+				const render = (props: Partial<ActivityProps>) =>
+					act(() => {
+						const next = () => app.root.render(ActivityApp, { ...initial, ...props });
+						if (priority === 'transition') startTransition(next);
+						else next();
+					});
+				try {
+					log.length = 0;
+					await render({ mode: to, gate: new Promise(() => {}) });
+					records.push(...observer.takeRecords());
+					expect(records).toEqual([]);
+					expect(shown()).toBe(from === 'visible');
+					expect(log).toEqual([]);
+
+					// The render that completes makes the same change.
+					await render({ mode: to, label: 'b' });
+					expect(shown()).toBe(to === 'visible');
+					expect(log).toEqual([to === 'visible' ? 'mount' : 'unmount']);
+					// And Activity keeps working afterwards.
+					log.length = 0;
+					await render({ mode: from, label: 'c' });
+					expect(shown()).toBe(from === 'visible');
+					expect(log).toEqual([from === 'visible' ? 'mount' : 'unmount']);
+				} finally {
+					observer.disconnect();
+					app.unmount();
+				}
+			});
+		}
 	}
 });

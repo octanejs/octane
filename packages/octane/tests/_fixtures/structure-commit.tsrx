@@ -1,4 +1,4 @@
-import { createPortal, use, useLayoutEffect, useRef } from 'octane';
+import { Activity, createPortal, use, useLayoutEffect, useRef } from 'octane';
 
 // One app that removes content through every structural slot kind: a branch
 // arm, a keyed component, keyed rows, a value hole, and a branch arm inside a
@@ -163,6 +163,33 @@ export function OutsideApp(props: OutsideProps) @{
 			</>
 		}
 		<Probe probe={props.probe} />
+		@if (props.gate) {
+			<Gate gate={props.gate} />
+		}
+	</main>
+}
+
+export interface ActivityProps {
+	mode: 'visible' | 'hidden';
+	label: string;
+	gate?: PromiseLike<unknown>;
+	log: (entry: string) => void;
+}
+
+function ActivityLeaf(props: { label: string; log: (entry: string) => void }) @{
+	useLayoutEffect(() => {
+		props.log('mount');
+		return () => props.log('unmount');
+	}, []);
+	<span id="activity-leaf">{props.label}</span>
+}
+
+// An Activity whose visibility a render can change while a sibling suspends.
+export function ActivityApp(props: ActivityProps) @{
+	<main>
+		<Activity mode={props.mode}>
+			<ActivityLeaf label={props.label} log={props.log} />
+		</Activity>
 		@if (props.gate) {
 			<Gate gate={props.gate} />
 		}

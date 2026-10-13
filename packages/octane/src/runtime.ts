@@ -43038,6 +43038,10 @@ function hideSuspensePortalRanges(scope: Scope, hidden: SuspenseHiddenDom): void
 	});
 }
 
+/**
+ * Hide the try block's range. A root render queues the hide for its commit,
+ * after the content it built (HIDE), so a dropped render touches no DOM.
+ */
 function hideTryBlock(state: TrySlot): void {
 	const block = state.tryBlock;
 	if (block === null || state.hiddenDom !== null) return;
@@ -43046,20 +43050,22 @@ function hideTryBlock(state: TrySlot): void {
 		texts: new Set(),
 		active: true,
 	};
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+		journalRootProperty(state, 'hiddenDom', null);
+		state.hiddenDom = hidden;
+		transaction.ops.push(rehideTryBlock, state);
+		return;
+	}
 	state.hiddenDom = hidden;
 	if (TRANSITION_JOURNAL !== null) {
 		journalUndo(() => {
 			if (state.hiddenDom === hidden) state.hiddenDom = null;
-			if (!hidden.active) return;
-			hidden.active = false;
-			for (const el of hidden.displays) releaseHiddenDisplay(el, true);
-			for (const text of hidden.texts) releaseHiddenText(text);
+			releaseTryHide(hidden);
 		});
 	}
 	hideBlockHostRange(block, hidden);
 	hideSuspensePortalRanges(block, hidden);
-	// Content this render's slots insert at commit joins the hidden range then.
-	ROOT_RENDER_TRANSACTION?.ops.push(rehideTryBlock, state);
 }
 
 function rehideTryBlock(state: TrySlot): void {
@@ -43070,10 +43076,20 @@ function rehideTryBlock(state: TrySlot): void {
 	hideSuspensePortalRanges(block, hidden);
 }
 
-/** Restore the host display/text state captured by hideTryBlock. */
+/**
+ * Restore the host display/text state captured by hideTryBlock. A root render
+ * queues the reveal (UNHIDE) where it starts, ahead of the content it patches.
+ */
 function showTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	if (hidden === null) return;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+		journalRootProperty(state, 'hiddenDom', hidden);
+		state.hiddenDom = null;
+		transaction.ops.push(releaseTryHide, hidden);
+		return;
+	}
 	state.hiddenDom = null;
 	if (TRANSITION_JOURNAL !== null) {
 		journalUndo(() => {
@@ -43087,14 +43103,14 @@ function showTryBlock(state: TrySlot): void {
 			}
 		});
 	}
+	releaseTryHide(hidden);
+}
+
+function releaseTryHide(hidden: SuspenseHiddenDom): void {
 	if (!hidden.active) return;
 	hidden.active = false;
-	for (const el of hidden.displays) {
-		releaseHiddenDisplay(el, true);
-	}
-	for (const text of hidden.texts) {
-		releaseHiddenText(text);
-	}
+	for (const el of hidden.displays) releaseHiddenDisplay(el, true);
+	for (const text of hidden.texts) releaseHiddenText(text);
 }
 
 /**
@@ -47149,6 +47165,16 @@ export function activityBlock(
 	}
 
 	const b = state.block!;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const queued = transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK;
+	if (queued && state.hidden !== wantHidden) {
+		// A dropped render leaves the Activity as it was: its visibility record,
+		// the Block's inactive flag and its suspense handler come back with it.
+		journalObjectOnce(state);
+		journalRootProperty(b, 'inactive', b.inactive);
+		const rare = blockRare(b);
+		journalRootProperty(rare, 'suspenseHandler', rare.suspenseHandler);
+	}
 	b.body = body;
 	b.extra = env;
 	const commitVersion = ++state.commitVersion;
@@ -47181,8 +47207,10 @@ export function activityBlock(
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileCount(ProfileCounter.ACTIVITY_SHOW);
 			// hidden → visible: restore DOM, clear inactive, re-render to re-fire
-			// effects (deactivateScope cleared their deps so they re-enqueue).
-			showActivityRange(state);
+			// effects (deactivateScope cleared their deps so they re-enqueue). A root
+			// render restores the DOM as it commits, ahead of the content it patches.
+			if (queued) transaction!.ops.push(showActivityRange, state);
+			else showActivityRange(state);
 			b.inactive = false;
 			state.hidden = false;
 			state.deactivationPending = false;
