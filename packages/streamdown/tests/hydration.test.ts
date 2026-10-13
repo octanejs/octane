@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { SERVER_HTML } from './server-html';
 import { ServerDocument } from './_fixtures/server-document.tsrx';
-
-const SERVER_HTML =
-	'<!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><div class="space-y-4 whitespace-normal [&amp;>*:first-child]:mt-0 [&amp;>*:last-child]:mb-0"><!--[--><!--[--><!--[--><!--[--><h1 class="mt-6 mb-2 font-semibold text-3xl" data-streamdown="heading-1">Hydrate</h1><!--]--><!--]--><!--[-->\n<!--]--><!--[--><!--[--><p>Stable.</p><!--]--><!--]--><!--]--><!--]--></div><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--]-->';
 
 const expandCountedHydrationMarkers = (html: string): string =>
 	html.replace(/<!--([\[\]])([1-9]\d*)-->/g, (whole, marker: string, rawCount: string) => {

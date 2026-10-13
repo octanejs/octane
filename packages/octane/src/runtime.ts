@@ -48614,7 +48614,9 @@ function mountItemsLinear<T>(
 	// shows fresh rows with their bindings half rolled back underneath them.
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
-	const parentNode = forSlotParent(state)!;
+	const parentNode = (
+		state.ownerBlock.disposed ? null : (state.ownerHost ?? domNode(state.end!).parentNode)
+	)!;
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
 	// element's existing raw children, keyed like the incoming items. This cold
 	// map preserves later survivors after a removed/changed key, and reorders
@@ -48845,7 +48847,9 @@ function reconcileKeyed<T>(
 	const oldItems = state.items;
 	const oldSize = state.size;
 	const newLen = items.length;
-	const parentNode = forSlotParent(state)!;
+	const parentNode = (
+		state.ownerBlock.disposed ? null : (state.ownerHost ?? domNode(state.end!).parentNode)
+	)!;
 	// Scalar survivor updates journal their own bindings. Capture the chain and
 	// key map only if reconciliation actually changes membership or order, so
 	// unchanged lists do not allocate a second O(N) representation every render.

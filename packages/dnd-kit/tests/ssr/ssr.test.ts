@@ -1,5 +1,7 @@
+import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'octane/server';
+import { SERVER_HTML } from '../hydration/server-html';
 import { ServerFixture } from './_fixtures/server.tsrx';
 
 function stripMarkers(html: string): string {
@@ -10,6 +12,9 @@ describe('@octanejs/dnd-kit SSR', () => {
 	it('renders provider, draggable, droppable, sortable, and inactive overlay without a DOM', () => {
 		expect(typeof document).toBe('undefined');
 		const { html, css } = renderToString(ServerFixture, {});
+		if (process.env.DND_KIT_CAPTURE_SERVER_HTML)
+			writeFileSync(process.env.DND_KIT_CAPTURE_SERVER_HTML, html);
+		expect(html).toBe(SERVER_HTML);
 		const flat = stripMarkers(html);
 		expect(flat).toContain('<main id="server-dnd">');
 		expect(flat).toContain('<button id="server-drag">server card</button>');

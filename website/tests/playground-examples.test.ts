@@ -97,11 +97,22 @@ describe('curated examples', () => {
 				for (const css of injectedCss(out.code)) {
 					expect(css, `${mode}: a rule reaches no element`).not.toContain('(unused)');
 				}
-				// Every authored class a block targets must be stamped with a scope
-				// hash in the compiled markup, i.e. sit inside a scope that styles it.
-				for (const literal of source.matchAll(/class="([^"]+)"/g)) {
+				// The client compiles every authored branch, including @catch.
+				// SSR emits only server-renderable branches. Every targeted class it
+				// actually emits must carry a hash on that same element.
+				const literals =
+					mode === 'client'
+						? source.matchAll(/class="([^"]+)"/g)
+						: out.code.matchAll(/\bclass=\\?"([^"\\]+)\\?"/g);
+				for (const literal of literals) {
 					for (const cls of literal[1].split(/\s+/)) {
 						if (!targeted.has(cls)) continue;
+						if (mode === 'server') {
+							expect(literal[1], `server: class "${cls}" carries no scope hash`).toMatch(
+								/(?:^|\s)tsrx-[a-z0-9]+(?:\s|$)/,
+							);
+							continue;
+						}
 						const stamped = new RegExp(`class=\\\\?"(?:[^"]* )?${cls}(?: [^"]*)? tsrx-[a-z0-9]+`);
 						expect(out.code, `${mode}: class "${cls}" carries no scope hash`).toMatch(stamped);
 					}

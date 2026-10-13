@@ -1,5 +1,7 @@
+import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'octane/server';
+import { SERVER_HTML } from '../server-html';
 import { ServerDocument, ServerFeatureDocument } from '../_fixtures/server-document.tsrx';
 
 describe('@octanejs/streamdown server rendering', () => {
@@ -13,6 +15,13 @@ describe('@octanejs/streamdown server rendering', () => {
 		expect(html).toContain('complete');
 		expect(html).toContain('class="katex"');
 		expect(html).not.toContain('[object Object]');
+	});
+
+	it('materializes the same server document used by the hydration test', () => {
+		const { html } = renderToString(ServerDocument, { content: '# Hydrate\n\nStable.' });
+		if (process.env.STREAMDOWN_CAPTURE_SERVER_HTML)
+			writeFileSync(process.env.STREAMDOWN_CAPTURE_SERVER_HTML, html);
+		expect(html).toBe(SERVER_HTML);
 	});
 
 	it('renders streaming Markdown through custom HAST components and code blocks', () => {

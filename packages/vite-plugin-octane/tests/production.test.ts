@@ -694,19 +694,28 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		expect(response.status).toBe(404);
 	});
 
-	it('loads and renders the configured root catch boundary in production', async () => {
+	it('retries a root error in the browser and renders its configured catch in dev and production', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 		const response = await handler(new Request('http://localhost/pages/error'));
 		expect(response.status).toBe(200);
 		const prodHtml = await response.text();
-		expect(prodHtml).toContain('Fixture failed: Error: fixture root boundary');
+		expect(prodHtml).toContain('<p class="root-pending">Loading fixture…</p>');
+		expect(prodHtml).not.toContain('fixture root boundary');
+		expect(prodHtml).not.toContain('Fixture failed:');
 		const stylesheet = findBuiltAsset(path.join(distDir, 'client'), '.css', '.root-catch');
 		expect(stylesheet).toBeTruthy();
 		expect(prodHtml).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
 
 		const devResponse = await fetch(devOrigin + '/pages/error');
 		expect(devResponse.status).toBe(200);
-		expect(bodyRegionOf(await devResponse.text())).toBe(bodyRegionOf(prodHtml));
+		const devHtml = await devResponse.text();
+		// Every request owns a distinct stream token. Compare the authored body
+		// and full range structure, excluding only that request-local token.
+		const boundary = /(<template data-oct-b=")[^"]+("><\/template>)/g;
+		expect(bodyRegionOf(devHtml).replace(boundary, '$1request$2')).toBe(
+			bodyRegionOf(prodHtml).replace(boundary, '$1request$2'),
+		);
+		expect(devHtml).not.toContain('fixture root boundary');
 
 		let browser: import('playwright').Browser | undefined;
 		try {
@@ -720,20 +729,26 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			);
 		}
 
-		const page = await browser.newPage();
-		const errors: string[] = [];
-		page.on('console', (message) => {
-			if (message.type() === 'error') errors.push(message.text());
-		});
-		page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
 		try {
-			await page.goto(devOrigin + '/pages/error', { waitUntil: 'load' });
-			expect(await page.locator('.root-catch').textContent()).toBe(
-				'Fixture failed: Error: fixture root boundary',
-			);
-			expect(errors).toEqual([]);
+			for (const origin of [devOrigin, productionOrigin]) {
+				const page = await browser.newPage();
+				const errors: string[] = [];
+				page.on('console', (message) => {
+					if (message.type() === 'error') errors.push(message.text());
+				});
+				page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+				try {
+					await page.goto(origin + '/pages/error', { waitUntil: 'load' });
+					await expect
+						.poll(() => page.locator('.root-catch').textContent())
+						.toBe('Fixture failed: Error: fixture root boundary');
+					expect(await page.locator('.root-pending').count()).toBe(0);
+					expect(errors, `${origin} browser errors`).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			}
 		} finally {
-			await page.close();
 			await browser.close();
 		}
 	});

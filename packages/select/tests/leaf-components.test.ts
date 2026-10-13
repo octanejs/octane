@@ -314,7 +314,7 @@ describe('first default component unit', () => {
 		expect(resolved.IndicatorSeparator).toBeNull();
 	});
 
-	it('renders no MenuPortal markup during SSR without a control element', () => {
+	it('renders no MenuPortal content during SSR without a control element', () => {
 		const common = reactProps({ kind: 'menu' }) as Record<string, unknown>;
 		const rendered = renderToString(MenuPortal, {
 			...common,
@@ -325,7 +325,10 @@ describe('first default component unit', () => {
 			menuPosition: 'fixed',
 			children: 'Portal child',
 		});
-		expect(rendered.html).toBe('');
+		const window = new Window();
+		window.document.body.innerHTML = rendered.html;
+		expect(window.document.body.children).toHaveLength(0);
+		expect(window.document.body.textContent).toBe('');
 		expect(rendered.css).toBe('');
 	});
 

@@ -824,29 +824,51 @@ describe('native reads in use() creations', () => {
 		for (const View of [server.ParallelErrors, server.ParallelJsxErrors]) {
 			const firstError = deferred<string>();
 			const secondError = deferred<string>();
+			const firstFailure = new Error('first error');
+			const laterFailure = new Error('later error');
+			const onError = vi.fn();
 			let completed = false;
-			const errors = prerender(View, {
-				load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
-			});
+			const errors = prerender(
+				View,
+				{ load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise) },
+				{ onError },
+			);
 			void errors.then(() => {
 				completed = true;
 			});
 			await drain();
-			secondError.reject(new Error('later error'));
+			secondError.reject(laterFailure);
 			await drain();
 			expect(completed).toBe(false);
-			firstError.reject(new Error('first error'));
-			expect((await errors).html).toContain('first error');
-			expect((await errors).html).not.toContain('later error');
+			expect(onError).not.toHaveBeenCalled();
+			firstError.reject(firstFailure);
+			const { html } = await errors;
+			const markup = document.createElement('div');
+			markup.innerHTML = html;
+			expect(markup.querySelector('.pending')?.textContent).toBe('loading');
+			expect(markup.querySelector('.error')).toBeNull();
+			expect(html).not.toContain(firstFailure.message);
+			expect(html).not.toContain(laterFailure.message);
+			expect(onError).toHaveBeenCalledExactlyOnceWith(firstFailure);
 			const failedStarts: string[] = [];
-			const failed = await prerender(View, {
-				load: (key: string) => {
-					failedStarts.push(key);
-					throw new Error('synchronous first error');
+			const synchronousFailure = new Error('synchronous first error');
+			onError.mockClear();
+			const failed = await prerender(
+				View,
+				{
+					load: (key: string) => {
+						failedStarts.push(key);
+						throw synchronousFailure;
+					},
 				},
-			});
+				{ onError },
+			);
 			expect(failedStarts).toEqual(['first']);
-			expect(failed.html).toContain('synchronous first error');
+			markup.innerHTML = failed.html;
+			expect(markup.querySelector('.pending')?.textContent).toBe('loading');
+			expect(markup.querySelector('.error')).toBeNull();
+			expect(failed.html).not.toContain(synchronousFailure.message);
+			expect(onError).toHaveBeenCalledExactlyOnceWith(synchronousFailure);
 		}
 	});
 

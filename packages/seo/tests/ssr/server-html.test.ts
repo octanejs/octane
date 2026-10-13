@@ -1,6 +1,7 @@
 // Drift guard for the materialized markup the hydration suite hydrates against.
 // If the emitted bytes change, this fails here rather than surfacing as a
 // confusing hydration mismatch in the other project.
+import { writeFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { prerender } from 'octane/static';
 import { HydratePage } from '../_fixtures/hydrate-page.tsrx';
@@ -12,6 +13,8 @@ describe('materialized server html', () => {
 		// The head-ownership keys are derived from call-site position in
 		// src/components.tsrx, so editing that file legitimately changes them. When
 		// this fails, copy the received strings into tests/hydration/server-html.ts.
+		if (process.env.SEO_CAPTURE_SERVER_HTML)
+			writeFileSync(process.env.SEO_CAPTURE_SERVER_HTML, JSON.stringify({ html, head }));
 		expect(head, 'update tests/hydration/server-html.ts with this value').toBe(SERVER_HEAD);
 		expect(html, 'update tests/hydration/server-html.ts with this value').toBe(SERVER_BODY);
 	});

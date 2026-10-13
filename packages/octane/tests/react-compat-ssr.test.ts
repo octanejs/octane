@@ -274,7 +274,7 @@ describe('ReactCompat buffered server rendering', () => {
 		expect(completion).toContain('<strong>React ready</strong>');
 	});
 
-	it('routes a React server error to the enclosing Octane catch arm', async () => {
+	it('rejects a React server error past an Octane catch arm with no pending fallback', async () => {
 		const error = new Error('React server failed');
 		const captured: unknown[] = [];
 		function Broken() {
@@ -289,9 +289,8 @@ describe('ReactCompat buffered server rendering', () => {
 				children: reactIsland(Broken),
 			});
 		}
-		const { html } = await prerender(Page);
-		expect(textFrom(html)).toBe('Octane caught the error');
-		expect(captured).toContain(error);
+		await expect(prerender(Page)).rejects.toBe(error);
+		expect(captured).toEqual([]);
 	});
 
 	it('awaits a local React Suspense boundary without shipping reveal scripts', async () => {

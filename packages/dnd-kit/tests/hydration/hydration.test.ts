@@ -3,13 +3,8 @@ import { flushSync, hydrateRoot } from 'octane';
 import { Feedback } from '@dnd-kit/dom';
 import { KeyboardSensor } from '@octanejs/dnd-kit';
 import { flushEffects } from '../../../octane/tests/_helpers';
+import { SERVER_HTML } from './server-html';
 import { ServerFixture, latestManager } from '../ssr/_fixtures/server.tsrx';
-
-// Pinned output from the dnd-kit-ssr project rendering this same fixture.
-// The SSR test independently verifies the semantic payload; this exact shape
-// verifies that the client adapter adopts the server component boundaries.
-const SERVER_HTML =
-	'<!--[--><!--[--><!--[--><!--]--><!--[--><!--[--><main id="server-dnd"><button id="server-drag">server card</button><div id="server-drop">server target</div><div id="server-sort">server sortable</div></main><!--]--><!--[--><!--[--><!--[--><div data-dnd-overlay="true"></div><!--]--><!--]--><!--]--><!--]--><!--]--><!--]-->';
 
 function expandCountedMarkers(html: string): string {
 	return html.replace(/<!--([\[\]])([1-9]\d*)-->/g, (whole, marker: string, raw: string) => {
