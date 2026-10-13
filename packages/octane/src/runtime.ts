@@ -13473,6 +13473,29 @@ export function componentSlotLite<P>(
 		);
 		return;
 	}
+	if (
+		parentScope.slots[slotKey] === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentScope.block.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
+	) {
+		const end = freshSlotEnd(parentScope.block, host, anchor);
+		if (end !== null) {
+			try {
+				componentSlotLite(
+					parentScope,
+					slotKey,
+					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					comp,
+					props,
+					invocationSite,
+					end,
+				);
+			} finally {
+				settleFreshSlot(parentScope, end, anchor);
+			}
+			return;
+		}
+	}
 	const hydration = hydrating ? activeHydration() : null;
 	// Fresh anchors belong to client-built DOM, while the enclosing hydration
 	// cursor still owns later server siblings. Match the general
@@ -23872,6 +23895,7 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	scope.slots[0] = bag;
 	return bag;
 }
+
 /* prettier-ignore */ export function bag0(s: Scope, r: Node | null, $ = 0): any { return commitBag(s, r, { __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 0 }); }
 /* prettier-ignore */ export function bag1(s: Scope, r: Node | null, a: any, $ = 0): any { return commitBag(s, r, { a, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 1 }); }
 /* prettier-ignore */ export function bag2(s: Scope, r: Node | null, a: any, b: any, $ = 0): any { return commitBag(s, r, { a, b, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 2 }); }
@@ -35186,6 +35210,37 @@ function componentSlotImpl(
 		}
 	}
 	const parentBlock = parentScope.block;
+	if (
+		parentScope.slots[slotKey] === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp &&
+		!inherit
+	) {
+		const end = freshSlotEnd(parentBlock, domParent, anchor);
+		if (end !== null) {
+			try {
+				componentSlotImpl(
+					outputHandler,
+					parentScope,
+					slotKey,
+					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					body,
+					identity,
+					props,
+					renderProps,
+					end,
+					key,
+					singleRoot,
+					inherit,
+					hasKey,
+					invocationSite,
+				);
+			} finally {
+				settleFreshSlot(parentScope, end, anchor);
+			}
+			return;
+		}
+	}
 	const hydration = hydrating ? activeHydration() : null;
 	// A component nested inside a client-built range must mount as ordinary
 	// client DOM. Its fresh anchor is not server output to adopt; keep
@@ -39282,6 +39337,38 @@ export function childSlot(
 			}
 		}
 	}
+	if (
+		parentScope.slots[slotKey] === undefined &&
+		ownsHost === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentScope.block.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
+	) {
+		const end = freshSlotEnd(parentScope.block, domParent, anchor);
+		if (end !== null) {
+			try {
+				childSlot(
+					parentScope,
+					slotKey,
+					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					value,
+					end,
+					false,
+					undefined,
+					compactable,
+					includeKeyedSingle,
+					compiledMapBody,
+					compiledMapKey,
+					compiledMapFlags,
+					compiledMapDeps,
+					mappedFallback,
+					bindingMarker,
+				);
+			} finally {
+				settleFreshSlot(parentScope, end, anchor);
+			}
+			return;
+		}
+	}
 	// Only an installed signal capability (compiled signal bindings) or a loaded
 	// signal engine can hand a handle to this hole. A signal-free app writes
 	// neither, so the bundler folds this branch away there. The engine check
@@ -42138,6 +42225,30 @@ export function tryBlock(
 			catchError: switchToCatch,
 		};
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
+	if (
+		state === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
+	) {
+		const end = freshSlotEnd(parentBlock, domParent, anchor);
+		if (end !== null) {
+			try {
+				return tryBlock(
+					parentScope,
+					slotKey,
+					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					tryBody,
+					catchBody,
+					pendingBody,
+					end,
+					env,
+					propagateSuspense,
+				);
+			} finally {
+				settleFreshSlot(parentScope, end, anchor);
+			}
+		}
+	}
 	let supersedesInputs = false;
 	// A boundary whose hydration has not finished yet.
 	let initial =
@@ -43530,12 +43641,38 @@ function commitResume(state: TrySlot): void {
 		!flushingSuspenseRetries &&
 		VIEW_TRANSITION_DRIVER &&
 		VIEW_TRANSITION_DRIVER.wrapResume(
-			() => commitResumeInner(state),
+			() => inBoundaryRender(state, commitResumeInner),
 			() => [state.parentBlock],
 		)
 	)
 		return;
-	commitResumeInner(state);
+	inBoundaryRender(state, commitResumeInner);
+}
+
+/**
+ * Run a boundary's resume or hidden retry as its root's render, so its commit,
+ * not its render, writes the DOM, and a suspended retry touches none. One that
+ * runs inside a render already joins that render's transaction.
+ */
+function inBoundaryRender<A extends unknown[]>(
+	state: TrySlot,
+	run: (state: TrySlot, ...args: A) => void,
+	...args: A
+): void {
+	// ViewTransitions still stage a resume's DOM as it renders (#2043 step 3).
+	const frame =
+		ROOT_RENDER_TRANSACTION === null && !VIEW_TRANSITION_DRIVER
+			? beginDetachedBoundaryRender(state)
+			: null;
+	try {
+		run(state, ...args);
+	} catch (error) {
+		if (frame !== null) rollbackRootRender(frame.transaction);
+		throw error;
+	} finally {
+		endDetachedBoundaryRender(frame);
+	}
+	if (frame !== null && !deferringStagedRevealEffects) commitEffects();
 }
 
 function commitResumeInner(state: TrySlot): void {
@@ -43555,7 +43692,7 @@ function commitResumeInner(state: TrySlot): void {
 				// This retry has already reached its commit window. Preserve its render
 				// priority above, but do not stage it through the same reveal timer again.
 				attemptHiddenReveal(state, 'urgent');
-				if (!deferringStagedRevealEffects) commitEffects();
+				if (!deferringStagedRevealEffects && ROOT_RENDER_TRANSACTION === null) commitEffects();
 			} finally {
 				RESUME_REPLAY = previousReplay;
 			}
@@ -43731,7 +43868,8 @@ function commitResumeInner(state: TrySlot): void {
 		// promises resolved, another still pending) enqueued effects for the now-hidden
 		// subtree that the effect drains must SKIP (inactive) and CLEAR — without draining here
 		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
-		if (!deferringStagedRevealEffects) commitEffects();
+		// A framed resume drains them once its render commits (inBoundaryRender).
+		if (!deferringStagedRevealEffects && ROOT_RENDER_TRANSACTION === null) commitEffects();
 	} finally {
 		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 		if (releaseHeld) {
@@ -44058,7 +44196,7 @@ function attemptHiddenReveal(
 	const previousReplay = RESUME_REPLAY;
 	if (reason === 'retry') RESUME_REPLAY = true;
 	try {
-		attemptHiddenRevealInner(state, scheduledMode, reason);
+		inBoundaryRender(state, attemptHiddenRevealInner, scheduledMode, reason);
 	} finally {
 		RESUME_REPLAY = previousReplay;
 		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
@@ -44201,8 +44339,9 @@ function attemptHiddenRevealInner(
 			// A saved-DOM retry can run directly from a thenable microtask, outside
 			// the scheduler's normal render→commit drain. Its terminal catch arm is a
 			// real commit and must publish refs/effects now. Parent/drain-driven hidden
-			// attempts already have an enclosing commit and leave it there.
-			if (!inFlush && CURRENT_BLOCK === null) commitEffects();
+			// attempts already have an enclosing commit and leave it there, as does a
+			// framed retry (inBoundaryRender).
+			if (!inFlush && CURRENT_BLOCK === null && ROOT_RENDER_TRANSACTION === null) commitEffects();
 		}
 		return;
 	}
@@ -46125,6 +46264,29 @@ function releaseFrontierSentinel(
 	SPARE_SENTINEL = end;
 }
 
+/**
+ * A slot mounting for the first time under a committed Block, which an earlier
+ * render did not carry this far (it suspended before reaching the slot),
+ * builds off-document like any other new structure: in a frontier its commit
+ * inserts before `anchor`, ending at a sentinel its root slots anchor to until
+ * then (settleFreshSlot). Null when the parent's DOM is fresh.
+ */
+function freshSlotEnd(
+	parentBlock: Block,
+	domParent: Node,
+	anchor: Node | null | undefined,
+): Comment | null {
+	if (hydrating || !usesFrontier(parentBlock, domParent)) return null;
+	return frontierSentinel(queueFrontier(parentBlock, domParent, anchor ?? null), '');
+}
+
+/** What anchored on a fresh slot's sentinel inserts where the slot lands. */
+function settleFreshSlot(parentScope: Scope, end: Comment, anchor: Node | null | undefined): void {
+	const frag = (STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode;
+	if (frag !== null)
+		releaseFrontierSentinel(parentScope, frag as DocumentFragment, end, anchor ?? null);
+}
+
 /** Remove a fragment's fresh nodes after `after` (or from its start) up to `until`. */
 function removeAfter(frag: DocumentFragment, after: Node | null, until: Node | null): void {
 	let node = after === null ? getFirstChild(frag) : getNextSibling(after);
@@ -47038,6 +47200,29 @@ export function activityBlock(
 	const hydration = hydrating ? activeHydration() : null;
 	const wantHidden = mode === 'hidden';
 	let state = parentScope.slots[slotKey] as ActivitySlot | undefined;
+	if (
+		state === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
+	) {
+		const end = freshSlotEnd(parentBlock, domParent, anchor);
+		if (end !== null) {
+			try {
+				activityBlock(
+					parentScope,
+					slotKey,
+					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					mode,
+					body,
+					end,
+					env,
+				);
+			} finally {
+				settleFreshSlot(parentScope, end, anchor);
+			}
+			return;
+		}
+	}
 
 	if (state === undefined) {
 		let bStart: Comment;
@@ -47695,6 +47880,34 @@ export function forBlock<T>(
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	let state = parentScope.slots[slotKey] as ForSlot | undefined;
+	if (
+		state === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
+	) {
+		const fresh = freshSlotEnd(parentBlock, domParent, anchor);
+		if (fresh !== null) {
+			try {
+				forBlock(
+					parentScope,
+					slotKey,
+					(STAGED_DOM ? STAGED_DOM.view(fresh) : fresh).parentNode!,
+					items,
+					getKey,
+					itemBody,
+					flags,
+					deps,
+					emptyBody,
+					fresh,
+					false,
+					signalSite,
+				);
+			} finally {
+				settleFreshSlot(parentScope, fresh, anchor);
+			}
+			return;
+		}
+	}
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;

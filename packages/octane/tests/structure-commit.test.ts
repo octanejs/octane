@@ -6,6 +6,7 @@ import {
 	BranchProbeApp,
 	ListProbeApp,
 	OutsideApp,
+	ResumeApp,
 	StructureApp,
 	type ActivityProps,
 	type ListProps,
@@ -466,4 +467,50 @@ describe('Activity visibility changes at commit', () => {
 			});
 		}
 	}
+});
+
+describe('a resumed boundary commits its reveal', () => {
+	it('keeps the fallback and the hide until the resumed render commits', async () => {
+		let resolve!: (value: string) => void;
+		const value = new Promise<string>((done) => {
+			resolve = done;
+		});
+		let seen: { pending: boolean; hidden: boolean; mutations: number } | null = null;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		const app = mount(ResumeApp, {
+			value,
+			probe: () => {
+				records.push(...observer.takeRecords());
+				seen = {
+					pending: app.container.querySelector('#resume-pending') !== null,
+					hidden:
+						(app.container.querySelector('#resume-static') as HTMLElement).style.display === 'none',
+					mutations: records.length,
+				};
+			},
+		});
+		try {
+			expect(app.find('#resume-pending').textContent).toBe('pending');
+			expect((app.find('#resume-static') as HTMLElement).style.display).toBe('none');
+			observer.observe(app.container, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				characterData: true,
+			});
+			await act(() => resolve('resumed'));
+			// While the resumed primary rendered, the screen was still the fallback's.
+			// Still pending: a component whose earlier render suspended mounts its
+			// first template in place (#2043 step 2 remainder), so only the screen's
+			// own state is asserted here.
+			expect(seen).toMatchObject({ pending: true, hidden: true });
+			expect(app.find('#resume-value').textContent).toBe('resumed');
+			expect((app.find('#resume-static') as HTMLElement).style.display).toBe('');
+			expect(app.findAll('#resume-pending')).toHaveLength(0);
+		} finally {
+			observer.disconnect();
+			app.unmount();
+		}
+	});
 });

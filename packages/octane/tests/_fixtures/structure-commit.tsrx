@@ -195,3 +195,24 @@ export function ActivityApp(props: ActivityProps) @{
 		}
 	</main>
 }
+
+function Reader(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<b id="resume-value">{value}</b>
+}
+
+// A boundary whose primary resumes when its promise settles; the probe
+// renders after the reader, inside the same primary.
+export function ResumeApp(props: { value: PromiseLike<string>; probe: () => void }) @{
+	<main>
+		@try {
+			<>
+				<s id="resume-static">{'static'}</s>
+				<Reader value={props.value} />
+				<Probe probe={props.probe} />
+			</>
+		} @pending {
+			<p id="resume-pending">{'pending'}</p>
+		}
+	</main>
+}
