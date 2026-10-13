@@ -40,8 +40,8 @@ const NATIVE_OPERATIONS = new Map(
 		getNextSibling: ['read:nextSibling'],
 		// Route preparation first. The committed read goes through the prototype
 		// because a form's named control can shadow its getAttribute method.
-		'HydrationCapability.allowAttribute': ['read:getAttribute'],
-		'HydrationCapability.settleValues': ['read:getAttribute'],
+		'HydrationValueChecks.attribute': ['read:getAttribute'],
+		'HydrationValueChecks.settle': ['read:getAttribute'],
 		// Transition handles inspect the current animation tree and committed resources.
 		vtScopeName: ['read:style', 'read:activeViewTransition'],
 		'ViewTransitionPseudoElement.animate': ['call:animate'],

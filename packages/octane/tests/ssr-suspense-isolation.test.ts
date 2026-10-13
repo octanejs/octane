@@ -1,5 +1,5 @@
 import { loadCompiledFixtureSource } from './_server-fixture.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 
@@ -160,9 +160,9 @@ describe('SSR suspense — resolved values and concurrent render isolation', () 
 		expect(out.html).toContain('ctxval:DATA');
 	});
 
-	// An error thrown after data resolves belongs to the application's ancestor
-	// boundary and must not reject the whole prerender operation.
-	it('routes a post-resolve error to the ancestor @catch, not out of render()', async () => {
+	// Discovery must retain the pending boundary which owns a post-resolve
+	// error, rather than rejecting the whole prerender operation.
+	it('reports a post-resolve error and retains the pending fallback', async () => {
 		const mod = evalServer(
 			`import { use } from 'octane';
 			 export function Boom(p) @{
@@ -184,11 +184,15 @@ describe('SSR suspense — resolved values and concurrent render isolation', () 
 			'discovery-error.tsrx',
 		);
 		const d = deferred<string>();
-		const p = prerender(mod.App, { promise: d.promise });
+		const onError = vi.fn();
+		const p = prerender(mod.App, { promise: d.promise }, { onError });
 		d.resolve('boom');
 		const { html } = await p;
-		expect(html).toContain('class="caught"');
-		expect(html).toContain('exploded: boom');
+		expect(html).toContain('class="pending"');
+		expect(html).not.toContain('class="caught"');
+		expect(html).not.toContain('exploded: boom');
 		expect(html).not.toContain('class="ok"');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toEqual(new Error('exploded: boom'));
 	});
 });

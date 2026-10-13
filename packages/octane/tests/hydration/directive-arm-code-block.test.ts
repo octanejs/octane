@@ -211,11 +211,8 @@ describe.each([false, true])('a child @{} block as a directive arm output (dev: 
 		}
 	}
 
-	// The @catch and @pending arms render only when their @try body fails or
-	// suspends, so they get a body that always does. Hydration re-renders a
-	// thrown or still-pending body on the client instead of adopting the
-	// server's arm, whatever the arm renders, so these arms are checked on the
-	// server and on mount and update.
+	// Pending arms can render on the server; catch arms run only on clients.
+	// Both client arm scopes must retain their setup on parent updates.
 	const boundaries = () =>
 		load(
 			`import { use, useState } from 'octane';
@@ -248,7 +245,11 @@ export function Pending({ label, promise }: Props) @{
 			const html = texts.map((text) => `<div class="list"><b>${text}</b></div>`);
 			const promise = new Promise<string>(() => {});
 			vi.spyOn(console, 'error').mockImplementation(() => {});
-			expect(serverHtml(compiled, name, { label: 'a', promise })).toBe(html[0]);
+			if (name === 'Catch') {
+				expect(() => serverHtml(compiled, name, { label: 'a', promise })).toThrow('boom a');
+			} else {
+				expect(serverHtml(compiled, name, { label: 'a', promise })).toBe(html[0]);
+			}
 			const container = newContainer();
 			const root = createRoot(container);
 			await act(() => root.render(compiled.client[name], { label: 'a', promise }));

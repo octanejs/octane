@@ -1,9 +1,9 @@
 import { ErrorBoundary, Hydrate, use, useState } from 'octane';
 import { condition } from 'octane/hydration';
 
-// The server's try body threw, so it rendered the @catch arm. When the client's
-// try body throws again during hydration, the client must adopt that catch DOM
-// rather than claim it for the try body.
+// Catch-only regions are client error boundaries. A server failure must reach
+// an actual @pending boundary or the shell. Failed pending bodies are retried
+// from client data, keeping unrelated sibling seeds and DOM.
 
 interface State {
 	failed: boolean;
@@ -120,6 +120,8 @@ export function Seeded(props: SeededProps) @{
 			<section>
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<button>{(error as Error).message as string}</button>
 		}
@@ -212,6 +214,8 @@ export function NestedResolved(props: NestedProps) @{
 				}
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<button>{(error as Error).message as string}</button>
 		}
@@ -267,6 +271,8 @@ export function NestedDeep(props: DeepProps) @{
 				}
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<button>{(error as Error).message as string}</button>
 		}
@@ -302,6 +308,8 @@ export function NestedInnerCatch(props: InnerCatchProps) @{
 				}
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<button>{(error as Error).message as string}</button>
 		}
@@ -332,6 +340,8 @@ export function CatchArmNested(props: NestedProps) @{
 			<section>
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<Panel message={(error as Error).message} promise={props.nested} />
 		}
@@ -361,6 +371,8 @@ export function NestedRetried(props: NestedProps) @{
 				<Retrying nested={props.nested} />
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<button>{(error as Error).message as string}</button>
 		}
@@ -406,6 +418,8 @@ export function NestedIsland(props: NestedProps) @{
 				</Hydrate>
 				<Checked promise={props.first} />
 			</section>
+		} @pending {
+			<i class="server-pending">loading</i>
 		} @catch (error) {
 			<button>{(error as Error).message as string}</button>
 		}

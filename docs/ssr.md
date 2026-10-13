@@ -69,6 +69,8 @@ Use `query$` from `octane/signals` for data that the page needs. Read it with
 sends the pending content. When its first value arrives, the server sends the
 ready HTML for that boundary. Separate boundaries let a fast section appear
 without waiting for a slower one.
+If a server read fails, its pending fallback stays until the client renders
+that boundary. The client can retry the read or render its `@catch` arm.
 
 ```tsrx
 import 'octane/signals';
@@ -280,9 +282,11 @@ script. For static pages / email.
 
 ### `prerender(component, props?, options?) => Promise<RenderResult>` — `octane/static`
 
-Awaits **all** data: every `use(thenable)` resolves and Suspense boundaries
-render their success arm (or route rejection to `@catch`). Use for SSG or any
-place that wants fully-resolved HTML with no client fallback.
+Awaits pending data and renders successful Suspense content. An error in
+`@try`/`@pending` or `<Suspense>` retains that boundary's fallback for a
+client retry and reaches `onError`. An error with no enclosing pending
+boundary rejects the prerender. Server rendering never runs `@catch` or an
+`<ErrorBoundary>` fallback.
 
 ### `renderToPipeableStream(component, props?, options?)` — `octane/server`
 
@@ -297,8 +301,8 @@ streaming only; the buffered renderers stay doctype-free, also matching
 React). Scoped styles flush with the shell
 (before the body markup) and per-wave with their segment; hoisted head elements
 render with the shell only. `hydrateRoot` on the client adopts the swapped-in
-DOM byte-for-byte, including per-boundary `use()` value or rejection seeds (a
-rejected boundary hydrates directly into its server-rendered `@catch` arm). Node
+DOM byte-for-byte, including per-boundary fulfilled `use()` seeds. An errored
+boundary retains its pending fallback and renders again from client data. Node
 destinations honor `write(false)`/`drain`; destination errors or an early close
 cancel the render.
 
@@ -534,17 +538,16 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
   between canonical full passes (a deep waterfall costs ~2 full passes + cheap
   subtree re-runs, not D+1 full passes). The emitted HTML always comes from a
   full pass, so hydration byte-format is identical either way. Resolved values
-  and versioned rejection metadata are serialized into the seed script so
-  hydration does not re-fetch, re-suspend, or replace a server `@catch` arm.
+  are serialized into the seed script so successful hydration need not
+  re-fetch or re-suspend.
   Compiler-owned request factories consult their matching server-provided seed
   before running, while existing promises, contexts, and externally owned
   hydration promises retain their original ownership.
-  Rejection records preserve primitive and JSON-safe plain-object reasons plus
-  Error names, messages, and enumerable custom fields. Cyclic fields are
-  bounded and marked, while hostile or opaque values degrade to fixed safe
-  markers instead of breaking the response. Rejection metadata lives outside
-  fulfilled values, and the undefined wire encoding escapes its string prefix,
-  so sentinel-shaped user data remains ordinary data.
+  Errors are reported to the server's `onError` callback, never serialized
+  as hydration data. A failed pending boundary renders from client data, and a
+  client error may then reach its `@catch` arm. Fulfilled values retain the
+  undefined wire encoding and escape its string prefix, so sentinel-shaped
+  user data remains ordinary data.
 - `useId` counters are root-local. Server output is hydration-stable when the
   client passes the same `identifierPrefix`; distinct sibling roots should use
   distinct prefixes.

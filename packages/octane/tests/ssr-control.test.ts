@@ -1,9 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { injectStyle } from '../src/index.js';
-import { TRY_CATCH_COMMENT } from '../src/hydration-markers.js';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from './_server-fixture';
@@ -27,9 +26,6 @@ const m = evalServer(readFileSync(join(FIXTURES, 'ssr-control.tsrx'), 'utf8'), '
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
-/** Leads a caught arm, counting the try body's and catch arm's positional seeds. */
-const CAUGHT = (trySeeds: number, catchSeeds: number) =>
-	`<!--${TRY_CATCH_COMMENT}${trySeeds}:${catchSeeds}-->`;
 const FOR_EMPTY_OPEN = '<!--[f0-->';
 const FOR_ITEMS_OPEN = '<!--[f1-->';
 
@@ -125,7 +121,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		}
 	});
 
-	it('@try renders the resolved success arm (awaiting use), @catch on error', async () => {
+	it('@try renders resolved success, or pending and reports a server error', async () => {
 		// Nested ranges: outer = try-slot, inner = the resolved arm. Sync body →
 		// success arm, no suspension, no seed script.
 		expect(
@@ -141,20 +137,25 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		const resolvedDocument = new DOMParser().parseFromString(resolved.html, 'text/html');
 		expect(resolvedDocument.querySelector('div > span.ok')?.textContent).toBe('x');
 		expect(resolvedDocument.querySelector('.pending, .error')).toBeNull();
-		// A thrown error renders the @catch arm with the error.
-		const caught = (
-			await RT.renderToString(m.Boundary, {
+		const reason = new Error('private-server-boom');
+		const onError = vi.fn();
+		const { html } = RT.renderToString(
+			m.Boundary,
+			{
 				read: () => {
-					throw new Error('boom');
+					throw reason;
 				},
-			})
-		).html;
-		expect(caught).toBe(
-			`<div>${OPEN}${CAUGHT(0, 0)}${OPEN}<span class="error">boom</span>${CLOSE}${CLOSE}</div>`,
+			},
+			{ onError },
 		);
+		const doc = new DOMParser().parseFromString(html, 'text/html');
+		expect(doc.querySelector('.loading')).not.toBeNull();
+		expect(doc.querySelector('.error, .ok')).toBeNull();
+		expect(html).not.toContain('private-server-boom');
+		expect(onError).toHaveBeenCalledExactlyOnceWith(reason);
 	});
 
-	it('@catch exposes a callable server reset function', async () => {
+	it('@catch without @pending lets a server error reach the shell', async () => {
 		const boundary = evalServer(
 			`
 				export const Boundary = () => @{
@@ -170,9 +171,10 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 			'ssr-catch-reset.tsrx',
 		);
 
-		expect((await RT.renderToString(boundary.Boundary)).html).toBe(
-			`${OPEN}${CAUGHT(0, 0)}${OPEN}<span data-reset="function">boom</span>${CLOSE}${CLOSE}`,
-		);
+		const onError = vi.fn();
+		expect(() => RT.renderToString(boundary.Boundary, undefined, { onError })).toThrow('boom');
+		expect(onError).toHaveBeenCalledTimes(1);
+		await expect(prerender(boundary.Boundary)).rejects.toThrow('boom');
 	});
 });
 

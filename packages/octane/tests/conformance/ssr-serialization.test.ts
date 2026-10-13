@@ -338,10 +338,10 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	});
 
 	it('renders a component returning text between two text nodes (Per :205)', () => {
-		expect(ssr('TextCompText')).toBe('<div>a<!--[-->b<!--]-->c</div>');
+		expect(ssr('TextCompText')).toBe('<div>a<!--[--><!--[-->b<!--]--><!--]-->c</div>');
 		const e = parse(ssr('TextCompText')).firstElementChild!;
 		expect(e.textContent).toBe('abc');
-		// Content-level: the adopted bare-text component mints its update anchor.
+		// The component adopts the ordinary range around its primitive return.
 		expectContentHydrate('TextCompText');
 		expect(container.querySelector('div')!.textContent).toBe('abc');
 	});

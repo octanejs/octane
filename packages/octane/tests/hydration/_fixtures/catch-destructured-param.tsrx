@@ -21,6 +21,8 @@ export function AnnotatedPattern(props: Props) @{
 	<div>
 		@try {
 			<Result state={props.state} label={props.label} />
+		} @pending {
+			<span />
 		} @catch ({ message }: any, retry) {
 			<button
 				class="retry"
@@ -44,6 +46,8 @@ export function DefaultFromParent(props: Props) @{
 		<span class="outer">{message}</span>
 		@try {
 			<Result state={props.state} label={props.label} thrown={props.thrown} />
+		} @pending {
+			<span />
 		} @catch ({ message = fallback, code }: any) {
 			<p class="caught">{message + ':' + code}</p>
 		}
@@ -55,6 +59,8 @@ export function ArrayPattern(props: Props) @{
 	<div>
 		@try {
 			<Result state={props.state} label={props.label} thrown={props.thrown} />
+		} @pending {
+			<span />
 		} @catch ([first, second = props.label]: any) {
 			<p class="caught">{first + '+' + second}</p>
 		}

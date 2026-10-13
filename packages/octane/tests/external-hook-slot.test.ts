@@ -197,21 +197,35 @@ describe('vite plugin gate routing', () => {
 	});
 
 	it('transforms installed raw Octane packages but preserves manual-slot sources', () => {
-		const installedRoot = join(process.cwd(), 'node_modules/.pnpm/node_modules/@octanejs');
-		const hookForm = join(installedRoot, 'hook-form/src/__probe__.ts');
-		const hookFormTsx = join(installedRoot, 'hook-form/src/__probe__.tsx');
-		const zustand = join(installedRoot, 'zustand/src/__probe__.ts');
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-installed-slots-'));
+		try {
+			const installedRoot = join(fixtureRoot, 'node_modules/@octanejs');
+			mkdirSync(installedRoot, { recursive: true });
+			for (const name of ['hook-form', 'zustand']) {
+				symlinkSync(join(process.cwd(), 'packages', name), join(installedRoot, name), 'dir');
+			}
+			// No exclude option: only the packages' actual manifests may decide
+			// whether these installed source files need automatic hook slots.
+			const installedPlugin = octane();
+			const transform = (code: string, id: string) =>
+				(installedPlugin.transform as any).call({}, code, id);
+			const hookForm = join(installedRoot, 'hook-form/src/__probe__.ts');
+			const hookFormTsx = join(installedRoot, 'hook-form/src/__probe__.tsx');
+			const zustand = join(installedRoot, 'zustand/src/__probe__.ts');
 
-		expect(run(HOOK, hookForm)?.code).toMatch(/useState\(0, _h\$\d+\)/);
-		expect(
-			run(
-				`import { useState } from 'octane'; export function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
-				hookFormTsx,
-			)?.code,
-		).toMatch(/template\(/);
-		// Zustand declares octane.hookSlots.manual=["src"], so installed and
-		// workspace-linked copies both retain their explicit sub-slot ABI.
-		expect(run(HOOK, zustand)).toBeNull();
+			expect(transform(HOOK, hookForm)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+			expect(
+				transform(
+					`import { useState } from 'octane'; export function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
+					hookFormTsx,
+				)?.code,
+			).toMatch(/template\(/);
+			// Zustand declares octane.hookSlots.manual=["src"] and must retain
+			// the explicit sub-slot ABI for the same hook source.
+			expect(transform(HOOK, zustand)).toBeNull();
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
 	});
 
 	it('configures installed Octane source packages for Vite transformation', () => {

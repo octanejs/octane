@@ -1858,7 +1858,9 @@ behavior.
 `@catch (error, reset)` and the JSX `<ErrorBoundary>` replace class
 error-boundary lifecycles. Catch fallbacks mount fresh nodes (like React's
 `forceUnmountCurrentAndReconcile`); deletion-phase and ref-detach errors route
-to the enclosing boundary.
+to the enclosing boundary. As with React's error boundaries, they run only
+on the client. During SSR, an error goes to the nearest `@pending` or
+`<Suspense>` fallback, or fails the shell when there is none.
 
 Directives are also renderable values. A module-level arrow can return a
 boundary directly, with or without parentheses or an explicit `return`:
@@ -1999,9 +2001,11 @@ normalizer accepts, in addition to ordinary objects.
 Server `useSyncExternalStore` falls back to `getSnapshot` when
 `getServerSnapshot` is absent. Transition starters and optimistic setters from
 server hooks are no-ops; a server hook's transition starter does not invoke its
-callback. Portals emit an empty placeholder. Unlike React's client-only error
-boundaries, template `@catch` also catches during SSR. JSX Suspense errors render
-its fallback and notify `onError`; a pending promise with no boundary makes a
+callback. Portals emit an empty placeholder. Template and JSX error boundaries
+are client-only. A server error in `@try` with `@pending` or JSX Suspense renders
+its pending fallback and notifies `onError`; hydration retries that boundary
+with client data. Server error details are not serialized into the response.
+A pending promise with no boundary makes a
 synchronous buffered render throw instead of returning partial HTML.
 
 ### Streaming
@@ -2120,9 +2124,8 @@ hydration walk, two static branches that share a root tag are not told apart:
 <span class="expanded">...</span>
 ```
 
-A `@try` body whose server render threw adopts the server's `@catch` arm
-rather than rendering the boundary on the client (template `@catch` also
-catches during SSR).
+A server error leaves the enclosing pending fallback for a fresh client render.
+If the client also throws, its `@catch` or `ErrorBoundary` handles that error.
 
 A `<Hydrate>` boundary replays captured interaction events as constructed,
 untrusted copies that keep the captured event's `timeStamp`, including through

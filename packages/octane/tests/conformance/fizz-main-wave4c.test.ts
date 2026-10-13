@@ -478,7 +478,7 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 	});
 
 	// Per ReactDOMFizzServer-test.js:703/:1070.
-	it('replaces a streamed lazy fallback with the public catch outcome on rejection', async () => {
+	it('leaves the streamed lazy fallback and reports the rejected load', async () => {
 		const module = deferred<{ default: () => unknown }>();
 		server.setRejectingLazyModule(module.promise);
 		const collector = createPipeableCollector();
@@ -491,9 +491,11 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 		module.reject(new Error('lazy failed'));
 		const container = activate(await collector.ended);
 		try {
-			expect(onError).not.toHaveBeenCalled();
-			expect(container.querySelector('#lazy-rejection-error')?.textContent).toBe('lazy failed');
-			expect(container.querySelector('#lazy-rejection-fallback')).toBeNull();
+			expect(onError).toHaveBeenCalledTimes(1);
+			expect(onError.mock.calls[0][0]).toEqual(new Error('lazy failed'));
+			expect(container.querySelector('#lazy-rejection-error')).toBeNull();
+			expect(container.querySelector('#lazy-rejection-fallback')).not.toBeNull();
+			expect(container.textContent).not.toContain('lazy failed');
 		} finally {
 			container.remove();
 		}
@@ -506,7 +508,9 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 		});
 		const container = activate(result.html);
 		try {
-			expect(container.querySelector('#context-error')?.textContent).toBe('provider failed');
+			expect(container.querySelector('#context-pending')?.textContent).toBe('outer');
+			expect(container.querySelector('#context-error')).toBeNull();
+			expect(container.textContent).not.toContain('provider failed');
 			expect(container.querySelector('#context-after-error')?.textContent).toBe('outer');
 			expect(container.querySelector('#context-outside-provider')?.textContent).toBe('default');
 		} finally {

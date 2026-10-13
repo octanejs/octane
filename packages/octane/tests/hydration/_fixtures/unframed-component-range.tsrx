@@ -342,8 +342,9 @@ function Thrower(): never {
 	throw new Error('boom');
 }
 
-// The sibling after the server's element is a boundary whose server render
-// threw, so the server marked its range as the caught arm.
+// The server completes the sibling boundary. When the mismatching client branch
+// takes over it throws into its own catch arm, whose report replaces the
+// recoverable mismatch report.
 export function CaughtBranch(props: { server?: boolean }) @{
 	<div>
 		<section>
@@ -351,7 +352,7 @@ export function CaughtBranch(props: { server?: boolean }) @{
 				<>
 					<b class="server">{'server'}</b>
 					@try {
-						<Thrower />
+						<s>{'server'}</s>
 					} @catch (error) {
 						<s>{(error as Error).message as string}</s>
 					}

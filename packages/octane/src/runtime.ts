@@ -227,7 +227,6 @@ import {
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATE_MARKER_SELECTOR,
-	TRY_CATCH_COMMENT,
 } from './hydration-markers.js';
 import {
 	ACTIVITY_TAG,
@@ -5592,6 +5591,14 @@ interface ForSlotRecord {
  * Null when hydration adoption journals the range instead. One call either
  * way, like the single snapshot function this replaces.
  */
+function forSlotParent(state: ForSlot): Node | null {
+	return state.ownerBlock.disposed ? null : (state.ownerHost ?? domNode(state.end!).parentNode);
+}
+
+function forSlotFirst(state: ForSlot): Node | null {
+	return state.ownerHost !== null ? getFirstChild(state.ownerHost) : getNextSibling(state.start!);
+}
+
 function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	const seen = TRANSITION_JOURNAL_BAGS!;
 	const at = seen.get(state) ?? -1;
@@ -5616,7 +5623,7 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 		journalUndo(() => {
 			seen.delete(state);
 		});
-		journalRootRange(domNode(state.start).parentNode!, state.start, state.end);
+		journalRootRange(forSlotParent(state)!, state.start, state.end);
 		// No chain record restores indices here, so rows that already exist keep
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
@@ -5765,14 +5772,14 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	const preservedMap: Map<any, Block> | null = chain === null ? snapshot.entries : null;
 	const kept: Set<Block> | null = chain === null ? null : new Set(chain);
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		if (preservedMap !== null || !kept!.has(b)) unmountBlock(b, false);
+		if (preservedMap !== null || !kept!.has(b)) unmountBlock(b, state.ownerHost !== null);
 	}
 	// Those teardowns dispatch their cleanup errors immediately, and an error
 	// routed to the enclosing boundary flips it to @catch — disposing this
 	// slot's whole range out from under the restore. Same mid-render teardown
 	// invariant as renderReturnedValue's disposed check: stop here, and let
 	// flushParkedItems finish off whatever stayed parked.
-	if (domNode(state.end).parentNode === null) return;
+	if (forSlotParent(state) === null) return;
 	state.head = chain === null ? snapshot.head : (chain[0] ?? null);
 	state.tail = chain === null ? snapshot.tail : (chain[chain.length - 1] ?? null);
 	state.size = chain === null ? snapshot.size : chain.length;
@@ -5817,19 +5824,19 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 		state.emptyBlock = snapshot.empty;
 	}
 	// The @empty teardown can dispose the range the same way the orphan walk can.
-	if (domNode(state.end).parentNode === null) return;
+	if (forSlotParent(state) === null) return;
 	if (snapshot.empty !== null) {
 		const range = takeParkedItem(snapshot.empty) ?? collectBlockRange(snapshot.empty);
 		for (const node of range) nodes.push(node);
 	}
-	const parent = domNode(state.end).parentNode!;
+	const parent = forSlotParent(state)!;
 	// An inner boundary may restore the @empty snapshot while an outer root
 	// attempt still owns rows parked inside those borrowed markers. Leave those
 	// rows connected until the outer attempt commits or rolls back; they are not
 	// members of this snapshot and must not be reordered with its nodes.
 	const keptNodes = new Set(nodes);
 	if (ROOT_RENDER_TRANSACTION !== null) retainedForSlotNodes(state, keptNodes);
-	let current: Node | null = getNextSibling(state.start);
+	let current: Node | null = state.ownerHost === null ? forSlotFirst(state) : null;
 	while (current !== null && current !== state.end) {
 		const next: Node | null = getNextSibling(current);
 		if (!keptNodes.has(current))
@@ -5838,13 +5845,15 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	}
 	// Do not detach already-correct survivors. Apart from preserving native focus
 	// events, this keeps the platform's input/composition state on the same nodes.
-	let anchor: Node = state.end;
+	let anchor: Node | null = state.end;
 	for (let i = nodes.length - 1; i >= 0; i--) {
 		const node = nodes[i];
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent ||
-			getNextSibling(node) !== anchor
-		) {
+		// The owner host also admits portals and imperative children. A foreign
+		// sibling after a row does not mean the row needs moving on rollback.
+		let next = getNextSibling(node);
+		if (state.ownerHost !== null)
+			while (next !== null && !keptNodes.has(next)) next = getNextSibling(next);
+		if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent || next !== anchor) {
 			if (renderingFocus !== null) moveFocusedNodeBefore(parent, node, anchor, renderingFocus);
 			else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
 		}
@@ -13308,38 +13317,6 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 				);
 			}
 		} else {
-			// A nested return-based component whose server output is EMPTY owns an
-			// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
-			// An unframed third-party SSR root receives an equivalent synthetic range.
-			// Borrow either component range for the return slot instead of letting
-			// childSlot mint an empty `<!---->` anchor during hydration. The return
-			// slot is the block's entire output, so it can safely reconcile future
-			// text/component values between the borrowed markers while the block
-			// remains their owner. This keeps hydration byte-preserving for `return
-			// null` / `false` / `''` components (including memo wrappers).
-			// A component returned where the server rendered a primitive borrows the
-			// range too, so the server's text stays inside every range below it,
-			// where a component that returns that text adopts it.
-			const returnHydration = hydrating ? activeHydration() : null;
-			if (
-				returnHydration !== null &&
-				block.slots[0] === undefined &&
-				block.startMarker !== null &&
-				block.endMarker !== null &&
-				block.startMarker !== block.endMarker &&
-				block.startMarker.nodeType === 8 &&
-				block.endMarker.nodeType === 8 &&
-				(getNextSibling(block.startMarker) === block.endMarker ||
-					returnHydration.isUnframedRootRange(block.startMarker, block.endMarker) ||
-					(isComponentDescriptor && returnHydration.holdsServerText(block)))
-			) {
-				const borrowed = returnHydration.lendRange(
-					block.startMarker as Comment,
-					block.endMarker as Comment,
-				);
-				block.slots[0] = borrowed;
-				registerSlot(block, borrowed);
-			}
 			childSlot(block, 0, block.parentNode, out, block.endMarker);
 		}
 		if (replacedStart !== null) {
@@ -19326,14 +19303,8 @@ function isSuspenseException(x: any): x is SuspenseException {
 	}
 }
 
-const HYDRATION_REJECTION_SEED = Symbol('octane.hydration.rejection-seed');
-const HYDRATION_REJECTION_EXCEPTION = Symbol('octane.hydration.rejection-exception');
 const HYDRATION_SITE_EVENTS = Symbol('octane.hydration.site-events');
 const HYDRATION_SEED_FACTORY = Symbol('octane.hydration.seed-factory');
-
-interface HydrationRejectionSeed {
-	[HYDRATION_REJECTION_SEED]: unknown;
-}
 
 interface HydrationSiteEvents {
 	queues: Map<string, number[]>;
@@ -19356,86 +19327,10 @@ interface HydrationSeedThenable extends TrackedThenable {
 	[HYDRATION_SEED_FACTORY]: HydrationSeedFactory;
 }
 
-class HydrationRejectionException {
-	readonly [HYDRATION_REJECTION_EXCEPTION] = true;
-	constructor(readonly reason: unknown) {}
-}
-
-function decodeHydrationRejectionPayload(payload: any): unknown {
-	if (payload === null || typeof payload !== 'object') {
-		return new Error(formatClientError(23));
-	}
-	switch (payload.kind) {
-		case 'value':
-			return payload.value;
-		case 'number':
-			switch (payload.value) {
-				case 'NaN':
-					return NaN;
-				case 'Infinity':
-					return Infinity;
-				case '-Infinity':
-					return -Infinity;
-				case '-0':
-					return -0;
-				default:
-					return new Error(formatClientError(23));
-			}
-		case 'bigint':
-			try {
-				return BigInt(payload.value);
-			} catch {
-				return String(payload.value);
-			}
-		case 'symbol':
-			return Symbol(typeof payload.value === 'string' ? payload.value : '');
-		case 'error': {
-			const error = new Error(
-				typeof payload.message === 'string' ? payload.message : formatClientError(23),
-			);
-			if (typeof payload.name === 'string') error.name = payload.name;
-			const fields = payload.fields;
-			if (fields !== null && typeof fields === 'object') {
-				for (const key of Object.keys(fields)) {
-					Object.defineProperty(error, key, {
-						value: fields[key],
-						writable: true,
-						enumerable: true,
-						configurable: true,
-					});
-				}
-			}
-			return error;
-		}
-		case 'fallback':
-			return typeof payload.message === 'string' ? payload.message : formatClientError(23);
-		default:
-			return new Error(formatClientError(23));
-	}
-}
-
-function hydrationRejectionFromSeed(seed: unknown): HydrationRejectionException | null {
-	if (seed === null || typeof seed !== 'object' || !hasOwnProp.call(seed, HYDRATION_REJECTION_SEED))
-		return null;
-	return new HydrationRejectionException(
-		(seed as HydrationRejectionSeed)[HYDRATION_REJECTION_SEED],
-	);
-}
-
-function isHydrationRejection(error: unknown): error is HydrationRejectionException {
-	return (
-		error !== null &&
-		typeof error === 'object' &&
-		(error as HydrationRejectionException)[HYDRATION_REJECTION_EXCEPTION] === true
-	);
-}
-
 /**
- * Hydration uses the server's settled value/reason as the canonical first-render
- * result. An externally supplied or otherwise unoptimized client thenable may
- * already exist, so observe it without letting its eventual result replace the
- * seed. Otherwise a later client-side rejection is reported as unhandled even
- * though the authored use() is visibly handled by its hydrated @catch arm.
+ * Hydration uses the server's settled value as the canonical first-render result.
+ * Observe an already-created client thenable so a later rejection is handled,
+ * without letting its eventual result replace the seed.
  * Compiler-owned seeded factories never create a client thenable to observe.
  */
 function observeHydrationSeedThenable(thenable: TrackedThenable<unknown>): void {
@@ -21448,14 +21343,12 @@ class HydrationCapability {
 	staleServerValues = false;
 	depth = 0;
 	/**
-	 * Depth of a render that adopts nothing but still consumes positional seeds:
-	 * a server-caught try body's replay, or the client render that continues
-	 * after a deferred mismatch (adoptOrDefer).
+	 * Depth of a render that continues after a deferred mismatch (adoptOrDefer):
+	 * it adopts nothing but still consumes positional seeds.
 	 */
 	replayDepth = -1;
 	seedCursor = 0;
 	private readonly freshNodes = new WeakSet<Node>();
-	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
 	private suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
 	/** The server node renderInPlace's body may adopt, until a template does. */
@@ -21546,8 +21439,6 @@ class HydrationCapability {
 	 * need not follow the server forms of its leading holes there.
 	 */
 	passthroughRoot = false;
-	/** A slot lent a server range whose first render has yet to claim it. */
-	lentSlot: ChildSlot | null = null;
 	/**
 	 * The adopted @if/@switch arm that renderAdoptedArm is rendering. Null once
 	 * the arm clones a template of its own, whose roots the cursor rests on.
@@ -21658,18 +21549,11 @@ class HydrationCapability {
 		if (seeded !== null && outer !== null) (outer.seeded ??= []).push(...seeded);
 	}
 
-	/**
-	 * The boundary falls back: restore the thenables this attempt's seeds
-	 * settled, so that the client render reads client data, as React's does.
-	 * `mark` keeps the outcomes written before it, by content outside a
-	 * boundary that falls back within this hydration (fallBackServerCatch).
-	 */
-	discardSeeds(mark = 0): void {
+	/** Restore seeded thenables before a fallback renders from client data. */
+	discardSeeds(): void {
 		const seeded = this.seeded;
-		if (seeded === null) return;
-		for (let i = seeded.length - 1; i >= mark; i--) seeded[i]();
-		if (mark === 0) this.seeded = null;
-		else seeded.length = mark;
+		this.seeded = null;
+		if (seeded !== null) for (let i = seeded.length - 1; i >= 0; i--) seeded[i]();
 	}
 
 	/** The attempt is discarded: restore the server nodes it changed. */
@@ -21783,8 +21667,7 @@ class HydrationCapability {
 	 * replaces the region, so the hold drops what the body reported.
 	 *
 	 * An error thrown while this hydration adopted the body's server DOM
-	 * (HYDRATION_THROWN), where the server's body did not throw (it would have
-	 * rendered its catch arm, which a replay adopts, or seeded the rejection),
+	 * (HYDRATION_THROWN), where the server's body succeeded,
 	 * fails the hydration of the nearest fallback owner, as React's does, even
 	 * though the catch arm would catch it. That owner renders on the client,
 	 * where a repeated throw reaches the catch arm.
@@ -22188,6 +22071,7 @@ class HydrationCapability {
 		const id = (STAGED_DOM ? STAGED_DOM.view(cursor as Element) : (cursor as Element)).getAttribute(
 			STREAM_BOUNDARY_ATTR,
 		)!;
+		this.save(domNode(cursor).parentNode!);
 		let stale: Node | null = cursor;
 		while (stale !== null && stale !== end) {
 			const next: Node | null = getNextSibling(stale);
@@ -22196,113 +22080,6 @@ class HydrationCapability {
 		}
 		this.node = end;
 		return id;
-	}
-
-	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
-	takeServerCatch(cursor: Node | null): ServerCatch | null {
-		if (cursor?.nodeType !== 8) return null;
-		const data = (STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data;
-		if (!data.startsWith(TRY_CATCH_COMMENT)) return null;
-		const counts = /^(0|[1-9]\d*):(0|[1-9]\d*)$/.exec(data.slice(TRY_CATCH_COMMENT.length));
-		const start = getNextSibling(cursor);
-		if (counts === null || !this.isOpen(start)) return null;
-		return {
-			marker: cursor as Comment,
-			start,
-			end: this.close(start),
-			trySeeds: Number(counts[1]),
-			catchSeeds: Number(counts[2]),
-			seedEnd: 0,
-			seeded: this.seeded?.length ?? 0,
-		};
-	}
-
-	/**
-	 * Render a try body whose server render threw, ahead of the server's catch
-	 * arm. That DOM belongs to the catch arm, so nothing in the body may adopt,
-	 * but the body still consumes its own positional seeds so that it throws
-	 * where the server's did. The catch arm's seeds start where the server's
-	 * body stopped, however many the replay read.
-	 */
-	replayCaughtTry(block: Block, caught: ServerCatch): void {
-		const seeds = this.seeds as HydrationSeedArray | null;
-		const tryEnd = this.seedCursor + caught.trySeeds;
-		caught.seedEnd = tryEnd + caught.catchSeeds;
-		// A body that reads past where the server's threw must not take the catch
-		// arm's seeds. Stop at the body's own, so it suspends there instead.
-		if (seeds !== null && tryEnd < seeds.length) {
-			const own: HydrationSeedArray = seeds.slice(0, tryEnd);
-			const events = seeds[HYDRATION_SITE_EVENTS];
-			if (events !== undefined) own[HYDRATION_SITE_EVENTS] = events;
-			this.seeds = own;
-		}
-		const previousReplay = this.replayDepth;
-		// A streamed arm's native values are the catch arm's, as is its DOM.
-		const previousNative = setNativeAdoptionResolver(null);
-		this.replayDepth = ++this.depth;
-		try {
-			// The server only marks an arm it caught, so this boundary catches.
-			this.renderTryBody(block, true);
-		} finally {
-			this.replayDepth = previousReplay;
-			this.depth--;
-			setNativeAdoptionResolver(previousNative);
-			this.seeds = seeds;
-			if (seeds !== null) this.seedCursor = Math.min(tryEnd, seeds.length);
-		}
-	}
-
-	/**
-	 * Keep the server's catch arm until the render that read it commits, then
-	 * drop its marker, and the arm too unless it was adopted. A discarded render
-	 * removes only what the client inserted into the slot, so a retried
-	 * hydration replays against the server's range again.
-	 */
-	settleServerCatch(caught: ServerCatch, slot: TrySlot | ErrorSlot, adopted: boolean): void {
-		const { start, end } = slot;
-		const { marker } = caught;
-		if (!adopted) this.rebuiltSlot(end);
-		const settle = (discarded: boolean): void => {
-			if ((STAGED_DOM ? STAGED_DOM.view(marker) : marker).parentNode === null) return;
-			if (discarded) {
-				// A streamed arm's seed comment precedes the marker, and the retry
-				// reads its seeds through it.
-				let first = getNextSibling(start);
-				if (
-					first?.nodeType === 8 &&
-					(STAGED_DOM ? STAGED_DOM.view(first as Comment) : (first as Comment)).data.startsWith(
-						STREAM_SEED_COMMENT,
-					)
-				)
-					first = getNextSibling(first);
-				removeRange(first, marker);
-				removeRange(getNextSibling(caught.end), end);
-			} else removeRange(marker, adopted ? caught.start : getNextSibling(caught.end));
-		};
-		if (WIP_CAPTURE === null) settle(false);
-		else (WIP_CAPTURE.renderCleanups ??= []).push(settle);
-	}
-
-	/** Later siblings read the seeds after the boundary, whichever arm rendered. */
-	skipServerCatchSeeds(caught: ServerCatch): void {
-		if (this.seeds !== null) this.seedCursor = Math.min(caught.seedEnd, this.seeds.length);
-	}
-
-	/**
-	 * Switch `state` to `caught`, the server's catch arm, which it adopts, for
-	 * the replayed body's `error`. Returns a mismatch in that arm when `state`
-	 * is a Suspense boundary (a `@try` with `@pending`), which owns it
-	 * (fallBackServerCatch); a catch-only boundary passes it to the next owner.
-	 */
-	adoptServerCatch(state: TrySlot, caught: ServerCatch, error: unknown): HydrationMismatch | null {
-		this.settleServerCatch(caught, state, true);
-		try {
-			TRY_OPS!.catchError(state, error, true, caught.start, caught.end);
-		} catch (failure) {
-			if (state.pendingBody === null || !(failure instanceof HydrationMismatch)) throw failure;
-			return failure;
-		}
-		return null;
 	}
 
 	/**
@@ -22349,48 +22126,6 @@ class HydrationCapability {
 	reportUnfinishedArm(arm: UnfinishedArm): void {
 		if (!arm.caught)
 			noteRecoverableHydrationError(() => new Error(formatClientError(341)), arm.state.parentBlock);
-	}
-
-	/**
-	 * A Suspense boundary found that `caught`, the server's catch arm it was
-	 * adopting, does not match the client's. As React does for a boundary whose
-	 * hydration fails, it discards the attempt and its server DOM, renders on
-	 * the client from client data (the attempt's seeds are discarded), and
-	 * reports `failure` once, unless that render catches an error
-	 * (catchesInHydrationFallback). The enclosing hydration continues past the
-	 * boundary. Called after mountTry restored its seed scope.
-	 */
-	fallBackServerCatch(state: TrySlot, caught: ServerCatch, failure: HydrationMismatch): void {
-		this.discardSeeds(caught.seeded);
-		const attempt = state.block;
-		state.block = state.tryBlock = null;
-		if (attempt !== null) {
-			// None of the attempt's refs or effects committed. Dispose its scopes
-			// without detaching the server nodes, which are discarded below.
-			const refs: SuspenseRefEntry[] = [];
-			collectVisibleSubtreeRefs(attempt, refs);
-			withRefDetachSuppression(refs, () => unmountBlock(attempt, false));
-			if (state.parentBlock.disposed || state.block !== null) return;
-		}
-		const parent = domNode(state.domParent);
-		journalRootChildren(parent);
-		this.save(parent);
-		markHydrationDiscard(
-			state.parentBlock.idState.renderOwner,
-			parent,
-			getNextSibling(state.start),
-			state.end,
-		);
-		removeRange(getNextSibling(state.start), state.end);
-		swapHydration(null);
-		let caughtError = false;
-		try {
-			caughtError = renderDehydratedTry(state);
-		} finally {
-			swapHydration(this);
-			this.node = getNextSibling(state.end);
-		}
-		if (!caughtError) noteRecoverableHydrationError(() => failure, state.parentBlock);
 	}
 
 	/**
@@ -22506,32 +22241,6 @@ class HydrationCapability {
 			if (inRootHydrationAttempt() && !this.staleServerValues) error.diagnostic = message;
 		}
 		throw error;
-	}
-
-	/**
-	 * A slot for the range `start`…`end` that a list item or a returning
-	 * component adopted, lent to the child slot that renders its value, so that
-	 * the value hydrates inside that range rather than claiming a range of its
-	 * own. The slot's first render claims the server range as an adopted one.
-	 */
-	lendRange(start: Comment, end: Comment): ChildSlot {
-		const slot: ChildSlot = {
-			__kind: 'childSlot',
-			start,
-			end,
-			ownerHost: null,
-			borrowed: true,
-			compactable: false,
-			block: null,
-			text: null,
-			currentComp: null,
-			currentIsBodyFn: false,
-			forSlot: null,
-			hostNode: null,
-			portal: null,
-		};
-		if (this.isOpen(start)) this.lentSlot = slot;
-		return slot;
 	}
 
 	/**
@@ -22904,14 +22613,6 @@ class HydrationCapability {
 		return parseSeedJson(raw);
 	}
 
-	isRejection(error: unknown): error is HydrationRejectionException {
-		return isHydrationRejection(error);
-	}
-
-	rejectionFromSeed(seed: unknown): HydrationRejectionException | null {
-		return hydrationRejectionFromSeed(seed);
-	}
-
 	seedOrCreate<T>(site: string, factory: () => T): T {
 		if (this.seeds === null) return factory();
 		const events = (this.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
@@ -22983,13 +22684,6 @@ class HydrationCapability {
 			!ROOT_RENDER_ROLLBACK
 		)
 			journalUndo(restore);
-		const rejection = this.rejectionFromSeed(seed);
-		if (rejection !== null) {
-			thenable.status = 'rejected';
-			thenable.reason = rejection.reason;
-			state[index] = thenable;
-			throw rejection;
-		}
 		const value = seed as T;
 		thenable.status = 'fulfilled';
 		thenable.value = value;
@@ -23073,28 +22767,9 @@ class HydrationCapability {
 		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
 		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(start, cursor);
 		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(end, remainder);
-		this.unframedRootRanges.set(start, end);
 		this.protectRootAnchor(end);
 		this.claimRootRemainder(remainder);
 		return [start, end];
-	}
-
-	isUnframedRootRange(start: Node, end: Node): boolean {
-		return this.unframedRootRanges.get(start) === end;
-	}
-
-	/**
-	 * Whether `block`'s server range holds only unclaimed text at the cursor:
-	 * what the server rendered for a primitive.
-	 */
-	holdsServerText(block: Block): boolean {
-		const text = this.node;
-		return (
-			text !== null &&
-			text.nodeType === 3 &&
-			getNextSibling(block.startMarker!) === text &&
-			getNextSibling(text) === block.endMarker
-		);
 	}
 
 	/** Record the first node outside a root-owned range exactly once. */
@@ -23293,8 +22968,7 @@ class HydrationCapability {
 	 * server's own error, not a hydration failure. Returns the failure, or null.
 	 */
 	private thrownWhileAdopting(error: unknown): HydrationMismatch | null {
-		if (HYDRATION_THROWN !== error || HYDRATION_THROWN_BY !== this || this.isRejection(error))
-			return null;
+		if (HYDRATION_THROWN !== error || HYDRATION_THROWN_BY !== this) return null;
 		clearHydrationThrow();
 		const failure = new HydrationMismatch(formatClientError(340));
 		(failure as Error & { cause?: unknown }).cause = error;
@@ -23576,10 +23250,20 @@ class HydrationCapability {
 	 * the host's text as a bare one is.
 	 */
 	private textFrameEnd(first: Node | null): Comment | null {
-		if (!this.isOpen(first)) return null;
-		const child = getNextSibling(first);
-		const end = child?.nodeType === 3 ? getNextSibling(child) : child;
-		return this.isClose(end) && getNextSibling(end) === null ? end : null;
+		let outer: Comment | null = null;
+		let stop: Node | null = null;
+		// A component and its returned value each own a regular range. Follow
+		// nested frames only when every frame contains that same single child.
+		while (this.isOpen(first)) {
+			const end = this.close(first!);
+			if (getNextSibling(end) !== stop) return null;
+			outer ??= end;
+			stop = end;
+			first = getNextSibling(first!);
+		}
+		return first === stop || (first?.nodeType === 3 && getNextSibling(first) === stop)
+			? outer
+			: null;
 	}
 
 	/**
@@ -23589,10 +23273,7 @@ class HydrationCapability {
 	 */
 	framesSlotContent(el: Node): boolean {
 		const first = getFirstChild(el);
-		if (!this.isOpen(first)) return false;
-		let next = getNextSibling(first);
-		if (next !== null && next.nodeType === 3) next = getNextSibling(next);
-		return !this.isClose(next);
+		return this.isOpen(first) && this.textFrameEnd(first) === null;
 	}
 
 	/**
@@ -23917,7 +23598,7 @@ class HydrationCapability {
 					);
 			}
 		}
-		this.values?.settle(this, root);
+		this.values?.settle(this, this.rootBlock.parentNode);
 	}
 }
 
@@ -24060,7 +23741,11 @@ class HydrationValueChecks {
 					? STAGED_DOM.view(el).getAttribute('class')
 					: Element.prototype.getAttribute.call(el, 'class');
 				const server = absentIsEmpty && raw === null ? '' : raw;
-				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
+				if (
+					server !== next &&
+					domBindingClaims.get(el)?.get('class') !== raw &&
+					(STAGED_DOM ? STAGED_DOM.view(root) : root).contains(el)
+				)
 					this.unpatched(hydration, el, 'attribute `class`', server, next);
 			}
 		}
@@ -24069,7 +23754,8 @@ class HydrationValueChecks {
 		if (unpatched === null) return;
 		this.unpatchedValues = null;
 		const lines: string[] = [];
-		for (const [line, node] of unpatched) if (root.contains(node)) lines.push(line);
+		for (const [line, node] of unpatched)
+			if ((STAGED_DOM ? STAGED_DOM.view(root) : root).contains(node)) lines.push(line);
 		if (lines.length !== 0) warnHydrationUnpatched(lines);
 	}
 }
@@ -24116,28 +23802,11 @@ function parseSeedJson(raw: string): unknown[] | null {
 			typeof envelope !== 'object' ||
 			envelope.version !== 1 ||
 			!Array.isArray(envelope.values) ||
-			!Array.isArray(envelope.rejections)
+			!Array.isArray(envelope.rejections) ||
+			envelope.rejections.length !== 0
 		)
 			return null;
 		const values = envelope.values.slice() as unknown[];
-		const seen = new Set<number>();
-		for (const entry of envelope.rejections) {
-			if (
-				!Array.isArray(entry) ||
-				entry.length !== 2 ||
-				!Number.isInteger(entry[0]) ||
-				entry[0] < 0 ||
-				entry[0] >= values.length ||
-				seen.has(entry[0]) ||
-				entry[1] === null ||
-				typeof entry[1] !== 'object'
-			)
-				return null;
-			seen.add(entry[0]);
-			values[entry[0]] = {
-				[HYDRATION_REJECTION_SEED]: decodeHydrationRejectionPayload(entry[1]),
-			} satisfies HydrationRejectionSeed;
-		}
 		if (envelope.sites !== undefined) {
 			if (!Array.isArray(envelope.sites)) return null;
 			const queues = new Map<string, number[]>();
@@ -37898,19 +37567,6 @@ function deoptItemBody(item: any, scope: Scope): void {
 			}
 			block.deoptNode = null;
 		}
-		// Hydration: the server serialized this component-bearing item as ONE
-		// `<!--[-->…<!--]-->` range (ssrChildItem emits no extra block for the
-		// item/childSlot layering, which is client-only structure), and mountItem
-		// already adopted that pair as the item block's markers. Seed the nested
-		// childSlot with the SAME markers so it BORROWS the item's range — without
-		// this it would grab the next `<!--[-->` at the cursor (the component's
-		// return content, one level too deep) as its own, desyncing everything
-		// inside. The cursor already sits on the item's first content node.
-		if (hydration !== null && scope.slots[0] === undefined && hydration.isOpen(block.startMarker)) {
-			const seeded = hydration.lendRange(block.startMarker as Comment, block.endMarker as Comment);
-			scope.slots[0] = seeded;
-			registerSlot(scope, seeded);
-		}
 		// Marker-elision M2: on a CLIENT mount, the nested childSlot BORROWS the
 		// item block's own `<!--it-->` pair as its range instead of minting a
 		// second inner pair (end anchor + lazy start) — the item's markers bound
@@ -39034,7 +38690,11 @@ function renderPreparedChildList(
 			state.end = null;
 			state.start = null;
 		}
-		if (state.end === null) {
+		// Compiled map bodies still find their single root relative to the list
+		// anchor. Keep that anchor until compiled creation returns the root itself.
+		const marked =
+			state.ownerHost === null || upgradeArmed || passthroughList || compiledMapBody !== undefined;
+		if (state.end === null && marked) {
 			// OWNS-PARENT slot entering array mode: ForSlot requires a real
 			// marker pair (reconcileKeyed anchors on it) — mint it lazily,
 			// appended at the element's tail. One-way, like the promotion above.
@@ -39069,7 +38729,7 @@ function renderPreparedChildList(
 				}
 			}
 		}
-		if (state.start === null) {
+		if (state.start === null && marked) {
 			state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
 			// Upgrade adoption: the element's existing raw children must sit
 			// INSIDE [start, end] (they become the items) — mint start before
@@ -39094,9 +38754,10 @@ function renderPreparedChildList(
 		}
 		state.forSlot = {
 			__kind: 'forBlockSlot',
+			ownerBlock: parentBlock,
+			ownerHost: state.start === null ? state.ownerHost : null,
 			start: state.start,
-			// Non-null: an anchorless slot was promoted to markers above.
-			end: state.end!,
+			end: state.end,
 			items: new Map(),
 			inOrder: true,
 			head: null,
@@ -39113,7 +38774,7 @@ function renderPreparedChildList(
 			signalSite: undefined,
 		};
 		if (upgradeArmed) {
-			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
+			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start!, state.end!);
 		}
 	}
 	const { items, keys } = preparedList;
@@ -39259,7 +38920,7 @@ function renderPreparedChildList(
 			throw error;
 		}
 		// Only first-fill adoption consumes unowned server items, as in forBlock.
-		if (hydration !== null && !passthroughList) hydration.settleItems(state.forSlot.end);
+		if (hydration !== null && !passthroughList) hydration.settleItems(state.forSlot.end!);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -39299,7 +38960,7 @@ function renderPreparedChildList(
 	if (passthroughList && !hydration!.passthroughRanges) {
 		// Once this list consumed the selected owner, its containing item must
 		// end after the entire list, including its own closing marker.
-		hydration!.node = getNextSibling(state.forSlot.end);
+		hydration!.node = getNextSibling(state.forSlot.end!);
 	}
 	return;
 }
@@ -39859,6 +39520,28 @@ export function childSlot(
 			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
 			hydration.node = getNextSibling(start);
 			adoptedRange = true;
+		} else if (
+			hydration !== null &&
+			parentScope === RETURNED_OUTPUT_SCOPE &&
+			parentBlock !== hydration.rootBlock &&
+			parentBlock.startMarker !== null &&
+			parentBlock.endMarker === anchor &&
+			hydration.node === getNextSibling(parentBlock.startMarker) &&
+			!hydration.isOpen(hydration.node)
+		) {
+			// The server rendered a primitive or empty range where this client
+			// renders a chain of components. Give the return value an ordinary
+			// owned range, so its normal claim checks all the server content.
+			// Matching text remains the same Text node through every wrapper.
+			const parent = domNode(domParent);
+			const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
+			hydration.save(parent);
+			start = doc.createComment(HYDRATION_START);
+			end = doc.createComment(HYDRATION_END);
+			parent.insertBefore(start, hydration.node);
+			parent.insertBefore(end, anchor ?? null);
+			hydration.node = getNextSibling(start);
+			adoptedRange = true;
 		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
 			// anchor is the block's end-marker (not a `<!--[-->`), but the CURSOR sits
@@ -39949,10 +39632,7 @@ export function childSlot(
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	} else if (hydration !== null) {
-		if (hydration.lentSlot === state) {
-			hydration.lentSlot = null;
-			adoptedRange = true;
-		} else hydratingUpdate = true;
+		hydratingUpdate = true;
 	}
 	if (adoptedRange)
 		rebuild = hydration!.claimRange(
@@ -42428,7 +42108,6 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	let start: Node | null = null;
 	let end: Node | null = null;
 	let freshBoundary = false;
-	let caught: ServerCatch | null = null;
 	if (!state.passthrough) {
 		let cursor = getNextSibling(state.start);
 		const freshIds = takeNativeFreshArm(hydration, cursor, state.end, state.idState);
@@ -42437,17 +42116,15 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 			freshBoundary = true;
 			cursor = state.end;
 		}
-		caught = hydration?.takeServerCatch(cursor) ?? null;
-		if (caught === null && hydration !== null && hydration.isOpen(cursor)) {
+		if (hydration !== null && hydration.isOpen(cursor)) {
 			start = cursor;
 			end = hydration.close(cursor);
 			hydration.node = getNextSibling(start);
 		} else {
-			// A server catch arm stays put while the body replays ahead of it.
 			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-			domNode(state.domParent).insertBefore(start, caught?.marker ?? state.end);
-			domNode(state.domParent).insertBefore(end, caught?.marker ?? state.end);
+			domNode(state.domParent).insertBefore(start, state.end);
+			domNode(state.domParent).insertBefore(end, state.end);
 			if (hydration !== null) {
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -42473,54 +42150,24 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
 	if (freshBoundary) hydration!.depth++;
 	try {
-		if (caught !== null) {
-			hydration!.replayCaughtTry(body, caught);
-			hydration!.settleServerCatch(caught, state, false);
-		} else if (hydration !== null) hydration.renderTryBody(body, true);
+		if (hydration !== null) hydration.renderTryBody(body, true);
 		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
-		if (caught !== null) {
-			// Drop the replay: whoever handles a hand-off retries hydration against
-			// the server's range, and a repeated throw adopts the catch arm in it.
-			state.block = null;
-			unmountBlock(body);
-		}
 		if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
 			throw error;
-		if (caught !== null) {
-			// Unmounting the replay can report a cleanup error that disposes the parent.
-			if (state.parentBlock.disposed) return;
-			hydration!.settleServerCatch(caught, state, true);
-			switchErrorToCatch(state, error, true, caught.start, caught.end);
-		} else {
-			const adoptServerCatch = hydration?.isRejection(error) === true;
-			switchErrorToCatch(
-				state,
-				error,
-				true,
-				adoptServerCatch && start !== null ? start : undefined,
-				adoptServerCatch && end !== null ? end : undefined,
-			);
-		}
+		switchErrorToCatch(state, error, true);
 	} finally {
-		if (caught !== null) hydration!.skipServerCatchSeeds(caught);
 		if (freshBoundary) hydration!.depth--;
 		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 	}
 }
 
-function switchErrorToCatch(
-	state: ErrorSlot,
-	error: any,
-	reportInline = false,
-	adoptedStart?: Node,
-	adoptedEnd?: Node,
-): void {
+function switchErrorToCatch(state: ErrorSlot, error: any, reportInline = false): void {
 	if (isAdoptionControl(error)) throw error;
 	const frame = beginDetachedBoundaryRender(state);
 	try {
-		switchErrorToCatchInner(state, error, reportInline, adoptedStart, adoptedEnd);
+		switchErrorToCatchInner(state, error, reportInline);
 	} catch (failure) {
 		if (frame !== null) rollbackRootRender(frame.transaction);
 		throw failure;
@@ -42529,49 +42176,32 @@ function switchErrorToCatch(
 	}
 }
 
-function switchErrorToCatchInner(
-	state: ErrorSlot,
-	error: any,
-	reportInline: boolean,
-	adoptedStart?: Node,
-	adoptedEnd?: Node,
-): void {
+function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boolean): void {
 	const hydration = hydrating ? activeHydration() : null;
-	const adopting = adoptedStart !== undefined && adoptedEnd !== undefined;
 	const previous = state.block;
 	if (previous !== null) {
 		state.block = null;
-		unmountBlock(previous, !adopting);
+		unmountBlock(previous);
 		if (state.parentBlock.disposed || state.block !== null) return;
 	}
-	// A replay that adopts nothing still reads rejection seeds (a server-caught
-	// try body, or the client render after a deferred mismatch).
-	const rejection = hydrating ? currentHydration!.isRejection(error) === true : false;
-	const caughtError = rejection ? error.reason : error;
 	state.hasResolved = false;
 	setTryBranch(state, 0);
-	state.err = caughtError;
+	state.err = error;
 	let start: Node | null = null;
 	let end: Node | null = null;
 	if (!state.passthrough) {
-		start =
-			adoptedStart ?? (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
-		end =
-			adoptedEnd ?? (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
-		if (!adopting) {
-			if (hydration !== null) {
-				if (hydration.isClose(state.end)) {
-					removeRange(getNextSibling(state.start), state.end);
-					hydration.rebuiltSlot(state.end);
-				}
-				hydration.markFresh(start);
-				hydration.markFresh(end);
+		start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
+		end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
+		if (hydration !== null) {
+			if (hydration.isClose(state.end)) {
+				removeRange(getNextSibling(state.start), state.end);
+				hydration.rebuiltSlot(state.end);
 			}
-			domNode(state.domParent).insertBefore(start, state.end);
-			domNode(state.domParent).insertBefore(end, state.end);
-		} else if (hydration !== null) {
-			hydration.node = getNextSibling(start);
+			hydration.markFresh(start);
+			hydration.markFresh(end);
 		}
+		domNode(state.domParent).insertBefore(start, state.end);
+		domNode(state.domParent).insertBefore(end, state.end);
 	}
 	const caught = createBlock(
 		'control-flow',
@@ -42580,37 +42210,28 @@ function switchErrorToCatchInner(
 		start,
 		end,
 		state.catchBody,
-		{ err: caughtError, reset: state.reset },
+		{ err: error, reset: state.reset },
 		state.env,
 	);
 	caught.idState = state.idState;
 	state.block = caught;
 	let control = false;
 	try {
-		if (!adopting && !state.passthrough && hydration !== null) {
-			hydration.suspend(() => renderBlock(caught));
-		} else {
-			renderBlock(caught);
-		}
+		if (!state.passthrough && hydration !== null) hydration.suspend(() => renderBlock(caught));
+		else renderBlock(caught);
 	} catch (nextError) {
 		if (forwardFallbackSuspension(caught, nextError)) return;
-		// An adopted server catch arm that does not match fails the nearest
-		// fallback owner, as any mismatch does (see switchToCatchInner).
 		if (isAdoptionControl(nextError)) {
 			control = true;
 			throw nextError;
 		}
-		const rethrowsReason = rejection && Object.is(nextError, caughtError);
 		if (state.block !== null) {
-			unmountBlock(state.block, !(adopting && rethrowsReason));
+			unmountBlock(state.block);
 			state.block = null;
 		}
-		const propagated = rethrowsReason ? error : nextError;
-		if (CURRENT_BLOCK !== null && (rethrowsReason || findTryHandler(state.parentBlock) !== null)) {
-			throw propagated;
-		}
 		const parent = findTryHandler(state.parentBlock);
-		if (parent !== null) parent(propagated);
+		if (CURRENT_BLOCK !== null && parent !== null) throw nextError;
+		if (parent !== null) parent(nextError);
 		else console.error('catch body threw, no outer tryBlock:', nextError);
 	} finally {
 		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
@@ -43305,45 +42926,14 @@ function renderInitialSuspenseHydration(
 		return;
 	}
 	if (isAdoptionControl(failure) || isHostContextRequest(failure)) throw failure;
-	const adoptServerCatch = hydration.isRejection(failure);
-	// A server rejection already rendered the catch arm in this range. Adopt
-	// it with the arm's ID/data scope, including retries outside root hydration.
-	// A new client error instead replaces the old server primary.
-	if (!adoptServerCatch) removeRange(getNextSibling(initial.start), initial.end);
-	const outerHydration = currentHydration;
-	if (adoptServerCatch) swapHydration(hydration);
-	try {
-		TRY_OPS!.catchError(
-			state,
-			failure,
-			true,
-			adoptServerCatch ? initial.start : undefined,
-			adoptServerCatch ? initial.end : undefined,
-		);
-		if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial);
-		else
-			(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
-				if (!discarded) finishInitialSuspenseHydration(initial);
-			});
-	} finally {
-		swapHydration(outerHydration);
-		if (outerHydration !== null) outerHydration.node = getNextSibling(state.end);
-	}
-}
-
-/**
- * A boundary arm the server rendered as `@catch` because its try body threw.
- * `seedEnd` is the stream position past both arms' seeds, set by the replay.
- */
-interface ServerCatch {
-	marker: Comment;
-	start: Comment;
-	end: Comment;
-	trySeeds: number;
-	catchSeeds: number;
-	seedEnd: number;
-	/** How many seeded outcomes the hydration held before this arm (discardSeeds). */
-	seeded: number;
+	removeRange(getNextSibling(initial.start), initial.end);
+	TRY_OPS!.catchError(state, failure, true);
+	if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial);
+	else
+		(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
+			if (!discarded) finishInitialSuspenseHydration(initial);
+		});
+	if (currentHydration !== null) currentHydration.node = getNextSibling(state.end);
 }
 
 /** A boundary arm that the server could not finish, while it renders on the client. */
@@ -43451,8 +43041,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		scopedSeeds = null;
 		scopedNativeRaw = undefined;
 	}
-	const caught = hydration?.takeServerCatch(adoptCursor) ?? null;
-	if (caught === null && hydration !== null && hydration.isOpen(adoptCursor)) {
+	if (hydration !== null && hydration.isOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
 		// see ifBlock). The seeded use() values let the try body render its success
 		// arm and adopt the server DOM.
@@ -43460,13 +43049,11 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		bEnd = hydration.close(bStart);
 		hydration.node = getNextSibling(bStart);
 	} else {
-		// A server catch arm keeps its seed scope: the replay below reads it, and
-		// a repeated throw adopts the arm with the rest.
-		if (caught === null) scopedSeeds = null;
+		scopedSeeds = null;
 		bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 		bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-		domNode(state.domParent).insertBefore(bStart, caught?.marker ?? state.end);
-		domNode(state.domParent).insertBefore(bEnd, caught?.marker ?? state.end);
+		domNode(state.domParent).insertBefore(bStart, state.end);
+		domNode(state.domParent).insertBefore(bEnd, state.end);
 		if (hydration !== null) {
 			hydration.markFresh(bStart);
 			hydration.markFresh(bEnd);
@@ -43499,61 +43086,20 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	// The entire newly mounted arm, including its pending/catch path, is outside
 	// adoption. A live child must not borrow an ancestor's historical data.
 	if (freshBoundary) hydration!.depth++;
-	// A mismatch in the server's catch arm of a Suspense boundary, which owns it.
-	let armFailure: HydrationMismatch | null = null;
 	try {
-		if (caught !== null) {
-			hydration!.replayCaughtTry(b, caught);
-			hydration!.settleServerCatch(caught, state, false);
-		} else if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
+		if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
 		else renderBlock(b);
 		state.hasResolved = true;
 		if (wasPending) recordSuspenseCommit(state);
 	} catch (err) {
-		// §6.3 control signal — bypass the local boundary (see the try-body
-		// re-render catch above); the renderer-region owner handles it.
-		const control = isHostContextRequest(err) || isAdoptionControl(err);
-		if (caught !== null && (control || (isSuspenseException(err) && state.propagateSuspense))) {
-			// Whoever handles this retries hydration against the server's range.
-			state.tryBlock = null;
-			state.block = null;
-			unmountBlock(b);
-			throw err;
-		}
-		if (control) throw err;
+		if (isHostContextRequest(err) || isAdoptionControl(err)) throw err;
 		if (isSuspenseException(err)) {
-			if (caught === null) {
-				if (state.propagateSuspense) throw err;
-				handleSuspense(state, err.thenable, b);
-			} else {
-				// The client body waits where the server's threw. It renders fresh
-				// from here on, so its fallback must not adopt the stale catch arm.
-				hydration!.settleServerCatch(caught, state, false);
-				hydration!.suspend(() => handleSuspense(state, err.thenable, b));
-			}
+			if (state.propagateSuspense) throw err;
+			handleSuspense(state, err.thenable, b);
 		} else {
-			// The server's catch arm sits beside a replayed body, or, for a seeded
-			// rejection, inside the adopted range this body was rendering.
-			const rejection = caught === null && hydration?.isRejection(err) === true;
-			if (state.tryBlock) {
-				// Tear down the aborted try render's bookkeeping, preserving a range it
-				// shares with the catch arm for adoption.
-				unmountBlock(state.tryBlock, !rejection);
-				state.tryBlock = null;
-				state.block = null;
-			}
-			if (caught !== null) armFailure = hydration!.adoptServerCatch(state, caught, err);
-			else
-				switchToCatch(
-					state,
-					err,
-					true,
-					rejection ? bStart : undefined,
-					rejection ? bEnd : undefined,
-				);
+			switchToCatch(state, err, true);
 		}
 	} finally {
-		if (caught !== null) hydration!.skipServerCatchSeeds(caught);
 		if (freshBoundary) hydration!.depth--;
 		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 		if (hasScopedBoundary) {
@@ -43562,9 +43108,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		}
 		if (unfinished !== null) hydration!.endUnfinishedArm(unfinished);
 	}
-	if (armFailure !== null) hydration!.fallBackServerCatch(state, caught!, armFailure);
-	// An error that escaped to an outer catch arm reports nothing either.
-	else if (unfinished !== null) hydration!.reportUnfinishedArm(unfinished);
+	if (unfinished !== null) hydration!.reportUnfinishedArm(unfinished);
 }
 
 /**
@@ -45854,17 +45398,11 @@ function forwardFallbackSuspension(fallbackBlock: Block, error: unknown): boolea
 	return true;
 }
 
-function switchToCatch(
-	state: TrySlot,
-	err: any,
-	reportInline = false,
-	adoptedStart?: Node,
-	adoptedEnd?: Node,
-): void {
+function switchToCatch(state: TrySlot, err: any, reportInline = false): void {
 	if (isAdoptionControl(err)) throw err;
 	const frame = beginDetachedBoundaryRender(state);
 	try {
-		switchToCatchInner(state, err, reportInline, adoptedStart, adoptedEnd);
+		switchToCatchInner(state, err, reportInline);
 	} catch (failure) {
 		if (frame !== null) rollbackRootRender(frame.transaction);
 		throw failure;
@@ -45873,13 +45411,7 @@ function switchToCatch(
 	}
 }
 
-function switchToCatchInner(
-	state: TrySlot,
-	err: any,
-	reportInline: boolean,
-	adoptedStart?: Node,
-	adoptedEnd?: Node,
-): void {
+function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): void {
 	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
@@ -45960,43 +45492,22 @@ function switchToCatchInner(
 		else console.error('tryBlock with no catch arm received error:', err);
 		return;
 	}
-	// Preserve the internal wrapper while bubbling through catch-less boundaries,
-	// then expose the original decoded reason only to the boundary that actually
-	// owns a catch arm (including primitive and null rejection reasons). A
-	// replay that adopts nothing still reads rejection seeds (a server-caught try
-	// body, or the client render after a deferred mismatch).
-	const hydrationRejection = hydrating ? currentHydration!.isRejection(err) === true : false;
-	const caughtError = hydrationRejection ? err.reason : err;
 	setTryBranch(state, 0);
-	state.err = caughtError;
-	const adopting = adoptedStart !== undefined && adoptedEnd !== undefined;
-	const bStart =
-		adoptedStart ?? (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
-	const bEnd =
-		adoptedEnd ?? (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
-	if (!adopting) {
-		if (hydration !== null) {
-			// Hydrating, but the server rendered a DIFFERENT arm in this slot (the
-			// try body threw on the CLIENT), so the catch arm is a client-fresh
-			// build. The aborted try adoption consumed only part of the server range
-			// and its teardown removed only the nodes its own block had claimed —
-			// discard whatever server content is left inside the slot and park the
-			// cursor past the slot so FOLLOWING siblings keep adopting from an
-			// aligned position. Only an adopted slot pair bounds server DOM; a slot
-			// that minted fresh markers under hydration owns no server range.
-			if (hydration.isClose(state.end)) {
-				removeRange(getNextSibling(state.start), state.end);
-				hydration.rebuiltSlot(state.end);
-			}
-			// Client-built replacement markers survive root-remainder sweeps.
-			hydration.markFresh(bStart);
-			hydration.markFresh(bEnd);
+	state.err = err;
+	const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
+	const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
+	if (hydration !== null) {
+		// Discard an aborted client adoption of the server primary before the
+		// fresh catch mounts; following siblings continue at their own cursor.
+		if (hydration.isClose(state.end)) {
+			removeRange(getNextSibling(state.start), state.end);
+			hydration.rebuiltSlot(state.end);
 		}
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
-	} else if (hydration !== null) {
-		hydration.node = getNextSibling(bStart);
+		hydration.markFresh(bStart);
+		hydration.markFresh(bEnd);
 	}
+	domNode(state.domParent).insertBefore(bStart, state.end);
+	domNode(state.domParent).insertBefore(bEnd, state.end);
 	const reset = () => requestReset(state);
 	const b = createBlock(
 		'control-flow',
@@ -46005,68 +45516,29 @@ function switchToCatchInner(
 		bStart,
 		bEnd,
 		state.catchBody,
-		{ err: caughtError, reset },
+		{ err, reset },
 		state.env,
 	);
 	b.idState = state.idState;
 	state.block = b;
-	if (
-		adopting &&
-		hydration !== null &&
-		hydration.rootBlock.disposed &&
-		hydration.rootBlock.startMarker === bStart &&
-		hydration.rootBlock.endMarker === bEnd
-	) {
-		// An initially resolved arm scoped adoption to its discarded try block.
-		// Its catch replaces that exact range; transfer ownership to this sibling
-		// so adoption stays local without treating the catch as a fresh render.
-		hydration.rootBlock = b;
-	}
 	let control = false;
 	try {
-		// A client-fresh catch build during hydration must not read the adoption
-		// cursor — the server rendered the try arm here, so adopting would consume
-		// (and warn about) another slot's server DOM. Suspend for the subtree.
-		if (!adopting && hydration !== null) hydration.suspend(() => renderBlock(b));
+		if (hydration !== null) hydration.suspend(() => renderBlock(b));
 		else renderBlock(b);
 	} catch (e2) {
 		if (forwardFallbackSuspension(b, e2)) return;
-		// The server's catch arm, adopted here, does not match the client's: the
-		// nearest fallback owner discards this attempt with its server DOM, as for
-		// any other mismatch (adoptServerCatch), and renders on the client.
 		if (isAdoptionControl(e2)) {
 			control = true;
 			throw e2;
 		}
-		// Catch body itself threw — bubble to next enclosing tryBlock.
-		const rethrowsHydrationReason = hydrationRejection && Object.is(e2, caughtError);
-		const preserveAdoptedRange = adopting && rethrowsHydrationReason;
 		if (state.block) {
-			unmountBlock(state.block, !preserveAdoptedRange);
+			unmountBlock(state.block);
 			state.block = null;
 		}
-		const propagated = rethrowsHydrationReason ? err : e2;
-		// Mid-render (a component render stack is live) with an outer boundary to
-		// take the error: RETHROW instead of delegating synchronously — the same
-		// rule as the no-catch-arm path above. The outer boundary's switch sweeps
-		// the DOM of every frame between this boundary and itself; delegating here
-		// and returning would let those still-on-stack frames keep rendering into
-		// the swept range (stale anchors → NotFoundError, and the bookkeeping
-		// error would REPLACE the original). The rethrow unwinds them; the outer
-		// boundary catches it at its own tryBlock frame. A hydration-rejection
-		// rethrow additionally retains the private hydration token so the outer
-		// mountTry can adopt its own server catch range instead of rebuilding it
-		// — that rethrow stays unconditional (hydrateRoot owns the unwind). With
-		// NO outer handler the error must not escape to the render caller: fall
-		// through to the console.error surface below (the boundary's content is
-		// already torn down — no content, no fallback).
-		if (
-			CURRENT_BLOCK !== null &&
-			(rethrowsHydrationReason || findTryHandler(state.parentBlock) !== null)
-		)
-			throw propagated;
+		// Unwind live frames before an outer boundary can replace their DOM.
 		const parent = findTryHandler(state.parentBlock);
-		if (parent) parent(propagated);
+		if (CURRENT_BLOCK !== null && parent !== null) throw e2;
+		if (parent) parent(e2);
 		else console.error('catch body threw, no outer tryBlock:', e2);
 	} finally {
 		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
@@ -48186,11 +47658,16 @@ export function switchBlock(
 
 interface ForSlot {
 	__kind: 'forBlockSlot';
+	// A detached host may still be live (Offscreen). The renderer owner tells
+	// rollback whether a cleanup has already disposed the whole list.
+	ownerBlock: Block;
 	// Inline row owners need a call-site namespace without consuming the list
 	// keys that independently compiled child components still inherit.
 	signalSite: string | undefined;
-	start: Comment;
-	end: Comment;
+	// A descriptor host can own all its children without an extra anchor pair.
+	ownerHost: Element | null;
+	start: Comment | null;
+	end: Comment | null;
 	items: Map<any, Block>; // key → item Block (O(1) survivor lookup)
 	// Whether `items` iterates in chain order: true for an empty Map and after an
 	// in-order fill, append or removal; a reorder or a middle insert clears it.
@@ -48284,7 +47761,8 @@ export function forBlock<T>(
 	// Packed into one numeric literal.
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
-	let state = parentScope.slots[slotKey] as ForSlot | undefined;
+	let state = parentScope.slots[slotKey] as
+		(ForSlot & { start: Comment; end: Comment; ownerHost: null }) | undefined;
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -48350,6 +47828,8 @@ export function forBlock<T>(
 		}
 		state = {
 			__kind: 'forBlockSlot',
+			ownerBlock: parentBlock,
+			ownerHost: null,
 			start,
 			end,
 			items: new Map(),
@@ -48657,6 +48137,7 @@ function fastHostListParent(
 	if (
 		state === undefined ||
 		state === null ||
+		state.ownerHost !== null ||
 		state.size !== 0 ||
 		state.emptyBlock !== null ||
 		state.adopt !== null ||
@@ -48664,12 +48145,12 @@ function fastHostListParent(
 		!Array.isArray(items) ||
 		items.length < FAST_HOST_LIST_MIN_ITEMS ||
 		(hydrating && activeHydration() !== null) ||
-		domNode(state.end).parentNode === null ||
-		domNode(state.start).parentNode !== domNode(state.end).parentNode
+		domNode(state.end!).parentNode === null ||
+		domNode(state.start!).parentNode !== domNode(state.end!).parentNode
 	) {
 		return null;
 	}
-	return domNode(state.end).parentNode;
+	return domNode(state.end!).parentNode;
 }
 
 /** Mount certified host-only rows without the full component render machinery. */
@@ -48737,7 +48218,7 @@ function mountFastHostItems<T>(
 			CURRENT_BLOCK = previousBlock;
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.endRender(block, true, false);
 			block.mounted = true;
-			const end = state.end;
+			const end = state.end!;
 			const root = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling!;
 			block.startMarker = root;
 			block.endMarker = root;
@@ -48760,7 +48241,7 @@ function mountFastHostItems<T>(
 			// its host. The still-unregistered row owns that host and any nested
 			// child scopes, so dispose it before unwinding the completed prefix.
 			if (current.slots[0] !== undefined) {
-				const end = state.end;
+				const end = state.end!;
 				const root = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling;
 				if (root !== null && root !== state.start) {
 					current.startMarker = root;
@@ -49220,7 +48701,7 @@ function mountItemsLinear<T>(
 	// shows fresh rows with their bindings half rolled back underneath them.
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
-	const parentNode = domNode(state.end).parentNode!;
+	const parentNode = forSlotParent(state)!;
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
 	// element's existing raw children, keyed like the incoming items. This cold
 	// map preserves later survivors after a removed/changed key, and reorders
@@ -49243,7 +48724,7 @@ function mountItemsLinear<T>(
 			const key = readListKey(keySource, item, i, normalizeKey);
 			if (observeKey !== undefined) observeKey(i, key);
 			let adoptNode: Node | null = null;
-			let anchor: Node = state.end;
+			let anchor: Node | null = state.end;
 			if (adoptByKey !== null) {
 				anchor = (prev === null ? getNextSibling(state.start!) : getNextSibling(prev.endMarker!))!;
 				const candidate = adoptByKey.get(key);
@@ -49263,7 +48744,7 @@ function mountItemsLinear<T>(
 					}
 				}
 			}
-			const block =
+			const block: Block =
 				hydrating && passthroughList
 					? mountPassthroughListItem(parentBlock, parentNode, anchor, item, i, key, itemBody, state)
 					: mountItem(
@@ -49337,7 +48818,7 @@ function mountItemsLinear<T>(
 function mountPassthroughListItem<T>(
 	parentBlock: Block,
 	parentNode: Node,
-	anchor: Node,
+	anchor: Node | null,
 	item: T,
 	index: number,
 	key: unknown,
@@ -49451,7 +48932,7 @@ function reconcileKeyed<T>(
 	const oldItems = state.items;
 	const oldSize = state.size;
 	const newLen = items.length;
-	const parentNode = domNode(state.end).parentNode!;
+	const parentNode = forSlotParent(state)!;
 	// Scalar survivor updates journal their own bindings. Capture the chain and
 	// key map only if reconciliation actually changes membership or order, so
 	// unchanged lists do not allocate a second O(N) representation every render.
@@ -49594,7 +49075,7 @@ function reconcileKeyed<T>(
 		if (links !== null && beforeMiddle !== null && !links.has(beforeMiddle))
 			links.set(beforeMiddle, beforeMiddle.nextSibling);
 		if (afterMiddle !== null) state.inOrder = false;
-		const anchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
+		const anchor: Node | null = afterMiddle ? afterMiddle.startMarker! : state.end;
 		let prev: Block | null = beforeMiddle;
 		for (let i = prefixLen; i <= newEnd; i++) {
 			const item = items[i];
@@ -49881,14 +49362,14 @@ function reconcileKeyed<T>(
 					}
 					for (const b of touched) if (b !== null && !links.has(b)) links.set(b, b.nextSibling);
 				}
-				const endAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
+				const endAnchor: Node | null = afterMiddle ? afterMiddle.startMarker! : state.end;
 				// Move right-to-left. Positions to the right of the rightmost
 				// displaced index are identity-mapped and have stable startMarkers;
 				// each moved block becomes the next iteration's anchor.
 				for (let j = dCount - 1; j >= 0; j--) {
 					const i = _disp[j];
 					const block = oldItems.get(newKeys[i])!;
-					const anchor: Node =
+					const anchor: Node | null =
 						i + 1 < newMidLen ? oldItems.get(newKeys[i + 1])!.startMarker! : endAnchor;
 					moveBlockBefore(block, anchor);
 				}
@@ -49941,7 +49422,7 @@ function reconcileKeyed<T>(
 		if (journalShape || record !== null) journalForSlot(state);
 		// Place survivors first, then mount new rows in authored order. Reversing
 		// mounts reverses their ref/layout/effect order even when the DOM is right.
-		const middleEndAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
+		const middleEndAnchor: Node | null = afterMiddle ? afterMiddle.startMarker! : state.end;
 		if (patched === newMidLen) {
 			// A pure reorder has no mount callbacks to sequence. Move and relink
 			// in one backward walk, keeping the established reorder cost.
@@ -50056,7 +49537,8 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  */
 function canDeferRootOwnedListClear(state: ForSlot): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
-	const parent = domNode(state.start).parentNode;
+	if (state.ownerHost !== null) return false;
+	const parent = domNode(state.start!).parentNode;
 	if (
 		transaction === null ||
 		transaction.aborted ||
@@ -50066,9 +49548,9 @@ function canDeferRootOwnedListClear(state: ForSlot): boolean {
 		state.size < 16 ||
 		parent === null ||
 		(parent.nodeType !== 1 && parent.nodeType !== 11) ||
-		domNode(state.end).parentNode !== parent ||
-		domNode(state.start).previousSibling !== null ||
-		getNextSibling(state.end) !== null
+		domNode(state.end!).parentNode !== parent ||
+		domNode(state.start!).previousSibling !== null ||
+		getNextSibling(state.end!) !== null
 	)
 		return false;
 	const oldHead = state.head;
@@ -50095,7 +49577,7 @@ function canDeferRootOwnedListClear(state: ForSlot): boolean {
 function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): boolean {
 	if (!certified && !canDeferRootOwnedListClear(state)) return false;
 	const transaction = ROOT_RENDER_TRANSACTION!;
-	const parent = domNode(state.start).parentNode!;
+	const parent = domNode(state.start!).parentNode!;
 	const oldHead = state.head;
 	const retired = (transaction.retired ??= new Set<Block>());
 	const newlyRetired: Block[] = [];
@@ -50114,8 +49596,8 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 		cancelled = true;
 		for (let i = 0; i < newlyRetired.length; i++) retired.delete(newlyRetired[i]);
 	});
-	const start = state.start;
-	const end = state.end;
+	const start = state.start!;
+	const end = state.end!;
 	(transaction.commit ??= []).push(() => {
 		if (cancelled) return;
 		// A later render may have inserted new rows, or outside code may have
@@ -50216,11 +49698,22 @@ function batchClearItems(
 	}
 	TEARDOWN_DEPTH++;
 	try {
+		if (state.ownerHost !== null) {
+			// The host may also contain a foreign portal or imperative children.
+			// Remove only row-owned ranges, within the same teardown bracket.
+			let next: Block | null;
+			for (let row = first; row !== null; row = next) {
+				next = row.nextSibling;
+				unmountBlock(row);
+			}
+			oldItems.clear();
+			return;
+		}
 		// Retire every row before any row's cleanup can move focus off another: the
 		// whole span between the list's markers leaves below. As for parked rows,
 		// only captured focus (or no capture at all) can make a row dispatch.
 		if (renderingFocus !== null || !inFlush)
-			retireHostRange(getNextSibling(state.start), state.end);
+			retireHostRange(getNextSibling(state.start!), state.end!);
 		// Dispose the items before their DOM leaves, like every other deletion:
 		// cleanups observe attached hosts. Walk the intrusive item chain (head →
 		// nextSibling) rather than the Map's iterator: zero allocation and a
@@ -50239,24 +49732,24 @@ function batchClearItems(
 				b.disposed = true;
 			}
 		}
-		const p = domNode(state.start).parentNode!;
-		if (domNode(state.start).previousSibling === null && getNextSibling(state.end) === null) {
+		const p = domNode(state.start!).parentNode!;
+		if (domNode(state.start!).previousSibling === null && getNextSibling(state.end!) === null) {
 			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
 			(STAGED_DOM ? STAGED_DOM.view(p as Element) : (p as Element)).textContent = '';
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.start);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.end);
+			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.start!);
+			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(state.end!);
 		} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
 			// Shared parent (other JSX interleaved) — detach the marker span directly.
 			// Each removal takes a whole item subtree, so this is one call per ITEM,
 			// not per node.
-			removeRange(getNextSibling(state.start), state.end);
+			removeRange(getNextSibling(state.start!), state.end!);
 		} else if (STAGED_DOM) {
-			STAGED_DOM.clearBetween(state.start, state.end);
+			STAGED_DOM.clearBetween(state.start!, state.end!);
 		} else {
 			// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
 			const range = document.createRange();
-			range.setStartAfter(state.start);
-			range.setEndBefore(state.end);
+			range.setStartAfter(state.start!);
+			range.setEndBefore(state.end!);
 			range.deleteContents();
 		}
 		oldItems.clear();
@@ -50268,7 +49761,7 @@ function batchClearItems(
 function mountItem<T>(
 	parentBlock: Block,
 	parentNode: Node,
-	anchor: Node,
+	anchor: Node | null,
 	item: T,
 	index: number,
 	key: unknown,
@@ -50367,7 +49860,7 @@ function mountItem<T>(
 			// The server rendered fewer items than the client, or at the cursor an item
 			// that cannot be this one.
 			hydration.itemMismatch(
-				forSlot.end,
+				forSlot.end!,
 				process.env.NODE_ENV !== 'production'
 					? forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
@@ -50445,7 +49938,7 @@ function mountItem<T>(
 		try {
 			renderBlock(block);
 		} catch (error) {
-			discardThrownItem(block, error, anchor);
+			discardThrownItem(block, error, true);
 			throw error;
 		}
 		// Body inserted ONE node right before `anchor` via
@@ -50453,7 +49946,8 @@ function mountItem<T>(
 		// and promote it to start === end. From now on `block.endMarker` is the
 		// actual element (so subsequent body re-renders insert nothing — the
 		// update path mutates the cached _b._el$N refs directly).
-		const root = (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling!;
+		const root =
+			block.deoptNode ?? (STAGED_DOM ? STAGED_DOM.view(anchor!) : anchor!).previousSibling!;
 		block.startMarker = root;
 		block.endMarker = root;
 		return block;
@@ -50493,7 +49987,7 @@ function mountItem<T>(
 	try {
 		renderBlock(block);
 	} catch (error) {
-		discardThrownItem(block, error, null);
+		discardThrownItem(block, error, false);
 		throw error;
 	}
 	return block;
@@ -50509,11 +50003,12 @@ function mountItem<T>(
  * anchor is this item's root. A sole component or `@if` root lives in a nested
  * slot instead, whose own Block owns and removes its element.
  */
-function discardThrownItem(block: Block, error: unknown, selfMarkedAnchor: Node | null): void {
+function discardThrownItem(block: Block, error: unknown, selfMarked: boolean): void {
 	const bag = block.slots[0];
-	if (selfMarkedAnchor !== null && bag != null && (bag as any).__kind === undefined) {
-		const root = (STAGED_DOM ? STAGED_DOM.view(selfMarkedAnchor) : selfMarkedAnchor)
-			.previousSibling;
+	if (selfMarked && bag != null && (bag as any).__kind === undefined) {
+		const anchor = block.endMarker;
+		const root =
+			anchor === null ? domNode(block.parentNode).lastChild : domNode(anchor).previousSibling;
 		block.startMarker = root;
 		block.endMarker = root;
 	}
@@ -50521,7 +50016,7 @@ function discardThrownItem(block: Block, error: unknown, selfMarkedAnchor: Node 
 	unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 }
 
-function moveBlockBefore(block: Block, anchor: Node): void {
+function moveBlockBefore(block: Block, anchor: Node | null): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_MOVE);
 	const parent = domNode(block.startMarker!).parentNode!;
@@ -50554,7 +50049,7 @@ function moveFocusedBlockBefore(
 	parent: Node,
 	node: Node,
 	end: Node,
-	anchor: Node,
+	anchor: Node | null,
 	snapshots: Exclude<FocusSelectionBatch, null>,
 ): void {
 	let current: Node | null = node;

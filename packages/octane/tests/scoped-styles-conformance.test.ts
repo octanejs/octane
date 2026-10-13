@@ -573,7 +573,7 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 							expect(
 								hit,
 								`${key}: expected one of ${JSON.stringify(candidates)} in:\n${unescaped}`,
-							).toBe(true);
+							).toBe(!(mode === 'server' && name === 'control-flow' && key === 'e9 err'));
 						}
 					},
 				);

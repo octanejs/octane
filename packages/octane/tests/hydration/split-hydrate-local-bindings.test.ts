@@ -85,7 +85,7 @@ function copy(input: Input): Input {
 	};
 }
 
-async function hydrate(dev: boolean, view: View, input: Input) {
+async function hydrate(dev: boolean, view: View, input: Input, serverInput: Input = input) {
 	const code = await bundle(dev);
 	const window = new Window({ settings: { enableJavaScriptEvaluation: true } });
 	const diagnostics: unknown[][] = [];
@@ -106,7 +106,7 @@ async function hydrate(dev: boolean, view: View, input: Input) {
 	const api = (window as any).__SPLIT_LOCAL_BINDINGS__;
 	const host = window.document.getElementById('host')!;
 	host.innerHTML = renderToString(server[view], {
-		...copy(input),
+		...copy(serverInput),
 		when: load(),
 		onPick() {},
 	}).html;
@@ -163,14 +163,13 @@ const base: Input = {
 
 for (const dev of [false, true]) {
 	describe(`${dev ? 'development' : 'production'} split Hydrate directive bindings`, () => {
-		it('hydrates server error content and resets the boundary through the @catch reset parameter', async () => {
+		it('activates a failed split boundary and resets it through the @catch reset parameter', async () => {
 			const page = await hydrate(dev, 'CatchReset', { ...base, state: { failed: true } });
 			try {
-				expect(page.serverHtml).toContain('catch failed');
-				const button = page.host.querySelector('.retry');
+				expect(page.serverHtml).not.toContain('catch failed');
+				expect(page.serverHtml).toContain('data-octane-hydrate-id');
 				expect(page.failures()).toEqual(none);
 				expect(page.caught).toEqual(['catch failed']);
-				expect(page.host.querySelector('.retry')).toBe(button);
 				expect(page.text('.retry')).toEqual(['catch failed']);
 
 				await page.click('.retry');
@@ -274,8 +273,11 @@ for (const dev of [false, true]) {
 		});
 
 		it('passes a @catch reset parameter that shadows a module function into a nested boundary', async () => {
-			const page = await hydrate(dev, 'ShadowedReset', { ...base, state: { failed: true } });
+			// The server completes this boundary; only the client fails into the
+			// split @catch content whose reset shadows the module function.
+			const page = await hydrate(dev, 'ShadowedReset', { ...base, state: { failed: true } }, base);
 			try {
+				expect(page.serverHtml).toContain('shadowed ready');
 				expect(page.failures()).toEqual(none);
 				expect(page.text('.retry')).toEqual(['shadowed failed']);
 

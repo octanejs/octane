@@ -544,24 +544,36 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		root.unmount();
 	});
 
-	it('adopts a rejected resource without starting a client request or replacing the server catch', async () => {
-		const { html } = await prerender(factoryServer.SeededResource, {
-			id: 'rejected',
-			load: () => Promise.reject(new Error('server-rejection')),
-		});
+	it('starts a client request after the server failed instead of exposing the server rejection', async () => {
+		const reported = vi.fn();
+		const { html } = await prerender(
+			factoryServer.SeededResource,
+			{
+				id: 'rejected',
+				load: () => Promise.reject(new Error('server-rejection')),
+			},
+			{ onError: reported },
+		);
 		container.innerHTML = html;
-		const serverCatch = container.querySelector('#seeded-error');
+		expect(reported).toHaveBeenCalledWith(expect.objectContaining({ message: 'server-rejection' }));
+		expect(html).not.toContain('server-rejection');
+		expect(container.querySelector('#seeded-error')).toBeNull();
 		const clientLoad = vi.fn(() => Promise.resolve('client-success'));
-
-		const root = hydrateRoot(container, factoryClient.SeededResource, {
-			id: 'rejected',
-			load: clientLoad,
-		});
-		flushSync(() => {});
-
-		expect(Array.from(container.querySelectorAll('#seeded-error'))).toEqual([serverCatch]);
-		expect(serverCatch?.textContent).toBe('server-rejection');
-		expect(clientLoad).not.toHaveBeenCalled();
+		const recovered = vi.fn();
+		const root = hydrateRoot(
+			container,
+			factoryClient.SeededResource,
+			{
+				id: 'rejected',
+				load: clientLoad,
+			},
+			{ onRecoverableError: recovered },
+		);
+		await act(async () => {});
+		expect(container.querySelector('#seeded-error')).toBeNull();
+		expect(container.querySelector('#seeded-resource')?.textContent).toBe('client-success');
+		expect(clientLoad).toHaveBeenCalledExactlyOnceWith('rejected');
+		expect(recovered).toHaveBeenCalledTimes(1);
 		root.unmount();
 	});
 

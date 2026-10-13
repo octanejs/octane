@@ -1171,10 +1171,18 @@ for (const fixture of fixtures) {
 				result.unmount();
 			});
 
-			it(`${exportName} server-renders its nearest error fallback`, () => {
-				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
-				expect(html).toContain('data-fallback="inner"');
-				expect(html).not.toContain('data-fallback="outer"');
+			it(`${exportName} lets server errors through nested catch-only boundaries`, () => {
+				const onError = vi.fn();
+				const expected = new Error(
+					exportName === 'BuiltInErrorValue' || exportName === 'WrappedErrorValue'
+						? 'scoped failure'
+						: 'scoped getter failure',
+				);
+				expect(() =>
+					ServerRuntime.renderToString(fixture.server[exportName], undefined, { onError }),
+				).toThrow(expected);
+				expect(onError).toHaveBeenCalledTimes(1);
+				expect(onError.mock.calls[0][0]).toEqual(expected);
 			});
 		}
 

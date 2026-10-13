@@ -264,8 +264,15 @@ async function hydrateServerOutput(
 		container.innerHTML = output.html;
 		activateStreamedMarkup(container);
 		const outputs = [...container.querySelectorAll('output')];
-		expect(outputs.map((node) => node.textContent)).not.toEqual([]);
-		expect(new Set(outputs.map((node) => node.textContent))).toEqual(new Set(['server result']));
+		if (options.adoptsOutput) {
+			expect(outputs.map((node) => node.textContent)).not.toEqual([]);
+			expect(new Set(outputs.map((node) => node.textContent))).toEqual(new Set(['server result']));
+		} else {
+			// Catch output exists only on the client. SSR preserves the enclosing
+			// pending arm, and never reads queries exclusive to the catch arm.
+			expect(outputs).toEqual([]);
+			expect(container.textContent).toContain('waiting');
+		}
 		const errors: unknown[] = [];
 		hydration = bootstrapStreamedSignalHydration(streamedSignals);
 		const props = { ...PROPS, load: browserLoad, when: condition(!options.deferred) };
@@ -278,12 +285,18 @@ async function hydrateServerOutput(
 		client.flushSync(() => {});
 		if (options.deferred)
 			await client.act(() => root!.render(clientModule.App, { ...props, when: condition(true) }));
-		expect(browserLoad).not.toHaveBeenCalled();
+		expect(browserLoad).toHaveBeenCalledTimes(options.loads === 0 ? 1 : 0);
 		const hydrated = [...container.querySelectorAll('output')];
 		if (options.adoptsOutput) expect(hydrated).toEqual(outputs);
-		expect(hydrated.map((node) => node.textContent)).toEqual(
-			outputs.map((node) => node.textContent),
-		);
+		if (options.adoptsOutput) {
+			expect(hydrated.map((node) => node.textContent)).toEqual(
+				outputs.map((node) => node.textContent),
+			);
+		} else {
+			expect(hydrated.map((node) => node.textContent)).toEqual([
+				options.loads === 0 ? 'browser result' : 'server result',
+			]);
+		}
 		expect(errors).toEqual([]);
 	} finally {
 		root?.unmount();
@@ -360,8 +373,8 @@ describe('signal declarations read across their component template', () => {
 	it.each(CASES)(
 		'resumes the server query for setup and $shape $read reads (nested: $nested, $name)',
 		async ({ dev, strong, read, shape, nested }) => {
-			// A synchronous render error is not a server rejection seed, so the
-			// browser rebuilds its catch arm; every other arm adopts server DOM.
+			// SSR leaves errors to the client. The query in setup has still
+			// completed, and the client's catch shares its declaration owner.
 			await hydrateServerOutput(source(capturedRead(read, shape, 'get()'), nested), {
 				dev,
 				strong,
@@ -379,6 +392,7 @@ describe('signal declarations read across their component template', () => {
 				dev,
 				strong,
 				adoptsOutput: shape !== 'catch',
+				loads: shape === 'catch' ? 0 : 1,
 			});
 		},
 	);

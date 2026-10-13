@@ -52,7 +52,6 @@ export const HYDRATION_FOR_ARM_INDEX = HYDRATION_FOR_PREFIX.length;
  * client cannot tell a caught arm from a successful one, so it would adopt the
  * catch DOM as try-body content.
  */
-export const TRY_CATCH_COMMENT = 'oct-catch:';
 
 /** Leads a resolved `@try` arm whose server render reserved sequential IDs. */
 export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';

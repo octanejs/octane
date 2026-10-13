@@ -257,7 +257,11 @@ describe.each([
 				.map((segment) => FOLDED.slice(segment.srcStart, segment.srcEnd!)),
 		);
 		for (const keyword of ['@if', '@else', '@for', '@empty', '@try', '@pending', '@catch']) {
-			expect(claimed.has(keyword), `${keyword} is unreachable on the fold path`).toBe(true);
+			// Server output omits the client catch arm, so it must not claim
+			// an emitted origin for the keyword either.
+			expect(claimed.has(keyword), `${keyword} on the fold path`).toBe(
+				!server || keyword !== '@catch',
+			);
 		}
 	});
 
@@ -315,7 +319,8 @@ describe.each([
 	['client prod', { hmr: false as const }],
 	['server', { mode: 'server' as const }],
 	['server dev', { mode: 'server' as const, dev: true }],
-])('control-flow keyword origins — %s', (_label, options) => {
+])('control-flow keyword origins — %s', (label, options) => {
+	const server = label.startsWith('server');
 	const SOURCE = `export default function App() @{
 	const n = 1;
 	const items: string[] = [];
@@ -367,6 +372,10 @@ describe.each([
 		const claimed = result.inspect.segments.filter(
 			(segment) => segment.exact === true && segment.srcStart === at,
 		);
+		if (server && keyword === '@catch') {
+			expect(claimed, 'SSR must not claim the erased catch arm').toEqual([]);
+			return;
+		}
 		expect(claimed.length, `nothing claims ${keyword}`).toBeGreaterThan(0);
 		// The claim is the keyword itself — never the block it introduces.
 		for (const segment of claimed) {

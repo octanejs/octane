@@ -602,9 +602,13 @@ describe('lazy — SSR', () => {
 		}
 	});
 
-	it('prerender routes a rejected load to @catch', async () => {
+	it('prerender reports a rejected load and leaves the pending content for the client', async () => {
 		const L = Server.lazy(() => Promise.reject(new Error('chunk failed')));
-		const r = await prerender(m.LazyHost, { comp: L });
-		expect(r.html).toContain('caught: chunk failed');
+		const onError = vi.fn();
+		const r = await prerender(m.LazyHost, { comp: L }, { onError });
+		expect(r.html).toContain('loading');
+		expect(r.html).not.toContain('chunk failed');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toEqual(new Error('chunk failed'));
 	});
 });

@@ -481,22 +481,22 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		}
 	});
 
-	it('routes a synchronous permanent-static error to an enclosing server catch', async () => {
+	it('fails the shell when a synchronous permanent-static error has no pending ancestor', async () => {
 		const c = collector();
 		const onError = vi.fn();
+		const onShellError = vi.fn();
+		const reason = new Error('static shell boom');
 		ServerRT.renderToPipeableStream(
 			permanentStaticServer.PermanentStaticSyncCaught,
-			{ error: new Error('static shell boom') },
-			{ onError },
+			{ error: reason },
+			{ onError, onShellError },
 		).pipe(c.dest);
 
 		await c.ended;
 		const html = c.chunks.join('');
-		expect(html).toContain('id="permanent-static-sync-catch"');
-		expect(html).toContain('static shell boom');
-		expect(html).not.toContain('data-oct-b');
-		expect(html).not.toContain('$OCTRX(');
-		expect(onError).not.toHaveBeenCalled();
+		expect(html).toBe('');
+		expect(onError).toHaveBeenCalledExactlyOnceWith(reason);
+		expect(onShellError).toHaveBeenCalledExactlyOnceWith(reason);
 	});
 
 	it('retains a permanent-static fallback when its pending stream rejects', async () => {
@@ -531,7 +531,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(onAllReady).toHaveBeenCalledOnce();
 	});
 
-	it('streams an authored catch inside a permanent-static range', async () => {
+	it('retains an authored pending fallback inside a permanent-static range after rejection', async () => {
 		const value = deferred<string>();
 		const c = collector();
 		const onError = vi.fn();
@@ -551,10 +551,14 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		container.insertAdjacentHTML('beforeend', tail);
 		activate(container);
 
-		expect(container.querySelector('#permanent-static-caught-error')?.textContent).toBe(
-			'caught static stream boom',
+		expect(container.querySelector('#permanent-static-caught-error')).toBeNull();
+		expect(container.querySelector('#permanent-static-caught-fallback')!.textContent).toBe(
+			'Caught fallback',
 		);
-		expect(onError).not.toHaveBeenCalled();
+		expect(c.chunks.join('')).not.toContain('caught static stream boom');
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ message: 'caught static stream boom' }),
+		);
 	});
 
 	it('retains a permanent-static fallback when the stream aborts', async () => {
@@ -1330,9 +1334,10 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					'middle-ready',
 					'last-ready',
 				]);
-				expect(container.querySelector('.err')?.textContent).toContain('last-rejected');
-				expect(container.textContent).not.toContain('loading');
-				expect(errors).toEqual([]);
+				expect(container.querySelector('.err')).toBeNull();
+				expect(container.querySelectorAll('.loading')).toHaveLength(1);
+				expect(chunks.join('')).not.toContain('last-rejected');
+				expect(errors).toEqual([expect.objectContaining({ message: 'last-rejected' })]);
 			} finally {
 				stop();
 				await ended.catch(() => {});
@@ -1578,16 +1583,28 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(container.querySelector('.outer-value')?.textContent).toBe('outside');
 	});
 
-	it('streams the @catch arm when the promise rejects', async () => {
+	it('retains pending HTML when the promise rejects and reports only on the server', async () => {
 		const d = deferred<string>();
 		const c = collector();
-		const { pipe } = ServerRT.renderToPipeableStream(server.Boundary, { promise: d.promise });
+		const reason = new Error('nope-private');
+		const onError = vi.fn();
+		const { pipe } = ServerRT.renderToPipeableStream(
+			server.Boundary,
+			{ promise: d.promise },
+			{ onError },
+		);
 		pipe(c.dest);
-		d.reject(new Error('nope'));
+		const id = protocolIds(c.chunks.join(''))[0];
+		d.reject(reason);
 		await c.ended;
-		container.innerHTML = c.chunks.join('');
+		const html = c.chunks.join('');
+		expect(html).toContain(errorCall(id));
+		expect(html).not.toContain('nope-private');
+		container.innerHTML = html;
 		activate(container);
-		expect(container.querySelector('.err')?.textContent).toContain('nope');
+		expect(container.querySelector('.err, .ok')).toBeNull();
+		expect(container.querySelector('.loading')!.textContent).toBe('loading');
+		expect(onError).toHaveBeenCalledExactlyOnceWith(reason);
 	});
 
 	it('abort landing during a wave coalesce cancels the pass and completes once', async () => {
@@ -1897,7 +1914,8 @@ describe('renderToReadableStream', () => {
 		});
 		const output = new Response(stream).text();
 		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
-		expect(await output).toBe('shell');
+		container.innerHTML = await output;
+		expect(container.textContent).toBe('shell');
 		expect(onError).toHaveBeenCalledWith(callbackError);
 	});
 
@@ -2244,132 +2262,129 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
-	it('adopts a streamed factory-rejection catch without duplicating the alert', async () => {
-		const rendered = collectPipeableStream(server.FactoryRejectionBoundary, {
+	it('retries a failed streamed factory on the client, including its catch reset', async () => {
+		const result = await collectPipeableStream(server.FactoryRejectionBoundary, {
 			scenario: 'weather-failure',
 		});
-		const result = await rendered;
-		expect(result.errors).toEqual([]);
+		expect(result.errors).toEqual([
+			expect.objectContaining({ message: 'The Kyoto forecast desk did not answer.' }),
+		]);
+		expect(result.html).not.toContain('The Kyoto forecast desk did not answer.');
 		container.innerHTML = result.html;
 		activate(container);
-		const serverCatch = container.querySelector('.factory-error');
-		expect(serverCatch).not.toBeNull();
-		expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
-
-		const root = hydrateRoot(container, FactoryRejectionBoundary as any, {
-			scenario: 'weather-failure',
-		});
+		const shell = container.querySelector('.weather-card');
+		expect(container.querySelector('.factory-pending')).not.toBeNull();
+		expect(container.querySelector('.factory-error')).toBeNull();
+		const root = hydrateRoot(container, FactoryRejectionBoundary, { scenario: 'weather-failure' });
 		try {
-			flushSync(function () {});
+			await act(async () => {});
+			expect(container.querySelector('.weather-card')).toBe(shell);
 			expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
-			expect(container.querySelector('.factory-error')).toBe(serverCatch);
+			const alert = container.querySelector('.factory-error')!;
+			await act(() => (alert.querySelector('button') as HTMLButtonElement).click());
+			expect(container.querySelector('.factory-error')).toBeNull();
+			expect(container.querySelector('.factory-ok')!.textContent).toBe(
+				'Clear mornings, cool after dusk.',
+			);
 		} finally {
 			root.unmount();
 		}
 	});
 
-	it('hydrates a streamed catch arm in place and consumes the superseded client rejection', async () => {
+	it('uses the new client rejection after a streamed failure without leaking it or losing sibling IDs', async () => {
 		const d = deferred<string>();
 		const c = collector();
+		const serverError = vi.fn();
 		const { pipe } = ServerRT.renderToPipeableStream(
 			server.IdBoundary,
 			{ promise: d.promise },
-			{ identifierPrefix: 'page-' },
+			{ identifierPrefix: 'page-', onError: serverError },
 		);
 		pipe(c.dest);
 		const [id] = protocolIds(c.chunks[0]);
-		d.reject({ name: 'PlainFailure', message: 'server-no' });
+		const reason = { name: 'PlainFailure', message: 'server-private-no' };
+		d.reject(reason);
 		await c.ended;
-
-		container.innerHTML = c.chunks.join('');
+		const html = c.chunks.join('');
+		expect(html).not.toContain('server-private-no');
+		expect(serverError).toHaveBeenCalledExactlyOnceWith(reason);
+		container.innerHTML = html;
 		activate(container);
-		const rootId = ':page-in-0:';
-		const boundaryId = ':page-b' + id + '-in-0:';
-		const errorSpan = container.querySelector('.id-error');
-		expect(errorSpan!.textContent).toBe('server-no');
-		expect(errorSpan!.getAttribute('data-boundary-id')).toBe(boundaryId);
-
+		const shell = container.querySelector('#id-box')!;
+		expect(shell.getAttribute('data-root-id')).toBe(':page-in-0:');
+		expect(container.querySelector('.id-error')).toBeNull();
 		const seen: Array<[string, string]> = [];
-		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const clientPending = deferred<string>();
-		const unhandledClientRejections: unknown[] = [];
-		const onUnhandledRejection = (reason: unknown, promise: Promise<unknown>) => {
-			if (promise === clientPending.promise) unhandledClientRejections.push(reason);
-		};
-		process.on('unhandledRejection', onUnhandledRejection);
+		const caught = vi.fn();
 		const root = hydrateRoot(
 			container,
-			IdBoundary as any,
+			IdBoundary,
 			{
 				promise: clientPending.promise,
 				onId: (arm: string, value: string) => seen.push([arm, value]),
 			},
-			{ identifierPrefix: 'page-' },
+			{ identifierPrefix: 'page-', onCaughtError: caught },
 		);
 		try {
 			flushSync(() => {});
-			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
+			expect(container.querySelector('.id-error')).toBeNull();
+			expect(container.querySelector('.id-loading')).not.toBeNull();
+			expect(seen).toContainEqual(['root', ':page-in-0:']);
+			const clientError = new Error('client request rejected');
+			await act(() => clientPending.reject(clientError));
+			expect(container.querySelector('.id-error')!.textContent).toBe('client request rejected');
 			expect(container.querySelector('.id-loading')).toBeNull();
-			expect(seen).toContainEqual(['root', rootId]);
-			expect(seen).toContainEqual(['catch', boundaryId]);
-			expect(errSpy).not.toHaveBeenCalled();
-
-			// The server rejection remains authoritative for this hydration episode,
-			// but the client-created request still settles later. Wait through a host
-			// task boundary so an unobserved promise would emit `unhandledRejection`.
-			clientPending.reject(new Error('client request also rejected'));
-			await new Promise<void>((resolve) => setTimeout(resolve, 0));
-			expect(unhandledClientRejections).toEqual([]);
-			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
-			expect(errorSpan!.textContent).toBe('server-no');
-			expect(errSpy).not.toHaveBeenCalled();
+			expect(container.querySelector('#id-box')).toBe(shell);
+			expect(caught).toHaveBeenCalledWith(clientError);
+			expect(seen).toContainEqual(['pending', ':page-b' + id + '-in-0:']);
+			expect(seen).toContainEqual(['catch', ':page-b' + id + '-in-1:']);
 		} finally {
-			process.off('unhandledRejection', onUnhandledRejection);
-			errSpy.mockRestore();
 			root.unmount();
 		}
 	});
 
-	it('preserves primitive and plain-object reasons in streamed catch hydration', async () => {
+	it('handles client primitive and plain-object failures after streamed server errors', async () => {
 		const cases = [
-			{ reason: 'stream-string', text: 'stream-string:', kind: 'string', code: '' },
+			{ reason: 'client-string', text: 'client-string:', kind: 'string', code: '' },
 			{
-				reason: { message: 'stream-object', code: 'E_STREAM' },
-				text: 'stream-object:E_STREAM',
+				reason: { message: 'client-object', code: 'E_CLIENT' },
+				text: 'client-object:E_CLIENT',
 				kind: 'object',
-				code: 'E_STREAM',
+				code: 'E_CLIENT',
 			},
 		] as const;
-
 		for (const testCase of cases) {
 			const d = deferred<string>();
 			const c = collector();
-			const { pipe } = ServerRT.renderToPipeableStream(server.ReasonBoundary, {
-				promise: d.promise,
-			});
+			const serverError = vi.fn();
+			const { pipe } = ServerRT.renderToPipeableStream(
+				server.ReasonBoundary,
+				{ promise: d.promise },
+				{ onError: serverError },
+			);
 			pipe(c.dest);
-			d.reject(testCase.reason);
+			const serverReason = new Error('server-private-error');
+			d.reject(serverReason);
 			await c.ended;
-
-			container.innerHTML = c.chunks.join('');
+			const html = c.chunks.join('');
+			expect(serverError).toHaveBeenCalledExactlyOnceWith(serverReason);
+			expect(html).not.toContain('server-private-error');
+			container.innerHTML = html;
 			activate(container);
-			const serverCatch = container.querySelector('.reason-error');
-			let caught: any;
-			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-			const root = hydrateRoot(container, ReasonBoundary as any, {
-				promise: new Promise<string>(() => {}),
-				onCatch: (reason: unknown) => (caught = reason),
+			const box = container.querySelector('#reason-box');
+			expect(container.querySelector('.reason-loading')).not.toBeNull();
+			const onCatch = vi.fn();
+			const root = hydrateRoot(container, ReasonBoundary, {
+				promise: Promise.reject(testCase.reason),
+				onCatch,
 			});
-			flushSync(() => {});
-
-			expect(container.querySelector('.reason-error')).toBe(serverCatch);
-			expect(serverCatch!.textContent).toBe(testCase.text);
-			expect(serverCatch!.getAttribute('data-kind')).toBe(testCase.kind);
-			expect(serverCatch!.getAttribute('data-code')).toBe(testCase.code);
-			if (typeof testCase.reason === 'string') expect(caught).toBe(testCase.reason);
-			else expect(caught).toEqual(testCase.reason);
-			expect(errorSpy).not.toHaveBeenCalled();
-			errorSpy.mockRestore();
+			await act(async () => {});
+			const alert = container.querySelector('.reason-error')!;
+			expect(alert.textContent).toBe(testCase.text);
+			expect(alert.getAttribute('data-kind')).toBe(testCase.kind);
+			expect(alert.getAttribute('data-code')).toBe(testCase.code);
+			expect(onCatch).toHaveBeenCalledWith(testCase.reason);
+			expect(container.querySelector('#reason-box')).toBe(box);
 			root.unmount();
 		}
 	});

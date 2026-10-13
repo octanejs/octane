@@ -2,9 +2,8 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { act, flushSync, hydrateRoot } from '../src/index.js';
 import {
 	NestedRejectionBoundary,
 	OpaqueReasonBoundary,
@@ -14,155 +13,147 @@ import {
 } from './_fixtures/ssr-suspense.tsrx';
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspense.tsrx');
-
-function serverModule(): Record<string, any> {
-	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
-		id: 'ssr-suspense.tsrx',
-		mode: 'server',
-		compileOptions: {
-			mode: 'server',
-		},
-	});
-}
-
-const server = serverModule();
+const server = loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+	id: 'ssr-suspense.tsrx',
+	mode: 'server',
+	compileOptions: { mode: 'server' },
+});
 const pending = <T>() => new Promise<T>(() => {});
-
 let container: HTMLElement;
 beforeEach(() => {
 	container = document.createElement('div');
 	document.body.appendChild(container);
 });
-afterEach(() => container.remove());
+afterEach(() => {
+	container.remove();
+	vi.restoreAllMocks();
+});
 
-describe('SSR rejection hydration fidelity', () => {
-	it('hydrates a primitive rejection through the existing server catch DOM', async () => {
-		const { html } = await prerender(server.ReasonBoundary, {
-			promise: Promise.reject('plain-reason'),
+describe('SSR failed boundaries use client data when they hydrate', () => {
+	it.each([
+		{ name: 'primitive', reason: 'server-private-reason' },
+		{
+			name: 'plain object',
+			reason: { message: 'server-private-reason', code: 'SERVER_PRIVATE_CODE' },
+		},
+		{
+			name: 'Error with custom fields',
+			reason: Object.assign(new Error('server-private-reason'), { code: 'SERVER_PRIVATE_CODE' }),
+		},
+	])(
+		'$name reaches server onError, while client success replaces only the pending boundary',
+		async ({ reason }) => {
+			const serverError = vi.fn();
+			const onCatch = vi.fn();
+			const { html } = await prerender(
+				server.ReasonBoundary,
+				{ promise: Promise.reject(reason), onCatch },
+				{ onError: serverError },
+			);
+			expect(serverError).toHaveBeenCalledExactlyOnceWith(reason);
+			expect(onCatch).not.toHaveBeenCalled();
+			expect(html).not.toContain('server-private-reason');
+			expect(html).not.toContain('SERVER_PRIVATE_CODE');
+			container.innerHTML = html;
+			const box = container.querySelector('#reason-box');
+			const fallback = container.querySelector('.reason-loading')!;
+			expect(fallback.textContent).toBe('loading');
+			const recovered = vi.fn();
+			const root = hydrateRoot(
+				container,
+				ReasonBoundary,
+				{ promise: Promise.resolve('client success'), onCatch },
+				{ onRecoverableError: recovered },
+			);
+			await act(async () => {});
+			expect(container.querySelector('#reason-box')).toBe(box);
+			expect(fallback.isConnected).toBe(false);
+			expect(container.querySelector('.reason-ok')!.textContent).toBe('client success');
+			expect(container.querySelector('.reason-error')).toBeNull();
+			expect(onCatch).not.toHaveBeenCalled();
+			expect(recovered).toHaveBeenCalledTimes(1);
+			root.unmount();
+		},
+	);
+
+	it('never snapshots an opaque or hostile error to produce fallback HTML', async () => {
+		const accessed = vi.fn(() => {
+			throw new Error('must not inspect error fields');
 		});
+		const reason: any = new Error('server-secret');
+		reason.cycle = reason;
+		Object.defineProperty(reason, 'private', { get: accessed, enumerable: true });
+		const onError = vi.fn();
+		const { html } = await prerender(
+			server.OpaqueReasonBoundary,
+			{ promise: Promise.reject(reason) },
+			{ onError },
+		);
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toBe(reason);
+		expect(accessed).not.toHaveBeenCalled();
+		expect(html).not.toContain('server-secret');
 		container.innerHTML = html;
-		const serverCatch = container.querySelector('.reason-error');
-		let caught: unknown;
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const root = hydrateRoot(container, ReasonBoundary as any, {
-			promise: pending(),
-			onCatch: (reason: unknown) => (caught = reason),
+		const box = container.querySelector('#opaque-reason-box');
+		const onCatch = vi.fn();
+		const clientError = new Error('client error');
+		const root = hydrateRoot(container, OpaqueReasonBoundary, {
+			promise: Promise.reject(clientError),
+			onCatch,
 		});
-		flushSync(() => {});
-
-		expect(container.querySelector('.reason-error')).toBe(serverCatch);
-		expect(serverCatch!.textContent).toBe('plain-reason:');
-		expect(serverCatch!.getAttribute('data-kind')).toBe('string');
-		expect(caught).toBe('plain-reason');
-		expect(errorSpy).not.toHaveBeenCalled();
-		errorSpy.mockRestore();
+		await act(async () => {});
+		expect(container.querySelector('#opaque-reason-box')).toBe(box);
+		expect(container.querySelector('.opaque-reason-loading')).toBeNull();
+		expect(container.querySelector('.opaque-reason-error')!.textContent).toBe('caught');
+		expect(onCatch).toHaveBeenCalledWith(clientError);
 		root.unmount();
 	});
 
-	it('preserves a plain-object rejection and its catch-visible custom fields', async () => {
-		const reason = { message: 'plain-no', code: 'E_PLAIN', details: { retry: false } };
-		const { html } = await prerender(server.ReasonBoundary, {
-			promise: Promise.reject(reason),
-		});
-		container.innerHTML = html;
-		const serverCatch = container.querySelector('.reason-error');
-		let caught: any;
-		const root = hydrateRoot(container, ReasonBoundary as any, {
-			promise: pending(),
-			onCatch: (value: unknown) => (caught = value),
-		});
-		flushSync(() => {});
-
-		expect(container.querySelector('.reason-error')).toBe(serverCatch);
-		expect(serverCatch!.textContent).toBe('plain-no:E_PLAIN');
-		expect(caught).toEqual(reason);
-		root.unmount();
-	});
-
-	it('reconstructs Error fields and safely snapshots cycles and hostile properties', async () => {
-		const reason: any = new Error('error-no');
-		reason.code = 'E_ERROR';
-		reason.details = { retry: false };
-		reason.details.self = reason.details;
-		Object.defineProperty(reason, '__proto__', {
-			value: { polluted: true },
-			enumerable: true,
-		});
-		Object.defineProperty(reason, 'hostile', {
-			enumerable: true,
-			get() {
-				throw new Error('do not invoke me twice');
-			},
-		});
-
-		const { html } = await prerender(server.ReasonBoundary, {
-			promise: Promise.reject(reason),
-		});
-		container.innerHTML = html;
-		let caught: any;
-		const root = hydrateRoot(container, ReasonBoundary as any, {
-			promise: pending(),
-			onCatch: (value: unknown) => (caught = value),
-		});
-		flushSync(() => {});
-
-		expect(caught).toBeInstanceOf(Error);
-		expect(caught).toMatchObject({
-			name: 'Error',
-			message: 'error-no',
-			code: 'E_ERROR',
-			details: { retry: false, self: '[Circular]' },
-			hostile: '[unavailable]',
-		});
-		expect(Object.prototype.hasOwnProperty.call(caught, '__proto__')).toBe(true);
-		expect(caught.__proto__).toEqual({ polluted: true });
-		expect(({} as any).polluted).toBeUndefined();
-		root.unmount();
-	});
-
-	it('bounds enumerable Error fields with one shared snapshot budget', async () => {
-		const reason: any = new Error('many-fields');
-		for (let i = 0; i < 600; i++) reason['field' + i] = { nested: { index: i } };
-		const { html } = await prerender(server.ReasonBoundary, {
-			promise: Promise.reject(reason),
-		});
-		container.innerHTML = html;
-		let caught: any;
-		const root = hydrateRoot(container, ReasonBoundary as any, {
-			promise: pending(),
-			onCatch: (value: unknown) => (caught = value),
-		});
-		flushSync(() => {});
-
-		expect(caught.field0).toEqual({ nested: { index: 0 } });
-		expect(caught.field255).toEqual({ nested: { index: 255 } });
-		expect(caught.field256).toBe('[truncated]');
-		expect(caught.field511).toBe('[truncated]');
-		expect(caught.field512).toBeUndefined();
-		expect(caught.__octane_truncated__).toBe(true);
-		root.unmount();
-	});
-
-	it('degrades a revoked proxy reason without losing the hydration seed', async () => {
-		const revocable = Proxy.revocable({}, {});
-		revocable.revoke();
-		const { html } = await prerender(server.OpaqueReasonBoundary, {
-			promise: Promise.reject(revocable.proxy),
-		});
-		expect(html).toContain('data-octane-suspense');
-		container.innerHTML = html;
-		const serverCatch = container.querySelector('.opaque-reason-error');
-		let caught: unknown;
-		const root = hydrateRoot(container, OpaqueReasonBoundary as any, {
-			promise: pending(),
-			onCatch: (value: unknown) => (caught = value),
-		});
-		flushSync(() => {});
-
-		expect(container.querySelector('.opaque-reason-error')).toBe(serverCatch);
-		expect(caught).toBe('[unavailable]');
-		root.unmount();
-	});
+	it.each([
+		{
+			name: 'catchless inner',
+			Component: NestedRejectionBoundary,
+			Server: server.NestedRejectionBoundary,
+			selector: '.nested-error',
+		},
+		{
+			name: 'rethrown inner',
+			Component: RethrowingNestedRejectionBoundary,
+			Server: server.RethrowingNestedRejectionBoundary,
+			selector: '.nested-rethrow-error',
+		},
+	])(
+		'$name routes a new client error to the ancestor catch',
+		async ({ Component, Server, selector }) => {
+			const onInnerCatch = vi.fn();
+			const onOuterCatch = vi.fn();
+			const onError = vi.fn();
+			const props = {
+				promise: Promise.reject(new Error('server-private-reason')),
+				onInnerCatch,
+				onOuterCatch,
+			};
+			const { html } = await prerender(Server, props, { onError });
+			expect(onError).toHaveBeenCalledTimes(1);
+			expect(onInnerCatch).not.toHaveBeenCalled();
+			expect(onOuterCatch).not.toHaveBeenCalled();
+			expect(html).not.toContain('server-private-reason');
+			container.innerHTML = html;
+			const clientError = Object.assign(new Error('client-visible-error'), { code: 'CLIENT' });
+			const root = hydrateRoot(container, Component, {
+				...props,
+				promise: Promise.reject(clientError),
+			});
+			await act(async () => {});
+			expect(container.querySelector(selector)!.textContent).toContain('client-visible-error');
+			if (Component === RethrowingNestedRejectionBoundary) {
+				expect(onInnerCatch).toHaveBeenCalledWith(clientError);
+				expect(onOuterCatch).toHaveBeenCalledWith(clientError);
+				expect(container.querySelector(selector)!.getAttribute('data-code')).toBe('CLIENT');
+			}
+			root.unmount();
+		},
+	);
 
 	it('keeps fulfilled data shaped like the former rejection sentinel as data', async () => {
 		const value = {
@@ -192,71 +183,6 @@ describe('SSR rejection hydration fidelity', () => {
 		expect(hydratedValue).toEqual(value);
 		expect(Object.prototype.hasOwnProperty.call(hydratedValue.nestedUndefined, 'value')).toBe(true);
 		expect(Object.prototype.hasOwnProperty.call(hydratedValue.undefinedList, 0)).toBe(true);
-		root.unmount();
-	});
-
-	it('keeps the former undefined sentinel shape inside a rejected plain object', async () => {
-		const reason = {
-			message: 'sentinel-shaped',
-			code: 'E_SENTINEL',
-			__octane_new_undefined__: true,
-		};
-		const { html } = await prerender(server.ReasonBoundary, {
-			promise: Promise.reject(reason),
-		});
-		container.innerHTML = html;
-		let caught: unknown;
-		const root = hydrateRoot(container, ReasonBoundary as any, {
-			promise: pending(),
-			onCatch: (value: unknown) => (caught = value),
-		});
-		flushSync(() => {});
-
-		expect(caught).toEqual(reason);
-		root.unmount();
-	});
-
-	it('retains the private rejection signal through a catch-less inner boundary', async () => {
-		const { html } = await prerender(server.NestedRejectionBoundary, {
-			promise: Promise.reject('nested-no'),
-		});
-		container.innerHTML = html;
-		const serverCatch = container.querySelector('.nested-error');
-		const root = hydrateRoot(container, NestedRejectionBoundary as any, {
-			promise: pending(),
-		});
-		flushSync(() => {});
-
-		expect(container.querySelector('.nested-error')).toBe(serverCatch);
-		expect(serverCatch!.textContent).toBe('nested-no');
-		root.unmount();
-	});
-
-	it('retains rejection adoption when an inner catch rethrows to an outer catch', async () => {
-		const reason = { message: 'rethrow-no', code: 'E_RETHROW' };
-		const { html } = await prerender(server.RethrowingNestedRejectionBoundary, {
-			promise: Promise.reject(reason),
-		});
-		container.innerHTML = html;
-		const serverCatch = container.querySelector('.nested-rethrow-error');
-		let inner: unknown;
-		let outer: unknown;
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const root = hydrateRoot(container, RethrowingNestedRejectionBoundary as any, {
-			promise: pending(),
-			onInnerCatch: (value: unknown) => (inner = value),
-			onOuterCatch: (value: unknown) => (outer = value),
-		});
-		flushSync(() => {});
-
-		expect(container.querySelector('.nested-rethrow-error')).toBe(serverCatch);
-		expect(serverCatch!.textContent).toBe('rethrow-no');
-		expect(serverCatch!.getAttribute('data-code')).toBe('E_RETHROW');
-		expect(inner).toBe(outer);
-		expect(outer).toEqual(reason);
-		expect(container.querySelector('.nested-rethrow-never')).toBeNull();
-		expect(errorSpy).not.toHaveBeenCalled();
-		errorSpy.mockRestore();
 		root.unmount();
 	});
 });

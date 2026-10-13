@@ -1,8 +1,4 @@
-// A @try body whose only child is a template-less component that reads a
-// promise with use(). The server rejected the promise, so it rendered the
-// @catch arm (plus a rejection seed) where the client's componentSlot claim
-// expects the reader's own range. Hydration must read the seed, adopt the
-// server catch arm, and keep the hosts around the boundary.
+// Template-less and compiled readers share the error boundary server contract.
 import { ErrorBoundary, use } from 'octane';
 
 function Reader(props: { promise: Promise<unknown> }) {
@@ -56,6 +52,8 @@ export function RejectedThenResolved(props: {
 				<Reader promise={props.rejected} />
 				<b>{'body'}</b>
 			</>
+		} @pending {
+			<em>{'first loading'}</em>
 		} @catch (error: unknown) {
 			<p class="caught">{String(error) as string}</p>
 		}

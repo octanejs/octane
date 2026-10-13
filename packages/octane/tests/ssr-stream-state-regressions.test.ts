@@ -690,7 +690,7 @@ describe('SSR stream state regressions', () => {
 		resetStreamRuntimeGlobals();
 	});
 
-	it('retires unresolved content descendants omitted by an outer catch segment', async () => {
+	it('retires unresolved content descendants when the outer stream fails', async () => {
 		const outer = deferred<string>();
 		const inner = deferred<string>();
 		const output = collector();
@@ -704,10 +704,12 @@ describe('SSR stream state regressions', () => {
 		outer.reject(new Error('outer failed'));
 		await output.ended;
 		const container = activateChunks(output.chunks);
-		expect(container.querySelector('.outer-catch')!.textContent).toBe('outer failed');
-		expect(container.querySelector('.outer-pending')).toBeNull();
+		expect(container.querySelector('.outer-catch')).toBeNull();
+		expect(container.querySelector('.outer-pending')).not.toBeNull();
 		expect(container.querySelector('.content-inner-pending')).toBeNull();
-		expect(onError).not.toHaveBeenCalled();
+		expect(container.textContent).not.toContain('outer failed');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toEqual(new Error('outer failed'));
 		container.remove();
 		resetStreamRuntimeGlobals();
 	});

@@ -151,7 +151,11 @@ describe('automatic hook dependencies — full compiler', () => {
 						depsOf(code).sort(
 							(a, b) => (Array.isArray(a) ? a.length : 0) - (Array.isArray(b) ? b.length : 0),
 						),
-					).toEqual([['method(props, "log")'], ['method(props, "log")', 'retry']]);
+					).toEqual(
+						mode === 'server'
+							? [['method(props, "log")']]
+							: [['method(props, "log")'], ['method(props, "log")', 'retry']],
+					);
 				}
 			}
 		}

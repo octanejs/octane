@@ -9814,19 +9814,24 @@ export function Answer() @{
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
 
-				// A server @catch arm is adopted in place when the client read fails too.
+				// Server errors render @pending. The activated binding retries the
+				// read, selects its own @catch and attaches that new button's reset.
 				generation$.set(6);
 				request(6).reject(new Error('server failure'));
 				await settle();
 				const failed = fixture();
 				container.innerHTML = failed.html;
-				const serverRetry = container.querySelector('button')!;
-				expect(serverRetry.textContent).toBe('Error: server failure');
+				const serverPending = container.querySelector('[data-pending]')!;
+				expect(serverPending.textContent).toBe('waiting');
+				expect(container.querySelector('button')).toBeNull();
 				const failedHandle = failed.attach(container.querySelector('section')!, failed.state);
-				expect(container.querySelector('button')).toBe(serverRetry);
+				await settle();
+				const clientRetry = container.querySelector('button')!;
+				expect(clientRetry.textContent).toBe('Error: server failure');
+				expect(serverPending.isConnected).toBe(false);
 				generation$.set(7);
 				request(7).resolve('seventh');
-				serverRetry.click();
+				clientRetry.click();
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('seventh');
 				failedHandle.dispose();
@@ -9882,7 +9887,7 @@ export function Answer() @{
 		});
 
 		// A binding view stays an ordinary component: hydrateRoot adopts the same
-		// server @try output, whichever settled arm the server rendered.
+		// server @try content in place, retrying server errors on the client.
 		it(`hydrates a binding view's settled @try arms with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
 			const source = `import { answer$ } from './island-state';
 export function Answer() @{
@@ -9919,8 +9924,13 @@ export function Answer() @{
 					await act(async () => {
 						for (let index = 0; index < 4; index++) await Promise.resolve();
 					});
-					expect(container.querySelector('section p')).toBe(server);
-					expect(server.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
+					const result = container.querySelector('section p')!;
+					if (outcome === 'ready') expect(result).toBe(server);
+					else {
+						expect(result).not.toBe(server);
+						expect(server.isConnected).toBe(false);
+					}
+					expect(result.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
 					expect(error).not.toHaveBeenCalled();
 				} finally {
 					error.mockRestore();

@@ -7,8 +7,8 @@ import * as Fixture from './_fixtures/catch-destructured-param.tsrx';
 
 // A `@catch` parameter may be a destructuring pattern, annotated or not, whose
 // defaults read component locals. Its bindings belong to the error arm and
-// shadow same-named component locals. Client render, server render, and
-// hydration of server HTML all produce the same error output from them.
+// shadow same-named component locals. Client rendering from both createRoot and a server pending fallback
+// must destructure identically.
 
 type Props = Fixture.Props;
 
@@ -23,7 +23,7 @@ export function UnannotatedPattern(props) @{
 	<div>
 		@try {
 			<Result state={props.state} label={props.label} />
-		} @catch ({ message }, retry) {
+		} @pending { <span /> } @catch ({ message }, retry) {
 			<button class="retry" onClick={() => { props.state.failed = false; retry(); }}>{message as string}</button>
 		}
 	</div>
@@ -76,12 +76,11 @@ const text = (selector: string) =>
 // depend on how its parameter is written, so these cases check the hosts outside.
 const OUTSIDE = 'div, .outer';
 
-type Server = { text: string | null; hosts: Element[] } | null;
+type Server = { hosts: Element[] } | null;
 
 // The client rendered the server's output and adopted the surrounding hosts.
 function expectHydrated(server: Server) {
 	if (server === null) return;
-	expect(container.textContent).toBe(server.text);
 	const hosts = [...container.querySelectorAll(OUTSIDE)];
 	expect(hosts).toHaveLength(server.hosts.length);
 	hosts.forEach((host, index) => expect(host).toBe(server.hosts[index]));
@@ -101,10 +100,9 @@ for (const how of ['createRoot', 'hydrateRoot'] as const) {
 			let serverDom: Server = null;
 			let root: ReturnType<typeof createRoot>;
 			if (how === 'hydrateRoot') {
-				serverHtml = renderToString(server[view], copy(props)).html;
+				serverHtml = renderToString(server[view], copy(props), { onError() {} }).html;
 				container.innerHTML = serverHtml;
 				serverDom = {
-					text: container.textContent,
 					hosts: [...container.querySelectorAll(OUTSIDE)],
 				};
 				root = hydrateRoot(container, Client[view], props, options);
@@ -126,7 +124,7 @@ for (const how of ['createRoot', 'hydrateRoot'] as const) {
 		for (const view of ['UnannotatedPattern', 'AnnotatedPattern'] as const) {
 			it(`${view}: renders the destructured message and resets through the reset parameter`, () => {
 				const page = mount(view, { state: { failed: true }, label: view });
-				if (how === 'hydrateRoot') expect(page.serverHtml).toContain(`${view} failed`);
+				if (how === 'hydrateRoot') expect(page.serverHtml).not.toContain(`${view} failed`);
 				const button = container.querySelector('.retry');
 				expect(text('.retry')).toEqual([`${view} failed`]);
 				expect(page.caught).toEqual([`${view} failed`]);
@@ -145,7 +143,7 @@ for (const how of ['createRoot', 'hydrateRoot'] as const) {
 		it('evaluates pattern defaults against component locals and shadows same-named locals', () => {
 			const props: Props = { state: { failed: true }, label: 'first', thrown: { code: 'E1' } };
 			const page = mount('DefaultFromParent', props);
-			if (how === 'hydrateRoot') expect(page.serverHtml).toContain('first fallback:E1');
+			if (how === 'hydrateRoot') expect(page.serverHtml).not.toContain('first fallback:E1');
 			expect(text('.outer')).toEqual(['first outer']);
 			expect(text('.caught')).toEqual(['first fallback:E1']);
 			expectHydrated(page.serverDom);
@@ -166,7 +164,7 @@ for (const how of ['createRoot', 'hydrateRoot'] as const) {
 				label: 'second',
 				thrown: ['first'],
 			});
-			if (how === 'hydrateRoot') expect(page.serverHtml).toContain('first+second');
+			if (how === 'hydrateRoot') expect(page.serverHtml).not.toContain('first+second');
 			expect(text('.caught')).toEqual(['first+second']);
 			expectHydrated(page.serverDom);
 			expect(page.failures).toEqual([]);

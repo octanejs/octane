@@ -478,11 +478,19 @@ describe('lazy server regression coverage', () => {
 	it('rejects a nested server lazy wrapper', () => {
 		const Inner = ServerRuntime.lazy(() => lazyModule(server.LazyText));
 		const Outer = ServerRuntime.lazy(() => lazyModule(Inner));
-		const { html } = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Outer,
-			childProps: { text: 'nested' },
-		});
-		expect(html).toContain('Error: lazy: expected');
+		const onError = vi.fn();
+		const { html } = ServerRuntime.renderToString(
+			server.LazyHost,
+			{
+				comp: Outer,
+				childProps: { text: 'nested' },
+			},
+			{ onError },
+		);
+		expect(html).toContain('<div class="lazy-fallback">Loading...</div>');
+		expect(html).not.toContain('class="lazy-error"');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0].message).toMatch(/^lazy: expected/);
 	});
 
 	// Server mirror of ReactLazy.js:70-180's transactional loader setup.
@@ -493,11 +501,19 @@ describe('lazy server regression coverage', () => {
 			if (attempts === 1) throw new Error('server load exploded');
 			return lazyModule(server.LazyText);
 		});
-		const first = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Lazy,
-			childProps: { text: 'first' },
-		});
-		expect(first.html).toContain('Error: server load exploded');
+		const onError = vi.fn();
+		const first = ServerRuntime.renderToString(
+			server.LazyHost,
+			{
+				comp: Lazy,
+				childProps: { text: 'first' },
+			},
+			{ onError },
+		);
+		expect(first.html).toContain('<div class="lazy-fallback">Loading...</div>');
+		expect(first.html).not.toContain('server load exploded');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toEqual(new Error('server load exploded'));
 
 		const second = ServerRuntime.renderToString(server.LazyHost, {
 			comp: Lazy,
@@ -521,11 +537,19 @@ describe('lazy server regression coverage', () => {
 			}
 			return lazyModule(server.LazyText);
 		});
-		const first = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Lazy,
-			childProps: { text: 'first' },
-		});
-		expect(first.html).toContain('Error: server subscription exploded');
+		const onError = vi.fn();
+		const first = ServerRuntime.renderToString(
+			server.LazyHost,
+			{
+				comp: Lazy,
+				childProps: { text: 'first' },
+			},
+			{ onError },
+		);
+		expect(first.html).toContain('<div class="lazy-fallback">Loading...</div>');
+		expect(first.html).not.toContain('server subscription exploded');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toEqual(new Error('server subscription exploded'));
 
 		const second = ServerRuntime.renderToString(server.LazyHost, {
 			comp: Lazy,
@@ -548,11 +572,19 @@ describe('lazy server regression coverage', () => {
 			}),
 		);
 		const Lazy = ServerRuntime.lazy(load);
-		const first = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Lazy,
-			childProps: { text: 'first' },
-		});
-		expect(first.html).toContain('Error: server default exploded');
+		const onError = vi.fn();
+		const first = ServerRuntime.renderToString(
+			server.LazyHost,
+			{
+				comp: Lazy,
+				childProps: { text: 'first' },
+			},
+			{ onError },
+		);
+		expect(first.html).toContain('<div class="lazy-fallback">Loading...</div>');
+		expect(first.html).not.toContain('server default exploded');
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0]).toEqual(new Error('server default exploded'));
 
 		const second = ServerRuntime.renderToString(server.LazyHost, {
 			comp: Lazy,

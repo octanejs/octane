@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { createContext, createElement, flushSync, hydrateRoot } from '../../src/index.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 const FIXTURE = `
@@ -415,6 +415,47 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 });
 
 describe('descriptor list serialization preserves observable child evaluation', () => {
+	it('adopts a Usable host item and moves keyed tails around its owned range', () => {
+		const serverValue = ServerRuntime.createContext(
+			ServerRuntime.createElement('input', { 'data-usable-input': '', defaultValue: 'server' }),
+		);
+		const value = createContext(
+			createElement('input', { 'data-usable-input': '', defaultValue: 'server' }),
+		);
+		const serverTail = (key: string) =>
+			ServerRuntime.createElement('span', { key, 'data-tail': key }, key);
+		const tail = (key: string) => createElement('span', { key, 'data-tail': key }, key);
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		host.innerHTML = ServerRuntime.renderToString(() => [
+			serverValue,
+			serverTail('a'),
+			serverTail('b'),
+		]).html;
+		const input = host.querySelector('input')!;
+		const a = host.querySelector('[data-tail="a"]')!;
+		const b = host.querySelector('[data-tail="b"]')!;
+		input.value = 'typed before hydration';
+		const errors = vi.fn();
+		const App = ({ reverse }: { reverse: boolean }) => [
+			value,
+			...(reverse ? [tail('b'), tail('a')] : [tail('a'), tail('b')]),
+		];
+		const root = hydrateRoot(host, App, { reverse: false }, { onRecoverableError: errors });
+		try {
+			flushSync(() => {});
+			expect(host.querySelector('input')).toBe(input);
+			expect(input.value).toBe('typed before hydration');
+			flushSync(() => root.render(App, { reverse: true }));
+			expect(Array.from(host.querySelectorAll('input, [data-tail]'))).toEqual([input, b, a]);
+			expect(input.value).toBe('typed before hydration');
+			expect(errors).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			host.remove();
+		}
+	});
+
 	it('reads an accessor-backed host descriptor child only once', () => {
 		let reads = 0;
 		const first = {

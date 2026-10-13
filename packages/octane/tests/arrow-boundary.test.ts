@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'octane/server';
 import { flushSync, hydrateRoot } from 'octane';
 import { act, flushEffects, mount } from './_helpers.js';
@@ -50,9 +50,16 @@ describe('module-level arrows returning @try', () => {
 			const compiled = loadCompiledFixtureSource(source, { id: 'arrow-form.tsrx', mode });
 			if (mode === 'server') {
 				expect(renderToString(compiled.Content, { label: 'ready' }).html).toContain('ready');
-				expect(renderToString(compiled.Content, { label: 'offline', fail: true }).html).toContain(
-					'Error: offline',
+				const onError = vi.fn();
+				const { html } = renderToString(
+					compiled.Content,
+					{ label: 'offline', fail: true },
+					{ onError },
 				);
+				expect(html).toContain('<p>loading</p>');
+				expect(html).not.toContain('offline');
+				expect(onError).toHaveBeenCalledTimes(1);
+				expect(onError.mock.calls[0][0]).toEqual(new Error('offline'));
 			} else {
 				const view = mount(compiled.Content, { label: 'ready' });
 				try {
@@ -245,17 +252,28 @@ describe('module-level arrows returning @try', () => {
 		}
 	});
 
-	it.each(runtimeForms)('%s server-renders each boundary arm', (_name, _Component, exportName) => {
-		expect(renderToString(server[exportName], { label: 'server', value: 'ready' }).html).toContain(
-			'server: ready',
-		);
-		expect(
-			renderToString(server[exportName], { label: 'server', promise: new Promise(() => {}) }).html,
-		).toContain('server: loading');
-		expect(renderToString(server[exportName], { label: 'server', fail: true }).html).toContain(
-			'unavailable',
-		);
-	});
+	it.each(runtimeForms)(
+		'%s server-renders primary content or its pending fallback',
+		(_name, _Component, exportName) => {
+			expect(
+				renderToString(server[exportName], { label: 'server', value: 'ready' }).html,
+			).toContain('server: ready');
+			expect(
+				renderToString(server[exportName], { label: 'server', promise: new Promise(() => {}) })
+					.html,
+			).toContain('server: loading');
+			const onError = vi.fn();
+			const { html } = renderToString(
+				server[exportName],
+				{ label: 'server', fail: true },
+				{ onError },
+			);
+			expect(html).toContain('server: loading');
+			expect(html).not.toContain('unavailable');
+			expect(onError).toHaveBeenCalledTimes(1);
+			expect(onError.mock.calls[0][0]).toEqual(new Error('unavailable'));
+		},
+	);
 
 	it.each(runtimeForms)(
 		'%s hydrates existing hosts and keeps events and updates live',

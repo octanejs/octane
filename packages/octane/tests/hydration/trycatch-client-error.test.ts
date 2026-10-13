@@ -10,7 +10,6 @@ import {
 	NestedPage,
 	RouterShape,
 	JsxBoundaryPage,
-	JsxRejectedBoundaryPage,
 } from './_fixtures/trycatch-client-error.tsrx';
 
 // The server rendered a @try's SUCCESS arm, but on the client the try body throws
@@ -233,23 +232,12 @@ describe('hydrateRoot — JSX error boundaries', () => {
 		root.unmount();
 	});
 
-	it('adopts a server-rendered rejection fallback and exposes its original primitive reason', async () => {
-		const { html } = await prerender(server.JsxRejectedBoundaryPage, {
-			promise: Promise.reject('server rejected'),
-		});
-		container.innerHTML = html;
-		const fallback = container.querySelector('#jsx-rejected-error');
-		const sibling = container.querySelector('#jsx-rejected-after');
-
-		const root = hydrateRoot(container, JsxRejectedBoundaryPage, {
-			promise: new Promise<string>(() => {}),
-		});
-		flushSync(() => {});
-		expect(container.querySelector('#jsx-rejected-error')).toBe(fallback);
-		expect(fallback?.textContent).toBe('server rejected');
-		expect(fallback?.getAttribute('data-kind')).toBe('string');
-		expect(container.querySelector('#jsx-rejected-after')).toBe(sibling);
-		expect(errSpy).not.toHaveBeenCalled();
-		root.unmount();
+	it('passes an original primitive rejection through JSX ErrorBoundary to the shell', async () => {
+		await expect(
+			prerender(server.JsxRejectedBoundaryPage, {
+				promise: Promise.reject('server rejected'),
+			}),
+		).rejects.toBe('server rejected');
+		expect(container.querySelector('#jsx-rejected-error')).toBeNull();
 	});
 });

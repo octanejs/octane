@@ -636,7 +636,12 @@ export function App() @{
 `;
 					const { code } = compile(source, 'App.tsrx', { mode });
 					expect(code).toContain('armA');
-					expect(code).toContain('armB');
+					if (directive.name === '@try' && mode === 'server') {
+						// A module-scoped catch remains client code, just like an inline one.
+						expect(code).not.toContain('armB');
+					} else {
+						expect(code).toContain('armB');
+					}
 					const evaluable = code
 						.replace(/^import[\s\S]*?from '[^']+';$/gm, '')
 						.replace(/^export /gm, '');
