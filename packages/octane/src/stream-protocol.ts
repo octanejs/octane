@@ -28,7 +28,12 @@ export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 /** Render-unique token stamped on deferred-hydration owners in a streamed shell. */
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
 
-function hydrationMarkerMultiplicity(data: string, open: boolean): number {
+/**
+ * Decode physical range markers for streaming capture and active hydration.
+ * Counted pairs from earlier clients still represent a single DOM nesting
+ * level. Reject non-canonical payloads as ordinary comments.
+ */
+export function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 	const marker = open ? HYDRATION_START : HYDRATION_END;
 	if (data === marker) return 1;
 	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;

@@ -13,7 +13,6 @@ import { createContext as createNativeContext } from '../../src/universal-native
 import * as ServerRT from 'octane/server';
 import { App } from '../_fixtures/ssr-provider.tsx';
 import { ProviderApp } from '../_fixtures/jsx-context-children.tsx';
-import { hydrationMarkerSummary } from './_marker-summary.js';
 import { LateProviderApp } from './_fixtures/late-provider.tsrx';
 
 // Round-trip SSR→hydrate for `.tsx` `<Ctx>` with descriptor children.
@@ -48,16 +47,12 @@ describe('hydration — .tsx <Context> descriptor children', () => {
 		expect(html).toContain('provided'); // children NOT dropped (bug 1)
 		container.innerHTML = html;
 		const leaf = container.querySelector('.leaf')!;
-		const before = hydrationMarkerSummary(container);
 		const root = hydrateRoot(container, App as any, {});
 		flushSync(() => {});
 		expect(container.querySelector('.leaf')).toBe(leaf); // adopted, not rebuilt
 		expect(leaf.textContent).toBe('provided');
-		const after = hydrationMarkerSummary(container);
-		expect(after.logicalPairs).toBe(before.logicalPairs);
-		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
-		expect(after.countedPairs).toBeGreaterThanOrEqual(1);
 		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 
 	it('renders a renderer-local provider on the server and hydrates the same context identity', () => {
@@ -102,15 +97,13 @@ describe('hydration — .tsx <Context> descriptor children', () => {
 	// `hostElementBody` → `childSlot` → the de-opt keyed list, which ADOPTS markers on
 	// hydration. The client now adopts the server host node (instead of building fresh),
 	// and the server emits the matching childSlot/forSlot/component block nesting
-	// (`ssrDeoptBlockChildren`) — so this round-trips without rebuilding hosts;
-	// hydration may compact exactly-coextensive protocol ranges afterward.
+	// (`ssrDeoptBlockChildren`) — so this round-trips without rebuilding hosts.
 	it('hydrates a de-opt host with a component-list child without mismatch', async () => {
 		const dserver = serverModule('packages/octane/tests/_fixtures/jsx-context-children.tsx');
 		const { html } = await ServerRT.renderToString(dserver.ProviderApp, {});
 		container.innerHTML = html;
 		const wrap = container.querySelector('.wrap')!;
 		const leaves = [...container.querySelectorAll('.leaf')];
-		const before = hydrationMarkerSummary(container);
 		const root = hydrateRoot(container, ProviderApp as any, {});
 		flushSync(() => {});
 		expect(container.querySelector('.wrap')).toBe(wrap);
@@ -118,11 +111,8 @@ describe('hydration — .tsx <Context> descriptor children', () => {
 		for (const el of leaves) {
 			expect(el.textContent).toBe('provided');
 		}
-		const after = hydrationMarkerSummary(container);
-		expect(after.logicalPairs).toBe(before.logicalPairs);
-		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
-		expect(after.countedPairs).toBeGreaterThanOrEqual(1);
 		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 });
 

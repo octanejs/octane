@@ -482,6 +482,15 @@ the build compiles them with the production Octane compiler and they count as
 
 The `shell_*` set, [`bundle-size/apps/app-shell`](bundle-size/apps/app-shell), is the smallest app that combines the features a production Octane app uses together: `hydrateRoot`, a `lazy` page under `Suspense`, `ViewTransition`, `startTransition`, and a `useSignal$` counter. It has under 1 kB of app code, so its bytes are almost all runtime. Its `react` twin is the same component on React 19.3 with `alien-signals`. It pins React 19.3 exactly, the first stable release with `<ViewTransition>`, because the default catalog is still on 19.2. The set has no ceiling build, so its signal and `alien-signals` imports do not widen the rows ceilings.
 
+The companion `shell_client_*` row builds that same app and lazy page through a
+`createRoot` entry for both frameworks. `shell_js_gzip - shell_client_js_gzip`
+is the additional complete client JS shipped when this app hydrates;
+`shell_fw_gzip - shell_client_fw_gzip` attributes the framework share under the
+same forced chunk split. Raw and Brotli, and each app share, are reported too.
+All emitted JS counts, including the lazy page. Both rows use the same
+production Oxc settings as every comparative app. The byte deltas are reported
+in pull request benchmarks and have no pass/fail budget.
+
 `bundle-reachability` builds twenty-five independent public-entry feature fixtures
 across thirty-three production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's

@@ -221,17 +221,11 @@ import {
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
-import {
-	bindingRootMarker,
-	BINDING_OPEN_PREFIX,
-	isBindingOpenComment,
-	isForBindingOpenComment,
-} from './dom-binding-protocol.js';
+import { bindingRootMarker, isForBindingOpenComment } from './dom-binding-protocol.js';
 import {
 	CLIENT_RENDER_ARM_COMMENT,
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
-	HYDRATION_FOR_PREFIX,
 	HYDRATE_MARKER_SELECTOR,
 	TRY_CATCH_COMMENT,
 } from './hydration-markers.js';
@@ -248,8 +242,10 @@ import {
 	SUSPENSE_TAG,
 } from './runtime-tags.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
+import { snapshotSignalValue } from './data-encoding.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
+	hydrationMarkerMultiplicity,
 	isRendererStreamBoundaryTemplate,
 	isRendererStreamToken,
 	rendererRangeClose,
@@ -287,6 +283,8 @@ import {
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
 	nativeProducerPublication,
+	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
+	startEarlySignalHydration,
 	readNativeDomStyle,
 	registerNativeActionResolver,
 	registerNativeReadRebase,
@@ -299,11 +297,11 @@ import {
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
-	createNativeAdoptionState,
-	captureInitialDocumentSignals,
-	materializeNativeSignalManifest,
 	NATIVE_SIGNAL_SEED_ATTR,
 	NATIVE_SIGNAL_FRESH_COMMENT,
+	captureInitialDocumentSignals,
+	createNativeAdoptionState,
+	materializeNativeSignalManifest,
 	parseNativeSignalManifest,
 	type NativeAdoptionState,
 	type NativeSignalManifest,
@@ -2076,13 +2074,39 @@ function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
 
 function ownNativeAdoption(
 	scope: Scope,
-	manifest: NativeSignalManifest,
+	manifest: NativeSignalManifest | string,
 	consume?: () => void,
 ): NativeAdoptionState {
-	const adoption = createNativeAdoptionState(
-		manifest,
-		scope.block.idState.renderOwner?.initialDocumentSignals,
-	);
+	const renderOwner = scope.block.idState.renderOwner;
+	const initial = renderOwner?.initialDocumentSignals;
+	const signalOwner = renderOwner?.signalOwner;
+	const initialScopeKey =
+		((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
+			?.scopeKey ?? 'octane:document';
+	let state: NativeAdoptionState | null | undefined = NATIVE_SIGNAL_HYDRATION
+		? createNativeAdoptionState(
+				typeof manifest === 'string' ? parseNativeSignalManifest(manifest) : manifest,
+				initial,
+				initialScopeKey,
+			)
+		: undefined;
+	// The signal engine can arrive inside this attempt after a lazy import.
+	// Delay only that case; loaded signal apps still validate before adopting.
+	const adoption: NativeAdoptionState = state ?? {
+		resolve(owner) {
+			if (state === null || !NATIVE_SIGNAL_HYDRATION) return undefined;
+			state ??= createNativeAdoptionState(
+				typeof manifest === 'string' ? parseNativeSignalManifest(manifest) : manifest,
+				initial,
+				initialScopeKey,
+			);
+			return state.resolve(owner);
+		},
+		release() {
+			state?.release();
+			state = null;
+		},
+	};
 	// Release moves an unchanged committed read live instead of rendering again.
 	registerNativeReadRebase(rebaseNativeRead);
 	registerHookCleanup(scope, () => {
@@ -18230,13 +18254,9 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	let restart: DeferredHydrationSuspension | undefined;
 	try {
 		if (preserved === undefined && state.nativeSeedRaw !== undefined) {
-			hydration.nativeAdoption = ownNativeAdoption(
-				block,
-				parseNativeSignalManifest(state.nativeSeedRaw),
-				() => {
-					state.nativeSeedRaw = undefined;
-				},
-			);
+			hydration.nativeAdoption = ownNativeAdoption(block, state.nativeSeedRaw, () => {
+				state.nativeSeedRaw = undefined;
+			});
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
 		if (preserved?.source !== null && preserved?.source !== undefined) {
@@ -18386,7 +18406,6 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
 	}
-	if (completed && hydration.hasAdjacentRangePair && !hydration.presentation) hydration.coalesce();
 }
 
 /**
@@ -21433,7 +21452,6 @@ class HydrationCapability {
 	 */
 	replayDepth = -1;
 	seedCursor = 0;
-	hasAdjacentRangePair = false;
 	private readonly freshNodes = new WeakSet<Node>();
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
@@ -22393,16 +22411,7 @@ class HydrationCapability {
 
 	close(open: Node): Comment {
 		const known = this.matchingCloses?.get(open);
-		const found =
-			known ?? findMatchingClose(open, (this.matchingCloses ??= new WeakMap<Node, Comment>()));
-		if (
-			!this.hasAdjacentRangePair &&
-			isBlockOpen((STAGED_DOM ? STAGED_DOM.view(open) : open).previousSibling) &&
-			isBlockClose(getNextSibling(found))
-		) {
-			this.hasAdjacentRangePair = true;
-		}
-		return found;
+		return known ?? findMatchingClose(open, (this.matchingCloses ??= new WeakMap<Node, Comment>()));
 	}
 
 	/**
@@ -24016,13 +24025,6 @@ class HydrationCapability {
 		for (const [line, node] of unpatched) if (root.contains(node)) lines.push(line);
 		if (lines.length !== 0) warnHydrationUnpatched(lines);
 	}
-
-	coalesce(): void {
-		const leases = this.rootBlock.idState.renderOwner?.bindingLeases;
-		if (leases !== undefined)
-			for (const lease of leases) if (lease.revision !== undefined && lease.active()) return;
-		coalesceHydratedRanges(this.rootBlock, this.liteRanges);
-	}
 }
 
 /**
@@ -25533,38 +25535,6 @@ export function setBindingClassIfChanged(
 // adopt. Without an active capability these are trivial DOM reads; hydration-only
 // navigation stays behind methods that client-only builds discard.
 // ---------------------------------------------------------------------------
-
-/**
- * Decode a hydration range marker. Legacy `[` / `]` comments have
- * multiplicity one; hydration-time range compaction writes `[N` / `]N` for
- * N >= 2 exactly-coextensive logical ranges sharing one physical pair. The
- * count is metadata — DOM navigation still treats the comment as ONE physical
- * nesting level. Non-canonical payloads are ordinary user comments.
- */
-function hydrationMarkerMultiplicity(data: string, open: boolean): number {
-	const marker = open ? HYDRATION_START : HYDRATION_END;
-	if (data === marker) return 1;
-	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;
-	if (
-		open &&
-		(data.startsWith(BINDING_OPEN_PREFIX) || data.startsWith(HYDRATION_FOR_PREFIX)) &&
-		isBindingOpenComment(data)
-	)
-		return 1;
-	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
-	// Canonical positive decimal: no signs, whitespace, zero, or leading zeroes.
-	const first = data.charCodeAt(1);
-	if (first < 49 || first > 57) return 0;
-	let value = first - 48;
-	for (let i = 2; i < data.length; i++) {
-		const digit = data.charCodeAt(i) - 48;
-		if (digit < 0 || digit > 9) return 0;
-		value = value * 10 + digit;
-		if (!Number.isSafeInteger(value)) return 0;
-	}
-	// Multiplicity one has exactly one canonical spelling: the legacy marker.
-	return value >= 2 ? value : 0;
-}
 
 /** True if `node` is a legacy or counted block-open marker. */
 function isBlockOpen(node: Node | null): node is Comment {
@@ -43066,13 +43036,9 @@ function takeInitialSuspenseHydration(
 	};
 }
 
-function finishInitialSuspenseHydration(
-	initial: InitialSuspenseHydration,
-	hydration: HydrationCapability,
-): void {
+function finishInitialSuspenseHydration(initial: InitialSuspenseHydration): void {
 	for (const node of initial.metadata) (STAGED_DOM ? STAGED_DOM.view(node) : node).remove();
 	initial.consume?.();
-	if (hydration.hasAdjacentRangePair) hydration.coalesce();
 }
 
 /**
@@ -43193,10 +43159,7 @@ function renderInitialSuspenseHydration(
 	let failure: unknown;
 	try {
 		if (initial.nativeRaw !== null) {
-			hydration.nativeAdoption = ownNativeAdoption(
-				block,
-				parseNativeSignalManifest(initial.nativeRaw),
-			);
+			hydration.nativeAdoption = ownNativeAdoption(block, initial.nativeRaw);
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
 		renderBlock(block);
@@ -43262,7 +43225,7 @@ function renderInitialSuspenseHydration(
 		// its server metadata and ranges replayable until that capture commits.
 		(capture.renderCleanups ??= []).push((discarded) => {
 			if (discarded) return;
-			finishInitialSuspenseHydration(initial, hydration);
+			finishInitialSuspenseHydration(initial);
 		});
 		spliceOffscreenCapture(capture);
 		return;
@@ -43307,10 +43270,10 @@ function renderInitialSuspenseHydration(
 			adoptServerCatch ? initial.start : undefined,
 			adoptServerCatch ? initial.end : undefined,
 		);
-		if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial, hydration);
+		if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial);
 		else
 			(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
-				if (!discarded) finishInitialSuspenseHydration(initial, hydration);
+				if (!discarded) finishInitialSuspenseHydration(initial);
 			});
 	} finally {
 		swapHydration(outerHydration);
@@ -43464,7 +43427,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let nativeAdoption: NativeAdoptionState | undefined;
 	if (hydrating && scopedNativeRaw !== undefined && !freshBoundary) {
 		const boundaryId = streamedBoundaryId!;
-		nativeAdoption = ownNativeAdoption(b, parseNativeSignalManifest(scopedNativeRaw), () => {
+		nativeAdoption = ownNativeAdoption(b, scopedNativeRaw, () => {
 			const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 			if (stash !== undefined) {
 				delete stash[boundaryId + '$signals'];
@@ -50697,420 +50660,6 @@ function lis(arr: Int32Array, n: number): number[] {
 // Post-hydration exact-range compaction
 // ---------------------------------------------------------------------------
 
-type CoalescedRangeOwner = CompSlot | ChildSlot | BranchSlot;
-
-interface HydrationRangeGroup {
-	start: Comment;
-	end: Comment;
-	/** Number of logical hydration ranges represented by this physical pair. */
-	depth: number;
-	/** Surviving exact-range group; null while this pair remains canonical. */
-	parent: HydrationRangeGroup | null;
-	blocks: Block[];
-	liteScopes: Scope[];
-	owners: CoalescedRangeOwner[];
-}
-
-/** True when a compiled ref manifest contains a `<Fragment ref>` binding. */
-function scopeHasFragmentRef(scope: Scope): boolean {
-	const fields = scope.refFields;
-	if (fields === null) return false;
-	for (let i = 0; i < fields.length; i += 3) {
-		if (fields[i] === 'f') return true;
-	}
-	return false;
-}
-
-/**
- * Collapse only ranges whose runtime ownership graph and DOM positions both
- * prove they are exactly coextensive. SSR deliberately stays on the legacy
- * explicit-pair protocol: hydration first adopts every range unambiguously,
- * then this one-shot pass redirects inner owners to the retained outer pair and
- * removes the redundant comments. Suspense/try, Activity, portals, and list
- * outer ranges are traversal barriers; keyed item ranges remain independently
- * movable, though wrapper-only descendants may compact inside each item pair.
- */
-function coalesceHydratedRanges(
-	rootBlock: Block,
-	liteRanges: WeakMap<Scope, HydratedLiteRange>,
-): void {
-	const blockGroups = new WeakMap<Block, HydrationRangeGroup>();
-	const scopeGroups = new WeakMap<Scope, HydrationRangeGroup>();
-	const ownerGroups = new WeakMap<object, HydrationRangeGroup>();
-	const groups: HydrationRangeGroup[] = [];
-	const seenBlocks = new WeakSet<Block>();
-	const seenScopes = new WeakSet<Scope>();
-	let redundantMarkers: Set<Comment> | null = null;
-	let removalRange: Range | null = null;
-
-	function canonicalGroup(group: HydrationRangeGroup): HydrationRangeGroup {
-		let canonical = group;
-		while (canonical.parent !== null) canonical = canonical.parent;
-		while (group.parent !== null && group.parent !== canonical) {
-			const parent = group.parent;
-			group.parent = canonical;
-			group = parent;
-		}
-		return canonical;
-	}
-
-	function makeGroup(
-		startNode: Node | null,
-		endNode: Node | null,
-		block?: Block,
-		liteScope?: Scope,
-		owner?: CoalescedRangeOwner,
-	): HydrationRangeGroup | null {
-		if (!isBlockOpen(startNode) || !isBlockClose(endNode) || startNode === endNode) return null;
-		// Binding receipts are observable to later renderer-free adoption; never compact them away.
-		if (isBindingOpenComment((STAGED_DOM ? STAGED_DOM.view(startNode) : startNode).data))
-			return null;
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(startNode) : startNode).parentNode === null ||
-			(STAGED_DOM ? STAGED_DOM.view(startNode) : startNode).parentNode !==
-				(STAGED_DOM ? STAGED_DOM.view(endNode) : endNode).parentNode
-		)
-			return null;
-		const openDepth = hydrationMarkerMultiplicity(
-			(STAGED_DOM ? STAGED_DOM.view(startNode) : startNode).data,
-			true,
-		);
-		const closeDepth = hydrationMarkerMultiplicity(
-			(STAGED_DOM ? STAGED_DOM.view(endNode) : endNode).data,
-			false,
-		);
-		if (openDepth === 0 || openDepth !== closeDepth) return null;
-		const group: HydrationRangeGroup = {
-			start: startNode,
-			end: endNode,
-			depth: openDepth,
-			parent: null,
-			blocks: block === undefined ? [] : [block],
-			liteScopes: liteScope === undefined ? [] : [liteScope],
-			owners: owner === undefined ? [] : [owner],
-		};
-		groups.push(group);
-		if (block !== undefined) blockGroups.set(block, group);
-		if (liteScope !== undefined) scopeGroups.set(liteScope, group);
-		if (owner !== undefined) ownerGroups.set(owner, group);
-		return group;
-	}
-
-	function writeMultiplicity(group: HydrationRangeGroup): void {
-		domNode(group.start).data =
-			group.depth === 1 ? HYDRATION_START : HYDRATION_START + String(group.depth);
-		domNode(group.end).data =
-			group.depth === 1 ? HYDRATION_END : HYDRATION_END + String(group.depth);
-	}
-
-	function removeRedundantMarkerRun(anchor: Comment, after: boolean): void {
-		if (redundantMarkers === null) return;
-		const adjacent = after
-			? getNextSibling(anchor)
-			: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling;
-		if (
-			adjacent === null ||
-			adjacent.nodeType !== 8 ||
-			!redundantMarkers.has(adjacent as Comment)
-		) {
-			return;
-		}
-		let edge = adjacent;
-		for (;;) {
-			const next = after
-				? getNextSibling(edge)
-				: (STAGED_DOM ? STAGED_DOM.view(edge) : edge).previousSibling;
-			if (next === null || next.nodeType !== 8 || !redundantMarkers.has(next as Comment)) break;
-			edge = next;
-		}
-		if (STAGED_DOM) {
-			const first = after ? adjacent : edge;
-			const last = after ? edge : adjacent;
-			removeRange(first, getNextSibling(last));
-			return;
-		}
-		const range = (removalRange ??= anchor.ownerDocument!.createRange());
-		range.setStartBefore(after ? adjacent : edge);
-		range.setEndAfter(after ? edge : adjacent);
-		range.deleteContents();
-	}
-
-	/** Merge bookkeeping for two runtime owners that already share one pair. */
-	function unifySharedPair(
-		outer: HydrationRangeGroup,
-		inner: HydrationRangeGroup,
-	): HydrationRangeGroup {
-		outer = canonicalGroup(outer);
-		inner = canonicalGroup(inner);
-		if (outer === inner) return outer;
-		outer.depth = Math.max(outer.depth, inner.depth);
-		inner.parent = outer;
-		writeMultiplicity(outer);
-		return outer;
-	}
-
-	function rangesAreExactlyNested(outer: HydrationRangeGroup, inner: HydrationRangeGroup): boolean {
-		return (
-			domNode(outer.start).parentNode !== null &&
-			domNode(outer.start).parentNode === domNode(inner.start).parentNode &&
-			domNode(outer.end).parentNode === domNode(outer.start).parentNode &&
-			domNode(inner.end).parentNode === domNode(outer.start).parentNode &&
-			getNextSibling(outer.start) === inner.start &&
-			getNextSibling(inner.end) === outer.end
-		);
-	}
-
-	/** Redirect one group's direct runtime owners after all exact pairs are known. */
-	function borrowGroupMembers(outer: HydrationRangeGroup, inner: HydrationRangeGroup): void {
-		for (let i = 0; i < inner.blocks.length; i++) {
-			const block = inner.blocks[i];
-			block.startMarker = outer.start;
-			block.endMarker = outer.end;
-			block.exclusiveMarkers = true;
-		}
-		for (let i = 0; i < inner.liteScopes.length; i++) {
-			inner.liteScopes[i].block.endMarker = outer.end;
-		}
-		for (let i = 0; i < inner.owners.length; i++) {
-			const owner = inner.owners[i];
-			owner.start = outer.start;
-			owner.end = outer.end;
-			if (owner.__kind === 'componentSlotSlot') {
-				owner.inherited = true;
-			} else if (owner.__kind === 'childSlot') {
-				owner.borrowed = true;
-				if (owner.forSlot !== null) {
-					owner.forSlot.start = outer.start;
-					owner.forSlot.end = outer.end;
-				}
-			} else {
-				owner.borrowed = true;
-			}
-		}
-	}
-
-	function mergeExactRanges(
-		outer: HydrationRangeGroup,
-		inner: HydrationRangeGroup,
-	): HydrationRangeGroup {
-		outer = canonicalGroup(outer);
-		inner = canonicalGroup(inner);
-		if (outer === inner) return outer;
-		if (outer.start === inner.start && outer.end === inner.end) {
-			return unifySharedPair(outer, inner);
-		}
-		if (!rangesAreExactlyNested(outer, inner)) return outer;
-		const mergedDepth = outer.depth + inner.depth;
-		// Both inputs were decoded as safe integers, but their sum may not be. Keep
-		// both physical pairs rather than minting metadata the protocol cannot parse.
-		if (!Number.isSafeInteger(mergedDepth)) return outer;
-		(redundantMarkers ??= new Set<Comment>()).add(inner.start).add(inner.end);
-		outer.depth = mergedDepth;
-		inner.parent = outer;
-		writeMultiplicity(outer);
-		return outer;
-	}
-
-	function attachOwner(group: HydrationRangeGroup | null, owner: CoalescedRangeOwner): void {
-		if (group === null) return;
-		group = canonicalGroup(group);
-		if (group.owners.indexOf(owner) === -1) group.owners.push(owner);
-		ownerGroups.set(owner, group);
-	}
-
-	function isBoundaryOwner(owner: CompSlot): boolean {
-		return hasComponentFlags(owner.currentComp, COMPONENT_FLAG_BOUNDARY);
-	}
-
-	function mayBorrowCandidate(value: any): boolean {
-		if (value === null || typeof value !== 'object') return false;
-		const kind = value.__kind;
-		if (kind === 'componentSlotSlot') {
-			const owner = value as CompSlot;
-			return (
-				owner.block !== null &&
-				!owner.keyed &&
-				!isBoundaryOwner(owner) &&
-				!scopeHasFragmentRef(owner.block)
-			);
-		}
-		if (kind === 'childSlot') {
-			const owner = value as ChildSlot;
-			return (
-				owner.block !== null &&
-				owner.forSlot === null &&
-				owner.portal === null &&
-				!hasComponentFlags(owner.currentComp, COMPONENT_FLAG_BOUNDARY) &&
-				!scopeHasFragmentRef(owner.block)
-			);
-		}
-		if (kind === 'ifBlockSlot' || kind === 'switchBlockSlot') {
-			const owner = value as BranchSlot;
-			return owner.block === null || !scopeHasFragmentRef(owner.block);
-		}
-		return liteRanges.has(value as Scope) && !scopeHasFragmentRef(value as Scope);
-	}
-
-	function mappedGroup(value: any): HydrationRangeGroup | undefined {
-		if (value === null || typeof value !== 'object') return undefined;
-		const group = ownerGroups.get(value) ?? scopeGroups.get(value as Scope);
-		return group === undefined ? undefined : canonicalGroup(group);
-	}
-
-	/**
-	 * A packed one-entry scope is the runtime proof for a sole output range.
-	 * Template pass-through holes also carry a compiler proof because slot 0 is
-	 * their binding bag; no DOM-only inference is made for arbitrary empty holes.
-	 */
-	function soleRangeCandidate(scope: Scope): HydrationRangeGroup | null {
-		let only: any = undefined;
-		let count = 0;
-		const slots = scope.slots;
-		for (let i = 0; i < slots.length; i++) {
-			if (slots[i] === undefined) continue;
-			only = slots[i];
-			count++;
-			if (count > 1) break;
-		}
-		if (count === 1 && mayBorrowCandidate(only)) {
-			const group = mappedGroup(only);
-			if (group !== undefined) return group;
-		}
-
-		const registered = scope._slots;
-		if (
-			registered !== null &&
-			registered.length === 1 &&
-			scope.children === null &&
-			registered[0].__kind === 'childSlot' &&
-			(registered[0] as ChildSlot).compactable &&
-			mayBorrowCandidate(registered[0])
-		) {
-			const group = ownerGroups.get(registered[0]);
-			return group === undefined ? null : canonicalGroup(group);
-		}
-		return null;
-	}
-
-	function compactScopeRange(scope: Scope, own: HydrationRangeGroup | null): void {
-		visitScopeContents(scope);
-		if (own === null || scopeHasFragmentRef(scope)) return;
-		const candidate = soleRangeCandidate(scope);
-		if (candidate !== null) mergeExactRanges(own, candidate);
-	}
-
-	function visitBlock(block: Block, owner?: CoalescedRangeOwner): HydrationRangeGroup | null {
-		if (seenBlocks.has(block)) {
-			const existing = blockGroups.get(block) ?? null;
-			if (owner !== undefined) attachOwner(existing, owner);
-			return existing;
-		}
-		seenBlocks.add(block);
-		const own = makeGroup(block.startMarker, block.endMarker, block, undefined, owner);
-		compactScopeRange(block, own);
-		return blockGroups.get(block) ?? own;
-	}
-
-	function visitNestedScope(scope: Scope): HydrationRangeGroup | null {
-		if (seenScopes.has(scope)) return scopeGroups.get(scope) ?? null;
-		seenScopes.add(scope);
-		const range = liteRanges.get(scope);
-		const own =
-			range === undefined ? null : makeGroup(range.start, range.end, undefined, scope, undefined);
-		compactScopeRange(scope, own);
-		return scopeGroups.get(scope) ?? own;
-	}
-
-	function visitForSlot(state: ForSlot): void {
-		for (let block = state.head; block !== null; block = block.nextSibling) visitBlock(block);
-		if (state.emptyBlock !== null) visitBlock(state.emptyBlock);
-	}
-
-	function visitBranchSlot(state: BranchSlot): void {
-		const inner = state.block === null ? null : visitBlock(state.block);
-		const outer = makeGroup(state.start, state.end, undefined, undefined, state);
-		if (outer !== null && inner !== null && !scopeHasFragmentRef(state.block!)) {
-			mergeExactRanges(outer, inner);
-		}
-	}
-
-	function visitSlot(state: any, scope: Scope): void {
-		const kind = state.__kind;
-		if (kind === 'componentSlotSlot') {
-			if (state.block !== null) visitBlock(state.block, state as CompSlot);
-			return;
-		}
-		if (kind === 'childSlot') {
-			const child = state as ChildSlot;
-			if (child.block !== null) visitBlock(child.block, child);
-			else if (child.borrowed) {
-				// Empty returns borrow their component's pair before a child Block
-				// exists. Redirect that borrower too if the component range compacts.
-				const own = blockGroups.get(scope.block);
-				if (own !== undefined && child.start === own.start && child.end === own.end)
-					attachOwner(own, child);
-			}
-			if (child.forSlot !== null) visitForSlot(child.forSlot);
-			if (child.portal?.block != null) visitBlock(child.portal.block);
-			return;
-		}
-		if (kind === 'ifBlockSlot' || kind === 'switchBlockSlot') {
-			visitBranchSlot(state as BranchSlot);
-			return;
-		}
-		if (kind === 'forBlockSlot') {
-			visitForSlot(state as ForSlot);
-			return;
-		}
-		if (kind === 'trySlotSlot') {
-			const visible = state.block as Block | null;
-			const persistent = state.tryBlock as Block | null;
-			if (visible !== null) visitBlock(visible);
-			if (persistent !== null && persistent !== visible) visitBlock(persistent);
-			return;
-		}
-		if (kind === 'activityBlockSlot' || kind === 'portalSlotSlot') {
-			if (state.block !== null) visitBlock(state.block);
-			return;
-		}
-		// Internal host-children scopes may carry a markerless Block. Traverse it
-		// for descendants, but never expose the wrapper itself as a candidate.
-		if (state.block != null) visitBlock(state.block);
-	}
-
-	function visitScopeContents(scope: Scope): void {
-		const children = scope.children;
-		if (children !== null)
-			for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
-		const registered = scope._slots;
-		if (registered === null) return;
-		for (let i = 0; i < registered.length; i++) visitSlot(registered[i], scope);
-	}
-
-	visitBlock(rootBlock);
-	// Weak lookup tables make traversal cheap but cannot drive finalization. The
-	// ordered group list visits each directly registered member once, after path
-	// compression resolves any chain of removed marker pairs to its survivor.
-	for (let i = 0; i < groups.length; i++) {
-		const group = groups[i];
-		const canonical = canonicalGroup(group);
-		if (group.start !== canonical.start || group.end !== canonical.end) {
-			borrowGroupMembers(canonical, group);
-		}
-	}
-	// Exact nesting leaves the redundant opens and closes in two contiguous
-	// runs. Delete each run as one DOM mutation instead of repeatedly repairing
-	// sibling links and live collections for every wrapper layer.
-	if (redundantMarkers !== null) {
-		for (let i = 0; i < groups.length; i++) {
-			const group = groups[i];
-			if (group.parent !== null) continue;
-			removeRedundantMarkerRun(group.start, true);
-			removeRedundantMarkerRun(group.end, false);
-		}
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Public root API — React-DOM parity
 // ---------------------------------------------------------------------------
@@ -52350,7 +51899,7 @@ function hydrateRootWithOutputHandler(
 	assertValidRootContainer(container);
 	// Leases, presentations and streamed arms below outlive the adoption pass.
 	installHydrationDriver();
-	installEarlyControlBridge();
+	startEarlySignalHydration(installEarlyControlBridge);
 	let body: ComponentBody;
 	let props: any;
 	let rootKey: any = null;
@@ -52420,21 +51969,25 @@ function hydrateRootWithOutputHandler(
 	const initialDocumentSignals =
 		rootOptions?.initialDocumentSignals === undefined
 			? undefined
-			: captureInitialDocumentSignals(
-					rootOptions.initialDocumentSignals,
-					((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
-						?.scopeKey ?? 'octane:document',
-				);
+			: NATIVE_SIGNAL_HYDRATION
+				? captureInitialDocumentSignals(
+						rootOptions.initialDocumentSignals,
+						((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
+							?.scopeKey ?? 'octane:document',
+					)
+				: (snapshotSignalValue(rootOptions.initialDocumentSignals) as ScopeSeed);
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
-	const nativeManifest =
+	const nativeRaw =
 		nativeSidecar === null
 			? undefined
-			: materializeNativeSignalManifest(
-					parseNativeSignalManifest(
-						(STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar).textContent || '',
-					),
+			: (STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar).textContent || '';
+	const nativeManifest =
+		nativeRaw !== undefined && NATIVE_SIGNAL_HYDRATION
+			? materializeNativeSignalManifest(
+					parseNativeSignalManifest(nativeRaw),
 					initialDocumentSignals,
-				);
+				)
+			: nativeRaw;
 	(STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar)?.remove();
 	const ownerToken = claimRootContainer(container);
 	registerDelegationTarget(container, true);
@@ -52569,18 +52122,26 @@ function hydrateRootWithOutputHandler(
 				});
 			};
 		}
-		if (nativeManifest !== undefined)
-			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
 		hydration.passthroughRoot = hydration.passthroughRanges =
 			(body as ComponentBody & { [HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner' })[
 				HYDRATION_RANGE_BOUNDARY
 			] === 'passthrough';
 		const previousHydration = currentHydration;
 		swapHydration(hydration);
-		const previousNative = setNativeAdoptionResolver(hydration.nativeAdoption?.resolve ?? null);
+		const previousNative = setNativeAdoptionResolver(null);
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
+			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
+				owner.initialDocumentSignals = captureInitialDocumentSignals(
+					owner.initialDocumentSignals,
+					((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
+						?.scopeKey ?? 'octane:document',
+				);
+			if (nativeManifest !== undefined) {
+				hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
+				setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
+			}
 			if (
 				firstNode?.nodeType === 8 &&
 				(STAGED_DOM ? STAGED_DOM.view(firstNode as Comment) : (firstNode as Comment)).data ===
@@ -52668,7 +52229,6 @@ function hydrateRootWithOutputHandler(
 			return;
 		}
 		if (!completed) return;
-		if (hydration.hasAdjacentRangePair && !hydration.presentation) hydration.coalesce();
 		// From here retries are ordinary client updates on the adopted tree.
 		owner.retry = () => {
 			if (!rootBlock.disposed) scheduleRender(rootBlock);

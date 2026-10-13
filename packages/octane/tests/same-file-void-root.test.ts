@@ -415,6 +415,72 @@ export async function run(){const host=document.querySelector('#host');host.inne
 			});
 	});
 
+	it.each([
+		{ operation: 'retry', compact: false },
+		{ operation: 'retry', compact: true },
+		{ operation: 'unmount', compact: false },
+		{ operation: 'unmount', compact: true },
+	])(
+		'keeps signal history until the first signal module arrives at a suspended root (%j)',
+		async ({ operation, compact }) => {
+			const source = `import {hydrateRoot,flushSync,useLayoutEffect} from 'octane';
+let effects=[],cleanups=0;
+function View(props) @{
+ if(!props.ready.value)throw props.ready.gate;
+ useLayoutEffect(()=>{effects.push(document.querySelector('#host span').textContent);return()=>{cleanups++}},[]);
+ <main><span>{props.ready.value as string}</span><textarea /></main>
+}
+export async function run(){
+ const host=document.querySelector('#host');
+ host.innerHTML='<main><span>server</span><textarea></textarea></main>';
+ const script=document.createElement('script');script.type='application/json';script.setAttribute('data-octane-native-signals','');
+ const seed={version:1,scopeKey:'octane:document',entries:[{key:'text',kind:'signal',value:['string','server'],complete:true}]};
+ script.textContent=JSON.stringify(${compact ? "{version:2,scopes:[],initialDocument:{scopeKey:seed.scopeKey,entries:[{key:'text',read:'value'}]}}" : '{version:1,scopes:[seed]}'});
+ host.appendChild(script);
+ const span=host.querySelector('span'),area=host.querySelector('textarea');area.value='typed';area.focus();area.setSelectionRange(1,3);
+ let scope;const ready={value:null,gate:null};let load;ready.gate=new Promise(resolve=>{load=resolve});
+ const errors=[];const root=hydrateRoot(host,View,{ready},{onRecoverableError:error=>errors.push(String(error)),${compact ? 'initialDocumentSignals:seed' : ''}});
+ const before={same:span===host.querySelector('span'),text:host.querySelector('span').textContent,focused:document.activeElement===area,effects:[...effects]};
+ seed.entries[0].value[1]='changed after hydration started';
+ ${operation === 'unmount' ? 'root.unmount();' : ''}
+ const {createScope}=await import('octane/signals');
+ scope=createScope({scopeKey:seed.scopeKey});ready.value=scope.signal$('text','live');load();
+ await ready.gate;await Promise.resolve();await Promise.resolve();flushSync(()=>{});
+ flushSync(()=>ready.value.set('updated'));
+ const after={same:span===host.querySelector('span'),text:host.querySelector('span')?.textContent??'',focused:document.activeElement===area,
+ value:host.querySelector('textarea')?.value??'',selection:[area.selectionStart,area.selectionEnd],effects:[...effects],errors};
+ root.unmount();ready.value.set('retired');const empty=host.childNodes.length===0;scope.dispose();
+ return {before,after,cleanups,empty};
+}`;
+			for (const dev of [false, true])
+				expect(await consume(source, dev, false, 'esnext', LATE_ENGINE)).toEqual({
+					before: { same: true, text: 'server', focused: true, effects: [] },
+					after:
+						operation === 'retry'
+							? {
+									same: true,
+									text: 'updated',
+									focused: true,
+									value: 'typed',
+									selection: [1, 3],
+									effects: ['server'],
+									errors: [],
+								}
+							: {
+									same: false,
+									text: '',
+									focused: false,
+									value: '',
+									selection: [1, 3],
+									effects: [],
+									errors: [],
+								},
+					cleanups: operation === 'retry' ? 1 : 0,
+					empty: true,
+				});
+		},
+	);
+
 	it.each(['retry', 'replace', 'unmount'])(
 		'preserves initial suspension adoption and cleanup across %s',
 		async (operation) => {

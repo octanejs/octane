@@ -36,6 +36,7 @@ import {
 	nativeAdoptionMiss,
 	nativeReadRebase,
 	registerNativeBatchHooks,
+	registerNativeSignalHydration,
 	reportNativeRead,
 	type NativeReadSource,
 	type NativeSerializedScope,
@@ -107,6 +108,7 @@ interface FrameData {
 let activeFrames: Map<ScopeImpl, AdoptionFrameImpl> | undefined;
 
 registerNativeBatchHooks({ startBatch: startSignalBatch, endBatch: endSignalBatch });
+registerNativeSignalHydration();
 
 function requireKey(key: string, label: string): void {
 	if (typeof key !== 'string' || !key.trim()) {

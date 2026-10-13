@@ -33,6 +33,7 @@ import {
 	SIGNAL_SAME_CAPTURE,
 	currentSignalDeclarationInvocation,
 	forwardNativeTransitionConsumer,
+	registerEarlySignalHydration,
 } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
 import { runAsDeclaredServerSignalReader as readAsDeclared } from './query-attempt-observer.js';
@@ -74,6 +75,8 @@ import type {
 const identityScopes = new WeakMap<object, OwnerScope>();
 const scopeOwners = new WeakMap<OwnerScope, SignalOwner>();
 const retiredIdentities = new WeakSet<object>();
+
+registerEarlySignalHydration();
 const documentInstances = new WeakMap<object, Set<object>>();
 const instanceDocuments = new WeakMap<object, object>();
 const frozenDocuments = new WeakMap<object, Promise<void>>();

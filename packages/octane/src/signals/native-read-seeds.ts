@@ -324,7 +324,10 @@ export function materializeNativeSignalManifest(
 export function createNativeAdoptionState(
 	manifest: NativeSignalManifest,
 	initialDocumentSignals?: ScopeSeed,
+	initialScopeKey?: string,
 ) {
+	if (initialDocumentSignals !== undefined && initialScopeKey !== undefined)
+		initialDocumentSignals = captureInitialDocumentSignals(initialDocumentSignals, initialScopeKey);
 	const materialized = materializeNativeSignalManifest(manifest, initialDocumentSignals);
 	const seeds = new Map(materialized.scopes.map((seed) => [seed.scopeKey, seed]));
 	const frames = new Map<NativeAdoptionOwner, AdoptionFrame>();

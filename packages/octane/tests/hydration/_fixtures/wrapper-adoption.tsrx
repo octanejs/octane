@@ -109,6 +109,30 @@ export function KeyedWrapperList(props: { rows: Row[] }) @{
 	</ul>
 }
 
+function DraftLeaf(props: { row: Row; fieldRef?: (el: HTMLInputElement | null) => void }) {
+	return (
+		<li data-draft={props.row.id}>
+			<input defaultValue={props.row.id} ref={props.fieldRef} />
+			<InteractiveMiddle label={props.row.id} className="draft-counter" />
+		</li>
+	);
+}
+
+function DraftWrapper(props: { row: Row; fieldRef?: (el: HTMLInputElement | null) => void }) {
+	return <DraftLeaf row={props.row} fieldRef={props.fieldRef} />;
+}
+
+export function DraftList(props: {
+	rows: Row[];
+	fieldRef?: (el: HTMLInputElement | null) => void;
+}) @{
+	<ul>
+		@for (const row of props.rows; key row.id) {
+			<DraftWrapper row={row} fieldRef={props.fieldRef} />
+		}
+	</ul>
+}
+
 // The compiler cannot recognize this local alias as a built-in boundary. The
 // shared runtime capability must still preserve its load-bearing SSR range.
 const Boundary = Suspense;

@@ -153,10 +153,10 @@ try {
 			before.logicalPairs !== expectedPairs ||
 			before.physicalPairs !== expectedPairs ||
 			after.logicalPairs !== expectedPairs ||
-			after.physicalPairs !== 1
+			after.physicalPairs !== before.physicalPairs
 		) {
 			throw new Error(
-				`${depth}-wrapper hydration did not preserve and compact its logical ranges: ` +
+				`${depth}-wrapper hydration did not retain its server ranges: ` +
 					JSON.stringify({ before, after }),
 			);
 		}
