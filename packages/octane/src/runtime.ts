@@ -29587,7 +29587,16 @@ export function headBlock(
 		const adopted = el !== null;
 		if (el === null) {
 			el = (STAGED_DOM ? STAGED_DOM.view(ownerDocument) : ownerDocument).createElement(tag);
-			(STAGED_DOM ? STAGED_DOM.view(head) : head).appendChild(el);
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+				// A root render's new head element joins <head> as it commits,
+				// unless an earlier deletion cleanup released its scope.
+				const created = el;
+				transaction.ops.push(() => {
+					if ((scope.slots[slot] as HeadSlot | undefined)?.el === created)
+						(STAGED_DOM ? STAGED_DOM.view(head) : head).appendChild(created);
+				}, null);
+			} else (STAGED_DOM ? STAGED_DOM.view(head) : head).appendChild(el);
 		}
 		// React 19 does not hydrate a hoisted head element in place: it claims the
 		// server's and sets the client's props on it (setInitialProperties), which
@@ -33694,8 +33703,18 @@ function renderPortalState(
 		// the target owner's re-renders (React parity — portals coexist with the
 		// container's own children). See reconcileDeoptChildren.
 		(start as any).$$portalEnd = end;
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).appendChild(start);
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).appendChild(end);
+		// A root render builds the portal off-document; its commit appends it.
+		// ViewTransitions still measure a portal where it renders (#2043 step 3).
+		const transaction = ROOT_RENDER_TRANSACTION;
+		const into =
+			transaction !== null &&
+			!transaction.aborted &&
+			!ROOT_RENDER_ROLLBACK &&
+			!VIEW_TRANSITION_DRIVER
+				? queueFrontier(parentBlock, target, null)
+				: target;
+		(STAGED_DOM ? STAGED_DOM.view(into) : into).appendChild(start);
+		(STAGED_DOM ? STAGED_DOM.view(into) : into).appendChild(end);
 		// The portal owns its start/end markers (default exclusiveMarkers=false), so
 		// unmountBlock removes them WITH the content — toggling a portal on/off never
 		// leaves orphan `<!--portal-->` comments in a persistent target (e.g.
@@ -33703,7 +33722,7 @@ function renderPortalState(
 		const block = createBlock(
 			'portal',
 			parentBlock,
-			target,
+			into,
 			start,
 			end,
 			norm.body,
@@ -36900,6 +36919,13 @@ function reconcileDeoptNode(
 function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
+	// An earlier render of this root left an order for this host: land it now,
+	// so this reconcile reads the children that render chose.
+	const pending: DeoptOrder | undefined = (el as any).$$deoptOrder;
+	if (pending !== undefined && pending.tx === ROOT_RENDER_TRANSACTION) {
+		journalRootChildren(el);
+		applyDeoptOrder(pending);
+	}
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
 	// Other shapes still need keyed matching: a lone text node may belong to a
 	// different array position, a nested wrapper, or independently inserted DOM.
@@ -36933,13 +36959,19 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	const next: any[] = [];
 	const nextKeys: any[] = [];
 	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
-	const firstChild = getFirstChild(el);
 	const journal =
 		ROOT_RENDER_TRANSACTION !== null &&
 		(STAGED_DOM ? STAGED_DOM.view(el) : el).parentNode !== null &&
 		(ownerBlock.mounted ||
 			ROOT_RENDER_TRANSACTION.hydrating ||
 			ROOT_RENDER_TRANSACTION.retainedCreated?.has(ownerBlock));
+	// A committed host's children change at its commit (queueDeoptOrder), unless
+	// hydration is adopting them.
+	const deferred =
+		journal &&
+		!(hydrating && activeHydration() !== null) &&
+		(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected;
+	const firstChild = getFirstChild(el);
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
@@ -36947,14 +36979,19 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		// Hydrating, an adopted host with no server children cannot hold these.
 		if (next.length !== 0 && hydrating) currentHydration!.missingDeoptChild(el, next[0]);
 		saveDeoptChildren(el);
+		const built: Node[] = [];
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
-				if (journal) journalRootChildren(el);
 				(node as any).$$deoptKey = nextKeys[i];
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
+				if (deferred) built.push(node);
+				else {
+					if (journal) journalRootChildren(el);
+					(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
+				}
 			}
 		}
+		if (built.length !== 0) queueDeoptOrder(el, built, false, false);
 		return;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
@@ -37079,7 +37116,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			// A speculative attempt's own record restores this removal if the
 			// attempt is discarded; a deferred removal would still run at commit.
 			if (journal && hydration?.speculative !== true) {
-				journalRootChildren(el);
+				if (!deferred) journalRootChildren(el);
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
@@ -37087,16 +37124,60 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			}
 		}
 	}
-	// Advance through owned live children once. Indexed childNodes reads restart
-	// native list walks after each insertion; foreign ranges also must not make
-	// every survivor rescan the preceding siblings.
+	const skip = hasForeign || singleton;
+	const adopt = hydrationOwnsUnstamped === true && !singleton;
+	if (deferred) queueDeoptOrder(el, result, skip, adopt);
+	else placeDeoptChildren(el, result, skip, adopt, journal === true);
+}
+
+/**
+ * A committed host's children as a root render's deopt reconcile chose them:
+ * its commit entry puts them in this order (applyDeoptOrder), after the
+ * deletions the reconcile queued. `skip` steps over foreign ranges; `adopt`
+ * also takes unstamped hydration children as owned.
+ */
+interface DeoptOrder {
+	tx: RootRenderTransaction;
+	el: Element;
+	nodes: Node[];
+	skip: boolean;
+	adopt: boolean;
+}
+
+function queueDeoptOrder(el: Element, nodes: Node[], skip: boolean, adopt: boolean): void {
+	const tx = ROOT_RENDER_TRANSACTION!;
+	const order: DeoptOrder = { tx, el, nodes, skip, adopt };
+	// A nested window that drops forgets its order with its entry.
+	journalRootProperty(el, '$$deoptOrder', (el as any).$$deoptOrder);
+	(el as any).$$deoptOrder = order;
+	tx.ops.push(applyDeoptOrder, order);
+}
+
+function applyDeoptOrder(order: DeoptOrder): void {
+	const el = order.el;
+	// A later render of this root landed it already.
+	if ((el as any).$$deoptOrder !== order) return;
+	(el as any).$$deoptOrder = undefined;
+	placeDeoptChildren(el, order.nodes, order.skip, order.adopt, false);
+}
+
+/**
+ * Put a host's owned children in `result`'s order. Advance through owned live
+ * children once. Indexed childNodes reads restart native list walks after each
+ * insertion; foreign ranges also must not make every survivor rescan the
+ * preceding siblings.
+ */
+function placeDeoptChildren(
+	el: Element,
+	result: Node[],
+	skip: boolean,
+	adopt: boolean,
+	journal: boolean,
+): void {
 	let cursor: Node | null = getFirstChild(el);
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
-		const at =
-			hasForeign || singleton
-				? nextDeoptOwnedChild(cursor, hydrationOwnsUnstamped === true && !singleton)
-				: cursor;
+		const at = skip ? nextDeoptOwnedChild(cursor, adopt) : cursor;
 		if (at !== want) {
 			saveDeoptChildren(el);
 			if (journal) journalRootChildren(el);

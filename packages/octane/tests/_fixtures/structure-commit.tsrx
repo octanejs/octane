@@ -1,4 +1,4 @@
-import { use, useLayoutEffect, useRef } from 'octane';
+import { createPortal, use, useLayoutEffect, useRef } from 'octane';
 
 // One app that removes content through every structural slot kind: a branch
 // arm, a keyed component, keyed rows, a value hole, and a branch arm inside a
@@ -137,6 +137,31 @@ export function ListProbeApp(props: ListProps) @{
 			}
 			<li>{'last'}</li>
 		</ol>
+		<Probe probe={props.probe} />
+		@if (props.gate) {
+			<Gate gate={props.gate} />
+		}
+	</main>
+}
+
+export interface OutsideProps {
+	show: boolean;
+	label: string;
+	target: HTMLElement;
+	gate?: PromiseLike<unknown>;
+	probe: () => void;
+}
+
+// Content that lands outside the root's container: a hoisted head element
+// and a portal, both mounted by a branch arm.
+export function OutsideApp(props: OutsideProps) @{
+	<main>
+		@if (props.show) {
+			<>
+				<title>{props.label}</title>
+				<div>{createPortal(<b class="portal-out">{props.label}</b>, props.target)}</div>
+			</>
+		}
 		<Probe probe={props.probe} />
 		@if (props.gate) {
 			<Gate gate={props.gate} />

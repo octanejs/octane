@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createRoot, startTransition } from '../src/index.js';
+import { createElement, createRoot, startTransition, use } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
 import {
 	BranchProbeApp,
 	ListProbeApp,
+	OutsideApp,
 	StructureApp,
 	type ListProps,
+	type OutsideProps,
 	type StructureProps,
 } from './_fixtures/structure-commit.tsrx';
 
@@ -265,6 +267,149 @@ describe('keyed lists change their structure at commit', () => {
 				observer.disconnect();
 				app.unmount();
 			}
+		});
+	}
+});
+
+// Descriptor children of a pure host reconcile through the de-opt list.
+interface DeoptProps {
+	rows: string[];
+	gate?: PromiseLike<unknown>;
+	probe: () => void;
+}
+
+function DeoptProbe(props: { probe: () => void }) {
+	props.probe();
+	return createElement('u', null, 'probe');
+}
+
+function DeoptGate(props: { gate: PromiseLike<unknown> }) {
+	use(props.gate);
+	return null;
+}
+
+function DeoptListApp(props: DeoptProps) {
+	return createElement(
+		'section',
+		null,
+		createElement(
+			'ul',
+			{ id: 'deopt' },
+			props.rows.map((row) => createElement('li', { key: row, id: 'deopt-' + row }, row)),
+		),
+		createElement(DeoptProbe, { probe: props.probe }),
+		props.gate ? createElement(DeoptGate, { gate: props.gate }) : null,
+	);
+}
+
+describe('de-opt host children change at commit', () => {
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`reorders, inserts and removes a host's children at commit only (${priority})`, async () => {
+			const records: MutationRecord[] = [];
+			const observer = new MutationObserver((batch) => records.push(...batch));
+			const mutations = () => {
+				records.push(...observer.takeRecords());
+				return records.splice(0);
+			};
+			let during: MutationRecord[] | null = null;
+			const initial: DeoptProps = { rows: ['a', 'b', 'c', 'd'], probe: () => {} };
+			const app = mount(DeoptListApp, initial);
+			const list = app.find('#deopt');
+			observer.observe(list, { childList: true, subtree: true, characterData: true });
+			const before = [...list.childNodes];
+			const render = (props: Partial<DeoptProps>) =>
+				act(() => {
+					const next = () =>
+						app.root.render(DeoptListApp, {
+							...initial,
+							probe: () => {
+								during = mutations();
+							},
+							...props,
+						});
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			try {
+				mutations();
+				// A sibling suspends: the dropped render leaves the children as they were.
+				await render({ rows: ['d', 'x', 'b', 'a'], gate: new Promise(() => {}) });
+				expect(during).toEqual([]);
+				expect(mutations()).toEqual([]);
+				expect([...list.childNodes].every((node, i) => node === before[i])).toBe(true);
+				expect(list.childNodes).toHaveLength(before.length);
+
+				await render({ rows: ['d', 'x', 'b', 'a'] });
+				expect(during).toEqual([]);
+				expect([...list.children].map((node) => node.id)).toEqual([
+					'deopt-d',
+					'deopt-x',
+					'deopt-b',
+					'deopt-a',
+				]);
+				for (const id of ['a', 'b', 'd'])
+					expect(app.find('#deopt-' + id)).toBe(
+						before.find((node) => (node as Element).id === 'deopt-' + id),
+					);
+			} finally {
+				observer.disconnect();
+				app.unmount();
+			}
+		});
+	}
+});
+
+describe('content outside the container lands at commit', () => {
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`appends a new head element and portal only when their render commits (${priority})`, async () => {
+			const target = document.createElement('aside');
+			document.body.appendChild(target);
+			const label = `outside-${priority}`;
+			const records: MutationRecord[] = [];
+			const observer = new MutationObserver((batch) => records.push(...batch));
+			const mutations = () => {
+				records.push(...observer.takeRecords());
+				return records.splice(0);
+			};
+			let during: MutationRecord[] | null = null;
+			const initial: OutsideProps = { show: false, label, target, probe: () => {} };
+			const app = mount(OutsideApp, initial);
+			observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+			observer.observe(target, { childList: true, subtree: true, characterData: true });
+			const titles = () =>
+				[...document.head.querySelectorAll('title')].filter((node) => node.textContent === label);
+			const render = (props: Partial<OutsideProps>) =>
+				act(() => {
+					const next = () =>
+						app.root.render(OutsideApp, {
+							...initial,
+							probe: () => {
+								during = mutations();
+							},
+							...props,
+						});
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			try {
+				mutations();
+				// A sibling suspends: nothing reaches <head> or the portal target.
+				await render({ show: true, gate: new Promise(() => {}) });
+				expect(during).toEqual([]);
+				expect(mutations()).toEqual([]);
+				expect(titles()).toHaveLength(0);
+				expect(target.childNodes).toHaveLength(0);
+
+				await render({ show: true });
+				expect(during).toEqual([]);
+				expect(titles()).toHaveLength(1);
+				expect(target.querySelector('.portal-out')?.textContent).toBe(label);
+			} finally {
+				observer.disconnect();
+				app.unmount();
+				target.remove();
+			}
+			expect(titles()).toHaveLength(0);
 		});
 	}
 });
