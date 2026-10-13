@@ -200,9 +200,10 @@ describe('returned components inside templates', () => {
 		'.shared-sole svg',
 	];
 
-	it('keeps a connected custom element effect through production parent updates', () => {
-		// Exercise production component reuse under both runtime projects. The hook
-		// itself is an ordinary fixture import with compiler-assigned hook slots.
+	it('keeps a connected custom element through production parent updates', () => {
+		// Exercise production component reuse under both runtime projects. As in
+		// React, a custom element's callbacks run at commit, when its content is
+		// inserted into the document, not inside the render that created it.
 		const client = loadCompiledFixtureSource<typeof fx>(
 			readFileSync('packages/octane/tests/_fixtures/components.tsrx', 'utf8'),
 			{
@@ -212,35 +213,31 @@ describe('returned components inside templates', () => {
 			},
 		);
 		const events: string[] = [];
-		const hookErrors: unknown[] = [];
 		customElements.define(
 			'octane-connected-effect-probe',
 			class extends HTMLElement {
 				connectedCallback() {
-					try {
-						fx.useConnectedElementEffect((event) => events.push(event));
-					} catch (error) {
-						hookErrors.push(error);
-					}
+					events.push('connected');
+				}
+				disconnectedCallback() {
+					events.push('disconnected');
 				}
 			},
 		);
 		const r = mount(client.ConnectedCustomElementParent, { tick: 'zero' });
 		try {
-			expect(hookErrors).toEqual([]);
 			expect(events).toEqual(['connected']);
 			const element = r.find('octane-connected-effect-probe');
 			r.update(client.ConnectedCustomElementParent, { tick: 'one' });
 			expect(r.find('.connected-tick').textContent).toBe('one');
 			expect(r.find('octane-connected-effect-probe')).toBe(element);
 			expect(element.isConnected).toBe(true);
-			expect(hookErrors).toEqual([]);
 			expect(events).toEqual(['connected']);
 		} finally {
 			r.unmount();
 		}
 		expect(r.container.childNodes).toHaveLength(0);
-		expect(events).toEqual(['connected', 'cleanup']);
+		expect(events).toEqual(['connected', 'disconnected']);
 	});
 
 	it('preserves SVG nodes through updates and keyed moves, and retires removed branches', () => {

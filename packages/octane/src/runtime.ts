@@ -4205,6 +4205,8 @@ interface RootRenderTransaction {
 	 * window truncates the queue and touches no DOM (dropRootOps).
 	 */
 	ops: any[];
+	/** Open render frames; a nested flushSync must not commit a render still running. */
+	rendering: number;
 	parked: ParkedItem[] | null;
 	/** Hook-cell folds published at commit, five slots each (foldHookQueue). */
 	cells: any[] | null;
@@ -4300,6 +4302,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			retired: null,
 			structures: null,
 			ops: [],
+			rendering: 0,
 			parked: null,
 			cells: null,
 			batches: null,
@@ -4313,6 +4316,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	}
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootEnter(transaction, owner);
+	transaction.rendering++;
 	const frame: RootRenderFrame = {
 		transaction,
 		previous: ROOT_RENDER_TRANSACTION,
@@ -4345,6 +4349,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 
 function endRootRender(frame: RootRenderFrame | null): void {
 	if (frame === null) return;
+	frame.transaction.rendering--;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootExit();
 	frame.transaction.parked = PARKED_ITEMS;
@@ -4605,9 +4610,10 @@ function slotFrontier(
 
 /**
  * A frontier of its own, for content that lands where no slot existed before
- * this render: a new return slot, or a root's first mount.
+ * this render: a new return slot, or a root's mount (whose root Block, created
+ * after the fragment, becomes its owner).
  */
-function queueFrontier(owner: Block, parent: Node, before: Node | null): DocumentFragment {
+function queueFrontier(owner: Block | null, parent: Node, before: Node | null): DocumentFragment {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	const next: SlotNext = {
 		tx,
@@ -4626,7 +4632,7 @@ function queueFrontier(owner: Block, parent: Node, before: Node | null): Documen
 
 function openFrontier(
 	next: SlotNext,
-	owner: Block,
+	owner: Block | null,
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
@@ -4636,7 +4642,7 @@ function openFrontier(
 	next.members = [];
 	next.parent = parent;
 	next.before = before;
-	next.owner = owningBlock(owner);
+	next.owner = owner === null ? null : owningBlock(owner);
 	return frag;
 }
 
@@ -4725,7 +4731,7 @@ function applyNext(next: SlotNext): void {
  * the binding-bag fields its compiled body cached from it.
  */
 function rehomeMember(member: any, frag: DocumentFragment, parent: Node): void {
-	if (member.__kind === 'trySlotSlot') {
+	if (member.__kind === 'trySlotSlot' || member.__kind === 'errorSlotSlot') {
 		if (member.domParent === frag) member.domParent = parent;
 		return;
 	}
@@ -4750,7 +4756,11 @@ function rehomeMember(member: any, frag: DocumentFragment, parent: Node): void {
 
 /** Development check: nothing below a committed frontier still names its fragment. */
 function assertRehomed(scope: any, frag: DocumentFragment): void {
-	if (scope.__kind === 'trySlotSlot' || scope.__kind === 'portalSlotSlot') {
+	if (
+		scope.__kind === 'trySlotSlot' ||
+		scope.__kind === 'errorSlotSlot' ||
+		scope.__kind === 'portalSlotSlot'
+	) {
 		if (scope.domParent === frag || scope.host === frag)
 			throw new Error('Octane: a slot was left in its fragment');
 		return;
@@ -4763,7 +4773,7 @@ function assertRehomed(scope: any, frag: DocumentFragment): void {
 	const slots: any[] | null = scope._slots;
 	if (slots !== null)
 		for (let i = 0; i < slots.length; i++)
-			if (slots[i].__kind === 'trySlotSlot' && slots[i].domParent === frag)
+			if (slots[i].domParent === frag)
 				throw new Error('Octane: a try slot was left in its fragment');
 	if (scope.block.disposed !== true)
 		forEachSubtreeChild(scope, (child) => assertRehomed(child, frag));
@@ -5072,106 +5082,112 @@ function commitRootRenders(): void {
 	if (transactions.length === 0) return;
 	ROOT_RENDER_TRANSACTIONS = [];
 	for (const transaction of transactions) {
-		const owner = transaction.owner;
-		const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
-			? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
-			: undefined;
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileRootEnter(transaction, owner);
-		try {
-			// A hold reached outside a drained origin (dropTransitionRender).
-			if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
-				TRANSITION_ROOT_DRIVER.drop(transaction);
-			if (transaction.aborted || owner.disposed) {
-				if (owner.transaction === transaction) owner.transaction = null;
-				continue;
-			}
-			// This is the native acceptance point. Validate before any deletion,
-			// ref, or effect callback can observe the candidate. A later callback
-			// write starts another transaction and does not revoke this snapshot.
-			if (
-				!transaction.nativeAdmitted &&
-				((hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
-					(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
-			) {
-				const presentationChanged = hydrationStarted
-					? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
-					: false;
-				rollbackRootRender(transaction);
-				if (owner.transaction === transaction) owner.transaction = null;
-				if (!owner.disposed) {
-					owner.wakeable = null;
-					owner.generation++;
-					if (presentationChanged) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
-					else owner.retry();
-				}
-				continue;
-			}
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileRootCommitted(transaction);
+		// A root still rendering (a nested flushSync) commits when its render ends.
+		if (transaction.rendering !== 0) ROOT_RENDER_TRANSACTIONS.push(transaction);
+		else commitRootRender(transaction);
+	}
+}
+
+function commitRootRender(transaction: RootRenderTransaction): void {
+	const owner = transaction.owner;
+	const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
+		? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
+		: undefined;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileRootEnter(transaction, owner);
+	try {
+		// A hold reached outside a drained origin (dropTransitionRender).
+		if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
+			TRANSITION_ROOT_DRIVER.drop(transaction);
+		if (transaction.aborted || owner.disposed) {
 			if (owner.transaction === transaction) owner.transaction = null;
-			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
-				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
-				STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
-			}
-			// The root request committed, unless a held transition keeps it waiting.
-			if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
+			return;
+		}
+		// This is the native acceptance point. Validate before any deletion,
+		// ref, or effect callback can observe the candidate. A later callback
+		// write starts another transaction and does not revoke this snapshot.
+		if (
+			!transaction.nativeAdmitted &&
+			((hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
+				(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
+		) {
+			const presentationChanged = hydrationStarted
+				? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
+				: false;
+			rollbackRootRender(transaction);
+			if (owner.transaction === transaction) owner.transaction = null;
+			if (!owner.disposed) {
 				owner.wakeable = null;
 				owner.generation++;
+				if (presentationChanged) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
+				else owner.retry();
 			}
-			if (owner.wakeable === null) {
-				owner.retryKey = null;
-				owner.nativeRetry?.clear();
-				// Claimed owners belong to accepted scopes. Unvisited branches from
-				// an earlier pending attempt have no continuing consumer.
-				if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
-			}
-			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
-			if (transaction.cells !== null) commitHookCells(transaction.cells);
-			// Values dropped rounds created were for work that has now committed.
-			if (
-				transaction.batches !== null &&
-				(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
-			)
-				TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
-			const acceptedGeneration = owner.generation;
-			// The mutation phase precedes the incoming ref/layout publication.
-			if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
-			const parked = transaction.parked;
-			if (parked !== null) {
-				for (const item of parked) {
-					if (owner.disposed || owner.generation !== acceptedGeneration) break;
-					unmountParkedItem(item);
-				}
-			}
-			if (NATIVE_READ_DRIVER) {
-				if (
-					!DEFERRED_LAYOUT_DRIVER ||
-					!DEFERRED_LAYOUT_DRIVER.stageAction(() => NATIVE_READ_DRIVER!.pruneDeferredRefs(owner))
-				)
-					NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
-			}
-			if (owner.disposed || owner.generation !== acceptedGeneration) {
-				discardOffscreenCapture(transaction.capture);
-				continue;
-			}
-			spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
-			if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
-				// A successful replacement may remove a still-dormant leased view.
-				// Inspect native containment only after staged DOM publication. Retiring
-				// against projected removal would stop still-visible early interactions.
-				const driver = HYDRATION_DRIVER!;
-				if (
-					!DEFERRED_LAYOUT_DRIVER ||
-					!DEFERRED_LAYOUT_DRIVER.stageAction(() => driver.retireDetachedBindingLeases(owner))
-				)
-					driver.retireDetachedBindingLeases(owner);
-			}
-		} finally {
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileRootExit();
-			finishStagedOwner?.();
+			return;
 		}
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileRootCommitted(transaction);
+		if (owner.transaction === transaction) owner.transaction = null;
+		if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
+			stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
+			STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
+		}
+		// The root request committed, unless a held transition keeps it waiting.
+		if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
+			owner.wakeable = null;
+			owner.generation++;
+		}
+		if (owner.wakeable === null) {
+			owner.retryKey = null;
+			owner.nativeRetry?.clear();
+			// Claimed owners belong to accepted scopes. Unvisited branches from
+			// an earlier pending attempt have no continuing consumer.
+			if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
+		}
+		const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
+		if (transaction.cells !== null) commitHookCells(transaction.cells);
+		// Values dropped rounds created were for work that has now committed.
+		if (
+			transaction.batches !== null &&
+			(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
+		)
+			TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
+		const acceptedGeneration = owner.generation;
+		// The mutation phase precedes the incoming ref/layout publication.
+		if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
+		const parked = transaction.parked;
+		if (parked !== null) {
+			for (const item of parked) {
+				if (owner.disposed || owner.generation !== acceptedGeneration) break;
+				unmountParkedItem(item);
+			}
+		}
+		if (NATIVE_READ_DRIVER) {
+			if (
+				!DEFERRED_LAYOUT_DRIVER ||
+				!DEFERRED_LAYOUT_DRIVER.stageAction(() => NATIVE_READ_DRIVER!.pruneDeferredRefs(owner))
+			)
+				NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
+		}
+		if (owner.disposed || owner.generation !== acceptedGeneration) {
+			discardOffscreenCapture(transaction.capture);
+			return;
+		}
+		spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
+		if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
+			// A successful replacement may remove a still-dormant leased view.
+			// Inspect native containment only after staged DOM publication. Retiring
+			// against projected removal would stop still-visible early interactions.
+			const driver = HYDRATION_DRIVER!;
+			if (
+				!DEFERRED_LAYOUT_DRIVER ||
+				!DEFERRED_LAYOUT_DRIVER.stageAction(() => driver.retireDetachedBindingLeases(owner))
+			)
+				driver.retireDetachedBindingLeases(owner);
+		}
+	} finally {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileRootExit();
+		finishStagedOwner?.();
 	}
 }
 
@@ -27516,7 +27532,11 @@ function inferTagNs(tag: string, inherited: string | undefined): string | undefi
 // SVG element but switches its children back to HTML; HTML is represented by an
 // undefined namespace because document.createElement is the fast/default path.
 function deoptChildNamespace(parent: Node): string | undefined {
-	if (parent.nodeType !== 1) return undefined;
+	if (parent.nodeType !== 1) {
+		// A frontier fragment builds content for its live parent.
+		const next: SlotNext | undefined = (parent as any).$$next;
+		return next === undefined ? undefined : deoptChildNamespace(next.parent!);
+	}
 	const el = parent as Element;
 	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
 	if (el.namespaceURI === MATHML_NS) return MATHML_NS;
@@ -41787,6 +41807,7 @@ export function errorBlock(
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
+		if (domParent.nodeType === 11) noteFrontierMember(domParent, newState);
 		state = newState;
 	} else {
 		// The env tuple carries the parent render's captured values, including the
@@ -50499,7 +50520,11 @@ export function devHtmlNesting(
 }
 
 /** Validate the supported Element root as the authored tree's outer HTML ancestor. */
-function validateRootHtmlNesting(container: RootContainer, body: ComponentBody): void {
+function validateRootHtmlNesting(
+	container: RootContainer,
+	body: ComponentBody,
+	content: Node,
+): void {
 	if (process.env.NODE_ENV !== 'production') {
 		if (container.nodeType !== 1) return;
 		const element = container as Element;
@@ -50513,7 +50538,8 @@ function validateRootHtmlNesting(container: RootContainer, body: ComponentBody):
 		) {
 			return;
 		}
-		const root = (STAGED_DOM ? STAGED_DOM.view(container) : container).firstElementChild;
+		const root = (STAGED_DOM ? STAGED_DOM.view(content as Element) : (content as Element))
+			.firstElementChild;
 		if (root === null) return;
 		if (invalidHtmlNestingWithParent(root.localName, element.localName) !== null) {
 			devHtmlNesting(root.localName, [element.localName]);
@@ -50644,6 +50670,10 @@ function makeRoot(
 			if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 			if (unmounted) return;
 		}
+		// Only a mount that commits as this call returns builds off-document. One
+		// inside a render or a commit callback lands with a later commit, so it
+		// keeps writing its container as it renders.
+		const commitsNow = !inFlush && ROOT_RENDER_TRANSACTION === null;
 		const frame = beginRootRender(renderOwner);
 		renderOwner.transaction!.rootRequest = true;
 		const previousRoot = rootBlock;
@@ -50674,6 +50704,9 @@ function makeRoot(
 			}
 			let start: Comment | null = null;
 			let end: Comment | null = null;
+			// A synchronous mount builds off-document and lands at commit as one
+			// insert. The container's previous content still leaves first.
+			let frontier: SlotNext | null = null;
 			if (staged) {
 				// A genuine root identity change mounts once beside the outgoing
 				// screen. Keep its focused hosts connected until the new tree succeeds.
@@ -50682,13 +50715,22 @@ function makeRoot(
 				(STAGED_DOM ? STAGED_DOM.view(container) : container).append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				renderOwner.hydrationFallback(false);
+			} else if (
+				commitsNow &&
+				container.nodeType !== 9 &&
+				!hydrating &&
+				!STAGED_DOM &&
+				!(mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0))
+			) {
+				clearRootContainer(container);
+				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
 			} else {
 				clearRootContainer(container);
 			}
 			rootBlock = createBlock(
 				'root',
 				null,
-				container,
+				frontier === null ? container : frontier.frag!,
 				start,
 				end,
 				body,
@@ -50696,6 +50738,10 @@ function makeRoot(
 				undefined,
 				outputHandler,
 			);
+			if (frontier !== null) {
+				frontier.owner = rootBlock;
+				noteFrontierMember(frontier.frag!, rootBlock);
+			}
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
@@ -50739,7 +50785,7 @@ function makeRoot(
 				// queued effects can publish the discarded initial state.
 				if (QUEUE.length > 0) drainHydrationRenderPhaseUpdates(mountedRoot);
 				if (process.env.NODE_ENV !== 'production') {
-					validateRootHtmlNesting(container, body);
+					validateRootHtmlNesting(container, body, frontier?.frag ?? container);
 				}
 			} catch (error) {
 				try {

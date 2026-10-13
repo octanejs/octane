@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { startTransition } from '../src/index.js';
+import { createRoot, startTransition } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
 import {
 	BranchProbeApp,
@@ -132,4 +132,32 @@ describe('structural deletions commit with their render', () => {
 			}
 		});
 	}
+
+	it('mounts a root off-document and inserts it in one commit', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const records: MutationRecord[] = [];
+		let during: MutationRecord[] | null = null;
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, { childList: true, subtree: true, characterData: true });
+		const root = createRoot(container);
+		try {
+			root.render(BranchProbeApp, {
+				show: false,
+				probe: () => {
+					during = observer.takeRecords();
+				},
+			});
+			records.push(...observer.takeRecords());
+			// The render touched nothing; its commit added the tree with one insert.
+			expect(during).toEqual([]);
+			expect(records).toHaveLength(1);
+			expect(records[0].target).toBe(container);
+			expect(container.querySelector('#hidden')?.textContent).toBe('hidden');
+		} finally {
+			observer.disconnect();
+			root.unmount();
+			container.remove();
+		}
+	});
 });
