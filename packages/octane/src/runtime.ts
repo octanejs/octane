@@ -763,6 +763,9 @@ let releasePortalTarget: typeof releaseRegisteredPortalTarget = noop;
 let PORTAL_CHILD: typeof renderPortalChild | null = null;
 let SIGNAL_CHILD: typeof bindImplicitSignalChild | null = null;
 let CONTEXT_CHILD: typeof useContextInternal | null = null;
+// A signal binding's commit-time read can find its handle pending since render.
+// Signal bindings install the retry; other bundles report every commit error.
+let SIGNAL_COMMIT_RETRY: typeof retryPendingCommit | null = null;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 // Hydration-only state: client paths read it behind `hydrationStarted`.
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
@@ -1226,6 +1229,7 @@ export function enableSignalBindings(abi = 1, potentialOnly = false): void {
 	if (abi !== 1) throw new TypeError(formatClientError(74));
 	SIGNAL_BINDINGS_ENABLED = true;
 	SIGNAL_CHILD = bindImplicitSignalChild;
+	SIGNAL_COMMIT_RETRY = retryPendingCommit;
 	if (!potentialOnly) enableSignalDocument(abi);
 }
 
@@ -4145,7 +4149,8 @@ function runCommitOps(ops: any[], owner: RootRenderOwner, generation: number): v
 			// committing; the failed bag's state was cleared before its first write.
 			// A structural entry's cleanups already route their own errors.
 			if (typeof target?.$ !== 'number') throw error;
-			reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+			if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
+				reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
 		}
 	}
 	ops.length = 0;
@@ -26059,6 +26064,73 @@ export function bindSignalChecked(
 }
 
 /**
+ * Record a direct signal binding (bagRecord). Render still reads a handle, so
+ * a pending or failed signal suspends or throws here, and a handle whose value
+ * the committed binding already shows records nothing. The commit function's
+ * bindSignal* call reads the handle again and subscribes: a value that moved
+ * after this read commits current, and a dropped render subscribed nothing.
+ * A text binding passes the raw value it last committed beside its Text; a
+ * value or checked binding passes the bag, so a scalar reasserts every commit.
+ */
+export function bagRecordSignal(
+	bag: any,
+	next: any[] | null,
+	cell: number,
+	value: unknown,
+	committed: unknown,
+	scope: Scope,
+	raw: unknown = committed,
+): any[] | null {
+	// An undefined slot has not yet compared an adopted server attribute.
+	let unchanged = value === raw && (value !== undefined || !hydrating);
+	if (isSignalHandle(value)) {
+		const prior = committed as DirectSignalBinding | null;
+		const bound =
+			prior?.[DIRECT_SIGNAL_BINDING] === true && prior.handle === value && !prior.disposed;
+		if (bound && prior!.pendingControl) {
+			// The preceding attempt's adoption may have been dropped with it.
+			prior!.policy.control!.adopt(prior!);
+			unchanged = true;
+		} else {
+			const read = readSignalInScope(scope, value);
+			unchanged = bound && Object.is(prior!.value, read);
+		}
+	}
+	if (next === null) {
+		if (unchanged && bag.$ <= BAG_SIZE) return null;
+		next = stageBag(bag);
+	}
+	next[cell] = unchanged ? bag : value;
+	return next;
+}
+
+/**
+ * A bag whose signal binding went pending after render renders its Block
+ * again, so the read suspends there, as updateDirectSignalBinding does.
+ */
+function retryPendingCommit(bag: any, error: unknown): boolean {
+	try {
+		if (error === null || typeof error !== 'object' || typeof (error as any).then !== 'function')
+			return false;
+	} catch {
+		// An opaque error value with a throwing accessor is still an error.
+		return false;
+	}
+	scheduleRender(bag.next[bag.$ & BAG_SIZE].block);
+	return true;
+}
+
+/** Read a handle in its binding Scope's owner, as bindDirectSignal does. */
+function readSignalInScope(scope: Scope, handle: SignalHandle<unknown>): unknown {
+	if (!signalDocumentEnabled || currentSignalOwner() !== scope.signalOwner) {
+		if (!signalDocumentEnabled) enableSignalBindings();
+		if (currentSignalOwner() !== scopeSignalOwner(scope))
+			return runWithBlockSignalOwner(scope, () => readSignalBinding(handle));
+	}
+	return readSignalBinding(handle);
+}
+
+/**
  * Compact compiler binding ABI. Evaluate the authored value first, compare its
  * raw identity, then call the ordinary writer. Returning only after that writer
  * succeeds keeps the caller's previous-value publication after coercion, errors,
@@ -29157,6 +29229,74 @@ export function bindSignalHostPropSources(
 	}
 	if (binding.pendingControl) queueSignalHostControlAdoption(committed, binding.resolved?.value);
 	return committed;
+}
+
+/**
+ * Record a spread-bearing host's prop sources (bagRecord). Every render's
+ * sources reach the commit function, which diffs them against the committed
+ * props (commitHostSources). Raw HTML stays a render-time write: child holes
+ * read whether it owns the host until structure commits too (#2043 step 2).
+ * A pending or failed signal source suspends or throws here, in render.
+ */
+export function bagRecordHost(
+	bag: any,
+	next: any[] | null,
+	cell: number,
+	sources: readonly HostPropSource[],
+	el: Element,
+	hasNestedChildren: boolean,
+): any[] {
+	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
+	resolveSignalHostPropSources(sources);
+	return bagRecordAlways(bag, next, cell, sources);
+}
+
+/**
+ * Commit recorded host sources in the Scope that rendered them, so handler
+ * authority and signal owners resolve as they did in render. Refs attach and
+ * subscriptions switch here, at commit.
+ */
+export function commitHostSources(
+	scope: Scope,
+	binding: unknown,
+	el: Element,
+	sources: readonly HostPropSource[],
+	site: string,
+	hasNestedChildren: boolean,
+): unknown {
+	const previous = CURRENT_SCOPE;
+	CURRENT_SCOPE = scope;
+	try {
+		return signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined
+			? runWithBlockSignalOwner(scope, () =>
+					bindSignalHostPropSources(scope, binding, el, sources, site, hasNestedChildren),
+				)
+			: bindSignalHostPropSources(scope, binding, el, sources, site, hasNestedChildren);
+	} finally {
+		CURRENT_SCOPE = previous;
+	}
+}
+
+/**
+ * A spread-bearing host's children for its child hole: the last writer among
+ * the sources this render recorded, or the committed props on mount.
+ */
+export function hostSourceChildren(
+	next: any[] | null,
+	cell: number,
+	committed: Record<string, unknown>,
+): unknown {
+	const sources = next === null ? null : next[cell];
+	if (!Array.isArray(sources))
+		return isOwnEnumerable(committed, 'children') ? committed.children : undefined;
+	let children: unknown;
+	for (const source of sources as HostPropSource[]) {
+		const value = source[1] as any;
+		if (!source[0]) {
+			if (value === 'children') children = source[2];
+		} else if (value != null && isOwnEnumerable(value, 'children')) children = value.children;
+	}
+	return children;
 }
 
 function isAggregatedFormControlProp(el: Element, name: string): boolean {

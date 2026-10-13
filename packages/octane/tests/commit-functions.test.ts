@@ -5,7 +5,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createRoot, flushSync, startTransition } from '../src/index.js';
 import { act } from './_helpers';
-import { CommitError, Held, MemoHeld, Nested } from './_fixtures/commit-functions.tsrx';
+import {
+	CommitError,
+	Held,
+	HeldDescriptor,
+	HeldSpread,
+	MemoHeld,
+	Nested,
+} from './_fixtures/commit-functions.tsrx';
 
 const never = () => new Promise<never>(() => {});
 const containers: HTMLElement[] = [];
@@ -46,6 +53,60 @@ describe('commit functions', () => {
 		expect(picks).toEqual(['next']);
 		root.unmount();
 	});
+
+	it.each([
+		{ kind: 'spread', View: HeldSpread },
+		{ kind: 'descriptor', View: HeldDescriptor },
+	])(
+		'leaves a $kind host’s committed props after a dropped transition, and a later urgent update still writes them',
+		async ({ kind, View }) => {
+			const container = host();
+			const root = createRoot(container);
+			const log: string[] = [];
+			const attrs = (label: string) => ({
+				title: label,
+				children: label,
+				onClick: () => log.push('click:' + label),
+				ref: (el: Element | null) => {
+					log.push('ref:' + label + ':' + (el === null ? 'null' : el.id));
+				},
+			});
+			flushSync(() =>
+				root.render(View, {
+					attrs: { ...attrs('committed'), 'data-state': 'committed' },
+					wait: null,
+				}),
+			);
+			const button = container.querySelector('#' + kind) as HTMLButtonElement;
+			expect(log).toEqual([`ref:committed:${kind}`]);
+
+			await act(() =>
+				startTransition(() => root.render(View, { attrs: attrs('next'), wait: never() })),
+			);
+			expect(button.title).toBe('committed');
+			expect(button.getAttribute('data-state')).toBe('committed');
+			expect(button.textContent).toBe('committed');
+			button.click();
+			// The dropped render attached no ref and installed no handler.
+			expect(log).toEqual([`ref:committed:${kind}`, 'click:committed']);
+
+			// The same props arriving urgently still differ from what the DOM shows.
+			flushSync(() => root.render(View, { attrs: attrs('next'), wait: null }));
+			expect(container.querySelector('#' + kind)).toBe(button);
+			expect(button.title).toBe('next');
+			expect(button.hasAttribute('data-state')).toBe(false);
+			expect(button.textContent).toBe('next');
+			button.click();
+			expect(log).toEqual([
+				`ref:committed:${kind}`,
+				'click:committed',
+				'ref:committed:null',
+				`ref:next:${kind}`,
+				'click:next',
+			]);
+			root.unmount();
+		},
+	);
 
 	it('calls the committed handler for an event during a held transition', async () => {
 		const container = host();

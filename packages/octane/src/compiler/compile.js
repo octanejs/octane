@@ -1716,9 +1716,13 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bagRecordAlways',
 	'bagRecordEvent',
 	'bagRecordBundle',
+	'bagRecordSignal',
+	'bagRecordHost',
 	'bagDone',
 	'setEventSlot',
 	'commitEventBundle',
+	'commitHostSources',
+	'hostSourceChildren',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
@@ -28298,13 +28302,14 @@ function planJsx(
 	// order-independent and byte-identical.
 	const spreadPaths = new Set();
 	const eventWriterCounts = new Map();
-	// A host with a writer that stays in render (a spread, a grouped commit
-	// collector, a signal binding) keeps every binding there in render too, so
-	// its writes keep their source order.
+	// A host with a writer that stays in render (a grouped commit collector, a
+	// native-read binding) keeps every binding there in render too, so its writes
+	// keep their source order.
 	const renderWriterPaths = new Set();
 	for (const b of elementBindings) {
 		if (b.kind === 'spread') spreadPaths.add(b.path.join(','));
-		if (RENDER_WRITER_KINDS.has(b.kind) || b.signalDirect) renderWriterPaths.add(b.path.join(','));
+		if (RENDER_WRITER_KINDS.has(b.kind) || (b.kind === 'hostCommit' && !commitBindingKind(b, ctx)))
+			renderWriterPaths.add(b.path.join(','));
 		if (b.kind === 'event' || b.kind === 'event-bundle') {
 			const key = `${b.path.join(',')}|${b.slotKey}`;
 			eventWriterCounts.set(key, (eventWriterCounts.get(key) || 0) + 1);
@@ -28341,7 +28346,7 @@ function planJsx(
 			!b.beforeConnect &&
 			b.name !== 'dangerouslySetInnerHTML';
 		b.commitCell =
-			commit !== null && !renderWriterPaths.has(b.path.join(',')) && commitBindingKind(b)
+			commit !== null && !renderWriterPaths.has(b.path.join(',')) && commitBindingKind(b, ctx)
 				? commit.cells(commitCellCount(b))
 				: -1;
 		if (b.commitCell >= 0)
@@ -29308,11 +29313,18 @@ function planJsx(
 				const host = bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
 				return cc.hostChildrenBinding.signalHostSources ? b.member(host, 'resolved') : host;
 			};
-			cc.valueExpr = b.conditional(
-				propertyIsEnumerableCall(props(), 'children'),
-				b.member(props(), 'children'),
-				undefinedNode(),
-			);
+			// A committing host writes its props at commit; its child hole renders
+			// now, from the sources this render recorded.
+			const cell = cc.hostChildrenBinding.commitCell;
+			if (cell >= 0) ctx.runtimeNeeded.add('hostSourceChildren');
+			cc.valueExpr =
+				cell >= 0
+					? b.call('_$hostSourceChildren', b.id('_n'), b.literal(cell), props())
+					: b.conditional(
+							propertyIsEnumerableCall(props(), 'children'),
+							b.member(props(), 'children'),
+							undefinedNode(),
+						);
 		} else if (cc.directChildrenBinding != null) {
 			cc.valueExpr = bagFieldNode(bag, `_prev$${cc.directChildrenBinding.id}`);
 		}
@@ -30273,8 +30285,15 @@ function directSignalBindingHelper(bind) {
 	return 'bindSignalAttribute';
 }
 
-function directSignalBindingArgs(bind, host, previous, value = bind.expr, previousValue) {
-	const common = [b.id('__s'), previous, host];
+function directSignalBindingArgs(
+	bind,
+	host,
+	previous,
+	value = bind.expr,
+	previousValue,
+	scope = b.id('__s'),
+) {
+	const common = [scope, previous, host];
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
 		// (…, onlyChild, previousValue, seededText, bindingMarker). An ordinary
 		// update passes only its raw-value cache: seededText matters only before
@@ -30300,12 +30319,12 @@ function directSignalBindingArgs(bind, host, previous, value = bind.expr, previo
 		bind.kind === 'checked' ||
 		bind.kind === 'checkedCheckable'
 	) {
-		return [...common, bind.expr, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
+		return [...common, value, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
 	}
 	return [
 		...common,
 		attrLoweringToken(b.literal(bind.name), bind),
-		bind.expr,
+		value,
 		b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 		directSignalAttributeWriter(bind),
 	];
@@ -30911,10 +30930,9 @@ const COMMIT_CONTROLLED_KINDS = new Set([
 	'defaultChecked',
 ]);
 // Writers that stay in render; a host carrying one keeps its other writers there.
+// So does a host collector that commitBindingKind keeps in render.
 const RENDER_WRITER_KINDS = new Set([
 	'spread',
-	'hostSpread',
-	'hostCommit',
 	'formCommit',
 	'dangerCommit',
 	'nativeStyle',
@@ -30949,11 +30967,19 @@ function makeCommitPlan() {
 	};
 }
 
-function commitBindingKind(bind) {
+function commitBindingKind(bind, ctx) {
 	// Raw HTML shares its host's children validation with the child holes, which
 	// stay in render until structure moves to commit (#2043 step 2).
-	if (bind.signalDirect || bind.mountOnly || bind.name === 'dangerouslySetInnerHTML') return false;
+	if (bind.mountOnly || bind.name === 'dangerouslySetInnerHTML') return false;
+	// A direct signal binding reads its handle in render and binds it at commit.
+	if (bind.signalDirect) return true;
 	switch (bind.kind) {
+		case 'hostCommit':
+			// Spread-bearing hosts commit their resolved props. A native-read host
+			// reads its winning style in render (readNativeDomStyle), a textarea's
+			// default follows its child hole, which renders there, and the other
+			// collectors (duplicate props, form cascades) stay there too.
+			return bind.signalHostSources && !ctx.nativeReads && !bind.textarea;
 		case 'text':
 		case 'textOnlyChild':
 		case 'class':
@@ -30971,6 +30997,8 @@ function commitBindingKind(bind) {
 }
 
 function commitRuntimeHelpers(bind) {
+	if (bind.signalDirect) return ['bagRecordSignal'];
+	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitHostSources'];
 	if (bind.kind === 'event') return ['bagRecordEvent', 'setEventSlot'];
 	if (bind.kind === 'event-bundle') return ['bagRecordBundle', 'commitEventBundle'];
 	return [COMMIT_CONTROLLED_KINDS.has(bind.kind) ? 'bagRecordAlways' : 'bagRecord'];
@@ -31051,6 +31079,69 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org) {
 	const callee = () => attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	const prev = () => F('_prev');
+	if (bind.signalDirect) {
+		// The commit binds, reads and subscribes through the ordinary bindSignal*
+		// call (bagRecordSignal). Text keeps its raw value beside its Text; value
+		// and checked compare against the bag, so a scalar reasserts every commit.
+		const helper = directSignalBindingHelper(bind);
+		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
+		const control = helper === 'bindSignalValue' || helper === 'bindSignalChecked';
+		const helperId = () => b.id(`_$${helper}`);
+		writeCell(
+			cell,
+			(scope) =>
+				b.assignment(
+					'=',
+					F('_sig'),
+					b.call(
+						text ? helperId() : attrLoweringToken(helperId(), bind),
+						...directSignalBindingArgs(
+							bind,
+							F('_el'),
+							F('_sig'),
+							V(),
+							text ? prev() : undefined,
+							scope,
+						),
+					),
+				),
+			text ? prev : null,
+			bind.deferred ? bind.expr : null,
+		);
+		return record(
+			'bagRecordSignal',
+			cell,
+			bind.expr,
+			F('_sig'),
+			b.id('__s'),
+			...(text ? [prev()] : control ? [b.id('_b')] : []),
+		);
+	}
+	if (bind.kind === 'hostCommit') {
+		const sources = commitSourceRows(bind.sources, (binding, spread) =>
+			bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
+		);
+		const nested = () => b.literal(bind.hasNestedChildren === true);
+		writeCell(
+			cell,
+			(scope) =>
+				b.assignment(
+					'=',
+					F('_host'),
+					b.call(
+						'_$commitHostSources',
+						scope,
+						F('_host'),
+						F('_el'),
+						V(),
+						b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+						nested(),
+					),
+				),
+			null,
+		);
+		return record('bagRecordHost', cell, sources, F('_el'), nested());
+	}
 	switch (bind.kind) {
 		case 'text':
 		case 'textOnlyChild':
@@ -33142,6 +33233,7 @@ function emitElementHtml(
 			hasNestedChildren: hasNestedJsxChildren,
 			signalHostSources,
 			signalSite: signalHostSources ? hostSignalSite : null,
+			textarea: tag === 'textarea',
 		};
 		bindings.push(hostCommitClientBinding);
 	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
