@@ -17,10 +17,7 @@ import {
 	type SignalControlBinding,
 } from './control-handoff.js';
 import { captureSignalOwner, currentSignalOwner } from './owner-context.js';
-import {
-	forwardNativeTransitionConsumer,
-	type NativeTransitionNotify,
-} from './read-protocol.js';
+import { forwardNativeTransitionConsumer, type NativeTransitionNotify } from './read-protocol.js';
 import {
 	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_BINDING_READ,

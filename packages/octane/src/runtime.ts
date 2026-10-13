@@ -280,6 +280,7 @@ import { installRendererSignalActions } from '#octane/signal-actions/renderer';
 import {
 	ADOPTION_CONTROL,
 	NativeAdoptionMiss,
+	NATIVE_TRANSITION_CONSUMER,
 	beginNativeBatch,
 	endNativeBatch,
 	nativeProducerPublication,
@@ -291,6 +292,7 @@ import {
 	runNativeBatch,
 	setNativeAdoptionResolver,
 	supplyNativeAdoptionMiss,
+	type NativeTransitionNotify,
 	type SignalDeclarationStage,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
@@ -3198,8 +3200,10 @@ function installPendingSignalHost(): void {
 			if (root !== other) entangleTransitionBatches(root, other);
 		},
 		consume(batch, block) {
-			invalidateRender(block as Block, block as Block);
-			noteTransitionBlock(rootTransitionBatch(batch as TransitionActionBatch), block as Block);
+			// A hookless component's stand-in renders with the Block that owns it.
+			const owner = owningBlock(block as Block);
+			invalidateRender(owner, owner);
+			noteTransitionBlock(rootTransitionBatch(batch as TransitionActionBatch), owner);
 		},
 		hold(batch, slot) {
 			const root = rootTransitionBatch(batch as TransitionActionBatch);
@@ -24634,9 +24638,9 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 		if (binding.unsubscribe === undefined) {
 			// Acquire the fallible subscription before either early lease retires.
 			// It cannot write or join a transition until input ownership is installed.
-			const notify = () => {
+			const notify = bindingTransitionNotify(binding, () => {
 				if (binding.controlWriterCleanup !== undefined) updateDirectSignalBinding(binding);
-			};
+			});
 			const stop = handle[SIGNAL_BINDING_SUBSCRIBE](notify, () =>
 				disposeDirectSignalBinding(binding),
 			);
@@ -25417,6 +25421,17 @@ function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
 	);
 }
 
+/**
+ * A transition that writes what a direct binding presents renders the
+ * binding's owner with its batch (signals/pending.ts), so the read the render
+ * records can suspend that transition. The binding itself writes only
+ * committed values, from its commit and from this subscription.
+ */
+function bindingTransitionNotify(binding: { scope: Scope }, notify: () => void): () => void {
+	(notify as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER] = binding.scope.block;
+	return notify;
+}
+
 function readSignalBinding(handle: SignalHandle<unknown>): unknown {
 	return handle[SIGNAL_BINDING_READ]();
 }
@@ -25702,8 +25717,8 @@ function activateDirectSignalBinding(
 ): void {
 	if (binding.disposed) return;
 	if (binding.handle !== null)
-		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](() =>
-			updateDirectSignalBinding(binding),
+		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](
+			bindingTransitionNotify(binding, () => updateDirectSignalBinding(binding)),
 		);
 	if (revision !== undefined) binding.policy.control!.activate(binding, revision);
 }
@@ -28736,7 +28751,9 @@ function addSignalHostSubscription(
 	binding: SignalHostPropSourcesBinding,
 	handle: SignalHandle<unknown>,
 ): () => void {
-	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](() => updateSignalHostPropSources(binding));
+	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](
+		bindingTransitionNotify(binding, () => updateSignalHostPropSources(binding)),
+	);
 	binding.subscriptions.set(handle, unsubscribe);
 	return unsubscribe;
 }
@@ -39058,7 +39075,9 @@ export function bindSignalChild(
 		value: initial,
 		disposed: false,
 	};
-	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](() => updateDirectSignalChild(binding));
+	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](
+		bindingTransitionNotify(binding, () => updateDirectSignalChild(binding)),
+	);
 	registerHookCleanup(parentScope, () => disposeDirectSignalChild(binding));
 	if (prior !== null) {
 		const finish = (discarded: boolean): void =>
