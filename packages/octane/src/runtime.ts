@@ -49131,7 +49131,7 @@ function updateSurvivor<T>(
 	// Only positions that the body or native identity can observe are render
 	// inputs. Every accepted row gets its final index with the sibling chain in
 	// reconcileKeyed, even if its other props required this body to render.
-	const prepareIndex = !indexIndependent || NATIVE_READ_DRIVER;
+	const prepareIndex = !indexIndependent || (NATIVE_READ_DRIVER ? true : false);
 	if (journal && block.body !== itemBody) journalRootProperty(block, 'body', block.body);
 	if (journal && prepareIndex && block.itemIndex !== newIdx)
 		journalRootProperty(block, 'itemIndex', block.itemIndex);
@@ -49708,7 +49708,8 @@ function reconcileKeyed<T>(
 			}
 			// Newly prepared rows have only now joined a hidden Activity's live
 			// DOM, including rows in foreign portal targets.
-			if (SCHEDULED_VISIBILITY_DRIVER?.rehide) settleDeoptVisibility(parentBlock);
+			if (SCHEDULED_VISIBILITY_DRIVER && SCHEDULED_VISIBILITY_DRIVER.rehide)
+				settleDeoptVisibility(parentBlock);
 		},
 		discard() {
 			for (const block of created) if (!block.disposed) discardPreparedBlock(block);
