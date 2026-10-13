@@ -23,6 +23,7 @@ import {
 	ThrownResourceSuspense,
 	ThrownResourceJsxSuspense,
 	PromiseThrownFromLayout,
+	BatchedFreshPromiseResume,
 	ConditionalUseResume,
 	UpdatedSiblingResume,
 } from './_fixtures/suspense.tsrx';
@@ -673,6 +674,69 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 		expect(attempts).toBe(4); // attempt 4 commits
 		expect(r.find('.both').textContent).toBe('C/D');
 		r.unmount();
+	});
+
+	// After its first read, every read mints a promise that never settles. The
+	// replay must keep the promise its batch suspended on, as an unbatched use()
+	// call keeps the promise stored at its position.
+	function freshSource(first: Promise<string>) {
+		let reads = 0;
+		return {
+			get promise() {
+				return reads++ === 0 ? first : new Promise<string>(() => {});
+			},
+		};
+	}
+
+	it('batched unwrap: a replay keeps the promise the batch suspended on', async () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const d = deferred<string>();
+			const r = mount(BatchedFreshPromiseResume, { pair: false, first: freshSource(d.promise) });
+			expect(r.find('p').textContent).toBe('pending');
+			await act(() => {
+				d.resolve('ready');
+			});
+			expect(r.find('b').textContent).toBe('ready');
+			expect(r.findAll('p')).toHaveLength(0);
+
+			// An update starts a new episode: its batch suspends on the new promise.
+			const next = deferred<string>();
+			r.update(BatchedFreshPromiseResume, { pair: false, first: freshSource(next.promise) });
+			expect(r.find('p').textContent).toBe('pending');
+			await act(() => {
+				next.resolve('next');
+			});
+			expect(r.find('b').textContent).toBe('next');
+			r.unmount();
+		} finally {
+			errors.mockRestore();
+		}
+	});
+
+	it('batched unwrap: a use() between batched calls keeps its own promise on replay', async () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const a = deferred<string>();
+			const label = deferred<string>();
+			const b = deferred<string>();
+			const r = mount(BatchedFreshPromiseResume, {
+				pair: true,
+				first: freshSource(a.promise),
+				label: label.promise,
+				second: freshSource(b.promise),
+			});
+			expect(r.find('p').textContent).toBe('pending');
+			await act(() => {
+				a.resolve('A');
+				label.resolve('label');
+				b.resolve('B');
+			});
+			expect(r.find('b').textContent).toBe('A/label/B');
+			r.unmount();
+		} finally {
+			errors.mockRestore();
+		}
 	});
 });
 

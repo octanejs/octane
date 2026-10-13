@@ -388,6 +388,38 @@ export function ReplayChurnBody(props) @{
 	</>
 }
 
+// `source.promise` may mint a fresh promise on every read. A member read is
+// batched but not memoized, so each replay reaches the batch with a new promise.
+function BatchedSourceReader(props) @{
+	const value = use(props.source.promise);
+	<b>{value as string}</b>
+}
+
+// A custom hook's use() runs between the two batched unwraps, so it takes the
+// call position after the first one.
+function useLabel(label) {
+	return use(label);
+}
+
+function BatchedPairReader(props) @{
+	const first = use(props.first.promise);
+	const label = useLabel(props.label);
+	const second = use(props.second.promise);
+	<b>{(first + '/' + label + '/' + second) as string}</b>
+}
+
+export function BatchedFreshPromiseResume(props) @{
+	@try {
+		@if (props.pair) {
+			<BatchedPairReader first={props.first} label={props.label} second={props.second} />
+		} @else {
+			<BatchedSourceReader source={props.first} />
+		}
+	} @pending {
+		<p>{'pending'}</p>
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Mount effects of siblings rendered BEFORE the suspending one.
 // ---------------------------------------------------------------------------

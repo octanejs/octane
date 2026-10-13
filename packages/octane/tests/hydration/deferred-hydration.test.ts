@@ -394,7 +394,10 @@ export function App(props) @{
 		expect(onEagerClick).toHaveBeenCalledOnce();
 	});
 
-	it('uses fallback only for a later client-only mount that suspends', async () => {
+	it.each([
+		['a batched use()', false],
+		['a custom hook use()', true],
+	])('uses fallback only for a later client-only mount that suspends in %s', async (_, viaHook) => {
 		const value = deferred<string>();
 		const replacement = deferred<string>();
 		const onClick = vi.fn();
@@ -402,6 +405,7 @@ export function App(props) @{
 		const when = never();
 		const props = {
 			show: false,
+			viaHook,
 			when,
 			promise: value.promise,
 			onClick,
