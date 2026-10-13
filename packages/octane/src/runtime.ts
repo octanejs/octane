@@ -3538,7 +3538,10 @@ function retryTransitionBatch(batch: TransitionActionBatch, render: boolean, fal
 	}
 	TRANSITION_DEPTH++;
 	try {
-		if (render && transitionBatchReady(batch)) scheduleTransitionBatch(batch);
+		if (render && transitionBatchReady(batch)) {
+			if (TRANSITION_CELL_HARVEST !== null) reapplyTransitionMemoCells();
+			scheduleTransitionBatch(batch);
+		}
 		if (fall) queueTransitionFall(batch, undefined);
 	} finally {
 		TRANSITION_DEPTH--;
@@ -3626,7 +3629,7 @@ let TRANSITION_ORIGIN: Block | null = null;
 
 /** Values dropped transition renders created, adoptable by a later transition render. */
 let TRANSITION_HARVEST: WarmHarvestEntry[] | null = null;
-/** Inline memo cells a dropped render published, as (cells, base, values) triples. */
+/** Inline memo cells a dropped render published: (cells, base, published, restored). */
 let TRANSITION_CELL_HARVEST: any[] | null = null;
 
 function harvestTransitionWarmValues(origin: Block): void {
@@ -3673,27 +3676,30 @@ function setMemoEntry(scope: Scope, slot: HookSlot, entry: unknown): void {
 	hooks.set(slot, entry);
 }
 
-/**
- * The compiled inline-memo ABI publishes `length` cells from `base`. A
- * transition render keeps their committed values for a drop, and a retry adopts
- * the value a dropped round published for the same dependencies (`deps`, or
- * null for a lifetime-invariant cell) rather than its fresh computation.
- */
-function transitionMemoCells<T>(cells: any[], base: number, value: T, deps: any[] | null): T {
-	const length = deps === null ? 1 : deps.length + 2;
+/** The compiled inline-memo ABI publishes `length` cells from `base` (see Transition holds). */
+function transitionMemoCells(cells: any[], base: number, length: number): void {
 	(ROOT_RENDER_TRANSACTION!.memos ??= []).push(cells, base, cells.slice(base, base + length));
-	const harvest = TRANSITION_CELL_HARVEST;
-	if (harvest === null) return value;
-	for (let i = 0; i < harvest.length; i += 3) {
-		if (harvest[i] !== cells || harvest[i + 1] !== base) continue;
+}
+
+/**
+ * A retry publishes the inline memo cells its dropped round computed again,
+ * oldest first, wherever no later render replaced the restored values: the
+ * compiled cache check computes before it publishes, so these cells cannot be
+ * adopted on a miss the way hook-map entries are.
+ */
+function reapplyTransitionMemoCells(): void {
+	const harvest = TRANSITION_CELL_HARVEST!;
+	TRANSITION_CELL_HARVEST = null;
+	for (let i = harvest.length - 4; i >= 0; i -= 4) {
+		const cells = harvest[i] as any[];
+		const base = harvest[i + 1] as number;
 		const published = harvest[i + 2] as any[];
-		if (deps === null) return published[0] ?? value;
-		if (published[0] !== true || published.length !== length) continue;
-		let equal = true;
-		for (let j = 0; equal && j < deps.length; j++) equal = Object.is(published[j + 1], deps[j]);
-		if (equal) return published[length - 1];
+		const restored = harvest[i + 3] as any[];
+		let unchanged = true;
+		for (let j = 0; unchanged && j < restored.length; j++)
+			unchanged = Object.is(cells[base + j], restored[j]);
+		if (unchanged) for (let j = 0; j < published.length; j++) cells[base + j] = published[j];
 	}
-	return value;
 }
 
 /** Restore the memo entries and cells a transaction replaced, newest first. */
@@ -3711,6 +3717,7 @@ function restoreTransitionMemos(transaction: RootRenderTransaction, harvest: boo
 					target,
 					key,
 					target.slice(key, key + previous.length),
+					previous,
 				);
 			for (let j = 0; j < previous.length; j++) target[key + j] = previous[j];
 			continue;
@@ -15340,7 +15347,7 @@ export function hookMemoCreate(size: number): any[] {
  * rest-parameter dependency array. */
 export function hookMemoPublish0<T>(cells: any[], base: number, value: T): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, []);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 2);
 	cells[base + 1] = value;
 	cells[base] = true;
 	return value;
@@ -15348,7 +15355,7 @@ export function hookMemoPublish0<T>(cells: any[], base: number, value: T): T {
 
 export function hookMemoPublish1<T>(cells: any[], base: number, value: T, d0: any): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, [d0]);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 3);
 	cells[base + 2] = value;
 	cells[base + 1] = d0;
 	cells[base] = true;
@@ -15357,7 +15364,7 @@ export function hookMemoPublish1<T>(cells: any[], base: number, value: T, d0: an
 
 export function hookMemoPublish2<T>(cells: any[], base: number, value: T, d0: any, d1: any): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, [d0, d1]);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 4);
 	cells[base + 3] = value;
 	cells[base + 1] = d0;
 	cells[base + 2] = d1;
@@ -15374,7 +15381,7 @@ export function hookMemoPublish3<T>(
 	d2: any,
 ): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, [d0, d1, d2]);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 5);
 	cells[base + 4] = value;
 	cells[base + 1] = d0;
 	cells[base + 2] = d1;
@@ -15393,7 +15400,7 @@ export function hookMemoPublish4<T>(
 	d3: any,
 ): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, [d0, d1, d2, d3]);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 6);
 	cells[base + 5] = value;
 	cells[base + 1] = d0;
 	cells[base + 2] = d1;
@@ -15406,7 +15413,7 @@ export function hookMemoPublish4<T>(
 /** Larger dependency lists retain the compact variadic publication fallback. */
 export function hookMemoPublish<T>(cells: any[], base: number, value: T, ...deps: any[]): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, deps);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, deps.length + 2);
 	cells[base + deps.length + 1] = value;
 	for (let i = 0; i < deps.length; i++) cells[base + i + 1] = deps[i];
 	cells[base] = true;
@@ -15416,7 +15423,7 @@ export function hookMemoPublish<T>(cells: any[], base: number, value: T, ...deps
 /** One-cell form for compiler-owned lifetime-invariant callback values. */
 export function hookMemoPublishInvariant<T>(cells: any[], base: number, value: T): T {
 	if (TRANSITION_ROOT_DRIVER && inTransitionRender())
-		value = TRANSITION_ROOT_DRIVER.memoCells(cells, base, value, null);
+		TRANSITION_ROOT_DRIVER.memoCells(cells, base, 1);
 	cells[base] = value;
 	return value;
 }
