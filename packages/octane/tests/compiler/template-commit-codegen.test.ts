@@ -36,7 +36,6 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 		expect(writers).toHaveLength(1);
 		for (const helper of [
 			'templateValues',
-			'prepareTemplate',
 			'commitTemplate',
 			'prepareTemplateText',
 			'prepareTemplatePlain',
@@ -70,7 +69,7 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 		for (const source of sources) {
 			const result = compiled(source, dev);
 			expect(result.writers, source).toHaveLength(0);
-			expect(result.imports, source).not.toContain('prepareTemplate');
+			expect(result.imports, source).not.toContain('commitTemplate');
 		}
 		const ssr = compiled(
 			`export function Server(p) @{<p title={p.title}>{p.label as string}</p>}`,
@@ -78,7 +77,7 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 			'server',
 		);
 		expect(ssr.writers).toHaveLength(0);
-		expect(ssr.imports).not.toContain('prepareTemplate');
+		expect(ssr.imports).not.toContain('commitTemplate');
 	});
 
 	it('keeps a bare renderable generic when it can change to empty or structural content', () => {

@@ -219,9 +219,14 @@ describe('SWR U3 root lifecycle', () => {
 		const fetcher = vi.fn(() => new Promise<string>((done) => (resolve = done)));
 		mount(SWRSuspense, { cacheKey: 'root-suspense', fetcher });
 		expect(container.querySelector('[data-testid="fallback"]')?.textContent).toBe('loading');
-		resolve('suspense-data');
-		await settle(10);
+		await Octane.act(async () => {
+			resolve('suspense-data');
+		});
 		expect(value().data).toBe('suspense-data');
+		expect(container.querySelector('[data-testid="fallback"]')).toBeNull();
+		expect((container.querySelector('[data-testid="value"]') as HTMLElement).style.display).not.toBe(
+			'none',
+		);
 		expect(fetcher).toHaveBeenCalledOnce();
 	});
 

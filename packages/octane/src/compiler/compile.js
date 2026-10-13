@@ -28793,7 +28793,6 @@ function planJsx(
 			? null
 			: allocCompilerName(ctx, `__commit$${ctx.nextHelperId++}`);
 	if (templateCommit !== null) {
-		ctx.runtimeNeeded.add('prepareTemplate');
 		ctx.runtimeNeeded.add('commitTemplate');
 		ctx.runtimeNeeded.add('templateValues');
 		for (const binding of templateBindings) {
@@ -28812,11 +28811,15 @@ function planJsx(
 						b.assignment(
 							'=',
 							b.id('_p'),
-							b.call(
-								'_$templateValues',
-								b.id('__s'),
+							b.conditional(
+								b.binary('===', bagFieldNode(bag, '_preparedTemplate'), nullNode()),
 								b.id('_b'),
-								b.literal(bag.letter('_preparedTemplate')),
+								b.call(
+									'_$templateValues',
+									b.id('__s'),
+									b.id('_b'),
+									b.literal(bag.letter('_preparedTemplate')),
+								),
 							),
 						),
 					),
@@ -29575,7 +29578,7 @@ function planJsx(
 					const copy = () =>
 						b.if(
 							b.binary('===', b.id('_p'), b.id('_pv')),
-							b.stmt(b.assignment('=', b.id('_p'), b.call('_$prepareTemplate', b.id('_pv')))),
+							b.stmt(b.assignment('=', b.id('_p'), b.object([b.spread(b.id('_pv'))]))),
 							null,
 						);
 					// Preserve generic-hole meaning and structural upgrades. Only an
@@ -31064,7 +31067,7 @@ function emitPreparedBinding(bind, bag) {
 	const changes = [
 		b.if(
 			b.binary('===', b.id('_p'), b.id('_pv')),
-			b.stmt(b.assignment('=', b.id('_p'), b.call('_$prepareTemplate', b.id('_pv')))),
+			b.stmt(b.assignment('=', b.id('_p'), b.object([b.spread(b.id('_pv'))]))),
 			null,
 		),
 	];

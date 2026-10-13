@@ -7830,11 +7830,6 @@ export function templateValues(scope: Scope, bag: Record<string, any>, field: st
 		: bag;
 }
 
-/** @internal Copy on first changed output, never during an unchanged render. */
-export function prepareTemplate(values: Record<string, any>): any {
-	return { ...values };
-}
-
 /**
  * Register a complete generated writer, once per changed scope render. No DOM
  * mutation or per-binding closure is recorded. The pointer is logical render
@@ -25514,7 +25509,7 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
-	const text = coerceText(value);
+	const text = typeof value === 'string' ? value : coerceText(value);
 	if (hiddenTextWriter !== null && hiddenTextWriter(target, text)) return;
 	(STAGED_DOM ? STAGED_DOM.view(target) : target).nodeValue = text;
 }
@@ -25601,7 +25596,7 @@ export function hydrateClaimedBindingCaches(
 				if (values !== undefined && values !== bag) {
 					// Never mutate a completed enclosing candidate on a nested
 					// claim. This scope submits the copy only if its body succeeds.
-					if (values === previous) values = prepareTemplate(values);
+					if (values === previous) values = { ...values };
 					values![field] = value;
 				}
 			}
@@ -36018,10 +36013,16 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 		} else {
 			for (const prepared of templates) {
 				if (
-					!DEFERRED_LAYOUT_DRIVER ||
-					!DEFERRED_LAYOUT_DRIVER.stageAction(() => publishTemplate(prepared))
+					DEFERRED_LAYOUT_DRIVER &&
+					DEFERRED_LAYOUT_DRIVER.stageAction(() => publishTemplate(prepared))
 				)
-					publishTemplate(prepared);
+					continue;
+				// Validate at acceptance, not when a deferred writer is queued.
+				// The deferred path repeats this guard in publishTemplate when it runs.
+				const { scope, bag, values, apply, field } = prepared;
+				if (bag[field] !== prepared || scope.block.disposed || scope.slots[0] !== bag) continue;
+				bag[field] = null;
+				apply(bag, values);
 			}
 		}
 	}

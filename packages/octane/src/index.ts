@@ -161,7 +161,6 @@ export {
 	bag16,
 	bagOf,
 	templateValues,
-	prepareTemplate,
 	commitTemplate,
 	prepareTemplateText,
 	prepareTemplateBoolean,
