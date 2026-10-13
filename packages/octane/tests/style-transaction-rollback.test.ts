@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot, startTransition } from 'octane';
+import { createRoot, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers';
@@ -135,16 +135,20 @@ describe.each([
 		}
 	});
 
-	it('restores each host when a later CSS value throws after earlier declarations changed', () => {
+	it('reports a later CSS value that throws at commit, after earlier hosts were written', () => {
 		const client = fixture(dev, native);
-		const root = mount(client.Siblings, { color: 'red', width: 10, last: 10 });
-		const first = root.find('#first') as HTMLElement;
-		const second = root.find('#second') as HTMLElement;
-		const originals = [first.style.cssText, second.style.cssText];
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const errors: string[] = [];
+		const root = createRoot(container, {
+			onUncaughtError: (error) => errors.push((error as Error).message),
+		});
 		const seen: string[] = [];
 		try {
-			expect(() =>
-				root.update(client.Siblings, {
+			flushSync(() => root.render(client.Siblings, { color: 'red', width: 10, last: 10 }));
+			const second = container.querySelector('#second') as HTMLElement;
+			flushSync(() =>
+				root.render(client.Siblings, {
 					color: 'blue',
 					width: 20,
 					last: {
@@ -154,11 +158,16 @@ describe.each([
 						},
 					},
 				}),
-			).toThrow('CSS coercion failed');
+			);
+			// As in React, the declarations are coerced while the commit writes them:
+			// the second host's earlier declaration is already written, and with no
+			// boundary the root unmounts and reports the error.
 			expect(seen).toEqual(['blue']);
-			expect([first.style.cssText, second.style.cssText]).toEqual(originals);
+			expect(errors).toEqual(['CSS coercion failed']);
+			expect(container.querySelector('#second')).toBe(null);
 		} finally {
 			root.unmount();
+			container.remove();
 		}
 	});
 

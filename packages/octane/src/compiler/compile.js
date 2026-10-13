@@ -1712,6 +1712,13 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'updateFreshClassAttr',
 	'textHoleUpdate',
 	'childTextHoleUpdate',
+	'bagRecord',
+	'bagRecordAlways',
+	'bagRecordEvent',
+	'bagRecordBundle',
+	'bagDone',
+	'setEventSlot',
+	'commitEventBundle',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
@@ -18255,6 +18262,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				node,
 			),
 		);
+		// A staged render's pending cells (null until a binding changes).
+		if (plan.commitCells) bodyStatements.push(inheritOriginLoc(b.let('_n', b.literal(null)), node));
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
 		// re-render, so they live after the if/else; the mount branch only clones +
 		// stores refs, and `else` carries the re-render-only diffs (text / refs).
@@ -28068,6 +28077,10 @@ function planJsx(
 	// re-enters the mount branch instead of updating a half-populated bag.
 	// Control-flow-only bodies carry no bag, so all of it is skipped.
 	const bag = makeBag();
+	// #2043: the template's hoisted commit function (see makeCommitPlan).
+	// Presentation views and scalar claim views keep their direct writers.
+	const commit =
+		!noTemplate && !ctx.presentationHydration && !ctx.scalarBindingClaims ? makeCommitPlan() : null;
 	const BAG_LOCALS_PLACEHOLDER = `    /*__bagLocals__*/`;
 	if (!noTemplate) mountLines.push(BAG_LOCALS_PLACEHOLDER);
 
@@ -28285,8 +28298,13 @@ function planJsx(
 	// order-independent and byte-identical.
 	const spreadPaths = new Set();
 	const eventWriterCounts = new Map();
+	// A host with a writer that stays in render (a spread, a grouped commit
+	// collector, a signal binding) keeps every binding there in render too, so
+	// its writes keep their source order.
+	const renderWriterPaths = new Set();
 	for (const b of elementBindings) {
 		if (b.kind === 'spread') spreadPaths.add(b.path.join(','));
+		if (RENDER_WRITER_KINDS.has(b.kind) || b.signalDirect) renderWriterPaths.add(b.path.join(','));
 		if (b.kind === 'event' || b.kind === 'event-bundle') {
 			const key = `${b.path.join(',')}|${b.slotKey}`;
 			eventWriterCounts.set(key, (eventWriterCounts.get(key) || 0) + 1);
@@ -28322,6 +28340,17 @@ function planJsx(
 			!sharesSpreadHost &&
 			!b.beforeConnect &&
 			b.name !== 'dangerouslySetInnerHTML';
+		b.commitCell =
+			commit !== null && !renderWriterPaths.has(b.path.join(',')) && commitBindingKind(b)
+				? commit.cells(commitCellCount(b))
+				: -1;
+		if (b.commitCell >= 0)
+			for (const helper of commitRuntimeHelpers(b)) ctx.runtimeNeeded.add(helper);
+	}
+	if (commit !== null && commit.size() > COMMIT_MAX_CELLS) {
+		// The cell count shares the bag's state word with two flag bits.
+		for (const b of elementBindings) b.commitCell = -1;
+		commit.reset();
 	}
 
 	// Materialize compiler-owned event callbacks only where the DOM installs
@@ -28429,14 +28458,19 @@ function planJsx(
 		// a mount-only import for deferred writes.
 		const attrHelper = b.signalDirect ? null : attrBindingHelper(b);
 		if (attrHelper !== null) {
-			if (b.kind === 'class' && b.fresh && (!b.deferred || (!b.mountOnly && inlineBindingGuards)))
+			if (
+				b.kind === 'class' &&
+				b.fresh &&
+				(!b.deferred || (!b.mountOnly && (inlineBindingGuards || b.commitCell >= 0)))
+			)
 				ctx.runtimeNeeded.add('normalizeClass');
 			if (!b.deferred) {
 				ctx.runtimeNeeded.add(attrHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
 			}
 			if (!b.mountOnly) {
-				const updateHelper = attrBindingUpdateHelper(b, inlineBindingGuards);
+				const updateHelper =
+					b.commitCell >= 0 ? attrHelper : attrBindingUpdateHelper(b, inlineBindingGuards);
 				ctx.runtimeNeeded.add(updateHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, updateHelper, b.name);
 			}
@@ -28641,9 +28675,13 @@ function planJsx(
 								`_$bag${bag.fields.length}`,
 								b.id('__s'),
 								rootArg(),
-								...optionalCallArgs(
-									...bag.fields.map((f) => (f.constExpr === 'undefined' ? null : bagFieldValue(f))),
-								),
+								...(commit !== null && commit.size() > 0
+									? [...bag.fields.map(bagFieldValue), b.literal(commit.size())]
+									: optionalCallArgs(
+											...bag.fields.map((f) =>
+												f.constExpr === 'undefined' ? null : bagFieldValue(f),
+											),
+										)),
 							),
 						),
 					),
@@ -28664,7 +28702,12 @@ function planJsx(
 								'_$bagOf',
 								b.id('__s'),
 								rootArg(),
-								b.object(bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f)))),
+								b.object([
+									...bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f))),
+									// The same state fields as the arity factories (see bagRecord).
+									b.prop('init', b.id('$'), b.literal(commit?.size() ?? 0)),
+									b.prop('init', b.id('next'), b.literal(null)),
+								]),
 							),
 						),
 					),
@@ -28728,12 +28771,27 @@ function planJsx(
 	// change observable order.
 	const updateLines = [];
 	const everyRenderLines = [];
+	// Deferred commit bindings write directly at mount (in authored order) only
+	// when no other deferred writer shares the every-render position.
+	if (commit !== null)
+		commit.directMount = elementBindings.every(
+			(binding) => !binding.deferred || binding.commitCell >= 0,
+		);
+	const deferredCommitLines = [];
 	for (const b of elementBindings) {
-		const updateEmit = emitBindingUpdate(b, bag, inlineBindingGuards);
+		const updateEmit = emitBindingUpdate(b, bag, inlineBindingGuards, commit);
 		if (!updateEmit) continue;
-		if (b.deferred) everyRenderLines.push(updateEmit);
+		const mountWrite = b.deferred && b.commitCell >= 0 ? commit.mountWrite(b.commitCell) : null;
+		if (mountWrite !== null) {
+			// Mount writes the fresh host right after its bag, where the deferred
+			// diff wrote, so a mount never stages; only updates record.
+			mountLines.push(mountWrite);
+			deferredCommitLines.push(updateEmit);
+		} else if (b.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
 	}
+	updateLines.push(...deferredCommitLines);
+	const commitName = commit !== null ? emitCommitFunction(ctx, commit, planOrigin) : null;
 	if (ctx.scalarBindingClaims) {
 		// Only opted-in scalar views can retain another writer's publication at
 		// hydration. Record their existing cache fields; ordinary output is unchanged.
@@ -28813,7 +28871,18 @@ function planJsx(
 				keyedSelection.selectedName,
 			]).size === 0
 		) {
-			keyedSelection.update = emitBindingUpdate(classes[0], bag, inlineBindingGuards);
+			const update = emitBindingUpdate(classes[0], bag, inlineBindingGuards, commit);
+			keyedSelection.update =
+				classes[0].commitCell >= 0
+					? inheritOriginLoc(
+							b.block([
+								b.let('_n', b.literal(null)),
+								update,
+								commitDoneStatement(ctx, commitName, planOrigin),
+							]),
+							planOrigin,
+						)
+					: update;
 		}
 	}
 
@@ -29811,7 +29880,11 @@ function planJsx(
 		hasBag: !noTemplate,
 		mount: mountLines,
 		update: updateLines,
-		everyRender: everyRenderLines,
+		everyRender:
+			commitName === null
+				? everyRenderLines
+				: [...everyRenderLines, commitDoneStatement(ctx, commitName, planOrigin)],
+		commitCells: commitName !== null,
 		after: afterStatements,
 		head: headEmit.head,
 		resources: headEmit.resources,
@@ -30805,7 +30878,335 @@ function emitBindingMount(bind, elVar, bag) {
 	return null;
 }
 
-function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
+// ---------------------------------------------------------------------------
+// Commit functions (#2043 step 1). Render computes; commit writes.
+//
+// A template's bag slots hold COMMITTED values. Each update binding calls one
+// tiny runtime recorder, which compares the new value with its committed slot
+// and records it into the bag's pending `next` cells once anything differs:
+//
+//   _n = _$bagRecord(_b, _n, 3, row.label, _b.g);
+//
+// The template's hoisted commit function walks the cells straight-line, writes
+// each changed one through the ordinary setter, then publishes it:
+//
+//   function _c$7(_b) { const _n = _b.next; let _v; _b.$ &= 255;
+//     if ((_v = _n[3]) !== _b) { _$setText(null, _v, _b.f); _b.g = _v; } … }
+//
+// The runtime's bagDone runs it at once when the render cannot be dropped and
+// queues it on the root's commit ops otherwise (runtime.ts, "Commit functions").
+// Mount paths keep their direct writes; deferred (every-render) kinds reach the
+// commit function on mount, which runs at once for a fresh Block.
+// ---------------------------------------------------------------------------
+// The runtime packs the cell count into the low byte of the bag's state word.
+const COMMIT_MAX_CELLS = 255;
+const COMMIT_ATTR_KINDS = new Set(['attr', 'stringData', 'booleanAttr', 'ariaAttr']);
+const COMMIT_CONTROLLED_KINDS = new Set([
+	'value',
+	'checked',
+	'checkedCheckable',
+	'selectValue',
+	'defaultValue',
+	'defaultValueUncontrolled',
+	'defaultChecked',
+]);
+// Writers that stay in render; a host carrying one keeps its other writers there.
+const RENDER_WRITER_KINDS = new Set([
+	'spread',
+	'hostSpread',
+	'hostCommit',
+	'formCommit',
+	'dangerCommit',
+	'nativeStyle',
+	'nativeProjection',
+]);
+
+function makeCommitPlan() {
+	let size = 0;
+	let writes = [];
+	const mounts = new Map();
+	return {
+		cells: (count) => {
+			const base = size;
+			size += count;
+			return base;
+		},
+		size: () => size,
+		reset: () => {
+			size = 0;
+			writes = [];
+		},
+		/** Register a binding's commit statement once (keyed selection re-emits it). */
+		write: (cell, make) => {
+			if (!writes.some((entry) => entry[0] === cell)) writes.push([cell, make]);
+		},
+		writes: () => writes,
+		/** A deferrable binding's direct mount write, by cell. */
+		mount: (cell, make) => {
+			if (!mounts.has(cell)) mounts.set(cell, make);
+		},
+		mountWrite: (cell) => mounts.get(cell)?.() ?? null,
+	};
+}
+
+function commitBindingKind(bind) {
+	// Raw HTML shares its host's children validation with the child holes, which
+	// stay in render until structure moves to commit (#2043 step 2).
+	if (bind.signalDirect || bind.mountOnly || bind.name === 'dangerouslySetInnerHTML') return false;
+	switch (bind.kind) {
+		case 'text':
+		case 'textOnlyChild':
+		case 'class':
+		case 'style':
+		case 'styleProperty':
+		case 'event':
+		case 'event-bundle':
+		case 'formAction':
+			return true;
+		case 'styleProperties':
+			return !bind.spread;
+		default:
+			return COMMIT_ATTR_KINDS.has(bind.kind) || COMMIT_CONTROLLED_KINDS.has(bind.kind);
+	}
+}
+
+function commitRuntimeHelpers(bind) {
+	if (bind.kind === 'event') return ['bagRecordEvent', 'setEventSlot'];
+	if (bind.kind === 'event-bundle') return ['bagRecordBundle', 'commitEventBundle'];
+	return [COMMIT_CONTROLLED_KINDS.has(bind.kind) ? 'bagRecordAlways' : 'bagRecord'];
+}
+
+function commitCellCount(bind) {
+	if (bind.kind === 'event-bundle') return bind.argExprs.length <= 2 ? 1 + bind.argExprs.length : 2;
+	return bind.kind === 'styleProperties' ? bind.properties.length : 1;
+}
+
+function emitCommitFunction(ctx, commit, origin) {
+	const writes = commit.writes();
+	if (writes.length === 0) return null;
+	const name = allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
+	const body = [
+		b.const('_n', b.member(b.id('_b'), 'next')),
+		b.declaration('let', [b.declarator('_v')]),
+		// Clear the staged state first: a setter that throws leaves the bag idle,
+		// its committed slots still describing the DOM.
+		b.stmt(b.assignment('&=', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS))),
+		...writes.sort((x, y) => x[0] - y[0]).map(([, make]) => make(commit.size())),
+	];
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(b.function_declaration(b.id(name), [b.id('_b')], b.block(body)), origin),
+	);
+	return name;
+}
+
+function commitDoneStatement(ctx, name, origin) {
+	ctx.runtimeNeeded.add('bagDone');
+	return inheritOriginLoc(
+		b.if(
+			b.binary('!==', b.id('_n'), b.literal(null)),
+			b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b'), b.id(name))),
+			null,
+		),
+		origin,
+	);
+}
+
+/** Render half of a commit binding: record; the write goes to the commit function. */
+function emitCommitBindingUpdate(bind, bag, commit, F, org) {
+	const cell = bind.commitCell;
+	const V = () => b.id('_v');
+	const nextAt = (i) => b.member(b.id('_n'), b.literal(i), true);
+	const record = (helper, i, value, ...rest) => {
+		return b.stmt(
+			b.assignment(
+				'=',
+				b.id('_n'),
+				b.call(`_$${helper}`, b.id('_b'), b.id('_n'), b.literal(i), value, ...rest),
+			),
+		);
+	};
+	// The ordinary cell write: a changed cell reaches its setter, then publishes.
+	// `write(scope)` builds the setter call over `_v`. A deferrable kind passes
+	// `mountValue`: its mount writes the fresh host directly (commit.mount).
+	const writeCell = (i, write, publish, mountValue = null) => {
+		const publishStmt = () => (publish === null ? [] : [b.stmt(b.assignment('=', publish(), V()))]);
+		commit.write(i, () =>
+			inheritOriginLoc(
+				b.if(
+					b.binary('!==', b.assignment('=', V(), nextAt(i)), b.id('_b')),
+					b.block([b.stmt(write(nextAt(commit.size()))), ...publishStmt()]),
+					null,
+				),
+				org,
+			),
+		);
+		if (mountValue !== null && commit.directMount)
+			commit.mount(i, () =>
+				inheritOriginLoc(
+					b.block([b.const('_v', mountValue), b.stmt(write(b.id('__s'))), ...publishStmt()]),
+					org,
+				),
+			);
+	};
+	const callee = () => attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind);
+	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
+	const prev = () => F('_prev');
+	switch (bind.kind) {
+		case 'text':
+		case 'textOnlyChild':
+			writeCell(
+				cell,
+				() =>
+					bag.has(`_txt$${bind.id}`)
+						? b.call(
+								'_$setText',
+								F('_txt'),
+								V(),
+								...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
+							)
+						: b.call('_$setText', b.literal(null), V(), F('_el')),
+				prev,
+			);
+			return record('bagRecord', cell, bind.expr, prev());
+		case 'class': {
+			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
+			writeCell(cell, () => b.call(callee(), F('_el'), V()), prev, value);
+			return record('bagRecord', cell, value, prev());
+		}
+		case 'style':
+			writeCell(
+				cell,
+				() => b.call(callee(), F('_el'), V(), F('_sty')),
+				() => F('_sty'),
+				bind.expr,
+			);
+			return record('bagRecord', cell, bind.expr, F('_sty'));
+		case 'styleProperty':
+			// The previous value tells a first absent longhand (the unset seed) apart.
+			writeCell(
+				cell,
+				(scope) =>
+					b.call(
+						callee(),
+						F('_el'),
+						inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
+						V(),
+						inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
+						prev(),
+						scope,
+					),
+				prev,
+				bind.expr,
+			);
+			return record('bagRecord', cell, bind.expr, prev());
+		case 'styleProperties': {
+			const valueName = (i) => bind.valueNames?.[i] ?? `_v${i}`;
+			const values = () => bind.evaluations.map((value, i) => b.const(valueName(i), value));
+			const valueOf = (property) => b.id(valueName(property.evaluationIndex));
+			const previous = (i) => bagFieldNode(bag, `_prev$${bind.id}_${i}`);
+			const propertyCallee = () =>
+				attrLoweringToken(b.id(`_$${attrBindingHelper({ kind: 'styleProperty' })}`), bind);
+			bind.properties.forEach((property, i) =>
+				writeCell(
+					cell + i,
+					() =>
+						b.call(
+							propertyCallee(),
+							F('_el'),
+							inheritOriginLoc(b.literal(property.name), property.key),
+							V(),
+							b.literal(''),
+							previous(i),
+						),
+					() => previous(i),
+				),
+			);
+			const entries = b.array(
+				bind.properties.flatMap((property) => [
+					inheritOriginLoc(b.literal(property.name), property.key),
+					valueOf(property),
+				]),
+			);
+			// Mount and hydration still compare and write one complete style.
+			const grouped = () => [
+				b.stmt(b.call(callee(), F('_el'), entries, b.literal(bind.staticCss))),
+				...(bind.deferred ? [b.stmt(b.assignment('=', F('_sty'), b.literal(null)))] : []),
+				...bind.properties.map((property, i) =>
+					b.stmt(b.assignment('=', previous(i), valueOf(property))),
+				),
+			];
+			const directMount = bind.deferred && commit.directMount;
+			if (directMount)
+				commit.mount(cell, () => inheritOriginLoc(b.block([...values(), ...grouped()]), org));
+			const hydrate = b.call('_$isHydratingStyle');
+			const needsGroup =
+				bind.deferred && !directMount
+					? b.logical('||', b.binary('===', F('_sty'), b.id('__s')), hydrate)
+					: hydrate;
+			return b.block([
+				...values(),
+				b.if(
+					needsGroup,
+					b.block(grouped()),
+					b.block(
+						bind.properties.map((property, i) =>
+							record('bagRecord', cell + i, valueOf(property), previous(i)),
+						),
+					),
+				),
+			]);
+		}
+		case 'event': {
+			const key = () => slotKeyLiteral(bind);
+			writeCell(cell, () => b.call('_$setEventSlot', F('_el'), key(), V()), null);
+			const value = bind.dev
+				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
+				: bind.expr;
+			// The committed handler is the one installed on the host.
+			return record('bagRecordEvent', cell, value, b.member(F('_el'), key(), true), F('_el'));
+		}
+		case 'event-bundle': {
+			const n = bind.argExprs.length;
+			const bundle = () => F('_ev');
+			commit.write(cell, () =>
+				inheritOriginLoc(
+					b.stmt(b.call('_$commitEventBundle', b.id('_b'), bundle(), b.id('_n'), b.literal(cell))),
+					org,
+				),
+			);
+			// The committed callback and captures are the dispatched bundle's own.
+			return b.stmt(
+				b.assignment(
+					'=',
+					b.id('_n'),
+					b.call(
+						'_$bagRecordBundle',
+						b.id('_b'),
+						b.id('_n'),
+						b.literal(cell),
+						bundle(),
+						bind.fnExpr,
+						...(n > 2 ? [b.array(bind.argExprs.slice())] : bind.argExprs),
+					),
+				),
+			);
+		}
+		case 'formAction':
+			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V(), prev()), prev, bind.expr);
+			return record('bagRecord', cell, bind.expr, prev());
+		default:
+			if (COMMIT_CONTROLLED_KINDS.has(bind.kind)) {
+				// A controlled property reasserts on every commit (React's contract).
+				writeCell(cell, () => b.call(callee(), F('_el'), V()), null);
+				return record('bagRecordAlways', cell, bind.expr);
+			}
+			// attr / stringData / booleanAttr / ariaAttr
+			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V()), prev, bind.expr);
+			return record('bagRecord', cell, bind.expr, prev());
+	}
+}
+
+function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null) {
 	const knownExpression = resolveKnownAttributeSource(bind.expr, (source) =>
 		bagFieldNode(bag, `_prev$${source.binding.id}`),
 	);
@@ -30820,6 +31221,8 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	// 1-char bag field names (see makeBag) — resolved from the same registry the
 	// mount pass registered them in; an unmounted field throws at compile time.
 	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
+	if (commit !== null && bind.commitCell >= 0)
+		return st(emitCommitBindingUpdate(bind, bag, commit, F, org));
 	// See emitBindingMount: the helper and the name literal carry the authored
 	// attribute name, so the name resolves to the update write too.
 	const callee = () =>
