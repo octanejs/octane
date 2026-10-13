@@ -327,9 +327,9 @@
       "fullName": "first default component unit publishes the exact upstream component registry through the root entry point"
     },
     {
-      "id": "runtime:d2b2077dda6a69de",
+      "id": "runtime:dcc3372a1223998e",
       "file": "packages/select/tests/leaf-components.test.ts",
-      "fullName": "first default component unit renders no MenuPortal markup during SSR without a control element"
+      "fullName": "first default component unit renders no MenuPortal content during SSR without a control element"
     },
     {
       "id": "runtime:3b8f708d84aee162",

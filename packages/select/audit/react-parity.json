@@ -178,7 +178,7 @@
         {
           "path": "packages/select/audit/differential-runtime.json",
           "role": "support",
-          "sha256": "b5ff60f3cb89d4888ce6402092f0effb339ca6854b4649c91fb00e18b9e78887"
+          "sha256": "eedc01033ddb6bc5aa6a3b1fde72ac903d92bbfc1751ec8ac8ca5ad90f1176dc"
         },
         {
           "path": "scripts/react-parity/react-select-runtime-inventory.mjs",
