@@ -221,6 +221,7 @@ import { BINDING_OPEN_PREFIX, bindingRootMarker } from './dom-binding-protocol.j
 import {
 	BOUNDARY_CLIENT,
 	BOUNDARY_CLIENT_ERROR,
+	BOUNDARY_CLIENT_NATIVE,
 	BOUNDARY_CLIENT_SUSPENDED,
 	BOUNDARY_CONTENT,
 	BOUNDARY_STREAMED,
@@ -231,6 +232,9 @@ import {
 	HYDRATION_PROTOCOL_VERSION,
 	HYDRATE_MARKER_SELECTOR,
 	isRangeOpen,
+	NATIVE_SIGNAL_FRESH_COMMENT,
+	STREAM_SEED_COMMENT,
+	SUSPENSE_RESOLVED_COMMENT,
 } from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
@@ -2159,7 +2163,9 @@ function takeNativeFreshArm(
 	ids: RootIdState,
 ): RootIdState | null {
 	if (hydration === null) return null;
-	const value = (STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data;
+	const value =
+		hydration.bindingTryState(open) ??
+		(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data;
 	const count = value.startsWith(BOUNDARY_CLIENT) ? boundaryIdCount(value) : -1;
 	if (count < 0) return null;
 	reserveHydrationIds(ids, count);
@@ -21723,9 +21729,17 @@ class HydrationCapability {
 	 * content directly inside its one range (hydration-protocol.ts), while the
 	 * client renders the arm in a range of its own inside the boundary's, where
 	 * it can hide the arm beside a fallback. An attempt that is discarded
-	 * restores the server's range.
+	 * restores the server's range. A presentation-binding view's arm keeps the
+	 * range of its own that opens at `first` (bindingTryState).
 	 */
-	armRange(first: Node | null, end: Node): [Comment, Comment] {
+	armRange(open: Node, first: Node | null, end: Node): [Comment, Comment] {
+		if (
+			(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data.startsWith(
+				BINDING_OPEN_PREFIX,
+			) &&
+			this.isOpen(first)
+		)
+			return [first, this.close(first)];
 		const parent = domNode(domNode(end).parentNode!);
 		const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
 		const start = doc.createComment('try-b');
@@ -21734,6 +21748,42 @@ class HydrationCapability {
 		parent.insertBefore(start, first);
 		parent.insertBefore(close, end);
 		return [start, close];
+	}
+
+	/**
+	 * What a presentation-binding view's `@try` range holds, spelled as a
+	 * boundary's open (hydration-protocol.ts), or null for any other range.
+	 * The view keeps its own shape: its open records the arm, the node after
+	 * the open may say what the server rendered, and the arm has a range of its
+	 * own (armRange).
+	 */
+	bindingTryState(open: Node): string | null {
+		if (
+			!(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data.startsWith(
+				BINDING_OPEN_PREFIX,
+			)
+		)
+			return null;
+		const lead = getNextSibling(open);
+		if (lead?.nodeType === 1) {
+			const sentinel = STAGED_DOM ? STAGED_DOM.view(lead as Element) : (lead as Element);
+			return isRendererStreamBoundaryTemplate(sentinel)
+				? BOUNDARY_STREAMED + sentinel.getAttribute(STREAM_BOUNDARY_ATTR)
+				: HYDRATION_START;
+		}
+		const data =
+			lead?.nodeType === 8
+				? (STAGED_DOM ? STAGED_DOM.view(lead as Comment) : (lead as Comment)).data
+				: '';
+		return data.startsWith(SUSPENSE_RESOLVED_COMMENT)
+			? BOUNDARY_CONTENT + data.slice(SUSPENSE_RESOLVED_COMMENT.length)
+			: data.startsWith(STREAM_SEED_COMMENT)
+				? BOUNDARY_STREAMED + data.slice(STREAM_SEED_COMMENT.length)
+				: data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)
+					? BOUNDARY_CLIENT +
+						BOUNDARY_CLIENT_NATIVE +
+						data.slice(NATIVE_SIGNAL_FRESH_COMMENT.length)
+					: HYDRATION_START;
 	}
 
 	/**
@@ -41652,7 +41702,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 			freshBoundary = true;
 		}
 		if (adopting && !freshBoundary) {
-			[start, end] = hydration!.armRange(getNextSibling(state.start), state.end);
+			[start, end] = hydration!.armRange(state.start, getNextSibling(state.start), state.end);
 			hydration!.node = getNextSibling(start);
 		} else {
 			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
@@ -42150,8 +42200,15 @@ function takeInitialSuspenseHydration(
 ): InitialSuspenseHydration | null {
 	// The boundary's open says what its server range holds (hydration-protocol.ts).
 	const open = state.start as Comment;
-	const text = (STAGED_DOM ? STAGED_DOM.view(open) : open).data;
+	const binding = hydration.bindingTryState(open);
+	const text = binding ?? (STAGED_DOM ? STAGED_DOM.view(open) : open).data;
 	let cursor = getNextSibling(open);
+	const metadata: ChildNode[] = [];
+	// A binding view's comment that says what the server rendered leads its arm.
+	if (binding !== null && cursor?.nodeType === 8) {
+		metadata.push(cursor);
+		cursor = getNextSibling(cursor);
+	}
 	if (text.startsWith(BOUNDARY_STREAMED)) {
 		// A sentinel still leads a pending boundary, which mountTry claims.
 		if (
@@ -42184,9 +42241,9 @@ function takeInitialSuspenseHydration(
 			renderOwner: state.parentBlock.idState.renderOwner,
 			signalState: state.parentBlock.idState.signalState,
 		};
-		const [start, end] = hydration.armRange(cursor, state.end);
+		const [start, end] = hydration.armRange(open, cursor, state.end);
 		return {
-			metadata: [],
+			metadata,
 			start,
 			end,
 			idStart: 0,
@@ -42200,7 +42257,6 @@ function takeInitialSuspenseHydration(
 	if (count < 0) return null;
 	let seedRaw: string | null = null;
 	let nativeRaw: string | null = null;
-	const sidecars: Element[] = [];
 	for (const attr of [SUSPENSE_RESOLVED_SEED_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR]) {
 		if (cursor?.nodeType !== 1) continue;
 		const script = cursor as Element;
@@ -42213,10 +42269,10 @@ function takeInitialSuspenseHydration(
 		if (attr === SUSPENSE_RESOLVED_SEED_ATTR)
 			seedRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
 		else nativeRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
-		sidecars.push(script);
+		metadata.push(script);
 		cursor = getNextSibling(script);
 	}
-	const [start, end] = hydration.armRange(cursor, state.end);
+	const [start, end] = hydration.armRange(open, cursor, state.end);
 	const rootIds = state.idState;
 	const idStart = rootIds.next;
 	reserveHydrationIds(rootIds, count);
@@ -42228,7 +42284,7 @@ function takeInitialSuspenseHydration(
 		renderOwner: rootIds.renderOwner,
 	};
 	return {
-		metadata: sidecars,
+		metadata,
 		start,
 		end,
 		idStart,
@@ -42531,7 +42587,8 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let freshBoundary = false;
 	const first = getNextSibling(state.start);
 	const open = adopting
-		? (STAGED_DOM ? STAGED_DOM.view(state.start as Comment) : (state.start as Comment)).data
+		? (hydration!.bindingTryState(state.start) ??
+			(STAGED_DOM ? STAGED_DOM.view(state.start as Comment) : (state.start as Comment)).data)
 		: '';
 	let streamedBoundaryId: string | null = null;
 	let unfinished: UnfinishedArm | null = null;
@@ -42569,7 +42626,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	if (adopting && !freshBoundary) {
 		// ADOPT the server's content, which the seeded use() values let the try
 		// body render its success arm over.
-		[bStart, bEnd] = hydration!.armRange(first, state.end);
+		[bStart, bEnd] = hydration!.armRange(state.start, first, state.end);
 		hydration!.node = getNextSibling(bStart);
 	} else {
 		scopedSeeds = null;
