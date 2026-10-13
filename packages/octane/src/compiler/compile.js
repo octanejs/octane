@@ -1716,7 +1716,6 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bagRecordAlways',
 	'bagRecordEvent',
 	'bagRecordBundle',
-	'bagResume',
 	'bagDone',
 	'setEventSlot',
 	'commitEventBundle',
@@ -28878,7 +28877,6 @@ function planJsx(
 					? inheritOriginLoc(
 							b.block([
 								b.let('_n', b.literal(null)),
-								commitResumeStatement(ctx, planOrigin),
 								update,
 								commitDoneStatement(ctx, commitName, planOrigin),
 							]),
@@ -29881,8 +29879,7 @@ function planJsx(
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
 		mount: mountLines,
-		update:
-			commitName === null ? updateLines : [commitResumeStatement(ctx, planOrigin), ...updateLines],
+		update: updateLines,
 		everyRender:
 			commitName === null
 				? everyRenderLines
@@ -31000,18 +30997,6 @@ function emitCommitFunction(ctx, commit, origin) {
 		inheritOriginLoc(b.function_declaration(b.id(name), [b.id('_b')], b.block(body)), origin),
 	);
 	return name;
-}
-
-function commitResumeStatement(ctx, origin) {
-	ctx.runtimeNeeded.add('bagResume');
-	return inheritOriginLoc(
-		b.if(
-			b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)),
-			b.stmt(b.assignment('=', b.id('_n'), b.call('_$bagResume', b.id('_b')))),
-			null,
-		),
-		origin,
-	);
 }
 
 function commitDoneStatement(ctx, name, origin) {

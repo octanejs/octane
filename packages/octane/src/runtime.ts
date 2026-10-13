@@ -4401,8 +4401,12 @@ function closeOpsWindow(): void {
 	OPS_CHECKPOINT = OPS_CHECKPOINTS.pop()!;
 }
 
-/** The first changed binding of a render stages the bag's reusable cells. */
+/**
+ * The first binding a render records into: a bag staged earlier in this
+ * transaction resumes its cells; otherwise its reusable cells are staged.
+ */
 function stageBag(bag: any): any[] {
+	if (bag.$ > BAG_SIZE) return bagResume(bag);
 	const state = bag.$;
 	let next = bag.next;
 	if (next === null) next = bag.next = new Array((state & BAG_SIZE) + 2).fill(bag);
@@ -4413,8 +4417,9 @@ function stageBag(bag: any): any[] {
 
 /**
  * Record one binding: `next` stays null until a value differs from its
- * committed slot; once staged, every binding writes its cell (the bag itself
- * when it equals the committed value, so a later render can revert a cell).
+ * committed slot, or the bag is already staged; from then on every binding
+ * writes its cell (the bag itself when it equals the committed value, so a
+ * later render can revert a cell).
  */
 export function bagRecord(
 	bag: any,
@@ -4424,7 +4429,7 @@ export function bagRecord(
 	committed: unknown,
 ): any[] | null {
 	if (next === null) {
-		if (value === committed) return null;
+		if (value === committed && bag.$ <= BAG_SIZE) return null;
 		next = stageBag(bag);
 	}
 	next[cell] = value === committed ? bag : value;
@@ -4440,7 +4445,7 @@ function bagRecordIs(
 	committed: unknown,
 ): any[] | null {
 	if (next === null) {
-		if (Object.is(value, committed)) return null;
+		if (Object.is(value, committed) && bag.$ <= BAG_SIZE) return null;
 		next = stageBag(bag);
 	}
 	next[cell] = Object.is(value, committed) ? bag : value;
@@ -4459,7 +4464,7 @@ export function bagRecordAlways(bag: any, next: any[] | null, cell: number, valu
  * writes a bag queued by an outer window saves its cells, so dropping the
  * nested window restores the outer window's pending values.
  */
-export function bagResume(bag: any): any[] {
+function bagResume(bag: any): any[] {
 	const next = bag.next;
 	if ((bag.$ & BAG_QUEUED) !== 0 && next[(bag.$ & BAG_SIZE) + 1] < OPS_CHECKPOINT)
 		journalObjectOnce(next);
