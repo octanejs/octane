@@ -39536,8 +39536,15 @@ export function childSlot(
 						bindingMarker,
 						prospectiveProps,
 					);
-					incoming = parentScope.slots[slotKey] as ChildSlot;
+				} catch (error) {
+					// A successor that suspends is still private. Release it before
+					// the enclosing fallback can commit its insertion effects, or
+					// the retry would allocate a second, ownerless copy.
+					incoming = parentScope.slots[slotKey] as ChildSlot | undefined;
+					if (incoming !== undefined) unmountSlot(incoming, true);
+					throw error;
 				} finally {
+					incoming ??= parentScope.slots[slotKey] as ChildSlot | undefined;
 					parentScope.slots[slotKey] = applied;
 					if (incoming !== undefined && parentScope._slots !== null) {
 						const registered = parentScope._slots.lastIndexOf(incoming);
