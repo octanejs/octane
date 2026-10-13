@@ -199,6 +199,29 @@ export interface NativeSerializedScope {
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;
 let nativeAdoptionResolver: NativeAdoptionResolver | null = null;
 
+// Hydration and signals can load in either order. Record only availability
+// here: the signal engine must not make renderer seed decoding reachable.
+export let nativeSignalHydration = false;
+let signalDeclarationsEnabled = false;
+let earlySignalHydrationStarter: (() => void) | null = null;
+
+export function registerNativeSignalHydration(): void {
+	nativeSignalHydration = true;
+}
+
+/** Only declarations can consume pre-module edits when their cells are created. */
+export function registerEarlySignalHydration(): void {
+	signalDeclarationsEnabled = true;
+	// A subsequently loaded declaration module claims already queued native edits.
+	if (earlySignalHydrationStarter) earlySignalHydrationStarter();
+}
+
+/** Only a hydration entry can supply the control-capture bridge. */
+export function startEarlySignalHydration(start: () => void): void {
+	earlySignalHydrationStarter = start;
+	if (signalDeclarationsEnabled) start();
+}
+
 /**
  * Brands hydration control-flow errors, this one and the renderer's refused
  * early presentation, so that a boundary can pass one through without naming
