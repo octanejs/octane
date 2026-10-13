@@ -118,6 +118,33 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 					return ts.factory.updateSourceFile(sourceFile, [...imports, ...statements]);
 				},
 			],
+			after: [
+				(context) => (sourceFile) => {
+					const protectModuleIntrinsics: ts.Visitor = (node) => {
+						// CommonJS module bookkeeping (including live re-exports)
+						// must use the evaluator's Object, not a legal fixture binding
+						// named Object. Parsed/compiler-authored reads have source
+						// provenance and must retain their normal lexical meaning.
+						if (
+							ts.isPropertyAccessExpression(node) &&
+							ts.isIdentifier(node.expression) &&
+							node.expression.text === 'Object' &&
+							ts.getOriginalNode(node.expression).pos < 0
+						) {
+							return context.factory.updatePropertyAccessExpression(
+								node,
+								context.factory.createPropertyAccessExpression(
+									context.factory.createIdentifier('require'),
+									'Object',
+								),
+								node.name,
+							);
+						}
+						return ts.visitEachChild(node, protectModuleIntrinsics, context);
+					};
+					return ts.visitNode(sourceFile, protectModuleIntrinsics) as ts.SourceFile;
+				},
+			],
 		},
 	});
 	const requireFixture = (request: string): CompiledFixtureModule => {
@@ -132,6 +159,7 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 			`Compiled fixture ${id} contains an import/export shape the shared loader cannot evaluate (${request}).`,
 		);
 	};
+	requireFixture.Object = Object;
 	const exports: CompiledFixtureModule = {};
 	const evaluate = new Function(
 		'require',

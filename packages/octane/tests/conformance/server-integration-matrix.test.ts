@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { createRoot, flushSync } from 'octane';
 import { compile } from 'octane/compiler';
 import { renderToString } from 'octane/server';
-import { loadServerFixture } from '../_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import * as anonymousDefaultClient from './_fixtures/anonymous-default-root.tsrx';
 import * as client from './_fixtures/server-integration-matrix.tsrx';
 import { createServerRenderMatrix } from './_helpers/server-render-matrix.js';
@@ -18,6 +18,39 @@ const anonymousDefaultMatrix = createServerRenderMatrix({
 	serverModule: anonymousDefaultServer,
 });
 Object.freeze(anonymousDefaultClient.default);
+
+it('keeps authored intrinsic names and live re-exports distinct from module bookkeeping', () => {
+	let label = 'first';
+	const module = loadCompiledFixtureSource(
+		`import { current } from './source';
+export { current as label } from './source';
+export const Object = { text: 'authored object' };
+export const Symbol = { text: 'authored symbol' };
+export function View() @{ <p>{Object.text + '/' + Symbol.text + '/' + current as string}</p> }`,
+		{
+			id: '/project/src/IntrinsicNames.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'./source': {
+					get current() {
+						return label;
+					},
+				},
+			},
+		},
+	);
+	expect(module.Object).toEqual({ text: 'authored object' });
+	expect(module.Symbol).toEqual({ text: 'authored symbol' });
+	expect(module.label).toBe('first');
+	expect(renderToString(module.View, {}).html).toContain(
+		'>authored object/authored symbol/first</p>',
+	);
+	label = 'second';
+	expect(module.label).toBe('second');
+	expect(renderToString(module.View, {}).html).toContain(
+		'>authored object/authored symbol/second</p>',
+	);
+});
 
 function replaceWithMismatchedMarkup(container: HTMLElement): void {
 	const wrong = document.createElement('aside');
