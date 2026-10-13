@@ -167,6 +167,30 @@ describe('structural deletions commit with their render', () => {
 			container.remove();
 		}
 	});
+
+	it("clears a root container's previous content at commit", () => {
+		const container = document.createElement('div');
+		container.innerHTML = '<p id="old">old</p>';
+		document.body.appendChild(container);
+		const old = container.firstChild;
+		let during: Node | null = null;
+		const root = createRoot(container);
+		try {
+			root.render(BranchProbeApp, {
+				show: false,
+				probe: () => {
+					during = container.firstChild;
+				},
+			});
+			// The render left the previous content in place; the commit replaced it.
+			expect(during).toBe(old);
+			expect(old!.parentNode).toBe(null);
+			expect(container.querySelector('#hidden')?.textContent).toBe('hidden');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
 });
 
 describe('keyed lists change their structure at commit', () => {

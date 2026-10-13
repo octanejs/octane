@@ -4571,6 +4571,21 @@ function slotNext(slot: { next: SlotNext | null }): SlotNext {
 			bound: null,
 		};
 		tx.ops.push(applySlotNext, slot);
+		// A window that drops truncates what it created; only a structure an
+		// outer window built needs copying back (below).
+		if (TRANSITION_JOURNAL_DEPTH > 1)
+			TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
+	} else if (
+		TRANSITION_JOURNAL_DEPTH > 1 &&
+		(TRANSITION_JOURNAL_BAGS!.get(next) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
+	) {
+		// An outer window changed this slot already. A nested window that drops
+		// must give its pending structure back: copy it on first touch, as a
+		// bag's cells are.
+		journalObjectOnce(next);
+		journalObjectOnce(next.out);
+		if (next.members !== null) journalObjectOnce(next.members);
+		if (next.bound !== null) journalObjectOnce(next.bound);
 	}
 	return next;
 }
@@ -4950,8 +4965,15 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	if (tx === null) return null;
 	let next = state.next;
 	if (next !== null && next.tx === tx) {
-		// A nested window that drops restores the log it grew.
-		if (TRANSITION_JOURNAL_DEPTH > 1) journalObjectOnce(next.out);
+		// A nested window that drops restores the log an outer window began.
+		if (
+			TRANSITION_JOURNAL_DEPTH > 1 &&
+			(TRANSITION_JOURNAL_BAGS!.get(next) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
+		) {
+			journalObjectOnce(next);
+			journalObjectOnce(next.out);
+			journalObjectOnce(next.members!);
+		}
 		return next;
 	}
 	const end = state.end;
@@ -4973,6 +4995,7 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	const ops = tx.ops;
 	if (at >= ops.length) ops.push(applySlotNext, state);
 	else ops.splice(at, 0, applySlotNext, state);
+	if (TRANSITION_JOURNAL_DEPTH > 1) TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
 	return next;
 }
 
@@ -51281,8 +51304,9 @@ function makeRoot(
 				!STAGED_DOM &&
 				!(mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0))
 			) {
-				clearRootContainer(container);
 				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
+				// The container's previous content leaves as the mount lands.
+				frontier.out.push(() => clearRootContainer(container), null, null);
 			} else {
 				clearRootContainer(container);
 			}
