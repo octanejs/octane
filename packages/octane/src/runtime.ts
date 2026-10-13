@@ -4432,7 +4432,7 @@ export function bagRecord(
 }
 
 /** bagRecord with SameValue: event captures keep signed zero and NaN observable. */
-export function bagRecordIs(
+function bagRecordIs(
 	bag: any,
 	next: any[] | null,
 	cell: number,

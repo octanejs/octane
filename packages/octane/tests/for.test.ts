@@ -2789,17 +2789,17 @@ describe.each([
 			},
 		};
 	}
-	// As in React, render evaluates every binding and the commit coerces the
-	// written values afterwards, in binding order. A mount writes its fresh row
-	// before the child holes render; an update writes at the root's commit.
+	// A mount writes its fresh row as it reads each binding. As in React, an
+	// update's render evaluates every binding and its commit coerces the written
+	// values afterwards, in binding order.
 	const readAndCoerceMount = [
 		'class',
 		'title',
+		'coerce-title',
 		'data',
+		'coerce-data',
 		'aria',
 		'hidden',
-		'coerce-title',
-		'coerce-data',
 		'only',
 		'mixed',
 	];
