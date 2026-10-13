@@ -4813,11 +4813,12 @@ function queueRootDeletion(owner: unknown, first: Node | null, last: Node | null
 function applyOutgoing(out: any[], parent?: Node): void {
 	for (let i = 0; i < out.length; i += 3) {
 		const kind = out[i];
-		if (kind === moveBlockBefore || kind === placeRun) {
+		if (kind === placeRoots || kind === moveBlockBefore || kind === placeRun) {
 			// A deletion cleanup can unmount the list before the rest of its log.
 			const anchor: Node = out[i + 2];
 			if ((STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).parentNode === parent) {
-				if (kind === placeRun) placeRun(parent!, out[i + 1], anchor);
+				if (kind === placeRoots) placeRoots(parent!, out[i + 1], anchor);
+				else if (kind === placeRun) placeRun(parent!, out[i + 1], anchor);
 				else if (!out[i + 1].disposed) moveBlockBefore(out[i + 1], anchor);
 			}
 			continue;
@@ -4987,6 +4988,36 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	if (at >= ops.length) ops.push(applySlotNext, state);
 	else ops.splice(at, 0, applySlotNext, state);
 	return next;
+}
+
+/**
+ * The end marker of a fresh single-root row in a committed list. commitBag
+ * leaves such a row's root detached and self-marks the row with it, so the
+ * row needs no container and no rehoming: its commit inserts the root alone,
+ * as React places a new row (placeRoots).
+ */
+let DETACHED_ROOT: Comment | null = null;
+
+function newDetachedRoot(): Comment {
+	return (DETACHED_ROOT = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(''));
+}
+
+/** The rows whose detached roots land before `anchor`: the log's last batch, or a new one. */
+function listRoots(next: SlotNext, anchor: Node): Block[] {
+	const out = next.out;
+	const n = out.length;
+	if (n !== 0 && out[n - 3] === placeRoots && out[n - 1] === anchor) return out[n - 2];
+	const rows: Block[] = [];
+	out.push(placeRoots, rows, anchor);
+	return rows;
+}
+
+function placeRoots(parent: Node, rows: Block[], anchor: Node): void {
+	const into = STAGED_DOM ? STAGED_DOM.view(parent) : parent;
+	for (let i = 0; i < rows.length; i++) {
+		const row = rows[i];
+		if (!row.disposed) into.insertBefore(row.startMarker!, anchor);
+	}
 }
 
 /** The fragment fresh rows that land before `anchor` render into: the log's last run, or a new one. */
@@ -23831,10 +23862,15 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	if (hydration !== null && hydration.deferred !== null) hydration.claimAfterHoles();
 	if (root !== null) {
 		const block = scope.block;
+		const end = block.endMarker;
 		if (hydration !== null && hydration.isActive()) hydration.insertRoot(root, block);
-		else {
+		else if (end !== null && end === DETACHED_ROOT) {
+			// A committed list's fresh row: its root stays detached until commit.
+			block.startMarker = root;
+			block.endMarker = root;
+		} else {
 			const parent = block.parentNode;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, block.endMarker);
+			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, end);
 		}
 	}
 	scope.slots[0] = bag;
@@ -48115,13 +48151,14 @@ function mountFastHostItems<T>(
 		if (state.mappedNative !== true) journalRootProperty(state, 'mappedNative', state.mappedNative);
 		state.mappedNative = true;
 	}
-	// A committed list's rows render off-document, in one run before its end.
+	// A committed list's rows keep their roots detached until they land before
+	// its end at commit (DETACHED_ROOT).
 	const next =
 		ROOT_RENDER_TRANSACTION === null
 			? null
 			: listNext(state, parentBlock, ROOT_RENDER_TRANSACTION.ops.length);
-	const host = next === null ? parentNode : listRun(next, state.end);
-	const anchor = next === null ? state.end : null;
+	const rows = next === null ? null : listRoots(next, state.end);
+	const anchor = rows === null ? state.end : (DETACHED_ROOT ?? newDetachedRoot());
 	try {
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index];
@@ -48130,7 +48167,7 @@ function mountFastHostItems<T>(
 			const block = createBlock(
 				'control-flow',
 				parentBlock,
-				host,
+				parentNode,
 				null,
 				anchor,
 				itemBody as ComponentBody,
@@ -48155,13 +48192,12 @@ function mountFastHostItems<T>(
 			CURRENT_BLOCK = previousBlock;
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.endRender(block, true, false);
 			block.mounted = true;
-			const root = (
-				anchor === null
-					? (STAGED_DOM ? STAGED_DOM.view(host) : host).lastChild
-					: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling
-			)!;
-			block.startMarker = root;
-			block.endMarker = root;
+			if (rows !== null) rows.push(block);
+			else {
+				const root = (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling!;
+				block.startMarker = root;
+				block.endMarker = root;
+			}
 			state.items.set(key, block);
 			block.prevSibling = previous;
 			if (previous !== null) previous.nextSibling = block;
@@ -48180,8 +48216,9 @@ function mountFastHostItems<T>(
 			// A value-position child can throw or suspend after commitBag inserted
 			// its host. The still-unregistered row owns that host and any nested
 			// child scopes, so dispose it before unwinding the completed prefix.
-			if (current.slots[0] !== undefined) {
-				const root = lastBefore(host, anchor);
+			// commitBag self-marked a detached row already.
+			if (current.slots[0] !== undefined && rows === null) {
+				const root = (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling;
 				if (root !== null && root !== state.start) {
 					current.startMarker = root;
 					current.endMarker = root;
@@ -48641,12 +48678,11 @@ function mountItemsLinear<T>(
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
 	const parentNode = domNode(state.end).parentNode!;
-	// A committed list's rows render off-document, in one run before its end.
+	// A committed list's rows render off-document and land before its end.
 	const next =
 		ROOT_RENDER_TRANSACTION === null || passthroughList
 			? null
 			: listNext(state, parentBlock, ROOT_RENDER_TRANSACTION.ops.length);
-	const host = next === null ? parentNode : listRun(next, state.end);
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
 	// element's existing raw children, keyed like the incoming items. This cold
 	// map preserves later survivors after a removed/changed key, and reorders
@@ -48669,7 +48705,7 @@ function mountItemsLinear<T>(
 			const key = readListKey(keySource, item, i, normalizeKey);
 			if (observeKey !== undefined) observeKey(i, key);
 			let adoptNode: Node | null = null;
-			let anchor: Node | null = next === null ? state.end : null;
+			let anchor: Node = state.end;
 			if (adoptByKey !== null) {
 				anchor = (prev === null ? getNextSibling(state.start!) : getNextSibling(prev.endMarker!))!;
 				const candidate = adoptByKey.get(key);
@@ -48691,19 +48727,10 @@ function mountItemsLinear<T>(
 			}
 			const block: Block =
 				hydrating && passthroughList
-					? mountPassthroughListItem(
-							parentBlock,
-							parentNode,
-							anchor!,
-							item,
-							i,
-							key,
-							itemBody,
-							state,
-						)
+					? mountPassthroughListItem(parentBlock, parentNode, anchor, item, i, key, itemBody, state)
 					: mountItem(
 							parentBlock,
-							host,
+							parentNode,
 							anchor,
 							item,
 							i,
@@ -48713,6 +48740,8 @@ function mountItemsLinear<T>(
 							singleRoot,
 							ssrMarkerless,
 							adoptNode,
+							false,
+							next,
 						);
 			oldItems.set(key, block);
 			block.prevSibling = prev;
@@ -49036,9 +49065,8 @@ function reconcileKeyed<T>(
 			links.set(beforeMiddle, beforeMiddle.nextSibling);
 		if (afterMiddle !== null) state.inOrder = false;
 		const anchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
+		// Fresh rows render off-document and land before the anchor at commit.
 		next = listNext(state, parentBlock, at);
-		// Fresh rows render into a run that lands before the anchor at commit.
-		const host = next === null ? parentNode : listRun(next, anchor);
 		let prev: Block | null = beforeMiddle;
 		for (let i = prefixLen; i <= newEnd; i++) {
 			const item = items[i];
@@ -49046,8 +49074,8 @@ function reconcileKeyed<T>(
 			if (observeKey !== undefined) observeKey(i, key);
 			const block = mountItem(
 				parentBlock,
-				host,
-				next === null ? anchor : null,
+				parentNode,
+				anchor,
 				item,
 				i,
 				key,
@@ -49057,6 +49085,7 @@ function reconcileKeyed<T>(
 				ssrMarkerless,
 				null,
 				true,
+				next,
 			);
 			oldItems.set(key, block);
 			block.prevSibling = prev;
@@ -49157,15 +49186,14 @@ function reconcileKeyed<T>(
 			state.head = null;
 			state.tail = null;
 			state.size = 0;
-			const host = next === null ? parentNode : listRun(next, state.end);
 			let prev: Block | null = null;
 			for (let i = 0; i < newLen; i++) {
 				const item = items[i];
 				const key = newKeys[i]; // prefixLen === 0, so newKeys spans the full list
 				const block = mountItem(
 					parentBlock,
-					host,
-					next === null ? state.end : null,
+					parentNode,
+					state.end,
 					item,
 					i,
 					key,
@@ -49175,6 +49203,7 @@ function reconcileKeyed<T>(
 					ssrMarkerless,
 					null,
 					true,
+					next,
 				);
 				oldItems.set(key, block);
 				block.prevSibling = prev;
@@ -49448,8 +49477,8 @@ function reconcileKeyed<T>(
 				const targetIdx = i + prefixLen;
 				block = mountItem(
 					parentBlock,
-					next === null ? parentNode : listRun(next, anchor),
-					next === null ? anchor : null,
+					parentNode,
+					anchor,
 					items[targetIdx],
 					targetIdx,
 					key,
@@ -49459,6 +49488,7 @@ function reconcileKeyed<T>(
 					ssrMarkerless,
 					null,
 					true,
+					next,
 				);
 				oldItems.set(key, block);
 				state.size++;
@@ -49759,6 +49789,9 @@ function mountItem<T>(
 	adoptNode: Node | null = null,
 	// A list update inserts this row beside rows it already rendered.
 	inserted = false,
+	// A committed list's pending structure (listNext): the row renders off the
+	// document and lands before `anchor` at commit.
+	next: SlotNext | null = null,
 ): Block {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_INSERT);
@@ -49861,6 +49894,11 @@ function mountItem<T>(
 		hydration.recordUpdate(block);
 		return block;
 	}
+	// Any other row of a committed list renders into a run fragment.
+	if (next !== null && !(singleRoot === true && ssrMarkerless)) {
+		parentNode = listRun(next, anchor!);
+		anchor = null;
+	}
 	if (
 		singleRoot === true ||
 		(singleRoot === 2 && isHostDescriptor(item) && !descNeedsBlocks(item))
@@ -49896,12 +49934,15 @@ function mountItem<T>(
 			renderBlock(block);
 			return block;
 		}
+		// A committed list's direct-host row, whose own template inserts its one
+		// root, keeps that root detached until commit (DETACHED_ROOT).
+		const detached = next !== null && singleRoot === true && ssrMarkerless;
 		const block = createBlock(
 			'control-flow',
 			parentBlock,
 			parentNode,
 			null,
-			anchor,
+			detached ? (DETACHED_ROOT ?? newDetachedRoot()) : anchor,
 			body as ComponentBody,
 			item,
 			forSlot.env,
@@ -49912,8 +49953,16 @@ function mountItem<T>(
 		try {
 			renderBlock(block);
 		} catch (error) {
-			discardThrownItem(block, error, parentNode, anchor);
+			discardThrownItem(block, error, detached ? null : parentNode, anchor);
 			throw error;
+		}
+		if (detached) {
+			// listRoots, inlined: a fill adds one row per call.
+			const out = next!.out;
+			const n = out.length;
+			if (n !== 0 && out[n - 3] === placeRoots && out[n - 1] === anchor) out[n - 2].push(block);
+			else out.push(placeRoots, [block], anchor);
+			return block;
 		}
 		// Body inserted ONE node right before `anchor` via
 		// `__block.parentNode.insertBefore(_root, __block.endMarker)`. Grab it
