@@ -486,8 +486,16 @@ async function buildSplitScenario(scenario, entry) {
 		executable: await linkChunks(chunks, entryChunk),
 		rows: [
 			{ name: scenario.name, files },
-			{ name: `${scenario.name}-runtime`, files: [runtime.code] },
-			{ name: `${scenario.name}-signals`, files: [signals.code] },
+			{
+				name: `${scenario.name}-runtime`,
+				files: [runtime.code],
+				modules: Object.keys(runtime.modules),
+			},
+			{
+				name: `${scenario.name}-signals`,
+				files: [signals.code],
+				modules: Object.keys(signals.modules),
+			},
 		],
 		modules,
 		runtimeExports: runtime.modules[runtimeModule].renderedExports,
@@ -842,7 +850,7 @@ try {
 					Object.entries(measured).map(([metric, value]) => [metric, stat(value)]),
 				),
 				meta: {
-					modules: modules.map((id) =>
+					modules: (row.modules ?? modules).map((id) =>
 						id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
 					),
 					hasRuntime,
