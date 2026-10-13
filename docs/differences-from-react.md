@@ -1597,9 +1597,10 @@ Other consequences:
   [Suspense retry timing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#5-retry-reveal-throttling--distinct-from-transition-shell-retention).
 - Resource readers can suspend by throwing a thenable during render, on the
   client and during SSR; `use()` is not required. Pending and error fallback
-  renders can also suspend through an enclosing pending boundary. A catch-only
-  error boundary does not own suspension; promises thrown by effects remain
-  application errors.
+  renders can also suspend through an enclosing pending boundary. As in React,
+  a catch-only error boundary (`ErrorBoundary`, or a `@try` with only
+  `@catch`) does not own suspension, on the client or the server; promises
+  thrown by effects remain application errors.
 - A Suspense retry runs on the settling thenable's microtask; React waits for a
   Scheduler task. If the retry suspends again on a thenable Octane has already
   seen settle, the next retry yields one macrotask after that thenable notifies,
@@ -2124,8 +2125,8 @@ error, or a rejected `use()`, reaches `onError` and leaves the nearest Suspense
 boundary's fallback, which hydration renders afresh from client data and
 reports through `onRecoverableError`. There a `@catch` arm takes a repeated
 throw. With no Suspense boundary above it, the error fails the server render,
-even under a catch-only `@try` or `ErrorBoundary`. See
-[Render errors](./ssr.md#render-errors).
+even under a catch-only `@try` or `ErrorBoundary`, which do not hold a
+suspension either. See [Render errors](./ssr.md#render-errors).
 
 A `<Hydrate>` boundary replays captured interaction events as constructed,
 untrusted copies that keep the captured event's `timeStamp`, including through

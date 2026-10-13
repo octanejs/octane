@@ -16651,17 +16651,18 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const bindingSite = node._octaneBindingSite
 		? inheritOriginLoc(b.literal(bindingMarker(node._octaneBindingSite, 'y')), node)
 		: null;
-	if (componentNs !== null || node.propagateSuspense === true || bindingSite !== null) {
+	// Without @pending the runtime passes suspension on, as the client's tryBlock
+	// does. A presentation-binding view's catch-only region owns it instead.
+	if (componentNs !== null || bindingSite !== null) {
 		trailing.push(
 			componentNs === null
 				? inheritOriginLoc(b.id('undefined'), node)
 				: inheritOriginLoc(b.literal(componentNs, JSON.stringify(componentNs)), node),
 		);
 	}
-	if (node.propagateSuspense === true || bindingSite !== null) {
-		trailing.push(inheritOriginLoc(b.literal(node.propagateSuspense === true), node));
+	if (bindingSite !== null) {
+		trailing.push(inheritOriginLoc(b.literal(node.propagateSuspense === true), node), bindingSite);
 	}
-	if (bindingSite !== null) trailing.push(bindingSite);
 	return ssrCall(
 		'ssrTry',
 		[b.id('__s'), b.literal(ssrTryKey(node)), b.id(trySub.fnName), pendFn, ...trailing],
