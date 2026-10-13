@@ -133,7 +133,7 @@ assert.equal(typeof server.renderToString, 'function');
 assert.equal(typeof floating.useFloating, 'function');
 assert.equal(typeof radix.Accordion, 'object');
 const ssr = server.renderToString(() => 'conditions');
-assert.deepEqual(ssr, { html: 'conditions', css: '' });
+assert.deepEqual(ssr, { html: '<!--[-->conditions<!--]-->', css: '' });
 process.stdout.write(JSON.stringify({
 	floating: Object.keys(floating),
 	octane: Object.keys(octane),
@@ -161,7 +161,7 @@ assert.equal(typeof base.Combobox.Root, 'function');
 assert.equal(typeof StoreInspector, 'function');
 assert.equal(typeof radix.Accordion, 'object');
 const ssr = server.renderToString(() => 'conditions');
-assert.deepEqual(ssr, { html: 'conditions', css: '' });
+assert.deepEqual(ssr, { html: '<!--[-->conditions<!--]-->', css: '' });
 process.stdout.write(JSON.stringify({
 	base: Object.keys(base),
 	floating: Object.keys(floating),

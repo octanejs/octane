@@ -13705,8 +13705,8 @@ export function componentSlotLite<P>(
 	const nativeToken = !NATIVE_READ_DRIVER ? -1 : beginActiveNativeReadScope(scope);
 	// The first node after the template that adopted the frame's content.
 	let claimed: Node | null | undefined;
-	const outerClaim =
-		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen));
+	const claim =
+		adoptedOpen === null ? null : hydration!.beginClaim(scope, getNextSibling(adoptedOpen));
 	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
@@ -13730,7 +13730,7 @@ export function componentSlotLite<P>(
 		profileThrown = error;
 		throw error;
 	} finally {
-		if (adoptedOpen !== null) claimed = hydration!.endClaim(outerClaim);
+		if (claim !== null) claimed = hydration!.endClaim(claim);
 		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
@@ -13747,7 +13747,7 @@ export function componentSlotLite<P>(
 	// anchor. Mirrors componentSlot's post-render advance. First, check that the
 	// server rendered nothing in the frame after this component's content.
 	if (hydration !== null && adoptedClose !== null) {
-		hydration.settleClaim(scope, adoptedClose, claimed, parentScope, slotKey);
+		hydration.settleClaim(adoptedClose, claimed, parentScope, slotKey);
 		hydration.parkPast(adoptedClose, parentScope);
 	} else if (hydration !== null) {
 		// A hydrating replay, such as a suspended activation's resume, re-renders
@@ -13847,7 +13847,7 @@ function renderLiteInPlace<P>(
 			slotKey,
 		)
 	)
-		hydration.parkInPlace(parentScope, parentScope.slots[slotKey]);
+		hydration.parkInPlace(parentScope);
 	// The walk found `root` for this call alone, which rendered nothing there.
 	else if (positional) hydration.slotMismatch(parentScope, slotKey, 'a component range', root);
 }
@@ -21332,6 +21332,16 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
  * discard its methods together with the marker/mismatch/seed helper graph.
  */
+interface HydrationClaim {
+	owner: Scope;
+	/** Null after the owner's template claimed its complete root extent. */
+	first: Node | null;
+	next: Node | null | undefined;
+	/** Child-slot count after last consumption, ignored for a claimed template. */
+	slots: number;
+	outer: HydrationClaim | null;
+}
+
 class HydrationCapability {
 	/**
 	 * Parent captures changed before this dormant boundary activated, so the
@@ -21396,16 +21406,10 @@ class HydrationCapability {
 	values = process.env.NODE_ENV !== 'production' ? new HydrationValueChecks() : null;
 	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
 	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
-	/**
-	 * The first node of the adopted range whose claim is open (beginClaim),
-	 * until the template that renders that range's content adopts it.
-	 */
-	private claimFrom: Node | null = null;
-	/**
-	 * The first node after that template's roots, which the range's content
-	 * does not claim. Undefined until the template adopts claimFrom.
-	 */
-	private claimEnd: Node | null | undefined = undefined;
+	/** The innermost owned range being rendered. Nested ranges consume their
+	 * parent's cursor when they return, whether its owner is a lite body,
+	 * a component, or a control-flow arm. */
+	private claim: HydrationClaim | null = null;
 	/** The last suspension thrown out of a client-built subtree (suspend). */
 	freshSuspension: SuspenseException | null = null;
 	/**
@@ -21439,23 +21443,6 @@ class HydrationCapability {
 	 * need not follow the server forms of its leading holes there.
 	 */
 	passthroughRoot = false;
-	/**
-	 * The adopted @if/@switch arm that renderAdoptedArm is rendering. Null once
-	 * the arm clones a template of its own, whose roots the cursor rests on.
-	 */
-	private arm: Block | null = null;
-	/**
-	 * Where the last server range that one of `arm`'s own slots claimed parked
-	 * the cursor, and how many slots `arm` had then.
-	 */
-	private armTail: Node | null = null;
-	private armSlots = 0;
-	/**
-	 * The slot that last adopted server nodes in place, and the node after
-	 * them, where it parked the cursor (parkInPlace).
-	 */
-	private inPlaceSlot: object | null = null;
-	private inPlaceTail: Node | null = null;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
@@ -21796,29 +21783,23 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Open a claim on the server range a slot adopted, whose content starts at
-	 * `first`, for the first render of that content. Returns what endClaim
-	 * restores. Claims nest: a range's content adopts its template before the
-	 * slots inside it render, so an enclosing claim is settled by then, or no
-	 * template will settle it, and only its record needs restoring.
+	 * Enter an owned server range while its ordinary body renders. The owner
+	 * consumes its template once; if it has no template, its children consume
+	 * their ranges on return. Its enclosing claim is preserved on suspension.
 	 */
-	beginClaim(first: Node | null): Node | null | undefined {
-		const outer = this.claimEnd;
-		this.claimFrom = first;
-		this.claimEnd = undefined;
-		return outer;
+	beginClaim(owner: Scope, first: Node | null): HydrationClaim {
+		return (this.claim = { owner, first, next: undefined, slots: -1, outer: this.claim });
 	}
 
 	/**
-	 * Close the open claim, restoring `outer` from beginClaim. Returns the first
-	 * node after the roots of the template that adopted the range's first node,
-	 * or undefined when no template did (claimRoots).
+	 * Close a range even when the body threw. An unclaimed template tail takes
+	 * precedence over a child that parked the shared walking cursor inside it.
 	 */
-	endClaim(outer: Node | null | undefined): Node | null | undefined {
-		const from = this.claimEnd;
-		this.claimFrom = null;
-		this.claimEnd = outer;
-		return from;
+	endClaim(claim: HydrationClaim): Node | null | undefined {
+		this.claim = claim.outer;
+		return claim.first === null || claim.slots === claim.owner.slots.length
+			? claim.next
+			: undefined;
 	}
 
 	/**
@@ -21830,19 +21811,21 @@ class HydrationCapability {
 	 * render that suspends leaves the claim to the resume of `block`
 	 * (renderSuspended).
 	 */
-	renderClaimed(block: Block, scope: Scope, slotKey: number): void {
-		const outer = this.beginClaim(getNextSibling(block.startMarker!));
+	renderClaimed(block: Block, scope: Scope, slotKey: number, branch = false): void {
+		const first = getNextSibling(block.startMarker!);
+		const claim = this.beginClaim(block, first);
 		let from: Node | null | undefined;
 		try {
 			renderBlock(block);
 		} catch (error) {
-			if (isSuspenseException(error))
+			if (!branch && isSuspenseException(error))
 				(this.suspendedClaims ??= new WeakMap()).set(block, [scope, slotKey]);
 			throw error;
 		} finally {
-			from = this.endClaim(outer);
+			from = this.endClaim(claim);
 		}
-		if (!block.disposed) this.settleClaim(block, block.endMarker!, from, scope, slotKey);
+		if (!block.disposed)
+			this.settleClaim(block.endMarker!, from, scope, slotKey, branch ? first : undefined);
 	}
 
 	/**
@@ -21856,34 +21839,33 @@ class HydrationCapability {
 	 * range.
 	 */
 	settleClaim(
-		owner: Scope,
 		end: Node,
 		from: Node | null | undefined,
 		scope: Scope,
 		slotKey: number,
+		branchFirst?: Node | null,
 	): void {
+		if (branchFirst !== undefined) {
+			// Arms without their own template can render nothing, leaving an open
+			// server range at the cursor. That too is unclaimed branch content.
+			if (from != null) this.node = from;
+			else if (this.isOpen(this.node)) from = this.node;
+		}
 		const cursor = this.node;
 		if (cursor === end) return;
-		if (from === undefined) {
-			// The cursor must follow the last slot's own server nodes: its range,
-			// or the nodes it adopted in place (parkInPlace). After any other slot,
-			// the cursor proves nothing.
-			const slots = owner.slots;
-			const last = slots[slots.length - 1];
-			if (last === this.inPlaceSlot) {
-				if (cursor !== this.inPlaceTail) return;
-			} else {
-				const lastEnd: Node | null | undefined =
-					this.liteRanges.get(last)?.end ?? (last?.borrowed || last?.inherited ? null : last?.end);
-				if (lastEnd == null || getNextSibling(lastEnd) !== cursor) return;
-			}
-			from = cursor;
-		}
+		if (from === undefined) return;
 		if (from === null || from === end) return;
 		// Leave anything the client built, and a tail outside the range.
 		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
-			if (node === null || this.freshNodes.has(node)) return;
+			if (node === null || (branchFirst === undefined && this.freshNodes.has(node))) return;
 		}
+		if (branchFirst !== undefined)
+			this.slotMismatch(
+				scope,
+				slotKey,
+				from === branchFirst ? 'an empty branch' : 'the end of the branch',
+				from,
+			);
 		this.mismatch(
 			process.env.NODE_ENV !== 'production'
 				? // A return slot or a list item has no site of its own: name the
@@ -22429,11 +22411,8 @@ class HydrationCapability {
 	 */
 	parkPast(close: Node, parent: Scope): void {
 		if (parent.block.disposed) return;
-		const next = (this.node = getNextSibling(close));
-		if (parent === this.arm) {
-			this.armTail = next;
-			this.armSlots = parent.slots.length;
-		}
+		this.node = getNextSibling(close);
+		this.parkInPlace(parent);
 	}
 
 	/**
@@ -22442,77 +22421,12 @@ class HydrationCapability {
 	 * sibling, or the node after a fragment's last root. Record it as parkPast
 	 * does, and for settleClaim, which slot parked the cursor there.
 	 */
-	parkInPlace(parent: Scope, slot: object): void {
-		this.inPlaceSlot = slot;
-		this.inPlaceTail = this.node;
-		if (parent === this.arm) {
-			this.armTail = this.node;
-			this.armSlots = parent.slots.length;
+	parkInPlace(parent: Scope): void {
+		const claim = this.claim;
+		if (claim !== null && claim.owner === parent && claim.first !== null) {
+			claim.next = this.node;
+			claim.slots = parent.slots.length;
 		}
-	}
-
-	/**
-	 * First render of an @if or @switch arm into the server range it adopted,
-	 * `block`'s own. Returns the node from which whatever the server rendered
-	 * belongs to no client node (settleArmTail), with the cursor parked on it:
-	 * the first node after the roots of the arm's own template, which records
-	 * them as the range's content (claimRoots), or else where the arm's last
-	 * slot parked the cursor after the range it claimed, or after the single
-	 * root it adopted in place (renderInPlace). Null when a later slot adopted
-	 * without either, such as a component that adopted a fragment or text in
-	 * place, since the cursor then rests on the roots it adopted.
-	 */
-	renderAdoptedArm(block: Block): Node | null {
-		const outerArm = this.arm;
-		const outerTail = this.armTail;
-		const outerSlots = this.armSlots;
-		const outerClaim = this.beginClaim(getNextSibling(block.startMarker!));
-		this.arm = block;
-		this.armTail = null;
-		let parked: Node | null = null;
-		let claimed: Node | null | undefined;
-		try {
-			renderBlock(block);
-			if (this.arm === block && this.armSlots === block.slots.length) parked = this.armTail;
-		} finally {
-			claimed = this.endClaim(outerClaim);
-			this.arm = outerArm;
-			this.armTail = outerTail;
-			this.armSlots = outerSlots;
-		}
-		// The cursor rests on the roots the arm's own template adopted, or inside
-		// them: step it past them, as a range claim parks it.
-		return claimed == null ? parked : (this.node = claimed);
-	}
-
-	/**
-	 * Runs after a branch's first hydrating render, which adopted the server's
-	 * arm range from `first` to `end`, when the cursor did not reach `end`.
-	 * Every slot the arm renders parks the cursor past the range it claimed, so
-	 * once the arm has claimed something, a server range at the cursor is one
-	 * that nothing in the arm claimed: the server rendered another arm here,
-	 * longer than this one. So is any server content at `parked`, where the arm
-	 * parked the cursor after its own template's roots, or after its last
-	 * slot's range or in-place root (renderAdoptedArm). An arm that rendered
-	 * nothing leaves the cursor on `first`, and the whole range is then the
-	 * server's other arm. The cursor does not move past the elements and text
-	 * that a template adopts, so at an element or text node it cannot otherwise
-	 * tell what the arm adopted from what the server rendered for another arm:
-	 * `parked` does, and anything else stays.
-	 */
-	settleArmTail(scope: Scope, slotKey: number, first: Node, end: Node, parked: Node | null): void {
-		const from = this.node;
-		if (!this.isOpen(from) && (parked === null || from !== parked)) return;
-		let node: Node | null = from;
-		while (node !== null && node !== end) node = getNextSibling(node);
-		// Only server content that precedes `end` is the arm's.
-		if (node === null) return;
-		this.slotMismatch(
-			scope,
-			slotKey,
-			from === first ? 'an empty branch' : 'the end of the branch',
-			from,
-		);
 	}
 
 	/**
@@ -22984,7 +22898,6 @@ class HydrationCapability {
 	): Node {
 		let cursor = this.node;
 		// The arm's own template: its roots may follow the arm's last claim.
-		if (this.arm !== null && CURRENT_SCOPE?.block === this.arm) this.arm = null;
 		const isFragment =
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
 		const pendingClaims = this.pendingClaims;
@@ -23067,7 +22980,7 @@ class HydrationCapability {
 					);
 				this.inPlace = null;
 				this.inPlaceEnd = remainder;
-				if (cursor === this.claimFrom) this.claimRoots(cursor, fragment);
+				if (cursor === this.claim?.first) this.claimRoots(cursor, fragment);
 				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			// A nested fragment has no server wrapper, so its first logical root must
@@ -23083,7 +22996,11 @@ class HydrationCapability {
 				// Roots that outnumber what the server rendered there, such as holes
 				// with no static element root after them, belong to other content:
 				// a mismatch, from which the nearest boundary, or the root, falls back.
-				if (cursor !== this.claimFrom || this.claimRoots(cursor, template ?? lazy!) || claimsRoot)
+				if (
+					cursor !== this.claim?.first ||
+					this.claimRoots(cursor, template ?? lazy!) ||
+					claimsRoot
+				)
 					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			const fragment = template ?? resolveLazyTemplate(lazy!);
@@ -23103,7 +23020,7 @@ class HydrationCapability {
 			this.inPlace = null;
 			this.inPlaceEnd = getNextSibling(cursor);
 		}
-		if (cursor === this.claimFrom) this.claimRoots(cursor, null);
+		if (cursor === this.claim?.first) this.claimRoots(cursor, null);
 		return cursor;
 	}
 
@@ -23161,18 +23078,19 @@ class HydrationCapability {
 			(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)
 		)
 			return true;
-		this.claimFrom = null;
+		const claim = this.claim!;
+		claim.first = null;
 		let node: Node | null = root;
 		// Step over each root's own range. A close marker first is the end of the
 		// claimed range, and nothing follows it.
 		for (let i = fragment === null ? 1 : templateRootCount(fragment); i > 1; i--) {
 			node = this.sibling(node, 1);
 			if (node === null || isBlockClose(node)) {
-				this.claimEnd = node;
+				claim.next = node;
 				return this.passthroughRoot;
 			}
 		}
-		this.claimEnd = getNextSibling(this.isOpen(node) ? this.close(node) : node);
+		claim.next = getNextSibling(this.isOpen(node) ? this.close(node) : node);
 		return true;
 	}
 
@@ -35598,7 +35516,7 @@ function componentSlotImpl(
 			}
 			// renderInPlace stepped the cursor past the adopted root. An arm or a
 			// range that ends with this root cannot tell that from the cursor alone.
-			if (adopted) hydration!.parkInPlace(parentScope, state);
+			if (adopted) hydration!.parkInPlace(parentScope);
 			// The walk found the server node for this call alone, which rendered
 			// nothing there.
 			else if (positionalRoot && !replaced)
@@ -46408,7 +46326,6 @@ function renderBranchSlot(
 				let rebuild = false;
 				let inner: Comment | null = null;
 				let innerEnd: Comment | null = null;
-				let first: Node | null = null;
 				if (hydration !== null && hydration.isOpen(getNextSibling(state.start))) {
 					inner = getNextSibling(state.start) as Comment;
 					innerEnd = hydration.close(inner);
@@ -46428,7 +46345,7 @@ function renderBranchSlot(
 				if (inner !== null) {
 					bStart = inner;
 					bEnd = innerEnd as Comment;
-					hydration!.node = first = getNextSibling(inner);
+					hydration!.node = getNextSibling(inner);
 				} else {
 					bStart = state.start;
 					bEnd = state.end as Node;
@@ -46464,11 +46381,7 @@ function renderBranchSlot(
 					hydration!.suspend(() => renderBlock(b));
 					hydration!.node = getNextSibling(state.end as Node);
 				} else if (inner !== null) {
-					const parked = hydration!.renderAdoptedArm(b);
-					// The server may have rendered another arm here, longer than this one
-					// or one this arm renders nothing of.
-					if (hydration!.node !== bEnd)
-						hydration!.settleArmTail(parentScope, slotKey, first!, bEnd, parked);
+					hydration!.renderClaimed(b, parentScope, slotKey, true);
 				} else {
 					renderBlock(b);
 				}
