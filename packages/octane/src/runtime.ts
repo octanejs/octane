@@ -1874,7 +1874,7 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 		stage.settled = true;
 		for (const callback of callbacks) callback(discarded);
 	};
-	// A held transition attempt unwinds its render while the capture survives.
+	// A boundary hold or a dropped transition unwinds its render while the capture survives.
 	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
 	(capture.renderCleanups ??= []).push(finish);
 	if (invocation !== undefined) invocation.invocationData = stage;
@@ -3952,11 +3952,10 @@ function discardHeldRoot(owner: RootRenderOwner): void {
 // rollback, only a boundary that never split.
 //
 // An explicit boundary replays its own checkpoint; writes outside that window
-// remain unless a P1 transition attempt also holds its staged driving cells.
-// If no boundary owns the suspension, the root instead replays its whole queued
-// render wave. A single-origin staged transition then renders its pending cue
-// with the old inputs, after the aborted wave has drained. These change-local
-// journals preserve committed output and lifecycle; they are not a separate
+// remain unless the render folded queued hook work, which drops the whole root
+// transaction (Transition holds). If no boundary owns the suspension, the root
+// instead replays its whole queued render wave. These change-local journals
+// preserve committed output and lifecycle; they are not a separate
 // render/commit phase for every eager native host mutation.
 //
 // Compiled bindings guard on a cached copy of the last value (`if (_b.d !== _v)`)
@@ -7872,11 +7871,11 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
  * Whether a queued block renders only its pending cue now, at urgent priority,
  * apart from any transition work. A pure cue (TRANSITION_CUES) has no transition
  * work of its own. A cue whose block also has transition work waiting in the
- * task queue (upgradeTransitionBlock) renders alone when that work holds staged
- * cells it can show at their committed values. A Suspense or Activity boundary
- * that owns the render, or a pending root request, keeps the combined render at
- * transition priority, as does work without staged cells. View Transition
- * routing asks this too, since a split cue is urgent work.
+ * task queue (upgradeTransitionBlock) renders alone when that work is queued
+ * hook updates, which the cue's urgent render leaves queued. A Suspense or
+ * Activity boundary that owns the render, or a pending root request, keeps the
+ * combined render at transition priority, as does work that is not hook state.
+ * View Transition routing asks this too, since a split cue is urgent work.
  */
 function splitsTransitionCue(block: Block): boolean {
 	if (syncFlush || TRANSITION_TASK_ACTIVE || block.pendingMode !== 'transition') return false;
@@ -7886,7 +7885,7 @@ function splitsTransitionCue(block: Block): boolean {
 		(TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH || TRANSITION_CUES.indexOf(block) === -1)
 	)
 		return false;
-	// A pure cue that gained staged cells from transition work scheduled in this
+	// A pure cue that gained queued hook work from a transition scheduled in this
 	// flush renders that work with it.
 	if (hasQueuedTransitionCells(block) !== waiting) return false;
 	const owner = block.idState.renderOwner;
@@ -14193,8 +14192,7 @@ function enqueueHookUpdate(
 
 /**
  * Queue an update the owner's render computes. Urgent work schedules that
- * render now; transition work renders when its batch is ready. A user update
- * outside render can unblock a held transition (wakeHeldTransitions).
+ * render now; transition work renders when its batch is ready.
  */
 function queueHookUpdate(
 	cell: QueuedCell,
@@ -14211,6 +14209,11 @@ function queueHookUpdate(
 			__profileSchedule(block, type, slot);
 		scheduleRender(block);
 	} else TRANSITION_ROOT_DRIVER!.queue(cell, batch, block, type, slot);
+	markRootUpdated(block);
+}
+
+/** A user update outside render can unblock a held transition (wakeHeldTransitions). */
+function markRootUpdated(block: Block): void {
 	if (TRANSITION_HOLDERS && TRANSITION_HOLDERS.size !== 0 && CURRENT_BLOCK === null)
 		TRANSITION_ROOT_DRIVER!.wake(block);
 }
@@ -14301,8 +14304,7 @@ function readStateHook<T>(
 						)
 							__profileSchedule(block, 'state', slot);
 						scheduleRender(block);
-						if (TRANSITION_HOLDERS && TRANSITION_HOLDERS.size !== 0 && CURRENT_BLOCK === null)
-							TRANSITION_ROOT_DRIVER!.wake(block);
+						markRootUpdated(block);
 						return;
 					}
 					queueHookUpdate(cell, block, batch, next, 'state', slot);
@@ -14555,8 +14557,7 @@ export function useLinkedState<Source, Value>(
 					__profileSchedule(block, 'state', slot);
 				state!.value = computed;
 				scheduleRender(block);
-				if (TRANSITION_HOLDERS && TRANSITION_HOLDERS.size !== 0 && CURRENT_BLOCK === null)
-					TRANSITION_ROOT_DRIVER!.wake(block);
+				markRootUpdated(block);
 			},
 		};
 		ensureHooks(scope).set(slot, state);
@@ -41147,8 +41148,8 @@ function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 		});
 		state.tryBlock = null;
 	}
-	// Disposal releases the pending cue and held synchronous cells as well as
-	// group membership. Removing only the member strands later transitions.
+	// Disposal releases the pending cue and the transition work it held as well
+	// as group membership. Removing only the member strands later transitions.
 	releaseHeldTransition(state);
 	setTryBranch(state, -1);
 	state.block = null;
