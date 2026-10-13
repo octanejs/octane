@@ -170,6 +170,50 @@ export function RawRootSuspensionAfterSiblingApp(props: { label: string; read: (
 	</section>
 }
 
+function ResultLabel(props: { name: string; value: string }) @{
+	<output data-result={props.name} title={props.value} aria-label={props.value}>
+		{props.value as string}
+	</output>
+}
+
+function RetainedCounter(props: {
+	label: string;
+	log: string[];
+	counterRef: (node: HTMLButtonElement | null) => void;
+}) @{
+	const [count, setCount] = useState(0);
+	useLayoutEffect(
+		(log, label) => {
+			log.push('active:' + label);
+			return () => log.push('cleanup:' + label);
+		},
+		[props.log, props.label],
+	);
+	<button
+		ref={props.counterRef}
+		data-counter
+		title={props.label}
+		onClick={() => setCount(count + 1)}
+	>
+		{props.label + ':' + count}
+	</button>
+}
+
+export function RetainedResults(props: {
+	left: string;
+	right: string;
+	read: () => string;
+	log: string[];
+	counterRef: (node: HTMLButtonElement | null) => void;
+}) @{
+	<section>
+		<ResultLabel name="left" value={props.left} />
+		<ResultLabel name="right" value={props.right} />
+		<RetainedCounter label={props.left} log={props.log} counterRef={props.counterRef} />
+		<RawRootSuspensionReader read={props.read} />
+	</section>
+}
+
 export function DescriptorRootSuspensionAfterSiblingApp(props: {
 	label: string;
 	read: () => string;

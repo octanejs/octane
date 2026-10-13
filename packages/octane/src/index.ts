@@ -160,6 +160,14 @@ export {
 	bag15,
 	bag16,
 	bagOf,
+	templateValues,
+	prepareTemplate,
+	commitTemplate,
+	prepareTemplateText,
+	prepareTemplateBoolean,
+	prepareTemplateStringData,
+	prepareTemplateAria,
+	prepareTemplatePlain,
 	// Event-bundle helpers (3b) — build an arity-specific descriptor once at
 	// mount, mutate it in place on update (dispatch reads `el[key]` per event).
 	evt0,

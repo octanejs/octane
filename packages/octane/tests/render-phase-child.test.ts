@@ -19,6 +19,7 @@ import {
 	PropDerivedSelfUpdate,
 	ReducerSelfUpdate,
 	ReturnedSelfUpdate,
+	UnchangedAfterHostReplay,
 } from './_fixtures/render-phase-child.tsrx';
 
 const cases = [
@@ -33,6 +34,50 @@ const cases = [
 ] as const;
 
 describe('children of render-phase state updates', () => {
+	it('does not publish an intermediate host answer when a replay returns to the committed value', () => {
+		const seen = new Set<string>();
+		let inspect = false;
+		const observe = () => {
+			if (inspect) {
+				const output = root.find('[data-replayed]');
+				seen.add(
+					[
+						output.textContent,
+						output.getAttribute('title'),
+						output.getAttribute('aria-label'),
+					].join('/'),
+				);
+			}
+		};
+		const root = mount(UnchangedAfterHostReplay, { revision: 0, observe });
+		try {
+			const output = root.find('[data-replayed]');
+			const text = output.firstChild;
+			expect([
+				output.textContent,
+				output.getAttribute('title'),
+				output.getAttribute('aria-label'),
+			]).toEqual(['A', 'A', 'A']);
+			// A third party owns these accessibility and text edits while the
+			// application's committed values remain unchanged.
+			output.firstChild!.nodeValue = 'spoken A';
+			output.setAttribute('title', 'title A');
+			output.setAttribute('aria-label', 'label A');
+			inspect = true;
+			root.update(UnchangedAfterHostReplay, { revision: 1, observe });
+			expect(seen).toEqual(new Set(['spoken A/title A/label A']));
+			expect(root.find('[data-replayed]')).toBe(output);
+			expect(output.firstChild).toBe(text);
+			expect([
+				output.textContent,
+				output.getAttribute('title'),
+				output.getAttribute('aria-label'),
+			]).toEqual(['spoken A', 'title A', 'label A']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it.each(cases)('initializes children from the settled parent state (%s)', (_, Component) => {
 		const log: string[] = [];
 		const root = mount(Component, { log: (value) => log.push(value) });

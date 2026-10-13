@@ -379,18 +379,24 @@ describe.each([
 		{
 			shape: 'a branch the server rendered another arm of',
 			name: 'RootRebuilt' as const,
-			html: '<span title="blue" style="color: blue;">blue</span>',
 		},
 		{
 			shape: 'a renderable hole the server rendered as text',
 			name: 'RootHoleClone' as const,
-			html: '<span title="blue" style="color: blue;">blue</span>',
 		},
 	])(
 		'renders the root on the client once for $shape, whether or not it suspends first',
-		async ({ name, html }) => {
+		async ({ name }) => {
 			const { reports: expected } = await committedReports(name, 'blue', false);
-			expect(expected.html).toContain(html);
+			const committed = document.createElement('template');
+			committed.innerHTML = expected.html;
+			const spans = committed.content.querySelectorAll('span');
+			expect(spans).toHaveLength(1);
+			expect([spans[0].textContent, spans[0].title, spans[0].style.cssText]).toEqual([
+				'blue',
+				'blue',
+				'color: blue;',
+			]);
 			expect(expected.survivors).toEqual([]);
 			expect(expected.recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 			expect(expected.warnings).toHaveLength(dev ? 1 : 0);

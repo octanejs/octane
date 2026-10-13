@@ -218,11 +218,16 @@ describe('descriptor list state and lifecycle', () => {
  for(const button of host.querySelectorAll('button')) button.click();
  await act(()=>resolve('ready'));
  const stale=snapshot();root.unmount();return {attempted,held,accepted,stale,events};`);
-			expect(attempted).toContainEqual({
-				labels: ['A1', 'B0'],
-				values: ['1', '0'],
-				state: ['1', '0'],
-			});
+			// The later reader ran, but even during its attempt the live rows
+			// must still be the last accepted render (including the urgent input).
+			expect(attempted.length).toBeGreaterThan(0);
+			for (const observation of attempted) {
+				expect(observation).toEqual({
+					labels: ['A0', 'B0'],
+					values: ['0', '0'],
+					state: ['1', '0'],
+				});
+			}
 			expect(result).toEqual({
 				held: {
 					labels: ['A0', 'B0'],

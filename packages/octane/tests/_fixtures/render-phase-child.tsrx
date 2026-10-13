@@ -152,3 +152,19 @@ export function InlineHostMapSelfUpdate(props: { items: Row[] }) @{
 		))}
 	</ul>
 }
+
+export function UnchangedAfterHostReplay(props: { revision: number; observe: () => void }) @{
+	const [last, setLast] = useState(props.revision);
+	<section>
+		<output
+			data-replayed
+			title={last !== props.revision ? (setLast(props.revision), 'B') : 'A'}
+			aria-label={last !== props.revision ? 'B' : 'A'}
+		>
+			{last !== props.revision ? 'B' : 'A'}
+		</output>
+		@{
+			props.observe();
+		}
+	</section>
+}

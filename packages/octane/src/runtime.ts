@@ -7757,6 +7757,8 @@ interface OffscreenCapture {
 	suspenseCommits: Set<TrySlot> | undefined;
 	/** Speculative renderer transactions are released only after commit or discard. */
 	renderCleanups: Array<(discarded: boolean) => void> | undefined;
+	/** Completed template preparations. Each scope owns at most its latest entry. */
+	templates: PreparedTemplate[] | undefined;
 	/** Only a structural binding lease records current-tree adoption receipts. */
 	presentations?: PresentationHydrationFrame[];
 }
@@ -7800,7 +7802,73 @@ function createOffscreenCapture(): OffscreenCapture {
 		stores: [],
 		suspenseCommits: undefined,
 		renderCleanups: undefined,
+		templates: undefined,
 	};
+}
+
+interface PreparedTemplate {
+	scope: Scope;
+	bag: Record<string, any>;
+	values: Record<string, any>;
+	apply: (bag: Record<string, any>, values: Record<string, any>) => void;
+	field: string;
+	capture: OffscreenCapture;
+	previous: PreparedTemplate | null;
+}
+
+/**
+ * A template keeps DOM hosts, ref and subscription tokens in its accepted bag.
+ * A render within the same attempt sees its last complete preparation, so a
+ * later A -> B -> A render can cancel B even before either has been published.
+ * Another attempt (including an urgent update of the still-visible content)
+ * starts from the accepted values.
+ */
+export function templateValues(scope: Scope, bag: Record<string, any>, field: string): any {
+	const prepared = bag[field] as PreparedTemplate | null;
+	return prepared !== null && prepared.capture === WIP_CAPTURE && prepared.scope === scope
+		? prepared.values
+		: bag;
+}
+
+/** @internal Copy on first changed output, never during an unchanged render. */
+export function prepareTemplate(values: Record<string, any>): any {
+	return { ...values };
+}
+
+/**
+ * Register a complete generated writer, once per changed scope render. No DOM
+ * mutation or per-binding closure is recorded. The pointer is logical render
+ * state: the existing boundary checkpoints rewind it on an inner failure, even
+ * when that boundary shares its enclosing root's capture. Immutable preparations
+ * mean restoring the pointer also restores the enclosing candidate's values.
+ */
+export function commitTemplate(
+	scope: Scope,
+	bag: Record<string, any>,
+	values: Record<string, any>,
+	apply: PreparedTemplate['apply'],
+	field: string,
+): void {
+	const capture = WIP_CAPTURE;
+	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
+	if (capture === null) {
+		apply(bag, values);
+		return;
+	}
+	const previous = bag[field] as PreparedTemplate | null;
+	const prepared: PreparedTemplate = { scope, bag, values, apply, field, capture, previous };
+	if (TRANSITION_JOURNAL !== null) TRANSITION_JOURNAL.push(JOURNAL_PROP, bag, field, previous);
+	bag[field] = prepared;
+	(capture.templates ??= []).push(prepared);
+}
+
+function publishTemplate(prepared: PreparedTemplate): void {
+	const { scope, bag, values, apply, field } = prepared;
+	if (bag[field] !== prepared || scope.block.disposed || scope.slots[0] !== bag) return;
+	// Clear before invoking a DOM setter: it can synchronously start a newer
+	// render, whose independently owned candidate must not be erased on return.
+	bag[field] = null;
+	apply(bag, values);
 }
 
 // Active append targets for Effect Event render output. renderBlockInner takes
@@ -21263,6 +21331,8 @@ interface PendingHydrationClass {
 interface PendingHydrationText {
 	server: string | null;
 	loc: string | undefined;
+	/** Last completed compiled preparation, without temporarily writing its DOM. */
+	prepared: string | undefined;
 }
 
 // Client-reachable code reads this only behind the `hydrating` flag
@@ -22500,7 +22570,8 @@ class HydrationCapability {
 		// the common pass rendersAgain's walk.
 		if (QUEUE.length !== 0 && node !== null && node.nodeType === 3 && this.rendersAgain()) {
 			const pending = (this.pendingTexts ??= new Map());
-			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc });
+			if (!pending.has(node as Text))
+				pending.set(node as Text, { server, loc, prepared: undefined });
 			if (inRootHydrationAttempt()) journalText(node as Text, server);
 			if (this.speculative || this.undoable)
 				(this.undo ??= []).push(() => {
@@ -22514,6 +22585,22 @@ class HydrationCapability {
 			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
 			node,
 		);
+	}
+
+	/** An update compares while the cursor is active; its writer may run later. */
+	prepareText(node: Text | null, host: Node | null, text: string): string | undefined {
+		if (node === null && host !== null) node = domNode(host).firstChild as Text | null;
+		if (host === null && node !== null) host = domNode(node).parentNode;
+		if (host !== null && !this.staleServerValues && isHydrationSuppressed(host)) return undefined;
+		const pending = node === null ? undefined : this.pendingTexts?.get(node);
+		if (pending !== undefined) {
+			// Replay settlement is render evidence, not a DOM write. An inner
+			// failed adoption must restore the enclosing attempt's evidence.
+			if (TRANSITION_JOURNAL !== null)
+				TRANSITION_JOURNAL.push(JOURNAL_PROP, pending, 'prepared', pending.prepared);
+			pending.prepared = text;
+		}
+		return text;
 	}
 
 	/**
@@ -23512,8 +23599,8 @@ class HydrationCapability {
 		const texts = this.pendingTexts;
 		if (texts !== null) {
 			this.pendingTexts = null;
-			for (const [node, { server, loc }] of texts) {
-				const text = (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!;
+			for (const [node, { server, loc, prepared }] of texts) {
+				const text = prepared ?? (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!;
 				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
 					this.mismatch(
 						loc || (domNode(node).parentNode as any)?.__oct_loc,
@@ -23929,6 +24016,17 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 function coerceText(value: unknown): string {
 	if (process.env.NODE_ENV !== 'production' && isSignalHandle(value)) devWarnPlainTextHandle();
 	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+/** @internal Finish authored coercion and adoption checks before publication. */
+export function prepareTemplateText(
+	node: Text | null,
+	host: Node | null,
+	value: unknown,
+): string | undefined {
+	const text = coerceText(value);
+	const hydration = hydrating ? activeHydration() : null;
+	return hydration === null ? text : hydration.prepareText(node, host, text);
 }
 
 let DEV_PLAIN_TEXT_HANDLE_WARNED = false;
@@ -25443,8 +25541,10 @@ const CLAIMED_BINDING_VALUE = /* @__PURE__ */ Symbol('octane.claimed-binding-val
 export function hydrateClaimedBindingCaches(
 	scope: Scope,
 	fields: readonly (string | number)[],
-): void {
-	if (!hydrating || activeHydration() === null) return;
+	values?: Record<string, any>,
+	previous?: Record<string, any>,
+): Record<string, any> | undefined {
+	if (!hydrating || activeHydration() === null) return values;
 	const bag = scope.slots[0] as Record<string, any>;
 	for (let i = 0; i < fields.length; i += 3) {
 		const field = fields[i]!;
@@ -25498,9 +25598,16 @@ export function hydrateClaimedBindingCaches(
 				// Scalar text keeps its adopted Text in the token field.
 				if (TRANSITION_JOURNAL !== null) journalBag();
 				bag[field] = value;
+				if (values !== undefined && values !== bag) {
+					// Never mutate a completed enclosing candidate on a nested
+					// claim. This scope submits the copy only if its body succeeds.
+					if (values === previous) values = prepareTemplate(values);
+					values![field] = value;
+				}
 			}
 		}
 	}
+	return values;
 }
 
 type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
@@ -27811,16 +27918,40 @@ function devValidateHostProps(el: Element, props: Record<string, unknown>): void
  */
 export function setPlainAttribute(el: Element, name: string, value: unknown): void {
 	if (process.env.NODE_ENV !== 'production') return setAttribute(el, name, value);
-	const type = typeof value;
-	const next =
-		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
-			? null
-			: String(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	const next = prepareTemplatePlain(el, name, value);
+	if (next === undefined) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
 	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+}
+
+/**
+ * Compiler-proven native scalar, with the same diagnostic and fallible
+ * coercion as setAttribute in development. No DOM is written before a render
+ * accepts. undefined means the server value was retained during adoption.
+ */
+export function prepareTemplatePlain(
+	el: Element,
+	name: string,
+	value: unknown,
+): string | null | undefined {
+	let next: string | null;
+	if (process.env.NODE_ENV !== 'production') {
+		if ((el as any).__oct_loc !== undefined) {
+			const warning = hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
+			if (warning !== null) devWarnAttributeOnce(el, name, warning);
+		}
+		next = coerceAttrValue(el, name, value);
+	} else {
+		const type = typeof value;
+		next =
+			value == null || type === 'boolean' || type === 'function' || type === 'symbol'
+				? null
+				: String(value);
+	}
+	const hydration = hydrating ? activeHydration() : null;
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	return next;
 }
 
 /** Same scalar contract for a statically proven, unnamespaced native URL sink. */
@@ -27860,6 +27991,19 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
  * behave as in setAttribute.
  */
 export function setStringData(el: Element, name: string, value: unknown): void {
+	const next = prepareTemplateStringData(el, name, value);
+	if (next === undefined) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+}
+
+/** @internal undefined means hydration retained the adopted server attribute. */
+export function prepareTemplateStringData(
+	el: Element,
+	name: string,
+	value: unknown,
+): string | null | undefined {
 	const t = typeof value;
 	let next: string | null;
 	if (value == null || t === 'function' || t === 'symbol') {
@@ -27884,9 +28028,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 	}
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	return next;
 }
 
 /**
@@ -27897,6 +28039,15 @@ export function setStringData(el: Element, name: string, value: unknown): void {
  * canonical empty-string presence form.
  */
 export function setBooleanAttribute(el: Element, name: string, value: unknown): void {
+	const present = prepareTemplateBoolean(el, name, value);
+	if (present === null) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (present) (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, '');
+	else (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+}
+
+/** @internal null means hydration retained the adopted server attribute. */
+export function prepareTemplateBoolean(el: Element, name: string, value: unknown): boolean | null {
 	if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 		const warning = booleanAttributeStringWarning(name, value);
 		if (warning !== null) devWarnAttributeOnce(el, name, warning);
@@ -27904,10 +28055,8 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
 	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return null;
+	return next !== null;
 }
 
 /**
@@ -27915,6 +28064,19 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
  * attribute. Booleans stringify; nullish, function, and symbol values remove.
  */
 export function setAriaAttribute(el: Element, name: string, value: unknown): void {
+	const next = prepareTemplateAria(el, name, value);
+	if (next === undefined) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+}
+
+/** @internal Snapshot fallible ARIA values during render, before queuing writes. */
+export function prepareTemplateAria(
+	el: Element,
+	name: string,
+	value: unknown,
+): string | null | undefined {
 	if (
 		process.env.NODE_ENV !== 'production' &&
 		(el as any).__oct_loc !== undefined &&
@@ -27929,9 +28091,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 			: String(value);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	return next;
 }
 
 /**
@@ -35843,6 +36003,28 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	// there is no enclosing speculative capture to transfer it into here.
 	if (NATIVE_READ_DRIVER && (WIP_CAPTURE !== null || !deferredNativeAcceptance))
 		NATIVE_READ_DRIVER.spliceCapture(capture, WIP_CAPTURE);
+	const templates = capture.templates;
+	if (templates !== undefined) {
+		capture.templates = undefined;
+		// A completed root is its own publication boundary. A discrete event
+		// can commit it while another root's first render is still on the stack;
+		// transferring to that ambient capture can strand the completed writers.
+		if (WIP_CAPTURE !== null && !capture.rootTransaction) {
+			const target = (WIP_CAPTURE.templates ??= []);
+			for (const prepared of templates) {
+				prepared.capture = WIP_CAPTURE;
+				target.push(prepared);
+			}
+		} else {
+			for (const prepared of templates) {
+				if (
+					!DEFERRED_LAYOUT_DRIVER ||
+					!DEFERRED_LAYOUT_DRIVER.stageAction(() => publishTemplate(prepared))
+				)
+					publishTemplate(prepared);
+			}
+		}
+	}
 	const rendered = capture.renderedBlocks;
 	capture.renderedBlocks = null;
 	capture.renderRoot = null;
@@ -35908,6 +36090,15 @@ function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCaptureDiscarded(capture);
 	if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.discardCapture(capture);
+	const templates = capture.templates;
+	if (templates !== undefined) {
+		capture.templates = undefined;
+		for (let i = templates.length - 1; i >= 0; i--) {
+			const prepared = templates[i]!;
+			if (prepared.bag[prepared.field] === prepared)
+				prepared.bag[prepared.field] = prepared.previous;
+		}
+	}
 	const rendered = capture.renderedBlocks;
 	const owner = capture.renderRoot;
 	capture.renderedBlocks = null;

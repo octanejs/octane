@@ -18270,6 +18270,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				node,
 			),
 		);
+		if (plan.templateCommit !== null) {
+			bodyStatements.push(
+				inheritOriginLoc(
+					b.declaration('let', [b.declarator('_p', b.id('_b')), b.declarator('_pv', b.id('_b'))]),
+					node,
+				),
+			);
+		}
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
 		// re-render, so they live after the if/else; the mount branch only clones +
 		// stores refs, and `else` carries the re-render-only diffs (text / refs).
@@ -18278,7 +18286,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			inheritOriginLoc(
 				b.if(
 					b.binary('===', b.id('_b'), b.id('undefined')),
-					b.block(plan.mount),
+					b.block(
+						plan.templateCommit === null
+							? plan.mount
+							: [
+									...plan.mount,
+									b.stmt(b.assignment('=', b.id('_pv'), b.assignment('=', b.id('_p'), b.id('_b')))),
+								],
+					),
 					plan.update.length > 0 ? b.block(plan.update) : null,
 				),
 				node,
@@ -28325,6 +28340,9 @@ function planJsx(
 				ctx.presentationHydration.unboundAttributes.has(name.toLowerCase());
 		}
 		const sharesSpreadHost = spreadPaths.has(b.path.join(','));
+		// A migrated write cannot jump past an unsupported spread on the same
+		// host: source-order overwrites must still win in either direction.
+		b.sharesSpreadHost = sharesSpreadHost;
 		const sharesEventSlot =
 			(b.kind === 'event' || b.kind === 'event-bundle') &&
 			eventWriterCounts.get(`${b.path.join(',')}|${b.slotKey}`) > 1;
@@ -28414,6 +28432,17 @@ function planJsx(
 	let nativeStyleSlots = 0;
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
+		// A presentation view already has an explicit writer receipt and a host
+		// frame. Its audited writes must execute in that frame to transfer leases.
+		// Ordinary template preparation cannot defer them beyond its lifetime.
+		b.preparedTemplate =
+			!noTemplate &&
+			ctx.presentationHydration == null &&
+			!b.mountOnly &&
+			!b.signalDirect &&
+			!b.sharesSpreadHost &&
+			!b.beforeConnect &&
+			preparedTemplateValueHelper(b) !== null;
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
 		// (the `<!>` placeholder / server text node) via the full path INCLUDING the
 		// childIndex — so the hole-aware child/sibling walk adopts the correct server
@@ -28451,7 +28480,7 @@ function planJsx(
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
 			}
 			if (!b.mountOnly) {
-				const updateHelper = attrBindingUpdateHelper(b, inlineBindingGuards);
+				const updateHelper = attrBindingUpdateHelper(b, inlineBindingGuards || b.preparedTemplate);
 				ctx.runtimeNeeded.add(updateHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, updateHelper, b.name);
 			}
@@ -28601,6 +28630,22 @@ function planJsx(
 	// Every element walk and mount flag is ready: text holes can replace their
 	// placeholders and iframe sources can initialize before the root is inserted.
 	for (const line of postWalkMounts) mountLines.push(line);
+	// Keep candidate ownership on the stable bag; it must be registered before
+	// the mount factory is emitted. Only bodies with migrated writers pay a slot.
+	const templateBindings = elementBindings.filter((binding) => binding.preparedTemplate);
+	const templateTextHoles =
+		noTemplate || ctx.presentationHydration != null
+			? []
+			: compCalls.filter(
+					(cc) =>
+						cc.isChild &&
+						cc.onlyChildText &&
+						!cc.potentialDangerouslySetInnerHTML &&
+						!(cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads)),
+				);
+	if (templateBindings.length || templateTextHoles.length) {
+		bag.constField('_preparedTemplate', 'null');
+	}
 
 	if (!noTemplate) {
 		// Allocate + insert + commit in ONE shared-factory call, LAST — see the
@@ -28743,10 +28788,88 @@ function planJsx(
 	// change observable order.
 	const updateLines = [];
 	const everyRenderLines = [];
-	for (const b of elementBindings) {
-		const updateEmit = emitBindingUpdate(b, bag, inlineBindingGuards);
+	const templateCommit =
+		templateBindings.length === 0 && templateTextHoles.length === 0
+			? null
+			: allocCompilerName(ctx, `__commit$${ctx.nextHelperId++}`);
+	if (templateCommit !== null) {
+		ctx.runtimeNeeded.add('prepareTemplate');
+		ctx.runtimeNeeded.add('commitTemplate');
+		ctx.runtimeNeeded.add('templateValues');
+		for (const binding of templateBindings) {
+			ctx.runtimeNeeded.add(preparedTemplateValueHelper(binding));
+		}
+		if (templateTextHoles.length) {
+			ctx.runtimeNeeded.add('prepareTemplateText');
+			ctx.runtimeNeeded.add('setText');
+		}
+		updateLines.push(
+			inheritOriginLoc(
+				b.stmt(
+					b.assignment(
+						'=',
+						b.id('_pv'),
+						b.assignment(
+							'=',
+							b.id('_p'),
+							b.call(
+								'_$templateValues',
+								b.id('__s'),
+								b.id('_b'),
+								b.literal(bag.letter('_preparedTemplate')),
+							),
+						),
+					),
+				),
+				planOrigin,
+			),
+		);
+		ctx.hoistedHelpers.push(
+			inheritOriginLoc(
+				b.function_declaration(
+					b.id(templateCommit),
+					[b.id('_b'), b.id('_p')],
+					b.block([
+						...templateBindings.map((binding) => emitPreparedBindingCommit(binding, bag)),
+						...templateTextHoles.map((cc) => {
+							const field = bag.letter(`_chp$${cc.id}`);
+							const saved = () => bagFieldNode(bag, `_chp$${cc.id}`);
+							const prepared = () => b.member(b.id('_p'), `_value$${field}`);
+							return inheritOriginLoc(
+								b.if(
+									b.binary('!==', saved(), b.member(b.id('_p'), field)),
+									b.block([
+										b.if(
+											b.binary('!==', prepared(), undefinedNode()),
+											b.stmt(
+												b.call(
+													'_$setText',
+													bagFieldNode(bag, `_chv$${cc.id}`),
+													prepared(),
+													bagFieldNode(bag, `_compHost$${cc.id}`),
+												),
+											),
+											null,
+										),
+										b.stmt(b.assignment('=', saved(), b.member(b.id('_p'), field))),
+									]),
+									null,
+								),
+								cc.origin ?? planOrigin,
+							);
+						}),
+					]),
+				),
+				planOrigin,
+			),
+		);
+	}
+	for (const binding of elementBindings) {
+		const updateEmit = templateBindings.includes(binding)
+			? emitPreparedBinding(binding, bag)
+			: emitBindingUpdate(binding, bag, inlineBindingGuards);
 		if (!updateEmit) continue;
-		if (b.deferred) everyRenderLines.push(updateEmit);
+		if (binding.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
 	}
 	if (ctx.scalarBindingClaims) {
@@ -28799,15 +28922,15 @@ function planJsx(
 					planOrigin,
 				),
 			);
+			const claims = b.call(
+				requireRuntimeForContext(ctx, 'hydrateClaimedBindingCaches'),
+				b.id('__s'),
+				b.id(name),
+				...(templateCommit === null ? [] : [b.id('_p'), b.id('_pv')]),
+			);
 			everyRenderLines.push(
 				inheritOriginLoc(
-					b.stmt(
-						b.call(
-							requireRuntimeForContext(ctx, 'hydrateClaimedBindingCaches'),
-							b.id('__s'),
-							b.id(name),
-						),
-					),
+					b.stmt(templateCommit === null ? claims : b.assignment('=', b.id('_p'), claims)),
 					planOrigin,
 				),
 			);
@@ -29444,6 +29567,67 @@ function planJsx(
 					);
 					update = b.if(b.call('_$compilerCacheArray', V(), chp()), cached, ordinary);
 				}
+				if (templateTextHoles.includes(cc)) {
+					const field = bag.letter(`_chp$${cc.id}`);
+					const currentNode = () => b.member(b.id('_p'), bag.letter(`_chv$${cc.id}`));
+					const current = () => b.member(b.id('_p'), field);
+					const prepared = () => b.member(b.id('_p'), `_value$${field}`);
+					const copy = () =>
+						b.if(
+							b.binary('===', b.id('_p'), b.id('_pv')),
+							b.stmt(b.assignment('=', b.id('_p'), b.call('_$prepareTemplate', b.id('_pv')))),
+							null,
+						);
+					// Preserve generic-hole meaning and structural upgrades. Only an
+					// established Text -> string/number/bigint update joins the writer;
+					// mount, null/booleans and complex values retain normal reconciliation.
+					update = b.if(
+						andChain([
+							b.binary('!=', currentNode(), nullNode()),
+							b.logical(
+								'||',
+								b.binary('===', b.unary('typeof', V()), b.literal('string')),
+								b.logical(
+									'||',
+									b.binary('===', b.unary('typeof', V()), b.literal('number')),
+									b.binary('===', b.unary('typeof', V()), b.literal('bigint')),
+								),
+							),
+						]),
+						b.block([
+							b.if(
+								b.binary('!==', current(), V()),
+								b.block([
+									copy(),
+									b.stmt(
+										b.assignment(
+											'=',
+											prepared(),
+											b.call('_$prepareTemplateText', currentNode(), hostExpr(), V()),
+										),
+									),
+									b.stmt(b.assignment('=', current(), V())),
+								]),
+								null,
+							),
+						]),
+						b.block([
+							update,
+							// The slow path succeeded. Forget a superseded scalar
+							// candidate, preserving all other fields in this template.
+							b.if(
+								b.binary('!==', b.id('_p'), b.id('_b')),
+								b.block([
+									copy(),
+									b.stmt(b.assignment('=', currentNode(), chv())),
+									b.stmt(b.assignment('=', current(), chp())),
+									b.stmt(b.assignment('=', prepared(), undefinedNode())),
+								]),
+								null,
+							),
+						]),
+					);
+				}
 				pushAfterStmt(
 					cc.id,
 					org,
@@ -29818,6 +30002,30 @@ function planJsx(
 		.map((c, i) => ({ ...c, i }))
 		.sort((x, y) => x.id - y.id || x.i - y.i)
 		.map((c) => c.line);
+	if (templateCommit !== null) {
+		// A whole body publishes one prepared snapshot after all of its child
+		// slots succeed. Never register an unfinished parent or clone its bag
+		// once per text hole: all eligible bindings share the same lazy copy.
+		afterStatements.push(
+			inheritOriginLoc(
+				b.if(
+					b.binary('!==', b.id('_p'), b.id('_pv')),
+					b.stmt(
+						b.call(
+							'_$commitTemplate',
+							b.id('__s'),
+							b.id('_b'),
+							b.id('_p'),
+							b.id(templateCommit),
+							b.literal(bag.letter('_preparedTemplate')),
+						),
+					),
+					null,
+				),
+				planOrigin,
+			),
+		);
+	}
 
 	return {
 		// Does this body carry a binding bag (`__s.slots[0]`)? Control-flow-only
@@ -29827,6 +30035,7 @@ function planJsx(
 		mount: mountLines,
 		update: updateLines,
 		everyRender: everyRenderLines,
+		templateCommit,
 		after: afterStatements,
 		head: headEmit.head,
 		resources: headEmit.resources,
@@ -30170,11 +30379,9 @@ function completeStyleSpread(bind, spread, valueOf, needsFull) {
 }
 
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
-// diff field to `undefined`. The every-render diff then performs the actual
-// write — including on the first render, since the `undefined` seed makes its
-// `_prev !== _v` guard fire, and `setAttribute(el, name, undefined)` /
-// `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
-// is byte-identical to the old unconditional mount write).
+// diff field. Prepared fields use the private 'unset' seed: even an initial
+// undefined must reach hydration validation before its writer can be skipped.
+// Other writers retain their existing freshly-cloned-element no-op behavior.
 function emitDeferredMount(bind, elVar, bag) {
 	// Whole-object and spread-prefix styles diff on `_sty`; other grouped styles
 	// use it only as a first-render marker. Each trailing property keeps a scalar.
@@ -30184,7 +30391,9 @@ function emitDeferredMount(bind, elVar, bag) {
 			: bind.kind === 'style' || bind.kind === 'styleProperties'
 				? `_sty$${bind.id}`
 				: `_prev$${bind.id}`,
-		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'unset' : 'undefined',
+		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' || bind.preparedTemplate
+			? 'unset'
+			: 'undefined',
 	);
 	if (bind.kind === 'styleProperties') {
 		if (bind.spread) bag.constField(`_styFull$${bind.id}`, 'undefined');
@@ -30818,6 +31027,110 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 	}
 	return null;
+}
+
+// Migrated update bindings read the candidate frame, not the last accepted bag:
+// a held A -> B -> A pass must supersede B even though A is still on screen.
+// Only a changed raw input copies that frame; no new snapshot for no-op renders.
+function preparedTemplateValueHelper(bind) {
+	switch (bind.kind) {
+		case 'text':
+		case 'textOnlyChild':
+			return 'prepareTemplateText';
+		case 'booleanAttr':
+			return 'prepareTemplateBoolean';
+		case 'stringData':
+			return 'prepareTemplateStringData';
+		case 'ariaAttr':
+			return 'prepareTemplateAria';
+		case 'attr':
+			// The static native-name admission selects this same data writer even
+			// when an opaque expression did not receive a text type proof.
+			if (bind.preparedAttributeHelper === 'setStringData') return 'prepareTemplateStringData';
+			if (bind.preparedAttributeHelper === 'setPlainAttribute') return 'prepareTemplatePlain';
+			return null;
+		default:
+			return null;
+	}
+}
+
+function emitPreparedBinding(bind, bag) {
+	const org = bindingOrigin(bind);
+	const field = bag.letter(`_prev$${bind.id}`);
+	const pending = () => b.member(b.id('_p'), field);
+	const expr = resolveKnownAttributeSource(bind.expr, (source) =>
+		b.member(b.id('_p'), bag.letter(`_prev$${source.binding.id}`)),
+	);
+	const changes = [
+		b.if(
+			b.binary('===', b.id('_p'), b.id('_pv')),
+			b.stmt(b.assignment('=', b.id('_p'), b.call('_$prepareTemplate', b.id('_pv')))),
+			null,
+		),
+	];
+	let prepared;
+	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
+		const node = bag.has(`_txt$${bind.id}`) ? bagFieldNode(bag, `_txt$${bind.id}`) : nullNode();
+		const host = bind.kind === 'textOnlyChild' ? bagFieldNode(bag, `_el$${bind.id}`) : nullNode();
+		prepared = b.call('_$prepareTemplateText', node, host, b.id('_v'));
+	} else {
+		prepared = b.call(
+			attrLoweringToken(b.id(`_$${preparedTemplateValueHelper(bind)}`), bind),
+			bagFieldNode(bag, `_el$${bind.id}`),
+			attrLoweringToken(b.literal(bind.preparedAttributeName ?? bind.name), bind),
+			b.id('_v'),
+		);
+	}
+	// Only the candidate owns its normalized snapshot. Keep the accepted bag's
+	// raw values (and every unmount/ref token) stable until the writer lands.
+	changes.push(b.stmt(b.assignment('=', b.member(b.id('_p'), `_value$${field}`), prepared)));
+	changes.push(b.stmt(b.assignment('=', pending(), b.id('_v'))));
+	const emitted = inheritOriginLoc(
+		b.block([
+			b.const('_v', expr),
+			b.if(b.binary('!==', pending(), b.id('_v')), b.block(changes), null),
+		]),
+		org,
+	);
+	return bind.presentationUnbound ? { ...emitted, _octanePresentationUnbound: true } : emitted;
+}
+
+function emitPreparedBindingCommit(bind, bag) {
+	const org = bindingOrigin(bind);
+	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
+	const field = bag.letter(`_prev$${bind.id}`);
+	const pending = () => b.member(b.id('_p'), field);
+	const prepared = () => b.member(b.id('_p'), `_value$${field}`);
+	let write;
+	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
+		write = b.call(
+			'_$setText',
+			bag.has(`_txt$${bind.id}`) ? F('_txt') : nullNode(),
+			prepared(),
+			...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
+		);
+	} else {
+		write = b.call(
+			attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind),
+			F('_el'),
+			attrLoweringToken(b.literal(bind.name), bind),
+			prepared(),
+		);
+	}
+	// Prepare validates during hydration, at the live cursor. A retained server
+	// value skips only the DOM write; the accepted raw cache still advances.
+	const retained = bind.kind === 'booleanAttr' ? nullNode() : undefinedNode();
+	return inheritOriginLoc(
+		b.if(
+			b.binary('!==', F('_prev'), pending()),
+			b.block([
+				b.if(b.binary('!==', prepared(), retained), b.stmt(write), null),
+				b.stmt(b.assignment('=', F('_prev'), pending())),
+			]),
+			null,
+		),
+		org,
+	);
 }
 
 function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
@@ -32700,13 +33013,16 @@ function emitElementHtml(
 				),
 			);
 		} else {
-			const writer = ctx.dev ? null : staticAttributeWriter(tag, attrName);
+			const proof = staticAttributeWriter(tag, attrName);
+			const writer = ctx.dev ? null : proof;
 			bindings.push(
 				markDirectSignalBinding(
 					{
 						id: bindings.length,
 						kind: 'attr',
 						attributeHelper: writer?.helper,
+						preparedAttributeHelper: directPropNames.has('is') ? null : proof?.helper,
+						preparedAttributeName: proof?.name,
 						// Connecting an iframe without its source creates an initial
 						// document before the intended navigation and sandbox checks.
 						beforeConnect: tag === 'iframe' && attrName.toLowerCase() === 'src',

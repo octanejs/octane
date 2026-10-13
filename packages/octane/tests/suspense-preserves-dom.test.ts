@@ -22,6 +22,7 @@ import {
 	SuspensePreservationApp,
 	RootSuspensionAfterSiblingApp,
 	RawRootSuspensionAfterSiblingApp,
+	RetainedResults,
 	UrgentChildSlotSuspenseApp,
 	UrgentComponentSlotSuspenseApp,
 	UrgentReturnKindSuspenseApp,
@@ -137,6 +138,186 @@ function setupNestedPortal(onDetach?: (mounted: ReturnType<typeof mount>) => voi
 }
 
 describe('Suspense preserves committed host DOM', () => {
+	it.each(['returns', 'throws', 'suspends'] as const)(
+		'leaves committed sibling text and attributes visible while a later reader %s',
+		(outcome) => {
+			const pending = deferred<string>();
+			let next = false;
+			const observed = new Set<string>();
+			const read = () => {
+				if (next) {
+					const element = root.find('#raw-root-suspension-label');
+					observed.add(element.textContent + ' / ' + element.getAttribute('title'));
+					if (outcome === 'throws') throw new Error('resource unavailable');
+					if (outcome === 'suspends') throw pending.promise;
+				}
+				return next ? 'B' : 'A';
+			};
+			const root = mount(RawRootSuspensionAfterSiblingApp, { label: 'original', read });
+			try {
+				const element = root.find('#raw-root-suspension-label');
+				const text = element.firstChild;
+				next = true;
+				if (outcome === 'throws') {
+					expect(() =>
+						root.update(RawRootSuspensionAfterSiblingApp, { label: 'replacement', read }),
+					).toThrow('resource unavailable');
+				} else {
+					root.update(RawRootSuspensionAfterSiblingApp, { label: 'replacement', read });
+				}
+				expect(observed).toEqual(new Set(['original / original']));
+				if (outcome === 'throws') {
+					expect(root.findAll('#raw-root-suspension-label')).toEqual([]);
+					expect(element.isConnected).toBe(false);
+				} else {
+					expect(root.find('#raw-root-suspension-label')).toBe(element);
+					expect(element.firstChild).toBe(text);
+				}
+				expect(element.textContent).toBe(outcome === 'returns' ? 'replacement' : 'original');
+				expect(element.getAttribute('title')).toBe(
+					outcome === 'returns' ? 'replacement' : 'original',
+				);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('retains two independent result labels and a live counter until new results are ready', async () => {
+		const pending = deferred<string>();
+		const log: string[] = [];
+		const refs: (HTMLButtonElement | null)[] = [];
+		let ready = true;
+		let inspect = false;
+		const observed = new Set<string>();
+		const read = () => {
+			if (inspect) {
+				observed.add(
+					root
+						.findAll('[data-result]')
+						.map((node) =>
+							[node.textContent, node.getAttribute('title'), node.getAttribute('aria-label')].join(
+								'/',
+							),
+						)
+						.join(' | '),
+				);
+			}
+			if (!ready) throw pending.promise;
+			return 'ready';
+		};
+		const common = { read, log, counterRef: (node: HTMLButtonElement | null) => refs.push(node) };
+		const root = mount(RetainedResults, { ...common, left: 'one', right: 'two' });
+		try {
+			const [left, right] = root.findAll('[data-result]');
+			const counter = root.find('[data-counter]');
+			expect(log).toEqual(['active:one']);
+			expect(refs).toEqual([counter]);
+			ready = false;
+			inspect = true;
+			root.update(RetainedResults, { ...common, left: 'three', right: 'four' });
+			expect(observed).toEqual(new Set(['one/one/one | two/two/two']));
+			expect(root.findAll('[data-result]')).toEqual([left, right]);
+			expect(log).toEqual(['active:one']);
+			expect(refs).toEqual([counter]);
+			root.click('[data-counter]');
+			expect(root.find('[data-counter]')).toBe(counter);
+			expect(counter.textContent).toBe('one:1');
+			expect(counter.getAttribute('title')).toBe('one');
+			expect(log).toEqual(['active:one']);
+			inspect = false;
+			ready = true;
+			await act(() => pending.resolve('done'));
+			expect(root.findAll('[data-result]')).toEqual([left, right]);
+			expect([
+				left.textContent,
+				left.getAttribute('title'),
+				left.getAttribute('aria-label'),
+			]).toEqual(['three', 'three', 'three']);
+			expect([
+				right.textContent,
+				right.getAttribute('title'),
+				right.getAttribute('aria-label'),
+			]).toEqual(['four', 'four', 'four']);
+			expect(root.find('[data-counter]')).toBe(counter);
+			expect(counter.textContent).toBe('three:1');
+			expect(log).toEqual(['active:one', 'cleanup:one', 'active:three']);
+			expect(refs).toEqual([counter]);
+		} finally {
+			root.unmount();
+		}
+		expect(log).toEqual(['active:one', 'cleanup:one', 'active:three', 'cleanup:three']);
+		expect(refs.at(-1)).toBe(null);
+	});
+
+	it('finishes with the newest root when an attribute write requests another render', () => {
+		const common = {
+			read: () => 'ready',
+			log: [] as string[],
+			counterRef: () => {},
+		};
+		const root = mount(RetainedResults, { ...common, left: 'one', right: 'two' });
+		const [left, right] = root.findAll('[data-result]');
+		const setAttribute = left.setAttribute;
+		try {
+			left.setAttribute = function (name, value) {
+				setAttribute.call(this, name, value);
+				if (name === 'title' && value === 'three') {
+					root.root.render(RetainedResults, { ...common, left: 'five', right: 'six' });
+				}
+			};
+			root.update(RetainedResults, { ...common, left: 'three', right: 'four' });
+			expect(root.findAll('[data-result]')).toEqual([left, right]);
+			expect([
+				left.textContent,
+				left.getAttribute('title'),
+				left.getAttribute('aria-label'),
+			]).toEqual(['five', 'five', 'five']);
+			expect([
+				right.textContent,
+				right.getAttribute('title'),
+				right.getAttribute('aria-label'),
+			]).toEqual(['six', 'six', 'six']);
+			expect(root.find('[data-counter]').textContent).toBe('five:0');
+		} finally {
+			left.setAttribute = setAttribute;
+			root.unmount();
+		}
+	});
+
+	it('keeps a root unmounted and its refs released when a native attribute setter removes it', () => {
+		const refs: (HTMLButtonElement | null)[] = [];
+		const common = {
+			read: () => 'ready',
+			log: [] as string[],
+			counterRef: (node: HTMLButtonElement | null) => refs.push(node),
+		};
+		const root = mount(RetainedResults, { ...common, left: 'one', right: 'two' });
+		const [left, right] = root.findAll('[data-result]');
+		const counter = root.find('[data-counter]');
+		const setLeft = left.setAttribute;
+		try {
+			expect(refs).toEqual([counter]);
+			expect(common.log).toEqual(['active:one']);
+			left.setAttribute = function (name, value) {
+				setLeft.call(this, name, value);
+				if (name === 'title' && value === 'three') {
+					root.root.unmount();
+				}
+			};
+			root.update(RetainedResults, { ...common, left: 'three', right: 'four' });
+			expect(root.container.innerHTML).toBe('');
+			expect(left.isConnected).toBe(false);
+			expect(right.isConnected).toBe(false);
+			expect(counter.isConnected).toBe(false);
+			expect(refs).toEqual([counter, null]);
+			expect(common.log).toEqual(['active:one', 'cleanup:one']);
+		} finally {
+			left.setAttribute = setLeft;
+			root.unmount();
+		}
+	});
+
 	it('abandons a suspended new conditional arm before growing and replacing the accepted arm', async () => {
 		const pending = deferred<string>();
 		const initial = fulfilled('A');

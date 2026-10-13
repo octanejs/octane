@@ -287,7 +287,9 @@ matrix.itRenders('serializes aria, unknown, event-like, and SVG attributes', {
 	component: 'AriaUnknownAndSvgAttributes',
 	mismatch,
 	clientDiagnostics(diagnostics) {
-		expect(diagnostics).toEqual(
+		// Diagnostics are emitted as their bindings prepare. Native compiled
+		// and generic attributes may prepare at different points of the mount.
+		expect([...diagnostics].sort()).toEqual(
 			PROD_COMPILE
 				? []
 				: [
@@ -301,7 +303,7 @@ matrix.itRenders('serializes aria, unknown, event-like, and SVG attributes', {
 							'spell it as lowercase `foobar` instead. ' +
 							'If you accidentally passed it from a parent component, remove it from the DOM element.',
 						'Unknown event handler property `onunknownevent`. It will be ignored.',
-					],
+					].sort(),
 		);
 	},
 	captureBeforeHydrate: (container) => container.querySelector('#aria-unknown-svg-attributes'),
