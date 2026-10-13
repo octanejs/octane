@@ -24,6 +24,11 @@ native argument delivery, genuinely changed captures, and unmount cleanup.
 Reproduce with `node benchmarks/scoped-signals/event-metadata.mjs [baseline-runtime.ts]`
 and `node --test benchmarks/scoped-signals/event-metadata.test.mjs`.
 
+Since the compiled commit functions (#2043, `dc409debd6`), a render records a
+changed capture for the commit instead of writing the bundle, so the
+changed-capture control also takes no snapshot. The guard expects 0 for both
+workloads; the results below are from the measured revision.
+
 ## Matched results
 
 Node 24.19.0, pnpm 11.15.1, esbuild 0.28.1, current frozen lockfile,
