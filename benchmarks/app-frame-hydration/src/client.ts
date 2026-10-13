@@ -1,7 +1,10 @@
-import { flushSync, hydrateRoot } from 'octane';
-import { AppFrame } from './frame.tsrx';
+import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { AppFrame, BoundedAppFrame } from './frame.tsrx';
 import {
+	BOUNDARIES,
 	FRAME_PROPS,
+	resetSettled,
+	whenSettled,
 	frameData,
 	SCENARIOS,
 	searchOpen$,
@@ -58,7 +61,7 @@ export function hydrateFrame(): number {
 	const started = performance.now();
 	const root = hydrateRoot(
 		frame.container,
-		AppFrame,
+		frame.scenario === 'frame-boundaries' ? BoundedAppFrame : AppFrame,
 		{ ...FRAME_PROPS, ...SCENARIOS[frame.scenario], data: frame.data },
 		{ onRecoverableError: (error) => errors.push(error) },
 	);
@@ -71,9 +74,49 @@ export function hydrateFrame(): number {
 }
 
 /**
+ * Hydrate the prepared frame, then wait until every Suspense boundary in it has
+ * committed, which can take later host tasks. The marks bound the trace window,
+ * which also takes in the passive effects that would otherwise run after paint,
+ * so a candidate that runs some of them sooner is not charged for them alone.
+ * Returns the hydrateRoot task's milliseconds, as hydrateFrame does.
+ */
+export async function hydrateFrameSettled(): Promise<number> {
+	const count = BOUNDARIES[prepared!.scenario];
+	resetSettled();
+	performance.mark('hydrate-start');
+	const durationMs = hydrateFrame();
+	await whenSettled(count);
+	drainPassiveEffects();
+	performance.mark('hydrate-settled');
+	return durationMs;
+}
+
+/**
+ * Click the first collapsible sidebar section as soon as hydrateRoot returns,
+ * before any later task runs, and report whether the click collapsed it once
+ * the frame settled.
+ */
+export async function clickBeforeSettled(): Promise<boolean> {
+	const count = BOUNDARIES[prepared!.scenario];
+	resetSettled();
+	const container = prepared!.container;
+	const lists = () => container.querySelectorAll('.nav-list').length;
+	const before = lists();
+	hydrateFrame();
+	container.querySelector<HTMLElement>('.nav-section-header button')!.click();
+	await whenSettled(count);
+	flushSync(() => {});
+	const collapsed = lists() === before - 1;
+	active!.root.unmount();
+	active = null;
+	return collapsed;
+}
+
+/**
  * Prove the hydration was a real adoption, then unmount: every server element
- * survives, a delegated click reaches a component and re-renders a native-read
- * arm, and unmount leaves no DOM behind.
+ * survives, a delegated click reaches a component and re-renders the arm that
+ * reads the store (natively, or through useSyncExternalStore in the plain
+ * twin, which subscribes in a passive effect), and unmount leaves no DOM behind.
  */
 export function verifyFrame(): FrameHydration {
 	if (active === null) throw new Error('No hydrated frame to verify.');
@@ -85,6 +128,7 @@ export function verifyFrame(): FrameHydration {
 		if (hydratedElements[index] !== serverElements[index]) replaced++;
 	}
 
+	drainPassiveEffects();
 	const search = container.querySelector<HTMLElement>('.sidebar-header-actions button');
 	if (search !== null) flushSync(() => search.click());
 	const opened = container.querySelector('.search-dialog') !== null;

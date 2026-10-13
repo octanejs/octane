@@ -241,6 +241,48 @@ describe.each([
 		expect(warnings()).toEqual([]);
 	});
 
+	// The island's server HTML has an element the client renders nothing for,
+	// which the island finds only after a call that suspended in its own range
+	// resumes: inside that range, after the call's content, or after the
+	// island's own range. As above, nothing is reported while the call is pending.
+	it.each([
+		{ shape: 'after the content of a call that resumed', inRange: true },
+		{ shape: 'after the island’s range', inRange: false },
+	])('client-renders an island whose server HTML has an element $shape', async ({ inRange }) => {
+		container.innerHTML = ServerRT.renderToString(server.HeldBranch, {
+			server: true,
+			gate: Promise.resolve('unused'),
+		}).html;
+		const outer = container.firstElementChild!;
+		const adopted = container.querySelector('p')!;
+		const extra = document.createElement('s');
+		if (inRange) adopted.after(extra);
+		else container.querySelector('[data-octane-hydrate-id]')!.append(extra);
+		let open!: (value: string) => void;
+		const gate = new Promise<string>((done) => (open = done));
+		const recoverable: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.HeldBranch,
+			{ gate },
+			{ onRecoverableError: (error: unknown) => recoverable.push(error) },
+		);
+		flushSync(() => {});
+		await act(async () => {});
+		expect(extra.isConnected).toBe(true);
+		expect(recoverable).toEqual([]);
+
+		await act(async () => {
+			open('y');
+			await gate;
+		});
+		expect(markup(container.querySelector('section')!)).toBe('<p>z</p><em>e</em>');
+		expect(extra.isConnected).toBe(false);
+		expect(adopted.isConnected).toBe(false);
+		expect(outer.isConnected).toBe(true);
+		expectReportedOnce(recoverable);
+	});
+
 	it.each([
 		{
 			shape: 'a nested <Hydrate> island, under an island',

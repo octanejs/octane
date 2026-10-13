@@ -1,7 +1,8 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { decodeSignalValue, encodeSignalValue, snapshotSignalValue } from './encoding.js';
-import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from './errors.js';
+import { decodeSignalValue, snapshotSignalValue } from './encoding.js';
+import { SignalFrameError, SignalSerializationError } from './errors.js';
 import { scopeStreams, type ScopeStreams } from './scope-streams.js';
+import { scopeSeedEntry } from './seed-serialization.js';
 import {
 	ScopedNode,
 	assertAlive,
@@ -32,14 +33,12 @@ import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,
 	getNativeAdoptionResolver,
-	isNativeAdoptionMiss,
 	nativeAdoptionMiss,
 	nativeReadRebase,
 	registerNativeBatchHooks,
 	registerNativeSignalHydration,
 	reportNativeRead,
 	type NativeReadSource,
-	type NativeSerializedScope,
 } from './read-protocol.js';
 import type {
 	initializeResource,
@@ -270,17 +269,9 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return node as WritableSignal<T>;
 	}
 
-	// Server native reads serialize, and hydration adopts, internal owner scopes
-	// too. Both reach these through the owner: their protocol modules load
-	// without signals, so importing the engine there would ship it, and run it
-	// on every server render, in applications that never create a signal.
-	serializeRead(
-		root: ScopedNode,
-		read: SignalReadMode,
-	): readonly NativeSerializedScope[] | undefined {
-		return serializeScopeRead(root, read);
-	}
-
+	// Hydration adopts internal owner scopes too. It reaches them through the
+	// owner: its protocol modules load without signals, so importing the engine
+	// there would ship it in applications that never create a signal.
 	beginAdoption(seed: ScopeSeed): AdoptionFrame {
 		assertAlive(this);
 		if (!this.seedable) throw new SignalFrameError(formatClientError(142));
@@ -615,52 +606,6 @@ function readHistoricalNode(node: ScopedNode, read: SignalReadMode): NodeState |
 	return frame.read(node, read);
 }
 
-/** One node's seed entry, for serialization and native-read handoff. */
-function scopeSeedEntry(
-	scope: ScopeImpl,
-	node: ScopedNode,
-	read: SignalReadMode = 'value',
-): SignalSeedEntry | undefined {
-	const current = node.state?.snapshot;
-	if (
-		current?.status === 'error' &&
-		(current.error instanceof ScopeDisposedError ||
-			current.error instanceof SignalFrameError ||
-			isNativeAdoptionMiss(current.error))
-	) {
-		throw current.error;
-	}
-	const presented =
-		read === 'latest' && node.state?.snapshot.status !== 'ready' ? node.lastState : node.state;
-	// A producer's cancellation callback may serialize before graph teardown.
-	// Only still-live inputs may be copied into a new historical handoff.
-	if (presented?.owners) for (const owner of presented.owners) assertAlive(owner);
-	const snapshot = presented?.snapshot;
-	if (snapshot?.status !== 'ready') {
-		if (read !== 'latest') return undefined;
-		return {
-			key: node.key,
-			kind: node.kind,
-			read,
-			available: false,
-			value: ['undefined'],
-			complete: false,
-		};
-	}
-	const request = scope.resources?.get(node)?.seedRequest(read === 'latest');
-	if (node.kind === 'async' && !request) return undefined;
-	return {
-		key: node.key,
-		kind: node.kind,
-		...(read !== 'value' ? { read } : {}),
-		value: encodeSignalValue(snapshot.value),
-		complete: snapshot.complete,
-		refreshing: snapshot.refreshing,
-		connection: snapshot.connection,
-		...(request ? { request } : {}),
-	};
-}
-
 function serializeScope(scope: ScopeImpl): ScopeSeed {
 	assertAlive(scope);
 	if (!scope.seedable) throw new SignalSerializationError(formatClientError(140));
@@ -673,47 +618,6 @@ function serializeScope(scope: ScopeImpl): ScopeSeed {
 		}
 		return { version: 1, scopeKey: scope.scopeKey, entries };
 	});
-}
-
-/** Serialize an observed ready subgraph, without evaluating anything new. */
-function serializeScopeRead(
-	root: ScopedNode,
-	read: SignalReadMode,
-): readonly NativeSerializedScope[] | undefined {
-	const scope = root.owner as ScopeImpl;
-	if (!scope.seedable) return [];
-	const rootEntry = scopeSeedEntry(scope, root, read);
-	if (!rootEntry) return undefined;
-	const owners = new Map<ScopeImpl, SignalSeedEntry[]>();
-	const keys = new Map<string, ScopeImpl>();
-	const seen = new Set<ScopedNode>();
-	const pending = [root];
-	while (pending.length) {
-		const node = pending.pop()!;
-		if (seen.has(node)) continue;
-		seen.add(node);
-		const owner = node.owner as ScopeImpl;
-		assertAlive(owner);
-		if (!owner.seedable) continue;
-		const other = keys.get(owner.scopeKey);
-		if (other && other !== owner) {
-			throw new SignalFrameError(formatClientError(141));
-		}
-		keys.set(owner.scopeKey, owner);
-		const entry = node === root ? rootEntry : scopeSeedEntry(owner, node);
-		if (entry) {
-			let entries = owners.get(owner);
-			if (!entries) owners.set(owner, (entries = []));
-			entries.push(entry);
-		}
-		for (let link = node.deps; link; link = link.nextDep) {
-			if (link.dep instanceof ScopedNode) pending.push(link.dep);
-		}
-	}
-	return [...owners].map(([owner, entries]) => ({
-		owner,
-		seed: { version: 1, scopeKey: owner.scopeKey, entries },
-	}));
 }
 
 // Installed by createScope when a scope records a debug trace.
