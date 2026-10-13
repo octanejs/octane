@@ -504,7 +504,7 @@ Enable it per module with `"use strong"` before the imports; comments, other dir
 
 In a Strong module:
 
-- `useMemo` and `useCallback` are errors (`OCTANE_STRONG_MANUAL_MEMO`). Write plain `const` calculations and callbacks; the compiler caches eligible ones from their inferred inputs.
+- `useMemo` and `useCallback` may control their own dependencies. Explicit lists are preserved, omitted lists are inferred, and `null` recomputes on every render. The compiler also caches eligible plain `const` calculations and callbacks automatically.
 - Omit dependency arrays. An explicit array that differs from the inferred inputs, or cannot be proven equivalent, is an error; an equivalent array is a hint that never fails a build (`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`). `null` dependencies are an error (`OCTANE_STRONG_UNTRACKED_EFFECT`).
 - Render never reads or writes `ref.current` (`OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE`). Create a value once with `useLazyRef(() => create())` instead of `if (ref.current === null) ref.current = create()`.
 - Effect setup never updates state synchronously (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). Render a DOM measurement from `useLayoutSnapshot(measure, { initial })` instead of setting state in a layout effect, and use `useLinkedState` when state follows a prop.
@@ -527,7 +527,6 @@ Migration recipes, React idiom → Strong replacement:
 - Create a value once: `if (ref.current === null) ref.current = new Store();` → `const ref = useLazyRef(() => new Store());`
 - Render from a DOM measurement: `useLayoutEffect(() => setWidth(el.current.offsetWidth));` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
 - Measure an element from a callback ref: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
-- Drop useMemo and useCallback: `const total = useMemo(() => sum(items), [items]);` → `const total = sum(items);`
 - Read the latest props from an effect: `const latest = useRef(onTick); latest.current = onTick;` → `const tick = useEffectEvent(onTick);`
 - Keep editable state in sync with a prop: `useEffect(() => setName(user.name), [user.name]);` → `const [name, setName] = useLinkedState(user.id, () => user.name);`
 - Render live browser state: `const wide = window.innerWidth > 800;` → `const wide = useSyncExternalStore(subscribe, getWide, () => false);`
@@ -550,7 +549,6 @@ Effects, state, and dependencies:
 - `OCTANE_STRONG_UNLINKED_PROP_STATE`: Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture.
 - `OCTANE_STRONG_EXPLICIT_DEPENDENCIES`: Omit the dependency argument.
 - `OCTANE_STRONG_UNTRACKED_EFFECT`: Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.
-- `OCTANE_STRONG_MANUAL_MEMO`: Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.
 - `OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`: Remove it. Effect Events are non-reactive, so they never belong in dependencies.
 - `OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`: Compile the module through the normal Octane integration, or keep it in compatibility mode.
 
@@ -615,7 +613,7 @@ See the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 - `useImperativeHandle` infers dependencies from its handle factory when the third argument is omitted; ref identity is still tracked separately.
 - An explicit array is authoritative. `[]` retains mount/reconnect-only or stable-value behavior, `[a, b]` tracks exactly those values, and `null` opts into every-render/recompute behavior.
 - In production compiles, eligible `useMemo`/`useCallback` declarations become inline caches (no per-render closure or deps-array allocation). This is transparent — identical semantics, including `Object.is` dependency compares.
-- These rules describe compatibility mode, the default. A Strong module rejects `useMemo`/`useCallback` (`OCTANE_STRONG_MANUAL_MEMO`), `null` dependencies, and explicit arrays that differ from the inferred inputs; see Strong mode above.
+- These rules also apply to `useMemo` and `useCallback` in Strong mode. Strong effects reject `null` dependencies and explicit arrays that differ from the inferred inputs; see Strong mode above.
 
 ## Async data with use()
 

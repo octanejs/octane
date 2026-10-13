@@ -103,7 +103,7 @@ selects, checkboxes/radios, dynamic input types, and explicitly intentional nati
 text commits alone.
 
 APIs that map one-to-one but whose usual React idioms Strong mode rejects
-(`useRef`, `useLayoutEffect`, `useMemo`, `useCallback`) carry a `strong` note
+(`useRef`, `useLayoutEffect`) carry a `strong` note
 naming the replacement, and the plan gains one conditional step for ports that
 will compile in Strong mode.
 

@@ -281,8 +281,8 @@ describe('bridgeReportFromSource', () => {
 		const strong = Object.fromEntries(report.apis.map((row) => [row.name, row.strong]));
 		expect(strong.useRef).toContain('useLazyRef');
 		expect(strong.useLayoutEffect).toContain('useLayoutSnapshot');
-		expect(strong.useMemo).toContain('OCTANE_STRONG_MANUAL_MEMO');
-		expect(strong.useCallback).toContain('OCTANE_STRONG_MANUAL_MEMO');
+		expect(strong.useMemo).toBeUndefined();
+		expect(strong.useCallback).toBeUndefined();
 		expect(strong.useState).toBeUndefined();
 		// These APIs still map one-to-one, so the port is not blocked on them.
 		for (const name of ['useRef', 'useLayoutEffect', 'useMemo', 'useCallback']) {

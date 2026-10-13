@@ -50,24 +50,18 @@ export function applyFixes(source, fixes) {
 	return { text, applied };
 }
 
-/** The hooks a fix can replace, whose imports it may leave unused. */
-const REPLACED_HOOKS = new Set(['useCallback', 'useMemo', 'useRef']);
-
 const OCTANE_NAMED_IMPORT =
 	/import\s*\{([^}]*)\}\s*from\s*(['"])octane\2([^\S\n]*;)?([^\S\n]*\n)?/g;
 
 /**
- * Drop `useMemo`, `useCallback`, and `useRef` from the `octane` import when
- * the fixes removed their last use. A name that still appears anywhere else,
+ * Drop `useRef` from the `octane` import when the fixes removed its last use.
+ * A name that still appears anywhere else,
  * even in a comment, keeps its import: an unused import is harmless, a missing
  * one is not.
  *
  * @param {string} text
- * @param {readonly string[]} candidates hook names a fix replaced
  */
-export function pruneImports(text, candidates) {
-	const names = candidates.filter((name) => REPLACED_HOOKS.has(name));
-	if (names.length === 0) return text;
+export function pruneImports(text) {
 	return text.replace(
 		OCTANE_NAMED_IMPORT,
 		(statement, /** @type {string} */ list, quote, semicolon = '', newline = '') => {
@@ -76,8 +70,8 @@ export function pruneImports(text, candidates) {
 				.map((specifier) => specifier.trim())
 				.filter(Boolean);
 			const kept = specifiers.filter((specifier) => {
-				if (!names.includes(specifier)) return true;
-				const uses = text.match(new RegExp(`\\b${specifier}\\b`, 'g'))?.length ?? 0;
+				if (specifier !== 'useRef') return true;
+				const uses = text.match(/\buseRef\b/g)?.length ?? 0;
 				return uses > 1;
 			});
 			if (kept.length === specifiers.length) return statement;

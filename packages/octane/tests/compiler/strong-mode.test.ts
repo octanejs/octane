@@ -18,7 +18,6 @@ const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 const HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
 const EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
-const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
 const EFFECT_DATA_FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 const RENDER_SIDE_EFFECT = 'OCTANE_STRONG_RENDER_SIDE_EFFECT';
 
@@ -711,7 +710,6 @@ export function App(props) @{
 				.filter(({ code }) => code === HOOK_LOCALITY || code === EVENT_HANDLER_LOCALITY)
 				.map(({ code }) => code),
 		).toEqual([HOOK_LOCALITY]);
-		expect(diagnostics).toContainEqual(expect.objectContaining({ code: MANUAL_MEMO }));
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 

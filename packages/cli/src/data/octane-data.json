@@ -3578,21 +3578,15 @@
       },
       "OCTANE_STRONG_EXPLICIT_DEPENDENCIES": {
         "severity": "error",
-        "detects": "An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.",
+        "detects": "An effect or imperative handle dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.",
         "replacement": "Omit the dependency argument.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-explicit-dependencies"
       },
       "OCTANE_STRONG_UNTRACKED_EFFECT": {
         "severity": "error",
-        "detects": "A built-in dependency hook receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.",
+        "detects": "An effect or imperative handle receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.",
         "replacement": "Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-untracked-effect"
-      },
-      "OCTANE_STRONG_MANUAL_MEMO": {
-        "severity": "error",
-        "detects": "A call to Octane's `useMemo` or `useCallback`, including known import aliases.",
-        "replacement": "Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.",
-        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-manual-memo"
       },
       "OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY": {
         "severity": "error",
@@ -3814,13 +3808,6 @@
         "react": "<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>",
         "strong": "const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });",
         "codes": ["OCTANE_STRONG_REF_STATE_UPDATE"]
-      },
-      {
-        "id": "manual-memo",
-        "title": "Drop useMemo and useCallback",
-        "react": "const total = useMemo(() => sum(items), [items]);",
-        "strong": "const total = sum(items);",
-        "codes": ["OCTANE_STRONG_MANUAL_MEMO"]
       },
       {
         "id": "latest-ref",

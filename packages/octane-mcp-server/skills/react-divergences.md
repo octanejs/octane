@@ -35,10 +35,10 @@ Ordinary two-item destructures keep the allocation-free React shape.
 ## Strong mode reads render snapshots
 
 Strong modules use inferred dependencies and automatic memoization: omit effect
-dependency arguments. `useMemo` and `useCallback` are errors
-(`OCTANE_STRONG_MANUAL_MEMO`): write normal const calculations and callbacks,
-which `octane analyze --fix` does for you. Equivalent explicit arrays are hints;
-conflicting arrays and `null` are errors. Avoid chains of effects linked by
+dependency arguments. For effects, equivalent explicit arrays are hints;
+conflicting arrays and `null` are errors. `useMemo` and `useCallback` allow
+explicit dependency control; omitted dependencies are inferred and `null` runs
+every render. Avoid chains of effects linked by
 state. An effect may not update state synchronously, including through
 `startTransition`, `queueMicrotask`, a settled promise, a zero-delay timer, or
 an await of a non-promise (`OCTANE_STRONG_EFFECT_STATE_UPDATE`); an effect that

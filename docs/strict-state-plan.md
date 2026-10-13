@@ -57,8 +57,9 @@ through `useCallback`, `useEffectEvent`, and functions returned by analyzable
 `useMemo` factories. Statically known Effect
 Event calls during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`) and Effect
 Events in explicit hook dependency lists
-(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong now rejects manual memo hooks and
-non-equivalent explicit dependency lists; equivalent arrays retain their
+(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong rejects
+non-equivalent explicit dependency lists on effects and imperative handles;
+`useMemo` and `useCallback` may use authored lists, inferred lists, or `null`. Equivalent effect arrays retain their
 behavior and produce a redundancy hint. See the
 [complete current compiler checks](./strong-compiler-checks.md).
 Synchronously evaluated state initializers, linked-state reconcilers, and
@@ -512,7 +513,7 @@ The original staged rollout was **not executed**. Current status is:
 
 | Historical milestone | What actually shipped or remains proposed |
 | -------------------- | ---------------------------------------- |
-| Report-only diagnostics, repository inventory, and codemods | Not prerequisites for opt-in Strong mode. Added later as `octane analyze --strong-preview` (what Strong would report, grouped by code) and `octane analyze --fix` (lazy-ref and manual-memo rewrites). |
+| Report-only diagnostics, repository inventory, and codemods | Not prerequisites for opt-in Strong mode. Added later as `octane analyze --strong-preview` (what Strong would report, grouped by code) and `octane analyze --fix` (including lazy-ref rewrites). |
 | Replacement primitives | `useLinkedState` shipped in [#366](https://github.com/octanejs/octane/pull/366) and `useLayoutSnapshot` is available; a core `useHydrated` and `useSource` remain proposals. |
 | Render-context enforcement | Opt-in compiler diagnostics shipped in [#376](https://github.com/octanejs/octane/pull/376); runtime phase guards and per-cell policy did not. |
 | Effect setup and cleanup | Provable synchronous setup updates are compiler errors in opted-in modules; cleanup restrictions remain unimplemented. |

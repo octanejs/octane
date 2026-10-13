@@ -53,11 +53,12 @@ locals, early returns) stays above it.
 ## If the target module is Strong
 
 A module with `"use strong"`, or an app with `compiler: { strong: true }`,
-rejects several React idioms that compile elsewhere: `useMemo`/`useCallback`,
-lazy `ref.current` initialization, measuring into state from
+rejects several React idioms that compile elsewhere: lazy `ref.current`
+initialization, measuring into state from
 `useLayoutEffect`, and state updates in effect setup among them. Convert the
 component first, then follow the `migrate-to-strong` skill and look up each
 `OCTANE_STRONG_*` code with `octane_strong_explain`.
+Manual `useMemo` and `useCallback` dependencies work in Strong mode.
 
 ## Text holes
 

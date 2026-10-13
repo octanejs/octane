@@ -560,8 +560,8 @@ The tuple also supports the same optional latest-value getter as `useState`.
 
 ## Optional Strong mode
 
-Strong modules also require inferred dependencies, compiler-owned memoization,
-keyed template lists in `.tsrx`, and branded HTML values. Standard keyed JSX
+Strong modules infer effect dependencies and cache eligible declarations. They
+also require keyed template lists in `.tsrx` and branded HTML values. Standard keyed JSX
 mapping remains supported in `.tsx`. See the
 [Strong compiler checks and migration table](./strong-compiler-checks.md), and the
 [Strong mode guide](https://octanejs.dev/docs/strong-mode) for adopting it in an
@@ -600,8 +600,14 @@ context, or pass an immutable snapshot as a prop. The checks follow provable
 synchronous calls through local callbacks and `useEffectEvent`. Calling a statically
 known Effect Event during render or including it in an explicit hook dependency
 list is also a compile error. Strong modules use normal const declarations for
-automatic memoization. Manual memo hooks and non-equivalent explicit dependencies
-are errors; equivalent arrays keep their behavior and produce a hint.
+automatic memoization. Non-equivalent explicit dependencies on effects or
+imperative handles are errors; equivalent arrays keep their behavior and produce
+a hint. `useMemo` and `useCallback` support manual dependency control.
+Explicit arrays are used as written, omitted or `undefined` dependencies are
+inferred, and `null` recomputes the memo or refreshes the callback on each
+render. A `useMemo` factory still runs during render and must obey Strong's
+purity and snapshot rules. Creating a callback does not execute its body;
+calling it during render remains subject to those rules.
 
 Inside an async function, code after a guaranteed `await` is not synchronous. In
 effect work, an `await` that resumes without waiting, such as `await null`, does

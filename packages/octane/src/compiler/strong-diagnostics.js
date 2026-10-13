@@ -131,7 +131,7 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'effects',
 		severity: 'error',
 		detects:
-			"An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.",
+			"An effect or imperative handle dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.",
 		replacement: 'Omit the dependency argument.',
 	},
 	{
@@ -139,17 +139,9 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'effects',
 		severity: 'error',
 		detects:
-			'A built-in dependency hook receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.',
+			'An effect or imperative handle receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.',
 		replacement:
 			'Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.',
-	},
-	{
-		code: 'OCTANE_STRONG_MANUAL_MEMO',
-		section: 'effects',
-		severity: 'error',
-		detects: "A call to Octane's `useMemo` or `useCallback`, including known import aliases.",
-		replacement:
-			'Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.',
 	},
 	{
 		code: 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY',
@@ -532,28 +524,6 @@ export function Label({ text }: { text: string }) {
 }
 `,
 		note: 'A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state.',
-	},
-	{
-		id: 'manual-memo',
-		title: 'Drop useMemo and useCallback',
-		react: 'const total = useMemo(() => sum(items), [items]);',
-		strong: 'const total = sum(items);',
-		codes: ['OCTANE_STRONG_MANUAL_MEMO'],
-		before: `import { useCallback, useMemo } from 'octane';
-
-export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
-	const total = useMemo(() => items.reduce((sum, item) => sum + item, 0), [items]);
-	const pick = useCallback(() => onPick(total), [onPick, total]);
-	return <button onClick={pick}>{String(total)}</button>;
-}
-`,
-		after: `export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
-	const total = items.reduce((sum, item) => sum + item, 0);
-	const pick = () => onPick(total);
-	return <button onClick={pick}>{String(total)}</button>;
-}
-`,
-		note: 'Strong production builds memoize render calculations from their inputs, and eligible callbacks keep a stable identity in every build until their inferred inputs change. `octane analyze --fix` applies this rewrite.',
 	},
 	{
 		id: 'latest-ref',

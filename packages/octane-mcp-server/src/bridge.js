@@ -255,15 +255,11 @@ export const REACT_API_MAP = {
 	useInsertionEffect: { status: 'same', note: 'Supported.' },
 	useMemo: {
 		status: 'same',
-		note: 'Identical.',
-		strong:
-			'Strong mode rejects useMemo (OCTANE_STRONG_MANUAL_MEMO). Write the calculation as a plain const; Strong compilation caches it from its inferred inputs. octane analyze --strong-preview --fix applies the rewrite.',
+		note: 'Explicit dependencies are preserved. Omitted dependencies are inferred, including in Strong mode.',
 	},
 	useCallback: {
 		status: 'same',
-		note: 'Identical.',
-		strong:
-			'Strong mode rejects useCallback (OCTANE_STRONG_MANUAL_MEMO). Declare the callback as a plain const; Strong compilation caches it from its inferred inputs. octane analyze --strong-preview --fix applies the rewrite.',
+		note: 'Explicit dependencies are preserved. Omitted dependencies are inferred, including in Strong mode.',
 	},
 	useRef: {
 		status: 'same',

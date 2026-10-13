@@ -397,7 +397,6 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'migration-recipes', title: 'Migration recipes' },
 			{ id: 'recipe-lazy-ref', title: 'Create a value once', level: 3 },
 			{ id: 'recipe-layout-measurement', title: 'Render from a DOM measurement', level: 3 },
-			{ id: 'recipe-manual-memo', title: 'Drop useMemo and useCallback', level: 3 },
 			{ id: 'recipe-latest-ref', title: 'Read the latest props from an effect', level: 3 },
 			{ id: 'recipe-prop-state', title: 'Keep editable state in sync with a prop', level: 3 },
 			{ id: 'recipe-browser-state', title: 'Render live browser state', level: 3 },

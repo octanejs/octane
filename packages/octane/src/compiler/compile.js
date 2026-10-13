@@ -3666,7 +3666,10 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 	const init = unwrapTsExpr(expression);
 	// An arrow/function init is auto-callback's job, not ours.
 	if (FN_TYPES.has(init?.type)) return null;
-	if (!isPropCreationExpr(init, ctx)) return null;
+	const literal =
+		ctx.strongLiteralMemo === true &&
+		(init?.type === 'ObjectExpression' || init?.type === 'ArrayExpression');
+	if (!isPropCreationExpr(init, ctx, literal)) return null;
 	// Every call reached during render must satisfy the same projection contract
 	// the region cache uses. Compatibility-mode member calls fail closed.
 	const immutableProjection = immutableArrayProjection(init, immutableStates);
@@ -3693,7 +3696,7 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 			return null;
 		}
 	}
-	return { init, deps, immutableProjection };
+	return { init, deps, immutableProjection, literal };
 }
 
 // The single-name `const` declarator a calculation can replace, or null.
@@ -3726,6 +3729,8 @@ function closeCalculationReads(
 	componentLocals,
 	ctx,
 	immutableStates = null,
+	literalReads = null,
+	renderRoots = [],
 ) {
 	if (renderReadNames.size === 0) return renderReadNames;
 	const declaredAt = new Map();
@@ -3750,6 +3755,24 @@ function closeCalculationReads(
 		if (decl === undefined) continue;
 		const calculation = autoCalculationOf(decl.init, name, componentLocals, ctx, immutableStates);
 		if (calculation === null) continue;
+		// An allocated local can still be mutated or escape during setup.
+		// Cache only literals read directly as eligible props/refs; other reads
+		// (including callback captures and alias creation) keep their JS lifetime.
+		if (calculation.literal) {
+			const allowed = literalReads?.get(name);
+			if (
+				!allowed ||
+				statements.some(
+					(statement) =>
+						statement.declarations?.[0] !== decl &&
+						collectFreeIdentifiers(statement, [], allowed).has(name),
+				) ||
+				collectFreeIdentifiers(renderRoots, [], allowed).has(name)
+			) {
+				forward.push(name);
+				continue;
+			}
+		}
 		const at = declaredAt.get(name);
 		if (calculation.deps.some((dependency) => declaredAt.get(dependency) > at)) {
 			forward.push(name);
@@ -3782,7 +3805,14 @@ function rewriteAutoCalculation(
 		immutableStates,
 	);
 	if (calculation === null) return stmt;
-	const { init, deps, immutableProjection } = calculation;
+	const { init, deps, immutableProjection, literal } = calculation;
+	// An unrelated update may supply a new props bag with the same fields.
+	// Literal identities depend on the inputs they read, not on that bag.
+	const dependencyNodes = literal
+		? collectDepPaths(init, null, moduleBoundCheckForDeps(ctx, init), () =>
+				requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+			)
+		: deps.map((n) => b.id(n));
 	return {
 		...stmt,
 		declarations: [
@@ -3799,7 +3829,7 @@ function rewriteAutoCalculation(
 								: { _octaneImmutableArrayFilter: immutableProjection }),
 						},
 						b.arrow([], init),
-						b.array(deps.map((n) => b.id(n))),
+						b.array(dependencyNodes),
 					),
 					init,
 				),
@@ -3843,20 +3873,24 @@ const CALCULATION_VALUE_PROOFS = [
  * unobservable. Positions whose evaluation is conditional or deferred keep
  * their expression: directive arms, component children (the child decides
  * whether and when they render), and built-in boundaries. An expression holding
- * JSX keeps its list and descriptor lowering, and event handlers, refs, and
- * keys keep their wiring. A render tree that writes to anything keeps its whole
+ * JSX keeps its list and descriptor lowering, and event handlers and keys keep
+ * their wiring. Ref arrays use the same identity proof as props. A render tree that writes to anything keeps its whole
  * evaluation order.
  *
  * Returns null when nothing moves; otherwise the copy-on-write render nodes,
  * the declarations to append, and their names.
  */
 function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
-	if (ctx.strongMemo !== true || ctx.nativeReads || !ctx.currentComponentLocals) return null;
+	if ((!ctx.strongMemo && !ctx.strongLiteralMemo) || ctx.nativeReads || !ctx.currentComponentLocals)
+		return null;
 	if (renderTreeWrites(jsxNodes)) return null;
 	const declarations = [];
 	const names = [];
+	const literalReads = new Map();
 	const nodes = mapNodes(jsxNodes, visitNode);
-	return declarations.length === 0 ? null : { jsxNodes: nodes, declarations, names };
+	return declarations.length === 0 && literalReads.size === 0
+		? null
+		: { jsxNodes: nodes, declarations, names, literalReads };
 
 	function visitNode(node) {
 		switch (node?.type) {
@@ -3894,7 +3928,10 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 				return attribute;
 			}
 			const name = attribute.name.name;
-			if (name === 'key' || name === 'ref' || name === 'children') return attribute;
+			if (name === 'key' || name === 'children') return attribute;
+			const inner = unwrapTsExpr(attribute.value?.expression);
+			if (name === 'ref' && inner?.type !== 'ArrayExpression' && inner?.type !== 'Identifier')
+				return attribute;
 			// The host handoff prepares unbound fields through the ordinary renderer.
 			// Hoisting one outside that preparation makes its writer ineligible.
 			if (
@@ -3905,7 +3942,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 				return attribute;
 			if (!component && /^on[A-Z]/.test(name)) return attribute;
 			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
-			const value = visitContainer(attribute.value);
+			const value = visitContainer(attribute.value, true);
 			return value === attribute.value ? attribute : { ...attribute, value };
 		});
 		// Component children render inside the child, if at all.
@@ -3918,11 +3955,27 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 		};
 	}
 
-	function visitContainer(container) {
+	function visitContainer(container, prop = false) {
 		const expression = container.expression;
 		const inner = unwrapTsExpr(expression);
 		if (!inner || inner.type === 'JSXEmptyExpression' || containsJsxNode(inner)) return container;
-		if (autoCalculationOf(inner, null, ctx.currentComponentLocals, ctx, immutableStates) === null) {
+		if (prop && inner.type === 'Identifier') {
+			let nodes = literalReads.get(inner.name);
+			if (!nodes) literalReads.set(inner.name, (nodes = new Set()));
+			nodes.add(inner);
+		}
+		const calculation = autoCalculationOf(
+			inner,
+			null,
+			ctx.currentComponentLocals,
+			ctx,
+			immutableStates,
+		);
+		if (
+			calculation === null ||
+			(!ctx.strongMemo && !calculation.literal) ||
+			(calculation.literal && !prop)
+		) {
 			return container;
 		}
 		const name = allocCompilerName(ctx, '__calc');
@@ -3931,6 +3984,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 		// A child warm plan runs outside this body, so it keeps the authored prop.
 		(ctx.hoistedRenderCalculations ??= new Map()).set(name, expression);
 		const reference = b.id(name, inner);
+		if (prop) literalReads.set(name, new Set([reference]));
 		for (const proof of CALCULATION_VALUE_PROOFS) {
 			if (inner.metadata?.[proof] === true) reference.metadata[proof] = true;
 		}
@@ -3957,9 +4011,10 @@ function establishesRenderScope(statement) {
 // `return <jsx>` reached after the render-scope proof above gets the same
 // calculations, declared immediately before it. Returns null when nothing moves.
 function hoistStrongReturnCalculations(statements, ctx) {
-	if (ctx.strongMemo !== true || ctx.nativeReads) return null;
+	if ((!ctx.strongMemo && !ctx.strongLiteralMemo) || ctx.nativeReads) return null;
 	let out = null;
 	const names = [];
+	const literalReads = new Map();
 	let established = false;
 	for (let index = 0; index < statements.length; index++) {
 		const statement = statements[index];
@@ -3969,13 +4024,18 @@ function hoistStrongReturnCalculations(statements, ctx) {
 				out ??= statements.slice(0, index);
 				out.push(...hoisted.declarations, { ...statement, argument: hoisted.jsxNodes[0] });
 				names.push(...hoisted.names);
+				for (const [name, reads] of hoisted.literalReads) {
+					let nodes = literalReads.get(name);
+					if (!nodes) literalReads.set(name, (nodes = new Set()));
+					for (const read of reads) nodes.add(read);
+				}
 				continue;
 			}
 		}
 		out?.push(statement);
 		established ||= establishesRenderScope(statement);
 	}
-	return out === null ? null : { statements: out, names };
+	return out === null ? null : { statements: out, names, literalReads };
 }
 
 function mapNodes(nodes, map) {
@@ -4928,7 +4988,9 @@ const CALLBACK_IDENTITY_OWNING_HOOKS = new Set(
 );
 
 function hookOwnsCallbackIdentity(call) {
-	const name = hookShapedCalleeName(call);
+	// After dependency inference, use the resolved hook even when an import
+	// alias looks like a custom hook. Earlier passes still use the spelling.
+	const name = stableHookCallName(call) ?? hookShapedCalleeName(call);
 	return name !== null && CALLBACK_IDENTITY_OWNING_HOOKS.has(name);
 }
 
@@ -11776,6 +11838,14 @@ function compileInternal(
 		splitModuleFunctions,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
+		// Ref and effect lifetimes must not churn on an unrelated dev/HMR render.
+		// Only proven literal props use these caches; region/call caching stays prod-only.
+		strongLiteralMemo:
+			strongModeEnabled &&
+			options?.autoMemo !== false &&
+			mode === 'client' &&
+			options?.__universal == null &&
+			options?.nativeReads !== true,
 		nativeReads: options?.nativeReads === true,
 		opaqueSignalHandles:
 			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
@@ -17892,6 +17962,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				ctx.currentComponentLocals,
 				ctx,
 				immutableStateProvenance,
+				hoisted?.literalReads,
+				jsxNodes,
 			);
 			if (renderReadNames.size > 0) {
 				workingStatements = workingStatements.map((statement) => {
@@ -19270,8 +19342,8 @@ function isTrivialUseArg(n) {
 // the lowering passes) and hook-shaped calls (`use` / `use[A-Z]…` / a tracked
 // `use` import alias — their slot/occurrence bookkeeping must execute on the
 // body proper every pass, so they can never sit behind a cache hit).
-function isPropCreationExpr(expr, ctx) {
-	let found = false;
+function isPropCreationExpr(expr, ctx, includesLiteral = false) {
+	let found = includesLiteral;
 	let blocked = false;
 	walk(expr);
 	return found && !blocked;
@@ -19305,7 +19377,13 @@ function isPropCreationExpr(expr, ctx) {
 				blocked = true;
 				return;
 			}
-			if (FN_TYPES.has(n.type)) return; // does not run during render
+			if (FN_TYPES.has(n.type)) {
+				// A regular function can mutate its receiver even if it never names
+				// the literal binding. Keep receiver-owning methods/accessors fresh.
+				// Arrow properties cannot acquire the literal as their `this`.
+				if (includesLiteral && n.type !== 'ArrowFunctionExpression') blocked = true;
+				return; // does not run during render
+			}
 			// Same render-time-call inventory as containsRenderCall: plain and
 			// optional calls, constructions, tagged templates, and dynamic
 			// import() (ESTree flavor; the Babel flavor is a CallExpression).
@@ -21973,6 +22051,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 			collectRenderReadNames(renderedRoots, ctx),
 			ctx.currentComponentLocals,
 			ctx,
+			null,
+			hoisted?.literalReads,
+			renderedRoots,
 		);
 		let autoCalculatedDeclarations = null;
 		let renderScopeEstablished = false;
