@@ -85,6 +85,25 @@ describe('scoped synchronous signals', () => {
 		expect(Object.is(values[1], -0)).toBe(true);
 	});
 
+	it('does not rerun readers of a derived value that recomputes equal', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 1);
+		const parity$ = scope.derived$('parity', () =>
+			scope.get(count$) < 0 ? Number.NaN : scope.get(count$) % 2,
+		);
+		const runs: number[] = [];
+		const label$ = scope.derived$('label', () => {
+			const parity = scope.get(parity$);
+			runs.push(parity);
+			return parity;
+		});
+		const stop = label$.subscribe(() => {});
+		expect(label$.get()).toBe(1);
+		for (const count of [3, -1, -3, 2, 4, 6]) count$.set(count);
+		expect(runs).toEqual([1, Number.NaN, 0]);
+		stop();
+	});
+
 	it('does not turn undefined, null, empty text, or false into pending', () => {
 		const scope = owner();
 		for (const [index, value] of [undefined, null, '', false].entries()) {

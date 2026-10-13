@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createElement, flushSync, hydrateRoot, type OctaneNode, type Root } from '../src/index.js';
+import {
+	createContext,
+	createElement,
+	flushSync,
+	hydrateRoot,
+	type OctaneNode,
+	type Root,
+} from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
@@ -298,5 +305,28 @@ describe.each(layouts)('renderable values as $name', (layout) => {
 			'unmount b',
 			'unmount c',
 		]);
+	});
+
+	// React 19 renders a Context as a child by reading its nearest Provider.
+	it('renders a Context as the value of its nearest Provider', () => {
+		const Theme = createContext('default');
+		const Provided = ({ theme }: { theme: string }) =>
+			createElement(Theme, { value: theme }, createElement(Body, { value: Theme }));
+		const unprovided = mount(Body, { value: Theme });
+		try {
+			expect(unprovided.find('#value-host').textContent).toBe(text('default'));
+		} finally {
+			unprovided.unmount();
+		}
+		const r = mount(Provided, { theme: 'dark' });
+		try {
+			const host = r.find('#value-host');
+			expect(host.textContent).toBe(text('dark'));
+			r.update(Provided, { theme: 'light' });
+			expect(r.find('#value-host')).toBe(host);
+			expect(host.textContent).toBe(text('light'));
+		} finally {
+			r.unmount();
+		}
 	});
 });

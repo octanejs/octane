@@ -74,9 +74,9 @@ export function __prepareBindingSources(
 	};
 }
 
-/** Error path only: inspection allocates. Whether a subscribed source's owner retired. */
+/** Error path only: whether a subscribed source's owner retired. */
 export function __retiredBindingSource(subscriptions: Map<NativeReadSource, unknown>): boolean {
-	for (const source of subscriptions.keys()) if (source.inspect?.().retired) return true;
+	for (const source of subscriptions.keys()) if (source.retired?.()) return true;
 	return false;
 }
 

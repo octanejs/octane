@@ -1,5 +1,13 @@
 # @octanejs/vite-plugin
 
+## 0.4.1
+
+### Patch Changes
+
+- 4798fab: Make Vite production builds reproducible. The client build identity that the hydration entry carries is now a hash of the rendered client modules rather than a random UUID, so building unchanged sources again, or from another checkout path, emits byte-identical client and server files. A source change still produces a new identity and a new hydration entry file name. Development and HMR identities are unchanged.
+- Updated dependencies [177f44e]
+  - @octanejs/app-core@0.1.7
+
 ## 0.4.0
 
 ### Minor Changes

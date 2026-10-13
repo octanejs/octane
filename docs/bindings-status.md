@@ -855,7 +855,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/mdx
 
-[`packages/mdx`](../packages/mdx) `0.1.62` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
+[`packages/mdx`](../packages/mdx) `0.1.63` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
 
 The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context. The octane website runs on it.
 
