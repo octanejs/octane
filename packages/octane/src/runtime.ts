@@ -48,7 +48,6 @@ import {
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
-	SUSPENSE_RESOLVED_COMMENT,
 	SUSPENSE_RESOLVED_SEED_ATTR,
 	SUSPENSE_RESOLVED_NATIVE_ATTR,
 	HYDRATE_STATIC_ID_COUNT_PREFIX,
@@ -61,7 +60,6 @@ import {
 	HYDRATE_INDEPENDENT_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SCRIPT_ATTR,
-	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
 	HYDRATION_TEXT_SEP,
@@ -221,8 +219,12 @@ import { formatClientError } from './error-codes.client.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { bindingRootMarker } from './dom-binding-protocol.js';
 import {
-	CLIENT_ERROR_ARM_COMMENT,
-	CLIENT_RENDER_ARM_COMMENT,
+	BOUNDARY_CLIENT,
+	BOUNDARY_CLIENT_ERROR,
+	BOUNDARY_CLIENT_SUSPENDED,
+	BOUNDARY_CONTENT,
+	BOUNDARY_STREAMED,
+	boundaryIdCount,
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATION_FOR_PREFIX,
@@ -297,7 +299,6 @@ import {
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
 	NATIVE_SIGNAL_SEED_ATTR,
-	NATIVE_SIGNAL_FRESH_COMMENT,
 	captureInitialDocumentSignals,
 	createNativeAdoptionState,
 	materializeNativeSignalManifest,
@@ -2135,35 +2136,28 @@ function releaseNativeAdoptions(): void {
 }
 
 /**
- * Only the renderer-owned arm is replaced; surrounding adopted hosts survive.
- * So is an arm the server could not finish (CLIENT_RENDER_ARM_COMMENT,
- * CLIENT_ERROR_ARM_COMMENT), which the boundary also reports
+ * A boundary whose `[$!rN` open, `open`, says the client renders it
+ * (hydration-protocol.ts) replaces only its arm: surrounding adopted hosts
+ * survive. Returns the id state of the fresh arm, after reserving the N ids the
+ * server's render took, or null for any other boundary. An arm the server could
+ * not finish because it suspended or threw is also reported
  * (HydrationCapability.beginUnfinishedArm).
  */
 function takeNativeFreshArm(
 	hydration: HydrationCapability | null,
-	cursor: Node | null,
+	open: Node,
 	end: Node,
 	ids: RootIdState,
 ): RootIdState | null {
-	if (hydration === null || cursor?.nodeType !== 8) return null;
-	const value = (STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data;
-	if (
-		!value.startsWith(NATIVE_SIGNAL_FRESH_COMMENT) &&
-		!value.startsWith(CLIENT_RENDER_ARM_COMMENT) &&
-		!value.startsWith(CLIENT_ERROR_ARM_COMMENT)
-	)
-		return null;
-	// Each prefix ends at its only colon.
-	const rawCount = value.slice(value.indexOf(':') + 1);
-	if (!/^(?:0|[1-9]\d*)$/.test(rawCount)) return null;
-	const count = Number(rawCount);
-	if (!Number.isSafeInteger(count)) return null;
+	if (hydration === null) return null;
+	const value = (STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data;
+	const count = value.startsWith(BOUNDARY_CLIENT) ? boundaryIdCount(value) : -1;
+	if (count < 0) return null;
 	reserveHydrationIds(ids, count);
 	// An attempt that is discarded, such as a root's that suspends, restores the
 	// server arm, so the page keeps showing it and the retry finds its marker.
-	hydration.save(domNode(cursor).parentNode!);
-	removeRange(cursor, end);
+	hydration.save(domNode(open).parentNode!);
+	removeRange(getNextSibling(open), end);
 	hydration.node = end;
 	return {
 		prefix: ids.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
@@ -22132,14 +22126,13 @@ class HydrationCapability {
 
 	/**
 	 * Start the client render of `state`'s arm when the server could not finish
-	 * it. `marker` is the fresh arm's comment, which says whether the buffered
-	 * render suspended (CLIENT_RENDER_ARM_COMMENT) or threw
-	 * (CLIENT_ERROR_ARM_COMMENT), or the claimed sentinel of a streamed boundary,
-	 * which `$OCTRX` marks errored. Returns what endUnfinishedArm and
-	 * reportUnfinishedArm need, or null for another fresh arm or a streamed
-	 * boundary that is merely pending. The boundary is dehydrated meanwhile
-	 * (DEHYDRATED_TRY), and catches in its render are its own (as
-	 * catchesInHydrationFallback).
+	 * it. `marker` is the boundary's `[$!rN` open, whose reason says whether
+	 * the buffered render suspended or threw, or the claimed sentinel of a
+	 * streamed boundary, which `$OCTRX` marks errored. Returns what
+	 * endUnfinishedArm and reportUnfinishedArm need, or null for an arm the
+	 * client renders without a report or a streamed boundary that is merely
+	 * pending. The boundary is dehydrated meanwhile (DEHYDRATED_TRY), and
+	 * catches in its render are its own (as catchesInHydrationFallback).
 	 */
 	beginUnfinishedArm(state: TrySlot, marker: Node): UnfinishedArm | null {
 		let errored: boolean;
@@ -22149,9 +22142,11 @@ class HydrationCapability {
 			).hasAttribute(HYDRATE_STREAM_ERROR_ATTR);
 			if (!errored) return null;
 		} else {
-			const data = (STAGED_DOM ? STAGED_DOM.view(marker as Comment) : (marker as Comment)).data;
-			errored = data.startsWith(CLIENT_ERROR_ARM_COMMENT);
-			if (!errored && !data.startsWith(CLIENT_RENDER_ARM_COMMENT)) return null;
+			const reason = (
+				STAGED_DOM ? STAGED_DOM.view(marker as Comment) : (marker as Comment)
+			).data.charAt(BOUNDARY_CLIENT.length);
+			errored = reason === BOUNDARY_CLIENT_ERROR;
+			if (!errored && reason !== BOUNDARY_CLIENT_SUSPENDED) return null;
 		}
 		const arm: UnfinishedArm = {
 			state,
@@ -22186,6 +22181,25 @@ class HydrationCapability {
 				() => new Error(arm.errored ? formatClientError(344) : formatClientError(341)),
 				arm.state.parentBlock,
 			);
+	}
+
+	/**
+	 * Bound the arm of a boundary range that ends at `end`, whose content starts
+	 * at `first`, with markers of its own. The server renders a boundary's
+	 * content directly inside its one range (hydration-protocol.ts), while the
+	 * client renders the arm in a range of its own inside the boundary's, where
+	 * it can hide the arm beside a fallback. An attempt that is discarded
+	 * restores the server's range.
+	 */
+	armRange(first: Node | null, end: Node): [Comment, Comment] {
+		const parent = domNode(domNode(end).parentNode!);
+		const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
+		const start = doc.createComment('try-b');
+		const close = doc.createComment('/try-b');
+		this.save(parent);
+		parent.insertBefore(start, first);
+		parent.insertBefore(close, end);
+		return [start, close];
 	}
 
 	/**
@@ -42129,22 +42143,23 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		unmountBlock(previous);
 		if (state.parentBlock.disposed || state.block !== null) return;
 	}
+	// Only the boundary's first render adopts the server's range.
+	const adopting = hydration !== null && state.branch === -1;
 	setTryBranch(state, 1);
 	let start: Node | null = null;
 	let end: Node | null = null;
 	let freshBoundary = false;
 	if (!state.passthrough) {
-		let cursor = getNextSibling(state.start);
-		const freshIds = takeNativeFreshArm(hydration, cursor, state.end, state.idState);
+		const freshIds = adopting
+			? takeNativeFreshArm(hydration, state.start, state.end, state.idState)
+			: null;
 		if (freshIds !== null) {
 			state.idState = freshIds;
 			freshBoundary = true;
-			cursor = state.end;
 		}
-		if (hydration !== null && hydration.isOpen(cursor)) {
-			start = cursor;
-			end = hydration.close(cursor);
-			hydration.node = getNextSibling(start);
+		if (adopting && !freshBoundary) {
+			[start, end] = hydration!.armRange(getNextSibling(state.start), state.end);
+			hydration!.node = getNextSibling(start);
 		} else {
 			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
@@ -42645,17 +42660,22 @@ function takeInitialSuspenseHydration(
 	state: TrySlot,
 	hydration: HydrationCapability,
 ): InitialSuspenseHydration | null {
-	const marker = getNextSibling(state.start);
-	if (marker?.nodeType !== 8) return null;
-	const text = (STAGED_DOM ? STAGED_DOM.view(marker as Comment) : (marker as Comment)).data;
-	if (text.startsWith(STREAM_SEED_COMMENT)) {
-		const boundaryId = text.slice(STREAM_SEED_COMMENT.length);
-		const start = getNextSibling(marker);
-		if (!hydration.isOpen(start)) return null;
-		const end = hydration.close(start);
+	// The boundary's open says what its server range holds (hydration-protocol.ts).
+	const open = state.start as Comment;
+	const text = (STAGED_DOM ? STAGED_DOM.view(open) : open).data;
+	let cursor = getNextSibling(open);
+	if (text.startsWith(BOUNDARY_STREAMED)) {
+		// A sentinel still leads a pending boundary, which mountTry claims.
+		if (
+			cursor?.nodeType === 1 &&
+			(STAGED_DOM ? STAGED_DOM.view(cursor as Element) : (cursor as Element)).hasAttribute(
+				STREAM_BOUNDARY_ATTR,
+			)
+		)
+			return null;
+		const boundaryId = text.slice(BOUNDARY_STREAMED.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
-		const owner = marker as Comment;
-		let payload = initialStreamedPayloads?.get(owner);
+		let payload = initialStreamedPayloads?.get(open);
 		if (payload === undefined) {
 			payload = {
 				seedRaw: typeof stash?.[boundaryId] === 'string' ? stash[boundaryId] : null,
@@ -42664,7 +42684,7 @@ function takeInitialSuspenseHydration(
 						? stash[boundaryId + '$signals']
 						: null,
 			};
-			(initialStreamedPayloads ??= new WeakMap()).set(owner, payload);
+			(initialStreamedPayloads ??= new WeakMap()).set(open, payload);
 			if (stash !== undefined) {
 				delete stash[boundaryId];
 				delete stash[boundaryId + '$signals'];
@@ -42676,23 +42696,20 @@ function takeInitialSuspenseHydration(
 			renderOwner: state.parentBlock.idState.renderOwner,
 			signalState: state.parentBlock.idState.signalState,
 		};
+		const [start, end] = hydration.armRange(cursor, state.end);
 		return {
-			metadata: [marker as ChildNode],
+			metadata: [],
 			start,
 			end,
 			idStart: 0,
 			...payload,
 			consume: () => {
-				initialStreamedPayloads?.delete(owner);
+				initialStreamedPayloads?.delete(open);
 			},
 		};
 	}
-	if (!text.startsWith(SUSPENSE_RESOLVED_COMMENT)) return null;
-	const rawCount = text.slice(SUSPENSE_RESOLVED_COMMENT.length);
-	if (!/^(?:0|[1-9]\d*)$/.test(rawCount)) return null;
-	const count = Number(rawCount);
-	if (!Number.isSafeInteger(count)) return null;
-	let cursor = getNextSibling(marker);
+	const count = text.startsWith(BOUNDARY_CONTENT) ? boundaryIdCount(text) : -1;
+	if (count < 0) return null;
 	let seedRaw: string | null = null;
 	let nativeRaw: string | null = null;
 	const sidecars: Element[] = [];
@@ -42711,8 +42728,7 @@ function takeInitialSuspenseHydration(
 		sidecars.push(script);
 		cursor = getNextSibling(script);
 	}
-	if (!hydration.isOpen(cursor)) return null;
-	const end = hydration.close(cursor);
+	const [start, end] = hydration.armRange(cursor, state.end);
 	const rootIds = state.idState;
 	const idStart = rootIds.next;
 	reserveHydrationIds(rootIds, count);
@@ -42724,8 +42740,8 @@ function takeInitialSuspenseHydration(
 		renderOwner: rootIds.renderOwner,
 	};
 	return {
-		metadata: [marker as ChildNode, ...sidecars],
-		start: cursor,
+		metadata: sidecars,
+		start,
 		end,
 		idStart,
 		seedRaw,
@@ -42989,6 +43005,8 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const wasPending = state.branch === 2;
 	const hydration = hydrating ? activeHydration() : null;
+	// Only a boundary's first render adopts the server's range.
+	const adopting = hydration !== null && state.branch === -1;
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
 	state.stagedEffectDeps = null;
@@ -43012,11 +43030,10 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	setTryBranch(state, 1);
 	let bStart: Node;
 	let bEnd: Node;
-	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
-	// `<!--oct-seed:opaque-id-->` comment between the slot's open marker and the
-	// inner branch range, with the boundary's seed JSON stashed on
-	// window.$OCTS[opaqueId]. The full id includes its stream namespace, so two
-	// roots composed into one document cannot consume each other's values.
+	// The boundary's open says what its server range holds (hydration-protocol.ts).
+	// A streamed boundary (`[$?id`) whose segment swapped in has its seed JSON
+	// stashed on window.$OCTS[id]. The full id includes its stream namespace, so
+	// two roots composed into one document cannot consume each other's values.
 	// Scope the seed stream to THIS boundary while its subtree hydrates (a
 	// depth-first synchronous render), restoring the outer scope after — nested
 	// streamed boundaries push again naturally.
@@ -43024,41 +43041,28 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let scopedNativeRaw: string | undefined;
 	let hasScopedBoundary = false;
 	let freshBoundary = false;
-	let adoptCursor = getNextSibling(state.start);
+	const first = getNextSibling(state.start);
+	const open = adopting
+		? (STAGED_DOM ? STAGED_DOM.view(state.start as Comment) : (state.start as Comment)).data
+		: '';
 	let streamedBoundaryId: string | null = null;
 	let unfinished: UnfinishedArm | null = null;
-	if (
-		hydration !== null &&
-		adoptCursor !== null &&
-		adoptCursor.nodeType === 8 &&
-		(STAGED_DOM
-			? STAGED_DOM.view(adoptCursor as Comment)
-			: (adoptCursor as Comment)
-		).data.startsWith(STREAM_SEED_COMMENT)
-	) {
+	if (open.startsWith(BOUNDARY_STREAMED)) {
+		streamedBoundaryId = open.slice(BOUNDARY_STREAMED.length);
 		hasScopedBoundary = true;
-		streamedBoundaryId = (
-			STAGED_DOM ? STAGED_DOM.view(adoptCursor as Comment) : (adoptCursor as Comment)
-		).data.slice(STREAM_SEED_COMMENT.length);
-		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
-		const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
-		if (typeof raw === 'string') scopedSeeds = hydration.parseSeeds(raw);
-		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
-		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
-		adoptCursor = getNextSibling(adoptCursor);
-	} else if (hydration !== null) {
 		// A shell hydrated before its streamed segment swaps: the client claims
 		// the boundary, mounting a fresh try/pending block in the cleared range.
 		// It reports a boundary that the server marked errored ($OCTRX).
-		streamedBoundaryId = hydration.claimStreamTemplate(adoptCursor, state.end);
-		if (streamedBoundaryId !== null) {
-			unfinished = hydration.beginUnfinishedArm(state, adoptCursor!);
-			hasScopedBoundary = true;
+		if (hydration!.claimStreamTemplate(first, state.end) !== null) {
+			unfinished = hydration!.beginUnfinishedArm(state, first!);
 			freshBoundary = true;
-			adoptCursor = state.end;
+		} else {
+			const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
+			const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
+			if (typeof raw === 'string') scopedSeeds = hydration!.parseSeeds(raw);
+			const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
+			if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		}
-	}
-	if (streamedBoundaryId !== null) {
 		state.idState = {
 			prefix: state.parentBlock.idState.prefix + 'b' + streamedBoundaryId + '-',
 			next: 0,
@@ -43066,22 +43070,19 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 			signalState: state.parentBlock.idState.signalState,
 		};
 	}
-	const freshIds = takeNativeFreshArm(hydration, adoptCursor, state.end, state.idState);
+	const freshIds = adopting
+		? takeNativeFreshArm(hydration, state.start, state.end, state.idState)
+		: null;
 	if (freshIds !== null) {
-		unfinished = hydration!.beginUnfinishedArm(state, adoptCursor!);
+		unfinished = hydration!.beginUnfinishedArm(state, state.start);
 		state.idState = freshIds;
 		freshBoundary = true;
-		adoptCursor = state.end;
-		scopedSeeds = null;
-		scopedNativeRaw = undefined;
 	}
-	if (hydration !== null && hydration.isOpen(adoptCursor)) {
-		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
-		// see ifBlock). The seeded use() values let the try body render its success
-		// arm and adopt the server DOM.
-		bStart = adoptCursor as Comment;
-		bEnd = hydration.close(bStart);
-		hydration.node = getNextSibling(bStart);
+	if (adopting && !freshBoundary) {
+		// ADOPT the server's content, which the seeded use() values let the try
+		// body render its success arm over.
+		[bStart, bEnd] = hydration!.armRange(first, state.end);
+		hydration!.node = getNextSibling(bStart);
 	} else {
 		scopedSeeds = null;
 		bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');

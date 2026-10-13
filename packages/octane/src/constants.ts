@@ -139,8 +139,8 @@ export {
 // holding the real content (+ that boundary's use() seed JSON in a
 // `data-oct-seed` script) and an inline `$OCTRC("N")` call that swaps the
 // content into the boundary's range, stashes the seeds on `window.$OCTS`, and
-// replaces the template with a `<!--oct-seed:N-->` comment the client's
-// hydration uses to scope that boundary's seeds.
+// removes the template. The boundary's `[$?N` open then scopes its seeds for
+// hydration (hydration-protocol.ts).
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export { STREAM_BOUNDARY_ATTR } from './stream-protocol.js';
 /** Hidden segment container attribute carrying a completed boundary's content. */

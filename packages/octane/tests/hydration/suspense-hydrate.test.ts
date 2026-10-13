@@ -12,6 +12,12 @@ import * as ServerRT from 'octane/server';
 import { condition } from 'octane/hydration';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
+import {
+	activateStreamedMarkup,
+	createPipeableCollector,
+	deferred,
+	resetStreamRuntimeGlobals,
+} from '../_server-stream.js';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
 import {
@@ -858,6 +864,129 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		flushSync(() => btn.click());
 		expect(container.querySelector('#ac-btn')!.textContent).toBe('count:1');
 		expect(container.querySelector('#ac h1')!.textContent).toBe('Hi');
+		root.unmount();
+	});
+});
+
+// A Suspense boundary's server range records what the server rendered for it:
+// its content, a streamed fallback whose content has not arrived, or a fallback
+// left for the client after the server's render threw. In each state the
+// boundary hydrates without disturbing the server DOM around it, and the
+// `useId` values the server reserved inside it keep later ids in step.
+const STATES_SOURCE = `
+	import { use, useId } from 'octane';
+
+	function Tail() @{
+		const id = useId();
+		<footer id="states-after">{id as string}</footer>
+	}
+
+	export function BoundaryStates(props) @{
+		<main>
+			<header id="states-before">{'before' as string}</header>
+			@try {
+				const id = useId();
+				const value = use(props.value);
+				<p id="states-content" data-id={id}>{value as string}</p>
+			} @pending {
+				<i id="states-fallback">{'loading' as string}</i>
+			}
+			<Tail />
+		</main>
+	}
+`;
+
+describe.each([true, false])('a Suspense boundary in each server state (dev=%s)', (dev) => {
+	const statesServer = loadCompiledFixtureSource(STATES_SOURCE, {
+		id: 'boundary-states.tsrx',
+		mode: 'server',
+		compileOptions: { dev },
+	});
+	const statesClient = loadCompiledFixtureSource(STATES_SOURCE, {
+		id: 'boundary-states.tsrx',
+		mode: 'client',
+		compileOptions: { dev },
+	});
+	afterEach(() => resetStreamRuntimeGlobals());
+
+	async function hydrateStates(value: Promise<string>) {
+		const before = container.querySelector('#states-before')!;
+		const after = container.querySelector('#states-after')!;
+		const afterId = after.textContent;
+		const recoverable: string[] = [];
+		const root = hydrateRoot(
+			container,
+			statesClient.BoundaryStates,
+			{ value },
+			{ onRecoverableError: (error) => recoverable.push((error as Error).message) },
+		);
+		await act(async () => {});
+		await vi.waitFor(() => expect(container.querySelector('#states-fallback')).toBeNull());
+		// The server's nodes around the boundary, and the id after it, survive.
+		expect(container.querySelector('#states-before')).toBe(before);
+		expect(container.querySelector('#states-after')).toBe(after);
+		expect(after.textContent).toBe(afterId);
+		return { root, recoverable };
+	}
+
+	it('adopts the content the server rendered', async () => {
+		container.innerHTML = (
+			await prerender(statesServer.BoundaryStates, { value: Promise.resolve('server') })
+		).html;
+		const content = container.querySelector('#states-content')!;
+		const id = content.getAttribute('data-id');
+
+		const { root, recoverable } = await hydrateStates(new Promise<string>(() => {}));
+		expect(container.querySelector('#states-content')).toBe(content);
+		expect(content.textContent).toBe('server');
+		expect(content.getAttribute('data-id')).toBe(id);
+		expect(recoverable).toEqual([]);
+		root.unmount();
+	});
+
+	it('renders a streamed boundary whose content has not arrived on the client', async () => {
+		const server = deferred<string>();
+		const collector = createPipeableCollector();
+		ServerRT.renderToPipeableStream(statesServer.BoundaryStates, {
+			value: server.promise,
+		}).pipe(collector.destination);
+		container.innerHTML = collector.chunks[0]!;
+		activateStreamedMarkup(container);
+		expect(container.querySelector('#states-fallback')).not.toBeNull();
+
+		const { root, recoverable } = await hydrateStates(Promise.resolve('client'));
+		expect(container.querySelector('#states-content')!.textContent).toBe('client');
+		expect(recoverable).toEqual([]);
+
+		// The late segment finds no boundary to fill: the client owns it now.
+		server.resolve('server');
+		await collector.ended;
+		const late = document.createElement('div');
+		late.innerHTML = collector.chunks.slice(1).join('');
+		container.append(...late.childNodes);
+		activateStreamedMarkup(container);
+		expect(container.querySelectorAll('#states-content')).toHaveLength(1);
+		expect(container.querySelector('#states-content')!.textContent).toBe('client');
+		root.unmount();
+	});
+
+	it('renders a boundary whose server render threw on the client, and reports it', async () => {
+		const errors: unknown[] = [];
+		container.innerHTML = (
+			await prerender(
+				statesServer.BoundaryStates,
+				{ value: Promise.reject(new Error('server failed')) },
+				{ onError: (error) => errors.push(error) },
+			)
+		).html;
+		expect(errors).toEqual([expect.objectContaining({ message: 'server failed' })]);
+		expect(container.querySelector('#states-content')).toBeNull();
+
+		const { root, recoverable } = await hydrateStates(Promise.resolve('client'));
+		expect(container.querySelector('#states-content')!.textContent).toBe('client');
+		expect(recoverable).toEqual([
+			expect.stringContaining('could not finish this Suspense boundary'),
+		]);
 		root.unmount();
 	});
 });

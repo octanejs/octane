@@ -130,11 +130,6 @@ export const STREAM_SEED_COMMENT = 'oct-seed:';
 /** A binding-view arm with untransportable demand is mounted fresh within its own range. */
 export const NATIVE_SIGNAL_FRESH_COMMENT = 'oct-native-fresh:';
 
-/** Leads the pending arm of a boundary that a buffered render could not finish. */
-export const CLIENT_RENDER_ARM_COMMENT = 'oct-client:';
-/** Leads the pending arm of a boundary whose buffered render threw. */
-export const CLIENT_ERROR_ARM_COMMENT = 'oct-client-error:';
-
 /**
  * Serialize one `useId()` value. The client regenerates the id the server
  * already wrote, so the namespace prefix, the `in-` infix, the base-36 ordinal,
