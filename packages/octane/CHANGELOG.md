@@ -1,5 +1,22 @@
 # octane
 
+## 0.13.3
+
+### Patch Changes
+
+- 1c7f7cb: Ship less signal code to the browser. Client bundles that read signals no longer
+  carry the server's seed serialization, which only the server's native read
+  collector installs: about 2.1 kB raw and 0.5 kB gzip. Behavior is unchanged.
+- e75d7a8: Hydrating applications without a `<Hydrate>` island no longer ship the island-only parts of hydration: resuming an activation that suspended, settling the island's trailing server content, and keeping the server nodes an island attempt changed. About 0.4 kB of minified runtime leaves bundles that call `hydrateRoot` without islands. Behavior is unchanged.
+- cfdb2ca: Compiled component bodies in modules that import `octane/signals` no longer wrap every render in a native-read bracket. The renderer already collects each body's reads, including reads made through helper calls, so the bracket only rejoined that collection. Signal-enabled modules compile smaller and hydrate slightly faster; their behavior is unchanged.
+- 3d5994c: Keep Strong-mode ref arrays and immutable object/array props stable when their
+  inputs are unchanged, including object literals assigned to a local before
+  being passed to a component. Local values used during setup or captured by
+  callbacks keep their ordinary JavaScript lifetime. Allow `useMemo` and
+  `useCallback` in Strong mode with inferred, explicit, or null dependencies so
+  authors can choose when to recompute a value or recreate a callback.
+- 292eaa1: Keep Strong literal props and ref arrays stable when they contain regular functions that do not depend on their receiver or their own identity. Functions that can mutate their receiver or themselves continue to get fresh values each render.
+
 ## 0.13.2
 
 ### Patch Changes
