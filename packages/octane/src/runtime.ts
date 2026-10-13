@@ -21355,6 +21355,19 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
  * discard its methods together with the marker/mismatch/seed helper graph.
  */
+/**
+ * Development only: report where hydration probes the server DOM for a range
+ * instead of knowing its shape (#2028), or falls back to adopting server nodes
+ * outside a range of their own. `kind` names the probe or the fallback, and
+ * `hit` whether a probe found a range. Tests install the reporter when
+ * OCTANE_HYDRATION_PROBE_AUDIT is set (tests/_hydration-probe-audit.ts), and
+ * read the call site from the stack. Production builds drop every call.
+ */
+function auditHydrationProbe(kind: string, hit: boolean): void {
+	const report = (globalThis as any).__OCTANE_HYDRATION_PROBE_AUDIT__;
+	if (report) report(kind, hit);
+}
+
 class HydrationCapability {
 	/**
 	 * Parent captures changed before this dormant boundary activated, so the
@@ -21776,6 +21789,7 @@ class HydrationCapability {
 		scope: Scope,
 		slotKey: number,
 	): void {
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('unframed', false);
 		this.node = root;
 		try {
 			if (root === null) render(target);
@@ -21955,6 +21969,7 @@ class HydrationCapability {
 		site: Scope | null,
 		slotKey: number,
 	): boolean {
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('inPlace', false);
 		const outer = this.inPlace;
 		const outerUnframed = this.inPlaceUnframed;
 		const outerEnd = this.inPlaceEnd;
@@ -22007,6 +22022,7 @@ class HydrationCapability {
 	 * before it.
 	 */
 	parkAtHole(node: Node): Node | null {
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('parkAtHole', false);
 		this.node = node;
 		return isBlockClose(node) ? node : getNextSibling(node);
 	}
@@ -22059,6 +22075,7 @@ class HydrationCapability {
 	holeOpen(anchor: Node | null | undefined, value: unknown, ownEnd?: boolean): Comment | null {
 		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
 		if (anchor == null || this.inPlaceEnd === undefined || !ownEnd) return null;
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('holeFrame', false);
 		const last = anchor === this.inPlaceHole;
 		const object = value !== null && (typeof value === 'object' || typeof value === 'function');
 		const holds = !last || (anchor.nodeType === 3 ? !object : anchor.nodeType === 1 && object);
@@ -22181,7 +22198,9 @@ class HydrationCapability {
 	}
 
 	isOpen(node: Node | null): node is Comment {
-		return isBlockOpen(node);
+		const open = isBlockOpen(node);
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('isOpen', open);
+		return open;
 	}
 
 	isClose(node: Node | null): node is Comment {
@@ -22201,7 +22220,9 @@ class HydrationCapability {
 	 * range, so bindingText builds one.
 	 */
 	adoptBindingText(posNode: Node | null, text: string): Text | null {
-		if (!isBlockOpen(posNode)) return null;
+		const open = isBlockOpen(posNode);
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('bindingTextOpen', open);
+		if (!open) return null;
 		const close = this.close(posNode);
 		const existing = getNextSibling(posNode);
 		const host = domNode(posNode).parentNode;
@@ -22236,7 +22257,9 @@ class HydrationCapability {
 		let cursor = this.node;
 		if (cursor === null || (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode !== domParent)
 			cursor = getFirstChild(domParent);
-		return cursor !== null && isBlockOpen(cursor) ? (cursor as Comment) : null;
+		const open = cursor !== null && isBlockOpen(cursor);
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('resolveOpen', open);
+		return open ? (cursor as Comment) : null;
 	}
 
 	/**
@@ -22293,6 +22316,7 @@ class HydrationCapability {
 	 * own. The slot's first render claims the server range as an adopted one.
 	 */
 	lendRange(start: Comment, end: Comment): ChildSlot {
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('lend', false);
 		const slot: ChildSlot = {
 			__kind: 'childSlot',
 			start,
@@ -22862,6 +22886,7 @@ class HydrationCapability {
 
 	/** Bound an unframed third-party component root so its returned host can adopt it. */
 	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
+		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('unframedRoot', false);
 		const parent = (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode!;
 		const remainder = getNextSibling(cursor);
 		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
@@ -48886,6 +48911,7 @@ function mountPassthroughListItem<T>(
 	const fresh = cursor === null || cursor === anchor || hydration.isFresh(cursor);
 	const previousPassthrough = hydration.passthroughRanges;
 	hydration.passthroughRanges = true;
+	if (process.env.NODE_ENV !== 'production') auditHydrationProbe('passthrough', false);
 	try {
 		if (fresh) hydration.suspend(() => renderBlock(block));
 		else renderBlock(block);
@@ -51688,6 +51714,8 @@ function hydrateRootWithOutputHandler(
 			(body as ComponentBody & { [HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner' })[
 				HYDRATION_RANGE_BOUNDARY
 			] === 'passthrough';
+		if (process.env.NODE_ENV !== 'production' && hydration.passthroughRoot)
+			auditHydrationProbe('passthroughRoot', false);
 		const previousHydration = currentHydration;
 		swapHydration(hydration);
 		const previousNative = setNativeAdoptionResolver(null);
