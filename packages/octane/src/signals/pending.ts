@@ -48,6 +48,16 @@ import {
 let world: object | null | undefined;
 let live = 0;
 
+function inWorld<T>(batch: object, callback: () => T): T {
+	const previous = world;
+	world = batch;
+	try {
+		return callback();
+	} finally {
+		world = previous;
+	}
+}
+
 class PendingSlot implements PendingSlotLike, CandidateContext {
 	/** The private node presenting the pending state; a computation forks it on its first pending read. */
 	shadow: ScopedNode | undefined = undefined;
@@ -62,13 +72,7 @@ class PendingSlot implements PendingSlotLike, CandidateContext {
 	) {}
 
 	run<T>(callback: () => T): T {
-		const previous = world;
-		world = this.batch;
-		try {
-			return callback();
-		} finally {
-			world = previous;
-		}
+		return inWorld(this.batch, callback);
 	}
 
 	resolve<T>(node: ScopedNode<T>): ScopedNode<T> {
@@ -225,13 +229,7 @@ function enlist(start: ScopedNode, batch: object): void {
 }
 
 function evaluateUpdater(batch: object, value: (previous: unknown) => unknown, previous: unknown) {
-	const outer = world;
-	world = batch;
-	try {
-		return graph.untrack(() => graph.pure(() => value(previous)));
-	} finally {
-		world = outer;
-	}
+	return inWorld(batch, () => graph.untrack(() => graph.pure(() => value(previous))));
 }
 
 function write(node: ScopedNode, value: unknown, batch: object): void {

@@ -3119,21 +3119,13 @@ function pendingSignalVisible(batch: object): boolean | undefined {
 /** Slots whose batches finished, promoted by the next commit (promotePendingSignals). */
 let PENDING_SIGNAL_PROMOTIONS: PendingSlotLike[] | null = null;
 
+/** A batch's signals promote once its work and holds are over and every batch entangled into it has flushed. */
 function settleTransitionSignals(batch: TransitionActionBatch): void {
 	const root = rootTransitionBatch(batch);
 	const slots = root.signals;
-	if (slots === undefined || slots === null || !transitionBatchSettled(root)) return;
+	if (!slots || !root.finished || root.waiting !== 0) return;
 	root.signals = null;
 	queuePendingSignalPromotion(slots);
-}
-
-/** A batch and the batches entangled into it have all finished. */
-function transitionBatchSettled(batch: TransitionActionBatch): boolean {
-	if (!batch.finished) return false;
-	const members = batch.members;
-	if (members !== null)
-		for (let i = 0; i < members.length; i++) if (!transitionBatchSettled(members[i])) return false;
-	return true;
 }
 
 function queuePendingSignalPromotion(slots: PendingSlotLike[]): void {
