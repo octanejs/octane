@@ -505,7 +505,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(html).toBe(
 			'<div id="leaf">hello</div>' +
-				'<script type="application/json" data-octane-suspense>["hello"]</script>',
+				'<script type="application/json" data-octane-suspense="2">["hello"]</script>',
 		);
 
 		container.innerHTML = html;
@@ -522,6 +522,42 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		// The seed <script> was consumed and removed from the live DOM.
 		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
+	});
+
+	// A server and client from different Octane versions may not agree on what
+	// the server's hydration ranges mean. The root seed script names the
+	// server's protocol version, and a root from another version renders on the
+	// client, reporting why, instead of adopting ranges it would misread.
+	it.each([
+		['an older server', ''],
+		['a newer server', '="3"'],
+	])('client-renders a root that %s rendered, and reports it', async (_label, version) => {
+		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('server') });
+		container.innerHTML = html.replace(
+			'data-octane-suspense="2"',
+			'data-octane-suspense' + version,
+		);
+		const div = container.querySelector('#leaf') as HTMLElement;
+		const recoverable: unknown[] = [];
+
+		await act(async () => {
+			hydrateRoot(
+				container,
+				AsyncLeaf,
+				{ promise: Promise.resolve('client') },
+				{ onRecoverableError: (error) => recoverable.push(error) },
+			);
+		});
+
+		const leaf = container.querySelector('#leaf')!;
+		expect(leaf).not.toBe(div);
+		expect(leaf.textContent).toBe('client');
+		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
+		expect(recoverable).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining('hydration protocol'),
+			}),
+		]);
 	});
 
 	it('adopts a fulfilled resource without starting a client request and refetches when its input changes', async () => {
@@ -848,7 +884,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		});
 		expect(html).toBe(
 			'<main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
-				'<script type="application/json" data-octane-suspense>["Hi"]</script>',
+				'<script type="application/json" data-octane-suspense="2">["Hi"]</script>',
 		);
 
 		container.innerHTML = html;

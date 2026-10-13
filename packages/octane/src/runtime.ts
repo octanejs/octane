@@ -228,6 +228,7 @@ import {
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATION_FOR_PREFIX,
+	HYDRATION_PROTOCOL_VERSION,
 	HYDRATE_MARKER_SELECTOR,
 	isRangeOpen,
 } from './hydration-protocol.js';
@@ -51624,10 +51625,17 @@ function hydrateRootWithOutputHandler(
 	const seedScript = (STAGED_DOM ? STAGED_DOM.view(container) : container).querySelector(
 		'script[' + SUSPENSE_SCRIPT_ATTR + ']',
 	);
+	// The seed script names the hydration protocol its server rendered. Another
+	// version's ranges would be misread, so the root renders on the client.
+	let protocolSkew = false;
 	if (seedScript !== null) {
-		seeds = parseSeedJson(
-			(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).textContent || '[]',
-		);
+		protocolSkew =
+			(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).getAttribute(SUSPENSE_SCRIPT_ATTR) !==
+			HYDRATION_PROTOCOL_VERSION;
+		if (!protocolSkew)
+			seeds = parseSeedJson(
+				(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).textContent || '[]',
+			);
 		(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).remove();
 	}
 	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
@@ -51730,6 +51738,7 @@ function hydrateRootWithOutputHandler(
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
+			if (protocolSkew) throw new HydrationMismatch(formatClientError(345));
 			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
 				owner.initialDocumentSignals = captureInitialDocumentSignals(
 					owner.initialDocumentSignals,

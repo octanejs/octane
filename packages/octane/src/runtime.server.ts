@@ -44,6 +44,7 @@ import {
 	BOUNDARY_CONTENT,
 	BOUNDARY_STREAMED,
 	formatUseId,
+	HYDRATION_PROTOCOL_VERSION,
 	HYDRATION_START,
 	isRangeOpen,
 	RANGE_OPEN_SOURCE,
@@ -8570,6 +8571,10 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
 	}).replace(/</g, '\\u003c');
 }
 
+// The root seed script's marker attribute names the hydration protocol
+// version the server rendered (hydration-protocol.ts).
+const ROOT_SEED_ATTR = SUSPENSE_SCRIPT_ATTR + '="' + HYDRATION_PROTOCOL_VERSION + '"';
+
 /**
  * Serialize the resolved `use(thenable)` values (in render order) into an inline
  * data `<script>` the client reads during hydration. `<` is escaped to
@@ -8579,7 +8584,7 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
 function serializeSuspenseSeeds(
 	values: unknown[],
 	nonceAttr: string,
-	attr = SUSPENSE_SCRIPT_ATTR,
+	attr = ROOT_SEED_ATTR,
 ): string {
 	// Encode `undefined` (which JSON drops/nulls) through the seed wire escape so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on

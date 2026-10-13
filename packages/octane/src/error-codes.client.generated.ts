@@ -314,6 +314,7 @@ type ClientErrorArguments = {
 	342: [];
 	343: [];
 	344: [];
+	345: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1371,6 +1372,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 344:
 				return formatDevErrorMessage(
 					'The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.',
+					args,
+				);
+			case 345:
+				return formatDevErrorMessage(
+					"Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
 					args,
 				);
 			default:
