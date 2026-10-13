@@ -290,6 +290,11 @@ handles a render error, or a rejected `use()`, the same way:
   a rejected `renderToReadableStream`). A `@try` with only `@catch` does not
   stop it.
 
+Nor does it hold a suspension. A `@try` with only `@catch`, like
+`<ErrorBoundary>`, is not a Suspense boundary, on the server as on the client:
+while something inside it waits, the nearest Suspense boundary shows its
+fallback, and with none above it the shell waits.
+
 `hydrateRoot` renders a marked boundary afresh from client data, running its
 `use()` calls and requests again, and reports it once through
 `onRecoverableError`, as React reports a boundary its server could not finish.
