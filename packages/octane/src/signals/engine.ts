@@ -2,6 +2,7 @@ import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, snapshotSignalValue } from './encoding.js';
 import { SignalFrameError, SignalSerializationError } from './errors.js';
 import { scopeStreams, type ScopeStreams } from './scope-streams.js';
+import { scopeSeedEntry } from './seed-serialization.js';
 import {
 	ScopedNode,
 	assertAlive,
@@ -28,7 +29,6 @@ import {
 	type SignalReadMode,
 	type SignalCandidateFrame,
 } from './graph.js';
-import { scopeSeedEntry } from './native-read-seeds.js';
 import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,

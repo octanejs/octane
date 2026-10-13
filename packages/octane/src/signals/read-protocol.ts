@@ -197,7 +197,7 @@ export interface NativeSerializedScope {
 }
 
 /**
- * Serializes a graph source's observed subgraph (native-read-seeds.ts). Only
+ * Serializes a graph source's observed subgraph (seed-serialization.ts). Only
  * the server read driver serializes sources, and it supplies this first, so a
  * client bundle keeps no serializer although every graph source names it.
  */

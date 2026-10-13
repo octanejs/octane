@@ -4,9 +4,9 @@ import {
 	mergeNativeSeedReads,
 	rewindNativeSeedReads,
 	serializeNativeSeedReads,
-	serializeScopeRead,
 	type NativeSeedReads,
 } from './native-read-seeds.js';
+import { serializeScopeRead } from './seed-serialization.js';
 
 interface ServerFrame {
 	collectorToken: number;
