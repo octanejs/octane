@@ -5890,6 +5890,8 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 					'jsx-static-hydrate',
 					(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
 					null,
+					undefined,
+					false,
 				),
 			);
 			const idCount = ID_COUNTER - childIdStart;
@@ -5951,6 +5953,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 										(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
 										null,
 										'html',
+										false,
 									),
 								);
 							children =
@@ -6589,14 +6592,7 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 		scope: SSRScope,
 	): string {
 		return ssrHtml(
-			ssrTry(
-				scope,
-				'jsx-error-boundary',
-				(_arg, s) => ssrChildrenHtml(props.children, s),
-				null,
-				FRAME?.namespace ?? 'html',
-				true,
-			),
+			ssrTry(scope, 'jsx-error-boundary', (_arg, s) => ssrChildrenHtml(props.children, s), null),
 		);
 	},
 	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
@@ -10551,10 +10547,13 @@ function ssrTryBody(content: string, bindingMarker: string | undefined): string 
  * React's server never runs an error boundary, so a `@catch` arm renders only
  * on the client. A Suspense boundary reports the error (onError) and ships its
  * fallback for the client to render; any other boundary passes the error on,
- * so with no Suspense boundary above it the render fails. In streaming mode a
- * suspended boundary additionally carries the `<template data-oct-b>`
- * sentinel, and a REGISTERED boundary keeps returning its pending form
- * (content ships via its segment, an error via its client-render instruction).
+ * so with no Suspense boundary above it the render fails. A boundary without a
+ * fallback passes suspension on too, as the client's tryBlock does, unless the
+ * caller owns it explicitly (a `<Hydrate>` wrapper, a presentation-binding
+ * view). In streaming mode a suspended boundary additionally carries the
+ * `<template data-oct-b>` sentinel, and a REGISTERED boundary keeps returning
+ * its pending form (content ships via its segment, an error via its
+ * client-render instruction).
  */
 export function ssrTry(
 	scope: SSRScope,
@@ -10562,7 +10561,7 @@ export function ssrTry(
 	tryFn: (arg: unknown, scope: SSRScope) => string,
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
-	propagateSuspense = false,
+	propagateSuspense = pendFn === null,
 	bindingMarker?: string,
 ): string {
 	if (inDiscardedPass()) return '';
@@ -10934,7 +10933,8 @@ export function ssrTry(
 				}
 				return pendingForm();
 			}
-			// Only a Suspense boundary, or one that already registered, recovers.
+			// Only a Suspense boundary, or one that owns its suspension and already
+			// registered it, recovers.
 			if (pendFn === null && entry === undefined) throw e;
 			if (stream !== null) {
 				// Fizz keeps a Suspense shell valid when its primary content throws:

@@ -77,6 +77,7 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		cleaned: true,
 	},
 	'deferred-hydration': {
+		adopted: true,
 		before: 'dormant',
 		after: 'active',
 		clicks: 1,

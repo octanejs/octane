@@ -1,4 +1,4 @@
-import { Hydrate, Suspense, use, useId, useState } from 'octane';
+import { ErrorBoundary, Hydrate, Suspense, use, useId, useState } from 'octane';
 import { Suspense as RetrySiblingSuspense, type HydrateProps } from 'octane';
 
 type HydrationGate = { pending: boolean; promise: Promise<void> };
@@ -362,6 +362,56 @@ export function FactoryRejectionBoundary(props: { scenario: string }) @{
 			</div>
 		}
 	</section>
+}
+
+// A @try without @pending is not a Suspense boundary: on the server, as on the
+// client, it passes both suspension and errors on to the nearest one. Its
+// @catch arm renders only on the client.
+function CatchOnlyValue(props: { promise: Promise<string>; error?: Error }) @{
+	if (props.error !== undefined) throw props.error;
+	const value = use(props.promise);
+	<span class="catch-only-ok">{value as string}</span>
+}
+
+export function CatchOnlyInSuspense(props: { promise: Promise<string>; error?: Error }) @{
+	<div id="catch-only-box">
+		@try {
+			<section class="catch-only-section">
+				@try {
+					<CatchOnlyValue promise={props.promise} error={props.error} />
+				} @catch (_error) {
+					<span class="catch-only-error">{'caught'}</span>
+				}
+			</section>
+		} @pending {
+			<span class="catch-only-loading">{'loading'}</span>
+		}
+	</div>
+}
+
+// The same shape through the compiler-lowered JSX error boundary.
+export function ErrorBoundaryInSuspense(props: { promise: Promise<string>; error?: Error }) @{
+	<div id="catch-only-box">
+		@try {
+			<section class="catch-only-section">
+				<ErrorBoundary fallback={<span class="catch-only-error">{'caught'}</span>}>
+					<CatchOnlyValue promise={props.promise} error={props.error} />
+				</ErrorBoundary>
+			</section>
+		} @pending {
+			<span class="catch-only-loading">{'loading'}</span>
+		}
+	</div>
+}
+
+export function CatchOnlyOutsideSuspense(props: { promise: Promise<string> }) @{
+	<div id="catch-only-root">
+		@try {
+			<CatchOnlyValue promise={props.promise} />
+		} @catch (_error) {
+			<span class="catch-only-error">{'caught'}</span>
+		}
+	</div>
 }
 
 // The inner catch deliberately rethrows the raw reason to the outer catch.
