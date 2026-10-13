@@ -13,7 +13,9 @@ import { rendererRangeClose } from '../src/stream-protocol.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
+	CatchOnlyInSuspense,
 	DeferredAsyncLeaf,
+	ErrorBoundaryInSuspense,
 	DeferredStreamWithLiveSibling,
 	DeferredStreamWithRetrySibling,
 	DeferredStreamedSuspense,
@@ -2502,5 +2504,238 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		root.unmount();
 		render.abort(new Error('test complete'));
 		await c.ended;
+	});
+});
+
+// A `@try` without `@pending` is not a Suspense boundary. As on React's server,
+// where an error boundary does not run, and as on Octane's client, it passes
+// both a suspension and an error on to the nearest Suspense boundary, in every
+// renderer and timing. With none above it, they reach the root.
+describe('a @try without @pending passes suspension and server errors on', () => {
+	// The lowered JSX ErrorBoundary is the same kind of boundary.
+	const BOUNDARIES = [
+		['@try with @catch', 'CatchOnlyInSuspense', CatchOnlyInSuspense],
+		['<ErrorBoundary>', 'ErrorBoundaryInSuspense', ErrorBoundaryInSuspense],
+	] as const;
+
+	/** Stream a fixture, then settle its read once the shell is out. */
+	async function streamCatchOnly(
+		fixture: string,
+		settle: (read: ReturnType<typeof deferred<string>>) => void,
+	) {
+		const read = deferred<string>();
+		const c = collector();
+		const onError = vi.fn();
+		const onAllReady = vi.fn();
+		ServerRT.renderToPipeableStream(
+			server[fixture],
+			{ promise: read.promise },
+			{ onError, onAllReady },
+		).pipe(c.dest);
+		const shell = c.chunks.join('');
+		settle(read);
+		await c.ended;
+		return { shell, html: c.chunks.join(''), onError, onAllReady };
+	}
+
+	it.each([
+		[
+			'renderToString',
+			(error: Error, onError: (error: unknown) => void) =>
+				ServerRT.renderToString(
+					server.CatchOnlyInSuspense,
+					{ promise: new Promise<string>(() => {}), error },
+					{ onError },
+				).html,
+		],
+		[
+			'prerender',
+			async (error: Error, onError: (error: unknown) => void) => {
+				const value = deferred<string>();
+				const result = prerender(
+					server.CatchOnlyInSuspense,
+					{ promise: value.promise },
+					{ onError },
+				);
+				value.reject(error);
+				return (await result).html;
+			},
+		],
+	])('%s ships the Suspense fallback for an error', async (_renderer, render) => {
+		const error = new Error('catch-only boom');
+		const onError = vi.fn();
+		container.innerHTML = await render(error, onError);
+		expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+		expect(container.querySelector('.catch-only-section, .catch-only-error')).toBeNull();
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError).toHaveBeenCalledWith(error);
+	});
+
+	it.each(BOUNDARIES)(
+		'renderToString ships the Suspense fallback for a suspension in %s',
+		(_kind, fixture) => {
+			const onError = vi.fn();
+			container.innerHTML = ServerRT.renderToString(
+				server[fixture],
+				{ promise: new Promise<string>(() => {}) },
+				{ onError },
+			).html;
+			expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+			expect(container.querySelector('.catch-only-section')).toBeNull();
+			expect(onError).not.toHaveBeenCalled();
+		},
+	);
+
+	it('streams the Suspense fallback for an error thrown before anything suspends', async () => {
+		const error = new Error('catch-only boom');
+		const result = await collectPipeableStream(server.CatchOnlyInSuspense, {
+			promise: new Promise<string>(() => {}),
+			error,
+		});
+		expect(result.errors).toEqual([error]);
+		const [id] = protocolIds(result.html);
+		expect(result.html).toContain(errorCall(id));
+		container.innerHTML = result.html;
+		activate(container);
+		expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+		expect(container.querySelector('.catch-only-section, .catch-only-error')).toBeNull();
+	});
+
+	it.each(BOUNDARIES)(
+		'streams the Suspense fallback while %s suspends, then content that hydration adopts',
+		async (_kind, fixture, Component) => {
+			const { shell, html } = await streamCatchOnly(fixture, (read) => read.resolve('streamed'));
+			container.innerHTML = shell;
+			expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+			expect(container.querySelector('.catch-only-section')).toBeNull();
+			// Only the Suspense boundary streams; the catch-only one has no sentinel.
+			expect(container.querySelectorAll('template[data-oct-b]')).toHaveLength(1);
+
+			container.innerHTML = html;
+			activate(container);
+			const section = container.querySelector('.catch-only-section')!;
+			const value = container.querySelector('.catch-only-ok')!;
+			expect(value.textContent).toBe('streamed');
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+
+			const onRecoverableError = vi.fn();
+			let root!: ReturnType<typeof hydrateRoot>;
+			await act(async () => {
+				root = hydrateRoot(
+					container,
+					Component as any,
+					{ promise: Promise.resolve('streamed') },
+					{ onRecoverableError },
+				);
+			});
+			try {
+				await vi.waitFor(async () => {
+					await act(async () => {});
+					expect(container.querySelector('.catch-only-ok')).toBe(value);
+				});
+				expect(container.querySelector('.catch-only-section')).toBe(section);
+				expect(container.querySelector('.catch-only-loading')).toBeNull();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each(BOUNDARIES)(
+		'keeps the Suspense fallback and marks it errored when the read %s suspended on rejects',
+		async (_kind, fixture) => {
+			const error = new Error('catch-only boom');
+			const { html, onError, onAllReady } = await streamCatchOnly(fixture, (read) =>
+				read.reject(error),
+			);
+			expect(onError).toHaveBeenCalledTimes(1);
+			expect(onError).toHaveBeenCalledWith(error);
+			expect(onAllReady).toHaveBeenCalledOnce();
+			expect(html).not.toContain('catch-only boom');
+			container.innerHTML = html;
+			activate(container);
+			expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+			expect(container.querySelector('.catch-only-section')).toBeNull();
+			// The Suspense boundary's sentinel is the only one on the page.
+			const sentinels = container.querySelectorAll('template[data-oct-b]');
+			expect(sentinels).toHaveLength(1);
+			expect(html).toContain(errorCall(sentinels[0].getAttribute('data-oct-b')!));
+		},
+	);
+
+	it.each(BOUNDARIES)(
+		'hydration renders the Suspense boundary on the client, where %s takes a repeated error',
+		async (_kind, fixture, Component) => {
+			const { html } = await streamCatchOnly(fixture, (read) =>
+				read.reject(new Error('catch-only boom')),
+			);
+			container.innerHTML = html;
+			activate(container);
+			const serverFallback = container.querySelector('.catch-only-loading');
+			expect(serverFallback).not.toBeNull();
+			const client = deferred<string>();
+			const onRecoverableError = vi.fn();
+			const onCaughtError = vi.fn();
+			let root!: ReturnType<typeof hydrateRoot>;
+			await act(async () => {
+				root = hydrateRoot(
+					container,
+					Component as any,
+					{ promise: client.promise },
+					{ onRecoverableError, onCaughtError },
+				);
+			});
+			try {
+				// The client renders the boundary afresh: its own fallback replaces the
+				// server's while the client data loads.
+				expect(serverFallback!.isConnected).toBe(false);
+				expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+				await act(async () => client.reject(new Error('client boom')));
+				await vi.waitFor(async () => {
+					await act(async () => {});
+					expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+				});
+				expect(container.querySelector('.catch-only-loading')).toBeNull();
+				expect(onRecoverableError).toHaveBeenCalledTimes(1);
+				expect(onCaughtError).toHaveBeenCalledTimes(1);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('holds the shell while it suspends with no Suspense boundary above it', async () => {
+		const value = deferred<string>();
+		let shellReady = false;
+		const rendered = ServerRT.renderToReadableStream(server.CatchOnlyOutsideSuspense, {
+			promise: value.promise,
+		}).then((stream) => {
+			shellReady = true;
+			return stream;
+		});
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(shellReady).toBe(false);
+		value.resolve('shell-value');
+		const text = await new Response(await rendered).text();
+		expect(text).toContain('shell-value');
+		expect(text).not.toContain('data-oct-b');
+	});
+
+	it('fails the shell when its suspended read rejects with no Suspense boundary above it', async () => {
+		const value = deferred<string>();
+		const onError = vi.fn();
+		const onShellError = vi.fn();
+		const rendered = ServerRT.renderToReadableStream(
+			server.CatchOnlyOutsideSuspense,
+			{ promise: value.promise },
+			{ onError, onShellError },
+		);
+		const error = new Error('catch-only boom');
+		value.reject(error);
+		await expect(rendered).rejects.toBe(error);
+		expect(onShellError).toHaveBeenCalledWith(error);
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError).toHaveBeenCalledWith(error);
 	});
 });
