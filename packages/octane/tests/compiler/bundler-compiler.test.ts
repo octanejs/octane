@@ -37,6 +37,30 @@ const COMPONENT =
 const HOOK =
 	"import { useState } from 'octane';\n" + 'export function useCount() { return useState(0); }\n';
 
+it('observes live imported values on later renders through a named alias', () => {
+	let current: string | undefined = 'first';
+	const module = loadCompiledFixtureSource(
+		`import { current as label } from './source';
+export function View() @{ <p>{label as string}</p> }`,
+		{
+			id: '/project/src/LiveSource.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'./source': {
+					get current() {
+						return current;
+					},
+				},
+			},
+		},
+	);
+	expect(renderToString(module.View, {}).html).toContain('>first</p>');
+	current = undefined;
+	expect(renderToString(module.View, {}).html).not.toContain('first');
+	current = 'second';
+	expect(renderToString(module.View, {}).html).toContain('>second</p>');
+});
+
 const RENDER_STATE_UPDATE =
 	"import { useState } from 'octane';\n" +
 	'export function App(props) @{\n' +

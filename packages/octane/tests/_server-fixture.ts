@@ -16,7 +16,7 @@ import * as HydrationRuntime from 'octane/hydration';
 import * as InternalClientRuntime from 'octane/internal/client';
 import * as InternalServerRuntime from 'octane/internal/server';
 import * as ClientRuntime from '../src/index.js';
-import 'octane/signals';
+import * as SignalsRuntime from 'octane/signals';
 
 export type CompiledFixtureModule = Record<string, any>;
 
@@ -96,121 +96,50 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 ): T {
 	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
 	const internalRuntime = mode === 'server' ? InternalServerRuntime : InternalClientRuntime;
-	// ESM imports initialize before module statements even when emitted at the
-	// module tail. Keep that ordering when replacing imports with fixture values.
-	const imports: string[] = [];
-	const importBinding = (binding: string): string => {
-		imports.push(binding);
-		return '';
-	};
-	code = code.replace(
-		/import\s*\*\s*as\s+([\w$]+)\s*from\s*['"]octane\/internal\/(?:client|server)['"];?/g,
-		(_match: string, name: string) => importBinding(`const ${name} = __internalRuntime;`),
-	);
-	code = code.replace(
-		/import\s*\*\s*as\s+([\w$]+)\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_match: string, name: string) => importBinding(`const ${name} = __runtime;`),
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/internal\/(?:client|server)['"];?/g,
-		(_match: string, names: string) =>
-			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __internalRuntime;`),
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_match: string, names: string) =>
-			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`),
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
-		(_match: string, names: string) =>
-			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`),
-	);
-	// The signals entrypoint was initialized by this loader's own bare import.
-	code = code.replace(/import\s*['"]octane\/signals['"];?/g, '');
-	code = code.replace(
-		/import\s+(\*\s+as\s+[\w$]+|\{[^}]*\}|[\w$]+)\s+from\s*['"]([^'"]+)['"];?/g,
-		(match: string, binding: string, request: string) => {
-			if (runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)) return match;
-			const module = `__runtimeModules[${JSON.stringify(request)}]`;
-			if (binding.startsWith('*'))
-				return importBinding(`const ${binding.replace(/^\*\s+as\s+/, '')} = ${module};`);
-			if (binding.startsWith('{'))
-				return importBinding(`const ${binding.replace(/\s+as\s+/g, ': ')} = ${module};`);
-			return importBinding(`const ${binding} = ${module}.default;`);
+	// Compiled imports are live bindings, including compiler-owned capability
+	// guards. Destructuring an imported primitive at evaluation time freezes
+	// that binding. TypeScript's normal module transform preserves reads through
+	// the source namespace and supports aliases, local shadowing and re-exports.
+	const { outputText } = ts.transpileModule(code, {
+		fileName: id.replace(/\.(?:tsrx|tsx|jsx)$/, '.js'),
+		compilerOptions: {
+			target: ts.ScriptTarget.ESNext,
+			module: ts.ModuleKind.CommonJS,
 		},
-	);
-
-	// `export function X` must stay a real function *declaration*: compiled
-	// modules reference exported components by name after the declaration (the
-	// compiler's module tail stamps `X.$$singleRoot = true;`, and sibling
-	// components call each other directly). Strip only the `export ` keyword
-	// here and register the exports at the end of the module — declarations
-	// hoist, so end-of-module registration is safe and also observes any later
-	// reassignment of the binding.
-	const functionExports: string[] = [];
-	code = code.replace(
-		/export\s+(async\s+)?function\s+([\w$]+)/g,
-		(_match: string, asyncKeyword: string | undefined, name: string) => {
-			functionExports.push(name);
-			return `${asyncKeyword ?? ''}function ${name}`;
+		transformers: {
+			// ESM imports initialize before statements even when a compiler emits
+			// them at the module tail. CommonJS requires execute in source order.
+			before: [
+				() => (sourceFile) => {
+					const imports = sourceFile.statements.filter(ts.isImportDeclaration);
+					const statements = sourceFile.statements.filter(
+						(statement) => !ts.isImportDeclaration(statement),
+					);
+					return ts.factory.updateSourceFile(sourceFile, [...imports, ...statements]);
+				},
+			],
 		},
-	);
-	code = code.replace(
-		/export\s+(const|let|var)\s+([\w$]+)\s*=/g,
-		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
-	);
-	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
-	// A compiler-selected module may forward its default export to another query.
-	code = code.replace(
-		/export\s*\{\s*default\s*\}\s*from\s*['"]([^'"]+)['"];?/g,
-		(match: string, request: string) =>
-			runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)
-				? match
-				: `__exports.default = __runtimeModules[${JSON.stringify(request)}].default;`,
-	);
-	// A split `<Hydrate>` child loads its compiler-selected module on demand.
-	code = code.replace(
-		/\bimport\(\s*(['"])([^'"]+)\1\s*\)/g,
-		(match: string, _quote: string, request: string) =>
-			runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)
-				? match
-				: `Promise.resolve(__runtimeModules[${JSON.stringify(request)}])`,
-	);
-	// A bundled chunk declares its exports in one local list. Register them at
-	// the end, like the function exports above.
-	const listedExports: string[] = [];
-	code = code.replace(
-		/export\s*\{([^}]*)\}\s*;?(?!\s*from\b)/g,
-		(_match: string, names: string) => {
-			for (const specifier of names.split(',')) {
-				const [local, exported = local] = specifier.trim().split(/\s+as\s+/);
-				if (local !== '') listedExports.push(`__exports[${JSON.stringify(exported)}] = ${local};`);
-			}
-			return '';
-		},
-	);
-
-	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
+	});
+	const requireFixture = (request: string): CompiledFixtureModule => {
+		if (request === 'octane' || request === 'octane/server') return runtime;
+		if (request === 'octane/internal/client' || request === 'octane/internal/server')
+			return internalRuntime;
+		if (request === 'octane/hydration') return HydrationRuntime;
+		if (runtimeModules !== undefined && Object.hasOwn(runtimeModules, request))
+			return runtimeModules[request]!;
+		if (request === 'octane/signals') return SignalsRuntime;
 		throw new Error(
-			`Compiled fixture ${id} contains an import/export shape the shared loader cannot evaluate.`,
+			`Compiled fixture ${id} contains an import/export shape the shared loader cannot evaluate (${request}).`,
 		);
-	}
-
-	for (const name of functionExports) {
-		code += `\n__exports.${name} = ${name};`;
-	}
-	for (const registration of listedExports) code += `\n${registration}`;
-
+	};
+	const exports: CompiledFixtureModule = {};
 	const evaluate = new Function(
-		'__runtime',
-		'__internalRuntime',
-		'__hydrationRuntime',
-		'__runtimeModules',
-		'__exports',
-		`'use strict';\n${imports.join('\n')}\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
+		'require',
+		'exports',
+		`${outputText}\n//# sourceURL=${id}?${mode}-fixture`,
 	);
-	return evaluate(runtime, internalRuntime, HydrationRuntime, runtimeModules, {}) as T;
+	evaluate(requireFixture, exports);
+	return exports as T;
 }
 
 export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(

@@ -111,7 +111,7 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 		);
 		expect(result.writers).toHaveLength(1);
 		expect(result.imports).toContain('prepareTemplateText');
-		expect(result.imports).toContain('childTextHoleUpdate');
+		expect(result.imports).toContain('childTextHole');
 		expect(result.imports).not.toContain('htext');
 	});
 
@@ -124,7 +124,7 @@ describe.each([false, true])('template prepare/commit compiler ABI (dev %s)', (d
 		expect(result.writers).toHaveLength(1);
 		const commits = [...result.code.matchAll(/_\$commitTemplate\(/g)];
 		expect(commits).toHaveLength(1);
-		const updates = [...result.code.matchAll(/_\$childTextHoleUpdate\(/g)];
+		const updates = [...result.code.matchAll(/_\$childTextHole\(/g)];
 		expect(updates).toHaveLength(16);
 		expect(commits[0].index).toBeGreaterThan(updates[15].index!);
 	});

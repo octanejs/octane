@@ -509,16 +509,20 @@ describe('scoped styles map to the stylesheet they became', () => {
 describe('client mapping — reactive emissions', () => {
 	const { code, mapping } = runtimeArtifact(SOURCE, 'client');
 
-	it('maps an event handler binding to every emitted call site', () => {
+	it('maps the prepared handler once, in both directions, without claiming the commit', () => {
 		const sourceOffset = SOURCE.indexOf('setCount(count + 1)');
 		const pair = mapping.pairFromSource(sourceOffset + 2);
 		expect(pair?.source).toContainEqual({
 			from: sourceOffset,
 			to: sourceOffset + 'setCount'.length,
 		});
-		// The mount and update branches both bind it, and both are pointed at.
-		expect(pair!.output.length).toBeGreaterThan(1);
-		for (const range of pair!.output) expect(textAt(code, range)).toContain('setCount');
+		// Preparation owns the authored expression. Mounts and updates share
+		// that evaluation; the generated commit receives its value.
+		expect(pair!.output.map((range) => textAt(code, range))).toEqual(['setCount']);
+		expect(mapping.pairFromGenerated(pair!.output[0].from + 1)?.source).toEqual(pair!.source);
+		const commit = code.indexOf('_$commitTemplate(');
+		expect(commit).toBeGreaterThanOrEqual(0);
+		expect(mapping.pairFromGenerated(commit + 2)?.source ?? []).not.toContainEqual(pair!.source[0]);
 	});
 });
 
@@ -721,9 +725,9 @@ describe('Counter example — per-node mapping coverage', () => {
 		['tag inside an @empty block', '<li class="empty"', 1, ['li']],
 		['text inside an @empty block', 'No items yet', 1, ['No items yet — add one.']],
 		['a hook call', 'useState(0)', 1, ['useState']],
-		['a state read in an expression', 'count + 1)', 1, ['count', 'count']],
+		['a state read in an expression', 'count + 1)', 1, ['count']],
 		['a handler declaration', 'addItem =', 1, ['addItem']],
-		['the same handler where the JSX binds it', 'addItem}', 1, ['addItem', 'addItem']],
+		['the same handler where the JSX binds it', 'addItem}', 1, ['addItem']],
 		['the loop variable', '{item}', 1, ['item']],
 		// An event attribute name emits nothing of its own — the compiler claims
 		// it for the slot key the binding lowers to.
@@ -970,7 +974,7 @@ export default function App(props: { bio: string; fallback: string; tone: string
 			'a select value driving option projection',
 			'value',
 			'<select value={',
-			{ client: ['_$bindSignalValue'], server: ['"value"', '_$ssrSelectScope'] },
+			{ client: ['_$prepareTemplateSignalValue'], server: ['"value"', '_$ssrSelectScope'] },
 		],
 	];
 

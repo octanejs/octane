@@ -37,7 +37,7 @@ import {
 	type BindingHandoff,
 	type BindingHandoffCapability,
 } from './dom-binding-handoff.js';
-import { bumpContextEpoch, contextEpochNow } from './context-epoch.js';
+import { bumpContextEpoch, contextEpochNow, EPOCH_CELL } from './context-epoch.js';
 import {
 	CONTROL_HANDOFF,
 	hasSignalControlBinding,
@@ -4753,7 +4753,11 @@ function undoCreatedInRootRender(block: Block, transaction: RootRenderTransactio
 
 function createdInRootRender(block: Block): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || ROOT_RENDER_ROLLBACK || isCreatedInRootRender(transaction, block))
+	if (
+		transaction === null ||
+		ROOT_RENDER_ROLLBACK ||
+		block.createdStamp === transaction.createdStamp
+	)
 		return;
 	// Child Blocks inherit their parent's renderOwner; root/hydration entry uses
 	// that root's owner. Reentrant frames reuse owner.transaction, so a Block
@@ -7079,11 +7083,15 @@ export function commitTemplate(
 	values: Record<string, any>,
 	apply: PreparedTemplate['apply'],
 	field: string,
+	eventOwner: SignalOwner | null = templateEventOwner(),
+	localMount = false,
 ): void {
 	const capture = WIP_CAPTURE;
-	const eventOwner = templateEventOwner();
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	if (capture === null) {
+	if (
+		capture === null ||
+		(localMount && !hydrationStarted && PREPARED_PARENTS.has(scope.block.parentNode.getRootNode()))
+	) {
 		apply(bag, values, scope, eventOwner);
 		return;
 	}
@@ -7155,7 +7163,8 @@ function retargetPreparedScope(scope: Scope, from: Node, to: Node): void {
 			}
 		}
 	}
-	forEachSubtreeChild(scope, (child) => retargetPreparedScope(child, from, to));
+	if (slots !== null || scope.children !== null)
+		forEachSubtreeChild(scope, (child) => retargetPreparedScope(child, from, to));
 }
 
 function discardPreparedBlock(block: Block): void {
@@ -12300,7 +12309,8 @@ function renderBlockInner(block: Block): true | undefined {
 	CURRENT_BLOCK = block;
 	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
 	CURRENT_EFFECT_REACHED = 0;
-	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
+	const continuesParentTree =
+		prevBlock !== null && (block.parentBlock === prevBlock || blockIsAncestor(prevBlock, block));
 	// An urgent ancestor must observe this child's committed cells, even when
 	// the child already queued a transition. Preserve that queue entry so its
 	// later owned pass gets the transition's boundary journal and reveal policy.
@@ -12397,7 +12407,7 @@ function renderBlockInner(block: Block): true | undefined {
 	// no recorded dep can be stale. Sampling at the TOP is deliberate — a
 	// provider commit mid-render advances the epoch past this stamp, so the
 	// bail scans still run and see any mixed-version entries.
-	block.$$ctxDepsEpoch = contextEpochNow();
+	block.$$ctxDepsEpoch = EPOCH_CELL.value;
 	// Capture the render priority. Explicit pendingMode (set by scheduleRender)
 	// wins. Otherwise INHERIT from the outer block — re-entrant renders (try,
 	// if, for, comp slots) called synchronously inside an outer body should
@@ -23566,7 +23576,7 @@ export function prepareTemplateText(
 	host: Node | null,
 	value: unknown,
 ): string | undefined {
-	const text = coerceText(value);
+	const text = typeof value === 'string' ? value : coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
 	return hydration === null ? text : hydratePrepareText(hydration, node, host, text);
 }
@@ -23616,11 +23626,11 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
 	// Coerce here (mirrors setText) rather than at every call site — keeps the
 	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
 	// the coercion in costs nothing on the hot update path.
-	const text = coerceText(value);
+	const text = typeof value === 'string' ? value : coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) return hydrateHtext(hydration, el, text);
 	if (seeded === 1) {
-		const first = getFirstChild(el);
+		const first = firstChildGetter === undefined ? el.firstChild : firstChildGetter.call(el);
 		if (first !== null && first.nodeType === 3) {
 			(first as Text).nodeValue = text;
 			return first as Text;
@@ -23646,7 +23656,7 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
  */
 export function htextSwap(posNode: Node | null, value: unknown): Text {
 	// Coerce here (see htext) so the call site stays a bare `htextSwap(pos, _v)`.
-	const text = coerceText(value);
+	const text = typeof value === 'string' ? value : coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) return hydrateHtextSwap(hydration, posNode, text);
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
@@ -25015,8 +25025,8 @@ export function child<T extends Node>(node: T): Node | null {
 	// stand-in — a plain object whose `firstChild` is a snapshot property (see
 	// adopt()) — and the native accessor throws on a non-Node receiver. Keep the
 	// plain read on the hydration branch; client mounts always hold a real Node.
-	if (hydrating) return node.firstChild;
-	return getFirstChild(node);
+	if (hydrating || firstChildGetter === undefined) return node.firstChild;
+	return firstChildGetter.call(node);
 }
 
 /**
@@ -28033,7 +28043,7 @@ export function prepareTemplateClass(
 	value: unknown,
 	asAttribute: boolean,
 ): string | null | undefined {
-	const normalized = normalizeClass(value);
+	const normalized = typeof value === 'string' ? value : normalizeClass(value);
 	const cls = value == null || value === false ? null : normalized;
 	const hydration = hydrating ? activeHydration() : null;
 	if (
@@ -28044,10 +28054,17 @@ export function prepareTemplateClass(
 	return cls;
 }
 
-export function setClassName(el: Element, value: unknown, _foreign?: boolean): void {
+export function setClassName(
+	el: Element,
+	value: unknown,
+	_foreign?: boolean,
+	prepared = false,
+): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
-	const cls = prepareTemplateClass(el, value, false);
+	const cls = prepared
+		? (value as string | null | undefined)
+		: prepareTemplateClass(el, value, false);
 	if (cls === undefined) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
@@ -28067,8 +28084,10 @@ export function setClassName(el: Element, value: unknown, _foreign?: boolean): v
 // clsx-composes the value; a nullish/false value REMOVES the attribute (parity with
 // the generic setAttribute this binding routed through before clsx composition
 // existed).
-export function setClassAttr(el: Element, value: unknown): void {
-	const cls = prepareTemplateClass(el, value, true);
+export function setClassAttr(el: Element, value: unknown, prepared = false): void {
+	const cls = prepared
+		? (value as string | null | undefined)
+		: prepareTemplateClass(el, value, true);
 	if (cls === undefined) return;
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
@@ -30274,7 +30293,15 @@ export function evt0(
 	eventOwner?: SignalOwner | null,
 ): HandlerBundle {
 	const d: HandlerBundle = { fn, args: EMPTY_ARGS, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d, undefined, scope, eventOwner);
+	(el as any)[key] = d;
+	if (
+		eventOwner !== null ||
+		hydrationStarted ||
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(el, undefined, undefined, undefined, scope, eventOwner);
 	return d;
 }
 export function evt0u(
@@ -30314,7 +30341,15 @@ export function evt1(
 	eventOwner?: SignalOwner | null,
 ): HandlerBundle {
 	const d: HandlerBundle = { fn, args: 1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d, undefined, scope, eventOwner);
+	(el as any)[key] = d;
+	if (
+		eventOwner !== null ||
+		hydrationStarted ||
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(el, undefined, undefined, undefined, scope, eventOwner);
 	return d;
 }
 export function evt1u(
@@ -30357,7 +30392,15 @@ export function evt2(
 	eventOwner?: SignalOwner | null,
 ): HandlerBundle {
 	const d: HandlerBundle = { fn, args: 2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d, undefined, scope, eventOwner);
+	(el as any)[key] = d;
+	if (
+		eventOwner !== null ||
+		hydrationStarted ||
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(el, undefined, undefined, undefined, scope, eventOwner);
 	return d;
 }
 export function evt2u(
@@ -30404,7 +30447,15 @@ export function evt1e(
 	eventOwner?: SignalOwner | null,
 ): HandlerBundle {
 	const d: HandlerBundle = { fn, args: -1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d, undefined, scope, eventOwner);
+	(el as any)[key] = d;
+	if (
+		eventOwner !== null ||
+		hydrationStarted ||
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(el, undefined, undefined, undefined, scope, eventOwner);
 	return d;
 }
 export function evt2e(
@@ -30417,7 +30468,15 @@ export function evt2e(
 	eventOwner?: SignalOwner | null,
 ): HandlerBundle {
 	const d: HandlerBundle = { fn, args: -2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d, undefined, scope, eventOwner);
+	(el as any)[key] = d;
+	if (
+		eventOwner !== null ||
+		hydrationStarted ||
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(el, undefined, undefined, undefined, scope, eventOwner);
 	return d;
 }
 export function evtN(
@@ -30429,7 +30488,15 @@ export function evtN(
 	eventOwner?: SignalOwner | null,
 ): HandlerBundle {
 	const d: HandlerBundle = { fn, args, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d, undefined, scope, eventOwner);
+	(el as any)[key] = d;
+	if (
+		eventOwner !== null ||
+		hydrationStarted ||
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(el, undefined, undefined, undefined, scope, eventOwner);
 	return d;
 }
 export function evtNu(
@@ -36022,7 +36089,11 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 					!DEFERRED_LAYOUT_DRIVER ||
 					!DEFERRED_LAYOUT_DRIVER.stageAction(() => publishTemplate(cleanup))
 				) {
-					publishTemplate(cleanup);
+					const { scope, bag, values, apply, field } = cleanup;
+					if (bag[field] !== cleanup || scope.block.disposed || scope.slots[0] !== bag) continue;
+					bag[field] = null;
+					if (cleanup.presentation !== undefined && !cleanup.presentation.completed) continue;
+					apply(bag, values, scope, cleanup.eventOwner);
 				}
 			}
 		}
@@ -38771,7 +38842,7 @@ function renderPreparedChildList(
 	if (state.forSlot.size === 0) {
 		try {
 			mountItemsLinear(
-				parentBlock,
+				parentScope,
 				state.forSlot,
 				items,
 				keySource,
@@ -38795,7 +38866,7 @@ function renderPreparedChildList(
 			hydrateSettleItems(hydration, state.forSlot.end!);
 	} else {
 		reconcileKeyed(
-			parentBlock,
+			parentScope,
 			state.forSlot,
 			items,
 			keySource,
@@ -40734,17 +40805,16 @@ export function childTextHoleUpdate(
 	cachedNode: Text | null,
 	previous: unknown,
 ): Text | null {
-	const complex = value !== null && (typeof value === 'object' || typeof value === 'function');
-	if (!complex) {
-		if (previous === value) return cachedNode;
-		if (cachedNode != null && value !== null) {
-			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
-			return state === undefined
-				? prepareOnlyChildText(parentScope, slotKey, domParent, coerceChildText(value), cachedNode)
-				: prepareChildText(parentScope, state, domParent, coerceChildText(value), cachedNode);
-		}
-	}
-	return childTextHole(parentScope, slotKey, domParent, value, cachedNode);
+	return childTextHole(
+		parentScope,
+		slotKey,
+		domParent,
+		value,
+		cachedNode,
+		undefined,
+		false,
+		previous,
+	);
 }
 
 function prepareOnlyChildText(
@@ -40756,6 +40826,22 @@ function prepareOnlyChildText(
 	previousTextToken = false,
 ): Text | null {
 	const text = value === '' ? null : (previous ?? document.createTextNode(value));
+	// A cloned host inside a renderer-owned preparation fragment has never
+	// been presented. Finish its already-normalized text while building that
+	// tree; the enclosing slot still decides whether the tree can be admitted.
+	if (!hydrationStarted && PREPARED_PARENTS.has(parent.getRootNode())) {
+		if (text === null) {
+			if (previous !== null) removeOnlyChildText(parent, previous);
+			else if (previousTextToken) resetOnlyChildHost(parent, null);
+		} else {
+			if (text.parentNode !== parent) {
+				if (parent.firstChild === null) parent.appendChild(text);
+				else resetOnlyChildHost(parent, text);
+			}
+			if (text.data !== value) text.data = value;
+		}
+		return text;
+	}
 	const prepared: PreparedChildText = {
 		text,
 		parent,
@@ -40809,7 +40895,29 @@ export function childTextHole(
 	cachedNode: Text | null,
 	prospectiveProps?: Record<string, unknown>,
 	previousTextToken = false,
+	previous?: unknown,
 ): Text | null {
+	// Calls that cannot author raw HTML can supply their accepted primitive.
+	// Arity, rather than a default value, distinguishes omitted from a genuinely
+	// accepted undefined. Other calls always perform the host ownership check.
+	if (arguments.length > 7) {
+		const complex = value !== null && (typeof value === 'object' || typeof value === 'function');
+		if (!complex) {
+			if (previous === value) return cachedNode;
+			if (cachedNode != null && value !== null) {
+				const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+				return state === undefined
+					? prepareOnlyChildText(
+							parentScope,
+							slotKey,
+							domParent,
+							coerceChildText(value),
+							cachedNode,
+						)
+					: prepareChildText(parentScope, state, domParent, coerceChildText(value), cachedNode);
+			}
+		}
+	}
 	if (
 		domParent.nodeType === 1 &&
 		VOID_ELEMENTS.has((domParent as Element).localName) &&
@@ -40818,7 +40926,10 @@ export function childTextHole(
 	) {
 		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}
-	if (dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey))
+	if (
+		(prospectiveProps !== undefined || DANGER_HTML_EVER_ACTIVE) &&
+		dangerouslySetInnerHTMLOwnsChild(domParent, value, prospectiveProps, parentScope, slotKey)
+	)
 		return null;
 	let vt = typeof value;
 	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
@@ -48572,7 +48683,7 @@ export function forBlock<T>(
 	if (isEmpty && emptyBody) {
 		if (state.size > 0) {
 			// had items last render, now we're empty — tear down the chain.
-			reconcileKeyed(parentBlock, state, items, getKey, itemBody as any, false, false);
+			reconcileKeyed(parentScope, state, items, getKey, itemBody as any, false, false);
 		}
 		if (state.emptyBlock) {
 			// keep the existing empty branch mounted, but re-render in case the
@@ -48715,7 +48826,7 @@ export function forBlock<T>(
 			state.cachedDeps = null;
 			pure = false;
 		} else {
-			if (state.cachedDeps !== null && depsEqual(state.cachedDeps, deps)) {
+			if (state.size !== 0 && state.cachedDeps !== null && depsEqual(state.cachedDeps, deps)) {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileCount(ProfileCounter.FOR_SKIP);
 				pure = true;
@@ -48731,7 +48842,7 @@ export function forBlock<T>(
 		// First fill (hydration adopt / fresh mount / update-path 0 → N): the
 		// linear pass — the full reconciler has no old list to diff against.
 		mountItemsLinear(
-			parentBlock,
+			parentScope,
 			state,
 			items,
 			getKey,
@@ -48745,7 +48856,7 @@ export function forBlock<T>(
 		if (hydration !== null) hydrateSettleItems(hydration, state.end);
 	} else {
 		reconcileKeyed(
-			parentBlock,
+			parentScope,
 			state,
 			items,
 			getKey,
@@ -48822,6 +48933,7 @@ export function keyedForBlock<T>(
 		state !== undefined &&
 		(!hydrating || activeHydration() === null) &&
 		state.cachedDeps !== null &&
+		state.selectionItems === items &&
 		tryUpdateKeyedSelection(state, items, itemBody, state.cachedDeps, deps, flags >>> 6)
 	) {
 		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentScope.block);
@@ -49016,11 +49128,15 @@ function updateSurvivor<T>(
 	// The list's shape record restores itemIndex from chain order; reconcileKeyed
 	// takes it before the first survivor index write.
 	const journal = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
+	// Only positions that the body or native identity can observe are render
+	// inputs. Every accepted row gets its final index with the sibling chain in
+	// reconcileKeyed, even if its other props required this body to render.
+	const prepareIndex = !indexIndependent || NATIVE_READ_DRIVER;
 	if (journal && block.body !== itemBody) journalRootProperty(block, 'body', block.body);
-	if (journal && block.itemIndex !== newIdx)
+	if (journal && prepareIndex && block.itemIndex !== newIdx)
 		journalRootProperty(block, 'itemIndex', block.itemIndex);
 	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
-		block.itemIndex = newIdx;
+		if (prepareIndex) block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
 	} else if (
 		// A plain de-opt list can update a same-component item without its render.
@@ -49032,7 +49148,7 @@ function updateSurvivor<T>(
 			TRANSITION_JOURNAL!.push(JOURNAL_INPUTS, block, block.props, block.extra);
 		block.props = newItem;
 		block.body = itemBody as ComponentBody;
-		block.itemIndex = newIdx;
+		if (prepareIndex) block.itemIndex = newIdx;
 		block.extra = env;
 		if (lite) {
 			// Lite survivors bypass renderBlock — pass the tuple directly as the
@@ -49093,7 +49209,7 @@ function checkedListKey<T>(
 }
 
 function mountItemsLinear<T>(
-	parentBlock: Block,
+	parentScope: Scope,
 	state: ForSlot,
 	items: ArrayLike<T>,
 	keySource: ListKeySource<T>,
@@ -49103,10 +49219,11 @@ function mountItemsLinear<T>(
 	normalizeKey: boolean = false,
 	passthroughList: boolean = false,
 ): void {
+	const parentBlock = parentScope.block;
 	const newLen = items.length;
 	if (!passthroughList && state.adopt === null && (!hydrating || activeHydration() === null)) {
 		reconcileKeyed(
-			parentBlock,
+			parentScope,
 			state,
 			items,
 			keySource,
@@ -49313,7 +49430,7 @@ function mountPassthroughListItem<T>(
 }
 
 function reconcileKeyed<T>(
-	parentBlock: Block,
+	parentScope: Scope,
 	state: ForSlot,
 	items: ArrayLike<T>,
 	keySource: ListKeySource<T>,
@@ -49325,13 +49442,14 @@ function reconcileKeyed<T>(
 	ssrMarkerless: boolean = false,
 	normalizeKey: boolean = false,
 ): void {
+	const parentBlock = parentScope.block;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_RECONCILE);
 	// Initial adoption consumes the SSR cursor. A subsequent change is a
 	// prepared client render; unvisited SSR nodes still belong to the cursor.
 	if (state.size === 0 && hydrating && activeHydration() !== null) {
 		mountItemsLinear(
-			parentBlock,
+			parentScope,
 			state,
 			items,
 			keySource,
@@ -49374,7 +49492,12 @@ function reconcileKeyed<T>(
 			const block = current;
 			journalUndo(() => retired!.add(block));
 		}
-		if (!pure || current.props !== item || current.body !== itemBody || current.itemIndex !== i)
+		if (
+			!pure ||
+			current.props !== item ||
+			current.body !== itemBody ||
+			((!indexIndependent || NATIVE_READ_DRIVER) && current.itemIndex !== i)
+		)
 			updateSurvivor(current, item, i, itemBody, pure, lite, indexIndependent, state.env);
 		current = current.nextSibling;
 	}
@@ -49384,6 +49507,33 @@ function reconcileKeyed<T>(
 			journalRootProperty(state, 'prepared', state.prepared);
 			state.prepared = undefined;
 		}
+		return;
+	}
+	if (n === 0) {
+		// An empty desired order needs no key map, LIS, or detached mount parent.
+		// Retirement is still render work: queued descendants must not render
+		// after this list has logically left, even if admission comes later.
+		retireListItems(state.head);
+		prepareSlot(parentScope, state, 'prepared', {
+			parent,
+			publish() {
+				const owner = parentBlock.idState.renderOwner;
+				const generation = owner?.generation;
+				const previousItems = state.items;
+				batchClearItems(state, previousItems);
+				if (
+					parentBlock.disposed ||
+					owner?.generation !== generation ||
+					state.items !== previousItems
+				)
+					return;
+				state.head = null;
+				state.tail = null;
+				state.size = 0;
+				state.inOrder = true;
+			},
+			discard() {},
+		});
 		return;
 	}
 	const prefix = i;
@@ -49438,7 +49588,16 @@ function reconcileKeyed<T>(
 					const kept = block;
 					journalUndo(() => retired!.add(kept));
 				}
-				if (!pure || block.props !== item || block.body !== itemBody || block.itemIndex !== i)
+				// A compiler-proven position-independent row whose body does not
+				// render has no new index input to prepare. Publication assigns its
+				// final index with the sibling chain. Native identities can read the
+				// provisional index outside the body, so they keep the regular path.
+				if (
+					!pure ||
+					block.props !== item ||
+					block.body !== itemBody ||
+					((!indexIndependent || NATIVE_READ_DRIVER) && block.itemIndex !== i)
+				)
 					updateSurvivor(block, item, i, itemBody, pure, lite, indexIndependent, state.env);
 			}
 			order.push(block);
@@ -49455,14 +49614,19 @@ function reconcileKeyed<T>(
 		}
 		throw error;
 	}
-	const seq = lis(positions, n);
+	// There is no subsequence to preserve if every desired row was just
+	// created. Avoid allocating/scanning LIS scratch across a first fill or
+	// complete replacement; admission below still places each private range.
+	const seq = created.length === n ? null : lis(positions, n);
 	const removed: Block[] = [];
 	for (let old = state.head; old !== null; old = old.nextSibling) {
 		if (!nextItems.has(old.key)) {
 			removed.push(old);
-			retireRootBlock(old);
 		}
 	}
+	const replaceAll = removed.length !== 0 && removed.length === state.size;
+	if (replaceAll) retireListItems(state.head);
+	else for (const block of removed) retireRootBlock(block);
 	const prepared: SlotPreparation = {
 		parent,
 		publish() {
@@ -49471,20 +49635,24 @@ function reconcileKeyed<T>(
 			const previousItems = state.items;
 			// All removed rows leave in this admission. Retire their event hosts
 			// before any earlier row's cleanup can focus a still-connected sibling.
-			if (renderingFocus !== null || !inFlush) {
-				for (const block of removed) {
-					if (
-						block.startMarker !== null &&
-						block.endMarker !== null &&
-						block.startMarker.parentNode === parent
-					)
-						retireHostRange(block.startMarker, block.endMarker);
+			if (replaceAll) {
+				batchClearItems(state, previousItems);
+			} else {
+				if (renderingFocus !== null || !inFlush) {
+					for (const block of removed) {
+						if (
+							block.startMarker !== null &&
+							block.endMarker !== null &&
+							block.startMarker.parentNode === parent
+						)
+							retireHostRange(block.startMarker, block.endMarker);
+					}
 				}
-			}
-			for (const block of removed) {
-				if (!block.disposed) unmountBlock(block);
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-					__profileCount(ProfileCounter.LIST_REMOVE);
+				for (const block of removed) {
+					if (!block.disposed) unmountBlock(block);
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileCount(ProfileCounter.LIST_REMOVE);
+				}
 			}
 			// All admitted deletions must finish, including after a cleanup
 			// reenters this root. Until then only the applied list is discoverable:
@@ -49509,14 +49677,29 @@ function reconcileKeyed<T>(
 				block.itemIndex = k;
 			}
 			let anchor: Node | null = state.end;
-			let last = seq.length - 1;
+			let last = seq === null ? -1 : seq.length - 1;
 			for (let k = n - 1; k >= 0; k--) {
 				const block = order[k];
 				if (block.disposed || state.items !== nextItems) return;
 				if (positions[k] === -1) {
-					retargetPreparedScope(block, fresh, parent);
-					placeRange(parent, block.startMarker!, block.endMarker!, anchor);
-				} else if (last >= 0 && seq[last] === k) {
+					// Decide from the completed body, not its compiler flags: even a
+					// single-root template can have slots in a descendant or a portal.
+					// A leaf with one owned root needs no subtree retarget or range walk.
+					const node = block.startMarker!;
+					if (
+						block.parentNode === fresh &&
+						node === block.endMarker &&
+						block._slots === null &&
+						block.children === null &&
+						renderingFocus === null
+					) {
+						block.parentNode = parent;
+						parent.insertBefore(node, anchor);
+					} else {
+						retargetPreparedScope(block, fresh, parent);
+						placeRange(parent, node, block.endMarker!, anchor);
+					}
+				} else if (last >= 0 && seq![last] === k) {
 					last--;
 				} else {
 					moveBlockBefore(block, anchor);
@@ -49525,32 +49708,46 @@ function reconcileKeyed<T>(
 			}
 			// Newly prepared rows have only now joined a hidden Activity's live
 			// DOM, including rows in foreign portal targets.
-			settleDeoptVisibility(parentBlock);
+			if (SCHEDULED_VISIBILITY_DRIVER?.rehide) settleDeoptVisibility(parentBlock);
 		},
 		discard() {
 			for (const block of created) if (!block.disposed) discardPreparedBlock(block);
 		},
 	};
-	prepareSlot(owningBlock(parentBlock), state, 'prepared', prepared);
+	prepareSlot(parentScope, state, 'prepared', prepared);
 }
 
 const RANGE_CLEAR_MIN_ITEMS = 512;
 
+function retireListItems(first: Block | null): void {
+	for (let old = first; old !== null; old = old.nextSibling) {
+		// Retirement is used only by the scheduler's queued-origin/ancestor
+		// check. A leaf without hook, effect, signal or child authority cannot
+		// enqueue itself later in this attempt, even through its native events.
+		// Already queued transition/deferred work uses the same pending flag;
+		// maximum-depth errors can still run with that flag cleared.
+		if (
+			old.pending ||
+			old.rare?.updateError ||
+			old.hooks !== null ||
+			old.effectSlots !== null ||
+			old.cleanups !== null ||
+			old.children !== null ||
+			old._slots !== null ||
+			old.signalOwner !== undefined ||
+			old.signalTokenEscaped
+		)
+			retireRootBlock(old);
+	}
+}
+
 /**
- * Bulk-clear a forBlock's items. When the forBlock owns its parent (markers
- * bracket the entire content), uses `textContent = ''` — the fastest DOM clear
- * on Chromium per Ripple's measured advantage on the `clear` op. A shared
- * parent keeps neighbours intact by clearing only the marker span: a sibling
- * walk, or a scoped Range once the list is large enough to pay for it
- * (RANGE_CLEAR_MIN_ITEMS).
- *
- * Every item still gets a disposal pass: items whose scope carries cleanups,
- * child scopes, or slot-stashed Blocks (a cross-module `<Row/>` lives on the
- * item's `_slots` as a componentSlot, NOT on `.children`) tear down through
- * `unmountBlock(b, false)` — full scope walk incl. `_slots`, portal
- * self-detach from foreign targets, and trySlot bookkeeping — with the DOM
- * skipped because the batch clear already removed the whole range. Plain
- * template rows (the common bulk-clear case) hit only the three-field guard.
+ * Bulk-clear an accepted list. A native row with no remaining lifetime work
+ * can be retired without walking an empty scope. Whole-span removal additionally
+ * requires that the LIVE DOM contains exactly those rows: inserted foreign nodes
+ * belong to their own renderer even when between the list's delimiters.
+ * Rows with effects, escaped signals, slots, refs, or active ViewTransitions
+ * use ordinary unmount, before removal, so cleanup can observe attached DOM.
  */
 function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -49565,9 +49762,45 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	}
 	TEARDOWN_DEPTH++;
 	try {
-		if (state.ownerHost !== null) {
-			// The host may also contain a foreign portal or imperative children.
-			// Remove only row-owned ranges, within the same teardown bracket.
+		const host = state.ownerHost;
+		const p = host ?? state.start!.parentNode!;
+		let cursor: Node | null = host === null ? state.start!.nextSibling : p.firstChild;
+		// A captured or rollback teardown must retain unmountBlock's deferral and
+		// adopted-DOM rules. Plain complete lists publish with neither active.
+		let whole =
+			ROOT_RENDER_TRANSACTION === null && !ROOT_RENDER_ROLLBACK && !VIEW_TRANSITION_DRIVER;
+		if (whole) {
+			for (let row = first; row !== null; row = row.nextSibling) {
+				if (
+					row.disposed ||
+					row.cleanups !== null ||
+					row.effectSlots !== null ||
+					row.children !== null ||
+					row._slots !== null ||
+					row.deoptRefs ||
+					row.signalOwner !== undefined ||
+					row.signalTokenEscaped ||
+					row.exclusiveMarkers ||
+					row.startMarker !== cursor ||
+					row.endMarker !== cursor ||
+					cursor === null
+				) {
+					whole = false;
+					break;
+				}
+				cursor = cursor.nextSibling;
+			}
+			whole = whole && cursor === state.end;
+		}
+		// All rows leave together. Retire their actual ranges before any cleanup
+		// can focus a later sibling; never retire a foreign host between two rows.
+		if (renderingFocus !== null || !inFlush) {
+			for (let row = first; row !== null; row = row.nextSibling) {
+				if (row.startMarker !== null && row.endMarker !== null && row.startMarker.parentNode === p)
+					retireHostRange(row.startMarker, row.endMarker);
+			}
+		}
+		if (!whole) {
 			let next: Block | null;
 			for (let row = first; row !== null; row = next) {
 				next = row.nextSibling;
@@ -49576,35 +49809,13 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 			oldItems.clear();
 			return;
 		}
-		// Retire every row before any row's cleanup can move focus off another: the
-		// whole span between the list's markers leaves below. As for parked rows,
-		// only captured focus (or no capture at all) can make a row dispatch.
-		if (renderingFocus !== null || !inFlush)
-			retireHostRange(getNextSibling(state.start!), state.end!);
-		// Dispose the items before their DOM leaves, like every other deletion:
-		// cleanups observe attached hosts. Walk the intrusive item chain (head →
-		// nextSibling) rather than the Map's iterator: zero allocation and a
-		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
-		// so the chain still covers exactly the old items here.
-		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-			if (b.cleanups !== null || b.children !== null || b._slots !== null) {
-				unmountBlock(b, false);
-			} else {
-				// Pure-host de-opt item (deoptItemBody with no component descendants):
-				// nothing to unmount scope-wise, but its subtree may carry stamped refs
-				// that must not keep pointing at the batch-removed DOM. Guarded so the
-				// common template-row clear stays a single null check; `deoptRefs`
-				// additionally skips the subtree scan for ref-free items.
-				if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
-				b.disposed = true;
-			}
+		for (let row = first; row !== null; row = row.nextSibling) {
+			row.disposed = true;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileBlockUnmounted();
 		}
-		const p = state.start!.parentNode!;
-		if (state.start!.previousSibling === null && getNextSibling(state.end!) === null) {
-			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
-			(p as Element).textContent = '';
-			p.appendChild(state.start!);
-			p.appendChild(state.end!);
+		if (host !== null) {
+			host.textContent = '';
 		} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
 			// Shared parent (other JSX interleaved) — detach the marker span directly.
 			// Each removal takes a whole item subtree, so this is one call per ITEM,
@@ -49612,7 +49823,7 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 			removeRange(getNextSibling(state.start!), state.end!);
 		} else {
 			// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
-			const range = document.createRange();
+			const range = p.ownerDocument!.createRange();
 			range.setStartAfter(state.start!);
 			range.setEndBefore(state.end!);
 			range.deleteContents();
@@ -49913,8 +50124,8 @@ function placeRange(parent: Node, first: Node, end: Node, anchor: Node | null): 
 	// the already-moved start (now adjacent at `endMarker`'s new neighbour
 	// position), so the walker loops back into the range and never terminates.
 	while (n) {
-		const isEnd = n === end;
-		const next: Node | null = getNextSibling(n);
+		const isEnd: boolean = n === end;
+		const next: Node | null = isEnd ? null : getNextSibling(n);
 		parent.insertBefore(n, anchor);
 		if (isEnd) break;
 		n = next;

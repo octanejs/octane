@@ -1660,6 +1660,8 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'activeSignalOwnerEnvironment',
+	'activeSynchronousSignalOwner',
 	'__createVoidRootDefaultOptions',
 	'__createRootDefaultOptions',
 	'__delegateEvents',
@@ -18297,6 +18299,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 					node,
 				),
 			);
+			if (plan.localTemplateCommit)
+				bodyStatements.push(
+					inheritOriginLoc(b.const('_mount', b.binary('===', b.id('_b'), b.id('undefined'))), node),
+				);
 		}
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
 		// re-render, so they live after the if/else; the mount branch only clones +
@@ -18305,7 +18311,9 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		bodyStatements.push(
 			inheritOriginLoc(
 				b.if(
-					b.binary('===', b.id('_b'), b.id('undefined')),
+					plan.localTemplateCommit && plan.templateCommit !== null
+						? b.id('_mount')
+						: b.binary('===', b.id('_b'), b.id('undefined')),
 					b.block(
 						plan.templateCommit === null
 							? plan.mount
@@ -28700,6 +28708,15 @@ function planJsx(
 	const templateHasEvents = templateBindings.some(
 		(binding) => binding.kind === 'event' || binding.kind === 'event-bundle',
 	);
+	// An initial writer can finish in the renderer's own private clone only
+	// when every host it can touch comes from that clone. Document hosts,
+	// customized elements, and bodies borrowing their insertion parent retain
+	// ordinary admission. Child slots still own their independent outputs.
+	const localTemplateCommit =
+		!noTemplate &&
+		single &&
+		ctx.presentationHydration == null &&
+		templateHasOnlyLocalNativeHosts(rootTemplate.parts);
 	const templateTextHoles =
 		noTemplate || ctx.presentationHydration != null
 			? []
@@ -28716,6 +28733,8 @@ function planJsx(
 	if (templateHasEvents) {
 		bag.constField('_eventOwner', 'undefined');
 		ctx.runtimeNeeded.add('templateEventOwner');
+		ctx.runtimeNeeded.add('activeSignalOwnerEnvironment');
+		ctx.runtimeNeeded.add('activeSynchronousSignalOwner');
 	}
 
 	if (!noTemplate) {
@@ -29629,19 +29648,21 @@ function planJsx(
 					);
 					continue;
 				}
-				ctx.runtimeNeeded.add('childTextHoleUpdate');
+				ctx.runtimeNeeded.add('childTextHole');
 				const updateHole = () =>
 					inlineBindingGuards
 						? emitInlineRenderableUpdate(
 								chp,
 								chv,
 								b.call(
-									'_$childTextHoleUpdate',
+									'_$childTextHole',
 									b.id('__s'),
 									b.literal(slotIndex),
 									hostExpr(),
 									V(),
 									chv(),
+									undefinedNode(),
+									b.literal(false),
 									chp(),
 								),
 							)
@@ -29651,12 +29672,14 @@ function planJsx(
 										'=',
 										chv(),
 										b.call(
-											'_$childTextHoleUpdate',
+											'_$childTextHole',
 											b.id('__s'),
 											b.literal(slotIndex),
 											hostExpr(),
 											V(),
 											chv(),
+											undefinedNode(),
+											b.literal(false),
 											chp(),
 										),
 									),
@@ -30131,7 +30154,18 @@ function planJsx(
 			afterStatements.push(
 				inheritOriginLoc(
 					b.block([
-						b.const('_e', b.call('_$templateEventOwner')),
+						b.const(
+							'_e',
+							b.conditional(
+								b.logical(
+									'&&',
+									b.binary('===', b.id('_$activeSynchronousSignalOwner'), nullNode()),
+									b.binary('===', b.id('_$activeSignalOwnerEnvironment'), undefinedNode()),
+								),
+								nullNode(),
+								b.call('_$templateEventOwner'),
+							),
+						),
 						b.if(
 							b.binary('!==', pending(), b.id('_e')),
 							b.block([
@@ -30161,6 +30195,8 @@ function planJsx(
 							b.id('_p'),
 							b.id(templateCommit),
 							b.literal(bag.letter('_preparedTemplate')),
+							templateHasEvents ? b.member(b.id('_p'), bag.letter('_eventOwner')) : nullNode(),
+							...(localTemplateCommit ? [b.id('_mount')] : []),
 						),
 					),
 					null,
@@ -30209,6 +30245,7 @@ function planJsx(
 		update: updateLines,
 		everyRender: everyRenderLines,
 		templateCommit,
+		localTemplateCommit,
 		after: afterStatements,
 		head: headEmit.head,
 		resources: headEmit.resources,
@@ -31968,10 +32005,13 @@ function emitPreparedBindingCommit(bind, bag) {
 			...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
 		);
 	} else if (bind.kind === 'class') {
+		const helper = attrBindingHelper(bind);
 		write = b.call(
-			attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind),
+			attrLoweringToken(b.id(`_$${helper}`), bind),
 			F('_el'),
 			prepared(),
+			...(helper === 'setClassName' ? [undefinedNode()] : []),
+			b.literal(true),
 		);
 	} else if (bind.kind === 'style') {
 		write = b.call(
@@ -31990,7 +32030,7 @@ function emitPreparedBindingCommit(bind, bag) {
 		);
 	} else if (bind.kind === 'formAction') {
 		write = b.call(
-			'_$setFormAction',
+			attrLoweringToken(b.id('_$setFormAction'), bind),
 			F('_el'),
 			attrLoweringToken(b.literal(bind.name), bind),
 			pending(),
