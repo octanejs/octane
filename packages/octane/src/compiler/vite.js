@@ -1397,6 +1397,11 @@ export function octane(options = {}) {
 						? null
 						: { _descriptorChildrenExportsProof: descriptorExportsProof }),
 					environment,
+					// Vite applies `resolve.alias` before any plugin's resolveId, so an
+					// alias for bare `octane` would hand server modules the client
+					// runtime. Name the server runtime in the source instead, as compiled
+					// `.tsrx` output already does; resolveId still covers other importers.
+					explicitRuntimeRequests: server,
 					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id, environment) } : null),
 					hmr: !server && hmrEnabled ? 'vite' : false,
 					// DEV server transforms also carry SSR-only diagnostics. HMR itself

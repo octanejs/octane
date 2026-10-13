@@ -75,10 +75,9 @@ const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: d
 // Vite 8's default client minifier; see the fairness note above.
 const VITE_MINIFY = 'oxc';
 
-// Five app sets: js-framework rows, TodoMVC, chat-stream, weather-app, and the
-// Octane-only bindings application. The later sets are app-shaped size
-// comparisons; their ops use distinct prefixes so every set rides one suite with
-// one baseline file.
+// App-shaped size comparisons use distinct prefixes so every set rides one
+// suite with one baseline file. Shell's client-only row uses the same app and
+// lazy page as its hydrating row, changing just the public root entry point.
 const SETS = [
 	{
 		root: JS_FRAMEWORK,
@@ -139,6 +138,13 @@ const SETS = [
 		prefix: 'shell_',
 		targets: ['octane-jsx', 'react'],
 		// Its signal and alien-signals imports would widen the rows ceilings.
+		ceiling: false,
+	},
+	{
+		root: APP_SHELL,
+		prefix: 'shell_client_',
+		targets: ['octane-jsx', 'react'],
+		entry: 'index-client.html',
 		ceiling: false,
 	},
 ];
@@ -244,7 +250,7 @@ for (const set of SETS)
 	for (const name of set.targets.filter(selected)) {
 		const appRoot = path.join(set.root, name);
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
-		const setLabel = set.prefix ? path.basename(set.root) + '/' : '';
+		const setLabel = set.prefix ? set.prefix + '/' : '';
 		console.log(`building ${setLabel}${name} (production, ${VITE_MINIFY} minify)…`);
 		let ceiling = ceilings.get(name);
 		if (set.ceiling !== false && ceiling === undefined) {
@@ -260,7 +266,10 @@ for (const set of SETS)
 				emptyOutDir: true,
 				minify: VITE_MINIFY,
 				target: 'esnext',
-				rollupOptions: { output: buildOutput },
+				rollupOptions: {
+					...(set.entry ? { input: path.join(appRoot, set.entry) } : {}),
+					output: buildOutput,
+				},
 			},
 		});
 
