@@ -1,5 +1,11 @@
 # @octanejs/app-core
 
+## 0.1.7
+
+### Patch Changes
+
+- 177f44e: Avoid retaining unused host form-action and Fragment-ref descriptor support through generated hydration entries. Pending and catch fallbacks keep their existing props, hydration, and boundary behavior.
+
 ## 0.1.6
 
 ### Patch Changes

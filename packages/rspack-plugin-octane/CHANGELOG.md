@@ -1,5 +1,13 @@
 # @octanejs/rspack-plugin
 
+## 0.2.4
+
+### Patch Changes
+
+- 860e865: Mount imported lightweight components without an anchor comment in Vite and Rspack production builds when their module proves the component's root keeps its position, as same-module calls already do. A host whose children are all components no longer clones and positions one empty comment per such child. Rendering, hydration and update behavior are unchanged.
+- f2bcd28: Skip unchanged imported pure components in Rspack production builds, as Vite production builds already do. Each importer is rebuilt with the compiler memo proofs its imported modules published, so a parent reuses an imported child's output while the child's props and proofs are unchanged. Imports without a proof keep their plain calls.
+- 860e865: Render hookless imported components on the lightweight component path in Rspack production builds, as Vite production builds already do. Each importer is rebuilt with the lite proofs its imported modules published, one module of an import chain per round, and a module that anything but SWC's syntax lowering transforms after Octane publishes none. Rendering, hydration and update behavior are unchanged.
+
 ## 0.2.3
 
 ### Patch Changes

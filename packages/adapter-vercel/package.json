@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/adapter-vercel",
-  "version": "0.0.66",
+  "version": "0.0.67",
   "license": "MIT",
   "type": "module",
   "engines": {
