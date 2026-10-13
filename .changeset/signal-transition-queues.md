@@ -13,5 +13,5 @@ that update one queue; a later transition no longer replaces an earlier one's
 write. A transition whose boundary shows its timeout fallback renders the rest
 of its work in the next task, after the fallback commits.
 
-Apps that use signals with transitions ship about 9.5 kB raw and 2.8 kB gzip
+Apps that use signals with transitions ship about 9.4 kB raw and 2.8 kB gzip
 less framework code.
