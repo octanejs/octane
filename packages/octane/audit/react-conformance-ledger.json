@@ -31327,11 +31327,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Octane adapts React's lazy-rejection client recovery to its supported public @try/@catch boundary: rejection replaces the streamed lazy fallback with the catch outcome.",
+      "rationale": "A rejected server lazy load keeps the Suspense fallback available for client rendering and reports the error through onError. The rejected load and its error UI are not serialized into the stream.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
-          "testName": "replaces a streamed lazy fallback with the public catch outcome on rejection",
+          "testName": "leaves the streamed lazy fallback and reports the rejected load",
           "modes": ["server-stream", "production-compile"]
         }
       ]
@@ -33114,11 +33114,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "A rejection after the fallback has streamed publishes the supported catch arm and hydration adopts that streamed error result without replacing its DOM.",
+      "rationale": "A rejection after flushing leaves the server fallback for a fresh client render. Hydration keeps the surrounding shell and ID namespace; a new client rejection reaches onCaughtError and the client catch arm, without replaying the server error.",
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "hydrates a streamed catch arm in place and consumes the superseded client rejection",
+          "testName": "uses the new client rejection after a streamed failure without leaking it or losing sibling IDs",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
       ]
@@ -44217,11 +44217,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Replacing the upstream class boundary with Octane's supported @catch surface, a rejected Promise Usable selects the catch arm and streams the rejection message.",
+      "rationale": "A rejected server Promise Usable throws to the nearest pending boundary, which marks that content for a fresh client render and reports the error once on the server. The stream retains the pending HTML without serializing the rejection.",
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "streams the @catch arm when the promise rejects",
+          "testName": "retains pending HTML when the promise rejects and reports only on the server",
           "modes": ["server-stream", "production-compile"]
         }
       ]

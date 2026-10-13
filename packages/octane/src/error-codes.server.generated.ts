@@ -17,7 +17,6 @@ type ServerErrorArguments = {
 	10: [unknown];
 	11: [];
 	12: [unknown];
-	23: [];
 	30: [unknown];
 	31: [];
 	32: [unknown];
@@ -31,7 +30,6 @@ type ServerErrorArguments = {
 	42: [];
 	43: [];
 	44: [];
-	45: [];
 	47: [unknown];
 	48: [unknown];
 	57: [];
@@ -301,8 +299,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				);
 			case 12:
 				return formatDevErrorMessage('%s(): argument is not a Context nor a thenable', args);
-			case 23:
-				return formatDevErrorMessage('Server-rendered use() rejected', args);
 			case 30:
 				return formatDevErrorMessage('Invalid tag: %s', args);
 			case 31:
@@ -347,8 +343,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('The stream consumer cancelled.', args);
 			case 44:
 				return formatDevErrorMessage('The readable stream is closed.', args);
-			case 45:
-				return formatDevErrorMessage('Server-rendered use() rejected (function)', args);
 			case 47:
 				return formatDevErrorMessage(
 					'octane SSR: exceeded %s suspense passes — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.',

@@ -138,7 +138,7 @@
       "message": "Server-rendered use() rejected",
       "argumentCount": 0,
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "24": {
       "message": "Element type is invalid: expected a string (for a built-in element) or a function (for a component), but got: %s.",
@@ -270,7 +270,7 @@
       "message": "Server-rendered use() rejected (function)",
       "argumentCount": 0,
       "runtime": ["server"],
-      "status": "active"
+      "status": "retired"
     },
     "46": {
       "message": "Expected %s listener to be a function, instead got a value of `%s` type.",

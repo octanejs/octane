@@ -34,7 +34,6 @@ type ClientErrorArguments = {
 	20: [];
 	21: [];
 	22: [];
-	23: [];
 	24: [unknown];
 	25: [];
 	26: [unknown];
@@ -423,8 +422,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 22:
 				return formatDevErrorMessage('A renderer-owned DOM region requires a live DOM root.', args);
-			case 23:
-				return formatDevErrorMessage('Server-rendered use() rejected', args);
 			case 24:
 				return formatDevErrorMessage(
 					'Element type is invalid: expected a string (for a built-in element) or a function (for a component), but got: %s.',
