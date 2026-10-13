@@ -54,7 +54,7 @@ const metrics = [
 	'journalForSlot',
 	'parkItemForHold',
 	'restoreForSlot',
-	'deferRootReplacement',
+	'queueSlotDeletion',
 	'unmountBlockInner',
 ];
 

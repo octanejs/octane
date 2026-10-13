@@ -3922,6 +3922,7 @@ function beginTransitionAttempt(block: Block): TransitionAttempt | null {
 		memoSwaps: null,
 		raised: null,
 	};
+	journalRootOps();
 	ACTIVE_TRANSITION_ATTEMPT = attempt;
 	return attempt;
 }
@@ -4331,7 +4332,8 @@ const JOURNAL_PROP = 3;
 const JOURNAL_CREATED = 4;
 const JOURNAL_RENDER = 5;
 const JOURNAL_UNDO = 6;
-const JOURNAL_RETIRED = 7;
+/** A window's start in its root's commit queue: replay drops what it queued (dropRootOps). */
+const JOURNAL_OPS = 7;
 const JOURNAL_INPUTS = 8;
 const JOURNAL_EVENT_OWNER = 9;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
@@ -4394,9 +4396,16 @@ interface RootRenderTransaction {
 	createdStamp: number;
 	bagWindow: number;
 	retainedCreated: Set<Block> | null;
+	/** Blocks this render deleted, still connected until commit. Truncated on drop. */
 	retired: Set<Block> | null;
 	structures: Map<object, number> | null;
-	commit: Array<() => void> | null;
+	/**
+	 * The commit queue: `(fn, target)` pairs that commitRootRenders runs in
+	 * order, before refs and layout effects. A slot whose structure changed
+	 * queues `(applySlotNext, slot)`; a dropped render truncates the queue and
+	 * touches no DOM (dropRootOps).
+	 */
+	ops: any[];
 	parked: ParkedItem[] | null;
 	aborted: boolean;
 	rootRequest: boolean;
@@ -4482,7 +4491,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			retainedCreated: null,
 			retired: null,
 			structures: null,
-			commit: null,
+			ops: [],
 			parked: null,
 			aborted: false,
 			rootRequest: false,
@@ -4684,7 +4693,7 @@ function restoreRootNodes(parent: Node, nodes: Node[], anchor: Node | null): voi
 	}
 }
 
-/** A deferred deletion is already absent from this root's logical render tree. */
+/** A queued deletion is already absent from this root's logical render tree. */
 function retireRootBlock(block: Block): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (
@@ -4695,176 +4704,190 @@ function retireRootBlock(block: Block): void {
 	)
 		return;
 	const retired = (transaction.retired ??= new Set());
-	if (!retired.has(block)) {
-		retired.add(block);
-		TRANSITION_JOURNAL!.push(JOURNAL_RETIRED, retired, block, null);
-	}
+	retired.add(block);
 	if (block.pending) {
 		journalRootProperty(block, 'pending', block.pending);
 		block.pending = false;
 	}
 }
 
-/** Retire only an outgoing range, after its genuine replacement has succeeded. */
-function deferRootReplacement(
-	block: Block,
-	parent: Node,
-	first: Node | null,
-	last: Node | null,
-	finalize?: () => void,
-): void {
-	retireRootBlock(block);
-	deferRootRange(
-		parent,
-		first,
-		last,
-		() => {
-			if (!block.disposed) unmountBlock(block, false);
-		},
-		finalize,
-	);
+/**
+ * A slot's pending structure in the open root render (#2043). The slot's own
+ * fields are what the DOM shows; `next` holds what this render changed. It is
+ * allocated the first time a root render changes the slot, stamped with that
+ * transaction so a record a dropped render left behind is replaced rather than
+ * reused, and applied by the slot's `(applySlotNext, slot)` commit entry.
+ */
+interface SlotNext {
+	tx: RootRenderTransaction;
+	/**
+	 * Outgoing content, three entries each: its owner (a Block, a lite arm's
+	 * Scope, a slot, a cleanup callback or null), then its first and last node.
+	 */
+	out: any[];
 }
 
-/** Retire an outgoing arm, a Block or a lite arm's Scope, once its root commits. */
-function deferRootArmReplacement(
-	block: Block | null,
-	lite: Scope | null,
-	parent: Node,
-	first: Node | null,
-	last: Node | null,
-): void {
-	if (block !== null) deferRootReplacement(block, parent, first, last);
-	else {
-		retireRootBlock(lite!.block);
-		deferRootRange(parent, first, last, () => releaseLiteArm(lite!));
+/** The open root render's pending structure for `slot`, queued for its commit. */
+function slotNext(slot: { next: SlotNext | null }): SlotNext {
+	const tx = ROOT_RENDER_TRANSACTION!;
+	let next = slot.next;
+	if (next === null || next.tx !== tx) {
+		next = slot.next = { tx, out: [] };
+		tx.ops.push(applySlotNext, slot);
 	}
+	return next;
 }
 
-function deferRootRange(
-	parent: Node,
+/** Retire a committed Block or lite arm and queue its range's deletion on `slot`. */
+function queueSlotDeletion(
+	slot: { next: SlotNext | null },
+	owner: Scope,
 	first: Node | null,
 	last: Node | null,
-	cleanup?: () => void,
-	finalize?: () => void,
 ): void {
-	const nodes: Node[] = [];
-	if (first !== null && last !== null) {
-		for (let node: Node | null = first; node !== null; node = getNextSibling(node)) {
-			nodes.push(node);
-			if (node === last) break;
-		}
-	}
-	let cancelled = false;
-	journalUndo(() => {
-		cancelled = true;
-	});
-	(ROOT_RENDER_TRANSACTION!.commit ??= []).push(() => {
-		if (cancelled) return;
-		// Retire the outgoing nodes before any cleanup can move focus off them.
-		nodes.forEach(retireEventHostTree);
-		cleanup?.();
-		for (const node of nodes)
-			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === parent)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
-		finalize?.();
-	});
+	retireRootBlock(owner.block);
+	slotNext(slot).out.push(owner, first, last);
 }
 
-function deferRootUnmount(block: Block, detachDom: boolean): boolean {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (
-		transaction === null ||
-		transaction.aborted ||
-		ROOT_RENDER_ROLLBACK ||
-		block.idState.renderOwner !== transaction.owner ||
-		!block.mounted ||
-		isCreatedInRootRender(transaction, block)
-	)
-		return false;
-	deferRootTeardown(
-		transaction,
-		block,
-		block.exclusiveMarkers || (!detachDom && block.startMarker !== block.endMarker),
-		detachDom,
-		unmountBlock as (scope: Scope, detachDom: boolean) => void,
-	);
-	return true;
+function applySlotNext(slot: { next: SlotNext | null }): void {
+	const next = slot.next;
+	slot.next = null;
+	if (next !== null) applyOutgoing(next.out);
+}
+
+/** Queue outgoing content no slot record owns: one `out` entry of its own. */
+function queueRootDeletion(owner: unknown, first: Node | null, last: Node | null): void {
+	ROOT_RENDER_TRANSACTION!.ops.push(applyOutgoing, [owner, first, last]);
 }
 
 /**
- * Hand a committed subtree's teardown to its root's commit. With `detachDom`
- * its range leaves the document now. Rollback restores the range, and the
- * commit reconnects it so `release`'s deletion cleanups observe connected DOM.
- * `scope` is a Block, or a lite arm's Scope whose stand-in carries the range; a
- * stand-in reads as neither a root nor disposed.
+ * Delete outgoing content at commit, in React's commitDeletionEffects order.
+ * Each range's hosts retire first, so no cleanup can move focus off them while
+ * they still dispatch. Its owner's cleanups then run against connected DOM, and
+ * only then do the nodes leave. The range is read here, at commit, not in render.
  */
-function deferRootTeardown(
-	transaction: RootRenderTransaction,
-	scope: Scope,
-	exclusive: boolean,
-	detachDom: boolean,
-	release: (scope: Scope, detachDom: boolean) => void,
-): void {
+function applyOutgoing(out: any[]): void {
+	for (let i = 0; i < out.length; i += 3) {
+		const first: Node | null = out[i + 1];
+		const parent = first === null ? null : (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode;
+		const nodes: Node[] = [];
+		if (parent !== null) {
+			const last: Node | null = out[i + 2];
+			for (let node: Node | null = first; node !== null; node = getNextSibling(node)) {
+				nodes.push(node);
+				if (node === last) break;
+			}
+		}
+		for (let j = 0; j < nodes.length; j++) retireEventHostTree(nodes[j]);
+		const owner = out[i];
+		if (owner !== null) releaseOutgoing(owner);
+		for (let j = 0; j < nodes.length; j++) {
+			const node = nodes[j];
+			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === parent)
+				(STAGED_DOM ? STAGED_DOM.view(parent!) : parent!).removeChild(node);
+		}
+	}
+}
+
+/** Run an outgoing owner's deletion cleanups: a Block's, a lite arm's, a slot's, or a callback. */
+function releaseOutgoing(owner: any): void {
+	if (typeof owner === 'function') owner();
+	else if (owner.__kind !== undefined) unmountSlot(owner, false);
+	else if (owner.block === owner) unmountBlock(owner, false);
+	else releaseLiteArm(owner);
+}
+
+/**
+ * Drop the commit work a render queued from `from` on, and the deletions it
+ * retired past the first `retired`. Nothing it deleted has left the DOM, so a
+ * dropped render restores no nodes.
+ */
+function dropRootOps(transaction: RootRenderTransaction, from: number, retired: number): void {
+	const ops = transaction.ops;
+	for (let i = from; i < ops.length; i += 2) if (ops[i] === applySlotNext) ops[i + 1].next = null;
+	ops.length = from;
+	const set = transaction.retired;
+	if (set !== null && set.size > retired) {
+		let i = 0;
+		for (const block of set) if (i++ >= retired) set.delete(block);
+	}
+}
+
+/** A rollback window opening inside a root render records where its commit work starts. */
+function journalRootOps(): void {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && TRANSITION_JOURNAL === transaction.log)
+		TRANSITION_JOURNAL.push(
+			JOURNAL_OPS,
+			transaction,
+			transaction.ops.length,
+			transaction.retired?.size ?? 0,
+		);
+}
+
+/**
+ * Whether a root render leaves `block`'s teardown to its commit: a committed
+ * Block the render removed from its tree. The range stays connected and
+ * untouched until then, so deletion cleanups observe connected DOM and a
+ * dropped render restores nothing.
+ */
+function defersRootUnmount(block: Block): boolean {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	return (
+		transaction !== null &&
+		!transaction.aborted &&
+		!ROOT_RENDER_ROLLBACK &&
+		block.idState.renderOwner === transaction.owner &&
+		block.mounted &&
+		!isCreatedInRootRender(transaction, block)
+	);
+}
+
+/**
+ * Queue a committed subtree's teardown for its root's commit. `scope` is a
+ * Block, or a lite arm's Scope whose stand-in carries the range; a stand-in
+ * reads as neither a root nor disposed. An `exclusive` range keeps its pair.
+ */
+function queueRootUnmount(scope: Scope, exclusive: boolean): void {
 	const block = scope.block;
 	retireRootBlock(block);
 	const start = block.startMarker;
 	const end = block.endMarker;
-	const nodes: Node[] = [];
-	let parent: Node | null = null;
-	let after: Node | null = null;
+	let first: Node | null = null;
+	let last: Node | null = null;
 	if (
 		start !== null &&
 		end !== null &&
 		(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode !== null
 	) {
-		parent = (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode;
-		after = exclusive ? end : getNextSibling(end);
-		for (
-			let node: Node | null = exclusive ? getNextSibling(start) : start;
-			node !== null && node !== after;
-			node = getNextSibling(node)
-		)
-			nodes.push(node);
+		if (!exclusive) {
+			first = start;
+			last = end;
+		} else if (getNextSibling(start) !== end) {
+			first = getNextSibling(start);
+			last = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling;
+		}
 	} else if (block.kind === 'root') {
-		parent = block.parentNode;
-		for (let node = getFirstChild(parent); node !== null; node = getNextSibling(node))
-			nodes.push(node);
+		first = getFirstChild(block.parentNode);
+		last = (STAGED_DOM ? STAGED_DOM.view(block.parentNode) : block.parentNode).lastChild;
 	}
-	let cancelled = false;
-	journalUndo(() => {
-		cancelled = true;
-		if (parent !== null) {
-			const anchor =
-				(STAGED_DOM ? STAGED_DOM.view(after) : after)?.parentNode === parent ? after : null;
-			restoreRootNodes(parent, nodes, anchor);
-		}
-	});
-	const suppressedRefs = REF_DETACH_SUPPRESSION;
-	(transaction.commit ??= []).push(() => {
-		if (cancelled || block.disposed) return;
-		// Deletion cleanups retain their connected-DOM observation. The old
-		// range is reconnected only for teardown, before incoming refs/effects.
-		if (parent !== null) {
-			const anchor =
-				(STAGED_DOM ? STAGED_DOM.view(after) : after)?.parentNode === parent ? after : null;
-			for (const node of nodes)
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent)
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-		}
-		const previousSuppression = REF_DETACH_SUPPRESSION;
-		REF_DETACH_SUPPRESSION = suppressedRefs;
-		try {
-			release(scope, false);
-		} finally {
-			REF_DETACH_SUPPRESSION = previousSuppression;
-		}
-		if (parent !== null)
-			for (const node of nodes)
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === parent)
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
-	});
-	if (detachDom && parent !== null)
-		for (const node of nodes) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
+	// A teardown inside an aborted mount keeps that mount's ref suppression.
+	const suppressed = REF_DETACH_SUPPRESSION;
+	queueRootDeletion(
+		suppressed === null
+			? scope
+			: () => {
+					const previous = REF_DETACH_SUPPRESSION;
+					REF_DETACH_SUPPRESSION = suppressed;
+					try {
+						releaseOutgoing(scope);
+					} finally {
+						REF_DETACH_SUPPRESSION = previous;
+					}
+				},
+		first,
+		last,
+	);
 }
 
 function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block): boolean {
@@ -4935,6 +4958,7 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 	const previousRollback = ROOT_RENDER_ROLLBACK;
 	ROOT_RENDER_ROLLBACK = true;
 	try {
+		dropRootOps(transaction, 0, 0);
 		const owner = transaction.owner.current;
 		if (owner !== null) rollbackTransitionJournal(0, owner);
 		else {
@@ -4944,8 +4968,6 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
 				else if (transaction.log[i] === JOURNAL_CREATED)
 					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
-				else if (transaction.log[i] === JOURNAL_RETIRED)
-					transaction.log[i + 1].delete(transaction.log[i + 2]);
 				else if (transaction.log[i] === JOURNAL_EVENT_OWNER)
 					transaction.log[i + 1].$$signalOwner = transaction.log[i + 2];
 			}
@@ -4958,7 +4980,6 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 			for (let i = created.length - 1; i >= 0; i--)
 				if (!created[i].disposed) undoCreatedInRootRender(created[i], transaction);
 		discardOffscreenCapture(transaction.capture);
-		transaction.commit = null;
 		// Restored rows have already left the parked list. Only speculative
 		// rows remain, and their ref attachments were never committed.
 		const checkpoint = refDetachQueue.length;
@@ -5096,13 +5117,11 @@ function commitRootRenders(): void {
 			}
 			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
 			const acceptedGeneration = owner.generation;
-			// Irreversible deletions precede the incoming ref/layout publication.
-			const commits = transaction.commit;
-			if (commits !== null) {
-				for (const commit of commits) {
-					if (owner.disposed || owner.generation !== acceptedGeneration) break;
-					commit();
-				}
+			// The mutation phase precedes the incoming ref/layout publication.
+			const ops = transaction.ops;
+			for (let i = 0; i < ops.length; i += 2) {
+				if (owner.disposed || owner.generation !== acceptedGeneration) break;
+				ops[i](ops[i + 1]);
 			}
 			const parked = transaction.parked;
 			if (parked !== null) {
@@ -5934,7 +5953,9 @@ function armTransitionJournal(state: TrySlot): number {
 	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL.length;
 	TRANSITION_JOURNAL_BAG_WINDOW = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
 	TRANSITION_JOURNAL_DEPTH++;
-	return TRANSITION_JOURNAL.length;
+	const checkpoint = TRANSITION_JOURNAL.length;
+	journalRootOps();
+	return checkpoint;
 }
 
 /**
@@ -6026,8 +6047,8 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 				case JOURNAL_CREATED:
 					undoCreatedInRootRender(target as Block, a as RootRenderTransaction);
 					break;
-				case JOURNAL_RETIRED:
-					(target as Set<Block>).delete(a as Block);
+				case JOURNAL_OPS:
+					dropRootOps(target as RootRenderTransaction, a, b);
 					break;
 				case JOURNAL_RENDER:
 					if (!target.disposed && (target === owner || blockIsAncestorOf(owner, target))) {
@@ -13429,7 +13450,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 		}
 		// Keep the retired slot intact for connected-DOM cleanup. Only its
 		// registry entry changes while the new return shape renders alongside it.
-		deferRootRange(parent, first, last, () => unmountSlot(state, false));
+		queueRootDeletion(state, first, last);
 		journalRootProperty(block.slots, 0, block.slots[0]);
 		const registry = block._slots;
 		if (registry !== null) {
@@ -13938,7 +13959,13 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 			(ROOT_RENDER_TRANSACTION.hydrating && block.kind !== 'portal'))
 	)
 		detachDom = false;
-	if (deferRootUnmount(block, detachDom)) return;
+	if (defersRootUnmount(block)) {
+		queueRootUnmount(
+			block,
+			block.exclusiveMarkers || (!detachDom && block.startMarker !== block.endMarker),
+		);
+		return;
+	}
 	if (TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
 		TEARDOWN_BLOCK = block;
@@ -21619,7 +21646,7 @@ class HydrationCapability {
 	 */
 	awaitsCommit(publish: () => void): boolean {
 		if (!inRootHydrationAttempt()) return false;
-		(ROOT_RENDER_TRANSACTION!.commit ??= []).push(publish);
+		ROOT_RENDER_TRANSACTION!.ops.push(publish, null);
 		return true;
 	}
 
@@ -22388,6 +22415,7 @@ class HydrationCapability {
 			forSlot: null,
 			hostNode: null,
 			portal: null,
+			next: null,
 		};
 		if (this.isOpen(start)) this.lentSlot = slot;
 		return slot;
@@ -26479,7 +26507,7 @@ export function setHTML(el: Element, value: any): void {
 		journalRootRange(el, null, null);
 		// Raw HTML is a leaf: stage its genuine new nodes next to the outgoing
 		// ones so a later suspension cannot blur an input in the retained HTML.
-		deferRootRange(el, getFirstChild(el), (STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild);
+		queueRootDeletion(null, getFirstChild(el), (STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild);
 		const fresh = (STAGED_DOM ? STAGED_DOM.view(el) : el).cloneNode(false) as Element;
 		(STAGED_DOM ? STAGED_DOM.view(fresh) : fresh).innerHTML = next;
 		while (getFirstChild(fresh) !== null)
@@ -33923,7 +33951,7 @@ function teardownRegisteredPortalState(state: PortalSlot): void {
 		!isCreatedInRootRender(transaction, state.block) &&
 		state.target !== null
 	) {
-		deferRootRange(state.target, state.start, state.end, () => teardownPortalState(state));
+		queueRootDeletion(() => teardownPortalState(state), state.start, state.end);
 		return;
 	}
 	if (state.block) {
@@ -34972,6 +35000,8 @@ interface CompSlot {
 	prevKey: any;
 	/** The call site supplied `key=`, even when its current value is undefined. */
 	keyed: boolean;
+	/** Pending structure in the open root render (SlotNext). */
+	next: SlotNext | null;
 }
 
 const NO_KEY: unique symbol = Symbol('NO_KEY');
@@ -35341,6 +35371,7 @@ function componentSlotImpl(
 			currentComp: null,
 			prevKey: NO_KEY,
 			keyed: hasKey === true || key !== undefined,
+			next: null,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -35497,7 +35528,7 @@ function componentSlotImpl(
 					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, r.wip.start, r.wip.end);
 				}
 				spliceWipCapture(r.wip);
-				deferRootReplacement(oldBlock, domParent, first, last);
+				queueSlotDeletion(state, oldBlock, first, last);
 				return;
 			}
 		}
@@ -35894,6 +35925,8 @@ interface ChildSlot {
 	// down when the value stops being a portal. Lets a portal render at any value
 	// position (component return, ternary, fragment root, render-fn result).
 	portal: PortalSlot | null;
+	/** Pending structure in the open root render (SlotNext). */
+	next: SlotNext | null;
 	/** Cold capability path for a signal passed through an otherwise-unmarked prop. */
 	implicitSignal?: unknown;
 }
@@ -36187,25 +36220,19 @@ function clearChildContent(state: ChildSlot): void {
 			const oldBlock = state.block;
 			const oldList = state.forSlot;
 			const oldHost = state.hostNode;
-			if (oldBlock !== null) {
-				deferRootReplacement(oldBlock, parent, first, last);
-			} else {
-				if (oldList !== null) {
-					for (let item = oldList.head; item !== null; item = item.nextSibling) {
-						retireRootBlock(item);
-					}
-					if (oldList.emptyBlock !== null) retireRootBlock(oldList.emptyBlock);
+			if (oldBlock !== null) queueSlotDeletion(state, oldBlock, first, last);
+			else if (oldList !== null) {
+				for (let item = oldList.head; item !== null; item = item.nextSibling) {
+					retireRootBlock(item);
 				}
-				deferRootRange(parent, first, last, () => {
-					if (oldList !== null) {
-						for (let item = oldList.head; item !== null; item = item.nextSibling)
-							unmountBlock(item, false);
-						if (oldList.emptyBlock !== null) unmountBlock(oldList.emptyBlock, false);
-					} else if (oldHost !== null) {
-						detachDeoptTreeRefs(oldHost, null);
-					}
-				});
-			}
+				if (oldList.emptyBlock !== null) retireRootBlock(oldList.emptyBlock);
+				slotNext(state).out.push(oldList, first, last);
+			} else
+				slotNext(state).out.push(
+					oldHost === null ? null : () => detachDeoptTreeRefs(oldHost, null),
+					first,
+					last,
+				);
 			// Logical ownership changes now; saved committed nodes remain connected
 			// until the root outcome is known. Incoming content mounts beside them.
 			state.block = null;
@@ -36306,7 +36333,7 @@ function clearReplacedChildBlock(state: ChildSlot, oldBlock: Block): void {
 				: after === null
 					? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
 					: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling;
-		deferRootReplacement(oldBlock, parent, first, last);
+		queueSlotDeletion(state, oldBlock, first, last);
 		return;
 	}
 	unmountBlock(oldBlock, false);
@@ -37382,7 +37409,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			// attempt is discarded; a deferred removal would still run at commit.
 			if (journal && hydration?.speculative !== true) {
 				journalRootChildren(el);
-				deferRootRange(el, n, n, () => detachDeoptTreeRefs(n, null));
+				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
 				(STAGED_DOM ? STAGED_DOM.view(el) : el).removeChild(n);
@@ -37550,7 +37577,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 						(STAGED_DOM ? STAGED_DOM.view(stale) : stale).previousSibling,
 						getNextSibling(stale),
 					);
-					deferRootRange(block.parentNode, stale, stale, () => detachDeoptTreeRefs(stale, null));
+					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 				} else {
 					detachDeoptTreeRefs(stale, null);
 					const parent = block.parentNode;
@@ -37604,6 +37631,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 				// candidate — childSlot's upgrade branch adopts it in place.
 				hostNode: transfer,
 				portal: null,
+				next: null,
 			};
 			scope.slots[0] = borrowed;
 			registerSlot(scope, borrowed);
@@ -37678,9 +37706,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 			}
 			if (ROOT_RENDER_TRANSACTION !== null) {
 				const retired = prev;
-				deferRootRange(block.parentNode, retired, retired, () =>
-					detachDeoptTreeRefs(retired, null),
-				);
+				queueRootDeletion(() => detachDeoptTreeRefs(retired, null), retired, retired);
 			} else {
 				detachDeoptTreeRefs(prev, null);
 				const parent = block.parentNode;
@@ -37801,7 +37827,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 						(STAGED_DOM ? STAGED_DOM.view(stale) : stale).previousSibling,
 						getNextSibling(stale),
 					);
-					deferRootRange(block.parentNode, stale, stale, () => detachDeoptTreeRefs(stale, null));
+					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 				} else {
 					detachDeoptTreeRefs(stale, null);
 					if (attached) domNode(block.parentNode).removeChild(stale);
@@ -38035,7 +38061,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 			// This Block keeps rendering, so the replaced element retires on its own,
 			// before its children leave it and can take focus with them.
 			if (ROOT_RENDER_TRANSACTION !== null)
-				deferRootRange(block.parentNode, null, null, () => retireEventHostTree(retired));
+				queueRootDeletion(() => retireEventHostTree(retired), null, null);
 			else retireEventHostTree(retired);
 			// The children slot's live content — markers included — sat inside the
 			// removed element, so a preserved slot would keep rendering into the
@@ -38050,8 +38076,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 				const ref = getDeoptDesc(retired)?.props?.ref;
 				if (ref != null) queueRefDetach(ref, retired);
 			};
-			if (ROOT_RENDER_TRANSACTION !== null)
-				deferRootRange(block.parentNode, retired, retired, detach);
+			if (ROOT_RENDER_TRANSACTION !== null) queueRootDeletion(detach, retired, retired);
 			else {
 				detach();
 				(STAGED_DOM ? STAGED_DOM.view(retired) : retired).remove();
@@ -38946,9 +38971,7 @@ function renderPreparedChildList(
 			const n = leftovers[i].node;
 			if ((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode !== null) {
 				if (ROOT_RENDER_TRANSACTION !== null) {
-					deferRootRange((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode!, n, n, () =>
-						detachDeoptTreeRefs(n, null),
-					);
+					queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 				} else {
 					detachDeoptTreeRefs(n, null);
 					domNode((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode!).removeChild(n);
@@ -39703,6 +39726,7 @@ export function childSlot(
 			forSlot: null,
 			hostNode: null,
 			portal: null,
+			next: null,
 			implicitSignal: undefined,
 		};
 		parentScope.slots[slotKey] = state;
@@ -39833,7 +39857,7 @@ export function childSlot(
 				const next: Node | null = getNextSibling(n);
 				if (ROOT_RENDER_TRANSACTION !== null) {
 					const outgoing = n;
-					deferRootRange(domParent, outgoing, outgoing, () => detachDeoptTreeRefs(outgoing, null));
+					queueRootDeletion(() => detachDeoptTreeRefs(outgoing, null), outgoing, outgoing);
 				} else {
 					detachDeoptTreeRefs(n, null);
 					(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(n);
@@ -39879,7 +39903,7 @@ export function childSlot(
 						const parent = (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!;
 						if (ROOT_RENDER_TRANSACTION !== null) {
 							journalRootChildShape(state, parent);
-							deferRootRange(parent, prev, prev, () => detachDeoptTreeRefs(prev, null));
+							queueRootDeletion(() => detachDeoptTreeRefs(prev, null), prev, prev);
 							if (node !== null)
 								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
 						} else {
@@ -39920,12 +39944,7 @@ export function childSlot(
 					if (ROOT_RENDER_TRANSACTION !== null) {
 						journalRootChildShape(state, domParent);
 						const outgoing = prev;
-						deferRootRange(
-							(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!,
-							prev,
-							prev,
-							() => detachDeoptTreeRefs(outgoing, null),
-						);
+						queueRootDeletion(() => detachDeoptTreeRefs(outgoing, null), prev, prev);
 					} else {
 						detachDeoptTreeRefs(prev, null);
 						domNode((STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!).removeChild(prev);
@@ -40263,8 +40282,7 @@ export function childSlot(
 					journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
 					r.wip.block.exclusiveMarkers = true;
 					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, state.start, state.end);
-					deferRootRange(domParent, oldStart, oldStart);
-					deferRootRange(domParent, oldEnd, oldEnd);
+					slotNext(state).out.push(null, oldStart, oldStart, null, oldEnd, oldEnd);
 				}
 				if (state.start === null && state.ownerHost === null && !state.borrowed) {
 					state.start = r.wip.start;
@@ -45727,6 +45745,8 @@ interface BranchSlot {
 	 * starts on the arm block's `startMarker` instead (pendingArmBefore).
 	 */
 	unfinalized: boolean;
+	/** Pending structure in the open root render (SlotNext). */
+	next: SlotNext | null;
 }
 
 /**
@@ -45997,8 +46017,8 @@ let UNMOUNT_LITE_ARM: ((state: BranchSlot, detachDom: boolean) => void) | null =
  * Remove a slot's lite arm: its Scope and, with `detachDom`, its DOM. A pair
  * that delimits the arm stays for the slot's next arm, as an arm Block's
  * borrowed markers do. When a root render that did not create the arm removes
- * it, the release waits for the commit and rollback restores the nodes, as
- * deferRootUnmount does for a committed Block.
+ * it, the release and the removal wait for the commit, as a committed Block's
+ * do (queueRootUnmount).
  */
 function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
 	const scope = state.lite!;
@@ -46014,7 +46034,7 @@ function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
 		arm.idState.renderOwner === transaction.owner &&
 		!isCreatedInRootRender(transaction, owningBlock(arm))
 	) {
-		deferRootTeardown(transaction, scope, exclusive, detachDom, releaseLiteArm);
+		queueRootUnmount(scope, exclusive);
 		return;
 	}
 	const start = arm.startMarker;
@@ -46265,7 +46285,7 @@ function renderBranchSlot(
 				state.block = null;
 				state.lite = null;
 				state.branch = next;
-				deferRootArmReplacement(oldBlock, oldLite, domParent, first, last);
+				queueSlotDeletion(state, (oldBlock ?? oldLite)!, first, last);
 				return;
 			}
 			const stageAfter = first === null ? (borrowed ? state.start : null) : last;
@@ -46321,7 +46341,7 @@ function renderBranchSlot(
 				journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
 				r.wip.block.exclusiveMarkers = true;
 				spliceWipCapture(r.wip);
-				deferRootArmReplacement(oldBlock, oldLite, domParent, first, last);
+				queueSlotDeletion(state, (oldBlock ?? oldLite)!, first, last);
 				return;
 			}
 		}
@@ -46727,6 +46747,7 @@ export function ifBlock(
 			block: null,
 			lite: null,
 			unfinalized: false,
+			next: null,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -47700,6 +47721,7 @@ export function switchBlock(
 			block: null,
 			lite: null,
 			unfinalized: false,
+			next: null,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -49037,7 +49059,7 @@ function reconcileKeyed<T>(
 	}
 	// Fast path: clear all.
 	if (newLen === 0) {
-		const ownedRootClear = journalShape && canDeferRootOwnedListClear(state);
+		const ownedRootClear = journalShape && canQueueOwnedListClear(state);
 		if (
 			ownedRootClear &&
 			(TRANSITION_JOURNAL_BAGS!.get(state) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
@@ -49603,7 +49625,7 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  * Rows with lifecycle work stay on the ordinary parked-item path so their
  * cleanup order and connected-DOM observations remain unchanged.
  */
-function canDeferRootOwnedListClear(state: ForSlot): boolean {
+function canQueueOwnedListClear(state: ForSlot): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
 	const parent = domNode(state.start).parentNode;
 	if (
@@ -49641,32 +49663,23 @@ function canDeferRootOwnedListClear(state: ForSlot): boolean {
 	return true;
 }
 
-function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): boolean {
-	if (!certified && !canDeferRootOwnedListClear(state)) return false;
+function queueOwnedListClear(state: ForSlot, certified: boolean = false): boolean {
+	if (!certified && !canQueueOwnedListClear(state)) return false;
 	const transaction = ROOT_RENDER_TRANSACTION!;
 	const parent = domNode(state.start).parentNode!;
 	const oldHead = state.head;
+	// retireRootBlock, inlined: this visits every row of a bulk clear.
 	const retired = (transaction.retired ??= new Set<Block>());
-	const newlyRetired: Block[] = [];
 	for (let block = oldHead; block !== null; block = block.nextSibling) {
-		if (!retired.has(block)) {
-			retired.add(block);
-			newlyRetired.push(block);
-		}
+		retired.add(block);
 		if (block.pending) {
 			journalRootProperty(block, 'pending', block.pending);
 			block.pending = false;
 		}
 	}
-	let cancelled = false;
-	journalUndo(() => {
-		cancelled = true;
-		for (let i = 0; i < newlyRetired.length; i++) retired.delete(newlyRetired[i]);
-	});
 	const start = state.start;
 	const end = state.end;
-	(transaction.commit ??= []).push(() => {
-		if (cancelled) return;
+	transaction.ops.push(() => {
 		// A later render may have inserted new rows, or outside code may have
 		// changed this parent. Only clear wholesale while these exact old nodes
 		// still occupy its complete content between the original two markers.
@@ -49711,7 +49724,7 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 					domNode((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!).removeChild(node);
 			}
 		}
-	});
+	}, null);
 	return true;
 }
 
@@ -49743,7 +49756,7 @@ function batchClearItems(
 	// inert rows can stay connected and clear together at commit; all other
 	// rows park individually so their cleanup and ref behavior stays intact.
 	if (forSlotParkable(state)) {
-		if (deferRootOwnedListClear(state, ownedRootClear)) {
+		if (queueOwnedListClear(state, ownedRootClear)) {
 			oldItems.clear();
 			return;
 		}
@@ -51082,7 +51095,10 @@ function makeRoot(
 				if (renderOwner.wakeable === null) root.unmount();
 				return;
 			}
-			if (staged) deferRootReplacement(previousRoot!, container, oldFirst, oldLast);
+			if (staged) {
+				retireRootBlock(previousRoot!);
+				queueRootDeletion(previousRoot, oldFirst, oldLast);
+			}
 			// First render commits effects on next microtask flush.
 			if (!syncFlush && !scheduled) {
 				scheduled = true;
@@ -51420,7 +51436,7 @@ function installHydrationFallback(
 		// Rolling back a render that never commits restores exactly these nodes.
 		journalRootRange(container, null, null);
 		if (container.nodeType === 9 || (container as Element).localName === 'html') removeNodes(nodes);
-		(transaction.commit ??= []).push(() => {
+		transaction.ops.push(() => {
 			owner.hydrationFallback = undefined;
 			// An island the client render adopted belongs to its tree now.
 			const discarded = nodes.filter(
@@ -51432,7 +51448,7 @@ function installHydrationFallback(
 				console.error(diagnostic);
 			if (report !== undefined && transaction.caught !== true)
 				queueMicrotask(() => invokeRootErrorHandler(report, failure));
-		});
+		}, null);
 	};
 }
 
