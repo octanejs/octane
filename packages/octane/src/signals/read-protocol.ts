@@ -1,6 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
-import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { ScopedNode, SignalReadMode } from './graph.js';
 
 /** Explicit async reads own an observer edge instead of a synchronous graph edge. */
@@ -17,24 +16,23 @@ export interface SignalCapture {
 	[SIGNAL_SAME_CAPTURE](committed: unknown, owner: object): boolean;
 }
 
-/** Only presentation subscriptions participate; public subscribers are never replayed. */
+/**
+ * The renderer Block a native read subscription renders. A transition that
+ * writes what it reads renders that Block with its batch (pending.ts); other
+ * subscribers, public ones included, hear only of the batch's commit.
+ */
 export const NATIVE_TRANSITION_CONSUMER: unique symbol = Symbol('octane.transitionConsumer');
 
-export interface NativeTransitionConsumer {
-	active(): boolean;
-	prepare(): void | NativeTransitionPresentation;
-}
+export type NativeTransitionNotify = (() => void) & {
+	[NATIVE_TRANSITION_CONSUMER]?: object;
+};
 
-/** Prepared host work stays private until every participating presentation is ready. */
+/** Prepared DOM binding work stays private until it is committed or discarded. */
 export interface NativeTransitionPresentation {
 	validate(): boolean;
 	commit(): void;
 	discard(): void;
 }
-
-export type NativeTransitionNotify = (() => void) & {
-	[NATIVE_TRANSITION_CONSUMER]?: NativeTransitionConsumer;
-};
 
 /** Preserve presentation identity when an owner or lifetime wraps a subscription. */
 export function forwardNativeTransitionConsumer<T extends () => void>(
@@ -42,7 +40,8 @@ export function forwardNativeTransitionConsumer<T extends () => void>(
 	wrapped: T,
 ): T {
 	const consumer = notify[NATIVE_TRANSITION_CONSUMER];
-	if (consumer) (wrapped as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER] = consumer;
+	if (consumer !== undefined)
+		(wrapped as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER] = consumer;
 	return wrapped;
 }
 
@@ -89,31 +88,6 @@ export function currentSignalDeclarationInvocation(): number {
 export function setSignalDeclarationInvocation(invocation: number): number {
 	const previous = declarationInvocation;
 	declarationInvocation = invocation;
-	return previous;
-}
-
-let nativeActionResolver: (() => SignalCandidateFrame | undefined) | undefined;
-let nativeCandidateResolver: (() => SignalCandidateFrame | undefined) | null | undefined;
-
-/** Lazy renderer registration survives a reentrant synchronous input scope. */
-export function registerNativeActionResolver(
-	resolver: () => SignalCandidateFrame | undefined,
-): void {
-	nativeActionResolver = resolver;
-}
-
-export function getNativeCandidate(): SignalCandidateFrame | undefined {
-	return nativeCandidateResolver === undefined
-		? nativeActionResolver?.()
-		: nativeCandidateResolver?.();
-}
-
-/** Restore before yielding; null suppresses even a newly registered Action resolver. */
-export function setNativeCandidateResolver(
-	resolver: (() => SignalCandidateFrame | undefined) | null | undefined,
-): typeof resolver {
-	const previous = nativeCandidateResolver;
-	nativeCandidateResolver = resolver;
 	return previous;
 }
 

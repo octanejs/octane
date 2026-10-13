@@ -19,7 +19,6 @@ import {
 import { captureSignalOwner, currentSignalOwner } from './owner-context.js';
 import {
 	forwardNativeTransitionConsumer,
-	NATIVE_TRANSITION_CONSUMER,
 	type NativeTransitionNotify,
 } from './read-protocol.js';
 import {
@@ -30,7 +29,7 @@ import {
 	type SignalHandle,
 	type SignalOwner,
 } from './types.js';
-import { withoutSignalCandidate } from './transition-state.js';
+import { withCommittedSignals } from './transition-state.js';
 
 type SignalControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type ControlChannel = 'value' | 'checked';
@@ -138,7 +137,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				if (disposed || !isWritableSignal(active)) return;
 				const writable = active;
 				// Target listeners run before delegated event urgency is established.
-				withoutSignalCandidate(() =>
+				withCommittedSignals(() =>
 					run(() => {
 						const previous = read(writable);
 						if (
@@ -482,27 +481,6 @@ export function bindSignalControl(
 		} finally {
 			busy = false;
 		}
-	};
-	refresh[NATIVE_TRANSITION_CONSUMER] = {
-		active: () => !disposed,
-		prepare: () => {
-			const prepared = lease.preview(handle$);
-			return {
-				validate: () => !disposed && !busy && prepared.validate(),
-				discard: prepared.discard,
-				commit() {
-					if (!disposed) {
-						busy = true;
-						try {
-							prepared.publish();
-							prepared.commit();
-						} finally {
-							busy = false;
-						}
-					}
-				},
-			};
-		},
 	};
 	const owner = currentSignalOwner();
 	lease = __createBindingControls(owner).claim(control, channel, refresh);

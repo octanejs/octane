@@ -269,34 +269,26 @@ import {
 } from './signals/native-read-collector.js';
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
-	activeCandidate,
-	swapActiveSignalCandidate,
-	withoutSignalCandidate,
+	pendingSignals,
+	registerPendingHost,
+	withCommittedSignals,
+	type PendingHost,
+	type PendingSlotLike,
 } from './signals/transition-state.js';
-// The graph registers these by default; an islands build bundles them here.
-import {
-	createSignalActionFrame,
-	createSignalTransitionCoordinator,
-} from '#octane/signal-actions/renderer';
-import { installNativeSignalActionExtension } from './signals/transition-candidate.js';
-import type { SignalActionFrame } from './signals/transition-action.js';
-import type {
-	NativeTransitionAttempt,
-	SignalTransitionCoordinator,
-} from './signals/transition-coordinator.js';
+// The graph registers pending signal state by default; an islands build bundles it here.
+import { installRendererSignalActions } from '#octane/signal-actions/renderer';
 import {
 	ADOPTION_CONTROL,
 	NativeAdoptionMiss,
-	NATIVE_TRANSITION_CONSUMER,
+	beginNativeBatch,
+	endNativeBatch,
 	nativeProducerPublication,
 	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
 	startEarlySignalHydration,
 	readNativeDomStyle,
-	registerNativeActionResolver,
 	registerNativeReadRebase,
 	registerSignalDeclarationStage,
 	runNativeBatch,
-	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
 	supplyNativeAdoptionMiss,
 	type SignalDeclarationStage,
@@ -1896,7 +1888,6 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER) return NATIVE_READ_DRIVER;
-	installNativeSignalActionExtension();
 	// Native producers share the landed host-task queue without installing
 	// the transition root or offscreen-rendering capabilities.
 	TRANSITION_TASK_DRIVER ??= {
@@ -1909,8 +1900,6 @@ function ensureNativeReadDriver(): NativeReadDriver {
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,
 		schedule: scheduleNativeRead,
-		prepare: prepareNativeTransitionBlock,
-		retire: retireNativeTransitionBlock,
 		suspended: retainNativeRetryReads,
 		replayRefs: (capture, owner) =>
 			replayNativeUnpublishedRefs(capture as OffscreenCapture, owner as RootRenderOwner),
@@ -2037,8 +2026,6 @@ export function replayNativeReadWitness(witness: NativeReadWitness | null | unde
 }
 
 function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
-	// The candidate's revocable preparation watch owns this unsuccessful read.
-	if (NATIVE_TRANSITION_ATTEMPT !== null) return;
 	// An existing Suspense/hidden Activity owner survives its unsuccessful body.
 	// Retain a minimal retry lease there, not in the discarded child Scope.
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
@@ -3018,23 +3005,26 @@ function ensureTransitionSwapDriver(): void {
 		dispose: disposeWip,
 		splice: spliceWipCapture,
 	};
-	TRANSITION_ROOT_DRIVER ??= {
-		fold: foldTransitionUpdate,
-		queue: queueTransitionUpdate,
-		memoCells: transitionMemoCells,
-		keep: keepTransitionWork,
-		splitCue: splitTransitionCue,
-		splitsCue: splitsTransitionCue,
-		armFalls: armTransitionFalls,
-		settleFalls: settleTransitionFalls,
-		cancelFall: cancelTransitionFall,
-		drop: dropTransitionRender,
-		retry: retryTransitionHolder,
-		unsuspend: unsuspendTransitionHolder,
-		holdsUnrendered: holdsUnrenderedTransition,
-		wake: wakeHeldTransitions,
-		discard: discardHeldRoot,
-	};
+	if (!TRANSITION_ROOT_DRIVER) {
+		TRANSITION_ROOT_DRIVER = {
+			fold: foldTransitionUpdate,
+			queue: queueTransitionUpdate,
+			memoCells: transitionMemoCells,
+			keep: keepTransitionWork,
+			splitCue: splitTransitionCue,
+			splitsCue: splitsTransitionCue,
+			armFalls: armTransitionFalls,
+			settleFalls: settleTransitionFalls,
+			cancelFall: cancelTransitionFall,
+			drop: dropTransitionRender,
+			retry: retryTransitionHolder,
+			unsuspend: unsuspendTransitionHolder,
+			holdsUnrendered: holdsUnrenderedTransition,
+			wake: wakeHeldTransitions,
+			discard: discardHeldRoot,
+		};
+		installPendingSignalHost();
+	}
 	TRANSITION_TASK_DRIVER ??= {
 		queue: queueTransitionBlock,
 		adopt: adoptTransitionQueue,
@@ -3110,49 +3100,111 @@ interface TransitionActionBatch {
 	cueEpoch: number;
 	pendingHolds?: number;
 	workComplete?: boolean;
-	/** Allocated only by a native write inside this Action. */
-	native?: SignalActionFrame;
-	nativeWake?: () => void;
-	nativeBlocks?: Set<Block>;
-	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
+	/**
+	 * Signal nodes pending in this batch (signals/pending.ts), promoted once it
+	 * and every batch entangled into it finish; null once they have been.
+	 */
+	signals?: PendingSlotLike[] | null;
 }
 
-/** Associate neutral coordinator ports with the renderer's actual object types. */
-interface NativeTransitionTypes {
-	Block: Block;
-	Owner: RootRenderOwner;
-	Transaction: RootRenderTransaction;
-	Hook: TransitionHookSlot;
-	Batch: TransitionActionBatch;
-	Boundary: TrySlot;
-	Thenable: TrackedThenable;
-	Suspense: SuspenseException;
-	Capture: OffscreenCapture;
-	RootFrame: RootRenderFrame;
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending signals (#2043).
+//
+// A signal written inside a transition keeps its committed state and gets one
+// pending slot tagged with the write's batch (signals/pending.ts). Committed
+// readers, subscriptions and DOM bindings keep reading committed state. The
+// Blocks that read it render with the batch, at transition priority, and a
+// transition render that folds a ready batch reads its slots, exactly as it
+// folds its hook updates, so a hold keeps them pending with the rest of the
+// batch. When the batch and every batch entangled into it finish, the slots
+// promote before the commit that presents them accepts its reads, and their
+// committed readers hear of it once that commit ends.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether the current read sees `batch`'s pending signals (PendingHost.visible):
+ * a render folds them exactly when it folds the batch's hook updates.
+ */
+function pendingSignalVisible(batch: object): boolean | undefined {
+	const block = CURRENT_BLOCK;
+	if (block === null) {
+		const active = ACTIVE_TRANSITION_ACTION_BATCH;
+		return active === null
+			? undefined
+			: rootTransitionBatch(active) === rootTransitionBatch(batch as TransitionActionBatch);
+	}
+	return foldTransitionUpdate(
+		batch as TransitionActionBatch,
+		block.currentRenderMode === 'transition',
+		ROOT_RENDER_TRANSACTION,
+	);
 }
 
-let NATIVE_TRANSITION_DRIVER: SignalTransitionCoordinator<NativeTransitionTypes> | null = null;
-let NATIVE_TRANSITION_ATTEMPT: NativeTransitionAttempt<NativeTransitionTypes> | null = null;
+/** Slots whose batches finished, promoted by the next commit (promotePendingSignals). */
+let PENDING_SIGNAL_PROMOTIONS: PendingSlotLike[] | null = null;
 
-function queueNativeTransition(batch: TransitionActionBatch): void {
-	NATIVE_TRANSITION_DRIVER!.queue(batch);
+function settleTransitionSignals(batch: TransitionActionBatch): void {
+	const root = rootTransitionBatch(batch);
+	const slots = root.signals;
+	if (slots === undefined || slots === null || !transitionBatchSettled(root)) return;
+	root.signals = null;
+	queuePendingSignalPromotion(slots);
 }
 
-function prepareNativeTransitionBlock(block: Block): void {
-	NATIVE_TRANSITION_DRIVER!.prepare(block);
+/** A batch and the batches entangled into it have all finished. */
+function transitionBatchSettled(batch: TransitionActionBatch): boolean {
+	if (!batch.finished) return false;
+	const members = batch.members;
+	if (members !== null)
+		for (let i = 0; i < members.length; i++) if (!transitionBatchSettled(members[i])) return false;
+	return true;
 }
 
-function retireNativeTransitionBlock(block: Block): void {
-	NATIVE_TRANSITION_DRIVER?.retire(block);
-}
-
-function scheduleNativeTransitionFlush(): void {
-	if (syncFlush) return;
-	if (!inFlush && CURRENT_BLOCK === null && !TRANSITION_TASK_ACTIVE) scheduleTransitionTask();
+function queuePendingSignalPromotion(slots: PendingSlotLike[]): void {
+	if (PENDING_SIGNAL_PROMOTIONS === null) PENDING_SIGNAL_PROMOTIONS = slots;
+	else PENDING_SIGNAL_PROMOTIONS.push(...slots);
+	// A flush promotes them with the commit it drains.
+	if (!inFlush && CURRENT_BLOCK === null) promotePendingSignals();
 	else if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
 	}
+}
+
+function promotePendingSignals(): void {
+	const slots = PENDING_SIGNAL_PROMOTIONS;
+	if (slots === null) return;
+	PENDING_SIGNAL_PROMOTIONS = null;
+	if (
+		DEFERRED_LAYOUT_DRIVER &&
+		DEFERRED_LAYOUT_DRIVER.stageAction(() => pendingSignals!.promote(slots))
+	)
+		return;
+	pendingSignals!.promote(slots);
+}
+
+function installPendingSignalHost(): void {
+	const host: PendingHost = {
+		batch: transitionActionBatchForUpdate,
+		visible: pendingSignalVisible,
+		root: rootTransitionBatch as PendingHost['root'],
+		entangle(into, from) {
+			const root = rootTransitionBatch(into as TransitionActionBatch);
+			const other = rootTransitionBatch(from as TransitionActionBatch);
+			if (root !== other) entangleTransitionBatches(root, other);
+		},
+		consume(batch, block) {
+			invalidateRender(block as Block, block as Block);
+			noteTransitionBlock(rootTransitionBatch(batch as TransitionActionBatch), block as Block);
+		},
+		hold(batch, slot) {
+			const root = rootTransitionBatch(batch as TransitionActionBatch);
+			if (root.signals === null) queuePendingSignalPromotion([slot]);
+			else (root.signals ??= []).push(slot);
+		},
+	};
+	registerPendingHost(host);
+	installRendererSignalActions();
 }
 
 /**
@@ -3171,85 +3223,6 @@ function scheduleNativeTransitionFlush(): void {
 let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 /** The entangled batch shared by explicit transitions while an Action is awaiting. */
 let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
-let nativeActionResolverInstalled = false;
-
-function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFrame | undefined {
-	let candidate = batch.native;
-	if (candidate !== undefined && !candidate.validate()) {
-		if (candidate.hasWrites()) candidate.rebase();
-		else {
-			candidate.discard();
-			candidate = undefined;
-		}
-	}
-	candidate ??= batch.native = createSignalActionFrame?.();
-	if (candidate !== undefined && NATIVE_TRANSITION_DRIVER === null) {
-		// Signals can first load after this Action awaited, so initialize the
-		// coordinator only when its first frame is acquired.
-		NATIVE_TRANSITION_DRIVER = createSignalTransitionCoordinator!<NativeTransitionTypes>({
-			get attempt() {
-				return NATIVE_TRANSITION_ATTEMPT;
-			},
-			set attempt(admission) {
-				NATIVE_TRANSITION_ATTEMPT = admission;
-			},
-			get visibility() {
-				return SCHEDULED_VISIBILITY_DRIVER;
-			},
-			get rollback() {
-				return ROOT_RENDER_ROLLBACK;
-			},
-			get fallbackTimeout() {
-				return TRANSITION_FALLBACK_TIMEOUT_MS;
-			},
-			schedule: scheduleNativeTransitionFlush,
-			beginRoot: beginRootRender,
-			endRoot: endRootRender,
-			invalidate: invalidateRender,
-			render: renderBlock,
-			journal: journalObjectOnce,
-			journalProperty: journalRootProperty,
-			isSuspense: isSuspenseException,
-			releaseHookHolder: releaseTransitionHookHolder,
-			flushBatch: flushTransitionActionBatch,
-			currentPresentations: (capture) =>
-				!hydrationStarted || HYDRATION_DRIVER!.currentPresentations(capture as OffscreenCapture),
-			validateCapture: (capture) =>
-				!NATIVE_READ_DRIVER || NATIVE_READ_DRIVER.validateCapture(capture),
-			acceptCapture: acceptNativeCapture,
-			commitRoots: commitRootRenders,
-			rollbackRoot: (transaction) => {
-				restoreTransitionMemos(transaction, false);
-				rollbackRootRender(transaction);
-			},
-			handleError: handleResumeError,
-			reportError: reportTransitionError,
-			unsupportedError: () => new TypeError(formatClientError(79)),
-		});
-	}
-	return candidate;
-}
-
-/** Setters, not reads, consult the same post-await batch as ordinary hooks. */
-function ensureNativeActionResolver(): void {
-	if (nativeActionResolverInstalled) return;
-	nativeActionResolverInstalled = true;
-	registerNativeActionResolver(resolveNativeActionCandidate);
-}
-
-function resolveNativeActionCandidate(): SignalActionFrame | undefined {
-	const batch = transitionActionBatchForUpdate();
-	return batch === null ? undefined : nativeCandidateForAction(batch);
-}
-
-// Installed only inside runTransition's synchronous slice, where the active batch
-// is that transition's own: a nested transition joins its parent's batch. Reading
-// it here instead of capturing it keeps every transition free of a closure.
-function resolveTransitionNativeCandidate(): SignalActionFrame | undefined {
-	const candidate = nativeCandidateForAction(ACTIVE_TRANSITION_ACTION_BATCH!);
-	swapActiveSignalCandidate(candidate);
-	return candidate;
-}
 
 function createTransitionActionBatch(): TransitionActionBatch {
 	return {
@@ -3299,14 +3272,11 @@ function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 /**
  * A transition render folds a batch once its synchronous callback has returned
  * and its Actions have settled, unless a dropped render holds it waiting for
- * data (dropTransitionRender): React's suspended lanes. A native candidate
- * folds its own batch while it prepares.
+ * data (dropTransitionRender): React's suspended lanes.
  */
 function transitionBatchReady(batch: TransitionActionBatch): boolean {
 	batch = rootTransitionBatch(batch);
-	return batch.flushed
-		? batch.waiting === 0 && batch.suspended === 0
-		: NATIVE_TRANSITION_ATTEMPT !== null && NATIVE_TRANSITION_ATTEMPT.batch === batch;
+	return batch.flushed && batch.waiting === 0 && batch.suspended === 0;
 }
 
 /** Record a Block whose render must process this batch's queued work. */
@@ -3358,17 +3328,6 @@ function scheduleTransitionBatch(batch: TransitionActionBatch): void {
 
 function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 	if (batch.flushed) return;
-	if (batch.native !== undefined) {
-		if (batch.native.hasWrites()) {
-			holdTransitionBatch(batch, batch, false);
-			queueNativeTransition(batch);
-			if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
-			return;
-		}
-		// Equal writes and throwing updaters can still acquire candidate read leases.
-		batch.native.discard();
-		batch.native = undefined;
-	}
 	batch.flushed = true;
 	if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) {
 		IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
@@ -3401,9 +3360,9 @@ let TRANSITION_PENDING_COUNT = 0;
 const TRANSITION_LISTENERS = new Set<() => void>();
 /**
  * Batches each holder keeps waiting: a Suspense boundary or root whose
- * dropped render suspended on them (dropTransitionRender), or a native
- * candidate's own batch. A held batch keeps its hooks pending and no render
- * folds it until its holder retries it (retryTransitionHolder).
+ * dropped render suspended on them (dropTransitionRender). A held batch keeps
+ * its hooks pending and no render folds it until its holder retries it
+ * (retryTransitionHolder).
  */
 let TRANSITION_HOLDERS: Map<object, TransitionHold> | null = null;
 /** Holders a new update woke, retried in the transition task once that update committed. */
@@ -3468,23 +3427,24 @@ function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 	const members = batch.members;
 	if (members !== null)
 		for (let i = 0; i < members.length; i++) finishTransitionHookBatch(members[i]);
+	settleTransitionSignals(batch);
 }
 
 /**
  * A hold keeps its batches' hooks pending. While it `suspends`, it also keeps
- * them from rendering (transitionBatchReady): a native candidate's hold of its
- * own batch, and a boundary showing its timeout fallback, only keep isPending.
+ * them from rendering (transitionBatchReady); a boundary showing its timeout
+ * fallback only keeps isPending (unsuspendTransitionHolder).
  */
 interface TransitionHold {
 	batches: Set<TransitionActionBatch>;
 	suspends: boolean;
 }
 
-function holdTransitionBatch(holder: object, batch: TransitionActionBatch, suspends = true): void {
+function holdTransitionBatch(holder: object, batch: TransitionActionBatch): void {
 	const holders = (TRANSITION_HOLDERS ??= new Map());
 	let hold = holders.get(holder);
-	if (hold === undefined) holders.set(holder, (hold = { batches: new Set(), suspends }));
-	else if (suspends && !hold.suspends) {
+	if (hold === undefined) holders.set(holder, (hold = { batches: new Set(), suspends: true }));
+	else if (!hold.suspends) {
 		// The holder suspended its retried work again.
 		hold.suspends = true;
 		for (const held of hold.batches) held.suspended++;
@@ -3554,13 +3514,20 @@ function retryTransitionBatch(batch: TransitionActionBatch, render: boolean, fal
 	}
 }
 
-/** A boundary that shows its timeout fallback lets the held work commit around it. */
+/**
+ * A boundary that shows its timeout fallback lets the held work commit around
+ * it. That work renders in the transition task, after the fallback's commit and
+ * its effects, as React renders a transition lane after the commit before it.
+ */
 function unsuspendTransitionHolder(holder: object): void {
 	const hold = TRANSITION_HOLDERS?.get(holder);
 	if (hold === undefined || !hold.suspends) return;
 	hold.suspends = false;
 	for (const batch of hold.batches)
-		if (--batch.suspended === 0) retryTransitionBatch(batch, true, false);
+		if (--batch.suspended === 0) {
+			(RETRIED_TRANSITION_BATCHES ??= []).push(batch, true, false);
+			scheduleTransitionTask();
+		}
 }
 // useTransition/useOptimistic listeners are runtime-owned publication work.
 // When a transition boundary changes the pending count while another component
@@ -3762,6 +3729,12 @@ function entangleTransitionBatches(into: TransitionActionBatch, from: Transition
 	(into.members ??= []).push(from);
 	if (!from.flushed) into.waiting++;
 	for (const block of from.blocks) noteTransitionBlock(into, block);
+	const signals = from.signals;
+	if (signals) {
+		from.signals = undefined;
+		if (into.signals === null) queuePendingSignalPromotion(signals);
+		else (into.signals ??= []).push(...signals);
+	}
 }
 
 /**
@@ -3845,32 +3818,51 @@ function dropTransitionRender(transaction: RootRenderTransaction): boolean {
 	if (!live) return false;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.ROLLBACK_TRANSITION);
-	const owner = transaction.owner;
 	if (TRANSITION_HARVEST !== null)
 		for (let i = 0; i < TRANSITION_HARVEST.length; i++) TRANSITION_HARVEST[i].taken = false;
-	restoreTransitionMemos(transaction, true);
-	if (!transaction.aborted) rollbackRootRender(transaction);
-	// Later origins in this drain render, and commit, in a transaction of their own.
-	if (owner.transaction === transaction) owner.transaction = null;
 	let first = false;
 	for (const batch of batches) {
 		if (!batch.held) first = batch.held = true;
 	}
-	// The scheduled Blocks this drain rendered in the dropped transaction.
-	for (let i = 0, end = QUEUE.length; i < end; i++) {
-		const origin = QUEUE[i];
-		if (origin.drainStamp !== DRAIN_ID || origin.disposed || origin.idState.renderOwner !== owner)
-			continue;
-		harvestTransitionWarmValues(origin);
-		if (first || origin.currentRenderMode === 'urgent') scheduleRender(origin);
-	}
+	renderDroppedTransaction(transaction, first);
 	for (const holder of holders) {
 		if ((holder as TrySlot).__kind === 'trySlotSlot') {
 			if (!(holder as TrySlot).transitionHeld) continue;
 		} else if (TRANSITION_HOLDERS?.has(holder) !== true) tickTransitionCount(+1);
 		for (const batch of batches) holdTransitionBatch(holder, batch);
 	}
+	// Signals are shared by every root. Another root that rendered a batch with
+	// pending signals that this one now holds waits with it, rather than commit
+	// those signals alone.
+	for (const other of ROOT_RENDER_TRANSACTIONS)
+		if (
+			other !== transaction &&
+			!other.aborted &&
+			other.batches !== null &&
+			other.batches.some((batch) => batch.signals && batches.includes(batch))
+		)
+			renderDroppedTransaction(other, true);
 	return true;
+}
+
+/**
+ * Roll a dropped transaction back and render this drain's origins in it again:
+ * every origin (`all`), or only its urgent ones, whose work the drop lost.
+ */
+function renderDroppedTransaction(transaction: RootRenderTransaction, all: boolean): void {
+	const owner = transaction.owner;
+	restoreTransitionMemos(transaction, true);
+	if (!transaction.aborted) rollbackRootRender(transaction);
+	// Later origins in this drain render, and commit, in a transaction of their own.
+	if (owner.transaction === transaction) owner.transaction = null;
+	// The scheduled Blocks this drain rendered in the dropped transaction.
+	for (let i = 0, end = QUEUE.length; i < end; i++) {
+		const origin = QUEUE[i];
+		if (origin.drainStamp !== DRAIN_ID || origin.disposed || origin.idState.renderOwner !== owner)
+			continue;
+		harvestTransitionWarmValues(origin);
+		if (all || origin.currentRenderMode === 'urgent') scheduleRender(origin);
+	}
 }
 
 /**
@@ -4205,8 +4197,6 @@ interface RootRenderOwner {
 	retrySignalOwners?: SignalRetryOwners;
 	/** Only native suspended readers allocate a retry lease outside their discarded Scopes. */
 	nativeRetry?: NativeReadRetry;
-	/** Only roots participating in a native candidate retain cancellation ownership. */
-	nativeTransitions?: Set<TransitionActionBatch>;
 	transaction: RootRenderTransaction | null;
 	disposed: boolean;
 }
@@ -4237,8 +4227,6 @@ interface RootRenderTransaction {
 	aborted: boolean;
 	rootRequest: boolean;
 	hydrating?: boolean;
-	/** Collectively validated before a native candidate published canonical state. */
-	nativeAdmitted?: boolean;
 	/**
 	 * A catch arm caught an error in this render (setTryBranch). The client
 	 * render that replaces a failed hydration then commits without reporting
@@ -4884,6 +4872,18 @@ function releaseRootLeases(owner: RootRenderOwner, root: Block | null): void {
 }
 
 function commitRootRenders(): void {
+	// Finished transitions' signals promote before this commit accepts the
+	// renders that read them; committed readers hear of it once it ends.
+	const signals = PENDING_SIGNAL_PROMOTIONS === null ? null : beginNativeBatch();
+	try {
+		promotePendingSignals();
+		commitRootTransactions();
+	} finally {
+		endNativeBatch(signals);
+	}
+}
+
+function commitRootTransactions(): void {
 	const transactions = ROOT_RENDER_TRANSACTIONS;
 	if (transactions.length === 0) return;
 	ROOT_RENDER_TRANSACTIONS = [];
@@ -4903,12 +4903,11 @@ function commitRootRenders(): void {
 				continue;
 			}
 			// This is the native acceptance point. Validate before any deletion,
-			// ref, or effect callback can observe the candidate. A later callback
+			// ref, or effect callback can observe the render. A later callback
 			// write starts another transaction and does not revoke this snapshot.
 			if (
-				!transaction.nativeAdmitted &&
-				((hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
-					(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
+				(hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
+				(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture))
 			) {
 				const presentationChanged = hydrationStarted
 					? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
@@ -7245,7 +7244,7 @@ function queueAllTransition(): boolean {
 				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current));
 		}
 	}
-	if (!cue || work || NATIVE_TRANSITION_DRIVER?.hasWork() === true) return true;
+	if (!cue || work) return true;
 	// The separate task queue can hold sibling work while this cue drains.
 	// Only receipts belonging to this drain make the cue share a capture.
 	for (const batch of FLUSHED_TRANSITION_BATCHES) {
@@ -8744,7 +8743,8 @@ function drainQueue(): { err: any } | null {
 		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 	}
 	commitRootRenders();
-	NATIVE_TRANSITION_DRIVER?.flush();
+	// Batches that finished during that commit.
+	promotePendingSignals();
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrainEnd();
 	return pendingError;
@@ -11392,7 +11392,7 @@ function hasScheduledWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
-		NATIVE_TRANSITION_DRIVER?.hasWork() === true ||
+		PENDING_SIGNAL_PROMOTIONS !== null ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||
@@ -24629,20 +24629,9 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 		if (binding.unsubscribe === undefined) {
 			// Acquire the fallible subscription before either early lease retires.
 			// It cannot write or join a transition until input ownership is installed.
-			const notify = Object.assign(
-				() => {
-					if (binding.controlWriterCleanup !== undefined) updateDirectSignalBinding(binding);
-				},
-				{
-					[NATIVE_TRANSITION_CONSUMER]: {
-						active: () =>
-							binding.controlWriterCleanup !== undefined &&
-							!binding.disposed &&
-							!scope.block.disposed,
-						prepare: () => prepareNativeTransitionBlock(scope.block),
-					},
-				},
-			);
+			const notify = () => {
+				if (binding.controlWriterCleanup !== undefined) updateDirectSignalBinding(binding);
+			};
 			const stop = handle[SIGNAL_BINDING_SUBSCRIBE](notify, () =>
 				disposeDirectSignalBinding(binding),
 			);
@@ -25427,19 +25416,6 @@ function readSignalBinding(handle: SignalHandle<unknown>): unknown {
 	return handle[SIGNAL_BINDING_READ]();
 }
 
-/** Direct bindings enlist their real render owner without replaying notifications. */
-function nativeTransitionBindingNotify(
-	binding: { scope: Scope; disposed: boolean },
-	notify: () => void,
-): () => void {
-	return Object.assign(notify, {
-		[NATIVE_TRANSITION_CONSUMER]: {
-			active: () => !binding.disposed && !binding.scope.block.disposed,
-			prepare: () => prepareNativeTransitionBlock(binding.scope.block),
-		},
-	});
-}
-
 function isWritableSignal(value: unknown): value is WritableSignal<unknown> {
 	return (
 		isSignalHandle(value) &&
@@ -25459,7 +25435,6 @@ function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
 	try {
 		binding.unsubscribe?.();
 	} finally {
-		retireNativeTransitionBlock(binding.scope.block);
 		binding.controlWriterCleanup?.();
 		if (binding.input !== undefined) {
 			domNode(binding.target as Element).removeEventListener('input', binding.input);
@@ -25660,7 +25635,7 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 		if (snapshot === null) return;
 		// Target listeners precede delegated dispatch. A platform edit is urgent,
 		// even while an unrelated async Action keeps its post-await batch open.
-		withoutSignalCandidate(() =>
+		withCommittedSignals(() =>
 			runWithBlockSignalOwner(binding.scope, () =>
 				handle.set(directSignalControlValue(binding, snapshot)),
 			),
@@ -25672,7 +25647,7 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 		element,
 		binding.policy.kind === 'checked' ? 'checked' : 'value',
 		(value) =>
-			withoutSignalCandidate(() =>
+			withCommittedSignals(() =>
 				runWithBlockSignalOwner(binding.scope, () => {
 					if (!binding.disposed && !binding.pendingControl && isWritableSignal(binding.handle))
 						binding.handle.set(value);
@@ -25690,7 +25665,7 @@ function queueDirectSignalControlAdoption(
 	// Ignore edits already published by an offered owner when fencing a restored value.
 	enqueueEffectEventCommitAction(() => {
 		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
-		withoutSignalCandidate(() =>
+		withCommittedSignals(() =>
 			runWithBlockSignalOwner(binding.scope, () => {
 				const element = binding.target as Element;
 				const snapshot = snapshotHydrationControl(element)!;
@@ -25722,8 +25697,8 @@ function activateDirectSignalBinding(
 ): void {
 	if (binding.disposed) return;
 	if (binding.handle !== null)
-		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](
-			nativeTransitionBindingNotify(binding, () => updateDirectSignalBinding(binding)),
+		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](() =>
+			updateDirectSignalBinding(binding),
 		);
 	if (revision !== undefined) binding.policy.control!.activate(binding, revision);
 }
@@ -28689,9 +28664,7 @@ function addSignalHostSubscription(
 	binding: SignalHostPropSourcesBinding,
 	handle: SignalHandle<unknown>,
 ): () => void {
-	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](
-		nativeTransitionBindingNotify(binding, () => updateSignalHostPropSources(binding)),
-	);
+	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](() => updateSignalHostPropSources(binding));
 	binding.subscriptions.set(handle, unsubscribe);
 	return unsubscribe;
 }
@@ -28730,7 +28703,7 @@ function addSignalHostControlWriter(
 	channel: 'value' | 'checked',
 ): () => void {
 	const cleanup = registerHydrationControlSignalWriter(binding.element, channel, (next) => {
-		withoutSignalCandidate(() =>
+		withCommittedSignals(() =>
 			runWithBlockSignalOwner(binding.scope, () => {
 				const handle = winningSignalHostControl(binding.sources, channel);
 				if (!binding.disposed && !binding.pendingControl && isWritableSignal(handle))
@@ -28803,7 +28776,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		if (live === null) return;
 		// A spread's winning handle must come from the committed source too:
 		// native edits never select or update a private Action candidate.
-		withoutSignalCandidate(() =>
+		withCommittedSignals(() =>
 			runWithBlockSignalOwner(binding.scope, () => {
 				const nextValue = winningSignalHostControl(binding.sources, 'value');
 				const nextChecked = winningSignalHostControl(binding.sources, 'checked');
@@ -28830,7 +28803,6 @@ function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): vo
 		return;
 	binding.disposed = true;
 	for (const unsubscribe of binding.subscriptions.values()) unsubscribe();
-	retireNativeTransitionBlock(binding.scope.block);
 	binding.subscriptions.clear();
 	for (const cleanup of binding.controlWriters.values()) cleanup();
 	binding.controlWriters.clear();
@@ -28845,7 +28817,7 @@ function queueSignalHostControlAdoption(
 ): void {
 	enqueueEffectEventCommitAction(() => {
 		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
-		withoutSignalCandidate(() =>
+		withCommittedSignals(() =>
 			runWithBlockSignalOwner(binding.scope, () => {
 				const snapshot = snapshotHydrationControl(binding.element)!;
 				const value = winningSignalHostControl(binding.sources, 'value');
@@ -38780,7 +38752,6 @@ function disposeDirectSignalChild(binding: DirectSignalChildBinding): void {
 	if (binding.disposed) return;
 	binding.disposed = true;
 	binding.unsubscribe?.();
-	retireNativeTransitionBlock(binding.scope.block);
 }
 
 function updateDirectSignalChild(binding: DirectSignalChildBinding): void {
@@ -38947,9 +38918,7 @@ export function bindSignalChild(
 		value: initial,
 		disposed: false,
 	};
-	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](
-		nativeTransitionBindingNotify(binding, () => updateDirectSignalChild(binding)),
-	);
+	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](() => updateDirectSignalChild(binding));
 	registerHookCleanup(parentScope, () => disposeDirectSignalChild(binding));
 	if (prior !== null) {
 		const finish = (discarded: boolean): void =>
@@ -41575,8 +41544,6 @@ interface TrySlot {
 	 * scope teardown so we don't leak callbacks past the slot's lifetime.
 	 */
 	transitionTimeoutId: any | null;
-	/** Native candidates own retry; a finite fallback still uses this boundary's lifetime. */
-	nativeTransition?: TransitionActionBatch;
 	/**
 	 * Host refs detached when this boundary suspended (object refs set to null,
 	 * callback refs invoked with null). React treats ref attachment like a layout
@@ -43082,10 +43049,6 @@ function handleSuspense(
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BOUNDARY_SUSPEND);
-	if (NATIVE_TRANSITION_ATTEMPT !== null) {
-		NATIVE_TRANSITION_ATTEMPT.suspensions.set(state, thenable);
-		throw new SuspenseException(thenable);
-	}
 	// Ordinary roots do not need hidden-subtree ancestry walks. Install this
 	// capability before the first boundary can preserve a suspended primary.
 	ensureScheduledVisibilityDriver();
@@ -43465,8 +43428,8 @@ function refreshPendingBody(state: TrySlot): void {
 function swapToPendingFallback(state: TrySlot): void {
 	if (!state.pendingBody || state.branch !== 1 || !state.tryBlock) return;
 	// Once the fallback shows, the held-whole contract is over for this
-	// boundary: render the held transition now so the shell commits the new
-	// values alongside the opted-in fallback, and the hidden primary retries
+	// boundary: the held transition renders next, so the shell commits the new
+	// values around the opted-in fallback, and the hidden primary retries
 	// against the data in flight. isPending stays raised until it reveals.
 	if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.unsuspend(state);
 	hideTryContentAndMountPending(state);
@@ -44047,10 +44010,6 @@ function attemptHiddenRevealInner(
 	scheduledMode?: 'urgent' | 'transition',
 	reason: 'update' | 'parent' | 'retry' = 'update',
 ): void {
-	if (state.nativeTransition !== undefined && NATIVE_TRANSITION_ATTEMPT === null) {
-		queueNativeTransition(state.nativeTransition);
-		return;
-	}
 	const retryOnly = reason === 'retry';
 	let tryBlock = state.tryBlock;
 	if (tryBlock === null || tryBlock.disposed || state.hiddenDom === null) return;
@@ -44144,7 +44103,6 @@ function attemptHiddenRevealInner(
 		// may escape into the parent commit while the fallback remains visible.
 		restoreSubtreeEffectDeps(tryBlock, effectDeps);
 		discardOffscreenCapture(hiddenCapture);
-		if (NATIVE_TRANSITION_ATTEMPT !== null) throw thrown;
 		if (isSuspenseException(thrown)) {
 			deactivateScope(tryBlock, false);
 			// Still suspended — hide the try DOM again (the pending arm never moved)
@@ -44457,7 +44415,6 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	// Install the optional off-screen swap graph before any listener or user
 	// update can observe transition priority.
 	ensureTransitionSwapDriver();
-	ensureNativeActionResolver();
 	// Bump the priority flag FIRST so any scheduleRender calls fired by the
 	// listener notification (and by fn itself) are tagged as transition.
 	TRANSITION_DEPTH++;
@@ -44484,14 +44441,7 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	try {
 		tickTransitionCount(+1);
 		try {
-			const previousCandidate = activeCandidate;
-			const nativeResolver = setNativeCandidateResolver(resolveTransitionNativeCandidate);
-			try {
-				result = fn();
-			} finally {
-				swapActiveSignalCandidate(previousCandidate);
-				setNativeCandidateResolver(nativeResolver);
-			}
+			result = fn();
 			if (result != null && typeof (result as { then?: unknown }).then === 'function') {
 				actionBatch.pendingActions++;
 				IN_FLIGHT_TRANSITION_ACTION_BATCH = actionBatch;

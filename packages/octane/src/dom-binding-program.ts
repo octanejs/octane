@@ -60,7 +60,6 @@ import type {
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import type { BindingControlPreview } from './signals/control-binding.js';
 import {
-	NATIVE_TRANSITION_CONSUMER,
 	forwardNativeTransitionConsumer,
 	type NativeTransitionNotify,
 	type NativeTransitionPresentation,
@@ -1981,94 +1980,6 @@ function bindProgram<Props>(
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	transaction.run = run;
-	refresh[NATIVE_TRANSITION_CONSUMER] = {
-		active: () => !transaction.disposed,
-		prepare: () =>
-			run(() => {
-				const version = revision;
-				const preview: BindingPreview = {
-					receipts: [],
-					controls: [],
-					fragments: new Set(),
-					signals: new Map(),
-					projections: new Map(),
-					text: new Map(),
-					disposals: [],
-				};
-				let accepted = false;
-				let retired = false;
-				const discard = (): void => {
-					if (accepted || retired) return;
-					retired = true;
-					for (const receipt of preview.receipts) receipt.discard();
-					for (const control of preview.controls) control.discard();
-					for (const dispose of preview.disposals) dispose();
-					for (const fragment of preview.fragments) releaseInstance(fragment, transaction);
-				};
-				let plan: FragmentPlan;
-				transaction.preview = preview;
-				const previousBusy = busy;
-				busy = true;
-				try {
-					const snapshot = source.getSnapshot();
-					if (snapshot != null && typeof (snapshot as { then?: unknown }).then === 'function')
-						throw new TypeError(formatClientError(296));
-					const environment = descriptor.prepareProps
-						? descriptor.prepareProps(snapshot)
-						: [snapshot];
-					plan = transaction.reads
-						? transaction.reads.prepare(() => prepareFragment(instance!, environment, transaction))
-						: prepareFragment(instance!, environment, transaction);
-					if (transaction.reads) preview.receipts.push(transaction.reads.preview());
-				} catch (error) {
-					discard();
-					throw error;
-				} finally {
-					transaction.preview = undefined;
-					busy = previousBusy;
-				}
-				return {
-					validate: () =>
-						!retired &&
-						!transaction.disposed &&
-						!busy &&
-						version === revision &&
-						preview.receipts.every((receipt) => receipt.validate()) &&
-						preview.controls.every((control) => control.validate()),
-					discard,
-					commit() {
-						if (retired || accepted || transaction.disposed) return;
-						accepted = true;
-						busy = true;
-						try {
-							for (const [fragment, signals] of preview.signals) fragment.signals = signals;
-							for (const [fragment, projections] of preview.projections)
-								fragment.projections = projections;
-							for (const [region, signal] of preview.text) region.signal = signal;
-							for (const receipt of preview.receipts) receipt.commit();
-							transaction.hostOperations?.publish(plan, transaction);
-							const document = instance!.range.start.ownerDocument;
-							const tree = instance!.range.start.getRootNode();
-							transaction.focused =
-								'activeElement' in tree
-									? (tree as Document | ShadowRoot).activeElement
-									: document.activeElement;
-							while (transaction.focused?.shadowRoot?.activeElement)
-								transaction.focused = transaction.focused.shadowRoot.activeElement;
-							transaction.contentEditable = !!(transaction.focused as HTMLElement | null)
-								?.isContentEditable;
-							commitFragment(plan, transaction);
-							transaction.published?.();
-							for (const fragment of preview.fragments) transaction.candidates.delete(fragment);
-							activateInstance(instance!, transaction);
-							settleFirstCommit(true);
-						} finally {
-							busy = false;
-						}
-					},
-				};
-			}),
-	};
 	transaction.reads = descriptor.trackReads?.(refresh);
 	let handoff: BindingHandoff | undefined;
 	const handle = {

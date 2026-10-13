@@ -28,7 +28,7 @@ import {
 	type NodeState,
 	type SignalObserver,
 	type SignalReadMode,
-	type SignalCandidateFrame,
+	type CandidateContext,
 } from './graph.js';
 import {
 	beginNativeWriteGuard,
@@ -82,7 +82,7 @@ export interface DerivedBindingLifecycle {
 	suspend(): boolean;
 	resume(): void;
 	dispose(): void;
-	forkCandidate?(target: ScopedNode, frame: SignalCandidateFrame): CandidateProducer | undefined;
+	forkCandidate?(target: ScopedNode, context: CandidateContext): CandidateProducer | undefined;
 	declared(sequence: number, captures?: readonly unknown[], declaring?: number): void;
 	/** A later render's declaration of this cell, with a computation that may capture new values. */
 	redeclare(

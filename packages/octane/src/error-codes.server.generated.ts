@@ -166,12 +166,6 @@ type ServerErrorArguments = {
 	203: [];
 	204: [];
 	205: [];
-	206: [];
-	207: [];
-	208: [];
-	209: [];
-	210: [];
-	211: [];
 	213: [];
 	214: [];
 	215: [];
@@ -774,18 +768,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('The request description is still pending.', args);
 			case 205:
 				return formatDevErrorMessage('Frozen scalar candidates are not supported.', args);
-			case 206:
-				return formatDevErrorMessage('Nested signal candidates are not supported.', args);
-			case 207:
-				return formatDevErrorMessage('Only live candidate-capable owners are supported.', args);
-			case 208:
-				return formatDevErrorMessage('Rebase the signal candidate before writing.', args);
-			case 209:
-				return formatDevErrorMessage('Native signal presentation is not installed.', args);
-			case 210:
-				return formatDevErrorMessage('The candidate owner changed lifetime.', args);
-			case 211:
-				return formatDevErrorMessage('Candidate dependency escaped its frame.', args);
 			case 213:
 				return formatDevErrorMessage(
 					'A signal document lifecycle requires a live document and build identity.',

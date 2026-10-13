@@ -1,16 +1,17 @@
 import { installDerivedCandidates, installResourceCandidates } from './candidate-producers.js';
-import { SignalActionFrame } from './transition-action.js';
-export { createSignalTransitionCoordinator } from './transition-coordinator.js';
+import { createPendingSignals } from './pending.js';
+import { registerPendingSignals } from './transition-state.js';
 
 /**
  * `#octane/signal-actions/renderer` under `octane-islands` (see
- * action-capability.ts): the renderer carries the frame and its candidate
- * producers, so signal bundles carry neither. Frames come only from this
- * factory, so it installs the producers itself; a bundler may drop a module
- * statement from this side-effect-free package.
+ * action-capability.ts): the renderer's transitions carry pending signal state
+ * and its candidate producers, so signal bundles carry neither. Only this
+ * installer creates pending state in that build, so it installs the producers
+ * itself; a bundler may drop a module statement from this side-effect-free
+ * package.
  */
-export function createSignalActionFrame(): SignalActionFrame {
+export function installRendererSignalActions(): void {
 	installResourceCandidates();
 	installDerivedCandidates();
-	return new SignalActionFrame();
+	registerPendingSignals(createPendingSignals());
 }

@@ -1,20 +1,22 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { DerivedBinding } from './computations.js';
-import type { CandidateProducer, ScopedNode, SignalCandidateFrame } from './graph.js';
+import type { CandidateProducer, ScopedNode } from './graph.js';
 import type { ResourceBinding } from './requests.js';
 import {
-	candidateGraph as bridge,
 	candidateHooks,
 	CandidateUnsupportedError,
+	graphBridge as bridge,
+	type CandidateContext,
 } from './transition-state.js';
 
 /**
- * An Action frame forks a resource or general derived binding into a private
- * candidate through these producers. Only a frame calls them, so they travel
- * with it (see action-capability.ts): requests.ts and computations.ts install
- * them when they create such a cell (`#octane/signal-actions/bindings`), or an
- * `octane-islands` renderer installs both. Binding modules are imported only as
- * types, so a renderer bundle never reaches the signal engine through this one.
+ * A node pending in a transition forks its resource or general derived binding
+ * into a private candidate through these producers. Only pending state calls
+ * them, so they travel with it (see action-capability.ts): requests.ts and
+ * computations.ts install them when they create such a cell
+ * (`#octane/signal-actions/bindings`), or an `octane-islands` renderer installs
+ * both. Binding modules are imported only as types, so a renderer bundle never
+ * reaches the signal engine through this one.
  */
 export function installResourceCandidates(): void {
 	candidateHooks.resource = forkResource;
@@ -116,14 +118,14 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 function forkDerived<T>(
 	this: DerivedBinding<T>,
 	target: ScopedNode<T>,
-	frame: SignalCandidateFrame,
+	context: CandidateContext,
 ): CandidateProducer {
 	const Binding = this.constructor as typeof DerivedBinding<T>;
 	if (this.frozen || this.owner.readBarrier || !this.compute) {
 		throw new CandidateUnsupportedError(formatClientError(110));
 	}
 	const fork = new Binding(this.owner, target, this.compute, this.options);
-	fork.candidate = frame;
+	fork.candidate = context;
 	return {
 		dispose: () => fork.dispose(),
 		dependencies: () => fork.current?.dependencies.keys() ?? [],
@@ -168,7 +170,7 @@ function forkDerived<T>(
 						current.dependencies.clear();
 						for (const dependency of dependencies) {
 							releases.push(dependency.unsubscribe);
-							dependency.node = frame.canonical(dependency.node);
+							dependency.node = context.canonical(dependency.node);
 							dependency.revision = dependency.node.revision;
 							// Canonical states and revisions are installed. Subscribe without
 							// refresh/evaluation, and acquire every lease before releasing any.
