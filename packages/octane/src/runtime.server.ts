@@ -4643,6 +4643,16 @@ interface HookPass {
 // restored synchronously around each body invocation, so a captured dispatch can
 // tell "my component, mid-render" (queue) from anything else (inert).
 let HOOK_PASS: HookPass | null = null;
+
+// Whether the executing body dispatched a render-phase update, so its pass is
+// discarded and replays from the settled state (replayUpdatedComponentBody).
+// Its child components and boundaries do not render meanwhile, as Fizz renders
+// children only after a body settles and the client's slots wait for the
+// replay: React's server runs no catch arm, so a child's throw from discarded
+// state would fail the render, or a Suspense boundary would report it.
+function inDiscardedPass(): boolean {
+	return HOOK_PASS !== null && HOOK_PASS.update;
+}
 // Custom-hook call-site path. A base hook reached through withSlot combines
 // every enclosing custom-hook boundary with its own compiler site. This mirrors
 // the client runtime: two calls to the same custom hook stay independent even
@@ -5483,6 +5493,7 @@ export function ssrComponent(
 	invocationSite?: string,
 	bindingMarker?: string,
 ): string {
+	if (inDiscardedPass()) return '';
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
 	// original identity for async keys, then use the stable cold body below. A
 	// spread-only key has not been split into the compiler's explicit key argument.
@@ -10554,6 +10565,7 @@ export function ssrTry(
 	propagateSuspense = false,
 	bindingMarker?: string,
 ): string {
+	if (inDiscardedPass()) return '';
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
 	// name/share/update propagate onto this boundary's streamed content chunk

@@ -196,3 +196,57 @@ export function ReplayedStaleSuspension(props: { a: boolean }) @{
 		<SettleThenCatchOnly a={props.a} />
 	</main>
 }
+
+// The discarded pass would throw in a Suspense boundary's own body: neither its
+// @pending arm nor the server's error report may show for it.
+function SettleThenThrowPending(props: { a: boolean }) @{
+	const [ready, setReady] = useState(false);
+	const settle = (value: boolean) => {
+		if (!ready) setReady(true);
+		return value;
+	};
+	<>
+		<StatefulA a={settle(props.a)} />
+		@try {
+			if (!ready) throw new Error('rendered with discarded state');
+			<span>{'t'}</span>
+		} @pending {
+			<i>{'p'}</i>
+		} @catch (e) {
+			<i>{'x'}</i>
+		}
+	</>
+}
+
+export function ReplayedStaleThrowPending(props: { a: boolean }) @{
+	<main>
+		<SettleThenThrowPending a={props.a} />
+	</main>
+}
+
+function CatchReady(props: { ready: boolean }) @{
+	@try {
+		<Ready ready={props.ready} />
+	} @catch (e) {
+		<i>{'x'}</i>
+	}
+}
+
+// The boundary sits in a child that the discarded pass renders with its state.
+function SettleThenChildTry(props: { a: boolean }) @{
+	const [ready, setReady] = useState(false);
+	const settle = (value: boolean) => {
+		if (!ready) setReady(true);
+		return value;
+	};
+	<>
+		<StatefulA a={settle(props.a)} />
+		<CatchReady ready={ready} />
+	</>
+}
+
+export function ReplayedStaleChildTry(props: { a: boolean }) @{
+	<main>
+		<SettleThenChildTry a={props.a} />
+	</main>
+}
