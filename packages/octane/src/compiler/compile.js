@@ -13773,6 +13773,19 @@ function compileServerComponent(node, ctx) {
 	return nodes;
 }
 
+// The sole root of a `return <jsx>` body is the component's returned value
+// (hydration protocol 3): the client renders it in the return slot, which
+// borrows the component's range, so the server renders a returned component or
+// renderable value directly in the component's frame.
+function returnedValueRoot(bodyNodes) {
+	if (bodyNodes.length !== 1) return false;
+	const root = bodyNodes[0];
+	if (root._octaneBindingSite !== undefined) return false;
+	return root.type === 'TSRXExpression'
+		? root.returnedJsxValue === true
+		: root.type === 'Element' && isComponentTag(root);
+}
+
 function ssrReturnedJsxNode(argument, ctx) {
 	const returnedHostRoot =
 		(argument.type === 'Element' || argument.type === 'JSXElement') && !isComponentTag(argument);
@@ -13986,11 +13999,19 @@ function ssrCompileBodyWithMapTemps(
 	// wrap (the parent's own pair already bounds it). Synthetic sub-bodies
 	// (statement arrays) never qualify. Consumed by ssrEmitComponent at the
 	// root emit, before it recurses into props/children.
+	// A returned value's sole root is `2` instead (returnedValueRoot), consumed
+	// by ssrEmitComponent or ssrEmitTsrxExpression.
 	const prevInheritRoot = ctx._ssrInheritRoot;
 	ctx._ssrInheritRoot =
 		((!!(node.body && node.body.type === 'JSXCodeBlock') && !returnedOutput) ||
 			returnedFragmentRoot) &&
-		inheritSoleCompRoot(bodyNodes, ctx);
+		inheritSoleCompRoot(bodyNodes, ctx)
+			? true
+			: (returnedOutput || node.body?.type === 'BlockStatement') &&
+				  !node._octaneBindingView &&
+				  returnedValueRoot(bodyNodes)
+				? 2
+				: false;
 	// Body/sub ROOTS (including fragment-root children) are not host-element
 	// children: the client routes rich holes there through the de-opt value
 	// path (a portal has no host to stamp — see the emitNodeHtml root branch),
@@ -15890,7 +15911,8 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
 	// comp-call root of a `@{}` body — which is exactly this emit.
-	const inherit = ctx._ssrInheritRoot === true && !node._octaneBindingSite;
+	const inherit =
+		ctx._ssrInheritRoot === 2 ? 2 : ctx._ssrInheritRoot === true && !node._octaneBindingSite;
 	ctx._ssrInheritRoot = false;
 	// Capture before compiling attributes/children: nested subs temporarily mutate
 	// this context flag. Only this component's immediate children sub inherits the
@@ -16052,7 +16074,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			[b.literal(invocationSite), compExpr, inheritOriginLoc(b.object(propNodes), node)],
 			node,
 		);
-		const child = ssrCall('ssrChild', [descriptor, b.id('__s')], node);
+		const child = ssrCall(
+			'ssrChild',
+			inherit === 2 ? [descriptor, b.id('__s'), b.literal(true)] : [descriptor, b.id('__s')],
+			node,
+		);
 		if (componentNs === null) return child;
 		ctx.runtimeNeeded.add('ssrInNamespace');
 		return ssrCall(
@@ -16065,20 +16091,16 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
 	ctx.runtimeNeeded.add(helper);
 	const args = [b.id('__s'), compExpr, inheritOriginLoc(b.object(propNodes), node)];
+	const inheritArg = b.literal(inherit, inherit === 2 ? '2' : inherit ? 'true' : 'false');
 	if (explicitNamespace) {
 		args.push(
 			b.literal(componentNs, JSON.stringify(componentNs)),
-			b.literal(inherit, inherit ? 'true' : 'false'),
+			inheritArg,
 			keyExpr ?? undefinedNode(),
 			b.literal(invocationSite),
 		);
 	} else {
-		args.push(
-			b.literal(inherit, inherit ? 'true' : 'false'),
-			keyExpr ?? undefinedNode(),
-			undefinedNode(),
-			b.literal(invocationSite),
-		);
+		args.push(inheritArg, keyExpr ?? undefinedNode(), undefinedNode(), b.literal(invocationSite));
 	}
 	if (node._octaneBindingSite) {
 		args.push(b.literal(bindingMarker(node._octaneBindingSite, 'v')));
@@ -16698,6 +16720,9 @@ function ssrControlKey(kind, node) {
 // renderer component so its template scopes and hydration range both survive.
 function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const expr = node.expression;
+	// A returned value's sole root renders in its component's frame (returnedValueRoot).
+	const returnedRoot = ctx._ssrInheritRoot === 2 && node.returnedJsxValue === true;
+	if (returnedRoot) ctx._ssrInheritRoot = false;
 	if (node._octaneBindingOpaque || node._octaneBindingValue || node._octaneBindingSlot) {
 		ctx.runtimeNeeded.add('ssrBindingChild');
 		const child = ssrCall(
@@ -16758,7 +16783,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 				b.id('__s'),
 				b.id(sub.fnName),
 				b.object([]),
-				b.literal(false),
+				returnedRoot ? b.literal(2) : b.literal(false),
 				undefinedNode(),
 				undefinedNode(),
 				// Like the client's lowerHostFragment renderer, this one keeps the
@@ -16824,7 +16849,9 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		// the setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
 		lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
 	}
-	const childExpr = ssrCall('ssrChild', [resolveStyleExpr(lowered, cssHash), b.id('__s')], node);
+	const childArgs = [resolveStyleExpr(lowered, cssHash), b.id('__s')];
+	if (returnedRoot) childArgs.push(b.literal(true));
+	const childExpr = ssrCall('ssrChild', childArgs, node);
 	if (componentNs === null) return childExpr;
 	ctx.runtimeNeeded.add('ssrInNamespace');
 	return ssrCall(

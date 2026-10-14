@@ -505,7 +505,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(html).toBe(
 			'<div id="leaf">hello</div>' +
-				'<script type="application/json" data-octane-suspense="2">["hello"]</script>',
+				'<script type="application/json" data-octane-suspense="3">["hello"]</script>',
 		);
 
 		container.innerHTML = html;
@@ -530,11 +530,12 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	// client, reporting why, instead of adopting ranges it would misread.
 	it.each([
 		['an older server', ''],
-		['a newer server', '="3"'],
+		['a version 2 server', '="2"'],
+		['a newer server', '="4"'],
 	])('client-renders a root that %s rendered, and reports it', async (_label, version) => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('server') });
 		container.innerHTML = html.replace(
-			'data-octane-suspense="2"',
+			'data-octane-suspense="3"',
 			'data-octane-suspense' + version,
 		);
 		const div = container.querySelector('#leaf') as HTMLElement;
@@ -884,7 +885,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		});
 		expect(html).toBe(
 			'<main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
-				'<script type="application/json" data-octane-suspense="2">["Hi"]</script>',
+				'<script type="application/json" data-octane-suspense="3">["Hi"]</script>',
 		);
 
 		container.innerHTML = html;

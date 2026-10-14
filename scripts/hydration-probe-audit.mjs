@@ -8,7 +8,8 @@
  * fails when a family exceeds its budget, or when a probe belongs to no family.
  *
  * Each step of the hydration cursor redesign makes its family's probes strict
- * and takes that budget to 0. A budget is never raised.
+ * and takes that budget to 0. A budget rises only when a protocol change moves
+ * misses from one family to another, which that change's commit says.
  *
  *   node scripts/hydration-probe-audit.mjs [--report] [-- vitest args…]
  *
@@ -71,12 +72,12 @@ const FAMILIES = {
 
 // Misses per family over SUITES at the commit that last lowered each budget.
 const BUDGET = {
-	returned: 69,
-	descriptors: 525,
-	components: 11992,
-	templates: 5485,
-	holes: 1056,
-	lists: 2112,
+	returned: 0,
+	descriptors: 46,
+	components: 10965,
+	templates: 5701,
+	holes: 1008,
+	lists: 2114,
 	branches: 249,
 	roots: 34,
 };

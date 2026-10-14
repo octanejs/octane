@@ -2240,16 +2240,19 @@ function serverComponentOutput(
 	out: unknown,
 	scope: SSRScope,
 	owner?: SignalRendererOwnerIdentity,
+	// The value a component returned, rather than a children function's output.
+	returned?: boolean,
 ): string {
 	if (out == null) return '';
 	if (typeof out === 'string') return escapeHtml(out);
 	if (typeof out === 'object' && SERVER_HTML in out) return (out as ServerHtml)[SERVER_HTML];
+	const normalize = returned ? ssrReturnedValue : ssrChild;
 	// The client renders a component's returned value inside that component's
 	// own render, so a read the value makes (a scoped JSX child) resolves in the
 	// component's declaration owner. Normalize the server's value there too.
 	return owner === undefined
-		? ssrChild(out, scope)
-		: (invokeServerSignalComponent(ssrChild, out, scope, owner) as string);
+		? normalize(out, scope)
+		: (invokeServerSignalComponent(normalize, out, scope, owner) as string);
 }
 
 export function escapeHtml(v: unknown): string {
@@ -2320,13 +2323,18 @@ export function ssrTextPre(v: unknown): string {
 // already mirrors positional children into props, so only legacy descriptors
 // with a distinct non-null children field need a repaired props object.
 // `keyScoped` says the caller's `child-key` membrane already encodes `d.key`.
-function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope, keyScoped?: 'key'): string {
+function ssrComponentDescriptor(
+	d: ElementDescriptor,
+	scope: SSRScope,
+	keyScoped?: 'key',
+	inherit?: 2,
+): string {
 	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
 		return ssrComponent(
 			scope,
 			d.type as ServerComponent,
 			d.props,
-			undefined,
+			inherit,
 			d.key ?? undefined,
 			keyScoped,
 			d.__octaneInvocationSite,
@@ -2338,7 +2346,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope, keyScoped
 			scope,
 			d.type as ServerComponent,
 			d.props,
-			undefined,
+			inherit,
 			d.key ?? undefined,
 			keyScoped,
 			d.__octaneInvocationSite,
@@ -2348,7 +2356,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope, keyScoped
 		scope,
 		d.type as ServerComponent,
 		{ ...d.props, children },
-		undefined,
+		inherit,
 		d.key ?? undefined,
 		keyScoped,
 		d.__octaneInvocationSite,
@@ -2362,12 +2370,24 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope, keyScoped
  * the client adopts it), while a primitive coerces to text. The compiler routes
  * `{x as string}` / literals / `+`-concats to `ssrText`, everything else here.
  */
-export function ssrChild(v: unknown, scope: SSRScope): string {
+export function ssrChild(
+	v: unknown,
+	scope: SSRScope,
+	// A component's returned value, inside the range that bounds the component's
+	// output (RETURN_IN_RANGE): the client's return slot borrows that range, so
+	// the value gets no range of its own, and a returned component renders
+	// inside it as the slot's own Block does.
+	inRange?: boolean,
+): string {
 	if (isSignalHandle(v)) {
 		v = readSignalBinding(v);
 	}
 	if (probingDangerHtmlChild(v)) return '';
-	return ssrChildValue(v, scope, true);
+	return ssrChildValue(v, scope, true, false, inRange === true && RETURN_IN_RANGE);
+}
+
+function ssrReturnedValue(v: unknown, scope: SSRScope): string {
+	return ssrChild(v, scope, true);
 }
 
 /** @internal Give an authored child slot an identity without adding a second hydration range. */
@@ -2390,6 +2410,8 @@ function ssrChildValue(
 	scope: SSRScope,
 	includeKeyedSingle: boolean,
 	selfMarkItem: boolean = false,
+	// The caller's range bounds the value (see ssrChild).
+	inRange: boolean = false,
 ): string {
 	if (v !== null && typeof v === 'object' && SERVER_HTML in v) {
 		return (v as ServerHtml)[SERVER_HTML];
@@ -2399,7 +2421,7 @@ function ssrChildValue(
 	// whether the value is a component, an element, a primitive, or empty — and
 	// an empty hole still occupies one logical node, keeping sibling cursor
 	// alignment intact. `ssrComponent` already wraps its output in block markers.
-	if (v == null || v === false || v === true) return ssrBlock('');
+	if (v == null || v === false || v === true) return inRange ? '' : ssrBlock('');
 	// React 19 Usables are valid renderable nodes, not only valid arguments to
 	// an explicit use() call. Unwrap recursively so a promise may resolve to a
 	// Context (and a Context value may itself be another Usable) before the
@@ -2413,6 +2435,8 @@ function ssrChildValue(
 			use(v as Context<unknown> | PromiseLike<unknown>),
 			scope,
 			includeKeyedSingle,
+			false,
+			inRange,
 		);
 	}
 	const iterable = iterableChildArray(v);
@@ -2430,7 +2454,7 @@ function ssrChildValue(
 				const key = preparedList.keys[i];
 				out += withSsrDeoptItem(key, i, () => ssrChildValue(item, scope, false, true));
 			}
-			return ssrBlock(out);
+			return inRange ? out : ssrBlock(out);
 		});
 	}
 	// A component-body / children render function, or `<Comp/>` used as a value.
@@ -2441,7 +2465,7 @@ function ssrChildValue(
 			scope,
 			v as ServerComponent,
 			{},
-			undefined,
+			inRange ? 2 : undefined,
 			undefined,
 			true,
 			templateInvocationSite(v),
@@ -2463,21 +2487,23 @@ function ssrChildValue(
 					const props = d.props;
 					const children = d.children;
 					const html = ssrHostElement(type, props, children, scope);
-					return selfMarkItem && serverHostHasPrimitiveChildren(children) ? html : ssrBlock(html);
+					return inRange || (selfMarkItem && serverHostHasPrimitiveChildren(children))
+						? html
+						: ssrBlock(html);
 				}
-				return ssrComponentDescriptor(d, scope, 'key');
+				return ssrComponentDescriptor(d, scope, 'key', inRange ? 2 : undefined);
 			};
 			const renderType = () => withAsyncIdentity('child-type', d.type, render);
 			return d.key != null ? withAsyncIdentity('child-key', d.key, renderType, true) : renderType();
 		}
 		// A portal as a value: its body renders into a foreign target client-side —
 		// server-side the site leaves the anchor placeholder (see ssrPortal).
-		if ((v as any).$$kind === PORTAL_TAG) return ssrBlock(ssrPortal());
+		if ((v as any).$$kind === PORTAL_TAG) return inRange ? ssrPortal() : ssrBlock(ssrPortal());
 		// A plain object is never a renderable child — serializing `String(v)` puts
 		// '[object Object]' in the markup. Throw like React so the bug is loud.
 		throw invalidChildError(v as object);
 	}
-	return ssrBlock(escapeHtml(v));
+	return inRange ? escapeHtml(v) : ssrBlock(escapeHtml(v));
 }
 
 // An ONLY-CHILD `{expr}` value hole (the host's sole content). A primitive
@@ -5333,10 +5359,19 @@ function captureServerComponentContext() {
 		signalOwnerActive: SERVER_SIGNAL_OWNER_ACTIVE,
 		signalControl: SIGNAL_CONTROL_SITE,
 		signalListKeys: SIGNAL_LIST_KEYS,
+		returnInRange: RETURN_IN_RANGE,
 		owner: undefined as SignalRendererOwnerIdentity | undefined,
 		previousOwner: undefined as SignalOwner | null | undefined,
 	};
 }
+
+/**
+ * Whether a range bounds the rendering component's output: its own frame, its
+ * returning component's range, or for an M3 call its parent's. The client's
+ * return slot borrows that range, so the component's returned value renders
+ * directly inside it. A root component's output has none.
+ */
+let RETURN_IN_RANGE = false;
 
 // Render a component body under an explicit frame, tracking it as the innermost
 // component (so a suspending use() inside it captures it as a discovery job). The
@@ -5352,7 +5387,8 @@ function renderComponentFramed(
 	// this output — skip the frame's `<!--[-->…<!--]-->` wrap. The FRAME itself
 	// is still created (use() path keys / seed order unchanged); the client's
 	// componentSlot(inherit) borrows the parent range instead of adopting.
-	inherit?: boolean,
+	// 2: the call is a returned value, and its component's range bounds it.
+	inherit?: boolean | 2,
 	instanceKey?: ServerSignalInstanceKey,
 	bindingMarker?: string,
 	// A fragment renderer's frame continues the list keys pending at its call
@@ -5370,6 +5406,7 @@ function renderComponentFramed(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
 	ASYNC_SCOPE = frame.asyncScope;
+	RETURN_IN_RANGE = MARKERS && (inherit !== true || RETURN_IN_RANGE);
 	if (instanceKey !== undefined) SIGNAL_COMPONENT_INSTANCE_KEY = instanceKey;
 	SIGNAL_CONTROL_SITE = '';
 	SIGNAL_LIST_KEYS = rendererListKeys ?? null;
@@ -5429,7 +5466,7 @@ function renderComponentFramed(
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			HOOK_PASS = previousHookPass;
 		}
-		const inner = serverComponentOutput(out, scope, previous.owner);
+		const inner = serverComponentOutput(out, scope, previous.owner, true);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
@@ -5458,6 +5495,7 @@ function renderComponentFramed(
 		SERVER_SIGNAL_OWNER_ACTIVE = previous.signalOwnerActive;
 		SIGNAL_CONTROL_SITE = previous.signalControl;
 		SIGNAL_LIST_KEYS = previous.signalListKeys;
+		RETURN_IN_RANGE = previous.returnInRange;
 		if (rendererListKeys != null && frame.deferred)
 			retainRendererJobListKeys(frame, rendererListKeys);
 	}
@@ -5487,7 +5525,9 @@ export function ssrComponent(
 	parent: SSRScope,
 	comp: ServerComponent | string | typeof Activity,
 	props: any,
-	inherit?: boolean,
+	// true (M3): the sole root of its parent's `@{}` body. 2: the root of a
+	// component's returned value. Either way an enclosing range bounds this output.
+	inherit?: boolean | 2,
 	key?: unknown,
 	identityScoped?: boolean | 'key',
 	invocationSite?: string,
@@ -5503,6 +5543,9 @@ export function ssrComponent(
 	// this small string-rendering wrapper does not retain the client Activity engine.
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
+	// A returned value renders in its component's range (RETURN_IN_RANGE), except
+	// a keyed element: the client's one-item list, whose item keeps a range.
+	if (inherit === 2 && (key != null || !RETURN_IN_RANGE)) inherit = false;
 	// A fragment renderer renders its enclosing component's JSX under that
 	// component's identity, exactly like the inline HTML the client also folds.
 	const renderer = invocationSite === RENDERER_INVOCATION_SITE;
@@ -5531,7 +5574,8 @@ export function ssrComponent(
 			comp = renderActivityDescriptor;
 			// The generic component and inner Activity both own hydratable ranges.
 			// This mirrors the client even for a sole-root dynamic Activity tag.
-			inherit = false;
+			// A returned Activity renders in its component's range instead.
+			if (inherit !== 2) inherit = false;
 		}
 		// Boundary builtins decline inherit through their component capability bit —
 		// mirrors componentSlot's
@@ -5657,7 +5701,7 @@ export function ssrComponentNS(
 	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
-	inherit?: boolean,
+	inherit?: boolean | 2,
 	key?: unknown,
 	invocationSite?: string,
 	bindingMarker?: string,

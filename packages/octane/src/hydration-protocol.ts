@@ -6,7 +6,7 @@
 // must stay off the DOM-table graph (the early interaction/control capture and
 // `stream-protocol.ts`) imports this leaf directly.
 //
-// Ranges (version 2). Every hydratable site is one pair of comments:
+// Ranges (version 3). Every hydratable site is one pair of comments:
 // - An open's data is `[` followed by nothing or a kind: `f0`/`f1` (an @for,
 //   with its server arm), `b;` (a presentation-binding range,
 //   dom-binding-protocol.ts) or `$` (a Suspense boundary, below). Any payload
@@ -14,6 +14,12 @@
 // - A close is exactly `]`.
 // Ranges nest, and nothing else is a range: the text separator `<!-- -->`, the
 // empty-text stand-in `<!---->` and the `<!--frag-->` pair are single nodes.
+//
+// A component call's range is its frame, and a value the component returns
+// renders directly inside it (version 3), as do the values of components it
+// returns in turn. A call that inherits its parent's range instead (the sole
+// root of a `@{}` body) has no frame and renders its value in that range. A
+// root's output has no range, so a value the root returns keeps one of its own.
 //
 // A Suspense boundary is one range whose opening comment carries its state,
 // with the boundary's content directly inside:
@@ -56,7 +62,7 @@ export const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
  * marker attribute's value, and a root whose server spoke another version
  * renders on the client instead of adopting ranges it would misread.
  */
-export const HYDRATION_PROTOCOL_VERSION = '2';
+export const HYDRATION_PROTOCOL_VERSION = '3';
 
 // The payloads below stay plain literals rather than deriving the longer ones
 // from the shorter. A bundler does not constant-fold a cross-module template

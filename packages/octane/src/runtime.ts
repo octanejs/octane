@@ -13251,6 +13251,13 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 			(out as any).key == null &&
 			typeof (out as any).type === 'function';
 		const existingRet = block.slots[0] as any;
+		// Hydrating, the first render borrows the range that bounds the block's
+		// output, where the server rendered the value (returnsInRange).
+		const returnHydration = hydrating ? activeHydration() : null;
+		const borrows =
+			returnHydration !== null &&
+			existingRet === undefined &&
+			returnHydration.returnsInRange(block);
 		let replacedStart: Node | null = null;
 		let replacedEnd: Node | null = null;
 		// A kind flip over committed DOM (usesFrontier) and its unwind point.
@@ -13348,9 +13355,9 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 							d.__octaneInvocationSite,
 							anchor,
 							true,
-							undefined,
+							borrows || undefined,
 							d.key ?? undefined,
-							hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
+							returnHydration !== null && elementKeyWasProvided(d),
 						),
 					);
 				} else {
@@ -13363,38 +13370,16 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 						d.__octaneInvocationSite,
 						anchor,
 						true,
-						undefined,
+						borrows || undefined,
 						d.key ?? undefined,
-						hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
+						returnHydration !== null && elementKeyWasProvided(d),
 					);
 				}
 			} else {
-				// A nested return-based component whose server output is EMPTY owns an
-				// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
-				// An unframed third-party SSR root receives an equivalent synthetic range.
-				// Borrow either component range for the return slot instead of letting
-				// childSlot mint an empty `<!---->` anchor during hydration. The return
-				// slot is the block's entire output, so it can safely reconcile future
-				// text/component values between the borrowed markers while the block
-				// remains their owner. This keeps hydration byte-preserving for `return
-				// null` / `false` / `''` components (including memo wrappers).
-				// A component returned where the server rendered a primitive borrows the
-				// range too, so the server's text stays inside every range below it,
-				// where a component that returns that text adopts it.
-				const returnHydration = hydrating ? activeHydration() : null;
-				if (
-					returnHydration !== null &&
-					block.slots[0] === undefined &&
-					block.startMarker !== null &&
-					block.endMarker !== null &&
-					block.startMarker !== block.endMarker &&
-					block.startMarker.nodeType === 8 &&
-					block.endMarker.nodeType === 8 &&
-					(getNextSibling(block.startMarker) === block.endMarker ||
-						returnHydration.isUnframedRootRange(block.startMarker, block.endMarker) ||
-						(isComponentDescriptor && returnHydration.holdsServerText(block)))
-				) {
-					const borrowed = returnHydration.lendRange(
+				// The return slot is the block's entire output, so it reconciles later
+				// values between the borrowed markers while the block owns them.
+				if (borrows) {
+					const borrowed = returnHydration!.lendRange(
 						block.startMarker as Comment,
 						block.endMarker as Comment,
 					);
@@ -21418,7 +21403,6 @@ class HydrationCapability {
 	replayDepth = -1;
 	seedCursor = 0;
 	readonly freshNodes = new WeakSet<Node>();
-	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
 	suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
 	/** The server node renderInPlace's body may adopt, until a template does. */
@@ -22388,13 +22372,32 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A slot for the range `start`…`end` that a list item or a returning
+	 * Whether the server rendered `block`'s returned value directly inside the
+	 * range that bounds the block's output (protocol 3): the component's frame,
+	 * or the range it shares with a returning parent, a list item or an M3
+	 * parent. A root's output has no range, and neither has the client-built
+	 * range of a call the server did not frame.
+	 */
+	returnsInRange(block: Block): boolean {
+		const start = block.startMarker;
+		const end = block.endMarker;
+		return (
+			start !== null &&
+			end !== null &&
+			start !== end &&
+			start.nodeType === 8 &&
+			end.nodeType === 8 &&
+			!this.isFresh(start)
+		);
+	}
+
+	/**
+	 * A slot for the server range `start`…`end` that a list item or a returning
 	 * component adopted, lent to the child slot that renders its value, so that
 	 * the value hydrates inside that range rather than claiming a range of its
 	 * own. The slot's first render claims the server range as an adopted one.
 	 */
 	lendRange(start: Comment, end: Comment): ChildSlot {
-		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('lend', false);
 		const slot: ChildSlot = {
 			__kind: 'childSlot',
 			start,
@@ -22410,8 +22413,10 @@ class HydrationCapability {
 			hostNode: null,
 			portal: null,
 			next: null,
+			// childSlot's own slots carry this key; one shape for both.
+			implicitSignal: undefined,
 		};
-		if (this.isOpen(start)) this.lentSlot = slot;
+		this.lentSlot = slot;
 		return slot;
 	}
 
@@ -22963,7 +22968,7 @@ class HydrationCapability {
 		this.rootCleanupBoundary = node;
 	}
 
-	/** Bound an unframed third-party component root so its returned host can adopt it. */
+	/** Bound an unframed third-party component root so its returned value can adopt it. */
 	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
 		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('unframedRoot', false);
 		const parent = (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode!;
@@ -22972,28 +22977,9 @@ class HydrationCapability {
 		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
 		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(start, cursor);
 		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(end, remainder);
-		this.unframedRootRanges.set(start, end);
 		this.protectRootAnchor(end);
 		this.claimRootRemainder(remainder);
 		return [start, end];
-	}
-
-	isUnframedRootRange(start: Node, end: Node): boolean {
-		return this.unframedRootRanges.get(start) === end;
-	}
-
-	/**
-	 * Whether `block`'s server range holds only unclaimed text at the cursor:
-	 * what the server rendered for a primitive.
-	 */
-	holdsServerText(block: Block): boolean {
-		const text = this.node;
-		return (
-			text !== null &&
-			text.nodeType === 3 &&
-			getNextSibling(block.startMarker!) === text &&
-			getNextSibling(text) === block.endMarker
-		);
 	}
 
 	/** Record the first node outside a root-owned range exactly once. */
