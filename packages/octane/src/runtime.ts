@@ -33288,12 +33288,13 @@ function componentSlotImpl(
 	if (
 		parentScope.slots[slotKey] === undefined &&
 		ROOT_RENDER_TRANSACTION !== null &&
-		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp &&
-		!inherit
+		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
 	) {
 		const end = freshSlotEnd(parentBlock, domParent, anchor);
 		if (end !== null) {
 			try {
+				// A sole root mints its own pair there: the range it would borrow is
+				// committed, and the client renders it the same either way.
 				componentSlotImpl(
 					outputHandler,
 					parentScope,
@@ -33306,7 +33307,7 @@ function componentSlotImpl(
 					end,
 					key,
 					singleRoot,
-					inherit,
+					false,
 					hasKey,
 					invocationSite,
 				);
