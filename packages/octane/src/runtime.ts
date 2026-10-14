@@ -4630,7 +4630,13 @@ function openFrontier(
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
-	const frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
+	// A container in another document, such as one a client render replacing a
+	// document's failed hydration owns, builds in a fragment of that document.
+	const doc = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument;
+	const frag =
+		doc === null || doc === document
+			? SPARE_FRONTIERS.pop() || document.createDocumentFragment()
+			: doc.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.frag = frag;
 	next.members = [];
@@ -4744,7 +4750,12 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 	if (frag === null) return;
 	(frag as any).$$next = undefined;
 	// Nothing names a committed frontier any more (assertRehomed).
-	if (SPARE_FRONTIERS.length < 64 && getFirstChild(frag) === null) SPARE_FRONTIERS.push(frag);
+	if (
+		SPARE_FRONTIERS.length < 64 &&
+		getFirstChild(frag) === null &&
+		frag.ownerDocument === document
+	)
+		SPARE_FRONTIERS.push(frag);
 }
 
 /** Point a try, error or portal slot created directly in a committed frontier at its live parent. */
@@ -5655,7 +5666,8 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 		journalUndo(() => {
 			seen.delete(state);
 		});
-		journalRootRange(state.start.parentNode!, state.start, state.end);
+		// A hydrating render writes none of the server range it adopts.
+		if (state.adopt !== null) journalRootRange(state.start.parentNode!, state.start, state.end);
 		// No chain record restores indices here, so rows that already exist keep
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
@@ -28119,6 +28131,9 @@ function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | 
  */
 let HEAD_CLAIMS: WeakMap<Comment, [ops: unknown[], at: number, pair: Comment[]]> | null = null;
 
+/** Server heads a client render discards with the document it replaces (installHydrationFallback). */
+let DISCARDED_HEADS: WeakSet<HTMLHeadElement> | null = null;
+
 function claimedHeadMarker(marker: Comment): boolean {
 	const claim = HEAD_CLAIMS?.get(marker);
 	return claim !== undefined && claim[0][claim[1] + 1] === claim[2];
@@ -28223,18 +28238,24 @@ export function headBlock(
 		const parent = scope.block.parentNode;
 		const ownerDocument = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
 		const head = ownerDocument.head;
-		let el = adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
+		// A client render that replaces a document's failed hydration claims nothing
+		// from the server head it discards (installHydrationFallback).
+		let el =
+			DISCARDED_HEADS?.has(head) === true
+				? null
+				: adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		const adopted = el !== null;
 		if (el === null) {
 			el = ownerDocument.createElement(tag);
 			const transaction = ROOT_RENDER_TRANSACTION;
 			if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 				// A root render's new head element joins <head> as it commits,
-				// unless an earlier deletion cleanup released its scope.
+				// unless an earlier deletion cleanup released its scope: the
+				// document's head then, which a commit that replaces it has swapped in.
 				const created = el;
 				transaction.ops.push(() => {
 					if ((scope.slots[slot] as HeadSlot | undefined)?.el === created)
-						head.appendChild(created);
+						ownerDocument.head.appendChild(created);
 				}, null);
 			} else head.appendChild(el);
 		}
@@ -47775,9 +47796,10 @@ function mountItemsLinear<T>(
 			if (discardOwnedDom && start !== null && start.parentNode !== null)
 				journalRootChildren(start.parentNode!);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+			// A hydrating item adopted server DOM, which a failed attempt leaves.
 			if (block.idState.renderOwner?.signalOwner !== undefined)
 				discardSignalRetryItem(block, error);
-			else unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
+			else unmountBlock(block, !hydrating && !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 			if (start !== null && end !== null) removePassthroughItemRange(start, end, discardOwnedDom);
 		}
 		state.head = null;
@@ -50244,16 +50266,17 @@ function installHydrationFallback(
 		const islands = Array.from(container.querySelectorAll('[' + HYDRATE_INDEPENDENT_ATTR + ']'));
 		const unadopted = (transaction.keptIslands = islands.slice());
 		ids.next = idSeed;
-		// A document cannot hold a second root element, nor an `<html>`
-		// container a second `<head>` or `<body>`, and the head entries the render
-		// places in `document.head` belong in the client's: their render goes in
-		// place, after it removes the server nodes up front, which a rollback
-		// restores.
-		let frontier: SlotNext | null = null;
+		// A document or `<html>` container renders its client `<html>`, or its
+		// `<head>` and `<body>`, off-document too: the commit removes the server's
+		// first, so the document never holds two. Its server head goes with them,
+		// so the render claims none of its elements, and the head entries it places
+		// land in the client's head at commit (headBlock).
 		if (container.nodeType === 9 || (container as Element).localName === 'html') {
-			journalRootRange(container, null, null);
-			removeNodes(nodes);
-		} else frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
+			const head = (container.nodeType === 9 ? (container as Document) : container.ownerDocument!)
+				.head;
+			if (head !== null) (DISCARDED_HEADS ??= new WeakSet()).add(head);
+		}
+		const frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
 		const commit = () => {
 			owner.hydrationFallback = undefined;
 			// An island the client render adopted belongs to its tree now.
@@ -50267,8 +50290,7 @@ function installHydrationFallback(
 			if (report !== undefined && transaction.caught !== true)
 				queueMicrotask(() => invokeRootErrorHandler(report, failure));
 		};
-		if (frontier === null) transaction.ops.push(commit, null);
-		else frontier.out.push(commit, null, null);
+		frontier.out.push(commit, null, null);
 		return frontier;
 	};
 }
