@@ -8,13 +8,30 @@ import { stripTypeScriptTypes } from 'node:module';
 import { performance } from 'node:perf_hooks';
 
 const file = 'packages/octane/src/runtime.ts';
+const refsFile = 'packages/octane/src/runtime/fragment-refs.ts';
 const baseRef = process.argv[2] ?? 'upstream/main';
 
-function comparator(source) {
-	const start = source.indexOf('function blockIsAncestorOf(');
+function comparator(source, revision) {
+	const start = source.indexOf('function comparePostOrder(');
 	const end = source.indexOf('function finishEffectCommit()', start);
 	if (start < 0 || end < 0) throw new Error('Effect comparator source moved');
-	const code = stripTypeScriptTypes(source.slice(start, end));
+	// Read each helper from the selected revision, including pre-split baselines.
+	let refs = source;
+	let ancestor = refs.indexOf('function blockIsAncestorOf(');
+	if (ancestor < 0) {
+		refs = revision
+			? execFileSync('git', ['show', `${revision}:${refsFile}`], {
+					encoding: 'utf8',
+					maxBuffer: 8 * 1024 * 1024,
+				})
+			: readFileSync(refsFile, 'utf8');
+		ancestor = refs.indexOf('function blockIsAncestorOf(');
+	}
+	const ancestorEnd = refs.indexOf('\n}', ancestor) + 2;
+	if (ancestor < 0 || ancestorEnd <= ancestor) throw new Error('Effect ancestor source moved');
+	const code = stripTypeScriptTypes(
+		refs.slice(ancestor, ancestorEnd) + '\n' + source.slice(start, end),
+	);
 	return Function(`${code}\nreturn comparePostOrder;`)();
 }
 
@@ -23,6 +40,7 @@ const baseline = comparator(
 		encoding: 'utf8',
 		maxBuffer: 8 * 1024 * 1024,
 	}),
+	baseRef,
 );
 const candidate = comparator(readFileSync(file, 'utf8'));
 

@@ -22,8 +22,9 @@ import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 // application first uses them. Vite's default production build drops what those
 // variables guard from an application that never uses the capability, but only
 // while the runtime reads each one in a form its minifier can fold (see the
-// driver declarations in runtime.ts). The oracle is the bundle's source map: a
-// declaration is retained exactly when some generated code maps into it.
+// driver declarations in runtime.ts and its owning modules). The oracle is the
+// bundle's source map: a declaration is retained exactly when some generated
+// code maps into it.
 const SOURCE = resolve(import.meta.dirname, '../src');
 const PACKAGE_ROOT = resolve(import.meta.dirname, '..');
 const OPTIONAL_DECLARATIONS = [
@@ -80,7 +81,7 @@ const ranges = resolveDeclarationRanges(
 		...REF_DECLARATIONS,
 	].map((name) => ({
 		name,
-		source: 'runtime.ts',
+		source: name === 'activityRefState' ? 'runtime/fragment-refs.ts' : 'runtime.ts',
 	})),
 );
 

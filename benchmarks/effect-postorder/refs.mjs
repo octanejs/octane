@@ -10,22 +10,41 @@ import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.m
 
 process.chdir(path.resolve(import.meta.dirname, '../..'));
 const file = 'packages/octane/src/runtime.ts';
+const refsFile = 'packages/octane/src/runtime/fragment-refs.ts';
 const baselineRef = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const measure = process.argv.includes('--measure');
 
-function instantiate(source) {
+function instantiate(source, revision) {
 	const refName = source.includes('function drainQueuedRefAttaches():')
 		? 'drainQueuedRefAttaches'
 		: 'drainRefAttaches';
 	const refStart = source.indexOf(`function ${refName}():`);
 	const refEnd = source.indexOf('// Callback replacement', refStart);
-	const comparisonStart = source.indexOf('function blockIsAncestorOf(');
+	const comparisonStart = source.indexOf('function comparePostOrder(');
 	const comparisonEnd = source.indexOf('function finishEffectCommit()', comparisonStart);
 	assert.ok(
 		refStart >= 0 && refEnd > refStart && comparisonStart >= 0 && comparisonEnd > comparisonStart,
 	);
+	// Never combine a historical runtime with the worktree's ref implementation.
+	let refs = source;
+	let ancestor = refs.indexOf('function blockIsAncestorOf(');
+	if (ancestor < 0) {
+		refs = revision
+			? execFileSync('git', ['show', `${revision}:${refsFile}`], {
+					encoding: 'utf8',
+					maxBuffer: 8 * 1024 * 1024,
+				})
+			: readFileSync(refsFile, 'utf8');
+		ancestor = refs.indexOf('function blockIsAncestorOf(');
+	}
+	const ancestorEnd = refs.indexOf('\n}', ancestor) + 2;
+	assert.ok(ancestor >= 0 && ancestorEnd > ancestor, 'effect ancestor source is present');
 	const code = stripTypeScriptTypes(
-		source.slice(comparisonStart, comparisonEnd) + '\n' + source.slice(refStart, refEnd),
+		refs.slice(ancestor, ancestorEnd) +
+			'\n' +
+			source.slice(comparisonStart, comparisonEnd) +
+			'\n' +
+			source.slice(refStart, refEnd),
 	);
 	return Function(`"use strict";
 		const counts = { sorts: 0 };
@@ -98,8 +117,8 @@ function workload(shape) {
 	return { queued, expected };
 }
 
-function observe(source, shape) {
-	const runtime = instantiate(source);
+function observe(source, shape, revision) {
+	const runtime = instantiate(source, revision);
 	const { queued, expected } = workload(shape);
 	runtime.enqueue(queued);
 	runtime.drain();
@@ -129,7 +148,7 @@ for (const [label, source] of sources) {
 		'unowned-last',
 		'unowned-only',
 	]) {
-		const result = observe(source, shape);
+		const result = observe(source, shape, label === 'baseline' ? baselineRef : undefined);
 		if (!measure && label === 'candidate' && shape === 'siblings') {
 			assert.equal(result.sorts, 0, 'sibling-only refs must drain without sorting');
 		}
