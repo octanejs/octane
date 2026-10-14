@@ -2181,16 +2181,15 @@ function releaseNativeAdoptions(): void {
 }
 
 /**
- * A boundary whose `[$!rN` open, `open`, says the client renders it
+ * An ErrorBoundary whose `[$!rN` open says the client renders it
  * (hydration-protocol.ts) replaces only its arm: surrounding adopted hosts
  * survive. Returns the id state of the fresh arm, after reserving the N ids the
- * server's render took, or null for any other boundary. An arm the server could
- * not finish because it suspended or threw is also reported
- * (HydrationCapability.beginUnfinishedArm).
+ * server's render took, or null for any other boundary. A `@try` or Suspense
+ * boundary claims its arm with HydrationCapability.claimClientArm.
  */
 function takeNativeFreshArm(
 	hydration: HydrationCapability | null,
-	state: TrySlot | ErrorSlot,
+	state: ErrorSlot,
 	ids: RootIdState,
 ): RootIdState | null {
 	if (hydration === null) return null;
@@ -4169,9 +4168,10 @@ interface RootRenderTransaction {
 	/** The owner generation that commit was prepared for (refreshPendingOwner). */
 	heldGeneration?: number;
 	/**
-	 * A catch arm caught an error in this render (setTryBranch). The client
-	 * render that replaces a failed hydration then commits without reporting
-	 * that failure, as React's does.
+	 * A catch arm caught an error in this render (setTryBranch), or its root
+	 * reported one that none caught (handleResumeError). The client render that
+	 * replaces a failed hydration then commits without reporting that failure,
+	 * as React's does.
 	 */
 	caught?: boolean;
 	/**
@@ -20861,76 +20861,29 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A shell hydrated before its streamed segment swaps still has the template
-	 * sentinel instead of the seed comment. Its opaque id owns the same boundary
-	 * namespace even though there are no scoped seeds yet. Octane cannot
-	 * selectively hydrate that server fallback, so claim the boundary `state`
-	 * for the client: its commit removes the sentinel and the server's fallback
-	 * arm, where mountTry's fresh try/pending block lands (discardServerArm).
-	 * Leaving either behind would duplicate the fallback and allow a later
-	 * stream swap to overwrite client-owned DOM. Returns the boundary's id, or
-	 * null when `cursor` is not a renderer sentinel. A method so that
+	 * The template sentinel that still leads the streamed boundary `open` opens
+	 * while its segment has not swapped in, or null. A method so that
 	 * client-only bundles drop the stream-protocol validator with this class.
 	 */
-	claimStreamTemplate(cursor: Node | null, state: TrySlot): string | null {
-		if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
-		discardServerArm(state);
-		this.node = state.end;
-		return (cursor as Element).getAttribute(STREAM_BOUNDARY_ATTR)!;
+	streamSentinel(open: Node): Element | null {
+		const sentinel = getNextSibling(open);
+		return sentinel?.nodeType === 1 && isRendererStreamBoundaryTemplate(sentinel as Element)
+			? (sentinel as Element)
+			: null;
 	}
 
 	/**
-	 * Start the client render of `state`'s arm when the server could not finish
-	 * it. `marker` is the boundary's `[$!rN` open, whose reason says whether
-	 * the buffered render suspended or threw, or the claimed sentinel of a
-	 * streamed boundary, which `$OCTRX` marks errored. Returns what
-	 * endUnfinishedArm and reportUnfinishedArm need, or null for an arm the
-	 * client renders without a report or a streamed boundary that is merely
-	 * pending. The boundary is dehydrated meanwhile (DEHYDRATED_TRY), and
-	 * catches in its render are its own (as catchesInHydrationFallback).
+	 * Render `state`, a boundary the server left to the client, as a dehydrated
+	 * boundary, and report one whose server render threw (`errored`) or
+	 * suspended unless a catch arm caught an error in that render
+	 * (claimClientArm). A method, so client code never names the flag setters
+	 * that render calls.
 	 */
-	beginUnfinishedArm(state: TrySlot, marker: Node): UnfinishedArm | null {
-		let errored: boolean;
-		if (marker.nodeType === 1) {
-			errored = (marker as Element).hasAttribute(HYDRATE_STREAM_ERROR_ATTR);
-			if (!errored) return null;
-		} else {
-			const reason = (marker as Comment).data.charAt(BOUNDARY_CLIENT.length);
-			errored = reason === BOUNDARY_CLIENT_ERROR;
-			if (!errored && reason !== BOUNDARY_CLIENT_SUSPENDED) return null;
-		}
-		const arm: UnfinishedArm = {
-			state,
-			errored,
-			dehydrated: DEHYDRATED_TRY,
-			caughtBefore: ROOT_RENDER_TRANSACTION?.caught === true,
-			caught: false,
-		};
-		DEHYDRATED_TRY = state;
-		if (ROOT_RENDER_TRANSACTION !== null) ROOT_RENDER_TRANSACTION.caught = false;
-		return arm;
-	}
-
-	/** End the render that beginUnfinishedArm started, whether or not it threw. */
-	endUnfinishedArm(arm: UnfinishedArm): void {
-		DEHYDRATED_TRY = arm.dehydrated;
-		const transaction = ROOT_RENDER_TRANSACTION;
-		if (transaction === null) return;
-		arm.caught = transaction.caught === true;
-		transaction.caught = arm.caught || arm.caughtBefore;
-	}
-
-	/**
-	 * Report that the boundary of `arm`, which the server could not finish,
-	 * rendered on the client, as React reports a boundary its server marked
-	 * errored, unless a catch arm caught an error in that render, which React
-	 * reports alone.
-	 */
-	reportUnfinishedArm(arm: UnfinishedArm): void {
-		if (!arm.caught)
+	clientRender(state: TrySlot, errored: boolean | null): void {
+		if (!clientRenderDehydratedTry(state, this) && errored !== null)
 			noteRecoverableHydrationError(
-				() => new Error(arm.errored ? formatClientError(344) : formatClientError(341)),
-				arm.state.parentBlock,
+				() => new Error(errored ? formatClientError(344) : formatClientError(341)),
+				state.parentBlock,
 			);
 	}
 
@@ -40897,6 +40850,9 @@ export function tryBlock(
 			setBranch: setTryBranch,
 			mount: mountTry,
 			catchError: switchToCatch,
+			inBoundary: inBoundaryRender,
+			resumeError: handleResumeError,
+			hiddenActivity: findHiddenActivity,
 		};
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
 	if (
@@ -41034,6 +40990,16 @@ export function tryBlock(
 		state.env = env;
 	}
 	const s = state;
+	// A boundary the server left to the client renders there (claimClientArm).
+	if (
+		hydrationStarted &&
+		initial === undefined &&
+		hydration !== null &&
+		s.branch === -1 &&
+		!s.passthrough &&
+		claimClientArm(hydration, s)
+	)
+		return s.reset;
 	if (initial === undefined && hydration !== null && s.branch === -1 && !s.propagateSuspense) {
 		initial = takeInitialSuspenseHydration(s, hydration) ?? undefined;
 		if (initial !== undefined) (initialSuspenseHydrations ??= new WeakMap()).set(s, initial);
@@ -41267,6 +41233,10 @@ interface TryOps {
 	setBranch: typeof setTryBranch;
 	mount: typeof mountTry;
 	catchError: typeof switchToCatch;
+	/** A boundary's retry, which runs as its root's render. */
+	inBoundary: typeof inBoundaryRender;
+	resumeError: typeof handleResumeError;
+	hiddenActivity: typeof findHiddenActivity;
 }
 let TRY_OPS: TryOps | null = null;
 
@@ -41286,7 +41256,7 @@ function takeInitialSuspenseHydration(
 		cursor = getNextSibling(cursor);
 	}
 	if (text.startsWith(BOUNDARY_STREAMED)) {
-		// A sentinel still leads a pending boundary, which mountTry claims.
+		// A sentinel still leads a pending boundary, which claimClientArm claims.
 		if (cursor?.nodeType === 1 && (cursor as Element).hasAttribute(STREAM_BOUNDARY_ATTR))
 			return null;
 		const boundaryId = text.slice(BOUNDARY_STREAMED.length);
@@ -41413,6 +41383,64 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
 }
 
 /**
+ * Render `state` on the client, as a dehydrated boundary is, when the
+ * server left it to the client. Its `[$!rN` open (hydration-protocol.ts)
+ * says the server's render threw, suspended, or read values it cannot send;
+ * a streamed `[$?id` boundary whose template sentinel still leads it shows a
+ * fallback whose content has not arrived. Octane cannot hydrate either, so
+ * the boundary claims its own id namespace (the N ids the server's render
+ * reserved, or the stream's), and its commit replaces the server's content.
+ * Leaving a sentinel would let a later stream swap overwrite client-owned
+ * DOM. One the server marked errored (`e`, or `$OCTRX`) or suspended (`s`)
+ * reports once, as React does, unless a catch arm caught an error in its
+ * client render, which React reports alone. Returns whether `state` is one.
+ * Only tryBlock calls it, behind `hydrationStarted`, so neither a client-only
+ * bundle nor a hydrating one without boundaries ships it. The client render,
+ * which swaps the hydration flags, stays on the capability (clientRender).
+ */
+function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean {
+	const parentIds = state.parentBlock.idState;
+	const open = hydration.bindingTryState(state.start) ?? (state.start as Comment).data;
+	// Whether the server's render threw rather than suspended; null reports nothing.
+	let errored: boolean | null = null;
+	if (open.startsWith(BOUNDARY_CLIENT)) {
+		const count = boundaryIdCount(open);
+		if (count < 0) return false;
+		reserveHydrationIds(state.idState, count);
+		state.idState = {
+			prefix: state.idState.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
+			next: 0,
+			renderOwner: state.idState.renderOwner,
+		};
+		const reason = open.charAt(BOUNDARY_CLIENT.length);
+		if (reason === BOUNDARY_CLIENT_ERROR || reason === BOUNDARY_CLIENT_SUSPENDED)
+			errored = reason === BOUNDARY_CLIENT_ERROR;
+	} else if (open.startsWith(BOUNDARY_STREAMED)) {
+		const sentinel = hydration.streamSentinel(state.start);
+		if (sentinel === null) return false;
+		state.idState = {
+			prefix: parentIds.prefix + 'b' + open.slice(BOUNDARY_STREAMED.length) + '-',
+			next: 0,
+			renderOwner: parentIds.renderOwner,
+			signalState: parentIds.signalState,
+		};
+		if (sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR)) errored = true;
+	} else return false;
+	hydration.clientRender(state, errored);
+	return true;
+}
+
+/** Captured intent aimed at the server content of `state`, which its fallback discards, is dropped. */
+function markArmDiscard(state: TrySlot): void {
+	markHydrationDiscard(
+		state.parentBlock.idState.renderOwner,
+		state.domParent,
+		getNextSibling(state.start),
+		state.end,
+	);
+}
+
+/**
  * Discard the server DOM of a Suspense arm whose hydration failed or was
  * overtaken by an update, and render the arm on the client, as React does for
  * a dehydrated boundary. Returns whether a catch arm caught an error in that
@@ -41420,20 +41448,16 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
  */
 function clientRenderDehydratedTry(state: TrySlot, outer: HydrationCapability | null): boolean {
 	initialSuspenseHydrations?.delete(state);
-	markHydrationDiscard(
-		state.parentBlock.idState.renderOwner,
-		state.domParent,
-		getNextSibling(state.start),
-		state.end,
-	);
 	// This discards the arm's metadata too. Leave a streamed payload with its
 	// weak marker owner: a discarded enclosing attempt leaves the marker, and
 	// hydrates the arm from it again, and a commit drops both together.
 	discardServerArm(state);
 	swapHydration(null);
+	const previousNative = setNativeAdoptionResolver(null);
 	try {
 		return renderDehydratedTry(state, true);
 	} finally {
+		setNativeAdoptionResolver(previousNative);
 		swapHydration(outer);
 		// Outside any hydration, an error that escaped the client render ends here.
 		if (outer !== null) outer.node = getNextSibling(state.end);
@@ -41455,6 +41479,7 @@ function renderInitialSuspenseHydration(
 		// server HTML predates them, so, as React client-renders a dehydrated
 		// boundary that an update reaches, the arm renders on the client from
 		// client data, reporting nothing, and its obsolete wakeable is ignored.
+		markArmDiscard(state);
 		clientRenderDehydratedTry(state, currentHydration);
 		return;
 	}
@@ -41563,16 +41588,15 @@ function renderInitialSuspenseHydration(
 	}
 	if (suspended !== null) {
 		state.pendingThenable = suspended;
-		const resume = () => {
+		resumeOnSettle(suspended, () => {
 			if (
 				state.parentBlock.disposed ||
 				state.pendingThenable !== suspended ||
 				initialSuspenseHydrations?.get(state) !== initial
 			)
 				return;
-			scheduleRender(state.parentBlock);
-		};
-		resumeOnSettle(suspended, resume);
+			TRY_OPS!.inBoundary(state, retryInitialSuspenseHydration, initial);
+		});
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
@@ -41581,6 +41605,7 @@ function renderInitialSuspenseHydration(
 		// inside it: as React does for a Suspense boundary, discard its server DOM
 		// and render it on the client rather than fail a root that may have
 		// committed already.
+		markArmDiscard(state);
 		if (!clientRenderDehydratedTry(state, previousHydration))
 			noteRecoverableHydrationError(() => failure, state.parentBlock);
 		return;
@@ -41600,17 +41625,21 @@ function renderInitialSuspenseHydration(
 	}
 }
 
-/** A boundary arm that the server could not finish, while it renders on the client. */
-interface UnfinishedArm {
-	state: TrySlot;
-	/** Whether the server's render threw, rather than suspended. */
-	errored: boolean;
-	/** The enclosing dehydrated boundary, restored when the render ends. */
-	dehydrated: TrySlot | null;
-	/** Whether the root's render had caught an error before this arm rendered. */
-	caughtBefore: boolean;
-	/** Whether a catch arm caught an error in this arm's render. */
-	caught: boolean;
+/**
+ * Retry the hydration of a boundary whose attempt suspended. Only the
+ * boundary renders, over its server arm, with the inputs and context it
+ * holds: its parent does not render again. A retry inside a hidden Activity
+ * stays hidden, and an error no boundary catches is its root's.
+ */
+function retryInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
+	const hiddenActivity = TRY_OPS!.hiddenActivity(state.parentBlock);
+	try {
+		renderInitialSuspenseHydration(state, initial);
+	} catch (error) {
+		TRY_OPS!.resumeError(state.parentBlock, error);
+	} finally {
+		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
+	}
 }
 
 /**
@@ -41649,89 +41678,18 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let bStart: Node;
 	let bEnd: Node;
 	let armParent = state.domParent;
-	// The boundary's open says what its server range holds (hydration-protocol.ts).
-	// A streamed boundary (`[$?id`) whose segment swapped in has its seed JSON
-	// stashed on window.$OCTS[id]. The full id includes its stream namespace, so
-	// two roots composed into one document cannot consume each other's values.
-	// Scope the seed stream to THIS boundary while its subtree hydrates (a
-	// depth-first synchronous render), restoring the outer scope after — nested
-	// streamed boundaries push again naturally.
-	let scopedSeeds: unknown[] | null = null;
-	let scopedNativeRaw: string | undefined;
-	let hasScopedBoundary = false;
-	let freshBoundary = false;
-	const start = state.start;
-	const first = getNextSibling(start);
-	const open = adopting ? (hydration!.bindingTryState(start) ?? start.data) : '';
-	let streamedBoundaryId: string | null = null;
-	let unfinished: UnfinishedArm | null = null;
-	if (open.startsWith(BOUNDARY_STREAMED)) {
-		streamedBoundaryId = open.slice(BOUNDARY_STREAMED.length);
-		hasScopedBoundary = true;
-		// A shell hydrated before its streamed segment swaps: the client claims
-		// the boundary, mounting a fresh try/pending block in the cleared range.
-		// It reports a boundary that the server marked errored ($OCTRX).
-		if (hydration!.claimStreamTemplate(first, state) !== null) {
-			unfinished = hydration!.beginUnfinishedArm(state, first!);
-			freshBoundary = true;
-		} else {
-			const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
-			const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
-			if (typeof raw === 'string') scopedSeeds = hydration!.parseSeeds(raw);
-			const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
-			if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
-		}
-		state.idState = {
-			prefix: state.parentBlock.idState.prefix + 'b' + streamedBoundaryId + '-',
-			next: 0,
-			renderOwner: state.parentBlock.idState.renderOwner,
-			signalState: state.parentBlock.idState.signalState,
-		};
-	}
-	const freshIds = adopting ? takeNativeFreshArm(hydration, state, state.idState) : null;
-	if (freshIds !== null) {
-		unfinished = hydration!.beginUnfinishedArm(state, state.start);
-		state.idState = freshIds;
-		freshBoundary = true;
-	}
-	if (adopting && !freshBoundary) {
+	if (adopting) {
 		// ADOPT the server's content, which the seeded use() values let the try
 		// body render its success arm over.
-		[bStart, bEnd] = hydration!.armRange(state.start, first, state.end);
+		[bStart, bEnd] = hydration!.armRange(state.start, getNextSibling(state.start), state.end);
 		hydration!.node = getNextSibling(bStart);
 	} else {
-		scopedSeeds = null;
 		bStart = document.createComment('try-b');
 		bEnd = document.createComment('/try-b');
 		armParent = insertArmPair(state, bStart, bEnd, state.end);
 	}
 	const b = createTryBody(state, bStart, bEnd, armParent);
 	state.block = b;
-	let nativeAdoption: NativeAdoptionState | undefined;
-	if (hydrating && scopedNativeRaw !== undefined && !freshBoundary) {
-		const boundaryId = streamedBoundaryId!;
-		nativeAdoption = ownNativeAdoption(b, scopedNativeRaw, () => {
-			const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
-			if (stash !== undefined) {
-				delete stash[boundaryId + '$signals'];
-				delete stash[boundaryId];
-			}
-		});
-	}
-	// Install this boundary's streamed seed scope (if any) for the subtree render.
-	const prevSeeds = hydration?.seeds ?? null;
-	const prevSeedCursor = hydration?.seedCursor ?? 0;
-	if (hasScopedBoundary) {
-		hydration!.seeds = scopedSeeds;
-		hydration!.seedCursor = 0;
-	}
-	const previousNative =
-		hasScopedBoundary || freshBoundary
-			? setNativeAdoptionResolver(nativeAdoption?.resolve ?? null)
-			: undefined;
-	// The entire newly mounted arm, including its pending/catch path, is outside
-	// adoption. A live child must not borrow an ancestor's historical data.
-	if (freshBoundary) hydration!.depth++;
 	try {
 		if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
 		else renderBlock(b);
@@ -41748,23 +41706,13 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 			if (state.tryBlock) {
 				// Tear down the aborted try render's bookkeeping. Server DOM it adopted
 				// leaves when the catch arm's commit discards it.
-				unmountBlock(state.tryBlock, !adopting || freshBoundary);
+				unmountBlock(state.tryBlock, !adopting);
 				state.tryBlock = null;
 				state.block = null;
 			}
 			switchToCatch(state, err, true);
 		}
-	} finally {
-		if (freshBoundary) hydration!.depth--;
-		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
-		if (hasScopedBoundary) {
-			hydration!.seeds = prevSeeds;
-			hydration!.seedCursor = prevSeedCursor;
-		}
-		if (unfinished !== null) hydration!.endUnfinishedArm(unfinished);
 	}
-	// An error that escaped to an outer catch arm reports nothing either.
-	if (unfinished !== null) hydration!.reportUnfinishedArm(unfinished);
 }
 
 /**
@@ -44215,10 +44163,8 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 			throw err;
 		}
 		// Detached context (resume microtask, effect commit): no render frames
-		// to unwind — delegate directly.
-		const parent = findTryHandler(state.parentBlock);
-		if (parent) parent(err);
-		else console.error('tryBlock with no catch arm received error:', err);
+		// to unwind. The enclosing boundary catches it, or the root reports it.
+		handleResumeError(state.parentBlock, err);
 		return;
 	}
 	setTryBranch(state, 0);
@@ -44356,6 +44302,8 @@ function handleResumeError(block: Block, error: unknown): void {
 		if (CURRENT_BLOCK !== null || inFlush) throw unhandled;
 		const root = suspenseRetryRoot(block);
 		if (!reportUncaughtError(block, unhandled)) console.error(unhandled);
+		// The root reports this error alone, not a hydration failure it replaced.
+		if (ROOT_RENDER_TRANSACTION !== null) ROOT_RENDER_TRANSACTION.caught = true;
 		if (root.kind === 'root' && !root.disposed) unmountBlock(root);
 	}
 }
