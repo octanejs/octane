@@ -34,7 +34,12 @@ function makeStore(initial: GenericChildSnapshot): GenericChildStore & {
 	};
 }
 
-describe.each(['state', 'store'] as const)('renderable children updated through %s', (mode) => {
+describe.each([
+	{ mode: 'state', wide: false },
+	{ mode: 'store', wide: false },
+	{ mode: 'state', wide: true },
+	{ mode: 'store', wide: true },
+] as const)('renderable children updated through $mode, wide: $wide', ({ mode, wide }) => {
 	it.each([
 		{ kind: 'string', value: 'next', expected: 'next' },
 		{ kind: 'number', value: 0, expected: '0' },
@@ -47,9 +52,10 @@ describe.each(['state', 'store'] as const)('renderable children updated through 
 		let setSnapshot!: (snapshot: GenericChildSnapshot) => void;
 		const root =
 			mode === 'store'
-				? mount(GenericChildTransition, { store })
+				? mount(GenericChildTransition, { store, wide })
 				: mount(GenericChildStateTransition, {
 						initial: store.get(),
+						wide,
 						bind: (set) => {
 							setSnapshot = set;
 						},
@@ -62,6 +68,9 @@ describe.each(['state', 'store'] as const)('renderable children updated through 
 			const input = root.find('#retained-input') as HTMLInputElement;
 			input.value = 'typed by the user';
 			expect(onlyChild.textContent).toBe('first');
+			if (wide) {
+				for (let i = 0; i < 17; i++) expect(onlyChild.getAttribute(`data-a${i}`)).toBe('first');
+			}
 			expect(descriptorChild.textContent).toBe('first');
 			expect(anchoredChild.textContent).toBe('before:first:after');
 
@@ -71,6 +80,9 @@ describe.each(['state', 'store'] as const)('renderable children updated through 
 			});
 			if (mode === 'state') {
 				expect(onlyChild.textContent).toBe('first');
+				if (wide) {
+					for (let i = 0; i < 17; i++) expect(onlyChild.getAttribute(`data-a${i}`)).toBe('first');
+				}
 				expect(descriptorChild.textContent).toBe('first');
 				expect(anchoredChild.textContent).toBe('before:first:after');
 				expect(root.find('#ready').textContent).toBe('ready:first');
@@ -89,6 +101,10 @@ describe.each(['state', 'store'] as const)('renderable children updated through 
 			expect(root.find('#descriptor-child')).toBe(descriptorChild);
 			expect(root.find('#anchored-child')).toBe(anchoredChild);
 			expect(onlyChild.textContent).toBe(expected);
+			if (wide) {
+				for (let i = 0; i < 17; i++)
+					expect(onlyChild.getAttribute(`data-a${i}`)).toBe(String(value));
+			}
 			expect(descriptorChild.textContent).toBe(expected);
 			expect(anchoredChild.textContent).toBe(`before:${expected}:after`);
 			expect(root.find('#ready').textContent).toBe('ready:second');

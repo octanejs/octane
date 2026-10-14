@@ -22,8 +22,33 @@ function PendingProbe() @{
 	<output id="pending">{pending ? 'pending' : 'idle'}</output>
 }
 
-function OnlyChild(props: { value: OctaneNode }) @{
-	<main id="only-child">{props.value}</main>
+function OnlyChild(props: { value: OctaneNode; wide: boolean }) @{
+	@if (props.wide) {
+		<main
+			id="only-child"
+			data-a0={String(props.value)}
+			data-a1={String(props.value)}
+			data-a2={String(props.value)}
+			data-a3={String(props.value)}
+			data-a4={String(props.value)}
+			data-a5={String(props.value)}
+			data-a6={String(props.value)}
+			data-a7={String(props.value)}
+			data-a8={String(props.value)}
+			data-a9={String(props.value)}
+			data-a10={String(props.value)}
+			data-a11={String(props.value)}
+			data-a12={String(props.value)}
+			data-a13={String(props.value)}
+			data-a14={String(props.value)}
+			data-a15={String(props.value)}
+			data-a16={String(props.value)}
+		>
+			{props.value}
+		</main>
+	} @else {
+		<main id="only-child">{props.value}</main>
+	}
 }
 
 function DescriptorChild(props: { value: OctaneNode }) {
@@ -44,21 +69,21 @@ function ReadyValue(props: { request: Promise<string> }) @{
 	<output id="ready">{value as string}</output>
 }
 
-function Contents(props: { snapshot: GenericChildSnapshot }) @{
+function Contents(props: { snapshot: GenericChildSnapshot; wide: boolean }) @{
 	<div>
-		<OnlyChild value={props.snapshot.value} />
+		<OnlyChild value={props.snapshot.value} wide={props.wide} />
 		<DescriptorChild value={props.snapshot.value} />
 		<AnchoredChild value={props.snapshot.value} />
 		<ReadyValue request={props.snapshot.request} />
 	</div>
 }
 
-export function GenericChildTransition(props: { store: GenericChildStore }) @{
+export function GenericChildTransition(props: { store: GenericChildStore; wide: boolean }) @{
 	const snapshot = useSyncExternalStore(props.store.subscribe, props.store.get);
 	<div>
 		<PendingProbe />
 		@try {
-			<Contents snapshot={snapshot} />
+			<Contents snapshot={snapshot} wide={props.wide} />
 		} @pending {
 			<output id="fallback">{'loading'}</output>
 		}
@@ -67,6 +92,7 @@ export function GenericChildTransition(props: { store: GenericChildStore }) @{
 
 export function GenericChildStateTransition(props: {
 	initial: GenericChildSnapshot;
+	wide: boolean;
 	bind: (set: (snapshot: GenericChildSnapshot) => void) => void;
 }) @{
 	const [snapshot, setSnapshot] = useState(props.initial);
@@ -75,7 +101,7 @@ export function GenericChildStateTransition(props: {
 	<div>
 		<output id="pending">{pending ? 'pending' : 'idle'}</output>
 		@try {
-			<Contents snapshot={snapshot} />
+			<Contents snapshot={snapshot} wide={props.wide} />
 		} @pending {
 			<output id="fallback">loading</output>
 		}

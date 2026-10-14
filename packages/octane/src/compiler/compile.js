@@ -27982,10 +27982,10 @@ function inlineRenderableValueDeclarations(valueExpr) {
 
 // A changed row must reach the slot's prepared output even when it already has
 // a Text node. Directly mutating that node would expose an unfinished render.
-function emitInlineRenderableUpdate(previous, cachedNode, updateCall) {
+function emitInlineRenderableUpdate(previous, cachedNode, updateCall, previousRead = previous) {
 	const V = () => b.id('_v');
 	return b.if(
-		b.logical('||', b.id('_o'), b.binary('!==', previous(), V())),
+		b.logical('||', b.id('_o'), b.binary('!==', previousRead(), V())),
 		b.block([
 			b.stmt(b.assignment('=', cachedNode(), updateCall)),
 			b.stmt(b.assignment('=', previous(), V())),
@@ -29121,29 +29121,34 @@ function planJsx(
 						...templateTextHoles.map((cc) => {
 							const field = bag.letter(`_chp$${cc.id}`);
 							const saved = () => bagFieldNode(bag, `_chp$${cc.id}`);
+							const node = () => bagFieldNode(bag, `_chv$${cc.id}`);
+							const currentNode = () => b.member(b.id('_p'), bag.letter(`_chv$${cc.id}`));
 							const prepared = () => b.member(b.id('_p'), `_value$${field}`);
+							const changed = () =>
+								b.logical(
+									'||',
+									b.binary('!==', saved(), b.member(b.id('_p'), field)),
+									b.binary('!==', node(), bag.preparedRead(currentNode())),
+								);
 							return inheritOriginLoc(
 								b.if(
 									!bag.sparsePreparation
-										? b.binary('!==', saved(), b.member(b.id('_p'), field))
-										: b.logical(
-												'&&',
-												b.binary('in', b.literal(field), b.id('_p')),
-												b.binary('!==', saved(), b.member(b.id('_p'), field)),
-											),
+										? changed()
+										: b.logical('&&', b.binary('in', b.literal(field), b.id('_p')), changed()),
 									b.block([
 										b.if(
 											b.binary('!==', prepared(), undefinedNode()),
 											b.stmt(
 												b.call(
 													'_$setText',
-													bagFieldNode(bag, `_chv$${cc.id}`),
+													bag.preparedRead(currentNode()),
 													prepared(),
 													bagFieldNode(bag, `_compHost$${cc.id}`),
 												),
 											),
 											null,
 										),
+										b.stmt(b.assignment('=', node(), bag.preparedRead(currentNode()))),
 										b.stmt(b.assignment('=', saved(), b.member(b.id('_p'), field))),
 									]),
 									null,
@@ -29796,8 +29801,17 @@ function planJsx(
 			// node (no `<!>`, no slot state). Either the shared helper or the inline
 			// row guard compares its cached value/node before the ordinary child path.
 			if (cc.onlyChildText && !noTemplate) {
-				const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
-				const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
+				const preparedHole = templateTextHoles.includes(cc);
+				const chp = () => b.member(b.id(preparedHole ? '_p' : '_b'), bag.letter(`_chp$${cc.id}`));
+				const chv = () => b.member(b.id(preparedHole ? '_p' : '_b'), bag.letter(`_chv$${cc.id}`));
+				const readPrevious = () => (preparedHole ? bag.preparedRead(chp()) : chp());
+				// Only reconciliation can replace a pending empty slot. If its
+				// candidate has no Text, it still owns the previously accepted one.
+				// Scalar fast-path admission below must read the actual candidate.
+				const readNode = () =>
+					preparedHole
+						? b.logical('??', bag.preparedRead(chv()), bagFieldNode(bag, `_chv$${cc.id}`))
+						: chv();
 				// A host that can receive dangerouslySetInnerHTML must validate its
 				// current child on EVERY render. The ordinary primitive fast path can
 				// identity-skip an unchanged child while a raw-HTML writer activates in
@@ -29819,7 +29833,7 @@ function planJsx(
 										b.literal(slotIndex),
 										hostExpr(),
 										V(),
-										chv(),
+										readNode(),
 										...(prospectiveHostProps === null ? [] : [prospectiveHostProps()]),
 									),
 								),
@@ -29841,11 +29855,12 @@ function planJsx(
 									b.literal(slotIndex),
 									hostExpr(),
 									V(),
-									chv(),
+									readNode(),
 									undefinedNode(),
 									b.literal(false),
-									chp(),
+									readPrevious(),
 								),
+								readPrevious,
 							)
 						: b.block([
 								b.stmt(
@@ -29858,10 +29873,10 @@ function planJsx(
 											b.literal(slotIndex),
 											hostExpr(),
 											V(),
-											chv(),
+											readNode(),
 											undefinedNode(),
 											b.literal(false),
-											chp(),
+											readPrevious(),
 										),
 									),
 								),
@@ -29881,14 +29896,14 @@ function planJsx(
 						slotIndex,
 						updateHole(),
 						// Array → scalar → the same array must reconstruct the list.
-						b.binary('!==', chp(), V()),
+						b.binary('!==', readPrevious(), V()),
 						true,
 						undefined,
 						null,
 					);
-					update = b.if(b.call('_$compilerCacheArray', V(), chp()), cached, ordinary);
+					update = b.if(b.call('_$compilerCacheArray', V(), readPrevious()), cached, ordinary);
 				}
-				if (templateTextHoles.includes(cc)) {
+				if (preparedHole) {
 					const field = bag.letter(`_chp$${cc.id}`);
 					const currentNode = () => b.member(b.id('_p'), bag.letter(`_chv$${cc.id}`));
 					const current = () => b.member(b.id('_p'), field);
@@ -29938,19 +29953,12 @@ function planJsx(
 							),
 						]),
 						b.block([
+							// Structural/empty output owns a slot preparation but
+							// its node and raw-value caches belong to this scope.
+							// A retry must still see the accepted pair after discard.
+							copy(),
 							update,
-							// The slow path succeeded. Forget a superseded scalar
-							// candidate, preserving all other fields in this template.
-							b.if(
-								b.binary('!==', b.id('_p'), b.id('_b')),
-								b.block([
-									copy(),
-									b.stmt(b.assignment('=', currentNode(), chv())),
-									b.stmt(b.assignment('=', current(), chp())),
-									b.stmt(b.assignment('=', prepared(), undefinedNode())),
-								]),
-								null,
-							),
+							b.stmt(b.assignment('=', prepared(), undefinedNode())),
 						]),
 					);
 				}
