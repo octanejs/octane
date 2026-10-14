@@ -28174,14 +28174,15 @@ export function headBlock(
 			scope.slots[slot] = undefined;
 		});
 		// The claimed element takes the client's props once hydration ends: at
-		// the attempt's commit.
-		if (hydration !== null) {
-			const transaction = ROOT_RENDER_TRANSACTION;
-			if (transaction === null) hydration.suspend(() => applyHeadProps(state!, tag, attrs, text));
-			else {
-				state.next = { tx: transaction, attrs, text };
-				transaction.ops.push(commitHeadProps, state);
-			}
+		// the attempt's commit, as a server element a client render claims does.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (hydration !== null && transaction === null) {
+			hydration.suspend(() => applyHeadProps(state!, tag, attrs, text));
+			return;
+		}
+		if (adopted && transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+			state.next = { tx: transaction, attrs, text };
+			transaction.ops.push(commitHeadProps, state);
 			return;
 		}
 	} else {
@@ -30120,11 +30121,17 @@ export function setFormAction(
 			FORM_SUBMIT_DRIVER = handleFormSubmit;
 			delegateEvents(['submit']);
 		}
-		// A function action implies a non-native submit; drop any stale attribute.
-		el.removeAttribute(name);
+		// A function action implies a non-native submit; drop any stale attribute,
+		// an adopted server element's at commit.
+		if (el.hasAttribute(name))
+			atCommitIf(hydrating && activeHydration() !== null, dropAttribute, [el, name]);
 		return;
 	}
 	setFormActionAttribute(el, name, value);
+}
+
+function dropAttribute([el, name]: [Element, string]): void {
+	el.removeAttribute(name);
 }
 
 // A string or nullish action is the native attribute. Clearing the action must
