@@ -112,6 +112,7 @@ import {
 	VOID_ELEMENTS,
 } from './constants.js';
 import { READ_ONLY_VALUE_INPUT_TYPES } from './dom-tables.js';
+import { STREAM_RETRY_PROP } from './stream-protocol.js';
 import {
 	createIndependentHydrateManifest,
 	serializeIndependentHydrateManifest,
@@ -11080,7 +11081,9 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment instead). `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders that boundary, as React does). Error
+// boundary errored (hydration client-renders that boundary, as React does).
+// Either calls the retry a hydrated client left on the boundary's open
+// (STREAM_RETRY_PROP), as React's `$RC` calls `_reactRetry`. Error
 // instructions that arrive before a queued parent reveal are retained until
 // insertion exposes their sentinel; transport order alone does not imply DOM
 // availability when an optional animation driver delays the parent swap. A
@@ -11128,18 +11131,26 @@ function streamRuntimeJs(): string {
 		'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
 		// A boundary's own open names it (`[$?id`). A binding view's range
 		// records its arm instead, so it scopes its seeds by a comment.
-		'if(t.previousSibling.data.charAt(1)==="' +
+		'var o=t.previousSibling;if(o.data.charAt(1)==="' +
 		BOUNDARY_STREAMED.charAt(1) +
 		'")p.removeChild(t);else p.replaceChild(d.createComment("' +
 		STREAM_SEED_COMMENT +
 		'"+id),t);' +
-		's.parentNode.removeChild(s);if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
+		's.parentNode.removeChild(s);if(o.' +
+		STREAM_RETRY_PROP +
+		')o.' +
+		STREAM_RETRY_PROP +
+		'();if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
 		'window.$OCTRC.marker=M;window.$OCTRC.parse=P;window.$OCTRC.content=C;' +
 		'var X=window.$OCTRX=function(id,so){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
 		"=\"'+id+'\"]');" +
-		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}else(E||(E=[])).push([id,so]);};' +
+		'if(t){if(so)t.remove();else{t.setAttribute("data-oct-err","");var o=t.previousSibling;if(o.' +
+		STREAM_RETRY_PROP +
+		')o.' +
+		STREAM_RETRY_PROP +
+		'()}}else(E||(E=[])).push([id,so]);};' +
 		// $OCTRH(id): hoist a wave carrier's Float sheet tags into document.head.
 		// With a live client runtime (window.$OCTFR, installed once client Float
 		// resource state exists) each tag is handed over so ONE authority keeps

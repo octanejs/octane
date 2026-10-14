@@ -2,13 +2,11 @@
 'octane': patch
 ---
 
-Float resources and resource hints a render requests now reach `document.head`
-at that render's commit instead of while it renders. This covers
-`<link rel="stylesheet" precedence>`, `<style href precedence>`,
-`<script async src>`, and `preload`, `preinit`, `preinitModule`,
-`preloadModule`, `preconnect` and `prefetchDNS` calls made during a render.
-They insert in render order, so deduplication, preload options carried onto a
-later `preinit`, and precedence-group order are unchanged, and a render that
-never commits, such as a transition that suspends, inserts nothing. A resource
-option whose name the DOM rejects as an attribute is now skipped rather than
-thrown.
+Float resource elements (`<link rel="stylesheet" precedence>`,
+`<style href precedence>` and `<script async src>`) now reach `document.head`
+when their render commits, as React DOM's do, instead of while it renders. A
+render that never commits, or an arm that fails, inserts none of them. As in
+React, a stylesheet resource the document lacks starts loading while it
+renders, through a `<link rel="preload" as="style">`. Resource hints
+(`preload`, `preinit`, `preinitModule`, `preloadModule`, `preconnect` and
+`prefetchDNS`) are unchanged and insert when called.

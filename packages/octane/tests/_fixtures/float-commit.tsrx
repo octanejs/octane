@@ -1,5 +1,6 @@
-// Fixtures for float-commit.test.ts: every Float resource and resource hint a
-// render requests reaches document.head at that render's commit (#2043).
+// Fixtures for float-commit.test.ts: React DOM's Float timing. A resource hint
+// inserts when called, a stylesheet resource preloads as the render discovers
+// it, and every resource element reaches document.head at its commit (#2043).
 import { preinit, preinitModule, preload, use } from 'octane';
 
 function Probe(props: { probe: () => void }) @{
@@ -12,25 +13,32 @@ function Gate(props: { gate: PromiseLike<unknown> }) @{
 	<i>{'gate'}</i>
 }
 
-// Hint identity outlives resetFloatResourceState, so each test names its own.
-function Resources(props: { hints: string }) @{
-	preload('/' + props.hints + '-hero.png', { as: 'image' });
-	preinit('/commit-init.css', { as: 'style', precedence: 'init' });
-	preinitModule('/' + props.hints + '-module.mjs');
+// Hint identity outlives resetFloatResourceState, so each case names its own
+// resources with `id`.
+function Resources(props: { id: string }) @{
+	preload('/' + props.id + '-hero.png', { as: 'image' });
+	preinit('/' + props.id + '-init.css', { as: 'style', precedence: 'init' });
+	preinitModule('/' + props.id + '-module.mjs');
 	<>
-		<link rel="stylesheet" href="/commit-app.css" precedence="app" />
-		<style href="commit-inline" precedence="app">
+		<link
+			rel="stylesheet"
+			href={'/' + props.id + '-app.css'}
+			precedence="app"
+			crossOrigin="anonymous"
+			media="all"
+		/>
+		<style href={props.id + '-inline'} precedence="app">
 			.commit {
 				color: teal;
 			}
 		</style>
-		<script async src="/commit-async.js" />
+		<script async src={'/' + props.id + '-async.js'} />
 		<b>{'resources'}</b>
 	</>
 }
 
 export interface FloatCommitProps {
-	hints: string;
+	id: string;
 	show: boolean;
 	gate?: PromiseLike<unknown>;
 	probe: () => void;
@@ -42,7 +50,7 @@ export interface FloatCommitProps {
 export function FloatCommitApp(props: FloatCommitProps) @{
 	<main>
 		@if (props.show) {
-			<Resources hints={props.hints} />
+			<Resources id={props.id} />
 		}
 		<Probe probe={props.probe} />
 		@if (props.gate !== undefined) {
@@ -51,9 +59,35 @@ export function FloatCommitApp(props: FloatCommitProps) @{
 	</main>
 }
 
+function Exploding(props: { fail: boolean }) @{
+	if (props.fail) throw new Error('arm failure');
+	<span>{'arm'}</span>
+}
+
+function ArmSheet(props: { href: string; fail: boolean }) @{
+	<>
+		<link rel="stylesheet" href={props.href} precedence="arm" />
+		<Exploding fail={props.fail} />
+	</>
+}
+
+// An arm that requests a sheet and then fails never commits: like React's
+// discarded fibers, it leaves its preload and none of its elements.
+export function FailingArmApp(props: { href: string; fail: boolean }) @{
+	<main>
+		@try {
+			<ArmSheet href={props.href} fail={props.fail} />
+		} @catch (error) {
+			<p>{(error as Error).message}</p>
+		}
+	</main>
+}
+
 // An option the platform rejects as an attribute name is skipped: the commit
 // that inserts the sheet must not throw past the rest of its writes.
-export function RejectedOptionName() @{
-	preinit('/commit-rejected.css', { as: 'style', 'not a name': 'x', media: 'print' });
-	<p>{'committed'}</p>
+export function RejectedOptionName(props: { extra: Record<string, unknown> }) @{
+	<>
+		<link rel="stylesheet" href="/commit-rejected.css" precedence="default" {...props.extra} />
+		<p>{'committed'}</p>
+	</>
 }

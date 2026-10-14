@@ -1353,11 +1353,6 @@ Out of scope, deliberately: **suspensey commits** (React's
 suspend-until-the-stylesheet-loads behavior; Octane inserts the sheet and
 continues).
 
-A render's resources and resource hints, including `preload()`/`preinit()`
-calls made while rendering, reach `document.head` at that render's commit, in
-render order, and a render that never commits inserts none. React inserts an
-imperative hint the moment it is called, even mid-render.
-
 Resource hints share the Float identity model — including React's option
 semantics: font preloads always emit `crossorigin=""` (anonymous) regardless of
 the caller's value; connection/integrity options seeded by a `preload` carry
@@ -2092,7 +2087,9 @@ As in React:
   scripts, styles and stylesheet links inside them: the client render's own
   elements replace them. A `Document` keeps its doctype.
 - A suspension while hydrating keeps the server HTML; it never causes a
-  fallback.
+  fallback. A streamed boundary whose content has not arrived keeps the
+  server's fallback until the stream swaps the content in, which then
+  hydrates, or until an update reaches it, which renders it on the client.
 
 A boundary that falls back renders from client data. The `use()` values its
 attempt read from the server's seeds are discarded, and so is captured

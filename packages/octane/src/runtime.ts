@@ -267,6 +267,7 @@ import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { snapshotSignalValue } from './data-encoding.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
+	STREAM_RETRY_PROP,
 	isRendererStreamBoundaryTemplate,
 	isRendererStreamToken,
 	rendererRangeClose,
@@ -4645,10 +4646,12 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	let owner = parentBlock;
 	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
 	if (owner.createdStamp === transaction.createdStamp && !transaction.retainedCreated?.has(owner)) {
-		if (!hydrationStarted || transaction.hydrating !== true) return false;
+		if (!hydrationStarted) return false;
 		// A root's hydrating attempt creates every Block, and the server DOM they
 		// adopted stays untouched until it commits. What a slot builds on the
-		// client over that DOM goes through a frontier too.
+		// client over that DOM goes through a frontier too, as it does in a
+		// boundary's hydration attempt in a later render.
+		if (transaction.hydrating !== true) return hydrating && domParent.isConnected;
 		const container = transaction.owner.current?.parentNode;
 		return container != null && container.contains(domParent);
 	}
@@ -10634,10 +10637,6 @@ let PENDING_DEFERRED_LAYOUT: DeferredLayoutCapture | null = null;
 let COMPLETING_DEFERRED_LAYOUT: DeferredLayoutCapture | null = null;
 let DEFERRED_LAYOUT_HELD_WORK: Set<Block> | null = null;
 
-function isRecordingTransitionJournal(): boolean {
-	return TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK && !TRANSITION_JOURNAL_REPLAYING;
-}
-
 function ensureDeferredLayoutDriver(): void {
 	if (!DEFERRED_LAYOUT_DRIVER) {
 		DEFERRED_LAYOUT_DRIVER = {
@@ -12678,7 +12677,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		const borrows =
 			returnHydration !== null &&
 			existingRet === undefined &&
-			(bordersOutput(block, returnHydration) ||
+			(bordersOutput(block) ||
 				(isComponentDescriptor &&
 					(out as ElementDescriptor).__octaneInvocationSite === RENDERER_INVOCATION_SITE &&
 					block.startMarker === null &&
@@ -12852,7 +12851,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
  * has none, nor has a single-root block. Hydrating, neither has the client-built
  * range of a call the server did not frame.
  */
-function bordersOutput(block: Block, hydration: HydrationCapability | null): boolean {
+function bordersOutput(block: Block): boolean {
 	const start = block.startMarker;
 	const end = block.endMarker;
 	return (
@@ -16418,8 +16417,8 @@ function preservePermanentStaticHydrationRange(scope: Scope): void {
 	if (range === null) return;
 	reserveHydrationIds(scope.block.idState, range.idCount);
 	hydration.node = getNextSibling(marker);
-	(marker as ChildNode).remove();
-	range.end.remove();
+	// The untouched range keeps its server markers until the commit.
+	atCommit(removeNodes, [marker, range.end]);
 }
 
 function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
@@ -17028,6 +17027,21 @@ function installHydrateBoundary(state: HydrateSlot): () => void {
 	return () => teardownHydrateBoundary(state);
 }
 
+/** An island's server wrapper no longer carries the ID count its server render reserved. */
+function dropHydrateIdCount(wrapper: Element): void {
+	wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
+}
+
+/** A seed sidecar after an island's range, which the commit that claims the island removes. */
+function isHydrateSeedSidecar(node: Node): boolean {
+	return (
+		node.nodeType === 1 &&
+		(node as Element).localName === 'script' &&
+		((node as Element).hasAttribute(HYDRATE_SEED_ATTR) ||
+			(node as Element).hasAttribute(NATIVE_SIGNAL_SEED_ATTR))
+	);
+}
+
 function findHydrateSeedSidecar(
 	wrapper: ParentNode,
 	attribute = HYDRATE_SEED_ATTR,
@@ -17059,12 +17073,24 @@ function createHydrateSlot(
 	initializeHydrationEventCapture(wrapper.ownerDocument);
 	const serverPreserved =
 		kept !== null || (hydration !== null && wrapper.parentNode === parentNode);
-	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
-	else parentNode.insertBefore(wrapper, parentBlock.endMarker);
-	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
-	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
+	// A server wrapper names its boundary already; a client one is named before
+	// it is placed.
+	if (!serverPreserved) {
+		wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
 		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
-	if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
+		if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
+	}
+	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
+	else {
+		// The kept server wrapper stays where the server put it until the commit
+		// moves it to its place in the client render (placeKeptIsland). A client
+		// wrapper built where its parent's DOM is committed lands from a frontier.
+		const place = kept === null ? null : document.createComment('');
+		if (usesFrontier(parentBlock, parentNode))
+			queueFrontier(parentBlock, parentNode, parentBlock.endMarker).appendChild(place ?? wrapper);
+		else parentNode.insertBefore(place ?? wrapper, parentBlock.endMarker);
+		if (place !== null) atCommit(placeKeptIsland, [place, wrapper]);
+	}
 
 	let start: Comment | null = null;
 	let end: Comment | null = null;
@@ -17086,11 +17112,10 @@ function createHydrateSlot(
 			overflow: rootIds,
 			renderOwner: rootIds.renderOwner,
 		};
-		wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
-		// A rolled-back attempt restores the count, so the attempt that replaces
-		// it, a retry or the fallback's client render adopting an independent
-		// wrapper, reserves the same IDs.
-		TRANSITION_JOURNAL?.push(JOURNAL_ATTR, wrapper, HYDRATE_ID_COUNT_ATTR, rawCount);
+		// The commit drops the count, so the attempt that replaces a dropped one,
+		// a retry or the fallback's client render adopting an independent wrapper,
+		// reserves the same IDs.
+		atCommit(dropHydrateIdCount, wrapper);
 	}
 	// An independent root may already have compacted its server ranges. The
 	// parent reserves its IDs but owns only the wrapper, never its child list or
@@ -17100,15 +17125,17 @@ function createHydrateSlot(
 	} else if (serverPreserved && hydration!.isOpen(getFirstChild(wrapper))) {
 		start = getFirstChild(wrapper) as Comment;
 		end = hydration!.close(start);
+		// The commit removes the sidecars, which an attempt that replaces a
+		// dropped one reads again.
 		const seed = findHydrateSeedSidecar(wrapper);
 		if (seed !== null) {
 			seedRaw = seed.textContent || '[]';
-			seed.remove();
+			atCommit(removeNodes, [seed]);
 		}
 		const nativeSeed = findHydrateSeedSidecar(wrapper, NATIVE_SIGNAL_SEED_ATTR);
 		if (nativeSeed !== null) {
 			nativeSeedRaw = nativeSeed.textContent || '';
-			nativeSeed.remove();
+			atCommit(removeNodes, [nativeSeed]);
 		}
 	} else {
 		// The server opens every ordinary wrapper with the boundary's own range. An
@@ -17227,7 +17254,9 @@ function finishRoot(hydration: HydrationCapability): void {
 	let remainder = hydration.rootRemainder === undefined ? hydration.node : hydration.rootRemainder;
 	while (
 		remainder !== null &&
-		(remainder === hydration.rootCleanupBoundary || isRendererHydrationStyle(remainder))
+		(remainder === hydration.rootCleanupBoundary ||
+			isRendererHydrationStyle(remainder) ||
+			isHydrateSeedSidecar(remainder))
 	)
 		remainder = getNextSibling(remainder);
 	if (remainder === null) return;
@@ -17443,8 +17472,8 @@ function discardHydrateTail(state: HydrateSlot, atCommit = false): void {
 	markHydrationDiscard(state.block.idState.renderOwner, wrapper, node, null);
 	while (node !== null) {
 		const next = getNextSibling(node);
-		if (isRendererHydrationStyle(node)) {
-			// Kept.
+		if (isRendererHydrationStyle(node) || isHydrateSeedSidecar(node)) {
+			// Kept: the commit that claims the island removes a sidecar.
 		} else if (atCommit) slotNext(state).out.push(null, node, node);
 		else wrapper.removeChild(node);
 		node = next;
@@ -20223,6 +20252,13 @@ interface HydratedLiteRange {
 interface PendingHydrationText {
 	server: string | null;
 	loc: string | undefined;
+	/** The text the client rendered last, which settleTexts compares. */
+	text: string;
+}
+
+/** Write `text` into `node` at commit (HydrationCapability.writeText). */
+function commitTextValue([node, text]: [Text, string]): void {
+	node.nodeValue = text;
 }
 
 // Client-reachable code reads this only behind the `hydrating` flag
@@ -21135,8 +21171,9 @@ class HydrationCapability {
 	 * the text again before the pass ends: React renders a component that
 	 * updates itself while it renders again before it compares the output, so
 	 * the text that render settles on decides, equal or not (settleTexts).
-	 * Meanwhile the node holds the client's text. A method, so that bundles
-	 * which never hydrate do not retain it.
+	 * Meanwhile the node keeps the server's text, and the record the client's
+	 * (writeText). A method, so that bundles which never hydrate do not retain
+	 * it.
 	 */
 	keepsText(
 		host: Node | null,
@@ -21155,8 +21192,8 @@ class HydrationCapability {
 		// the common pass rendersAgain's walk.
 		if (QUEUE.length !== 0 && node !== null && node.nodeType === 3 && this.rendersAgain()) {
 			const pending = (this.pendingTexts ??= new Map());
-			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc });
-			return equal;
+			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc, text });
+			return true;
 		}
 		if (equal) return true;
 		this.fail(
@@ -21747,7 +21784,7 @@ class HydrationCapability {
 				(server === text || domBindingClaims.get(el as Element)?.get('#text') !== server) &&
 				!this.keepsText(el, first, server, text, loc)
 			)
-				(first as Text).nodeValue = text;
+				this.adoptText(first as Text, text);
 			return first as Text;
 		}
 		if (first !== null) this.unclaimedText(el, first, text, loc);
@@ -21880,7 +21917,8 @@ class HydrationCapability {
 		if (first.nodeType === 3 && getNextSibling(first) === null) {
 			// With no host, keepsText applies no suppressHydrationWarning, and the
 			// hole already ruled out a host it would write the client's text into.
-			if (!this.keepsText(text ? el : null, first, first.nodeValue, '', loc)) first.nodeValue = '';
+			if (!this.keepsText(text ? el : null, first, first.nodeValue, '', loc))
+				this.adoptText(first as Text, '');
 			return first as Text;
 		}
 		this.unclaimedText(el, first, '', loc);
@@ -21910,7 +21948,7 @@ class HydrationCapability {
 			// A client-built template's `<!>` reads as the server's empty slot,
 			// swapped for '' above, and takes the client's text.
 			if (!this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
-				(posNode as Text).nodeValue = text;
+				this.adoptText(posNode as Text, text);
 			return posNode as Text;
 		}
 		// No server text node stands here: the server rendered the hole empty. A
@@ -21920,6 +21958,25 @@ class HydrationCapability {
 		if (posNode !== null && host !== null)
 			atCommit(placeHydratedText, [host, created, posNode, false]);
 		return created;
+	}
+
+	/**
+	 * Give `node`, a Text this pass adopted, the client's `text`: the record a
+	 * render-phase update compares at the end of the pass (keepsText), or else
+	 * a write at commit. Returns false for a Text no document holds, which the
+	 * caller writes now.
+	 */
+	writeText(node: Text, text: string): boolean {
+		const pending = this.pendingTexts?.get(node);
+		if (pending !== undefined) pending.text = text;
+		else if (node.isConnected) atCommit(commitTextValue, [node, text]);
+		else return false;
+		return true;
+	}
+
+	/** writeText, writing a Text no document holds now. */
+	private adoptText(node: Text, text: string): void {
+		if (!this.writeText(node, text)) node.nodeValue = text;
 	}
 
 	sibling(node: Node, count: number): Node | null {
@@ -22014,8 +22071,7 @@ class HydrationCapability {
 		const texts = this.pendingTexts;
 		if (texts !== null) {
 			this.pendingTexts = null;
-			for (const [node, { server, loc }] of texts) {
-				const text = node.nodeValue!;
+			for (const [node, { server, loc, text }] of texts) {
 				if (text !== server && !parserNormalizedMatch(server, text))
 					this.fail(
 						loc || (node.parentNode as any)?.__oct_loc,
@@ -23243,7 +23299,7 @@ function writeAtCommit<T>(writer: (...args: any[]) => T, kind: string, args: any
 	let cached: unknown;
 	if (kind.endsWith('IfChanged')) {
 		// `(value, previous, element, …)`: an unchanged value keeps its cache.
-		if (attributeUnchanged(args[1], args[0], args[2])) return args[1];
+		if (attributeUnchanged(args[1], args[0])) return args[1];
 		cached = args[0];
 	} else if (kind.startsWith('updateFresh')) {
 		cached = normalizeClass(args[0]);
@@ -23737,9 +23793,15 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 				node = document.createTextNode('');
 				resetOnlyChildHost(host, node);
 			}
-		} else if (node.parentNode !== host) resetOnlyChildHost(host, node);
+		} else if (
+			node.parentNode !== host &&
+			!(hydrationStarted && PENDING_HOST_TEXTS?.get(host) === node)
+		)
+			resetOnlyChildHost(host, node);
 	}
 	const target = node as Text;
+	// A hydrating render writes no adopted DOM (HydrationCapability.writeText).
+	if (hydrating && currentHydration?.writeText(target, coerceText(value)) === true) return;
 	//
 	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
@@ -24642,7 +24704,7 @@ function readSignalInScope(scope: Scope, handle: SignalHandle<unknown>): unknown
 // An identical raw value needs no write, except a first `undefined` over an
 // adopted server element: its cache slot has not yet reconciled the server
 // attribute, which the writer removes. The direct-signal path does the same.
-function attributeUnchanged(previous: unknown, value: unknown, el: Element): boolean {
+function attributeUnchanged(previous: unknown, value: unknown): boolean {
 	if (previous !== value) return false;
 	if (value !== undefined) return true;
 	const hydration = hydrating ? activeHydration() : null;
@@ -24655,7 +24717,7 @@ export function setAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setAttribute(el, name, value);
 	return value;
 }
@@ -24666,7 +24728,7 @@ export function setPlainAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setPlainAttribute(el, name, value);
 	return value;
 }
@@ -24677,7 +24739,7 @@ export function setURLAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setURLAttribute(el, name, value);
 	return value;
 }
@@ -24688,7 +24750,7 @@ export function setStringDataIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setStringData(el, name, value);
 	return value;
 }
@@ -24699,7 +24761,7 @@ export function setBooleanAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setBooleanAttribute(el, name, value);
 	return value;
 }
@@ -24710,19 +24772,19 @@ export function setAriaAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setAriaAttribute(el, name, value);
 	return value;
 }
 
 export function setClassNameIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setClassName(el, value);
 	return value;
 }
 
 export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setClassAttr(el, value);
 	return value;
 }
@@ -27978,17 +28040,30 @@ function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | 
 	}
 }
 
+/**
+ * The head marker pairs a render claimed, each with the op that removes them at
+ * its commit: a claim lasts while that op is still queued, so a dropped or
+ * committed render releases it.
+ */
+let HEAD_CLAIMS: WeakMap<Comment, [ops: unknown[], at: number, pair: Comment[]]> | null = null;
+
+function claimedHeadMarker(marker: Comment): boolean {
+	const claim = HEAD_CLAIMS?.get(marker);
+	return claim !== undefined && claim[0][claim[1] + 1] === claim[2];
+}
+
 // Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
-// remove the pair so a later mount can't re-match it, and return the element. A foreign
-// node can be injected between the marker and the server element (extensions,
-// analytics, or document transforms); never claim or mutate it merely because it
-// is adjacent. Nested, missing, or reordered delimiters make the interval
-// unprovable, so recovery creates fresh metadata without claiming a same-tag node.
-// Returns null on a fresh client render or when the expected element is missing.
+// claim the pair so a later mount can't re-match it, and return the element. The
+// commit removes the pair. A foreign node can be injected between the marker and
+// the server element (extensions, analytics, or document transforms); never claim
+// or mutate it merely because it is adjacent. Nested, missing, or reordered
+// delimiters make the interval unprovable, so recovery creates fresh metadata
+// without claiming a same-tag node. Returns null on a fresh client render or when
+// the expected element is missing.
 function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Element | null {
 	const closeKey = '/' + key;
 	for (let n: Node | null = getFirstChild(head); n !== null; n = getNextSibling(n)) {
-		if (n.nodeType === 8 && (n as Comment).data === key) {
+		if (n.nodeType === 8 && (n as Comment).data === key && !claimedHeadMarker(n as Comment)) {
 			let candidate: Node | null = getNextSibling(n);
 			let match: Element | null = null;
 			let end: Comment | null = null;
@@ -28010,9 +28085,18 @@ function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Ele
 				}
 				candidate = getNextSibling(candidate);
 			}
-			(n as Comment).remove();
+			const pair = end === null ? [n as Comment] : [n as Comment, end];
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (transaction === null) removeNodes(pair);
+			else {
+				(HEAD_CLAIMS ??= new WeakMap()).set(n as Comment, [
+					transaction.ops,
+					transaction.ops.length,
+					pair,
+				]);
+				transaction.ops.push(removeNodes, pair);
+			}
 			if (end === null) return null;
-			end.remove();
 			// Two same-tag candidates are as unprovable as none.
 			return matches === 1 ? match : null;
 		}
@@ -28102,14 +28186,15 @@ export function headBlock(
 			scope.slots[slot] = undefined;
 		});
 		// The claimed element takes the client's props once hydration ends: at
-		// the attempt's commit.
-		if (hydration !== null) {
-			const transaction = ROOT_RENDER_TRANSACTION;
-			if (transaction === null) hydration.suspend(() => applyHeadProps(state!, tag, attrs, text));
-			else {
-				state.next = { tx: transaction, attrs, text };
-				transaction.ops.push(commitHeadProps, state);
-			}
+		// the attempt's commit, as a server element a client render claims does.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (hydration !== null && transaction === null) {
+			hydration.suspend(() => applyHeadProps(state!, tag, attrs, text));
+			return;
+		}
+		if (adopted && transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+			state.next = { tx: transaction, attrs, text };
+			transaction.ops.push(commitHeadProps, state);
 			return;
 		}
 	} else {
@@ -30048,11 +30133,17 @@ export function setFormAction(
 			FORM_SUBMIT_DRIVER = handleFormSubmit;
 			delegateEvents(['submit']);
 		}
-		// A function action implies a non-native submit; drop any stale attribute.
-		el.removeAttribute(name);
+		// A function action implies a non-native submit; drop any stale attribute,
+		// an adopted server element's at commit.
+		if (el.hasAttribute(name))
+			atCommitIf(hydrating && activeHydration() !== null, dropAttribute, [el, name]);
 		return;
 	}
 	setFormActionAttribute(el, name, value);
+}
+
+function dropAttribute([el, name]: [Element, string]): void {
+	el.removeAttribute(name);
 }
 
 // A string or nullish action is the native attribute. Clearing the action must
@@ -30716,6 +30807,9 @@ export function setValue(el: Element, value: unknown): void {
 			input.defaultValue = s;
 			return;
 		}
+		// The adopted control's mirror takes the client value at commit.
+		atCommit(mirrorDefaultValue, [input, s]);
+		return;
 	} else {
 		if (process.env.NODE_ENV !== 'production' && ctrl.v === UNCONTROLLED)
 			devWarnControlledFlip(el, true);
@@ -30732,17 +30826,80 @@ export function setValue(el: Element, value: unknown): void {
 		// the reset button's default action, i.e. any script-dispatched click.
 		// IME: an UNCHANGED rendered value must not cancel an active composition;
 		// a genuinely changed one still wins (React: setState during composition).
-		if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
-			input.value = s;
+		const update: ControlledValueWrite = [
+			input,
+			value,
+			s,
+			!(ctrl.composing && Object.is(prev, value)),
+		];
+		// A hydrating render-phase update writes its adopted control at commit.
+		if (hydrating && activeHydration() !== null) atCommit(writeControlledValue, update);
+		else writeControlledValue(update);
+		return;
 	}
-	if (input.defaultValue !== s) {
-		// Replacing textarea child text between edits splits native Undo groups.
-		// Keep its Text node while mirroring the controlled reset baseline.
-		const text = el.localName === 'textarea' ? getFirstChild(el) : null;
-		if (text !== null && text.nodeType === 3 && getNextSibling(text) === null)
-			(text as Text).data = s;
-		else input.defaultValue = s;
-	}
+	mirrorDefaultValue([input, s]);
+}
+
+type ControlledValueWrite = [
+	input: HTMLInputElement | HTMLTextAreaElement,
+	value: unknown,
+	s: string,
+	live: boolean,
+];
+
+/** A controlled value's update (setValue): the live value, then the attribute mirror. */
+function writeControlledValue([input, value, s, live]: ControlledValueWrite): void {
+	if (live && valueNeedsWrite(input, value)) input.value = s;
+	mirrorDefaultValue([input, s]);
+}
+
+/**
+ * The value attribute, or a textarea's text, mirrors controlled value `s`
+ * (React's attribute-syncing cascade). Replacing textarea child text between
+ * edits splits native Undo groups, so its Text node stays.
+ */
+function mirrorDefaultValue([input, s]: [HTMLInputElement | HTMLTextAreaElement, string]): void {
+	if (input.defaultValue === s) return;
+	const text = input.localName === 'textarea' ? getFirstChild(input) : null;
+	if (text !== null && text.nodeType === 3 && getNextSibling(text) === null)
+		(text as Text).data = s;
+	else input.defaultValue = s;
+}
+
+/**
+ * Hydration's first writes to an adopted checkable, at commit: the live
+ * checkedness is re-assigned, which separates it from the server default as
+ * React's initInput does, and the default takes `baseline` unless it is null.
+ */
+function adoptCheckedness([input, reassign, baseline]: [
+	HTMLInputElement,
+	boolean,
+	boolean | null,
+]): void {
+	// eslint-disable-next-line no-self-assign
+	if (reassign) input.checked = input.checked;
+	if (baseline !== null && input.defaultChecked !== baseline) input.defaultChecked = baseline;
+}
+
+/** An uncontrolled control loses its default (setDefaultValue). */
+function clearDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): void {
+	if (input.localName === 'input') input.removeAttribute('value');
+	else input.defaultValue = '';
+}
+
+/** Run `fn` at commit when `deferred`, a hydrating render's write to adopted DOM, else now. */
+function atCommitIf<T>(deferred: boolean, fn: (arg: T) => void, arg: T): void {
+	if (deferred) atCommit(fn, arg);
+	else fn(arg);
+}
+
+/** Hydration's default for an adopted uncontrolled `input`, `s`, at commit (setDefaultValue). */
+function adoptDefaultValue([input, s]: [HTMLInputElement | HTMLTextAreaElement, string]): void {
+	if (
+		input.defaultValue !== s ||
+		(s === '' && input.localName === 'input' && !input.hasAttribute('value'))
+	)
+		input.defaultValue = s;
 }
 
 /**
@@ -30771,10 +30928,14 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
 		// Hydration re-assigns the live (server or user) selection instead, as
 		// React's initInput does, which separates it from the server default,
-		// including for a later controlled → default flip.
-		input.checked = hydrating && activeHydration() !== null ? input.checked : b;
-		if (input.defaultChecked !== b) input.defaultChecked = b;
+		// including for a later controlled → default flip: at commit.
 		ctrl.sawDC = true;
+		if (hydrating && activeHydration() !== null) {
+			atCommit(adoptCheckedness, [input, true, b]);
+			return;
+		}
+		input.checked = b;
+		if (input.defaultChecked !== b) input.defaultChecked = b;
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
@@ -30979,19 +31140,17 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	if (ctrl.v !== UNCONTROLLED) return;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	if (value == null) {
-		if (previousDefault !== UNCONTROLLED && previousDefault != null) {
-			if (el.localName === 'input') input.removeAttribute('value');
-			else input.defaultValue = '';
-		}
+		if (previousDefault !== UNCONTROLLED && previousDefault != null)
+			atCommitIf(adopted, clearDefaultValue, input);
 		return;
 	}
 	const s = toControlledString(value);
-	if (first && !adopted && input.value !== s) input.value = s;
-	if (
-		input.defaultValue !== s ||
-		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	)
-		input.defaultValue = s;
+	if (adopted) {
+		atCommit(adoptDefaultValue, [input, s]);
+		return;
+	}
+	if (first && input.value !== s) input.value = s;
+	adoptDefaultValue([input, s]);
 }
 
 /**
@@ -31014,18 +31173,15 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	(input as any)[DEFAULT_VALUE_BASELINE] = s;
 	const adopted = hydration !== null;
 	if (s === null) {
-		if (previous != null) {
-			if (el.localName === 'input') input.removeAttribute('value');
-			else input.defaultValue = '';
-		}
+		if (previous != null) atCommitIf(adopted, clearDefaultValue, input);
 		return;
 	}
-	if (previous === undefined && !adopted && input.value !== s) input.value = s;
-	if (
-		input.defaultValue !== s ||
-		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	)
-		input.defaultValue = s;
+	if (adopted) {
+		atCommit(adoptDefaultValue, [input, s]);
+		return;
+	}
+	if (previous === undefined && input.value !== s) input.value = s;
+	adoptDefaultValue([input, s]);
 }
 
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
@@ -31040,8 +31196,12 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	}
 	ctrl.sawDC = true;
 	// Adopt the user's live choice, separated from the server's pristine default
-	// so the client baseline below (React's initInput) cannot drag it along.
-	if (adopted && first) input.checked = input.checked;
+	// so the client baseline (React's initInput) cannot drag it along, at commit.
+	if (adopted) {
+		const baseline = ctrl.c === -1 && value != null ? !!value : null;
+		if (first || baseline !== null) atCommit(adoptCheckedness, [input, first, baseline]);
+		return;
+	}
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
 	// React initInput marks the live checkedness dirty even when the initial
@@ -37818,7 +37978,7 @@ export function childSlot(
 			parentScope === RETURNED_OUTPUT_SCOPE &&
 			slotKey === 0 &&
 			anchor === parentBlock.endMarker &&
-			bordersOutput(parentBlock, hydration);
+			bordersOutput(parentBlock);
 		if (hydrationTransparent) {
 			// The selected hydration container begins below this logical return
 			// slot. Keep its lifecycle/block, but leave the server cursor and ranges
@@ -40718,6 +40878,7 @@ export function tryBlock(
 			inBoundary: inBoundaryRender,
 			resumeError: handleResumeError,
 			hiddenActivity: findHiddenActivity,
+			take: takeInitialSuspenseHydration,
 		};
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
 	if (
@@ -41065,6 +41226,13 @@ function mountHiddenTryBody(state: TrySlot): Block {
 interface InitialSuspenseHydration {
 	metadata: ChildNode[];
 	consume?: () => void;
+	/**
+	 * The template sentinel of a streamed boundary whose content had not arrived
+	 * when hydration reached it (waitForStreamedArm), and the hydration that
+	 * reached it, which reads the rest of the record once it has.
+	 */
+	waits?: Element;
+	reader?: HydrationCapability;
 	/** The range the body adopts (armRange), and its first server node. */
 	start: Node;
 	end: Node;
@@ -41107,6 +41275,8 @@ interface TryOps {
 	inBoundary: typeof inBoundaryRender;
 	resumeError: typeof handleResumeError;
 	hiddenActivity: typeof findHiddenActivity;
+	/** The record a streamed boundary takes once its content arrived (waitForStreamedArm). */
+	take: typeof takeInitialSuspenseHydration;
 }
 let TRY_OPS: TryOps | null = null;
 
@@ -41126,9 +41296,20 @@ function takeInitialSuspenseHydration(
 		cursor = getNextSibling(cursor);
 	}
 	if (text.startsWith(BOUNDARY_STREAMED)) {
-		// A sentinel still leads a pending boundary, which claimClientArm claims.
+		// A sentinel still leads a pending boundary, whose fallback stays until its
+		// content arrives (waitForStreamedArm).
 		if (cursor?.nodeType === 1 && (cursor as Element).hasAttribute(STREAM_BOUNDARY_ATTR))
-			return null;
+			return {
+				metadata,
+				start: open,
+				end: state.end,
+				first: null,
+				idStart: 0,
+				seedRaw: null,
+				nativeRaw: null,
+				waits: cursor as Element,
+				reader: hydration,
+			};
 		const boundaryId = text.slice(BOUNDARY_STREAMED.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		let payload = initialStreamedPayloads?.get(open);
@@ -41146,12 +41327,7 @@ function takeInitialSuspenseHydration(
 				delete stash[boundaryId + '$signals'];
 			}
 		}
-		state.idState = {
-			prefix: state.parentBlock.idState.prefix + 'b' + boundaryId + '-',
-			next: 0,
-			renderOwner: state.parentBlock.idState.renderOwner,
-			signalState: state.parentBlock.idState.signalState,
-		};
+		claimStreamedIds(state, boundaryId);
 		const [start, end] = hydration.armRange(open, cursor, state.end);
 		return {
 			metadata,
@@ -41203,6 +41379,60 @@ function takeInitialSuspenseHydration(
 		seedRaw,
 		nativeRaw,
 	};
+}
+
+/** The ids of streamed boundary `id`, which the server's segment used. */
+function claimStreamedIds(state: TrySlot, id: string): void {
+	const parentIds = state.parentBlock.idState;
+	state.idState = {
+		prefix: parentIds.prefix + 'b' + id + '-',
+		next: 0,
+		renderOwner: parentIds.renderOwner,
+		signalState: parentIds.signalState,
+	};
+}
+
+/**
+ * Whether `state`, a streamed boundary that hydration reached before its
+ * content arrived (InitialSuspenseHydration.waits), still waits. As React
+ * leaves a pending dehydrated boundary, it keeps the server's fallback until
+ * the stream swaps its content in or marks it errored, whose call to the retry
+ * left on its open (STREAM_RETRY_PROP) retries it. Otherwise the boundary
+ * takes its content's record, or, errored, renders on the client and reports
+ * once, as React does. Returns the record to hydrate, or null.
+ */
+function waitForStreamedArm(
+	state: TrySlot,
+	initial: InitialSuspenseHydration,
+): InitialSuspenseHydration | null {
+	const sentinel = initial.waits!;
+	const open = state.start as Comment & { [STREAM_RETRY_PROP]?: () => void };
+	if (sentinel.parentNode === null || sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
+		open[STREAM_RETRY_PROP] = undefined;
+	else {
+		const wait = new Promise<void>((resolve) => (open[STREAM_RETRY_PROP] = resolve));
+		state.pendingThenable = wait as TrackedThenable<void>;
+		resumeOnSettle(wait, () => {
+			if (
+				!state.parentBlock.disposed &&
+				state.pendingThenable === wait &&
+				initialSuspenseHydrations?.get(state) === initial
+			)
+				TRY_OPS!.inBoundary(state, retryInitialSuspenseHydration, initial);
+		});
+		return null;
+	}
+	initialSuspenseHydrations!.delete(state);
+	const taken = sentinel.parentNode === null ? TRY_OPS!.take(state, initial.reader!) : null;
+	if (taken === null) {
+		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
+		markArmDiscard(state);
+		if (!clientRenderDehydratedTry(state, currentHydration))
+			noteRecoverableHydrationError(() => new Error(formatClientError(344)), state.parentBlock);
+		return null;
+	}
+	initialSuspenseHydrations!.set(state, taken);
+	return taken;
 }
 
 function finishInitialSuspenseHydration(initial: InitialSuspenseHydration): void {
@@ -41269,7 +41499,6 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
  * which swaps the hydration flags, stays on the capability (clientRender).
  */
 function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean {
-	const parentIds = state.parentBlock.idState;
 	const open = hydration.bindingTryState(state.start) ?? (state.start as Comment).data;
 	// Whether the server's render threw rather than suspended; null reports nothing.
 	let errored: boolean | null = null;
@@ -41286,15 +41515,11 @@ function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean
 		if (reason === BOUNDARY_CLIENT_ERROR || reason === BOUNDARY_CLIENT_SUSPENDED)
 			errored = reason === BOUNDARY_CLIENT_ERROR;
 	} else if (open.startsWith(BOUNDARY_STREAMED)) {
-		const sentinel = hydration.streamSentinel(state.start);
-		if (sentinel === null) return false;
-		state.idState = {
-			prefix: parentIds.prefix + 'b' + open.slice(BOUNDARY_STREAMED.length) + '-',
-			next: 0,
-			renderOwner: parentIds.renderOwner,
-			signalState: parentIds.signalState,
-		};
-		if (sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR)) errored = true;
+		// A pending boundary waits for its content instead (waitForStreamedArm).
+		if (!hydration.streamSentinel(state.start)?.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
+			return false;
+		claimStreamedIds(state, open.slice(BOUNDARY_STREAMED.length));
+		errored = true;
 	} else return false;
 	hydration.clientRender(state, errored);
 	return true;
@@ -41345,13 +41570,24 @@ function renderInitialSuspenseHydration(
 ): void {
 	state.pendingThenable = null;
 	if (updated) {
-		// New inputs reached the arm while its hydration was suspended. The
-		// server HTML predates them, so, as React client-renders a dehydrated
-		// boundary that an update reaches, the arm renders on the client from
-		// client data, reporting nothing, and its obsolete wakeable is ignored.
+		// New inputs reached the arm while its hydration was suspended, or its
+		// streamed content had not arrived. The server HTML predates them, so, as
+		// React client-renders a dehydrated boundary that an update reaches, the
+		// arm renders on the client from client data, reporting nothing, and its
+		// obsolete wakeable is ignored.
+		if (initial.waits !== undefined) {
+			(state.start as Comment & { [STREAM_RETRY_PROP]?: () => void })[STREAM_RETRY_PROP] =
+				undefined;
+			claimStreamedIds(state, initial.waits.getAttribute(STREAM_BOUNDARY_ATTR)!);
+		}
 		markArmDiscard(state);
 		clientRenderDehydratedTry(state, currentHydration);
 		return;
+	}
+	if (initial.waits !== undefined) {
+		const taken = waitForStreamedArm(state, initial);
+		if (taken === null) return;
+		initial = taken;
 	}
 	state.idState.next = initial.idStart;
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
@@ -49074,21 +49310,22 @@ function hydrationFallbackNodes(container: RootContainer): Node[] {
 
 /**
  * Take island `boundaryId`'s server wrapper for the client render replacing a
- * failed hydration, which moves it into place. A rollback of that render puts
- * it back where the server DOM had it. The island lives on its own root, so
- * the render adopts it as hydration would have, and only an island the render
- * no longer has is discarded with the server DOM (installHydrationFallback).
+ * failed hydration, whose commit moves it into place (placeKeptIsland). A
+ * render that never commits leaves it where the server DOM had it. The island
+ * lives on its own root, so the render adopts it as hydration would have, and
+ * only an island the render no longer has is discarded with the server DOM
+ * (installHydrationFallback).
  */
 function keptHydrationIsland(boundaryId: string): Element | null {
 	const islands = ROOT_RENDER_TRANSACTION?.keptIslands;
 	const index =
 		islands?.findIndex((island) => island.getAttribute(HYDRATE_ID_ATTR) === boundaryId) ?? -1;
-	if (index < 0) return null;
-	const wrapper = islands!.splice(index, 1)[0];
-	const parent = wrapper.parentNode!;
-	const next = wrapper.nextSibling;
-	journalUndo(() => parent.insertBefore(wrapper, next));
-	return wrapper;
+	return index < 0 ? null : islands!.splice(index, 1)[0];
+}
+
+/** Move a kept island's server wrapper to `place`, its place in the client render. */
+function placeKeptIsland([place, wrapper]: [Comment, Element]): void {
+	place.parentNode?.replaceChild(wrapper, place);
 }
 
 /** Remove each of `nodes` that is still attached. */
@@ -50465,12 +50702,11 @@ export function createIndependentHydrateActivator(
 // Each call inserts one deduped <link>/<script> into document.head (client).
 // Dedupe key = rel/kind + href, matching React's resource identity model.
 //
-// A call made while a root renders runs at that render's commit, in render
-// order with the Float resources below (atCommit), so the render writes no
-// head entry and a dropped render inserts none (#2043). The whole call waits,
-// not just its insert: each identity check and preload transfer then sees
-// the requests before it, exactly as calls made outside a render do. Only
-// the development warning stays with the call.
+// As in React DOM, a hint inserts the moment it is called, even while a root
+// renders: starting the fetch early is the hint's whole purpose, so a render
+// that later throws or is dropped leaves its hints behind. These are the only
+// render-time head writers, and scripts/render-writers.mjs classifies them as
+// `hint`. A resource element waits for its commit (requestResourceElement).
 // ---------------------------------------------------------------------------
 
 const _resourceHints = new Set<string>();
@@ -50572,10 +50808,6 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreload, [href, options]);
-}
-
-function commitPreload([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (
@@ -50636,21 +50868,18 @@ function commitPreload([href, options]: [string, { as: string } & Record<string,
 
 /**
  * React DOM `preinit(href, {as: 'style'|'script', …})` — executes/applies the
- * resource. Routes through the Float resource inserts so preinit and the
- * rendered resource forms share ONE identity: a preinit'd stylesheet joins the
- * precedence groups (`precedence` option honored, default `'default'`) and
- * dedupes against `<link rel="stylesheet" precedence>`; a preinit'd script
- * dedupes against `<script async src>`.
+ * resource. It shares ONE identity with the rendered resource forms: a
+ * preinit'd stylesheet joins the precedence groups (`precedence` option
+ * honored, default `'default'`) and dedupes against
+ * `<link rel="stylesheet" precedence>`; a preinit'd script dedupes against
+ * `<script async src>`. Like React's preinitStyle and preinitScript, it inserts
+ * its element when called, not at a commit.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreinit, [href, options]);
-}
-
-function commitPreinit([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (options === null || typeof options !== 'object') return;
@@ -50658,16 +50887,17 @@ function commitPreinit([href, options]: [string, { as: string } & Record<string,
 	if (as !== 'style' && as !== 'script') return;
 	const rawHref = guarded;
 	const seeded = takePreloadTransfer(as, rawHref);
+	if (typeof document === 'undefined') return;
+	const state = resourceState();
+	const attrs = { ...seeded, ...options, as: undefined };
 	if (as === 'style') {
-		stylesheetResource({
-			...seeded,
-			...options,
-			as: undefined,
-			href: rawHref,
-			precedence: (options as any).precedence ?? 'default',
-		});
-	} else {
-		scriptResource({ ...seeded, ...options, as: undefined, href: undefined, src: rawHref });
+		if (state.sheets.has(rawHref)) return;
+		const precedence = String((options as any).precedence ?? 'default');
+		insertPrecedenced(state, stylesheetLink(rawHref, precedence, attrs), precedence);
+		state.sheets.add(rawHref);
+	} else if (!state.scripts.has(rawHref)) {
+		document.head.appendChild(asyncScript(rawHref, attrs));
+		state.scripts.add(rawHref);
 	}
 }
 
@@ -50677,10 +50907,6 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreconnect, [href, options]);
-}
-
-function commitPreconnect([href, options]: [string, { crossOrigin?: string } | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options !== null && typeof options !== 'object') options = undefined;
@@ -50705,10 +50931,6 @@ export function prefetchDNS(href: string): void {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPrefetchDNS, href);
-}
-
-function commitPrefetchDNS(href: string): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
@@ -50730,10 +50952,6 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreloadModule, [href, options]);
-}
-
-function commitPreloadModule([href, options]: [string, Record<string, unknown> | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
@@ -50765,13 +50983,6 @@ export function preinitModule(
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreinitModule, [href, options]);
-}
-
-function commitPreinitModule([href, options]: [
-	string,
-	({ as?: string } & Record<string, unknown>) | undefined,
-]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options != null && typeof options !== 'object') return;
@@ -50808,10 +51019,13 @@ function commitPreinitModule([href, options]: [
 // seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
 // so hydration never duplicates.
 //
-// A render reads the committed identity only: a resource the page already has
-// costs a set lookup, and any other joins the render's commit (atCommit),
-// where the identity check runs again. The first request in render order
-// therefore wins, and a dropped render inserts nothing (#2043).
+// The element waits for its render's commit, as React's acquireResource runs
+// in the mutation phase (#2043). A render reads the committed identity only,
+// so a resource the page already has costs a set lookup; the identity check
+// runs again at commit, where the first request in render order wins. As in
+// React's getResource, a stylesheet the document lacks also starts loading
+// while the render discovers it, through a style preload; a style or script
+// resource writes nothing until its commit.
 // ---------------------------------------------------------------------------
 
 interface ResourceState {
@@ -50909,6 +51123,75 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 	}
 }
 
+/** A detached `<link rel="stylesheet">` for a resource or a preinit. */
+function stylesheetLink(href: string, precedence: string, attrs: Record<string, unknown>): Element {
+	const l = document.createElement('link');
+	l.rel = 'stylesheet';
+	l.href = sanitizeURL(href);
+	l.setAttribute('data-precedence', precedence);
+	applyResourceAttrs(l, attrs);
+	return l;
+}
+
+/** A detached `<script async src>` for a resource or a preinit. */
+function asyncScript(src: string, attrs: Record<string, unknown>): Element {
+	const s = document.createElement('script');
+	(s as HTMLScriptElement).src = sanitizeURL(src);
+	(s as HTMLScriptElement).async = true;
+	s.setAttribute('data-oct-res', '');
+	applyResourceAttrs(s, attrs);
+	return s;
+}
+
+/**
+ * Insert a resource element at the open root render's commit, or now outside
+ * one. React acquires a resource only for a fiber that commits, so a dropped
+ * render queues nothing that runs, and an arm that failed or was replaced
+ * leaves only its hints: the element is skipped when its requesting Block has
+ * unmounted. That arm's deletion may be queued after this entry, so the entry
+ * first moves behind everything its render queued.
+ */
+function requestResourceElement<T>(insert: (arg: T) => void, arg: T): void {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction === null) insert(arg);
+	else transaction.ops.push(commitResourceElement, [insert, arg, CURRENT_BLOCK, transaction.ops]);
+}
+
+function commitResourceElement(entry: [(arg: any) => void, any, Block | null, any[] | null]): void {
+	const ops = entry[3];
+	if (ops !== null) {
+		entry[3] = null;
+		ops.push(commitResourceElement, entry);
+	} else if (!blockSubtreeDisposed(entry[2])) entry[0](entry[1]);
+}
+
+/**
+ * React's getResource: a stylesheet resource the document lacks starts
+ * loading as the render discovers it, through a style preload keyed like
+ * `preload(href, {as: 'style'})`, which stays even if the render never
+ * commits. Its options seed a later preinit, as a preload's do.
+ */
+function preloadStylesheetResource(href: string, attrs: Record<string, unknown>): void {
+	const key = 'preload:style:' + href;
+	if (hasHeadHint(key)) return;
+	stashPreloadTransfer('style', href, attrs);
+	const safeHref = sanitizeURL(href);
+	insertHeadHint(key, () => {
+		const l = document.createElement('link');
+		l.rel = 'preload';
+		l.href = safeHref;
+		l.setAttribute('as', 'style');
+		applyResourceAttrs(l, {
+			crossOrigin: attrs.crossOrigin,
+			integrity: attrs.integrity,
+			media: attrs.media,
+			hrefLang: attrs.hrefLang,
+			referrerPolicy: attrs.referrerPolicy,
+		});
+		return l;
+	});
+}
+
 function warnInvalidStylesheetResource(reason: string): void {
 	let conflict: string;
 	if (reason === 'missing-href') {
@@ -50938,7 +51221,8 @@ export function stylesheetResource(
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
-	atCommit(commitStylesheetResource, attrs);
+	preloadStylesheetResource(href, attrs);
+	requestResourceElement(commitStylesheetResource, attrs);
 }
 
 function commitStylesheetResource(attrs: Record<string, unknown>): void {
@@ -50948,12 +51232,7 @@ function commitStylesheetResource(attrs: Record<string, unknown>): void {
 	// resource identity (later differing props do not retarget a live sheet).
 	if (state.sheets.has(href)) return;
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
-	const l = document.createElement('link');
-	l.rel = 'stylesheet';
-	l.href = sanitizeURL(href);
-	l.setAttribute('data-precedence', precedence);
-	applyResourceAttrs(l, attrs);
-	insertPrecedenced(state, l, precedence);
+	insertPrecedenced(state, stylesheetLink(href, precedence, attrs), precedence);
 	state.sheets.add(href);
 }
 
@@ -50971,7 +51250,7 @@ export function styleResource(
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
-	atCommit(commitStyleResource, [attrs, css, development]);
+	requestResourceElement(commitStyleResource, [attrs, css, development]);
 }
 
 function commitStyleResource([attrs, css, development]: [
@@ -51029,18 +51308,13 @@ export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const src = attrs.src;
 	if (typeof src !== 'string' || src === '' || resourceState().scripts.has(src)) return;
-	atCommit(commitScriptResource, attrs);
+	requestResourceElement(commitScriptResource, attrs);
 }
 
 function commitScriptResource(attrs: Record<string, unknown>): void {
 	const src = attrs.src as string;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
-	const s = document.createElement('script');
-	(s as HTMLScriptElement).src = sanitizeURL(src);
-	(s as HTMLScriptElement).async = true;
-	s.setAttribute('data-oct-res', '');
-	applyResourceAttrs(s, attrs);
-	document.head.appendChild(s);
+	document.head.appendChild(asyncScript(src, attrs));
 	state.scripts.add(src);
 }
