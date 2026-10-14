@@ -37,7 +37,7 @@ import {
 	type BindingHandoff,
 	type BindingHandoffCapability,
 } from './dom-binding-handoff.js';
-import { bumpContextEpoch, contextEpochNow } from './context-epoch.js';
+import { bumpContextEpoch, EPOCH_CELL } from './context-epoch.js';
 import {
 	CONTROL_HANDOFF,
 	hasSignalControlBinding,
@@ -5027,7 +5027,12 @@ function undoCreatedInRootRender(block: Block, transaction: RootRenderTransactio
 
 function createdInRootRender(block: Block): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || ROOT_RENDER_ROLLBACK || isCreatedInRootRender(transaction, block))
+	// isCreatedInRootRender, inline: every mounted Block passes here.
+	if (
+		transaction === null ||
+		ROOT_RENDER_ROLLBACK ||
+		block.createdStamp === transaction.createdStamp
+	)
 		return;
 	// Child Blocks inherit their parent's renderOwner; root/hydration entry uses
 	// that root's owner. Reentrant frames reuse owner.transaction, so a Block
@@ -12376,7 +12381,8 @@ function renderBlockInner(block: Block): true | undefined {
 	CURRENT_BLOCK = block;
 	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
 	CURRENT_EFFECT_REACHED = 0;
-	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
+	const continuesParentTree =
+		prevBlock !== null && (block.parentBlock === prevBlock || blockIsAncestor(prevBlock, block));
 	// An urgent ancestor renders this child's urgent updates only, even when the
 	// child already queued a transition. Preserve that queue entry so its later
 	// owned pass gets the transition's boundary journal and reveal policy.
@@ -12462,7 +12468,7 @@ function renderBlockInner(block: Block): true | undefined {
 			!state.independent &&
 			!state.hydrated
 		) {
-			state.contextChanged = block.$$ctxDepsEpoch !== contextEpochNow() && ctxDirectChanged(block);
+			state.contextChanged = block.$$ctxDepsEpoch !== EPOCH_CELL.value && ctxDirectChanged(block);
 		}
 		block.$$ctxDirect.clear();
 	}
@@ -12471,7 +12477,7 @@ function renderBlockInner(block: Block): true | undefined {
 	// no recorded dep can be stale. Sampling at the TOP is deliberate — a
 	// provider commit mid-render advances the epoch past this stamp, so the
 	// bail scans still run and see any mixed-version entries.
-	block.$$ctxDepsEpoch = contextEpochNow();
+	block.$$ctxDepsEpoch = EPOCH_CELL.value;
 	// Capture the render priority. Explicit pendingMode (set by scheduleRender)
 	// wins. Otherwise INHERIT from the outer block — re-entrant renders (try,
 	// if, for, comp slots) called synchronously inside an outer body should
@@ -15584,7 +15590,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 // Compiler-owned output caches compare their own lexical dependencies, but a
 // Provider update is propagated lazily through the already-mounted Block tree
 // rather than scheduling every consumer. One process-wide epoch (read as
-// contextEpochNow() from context-epoch.ts, whose Symbol.for'd cell is shared
+// EPOCH_CELL from context-epoch.ts, whose Symbol.for'd cell is shared
 // by every module copy so universal renderers and react-hosted mirrors share
 // the same counter) lets generated cache guards and
 // the $$ctxDepsEpoch bail fast path notice that exceptional channel without
@@ -16334,7 +16340,7 @@ function hydrateServerValuesStale(state: HydrateSlot): boolean {
 	// Every provider value change moves the epoch, so an unmoved epoch proves
 	// the inherited context values are the ones the server HTML was claimed with.
 	return (
-		initial.contextEpoch !== contextEpochNow() &&
+		initial.contextEpoch !== EPOCH_CELL.value &&
 		changedHydrateContexts(
 			initial.contexts,
 			collectHydrateContexts(
@@ -17290,7 +17296,7 @@ function createHydrateSlot(
 		state.initialCaptures = {
 			props,
 			contexts: collectHydrateContexts(scope),
-			contextEpoch: contextEpochNow(),
+			contextEpoch: EPOCH_CELL.value,
 			stale: hydration!.staleServerValues,
 		};
 	}
@@ -22678,12 +22684,12 @@ function devWarnPlainTextHandle(): void {
 export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefined): Text {
 	// Coerce here (mirrors setText) rather than at every call site — keeps the
 	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
-	// the coercion in costs nothing on the hot update path.
-	const text = coerceText(value);
+	// the coercion in costs nothing on the hot update path. A string needs none.
+	const text = typeof value === 'string' ? value : coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) return hydration.htext(el, text);
 	if (seeded === 1) {
-		const first = getFirstChild(el);
+		const first = firstChildGetter === undefined ? el.firstChild : firstChildGetter.call(el);
 		if (first !== null && first.nodeType === 3) {
 			(first as Text).nodeValue = text;
 			return first as Text;
@@ -22709,7 +22715,7 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
  */
 export function htextSwap(posNode: Node | null, value: unknown): Text {
 	// Coerce here (see htext) so the call site stays a bare `htextSwap(pos, _v)`.
-	const text = coerceText(value);
+	const text = typeof value === 'string' ? value : coerceText(value);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) return hydration.htextSwap(posNode, text);
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
@@ -23988,8 +23994,8 @@ export function child<T extends Node>(node: T): Node | null {
 	// stand-in — a plain object whose `firstChild` is a snapshot property (see
 	// adopt()) — and the native accessor throws on a non-Node receiver. Keep the
 	// plain read on the hydration branch; client mounts always hold a real Node.
-	if (hydrating) return node.firstChild;
-	return getFirstChild(node);
+	if (hydrating || firstChildGetter === undefined) return node.firstChild;
+	return firstChildGetter.call(node);
 }
 
 /**
@@ -24004,7 +24010,7 @@ export function sibling(node: Node, n: number = 1): Node | null {
 	for (let i = 0; i < n; i++) {
 		// Over-walk (cursor already past the last node) → return null, don't throw.
 		if (c === null) return null;
-		c = getNextSibling(c);
+		c = nextSiblingGetter === undefined ? c.nextSibling : nextSiblingGetter.call(c);
 	}
 	return c;
 }
@@ -26769,8 +26775,8 @@ export { normalizeClass };
 
 export function setClassName(el: Element, value: unknown, foreign?: boolean): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
-	// compare below sees the value we actually write).
-	const cls = normalizeClass(value);
+	// compare below sees the value we actually write). A string needs none.
+	const cls = typeof value === 'string' ? value : normalizeClass(value);
 	if (hydrating && activeHydration()?.keepsClass(el, cls, true)) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
@@ -28887,9 +28893,18 @@ function publishEventOwner(next: any[]): void {
 	el.$$signalOwner = next[1];
 }
 
+// A mount installs its bundle directly unless setEventHandler has more to do:
+// journal the slot (see its ROOT_DISCARD_STAMP case) or publish authority
+// (signalOwnerUse over-approximates its owner check).
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
 	const d: HandlerBundle = { fn, args: EMPTY_ARGS, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	if (
+		signalOwnerUse.active ||
+		(TRANSITION_JOURNAL !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+	)
+		setEventHandler(el, key, d);
+	else (el as any)[key] = d;
 	return d;
 }
 export function evt0u(d: HandlerBundle, fn: any): void {
@@ -28914,7 +28929,13 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
 	const d: HandlerBundle = { fn, args: 1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	if (
+		signalOwnerUse.active ||
+		(TRANSITION_JOURNAL !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+	)
+		setEventHandler(el, key, d);
+	else (el as any)[key] = d;
 	return d;
 }
 export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
@@ -28940,7 +28961,13 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
 	const d: HandlerBundle = { fn, args: 2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	if (
+		signalOwnerUse.active ||
+		(TRANSITION_JOURNAL !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+	)
+		setEventHandler(el, key, d);
+	else (el as any)[key] = d;
 	return d;
 }
 export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
@@ -28970,17 +28997,35 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 // and reuse its field layout, update helpers, journal, and dispatch snapshot.
 export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle {
 	const d: HandlerBundle = { fn, args: -1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	if (
+		signalOwnerUse.active ||
+		(TRANSITION_JOURNAL !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+	)
+		setEventHandler(el, key, d);
+	else (el as any)[key] = d;
 	return d;
 }
 export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
 	const d: HandlerBundle = { fn, args: -2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	if (
+		signalOwnerUse.active ||
+		(TRANSITION_JOURNAL !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+	)
+		setEventHandler(el, key, d);
+	else (el as any)[key] = d;
 	return d;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
 	const d: HandlerBundle = { fn, args, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
-	setEventHandler(el, key, d);
+	if (
+		signalOwnerUse.active ||
+		(TRANSITION_JOURNAL !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+	)
+		setEventHandler(el, key, d);
+	else (el as any)[key] = d;
 	return d;
 }
 export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
@@ -39400,10 +39445,10 @@ function ctxDirectChanged(block: Block): boolean {
 // refreshes just its consumers. Returns false when a DIRECT dep changed and
 // the block's own body must re-run (bail refused).
 function ctxBailDepsClean(block: Block): boolean {
-	if (block.$$ctxDepsEpoch !== contextEpochNow()) {
+	if (block.$$ctxDepsEpoch !== EPOCH_CELL.value) {
 		if (ctxDirectChanged(block)) return false;
 		if (ctxDepsChanged(block)) refreshContextConsumers(block);
-		else block.$$ctxDepsEpoch = contextEpochNow();
+		else block.$$ctxDepsEpoch = EPOCH_CELL.value;
 	}
 	return true;
 }
@@ -39579,7 +39624,7 @@ function refreshBlockForContext(block: Block): void {
 	// stale entry: its own direct read cannot have changed, and for a memo/armed
 	// block no DESCENDANT dep changed either. Non-memo intermediates carry no
 	// $$ctxReads aggregate, so they still descend to find unstamped consumers.
-	const verified = block.$$ctxDepsEpoch === contextEpochNow();
+	const verified = block.$$ctxDepsEpoch === EPOCH_CELL.value;
 	if (!verified && ctxDirectChanged(block)) {
 		// This child directly consumes the changed context (or shares its block
 		// with a lite descendant that does): re-run it. renderBlock re-renders its
@@ -39594,14 +39639,14 @@ function refreshBlockForContext(block: Block): void {
 		// re-reach inside the same epoch prunes without rescanning.
 		if (!verified) {
 			if (ctxDepsChanged(block)) refreshContextConsumers(block);
-			else block.$$ctxDepsEpoch = contextEpochNow();
+			else block.$$ctxDepsEpoch = EPOCH_CELL.value;
 		}
 	} else {
 		// A non-memo intermediate (control-flow branch, plain wrapper) isn't stamped
 		// in $$ctxReads, so we can't prune — descend unconditionally to find any
 		// consumer it strands. Bounded by this bailed boundary's subtree. Its own
 		// direct map was verified above, so the stamp can only prune a re-check.
-		if (!verified) block.$$ctxDepsEpoch = contextEpochNow();
+		if (!verified) block.$$ctxDepsEpoch = EPOCH_CELL.value;
 		refreshContextConsumers(block);
 	}
 }
@@ -39631,7 +39676,7 @@ export function compilerCacheContext(
 	previous: number | undefined,
 	restampMemoAncestors: boolean = false,
 ): number {
-	const current = contextEpochNow();
+	const current = EPOCH_CELL.value;
 	if (previous === undefined) return current;
 	const reconnect = !!EFFECT_RECONNECT_CONTEXT;
 	const restamp = restampMemoAncestors && scope.block.memoInChain;
@@ -47018,7 +47063,7 @@ export function forBlock<T>(
 // cleared them. A pure body is hookless, so a row with no child scope or slot
 // reads no context.
 function refreshSkippedRows(list: ForSlot, owner: Block): void {
-	const epoch = contextEpochNow();
+	const epoch = EPOCH_CELL.value;
 	const refresh = list.ctxEpoch !== epoch;
 	if (!refresh && !owner.memoInChain) return;
 	for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
