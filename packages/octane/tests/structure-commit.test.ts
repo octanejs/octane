@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement, createRoot, flushSync, startTransition, use } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
 import {
+	RetireList,
 	ActivityApp,
 	ArmSwapApp,
 	type ArmSwapControls,
@@ -905,6 +906,34 @@ function ProbeChip(props: { probe: () => void }) {
 	props.probe();
 	return createElement('mark', { id: 'in' }, 'chip in');
 }
+
+describe('deleted rows retire with the render that deletes them', () => {
+	it("skips a deleted row's own update queued in the same drain", () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const log: string[] = [];
+		let setLast: (n: number) => void = () => {};
+		const expose = (set: (n: number) => void) => {
+			setLast = set;
+		};
+		try {
+			flushSync(() => root.render(RetireList, { ids: [1, 2], log, expose }));
+			const setRow2 = setLast;
+			log.length = 0;
+			flushSync(() => {
+				root.render(RetireList, { ids: [1], log, expose });
+				setRow2(5);
+			});
+			// The root render deleted row 2, which therefore never renders its update.
+			expect(log).toEqual(['row 1:0']);
+			expect(container.querySelector('#retire')!.textContent).toBe('0');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+});
 
 describe('a one-host arm lands at commit', () => {
 	it('renders a swapped-in arm detached and inserts its root at commit', () => {

@@ -4489,7 +4489,8 @@ function retireRootBlock(block: Block): void {
 		transaction === null ||
 		transaction.aborted ||
 		ROOT_RENDER_ROLLBACK ||
-		block.idState.renderOwner !== transaction.owner
+		block.idState.renderOwner !== transaction.owner ||
+		!retiresVisibly(block)
 	)
 		return;
 	const retired = (transaction.retired ??= new Set());
@@ -4498,6 +4499,28 @@ function retireRootBlock(block: Block): void {
 		journalRootProperty(block, 'pending', block.pending);
 		block.pending = false;
 	}
+}
+
+/**
+ * Whether a deleted Block joins its transaction's retired set. The scheduler
+ * skips queued work at or below a retired Block (drainQueue), and a held
+ * ViewTransition reads the set for what leaves (vtPreview). A Block with no
+ * pending work, scope state, children or signal authority can have none queued.
+ */
+function retiresVisibly(block: Block): boolean {
+	// A truthiness read, which an application without the driver folds away.
+	if (VIEW_TRANSITION_DRIVER) return true;
+	return (
+		block.pending ||
+		block.rare?.updateError === true ||
+		block.hooks !== null ||
+		block.effectSlots !== null ||
+		block.cleanups !== null ||
+		block.children !== null ||
+		block._slots !== null ||
+		block.signalOwner !== undefined ||
+		block.signalTokenEscaped
+	);
 }
 
 /**
@@ -48837,9 +48860,9 @@ function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = fa
 	const parent = state.start.parentNode!;
 	const oldHead = state.head;
 	// retireRootBlock, inlined: this visits every row of a bulk clear.
-	const retired = (transaction.retired ??= new Set<Block>());
 	for (let block = oldHead; block !== null; block = block.nextSibling) {
-		retired.add(block);
+		if (!retiresVisibly(block)) continue;
+		(transaction.retired ??= new Set<Block>()).add(block);
 		if (block.pending) {
 			journalRootProperty(block, 'pending', block.pending);
 			block.pending = false;
@@ -48929,9 +48952,9 @@ function batchClearItems(
 			const end = state.end;
 			const size = oldItems.size;
 			// retireRootBlock, inlined: this visits every row of a bulk clear.
-			const retired = (next.tx.retired ??= new Set<Block>());
 			for (let block = head; block !== null; block = block.nextSibling) {
-				retired.add(block);
+				if (!retiresVisibly(block)) continue;
+				(next.tx.retired ??= new Set<Block>()).add(block);
 				if (block.pending) {
 					journalRootProperty(block, 'pending', block.pending);
 					block.pending = false;

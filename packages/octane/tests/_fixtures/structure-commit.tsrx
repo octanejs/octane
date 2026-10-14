@@ -393,3 +393,28 @@ export function ArmSwapApp(props: {
 	};
 	<ArmSwapOwner start={props.start} step={step} controls={props.controls} probe={props.probe} />
 }
+
+function RetireRow(props: {
+	id: number;
+	log: string[];
+	expose: (set: (n: number) => void) => void;
+}) @{
+	const [n, setN] = useState(0);
+	props.expose(setN);
+	props.log.push('row ' + props.id + ':' + n);
+	<li>{String(n) as string}</li>
+}
+
+// Rows with state, so a row's own update can be queued in the drain whose
+// root render deletes it.
+export function RetireList(props: {
+	ids: number[];
+	log: string[];
+	expose: (set: (n: number) => void) => void;
+}) @{
+	<ul id="retire">
+		@for (const id of props.ids; key id) {
+			<RetireRow id={id} log={props.log} expose={props.expose} />
+		}
+	</ul>
+}
