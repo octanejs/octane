@@ -124,6 +124,34 @@ export function Nested(props: { controls: NestedControls; wait: Promise<unknown>
 	</section>
 }
 
+// The same drain, but the transition's render of the row lands back on the
+// committed values while the urgent render's are still pending.
+interface RevertControls {
+	setStep(step: number): void;
+	setLocal(local: number): void;
+}
+
+function RevertRow(props: { step: number; controls: RevertControls }) @{
+	const [local, setLocal] = useState(0);
+	props.controls.setLocal = setLocal;
+	const shown = String(props.step - local);
+	<p id="revert" title={'title:' + shown} onClick={() => props.controls.setLocal(local)}>
+		{shown}
+	</p>
+}
+
+export function Revert(props: { controls: RevertControls }) @{
+	const [step, setStep] = useState(0);
+	props.controls.setStep = setStep;
+	<section>
+		@try {
+			<RevertRow step={step} controls={props.controls} />
+		} @pending {
+			<p id="fallback">{'loading'}</p>
+		}
+	</section>
+}
+
 function CallbackTail(props: { tail: string }) @{
 	<span id="tail">{props.tail as string}</span>
 }

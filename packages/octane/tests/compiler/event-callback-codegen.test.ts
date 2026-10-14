@@ -186,7 +186,7 @@ describe('compiler-owned native event callbacks', () => {
 		// An update records the handler for its commit (or, outside commit
 		// functions, rewrites it through the bundle update helper).
 		const rewritesOnUpdate = (code: string) =>
-			/_\$(?:evt\d+u|bagRecordEvent|bagRecordBundle)\(/.test(code) || emitCount(code) > 1;
+			/_\$(?:evt\d+u|bagRecord)\(/.test(code) || emitCount(code) > 1;
 
 		const installedOnce = (body: string) => !rewritesOnUpdate(compileBody(body));
 
@@ -296,7 +296,7 @@ describe('compiler-owned native event callbacks', () => {
 		expect(rowBody).toContain('function __item');
 		// `item.label` is a member path, so the row takes the bundle lowering;
 		// the update record is the proof its slot still follows the item.
-		expect(rowBody).toMatch(/_\$bagRecordBundle\(/);
+		expect(rowBody).toMatch(/_\$bagRecord\(/);
 	});
 
 	it('retains an Effect Event mount wrapper only for an unshared native event slot', () => {
