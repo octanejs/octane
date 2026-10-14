@@ -54,6 +54,7 @@ export const WRITERS = new Map(
 		commitScriptResource: 'commit',
 		insertPrecedenced: 'commit',
 		applyResourceAttrs: 'commit',
+		commitHiddenStyle: 'commit',
 		// primitive
 		updateTextValue: 'primitive',
 		setText: 'primitive',
@@ -85,7 +86,6 @@ export const WRITERS = new Map(
 		markInputCheckedness: 'primitive',
 		enforceHiddenDisplay: 'primitive',
 		restoreHiddenDisplayValue: 'primitive',
-		writeHiddenStyle: 'primitive',
 		enforceHiddenText: 'primitive',
 		releaseHiddenText: 'primitive',
 		// fresh
