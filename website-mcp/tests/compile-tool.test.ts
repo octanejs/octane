@@ -60,7 +60,7 @@ describe('runCompile', () => {
 	it('compiles standard .tsx without tsrx directives', () => {
 		const result = runCompile({
 			...base(`export function Plain() { return <div>{'hi'}</div>; }`),
-			filename: 'input.tsx',
+			filename: 'input.tsrx',
 		});
 		expect(result.ok).toBe(true);
 	});
@@ -117,7 +117,7 @@ function applyEdits(source: string, edits: Array<{ start: number; end: number; t
 
 describe('runCompile in Strong mode', () => {
 	it('reports every Strong finding, not only the first error', () => {
-		const result = runCompile({ ...base(IMPURE), filename: 'input.tsx', strong: true });
+		const result = runCompile({ ...base(IMPURE), filename: 'input.tsrx', strong: true });
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		// The error compilation stopped at keeps its existing shape, now with
@@ -146,7 +146,7 @@ describe('runCompile in Strong mode', () => {
 	it('applies Strong mode to a module with the directive without the option', () => {
 		const result = runCompile({
 			...base(`"use strong";\n${IMPURE}`),
-			filename: 'input.tsx',
+			filename: 'input.tsrx',
 		});
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
@@ -154,7 +154,7 @@ describe('runCompile in Strong mode', () => {
 	});
 
 	it('carries source edits that rewrite the lazy ref idiom to useLazyRef', () => {
-		const result = runCompile({ ...base(LAZY_REF), filename: 'input.tsx', strong: true });
+		const result = runCompile({ ...base(LAZY_REF), filename: 'input.tsrx', strong: true });
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		const findings = result.diagnostics ?? [];
@@ -179,7 +179,7 @@ describe('runCompile in Strong mode', () => {
 		const fixed = applyEdits(LAZY_REF, fix.edits);
 		expect(fixed).toContain('useLazyRef(() => new Map())');
 		expect(fixed).not.toContain('store.current === null');
-		const recompiled = runCompile({ ...base(fixed), filename: 'input.tsx', strong: true });
+		const recompiled = runCompile({ ...base(fixed), filename: 'input.tsrx', strong: true });
 		expect(recompiled.ok).toBe(true);
 	});
 
@@ -193,7 +193,7 @@ export function Title({ text }: { text: string }) {
 	return <h1>{text}</h1>;
 }
 `),
-			filename: 'input.tsx',
+			filename: 'input.tsrx',
 			strong: true,
 		});
 		expect(result.ok).toBe(true);
@@ -219,7 +219,7 @@ export function Title({ text }: { text: string }) {
 	});
 
 	it('leaves compatibility-mode output unchanged', () => {
-		const result = runCompile({ ...base(IMPURE), filename: 'input.tsx' });
+		const result = runCompile({ ...base(IMPURE), filename: 'input.tsrx' });
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.warnings).toEqual([]);

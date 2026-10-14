@@ -837,10 +837,11 @@ export function App(props) @{
 	);
 });
 
+// Strong compiles only `.tsrx`, so both component forms are `.tsrx` modules.
 describe.each([
-	{ extension: 'tsrx', open: '@{', render: '', close: '}' },
-	{ extension: 'tsx', open: '{', render: 'return (', close: '); }' },
-])('Strong inline template values ($extension)', ({ extension, open, render, close }) => {
+	{ form: 'template body', extension: 'tsrx', open: '@{', render: '', close: '}' },
+	{ form: 'returned JSX', extension: 'tsrx', open: '{', render: 'return (', close: '); }' },
+])('Strong inline template values ($form)', ({ extension, open, render, close }) => {
 	it.each([false, true])(
 		'keeps ref attachments until an inline array member changes (dev=%s)',
 		(dev) => {

@@ -94,7 +94,7 @@ describe('remote MCP server', () => {
 		const result = await client.callTool({
 			name: 'octane_compile',
 			arguments: {
-				filename: 'input.tsx',
+				filename: 'input.tsrx',
 				strong: true,
 				source: `export function Stamp() {
 	const now = Date.now();

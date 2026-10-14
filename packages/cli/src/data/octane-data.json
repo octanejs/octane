@@ -3720,7 +3720,7 @@
       "OCTANE_STRONG_MAP_JSX": {
         "severity": "error",
         "detects": "In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases.",
-        "replacement": "Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.",
+        "replacement": "Use `@for` with a stable item key. Data-only mapping remains valid.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-map-jsx"
       },
       "OCTANE_STRONG_INDEX_KEY": {
@@ -3753,6 +3753,12 @@
         "replacement": "Move `\"use strong\"` to the top of the file, before imports or other code.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-directive-placement"
       },
+      "OCTANE_STRONG_TSX_MODULE": {
+        "severity": "error",
+        "detects": "A `.tsx` or `.jsx` module is Strong, through its own `\"use strong\"` directive or the application's `compiler.strong` setting. Its JSX lowers to element descriptors, which render through the generic descriptor renderer instead of compiled templates. Installed dependencies keep their own mode.",
+        "replacement": "Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts` or `.js`; `root.render(App, props)` renders an entry point without JSX.",
+        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-tsx-module"
+      },
       "OCTANE_STRONG_SUPPRESSION_PROP": {
         "severity": "error",
         "detects": "A DOM intrinsic uses `suppressHydrationWarning` or `suppressNativeChangeWarning`, including statically visible object spreads.",
@@ -3773,8 +3779,8 @@
       },
       "OCTANE_STRONG_ELEMENT_API": {
         "severity": "error",
-        "detects": "Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.",
-        "replacement": "Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.",
+        "detects": "Imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.",
+        "replacement": "Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-element-api"
       },
       "OCTANE_STRONG_MANAGED_DOM_WRITE": {

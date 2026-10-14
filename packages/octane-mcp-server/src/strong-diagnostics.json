@@ -264,7 +264,7 @@
       "section": "templates",
       "severity": "error",
       "detects": "In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases.",
-      "replacement": "Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.",
+      "replacement": "Use `@for` with a stable item key. Data-only mapping remains valid.",
       "url": "https://octanejs.dev/docs/strong-mode#octane-strong-map-jsx"
     },
     {
@@ -308,6 +308,14 @@
       "url": "https://octanejs.dev/docs/strong-mode#octane-strong-directive-placement"
     },
     {
+      "code": "OCTANE_STRONG_TSX_MODULE",
+      "section": "templates",
+      "severity": "error",
+      "detects": "A `.tsx` or `.jsx` module is Strong, through its own `\"use strong\"` directive or the application's `compiler.strong` setting. Its JSX lowers to element descriptors, which render through the generic descriptor renderer instead of compiled templates. Installed dependencies keep their own mode.",
+      "replacement": "Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts` or `.js`; `root.render(App, props)` renders an entry point without JSX.",
+      "url": "https://octanejs.dev/docs/strong-mode#octane-strong-tsx-module"
+    },
+    {
       "code": "OCTANE_STRONG_SUPPRESSION_PROP",
       "section": "templates",
       "severity": "error",
@@ -335,8 +343,8 @@
       "code": "OCTANE_STRONG_ELEMENT_API",
       "section": "templates",
       "severity": "error",
-      "detects": "Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.",
-      "replacement": "Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.",
+      "detects": "Imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.",
+      "replacement": "Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid.",
       "url": "https://octanejs.dev/docs/strong-mode#octane-strong-element-api"
     },
     {
@@ -397,8 +405,8 @@
       "react": "if (ref.current === null) ref.current = new Store();",
       "strong": "const ref = useLazyRef(() => new Store());",
       "codes": ["OCTANE_STRONG_RENDER_REF_READ", "OCTANE_STRONG_RENDER_REF_WRITE"],
-      "before": "\"use strong\";\nimport { useRef } from 'octane';\nimport { Store } from './store';\n\nexport function Cart() {\n\tconst store = useRef<Store | null>(null);\n\tif (store.current === null) store.current = new Store();\n\treturn <button onClick={() => store.current?.add()}>Add</button>;\n}\n",
-      "after": "\"use strong\";\nimport { useLazyRef } from 'octane';\nimport { Store } from './store';\n\nexport function Cart() {\n\tconst store = useLazyRef(() => new Store());\n\treturn <button onClick={() => store.current.add()}>Add</button>;\n}\n",
+      "before": "\"use strong\";\nimport { useRef } from 'octane';\nimport { Store } from './store';\n\nexport function Cart() @{\n\tconst store = useRef<Store | null>(null);\n\tif (store.current === null) store.current = new Store();\n\t<button onClick={() => store.current?.add()}>Add</button>\n}\n",
+      "after": "\"use strong\";\nimport { useLazyRef } from 'octane';\nimport { Store } from './store';\n\nexport function Cart() @{\n\tconst store = useLazyRef(() => new Store());\n\t<button onClick={() => store.current.add()}>Add</button>\n}\n",
       "note": "`useLazyRef` runs its factory once, when the hook cell is created, and keeps the ref on later renders. The factory follows the rules of a lazy `useState` initializer. `octane analyze --fix` applies this rewrite when the `useRef` declaration directly precedes the `if`."
     },
     {
@@ -407,8 +415,8 @@
       "react": "useLayoutEffect(() => setWidth(el.current.offsetWidth));",
       "strong": "const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });",
       "codes": ["OCTANE_STRONG_EFFECT_STATE_UPDATE"],
-      "before": "\"use strong\";\nimport { useLayoutEffect, useRef, useState } from 'octane';\n\nexport function Label({ text }: { text: string }) {\n\tconst el = useRef<HTMLSpanElement>(null);\n\tconst [width, setWidth] = useState(0);\n\tuseLayoutEffect(() => {\n\t\tsetWidth(el.current?.offsetWidth ?? 0);\n\t});\n\treturn <span ref={el}>{text + ' (' + width + 'px)'}</span>;\n}\n",
-      "after": "\"use strong\";\nimport { useLayoutSnapshot, useRef } from 'octane';\n\nexport function Label({ text }: { text: string }) {\n\tconst el = useRef<HTMLSpanElement>(null);\n\tconst width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });\n\treturn <span ref={el}>{text + ' (' + width + 'px)'}</span>;\n}\n",
+      "before": "\"use strong\";\nimport { useLayoutEffect, useRef, useState } from 'octane';\n\nexport function Label({ text }: { text: string }) @{\n\tconst el = useRef<HTMLSpanElement>(null);\n\tconst [width, setWidth] = useState(0);\n\tuseLayoutEffect(() => {\n\t\tsetWidth(el.current?.offsetWidth ?? 0);\n\t});\n\t<span ref={el}>{text + ' (' + width + 'px)'}</span>\n}\n",
+      "after": "\"use strong\";\nimport { useLayoutSnapshot, useRef } from 'octane';\n\nexport function Label({ text }: { text: string }) @{\n\tconst el = useRef<HTMLSpanElement>(null);\n\tconst width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });\n\t<span ref={el}>{text + ' (' + width + 'px)'}</span>\n}\n",
       "note": "`useLayoutSnapshot` measures after each commit and re-renders before paint only when the value changes. `initial` is the value for the first render and for server rendering. It does not observe later resizes: subscribe to those with an observer in an effect."
     },
     {
@@ -417,8 +425,8 @@
       "react": "<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>",
       "strong": "const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });",
       "codes": ["OCTANE_STRONG_REF_STATE_UPDATE"],
-      "before": "\"use strong\";\nimport { useState } from 'octane';\n\nexport function Label({ text }: { text: string }) {\n\tconst [width, setWidth] = useState(0);\n\treturn (\n\t\t<span\n\t\t\tref={(el) => {\n\t\t\t\tif (el) setWidth(el.offsetWidth);\n\t\t\t}}\n\t\t>\n\t\t\t{text + ' (' + width + 'px)'}\n\t\t</span>\n\t);\n}\n",
-      "after": "\"use strong\";\nimport { useLayoutSnapshot, useRef } from 'octane';\n\nexport function Label({ text }: { text: string }) {\n\tconst el = useRef<HTMLSpanElement>(null);\n\tconst width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });\n\treturn <span ref={el}>{text + ' (' + width + 'px)'}</span>;\n}\n",
+      "before": "\"use strong\";\nimport { useState } from 'octane';\n\nexport function Label({ text }: { text: string }) @{\n\tconst [width, setWidth] = useState(0);\n\t<span\n\t\tref={(el) => {\n\t\t\tif (el) setWidth(el.offsetWidth);\n\t\t}}\n\t>\n\t\t{text + ' (' + width + 'px)'}\n\t</span>\n}\n",
+      "after": "\"use strong\";\nimport { useLayoutSnapshot, useRef } from 'octane';\n\nexport function Label({ text }: { text: string }) @{\n\tconst el = useRef<HTMLSpanElement>(null);\n\tconst width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });\n\t<span ref={el}>{text + ' (' + width + 'px)'}</span>\n}\n",
       "note": "A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state."
     },
     {
@@ -427,8 +435,8 @@
       "react": "const latest = useRef(onTick); latest.current = onTick;",
       "strong": "const tick = useEffectEvent(onTick);",
       "codes": ["OCTANE_STRONG_RENDER_REF_WRITE"],
-      "before": "\"use strong\";\nimport { useEffect, useRef } from 'octane';\n\nexport function Ticker({ onTick }: { onTick: () => void }) {\n\tconst latest = useRef(onTick);\n\tlatest.current = onTick;\n\tuseEffect(() => {\n\t\tconst id = setInterval(() => latest.current(), 1000);\n\t\treturn () => clearInterval(id);\n\t}, []);\n\treturn <span>Ticking</span>;\n}\n",
-      "after": "\"use strong\";\nimport { useEffect, useEffectEvent } from 'octane';\n\nexport function Ticker({ onTick }: { onTick: () => void }) {\n\tconst tick = useEffectEvent(onTick);\n\tuseEffect(() => {\n\t\tconst id = setInterval(() => tick(), 1000);\n\t\treturn () => clearInterval(id);\n\t});\n\treturn <span>Ticking</span>;\n}\n",
+      "before": "\"use strong\";\nimport { useEffect, useRef } from 'octane';\n\nexport function Ticker({ onTick }: { onTick: () => void }) @{\n\tconst latest = useRef(onTick);\n\tlatest.current = onTick;\n\tuseEffect(() => {\n\t\tconst id = setInterval(() => latest.current(), 1000);\n\t\treturn () => clearInterval(id);\n\t}, []);\n\t<span>Ticking</span>\n}\n",
+      "after": "\"use strong\";\nimport { useEffect, useEffectEvent } from 'octane';\n\nexport function Ticker({ onTick }: { onTick: () => void }) @{\n\tconst tick = useEffectEvent(onTick);\n\tuseEffect(() => {\n\t\tconst id = setInterval(() => tick(), 1000);\n\t\treturn () => clearInterval(id);\n\t});\n\t<span>Ticking</span>\n}\n",
       "note": "An Effect Event always calls the latest `onTick` without making the effect depend on it."
     },
     {
@@ -437,8 +445,8 @@
       "react": "useEffect(() => setName(user.name), [user.name]);",
       "strong": "const [name, setName] = useLinkedState(user.id, () => user.name);",
       "codes": ["OCTANE_STRONG_EFFECT_STATE_UPDATE"],
-      "before": "\"use strong\";\nimport { useEffect, useState } from 'octane';\n\nexport function NameField({ user }: { user: { id: string; name: string } }) {\n\tconst [name, setName] = useState('');\n\tuseEffect(() => {\n\t\tsetName(user.name);\n\t});\n\treturn <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;\n}\n",
-      "after": "\"use strong\";\nimport { useLinkedState } from 'octane';\n\nexport function NameField({ user }: { user: { id: string; name: string } }) {\n\tconst [name, setName] = useLinkedState(user.id, () => user.name);\n\treturn <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;\n}\n",
+      "before": "\"use strong\";\nimport { useEffect, useState } from 'octane';\n\nexport function NameField({ user }: { user: { id: string; name: string } }) @{\n\tconst [name, setName] = useState('');\n\tuseEffect(() => {\n\t\tsetName(user.name);\n\t});\n\t<input value={name} onInput={(event) => setName(event.currentTarget.value)} />\n}\n",
+      "after": "\"use strong\";\nimport { useLinkedState } from 'octane';\n\nexport function NameField({ user }: { user: { id: string; name: string } }) @{\n\tconst [name, setName] = useLinkedState(user.id, () => user.name);\n\t<input value={name} onInput={(event) => setName(event.currentTarget.value)} />\n}\n",
       "note": "`useLinkedState` resets the editable value in the same render whenever its source changes, so there is no frame with the stale value."
     },
     {
@@ -447,8 +455,8 @@
       "react": "const wide = window.innerWidth > 800;",
       "strong": "const wide = useSyncExternalStore(subscribe, getWide, () => false);",
       "codes": ["OCTANE_STRONG_RENDER_AMBIENT_READ"],
-      "before": "\"use strong\";\nexport function Layout() {\n\tconst wide = window.innerWidth > 800;\n\treturn <main class={wide ? 'wide' : 'narrow'}>Content</main>;\n}\n",
-      "after": "\"use strong\";\nimport { useSyncExternalStore } from 'octane';\n\nfunction subscribe(notify: () => void) {\n\twindow.addEventListener('resize', notify);\n\treturn () => window.removeEventListener('resize', notify);\n}\n\nfunction getWide() {\n\treturn window.innerWidth > 800;\n}\n\nexport function Layout() {\n\tconst wide = useSyncExternalStore(subscribe, getWide, () => false);\n\treturn <main class={wide ? 'wide' : 'narrow'}>Content</main>;\n}\n",
+      "before": "\"use strong\";\nexport function Layout() @{\n\tconst wide = window.innerWidth > 800;\n\t<main class={wide ? 'wide' : 'narrow'}>Content</main>\n}\n",
+      "after": "\"use strong\";\nimport { useSyncExternalStore } from 'octane';\n\nfunction subscribe(notify: () => void) {\n\twindow.addEventListener('resize', notify);\n\treturn () => window.removeEventListener('resize', notify);\n}\n\nfunction getWide() {\n\treturn window.innerWidth > 800;\n}\n\nexport function Layout() @{\n\tconst wide = useSyncExternalStore(subscribe, getWide, () => false);\n\t<main class={wide ? 'wide' : 'narrow'}>Content</main>\n}\n",
       "note": "The server snapshot is rendered on the server and during hydration, so both agree."
     },
     {
@@ -457,8 +465,8 @@
       "react": "const id = 'field-' + Math.random();",
       "strong": "const id = useId();",
       "codes": ["OCTANE_STRONG_RENDER_IMPURE_CALL"],
-      "before": "\"use strong\";\nexport function Field({ label }: { label: string }) {\n\tconst id = 'field-' + Math.random().toString(36).slice(2);\n\treturn (\n\t\t<label for={id}>\n\t\t\t{label}\n\t\t\t<input id={id} />\n\t\t</label>\n\t);\n}\n",
-      "after": "\"use strong\";\nimport { useId } from 'octane';\n\nexport function Field({ label }: { label: string }) {\n\tconst id = useId();\n\treturn (\n\t\t<label for={id}>\n\t\t\t{label}\n\t\t\t<input id={id} />\n\t\t</label>\n\t);\n}\n",
+      "before": "\"use strong\";\nexport function Field({ label }: { label: string }) @{\n\tconst id = 'field-' + Math.random().toString(36).slice(2);\n\t<label for={id}>\n\t\t{label as string}\n\t\t<input id={id} />\n\t</label>\n}\n",
+      "after": "\"use strong\";\nimport { useId } from 'octane';\n\nexport function Field({ label }: { label: string }) @{\n\tconst id = useId();\n\t<label for={id}>\n\t\t{label as string}\n\t\t<input id={id} />\n\t</label>\n}\n",
       "note": "`useId` is stable across renders and matches between server and client."
     },
     {
@@ -467,8 +475,8 @@
       "react": "useEffect(() => { load(id).then(setData); }, [id]);",
       "strong": "let ignore = false; load(id).then((p) => { if (!ignore) setName(p.name); }); return () => { ignore = true; };",
       "codes": ["OCTANE_STRONG_EFFECT_DATA_FETCH"],
-      "before": "\"use strong\";\nimport { useEffect, useState } from 'octane';\nimport { load } from './api';\n\nexport function Profile({ id }: { id: string }) {\n\tconst [name, setName] = useState('');\n\tuseEffect(() => {\n\t\tload(id).then((profile) => setName(profile.name));\n\t});\n\treturn <p>{name}</p>;\n}\n",
-      "after": "\"use strong\";\nimport { useEffect, useState } from 'octane';\nimport { load } from './api';\n\nexport function Profile({ id }: { id: string }) {\n\tconst [name, setName] = useState('');\n\tuseEffect(() => {\n\t\tlet ignore = false;\n\t\tload(id).then((profile) => {\n\t\t\tif (!ignore) setName(profile.name);\n\t\t});\n\t\treturn () => {\n\t\t\tignore = true;\n\t\t};\n\t});\n\treturn <p>{name}</p>;\n}\n",
+      "before": "\"use strong\";\nimport { useEffect, useState } from 'octane';\nimport { load } from './api';\n\nexport function Profile({ id }: { id: string }) @{\n\tconst [name, setName] = useState('');\n\tuseEffect(() => {\n\t\tload(id).then((profile) => setName(profile.name));\n\t});\n\t<p>{name as string}</p>\n}\n",
+      "after": "\"use strong\";\nimport { useEffect, useState } from 'octane';\nimport { load } from './api';\n\nexport function Profile({ id }: { id: string }) @{\n\tconst [name, setName] = useState('');\n\tuseEffect(() => {\n\t\tlet ignore = false;\n\t\tload(id).then((profile) => {\n\t\t\tif (!ignore) setName(profile.name);\n\t\t});\n\t\treturn () => {\n\t\t\tignore = true;\n\t\t};\n\t});\n\t<p>{name as string}</p>\n}\n",
       "note": "Without the flag, a slow response for an old `id` can overwrite a newer one. For data the render needs, `use()` or a query binding avoids the effect entirely."
     },
     {
@@ -477,8 +485,8 @@
       "react": "const [, forceUpdate] = useReducer((x) => x + 1, 0);",
       "strong": "const value = useSyncExternalStore(store.subscribe, store.get, store.get);",
       "codes": ["OCTANE_STRONG_WRITE_ONLY_STATE"],
-      "before": "\"use strong\";\nimport { useEffect, useReducer } from 'octane';\nimport { store } from './store';\n\nexport function Count() {\n\tconst [, forceUpdate] = useReducer((x: number) => x + 1, 0);\n\tuseEffect(() => store.subscribe(() => forceUpdate()));\n\treturn <span>{String(store.get())}</span>;\n}\n",
-      "after": "\"use strong\";\nimport { useSyncExternalStore } from 'octane';\nimport { store } from './store';\n\nexport function Count() {\n\tconst count = useSyncExternalStore(store.subscribe, store.get, store.get);\n\treturn <span>{String(count)}</span>;\n}\n",
+      "before": "\"use strong\";\nimport { useEffect, useReducer } from 'octane';\nimport { store } from './store';\n\nexport function Count() @{\n\tconst [, forceUpdate] = useReducer((x: number) => x + 1, 0);\n\tuseEffect(() => store.subscribe(() => forceUpdate()));\n\t<span>{String(store.get())}</span>\n}\n",
+      "after": "\"use strong\";\nimport { useSyncExternalStore } from 'octane';\nimport { store } from './store';\n\nexport function Count() @{\n\tconst count = useSyncExternalStore(store.subscribe, store.get, store.get);\n\t<span>{String(count)}</span>\n}\n",
       "note": "`useSyncExternalStore` re-checks the snapshot after commit, so a change between render and subscription is not lost."
     },
     {
@@ -487,8 +495,8 @@
       "react": "dangerouslySetInnerHTML={{ __html: html }}",
       "strong": "dangerouslySetInnerHTML={trustHTML(sanitize(html))}",
       "codes": ["OCTANE_STRONG_UNTRUSTED_HTML"],
-      "before": "\"use strong\";\nimport { sanitize } from './sanitize';\n\nexport function Article({ html }: { html: string }) {\n\treturn <article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />;\n}\n",
-      "after": "\"use strong\";\nimport { trustHTML } from 'octane';\nimport { sanitize } from './sanitize';\n\nexport function Article({ html }: { html: string }) {\n\treturn <article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />;\n}\n",
+      "before": "\"use strong\";\nimport { sanitize } from './sanitize';\n\nexport function Article({ html }: { html: string }) @{\n\t<article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />\n}\n",
+      "after": "\"use strong\";\nimport { trustHTML } from 'octane';\nimport { sanitize } from './sanitize';\n\nexport function Article({ html }: { html: string }) @{\n\t<article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />\n}\n",
       "note": "`trustHTML` marks the value as trusted; it does not sanitize. Call it only on sanitized or already trusted HTML."
     }
   ]

@@ -6,7 +6,7 @@ import { renderToString } from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture';
 
 const source = readFileSync(
-	join(process.cwd(), 'packages/octane/tests/_fixtures/trusted-html.tsx'),
+	join(process.cwd(), 'packages/octane/tests/_fixtures/trusted-html.tsrx'),
 	'utf8',
 );
 const suppressedSource = readFileSync(
@@ -23,12 +23,12 @@ describe('explicitly trusted HTML', () => {
 	it.each([false, true])('renders, hydrates, updates, and clears HTML (dev: %s)', (dev) => {
 		const compileOptions = { dev, hmr: false };
 		const client = loadCompiledFixtureSource(source, {
-			id: 'trusted-html.tsx',
+			id: 'trusted-html.tsrx',
 			mode: 'client',
 			compileOptions,
 		});
 		const server = loadCompiledFixtureSource(source, {
-			id: 'trusted-html.tsx',
+			id: 'trusted-html.tsrx',
 			mode: 'server',
 			compileOptions,
 		});
@@ -81,7 +81,7 @@ describe('explicitly trusted HTML', () => {
 	it.each([false, true])(
 		'adopts parser-normalized HTML without a warning and rewrites it on the next render (dev: %s)',
 		(dev) => {
-			const options = { id: 'trusted-html.tsx', compileOptions: { dev, hmr: false } };
+			const options = { id: 'trusted-html.tsrx', compileOptions: { dev, hmr: false } };
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 			const props = { html: '<b data-note="&amp;"/>' };
@@ -112,7 +112,7 @@ describe('explicitly trusted HTML', () => {
 	);
 
 	it.each([false, true])('updates retained hydration mismatches on render (dev: %s)', (dev) => {
-		const options = { id: 'trusted-html.tsx', compileOptions: { dev, hmr: false } };
+		const options = { id: 'trusted-html.tsrx', compileOptions: { dev, hmr: false } };
 		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 		const suppressedOptions = { ...options, id: 'reconnecting-wave4c.tsrx' };
@@ -179,7 +179,7 @@ describe('explicitly trusted HTML', () => {
 
 	it.each([false, true])('preserves HTML when a suspended render is abandoned (dev: %s)', (dev) => {
 		const client = loadCompiledFixtureSource(source, {
-			id: 'trusted-html.tsx',
+			id: 'trusted-html.tsrx',
 			mode: 'client',
 			compileOptions: { dev, hmr: false },
 		});

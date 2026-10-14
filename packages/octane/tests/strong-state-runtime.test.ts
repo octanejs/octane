@@ -15,7 +15,7 @@ function fixture(body: string, strong = false) {
 	return loadCompiledFixtureSource(
 		`/** @jsxImportSource octane */\n${strong ? '"use strong";\n' : ''}import { memo, useEffect, useLayoutEffect, useOptimistic, useState, useSyncExternalStore, useTransition } from 'octane';\n${body}`,
 		{
-			id: '/src/strong-state-runtime.tsx',
+			id: '/src/strong-state-runtime.tsrx',
 			mode: 'client',
 			compileOptions: { dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod', hmr: false },
 		},

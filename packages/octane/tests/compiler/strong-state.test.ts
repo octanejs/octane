@@ -17,7 +17,7 @@ function tsx(body: string, imports = IMPORTS, strong = false): string {
 	return `/** @jsxImportSource octane */\n${strong ? '"use strong";\n' : ''}${imports}\n${body}`;
 }
 
-function strongCode(source: string, filename = '/src/App.tsx'): string | null {
+function strongCode(source: string, filename = '/src/App.tsrx'): string | null {
 	try {
 		if (filename.endsWith('.ts') || filename.endsWith('.js')) {
 			slotHooks(source, filename, { strong: true });
@@ -32,7 +32,7 @@ function strongCode(source: string, filename = '/src/App.tsx'): string | null {
 
 /** The first Strong error for `body`, after proving compatibility mode accepts it. */
 function rejected(body: string, imports = IMPORTS): string | null {
-	expect(() => compile(tsx(body, imports), '/src/App.tsx')).not.toThrow();
+	expect(() => compile(tsx(body, imports), '/src/App.tsrx')).not.toThrow();
 	const code = strongCode(tsx(body, imports));
 	expect(strongCode(tsx(body, imports, true))).toBe(code);
 	return code;
@@ -286,7 +286,7 @@ export function useLog() {
 			IMPORTS,
 			true,
 		);
-		const diagnostic = volarDiagnostic(source, '/src/App.tsx', IMPURE_UPDATER);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsrx', IMPURE_UPDATER);
 		expect(diagnostic.start.offset).toBe(source.indexOf('Date.now'));
 		expect(diagnostic.message).toContain('replay');
 		expect(diagnostic.message).toContain(
@@ -302,7 +302,7 @@ export function A({ step }) {
   const [items, dispatch] = useReducer(reducer, []);
   return <b onClick={() => { setN((p) => p + step); dispatch({ type: 'add', item: n }); }}>{items.length}</b>;
 }`),
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 	});
 });
@@ -557,7 +557,7 @@ export function useList() {
 			IMPORTS,
 			true,
 		);
-		const diagnostic = volarDiagnostic(source, '/src/App.tsx', SNAPSHOT_MUTATION);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsrx', SNAPSHOT_MUTATION);
 		expect(diagnostic.start.offset).toBe(source.indexOf('items.push'));
 		expect(diagnostic.end.offset).toBe(source.indexOf('items.push') + 'items.push'.length);
 		expect(diagnostic.message).toContain('setItems((current) => [...current, item])');
@@ -570,7 +570,7 @@ export function useList() {
   const [items, setItems] = useState([]);
   return <b onClick={() => { setItems([...items, 1]); setItems((current) => current.concat(2)); }}>{items.length}</b>;
 }`),
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 	});
 });
@@ -815,7 +815,7 @@ export function useSave(save) {
 			IMPORTS,
 			true,
 		);
-		const diagnostic = volarDiagnostic(source, '/src/App.tsx', STALE_STATE_UPDATE);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsrx', STALE_STATE_UPDATE);
 		expect(diagnostic.start.offset).toBe(source.indexOf('n + 1'));
 		expect(diagnostic.message).toContain('setValue((current) => current + 1)');
 		expect(diagnostic.message).toContain('state getter');
@@ -824,7 +824,7 @@ export function useSave(save) {
 			IMPORTS,
 			true,
 		);
-		expect(volarDiagnostic(reducer, '/src/App.tsx', STALE_STATE_UPDATE).message).toContain(
+		expect(volarDiagnostic(reducer, '/src/App.tsrx', STALE_STATE_UPDATE).message).toContain(
 			'in the reducer',
 		);
 	});
@@ -835,7 +835,7 @@ export function useSave(save) {
   const [n, setN] = useState(0);
   return <b onClick={async () => { await save(); setN((p) => p + 1); setTimeout(() => setN((p) => p - 1)); }}>{n}</b>;
 }`),
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 	});
 });
@@ -965,7 +965,7 @@ export function A() @{
 			IMPORTS,
 			true,
 		);
-		const diagnostic = volarDiagnostic(source, '/src/App.tsx', WRITE_ONLY_STATE);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsrx', WRITE_ONLY_STATE);
 		expect(diagnostic.start.offset).toBe(source.indexOf('[, force]'));
 		expect(diagnostic.message).toContain(
 			'useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)',
@@ -978,7 +978,7 @@ export function A() @{
   const [count, setCount] = useState(0);
   return <b onClick={() => setCount(count + 1)}>{count}</b>;
 }`),
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 	});
 });
@@ -1085,7 +1085,7 @@ export function useSelection(store) {
 			IMPORTS,
 			true,
 		);
-		const diagnostic = volarDiagnostic(source, '/src/App.tsx', UNCACHED_STORE_SNAPSHOT);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsrx', UNCACHED_STORE_SNAPSHOT);
 		expect(diagnostic.start.offset).toBe(source.indexOf('{ a: store.a'));
 		expect(diagnostic.message).toContain('Object.is');
 		expect(diagnostic.message).toContain('its own useSyncExternalStore call');
@@ -1097,7 +1097,7 @@ export function useSelection(store) {
   const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0);
   return <p>{value}</p>;
 }`),
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 	});
 });

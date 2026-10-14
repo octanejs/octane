@@ -213,6 +213,7 @@ export const STRONG_EFFECT_CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
 export const STRONG_LAYOUT_SNAPSHOT_ASYNC = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC';
 export const STRONG_UNLINKED_PROP_STATE = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 export const STRONG_DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
+export const STRONG_TSX_MODULE = 'OCTANE_STRONG_TSX_MODULE';
 export const STRONG_HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
 export const STRONG_EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
 
@@ -1444,6 +1445,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 	const enabled = options.strong === true || directives.enabled;
 	if (!enabled) return { enabled: false, diagnostics };
+	// Strong code renders through compiled templates, and `.tsx`/`.jsx` JSX
+	// lowers to element descriptors. The rest of the analysis still runs, so
+	// tooling lists everything the converted module has to fix.
+	if (/\.[jt]sx(?:[?#]|$)/.test(filename)) {
+		diagnostics.push(
+			diagnostic(
+				STRONG_TSX_MODULE,
+				filename,
+				ast.body?.find((statement) => statement.directive === 'use strong')?.expression,
+				'`.tsx` and `.jsx` modules cannot be Strong: their JSX lowers to element descriptors instead of compiled templates. Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts`; `root.render(App, props)` renders an entry point without JSX.',
+			),
+		);
+	}
 	const strongHookAnalysis = analyzeStrongHookBindings(ast, options);
 	const hookNames = new WeakMap();
 	for (const [call, name] of strongHookAnalysis.callNames) {

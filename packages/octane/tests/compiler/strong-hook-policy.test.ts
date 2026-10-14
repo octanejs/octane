@@ -78,9 +78,9 @@ describe('Strong compiler-owned hook policies', () => {
 	])('accepts manual memo dependencies through recognized bindings: %s', (imports, callee) => {
 		const source = strong(`${imports}
 export function useExample(props) { return ${callee}(() => props.value, [props.revision]); }`);
-		expect(compile(source, '/src/useExample.tsx').diagnostics).toEqual([]);
+		expect(compile(source, '/src/useExample.tsrx').diagnostics).toEqual([]);
 		expect(slotHooks(source, '/src/useExample.ts')?.diagnostics ?? []).toEqual([]);
-		expect(compileToVolarMappings(source, '/src/useExample.tsx').diagnostics).toEqual([]);
+		expect(compileToVolarMappings(source, '/src/useExample.tsrx').diagnostics).toEqual([]);
 	});
 
 	it.each([
@@ -180,9 +180,9 @@ export function App(props) @{
 				`${imports} export function useLog(props) { ${callee}(() => console.log(props.value), ${dependencies}); }`,
 			);
 			for (const options of [{}, { dev: true }, { mode: 'server' }])
-				expect(() => compile(source, '/src/useLog.tsx', options as any)).not.toThrow();
+				expect(() => compile(source, '/src/useLog.tsrx', options as any)).not.toThrow();
 			expect(() => slotHooks(source, '/src/useLog.ts')).not.toThrow();
-			expect(compileToVolarMappings(source, '/src/useLog.tsx').diagnostics).toEqual([]);
+			expect(compileToVolarMappings(source, '/src/useLog.tsrx').diagnostics).toEqual([]);
 		}
 	});
 
@@ -191,9 +191,9 @@ export function App(props) @{
 		'const undefined = []; export function useLog(props) { useEffect(() => console.log(props.value), (undefined as any)); }',
 	])('retains explicit policy for a shadowed undefined binding', (declaration) => {
 		const source = strong(`import { useEffect } from 'octane'; ${declaration}`);
-		expect(() => compile(source, '/src/useLog.tsx')).toThrow(EXPLICIT);
+		expect(() => compile(source, '/src/useLog.tsrx')).toThrow(EXPLICIT);
 		expect(() => slotHooks(source, '/src/useLog.ts')).toThrow(EXPLICIT);
-		expect(compileToVolarMappings(source, '/src/useLog.tsx').diagnostics).toEqual(
+		expect(compileToVolarMappings(source, '/src/useLog.tsrx').diagnostics).toEqual(
 			expect.arrayContaining([expect.objectContaining({ code: EXPLICIT })]),
 		);
 	});
@@ -252,13 +252,13 @@ export function App(props) @{
 	it('rejects a later declaration read by a plain TypeScript hook', () => {
 		const source = `"use strong"; import { useEffect } from 'octane'; export function useLog(value: string) { useEffect(() => console.log(label)); const label = value.trim(); }`;
 		expect(() => slotHooks(source, '/src/useLog.ts')).toThrow(EVERY_RENDER);
-		expect(() => compile(source, '/src/useLog.tsx')).toThrow(EVERY_RENDER);
+		expect(() => compile(source, '/src/useLog.tsrx')).toThrow(EVERY_RENDER);
 	});
 
-	it('enforces policies in plain TypeScript and TSX', () => {
+	it('enforces policies in plain TypeScript and .tsrx', () => {
 		const source = `"use strong"; import { useEffect } from 'octane'; export function useLog(value: string) { useEffect(() => console.log(value), []); }`;
 		expect(() => slotHooks(source, '/src/useLog.ts')).toThrow(EXPLICIT);
-		expect(() => compile(source, '/src/useLog.tsx')).toThrow(EXPLICIT);
+		expect(() => compile(source, '/src/useLog.tsrx')).toThrow(EXPLICIT);
 	});
 
 	it.each([{ mode: 'client' }, { mode: 'server' }, { dev: true }, { hmr: true }])(
@@ -330,10 +330,10 @@ export function App(props) @{
 		(imports, call, code) => {
 			const setup = `${imports} export function useExample(props) { const result = ${call}; return result; }`;
 			const source = strong(setup);
-			expect(() => compile(setup, '/src/useExample.tsx')).not.toThrow();
-			expect(() => compile(source, '/src/useExample.tsx')).toThrow(code);
+			expect(() => compile(setup, '/src/useExample.tsrx')).not.toThrow();
+			expect(() => compile(source, '/src/useExample.tsrx')).toThrow(code);
 			expect(() => slotHooks(source, '/src/useExample.ts')).toThrow(code);
-			expect(compileToVolarMappings(source, '/src/useExample.tsx').diagnostics).toEqual(
+			expect(compileToVolarMappings(source, '/src/useExample.tsrx').diagnostics).toEqual(
 				expect.arrayContaining([expect.objectContaining({ code })]),
 			);
 		},

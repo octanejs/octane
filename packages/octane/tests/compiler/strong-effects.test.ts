@@ -593,11 +593,11 @@ describe('Strong effect diagnostic integration', () => {
 			),
 		).toThrow(FETCH);
 	});
-	it('enforces TSX components and namespace imports', () => {
+	it('enforces .tsrx components and namespace imports', () => {
 		expect(() =>
 			compile(
 				`"use strong"; import * as O from 'octane'; export function App(props) { const [value] = O.useState(props.value); return <div />; }`,
-				'/src/App.tsx',
+				'/src/App.tsrx',
 			),
 		).toThrow(PROPS);
 	});
@@ -1380,22 +1380,22 @@ export function App(props) @{
 
 	it.each([
 		[
-			'TSX components',
-			'/src/App.tsx',
+			'.tsrx components',
+			'/src/App.tsrx',
 			`"use strong";
 import { useState, useEffect, startTransition } from 'octane';
 export function A({ first, last }) { const [full, setFull] = useState(''); useEffect(() => { startTransition(() => setFull(first + ' ' + last)); }); return <p>{full}</p>; }`,
 		],
 		[
-			'TSX transitions',
-			'/src/App.tsx',
+			'.tsrx transitions',
+			'/src/App.tsrx',
 			`"use strong";
 import { useState, useEffect, useTransition } from 'octane';
 export function A({ v }) { const [x, setX] = useState(0); const [p, start] = useTransition(); useEffect(() => { start(() => setX(v)); }); return <p>{x}</p>; }`,
 		],
 		[
-			'TSX awaits',
-			'/src/App.tsx',
+			'.tsrx awaits',
+			'/src/App.tsrx',
 			`"use strong";
 import { useState, useEffect } from 'octane';
 export function A({ v }) { const [x, setX] = useState(0); useEffect(() => { (async () => { await null; setX(v * 2); })(); }); return <p>{x}</p>; }`,
@@ -1668,7 +1668,7 @@ export function App(props) @{
 		).toContain('OCTANE_STRONG_IMPURE_UPDATER');
 	});
 
-	it('follows same-module hooks in plain TypeScript and TSX', () => {
+	it('follows same-module hooks in plain TypeScript and .tsrx', () => {
 		const ts = `"use strong";
 import { useState, useEffect } from 'octane';
 function useThing() { return useState(0); }
@@ -1678,8 +1678,8 @@ export function useMirror(value) { const [mirror, setMirror] = useThing(); useEf
 import { useState, useEffect } from 'octane';
 function useThing() { return useState(0); }
 export function A({ v }) { const [x, setX] = useThing(); useEffect(() => { setX(v); }); return <p>{x}</p>; }`;
-		expect(() => compile(tsx, '/src/A.tsx')).toThrow(UPDATE);
-		expect(() => compile(tsx.replace('"use strong";', ''), '/src/A.tsx')).not.toThrow();
+		expect(() => compile(tsx, '/src/A.tsrx')).toThrow(UPDATE);
+		expect(() => compile(tsx.replace('"use strong";', ''), '/src/A.tsrx')).not.toThrow();
 	});
 });
 
@@ -1863,12 +1863,12 @@ export function App(props) @{
 		accepts(app(`useEffect(() => { props.log(LIMIT); });`, '<div />', moduleSetup));
 	});
 
-	it('enforces TSX components and plain TypeScript custom hooks', () => {
+	it('enforces .tsrx components and plain TypeScript custom hooks', () => {
 		const tsx = `"use strong";
 import { useState, useEffect } from 'octane';
 let last = 0;
 export function A({ log }) { const [c, setC] = useState(0); useEffect(() => { log(last); last = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
-		expect(() => compile(tsx, '/src/A.tsx')).toThrow(HIDDEN);
+		expect(() => compile(tsx, '/src/A.tsrx')).toThrow(HIDDEN);
 		const ts = `"use strong";
 import { useEffect } from 'octane';
 let last = 0;
@@ -1876,12 +1876,12 @@ export function usePreviousLog(value, log) { useEffect(() => { log(last); last =
 		expect(() => slotHooks(ts, '/src/use-previous-log.ts')).toThrow(HIDDEN);
 	});
 
-	it('accepts refs and state getters in TSX component and plain TypeScript custom-hook effects', () => {
+	it('accepts refs and state getters in .tsrx component and plain TypeScript custom-hook effects', () => {
 		const tsx = `"use strong";
 import { useState, useEffect, useRef } from 'octane';
 export function A({ log }) { const [c, setC, getC] = useState(0); const last = useRef(0); useEffect(() => { log(last.current, getC()); last.current = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
-		expect(() => compile(tsx, '/src/A.tsx')).not.toThrow();
-		expect(errors(tsx, '/src/A.tsx')).toEqual([]);
+		expect(() => compile(tsx, '/src/A.tsrx')).not.toThrow();
+		expect(errors(tsx, '/src/A.tsrx')).toEqual([]);
 		const ts = `"use strong";
 import { useState, useRef, useEffect } from 'octane';
 export function usePreviousLog(value, log) { const [count, setCount, getCount] = useState(0); const last = useRef(value); useEffect(() => { log(last.current, getCount()); last.current = value; }); return [count, setCount]; }`;
@@ -2029,7 +2029,7 @@ export function usePreviousLog(value, log) { const [count, setCount, getCount] =
 		expect(errors(source)).toContain(LEAK);
 	});
 
-	it('treats a callback-attached ref in a TSX component as a host element', () => {
+	it('treats a callback-attached ref in a .tsrx component as a host element', () => {
 		const source = `import { useLayoutEffect, useRef } from 'octane';
 export function App(props) {
   const element = useRef(null);
@@ -2037,9 +2037,9 @@ export function App(props) {
   return <div ref={(node) => { element.current = node; }} />;
 }`;
 		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, '/src/App.tsx', { mode, strong: true })).toThrow(LEAK);
+			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
 		}
-		expect(errors(source, '/src/App.tsx')).toContain(LEAK);
+		expect(errors(source, '/src/App.tsrx')).toContain(LEAK);
 	});
 
 	it.each([
@@ -2774,11 +2774,11 @@ export function App(props) @{
 		]);
 	});
 
-	it('enforces TSX components and plain TypeScript custom hooks', () => {
+	it('enforces .tsrx components and plain TypeScript custom hooks', () => {
 		const tsx = `"use strong";
 import { useState, useEffect, useRef } from 'octane';
 export function A() { const r = useRef(null); const [h, setH] = useState(0); useEffect(() => { new ResizeObserver(([e]) => setH(e.contentRect.height)).observe(r.current); }); return <div ref={r}>{h}</div>; }`;
-		expect(() => compile(tsx, '/src/A.tsx')).toThrow(LEAK);
+		expect(() => compile(tsx, '/src/A.tsrx')).toThrow(LEAK);
 		const ts = `"use strong";
 import { useState, useEffect } from 'octane';
 export function useWidth() { const [w, setW] = useState(0); useEffect(() => { window.addEventListener('resize', () => setW(window.innerWidth)); }); return w; }`;

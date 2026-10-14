@@ -279,8 +279,8 @@ describe('Strong mode nondeterministic render calls', () => {
 			'export default function() { return <div>{Date.now()}</div>; }',
 		],
 	])('enforces nondeterministic render calls in %s', (_label, source) => {
-		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
-		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(RENDER_IMPURE_CALL);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
 	});
 
 	it('does not treat shadowed memo utilities or lazy module loaders as component bodies', () => {
@@ -290,7 +290,7 @@ const memo = (callback) => callback;
 const App = memo(() => <div>{Date.now()}</div>);
 const Deferred = lazy(() => { Date.now(); return import('./Deferred'); });
 export function Controls() { return <button onClick={App}>Create preview</button>; }`;
-		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('keeps uppercase initialization and event helpers outside render', () => {
@@ -302,7 +302,7 @@ export function App() {
   const [time] = useState(InitialTime);
   return <button onClick={() => new Clock()}>{time}</button>;
 }`;
-		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each(['Date.now()', 'Math.random()', 'performance.now()', 'new Date()', 'Date()'])(
@@ -377,8 +377,8 @@ export function App() @{
 		const plain = '"use strong"; export function useClock() { return Date.now(); }';
 		const jsx = '"use strong"; export const App = () => <div>{Math.random()}</div>;';
 		expect(() => slotHooks(plain, '/src/useClock.ts')).toThrow(RENDER_IMPURE_CALL);
-		expect(() => compile(jsx, '/src/App.tsx')).toThrow(RENDER_IMPURE_CALL);
-		expect(compileToVolarMappings(jsx, '/src/App.tsx').diagnostics).toContainEqual(
+		expect(() => compile(jsx, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
+		expect(compileToVolarMappings(jsx, '/src/App.tsrx').diagnostics).toContainEqual(
 			expect.objectContaining({ code: RENDER_IMPURE_CALL, severity: 'error' }),
 		);
 	});
@@ -4209,7 +4209,7 @@ export function App() {
   return <button onClick={() => setCount(count + 1)}>{count}</button>;
 }`;
 
-		expect(() => compile(source, '/src/App.tsx')).toThrow(RENDER_STATE_UPDATE);
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
 	it('rejects random crypto calls in render but keeps other crypto methods opaque', () => {
@@ -4493,7 +4493,7 @@ export function App() {
 }`;
 
 		expect(() => slotHooks(hook, '/src/useValue.ts')).toThrow(RENDER_REF_READ);
-		expect(() => compile(component, '/src/App.tsx')).toThrow(RENDER_REF_READ);
+		expect(() => compile(component, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
 	});
 });
 
@@ -4697,7 +4697,7 @@ export function App() {
   return <p>{get()}</p>;
 }`;
 		expect(() => slotHooks(plain, '/src/useCurrent.ts')).toThrow(RENDER_STATE_GETTER_CALL);
-		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_STATE_GETTER_CALL);
+		expect(() => compile(tsx, '/src/App.tsrx')).toThrow(RENDER_STATE_GETTER_CALL);
 	});
 });
 
@@ -4971,8 +4971,8 @@ export function App(props) @{
 let revision = 0;
 function advance() { revision++; }
 export const App = ${wrapped};`;
-		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
-		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
 			RENDER_MODULE_STATE_READ,
 		);
 	});
@@ -5149,8 +5149,8 @@ export function App() @{
 let revision = (value) => value;
 function advance() { revision = (value) => value; }
 export function App() { ${declaration} return <p />; }`;
-		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
-		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
 			RENDER_MODULE_STATE_READ,
 		);
 	});
@@ -5214,7 +5214,7 @@ let revision = 0;
 function advance() { revision++; }
 export function App() { return <p>{revision}</p>; }`;
 		expect(() => slotHooks(plain, '/src/useRevision.ts')).toThrow(RENDER_MODULE_STATE_READ);
-		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_MODULE_STATE_READ);
+		expect(() => compile(tsx, '/src/App.tsrx')).toThrow(RENDER_MODULE_STATE_READ);
 	});
 });
 
@@ -5579,8 +5579,8 @@ export function App() @{
 		const tsx =
 			'/** @jsxImportSource octane */\n"use strong"; export function App() { return <p>{document.visibilityState}</p>; }';
 		expect(() => slotHooks(plain, '/src/useViewportWidth.ts')).toThrow(RENDER_AMBIENT_READ);
-		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_AMBIENT_READ);
-		expect(compileToVolarMappings(tsx, '/src/App.tsx').diagnostics).toContainEqual(
+		expect(() => compile(tsx, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+		expect(compileToVolarMappings(tsx, '/src/App.tsrx').diagnostics).toContainEqual(
 			expect.objectContaining({ code: RENDER_AMBIENT_READ, severity: 'error' }),
 		);
 	});

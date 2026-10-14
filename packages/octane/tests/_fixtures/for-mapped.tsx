@@ -1,6 +1,6 @@
 /** @jsxImportSource octane */
-'use strong';
-
+// The compatibility `.map()` counterpart of the Strong `@for` lists in
+// for-strong.tsrx. Strong mode does not compile `.tsx`.
 import type { SnapshotListProps } from './for-strong.tsrx';
 
 export function SnapshotMappedList({ items, prefix, onSelect }: SnapshotListProps) {

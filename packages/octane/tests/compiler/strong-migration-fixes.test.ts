@@ -11,7 +11,7 @@ type Diagnostic = {
 	suggestions?: Suggestion[];
 };
 
-function strong(source: string, filename = '/src/App.tsx') {
+function strong(source: string, filename = '/src/App.tsrx') {
 	const { diagnostics, error } = collectDiagnostics(`"use strong";\n${source}`, filename);
 	expect(error, String(error)).toBe(null);
 	return diagnostics as Diagnostic[];
@@ -73,7 +73,7 @@ describe("Strong migration guidance for React's lazy ref idiom", () => {
 		expect(fixed).toContain('const store = useLazyRef(() => new Store());');
 		expect(fixed).not.toContain('store.current = new Store()');
 		expect(fixed).not.toContain('??=');
-		expect(() => compile(fixed, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(fixed, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('parenthesizes an object literal factory body', () => {
@@ -255,18 +255,18 @@ describe('collectDiagnostics', () => {
 			['OCTANE_STRONG_RENDER_IMPURE_CALL', 3],
 			['OCTANE_STRONG_RENDER_IMPURE_CALL', 4],
 		]);
-		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsx')).toThrow(
+		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsrx')).toThrow(
 			/:3:\d+: \[OCTANE_STRONG_RENDER_IMPURE_CALL\]/,
 		);
 	});
 
 	it('applies the strong option to a module without the directive', () => {
-		const { diagnostics } = collectDiagnostics(CLOCK, '/src/App.tsx', { strong: true });
+		const { diagnostics } = collectDiagnostics(CLOCK, '/src/App.tsrx', { strong: true });
 		expect(diagnostics.map((diagnostic: Diagnostic) => diagnostic.code)).toEqual([
 			'OCTANE_STRONG_RENDER_IMPURE_CALL',
 			'OCTANE_STRONG_RENDER_IMPURE_CALL',
 		]);
-		expect(collectDiagnostics(CLOCK, '/src/App.tsx').diagnostics).toEqual([]);
+		expect(collectDiagnostics(CLOCK, '/src/App.tsrx').diagnostics).toEqual([]);
 	});
 
 	it('keeps compatibility-mode warnings and returns compile failures as the error', () => {
@@ -331,7 +331,7 @@ export function Loop({ value }) @{
 	});
 
 	it('links a thrown Strong error to its documentation', () => {
-		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsx')).toThrow(
+		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsrx')).toThrow(
 			'See https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call',
 		);
 	});

@@ -162,7 +162,7 @@ describe('Strong managed DOM writes through refs', () => {
 		],
 	])('rejects %s', (_label, write, element) => {
 		const source = effect(write, element, '{ label, on, html, color, extra, other }');
-		expectStrongError(source, '/src/App.tsx', MANAGED_DOM_WRITE);
+		expectStrongError(source, '/src/App.tsrx', MANAGED_DOM_WRITE);
 	});
 
 	it.each([
@@ -176,28 +176,28 @@ describe('Strong managed DOM writes through refs', () => {
 		['insertAdjacentHTML', "r.current.insertAdjacentHTML('beforeend', html);", '<div ref={r} />'],
 		['setHTMLUnsafe', 'r.current.setHTMLUnsafe(html);', '<div ref={r} />'],
 	])('rejects raw HTML through %s', (_label, write, element) => {
-		expectStrongError(effect(write, element), '/src/App.tsx', RAW_HTML_WRITE);
+		expectStrongError(effect(write, element), '/src/App.tsrx', RAW_HTML_WRITE);
 	});
 
 	it('names the replacement in each message', () => {
 		expect(
 			messageOf(
 				effect('r.current.innerHTML = html;', '<div ref={r} />'),
-				'/src/App.tsx',
+				'/src/App.tsrx',
 				RAW_HTML_WRITE,
 			),
 		).toContain('dangerouslySetInnerHTML={trustHTML(html)}');
 		expect(
 			messageOf(
 				effect('r.current.textContent = label;', '<p ref={r}>{label}</p>'),
-				'/src/App.tsx',
+				'/src/App.tsrx',
 				MANAGED_DOM_WRITE,
 			),
 		).toContain('Render the content as its children from state or props');
 		expect(
 			messageOf(
 				effect("r.current.className = 'on';", '<p ref={r} className="base" />'),
-				'/src/App.tsx',
+				'/src/App.tsrx',
 				MANAGED_DOM_WRITE,
 			),
 		).toContain("class={['base', active && 'active']}");
@@ -209,7 +209,7 @@ describe('Strong managed DOM writes through refs', () => {
   const r = useRef(null);
   return <p ref={r} onClick={() => { r.current.textContent = 'clicked'; }}>{label}</p>;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
 		);
 		expectStrongError(
@@ -218,14 +218,14 @@ describe('Strong managed DOM writes through refs', () => {
   useLayoutEffect(() => { r.current.classList.add(on ? 'on' : 'off'); });
   return <p ref={r} className="base" />;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
 		);
 		expectStrongError(
 			`export function App({ label }) {
   return <p ref={(element) => { if (element) element.textContent = label; }}>{label}</p>;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
 		);
 	});
@@ -250,7 +250,7 @@ describe('Strong managed DOM writes through refs', () => {
   ${useEffect}(() => { r.current.textContent = label; });
   return <p ref={r}>{label}</p>;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
 		);
 	});
@@ -321,15 +321,15 @@ describe('Strong managed DOM writes through refs', () => {
 	it('locates the write in compiler and editor diagnostics', () => {
 		const source = `"use strong";\n${effect('r.current.textContent = label;', '<p ref={r}>{label}</p>')}`;
 		const start = source.indexOf('r.current.textContent');
-		expect(errors(source, '/src/App.tsx')).toContainEqual(
+		expect(errors(source, '/src/App.tsrx')).toContainEqual(
 			expect.objectContaining({
 				code: MANAGED_DOM_WRITE,
 				start: expect.objectContaining({ offset: start }),
 				end: expect.objectContaining({ offset: start + 'r.current.textContent'.length }),
 			}),
 		);
-		expect(() => compile(source, '/src/App.tsx')).toThrow(
-			/App\.tsx:5:\d+: \[OCTANE_STRONG_MANAGED_DOM_WRITE\]/,
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(
+			/App\.tsrx:5:\d+: \[OCTANE_STRONG_MANAGED_DOM_WRITE\]/,
 		);
 	});
 
@@ -385,9 +385,9 @@ describe('Strong managed DOM writes through refs', () => {
 			'<div><p ref={r}>{label}</p><p ref={r}>{label}</p></div>',
 		],
 		[
-			'a ref attached in a mapped callback',
+			'a ref attached in a render callback',
 			'r.current.textContent = label;',
-			'<ul>{[1, 2].map((n) => <li key={n} ref={r}>{n}</li>)}</ul>',
+			'<Field render={(n) => <li ref={r}>{n}</li>} />',
 		],
 		[
 			'a ref whose target is reassigned',
@@ -423,7 +423,7 @@ describe('Strong managed DOM writes through refs', () => {
 		const source = `${effect(write, element, '{ label, on, color, other }')}
 function Field(props) { return <p>{props.children}</p>; }
 function measure(ref) { return ref; }`;
-		expectStrongValid(source, '/src/App.tsx');
+		expectStrongValid(source, '/src/App.tsrx');
 	});
 
 	it('does not prove a ref declared outside the @for row that attaches it', () => {
@@ -450,7 +450,7 @@ export function App({ label }) {
   useEffect(() => { r.current.textContent = label; });
   return <p ref={r}>{label}</p>;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 		const plain = `"use strong";
 import { useEffect } from 'octane';
@@ -467,8 +467,8 @@ export function useUppercase(ref, label) {
   return <div className="ticker"><span ref={r} /></div>;
 }`;
 		for (const mode of ['client', 'server'] as const) {
-			const standard = compile(source, '/src/Ticker.tsx', { mode });
-			const strong = compile(source, '/src/Ticker.tsx', { mode, strong: true } as any);
+			const standard = compile(source, '/src/Ticker.tsrx', { mode });
+			const strong = compile(source, '/src/Ticker.tsrx', { mode, strong: true } as any);
 			expect(strong.code).toBe(standard.code);
 			expect(strong.diagnostics).toEqual(standard.diagnostics);
 		}
@@ -502,7 +502,7 @@ describe('Strong queries for a component’s own markup', () => {
 		['globalThis.document', "globalThis.document.querySelector('#x')", '<input id="x" />'],
 		['optional calls', "document.getElementById?.('x')?.focus()", '<input id="x" />'],
 	])('rejects %s', (_label, call, element) => {
-		expectStrongError(query(call, element), '/src/App.tsx', OWN_MARKUP_QUERY);
+		expectStrongError(query(call, element), '/src/App.tsrx', OWN_MARKUP_QUERY);
 	});
 
 	it('follows document aliases, event handlers, and .tsrx @for rows', () => {
@@ -511,7 +511,7 @@ describe('Strong queries for a component’s own markup', () => {
 export function App() {
   return <button id="save" onClick={() => doc.getElementById('save').blur()}>Save</button>;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 			OWN_MARKUP_QUERY,
 		);
 		expectStrongError(
@@ -531,7 +531,7 @@ export function App() {
 	it('names a ref as the replacement', () => {
 		const message = messageOf(
 			query("document.getElementById('x').focus()", '<input id="x" />'),
-			'/src/App.tsx',
+			'/src/App.tsrx',
 			OWN_MARKUP_QUERY,
 		);
 		expect(message).toContain('ref={element}');
@@ -555,7 +555,7 @@ export function App() {
 		['dynamic ids', "document.getElementById('x')", '<input id={on} />'],
 		['element-scoped queries', "document.body.querySelector('#x')", '<input id="x" />'],
 	])('allows %s', (_label, call, element) => {
-		expectStrongValid(query(call, element), '/src/App.tsx');
+		expectStrongValid(query(call, element), '/src/App.tsrx');
 	});
 
 	it('scopes markup to one component and respects a shadowed document', () => {
@@ -569,7 +569,7 @@ export function Frame({ document }) {
   useEffect(() => { document.getElementById('x').focus(); });
   return <input id="x" />;
 }`,
-			'/src/App.tsx',
+			'/src/App.tsrx',
 		);
 	});
 });

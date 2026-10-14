@@ -498,8 +498,8 @@ describe('octane_strong_explain', () => {
 			expect(body).toContain(recipe.note);
 			expect(body).toContain(`https://octanejs.dev/docs/strong-mode#recipe-${id}`);
 			// The served sources carry the directive that makes the example Strong.
-			expect(body).toContain(`\`\`\`tsx\n"use strong";\n${recipe.before.trimEnd()}\n\`\`\``);
-			expect(body).toContain(`\`\`\`tsx\n"use strong";\n${recipe.after.trimEnd()}\n\`\`\``);
+			expect(body).toContain(`\`\`\`tsrx\n"use strong";\n${recipe.before.trimEnd()}\n\`\`\``);
+			expect(body).toContain(`\`\`\`tsrx\n"use strong";\n${recipe.after.trimEnd()}\n\`\`\``);
 		}
 	});
 

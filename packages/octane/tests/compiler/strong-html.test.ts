@@ -15,8 +15,8 @@ describe('Strong trusted HTML', () => {
 		'rejects raw HTML objects on DOM elements in %s',
 		(mode) => {
 			const source = `export function App() { return <div dangerouslySetInnerHTML={{ __html: '<b>raw</b>' }} />; }`;
-			expect(() => compile(source, 'app.tsx', { mode })).not.toThrow();
-			expect(() => compile(source, 'app.tsx', { mode, strong: true })).toThrow(CODE);
+			expect(() => compile(source, 'app.tsrx', { mode })).not.toThrow();
+			expect(() => compile(source, 'app.tsrx', { mode, strong: true })).toThrow(CODE);
 		},
 	);
 
@@ -29,7 +29,7 @@ describe('Strong trusted HTML', () => {
 		String.raw`<div {...{ 'dangerouslySetInner\x48TML': { __html: 'raw' } }} />`,
 	])('rejects a visible untrusted final HTML value: %s', (element) => {
 		expect(() =>
-			compile(`export function App(props) { return ${element}; }`, 'app.tsx', { strong: true }),
+			compile(`export function App(props) { return ${element}; }`, 'app.tsrx', { strong: true }),
 		).toThrow(CODE);
 	});
 
@@ -45,7 +45,7 @@ describe('Strong trusted HTML', () => {
 			expect(() =>
 				compile(
 					`import { trustHTML } from 'octane'; import { Child } from './child'; export function App(props) { return ${element}; }`,
-					'app.tsx',
+					'app.tsrx',
 					{ strong: true },
 				),
 			).not.toThrow();
@@ -65,49 +65,6 @@ describe('Strong trusted HTML', () => {
 		);
 		expect(result.diagnostics.filter((item: { code: string }) => item.code === CODE)).toEqual([]);
 		expect(result.code).toContain('@jsxImportSource @fixture/intrinsics');
-	});
-
-	it.each([
-		[
-			"import { createElement } from 'octane';",
-			"createElement('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })",
-		],
-		[
-			"import { createElement as h } from 'octane';",
-			"h('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })",
-		],
-		[
-			"import * as Octane from 'octane';",
-			"Octane['createElement']('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })",
-		],
-		[
-			String.raw`import { create\u0045lement as h } from 'octane';`,
-			"h('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })",
-		],
-		[
-			"import * as Octane from 'octane';",
-			String.raw`Octane['create\u0045lement']('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })`,
-		],
-		[
-			"import * as Octane from 'octane';",
-			String.raw`Octane['creat\eElement']('div', { dangerouslySetInnerHTML: { __html: 'raw' } })`,
-		],
-	])('rejects raw HTML in an Octane element factory', (imports, expression) => {
-		expect(() =>
-			compile(`${imports} export function App() { return ${expression}; }`, 'app.tsx', {
-				strong: true,
-			}),
-		).toThrow(CODE);
-	});
-
-	it('respects shadowed and foreign element factories and component props', () => {
-		for (const source of [
-			`import { createElement } from './factory'; export function App() { return createElement('div', { dangerouslySetInnerHTML: { __html: 'owned' } }); }`,
-			`import { createElement } from 'octane'; export function App(createElement) { return createElement('div', { dangerouslySetInnerHTML: { __html: 'owned' } }); }`,
-			`import * as Octane from 'octane'; export function App(Octane) { return Octane.createElement('div', { dangerouslySetInnerHTML: { __html: 'owned' } }); }`,
-			`import { createElement } from 'octane'; import { Child } from './child'; export function App() { return createElement(Child, { dangerouslySetInnerHTML: { __html: 'owned' } }); }`,
-		])
-			expect(() => compile(source, 'app.tsx', { strong: true })).not.toThrow();
 	});
 
 	it('keeps an authored line-comment pragma readable when selecting Strong JSX types', () => {

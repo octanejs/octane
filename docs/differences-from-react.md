@@ -343,7 +343,7 @@ stable live object safe across `memo`, an unchanged child boundary, or Strong
 memoization. The supported migration is to subscribe and select in compatibility
 code, then cross the Strong boundary with the selected value:
 
-```tsx
+```tsrx
 // SelectionBridge.tsrx — compatibility mode
 function SelectionBridge({ table, row }) @{
   <table.Subscribe
@@ -355,12 +355,12 @@ function SelectionBridge({ table, row }) @{
 }
 ```
 
-```tsx
+```tsrx
 // StrongSelectionRow.tsrx
 "use strong";
 
 function StrongSelectionRow({ label, selected }) @{
-  <li data-selected={selected ? '1' : '0'}>{label}</li>
+  <li data-selected={selected ? '1' : '0'}>{label as string}</li>
 }
 ```
 
@@ -413,7 +413,7 @@ An imported component renders that way only when both modules are Strong.
 Mutation of fresh render-local data is supported when it finishes before that
 data escapes. A plain JavaScript loop has normal sequential JavaScript semantics:
 
-```tsx
+```tsrx
 function Labels({ items }) @{
   const labels = [];
   for (const item of items) labels.push(item.label);
@@ -427,7 +427,7 @@ the row would make its output depend on which other rows happened to run and in
 what order. Strong reports that shape as
 `OCTANE_STRONG_RETAINED_ROW_MUTATION`:
 
-```tsx
+```tsrx
 let position = 0;
 @for (const item of items; key item.id) {
   position++; // Strong compile error: shared across retained rows.
@@ -439,7 +439,7 @@ Use setup to build a complete value before it escapes, keep mutable scratch data
 inside one row, or use the directive's index binding when position is the desired
 input:
 
-```tsx
+```tsrx
 @for (const item of items; index position; key item.id) {
   <li>{String(position + 1)}</li>
 }
@@ -561,8 +561,10 @@ The tuple also supports the same optional latest-value getter as `useState`.
 ## Optional Strong mode
 
 Strong modules infer effect dependencies and cache eligible declarations. They
-also require keyed template lists in `.tsrx` and branded HTML values. Standard keyed JSX
-mapping remains supported in `.tsx`. See the
+also require keyed `@for` lists and branded HTML values. Strong compiles `.tsrx`,
+`.ts`, and `.js` modules; a `.tsx` or `.jsx` module that it reaches reports
+`OCTANE_STRONG_TSX_MODULE`, because its JSX lowers to element descriptors
+instead of compiled templates. See the
 [Strong compiler checks and migration table](./strong-compiler-checks.md), and the
 [Strong mode guide](https://octanejs.dev/docs/strong-mode) for adopting it in an
 existing app.
@@ -571,14 +573,15 @@ Strong mode opts into the immutable render-snapshot contract above and adds
 compile-time checks for detectable violations. Opt into one module with a
 directive before its imports:
 
-```tsx
+```tsrx
 "use strong";
 
 import { useLinkedState } from 'octane';
 ```
 
 Alternatively, enable it across application-owned modules with
-`compiler: { strong: true }` in `octane.config.ts`. Installed dependencies stay
+`compiler: { strong: true }` in `octane.config.ts`, after converting the
+application's `.tsx` and `.jsx` modules to `.tsrx`. Installed dependencies stay
 in compatibility mode unless their own source opts in.
 
 A Strong module cannot call a state updater during render or synchronously while

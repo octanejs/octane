@@ -4,7 +4,7 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
 // Every Strong error the editor publishes for a module.
 function errors(source: string) {
-	return compileToVolarMappings(source, '/src/App.tsx', { strong: true })
+	return compileToVolarMappings(source, '/src/App.tsrx', { strong: true })
 		.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')
 		.map((diagnostic) => diagnostic.code);
 }
@@ -18,7 +18,7 @@ describe('Strong lazy ref factories and ownership', () => {
 						useLazyRef(() => { queueMicrotask(() => {}); return {}; });
 						return <div />;
 					}`;
-				expect(() => compile(source, '/src/App.tsx', { mode, dev, strong: true })).toThrow(
+				expect(() => compile(source, '/src/App.tsrx', { mode, dev, strong: true })).toThrow(
 					'OCTANE_STRONG_RENDER_SIDE_EFFECT',
 				);
 			});
@@ -28,7 +28,7 @@ describe('Strong lazy ref factories and ownership', () => {
 						useLazyRef(...[() => { queueMicrotask(() => {}); return {}; }]);
 						return <div />;
 					}`;
-				expect(() => compile(source, '/src/App.tsx', { mode, dev, strong: true })).toThrow(
+				expect(() => compile(source, '/src/App.tsrx', { mode, dev, strong: true })).toThrow(
 					'OCTANE_STRONG_RENDER_SIDE_EFFECT',
 				);
 			});
@@ -38,7 +38,7 @@ describe('Strong lazy ref factories and ownership', () => {
 	it('does not analyze an ordinary function-valued ref as an initializer', () => {
 		const source = `import { useRef } from 'octane';
 			export function App() { useRef(() => queueMicrotask(() => {})); return <div />; }`;
-		expect(() => compile(source, '/src/App.tsx', { strong: true })).not.toThrow();
+		expect(() => compile(source, '/src/App.tsrx', { strong: true })).not.toThrow();
 	});
 
 	it.each([
@@ -50,7 +50,7 @@ describe('Strong lazy ref factories and ownership', () => {
 		for (const hook of ['useState', 'useLazyRef']) {
 			const source = `import { ${hook} } from 'octane';
 				export function App() { ${hook}(() => { ${body} }); return <div />; }`;
-			expect(() => compile(source, '/src/App.tsx', { strong: true })).not.toThrow();
+			expect(() => compile(source, '/src/App.tsrx', { strong: true })).not.toThrow();
 		}
 	});
 
@@ -114,7 +114,7 @@ describe('Strong lazy ref factories and ownership', () => {
 		],
 	])('checks a synchronous factory through %s', (_, imports, call) => {
 		const source = `${imports} export function App() { ${call} return <div />; }`;
-		expect(() => compile(source, '/src/App.tsx', { strong: true })).toThrow(
+		expect(() => compile(source, '/src/App.tsrx', { strong: true })).toThrow(
 			'OCTANE_STRONG_RENDER_SIDE_EFFECT',
 		);
 	});
@@ -125,7 +125,7 @@ describe('Strong lazy ref factories and ownership', () => {
 	])('applies ref ownership to render-time %s', (_, action, diagnostic) => {
 		const source = `import { useLazyRef } from 'octane';
 			export function App() { const ref = useLazyRef(() => 1); ${action} return <div />; }`;
-		expect(() => compile(source, '/src/App.tsx', { strong: true })).toThrow(diagnostic);
+		expect(() => compile(source, '/src/App.tsrx', { strong: true })).toThrow(diagnostic);
 	});
 
 	it('permits value and element ref access in effects', () => {
