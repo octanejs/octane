@@ -1,4 +1,13 @@
-import { Activity, ErrorBoundary, createPortal, use, useLayoutEffect, useRef } from 'octane';
+import {
+	Activity,
+	ErrorBoundary,
+	createPortal,
+	startTransition,
+	use,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'octane';
 
 // One app that removes content through every structural slot kind: a branch
 // arm, a keyed component, keyed rows, a value hole, and a branch arm inside a
@@ -343,4 +352,44 @@ export function MappedApp(props: MappedProps) @{
 		</ul>
 		<Probe probe={props.probe} />
 	</main>
+}
+
+export interface ArmSwapControls {
+	move(): void;
+	setLocal(local: number): void;
+}
+
+function ArmSwapOwner(props: {
+	start: boolean;
+	step: number;
+	controls: ArmSwapControls;
+	probe: () => void;
+}) @{
+	const [local, setLocal] = useState(0);
+	props.controls.setLocal = setLocal;
+	const flipped = props.step === 1 && local === 0;
+	const on = props.start ? !flipped : flipped;
+	<div id="arm-swap">
+		@if (on) {
+			<b class="lone">{'lone'}</b>
+		}
+		<i>{'tail'}</i>
+		<Probe probe={props.probe} />
+	</div>
+}
+
+// One drain swaps the arm twice: the parent's urgent update flips it, and the
+// owner's transition after it flips it back, so the second swap replaces an
+// arm the same render swapped in.
+export function ArmSwapApp(props: {
+	start: boolean;
+	controls: ArmSwapControls;
+	probe: () => void;
+}) @{
+	const [step, setStep] = useState(0);
+	props.controls.move = () => {
+		setStep(1);
+		startTransition(() => props.controls.setLocal(1));
+	};
+	<ArmSwapOwner start={props.start} step={step} controls={props.controls} probe={props.probe} />
 }

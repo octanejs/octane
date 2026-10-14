@@ -4517,6 +4517,8 @@ interface SlotNext {
 	 * into `parent` before `before` (slotFrontier).
 	 */
 	frag: DocumentFragment | null;
+	/** A branch arm's lone root, rendered detached: commit inserts it as it would `frag`. */
+	root: Node | null;
 	parent: Node | null;
 	before: Node | null;
 	/** Blocks, lite stand-ins and try slots created directly in `frag`. */
@@ -4545,6 +4547,7 @@ function slotNext(slot: { next: SlotNext | null }): SlotNext {
 			tx,
 			out: [],
 			frag: null,
+			root: null,
 			parent: null,
 			before: null,
 			members: null,
@@ -4601,6 +4604,7 @@ function queueFrontier(owner: Block | null, parent: Node, before: Node | null): 
 		tx,
 		out: [],
 		frag: null,
+		root: null,
 		parent: null,
 		before: null,
 		members: null,
@@ -4698,6 +4702,16 @@ function applyNext(next: SlotNext): void {
 	}
 	applyOutgoing(out, parent);
 	const members = next.members;
+	const root = next.root;
+	if (root !== null) {
+		// A branch arm's detached root lands alone; nothing names a fragment.
+		if (next.owner!.disposed) return;
+		parent.insertBefore(root, before);
+		const bound = next.bound;
+		if (bound !== null)
+			replaceSharedBlockBoundary(bound[0], bound[1], bound[2], bound[3], bound[4]);
+		return;
+	}
 	// A deletion cleanup can unmount the slot's owner before its content lands.
 	if (members === null || next.owner!.disposed) return;
 	const frag = next.frag;
@@ -4953,6 +4967,7 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 		tx,
 		out: [],
 		frag: null,
+		root: null,
 		parent,
 		before: null,
 		members: [],
@@ -45065,6 +45080,7 @@ function swapBranchFrontier(
 	body: ComponentBody | null,
 	marker: string,
 	env: any[] | undefined,
+	lone: boolean | undefined,
 ): void {
 	const parentBlock = parentScope.block;
 	const transaction = ROOT_RENDER_TRANSACTION!;
@@ -45113,8 +45129,15 @@ function swapBranchFrontier(
 			last = null;
 		} else before = getNextSibling(last!);
 	}
-	const frag =
-		body !== null || fresh
+	// An earlier arm of this render that kept its root detached never landed.
+	if (fresh) state.next!.root = null;
+	// A markerless slot's arm that renders one template host keeps that root
+	// detached, as a committed list's fresh row does (DETACHED_ROOT): no
+	// fragment, no rehoming, and its commit inserts the root alone.
+	lone = lone === true && body !== null && !paired && !fresh;
+	const frag = lone
+		? null
+		: body !== null || fresh
 			? slotFrontier(state, parentBlock, domParent, before)
 			: state.next?.tx === transaction
 				? state.next.frag
@@ -45129,8 +45152,21 @@ function swapBranchFrontier(
 	if (body !== null) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
-		const end: Node = pairInFrag ? state.end! : frontierSentinel(frag!, '/' + marker);
-		arm = createBlock('control-flow', parentBlock, frag!, null, end, body, undefined, env);
+		const end: Node = lone
+			? (DETACHED_ROOT ?? newDetachedRoot())
+			: pairInFrag
+				? state.end!
+				: frontierSentinel(frag!, '/' + marker);
+		arm = createBlock(
+			'control-flow',
+			parentBlock,
+			frag ?? domParent,
+			null,
+			end,
+			body,
+			undefined,
+			env,
+		);
 		const retryLocation: SignalRetryLocation | undefined =
 			parentBlock.idState.renderOwner?.signalOwner === undefined
 				? undefined
@@ -45151,14 +45187,27 @@ function swapBranchFrontier(
 			// does, so its retry resumes this Block and its state.
 			if (old !== null || !isSuspenseException(error)) {
 				discardFrontierBlock(arm, parentBlock, error, retryLocation);
-				removeAfter(frag!, mark, pairInFrag ? end : null);
+				if (frag !== null) removeAfter(frag, mark, pairInFrag ? end : null);
 				throw error;
 			}
 			suspended = error;
 		}
 		if (owningBlock(parentBlock).disposed) return;
-		const content = mark === null ? getFirstChild(frag!) : getNextSibling(mark);
-		if (pairInFrag) {
+		const content =
+			frag === null ? null : mark === null ? getFirstChild(frag) : getNextSibling(mark);
+		if (lone) {
+			const landing = slotNext(state);
+			landing.parent = domParent;
+			landing.before = before;
+			landing.owner = owningBlock(parentBlock);
+			// commitBag self-marked the arm with its root, which lands at commit. A
+			// first arm that suspended before its root lands where its anchor is.
+			if (arm.endMarker !== end) landing.root = arm.startMarker;
+			else {
+				arm.endMarker = before;
+				pending = true;
+			}
+		} else if (pairInFrag) {
 			// The incoming arm borrows the pair this render built.
 			arm.startMarker = state.start;
 			arm.exclusiveMarkers = true;
@@ -45339,6 +45388,8 @@ function renderBranchSlot(
 	env?: any[],
 	// The compiler proved this arm hookless (ifBlock/switchBlock's lite mask).
 	lite?: boolean,
+	// The arm renders one template host (ifBlock's mask, switchBlock's roots).
+	lone?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
@@ -45350,7 +45401,7 @@ function renderBranchSlot(
 		)
 			__profileArm(true);
 		if (usesFrontier(parentBlock, domParent)) {
-			swapBranchFrontier(parentScope, slotKey, state, domParent, next, body, marker, env);
+			swapBranchFrontier(parentScope, slotKey, state, domParent, next, body, marker, env, lone);
 			return;
 		}
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
@@ -45667,7 +45718,8 @@ export function ifBlock(
 	anchor?: Node | null,
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
-	// Arms the compiler proved hookless: 1 for then, 2 for else (renderBranchSlot).
+	// Arms the compiler proved hookless: 1 for then, 2 for else (renderBranchSlot);
+	// 4 and 8 for each arm that renders one template host.
 	lite?: number,
 ): void {
 	// Evaluating this call's or an earlier slot's arguments can queue the
@@ -45740,6 +45792,7 @@ export function ifBlock(
 		'if',
 		env,
 		lite !== undefined && (lite & (next ? 1 : 2)) !== 0,
+		lite !== undefined && (lite & (next ? 4 : 8)) !== 0,
 	);
 }
 
@@ -46671,6 +46724,8 @@ export function switchBlock(
 	env?: any[],
 	// Arms the compiler proved hookless: bit 0 for the default, bit i + 1 for case i.
 	lite?: number,
+	// Arms that render one template host, in the same bits.
+	roots?: number,
 ): void {
 	// Leave the slot to a pending replay, as ifBlock does.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
@@ -46756,6 +46811,7 @@ export function switchBlock(
 		env,
 		// Only the first 30 cases have lite bits, and a shift count wraps at 32.
 		lite !== undefined && nextIdx < 30 && (lite & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
+		roots !== undefined && nextIdx < 30 && (roots & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
 	);
 }
 

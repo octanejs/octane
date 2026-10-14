@@ -29946,9 +29946,10 @@ function planJsx(
 		if (switchAnchor) trailing.push(switchAnchor);
 		else if (swEnv) trailing.push(undefinedNode());
 		if (swEnv) trailing.push(swEnv);
-		if (sc.liteMask) {
+		if (sc.liteMask || sc.rootMask) {
 			while (trailing.length < 2) trailing.push(undefinedNode());
 			trailing.push(b.literal(sc.liteMask));
+			if (sc.rootMask) trailing.push(b.literal(sc.rootMask));
 		}
 		pushAfterStmt(
 			sc.id,
@@ -34262,6 +34263,18 @@ function hoistBodyHelper(
 // ===========================================================================
 
 /**
+ * Whether a control-flow arm's only output is one template host element, as a
+ * direct-host row's is (isSsrMarkerlessForItem): a swap over committed DOM can
+ * keep that element detached until its commit inserts it (ifBlock's mask bits
+ * 4 and 8, switchBlock's root mask).
+ */
+function controlFlowArmIsSingleRoot(stmts) {
+	if (armMayExit(stmts)) return false;
+	const output = stmts.filter((s) => isJsxNode(s));
+	return output.length === 1 && isSingleTemplateHost(output[0]);
+}
+
+/**
  * Whether a control-flow arm may render without a Block of its own (the lite
  * mask ifBlock and switchBlock take). Mirrors componentSlotLite's proof,
  * tightened for arms: no hook, `use` or context read; no @try; and no call
@@ -34391,10 +34404,13 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
-		// ifBlock's lite mask: 1 when the then arm is hookless, 2 when the else arm is.
+		// ifBlock's arm mask: 1 when the then arm is hookless, 2 when the else arm
+		// is; 4 and 8 when each renders one template host (controlFlowArmIsSingleRoot).
 		liteMask:
 			(thenStmts !== null && controlFlowArmIsLite(thenStmts) ? 1 : 0) |
-			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0),
+			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0) |
+			(thenStmts !== null && controlFlowArmIsSingleRoot(thenStmts) ? 4 : 0) |
+			(elseStmts !== null && controlFlowArmIsSingleRoot(elseStmts) ? 8 : 0),
 		// `@else`'s own keyword — the clause is a BlockStatement starting at `{`.
 		alternateKeyword: node.alternateKeyword ?? null,
 		hostPath: null,
@@ -35556,12 +35572,17 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
 	);
 	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
+	// Its root mask marks the arms that render one template host the same way.
 	let liteMask = 0;
+	let rootMask = 0;
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
-		if ((isDefault || caseRecords.length < 30) && stmts.length > 0 && controlFlowArmIsLite(stmts))
-			liteMask |= isDefault ? 1 : 2 << caseRecords.length;
+		const bit = isDefault ? 1 : 2 << caseRecords.length;
+		if ((isDefault || caseRecords.length < 30) && stmts.length > 0) {
+			if (controlFlowArmIsLite(stmts)) liteMask |= bit;
+			if (controlFlowArmIsSingleRoot(stmts)) rootMask |= bit;
+		}
 		const helperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -35606,6 +35627,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		defaultHelper,
 		defaultKeyword,
 		liteMask,
+		rootMask,
 		hostPath: null,
 	};
 }

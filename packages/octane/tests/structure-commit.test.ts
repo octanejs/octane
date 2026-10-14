@@ -3,6 +3,8 @@ import { createElement, createRoot, flushSync, startTransition, use } from '../s
 import { act, mount, type MountResult } from './_helpers';
 import {
 	ActivityApp,
+	ArmSwapApp,
+	type ArmSwapControls,
 	BoundaryArmsApp,
 	BranchProbeApp,
 	LateBoundaryApp,
@@ -903,6 +905,62 @@ function ProbeChip(props: { probe: () => void }) {
 	props.probe();
 	return createElement('mark', { id: 'in' }, 'chip in');
 }
+
+describe('a one-host arm lands at commit', () => {
+	it('renders a swapped-in arm detached and inserts its root at commit', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const controls = {} as ArmSwapControls;
+		let during: MutationRecord[] | null = null;
+		const observer = new MutationObserver(() => {});
+		const probe = () => {
+			during = observer.takeRecords();
+		};
+		try {
+			flushSync(() => root.render(ArmSwapApp, { start: false, controls, probe }));
+			const owner = container.querySelector('#arm-swap')!;
+			const tail = owner.querySelector('i');
+			observer.observe(container, { childList: true, subtree: true, attributes: true });
+			flushSync(() => root.render(ArmSwapApp, { start: true, controls, probe }));
+			// The probe renders after the arm: nothing had touched the DOM.
+			expect(during).toEqual([]);
+			expect([...owner.children].map((el) => el.localName)).toEqual(['b', 'i', 'u']);
+			expect(owner.querySelector('i')).toBe(tail);
+			// The commit's own insert.
+			observer.takeRecords();
+			flushSync(() => root.render(ArmSwapApp, { start: false, controls, probe }));
+			expect(during).toEqual([]);
+			expect([...owner.children].map((el) => el.localName)).toEqual(['i', 'u']);
+		} finally {
+			observer.disconnect();
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	for (const start of [false, true]) {
+		it(`drops an arm that a later swap of the same render replaced (starting ${start ? 'on' : 'off'})`, async () => {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const root = createRoot(container);
+			const controls = {} as ArmSwapControls;
+			const probe = () => {};
+			try {
+				flushSync(() => root.render(ArmSwapApp, { start, controls, probe }));
+				const shown = () =>
+					[...container.querySelector('#arm-swap')!.children].map((el) => el.localName);
+				expect(shown()).toEqual(start ? ['b', 'i', 'u'] : ['i', 'u']);
+				await act(() => controls.move());
+				expect(shown()).toEqual(start ? ['b', 'i', 'u'] : ['i', 'u']);
+				expect(container.querySelectorAll('.lone')).toHaveLength(start ? 1 : 0);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		});
+	}
+});
 
 describe('de-opt markers change at commit', () => {
 	it('renders a mapped host row that becomes a component against the pair its commit lands', () => {
