@@ -4317,26 +4317,14 @@ function journalRootProperty(target: object, key: PropertyKey, oldValue: unknown
 	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, oldValue);
 }
 
-/** Save only a structurally changed slot and its exact, shallow sibling range. */
-function journalRootSlot(
-	state: object,
-	parent: Node,
-	before: Node | null,
-	after: Node | null,
-): void {
+/**
+ * Save a structurally changed slot's record. Its DOM changes at commit, or in
+ * DOM the render created (#2043), so a dropped render left the range as it was.
+ */
+function journalRootSlot(state: object): void {
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
 		return;
-	const seen = TRANSITION_JOURNAL_BAGS!;
-	const at = seen.get(state) ?? -1;
-	// `seen` holds the snapshot's log index, plus one when the range was taken
-	// with it. A plain snapshot (journalObjectOnce) has no range, so take
-	// another with one; replay restores the older snapshot last.
-	if (at >= TRANSITION_JOURNAL_CHECKPOINT && (at & 1) !== 0) return;
-	seen.set(state, TRANSITION_JOURNAL!.length + 1);
-	TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
-	// Strict adoption prepares scopes, never an undo of the early owner's live DOM.
-	if (!hydrationStarted || PRESENTATION_HYDRATION?.revision === undefined)
-		journalRootRange(parent, before, after);
+	journalObjectOnce(state);
 }
 
 /** `parent`'s children after `before` (or from its first) up to, not including, `after`. */
@@ -12907,12 +12895,7 @@ function disposeReturnSlot(block: Block, state: any, out?: any[]): void {
 					: borrowed
 						? end.previousSibling
 						: (end ?? arm?.endMarker ?? first);
-		journalRootSlot(
-			state,
-			parent,
-			borrowed ? state.start : first !== null ? first.previousSibling : parent.lastChild,
-			borrowed ? end : (last?.nextSibling ?? null),
-		);
+		journalObjectOnce(state);
 		const retiredBlock = state.block ?? state.portal?.block ?? state.lite?.block;
 		if (retiredBlock != null) retireRootBlock(retiredBlock);
 		if (state.forSlot != null) {
@@ -23935,7 +23918,6 @@ export function setText(node: Text | null, value: any, host?: Node): void {
  * node stays valid.
  */
 function resetOnlyChildHost(host: Node, node: Text | null): void {
-	if (ROOT_RENDER_TRANSACTION !== null) journalRootRange(host, null, null);
 	const view = host;
 	view.textContent = '';
 	if (node !== null) view.appendChild(node);
@@ -24889,10 +24871,7 @@ export function setScriptText(el: Element, value: any): void {
 	if (first !== null && first === el.lastChild && first.nodeType === 3) {
 		updateTextValue(first as Text, text);
 	} else {
-		if (ROOT_RENDER_TRANSACTION !== null) {
-			journalBag();
-			journalRootRange(el, null, null);
-		}
+		if (ROOT_RENDER_TRANSACTION !== null) journalBag();
 		el.textContent = text;
 	}
 }
@@ -28364,13 +28343,7 @@ function applyHeadProps(
 	}
 	if (text != null || tag === 'title') {
 		const t = text == null ? '' : String(text);
-		if (el.textContent !== t) {
-			// textContent replaces child nodes, even when only the text changes.
-			// Retain their identity when a later sibling suspends and this visible
-			// head entry belongs to the held transition boundary.
-			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
-			el.textContent = t;
-		}
+		if (el.textContent !== t) el.textContent = t;
 	}
 }
 
@@ -33749,33 +33722,7 @@ function componentSlotImpl(
 	const replacing = identity !== state.currentComp || keyChanged;
 	const journaledSlot = ROOT_RENDER_TRANSACTION !== null && state.block !== null && replacing;
 	const frontier = journaledSlot && usesFrontier(parentBlock, domParent);
-	if (frontier) journalObjectOnce(state);
-	else if (journaledSlot) {
-		// Owned component markers belong to the replaced range; inherited markers
-		// do not. A self-marked component takes its range from its live Block.
-		if (state.inherited) {
-			journalRootSlot(state, domParent, state.start, state.end);
-		} else {
-			const first = state.start ?? state.block!.startMarker;
-			const last = state.end ?? state.block!.endMarker;
-			if (
-				first !== null &&
-				last !== null &&
-				first.parentNode === domParent &&
-				last.parentNode === domParent
-			) {
-				journalRootSlot(state, domParent, first.previousSibling, getNextSibling(last));
-			} else {
-				const after = state.anchor;
-				journalRootSlot(
-					state,
-					domParent,
-					after === null ? domParent.lastChild : after.previousSibling,
-					after,
-				);
-			}
-		}
-	}
+	if (journaledSlot) journalRootSlot(state);
 	if ((hasKey === true || key !== undefined) && !state.keyed) {
 		if (!journaledSlot) journalRootProperty(state, 'keyed', state.keyed);
 		state.keyed = true;
@@ -34450,7 +34397,7 @@ function clearChildContent(state: ChildSlot): void {
 			state.block?.parentNode ??
 			null;
 		if (parent !== null) {
-			journalRootChildShape(state, parent);
+			journalRootChildShape(state);
 			let first =
 				state.ownerHost !== null || (state.borrowed && state.start === null)
 					? getFirstChild(parent)
@@ -35539,10 +35486,7 @@ function reconcileDeoptChildren(
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				if (defer) built.push(node);
-				else {
-					if (journal) journalRootChildren(el);
-					el.appendChild(node);
-				}
+				else el.appendChild(node);
 			}
 		}
 		return built.length !== 0 ? built : null;
@@ -35678,7 +35622,6 @@ function reconcileDeoptChildren(
 					n,
 				);
 			if (defer || journal) {
-				if (!defer) journalRootChildren(el);
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
@@ -35707,7 +35650,6 @@ function reconcileDeoptChildren(
 		result,
 		hasForeign || singleton,
 		hydrationOwnsUnstamped === true && !singleton,
-		journal === true,
 	);
 	return null;
 }
@@ -35798,7 +35740,7 @@ function applyDeoptOrder(order: DeoptOrder): void {
 	}
 	if (order.desc !== null) commitInScope(order.owner!, commitDeoptHost, node, order.desc);
 	// Foreign ranges among the children stay where they are.
-	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false, false);
+	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false);
 }
 
 /**
@@ -35834,19 +35776,12 @@ function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): 
  * insertion; foreign ranges also must not make every survivor rescan the
  * preceding siblings.
  */
-function placeDeoptChildren(
-	el: Element,
-	result: Node[],
-	skip: boolean,
-	adopt: boolean,
-	journal: boolean,
-): void {
+function placeDeoptChildren(el: Element, result: Node[], skip: boolean, adopt: boolean): void {
 	let cursor: Node | null = getFirstChild(el);
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
 		const at = skip ? nextDeoptOwnedChild(cursor, adopt) : cursor;
 		if (at !== want) {
-			if (journal) journalRootChildren(el);
 			if (renderingFocus === null) el.insertBefore(want, at);
 			else {
 				captureFocusedMovement(el, renderingFocus);
@@ -36003,7 +35938,6 @@ function deoptItemBody(item: any, scope: Scope): void {
 				transfer = stale;
 			} else if (stale.parentNode === block.parentNode) {
 				if (ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(block.parentNode, stale.previousSibling, getNextSibling(stale));
 					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 				} else {
 					detachDeoptTreeRefs(stale, null);
@@ -36112,16 +36046,6 @@ function deoptItemBody(item: any, scope: Scope): void {
 			// insert would throw. Committed DOM takes it at commit, from a frontier.
 			const attached = host === parent;
 			const frontier = usesFrontier(block, parent);
-			if (
-				ROOT_RENDER_TRANSACTION !== null &&
-				!frontier &&
-				(attached || (node !== null && block.mounted))
-			)
-				journalRootRange(
-					parent,
-					attached ? prev!.previousSibling : (endM?.previousSibling ?? parent.lastChild),
-					attached ? getNextSibling(prev!) : endM,
-				);
 			if (node !== null) {
 				const before = attached ? prev : endM;
 				if (frontier) {
@@ -36491,10 +36415,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		const frontier = el !== null && usesFrontier(block, parent);
 		if (el !== null) {
 			const retired = el;
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				if (!frontier) journalRootRange(parent, retired.previousSibling, getNextSibling(retired));
-				journalRootProperty(block, 'deoptNode', block.deoptNode);
-			}
+			journalRootProperty(block, 'deoptNode', block.deoptNode);
 			// This Block keeps rendering, so the replaced element retires on its own,
 			// before its children leave it and can take focus with them.
 			if (ROOT_RENDER_TRANSACTION !== null)
@@ -37108,34 +37029,13 @@ export function mapSlot(
 // List-only reconciliation is separate from childSlot's text/function path so
 // its first-use compilation can remain deferred until a list value reaches it.
 // Slot registration and upgrade ownership have already been established.
-function journalRootChildShape(state: ChildSlot, parent: Node): void {
+function journalRootChildShape(state: ChildSlot): void {
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
 		return;
 	// Compiled holes cache their input after this helper returns. A structural
 	// clear can be the parent's only binding write, so restore that cache too.
 	journalBag();
-	if (state.ownerHost !== null) {
-		journalRootSlot(state, state.ownerHost, null, null);
-	} else if (state.start !== null) {
-		journalRootSlot(
-			state,
-			parent,
-			state.borrowed ? state.start : state.start.previousSibling,
-			state.borrowed ? state.end : (state.end?.nextSibling ?? null),
-		);
-	} else if (state.borrowed && state.block !== null && state.block.startMarker === null) {
-		journalRootSlot(state, parent, null, state.end);
-	} else {
-		const first = state.text ?? state.hostNode ?? state.block?.startMarker ?? state.end;
-		const last = state.end ?? state.block?.endMarker ?? first;
-		const after = last?.nextSibling ?? null;
-		journalRootSlot(
-			state,
-			parent,
-			first !== null ? first.previousSibling : parent.lastChild,
-			after,
-		);
-	}
+	journalObjectOnce(state);
 }
 
 function renderPreparedChildList(
@@ -37995,7 +37895,7 @@ export function childSlot(
 			state.portal === null &&
 			(state.text === null) === (text === '');
 		if (!unchangedList && !unchangedComponent && !unchangedHost && !unchangedText) {
-			journalRootChildShape(state, domParent);
+			journalRootChildShape(state);
 			rootShapeChanged = true;
 		}
 	}
@@ -38057,18 +37957,9 @@ export function childSlot(
 			parentScope.mounted &&
 			!isCreatedInRootRender(transaction, parentBlock)
 		) {
-			// A stable component may have returned undefined until now, so no
-			// previous slot owns this first insertion. Keep the original anchor
-			// outside the undo range; newly minted markers/raw DOM belong inside.
+			// A stable component may have returned undefined until now: its first
+			// slot's hole cache.
 			journalBag();
-			const after = ownsHost === undefined ? (anchor ?? null) : null;
-			const before =
-				ownsHost === undefined
-					? after === null
-						? domParent.lastChild
-						: after.previousSibling
-					: null;
-			journalRootRange(domParent, before, after);
 		}
 		let start: Comment | null;
 		let end: Comment | null;
@@ -38403,7 +38294,7 @@ export function childSlot(
 						// Over committed DOM, the new node waits in the slot's frontier and
 						// takes the old one's place at commit.
 						if (parent !== null) {
-							journalRootChildShape(state, parent);
+							journalRootChildShape(state);
 							const pending = slotNext(state);
 							pending.out.push(() => detachDeoptTreeRefs(prev!, null), prev, prev);
 							pending.follows = true;
@@ -38414,7 +38305,7 @@ export function childSlot(
 						}
 					} else if (parent !== null) {
 						if (ROOT_RENDER_TRANSACTION !== null) {
-							journalRootChildShape(state, parent);
+							journalRootChildShape(state);
 							queueRootDeletion(() => detachDeoptTreeRefs(prev!, null), prev, prev);
 							if (node !== null) parent.insertBefore(node, prev);
 						} else {
@@ -38441,7 +38332,7 @@ export function childSlot(
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
 					if (ROOT_RENDER_TRANSACTION !== null) {
-						journalRootChildShape(state, domParent);
+						journalRootChildShape(state);
 						const outgoing = prev;
 						queueRootDeletion(() => detachDeoptTreeRefs(outgoing, null), prev, prev);
 					} else {
@@ -38884,7 +38775,7 @@ export function textSlot(
 		return;
 	}
 	if (str === '') return;
-	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state, domParent);
+	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state);
 	insertSlotText(state, parentScope.block, domParent, str);
 }
 
@@ -39172,7 +39063,6 @@ export function childTextHole(
 	}
 	if (ROOT_RENDER_TRANSACTION !== null && state === undefined && parentScope.mounted) {
 		journalBag();
-		journalRootRange(domParent, null, null);
 		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 	}
 	// `null` is a primitive here too: ssrChildText serializes every empty value
@@ -40415,20 +40305,13 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 /**
  * Detached retry/error callbacks still publish through the owning root journal.
  * Their arms build off-document (insertArmPair), so a dropped render restores
- * only the slot's record; hydration, which writes the server range in place,
- * restores that range too.
+ * only the slot's record.
  */
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
-	if (
-		hydrating &&
-		state.start.parentNode === state.domParent &&
-		state.end.parentNode === state.domParent
-	)
-		journalRootSlot(state, state.domParent, state.start, state.end);
-	else if (frame === null) journalObjectOnce(state);
+	if (frame === null) journalObjectOnce(state);
 	else {
 		// A frame of its own opens a window nothing has snapshotted in yet: one
 		// snapshot per resume, with no lookup.
@@ -45130,50 +45013,8 @@ function renderBranchSlot(
 			swapBranchFrontier(parentScope, slotKey, state, domParent, next, body, marker, env, lone);
 			return;
 		}
-		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
-			// A lite arm's stand-in carries the bound an arm Block would.
-			const previousBlock = state.block ?? state.lite?.block ?? null;
-			if (state.unfinalized && previousBlock !== null) {
-				// A client arm without a bound owns only its own range before its
-				// anchor; the content in front of that belongs to its siblings.
-				journalRootSlot(
-					state,
-					domParent,
-					pendingArmBefore(previousBlock, domParent),
-					previousBlock.endMarker,
-				);
-			} else if (state.start !== null) {
-				// An owned pair can itself be replaced by an explicit boundary's
-				// completed WIP; borrowed parent markers stay outside this range.
-				journalRootSlot(
-					state,
-					domParent,
-					state.borrowed ? state.start : state.start.previousSibling,
-					state.borrowed ? state.end : (state.end?.nextSibling ?? null),
-				);
-			} else if (state.borrowed && previousBlock?.startMarker == null) {
-				journalRootSlot(state, domParent, null, null);
-			} else {
-				const first = previousBlock?.startMarker ?? null;
-				const last = previousBlock?.endMarker ?? null;
-				if (
-					first !== null &&
-					last !== null &&
-					first.parentNode === domParent &&
-					last.parentNode === domParent
-				) {
-					journalRootSlot(state, domParent, first.previousSibling, getNextSibling(last));
-				} else {
-					const after = state.anchor;
-					journalRootSlot(
-						state,
-						domParent,
-						after === null ? domParent.lastChild : after.previousSibling,
-						after,
-					);
-				}
-			}
-		}
+		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null))
+			journalRootSlot(state);
 		let provisionalAfter: Node | null = null;
 		if (state.unfinalized && state.block !== null) {
 			// The first arm suspended before it could publish a stable boundary. Its
