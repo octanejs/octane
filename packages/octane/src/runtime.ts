@@ -40864,22 +40864,13 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
  * supersedes leaves the fragment with its own unmount. Hydration and a
  * boundary this render created write in place.
  */
-function insertArmPair(
-	state: TrySlot | ErrorSlot,
-	start: Node,
-	end: Node,
-	before: Node,
-	// The end of a body that borrowed the boundary's range, which lands before
-	// this arm (mountPendingBody).
-	bound: Node | null = null,
-): Node {
+function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
 	const live = before.parentNode!;
 	const parent =
 		live === state.domParent && usesFrontier(state.parentBlock, live)
 			? slotFrontier(state, state.parentBlock, live, before)
 			: live;
 	const at = parent === live ? before : null;
-	if (bound !== null) parent.insertBefore(bound, at);
 	parent.insertBefore(start, at);
 	parent.insertBefore(end, at);
 	return parent;
@@ -42244,15 +42235,9 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
  * are handled separately by hideTryContentAndMountPending. Focus remains owned by
  * the connected hidden host, matching React DOM's hideInstance behavior.
  */
-function hideBlockHostRange(
-	block: Block,
-	hidden: SuspenseHiddenDom,
-	// The boundary's end, which also bounds a body whose own end lands with
-	// the arm this hide shows (mountPendingBody).
-	limit: Node | null = null,
-): void {
+function hideBlockHostRange(block: Block, hidden: SuspenseHiddenDom): void {
 	let node = getNextSibling(block.startMarker!) as ChildNode | null;
-	while (node !== null && node !== block.endMarker && node !== limit) {
+	while (node !== null && node !== block.endMarker) {
 		if (node.nodeType === 1) {
 			const el = node as HTMLElement;
 			if (!hidden.displays.has(el)) {
@@ -42293,13 +42278,19 @@ function hideTryBlock(state: TrySlot): void {
 		texts: new Set(),
 		active: true,
 	};
+	// A body that hydrated borrows the boundary's range (armRange). The commit
+	// that hides it gives it a range of its own first, so the arm that shows
+	// beside it lies outside the body.
+	const owns = hydrationStarted ? block.startMarker === state.start : false;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 		journalRootProperty(state, 'hiddenDom', null);
 		state.hiddenDom = hidden;
+		if (owns) transaction.ops.push(ownTryBodyRange, state);
 		transaction.ops.push(rehideTryBlock, state);
 		return;
 	}
+	if (owns) ownTryBodyRange(state);
 	state.hiddenDom = hidden;
 	if (TRANSITION_JOURNAL !== null) {
 		journalUndo(() => {
@@ -42307,15 +42298,39 @@ function hideTryBlock(state: TrySlot): void {
 			releaseTryHide(hidden);
 		});
 	}
-	hideBlockHostRange(block, hidden, state.end);
+	hideBlockHostRange(block, hidden);
 	hideSuspensePortalRanges(block, hidden);
+}
+
+/**
+ * Give a body that borrows its boundary's range a pair of its own around its
+ * content, as a client mount's body has. The arm beside it may have landed
+ * already, before the boundary's end.
+ */
+function ownTryBodyRange(state: TrySlot): void {
+	const block = state.tryBlock;
+	if (block === null || block.disposed || block.startMarker !== state.start) return;
+	const parent = state.start.parentNode!;
+	const arm = state.block;
+	const start = document.createComment('try-b');
+	const end = document.createComment('/try-b');
+	parent.insertBefore(start, getNextSibling(state.start));
+	parent.insertBefore(
+		end,
+		arm !== null && arm !== block && arm.startMarker?.parentNode === parent
+			? arm.startMarker
+			: state.end,
+	);
+	block.startMarker = start;
+	block.endMarker = end;
+	block.exclusiveMarkers = false;
 }
 
 function rehideTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	const block = state.tryBlock;
 	if (hidden === null || !hidden.active || block === null || block.disposed) return;
-	hideBlockHostRange(block, hidden, state.end);
+	hideBlockHostRange(block, hidden);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42701,19 +42716,10 @@ function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = document.createComment('pend-b');
 		const bEnd = document.createComment('/pend-b');
-		// A body that hydrated borrows the boundary's range (armRange). The first
-		// arm beside it mints the body's own end, which lands with the arm.
-		let bound: Comment | null = null;
-		const kept = hydrationStarted ? state.tryBlock : null;
-		if (kept !== null && kept.endMarker === state.end) {
-			bound = document.createComment('/try-b');
-			journalRootProperty(kept, 'endMarker', state.end);
-			kept.endMarker = bound;
-		}
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
-			insertArmPair(state, bStart, bEnd, state.end, bound),
+			insertArmPair(state, bStart, bEnd, state.end),
 			bStart,
 			bEnd,
 			state.pendingBody,

@@ -933,6 +933,22 @@ const STATES_SOURCE = `
 			<Tail />
 		</main>
 	}
+
+	export function CatchingStates(props) @{
+		<main>
+			<header id="states-before">{'before' as string}</header>
+			@try {
+				const value = use(props.value);
+				if (value === 'boom') throw new Error('boom');
+				<p id="states-content">{value as string}</p>
+			} @pending {
+				<i id="states-fallback">{'loading' as string}</i>
+			} @catch (error) {
+				<b id="states-error">{(error as Error).message as string}</b>
+			}
+			<Tail />
+		</main>
+	}
 `;
 
 describe.each([true, false])('a Suspense boundary in each server state (dev=%s)', (dev) => {
@@ -1023,7 +1039,7 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 			expect(container.querySelectorAll('#states-fallback')).toHaveLength(1);
 
 			await act(async () => resolve(label));
-			expect(container.querySelector('#states-fallback')).toBeNull();
+			await vi.waitFor(() => expect(container.querySelector('#states-fallback')).toBeNull());
 			expect(container.querySelector('#states-content')).toBe(content);
 			expect(content.textContent).toBe(label);
 			expect(content.style.display).toBe('');
@@ -1047,21 +1063,58 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 			let resolve!: (value: string) => void;
 			const value = new Promise<string>((done) => (resolve = done));
 			await act(() => startTransition(() => root.render(statesClient.BoundaryStates, { value })));
-			expect(container.querySelector('#states-fallback')).toBeNull();
-			await act(() => new Promise((done) => setTimeout(done, 10)));
+			await vi.waitFor(() => expect(container.querySelector('#states-fallback')).not.toBeNull());
 			const fallback = container.querySelector<HTMLElement>('#states-fallback')!;
 			expect(fallback.style.display).toBe('');
 			expect(content.style.display).toBe('none');
 			expect(after.style.display).toBe('');
 
 			await act(async () => resolve('late'));
-			expect(container.querySelector('#states-fallback')).toBeNull();
+			// A revealed retry may wait out the fallback's throttle window.
+			await vi.waitFor(() => expect(container.querySelector('#states-fallback')).toBeNull());
 			expect(container.querySelector('#states-content')).toBe(content);
 			expect(content.textContent).toBe('late');
 			expect(content.style.display).toBe('');
 		} finally {
 			setTransitionFallbackTimeout(Infinity);
 		}
+		expect(recoverable).toEqual([]);
+		root.unmount();
+	});
+
+	it('replaces what a hydrated boundary showed when its content then throws', async () => {
+		container.innerHTML = (
+			await prerender(statesServer.CatchingStates, { value: Promise.resolve('server') })
+		).html;
+		const before = container.querySelector('#states-before')!;
+		const recoverable: string[] = [];
+		const root = hydrateRoot(
+			container,
+			statesClient.CatchingStates,
+			{ value: new Promise<string>(() => {}) },
+			{ onRecoverableError: (error) => recoverable.push((error as Error).message) },
+		);
+		await act(async () => {});
+		const after = container.querySelector('#states-after')!;
+
+		let resolve!: (value: string) => void;
+		const value = new Promise<string>((done) => (resolve = done));
+		await act(() => root.render(statesClient.CatchingStates, { value }));
+		expect(container.querySelector('#states-fallback')).not.toBeNull();
+		// Everything the boundary showed: the hidden content, the fallback, and
+		// whatever separates them, between its opening node and the closing one
+		// before the next component's.
+		const close = after.previousSibling!.previousSibling;
+		const shown: Node[] = [];
+		for (let node = before.nextSibling!.nextSibling; node !== close; node = node!.nextSibling)
+			shown.push(node!);
+
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		await act(async () => resolve('boom'));
+		await vi.waitFor(() => expect(container.querySelector('#states-error')).not.toBeNull());
+		errors.mockRestore();
+		expect(container.querySelector('#states-error')!.textContent).toBe('boom');
+		expect(shown.filter((node) => node.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([]);
 		root.unmount();
 	});

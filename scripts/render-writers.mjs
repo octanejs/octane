@@ -32,6 +32,7 @@ export const WRITERS = new Map(
 		drainQueuedControlledSyncs: 'commit',
 		placeDeoptChildren: 'commit',
 		insertArmPair: 'commit',
+		ownTryBodyRange: 'commit',
 		removeRange: 'commit',
 		queueOwnedListClear: 'commit',
 		clearItems: 'commit',
