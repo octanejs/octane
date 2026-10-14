@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "MDX for the octane renderer — compiles .mdx/.md through @mdx-js/mdx to JSX source and then through octane/compiler, so documents render as real compiled octane components (templates, not runtime descriptors); ships the @mdx-js/react provider layer (MDXProvider/useMDXComponents) ported onto octane context.",
+  "description": "MDX for the octane renderer \u2014 compiles .mdx/.md through @mdx-js/mdx to JSX source and then through octane/compiler, so documents render as real compiled octane components (templates, not runtime descriptors); ships the @mdx-js/react provider layer (MDXProvider/useMDXComponents) ported onto octane context.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -26,17 +26,23 @@
     "url": "git+https://github.com/octanejs/octane.git",
     "directory": "packages/mdx"
   },
-  "main": "src/index.ts",
-  "module": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "src/index.tsrx",
+  "module": "src/index.tsrx",
+  "types": "src/index.tsrx.d.ts",
   "files": [
     "src",
     "types",
     "README.md"
   ],
   "exports": {
-    ".": "./src/index.ts",
-    "./server": "./src/server.ts",
+    ".": {
+      "types": "./src/index.tsrx.d.ts",
+      "default": "./src/index.tsrx"
+    },
+    "./server": {
+      "types": "./src/server.tsrx.d.ts",
+      "default": "./src/server.tsrx"
+    },
     "./compile": {
       "types": "./types/compile.d.ts",
       "default": "./src/compile.js"

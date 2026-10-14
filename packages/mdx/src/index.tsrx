@@ -1,3 +1,5 @@
+'use strong';
+
 /**
  * @octanejs/mdx — the runtime provider layer.
  *
@@ -27,9 +29,9 @@
  * SSR provider support lives in `@octanejs/mdx/server` — the same layer
  * mirrored onto `octane/server` context (the two runtimes' context stores are
  * disjoint; server-mode documents import `useMDXComponents` from there). Keep
- * the merge semantics here and in src/server.ts in lockstep.
+ * the merge semantics here and in src/server.tsrx in lockstep.
  */
-import { createContext, createElement, useContext, type ComponentBody } from 'octane';
+import { createContext, useContext, type ComponentBody } from 'octane';
 
 /**
  * A components mapping: markdown element name (`h1`, `p`, `code`, …) or
@@ -85,7 +87,7 @@ export interface MDXProviderProps {
  * `MDXProvider`: nested providers MERGE by default (`components` over the
  * inherited mapping); `disableParentContext` starts from scratch.
  */
-export function MDXProvider(props: MDXProviderProps): unknown {
+export function MDXProvider(props: MDXProviderProps) @{
 	let allComponents: MDXComponents;
 	if (props.disableParentContext) {
 		allComponents =
@@ -95,10 +97,7 @@ export function MDXProvider(props: MDXProviderProps): unknown {
 	} else {
 		allComponents = useMDXComponents(props.components);
 	}
-	return createElement(MDXContext as ComponentBody<any>, {
-		value: allComponents,
-		children: props.children,
-	});
+	<MDXContext value={allComponents} children={props.children} />
 }
 
 /** The props every compiled MDX document component accepts. */
