@@ -6,7 +6,6 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const EXPLICIT = 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES';
 const REDUNDANT = EXPLICIT;
 const EVERY_RENDER = 'OCTANE_STRONG_UNTRACKED_EFFECT';
-const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
 const app = (
 	setup: string,
 	output = '<div />',
@@ -39,15 +38,49 @@ describe('Strong compiler-owned hook policies', () => {
 		},
 	);
 
+	it.each(['useMemo', 'useCallback'])(
+		'leaves %s dependency control to the author without Strong diagnostics',
+		(hook) => {
+			for (const deps of [
+				'',
+				', undefined',
+				', [props.value]',
+				', [props.revision]',
+				', []',
+				', props.dependencies',
+				', null',
+			]) {
+				const source = strong(
+					app(
+						`const value = ${hook}(() => props.value * 2${deps});`,
+						'<span>{String(value)}</span>',
+					),
+				);
+				for (const options of [{}, { dev: true }, { mode: 'server' }]) {
+					expect(compile(source, '/src/App.tsrx', options as any).diagnostics).toEqual([]);
+				}
+				expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toEqual([]);
+			}
+		},
+	);
+
 	it.each([
-		'useMemo(() => props.value * 2)',
-		'useMemo(() => props.value * 2, [props.value])',
-		'useCallback(() => props.value)',
-		'useCallback(() => props.value, [])',
-	])('rejects manual caching with %s', (call) => {
-		const source = app(`const value = ${call};`);
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
-		expect(() => compile(strong(source), '/src/App.tsrx')).toThrow(MANUAL_MEMO);
+		["import { useMemo as memo } from 'octane';", 'memo'],
+		["import * as Octane from 'octane';", 'Octane.useMemo'],
+		["import * as Octane from 'octane'; const { useMemo: memo } = Octane;", 'memo'],
+		["import { useMemo } from 'octane/server';", 'useMemo'],
+		["import { useCallback as callback } from 'octane';", 'callback'],
+		["import * as Octane from 'octane';", 'Octane.useCallback'],
+		["import * as Octane from 'octane'; const { useCallback: callback } = Octane;", 'callback'],
+		["import { useCallback } from 'octane/server';", 'useCallback'],
+		["import { useCallback } from 'octane';", 'useCallback?.'],
+		["import * as Octane from 'octane';", 'Octane?.useCallback'],
+	])('accepts manual memo dependencies through recognized bindings: %s', (imports, callee) => {
+		const source = strong(`${imports}
+export function useExample(props) { return ${callee}(() => props.value, [props.revision]); }`);
+		expect(compile(source, '/src/useExample.tsx').diagnostics).toEqual([]);
+		expect(slotHooks(source, '/src/useExample.ts')?.diagnostics ?? []).toEqual([]);
+		expect(compileToVolarMappings(source, '/src/useExample.tsx').diagnostics).toEqual([]);
 	});
 
 	it.each([
@@ -262,9 +295,7 @@ export function App(props) @{
 	});
 
 	it.each([
-		['', 'useMemo(() => props.value)', MANUAL_MEMO],
 		['', 'useEffect(() => console.log(props.value), [])', EXPLICIT],
-		["import { useMemo } from 'octane/server';", 'useMemo(() => props.value)', MANUAL_MEMO],
 		[
 			"import * as Octane from 'octane/server'; const {useEffect: effect}=Octane;",
 			'effect(() => console.log(props.value), [])',
@@ -279,22 +310,15 @@ export function App(props) @{
 	});
 
 	it.each([
-		["import { useMemo } from 'octane';", 'useMemo?.(() => props.value)', MANUAL_MEMO],
 		[
 			"import { useEffect } from 'octane';",
 			'useEffect?.(() => console.log(props.value), [])',
 			EXPLICIT,
 		],
-		["import * as Octane from 'octane';", 'Octane?.useMemo(() => props.value)', MANUAL_MEMO],
 		[
 			"import * as Octane from 'octane';",
 			'Octane.useEffect?.(() => console.log(props.value), [])',
 			EXPLICIT,
-		],
-		[
-			"import * as Octane from 'octane'; const { useMemo } = Octane;",
-			'useMemo(() => props.value)',
-			MANUAL_MEMO,
 		],
 		[
 			"import * as Octane from 'octane'; const { useEffect: effect } = Octane;",

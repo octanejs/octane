@@ -1184,9 +1184,12 @@ Strong mode; ordinary modules keep their existing behavior.
 The checks follow provable synchronous calls through local helpers and
 `useEffectEvent` results. Creating a callback remains valid. Effect Events are
 non-reactive and should be omitted from hook dependencies. Strong uses automatic
-declaration caching and inferred dependencies: manual memo hooks and conflicting
-dependency arrays are errors. Equivalent arrays preserve their behavior and
-produce a redundancy hint.
+declaration caching. Conflicting dependency arrays on effects or imperative
+handles are errors; equivalent arrays preserve their behavior and produce a
+redundancy hint. `useMemo` and `useCallback` let you control dependencies: each
+accepts explicit arrays, omitted or `undefined` dependencies for inference,
+and `null` for every render. Strong render-purity checks still apply to a
+`useMemo` factory or a callback called during render.
 
 The analysis is deliberately bounded. Factories with unknown return values or
 complex control flow remain opaque. Dependency checks follow literal arrays,

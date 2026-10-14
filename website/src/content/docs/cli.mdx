@@ -127,8 +127,8 @@ them.
 `--strong-preview` compiles every module as if Strong mode were on and ends with
 a count of what it would reject, by code. Findings in modules that are not Strong
 yet do not fail the run. `--fix` applies the compiler's suggested edits, such as
-React's lazy ref initialization to `useLazyRef` and `useMemo(() => value, deps)`
-to `value`, then reports what remains; add `--dry-run` to see the fixes without
+React's lazy ref initialization to `useLazyRef`, then reports what remains;
+add `--dry-run` to see the fixes without
 writing them. See [Adopt it in an existing app](/docs/strong-mode#adopt-strong-mode).
 
 `--strong-baseline init` records every module that compiles without Strong mode

@@ -113,9 +113,13 @@ The compiler rejects state updates during render, synchronous state updates
 while an effect is being set up, and reads and writes of `ref.current` during
 render. It follows provable calls through local helpers and `useEffectEvent`.
 Calling a statically known Effect Event during render or including it in explicit
-hook dependencies is also an error. The compiler owns memoization in a Strong
-module, so `useMemo` and `useCallback` are errors, and an explicit dependency list
-that differs from the inferred inputs is an error; an equivalent one is a hint.
+hook dependencies is also an error. Strong caches eligible declarations.
+For effects and imperative handles, an explicit
+dependency list that differs from the inferred inputs is an error; an equivalent
+one is a hint. Use `useMemo` or `useCallback` for manual dependency control.
+Both accept explicit lists, omitted or `undefined` lists for inference, and
+`null` to recompute the memo or refresh the callback every render. Memo
+factories and callbacks called during render still follow the render-purity rules.
 
 Use `useLinkedState` when editable state should follow a changing prop,
 `useLazyRef` to create a ref's value once, and `useLayoutSnapshot` to render from a

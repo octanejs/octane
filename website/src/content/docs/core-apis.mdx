@@ -320,10 +320,13 @@ export function ProfileEditor({ user }) {
 
 A Strong module cannot update state or read or write `ref.current` while rendering, or
 update state synchronously while setting up an effect. The compiler caches eligible
-calculations and callbacks itself, so `useMemo` and `useCallback` are compile errors, and dependency
-arrays are inferred: an explicit array that differs from the inferred inputs is an
-error, and an equivalent one is a hint. Event handlers still update state, and effects
-still synchronize external systems.
+calculations and callbacks itself. Effects
+and imperative handles infer dependencies: an explicit array that differs from the
+inferred inputs is an error, and an equivalent one is a hint. `useMemo` and
+`useCallback` allow manual dependency control, using explicit lists as written,
+inferring omitted or `undefined` lists, and recomputing the memo or refreshing
+the callback on each render for `null`. Event handlers still update
+state, and effects still synchronize external systems.
 
 [Strong mode](/docs/strong-mode) covers enabling it, adopting it in an existing app,
 replacements for the React idioms it rejects, and every diagnostic.

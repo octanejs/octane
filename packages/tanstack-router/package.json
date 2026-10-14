@@ -37,6 +37,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./history": "./src/history.ts",
+    "./compiled": "./src/compiled.ts",
     "./ssr/server": {
       "types": "./src/ssr/server.ts",
       "default": "./src/ssr/server.ts"

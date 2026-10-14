@@ -447,7 +447,7 @@ export default defineCommand({
 				);
 				if (fixes.length > 0) {
 					const { text, applied } = applyFixes(source, fixes);
-					const next = pruneImports(text, ['useCallback', 'useMemo', 'useRef']);
+					const next = pruneImports(text);
 					if (applied.length > 0 && next !== source) {
 						fixedFindings += applied.length;
 						fixedFiles.push(file);

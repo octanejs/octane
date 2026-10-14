@@ -312,6 +312,9 @@ type ClientErrorArguments = {
 	340: [];
 	341: [];
 	342: [];
+	344: [];
+	345: [];
+	346: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1359,6 +1362,18 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 342:
 				return formatDevErrorMessage(
 					'A descriptor carried a function form action, but no element factory installed form actions. This is a bug in the Octane compiler.',
+					args,
+				);
+			case 344:
+				return formatDevErrorMessage(
+					'Provide a compiled context with <CompiledContext context={context}>.',
+					args,
+				);
+			case 345:
+				return formatDevErrorMessage('CompiledContext requires compiled template children.', args);
+			case 346:
+				return formatDevErrorMessage(
+					'CompiledOutlet requires a compiled component function with no returned renderable.',
 					args,
 				);
 			default:

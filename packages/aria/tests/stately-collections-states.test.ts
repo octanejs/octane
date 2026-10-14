@@ -255,13 +255,10 @@ describe('@octanejs/aria/stately — useNumberFieldState', () => {
 		const source = readFileSync(filename, 'utf8');
 
 		expect(() => compile(source, filename)).not.toThrow();
-		// This compatibility binding deliberately retains upstream memo hooks.
-		// Collect every Strong diagnostic so their authoring-policy errors cannot
-		// hide a return of the render-time state update fixed by linked state.
+		// Its upstream memo hooks remain valid in Strong mode; still catch
+		// any return of the render-time state update fixed by linked state.
 		const { diagnostics } = compileToVolarMappings(source, filename, { strong: true });
-		expect(new Set(diagnostics.map(({ code }) => code))).toEqual(
-			new Set(['OCTANE_STRONG_MANUAL_MEMO']),
-		);
+		expect(diagnostics).toEqual([]);
 	});
 
 	it('preserves unfinished controlled edits when equivalent formatting options are recreated', async () => {
