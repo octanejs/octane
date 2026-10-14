@@ -52,6 +52,29 @@ function ResumedPair(props: { value: PromiseLike<string> }) @{
 	</>
 }
 
+function SoleRootLeaf(props: { label: string }) @{
+	<span id="sole-leaf">{props.label}</span>
+}
+
+// Its sole root is a component the retry mounts for the first time.
+function SoleRootResume(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<SoleRootLeaf label={value} />
+}
+
+export function SoleRootResumeApp(props: DelayedBoundaryProps) @{
+	<main>
+		@try {
+			<>
+				<SoleRootResume value={props.value} />
+				<ObservePendingBoundary probe={props.probe} />
+			</>
+		} @pending {
+			<label id="late-waiting">{'Loading'}</label>
+		}
+	</main>
+}
+
 // A child that suspended on its first render mounts its template on the
 // retry: a single root, a two-root template, and a try body revealed after it.
 export function ResumedTemplateApp(props: DelayedBoundaryProps) @{
