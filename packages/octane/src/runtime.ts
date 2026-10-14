@@ -4211,6 +4211,8 @@ interface RootRenderTransaction {
 	holders: Array<TrySlot | RootRenderOwner> | null;
 	/** Memo entries and cells transition renders replaced, three slots each (setMemoEntry). */
 	memos: any[] | null;
+	/** Text nodes with a write in `ops`; the DOM does not show that write yet (renderText). */
+	texts: Set<Text> | null;
 	aborted: boolean;
 	rootRequest: boolean;
 	hydrating?: boolean;
@@ -4308,6 +4310,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			batches: null,
 			holders: null,
 			memos: null,
+			texts: null,
 			aborted: false,
 			rootRequest: false,
 		};
@@ -25603,6 +25606,60 @@ function resetOnlyChildHost(host: Node, node: Text | null): void {
 	if (node !== null) view.appendChild(node);
 }
 
+/**
+ * A render's new text for a Text node the DOM shows (#2043). A root render that
+ * may be dropped queues the write for its commit, as bagDone queues a template's
+ * commit function; a Block that render discards whole, and a render nothing can
+ * drop, write at once. Once a transaction queued a write to `node`, the DOM no
+ * longer shows what render last asked for, so every later change queues too and
+ * commit applies them in order. An only-child Text passes its host, so a Text a
+ * page translator took out is put back (resetOnlyChildHost).
+ */
+function renderText(block: Block, node: Text, str: string, host?: Node): void {
+	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(block);
+	if (transaction === null) {
+		if (host !== undefined && domNode(node).parentNode !== host) resetOnlyChildHost(host, node);
+		updateTextValue(node, str);
+		return;
+	}
+	const queued = transaction.texts;
+	if (queued === null || !queued.has(node)) {
+		// A hidden Text keeps its value aside (hiddenTextWriter), so the DOM shows ''.
+		if (
+			hiddenTextWriter === null &&
+			domNode(node).nodeValue === str &&
+			(host === undefined || domNode(node).parentNode === host)
+		)
+			return;
+		(transaction.texts ??= new Set()).add(node);
+	}
+	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
+	transaction.ops.push(commitText, [node, str, host]);
+}
+
+function commitText(write: [Text, string, Node | undefined]): void {
+	const node = write[0];
+	const host = write[2];
+	if (host !== undefined && domNode(node).parentNode !== host) resetOnlyChildHost(host, node);
+	updateTextValue(node, write[1]);
+}
+
+/**
+ * The open root render that a write to DOM the screen shows waits for, or null
+ * when the write lands at once: nothing can drop the render (no transaction, a
+ * rollback, an adopting hydration), or `block` is one the root attempt
+ * discards whole, so its DOM is fresh (bagDone's rule).
+ */
+function pendingWrites(block: Block | null): RootRenderTransaction | null {
+	const transaction = ROOT_RENDER_TRANSACTION!;
+	return transaction.aborted ||
+		ROOT_RENDER_ROLLBACK ||
+		hydrating ||
+		(block !== null && TRANSITION_JOURNAL_DEPTH === 1 && block.createdStamp === ROOT_DISCARD_STAMP)
+		? null
+		: transaction;
+}
+
 const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-binding');
 const CLAIMED_BINDING_VALUE = /* @__PURE__ */ Symbol('octane.claimed-binding-value');
 
@@ -40026,6 +40083,14 @@ export function childSlot(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+		// A host's first component child (an only-child hole leaving text, say)
+		// builds off-document under a committed Block, as a replacement does. An
+		// upgraded host adopts the children it has instead.
+		rootShapeChanged =
+			ownsHost !== undefined &&
+			hydration === null &&
+			ROOT_RENDER_TRANSACTION !== null &&
+			DEOPT_UPGRADE?.block !== parentScope.block;
 	} else if (hydration !== null) {
 		if (hydration.lentSlot === state) {
 			hydration.lentSlot = null;
@@ -40071,10 +40136,29 @@ export function childSlot(
 		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
 		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
 		const host = state.hostNode;
-		if (host !== null && (STAGED_DOM ? STAGED_DOM.view(host) : host).parentNode !== null) {
-			const p = (STAGED_DOM ? STAGED_DOM.view(host) : host).parentNode!;
+		const p = host === null ? null : (STAGED_DOM ? STAGED_DOM.view(host) : host).parentNode;
+		if (
+			p !== null &&
+			typeof elementType !== 'string' &&
+			ROOT_RENDER_TRANSACTION !== null &&
+			usesFrontier(parentBlock, p)
+		) {
+			// Over committed DOM the pair, and whatever this render puts in it, take
+			// the host's place at commit: the rest of this call renders into the
+			// slot's frontier, as a fresh slot's does (freshSlotEnd). A host
+			// descriptor can adopt the host instead (the pure-host upgrade below).
+			const frag = slotFrontier(state, parentBlock, p, null);
+			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).append(start, end);
+			const pending = state.next!;
+			pending.out.push(() => detachDeoptTreeRefs(host!, null), host, host);
+			pending.follows = true;
+			if (sharesBlockBoundary(parentBlock, host, host))
+				pending.bound = [parentBlock, host, host, start, end];
+			state.hostNode = null;
+			domParent = frag;
+		} else if (p !== null) {
 			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(start, host);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(end, getNextSibling(host));
+			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(end, getNextSibling(host!));
 			replaceSharedBlockBoundary(parentBlock, host, host, start, end);
 		} else {
 			// Defensive — anchorless is only entered after a successful pure-host
@@ -40194,18 +40278,32 @@ export function childSlot(
 				const prev = state.hostNode;
 				const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 				if (node !== prev) {
-					if (prev !== null && (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode !== null) {
-						const parent = (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!;
+					const parent =
+						prev === null ? null : (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode;
+					if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, parent ?? domParent)) {
+						// Over committed DOM, the new node waits in the slot's frontier and
+						// takes the old one's place at commit.
+						if (parent !== null) {
+							journalRootChildShape(state, parent);
+							const pending = slotNext(state);
+							pending.out.push(() => detachDeoptTreeRefs(prev!, null), prev, prev);
+							pending.follows = true;
+						}
+						if (node !== null) {
+							const frag = slotFrontier(state, parentBlock, parent ?? domParent, anchor ?? null);
+							(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
+						}
+					} else if (parent !== null) {
 						if (ROOT_RENDER_TRANSACTION !== null) {
 							journalRootChildShape(state, parent);
-							queueRootDeletion(() => detachDeoptTreeRefs(prev, null), prev, prev);
+							queueRootDeletion(() => detachDeoptTreeRefs(prev!, null), prev, prev);
 							if (node !== null)
 								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
 						} else {
 							if (node !== null)
 								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
-							detachDeoptTreeRefs(prev, null);
-							(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev);
+							detachDeoptTreeRefs(prev!, null);
+							(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev!);
 						}
 					} else if (node !== null) {
 						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
@@ -40217,16 +40315,12 @@ export function childSlot(
 				state.hostNode = node;
 				return;
 			}
-			if (state.start === null) {
-				state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(state.start, state.end);
-			}
 			// First render: adopt the server node during hydration, else reuse the
 			// prior built node, else build fresh. claimRange checked that a server
 			// range holds that node and nothing else.
 			let prev = state.hostNode;
 			if (prev === null && hydration !== null) {
-				prev = getNextSibling(state.start);
+				prev = getNextSibling(state.start!);
 				if (prev === state.end) prev = null;
 			}
 			const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
@@ -40245,7 +40339,25 @@ export function childSlot(
 						domNode((STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!).removeChild(prev);
 					}
 				}
-				if (node !== null) domNode(domNode(state.start).parentNode!).insertBefore(node, state.end);
+				// Over committed DOM in a root render, the new node, and the slot's
+				// first lower marker, wait in its frontier before its end.
+				const frag =
+					ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, domParent)
+						? slotFrontier(state, parentBlock, domParent, state.end)
+						: null;
+				if (state.start === null) {
+					state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+					if (frag !== null) (STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(state.start);
+					else
+						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
+							state.start,
+							state.end,
+						);
+				}
+				if (node !== null) {
+					if (frag !== null) (STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
+					else domNode(domNode(state.start).parentNode!).insertBefore(node, state.end);
+				}
 			}
 			state.hostNode = node;
 			return;
@@ -40574,7 +40686,7 @@ export function childSlot(
 		return;
 	}
 	if (state.text !== null) {
-		updateTextValue(state.text, str);
+		renderText(parentBlock, state.text, str);
 		return;
 	}
 	if (hydration !== null && !hydratingUpdate) {
@@ -40605,9 +40717,24 @@ export function childSlot(
 			return;
 		}
 	}
+	insertSlotText(state, parentBlock, domParent, str);
+}
+
+/**
+ * Give a text child slot its Text. Over committed DOM in a root render
+ * (usesFrontier) it waits in the slot's frontier, which commit inserts where
+ * the slot's content goes, after the outgoing content leaves.
+ */
+function insertSlotText(state: ChildSlot, parentBlock: Block, domParent: Node, str: string): void {
 	const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
 	state.text = tn;
+	if (ROOT_RENDER_TRANSACTION === null || !usesFrontier(parentBlock, domParent)) {
+		(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
+		return;
+	}
+	const owned = state.ownerHost !== null || (state.borrowed && state.start === null);
+	const frag = slotFrontier(state, parentBlock, domParent, owned ? null : state.end);
+	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(tn);
 }
 
 // A `{expr}` value-hole slot whose value is USUALLY a primitive (text) — what the
@@ -40660,14 +40787,12 @@ export function textSlot(
 	const str =
 		vt === 'string' ? (value as string) : vt === 'boolean' || value == null ? '' : String(value);
 	if (state.text !== null) {
-		updateTextValue(state.text, str);
+		renderText(parentScope.block, state.text, str);
 		return;
 	}
 	if (str === '') return;
 	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state, domParent);
-	const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
-	state.text = tn;
+	insertSlotText(state, parentScope.block, domParent, str);
 }
 
 // General path for a compiled renderable binding. The shared textHoleUpdate
@@ -40740,11 +40865,23 @@ export function childTextHoleUpdate(
 
 // The markerless Text leaves an only-child hole. When a translator already took
 // it out, its replacement is what the host shows; clear that, as React resets a
-// host's text content.
-function removeOnlyChildText(host: Node, node: Text): void {
+// host's text content. A Text the host shows leaves at the commit of a root
+// render over committed DOM; one this render built is still in its frontier.
+function removeOnlyChildText(block: Block, host: Node, node: Text): void {
 	const view = STAGED_DOM ? STAGED_DOM.view(node) : node;
-	if (view.parentNode === host) view.remove();
+	const parent = view.parentNode;
+	if (parent !== host && parent !== null && (parent as any).$$next !== undefined) view.remove();
+	else if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, host))
+		queueRootDeletion(() => removeOnlyChildText(block, host, node), null, null);
+	else if (parent === host) view.remove();
 	else resetOnlyChildHost(host, null);
+}
+
+/** The client's text replaces `host`'s kept server content, at its render's commit. */
+function clearKeptText(kept: WeakSet<Node>, block: Block, host: Node): void {
+	if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, host))
+		queueRootDeletion(() => clearKeptTextContent(kept, host), null, null);
+	else clearKeptTextContent(kept, host);
 }
 
 // Slow path for an ONLY-CHILD `{expr}` value hole (the value hole is the sole
@@ -40809,7 +40946,8 @@ export function childTextHole(
 			if (cachedNode === null) {
 				const hydration = hydrating ? activeHydration() : null;
 				if (hydration === null) {
-					if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, domParent);
+					if (KEPT_TEXT_CONTENT !== null)
+						clearKeptText(KEPT_TEXT_CONTENT, parentScope.block, domParent);
 					return null;
 				}
 				// React treats a host whose child is a string or number as text content.
@@ -40817,20 +40955,23 @@ export function childTextHole(
 					return null;
 				return hydration.hempty(domParent, vt === 'string', siteLoc(parentScope, slotKey));
 			}
-			removeOnlyChildText(domParent, cachedNode);
+			removeOnlyChildText(parentScope.block, domParent, cachedNode);
 			return null;
 		}
 		if (cachedNode !== null) {
-			if ((STAGED_DOM ? STAGED_DOM.view(cachedNode) : cachedNode).parentNode !== domParent)
-				resetOnlyChildHost(domParent, cachedNode);
-			updateTextValue(cachedNode, str);
+			renderText(parentScope.block, cachedNode, str, domParent);
 			return cachedNode;
 		}
 		const hydration = hydrating ? activeHydration() : null;
 		if (hydration === null) {
-			if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, domParent);
+			if (KEPT_TEXT_CONTENT !== null)
+				clearKeptText(KEPT_TEXT_CONTENT, parentScope.block, domParent);
 			const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).appendChild(tn);
+			const parent =
+				ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentScope.block, domParent)
+					? queueFrontier(parentScope.block, domParent, null)
+					: domParent;
+			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(tn);
 			return tn;
 		}
 		if (hydration.keepsServerContent(domParent)) return null;
@@ -40850,7 +40991,8 @@ export function childTextHole(
 	// server's `<!--[-->` range (ownsHost is ignored under hydration: server-pair
 	// adoption wins, as in M2), or builds the value as a client mount would when
 	// the server rendered text or nothing there.
-	if (state === undefined && cachedNode !== null) removeOnlyChildText(domParent, cachedNode);
+	if (state === undefined && cachedNode !== null)
+		removeOnlyChildText(parentScope.block, domParent, cachedNode);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && state === undefined)
 		hydration.hydrateOnlyChild(parentScope, slotKey, domParent, value, (parent) =>
