@@ -4630,7 +4630,13 @@ function openFrontier(
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
-	const frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
+	// A container in another document, such as one a client render replacing a
+	// document's failed hydration owns, builds in a fragment of that document.
+	const doc = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument;
+	const frag =
+		doc === null || doc === document
+			? SPARE_FRONTIERS.pop() || document.createDocumentFragment()
+			: doc.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.frag = frag;
 	next.members = [];
@@ -4744,7 +4750,12 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 	if (frag === null) return;
 	(frag as any).$$next = undefined;
 	// Nothing names a committed frontier any more (assertRehomed).
-	if (SPARE_FRONTIERS.length < 64 && getFirstChild(frag) === null) SPARE_FRONTIERS.push(frag);
+	if (
+		SPARE_FRONTIERS.length < 64 &&
+		getFirstChild(frag) === null &&
+		frag.ownerDocument === document
+	)
+		SPARE_FRONTIERS.push(frag);
 }
 
 /** Point a try, error or portal slot created directly in a committed frontier at its live parent. */
@@ -4782,6 +4793,68 @@ function assertRehomed(scope: any, frag: DocumentFragment): void {
 			if (slots[i].domParent === frag) throw new Error(formatClientError(349, 'a try slot'));
 	if (scope.block.disposed !== true)
 		forEachSubtreeChild(scope, (child) => assertRehomed(child, frag));
+}
+
+/**
+ * Markers a hydrating render minted over the server DOM it adopts, which its
+ * commit places, each before the node it names (placeAtCommit). A render that
+ * never commits leaves the server DOM without them.
+ */
+let PENDING_MARKERS: WeakMap<Node, [parent: Node, before: Node | null]> | null = null;
+
+/**
+ * Put `node`, a marker a hydrating render minted, before `before` in `parent`
+ * at commit. A later call before the commit moves it.
+ */
+function placeAtCommit(parent: Node, node: Node, before: Node | null): void {
+	if (ROOT_RENDER_TRANSACTION === null) {
+		parent.insertBefore(node, before);
+		return;
+	}
+	const pending = (PENDING_MARKERS ??= new WeakMap());
+	const queued = pending.has(node);
+	pending.set(node, [parent, before]);
+	if (!queued) ROOT_RENDER_TRANSACTION.ops.push(placeMarker, node);
+}
+
+function placeMarker(node: Node): void {
+	const placement = PENDING_MARKERS?.get(node);
+	if (placement === undefined) return;
+	const [parent, before] = placement;
+	PENDING_MARKERS!.delete(node);
+	// A marker it goes before that is still to be placed lands first.
+	if (before !== null && PENDING_MARKERS!.has(before)) placeMarker(before);
+	parent.insertBefore(node, before);
+}
+
+/** Whether `node` is a marker still to be placed (placeAtCommit). */
+function markerPending(node: Node): boolean {
+	return PENDING_MARKERS !== null && node.parentNode === null && PENDING_MARKERS.has(node);
+}
+
+/**
+ * Where `node` stands in the server DOM: itself, or for a marker still to be
+ * placed, the node it goes before, past any other such marker.
+ */
+function markerPosition(node: Node | null): Node | null {
+	while (node !== null && markerPending(node)) node = PENDING_MARKERS!.get(node)![1];
+	return node;
+}
+
+/** The parent `node` is in, or for a marker still to be placed, the one it lands in. */
+function markerParent(node: Node): Node | null {
+	return node.parentNode ?? PENDING_MARKERS?.get(node)?.[0] ?? null;
+}
+
+/** Take `node`, a marker a hydrating render minted, out: before its commit places it, or now. */
+function discardMarker(node: Node): void {
+	if (markerPending(node)) PENDING_MARKERS!.delete(node);
+	else (node as ChildNode).remove();
+}
+
+/** The node after `node` in the server DOM, for a marker still to be placed too (markerPosition). */
+function nodeAfter(node: Node): Node | null {
+	return markerPending(node) ? markerPosition(node) : getNextSibling(node);
 }
 
 /** Run `fn(arg)` at the open root render's commit, or now outside one. */
@@ -5597,7 +5670,8 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 		journalUndo(() => {
 			seen.delete(state);
 		});
-		journalRootRange(state.start.parentNode!, state.start, state.end);
+		// A hydrating render writes none of the server range it adopts.
+		if (state.adopt !== null) journalRootRange(state.start.parentNode!, state.start, state.end);
 		// No chain record restores indices here, so rows that already exist keep
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
@@ -21174,7 +21248,7 @@ class HydrationCapability {
 	 * boundary left it.
 	 */
 	parkPast(close: Node, parent: Scope): void {
-		if (!parent.block.disposed) this.node = getNextSibling(close);
+		if (!parent.block.disposed) this.node = nodeAfter(close);
 	}
 
 	/**
@@ -28056,6 +28130,9 @@ function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | 
  */
 let HEAD_CLAIMS: WeakMap<Comment, [ops: unknown[], at: number, pair: Comment[]]> | null = null;
 
+/** Server heads a client render discards with the document it replaces (installHydrationFallback). */
+let DISCARDED_HEADS: WeakSet<HTMLHeadElement> | null = null;
+
 function claimedHeadMarker(marker: Comment): boolean {
 	const claim = HEAD_CLAIMS?.get(marker);
 	return claim !== undefined && claim[0][claim[1] + 1] === claim[2];
@@ -28160,18 +28237,24 @@ export function headBlock(
 		const parent = scope.block.parentNode;
 		const ownerDocument = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
 		const head = ownerDocument.head;
-		let el = adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
+		// A client render that replaces a document's failed hydration claims nothing
+		// from the server head it discards (installHydrationFallback).
+		let el =
+			DISCARDED_HEADS?.has(head) === true
+				? null
+				: adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		const adopted = el !== null;
 		if (el === null) {
 			el = ownerDocument.createElement(tag);
 			const transaction = ROOT_RENDER_TRANSACTION;
 			if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 				// A root render's new head element joins <head> as it commits,
-				// unless an earlier deletion cleanup released its scope.
+				// unless an earlier deletion cleanup released its scope: the
+				// document's head then, which a commit that replaces it has swapped in.
 				const created = el;
 				transaction.ops.push(() => {
 					if ((scope.slots[slot] as HeadSlot | undefined)?.el === created)
-						head.appendChild(created);
+						ownerDocument.head.appendChild(created);
 				}, null);
 			} else head.appendChild(el);
 		}
@@ -35422,8 +35505,13 @@ function reconcileDeoptNode(
 				defer = true;
 				pending = pendingDeoptOrder(el);
 				desc = changedDeoptRecord(el, value, pending);
-			} else
+			} else {
 				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
+				// Hydration orders an adopted host's children at commit, after what
+				// its reconcile removes.
+				if (hydrating && activeHydration() !== null && ROOT_RENDER_TRANSACTION !== null)
+					defer = true;
+			}
 		} else {
 			// What hydration builds here, as in a `<noscript>` whose server content
 			// is text, is client DOM: it builds with adoption suspended.
@@ -37142,7 +37230,7 @@ function renderPreparedChildList(
 					if (
 						owner.forSlot !== null &&
 						owner.endMarker !== null &&
-						owner.endMarker.parentNode === domParent
+						markerParent(owner.endMarker) === domParent
 					) {
 						anchor = owner.endMarker;
 						break;
@@ -37156,14 +37244,10 @@ function renderPreparedChildList(
 					}
 				}
 			}
-			domParent.insertBefore(state.end, anchor);
-			if (passthroughList) {
-				passthroughEnd = state.end;
-				if (TRANSITION_JOURNAL !== null) {
-					const end = state.end;
-					journalUndo(() => end.remove());
-				}
-			}
+			// A hydrating render places the list's markers in the server DOM at commit.
+			if (hydration !== null) placeAtCommit(domParent, state.end, anchor);
+			else domParent.insertBefore(state.end, anchor);
+			if (passthroughList) passthroughEnd = state.end;
 		}
 		if (state.start === null) {
 			state.start = document.createComment('');
@@ -37171,21 +37255,14 @@ function renderPreparedChildList(
 			// INSIDE [start, end] (they become the items) — mint start before
 			// the first of them, not at the tail.
 			const cursor = passthroughList ? hydration!.node : null;
-			domParent.insertBefore(
-				state.start,
-				upgradeArmed
-					? getFirstChild(domParent)
-					: cursor !== null && cursor.parentNode === domParent
-						? cursor
-						: state.end,
-			);
-			if (passthroughList) {
-				passthroughStart = state.start;
-				if (TRANSITION_JOURNAL !== null) {
-					const start = state.start;
-					journalUndo(() => start.remove());
-				}
-			}
+			const before = upgradeArmed
+				? getFirstChild(domParent)
+				: cursor !== null && cursor.parentNode === domParent
+					? cursor
+					: state.end;
+			if (hydration !== null) placeAtCommit(domParent, state.start, before);
+			else domParent.insertBefore(state.start, before);
+			if (passthroughList) passthroughStart = state.start;
 		}
 		state.forSlot = {
 			__kind: 'forBlockSlot',
@@ -37326,11 +37403,11 @@ function renderPreparedChildList(
 			);
 		} catch (error) {
 			if (passthroughStart !== null) {
-				passthroughStart.remove();
+				discardMarker(passthroughStart);
 				state.start = null;
 			}
 			if (passthroughEnd !== null) {
-				passthroughEnd.remove();
+				discardMarker(passthroughEnd);
 				state.end = null;
 			}
 			if (passthroughStart !== null || passthroughEnd !== null) state.forSlot = null;
@@ -38098,9 +38175,11 @@ export function childSlot(
 					);
 			}
 			end = document.createComment('');
-			domParent.insertBefore(end, anchor ?? null);
-			if (hydration !== null && parentBlock === hydration.rootBlock)
-				hydration.protectRootAnchor(end);
+			// Hydration places the slot's marker in the server DOM it adopts at commit.
+			if (hydration !== null) {
+				placeAtCommit(domParent, end, anchor ?? null);
+				if (parentBlock === hydration.rootBlock) hydration.protectRootAnchor(end);
+			} else domParent.insertBefore(end, anchor ?? null);
 		}
 		state = {
 			__kind: 'childSlot',
@@ -38643,7 +38722,8 @@ export function childSlot(
 			// clearChildContent can sweep a (possibly multi-node) component body.
 			// (An OWNS-PARENT slot needs neither bound: clears sweep the element.)
 			state.start = document.createComment('');
-			domParent.insertBefore(state.start, state.end);
+			if (hydration !== null && !hydratingUpdate) placeAtCommit(domParent, state.start, state.end);
+			else domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock(
 			'dynamic',
@@ -45944,6 +46024,13 @@ function setActivitySuspenseHandler(state: ActivitySlot, hidden: boolean): void 
 	}
 }
 
+/** Give an Activity whose client tree landed from a frontier its adopted markers back. */
+function restoreActivityRange([block, start, end]: [Block, Comment, Comment]): void {
+	if (block.disposed) return;
+	block.startMarker = start;
+	block.endMarker = end;
+}
+
 function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVersion: number): void {
 	enqueueEffectEventCommitAction(() => {
 		if (
@@ -46075,8 +46162,16 @@ export function activityBlock(
 			if (wantHidden) setActivitySuspenseHandler(state, true);
 			hydration.deferredActivities.push(() => {
 				if (b.disposed) return;
+				// The client tree builds off-document and lands between the adopted
+				// markers at commit, which hides it there.
+				if (ROOT_RENDER_TRANSACTION !== null) {
+					const frag = queueFrontier(b, domParent, bEnd);
+					b.parentNode = frag;
+					b.startMarker = b.endMarker = null;
+					noteFrontierMember(frag, b);
+					atCommit(restoreActivityRange, [b, bStart, bEnd]);
+				}
 				hydration.suspend(() => (state!.hidden ? renderHiddenActivity(state!) : renderBlock(b)));
-				// The client tree lands at commit: hide it there.
 				if (state!.hidden) atCommit(hideActivityRange, state!);
 			});
 			hydration.parkPast(bEnd, parentScope);
@@ -47630,7 +47725,8 @@ function mountItemsLinear<T>(
 	// shows fresh rows with their bindings half rolled back underneath them.
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
-	const parentNode = state.end.parentNode!;
+	// A hydrating list's end may still be to place (placeAtCommit).
+	const parentNode = markerParent(state.end)!;
 	// A committed list's rows render off-document and land before its end.
 	const next =
 		ROOT_RENDER_TRANSACTION === null || passthroughList
@@ -47721,13 +47817,13 @@ function mountItemsLinear<T>(
 				!isSuspenseException(error) &&
 				!isHostContextRequest(error) &&
 				!isAdoptionControl(error);
-			if (discardOwnedDom && start !== null && start.parentNode !== null)
-				journalRootChildren(start.parentNode!);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+			// A hydrating item adopted server DOM, which a failed attempt leaves.
 			if (block.idState.renderOwner?.signalOwner !== undefined)
 				discardSignalRetryItem(block, error);
-			else unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
-			if (start !== null && end !== null) removePassthroughItemRange(start, end, discardOwnedDom);
+			else unmountBlock(block, !hydrating && !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
+			if (start !== null && end !== null)
+				removePassthroughItemRange(parentNode, start, end, discardOwnedDom);
 		}
 		state.head = null;
 		state.tail = null;
@@ -47758,18 +47854,18 @@ function mountPassthroughListItem<T>(
 	forSlot: ForSlot,
 ): Block {
 	const hydration = activeHydration()!;
+	// The list's own end may still be to place (placeAtCommit): a cursor that
+	// reached where it lands stands at it.
+	const end$ = markerPosition(anchor);
 	const cursor = hydration.node;
-	const before = cursor !== null && cursor.parentNode === parentNode ? cursor : anchor;
+	const before =
+		cursor !== null && cursor.parentNode === parentNode && cursor !== end$ ? cursor : anchor;
 	const start = document.createComment('it');
 	const end = document.createComment('/it');
-	parentNode.insertBefore(start, before);
-	parentNode.insertBefore(end, anchor);
-	if (TRANSITION_JOURNAL !== null) {
-		journalUndo(() => {
-			start.remove();
-			end.remove();
-		});
-	}
+	// The item's range lands in the server DOM at commit: its end, provisionally
+	// at the list's end, moves past what the item adopted once it rendered.
+	placeAtCommit(parentNode, start, before);
+	placeAtCommit(parentNode, end, anchor);
 	const block = createBlock(
 		'control-flow',
 		parentBlock,
@@ -47784,7 +47880,7 @@ function mountPassthroughListItem<T>(
 	block.key = key;
 	block.itemIndex = index;
 	preserveRootCreatedDom(block);
-	const fresh = cursor === null || cursor === anchor;
+	const fresh = cursor === null || cursor === anchor || cursor === end$;
 	const previousPassthrough = hydration.passthroughRanges;
 	hydration.passthroughRanges = true;
 	if (process.env.NODE_ENV !== 'production') auditHydrationProbe('passthrough', false);
@@ -47799,31 +47895,39 @@ function mountPassthroughListItem<T>(
 			!isSuspenseException(error) &&
 			!isHostContextRequest(error) &&
 			!isAdoptionControl(error);
-		if (discardOwnedDom) journalRootChildren(parentNode);
 		unmountBlock(block, false);
-		removePassthroughItemRange(start, end, discardOwnedDom);
+		removePassthroughItemRange(parentNode, start, end, discardOwnedDom);
 		throw error;
 	} finally {
 		hydration.passthroughRanges = previousPassthrough && hydration.passthroughRanges;
 	}
 	const next = hydration.node;
-	parentNode.insertBefore(end, next !== null && next.parentNode === parentNode ? next : anchor);
+	const after = next !== null && next.parentNode === parentNode && next !== end$ ? next : anchor;
+	placeAtCommit(parentNode, end, after);
 	// The owner can advance the cursor to this item's provisional end. The
 	// following logical sibling must start after that end, not inside the item.
-	hydration.node = getNextSibling(end);
+	hydration.node = markerPosition(after);
 	return block;
 }
 
-function removePassthroughItemRange(start: Node, end: Node, discardContents: boolean): void {
-	if (!discardContents) {
-		(start as ChildNode).remove();
-		(end as ChildNode).remove();
-		return;
-	}
-	for (let node: Node | null = start; node !== null;) {
+/**
+ * Take a passthrough item's range out. A hydrating render places it at commit,
+ * so it cancels that, and the server content the item owned (`discard`), from
+ * where the range starts to where it ends, leaves at commit.
+ */
+function removePassthroughItemRange(parent: Node, start: Node, end: Node, discard: boolean): void {
+	const from = markerPosition(start);
+	const to = markerPending(end) ? markerPosition(end) : getNextSibling(end);
+	discardMarker(start);
+	discardMarker(end);
+	if (discard) atCommit(removeOwnedContent, [parent, from, to]);
+}
+
+/** Remove `parent`'s nodes from `from` up to `to`, but a renderer style. */
+function removeOwnedContent([parent, from, to]: [Node, Node | null, Node | null]): void {
+	for (let node = from; node !== null && node !== to;) {
 		const next = getNextSibling(node);
-		if (!isRendererHydrationStyle(node)) (node as ChildNode).remove();
-		if (node === end) break;
+		if (node.parentNode === parent && !isRendererHydrationStyle(node)) (node as ChildNode).remove();
 		node = next;
 	}
 }
@@ -50193,16 +50297,17 @@ function installHydrationFallback(
 		const islands = Array.from(container.querySelectorAll('[' + HYDRATE_INDEPENDENT_ATTR + ']'));
 		const unadopted = (transaction.keptIslands = islands.slice());
 		ids.next = idSeed;
-		// A document cannot hold a second root element, nor an `<html>`
-		// container a second `<head>` or `<body>`, and the head entries the render
-		// places in `document.head` belong in the client's: their render goes in
-		// place, after it removes the server nodes up front, which a rollback
-		// restores.
-		let frontier: SlotNext | null = null;
+		// A document or `<html>` container renders its client `<html>`, or its
+		// `<head>` and `<body>`, off-document too: the commit removes the server's
+		// first, so the document never holds two. Its server head goes with them,
+		// so the render claims none of its elements, and the head entries it places
+		// land in the client's head at commit (headBlock).
 		if (container.nodeType === 9 || (container as Element).localName === 'html') {
-			journalRootRange(container, null, null);
-			removeNodes(nodes);
-		} else frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
+			const head = (container.nodeType === 9 ? (container as Document) : container.ownerDocument!)
+				.head;
+			if (head !== null) (DISCARDED_HEADS ??= new WeakSet()).add(head);
+		}
+		const frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
 		const commit = () => {
 			owner.hydrationFallback = undefined;
 			// An island the client render adopted belongs to its tree now.
@@ -50216,8 +50321,7 @@ function installHydrationFallback(
 			if (report !== undefined && transaction.caught !== true)
 				queueMicrotask(() => invokeRootErrorHandler(report, failure));
 		};
-		if (frontier === null) transaction.ops.push(commit, null);
-		else frontier.out.push(commit, null, null);
+		frontier.out.push(commit, null, null);
 		return frontier;
 	};
 }
@@ -50532,6 +50636,7 @@ function hydrateRootWithOutputHandler(
 		const previousNative = setNativeAdoptionResolver(null);
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
+		let teardown: (() => void) | null = null;
 		try {
 			if (protocolSkew) throw new HydrationMismatch(formatClientError(348));
 			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
@@ -50582,9 +50687,11 @@ function hydrateRootWithOutputHandler(
 					retryPresentationMiss(error, retry);
 				} else {
 					owner.preservePresentation = true;
-					root.unmount();
-					if (!Object.prototype.hasOwnProperty.call(error, 'failure')) throw error;
-					if (!reportUncaughtError(rootBlock, error.failure)) throw error.failure;
+					teardown = () => {
+						root.unmount();
+						if (!Object.prototype.hasOwnProperty.call(error, 'failure')) throw error;
+						if (!reportUncaughtError(rootBlock, error.failure)) throw error.failure;
+					};
 				}
 			} else if (error instanceof NativeAdoptionMiss) {
 				nativeRecovery = error;
@@ -50596,14 +50703,15 @@ function hydrateRootWithOutputHandler(
 				} catch (unhandled) {
 					rollbackRootRender(owner.transaction!);
 					unmountBlock(rootBlock, false);
-					clearRootContainer(container);
-					if (!reportUncaughtError(rootBlock, unhandled)) throw unhandled;
-					return;
+					teardown = () => {
+						clearRootContainer(container);
+						if (!reportUncaughtError(rootBlock, unhandled)) throw unhandled;
+					};
 				}
 				// An unowned root keeps the server screen while its wakeable is
 				// pending. A hosted root still belongs to the external renderer's
 				// retry protocol and must release its claim/delegation registration.
-				if (owner.wakeable === null) root.unmount();
+				if (teardown === null && owner.wakeable === null) teardown = () => root.unmount();
 			}
 		} finally {
 			setNativeAdoptionResolver(previousNative);
@@ -50611,6 +50719,12 @@ function hydrateRootWithOutputHandler(
 			if (previousHydration === null) clearHydrationThrow();
 			endRootRender(frame);
 			if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
+		}
+		// A root the attempt gave up on releases its DOM once its render has
+		// closed: rendering writes none.
+		if (teardown !== null) {
+			teardown();
+			return;
 		}
 		if (nativeRecovery !== undefined && !owner.disposed) {
 			installHydrationFallback(
