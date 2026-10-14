@@ -2095,10 +2095,20 @@ interaction intent whose target was in the discarded DOM. An early host
 binding (`adoptBindings`, a behavior root) whose server DOM lies in a
 boundary that falls back loses it: its lease ends when the fallback commits,
 its cleanup runs once, and it stops writing, even if its host was moved
-elsewhere while the boundary was pending. A boundary whose captures changed
-before it activated (a dormant `<Hydrate>` island) falls back without a
-report when its server content differs, as React reports nothing for an
-update that reaches a dehydrated boundary.
+elsewhere while the boundary was pending.
+
+A dormant `<Hydrate>` island whose captures or provided context values changed
+before it activated hydrates first, as React hydrates a dehydrated boundary
+before the update that reached it: its first render uses the values its server
+HTML was rendered with, and the newer ones apply as an update once it commits.
+Its effects mount and then update, and the update patches the adopted server
+nodes and any draft in them. One difference here is intentional. An update
+that reaches an island while its hydration attempt waits on data leaves the
+server HTML in place until the attempt retries, which then hydrates and
+applies the update. React instead gives up hydrating the boundary and renders
+it on the client, showing its fallback, unless the update is a transition.
+Octane keeps the server HTML because the island's attempt still owns it and
+the retry can adopt it.
 
 Two differences are intentional. Matching React exactly would mean shipping
 and running a structural comparison of everything hydration adopts, which is

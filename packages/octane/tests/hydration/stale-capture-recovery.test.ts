@@ -6,14 +6,15 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // When a dormant Hydrate boundary's captures change before it activates, the
-// server HTML predates the client's state, and a dormant boundary never renders
-// its stale captures to compare them. As React does for an update that reaches
-// a dehydrated boundary it cannot hydrate, a boundary whose output differs
-// renders on the client with no hydration warning and no onRecoverableError,
-// and takes the client's values even where a real mismatch would keep the
-// server's: suppressHydrationWarning and dangerouslySetInnerHTML. Each Plain*
-// control renders the same tree without a boundary, where the same difference
-// is a real mismatch: the root renders on the client and reports.
+// server HTML predates the client's state. As React hydrates a dehydrated
+// boundary before the update that reached it, the boundary first hydrates with
+// the captures the server rendered, adopting the server's nodes, and then
+// applies the newer captures as an ordinary update. The update patches the
+// adopted nodes, so it takes the client's values even where a real mismatch
+// would keep the server's: suppressHydrationWarning and
+// dangerouslySetInnerHTML. Each Plain* control renders the same tree without a
+// boundary, where the same difference is a real mismatch: the root renders on
+// the client and reports.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -128,7 +129,7 @@ describe.each([
 	);
 
 	it.each(structural)(
-		'renders $site on the client without a report when the captures changed',
+		'hydrates $site, then updates it without a report when the captures changed',
 		async ({ name, serverProps, clientProps, html }) => {
 			container.innerHTML = ServerRT.renderToString(server[`Dormant${name}`], serverProps).html;
 			const outer = container.firstElementChild;
@@ -138,9 +139,9 @@ describe.each([
 			await act(async () => {});
 
 			expect(markup(container.querySelector('section')!.parentElement!)).toBe(html);
-			// Only the boundary renders on the client.
+			// The update patches the server's nodes.
 			expect(container.firstElementChild).toBe(outer);
-			expect(section.isConnected).toBe(false);
+			expect(container.querySelector('section')).toBe(section);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 		},
@@ -216,9 +217,9 @@ describe.each([
 		expect(values(em)).toEqual({ text: 'green', title: 'green', class: 'green', color: 'green' });
 	});
 
-	// Each kind of value the server kept is compared on its own: one that the
-	// changed captures moved renders the boundary on the client, and captures
-	// that moved no value, such as a new handler, keep the server's element.
+	// Each kind of value the changed captures moved is patched on the server's
+	// element, and captures that moved no value, such as a new handler, leave
+	// the element as the server rendered it.
 	const kept = { title: 't', tone: 'a', width: '1px' };
 	const look = (el: HTMLElement) => ({
 		title: el.title,
@@ -231,14 +232,14 @@ describe.each([
 		{ value: 'class', change: { tone: 'b' } },
 		{ value: 'style', change: { width: '2px' } },
 	])(
-		'renders the boundary on the client without a report when only its $value changed',
+		'patches the server element without a report when only its $value changed',
 		async ({ change }) => {
 			const onPress = () => {};
 			await activate('DormantValues', { ...kept, onPress }, { ...kept, ...change, onPress });
 
 			const em = container.querySelector('em')!;
 			expect(look(em)).toEqual({ ...kept, ...change });
-			expect(served!.isConnected).toBe(false);
+			expect(em).toBe(served);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 		},
@@ -310,7 +311,10 @@ describe.each([
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
-	it('renders the dormant boundary on the client where a suppressed host lost its server text node', async () => {
+	// The boundary hydrates with the server's captures first, so the lost text
+	// node is a real mismatch: the boundary alone renders on the client and
+	// reports, as React reports a dehydrated boundary that fails to hydrate.
+	it('renders the dormant boundary on the client and reports where a suppressed host lost its server text node', async () => {
 		container.innerHTML = ServerRT.renderToString(server.DormantSwap, { v: 'red' }).html;
 		const outer = container.firstElementChild;
 		// Something outside Octane replaced the server's text with another node.
@@ -322,7 +326,7 @@ describe.each([
 		expect(em.isConnected).toBe(false);
 		expect(container.firstElementChild).toBe(outer);
 		expect(container.querySelector('em')!.innerHTML).toBe('<b>b</b>blue');
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 });

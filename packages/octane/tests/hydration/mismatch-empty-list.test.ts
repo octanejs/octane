@@ -180,9 +180,10 @@ describe.each([
 	);
 
 	// Captures that changed before a dormant island activated legitimately
-	// differ from the server's: the island renders on the client, and its server
-	// output predating the client state is not reported as a mismatch.
-	it('renders a dormant island on the client without reporting when its list filled before activation', async () => {
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it, the island adopts the server's empty list with
+	// the captures it rendered, then the update fills it, and nothing reports.
+	it('hydrates a dormant island, then fills its list without reporting', async () => {
 		const serverProps = { items: [] as string[], when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantList, serverProps).html;
 		const outer = container.firstElementChild!;
@@ -199,9 +200,8 @@ describe.each([
 		await act(async () => {});
 
 		expect(container.firstElementChild).toBe(outer);
-		expect(host.isConnected).toBe(false);
-		const live = container.querySelector('i')!;
-		expect(markup(live.parentElement!)).toBe('<i><s>x</s><s>y</s>ok</i>');
+		expect(container.querySelector('i')).toBe(host);
+		expect(markup(host.parentElement!)).toBe('<i><s>x</s><s>y</s>ok</i>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

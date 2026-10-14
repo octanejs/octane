@@ -103,14 +103,16 @@ describe('Context providers across split hydration', { timeout: 15_000 }, () => 
 		expect(host.querySelector('#split-context-value')).toBe(value);
 		expect(value.textContent).toBe('server');
 		expect(input.value).toBe('draft before activation');
-		// The provider value changed before the boundary activated. A dormant
-		// boundary never renders its stale captures to compare them, so, as React
-		// does for an update that reaches a dehydrated boundary it cannot hydrate,
-		// the boundary renders on the client with the latest value and reports
-		// nothing. Everything outside it stays adopted.
+		// The provider value changed before the boundary activated. As React
+		// hydrates a dehydrated boundary before the update that reached it, the
+		// boundary adopts its server UI with the value the server rendered, then
+		// renders the latest one as an update, reporting nothing.
 		await act(() => root!.render(client.App, { ...props, when: load(), value: 'latest' }));
 		await vi.waitFor(() => expect(onHydrated).toHaveBeenCalledOnce(), SPLIT_CHILD_LOAD);
-		expect(editor.isConnected).toBe(false);
+		expect(host.querySelector('#split-context-editor')).toBe(editor);
+		expect(host.querySelector('#split-context-value')).toBe(value);
+		expect(host.querySelector('#split-context-draft')).toBe(input);
+		expect(input.value).toBe('draft before activation');
 		expect(host.querySelector('#split-context-value')!.textContent).toBe('latest');
 		expect(host.querySelector('#split-context-value')!.getAttribute('title')).toBe('latest');
 		expect(host.querySelector('main')).toBe(main);

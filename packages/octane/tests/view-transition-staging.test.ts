@@ -392,9 +392,10 @@ describe('ViewTransition staged commits', () => {
 		}
 	});
 
-	// An update that reaches a dormant island with changed captures renders
-	// the island on the client (docs/deferred-hydration.md), as React does for
-	// an update that reaches a dehydrated boundary it cannot hydrate first.
+	// An update that reaches a dormant island with changed captures hydrates
+	// the island with the captures it was claimed with, then applies the newer
+	// ones as an update (docs/deferred-hydration.md), as React hydrates a
+	// dehydrated boundary before the update that reached it.
 	// Use the canonical component with split={false}: a compiler-split import
 	// completes as legitimate urgent work and interrupts a held transition.
 	// With no such interruption, activation must preserve visible SSR until
@@ -435,8 +436,10 @@ describe('ViewTransition staged commits', () => {
 		expect(preservedText.textContent).toBe('before text');
 		expect(preserved.querySelector('[data-binding-arm]')!.localName).toBe('i');
 		await handles[hydrationCapture].update();
-		expect(preserved.isConnected).toBe(false);
+		// The update patches the adopted server nodes.
 		const presentation = container.querySelector('[data-presentation]')!;
+		expect(presentation).toBe(preserved);
+		expect(presentation.querySelector('[data-binding-text]')).toBe(preservedText);
 		expect(presentation.querySelector('[data-binding-text]')!.textContent).toBe('after text');
 		expect(presentation.querySelector('[data-binding-value]')!.textContent).toBe('after');
 		expect(presentation.querySelector('[data-binding-arm]')!.localName).toBe('b');

@@ -298,6 +298,7 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	beginNativeBatch,
 	endNativeBatch,
+	nativeBatchHooks,
 	nativeProducerPublication,
 	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
 	startEarlySignalHydration,
@@ -793,8 +794,6 @@ let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
  * of the driver, so that hydrating bundles without binding views keep none.
  */
 interface HydrationDriver {
-	/** The suspended `<Hydrate>` activation a scheduled native read belongs to. */
-	pendingHydrateOwner(target: Block): HydrateSlot | null;
 	/** A commit's accepted native-signal adoptions end after its layout phase. */
 	releaseNativeAdoptions(): void;
 	/** Whether every early presentation a capture prepared is still current. */
@@ -1849,21 +1848,6 @@ function beginActiveNativeReadScope(scope: Scope): number {
 function scheduleNativeRead(target: Block): void {
 	// The adapter records the real owning Block separately from lightweight
 	// Scope proxies. Native reads and suspended retry leases share this path.
-	const activation =
-		hydrationStarted && preservedHydrateActivationCount !== 0
-			? HYDRATION_DRIVER!.pendingHydrateOwner(target)
-			: null;
-	if (activation !== null) {
-		// A prepared descendant still belongs to the suspended island's capture.
-		// Rendering it as an independent root update would publish its refs and
-		// retire early bindings before the surrounding island has been accepted.
-		invalidateRender(target, activation.block);
-		if (activation.activationRequested) {
-			activation.serverActivationStarted = false;
-			scheduleRender(activation.parentBlock);
-		}
-		return;
-	}
 	invalidateRender(target, target);
 	// Native reads belong to a versioned publication frame. Invalidating an
 	// already-held primary retries that frame coherently; it does not supersede
@@ -2278,7 +2262,7 @@ function componentSourceLoc(body: unknown): string | undefined {
 // writers return while hydration adopts their element (HydrationCapability's
 // keepsAttribute, keepsClass, keepsStyle and adoptHTML). Development lists what
 // differs in one warning per hydration pass (hydration/dev-values.ts), and
-// production compares nothing but stale server values (staleServerValues).
+// production compares nothing.
 // `suppressHydrationWarning` on the owning element (React's
 // shallow semantics) keeps a differing server text and silences the attribute
 // warning. It never keeps a structural difference.
@@ -2348,15 +2332,10 @@ function clearHydrationThrow(): void {
 /**
  * DEV-only: log a hydration-mismatch warning unless a try body holds it, then
  * wait for its root attempt's commit. An attempt that is rolled back is
- * retried, and the retry repeats the warning. Nothing is logged under captures
- * that changed before a dormant boundary activated (staleServerValues).
+ * retried, and the retry repeats the warning.
  */
 function logHydrationMismatch(message: string): void {
-	if (
-		currentHydration?.staleServerValues === true ||
-		currentHydration?.holds(() => logHydrationMismatch(message)) === true
-	)
-		return;
+	if (currentHydration?.holds(() => logHydrationMismatch(message)) === true) return;
 	if (currentHydration?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
 }
 
@@ -16203,39 +16182,20 @@ interface HydrateSlot {
 // ordinary Hydrate state shape unchanged and retain no completed boundaries.
 let hydrateStreamWaitCleanups: WeakMap<HydrateSlot, () => void> | null = null;
 
-interface PreservedHydrateActivation {
-	hydration: HydrationCapability;
-	thenable: TrackedThenable<unknown>;
-	generation: number;
-	capture: OffscreenCapture;
-	source: Block | null;
-	cursor: Node | null;
-	/** The source mounted inside client-built DOM, which it resumes as. */
-	fresh: boolean;
-}
-
-// Allocate bookkeeping only when an already-visible SSR arm really suspends.
-// Keeping its actual DOM attached preserves focus, selection, draft values and
-// native IME sessions; cloning that arm cannot preserve browser-owned state.
-let preservedHydrateActivations: WeakMap<HydrateSlot, PreservedHydrateActivation> | null = null;
-let preservedHydrateActivationCount = 0;
-
 /**
  * What a dormant server-preserved boundary was first claimed with. The server
  * HTML is the output of exactly these captures, so while the boundary activates
  * with equal captures a value mismatch is a genuine server/client divergence.
  * Once a mounted parent legitimately changes them, the server HTML predates the
- * client's own state: any attribute or text difference then makes the boundary
- * fall back and render on the client, without reporting it
- * (staleServerValues). Deciding this compares values and never runs a child
- * render.
+ * client's own state, so the island hydrates with these, as React hydrates a
+ * dehydrated boundary before the update that reached it, and the newer ones
+ * apply as an update once that commits (activateHydrateBoundary). Deciding
+ * this compares values and never runs a child render.
  */
 interface HydrateInitialCaptures {
 	props: InternalHydrateProps;
 	contexts: Map<Context<any>, any> | null;
 	contextEpoch: number;
-	/** The enclosing boundary had already activated with changed captures. */
-	stale: boolean;
 }
 
 function collectHydrateContexts(scope: Scope): Map<Context<any>, any> | null {
@@ -16252,19 +16212,6 @@ function collectHydrateContexts(scope: Scope): Map<Context<any>, any> | null {
 	for (let block = scope.block.parentBlock; block !== null; block = block.parentBlock)
 		add(block.$$ctxValues);
 	return contexts;
-}
-
-function changedHydrateContexts(
-	initial: Map<Context<any>, any> | null,
-	next: Map<Context<any>, any> | null,
-): boolean {
-	if ((initial?.size ?? 0) !== (next?.size ?? 0)) return true;
-	if (initial !== null) {
-		for (const [context, value] of initial) {
-			if (next === null || !next.has(context) || !Object.is(value, next.get(context))) return true;
-		}
-	}
-	return false;
 }
 
 function changedHydrateCaptures(
@@ -16311,95 +16258,69 @@ function changedHydrateChildren(initial: unknown, next: unknown): boolean {
 	}
 }
 
-function hydrateServerValuesStale(state: HydrateSlot): boolean {
-	const initial = state.initialCaptures;
-	if (initial === null) return false;
-	if (initial.stale || changedHydrateCaptures(initial.props, state.props)) return true;
-	// Every provider value change moves the epoch, so an unmoved epoch proves
-	// the inherited context values are the ones the server HTML was claimed with.
-	return (
-		initial.contextEpoch !== EPOCH_CELL.value &&
-		changedHydrateContexts(
-			initial.contexts,
-			collectHydrateContexts(
-				CURRENT_SCOPE?.block === state.parentBlock ? CURRENT_SCOPE : state.parentBlock,
-			),
-		)
-	);
-}
-
-function releasePreservedHydrateActivation(state: HydrateSlot): void {
-	if (preservedHydrateActivations?.delete(state)) preservedHydrateActivationCount--;
-}
-
-function pendingHydrateOwner(target: Block): HydrateSlot | null {
-	let owner: HydrateSlot | null = null;
-	for (let block: Block | null = target; block !== null; block = block.parentBlock) {
-		// Lite DOM-context proxies have no hook slots. Keep walking through them
-		// so the enclosing preserved island still owns its descendants' retries.
-		if (block.block !== block) continue;
-		const state = block.slots[0] as HydrateSlot | undefined;
-		if (
-			state?.__kind === 'hydrateBlockSlot' &&
-			!state.hydrated &&
-			preservedHydrateActivations?.has(state)
-		)
-			owner = state;
-	}
-	return owner;
-}
-
-function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unknown>): Block | null {
-	const block = scope.block;
-	let suspended: Block | null = null;
-	// A lite scope's block is a DOM-context proxy (LiteBlockImpl) with no render
-	// or mount state, so it is never the source. The Blocks below it still are.
-	if (block.block === block) {
-		const own = block.rare?.thenables;
-		if (own !== undefined && own.includes(thenable)) return block;
-		// Compiler-emitted useBatch can suspend before use() registers a thenable
-		// on its block. The deepest unfinished registered child is that same source.
-		if (!block.mounted) suspended = block;
-	}
-	forEachSubtreeChild(scope, (child) => {
-		const candidate = findSuspendedHydrateBlock(child, thenable);
-		if (candidate !== null) suspended = candidate;
-	});
-	return suspended;
-}
-
-function preserveSuspendedHydrateActivation(
+/**
+ * The context values `state`'s server HTML was rendered with, where the
+ * island's current ones differ: a context it reads no provider of now reads
+ * as its default. Null when none differ. Every provider value change moves
+ * the epoch, so an unmoved epoch proves the inherited values are the claimed
+ * ones.
+ */
+function serverHydrateContexts(
 	state: HydrateSlot,
-	hydration: HydrationCapability,
-	suspension: SuspenseException,
-): void {
-	const thenable = suspension.thenable;
-	const suspendedBlock = findSuspendedHydrateBlock(state.block, thenable);
-	const activation: PreservedHydrateActivation = {
-		hydration,
-		thenable,
-		generation: state.activationGeneration,
-		capture: WIP_CAPTURE!,
-		source: suspendedBlock === state.block ? null : suspendedBlock,
-		cursor: hydration.node,
-		fresh: hydration.freshSuspension === suspension,
-	};
-	hydration.freshSuspension = null;
-	const activations = (preservedHydrateActivations ??= new WeakMap());
-	if (!activations.has(state)) preservedHydrateActivationCount++;
-	activations.set(state, activation);
-	const resume = () => {
-		if (
-			state.block.disposed ||
-			!state.activationRequested ||
-			state.activationGeneration !== activation.generation ||
-			preservedHydrateActivations?.get(state) !== activation
-		)
-			return;
-		state.serverActivationStarted = false;
-		scheduleRender(state.parentBlock);
-	};
-	resumeOnSettle(thenable, resume);
+	initial: HydrateInitialCaptures,
+): Map<Context<any>, any> | null {
+	if (initial.contextEpoch === EPOCH_CELL.value) return null;
+	const current = collectHydrateContexts(
+		CURRENT_SCOPE?.block === state.parentBlock ? CURRENT_SCOPE : state.parentBlock,
+	);
+	let server: Map<Context<any>, any> | null = null;
+	for (const [context, value] of initial.contexts ?? [])
+		if (current === null || !current.has(context) || !Object.is(value, current.get(context)))
+			(server ??= new Map()).set(context, value);
+	for (const context of current?.keys() ?? [])
+		if (initial.contexts === null || !initial.contexts.has(context))
+			(server ??= new Map()).set(context, context.defaultValue);
+	return server;
+}
+
+/**
+ * After an island hydrated the captures its server HTML was rendered with
+ * (activateHydrateBoundary), its newer ones apply as an update in a render of
+ * their own, once that hydration commits, as React applies an update that
+ * reached a dehydrated boundary after hydrating it. A reader of a context the
+ * island shadowed with its server value (`shadowed`) renders again too: the
+ * cascade that delivered the newer value ran before it existed.
+ */
+function applyHydrateCaptures(state: HydrateSlot, shadowed: boolean): void {
+	const blocks: Block[] = [state.block];
+	if (shadowed) forgetShadowedContexts(state.block, state.block, blocks);
+	atCommit(renderHydratedUpdate, blocks);
+}
+
+/** Drop the context owners that scopes under `scope` resolved to `owner`, and collect their blocks. */
+function forgetShadowedContexts(scope: Scope, owner: Block, readers: Block[]): void {
+	forEachSubtreeChild(scope, (child) => {
+		const cache = child.$$ctxCache;
+		let read = false;
+		if (child.$$ctxCacheOwner === owner) {
+			child.$$ctxCache = child.$$ctxCacheOwner = null;
+			read = true;
+		} else if (cache !== null && child.$$ctxCacheOwner === null) {
+			for (const [context, resolved] of cache as Map<Context<any>, unknown>)
+				if (resolved === owner) read = (cache as Map<Context<any>, unknown>).delete(context);
+		}
+		if (read) {
+			// A lite stand-in renders with the Block it belongs to.
+			let block = child.block as Block;
+			while (block.block !== block) block = block.parentBlock!;
+			readers.push(block);
+		}
+		forgetShadowedContexts(child, owner, readers);
+	});
+}
+
+function renderHydratedUpdate(blocks: Block[]): void {
+	for (const block of blocks) if (!block.disposed) scheduleRender(block);
 }
 
 function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
@@ -16561,27 +16482,13 @@ function createHydrateBoundaryBody(
 			}
 			renderChild(state, scope, extra);
 		} catch (error) {
-			if (
-				isSuspenseException(error) &&
-				currentHydration?.deferred != null &&
-				state.serverPreserved &&
-				!state.hydrated
-			)
+			// The server's content is already visible. An activation that suspends
+			// drops its attempt, never mounting a fallback over it, and the island
+			// adopts its server DOM afresh once the wakeable settles, as a
+			// suspended Suspense arm does (activateHydrateBoundary).
+			if (hydrating && state.serverPreserved && !state.hydrated && isSuspenseException(error))
 				throw new DeferredHydrationSuspension(error.thenable);
-			const hydration = activeHydration();
-			if (
-				!state.serverPreserved ||
-				state.hydrated ||
-				hydration === null ||
-				!isSuspenseException(error)
-			) {
-				throw error;
-			}
-			// The SSR arm is already the visible content. Let its adopted try block
-			// remain connected and retry adoption in the same hydration capability
-			// once application data settles, without ever mounting a cloned fallback.
-			preserveSuspendedHydrateActivation(state, hydration, error);
-			return;
+			throw error;
 		}
 		state.hydrated = true;
 		// Runtime-owned effect bodies receive their dependency tuple as arguments.
@@ -16759,20 +16666,9 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 }
 
 function teardownHydrateBoundary(state: HydrateSlot): void {
-	const preserved = preservedHydrateActivations?.get(state);
-	if (preserved !== undefined) {
-		// Recursive teardown must recognize these refs as uncommitted. Restore
-		// this logical state if the preparing transition is abandoned.
-		if (isRecordingTransitionJournal()) journalObjectOnce(state.block);
-		state.block.mounted = false;
-	}
 	state.initialCaptures = null;
 	cleanupHydrateInstallers(state);
 	cleanupHydrateStreamWait(state);
-	if (preserved !== undefined) {
-		releasePreservedHydrateActivation(state);
-		discardOffscreenCapture(preserved.capture);
-	}
 	state.prefetchAbort?.abort();
 	resolveHydrateWaiters(state, 'abort');
 	unregisterHydrationIntentBoundary(state.wrapper, state.intentBoundary);
@@ -17274,7 +17170,6 @@ function createHydrateSlot(
 			props,
 			contexts: collectHydrateContexts(scope),
 			contextEpoch: EPOCH_CELL.value,
-			stale: hydration!.staleServerValues,
 		};
 	}
 	scope.slots[0] = state;
@@ -17294,53 +17189,6 @@ function createHydrateSlot(
 		if (!shouldDefer && initialStrategy._t !== 'never') requestHydrateBoundary(state);
 	}
 	return state;
-}
-
-/**
- * Resume `source`, a preserved activation's leaf that suspended inside
- * client-built DOM. A client arm around it that suspended before inserting
- * anything has no bound and reads its range from its insertion anchor
- * (pendingArmBefore), so mark where the content the leaf inserts at that
- * anchor starts on each such arm's block: that content is the arm's own.
- */
-function resumeFreshHydrateSource(source: Block): void {
-	const anchor = source.endMarker;
-	const parent = source.parentNode;
-	const before = anchor ? anchor.previousSibling : parent.lastChild;
-	try {
-		renderBlock(source);
-	} finally {
-		const first = before ? getNextSibling(before) : getFirstChild(parent);
-		for (
-			let arm = source.parentBlock;
-			first !== anchor &&
-			arm?.kind === 'control-flow' &&
-			!arm.mounted &&
-			arm.startMarker === null &&
-			arm.endMarker === anchor;
-			arm = arm.parentBlock
-		) {
-			journalRootProperty(arm, 'startMarker', null);
-			arm.startMarker = first;
-		}
-	}
-}
-
-// Only a <Hydrate> island's activation runs these, so they are module
-// functions rather than HydrationCapability methods: a hydrating bundle without
-// islands drops them with activateHydrateBoundary.
-
-/**
- * Resume `source`, the block that a preserved activation suspended in. A
- * source whose first render into its adopted range suspended claims that
- * range again, as the render that suspended did.
- */
-function renderSuspended(hydration: HydrationCapability, source: Block): void {
-	const claim = hydration.suspendedClaims?.get(source);
-	if (claim !== undefined) {
-		hydration.suspendedClaims!.delete(source);
-		hydration.renderClaimed(source, claim[0], claim[1]);
-	} else renderBlock(source);
 }
 
 /**
@@ -17372,33 +17220,28 @@ function finishRoot(hydration: HydrationCapability): void {
 function activateHydrateBoundary(state: HydrateSlot): void {
 	if (state.start === null || state.end === null) return;
 	const block = state.block;
-	let preserved = preservedHydrateActivations?.get(state);
-	if (preserved !== undefined && !currentPresentations(preserved.capture)) {
-		discardHydratePresentation(state, preserved.capture);
-		preserved = undefined;
-	}
-	const activationSlot = block.slots[0] as TrySlot | undefined;
-	if (
-		!state.serverPreserved ||
-		(activationSlot?.__kind === 'trySlotSlot' && preserved === undefined)
-	) {
+	if (!state.serverPreserved || (block.slots[0] as TrySlot | undefined)?.__kind === 'trySlotSlot') {
 		renderBlock(block);
 		return;
 	}
-	const hydration =
-		preserved?.hydration ?? new HydrationCapability(block, getNextSibling(state.start), null);
-	// A suspended first attempt keeps its capability, so re-check each attempt.
-	if (!hydration.staleServerValues && hydrateServerValuesStale(state))
-		hydration.staleServerValues = true;
-	if (preserved === undefined) {
-		if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
-		hydration.protectRootAnchor(state.end);
-		hydration.defers = true;
-		hydration.idStart = block.idState.next;
-	}
+	const hydration = new HydrationCapability(block, getNextSibling(state.start), null);
+	// Captures that changed before the island activated: the server HTML is the
+	// output of the ones it was claimed with, so the attempt hydrates those, and
+	// the newer ones apply once it commits (applyHydrateCaptures).
+	const initial = state.initialCaptures;
+	const props = state.props;
+	const serverProps =
+		initial !== null && changedHydrateCaptures(initial.props, props) ? initial.props : null;
+	const serverContexts = initial === null ? null : serverHydrateContexts(state, initial);
+	if (serverProps !== null) state.props = serverProps;
+	if (serverContexts !== null) block.$$ctxValues = serverContexts;
+	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
+	hydration.protectRootAnchor(state.end);
+	hydration.defers = true;
+	hydration.idStart = block.idState.next;
 	const previousHydration = currentHydration;
 	const previousCapture = WIP_CAPTURE;
-	const capture = preserved?.capture ?? createOffscreenCapture();
+	const capture = createOffscreenCapture();
 	if (block.idState.renderOwner?.bindingLeases?.size) {
 		hydration.retryPresentation = () => {
 			if (block.disposed) return;
@@ -17417,41 +17260,19 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	let nativeRecovery: NativeAdoptionMiss | undefined;
 	let restart: DeferredHydrationSuspension | undefined;
 	try {
-		if (preserved === undefined && state.nativeSeedRaw !== undefined) {
+		if (state.nativeSeedRaw !== undefined) {
 			hydration.nativeAdoption = ownNativeAdoption(block, state.nativeSeedRaw, () => {
 				state.nativeSeedRaw = undefined;
 			});
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
-		if (preserved?.source !== null && preserved?.source !== undefined) {
-			// Existing component slots do not re-enter their own adopted server
-			// ranges on an ordinary parent replay. Complete the actually suspended
-			// leaf at its saved cursor first, then let its ancestors reconcile the
-			// already-adopted siblings without treating their range as fresh DOM.
-			// A leaf that mounted inside DOM the client built has no server DOM to
-			// adopt and completes as a client render.
-			const source = preserved.source;
-			hydration.node = preserved.cursor;
-			try {
-				if (preserved.fresh) hydration.suspend(() => resumeFreshHydrateSource(source));
-				else renderSuspended(hydration, source);
-			} catch (error) {
-				if (!isSuspenseException(error)) throw error;
-				preserveSuspendedHydrateActivation(state, hydration, error);
-				return;
-			}
-		}
 		renderBlock(block);
 		if (hydration.deferred !== null) hydration.claimDeferred();
 		drainHydrationRenderPhaseUpdates(block, true);
-		// Suspended initial adoption intentionally leaves its real server arm and
-		// cursor untouched. Sweep only after that same arm eventually commits.
 		if (state.hydrated) {
-			// A descriptor-only child need not clone a compiled root template, and a
-			// resumed cursor can still be inside the internal try slot's owned range.
-			// Wait until adoption completes before claiming that range's remainder:
-			// a later template clone must get the first claim, and DOM added while
-			// suspended must not be skipped by an earlier fallback snapshot.
+			// A descriptor-only child need not clone a compiled root template. Claim
+			// the internal try slot's remainder only once adoption completes: a later
+			// template clone must get the first claim.
 			const adoptedSlot = block.slots[0] as TrySlot | undefined;
 			if (adoptedSlot?.__kind === 'trySlotSlot') {
 				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
@@ -17469,10 +17290,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			(error instanceof DeferredHydrationSuspension || error instanceof PresentationAdoptionMiss)
 		)
 			dropRootOps(transaction, opsMark, retiredMark);
-		// A rejected parked promise can throw while its unfinished source retries.
-		// Discard the same uncommitted work as an explicit boundary unmount before
-		// the enclosing error boundary tears down its partially mounted children.
-		releasePreservedHydrateActivation(state);
+		// Discard the attempt's uncommitted work before the enclosing error
+		// boundary tears down its partially mounted children.
 		discardOffscreenCapture(capture);
 		state.block.mounted = false;
 		if (error instanceof PresentationAdoptionMiss) {
@@ -17492,12 +17311,17 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		WIP_CAPTURE = previousCapture;
 		swapHydration(previousHydration);
 		if (previousHydration === null) clearHydrationThrow();
+		state.props = props;
+		if (serverContexts !== null) block.$$ctxValues = null;
 	}
 	if (restart !== undefined) {
 		// As a suspended Suspense arm does, the island keeps its server DOM, with
 		// nothing reported, and its retry adopts it afresh, seeding afresh too.
+		// Until then the attempt still owns the island: a parent render waits for
+		// the retry rather than start another attempt.
 		hydration.discardSeeds();
 		discardHydratePresentation(state, capture);
+		state.serverActivationStarted = true;
 		block.idState.next = hydration.idStart;
 		const generation = state.activationGeneration;
 		resumeOnSettle(restart.thenable, () => {
@@ -17569,16 +17393,16 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// Outside any hydration, an error that escaped the client render ends here.
 			if (recoveryHydration === null) clearHydrationThrow();
 		}
-		if (!caught && !hydration.staleServerValues)
-			noteRecoverableHydrationError(() => nativeRecovery!, block);
+		if (!caught) noteRecoverableHydrationError(() => nativeRecovery!, block);
 		spliceOffscreenCapture(recoveryCapture);
 		return;
 	}
 	if (completed) {
 		state.initialCaptures = null;
 		hydration.passSeeds(previousHydration);
-		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
+		if (serverProps !== null || serverContexts !== null)
+			applyHydrateCaptures(state, serverContexts !== null);
 	}
 }
 
@@ -17640,7 +17464,6 @@ function discardHydratePresentation(state: HydrateSlot, capture: OffscreenCaptur
 	const refs: SuspenseRefEntry[] = [];
 	collectVisibleSubtreeRefs(state.block, refs);
 	discardOffscreenCapture(capture);
-	releasePreservedHydrateActivation(state);
 	for (const frame of capture.presentations ?? [])
 		if (PRESENTATION_PREPARATIONS.get(frame.lease) === frame)
 			PRESENTATION_PREPARATIONS.delete(frame.lease);
@@ -20409,7 +20232,6 @@ function installHydrationDriver(): void {
 	startHydration();
 	supplyNativeAdoptionMiss();
 	HYDRATION_DRIVER ??= {
-		pendingHydrateOwner,
 		releaseNativeAdoptions,
 		currentPresentations,
 		retryPresentations,
@@ -20512,14 +20334,6 @@ function auditHydrationProbe(kind: string, hit: boolean): void {
 }
 
 class HydrationCapability {
-	/**
-	 * Parent captures changed before this dormant boundary activated, so the
-	 * server HTML predates the client's state. Any difference from it, a text or
-	 * attribute value included (staleValue), does not match the client render,
-	 * and the boundary's fallback reports nothing (noteRecoverableHydrationError,
-	 * logHydrationMismatch).
-	 */
-	staleServerValues = false;
 	depth = 0;
 	/**
 	 * Depth of a render that adopts nothing but still consumes positional seeds:
@@ -20527,8 +20341,6 @@ class HydrationCapability {
 	 */
 	replayDepth = -1;
 	seedCursor = 0;
-	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
-	suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
 	/**
 	 * What a hydrating update built on the client where its slot had already
 	 * rendered: blocks (renderUpdate), and child slots whose list it built.
@@ -20554,8 +20366,6 @@ class HydrationCapability {
 	 * does not claim. Undefined until the template adopts claimFrom.
 	 */
 	private claimEnd: Node | null | undefined = undefined;
-	/** The last suspension thrown out of a client-built subtree (suspend). */
-	freshSuspension: SuspenseException | null = null;
 	/**
 	 * Whether a template's adoption may defer the mismatch it finds
 	 * (adoptOrDefer): set by an owner that discards an attempt that suspends and
@@ -20660,9 +20470,6 @@ class HydrationCapability {
 		const previousNative = setNativeAdoptionResolver(null);
 		try {
 			return fn();
-		} catch (error) {
-			if (isSuspenseException(error)) this.freshSuspension = error;
-			throw error;
 		} finally {
 			setNativeAdoptionResolver(previousNative);
 			this.depth--;
@@ -20798,19 +20605,13 @@ class HydrationCapability {
 	 * own: its component frame, or the range of a renderable hole or list item
 	 * whose value it is. The server may have rendered another component there,
 	 * or more from this one, whose content starts with what the client renders:
-	 * anything left after the client's content is a mismatch (settleClaim). A
-	 * render that suspends leaves the claim to the resume of `block`
-	 * (renderSuspended).
+	 * anything left after the client's content is a mismatch (settleClaim).
 	 */
 	renderClaimed(block: Block, scope: Scope, slotKey: number): void {
 		const outer = this.beginClaim(getNextSibling(block.startMarker!));
 		let from: Node | null | undefined;
 		try {
 			renderBlock(block);
-		} catch (error) {
-			if (isSuspenseException(error))
-				(this.suspendedClaims ??= new WeakMap()).set(block, [scope, slotKey]);
-			throw error;
 		} finally {
 			from = this.endClaim(outer);
 		}
@@ -21097,7 +20898,7 @@ class HydrationCapability {
 			if (this.adopting) error.warning = message;
 			// A root's attempt publishes its diagnostics when it commits, which this
 			// mismatch prevents if the root is what falls back (hydrateRoot).
-			if (inRootHydrationAttempt() && !this.staleServerValues) error.diagnostic = message;
+			if (inRootHydrationAttempt()) error.diagnostic = message;
 		}
 		throw error;
 	}
@@ -21307,8 +21108,7 @@ class HydrationCapability {
 	 * when the client's text is written instead: in a host the client built,
 	 * which holds the client template, and in a `<textarea>`, whose text is its
 	 * default value, which React sets to the client's. Any other difference
-	 * does not match the client render, nor does any difference from stale
-	 * server values (staleServerValues). Unless a render-phase update renders
+	 * does not match the client render. Unless a render-phase update renders
 	 * the text again before the pass ends: React renders a component that
 	 * updates itself while it renders again before it compares the output, so
 	 * the text that render settles on decides, equal or not (settleTexts).
@@ -21326,7 +21126,7 @@ class HydrationCapability {
 		if (!equal) {
 			if (host !== null && host.nodeType === 1 && (host as Element).localName === 'textarea')
 				return false;
-			if (!this.staleServerValues && isHydrationSuppressed(host)) return true;
+			if (isHydrationSuppressed(host)) return true;
 		}
 		// Every block with an update queued is in the queue, so an empty one spares
 		// the common pass rendersAgain's walk.
@@ -21460,20 +21260,11 @@ class HydrationCapability {
 	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. React 19 keeps the
 	 * server's content and records nothing, so the next render that passes an
 	 * `__html` object rewrites it, even with the same string (setHTML).
-	 * Production therefore compares nothing, unless the server values are stale
-	 * (staleServerValues), where a difference in the raw strings does not match
-	 * the client render: a spelling difference only renders that rare pass on
-	 * the client. Development lists a difference (hydration/dev-values.ts).
+	 * Production therefore compares nothing. Development lists a difference
+	 * (hydration/dev-values.ts).
 	 */
 	adoptHTML(el: Element, next: string): void {
-		if (this.staleServerValues) {
-			if ((el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML) !== next)
-				this.fail(
-					(el as any).__oct_loc,
-					() => `\`dangerouslySetInnerHTML\` content ${JSON.stringify(next)}`,
-					el,
-				);
-		} else if (process.env.NODE_ENV !== 'production') unpatchedHTML(this, el, next);
+		if (process.env.NODE_ENV !== 'production') unpatchedHTML(this, el, next);
 	}
 
 	/**
@@ -21908,12 +21699,7 @@ class HydrationCapability {
 	 * own. A method, so that bundles which never hydrate do not retain it.
 	 */
 	keepsServerContent(el: Node): boolean {
-		if (
-			!isHydrationSuppressed(el) ||
-			this.staleServerValues ||
-			(el as Element).localName === 'textarea'
-		)
-			return false;
+		if (!isHydrationSuppressed(el) || (el as Element).localName === 'textarea') return false;
 		const first = getFirstChild(el);
 		if (first === null || (first.nodeType === 3 && getNextSibling(first) === null)) return false;
 		(KEPT_TEXT_CONTENT ??= new WeakSet()).add(el);
@@ -22146,23 +21932,13 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A stale server value (staleServerValues) that differs from the client's
-	 * does not match the client render, which reports nothing. Production
-	 * compares only stale values, and raw: a spelling difference only renders
-	 * that rare pass on the client. Development lists every other difference
-	 * (hydration/dev-values.ts).
+	 * Whether an adopted `el` keeps its server attribute `name` where the client
+	 * writes `next`. Production compares nothing; development lists a
+	 * difference (hydration/dev-values.ts).
 	 */
-	private staleValue(el: Element, differs: boolean): void {
-		if (differs) this.fail((el as any).__oct_loc, () => 'a newer value', el);
-	}
-
-	/** Whether an adopted `el` keeps its server attribute `name` where the client writes `next`. */
 	keepsAttribute(el: Element, name: string, next: string | null): boolean {
 		if (!this.adopts(el)) return false;
-		if (this.staleServerValues)
-			// Read through the prototype: a form's named control can shadow its method.
-			this.staleValue(el, Element.prototype.getAttribute.call(el, name) !== next);
-		else if (process.env.NODE_ENV !== 'production') unpatchedAttribute(this, el, name, next);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(this, el, name, next);
 		return true;
 	}
 
@@ -22172,10 +21948,7 @@ class HydrationCapability {
 	 */
 	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
 		if (!this.adopts(el)) return false;
-		if (this.staleServerValues) {
-			const server = Element.prototype.getAttribute.call(el, 'class');
-			this.staleValue(el, (absentIsEmpty && server === null ? '' : server) !== next);
-		} else if (process.env.NODE_ENV !== 'production') unpatchedClass(this, el, next, absentIsEmpty);
+		if (process.env.NODE_ENV !== 'production') unpatchedClass(this, el, next, absentIsEmpty);
 		return true;
 	}
 
@@ -22191,12 +21964,7 @@ class HydrationCapability {
 		entries?: readonly unknown[],
 	): boolean {
 		if (!this.adopts(el)) return false;
-		if (this.staleServerValues)
-			this.staleValue(
-				el,
-				el.style.cssText !== expectedStyle(el, value, staticCss, entries).cssText,
-			);
-		else if (process.env.NODE_ENV !== 'production')
+		if (process.env.NODE_ENV !== 'production')
 			unpatchedStyle(this, el, expectedStyle(el, value, staticCss, entries));
 		return true;
 	}
@@ -23796,10 +23564,9 @@ class HydrationMismatch extends NativeAdoptionMiss {
 }
 
 /**
- * A Hydrate island's attempt suspended on `thenable` after a template's or a
- * call's adoption deferred a mismatch (adoptOrDefer, callOpen), so that it
- * rendered on the client since. It cannot resume where it suspended: the
- * island discards it, keeping its server DOM, and adopts afresh once
+ * A Hydrate island's activation suspended on `thenable` outside any Suspense
+ * arm inside it. As a dehydrated Suspense arm's attempt does, the island
+ * discards the attempt, keeping its server DOM, and adopts afresh once
  * `thenable` settles. Like a mismatch, it passes every boundary inside the
  * island (isAdoptionControl).
  */
@@ -29690,7 +29457,10 @@ function reportListenerError(err: unknown): void {
 function maybeFlushDiscrete(type: DelegatedEventType): void {
 	if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0 && pendingRestores.length > 0) {
 		// Commit handler-scheduled work first, so the controlled restore below
-		// compares the DOM against the values the handlers just rendered.
+		// compares the DOM against the values the handlers just rendered. Signal
+		// writes from an event a graph subscriber dispatched still wait in the
+		// graph's queue; admit their renders first.
+		if (nativeBatchHooks) nativeBatchHooks.present();
 		if (!inFlush && hasPendingWork()) {
 			// Native events can fire from commit-phase DOM mutations or effects.
 			// The ambient flush already owns their updates; calling public flushSync
@@ -41144,8 +40914,6 @@ interface InitialSuspenseHydration {
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
-	/** The captures changed before a dormant boundary activated; see staleServerValues. */
-	stale?: true;
 }
 
 // Server metadata gives each resolved arm an independent adoption scope. The
@@ -41438,9 +41206,6 @@ function renderInitialSuspenseHydration(
 	hydration.claimRootRemainder(initial.end);
 	hydration.protectRootAnchor(initial.end);
 	const previousHydration = currentHydration;
-	// Only the activation knows; a retry runs outside it, over the restored arm.
-	if (previousHydration?.staleServerValues || initial.stale)
-		hydration.staleServerValues = initial.stale = true;
 	if (previousHydration?.retryPresentation !== undefined)
 		hydration.retryPresentation = previousHydration.retryPresentation;
 	const previousCapture = WIP_CAPTURE;
@@ -44419,15 +44184,12 @@ function finalizeMarkerlessBranch(
 
 /**
  * The node before the content of a client arm without a bound
- * (`unfinalized`). It inserted nothing, so that is whatever
- * precedes its insertion anchor now, unless a hydration retry resumed a leaf
- * inside it: what that leaf inserted is the arm's own and starts at the arm
- * block's `startMarker` (resumeFreshHydrateSource).
+ * (`unfinalized`). It inserted nothing, so that is whatever precedes its
+ * insertion anchor now.
  */
 function pendingArmBefore(block: Block, domParent: Node): Node | null {
-	const first = block.startMarker;
-	const node = first !== null && first.parentNode === domParent ? first : block.endMarker;
-	return node ? node.previousSibling : domParent.lastChild;
+	const end = block.endMarker;
+	return end ? end.previousSibling : domParent.lastChild;
 }
 
 /**
@@ -49059,11 +48821,10 @@ function registeredReportUncaughtError(block: Block | null, err: unknown): boole
  * callback can never re-enter the in-progress hydration walk. A hydrating try
  * body holds it until the body settles (HYDRATION_DIAGNOSTIC_HOLDS), and a
  * root's hydrating attempt delivers it only if it commits
- * (inRootHydrationAttempt). A boundary whose server output predates the
- * client's state is not a mismatch, so it reports nothing.
+ * (inRootHydrationAttempt).
  */
 function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
-	if (ROOT_ERROR_HANDLERS === null || currentHydration?.staleServerValues === true) return;
+	if (ROOT_ERROR_HANDLERS === null) return;
 	const from = block ?? CURRENT_BLOCK;
 	if (currentHydration?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
@@ -50375,8 +50136,6 @@ function hydrateRootWithOutputHandler(
 				process.env.NODE_ENV !== 'production' && nativeRecovery instanceof HydrationMismatch
 					? nativeRecovery.diagnostic
 					: undefined,
-				// A root's server output never predates its client state
-				// (staleServerValues), so its fallback always reports.
 				rootOptions?.onRecoverableError,
 				idState,
 				rootOptions?.identifierSeed ?? 0,

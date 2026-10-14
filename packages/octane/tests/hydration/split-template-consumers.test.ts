@@ -14,14 +14,14 @@ import type * as updatedAttributesClient from './_fixtures/split-hydrate-updated
 import type * as fragmentClient from './_fixtures/split-hydrate-fragments.tsrx';
 
 // A dormant <Hydrate> boundary adopts its server UI until it activates. When its
-// captures change first, a dormant boundary never renders its stale captures to
-// compare them with the server's output, so, as React does for an update that
-// reaches a dehydrated boundary it cannot hydrate, a boundary whose output
-// changed renders on the client: its server DOM and native drafts inside it are
-// replaced, nothing is reported, and everything outside it stays adopted. A
-// boundary whose output is unchanged adopts its server UI. A genuine initial
-// mismatch renders the boundary on the client and reports once; without a
-// boundary, the root renders on the client.
+// captures change first, it hydrates with the captures its server UI was
+// rendered with, as React hydrates a dehydrated boundary before the update that
+// reached it, and then renders the newer captures as an update: its server DOM
+// and the native drafts inside it stay, state it initializes and effects it
+// mounts see the server's captures first, nothing is reported, and everything
+// outside it stays adopted. A genuine initial mismatch renders the boundary on
+// the client and reports once; without a boundary, the root renders on the
+// client.
 
 const filename = resolve(import.meta.dirname, '_fixtures/split-template-lifecycle.tsrx');
 const server = loadServerFixture<typeof client>(filename);
@@ -157,14 +157,17 @@ for (const dev of [false, true]) {
 						expect(section.className).toBe('active-tone');
 						expect(section.style.opacity).toBe('1');
 						expect(section.dataset.region).toBe('fragment region');
-						// The boundary renders on the client, including its native draft.
-						expect(serverSection?.isConnected ?? false).toBe(false);
-						expect(serverHeadings.some((node) => node.isConnected)).toBe(false);
-						expect(prefix.isConnected).toBe(false);
-						expect(tail.isConnected).toBe(false);
-						expect(view.host.querySelector<HTMLInputElement>('[data-row-tail]')!.value).toBe(
-							'server row draft',
-						);
+						// The captures changed while the boundary was dormant. As React
+						// hydrates a dehydrated boundary before the update that reached it,
+						// the boundary adopts its server rows, native drafts included, then
+						// renders the newer captures as an update.
+						if (initiallyVisible) {
+							expect(section).toBe(serverSection);
+							headings.forEach((node, index) => expect(node).toBe(serverHeadings[index]));
+						}
+						expect(view.host.querySelector('[data-row-prefix]')).toBe(prefix);
+						expect(view.host.querySelector('[data-row-tail]')).toBe(tail);
+						expect(tail.value).toBe('edited row draft');
 						expect(view.host.querySelector('#fragment-outside')).toBe(outside);
 						expect(outside.value).toBe('edited outside draft');
 						expect(refs).toEqual([section]);
@@ -311,21 +314,16 @@ for (const dev of [false, true]) {
 						]);
 						expect(section.className).toBe('active-tone');
 						expect(section.style.opacity).toBe('1');
-						if (mode === 'direct') {
-							// No boundary: the update applies to the hydrated root in place.
-							if (initiallyVisible) expect(section).toBe(serverSection);
-						} else {
-							// The boundary's captures changed while it was dormant, so it renders
-							// on the client, including the native draft inside it.
-							expect(serverSection?.isConnected ?? false).toBe(false);
-						}
+						// Without a boundary the update applies to the hydrated root in place.
+						// A boundary whose captures changed while it was dormant hydrates
+						// first, as React's does, so the update applies in place there too,
+						// native drafts included.
+						if (initiallyVisible) expect(section).toBe(serverSection);
 						expect(view.host.querySelector('#fragment-outside')).toBe(outside);
 						expect(outside.value).toBe('edited outside draft');
 						if (tail) {
-							expect(tail.isConnected).toBe(false);
-							expect(view.host.querySelector<HTMLInputElement>('#fragment-root-tail')!.value).toBe(
-								'server root draft',
-							);
+							expect(view.host.querySelector('#fragment-root-tail')).toBe(tail);
+							expect(tail.value).toBe('edited root draft');
 						}
 						expect(root.recoverable).toEqual([]);
 						root.unmount();
@@ -546,9 +544,10 @@ for (const dev of [false, true]) {
 				expect(preloaded).toBe(true);
 				expect(effects).toEqual([]);
 				await root.update({ ...props, label: 'latest', when: load() });
-				// The label changed while dormant, so the boundary renders on the client.
-				expect(button.isConnected).toBe(false);
-				expect(view.host.querySelector('#split-template-action')!.textContent).toBe('latest:0');
+				// The label changed while dormant: the boundary hydrates its server UI,
+				// then renders the latest label as an update.
+				expect(view.host.querySelector('#split-template-action')).toBe(button);
+				expect(button.textContent).toBe('latest:0');
 				expect(effects).toEqual(['mount']);
 				root.unmount();
 				expect(effects).toEqual(['mount', 'cleanup']);
@@ -600,25 +599,27 @@ for (const dev of [false, true]) {
 				expect(section.style.opacity).toBe('0.5');
 				expect(button.hasAttribute('hidden')).toBe(true);
 				await root.update({ ...props, identity: 'committed-id', hidden: false, when: load() });
-				// The attributes changed while dormant, so the boundary renders on the
-				// client from its latest captures, replacing the server's controls and the
-				// native draft among them.
-				expect([section, button, input].some((node) => node.isConnected)).toBe(false);
+				// The attributes changed while dormant. The boundary hydrates its server
+				// controls with the captures they were rendered with, the native draft
+				// among them, then renders the latest captures as an update. State it
+				// initializes and the effect it mounts see the server's captures.
 				const live = view.host.querySelector<HTMLElement>('#updated-capture-controls')!;
 				const liveButton = view.host.querySelector<HTMLButtonElement>('#updated-capture-action')!;
-				expect(view.host.querySelector<HTMLInputElement>('#updated-capture-draft')!.value).toBe(
-					'server draft',
-				);
-				const liveId = live.getAttribute('data-runtime-id');
-				expect(liveId).not.toBeNull();
+				expect(live).toBe(section);
+				expect(liveButton).toBe(button);
+				expect(view.host.querySelector('#updated-capture-draft')).toBe(input);
+				expect(input.value).toBe('native draft');
+				expect(live.getAttribute('data-runtime-id')).toBe(runtimeId);
 				expect(live.getAttribute('data-probe-id')).toBe('committed-id');
 				expect(live.className).toBe('identified');
 				expect(live.style.opacity).toBe('1');
-				expect(live.getAttribute('data-initial-id')).toBe('committed-id');
-				expect(live.getAttribute('data-initial-visibility')).toBe('visible');
+				expect(live.getAttribute('data-initial-id')).toBeNull();
+				expect(live.getAttribute('data-initial-visibility')).toBe('hidden');
 				expect(liveButton.hasAttribute('hidden')).toBe(false);
-				expect(effects).toEqual([['mount', 'committed-id', false]]);
-				expect(refs).toEqual([liveButton]);
+				expect(effects).toEqual([['mount', null, true]]);
+				// The inline ref callback is a new function in the update, which detaches
+				// the hydrated one and attaches the new one, as React does.
+				expect(refs).toEqual([liveButton, null, liveButton]);
 				expect(hydrated).toBe(1);
 				liveButton.click();
 				await root.settle();
@@ -627,11 +628,11 @@ for (const dev of [false, true]) {
 				await root.update({ ...props, identity: 'next-id', hidden: true, when: load() });
 				expect(view.host.querySelector('#updated-capture-controls')).toBe(live);
 				expect(live.getAttribute('data-probe-id')).toBe('next-id');
-				expect(live.getAttribute('data-runtime-id')).toBe(liveId);
+				expect(live.getAttribute('data-runtime-id')).toBe(runtimeId);
 				expect(live.className).toBe('identified');
 				expect(live.style.opacity).toBe('0.5');
-				expect(live.getAttribute('data-initial-id')).toBe('committed-id');
-				expect(live.getAttribute('data-initial-visibility')).toBe('visible');
+				expect(live.getAttribute('data-initial-id')).toBeNull();
+				expect(live.getAttribute('data-initial-visibility')).toBe('hidden');
 				expect(liveButton.hasAttribute('hidden')).toBe(true);
 				liveButton.click();
 				await root.settle();
@@ -640,13 +641,13 @@ for (const dev of [false, true]) {
 				await root.update({ ...props, identity: null, hidden: false, when: load() });
 				expect(live.className).toBe('');
 				expect(live.style.opacity).toBe('1');
-				expect(live.getAttribute('data-initial-id')).toBe('committed-id');
+				expect(live.getAttribute('data-initial-id')).toBeNull();
 				expect(view.host.querySelector('#updated-capture-action')).toBe(liveButton);
 				expect(root.recoverable).toEqual([]);
 				root.unmount();
 				expect(effects).toEqual([
-					['mount', 'committed-id', false],
-					['cleanup', 'committed-id', false],
+					['mount', null, true],
+					['cleanup', null, true],
 				]);
 				expect(view.host.childNodes.length).toBe(0);
 				expect(view.diagnostics).toEqual([]);
@@ -693,9 +694,10 @@ for (const dev of [false, true]) {
 		});
 
 		for (const split of [true, false]) {
-			// Server HTML cannot be compared with captures the client no longer holds
-			// without rendering them, so once captures change the repair is silent.
-			it(`repairs an attribute without diagnostics once a mounted parent changes ${split ? 'split' : 'unsplit'} captures`, async () => {
+			// The boundary hydrates the captures it was claimed with, which differ
+			// from the server's: as React does, it keeps the server's attribute and
+			// development warns. The mounted parent's change then applies as an update.
+			it(`keeps an initial attribute mismatch, then applies a mounted parent's change to ${split ? 'split' : 'unsplit'} captures`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const serverProps = { when: condition(false), identity: null, hidden: true };
 				const initialClientProps = { ...serverProps, identity: 'initial-client-mismatch' };
@@ -712,7 +714,16 @@ for (const dev of [false, true]) {
 					expect(section.getAttribute('data-probe-id')).toBeNull();
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
-					expect(view.diagnostics).toEqual([]);
+					if (dev) {
+						expect(view.diagnostics).toEqual([
+							{
+								level: 'error',
+								args: [expect.stringContaining('attribute `data-probe-id`')],
+							},
+						]);
+					} else {
+						expect(view.diagnostics).toEqual([]);
+					}
 				} finally {
 					view.close();
 				}
@@ -720,7 +731,7 @@ for (const dev of [false, true]) {
 		}
 
 		for (const split of [true, false]) {
-			it(`repairs class and style without diagnostics once a mounted parent changes ${split ? 'split' : 'unsplit'} captures`, async () => {
+			it(`keeps an initial class and style mismatch, then applies a mounted parent's change to ${split ? 'split' : 'unsplit'} captures`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const serverProps = { when: condition(false), identity: null, hidden: true };
 				const initialClientProps = { ...serverProps, identity: 'initial-class', hidden: false };
@@ -738,7 +749,11 @@ for (const dev of [false, true]) {
 					expect(section.style.opacity).toBe('0.5');
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
-					expect(view.diagnostics).toEqual([]);
+					// The claimed captures differ from the server's, which development
+					// reports as values it won't patch up, as React does.
+					expect(view.diagnostics).toEqual(
+						dev ? [{ level: 'error', args: [expect.stringContaining('attribute `class`')] }] : [],
+					);
 				} finally {
 					view.close();
 				}
@@ -747,7 +762,7 @@ for (const dev of [false, true]) {
 
 		for (const split of [true, false]) {
 			for (const initialSuppressed of [true, false]) {
-				it(`repairs a ${split ? 'split' : 'unsplit'} boundary without diagnostics after suppression ${initialSuppressed ? 'is removed' : 'is enabled'} by changed captures`, async () => {
+				it(`keeps a ${split ? 'split' : 'unsplit'} boundary's server values, then applies changed captures that ${initialSuppressed ? 'remove' : 'enable'} suppression`, async () => {
 					const view = await consumer<typeof updatedAttributesClient>(
 						dev,
 						updatedAttributesFilename,
@@ -783,7 +798,13 @@ for (const dev of [false, true]) {
 						expect(section.style.opacity).toBe('0.5');
 						expect(root.recoverable).toEqual([]);
 						root.unmount();
-						expect(view.diagnostics).toEqual([]);
+						// Hydration compares the claimed captures, under the suppression they
+						// were claimed with.
+						expect(view.diagnostics).toEqual(
+							dev && !initialSuppressed
+								? [{ level: 'error', args: [expect.stringContaining('attribute `data-probe-id`')] }]
+								: [],
+						);
 					} finally {
 						view.close();
 					}
@@ -792,7 +813,7 @@ for (const dev of [false, true]) {
 		}
 
 		for (const contextOnly of [false, true]) {
-			it(`renders a boundary on the client for a surrounding ${contextOnly ? 'context-only' : 'context and capture'} update without diagnostics while preserving hydrated sibling IDs`, async () => {
+			it(`hydrates a boundary, then applies a surrounding ${contextOnly ? 'context-only' : 'context and capture'} update without diagnostics, keeping every hydrated ID`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const serverProps = {
 					when: condition(false),
@@ -829,13 +850,13 @@ for (const dev of [false, true]) {
 									when: load(),
 								},
 					);
-					// The context changed while dormant, so the boundary renders on the
-					// client with an ID of its own; the hydrated sibling keeps its node and ID.
-					expect(section.isConnected).toBe(false);
+					// The context changed while dormant: the boundary hydrates its server
+					// controls with the context value they were rendered with, then renders
+					// the latest one. Its node and ID stay, as do the hydrated sibling's.
 					const live = view.host.querySelector<HTMLElement>('#updated-capture-controls')!;
+					expect(live).toBe(section);
 					const liveId = live.getAttribute('data-runtime-id');
-					expect(liveId).not.toBeNull();
-					expect(liveId).not.toBe(siblingId);
+					expect(liveId).toBe(runtimeId);
 					expect(live.getAttribute('data-context')).toBe(activationContext);
 					expect(view.host.querySelector('#updated-context-sibling')).toBe(sibling);
 					expect(sibling.getAttribute('data-runtime-id')).toBe(siblingId);
@@ -937,7 +958,7 @@ for (const dev of [false, true]) {
 			}
 		});
 
-		it('renders an unsplit boundary updated while dormant on the client without attribute mismatch diagnostics', async () => {
+		it('hydrates an unsplit boundary updated while dormant, then applies the update without attribute mismatch diagnostics', async () => {
 			const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 			const props = { when: condition(false), identity: null, hidden: true };
 			try {
@@ -950,9 +971,9 @@ for (const dev of [false, true]) {
 				const root = view.api.start(view.host, props, false);
 				await root.settle();
 				await root.update({ ...props, identity: 'committed-id', hidden: false, when: load() });
-				expect(section.isConnected).toBe(false);
-				expect(button.isConnected).toBe(false);
 				const live = view.host.querySelector<HTMLElement>('#updated-capture-controls')!;
+				expect(live).toBe(section);
+				expect(view.host.querySelector('#updated-capture-action')).toBe(button);
 				expect(live.getAttribute('data-probe-id')).toBe('committed-id');
 				expect(view.host.querySelector('#updated-capture-action')!.hasAttribute('hidden')).toBe(
 					false,
@@ -969,7 +990,7 @@ for (const dev of [false, true]) {
 			const boundary = split ? 'split' : 'unsplit';
 			const store = { subscribe: () => () => {}, get: () => 'store' };
 
-			it(`renders a ${boundary} boundary updated while dormant on the client without rendering stale captures or reporting its changed text`, async () => {
+			it(`hydrates a ${boundary} boundary updated while dormant with its server captures, then renders the latest ones without reporting its changed text`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const View = split
 					? updatedAttributesServer.LoggedBoundary
@@ -983,16 +1004,19 @@ for (const dev of [false, true]) {
 					await root.settle();
 					expect(log).toEqual([]);
 					await root.update({ ...props, label: 'latest', when: load() });
-					expect(child.isConnected).toBe(false);
 					const live = view.host.querySelector<HTMLElement>('#logged-child')!;
+					expect(live).toBe(child);
 					expect(live.textContent).toBe('latest');
 					expect(live.title).toBe('latest');
-					expect(live.dataset.initial).toBe('latest');
+					// State is initialized once, from the captures the boundary hydrated.
+					expect(live.dataset.initial).toBe('first');
 					expect(live.dataset.memo).toBe('latest');
-					// Dev and prod run user render code with the current captures only.
-					expect(log).toContain('render:latest');
-					expect(log).toContain('init:latest');
-					expect(log.filter((entry) => entry.endsWith(':first'))).toEqual([]);
+					// As React hydrates a dehydrated boundary with the props it rendered
+					// before the update that reached it, render code sees the server's
+					// captures first and the latest ones in the update.
+					expect(log.indexOf('render:first')).toBeGreaterThanOrEqual(0);
+					expect(log.indexOf('render:latest')).toBeGreaterThan(log.indexOf('render:first'));
+					expect(log.filter((entry) => entry.startsWith('init:'))).toEqual(['init:first']);
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
 					expect(view.diagnostics).toEqual([]);
@@ -1049,7 +1073,7 @@ for (const dev of [false, true]) {
 		}
 
 		for (const initialMismatch of [false, true]) {
-			it(`renders a nested dormant boundary whose captures changed on the client without diagnostics${initialMismatch ? ' after an initial client mismatch' : ''} when nested boundaries activate separately`, async () => {
+			it(`hydrates a nested dormant boundary whose captures changed${initialMismatch ? ' after an initial client mismatch' : ''}, then applies them, when nested boundaries activate separately`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const effects: [string, string | null, boolean][] = [];
 				const refs: (HTMLButtonElement | null)[] = [];
@@ -1082,39 +1106,50 @@ for (const dev of [false, true]) {
 						when: load(),
 					};
 					await root.update(outerProps);
-					expect(effects).toEqual([]);
-					expect(refs).toEqual([]);
-					expect(section.getAttribute('data-probe-id')).toBeNull();
-					// Identical inner captures: the parent update alone activates the inner
-					// boundary, whose server HTML predates the outer boundary's new captures.
-					await root.update({ ...outerProps });
-					// The inner boundary's captures changed while it was dormant, so it
-					// renders on the client and reports nothing.
-					expect(section.isConnected).toBe(false);
-					expect(button.isConnected).toBe(false);
+					// The outer boundary hydrates with its server captures, then applies the
+					// newer ones: an update that reaches the inner boundary, which activates
+					// it. The inner one hydrates the captures it was claimed with, so state
+					// it initializes and the effect it mounts see those, then applies the
+					// outer boundary's.
+					const claimed = clientProps.identity;
 					const live = view.host.querySelector<HTMLElement>('#updated-capture-controls')!;
 					const liveButton = view.host.querySelector('#updated-capture-action')!;
+					expect(live).toBe(section);
+					expect(liveButton).toBe(button);
 					expect(live.getAttribute('data-probe-id')).toBe('outer-committed');
-					expect(live.getAttribute('data-initial-id')).toBe('outer-committed');
-					expect(live.getAttribute('data-initial-visibility')).toBe('visible');
+					// Hydration keeps the server's attribute where the claimed state
+					// differs, and the update writes nothing for the unchanged state.
+					expect(live.getAttribute('data-initial-id')).toBeNull();
+					expect(live.getAttribute('data-initial-visibility')).toBe('hidden');
 					expect(liveButton.hasAttribute('hidden')).toBe(false);
-					expect(effects).toEqual([['mount', 'outer-committed', false]]);
-					expect(refs).toEqual([liveButton]);
+					expect(effects).toEqual([['mount', claimed, true]]);
+					// The update's inline ref callback replaces the hydrated one.
+					expect(refs).toEqual([liveButton, null, liveButton]);
+					// Identical captures change nothing more.
+					await root.update({ ...outerProps });
+					expect(view.host.querySelector('#updated-capture-controls')).toBe(live);
+					expect(effects).toEqual([['mount', claimed, true]]);
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
-					expect(refs).toEqual([liveButton, null]);
+					expect(refs.at(-1)).toBeNull();
 					expect(effects).toEqual([
-						['mount', 'outer-committed', false],
-						['cleanup', 'outer-committed', false],
+						['mount', claimed, true],
+						['cleanup', claimed, true],
 					]);
-					expect(view.diagnostics).toEqual([]);
+					// An initial mismatch is one the inner boundary hydrates, and development
+					// reports what it keeps, as React does.
+					expect(view.diagnostics).toEqual(
+						dev && initialMismatch
+							? [{ level: 'error', args: [expect.stringContaining('attribute `data-probe-id`')] }]
+							: [],
+					);
 				} finally {
 					view.close();
 				}
 			});
 		}
 
-		it('keeps dormant portal captures and stylesheet resources from publishing historical values', async () => {
+		it("publishes a dormant boundary's portal and stylesheet resources only once it hydrates, then applies its latest captures", async () => {
 			const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 			const portalTarget = view.window.document.createElement('aside');
 			portalTarget.innerHTML = '<span id="foreign-kept">foreign content</span>';
@@ -1157,16 +1192,16 @@ for (const dev of [false, true]) {
 					stylesheetIdentity: 'current-resource',
 					when: load(),
 				});
-				// The captures changed while dormant, so the boundary renders on the
-				// client, from its latest captures only.
-				expect(section.isConnected).toBe(false);
-				expect(button.isConnected).toBe(false);
+				// The captures changed while dormant: the boundary hydrates its server
+				// controls with the captures it was claimed with, then applies the latest.
 				const live = view.host.querySelector<HTMLElement>('#updated-capture-controls')!;
 				const liveButton = view.host.querySelector('#updated-capture-action')!;
+				expect(live).toBe(section);
+				expect(liveButton).toBe(button);
 				expect(live.getAttribute('data-probe-id')).toBe('committed-id');
 				expect(liveButton.hasAttribute('hidden')).toBe(false);
-				expect(effects).toEqual([['mount', 'committed-id', false]]);
-				expect(refs).toEqual([liveButton]);
+				expect(effects).toEqual([['mount', null, true]]);
+				expect(refs).toEqual([liveButton, null, liveButton]);
 				expect(portalTarget.querySelector('#foreign-kept')).toBe(foreignNode);
 				const portalButton = portalTarget.querySelector(
 					'#updated-capture-portal-action',
@@ -1176,28 +1211,29 @@ for (const dev of [false, true]) {
 				portalButton.click();
 				await root.settle();
 				expect(clicked).toEqual(['committed-id']);
-				expect(
-					view.window.document.head.querySelector('style[data-href="dormant-resource"]'),
-				).toBeNull();
+				// As React inserts the stylesheet resources a hydrating render reads,
+				// the claimed captures' resource is published with the hydration, and
+				// the latest one with the update. Resources stay once inserted.
+				const resources = () =>
+					[...view.window.document.head.querySelectorAll('style[data-href]')].map((node) =>
+						node.getAttribute('data-href'),
+					);
+				expect(resources()).toEqual(['server-resource', 'dormant-resource', 'current-resource']);
 				const currentResource = view.window.document.head.querySelector(
 					'style[data-href="current-resource"]',
 				);
-				expect(currentResource).not.toBeNull();
 				expect(root.recoverable).toEqual([]);
 				root.unmount();
-				expect(refs).toEqual([liveButton, null]);
+				expect(refs.at(-1)).toBeNull();
 				expect(effects).toEqual([
-					['mount', 'committed-id', false],
-					['cleanup', 'committed-id', false],
+					['mount', null, true],
+					['cleanup', null, true],
 				]);
 				expect(portalTarget.querySelector('#updated-capture-portal-action')).toBeNull();
 				expect(portalTarget.querySelector('#foreign-kept')).toBe(foreignNode);
 				expect(view.window.document.head.querySelector('style[data-href="current-resource"]')).toBe(
 					currentResource,
 				);
-				expect(
-					view.window.document.head.querySelector('style[data-href="dormant-resource"]'),
-				).toBeNull();
 				expect(view.diagnostics).toEqual([]);
 			} finally {
 				view.close();
