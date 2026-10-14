@@ -1,5 +1,5 @@
 ---
-'octane': minor
+'octane': patch
 ---
 
 Reduce the production code needed for hydration. The server and client keep consistent ranges for returned values and descriptor lists. Client-only descriptor hosts now let the host own its keyed rows without an extra list marker pair.
