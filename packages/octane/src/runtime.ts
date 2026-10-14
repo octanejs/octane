@@ -36462,10 +36462,12 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 	if (isElementDescriptor(item) && typeof item.type === 'function') {
 		if (state === undefined || state.__kind === 'componentSlotSlot') {
 			const stale = block.deoptNode;
+			let parent: Node = block.parentNode;
+			// The item's node while the component renders off-document.
+			let held: Node | null = null;
 			if (stale !== null) {
 				journalRootProperty(block, 'deoptNode', stale);
 				block.deoptNode = null;
-				const parent = block.parentNode;
 				const attached = stale.parentNode === parent;
 				if (
 					state === undefined &&
@@ -36473,33 +36475,39 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 					block.startMarker === stale &&
 					usesFrontier(block, parent)
 				) {
-					mountItemComponentOffDocument(scope, block, stale, item);
-					return;
-				}
-				// A self-marked host node is the item's whole range; mint the pair
-				// the component renders into before that node is retired.
-				promoteSelfMarkedItem(block);
-				if (attached && ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(parent, stale.previousSibling, getNextSibling(stale));
-					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
+					parent = itemComponentFrontier(block, stale);
+					held = stale;
 				} else {
-					detachDeoptTreeRefs(stale, null);
-					if (attached) parent.removeChild(stale);
+					// A self-marked host node is the item's whole range; mint the pair
+					// the component renders into before that node is retired.
+					promoteSelfMarkedItem(block);
+					if (attached && ROOT_RENDER_TRANSACTION !== null) {
+						journalRootRange(parent, stale.previousSibling, getNextSibling(stale));
+						queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
+					} else {
+						detachDeoptTreeRefs(stale, null);
+						if (attached) parent.removeChild(stale);
+					}
 				}
 			}
-			// The server frames the compiled body's call inside the item's range,
-			// which a hydrating call adopts instead of inheriting the item's.
-			componentSlot(
-				scope,
-				0,
-				block.parentNode,
-				item.type,
-				item.props,
-				item.__octaneInvocationSite,
-				itemRange(block)[1],
-				true,
-				hydrating ? activeHydration() === null : true,
-			);
+			try {
+				// The server frames the compiled body's call inside the item's range,
+				// which a hydrating call adopts instead of inheriting the item's.
+				componentSlot(
+					scope,
+					0,
+					parent,
+					item.type,
+					item.props,
+					item.__octaneInvocationSite,
+					itemRange(block)[1],
+					true,
+					hydrating ? activeHydration() === null : true,
+				);
+			} finally {
+				// Until its commit swaps the bound, the item's range is its node.
+				if (held !== null) block.startMarker = block.endMarker = held;
+			}
 			return;
 		}
 	} else if (state?.__kind === 'componentSlotSlot') {
@@ -36514,17 +36522,13 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 }
 
 /**
- * A self-marked item over committed DOM whose value becomes a component: the
- * component renders off-document, between the `it` pair its commit puts where
- * the host node stood. Until then the item's range is still the node, which its
- * list moves; the commit then swaps the item's markers for the pair (bound).
+ * A self-marked item over committed DOM whose value becomes a component renders
+ * it off-document, in a frontier between the `it` pair that its commit puts
+ * where the host node stood, after the list has moved that node. The item's
+ * markers name the pair for the component to inherit; the commit swaps them in
+ * for good through the frontier's bound.
  */
-function mountItemComponentOffDocument(
-	scope: Scope,
-	block: Block,
-	stale: Node,
-	item: ElementDescriptor,
-): void {
+function itemComponentFrontier(block: Block, stale: Node): DocumentFragment {
 	const frag = queueFrontier(block, block.parentNode, null);
 	const next: SlotNext = (frag as any).$$next;
 	const start = document.createComment('it');
@@ -36534,24 +36538,9 @@ function mountItemComponentOffDocument(
 	next.follows = true;
 	next.out.push(() => detachDeoptTreeRefs(stale, null), stale, stale);
 	next.bound = [block, stale, stale, start, end];
-	// The component inherits the pair it renders between.
 	block.startMarker = start;
 	block.endMarker = end;
-	try {
-		componentSlot(
-			scope,
-			0,
-			frag,
-			item.type as ComponentBody,
-			item.props,
-			item.__octaneInvocationSite,
-			end,
-			true,
-			true,
-		);
-	} finally {
-		block.startMarker = block.endMarker = stale;
-	}
+	return frag;
 }
 
 // True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
