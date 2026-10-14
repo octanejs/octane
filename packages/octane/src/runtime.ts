@@ -1558,18 +1558,27 @@ function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, sc
 	const value = SIGNAL_BINDINGS_ENABLED
 		? runWithBlockSignalOwner(scope.parent, () => readNativeDomStyle(props.value))
 		: readNativeDomStyle(props.value);
-	publishNativeStyle([scope.slots, props.el, value], usesFrontier(scope.block, props.el));
+	// The host belongs to the template that owns this binding, whose Block may
+	// predate this one: a Block created for a later structured value still
+	// writes committed DOM.
+	const owner = scope.parent!.block;
+	publishNativeStyle([scope.slots, props.el, value], usesFrontier(owner, props.el) ? owner : null);
 }
 
 /**
  * Write a native style binding's value and publish it as the committed one,
- * or, for committed DOM in a root render, queue both for its commit. `write`
- * is `[committed, el, value]`: the cache holding the value at index 0, or a
- * scalar binding, which holds it as `style`.
+ * or, for committed DOM in a root render, queue both for its commit, where
+ * `owner`'s boundary handles a failed write. `write` is `[committed, el,
+ * value]`: the cache holding the value at index 0, or a scalar binding, which
+ * holds it as `style`.
  */
-function publishNativeStyle(write: any[], atCommit: boolean): void {
-	if (atCommit) {
-		ROOT_RENDER_TRANSACTION!.ops.push(publishNativeStyle, write);
+function publishNativeStyle(write: any[], owner: Block | null): void {
+	if (owner !== null) {
+		ROOT_RENDER_TRANSACTION!.ops.push(commitRenderWrite, [
+			publishNativeStyle,
+			[write, null],
+			owner,
+		]);
 		return;
 	}
 	const committed = write[0];
@@ -1651,7 +1660,7 @@ function writeScalarNativeStyle(
 	// A compiler literal is fresh per render and never escapes, and a primitive
 	// is immutable, so either is its own snapshot.
 	if (write === setStyle) {
-		publishNativeStyle([binding, el, value], usesFrontier(owner.block, el));
+		publishNativeStyle([binding, el, value], usesFrontier(owner.block, el) ? owner.block : null);
 		return;
 	}
 	write(el, value, binding.style);
@@ -1699,7 +1708,7 @@ function publishNativeProjection(
 
 function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
 	const write = [scope.slots, props, prepareNativeProjection(props, scope)];
-	if (usesFrontier(scope.block, props.el))
+	if (usesFrontier(scope.parent!.block, props.el))
 		ROOT_RENDER_TRANSACTION!.ops.push(commitNativeProjection, write);
 	else commitNativeProjection(write);
 }
@@ -23219,6 +23228,50 @@ export function presentationHostWrite<T>(writer: (...args: any[]) => T, ...args:
 	return prepared.binding as T;
 }
 
+/**
+ * @internal A writer a presentation view calls from its render, which has no
+ * commit function. A root render that can be dropped writes committed DOM at
+ * its commit; a writer that returns a cache value returns it now (#2043).
+ */
+export function renderWrite<T>(writer: (...args: any[]) => T, kind: string, ...args: any[]): T {
+	return writeAtCommit(writer, kind, args);
+}
+
+function writeAtCommit<T>(writer: (...args: any[]) => T, kind: string, args: any[]): T {
+	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
+	if (transaction === null || !RENDER_WRITERS.test(kind)) return writer(...args);
+	let cached: unknown;
+	if (kind.endsWith('IfChanged')) {
+		// `(value, previous, element, …)`: an unchanged value keeps its cache.
+		if (attributeUnchanged(args[1], args[0], args[2])) return args[1];
+		cached = args[0];
+	} else if (kind.startsWith('updateFresh')) {
+		cached = normalizeClass(args[0]);
+		if (cached === args[1]) return cached as T;
+	}
+	// The view caches what it wrote in its bag; a dropped render must restore it.
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	transaction.ops.push(commitRenderWrite, [writer, args, CURRENT_BLOCK]);
+	return cached as T;
+}
+
+// DOM setters. Signal, native style and text writers commit by themselves, and
+// installing an event handler writes no DOM.
+const RENDER_WRITERS = /^(?:set(?!RenderText|EventHandler)|updateFresh)/;
+
+function commitRenderWrite([writer, args, block]: [
+	(...args: any[]) => unknown,
+	any[],
+	Block | null,
+]): void {
+	try {
+		writer(...args);
+	} catch (error) {
+		// As for a binding bag's commit function, the nearest boundary handles it.
+		reportEffectError(block, error);
+	}
+}
+
 /** @internal Compiler-selected writer seam; ordinary renderer setters stay unchanged. */
 export function presentationWrite<T>(
 	writer: (...args: any[]) => T,
@@ -23226,7 +23279,7 @@ export function presentationWrite<T>(
 	...args: any[]
 ): T {
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
-	if (frame === null) return writer(...args);
+	if (frame === null) return writeAtCommit(writer, kind, args);
 	if (frame.lease.host !== undefined) {
 		// A host receipt proves native fields, never descendant or generic-spread
 		// ownership. Known provider projections must retain their exact field set.
@@ -23962,8 +24015,52 @@ function validateDirectSignalControl(element: Element, site: string): void {
 
 function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
-	binding.policy.writeBinding(binding, value);
+	// A render that can be dropped writes committed DOM at its commit; text
+	// writes wait for it themselves (setRenderText).
+	const policy = binding.policy;
+	const transaction = directSignalWrites(binding.scope, policy);
+	if (transaction === null) policy.writeBinding(binding, value);
+	else
+		transaction.ops.push(commitRenderWrite, [
+			policy.writeBinding,
+			[binding, value],
+			binding.scope.block,
+		]);
 	binding.value = value;
+}
+
+/** The open render's commit queue for a direct signal write that must wait for it. */
+function directSignalWrites(
+	scope: Scope,
+	policy: DirectSignalBindingPolicy,
+): RootRenderTransaction | null {
+	return ROOT_RENDER_TRANSACTION === null ||
+		policy.kind === 'text' ||
+		policy.kind === 'textOnlyChild'
+		? null
+		: pendingWrites(scope.block);
+}
+
+/** A plain value's write, at the commit of a render that can be dropped. */
+function writeDirectSignal(
+	scope: Scope,
+	policy: DirectSignalBindingPolicy,
+	target: Node,
+	value: unknown,
+	previous: unknown,
+	name?: string,
+	attributeKind?: DirectSignalAttributeKind,
+): unknown {
+	const transaction = directSignalWrites(scope, policy);
+	if (transaction === null)
+		return policy.write(target, value, policy.kind, previous, name, attributeKind);
+	transaction.ops.push(commitRenderWrite, [
+		policy.write,
+		[target, value, policy.kind, previous, name, attributeKind],
+		scope.block,
+	]);
+	// Attribute, value and checked writers return the value they wrote.
+	return value;
 }
 
 function writeDirectSignalBoundText(binding: DirectSignalBinding, value: unknown): void {
@@ -24291,7 +24388,7 @@ function bindDirectSignal(
 		if (TRANSITION_JOURNAL !== null) journalBag();
 		const scalarTarget =
 			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
-		return policy.write(scalarTarget, value, kind, previous, name, attributeKind);
+		return writeDirectSignal(scope, policy, scalarTarget, value, previous, name, attributeKind);
 	}
 	if (
 		prior !== null &&
@@ -24318,10 +24415,11 @@ function bindDirectSignal(
 			kind === 'text' || kind === 'textOnlyChild'
 				? (prior?.text ?? prior?.target ?? target)
 				: target;
-		const token = policy.write(
+		const token = writeDirectSignal(
+			scope,
+			policy,
 			scalarTarget,
 			value,
-			kind,
 			kind === 'text' || kind === 'textOnlyChild' ? prior?.text : (prior?.value ?? previous),
 			name,
 			attributeKind,
@@ -26464,10 +26562,10 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
 	if (hydrating && activeHydration()?.keepsStyle(el, value)) return;
+	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
-	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	applyStyleValue(el, style, value, prev);
 }
 
@@ -26491,6 +26589,7 @@ export function setStyleProperty(
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
 	// A commit function passes the rendering scope it recorded.
 	if (remove && previous === scope) return;
+	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
 	if (TRANSITION_JOURNAL !== null) {
 		const log = TRANSITION_JOURNAL;
 		let tail = log.length - 4;
@@ -26507,7 +26606,6 @@ export function setStyleProperty(
 			journalAttr(el, 'style');
 		else journalBag();
 	}
-	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
@@ -26531,12 +26629,12 @@ export function setStyleProperties(
 		// No dynamic declaration exists yet. Removing a null or boolean value
 		// could erase a longhand supplied by the baked static prefix.
 		if (value == null || typeof value === 'boolean') continue;
+		const name = entries[i] as string;
+		if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, undefined, name)) continue;
 		if (!journaled && TRANSITION_JOURNAL !== null) {
 			journalAttr(el, 'style');
 			journaled = true;
 		}
-		const name = entries[i] as string;
-		if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, undefined, name)) continue;
 		applyStyleProperty(el, style, name, value);
 	}
 }
@@ -39784,16 +39882,46 @@ function restoreHiddenDisplayValue(el: HTMLElement | SVGElement, display: Hidden
 	if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
 }
 
-/** Apply an authored style against its real previous value, underneath the hide. */
+/**
+ * Apply an authored style against its real previous value, underneath the hide.
+ * The style setters call this before they journal. A root render's write lands
+ * at its commit, so the render leaves the hidden host as it is and a dropped
+ * render writes nothing (#2043); only the binding cache its caller moves needs
+ * a snapshot. Any other write, a commit function's included, lands now.
+ */
 function writeHiddenStyle(
 	el: HTMLElement | SVGElement,
 	value: any,
 	previous: any,
 	property?: string,
 ): boolean {
+	if (!HIDDEN_DISPLAYS.has(el as HTMLElement)) return false;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+		if (TRANSITION_JOURNAL !== null) journalBag();
+		transaction.ops.push(commitHiddenStyle, [el, value, previous, property, CURRENT_SCOPE]);
+	} else {
+		if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+		commitHiddenStyle([el, value, previous, property, null]);
+	}
+	return true;
+}
+
+/**
+ * Write a hidden host's authored style under its hide. A reveal earlier in the
+ * same commit may have released the host: the write is then an ordinary one.
+ * A queued write's error reaches its scope's boundary, as a commit function's
+ * does.
+ */
+function commitHiddenStyle([el, value, previous, property, scope]: [
+	HTMLElement | SVGElement,
+	any,
+	any,
+	string | undefined,
+	Scope | null,
+]): void {
 	const hidden = HIDDEN_DISPLAYS.get(el as HTMLElement);
-	if (hidden === undefined) return false;
-	if (TRANSITION_JOURNAL !== null) {
+	if (hidden !== undefined && TRANSITION_JOURNAL !== null) {
 		TRANSITION_JOURNAL.push(
 			JOURNAL_PROP,
 			hidden,
@@ -39809,19 +39937,23 @@ function writeHiddenStyle(
 			hidden.hadStyle,
 		);
 	}
-	restoreHiddenDisplayValue(el, hidden);
+	if (hidden !== undefined) restoreHiddenDisplayValue(el, hidden);
 	try {
 		if (property === undefined) applyStyleValue(el, el.style, value, previous);
 		else if (value == null || typeof value === 'boolean')
 			el.style.removeProperty(styleName(property));
 		else applyStyleProperty(el, el.style, property, value);
+	} catch (error) {
+		if (scope === null) throw error;
+		reportEffectError(scope.block, error);
 	} finally {
-		hidden.value = el.style.getPropertyValue('display');
-		hidden.priority = el.style.getPropertyPriority('display');
-		hidden.hadStyle = el.hasAttribute('style');
-		enforceHiddenDisplay(el as HTMLElement);
+		if (hidden !== undefined) {
+			hidden.value = el.style.getPropertyValue('display');
+			hidden.priority = el.style.getPropertyPriority('display');
+			hidden.hadStyle = el.hasAttribute('style');
+			enforceHiddenDisplay(el as HTMLElement);
+		}
 	}
-	return true;
 }
 
 function writeHiddenText(node: Text, value: string): boolean {
@@ -50332,6 +50464,13 @@ export function createIndependentHydrateActivator(
 // Resource hints — React DOM's preload / preinit / preconnect / prefetchDNS.
 // Each call inserts one deduped <link>/<script> into document.head (client).
 // Dedupe key = rel/kind + href, matching React's resource identity model.
+//
+// A call made while a root renders runs at that render's commit, in render
+// order with the Float resources below (atCommit), so the render writes no
+// head entry and a dropped render inserts none (#2043). The whole call waits,
+// not just its insert: each identity check and preload transfer then sees
+// the requests before it, exactly as calls made outside a render do. Only
+// the development warning stays with the call.
 // ---------------------------------------------------------------------------
 
 const _resourceHints = new Set<string>();
@@ -50433,6 +50572,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreload, [href, options]);
+}
+
+function commitPreload([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (
@@ -50504,6 +50647,10 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreinit, [href, options]);
+}
+
+function commitPreinit([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (options === null || typeof options !== 'object') return;
@@ -50530,6 +50677,10 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreconnect, [href, options]);
+}
+
+function commitPreconnect([href, options]: [string, { crossOrigin?: string } | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options !== null && typeof options !== 'object') options = undefined;
@@ -50554,6 +50705,10 @@ export function prefetchDNS(href: string): void {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPrefetchDNS, href);
+}
+
+function commitPrefetchDNS(href: string): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
@@ -50575,6 +50730,10 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreloadModule, [href, options]);
+}
+
+function commitPreloadModule([href, options]: [string, Record<string, unknown> | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
@@ -50606,6 +50765,13 @@ export function preinitModule(
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreinitModule, [href, options]);
+}
+
+function commitPreinitModule([href, options]: [
+	string,
+	({ as?: string } & Record<string, unknown>) | undefined,
+]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options != null && typeof options !== 'object') return;
@@ -50641,6 +50807,11 @@ export function preinitModule(
 // ("suspensey" commit) is deliberately out of scope. The first client call
 // seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
 // so hydration never duplicates.
+//
+// A render reads the committed identity only: a resource the page already has
+// costs a set lookup, and any other joins the render's commit (atCommit),
+// where the identity check runs again. The first request in render order
+// therefore wins, and a dropped render inserts nothing (#2043).
 // ---------------------------------------------------------------------------
 
 interface ResourceState {
@@ -50732,6 +50903,8 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 		const v = (attrs as any)[k];
 		if (v == null || v === false || typeof v === 'function') continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
+		// A commit must not throw on a name the platform rejects (setAttribute).
+		if (!VALID_ATTR_NAME.test(name)) continue;
 		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)));
 	}
 }
@@ -50764,7 +50937,12 @@ export function stylesheetResource(
 	}
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
+	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
+	atCommit(commitStylesheetResource, attrs);
+}
+
+function commitStylesheetResource(attrs: Record<string, unknown>): void {
+	const href = attrs.href as string;
 	const state = resourceState();
 	// First instance wins, including its non-key props — matching React's
 	// resource identity (later differing props do not retarget a live sheet).
@@ -50792,7 +50970,16 @@ export function styleResource(
 ): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
+	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
+	atCommit(commitStyleResource, [attrs, css, development]);
+}
+
+function commitStyleResource([attrs, css, development]: [
+	Record<string, unknown>,
+	string,
+	boolean | undefined,
+]): void {
+	const href = attrs.href as string;
 	const state = resourceState();
 	if (state.sheets.has(href)) return;
 	if (
@@ -50841,7 +51028,12 @@ export function resetFloatResourceState(): void {
 export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const src = attrs.src;
-	if (typeof src !== 'string' || src === '') return;
+	if (typeof src !== 'string' || src === '' || resourceState().scripts.has(src)) return;
+	atCommit(commitScriptResource, attrs);
+}
+
+function commitScriptResource(attrs: Record<string, unknown>): void {
+	const src = attrs.src as string;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
 	const s = document.createElement('script');
