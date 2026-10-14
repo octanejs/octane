@@ -225,7 +225,10 @@ function takenByRenames(bindings, renamed) {
  * it names while a dependency's own imports are its implementation. A module
  * counts when it declares one of the names taken from it, Octane compiles it,
  * it belongs to a package other than its Strong importer's, and it is not
- * Strong. The last three answers come from the project's compiler.
+ * Strong. The last three answers come from the project's compiler. A Strong
+ * module in a dependency answers to the same rule as the roots, so its own
+ * imports are followed too, through every Strong layer to the first module
+ * that is not Strong.
  *
  * @param {{
  *   roots: string[],
@@ -262,16 +265,18 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 	};
 
 	/**
+	 * Whether the module compiles under Strong mode, or `null` when it does not
+	 * parse. Then it fails its own build, so, like the coverage measurement, the
+	 * report leaves it out and follows nothing from it.
+	 *
 	 * @param {string} source
 	 * @param {string} absolute
 	 */
-	const notStrong = (source, absolute) => {
+	const isStrong = (source, absolute) => {
 		try {
-			return !status(source, absolute).strong;
+			return status(source, absolute).strong;
 		} catch {
-			// It does not parse, so it fails its own build. Like the coverage
-			// measurement, the report leaves it out.
-			return false;
+			return null;
 		}
 	};
 
@@ -302,7 +307,9 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 			);
 			// A module that only passes names on is a step, not a dependency.
 			const { provides, renamed } = ownExports(source, wanted, imported);
-			if (provides && owner.compiled && owner.root !== home && notStrong(source, absolute)) {
+			const strong =
+				provides && owner.compiled && owner.root !== home ? isStrong(source, absolute) : null;
+			if (strong === false) {
 				const group = packages.get(from.name) ?? {
 					name: from.name,
 					modules: new Set(),
@@ -325,9 +332,10 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 					continue;
 				}
 				if (/^octane(?:\/|$)/.test(request)) continue;
-				const names =
-					reexport || absolute === root
-						? taken(bindings, wanted)
+				const names = reexport
+					? taken(bindings, wanted)
+					: absolute === root || strong === true
+						? taken(bindings, null)
 						: takenByRenames(bindings, renamed);
 				const target = names?.size === 0 ? null : resolveRequest(request, absolute);
 				if (target !== null) visit(target, names);
