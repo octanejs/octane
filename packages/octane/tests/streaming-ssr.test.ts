@@ -1001,7 +1001,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		['list items', 'ListFallbackBoundary', ListFallbackBoundary],
 		['a binding view list', 'BindingListFallbackBoundary', BindingListFallbackBoundary],
 	] as const)(
-		'claims a still-pending shell whose fallback renders %s',
+		'keeps a still-pending shell whose fallback renders %s until its content streams in',
 		async (_label, name, Client) => {
 			const items = ['a', 'b'];
 			const d = deferred<string>();
@@ -1012,24 +1012,43 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			container.innerHTML = c.chunks[0];
 			activate(container);
 			const after = container.querySelector('#list-fallback-after') as HTMLButtonElement;
+			const fallbackItems = [...container.querySelectorAll('.list-fallback-item')];
 
-			// Hydrating before the segment arrives takes mountTry's documented
-			// client-render path for the boundary, which reports a structural warning.
+			// As React leaves a pending dehydrated boundary, the server's fallback
+			// stays until the segment arrives, and the sibling after it hydrates.
 			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const onRecoverableError = vi.fn();
 			const client = deferred<string>();
-			const root = hydrateRoot(container, Client as any, { promise: client.promise, items });
+			const root = hydrateRoot(
+				container,
+				Client as any,
+				{ promise: client.promise, items },
+				{ onRecoverableError },
+			);
 			try {
 				flushSync(() => {});
-				expect(container.querySelector('template[data-oct-b]')).toBeNull();
-				expect(container.querySelectorAll('.list-fallback-item')).toHaveLength(2);
+				expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
+				expect([...container.querySelectorAll('.list-fallback-item')]).toEqual(fallbackItems);
 				expect(container.querySelectorAll('.list-fallback-tail')).toHaveLength(1);
 				expect(container.querySelector('#list-fallback-after')).toBe(after);
 				flushSync(() => after.click());
 				expect(after.textContent).toBe('1');
 
+				// The client's own data does not replace the server's fallback.
 				await act(() => client.resolve('client rows'));
-				expect(container.querySelector('#list-fallback')!.textContent).toBe('client rows1');
+				expect([...container.querySelectorAll('.list-fallback-item')]).toEqual(fallbackItems);
+
+				d.resolve('server rows');
+				await c.ended;
+				container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
+				activate(container);
+				const ready = container.querySelector('.rows-ready');
+				await act(() => {});
+				expect(container.querySelector('.rows-ready')).toBe(ready);
+				expect(container.querySelector('#list-fallback')!.textContent).toBe('server rows1');
 				expect(container.querySelector('#list-fallback-after')).toBe(after);
+				expect(errorSpy).not.toHaveBeenCalled();
+				expect(onRecoverableError).not.toHaveBeenCalled();
 			} finally {
 				root.unmount();
 				errorSpy.mockRestore();
@@ -2145,8 +2164,6 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 
 		const seen: Array<[string, string]> = [];
 		const clientPending = deferred<string>();
-		// A still-pending shell intentionally takes mountTry's documented degraded
-		// client-render path; keep its expected structural warning out of test output.
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(
 			container,
@@ -2159,11 +2176,14 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		);
 		try {
 			flushSync(() => {});
-			expect(seen).toContainEqual(['root', rootId]);
-			expect(seen).toContainEqual(['pending', boundaryId]);
+			// As React leaves a pending dehydrated boundary, the server's fallback
+			// stays until the content streams in, and the client renders no arm.
+			expect(seen).toEqual([['root', rootId]]);
 			expect(container.querySelectorAll('.id-loading')).toHaveLength(1);
-			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+			expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
 
+			// An update that reaches it renders it on the client, in the namespace
+			// the server reserved for the boundary.
 			const replacement = deferred<string>();
 			flushSync(() => {
 				root.render(IdBoundary as any, {
@@ -2171,6 +2191,8 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 					onId: (arm: string, value: string) => seen.push([arm, value]),
 				});
 			});
+			expect(seen).toContainEqual(['pending', boundaryId]);
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
 			await act(() => replacement.resolve('client-ready'));
 			expect(container.querySelectorAll('.id-ok')).toHaveLength(1);
 			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
@@ -2178,8 +2200,8 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			expect(container.querySelector('template[data-oct-b]')).toBeNull();
 			expect(seen.some(([arm]) => arm === 'content')).toBe(true);
 
-			// If the server finishes after hydration claimed the still-pending shell,
-			// its obsolete carrier is discarded rather than leaking hidden DOM.
+			// If the server finishes after the client rendered the boundary, its
+			// obsolete carrier is discarded rather than leaking hidden DOM.
 			d.resolve('server-late');
 			await c.ended;
 			container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
@@ -2199,27 +2221,37 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
-	it('keeps the client fallback when a root-level pending shell is claimed', async () => {
+	it('keeps a root-level pending shell until its content streams in, then hydrates it', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const render = ServerRT.renderToPipeableStream(server.RootBoundary, { promise: d.promise });
 		render.pipe(c.dest);
 		container.innerHTML = c.chunks[0];
 		activate(container);
+		const loading = container.querySelector('.root-loading');
 		expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
 
-		// The boundary is the root's whole output. Claiming it for the client must
-		// not let the root discard the client-mounted fallback as stale server DOM.
+		// The boundary is the root's whole output. The root must not discard the
+		// fallback the boundary keeps as stale server DOM, nor render it again.
 		const client = deferred<string>();
 		const root = hydrateRoot(container, RootBoundary as any, { promise: client.promise });
 		try {
 			flushSync(() => {});
-			expect(container.querySelector('template[data-oct-b]')).toBeNull();
-			expect(container.querySelectorAll('.root-loading')).toHaveLength(1);
+			expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
+			expect(container.querySelector('.root-loading')).toBe(loading);
 
 			await act(() => client.resolve('client-ready'));
+			expect(container.querySelector('.root-loading')).toBe(loading);
+
+			d.resolve('server-ready');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
+			activate(container);
+			const ok = container.querySelector('.root-ok')!;
+			await act(() => {});
 			expect(container.querySelector('.root-loading')).toBeNull();
-			expect(container.querySelector('.root-ok')?.textContent).toBe('client-ready');
+			expect(container.querySelector('.root-ok')).toBe(ok);
+			expect(ok.textContent).toBe('server-ready');
 		} finally {
 			root.unmount();
 			render.abort(new Error('test complete'));
@@ -2484,8 +2516,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		const clientOuter: any = new Promise<string>(() => {});
 		const clientInner: any = new Promise<string>(() => {});
 		const clientLater: any = new Promise<string>(() => {});
-		// A still-pending nested template takes the existing degraded structural
-		// recovery path; this regression observes seed ownership on the thenables.
+		// This regression observes seed ownership on the thenables.
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(container, NestedStreamSeedScopes as any, {
 			outer: clientOuter,
@@ -2496,10 +2527,15 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 
 		expect(clientOuter.status).toBe('fulfilled');
 		expect(clientOuter.value).toBe('outer-ready');
-		// The inner template owns an EMPTY scope. Without the guard it consumes
-		// the outer segment's `later-ready` seed and becomes spuriously fulfilled.
-		expect(clientInner.status).toBe('pending');
+		// The inner boundary keeps its fallback until its content streams in, and
+		// owns none of the outer segment's seeds: the `later-ready` seed reaches
+		// the sibling after it.
+		expect(clientInner.status).not.toBe('fulfilled');
 		expect(clientInner.value).toBeUndefined();
+		expect(container.querySelector('.inner-seed-pending')).toBe(pendingNode);
+		expect(clientLater.status).toBe('fulfilled');
+		expect(clientLater.value).toBe('later-ready');
+		expect(container.querySelector('.later-seed')).toBe(laterNode);
 		errorSpy.mockRestore();
 		root.unmount();
 		render.abort(new Error('test complete'));

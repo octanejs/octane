@@ -330,7 +330,12 @@ streaming only; the buffered renderers stay doctype-free, also matching
 React). Scoped styles flush with the shell
 (before the body markup) and per-wave with their segment; hoisted head elements
 render with the shell only. `hydrateRoot` on the client adopts the swapped-in
-DOM byte-for-byte, including per-boundary `use()` value seeds. Node
+DOM byte-for-byte, including per-boundary `use()` value seeds. A boundary
+whose segment has not arrived when hydration reaches it keeps the server's
+fallback, as React leaves a pending dehydrated boundary, and the swap then
+hydrates the segment's content. An update that reaches the boundary first
+renders it on the client, and so does `$OCTRX`, which marks a boundary the
+server's render failed, reporting it through `onRecoverableError`. Node
 destinations honor `write(false)`/`drain`; destination errors or an early close
 cancel the render.
 

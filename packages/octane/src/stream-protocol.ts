@@ -15,6 +15,14 @@ import {
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
 
+/**
+ * The property a hydrated client sets on a pending streamed boundary's open
+ * comment. The stream's swap (`$OCTRC`) or error (`$OCTRX`) calls it, as
+ * React's `$RC` calls a dehydrated boundary's `_reactRetry`, so the boundary
+ * retries its hydration.
+ */
+export const STREAM_RETRY_PROP = '_octR';
+
 /** Renderer-owned JSON script carrying resolved SSR Suspense values. */
 export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
 

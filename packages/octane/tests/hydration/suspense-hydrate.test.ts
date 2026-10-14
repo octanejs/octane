@@ -1123,29 +1123,113 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		root.unmount();
 	});
 
-	it('renders a streamed boundary whose content has not arrived on the client', async () => {
+	/** Stream the boundary's shell into the container, leaving its content pending. */
+	function streamShell() {
 		const server = deferred<string>();
 		const collector = createPipeableCollector();
-		ServerRT.renderToPipeableStream(statesServer.BoundaryStates, {
-			value: server.promise,
-		}).pipe(collector.destination);
+		ServerRT.renderToPipeableStream(
+			statesServer.BoundaryStates,
+			{ value: server.promise },
+			{ onError: () => {} },
+		).pipe(collector.destination);
 		container.innerHTML = collector.chunks[0]!;
 		activateStreamedMarkup(container);
+		const deliver = async () => {
+			await collector.ended;
+			const late = document.createElement('div');
+			late.innerHTML = collector.chunks.slice(1).join('');
+			container.append(...late.childNodes);
+			activateStreamedMarkup(container);
+		};
+		return { server, deliver };
+	}
+
+	function hydratePending(value: Promise<string>) {
+		const recoverable: string[] = [];
+		const root = hydrateRoot(
+			container,
+			statesClient.BoundaryStates,
+			{ value },
+			{ onRecoverableError: (error) => recoverable.push((error as Error).message) },
+		);
+		return { root, recoverable };
+	}
+
+	/** A thenable use() reads synchronously. */
+	function fulfilled(value: string): Promise<string> {
+		return Object.assign(Promise.resolve(value), { status: 'fulfilled', value });
+	}
+
+	// As React leaves a dehydrated boundary whose content is still streaming,
+	// the boundary keeps the server's fallback until the stream swaps its
+	// content in, and the swap's retry then hydrates that content.
+	it('keeps the fallback of a streamed boundary whose content has not arrived, then hydrates its content', async () => {
+		const { server, deliver } = streamShell();
+		const fallback = container.querySelector('#states-fallback')!;
+		const before = container.querySelector('#states-before')!;
+		const after = container.querySelector('#states-after')!;
+		const afterId = after.textContent;
+
+		const { root, recoverable } = hydratePending(Promise.resolve('client'));
+		await act(async () => {});
+		expect(container.querySelector('#states-fallback')).toBe(fallback);
+		expect(container.querySelector('#states-content')).toBeNull();
+		expect(container.querySelector('#states-before')).toBe(before);
+		expect(container.querySelector('#states-after')).toBe(after);
+		expect(after.textContent).toBe(afterId);
+
+		server.resolve('server');
+		await deliver();
+		const content = container.querySelector('#states-content')!;
+		expect(content.textContent).toBe('server');
+		const id = content.getAttribute('data-id');
+		await act(async () => {});
+		expect(container.querySelector('#states-content')).toBe(content);
+		expect(content.getAttribute('data-id')).toBe(id);
+		expect(recoverable).toEqual([]);
+
+		// The content hydrated: an update patches the server's node.
+		await act(() => root.render(statesClient.BoundaryStates, { value: fulfilled('next') }));
+		expect(container.querySelector('#states-content')).toBe(content);
+		expect(content.textContent).toBe('next');
+		root.unmount();
+	});
+
+	it('renders a waiting streamed boundary on the client and reports it when its stream errors', async () => {
+		const { server, deliver } = streamShell();
+		const { root, recoverable } = hydratePending(Promise.resolve('client'));
+		await act(async () => {});
 		expect(container.querySelector('#states-fallback')).not.toBeNull();
 
-		const { root, recoverable } = await hydrateStates(Promise.resolve('client'));
+		server.reject(new Error('server failed'));
+		await deliver();
+		await act(async () => {});
+		await vi.waitFor(() => expect(container.querySelector('#states-fallback')).toBeNull());
 		expect(container.querySelector('#states-content')!.textContent).toBe('client');
-		expect(recoverable).toEqual([]);
+		expect(recoverable).toEqual([
+			expect.stringContaining('likely due to an error during server rendering'),
+		]);
+		root.unmount();
+	});
+
+	it('renders a waiting streamed boundary on the client when an update reaches it', async () => {
+		const { server, deliver } = streamShell();
+		const { root, recoverable } = hydratePending(Promise.resolve('client'));
+		await act(async () => {});
+		expect(container.querySelector('#states-fallback')).not.toBeNull();
+
+		// As React does for an update that reaches a pending dehydrated boundary.
+		await act(() => root.render(statesClient.BoundaryStates, { value: fulfilled('update') }));
+		expect(container.querySelector('#states-fallback')).toBeNull();
+		expect(container.querySelector('#states-content')!.textContent).toBe('update');
 
 		// The late segment finds no boundary to fill: the client owns it now.
 		server.resolve('server');
-		await collector.ended;
-		const late = document.createElement('div');
-		late.innerHTML = collector.chunks.slice(1).join('');
-		container.append(...late.childNodes);
-		activateStreamedMarkup(container);
+		await deliver();
+		await act(async () => {});
 		expect(container.querySelectorAll('#states-content')).toHaveLength(1);
-		expect(container.querySelector('#states-content')!.textContent).toBe('client');
+		expect(container.querySelector('#states-content')!.textContent).toBe('update');
+		expect(recoverable).toEqual([]);
 		root.unmount();
 	});
 
