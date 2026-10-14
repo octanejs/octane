@@ -48822,6 +48822,8 @@ function canQueueOwnedListClear(state: ForSlot): boolean {
 			block._slots !== null ||
 			block.refFields !== null ||
 			block.deoptNode !== null ||
+			block.signalOwner !== undefined ||
+			block.signalTokenEscaped ||
 			(block.rare !== null && block.rare.vt !== null)
 		)
 			return false;
@@ -48971,7 +48973,11 @@ function clearItems(first: Block | null, start: Comment, end: Comment, size: num
 				b._slots !== null ||
 				b.hooks !== null ||
 				b.effectSlots !== null ||
-				b.refFields !== null
+				b.refFields !== null ||
+				// A row's signal authority, or a token its handlers escaped with,
+				// retires with it (runScopeCleanups).
+				b.signalOwner !== undefined ||
+				b.signalTokenEscaped
 			) {
 				unmountBlock(b, false);
 			} else {
