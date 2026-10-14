@@ -20944,7 +20944,6 @@ function initDomOperations(): void {
 		// De-opt child scans poll these on every owned child.
 		seedExpando(elementProto, '$$portalEnd');
 		seedExpando(elementProto, '$$deoptKey');
-		seedExpando(elementProto, '$$deoptOrder', false);
 		// Controlled-form and hydration-suppression checks.
 		seedExpando(elementProto, '$$ctrl');
 		seedExpando(elementProto, '__oct_suppress');
@@ -20968,7 +20967,6 @@ function initDomOperations(): void {
 	if (typeof CharacterData !== 'undefined' && Object.isExtensible(CharacterData.prototype)) {
 		seedExpando(CharacterData.prototype, '$$portalEnd');
 		seedExpando(CharacterData.prototype, '$$deoptKey');
-		seedExpando(CharacterData.prototype, '$$deoptOrder', false);
 		seedExpando(CharacterData.prototype, DEOPT_DESC, false);
 	}
 }
@@ -37618,8 +37616,8 @@ function reconcileDeoptNode(
 //
 // A committed host passes its pending record (`order`): the reconcile then
 // writes nothing, and its commit places the children it chose. An earlier pass
-// of the same root render may have chosen them already, so the record's
-// `nodes`, not the DOM, are the children this pass starts from.
+// of the same root render may have chosen them already: the record's `nodes`,
+// not the DOM, are then the children this pass reconciles, in full.
 function reconcileDeoptChildren(
 	el: Element,
 	children: any,
@@ -37629,31 +37627,26 @@ function reconcileDeoptChildren(
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
 	const pending = order === null ? null : order.nodes;
+	const firstChild = pending === null ? getFirstChild(el) : null;
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
 	// Other shapes still need keyed matching: a lone text node may belong to a
 	// different array position, a nested wrapper, or independently inserted DOM.
 	const type = typeof children;
 	if ((type === 'string' && children !== '') || type === 'number' || type === 'bigint') {
-		const first =
-			pending === null
-				? getFirstChild(el)
-				: pending.length === 1 && !order!.skip
-					? pending[0]
-					: null;
 		if (
-			first !== null &&
-			first.nodeType === 3 &&
-			(pending !== null || getNextSibling(first) === null) &&
-			(first as any).$$deoptKey === 0 &&
-			(first as any).$$portalEnd == null
+			firstChild !== null &&
+			firstChild.nodeType === 3 &&
+			getNextSibling(firstChild) === null &&
+			(firstChild as any).$$deoptKey === 0 &&
+			(firstChild as any).$$portalEnd == null
 		) {
 			const hydration = hydrating ? activeHydration() : null;
 			if (hydration !== null && !hydration.isFresh(el)) {
-				hydration.htextSwap(first, String(children));
+				hydration.htextSwap(firstChild, String(children));
 			} else if (order !== null) {
-				queueDeoptText(first as Text, String(children));
+				queueDeoptText(firstChild as Text, String(children));
 			} else {
-				updateTextValue(first as Text, String(children));
+				updateTextValue(firstChild as Text, String(children));
 			}
 			return;
 		}
@@ -37662,7 +37655,8 @@ function reconcileDeoptChildren(
 	// scratch arrays. Existing DOM must still take the ownership/clearing path.
 	if (
 		(children == null || type === 'boolean' || children === '') &&
-		(pending === null ? getFirstChild(el) === null : pending.length === 0)
+		pending === null &&
+		firstChild === null
 	)
 		return;
 	// The element that owns these children is authoritative. This matters when a
@@ -37678,11 +37672,10 @@ function reconcileDeoptChildren(
 		(ownerBlock.mounted ||
 			ROOT_RENDER_TRANSACTION.hydrating ||
 			ROOT_RENDER_TRANSACTION.retainedCreated?.has(ownerBlock));
-	const firstChild = pending === null ? getFirstChild(el) : null;
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
-	if (pending === null ? firstChild === null : pending.length === 0 && !order!.skip) {
+	if (pending === null && firstChild === null) {
 		// Hydrating, an adopted host with no server children cannot hold these.
 		if (next.length !== 0 && hydrating) currentHydration!.missingDeoptChild(el, next[0]);
 		saveDeoptChildren(el);
@@ -37698,10 +37691,7 @@ function reconcileDeoptChildren(
 				}
 			}
 		}
-		if (built.length !== 0) {
-			order!.nodes = built;
-			order!.skip = false;
-		}
+		if (built.length !== 0) order!.nodes = built;
 		return;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
