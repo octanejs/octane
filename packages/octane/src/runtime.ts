@@ -3917,8 +3917,8 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // commit function `C(bag)`. The bag's binding slots hold COMMITTED values, the
 // ones the DOM shows. A render compares each binding against its committed
 // slot, and only the first difference stages the bag: `bag.next` is a reusable
-// array of pending cells (from BAG_POOL on its first stage), filled with the
-// bag itself as the "unchanged" marker. Every later binding of that render
+// array of pending cells, allocated once per bag and filled with the bag itself
+// as the "unchanged" marker. Every later binding of that render
 // records its cell. `C` walks the cells straight-line: it writes each changed
 // cell through the ordinary setter and only then publishes it to the committed
 // slot.
@@ -3972,26 +3972,22 @@ function stageBag(bag: any): any[] {
 	const state = bag.$;
 	let next = bag.next;
 	if (next === null) {
-		// Kept packed: the commit function reads every cell.
-		next = bag.next = BAG_POOL.pop() ?? [];
-		const size = (state & BAG_SIZE) + 2;
-		while (next.length < size) next.push(bag);
-		if (next.length > size) next.length = size;
+		// Packed from the start: the commit function reads every cell.
+		next = bag.next = SPARE_CELLS.pop() ?? [];
+		for (let i = (state & BAG_SIZE) + 2; i > 0; i--) next.push(bag);
+	} else {
+		// A loop, not fill(): a builtin call costs more than a few cells.
+		for (let i = next.length - 1; i >= 0; i--) next[i] = bag;
 	}
-	// A loop, not fill(): a builtin call costs more than a few cells.
-	for (let i = next.length - 1; i >= 0; i--) next[i] = bag;
 	bag.$ = state | BAG_STAGED;
 	return next;
 }
 
 /**
- * Spare cell arrays. A bag's first stage takes one, and while the pool is
- * short a queued commit returns its bag's array (runCommitOps), so the first
- * update of a newly mounted template allocates nothing. Bags past the pool
- * keep their arrays.
+ * Preallocated cell arrays for the first bags a page stages, so their first
+ * update allocates nothing. Every bag keeps the array it stages into.
  */
-const BAG_POOL_SIZE = 8;
-const BAG_POOL: any[][] = [[], [], [], [], [], [], [], []];
+const SPARE_CELLS: any[][] = [[], [], [], [], [], [], [], []];
 
 /**
  * Record one binding: `next` stays null until a value differs from its
@@ -4103,11 +4099,6 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 				if (typeof target?.$ !== 'number') throw error;
 				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
 					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
-			}
-			// Only a bag has `$`; any other target compares undefined, which is false.
-			if (BAG_POOL.length < BAG_POOL_SIZE && target?.$ <= BAG_SIZE && target.next !== null) {
-				BAG_POOL.push(target.next);
-				target.next = null;
 			}
 		}
 		return COMMITTING_GENERATION;
