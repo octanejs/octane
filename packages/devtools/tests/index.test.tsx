@@ -1,6 +1,7 @@
 /** @jsxImportSource octane */
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, render, screen } from '@octanejs/testing-library';
+import { createPortal, type OctaneNode } from 'octane';
 import { octaneDevtools } from '../src/index';
 
 type Listener = () => void;
@@ -64,5 +65,36 @@ describe('octaneDevtools', () => {
 
 		expect(screen.getByText(/no profiling data/i)).toBeTruthy();
 		expect(screen.queryByText(/no mounted roots yet/i)).toBeNull();
+	});
+
+	it('preserves the panel and selected tab when a recreated plugin renders into the same portal', async () => {
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		function Host(props: { content: OctaneNode }) {
+			return createPortal(props.content, target);
+		}
+		try {
+			const firstBody = octaneDevtools().render();
+			const { rerender, unmount } = render(Host, { props: { content: firstBody } });
+			const panel = target.querySelector('.odt-root');
+			const profiler = screen.getByRole('button', { name: /profiler/i });
+			expect(panel).not.toBeNull();
+			act(() => profiler.click());
+			expect(await screen.findByText(/no profiling data/i)).toBeTruthy();
+
+			const secondBody = octaneDevtools().render();
+			expect(secondBody).not.toBe(firstBody);
+			rerender({ props: { content: secondBody } });
+
+			expect(target.querySelector('.odt-root')).toBe(panel);
+			expect(screen.getByRole('button', { name: /profiler/i })).toBe(profiler);
+			expect(screen.getByText(/no profiling data/i)).toBeTruthy();
+			expect(screen.queryByText(/no mounted roots yet/i)).toBeNull();
+			unmount();
+			expect(target.childNodes.length).toBe(0);
+		} finally {
+			cleanup();
+			target.remove();
+		}
 	});
 });
