@@ -11,7 +11,10 @@
     "integrity": "sha256:648a3eae6d4a8708e215b7272907ba018b5f77430acbb568a2c5aebd238ce945",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/textarea-autosize/src"],
@@ -223,7 +226,7 @@
         {
           "path": "packages/textarea-autosize/tests/ssr/react-contract.test.ts",
           "role": "test",
-          "sha256": "e025b7c0bfaa762a7457beed30da5d7f263bbea6a07d15c30498a85a09e39a12",
+          "sha256": "a620aa11ffefec0ff13c3f4b598d6dbd14a482cd0ab4cbd07aeac89a530f77a8",
           "cases": [
             {
               "id": "ssr:react-contract",
