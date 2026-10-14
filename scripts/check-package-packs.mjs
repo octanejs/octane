@@ -1443,6 +1443,12 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			config: {
 				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
 				nodeTypes: false,
+				// MDX's server provider belongs to the full Node lane above. Keep its
+				// client source checked here; an actual client import of server code
+				// still enters the TypeScript program despite this root exclusion.
+				sourceExcludeFiles: resolvePackedTsrxSourceDirectories(consumerDirectory, [
+					'@octanejs/mdx',
+				]).map((directory) => `${directory}/src/server.tsrx`),
 			},
 			consumerTsrxFiles: [],
 			sourcePackages: [...browserSourceConsumerSpecifiers.keys()],
@@ -1525,11 +1531,14 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	};
 
 	let checkedTsrxFiles = 0;
-	for (const { project, consumerTsrxFiles, sourcePackages } of projects) {
+	for (const { project, config, consumerTsrxFiles, sourcePackages } of projects) {
 		const label = `${lane.name} ${project} (${lane.checker})`;
 		const result = typecheck(project);
 		const { diagnostics, files } = splitPackedTsrxTypecheckOutput(result.stdout);
 		assertPackedTsrxConsumerSucceeded({ ...result, stdout: diagnostics }, label);
+		const excludedSourceFiles = new Set(
+			(config.sourceExcludeFiles ?? []).map((file) => path.join(realConsumerDirectory, file)),
+		);
 		const expectedTsrxFiles = [
 			...consumerTsrxFiles.map((file) => path.join(realConsumerDirectory, file)),
 			...sourcePackages.flatMap((packageName) => {
@@ -1538,7 +1547,8 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 				);
 				return [...packedFiles.get(packageName)]
 					.filter((file) => file.endsWith('.tsrx'))
-					.map((file) => path.join(installedPackage, file));
+					.map((file) => path.join(installedPackage, file))
+					.filter((file) => !excludedSourceFiles.has(file));
 			}),
 		];
 		assertPackedTsrxFilesChecked(
