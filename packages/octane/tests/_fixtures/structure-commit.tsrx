@@ -1,4 +1,13 @@
-import { Activity, ErrorBoundary, createPortal, use, useLayoutEffect, useRef } from 'octane';
+import {
+	Activity,
+	ErrorBoundary,
+	createPortal,
+	startTransition,
+	use,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'octane';
 
 // One app that removes content through every structural slot kind: a branch
 // arm, a keyed component, keyed rows, a value hole, and a branch arm inside a
@@ -295,4 +304,117 @@ export function SelectProbeApp(props: SelectProps) @{
 			<Gate gate={props.gate} />
 		}
 	</main>
+}
+
+function LateBoundary(props: { value: PromiseLike<string>; probe: () => void }) @{
+	const value = use(props.value);
+	<>
+		<ErrorBoundary fallback={<i>{'late caught'}</i>}>
+			<b id="late-value">{value}</b>
+		</ErrorBoundary>
+		<Probe probe={props.probe} />
+	</>
+}
+
+// A component whose first render suspended before its error boundary: when it
+// resumes, the boundary is new under DOM its earlier render committed.
+export function LateBoundaryApp(props: { value: PromiseLike<string>; probe: () => void }) @{
+	<main>
+		@try {
+			<LateBoundary value={props.value} probe={props.probe} />
+		} @pending {
+			<p id="late-pending">{'pending'}</p>
+		}
+	</main>
+}
+
+export interface MappedRow {
+	id: number;
+}
+
+export interface MappedProps {
+	rows: { map<T>(callback: (row: MappedRow, index: number) => T): T[] };
+	probe: () => void;
+}
+
+function MappedChip(props: { id: number }) @{
+	<li id={'mapped-' + props.id}>{('chip ' + props.id) as string}</li>
+}
+
+// Rows through an exotic `map`, which can return a host descriptor for a row
+// that the next render maps to a component.
+export function MappedApp(props: MappedProps) @{
+	<main>
+		<ul id="mapped">
+			{props.rows.map((row) => (
+				<MappedChip key={row.id} id={row.id} />
+			))}
+		</ul>
+		<Probe probe={props.probe} />
+	</main>
+}
+
+export interface ArmSwapControls {
+	move(): void;
+	setLocal(local: number): void;
+}
+
+function ArmSwapOwner(props: {
+	start: boolean;
+	step: number;
+	controls: ArmSwapControls;
+	probe: () => void;
+}) @{
+	const [local, setLocal] = useState(0);
+	props.controls.setLocal = setLocal;
+	const flipped = props.step === 1 && local === 0;
+	const on = props.start ? !flipped : flipped;
+	<div id="arm-swap">
+		@if (on) {
+			<b class="lone">{'lone'}</b>
+		}
+		<i>{'tail'}</i>
+		<Probe probe={props.probe} />
+	</div>
+}
+
+// One drain swaps the arm twice: the parent's urgent update flips it, and the
+// owner's transition after it flips it back, so the second swap replaces an
+// arm the same render swapped in.
+export function ArmSwapApp(props: {
+	start: boolean;
+	controls: ArmSwapControls;
+	probe: () => void;
+}) @{
+	const [step, setStep] = useState(0);
+	props.controls.move = () => {
+		setStep(1);
+		startTransition(() => props.controls.setLocal(1));
+	};
+	<ArmSwapOwner start={props.start} step={step} controls={props.controls} probe={props.probe} />
+}
+
+function RetireRow(props: {
+	id: number;
+	log: string[];
+	expose: (set: (n: number) => void) => void;
+}) @{
+	const [n, setN] = useState(0);
+	props.expose(setN);
+	props.log.push('row ' + props.id + ':' + n);
+	<li>{String(n) as string}</li>
+}
+
+// Rows with state, so a row's own update can be queued in the drain whose
+// root render deletes it.
+export function RetireList(props: {
+	ids: number[];
+	log: string[];
+	expose: (set: (n: number) => void) => void;
+}) @{
+	<ul id="retire">
+		@for (const id of props.ids; key id) {
+			<RetireRow id={id} log={props.log} expose={props.expose} />
+		}
+	</ul>
 }

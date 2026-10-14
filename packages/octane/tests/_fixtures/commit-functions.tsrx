@@ -73,7 +73,7 @@ export function MemoHeld(props: { label: string; wait: Promise<unknown> | null }
 export function CommitError(props: { title: unknown; sibling: string }) @{
 	<section>
 		@try {
-			<p id="fails" title={props.title}>
+			<p id="fails" title={props.title as string}>
 				{'body'}
 			</p>
 		} @catch (error) {
@@ -118,6 +118,34 @@ export function Nested(props: { controls: NestedControls; wait: Promise<unknown>
 				<Owner step={step} controls={props.controls} />
 				<Susp controls={props.controls} wait={props.wait} />
 			</>
+		} @pending {
+			<p id="fallback">{'loading'}</p>
+		}
+	</section>
+}
+
+// The same drain, but the transition's render of the row lands back on the
+// committed values while the urgent render's are still pending.
+interface RevertControls {
+	setStep(step: number): void;
+	setLocal(local: number): void;
+}
+
+function RevertRow(props: { step: number; controls: RevertControls }) @{
+	const [local, setLocal] = useState(0);
+	props.controls.setLocal = setLocal;
+	const shown = String(props.step - local);
+	<p id="revert" title={'title:' + shown} onClick={() => props.controls.setLocal(local)}>
+		{shown}
+	</p>
+}
+
+export function Revert(props: { controls: RevertControls }) @{
+	const [step, setStep] = useState(0);
+	props.controls.setStep = setStep;
+	<section>
+		@try {
+			<RevertRow step={step} controls={props.controls} />
 		} @pending {
 			<p id="fallback">{'loading'}</p>
 		}

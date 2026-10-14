@@ -22,7 +22,7 @@
 export const WRITERS = new Map(
 	Object.entries({
 		// commit
-		applyNext: 'commit',
+		applySlotNext: 'commit',
 		applyOutgoing: 'commit',
 		placeRoots: 'commit',
 		placeRun: 'commit',
@@ -35,11 +35,13 @@ export const WRITERS = new Map(
 		ownTryBodyRange: 'commit',
 		placeHydratedText: 'commit',
 		removeRange: 'commit',
-		queueOwnedListClear: 'commit',
 		clearItems: 'commit',
 		moveBlockBefore: 'commit',
 		removeNodes: 'commit',
 		clearRootContainer: 'commit',
+		landItemPair: 'commit',
+		landHostPair: 'commit',
+		mappedDeoptItemBody: 'commit',
 		// primitive
 		updateTextValue: 'primitive',
 		setText: 'primitive',
@@ -95,9 +97,7 @@ export const WRITERS = new Map(
 		hostComponent: 'fresh',
 		renderFragmentRefDescriptor: 'fresh',
 		reconcileDeoptChildren: 'fresh',
-		promoteSelfMarkedItem: 'fresh',
 		deoptItemBody: 'fresh',
-		mappedDeoptItemBody: 'fresh',
 		hostElementBody: 'fresh',
 		hostStringTagBody: 'fresh',
 		renderPreparedChildList: 'fresh',
@@ -112,6 +112,7 @@ export const WRITERS = new Map(
 		swapBranchFrontier: 'fresh',
 		frontierSentinel: 'fresh',
 		releaseFrontierSentinel: 'fresh',
+		itemComponentFrontier: 'fresh',
 		removeAfter: 'fresh',
 		renderBranchSlot: 'fresh',
 		activityBlock: 'fresh',

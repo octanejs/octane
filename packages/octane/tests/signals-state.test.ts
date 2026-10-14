@@ -328,6 +328,33 @@ describe('scoped synchronous signals', () => {
 		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
 	});
 
+	it('stops retaining a foreign value once another dependency owner retires', () => {
+		const data = owner('retained-data');
+		const gate = owner('retiring-gate');
+		const view = owner('retaining-view');
+		const value$ = data.signal$('value', 'private value');
+		const reason$ = gate.signal$('reason', 'closed');
+		const blocked$ = view.signal$('blocked', false);
+		const card$ = view.derived$('card', () => {
+			if (blocked$.get()) throw new Error(reason$.get());
+			return value$.get();
+		});
+		let notifications = 0;
+		card$.subscribe(() => notifications++);
+		expect(card$.get()).toBe('private value');
+		blocked$.set(true);
+		expect(card$.latest(null)).toBe('private value');
+
+		gate.dispose();
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+		const delivered = notifications;
+		// The view no longer reads or retains the data owner's value, so that
+		// owner retiring later is not another change to the card.
+		data.dispose();
+		expect(notifications).toBe(delivered);
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
 	it.each([
 		{ blocked: 'pending', indirect: false },
 		{ blocked: 'error', indirect: false },
