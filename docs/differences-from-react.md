@@ -2053,6 +2053,11 @@ the failure; its owner must choose the transport response.
 
 ### Hydration
 
+Browser translation and other external tools replacing nodes inside
+framework-owned content are unsupported, including after hydration. Applications
+should keep localization under their control and opt owned content out of browser
+translation in the initial HTML; see [DOM ownership and translation opt-outs](./deferred-hydration.md#compiled-presentation-on-existing-dom).
+
 Mismatches are handled as React 19 handles them. Nothing is repaired in
 place. When the server's HTML differs structurally from the client render (a
 different tag, a missing node, or server content the client renders nothing
