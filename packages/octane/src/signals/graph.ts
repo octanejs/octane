@@ -649,8 +649,8 @@ function releaseRetainedOwners(node: ScopedNode): void {
 
 export function releaseRetention(node: ScopedNode): void {
 	if (node.lastState?.owners) releaseRetainedOwners(node);
-	node.last = undefined;
 	node.lastState = undefined;
+	node.last = undefined;
 	node.hasLast = false;
 }
 
@@ -736,17 +736,34 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	subsTail: ReactiveNode['subsTail'];
 	flags: ReactiveFlags;
 	revision = 0;
-	state: NodeState<T> | undefined;
+	protected storedState: NodeState<T> | undefined;
+	protected storedLastState: NodeState<T> | undefined;
 	compute: ((target: ScopedNode<T>) => NodeState<T>) | undefined;
 	invalidateAttempt: (() => void) | undefined;
 	last: T | undefined;
-	lastState: NodeState<T> | undefined;
 	hasLast = false;
 	evaluating = false;
 	wakeup: Wakeup | undefined;
 	nativeSource: NativeReadSource | undefined;
 	nativeLatestSource: NativeReadSource | undefined;
 	nativeSnapshotSource: NativeReadSource | undefined;
+
+	get state(): NodeState<T> | undefined {
+		return this.storedState;
+	}
+
+	set state(state: NodeState<T> | undefined) {
+		this.storedState = state;
+	}
+
+	get lastState(): NodeState<T> | undefined {
+		return this.storedLastState;
+	}
+
+	set lastState(state: NodeState<T> | undefined) {
+		this.storedLastState = state;
+	}
+
 	retry(_options?: { pending?: boolean }): void {
 		assertAlive(this.owner);
 		throw new TypeError(formatClientError(163));
@@ -805,7 +822,9 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			return;
 		}
 		signalBatch(() => {
-			const previous = strictValue(refreshNode(this), this.key);
+			refresh(this);
+			const writable = this instanceof WritableScopedNode ? this : undefined;
+			const previous = writable?.valueOnly ? (this.last as T) : strictValue(this.state!, this.key);
 			const next =
 				typeof value === 'function'
 					? untrack(() => pure(() => (value as (previous: T) => T)(previous)))
@@ -815,7 +834,15 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			const releases = candidateHooks.urgentWrite?.(this, value);
 			try {
 				if (!Object.is(previous, next)) {
-					publishNode(this, readyState(next));
+					if (writable?.valueOnly) {
+						this.last = next;
+						this.storedState = this.storedLastState = undefined;
+						this.revision++;
+						if (this.subs) {
+							propagate(this.subs, executionDepth !== 0);
+							shallowPropagate(this.subs);
+						}
+					} else publishNode(this, readyState(next));
 					this.owner.trace('write', this);
 				}
 			} finally {
@@ -855,6 +882,56 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	}
 }
 
+/** Ordinary writable cells materialize immutable ready snapshots only when read. */
+export class WritableScopedNode<T = any> extends ScopedNode<T> {
+	valueOnly = true;
+	override hasLast = true;
+
+	override get state(): NodeState<T> | undefined {
+		if (this.valueOnly && this.storedState === undefined)
+			this.storedState = this.storedLastState = readyState(this.last as T);
+		return this.storedState;
+	}
+
+	override set state(state: NodeState<T> | undefined) {
+		if (this.valueOnly) {
+			// Pending/error/provenance state must retain the old ready value.
+			this.storedLastState = this.state;
+			this.valueOnly = false;
+		}
+		this.storedState = state;
+	}
+
+	override get lastState(): NodeState<T> | undefined {
+		return this.valueOnly ? this.state : this.storedLastState;
+	}
+
+	override set lastState(state: NodeState<T> | undefined) {
+		if (this.valueOnly) {
+			this.storedState = this.state;
+			this.valueOnly = false;
+		}
+		this.storedLastState = state;
+	}
+
+	override get(): T {
+		if (
+			this.valueOnly &&
+			!activeCandidate &&
+			!historicalReader &&
+			!(this.owner.seedable && getNativeAdoptionResolver())
+		) {
+			refresh(this);
+			trackRead(this, 'value', undefined);
+			// A writable ready value carries no extra retained owners.
+			if (activeNode && this.owner !== activeNode.owner)
+				(activeOwners ??= new Set()).add(this.owner);
+			return this.last as T;
+		}
+		return super.get();
+	}
+}
+
 export function assertAlive(owner: GraphOwner): void {
 	if (owner.retired) throw new ScopeDisposedError(owner.scopeKey);
 }
@@ -886,21 +963,55 @@ export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): Nativ
 }
 
 function createNativeSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
-	const view = declarationViews?.get(node);
-	return view === undefined ? createGraphSource(node, read) : createViewSource(node, view, read);
+	return new GraphReadSource(node, read, declarationViews?.get(node));
 }
 
-function createGraphSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
-	return {
-		getVersion: () => (activeCandidate && !activeCandidate.observes(node) ? NaN : node.revision),
-		subscribe: (notify) => {
-			assertAlive(node.owner);
-			return attachObserver(node, notify, true);
-		},
-		serialize: (revision) =>
-			node.revision === revision ? nativeReadSerializer!(node, read) : undefined,
-		inspect: () => inspectNativeNode(node, read),
-	};
+class GraphReadSource implements NativeReadSource {
+	constructor(
+		readonly node: ScopedNode,
+		readonly read: SignalReadMode,
+		readonly view: DeclarationView | undefined,
+	) {}
+
+	private canonicalSource(): NativeReadSource | undefined {
+		const view = this.view;
+		if (!view?.promoted) return undefined;
+		const node = view.canonical;
+		return (node[nativeSourceField(this.read)] ??= createNativeSource(node, this.read));
+	}
+
+	getVersion(): number {
+		const view = this.view;
+		if (view !== undefined) {
+			const canonical = this.canonicalSource();
+			if (canonical)
+				return canonical.getVersion() === view.canonicalRevision ? view.viewRevision : NaN;
+			if (view.retired) return NaN;
+		}
+		const node = this.node;
+		return activeCandidate && !activeCandidate.observes(node) ? NaN : node.revision;
+	}
+
+	subscribe(notify: () => void): () => void {
+		const canonical = this.canonicalSource();
+		if (canonical) return canonical.subscribe(notify);
+		assertAlive(this.node.owner);
+		return attachObserver(this.node, notify, true);
+	}
+
+	serialize(revision: number) {
+		const canonical = this.canonicalSource();
+		if (canonical)
+			return revision === this.view!.viewRevision
+				? canonical.serialize?.(this.view!.canonicalRevision)
+				: undefined;
+		const node = this.node;
+		return node.revision === revision ? nativeReadSerializer!(node, this.read) : undefined;
+	}
+
+	inspect(): NativeReadInspection {
+		return this.canonicalSource()?.inspect!() ?? inspectNativeNode(this.node, this.read);
+	}
 }
 
 export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value'): NodeState<T> {
@@ -916,25 +1027,28 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 	const state = refreshNode(node);
 	const observed =
 		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
+	trackRead(node, read, candidate);
+	// Retirement marks the owner before invoking user cancellation callbacks.
+	// A reentrant read must not expose its old value before graph teardown runs.
+	if (observed.owners) for (const owner of observed.owners) assertAlive(owner);
+	if (activeNode) recordOwners(node, observed);
+	return observed;
+}
+
+function trackRead(
+	node: ScopedNode,
+	read: SignalReadMode,
+	candidate: SignalCandidateFrame | undefined,
+): void {
 	if (activeNode) linkDependency(node, activeNode, trackingCycle);
 	if (getNativeReadObserver()) {
-		const field =
-			read === 'value'
-				? 'nativeSource'
-				: read === 'latest'
-					? 'nativeLatestSource'
-					: 'nativeSnapshotSource';
+		const field = nativeSourceField(read);
 		const source = (node[field] ??= createNativeSource(node, read));
 		reportNativeRead(
 			candidate ? candidate.nativeSource(node, read, source) : source,
 			node.revision,
 		);
 	}
-	// Retirement marks the owner before invoking user cancellation callbacks.
-	// A reentrant read must not expose its old value before graph teardown runs.
-	if (observed.owners) for (const owner of observed.owners) assertAlive(owner);
-	if (activeNode) recordOwners(node, observed);
-	return observed;
 }
 
 export function strictValue<T>(state: NodeState<T>, key = 'idle'): T {
@@ -1006,6 +1120,11 @@ export function unchangedLiveRead(
 }
 
 export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
+	refresh(node);
+	return node.state!;
+}
+
+function refresh(node: ScopedNode): void {
 	assertAlive(node.owner);
 	if (node.evaluating) throw new SignalCycleError(node.key);
 	// Dirty dependency checks may execute an async description and its loader
@@ -1030,7 +1149,6 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 			node.flags &= ~REACTIVE_RECURSED;
 			break;
 		}
-		return node.state!;
 	} finally {
 		if (guarded) pureDepth--;
 	}
@@ -1351,34 +1469,6 @@ function nativeSourceField(read: SignalReadMode) {
 		: read === 'latest'
 			? ('nativeLatestSource' as const)
 			: ('nativeSnapshotSource' as const);
-}
-
-function createViewSource(
-	view: ScopedNode,
-	record: DeclarationView,
-	read: SignalReadMode,
-): NativeReadSource {
-	const own = createGraphSource(view, read);
-	const canonical = (): NativeReadSource =>
-		(record.canonical[nativeSourceField(read)] ??= createNativeSource(record.canonical, read));
-	return {
-		getVersion: () =>
-			record.promoted
-				? canonical().getVersion() === record.canonicalRevision
-					? record.viewRevision
-					: NaN
-				: record.retired
-					? NaN
-					: own.getVersion(),
-		subscribe: (notify) => (record.promoted ? canonical() : own).subscribe(notify),
-		serialize: (version) =>
-			record.promoted
-				? version === record.viewRevision
-					? canonical().serialize?.(record.canonicalRevision)
-					: undefined
-				: own.serialize?.(version),
-		inspect: () => (record.promoted ? canonical() : own).inspect!(),
-	};
 }
 
 export function createDeclarationView<T>(

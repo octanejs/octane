@@ -202,9 +202,32 @@ function RawRootSuspensionReader(props: { read: () => string }) @{
 	<strong id="raw-root-suspension-reader">{'resource:' + value}</strong>
 }
 
-export function RawRootSuspensionAfterSiblingApp(props: { label: string; read: () => string }) @{
+export function RawRootSuspensionAfterSiblingApp(props: {
+	label: string;
+	title?: string | null;
+	read: () => string;
+}) @{
 	<section id="raw-root-suspension-shell">
-		<span id="raw-root-suspension-label" title={props.label}>
+		<span
+			id="raw-root-suspension-label"
+			title={props.title === undefined ? props.label : props.title}
+			aria-label={props.title}
+			aria-description={props.title}
+			aria-keyshortcuts={props.title}
+			data-heading={props.title}
+			data-subheading={props.title}
+			data-description={props.title}
+			data-summary={props.title}
+			data-display={props.title}
+			data-layout={props.title}
+			data-group={props.title}
+			data-section={props.title}
+			data-item={props.title}
+			data-detail={props.title}
+			data-state={props.title}
+			data-category={props.title}
+			data-position={props.title}
+		>
 			{props.label}
 		</span>
 		<RawRootSuspensionReader read={props.read} />

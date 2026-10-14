@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'octane/server';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createElement, flushSync, hydrateRoot } from '../src/index.js';
 import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
@@ -204,6 +204,83 @@ describe('authored host JSX', () => {
 			expect(
 				renderToString(fixture(source, true).App, { css: '.x { color: red; }' }).html,
 			).toContain('<style>.x { color: red; }</style>');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Exercise both binding bag layouts with distinct captures. A single shared
+	// fixture cannot represent different numbers of authored (non-spread) props.
+	it.each(Array.from({ length: 12 }, (_, index) => index + 5))(
+		'keeps native signal children and events live with %i dynamic host attrs',
+		async (width) => {
+			const fields = Array.from({ length: width }, (_, index) => index);
+			const attrs = fields
+				.map((index) => `data-field-${index}={props.label + '-${index}'}`)
+				.join(' ');
+			const { App } = fixture(`
+				import {signal$} from 'octane/signals';
+				export function App(props) @{
+					const value$ = signal$('seed');
+					<button ${attrs} onClick={() => {
+						props.onAction(props.label + ':' + value$.get());
+						value$.set('edited');
+					}}>
+						{value$}
+					</button>
+				}`);
+			const onAction = vi.fn();
+			const r = mount(App, { label: 'first', onAction });
+			try {
+				const host = r.find('button');
+				expect(host.textContent).toBe('seed');
+				expect(fields.map((index) => host.getAttribute(`data-field-${index}`))).toEqual(
+					fields.map((index) => `first-${index}`),
+				);
+				await act(() => r.click('button'));
+				expect(onAction).toHaveBeenLastCalledWith('first:seed');
+				expect(host.textContent).toBe('edited');
+				r.update(App, { label: 'second', onAction });
+				expect(r.find('button')).toBe(host);
+				expect(fields.map((index) => host.getAttribute(`data-field-${index}`))).toEqual(
+					fields.map((index) => `second-${index}`),
+				);
+				expect(host.textContent).toBe('edited');
+				await act(() => r.click('button'));
+				expect(onAction).toHaveBeenLastCalledWith('second:edited');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('keeps legitimate children of a wide host with unchanged null raw HTML and rejects later conflicting HTML', () => {
+		const fields = Array.from({ length: 16 }, (_, index) => index);
+		const attrs = fields
+			.map((index) => `data-field-${index}={props.stable + '-${index}'}`)
+			.join(' ');
+		const { App } = fixture(`export function App(props) @{
+			<section title={props.label} ${attrs} dangerouslySetInnerHTML={props.html}>{props.child}</section>
+		}`);
+		const child = createElement('em', { 'data-child': 'live' }, 'ordinary child');
+		const props = { label: 'first', stable: 'keep', html: null, child };
+		const r = mount(App, props);
+		try {
+			const host = r.find('section');
+			const original = r.find('em');
+			expect(host.textContent).toBe('ordinary child');
+			expect(host.getAttribute('title')).toBe('first');
+			r.update(App, { ...props, label: 'second' });
+			expect(r.find('section')).toBe(host);
+			expect(r.find('em')).toBe(original);
+			expect(host.textContent).toBe('ordinary child');
+			expect(host.getAttribute('title')).toBe('second');
+			expect(fields.map((index) => host.getAttribute(`data-field-${index}`))).toEqual(
+				fields.map((index) => `keep-${index}`),
+			);
+			expect(() =>
+				r.update(App, { ...props, label: 'third', html: { __html: '<b>conflict</b>' } }),
+			).toThrow(/dangerouslySetInnerHTML/);
 		} finally {
 			r.unmount();
 		}

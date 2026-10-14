@@ -30,6 +30,34 @@ describe('scoped synchronous signals', () => {
 		expect(value$.snapshot()).toMatchObject({ status: 'ready', value: 2 });
 	});
 
+	it('keeps captured snapshots stable across unobserved writes and an equal final batch', () => {
+		const scope = owner();
+		const value$ = scope.signal$('value', 0);
+		// Reads before the first snapshot are still observable graph reads.
+		const doubled$ = scope.derived$('doubled', () => value$.get() * 2);
+		expect(doubled$.get()).toBe(0);
+		value$.set(2);
+		expect(doubled$.get()).toBe(4);
+		const first = value$.snapshot();
+		const observed: number[] = [];
+		const stop = value$.subscribe(() => observed.push(value$.get()));
+		scope.batch(() => {
+			value$.set(3);
+			expect(value$.get()).toBe(3);
+			expect(value$.latest()).toBe(3);
+			expect(value$.snapshot()).toMatchObject({ status: 'ready', value: 3 });
+			expect(first).toMatchObject({ status: 'ready', value: 2 });
+			value$.set(2);
+			expect(doubled$.get()).toBe(4);
+		});
+		expect(observed).toEqual([]);
+		value$.set(4);
+		expect(observed).toEqual([4]);
+		expect(value$.snapshot()).toMatchObject({ status: 'ready', value: 4 });
+		expect(first).toMatchObject({ status: 'ready', value: 2 });
+		stop();
+	});
+
 	it('reads writes immediately, including through derived values inside a batch', () => {
 		const scope = owner();
 		const count$ = scope.signal$('count', 1);

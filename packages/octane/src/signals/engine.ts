@@ -5,6 +5,7 @@ import { scopeStreams, type ScopeStreams } from './scope-streams.js';
 import { scopeSeedEntry } from './seed-serialization.js';
 import {
 	ScopedNode,
+	WritableScopedNode,
 	assertAlive,
 	assertWritable,
 	derivedState,
@@ -266,10 +267,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	signal$<T>(key: string, initial: T): WritableSignal<T> {
 		const node = createScopeNode<T>(this, key, 'signal');
 		const seed = initialScopeSeed(this, key) ?? retainedScopeSeed(this, key);
-		node.state = readyState(seed ? (seed.value as T) : initial);
-		node.lastState = node.state;
-		node.last = (node.state.snapshot as { value: T }).value;
-		node.hasLast = true;
+		node.last = seed ? (seed.value as T) : initial;
 		consumeScopeSeed(this, key);
 		return node as WritableSignal<T>;
 	}
@@ -378,7 +376,10 @@ function createScopeNode<T>(
 				throw new SignalFrameError(formatClientError(133, key));
 			}
 		}
-	const node = new ScopedNode<T>(owner, key, kind);
+	const node =
+		kind === 'signal'
+			? new WritableScopedNode<T>(owner, key, kind)
+			: new ScopedNode<T>(owner, key, kind);
 	owner.nodes.set(key, node);
 	return node;
 }
@@ -803,10 +804,7 @@ export function createDeclaredSignalCell<T>(
 	const [node, created] = declaredScopeNode<T>(owner, key, 'signal');
 	if (!created) return node as WritableSignal<T>;
 	const seed = initialScopeSeed(owner, key) ?? retainedScopeSeed(owner, key);
-	node.state = readyState(seed && !preferInitial ? (seed.value as T) : initial);
-	node.lastState = node.state;
-	node.last = (node.state.snapshot as { value: T }).value;
-	node.hasLast = true;
+	node.last = seed && !preferInitial ? (seed.value as T) : initial;
 	consumeScopeSeed(owner, key);
 	return node as WritableSignal<T>;
 }

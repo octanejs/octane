@@ -28829,6 +28829,15 @@ function planJsx(
 				// children (an only child) or range (a sibling or whole-output hole)
 				// that no other binding owns.
 				bag.constField(`_chp$${cc.id}`, 'unset');
+				// Reserve native-child tokens before choosing the bag factory and
+				// prepare representation; both must see exactly the same field set.
+				if (
+					!cc.bindingMarker &&
+					cc.signalSite != null &&
+					(ctx.signalBindingsUsed || ctx.nativeReads)
+				) {
+					bag.constField(`_sigch$${cc.id}`, 'null');
+				}
 			}
 		},
 	});
@@ -29021,6 +29030,10 @@ function planJsx(
 	// change observable order.
 	const updateLines = [];
 	const everyRenderLines = [];
+	// DOM hosts, subscription tokens and optimistic text nodes increase the
+	// allocation bag but are not bindings. Only independently changed bindings
+	// can repay the sparse reads (a keyed JSX row has 17 slots but only 5).
+	bag.sparsePreparation = templateBindings.length + templateTextHoles.length > BAG_FACTORY_MAX;
 	const templateCommit =
 		templateBindings.length === 0 && templateTextHoles.length === 0
 			? null
@@ -29096,7 +29109,13 @@ function planJsx(
 							const prepared = () => b.member(b.id('_p'), `_value$${field}`);
 							return inheritOriginLoc(
 								b.if(
-									b.binary('!==', saved(), b.member(b.id('_p'), field)),
+									!bag.sparsePreparation
+										? b.binary('!==', saved(), b.member(b.id('_p'), field))
+										: b.logical(
+												'&&',
+												b.binary('in', b.literal(field), b.id('_p')),
+												b.binary('!==', saved(), b.member(b.id('_p'), field)),
+											),
 									b.block([
 										b.if(
 											b.binary('!==', prepared(), undefinedNode()),
@@ -29123,7 +29142,7 @@ function planJsx(
 										b.assignment(
 											'=',
 											bagFieldNode(bag, '_eventOwner'),
-											b.member(b.id('_p'), bag.letter('_eventOwner')),
+											bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner'))),
 										),
 									),
 								]
@@ -29658,7 +29677,9 @@ function planJsx(
 					? () => b.member(b.member(b.id('_p'), bag.letter(`_host$${binding.id}`)), 'resolved')
 					: () =>
 							b.member(
-								b.member(b.id('_p'), `_value$${bag.letter(`_prev$${binding.id}`)}`),
+								bag.preparedRead(
+									b.member(b.id('_p'), `_value$${bag.letter(`_prev$${binding.id}`)}`),
+								),
 								'props',
 							);
 		}
@@ -29694,7 +29715,6 @@ function planJsx(
 				if (isDirectSignalHandleExpression(cc.valueExpr)) ctx.signalBindingsEager = true;
 				ctx.runtimeNeeded.add('bindSignalChild');
 				const tokenKey = `_sigch$${cc.id}`;
-				bag.constField(tokenKey, b.literal(null));
 				const bindChild = (value) =>
 					b.stmt(
 						b.assignment(
@@ -29858,7 +29878,7 @@ function planJsx(
 					const copy = () =>
 						b.if(
 							b.binary('===', b.id('_p'), b.id('_pv')),
-							b.stmt(b.assignment('=', b.id('_p'), b.object([b.spread(b.id('_pv'))]))),
+							b.stmt(b.assignment('=', b.id('_p'), preparedCopy(bag))),
 							null,
 						);
 					// Preserve generic-hole meaning and structural upgrades. Only an
@@ -29866,7 +29886,7 @@ function planJsx(
 					// mount, null/booleans and complex values retain normal reconciliation.
 					update = b.if(
 						andChain([
-							b.binary('!=', currentNode(), nullNode()),
+							b.binary('!=', bag.preparedRead(currentNode()), nullNode()),
 							b.logical(
 								'||',
 								b.binary('===', b.unary('typeof', V()), b.literal('string')),
@@ -29879,14 +29899,19 @@ function planJsx(
 						]),
 						b.block([
 							b.if(
-								b.binary('!==', current(), V()),
+								b.binary('!==', bag.preparedRead(current()), V()),
 								b.block([
 									copy(),
 									b.stmt(
 										b.assignment(
 											'=',
 											prepared(),
-											b.call('_$prepareTemplateText', currentNode(), hostExpr(), V()),
+											b.call(
+												'_$prepareTemplateText',
+												bag.preparedRead(currentNode()),
+												hostExpr(),
+												V(),
+											),
 										),
 									),
 									b.stmt(b.assignment('=', current(), V())),
@@ -30309,11 +30334,11 @@ function planJsx(
 							),
 						),
 						b.if(
-							b.binary('!==', pending(), b.id('_e')),
+							b.binary('!==', bag.preparedRead(pending()), b.id('_e')),
 							b.block([
 								b.if(
 									b.binary('===', b.id('_p'), b.id('_pv')),
-									b.stmt(b.assignment('=', b.id('_p'), b.object([b.spread(b.id('_pv'))]))),
+									b.stmt(b.assignment('=', b.id('_p'), preparedCopy(bag))),
 									null,
 								),
 								b.stmt(b.assignment('=', pending(), b.id('_e'))),
@@ -30337,7 +30362,9 @@ function planJsx(
 							b.id('_p'),
 							b.id(templateCommit),
 							b.literal(bag.letter('_preparedTemplate')),
-							templateHasEvents ? b.member(b.id('_p'), bag.letter('_eventOwner')) : nullNode(),
+							templateHasEvents
+								? bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner')))
+								: nullNode(),
 							...(localTemplateCommit ? [b.id('_mount')] : []),
 						),
 					),
@@ -30475,6 +30502,17 @@ function makeBag() {
 		return r;
 	};
 	return {
+		sparsePreparation: false,
+		// Undefined and null are authored or hydration values, not missing cells.
+		preparedRead(cell) {
+			if (!this.sparsePreparation) return cell;
+			return b.conditional(
+				b.binary('in', cell.computed ? cell.property : b.literal(cell.property.name), b.id('_p')),
+				cell,
+				b.member(b.id('_b'), cell.computed ? cell.property : cell.property.name, cell.computed),
+			);
+		},
+
 		/**
 		 * Mount-time reference for `key` — the pre-declared local, or a host-backed
 		 * field's const (read-only: host() returned false, so nothing assigns it).
@@ -31507,6 +31545,19 @@ function preparedTemplateValueHelper(bind) {
 	}
 }
 
+// Few binding groups are cheaper to copy than checking every read. For wide
+// sets of dynamic bindings, copy only this capture's prepared cells.
+function preparedCopy(bag) {
+	const previous = b.object([b.spread(b.id('_pv'))]);
+	if (!bag.sparsePreparation) return previous;
+	const nullPrototype = () => b.prop('init', b.id('__proto__'), nullNode());
+	return b.conditional(
+		b.binary('===', b.id('_pv'), b.id('_b')),
+		b.object([nullPrototype()]),
+		b.object([nullPrototype(), b.spread(b.id('_pv'))]),
+	);
+}
+
 function emitPreparedBinding(bind, bag) {
 	const org = bindingOrigin(bind);
 	const prefix = bind.signalDirect
@@ -31523,12 +31574,12 @@ function emitPreparedBinding(bind, bag) {
 	const field = bag.letter(`${prefix}$${bind.id}`);
 	const pending = () => b.member(b.id('_p'), field);
 	let expr = resolveKnownAttributeSource(bind.expr, (source) =>
-		b.member(b.id('_p'), bag.letter(`_prev$${source.binding.id}`)),
+		bag.preparedRead(b.member(b.id('_p'), bag.letter(`_prev$${source.binding.id}`))),
 	);
 	const changes = [
 		b.if(
 			b.binary('===', b.id('_p'), b.id('_pv')),
-			b.stmt(b.assignment('=', b.id('_p'), b.object([b.spread(b.id('_pv'))]))),
+			b.stmt(b.assignment('=', b.id('_p'), preparedCopy(bag))),
 			null,
 		),
 	];
@@ -31539,7 +31590,7 @@ function emitPreparedBinding(bind, bag) {
 	) {
 		changes.push(b.stmt(b.assignment('=', pending(), b.literal(true))));
 		return inheritOriginLoc(
-			b.if(b.binary('!==', pending(), b.literal(true)), b.block(changes), null),
+			b.if(b.binary('!==', bag.preparedRead(pending()), b.literal(true)), b.block(changes), null),
 			org,
 		);
 	}
@@ -31574,9 +31625,9 @@ function emitPreparedBinding(bind, bag) {
 			...directSignalBindingArgs(
 				bind,
 				bagFieldNode(bag, `_el$${bind.id}`),
-				pending(),
+				bag.preparedRead(pending()),
 				b.id('_v'),
-				previous,
+				text ? bag.preparedRead(previous) : undefined,
 			),
 			...(helper === 'prepareTemplateScalarSignalAttribute'
 				? [b.id(`_$${preparedTemplateValueHelper(bind)}`)]
@@ -31598,7 +31649,7 @@ function emitPreparedBinding(bind, bag) {
 				...(text
 					? [
 							b.if(
-								orChain([b.binary('!==', previous, b.id('_v')), readsHandle]),
+								orChain([b.binary('!==', bag.preparedRead(previous), b.id('_v')), readsHandle]),
 								b.block(changes),
 								null,
 							),
@@ -31610,9 +31661,11 @@ function emitPreparedBinding(bind, bag) {
 	}
 	if (bind.kind === 'hostCommit') {
 		const sources = commitSourceRows(bind.sources, (binding, spread) =>
-			b.member(b.id('_p'), bag.letter(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
+			bag.preparedRead(
+				b.member(b.id('_p'), bag.letter(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
+			),
 		);
-		const previous = b.member(b.id('_p'), `_value$${field}`);
+		const previous = bag.preparedRead(b.member(b.id('_p'), `_value$${field}`));
 		const host = bagFieldNode(bag, `_el$${bind.id}`);
 		const call = bind.signalHostSources
 			? b.call(
@@ -31650,7 +31703,7 @@ function emitPreparedBinding(bind, bag) {
 			b.block([
 				b.const('_v', expr),
 				b.if(
-					b.binary('!==', pending(), b.id('_v')),
+					b.binary('!==', bag.preparedRead(pending()), b.id('_v')),
 					b.block([...changes, b.stmt(b.assignment('=', pending(), b.id('_v')))]),
 					null,
 				),
@@ -31678,8 +31731,10 @@ function emitPreparedBinding(bind, bag) {
 				...bind.evaluations.map((value, i) => b.const(valueName(i), value)),
 				b.if(
 					orChain([
-						b.binary('!==', pending(), spread),
-						...previous.map((prev, i) => b.binary('!==', prev, valueOf(bind.properties[i]))),
+						b.binary('!==', bag.preparedRead(pending()), spread),
+						...previous.map((prev, i) =>
+							b.binary('!==', bag.preparedRead(prev), valueOf(bind.properties[i])),
+						),
 					]),
 					b.block([
 						...changes,
@@ -31692,11 +31747,15 @@ function emitPreparedBinding(bind, bag) {
 									bagFieldNode(bag, `_el$${bind.id}`),
 									value,
 									b.conditional(
-										b.binary('===', b.member(b.id('_p'), `_value$${field}`), undefinedNode()),
+										b.binary(
+											'===',
+											bag.preparedRead(b.member(b.id('_p'), `_value$${field}`)),
+											undefinedNode(),
+										),
 										undefinedNode(),
-										b.member(b.member(b.id('_p'), `_value$${field}`), 'raw'),
+										b.member(bag.preparedRead(b.member(b.id('_p'), `_value$${field}`)), 'raw'),
 									),
-									b.member(b.id('_p'), `_value$${field}`),
+									bag.preparedRead(b.member(b.id('_p'), `_value$${field}`)),
 									b.literal(bind.staticCss ?? ''),
 									...(bind.spread ? [] : [entries]),
 								),
@@ -31723,8 +31782,10 @@ function emitPreparedBinding(bind, bag) {
 				...bind.argExprs.map((arg, i) => b.const(`_a${i}`, arg)),
 				b.if(
 					orChain([
-						b.binary('!==', pending(), b.id('_v')),
-						...args.map((arg, i) => b.unary('!', b.call('_$hookMemoEqual', arg, b.id(`_a${i}`)))),
+						b.binary('!==', bag.preparedRead(pending()), b.id('_v')),
+						...args.map((arg, i) =>
+							b.unary('!', b.call('_$hookMemoEqual', bag.preparedRead(arg), b.id(`_a${i}`))),
+						),
 					]),
 					b.block([
 						...changes,
@@ -31745,7 +31806,7 @@ function emitPreparedBinding(bind, bag) {
 		return inheritOriginLoc(
 			b.block([
 				b.const('_v', expr),
-				b.if(b.binary('!==', pending(), b.id('_v')), b.block(changes), null),
+				b.if(b.binary('!==', bag.preparedRead(pending()), b.id('_v')), b.block(changes), null),
 			]),
 			org,
 		);
@@ -31758,7 +31819,12 @@ function emitPreparedBinding(bind, bag) {
 				? bagFieldNode(bag, `_txt$${bind.id}`)
 				: nullNode();
 		const host = bind.kind === 'textOnlyChild' ? bagFieldNode(bag, `_el$${bind.id}`) : nullNode();
-		prepared = b.call('_$prepareTemplateText', node, host, b.id('_v'));
+		prepared = b.call(
+			'_$prepareTemplateText',
+			bind.claimAfterHost ? bag.preparedRead(node) : node,
+			host,
+			b.id('_v'),
+		);
 		if (bind.claimAfterHost) {
 			const position = bagFieldNode(bag, `_el$${bind.id}`);
 			const mount =
@@ -31772,7 +31838,7 @@ function emitPreparedBinding(bind, bag) {
 						);
 			changes.push(
 				b.if(
-					b.binary('===', node, nullNode()),
+					b.binary('===', bag.preparedRead(node), nullNode()),
 					b.block([
 						// The placeholder is consumed even if a later descendant
 						// suspends. Keep its resolved node on the retained clone;
@@ -31795,7 +31861,7 @@ function emitPreparedBinding(bind, bag) {
 			return inheritOriginLoc(
 				b.block([
 					b.const('_v', expr),
-					b.if(b.binary('!==', pending(), b.id('_v')), b.block(changes), null),
+					b.if(b.binary('!==', bag.preparedRead(pending()), b.id('_v')), b.block(changes), null),
 				]),
 				org,
 			);
@@ -31814,8 +31880,8 @@ function emitPreparedBinding(bind, bag) {
 			'_$prepareTemplateStyle',
 			bagFieldNode(bag, `_el$${bind.id}`),
 			b.id('_v'),
-			pending(),
-			b.member(b.id('_p'), `_value$${field}`),
+			bag.preparedRead(pending()),
+			bag.preparedRead(b.member(b.id('_p'), `_value$${field}`)),
 		);
 	} else if (bind.kind === 'styleProperty') {
 		prepared = b.call(
@@ -31824,7 +31890,7 @@ function emitPreparedBinding(bind, bag) {
 			inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
 			b.id('_v'),
 			inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
-			pending(),
+			bag.preparedRead(pending()),
 		);
 	} else {
 		prepared = b.call(
@@ -31848,7 +31914,7 @@ function emitPreparedBinding(bind, bag) {
 	const emitted = inheritOriginLoc(
 		b.block([
 			b.const('_v', expr),
-			b.if(b.binary('!==', pending(), b.id('_v')), b.block(changes), null),
+			b.if(b.binary('!==', bag.preparedRead(pending()), b.id('_v')), b.block(changes), null),
 		]),
 		org,
 	);
@@ -31856,8 +31922,6 @@ function emitPreparedBinding(bind, bag) {
 }
 
 function emitPreparedBindingCommit(bind, bag) {
-	const org = bindingOrigin(bind);
-	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
 	const prefix = bind.signalDirect
 		? '_sig'
 		: bind.kind === 'ref'
@@ -31870,7 +31934,28 @@ function emitPreparedBindingCommit(bind, bag) {
 						? '_sty'
 						: '_prev';
 	const field = bag.letter(`${prefix}$${bind.id}`);
-	const pending = () => b.member(b.id('_p'), field);
+
+	if (!bag.sparsePreparation) {
+		return emitPreparedBindingWriter(bind, bag, field, prefix);
+	}
+
+	const present = [b.binary('in', b.literal(field), b.id('_p'))];
+	if (bind.kind === 'event' || bind.kind === 'event-bundle') {
+		present.push(b.binary('in', b.literal(bag.letter('_eventOwner')), b.id('_p')));
+	}
+	return inheritOriginLoc(
+		b.if(orChain(present), b.block([emitPreparedBindingWriter(bind, bag, field, prefix)]), null),
+		bindingOrigin(bind),
+	);
+}
+
+function emitPreparedBindingWriter(bind, bag, field, prefix) {
+	const org = bindingOrigin(bind);
+	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
+	const pending = () =>
+		bind.kind === 'event' || bind.kind === 'event-bundle'
+			? bag.preparedRead(b.member(b.id('_p'), field))
+			: b.member(b.id('_p'), field);
 	const prepared = () => b.member(b.id('_p'), `_value$${field}`);
 	let write;
 	if (
@@ -31995,7 +32080,7 @@ function emitPreparedBindingCommit(bind, bag) {
 	if (bind.kind === 'event-bundle') {
 		const n = bind.argExprs.length;
 		const fields = bind.argExprs.map((_, i) => bag.letter(`_arg$${bind.id}_${i}`));
-		const args = fields.map((field) => b.member(b.id('_p'), field));
+		const args = fields.map((field) => bag.preparedRead(b.member(b.id('_p'), field)));
 		const values = n <= 2 ? args : [b.array(args)];
 		const arity = n <= 2 ? String(n) : 'N';
 		return inheritOriginLoc(
@@ -32005,12 +32090,16 @@ function emitPreparedBindingCommit(bind, bag) {
 					b.binary(
 						'!==',
 						bagFieldNode(bag, '_eventOwner'),
-						b.member(b.id('_p'), bag.letter('_eventOwner')),
+						bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner'))),
 					),
 					...fields.map((field) =>
 						b.unary(
 							'!',
-							b.call('_$hookMemoEqual', b.member(b.id('_b'), field), b.member(b.id('_p'), field)),
+							b.call(
+								'_$hookMemoEqual',
+								b.member(b.id('_b'), field),
+								bag.preparedRead(b.member(b.id('_p'), field)),
+							),
 						),
 					),
 				]),
@@ -32045,7 +32134,13 @@ function emitPreparedBindingCommit(bind, bag) {
 					),
 					b.stmt(b.assignment('=', F('_prev'), pending())),
 					...fields.map((field) =>
-						b.stmt(b.assignment('=', b.member(b.id('_b'), field), b.member(b.id('_p'), field))),
+						b.stmt(
+							b.assignment(
+								'=',
+								b.member(b.id('_b'), field),
+								bag.preparedRead(b.member(b.id('_p'), field)),
+							),
+						),
 					),
 				]),
 				null,
@@ -32075,7 +32170,7 @@ function emitPreparedBindingCommit(bind, bag) {
 								b.binary(
 									'!==',
 									bagFieldNode(bag, '_eventOwner'),
-									b.member(b.id('_p'), bag.letter('_eventOwner')),
+									bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner'))),
 								),
 							]
 						: []),
@@ -32159,7 +32254,11 @@ function emitPreparedBindingCommit(bind, bag) {
 				...(bind.claimAfterHost
 					? [
 							b.stmt(
-								b.assignment('=', F('_txt'), b.member(b.id('_p'), bag.letter(`_txt$${bind.id}`))),
+								b.assignment(
+									'=',
+									F('_txt'),
+									bag.preparedRead(b.member(b.id('_p'), bag.letter(`_txt$${bind.id}`))),
+								),
 							),
 						]
 					: []),

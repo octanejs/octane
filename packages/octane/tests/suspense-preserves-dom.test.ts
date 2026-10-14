@@ -556,6 +556,41 @@ describe('Suspense preserves committed host DOM', () => {
 		}
 	});
 
+	it('keeps an unchanged attribute across superseded text refreshes and still accepts its later removal', async () => {
+		const pending = deferred<string>();
+		let value: string | null = 'A';
+		const read = () => {
+			if (value === null) throw pending.promise;
+			return value;
+		};
+		const root = mount(RawRootSuspensionAfterSiblingApp, { label: 'one', title: 'fixed', read });
+		try {
+			const label = root.find('#raw-root-suspension-label');
+			const text = label.firstChild!;
+			label.setAttribute('title', 'external title');
+			value = null;
+			root.update(RawRootSuspensionAfterSiblingApp, { label: 'abandoned', title: 'fixed', read });
+			expect(label.textContent).toBe('one');
+			expect(label.getAttribute('title')).toBe('external title');
+
+			value = 'C';
+			root.update(RawRootSuspensionAfterSiblingApp, { label: 'two', title: 'fixed', read });
+			root.update(RawRootSuspensionAfterSiblingApp, { label: 'three', title: 'fixed', read });
+			await act(() => pending.resolve('obsolete'));
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.firstChild).toBe(text);
+			expect(text.nodeValue).toBe('three');
+			expect(label.getAttribute('title')).toBe('external title');
+			expect(root.find('#raw-root-suspension-reader').textContent).toBe('resource:C');
+
+			root.update(RawRootSuspensionAfterSiblingApp, { label: 'three', title: null, read });
+			expect(label.hasAttribute('title')).toBe(false);
+			expect(text.nodeValue).toBe('three');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('keeps earlier sibling writes and an edited input intact while a root props refresh suspends', async () => {
 		const pending = deferred<string>();
 		const root = mount(RootSuspensionAfterSiblingApp, {

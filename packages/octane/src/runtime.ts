@@ -24835,8 +24835,9 @@ export function hydrateClaimedBindingCaches(
 				if (channel === 'style') bag['_value$' + field] = { value, raw: value, kept: false };
 				if (values !== undefined && values !== bag) {
 					// Never mutate a completed enclosing candidate on a nested
-					// claim. This scope submits the copy only if its body succeeds.
-					if (values === previous) values = { ...values };
+					// claim. Sparse candidates must also keep a null prototype:
+					// an inherited property cannot become a claimed binding.
+					if (values === previous) values = { __proto__: null, ...values };
 					values![field] = value;
 					if (channel === 'style') values!['_value$' + field] = bag['_value$' + field];
 				}
