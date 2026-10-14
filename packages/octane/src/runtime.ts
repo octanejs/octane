@@ -32924,7 +32924,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	if (hydration !== null && !hydration.isFresh(el)) return;
 	// A ViewTransition drain's DOMStage still stages a render's projection
 	// itself. Any other root render leaves the projection to its commit.
-	const now = ROOT_RENDER_TRANSACTION === null || STAGED_DOM !== null;
+	const now = STAGED_DOM ? true : ROOT_RENDER_TRANSACTION === null;
 	if (now) projectSelectValue(sel, ctrl.sv, false);
 	if (!ctrl.queued || !now) {
 		ctrl.queued = true;
