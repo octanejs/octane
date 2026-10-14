@@ -1042,13 +1042,17 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		const content = container.querySelector<HTMLElement>('#states-content')!;
 		const { root, recoverable } = await hydrateStates(new Promise<string>(() => {}));
 		const after = container.querySelector<HTMLElement>('#states-after')!;
-		setTransitionFallbackTimeout(0);
+		// Fake timers decide when the timeout elapses: whether a real 0 ms timer
+		// fires inside act depends on the runtime build's task ordering.
+		vi.useFakeTimers({ shouldAdvanceTime: false });
+		setTransitionFallbackTimeout(100);
 		try {
 			let resolve!: (value: string) => void;
 			const value = new Promise<string>((done) => (resolve = done));
 			await act(() => startTransition(() => root.render(statesClient.BoundaryStates, { value })));
+			await vi.advanceTimersByTimeAsync(99);
 			expect(container.querySelector('#states-fallback')).toBeNull();
-			await act(() => new Promise((done) => setTimeout(done, 10)));
+			await vi.advanceTimersByTimeAsync(1);
 			const fallback = container.querySelector<HTMLElement>('#states-fallback')!;
 			expect(fallback.style.display).toBe('');
 			expect(content.style.display).toBe('none');
@@ -1061,6 +1065,7 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 			expect(content.style.display).toBe('');
 		} finally {
 			setTransitionFallbackTimeout(Infinity);
+			vi.useRealTimers();
 		}
 		expect(recoverable).toEqual([]);
 		root.unmount();
