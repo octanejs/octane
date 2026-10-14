@@ -3998,10 +3998,11 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // commit function `C(bag)`. The bag's binding slots hold COMMITTED values, the
 // ones the DOM shows. A render compares each binding against its committed
 // slot, and only the first difference stages the bag: `bag.next` is a reusable
-// array of pending cells, allocated once per bag and filled with the bag itself
-// as the "unchanged" marker. Every later binding of that render records its
-// cell. `C` walks the cells straight-line: it writes each changed cell through
-// the ordinary setter and only then publishes it to the committed slot.
+// array of pending cells (from BAG_POOL on its first stage), filled with the
+// bag itself as the "unchanged" marker. Every later binding of that render
+// records its cell. `C` walks the cells straight-line: it writes each changed
+// cell through the ordinary setter and only then publishes it to the committed
+// slot.
 //
 // `bag.$` packs the template's cell count (low byte, the bag factory's last
 // argument) with the STAGED and QUEUED bits. `next` carries two trailing
@@ -4052,15 +4053,32 @@ function stageBag(bag: any): any[] {
 	const state = bag.$;
 	let next = bag.next;
 	if (next === null) {
-		// Packed from the start: the commit function reads every cell.
-		next = bag.next = [];
-		for (let i = (state & BAG_SIZE) + 2; i > 0; i--) next.push(bag);
-	} else {
-		// A loop, not fill(): a builtin call costs more than a few cells.
-		for (let i = next.length - 1; i >= 0; i--) next[i] = bag;
+		// Kept packed: the commit function reads every cell.
+		next = bag.next = BAG_POOL.pop() ?? [];
+		const size = (state & BAG_SIZE) + 2;
+		while (next.length < size) next.push(bag);
+		if (next.length > size) next.length = size;
 	}
+	// A loop, not fill(): a builtin call costs more than a few cells.
+	for (let i = next.length - 1; i >= 0; i--) next[i] = bag;
 	bag.$ = state | BAG_STAGED;
 	return next;
+}
+
+/**
+ * Spare cell arrays. A bag's first stage takes one, and while the pool is
+ * short a commit returns its bag's array, so the first update of a newly
+ * mounted template allocates nothing. Bags past the pool keep their arrays.
+ */
+const BAG_POOL_SIZE = 8;
+const BAG_POOL: any[][] = [[], [], [], [], [], [], [], []];
+
+/** After a commit op: while the pool is short, return an idle bag's cells to it. */
+function releaseBag(target: any): void {
+	if (typeof target?.$ === 'number' && target.$ <= BAG_SIZE && target.next !== null) {
+		BAG_POOL.push(target.next);
+		target.next = null;
+	}
 }
 
 /**
@@ -4133,6 +4151,7 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any) => void): void {
 		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
 	) {
 		commit(bag);
+		if (BAG_POOL.length < BAG_POOL_SIZE) releaseBag(bag);
 		return;
 	}
 	const ops = transaction.ops;
@@ -4174,6 +4193,7 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
 					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
 			}
+			if (BAG_POOL.length < BAG_POOL_SIZE) releaseBag(target);
 		}
 		return COMMITTING_GENERATION;
 	} finally {
