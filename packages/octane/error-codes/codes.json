@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 344,
+  "nextCode": 347,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2061,6 +2061,24 @@
       "message": "A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.",
       "argumentCount": 0,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "344": {
+      "message": "Provide a compiled context with <CompiledContext context={context}>.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "345": {
+      "message": "CompiledContext requires compiled template children.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "346": {
+      "message": "CompiledOutlet requires a compiled component function with no returned renderable.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
       "status": "active"
     }
   }

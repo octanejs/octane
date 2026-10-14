@@ -8,7 +8,7 @@ import { attachStreamedSignalResult, initializeDocumentSignalOwner } from '../si
 import { registerSignalOwnerDocument } from '../signals/early-values.js';
 import { retireSignalOwnerIdentity } from '../signals/owner-context.js';
 import {
-	parseNativeSignalManifest,
+	validateNativeSignalManifest,
 	type NativeSignalManifest,
 } from '../signals/native-read-seeds.js';
 export type { NativeSignalManifest, NativeSignalReference } from '../signals/native-read-seeds.js';
@@ -196,7 +196,7 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 			for (const selection of selections.values()) attach(selection, owner);
 		});
 		if (options.initialSignals !== undefined) {
-			const manifest = parseNativeSignalManifest(JSON.stringify(options.initialSignals));
+			const manifest = validateNativeSignalManifest(options.initialSignals);
 			if (manifest.version !== 1) throw new TypeError(formatClientError(270));
 			initializeDocumentSignalOwner(
 				signalOwner,

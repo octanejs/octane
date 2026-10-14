@@ -2,9 +2,9 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "types": ["node", "vitest"],
-    "baseUrl": "../../..",
     "paths": {
-      "@octanejs/tanstack-router": ["packages/tanstack-router/src/index.ts"]
+      "@octanejs/tanstack-router": ["../src/index.ts"],
+      "@octanejs/tanstack-router/compiled": ["../src/compiled.ts"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false
