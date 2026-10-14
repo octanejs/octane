@@ -336,6 +336,15 @@ export const STRONG_DIAGNOSTICS = [
 			'Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.',
 	},
 	{
+		code: 'OCTANE_STRONG_SINGLE_ITEM_FOR',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'An `@for` iterates a one-item array literal, such as `@for (const item of [value]; key item)`, or a `const` holding one that nothing but `@for` headers reads. A one-row loop is a workaround for a keyed remount or a local binding.',
+		replacement:
+			'To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid.',
+	},
+	{
 		code: 'OCTANE_STRONG_HOOK_LOCALITY',
 		section: 'templates',
 		severity: 'error',

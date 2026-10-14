@@ -94,6 +94,66 @@ describe('Strong template authoring checks', () => {
 			expect(compileToVolarMappings(source, 'App.tsrx').diagnostics).toEqual([]);
 		},
 	);
+	const singleItemApp = (loop: string, setup = '', module = '') =>
+		`${module} export function App(props) @{ ${setup} <ul>${loop}</ul> }`;
+	it.each([
+		[
+			'a literal keyed by its item',
+			singleItemApp('@for (const item of [props.value]; key item) { <li /> }'),
+		],
+		[
+			'a literal with a constant key',
+			singleItemApp(`@for (const { id } of [props.value]; key 'row') { <li>{id as string}</li> }`),
+		],
+		[
+			'a literal with a row-root key',
+			singleItemApp('@for (const item of ([props.value] as const)) { <li key={item} /> }'),
+		],
+		[
+			'a local alias',
+			singleItemApp('@for (const item of one; key item) { <li /> }', 'const one = [props.value];'),
+		],
+		[
+			'a module alias',
+			singleItemApp('@for (const item of ONE; key item) { <li /> }', '', `const ONE = ['row'];`),
+		],
+	])('rejects a single-item @for over %s', (_label, source) => {
+		expect(() => compile(source, 'App.tsrx')).not.toThrow();
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(strong(source), 'App.tsrx', { mode })).toThrow(
+				'OCTANE_STRONG_SINGLE_ITEM_FOR',
+			);
+		}
+		expect(compileToVolarMappings(strong(source), 'App.tsrx').diagnostics).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_SINGLE_ITEM_FOR', severity: 'error' }),
+		]);
+	});
+	it.each([
+		[
+			'several items',
+			singleItemApp('@for (const item of [props.a, props.b]; key item) { <li /> }'),
+		],
+		['a spread', singleItemApp('@for (const item of [...props.items]; key item) { <li /> }')],
+		[
+			'an alias that grows',
+			singleItemApp(
+				'@for (const item of one; key item) { <li /> }',
+				'const one = [props.a]; one.push(props.b);',
+			),
+		],
+		[
+			'a shadowed alias',
+			singleItemApp(
+				'@for (const item of one; key item) { <li /> }',
+				'const one = props.items;',
+				`const one = ['row'];`,
+			),
+		],
+	])('allows @for over %s', (_label, source) => {
+		for (const mode of ['client', 'server'] as const)
+			expect(() => compile(strong(source), 'App.tsrx', { mode })).not.toThrow();
+		expect(compileToVolarMappings(strong(source), 'App.tsrx').diagnostics).toEqual([]);
+	});
 	it.each(['suppressHydrationWarning', 'suppressNativeChangeWarning'])(
 		'rejects intrinsic %s including false and object spreads',
 		(prop) => {

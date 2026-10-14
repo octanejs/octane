@@ -74,6 +74,46 @@ export function createStrongTemplatePolicy({
 			);
 		else if (elementChecks && ELEMENT_EXPORTS.has(name)) elementApi(name, node);
 	}
+	// `[value]`, but not `[a, b]`, `[...rows]`, or a hole.
+	function singleItemArray(expression) {
+		const node = unwrap(expression);
+		return (
+			node?.type === 'ArrayExpression' &&
+			node.elements.length === 1 &&
+			node.elements[0] != null &&
+			node.elements[0].type !== 'SpreadElement'
+		);
+	}
+	function singleItemFor(node) {
+		add(
+			'OCTANE_STRONG_SINGLE_ITEM_FOR',
+			node,
+			'`@for` over a one-item array renders a single row. To remount a subtree when a value changes, key it as in React: wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly.',
+		);
+	}
+	// `const` declarations of one-item literals, and `@for` iterables that are
+	// identifiers, as the visitor meets them.
+	const singleItemConstants = new Set();
+	const iteratedNames = new Set();
+	// A loop over `const rows = [value]` is still one row when no other
+	// identifier in the module spells `rows`, so nothing can add a row or shadow it.
+	function reportSingleItemAliases() {
+		const names = new Set();
+		for (const id of singleItemConstants) names.add(id.name);
+		(function walk(node) {
+			if (!node || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) walk(child);
+				return;
+			}
+			if (node.type === 'Identifier' && !singleItemConstants.has(node) && !iteratedNames.has(node))
+				names.delete(node.name);
+			for (const key in node)
+				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) walk(node[key]);
+		})(ast);
+		for (const identifier of iteratedNames)
+			if (names.has(identifier.name)) singleItemFor(identifier);
+	}
 	function checkKey(expression, scope) {
 		const node = unwrap(expression);
 		if (!node || typeof node !== 'object' || FUNCTIONS.has(node.type)) return;
@@ -236,6 +276,8 @@ export function createStrongTemplatePolicy({
 		} else if (node.type === 'VariableDeclaration') {
 			for (const declaration of node.declarations) {
 				const value = unwrap(declaration.init);
+				if (node.kind === 'const' && declaration.id.type === 'Identifier' && singleItemArray(value))
+					singleItemConstants.add(declaration.id);
 				if (
 					declaration.id.type !== 'ObjectPattern' ||
 					value?.type !== 'Identifier' ||
@@ -292,6 +334,10 @@ export function createStrongTemplatePolicy({
 					node,
 					'Use a keyed `@for` block to render a list instead of `.map()` returning JSX. Choose a stable item identity for its key.',
 				);
+		} else if (node.type === 'JSXForExpression') {
+			const iterable = unwrap(node.right);
+			if (singleItemArray(iterable)) singleItemFor(node.right);
+			else if (iterable?.type === 'Identifier') iteratedNames.add(iterable);
 		} else if (node.type === 'JSXOpeningElement') {
 			let root = node.name;
 			let member = null;
@@ -318,6 +364,7 @@ export function createStrongTemplatePolicy({
 		enterKey: checkKey,
 		exitKey() {},
 		finish() {
+			if (singleItemConstants.size !== 0 && iteratedNames.size !== 0) reportSingleItemAliases();
 			for (const { code, node, message } of pending) report(code, node, message);
 		},
 	};
