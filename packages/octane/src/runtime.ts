@@ -50277,6 +50277,13 @@ export function createIndependentHydrateActivator(
 // Resource hints — React DOM's preload / preinit / preconnect / prefetchDNS.
 // Each call inserts one deduped <link>/<script> into document.head (client).
 // Dedupe key = rel/kind + href, matching React's resource identity model.
+//
+// A call made while a root renders runs at that render's commit, in render
+// order with the Float resources below (atCommit), so the render writes no
+// head entry and a dropped render inserts none (#2043). The whole call waits,
+// not just its insert: each identity check and preload transfer then sees
+// the requests before it, exactly as calls made outside a render do. Only
+// the development warning stays with the call.
 // ---------------------------------------------------------------------------
 
 const _resourceHints = new Set<string>();
@@ -50378,6 +50385,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreload, [href, options]);
+}
+
+function commitPreload([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (
@@ -50449,6 +50460,10 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreinit, [href, options]);
+}
+
+function commitPreinit([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (options === null || typeof options !== 'object') return;
@@ -50475,6 +50490,10 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreconnect, [href, options]);
+}
+
+function commitPreconnect([href, options]: [string, { crossOrigin?: string } | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options !== null && typeof options !== 'object') options = undefined;
@@ -50499,6 +50518,10 @@ export function prefetchDNS(href: string): void {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPrefetchDNS, href);
+}
+
+function commitPrefetchDNS(href: string): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
@@ -50520,6 +50543,10 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreloadModule, [href, options]);
+}
+
+function commitPreloadModule([href, options]: [string, Record<string, unknown> | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
@@ -50551,6 +50578,13 @@ export function preinitModule(
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
+	atCommit(commitPreinitModule, [href, options]);
+}
+
+function commitPreinitModule([href, options]: [
+	string,
+	({ as?: string } & Record<string, unknown>) | undefined,
+]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options != null && typeof options !== 'object') return;
@@ -50586,6 +50620,11 @@ export function preinitModule(
 // ("suspensey" commit) is deliberately out of scope. The first client call
 // seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
 // so hydration never duplicates.
+//
+// A render reads the committed identity only: a resource the page already has
+// costs a set lookup, and any other joins the render's commit (atCommit),
+// where the identity check runs again. The first request in render order
+// therefore wins, and a dropped render inserts nothing (#2043).
 // ---------------------------------------------------------------------------
 
 interface ResourceState {
@@ -50677,6 +50716,8 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 		const v = (attrs as any)[k];
 		if (v == null || v === false || typeof v === 'function') continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
+		// A commit must not throw on a name the platform rejects (setAttribute).
+		if (!VALID_ATTR_NAME.test(name)) continue;
 		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)));
 	}
 }
@@ -50709,7 +50750,12 @@ export function stylesheetResource(
 	}
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
+	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
+	atCommit(commitStylesheetResource, attrs);
+}
+
+function commitStylesheetResource(attrs: Record<string, unknown>): void {
+	const href = attrs.href as string;
 	const state = resourceState();
 	// First instance wins, including its non-key props — matching React's
 	// resource identity (later differing props do not retarget a live sheet).
@@ -50737,7 +50783,16 @@ export function styleResource(
 ): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
+	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
+	atCommit(commitStyleResource, [attrs, css, development]);
+}
+
+function commitStyleResource([attrs, css, development]: [
+	Record<string, unknown>,
+	string,
+	boolean | undefined,
+]): void {
+	const href = attrs.href as string;
 	const state = resourceState();
 	if (state.sheets.has(href)) return;
 	if (
@@ -50786,7 +50841,12 @@ export function resetFloatResourceState(): void {
 export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const src = attrs.src;
-	if (typeof src !== 'string' || src === '') return;
+	if (typeof src !== 'string' || src === '' || resourceState().scripts.has(src)) return;
+	atCommit(commitScriptResource, attrs);
+}
+
+function commitScriptResource(attrs: Record<string, unknown>): void {
+	const src = attrs.src as string;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
 	const s = document.createElement('script');

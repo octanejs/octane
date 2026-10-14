@@ -16,8 +16,8 @@
  *   rollback   The transition journal restoring what a dropped render changed.
  *   unmount    Removes an unmounting tree outside a root render.
  *   native     Outside rendering: imperative handles, form and focus
- *              plumbing, ViewTransition naming in the native update, head and
- *              resource hints, style injection, hot reload.
+ *              plumbing, ViewTransition naming in the native update, style
+ *              injection, hot reload.
  */
 export const WRITERS = new Map(
 	Object.entries({
@@ -42,6 +42,18 @@ export const WRITERS = new Map(
 		landItemPair: 'commit',
 		landHostPair: 'commit',
 		mappedDeoptItemBody: 'commit',
+		commitPreload: 'commit',
+		commitPreconnect: 'commit',
+		commitPrefetchDNS: 'commit',
+		commitPreloadModule: 'commit',
+		commitPreinitModule: 'commit',
+		insertHeadHint: 'commit',
+		applyHintAttrs: 'commit',
+		commitStylesheetResource: 'commit',
+		commitStyleResource: 'commit',
+		commitScriptResource: 'commit',
+		insertPrecedenced: 'commit',
+		applyResourceAttrs: 'commit',
 		// primitive
 		updateTextValue: 'primitive',
 		setText: 'primitive',
@@ -166,17 +178,5 @@ export const WRITERS = new Map(
 		restoreControlledElement: 'native',
 		restoreCheckedState: 'native',
 		restoreRadioCousins: 'native',
-		insertHeadHint: 'native',
-		applyHintAttrs: 'native',
-		preload: 'native',
-		preconnect: 'native',
-		prefetchDNS: 'native',
-		preloadModule: 'native',
-		preinitModule: 'native',
-		insertPrecedenced: 'native',
-		applyResourceAttrs: 'native',
-		stylesheetResource: 'native',
-		styleResource: 'native',
-		scriptResource: 'native',
 	}),
 );
