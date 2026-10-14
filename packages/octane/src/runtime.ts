@@ -26011,6 +26011,12 @@ function updateDirectSignalBinding(binding: DirectSignalBinding): void {
 		binding.scope.block.disposed
 	)
 		return;
+	// A signal written while a root renders: the owner's render reads the new
+	// value and its commit writes it, rather than this write landing mid-render.
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		scheduleRender(binding.scope.block);
+		return;
+	}
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
 			const value = readSignalBinding(binding.handle!);
@@ -26562,6 +26568,11 @@ export function updateFreshClassAttr(value: unknown, previous: unknown, el: Elem
  */
 export function setScriptText(el: Element, value: any): void {
 	const text = value == null ? '' : String(value);
+	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
+	if (transaction !== null) {
+		transaction.ops.push(commitScriptText, [el, text]);
+		return;
+	}
 	const first = getFirstChild(el);
 	if (
 		first !== null &&
@@ -26638,18 +26649,22 @@ export function setHTML(el: Element, value: any): void {
 	const host = STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any);
 	if (host[DANGER_HTML_VALUE] === next) return;
 	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		journalBag();
-		journalRootRange(el, null, null);
-		// Raw HTML is a leaf: stage its genuine new nodes next to the outgoing
-		// ones so a later suspension cannot blur an input in the retained HTML.
-		queueRootDeletion(null, getFirstChild(el), (STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild);
-		const fresh = (STAGED_DOM ? STAGED_DOM.view(el) : el).cloneNode(false) as Element;
-		(STAGED_DOM ? STAGED_DOM.view(fresh) : fresh).innerHTML = next;
-		while (getFirstChild(fresh) !== null)
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(getFirstChild(fresh)!);
-	} else (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML = next;
 	host[DANGER_HTML_VALUE] = next;
+	// A render that may be dropped replaces the raw HTML at its commit, so a
+	// dropped one leaves the committed nodes, and any input in them, untouched.
+	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
+	if (transaction !== null) {
+		journalBag();
+		transaction.ops.push(commitHTML, [el, next]);
+	} else (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML = next;
+}
+
+function commitHTML(write: [Element, string]): void {
+	(STAGED_DOM ? STAGED_DOM.view(write[0]) : write[0]).innerHTML = write[1];
+}
+
+function commitScriptText(write: [Element, string]): void {
+	setScriptText(write[0], write[1]);
 }
 
 const DANGER_HTML_VALUE = /* @__PURE__ */ Symbol('octane.dangerHTMLValue');
@@ -29113,6 +29128,10 @@ function winningSignalHostControl(
 
 function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): void {
 	if (binding.disposed || binding.pendingControl || binding.scope.block.disposed) return;
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		scheduleRender(binding.scope.block);
+		return;
+	}
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
 			const next = resolveSignalHostPropSources(binding.sources, binding.readStyle);
@@ -29542,11 +29561,12 @@ export function bindSignalHostPropSources(
 }
 
 /**
- * Record a spread-bearing host's prop sources (bagRecord). Every render's
- * sources reach the commit function, which diffs them against the committed
- * props (commitHostSources). Raw HTML stays a render-time write: child holes
- * read whether it owns the host until structure commits too (#2043 step 2).
- * A pending or failed signal source suspends or throws here, in render.
+ * Record a host's prop sources (bagRecord). Every render's sources reach the
+ * commit function, which diffs them against the committed props
+ * (commitHostSources). Raw-HTML ownership resolves here, so child holes see it
+ * in this render; setHTML writes the HTML at commit. A pending or failed signal
+ * source suspends or throws here, in render, and a native-read host reads its
+ * winning style here, so this render observes it.
  */
 export function bagRecordHost(
 	bag: any,
@@ -29555,33 +29575,70 @@ export function bagRecordHost(
 	sources: readonly HostPropSource[],
 	el: Element,
 	hasNestedChildren: boolean,
+	signals?: boolean,
+	readStyle?: (value: unknown) => unknown,
 ): any[] {
 	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
-	resolveSignalHostPropSources(sources);
+	if (signals === true) resolveSignalHostPropSources(sources, readStyle);
+	if (readStyle !== undefined) {
+		let style: unknown;
+		let found = false;
+		for (const source of sources) {
+			if (!source[0]) {
+				if (source[1] === 'style') {
+					style = source[2];
+					found = true;
+				}
+			} else if (source[1] != null && isOwnEnumerable(source[1] as object, 'style')) {
+				style = (source[1] as Record<string, unknown>).style;
+				found = true;
+			}
+		}
+		if (found) readStyle(style);
+	}
 	return bagRecordAlways(bag, next, cell, sources);
 }
 
 /**
  * Commit recorded host sources in the Scope that rendered them, so handler
  * authority and signal owners resolve as they did in render. Refs attach and
- * subscriptions switch here, at commit.
+ * subscriptions switch here, at commit. A host with no signal site resolves
+ * its plain props (setHostPropSources).
  */
 export function commitHostSources(
 	scope: Scope,
 	binding: unknown,
 	el: Element,
 	sources: readonly HostPropSource[],
-	site: string,
+	site: string | null,
 	hasNestedChildren: boolean,
+	readStyle?: (value: unknown) => unknown,
 ): unknown {
 	const previous = CURRENT_SCOPE;
 	CURRENT_SCOPE = scope;
 	try {
+		if (site === null)
+			return setHostPropSources(
+				el,
+				sources,
+				binding as Record<string, unknown> | undefined,
+				scope,
+				hasNestedChildren,
+				readStyle,
+			);
 		return signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined
 			? runWithBlockSignalOwner(scope, () =>
-					bindSignalHostPropSources(scope, binding, el, sources, site, hasNestedChildren),
+					bindSignalHostPropSources(
+						scope,
+						binding,
+						el,
+						sources,
+						site,
+						hasNestedChildren,
+						readStyle,
+					),
 				)
-			: bindSignalHostPropSources(scope, binding, el, sources, site, hasNestedChildren);
+			: bindSignalHostPropSources(scope, binding, el, sources, site, hasNestedChildren, readStyle);
 	} finally {
 		CURRENT_SCOPE = previous;
 	}
@@ -39351,6 +39408,10 @@ function disposeDirectSignalChild(binding: DirectSignalChildBinding): void {
 
 function updateDirectSignalChild(binding: DirectSignalChildBinding): void {
 	if (binding.disposed || binding.scope.block.disposed) return;
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		scheduleRender(binding.scope.block);
+		return;
+	}
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
 			const value = readSignalBinding(binding.handle);

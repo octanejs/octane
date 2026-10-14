@@ -28308,14 +28308,12 @@ function planJsx(
 	// order-independent and byte-identical.
 	const spreadPaths = new Set();
 	const eventWriterCounts = new Map();
-	// A host with a writer that stays in render (a grouped commit collector, a
-	// native-read binding) keeps every binding there in render too, so its writes
-	// keep their source order.
+	// A host with a writer that stays in render (a native-read binding) keeps
+	// every binding there in render too, so its writes keep their source order.
 	const renderWriterPaths = new Set();
 	for (const b of elementBindings) {
 		if (b.kind === 'spread') spreadPaths.add(b.path.join(','));
-		if (RENDER_WRITER_KINDS.has(b.kind) || (b.kind === 'hostCommit' && !commitBindingKind(b, ctx)))
-			renderWriterPaths.add(b.path.join(','));
+		if (RENDER_WRITER_KINDS.has(b.kind)) renderWriterPaths.add(b.path.join(','));
 		if (b.kind === 'event' || b.kind === 'event-bundle') {
 			const key = `${b.path.join(',')}|${b.slotKey}`;
 			eventWriterCounts.set(key, (eventWriterCounts.get(key) || 0) + 1);
@@ -28352,7 +28350,7 @@ function planJsx(
 			!b.beforeConnect &&
 			b.name !== 'dangerouslySetInnerHTML';
 		b.commitCell =
-			commit !== null && !renderWriterPaths.has(b.path.join(',')) && commitBindingKind(b, ctx)
+			commit !== null && !renderWriterPaths.has(b.path.join(',')) && commitBindingKind(b)
 				? commit.cells(commitCellCount(b))
 				: -1;
 		if (b.commitCell >= 0)
@@ -31112,7 +31110,7 @@ function makeCommitPlan() {
 	};
 }
 
-function commitBindingKind(bind, ctx) {
+function commitBindingKind(bind) {
 	// Raw HTML shares its host's children validation with the child holes, which
 	// stay in render until structure moves to commit (#2043 step 2).
 	if (bind.mountOnly || bind.name === 'dangerouslySetInnerHTML') return false;
@@ -31120,11 +31118,10 @@ function commitBindingKind(bind, ctx) {
 	if (bind.signalDirect) return true;
 	switch (bind.kind) {
 		case 'hostCommit':
-			// Spread-bearing hosts commit their resolved props. A native-read host
-			// reads its winning style in render (readNativeDomStyle), a textarea's
-			// default follows its child hole, which renders there, and the other
-			// collectors (duplicate props, form cascades) stay there too.
-			return bind.signalHostSources && !ctx.nativeReads && !bind.textarea;
+			// A host whose props resolve across sources (spreads, duplicate props,
+			// form cascades) commits them; a native-read host still reads its
+			// winning style in render (bagRecordHost).
+			return true;
 		case 'text':
 		case 'textOnlyChild':
 		case 'class':
@@ -31337,6 +31334,7 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org) {
 			bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
 		);
 		const nested = () => b.literal(bind.hasNestedChildren === true);
+		const readStyle = () => (bind.readStyle ? [b.id(bind.readStyle)] : []);
 		writeCell(
 			cell,
 			(scope) =>
@@ -31351,11 +31349,19 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org) {
 						V(),
 						b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 						nested(),
+						...readStyle(),
 					),
 				),
 			null,
 		);
-		return record('bagRecordHost', cell, sources, F('_el'), nested());
+		return record(
+			'bagRecordHost',
+			cell,
+			sources,
+			F('_el'),
+			nested(),
+			...optionalCallArgs(bind.signalHostSources ? b.literal(true) : null, ...readStyle()),
+		);
 	}
 	switch (bind.kind) {
 		case 'text':
@@ -33453,7 +33459,6 @@ function emitElementHtml(
 			hasNestedChildren: hasNestedJsxChildren,
 			signalHostSources,
 			signalSite: signalHostSources ? hostSignalSite : null,
-			textarea: tag === 'textarea',
 		};
 		bindings.push(hostCommitClientBinding);
 	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
