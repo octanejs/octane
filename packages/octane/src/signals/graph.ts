@@ -1521,11 +1521,12 @@ function runObserver(observer: SignalObserver): void {
 	if (observer.notify) untrack(observer.notify);
 }
 
-export function stopObserver(observer: SignalObserver): void {
+/** A retiring owner keeps the observer in its set, which it then clears at once. */
+export function stopObserver(observer: SignalObserver, retiring?: boolean): void {
 	if (!observer.node) return;
 	queued.delete(observer);
 	observer.flags = REACTIVE_NONE;
-	observer.node.owner.observers.delete(observer);
+	if (!retiring) observer.node.owner.observers.delete(observer);
 	observer.node = undefined;
 	observer.notify = undefined;
 	observer.previous = undefined;
@@ -1771,8 +1772,10 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			// Public subscriptions end silently. Native views must invalidate once so
 			// a mounted consumer cannot keep displaying a retired owner's values.
 			if (observer.native && observer.notify) queued.add(observer.notify);
-			stopObserver(observer);
+			stopObserver(observer, true);
 		}
+		// Deleting each observer while iterating would rehash the set as it shrinks.
+		owner.observers.clear();
 		revokeRetainedValues(owner);
 		for (const node of nodes) {
 			if (node.pending !== undefined) pendingSignals!.drop(node.pending);
