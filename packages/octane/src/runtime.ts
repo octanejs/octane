@@ -17075,11 +17075,11 @@ function createHydrateSlot(
 		// The kept server wrapper stays where the server put it until the commit
 		// moves it to its place in the client render (placeKeptIsland). A client
 		// wrapper built where its parent's DOM is committed lands from a frontier.
-		const place = kept === null ? wrapper : document.createComment('');
+		const place = kept === null ? null : document.createComment('');
 		if (usesFrontier(parentBlock, parentNode))
-			queueFrontier(parentBlock, parentNode, parentBlock.endMarker).appendChild(place);
-		else parentNode.insertBefore(place, parentBlock.endMarker);
-		if (kept !== null) atCommit(placeKeptIsland, [place, wrapper]);
+			queueFrontier(parentBlock, parentNode, parentBlock.endMarker).appendChild(place ?? wrapper);
+		else parentNode.insertBefore(place ?? wrapper, parentBlock.endMarker);
+		if (place !== null) atCommit(placeKeptIsland, [place, wrapper]);
 	}
 
 	let start: Comment | null = null;
