@@ -14,7 +14,12 @@ const postRoute = createRoute({
 	path: 'posts/$postId',
 	loader: () => ({ title: 'Post' }),
 });
-const routeTree = rootRoute.addChildren([postRoute]);
+const commentRoute = createRoute({
+	getParentRoute: () => postRoute,
+	path: 'comments/$commentId',
+});
+const posts = postRoute.addChildren([commentRoute]);
+const routeTree = rootRoute.addChildren([posts]);
 const router = createRouter({
 	routeTree,
 	history: createMemoryHistory({ initialEntries: ['/'] }),
@@ -29,6 +34,19 @@ declare module '@octanejs/tanstack-router' {
 expectTypeOf(postRoute.fullPath).toEqualTypeOf<'/posts/$postId'>();
 expectTypeOf(postRoute.useParams()).toEqualTypeOf<{ postId: string }>();
 expectTypeOf(postRoute.useLoaderData()).toEqualTypeOf<{ title: string }>();
+
+// Adding children returns the same concrete binding route; its methods remain
+// callable, including after file-route type combinators and lazy configuration.
+expectTypeOf(routeTree.useParams()).toEqualTypeOf<{}>();
+expectTypeOf(posts.useParams()).toEqualTypeOf<{ postId: string }>();
+expectTypeOf(posts.useLoaderData()).toEqualTypeOf<{ title: string }>();
+expectTypeOf(posts.Link).toEqualTypeOf(postRoute.Link);
+expectTypeOf(rootRoute._addFileChildren({ posts }).useNavigate).toEqualTypeOf(
+	rootRoute.useNavigate,
+);
+expectTypeOf(posts._addFileTypes<unknown>().useParams()).toEqualTypeOf<{ postId: string }>();
+declare const lazyPost: Parameters<typeof postRoute.lazy>[0];
+expectTypeOf(postRoute.lazy(lazyPost).useParams()).toEqualTypeOf<{ postId: string }>();
 
 const postApi = getRouteApi('/posts/$postId');
 expectTypeOf(postApi.id).toEqualTypeOf<'/posts/$postId'>();

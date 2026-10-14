@@ -134,3 +134,51 @@ package's `status.json`).
 - **Native DOM events** — link callbacks receive browser events rather than React
   synthetic events.
 - Router devtools are distributed separately and are not part of this binding.
+
+## Compiled code routes
+
+Use `@octanejs/tanstack-router/compiled` for a tree whose selected route, pending,
+error and not-found components are compiled Octane `@{ ... }` bodies. Its
+`CompiledRouterProvider`, `CompiledOutlet`, and `lazyCompiledRouteComponent`
+avoid retaining the descriptor renderer merely to select a route at runtime.
+TanStack still owns the matching, loading, navigation, history and render
+acknowledgements.
+
+```tsx
+import {
+  BaseRootRoute, BaseRoute, createRouter, createBrowserHistory,
+  CompiledRouterProvider, CompiledOutlet, lazyCompiledRouteComponent, useParams,
+} from '@octanejs/tanstack-router/compiled';
+
+const root = new BaseRootRoute({ component: Layout });
+const item = new BaseRoute({
+  getParentRoute: () => root,
+  path: 'items/$id',
+  component: lazyCompiledRouteComponent(() => import('./Item')),
+});
+const router = createRouter({
+  routeTree: root.addChildren([item]),
+  history: createBrowserHistory(),
+});
+
+function Layout() @{
+  <main><CompiledOutlet /></main>
+}
+function App() @{
+  <CompiledRouterProvider router={router} />
+}
+```
+
+Import read/navigation hooks (`useMatch`, `useParams`, `useSearch`,
+`useLoaderData`, `useLoaderDeps`, `useRouteContext`, `useLocation`,
+`useMatches`, `useParentMatches`, `useChildMatches`, `useNavigate`,
+`useCanGoBack`, `useRouter`, and `useRouterState`) from the same `/compiled`
+entry. It owns a separate pair of non-callable contexts. Base route factories
+come directly from router-core: use the free hooks in the route components,
+rather than route-bound hooks or `Route.Link` from the normal Octane entry.
+
+The first compiled contract excludes `Wrap`, `InnerWrap`, and
+`shellComponent`; the provider reports a diagnostic if they are configured.
+For returned JSX, host strings, renderable wrappers or mixed route trees, retain
+`RouterProvider`, `Outlet` and `lazyRouteComponent` from the ordinary entry.
+SSR and client builds must select the same entry for a tree.

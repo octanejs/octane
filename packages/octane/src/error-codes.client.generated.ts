@@ -314,6 +314,9 @@ type ClientErrorArguments = {
 	341: [];
 	342: [];
 	343: [];
+	344: [];
+	345: [];
+	346: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1368,6 +1371,18 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 343:
 				return formatDevErrorMessage(
 					'A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.',
+					args,
+				);
+			case 344:
+				return formatDevErrorMessage(
+					'Provide a compiled context with <CompiledContext context={context}>.',
+					args,
+				);
+			case 345:
+				return formatDevErrorMessage('CompiledContext requires compiled template children.', args);
+			case 346:
+				return formatDevErrorMessage(
+					'CompiledOutlet requires a compiled component function with no returned renderable.',
 					args,
 				);
 			default:

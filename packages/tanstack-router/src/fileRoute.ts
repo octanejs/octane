@@ -1,4 +1,5 @@
 import { createRoute } from './route';
+import type { Route } from './route';
 import {
 	useLoaderData,
 	useLoaderDeps,
@@ -22,7 +23,6 @@ import type {
 	Register,
 	RegisteredRouter,
 	ResolveParams,
-	Route,
 	RouteById,
 	RouteConstraints,
 	RouteIds,
