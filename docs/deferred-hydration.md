@@ -1163,18 +1163,28 @@ tracking its native reads so a later truthy value can activate the boundary.
 Parent capture and provider-context updates retain the early-activation behavior,
 including when a false native signal refresh is also pending.
 
-When a mounted parent updates a dormant boundary, activation uses the latest
-captures for child state, events, refs, and effects. Octane never renders the
-child with its earlier captures, in development or production. If the captures
-or provided context values changed before activation, the server HTML predates
-the client's own state. When it differs from the client render, attributes,
-class, style, and text included, and values that `suppressHydrationWarning` or
-`dangerouslySetInnerHTML` would otherwise keep from the server, the boundary
-renders on the client without a hydration warning or `onRecoverableError`, as
-React reports nothing for an update that reaches a dehydrated boundary. A
-boundary nested inside such a boundary is treated the same way. When the
-captures are unchanged, for example after a parent re-render with equal
-values, a server/client mismatch is still reported as usual.
+When a mounted parent updates a dormant boundary with captures or provided
+context values that changed since the server rendered it, the boundary hydrates
+first, as React hydrates a dehydrated boundary before the update that reached
+it. Activation renders the child with the captures and context values it was
+claimed with, which produced the server HTML, and adopts the server's nodes.
+The latest captures then apply as an ordinary update in a render of their own,
+once that hydration commits. So the child's first render sees the earlier
+captures, its effects mount and then update, a callback ref that the update
+replaces receives the server node, then `null` and the node again, and the
+update patches the adopted nodes, including a draft the user typed, instead of
+replacing them. Values that `suppressHydrationWarning` or
+`dangerouslySetInnerHTML` keep from the server take the client's value in that
+update. Hydration compares the server HTML with the captures the boundary was
+claimed with, so a difference there is a real mismatch: the boundary renders
+on the client and reports it once, and development warns about server
+attributes it won't patch up, as for any hydration pass.
+
+A parent update that reaches a boundary while its hydration attempt waits on
+data leaves the server HTML in place until the attempt retries, which then
+hydrates and applies the update. This differs from React, which renders such a
+boundary on the client for an update outside a transition (see
+[Differences from React](./differences-from-react.md#hydration)).
 
 A `<Hydrate>` boundary is a hydration fallback boundary, like Suspense. When
 its server HTML does not match the client render, it discards its server DOM

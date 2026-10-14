@@ -322,14 +322,15 @@ describe.each([
 	);
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's. As React reports nothing for an update that
-	// reaches a dehydrated boundary, the island renders on the client silently.
-	it('renders a dormant island on the client without reporting when its captures changed', async () => {
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it, the island adopts the server's nodes with the
+	// captures it rendered, then the update switches the arm, and nothing
+	// reports.
+	it('hydrates a dormant island, then updates it without reporting when its captures changed', async () => {
 		const serverProps = { server: true, when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantTail, serverProps).html;
 		const div = container.firstElementChild!;
 		const section = container.querySelector('section')!;
-		const islandNodes = [section, ...section.querySelectorAll('*')];
 		const recoverable: string[] = [];
 		const active = hydrateRoot(container, client.DormantTail, serverProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
@@ -342,8 +343,8 @@ describe.each([
 		await act(async () => {});
 
 		expect(container.firstElementChild).toBe(div);
-		expect(markup(container.querySelector('section')!)).toBe('<s>s</s><b>a</b>');
-		expect(islandNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(container.querySelector('section')).toBe(section);
+		expect(markup(section)).toBe('<s>s</s><b>a</b>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

@@ -126,7 +126,6 @@ test('esbuild is held to every hydration body but not to the foldOnly state cell
 			'activeHydration',
 			'seedHydration',
 			'PRESENTATION_HYDRATION',
-			'preservedHydrateActivationCount',
 			'NATIVE_ADOPTION_RELEASES',
 		],
 	);

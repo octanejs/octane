@@ -53,10 +53,6 @@ export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	{ name: 'retryPresentations', source: 'runtime.ts' },
 	{ name: 'retireDetachedBindingLeases', source: 'runtime.ts' },
 	{ name: 'retireBindingLease', source: 'runtime.ts' },
-	// Suspended <Hydrate> activations, which only island activation preserves.
-	{ name: 'preservedHydrateActivations', source: 'runtime.ts' },
-	{ name: 'preservedHydrateActivationCount', source: 'runtime.ts', foldOnly: true },
-	{ name: 'pendingHydrateOwner', source: 'runtime.ts' },
 	// Server native-signal adoption, owned by a hydration pass. The miss is
 	// "internal hydration control flow, never an application error-boundary value".
 	{ name: 'NATIVE_ADOPTION_RELEASES', source: 'runtime.ts', foldOnly: true },

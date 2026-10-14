@@ -1182,10 +1182,10 @@ describe.each([
 			);
 		});
 
-		// Captures that changed before a dormant island activated legitimately
-		// differ from the server's: the island renders on the client, and its
-		// server output predating the client state is not reported as a mismatch.
-		it('renders a dormant island on the client without reporting when its value became an element before activation', async () => {
+		// Captures that changed before a dormant island activated: the island
+		// hydrates with the server's captures, then patches its adopted nodes with
+		// the newer ones, and nothing reports a mismatch.
+		it('hydrates a dormant island, then updates it without reporting when its value became an element before activation', async () => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
 			const main = container.querySelector('main')!;
@@ -1199,8 +1199,8 @@ describe.each([
 				expect(div.textContent).toBe('A');
 				await act(() => root.render(client.DormantHole, { when: load(), kind: 'p', v: 'A' }));
 				expect(container.querySelector('main')).toBe(main);
-				expect(div.isConnected).toBe(false);
 				const live = container.querySelector('section > div')!;
+				expect(live).toBe(div);
 				expect(markup(live)).toBe('<p class="x">A</p>');
 				await act(async () => {});
 				expect(recovered).toEqual([]);
@@ -1666,11 +1666,11 @@ describe.each([
 		);
 	});
 
-	// Captures that changed before a dormant island activated legitimately
-	// differ from the server's: the island renders on the client, and its server
-	// output predating the client state is not reported as a mismatch.
+	// Captures that changed before a dormant island activated: the island
+	// hydrates with the server's captures, then patches its adopted nodes with
+	// the newer ones, and nothing reports a mismatch.
 	it.each(EMPTY_KINDS)(
-		'renders a dormant island on the client without reporting when its value became %j before activation',
+		'hydrates a dormant island, then updates it without reporting when its value became %j before activation',
 		async (kind) => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
@@ -1685,8 +1685,8 @@ describe.each([
 				expect(div.textContent).toBe('A');
 				await act(() => root.render(client.DormantHole, { when: load(), kind, v: 'A' }));
 				expect(container.querySelector('main')).toBe(main);
-				expect(div.isConnected).toBe(false);
 				const live = container.querySelector('section > div')!;
+				expect(live).toBe(div);
 				expect(markup(live)).toBe('');
 				await act(async () => {});
 				expect(recovered).toEqual([]);
@@ -1910,10 +1910,10 @@ describe.each([
 		);
 	});
 
-	// Captures that changed before a dormant island activated legitimately
-	// differ from the server's: the island renders on the client, and its server
-	// output predating the client state is not reported as a mismatch.
-	it('renders a dormant island on the client without reporting when it was updated before activation', async () => {
+	// Captures that changed before a dormant island activated: the island
+	// hydrates with the server's captures, then patches its adopted nodes with
+	// the newer ones, and nothing reports a mismatch.
+	it('hydrates a dormant island, then updates it without reporting when it was updated before activation', async () => {
 		const serverProps = { when: condition(false), kind: 'p', v: 'A' };
 		container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
 		const main = container.querySelector('main')!;
@@ -1927,8 +1927,8 @@ describe.each([
 			expect(markup(div)).toBe('<p class="x">A</p>');
 			await act(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'A' }));
 			expect(container.querySelector('main')).toBe(main);
-			expect(div.isConnected).toBe(false);
-			expect(markup(container.querySelector('section > div')!)).toBe('A');
+			expect(container.querySelector('section > div')).toBe(div);
+			expect(markup(div)).toBe('A');
 			await act(async () => {});
 			expect(recovered).toEqual([]);
 			expect(warns()).toEqual([]);

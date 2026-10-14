@@ -1811,12 +1811,19 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 						return stop;
 					});
 				try {
-					hydratedRoot = hydrateRoot(container, client.NativeControlHydration, application, {
-						signalOwner: scope,
-						bindingLeases: [layoutBinding, binding],
-						controlLeases: [control],
-						onUncaughtError,
-					});
+					// The island hydrates with the captures it is claimed with, so those
+					// suspend its activation.
+					hydratedRoot = hydrateRoot(
+						container,
+						client.NativeControlHydration,
+						{ ...application, suspend: true },
+						{
+							signalOwner: scope,
+							bindingLeases: [layoutBinding, binding],
+							controlLeases: [control],
+							onUncaughtError,
+						},
+					);
 					await act(() =>
 						hydratedRoot!.render(client.NativeControlHydration, {
 							...application,
@@ -4212,14 +4219,16 @@ export function ScalarTextHydration(props) @{
 						expect(paragraph.textContent).toBe('early owner survives refusal');
 						continue;
 					}
+					const suspended =
+						outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
+					// The island hydrates with the captures it is claimed with, so those
+					// decide whether its activation suspends.
 					hydratedRoot = hydrateRoot(
 						article,
 						client.ScalarTextHydration,
-						{ ...application, value },
+						{ ...application, value, suspend: suspended },
 						{ signalOwner: scope, bindingLeases: [binding] },
 					);
-					const suspended =
-						outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
 					await act(() =>
 						hydratedRoot!.render(client.ScalarTextHydration, {
 							...application,

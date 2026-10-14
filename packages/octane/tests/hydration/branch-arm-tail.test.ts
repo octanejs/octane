@@ -522,10 +522,11 @@ describe.each([
 	});
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: the island renders on the client, but reports
-	// nothing, as React reports nothing for an update that reaches a dehydrated
-	// boundary.
-	it('client-renders a dormant island silently when its branch changed before activation', async () => {
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it, the island adopts the server's arm with the
+	// captures it rendered, then the update switches the branch, and nothing
+	// reports.
+	it('hydrates a dormant island, then switches its branch silently when it changed before activation', async () => {
 		const serverProps = { on: false, when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantIf, serverProps).html;
 		const host = container.querySelector('#r')!;
@@ -542,8 +543,8 @@ describe.each([
 		await act(async () => {});
 
 		expect(container.querySelector('#r')).toBe(host);
-		expect(section.isConnected).toBe(false);
-		expect(markup(container.querySelector('section')!)).toBe('<em>x</em>');
+		expect(container.querySelector('section')).toBe(section);
+		expect(markup(section)).toBe('<em>x</em>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

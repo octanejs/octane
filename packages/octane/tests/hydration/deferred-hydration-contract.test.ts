@@ -1294,7 +1294,10 @@ describe('deferred hydration contract edges', () => {
 			shellLabel: 'Initial shell',
 		};
 		container.innerHTML = renderToString(server.ActivationSuspendingHydration, serverProps).html;
-		root = hydrateRoot(container, client.ActivationSuspendingHydration, serverProps);
+		root = hydrateRoot(container, client.ActivationSuspendingHydration, {
+			...serverProps,
+			suspend: true,
+		});
 		flushSync(() => {});
 		flushEffects();
 
@@ -1630,16 +1633,22 @@ describe('deferred hydration contract edges', () => {
 			}),
 		);
 
+		// Reactivation hydrates with the captures the boundary was claimed with,
+		// whose promise has settled, then applies the newer ones as an update, as
+		// React hydrates a dehydrated boundary before the update that reached it.
+		// The update suspends on the fresh promise outside a transition, so the
+		// hydrated boundary hides its content behind the authored fallback.
 		expect(container.querySelector('#activation-shell')?.textContent).toBe('Reactivated shell');
-		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
-		expect(container.querySelector('#activation-fallback')).toBeNull();
-		expect(onHydrated).not.toHaveBeenCalled();
+		expect(onHydrated).toHaveBeenCalledOnce();
+		expect(container.querySelector('#activation-content')).toBe(pendingContent);
+		expect(container.querySelector('#activation-fallback')).not.toBeNull();
 
 		await act(() => fresh.resolve());
 
 		expect(container.querySelector('#activation-fallback')).toBeNull();
 		expect(onHydrated).toHaveBeenCalledOnce();
 		const activeContent = container.querySelector('#activation-content') as HTMLButtonElement;
+		expect(activeContent).toBe(pendingContent);
 		await act(() => activeContent.click());
 		expect(onClick).toHaveBeenCalledOnce();
 		expect(onHydrated).toHaveBeenCalledOnce();

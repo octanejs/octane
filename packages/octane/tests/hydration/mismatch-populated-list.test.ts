@@ -167,11 +167,10 @@ describe.each([
 	);
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's, and a dormant boundary never renders its stale
-	// captures to compare them. As React does for an update that reaches a
-	// dehydrated boundary it cannot hydrate, the boundary renders on the client
-	// and reports nothing.
-	it('renders a dormant boundary whose list emptied before activation on the client without reporting', async () => {
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it, the boundary adopts the server's list with the
+	// captures it rendered, then the update empties it, and nothing reports.
+	it('hydrates a dormant boundary, then empties its list without reporting', async () => {
 		const serverProps = { items: ['x'], when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantEmptyArm, serverProps).html;
 		const div = container.firstElementChild!;
@@ -188,8 +187,8 @@ describe.each([
 		await act(async () => {});
 
 		expect(container.firstElementChild).toBe(div);
-		expect(host.isConnected).toBe(false);
-		expect(markup(container.querySelector('i')!.parentElement!)).toBe('<i><b>none</b>ok</i>');
+		expect(container.querySelector('i')).toBe(host);
+		expect(markup(host.parentElement!)).toBe('<i><b>none</b>ok</i>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});
