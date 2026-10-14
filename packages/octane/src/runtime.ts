@@ -204,6 +204,12 @@ import {
 } from './hydration/event-capture.js';
 import { isRestoredHydrationTextarea } from './hydration/control-capture.js';
 import {
+	SEED_SITE_DRIVER,
+	seedSite,
+	type SeedSiteDriver,
+	type SeedSites,
+} from './hydration/use-seeds.js';
+import {
 	takeUnpatchedValues,
 	unpatchedAttribute,
 	unpatchedClass,
@@ -18534,28 +18540,17 @@ function isSuspenseException(x: any): x is SuspenseException {
 }
 
 const HYDRATION_SITE_EVENTS = Symbol('octane.hydration.site-events');
-const HYDRATION_SEED_FACTORY = Symbol('octane.hydration.seed-factory');
-
-interface HydrationSiteEvents {
-	queues: Map<string, number[]>;
-	offsets: Map<string, number>;
-}
 
 interface HydrationSeedArray extends Array<unknown> {
-	[HYDRATION_SITE_EVENTS]?: HydrationSiteEvents;
+	[HYDRATION_SITE_EVENTS]?: SeedSites;
 }
 
-interface HydrationSeedFactory {
-	index: number;
-	factory: (() => unknown) | null;
-	value?: unknown;
-	error?: unknown;
-	failed?: boolean;
-}
-
-interface HydrationSeedThenable extends TrackedThenable {
-	[HYDRATION_SEED_FACTORY]: HydrationSeedFactory;
-}
+/**
+ * Compiler-owned use() sites (hydration/use-seeds.ts), installed by the first
+ * compiled seedOrCreate that a hydration pass seeds. Only that call writes
+ * it, so an app without one folds every read away.
+ */
+let SEED_SITES: SeedSiteDriver | null = null;
 
 /**
  * Hydration uses the server's fulfilled value as the canonical first-render
@@ -18580,34 +18575,16 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 	}
 }
 
-function materializeHydrationSeedFactory(record: HydrationSeedFactory): unknown {
-	if (record.failed === true) throw record.error;
-	if (record.factory !== null) {
-		const factory = record.factory;
-		record.factory = null;
-		try {
-			record.value = factory();
-		} catch (error) {
-			record.failed = true;
-			record.error = error;
-			throw error;
-		}
-	}
-	return record.value;
-}
-
-function getHydrationSeedFactory(thenable: TrackedThenable): HydrationSeedFactory | undefined {
-	try {
-		return (thenable as HydrationSeedThenable)[HYDRATION_SEED_FACTORY];
-	} catch {
-		return undefined;
-	}
-}
-
 /** Compiler-owned direct use() creations consult their server-proven site outcome first. */
 export function seedOrCreate<T>(site: string, factory: () => T): T {
 	const hydration = hydrating ? seedHydration() : null;
-	return hydration === null ? factory() : hydration.seedOrCreate(site, factory);
+	const sites =
+		hydration === null || hydration.seeds === null
+			? undefined
+			: (hydration.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
+	if (sites === undefined) return factory();
+	SEED_SITES = SEED_SITE_DRIVER;
+	return seedSite(sites, hydration!.seedCursor, site, factory);
 }
 
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
@@ -20386,6 +20363,8 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 // `<script data-octane-suspense>` in `hydrateRoot()` and consumed in render
 // order by `useThenable` so a hydrating boundary returns synchronously. They are
 // fields on the hydrateRoot-only capability, so client-only builds discard them.
+// A compiled use() creation's seeded site (seedOrCreate) is hydration/use-seeds.ts,
+// which only an app with such a site ships.
 // Set while adopting a root when a matched range is physically wrapped by an
 // exactly-adjacent marker pair. The post-hydration ownership walk can only
 // remove comments in that shape, so roots without one skip the pass entirely.
@@ -21642,47 +21621,19 @@ class HydrationCapability {
 		return parseSeedJson(raw);
 	}
 
-	seedOrCreate<T>(site: string, factory: () => T): T {
-		if (this.seeds === null) return factory();
-		const events = (this.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
-		if (events === undefined) return factory();
-		const queue = events.queues.get(site);
-		if (queue === undefined) return factory();
-		const offset = events.offsets.get(site) ?? 0;
-		events.offsets.set(site, offset + 1);
-		const index = queue[offset];
-		if (index === undefined || index < this.seedCursor) return factory();
-
-		const record: HydrationSeedFactory = { index, factory };
-		const thenable: HydrationSeedThenable = {
-			[HYDRATION_SEED_FACTORY]: record,
-			then(onFulfilled, onRejected) {
-				if (thenable.status === 'fulfilled') {
-					return Promise.resolve(thenable.value).then(onFulfilled, onRejected);
-				}
-				if (thenable.status === 'rejected') {
-					return Promise.reject(thenable.reason).then(onFulfilled, onRejected);
-				}
-				return Promise.resolve(materializeHydrationSeedFactory(record)).then(
-					onFulfilled,
-					onRejected,
-				);
-			},
-		};
-		return thenable as T;
-	}
-
 	useSeed<T>(
 		thenable: TrackedThenable<T>,
 		state: TrackedThenable<any>[],
 		index: number,
 		replaceOnResume: boolean,
 	): T {
-		const factory = getHydrationSeedFactory(thenable);
+		// A compiled site's thenable whose seed is not the next one renders what
+		// its factory makes instead (hydration/use-seeds.ts).
+		const factory = SEED_SITES ? SEED_SITES.factoryOf(thenable) : undefined;
 		if (factory !== undefined && factory.index !== this.seedCursor) {
 			// useThenable allocated the record before seeding this call.
 			CURRENT_BLOCK!.rare!.thenableIdx = index;
-			const usable = materializeHydrationSeedFactory(factory);
+			const usable = SEED_SITES!.materialize(factory);
 			if (
 				replaceOnResume &&
 				usable !== null &&
