@@ -307,23 +307,26 @@ immutable snapshots and has no side effects, and the compiler reports the violat
 can prove. Add `"use strong"` before a module's imports to try it one file at a time,
 or set `compiler: { strong: true }` in `octane.config.ts` to cover your application.
 
-```tsx
+```tsrx
 'use strong';
 
 import { useLinkedState } from 'octane';
 
-export function ProfileEditor({ user }) {
+export function ProfileEditor({ user }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 
 A Strong module cannot update state or read or write `ref.current` while rendering, or
 update state synchronously while setting up an effect. The compiler caches eligible
-calculations and callbacks itself, so `useMemo` and `useCallback` are compile errors, and dependency
-arrays are inferred: an explicit array that differs from the inferred inputs is an
-error, and an equivalent one is a hint. Event handlers still update state, and effects
-still synchronize external systems.
+calculations and callbacks itself. Effects
+and imperative handles infer dependencies: an explicit array that differs from the
+inferred inputs is an error, and an equivalent one is a hint. `useMemo` and
+`useCallback` allow manual dependency control, using explicit lists as written,
+inferring omitted or `undefined` lists, and recomputing the memo or refreshing
+the callback on each render for `null`. Event handlers still update
+state, and effects still synchronize external systems.
 
 [Strong mode](/docs/strong-mode) covers enabling it, adopting it in an existing app,
 replacements for the React idioms it rejects, and every diagnostic.

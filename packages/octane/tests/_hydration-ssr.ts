@@ -278,11 +278,11 @@ function hydrationTracePlugin() {
 	const contextFile = resolve(repositoryRoot, 'packages/tanstack-query/src/context.ts');
 	const sources = new Map([runtimeFile, contextFile].map((id) => [id, readFileSync(id, 'utf8')]));
 	const transformed: Array<{ id: string; sourceSha256: string }> = [];
-	const replace = (source: string, before: string, after: string, id: string) => {
-		if (source.split(before).length !== 2) {
+	const replace = (source: string, before: string, after: string, id: string, count = 1) => {
+		if (source.split(before).length !== count + 1) {
 			throw new Error(`Hydration SSR trace source preimage mismatch: ${id}`);
 		}
-		return source.replace(before, () => after);
+		return source.replaceAll(before, () => after);
 	};
 	const plugin: Plugin = {
 		name: 'octane-test-hydration-ssr-trace',
@@ -310,6 +310,13 @@ function hydrationTracePlugin() {
 					traced,
 					'\tregisterContext(ctx);\n',
 					'\tregisterContext(ctx);\n\t__testHydrationTrace.context(ctx);\n',
+					id,
+					2,
+				);
+				traced = replace(
+					traced,
+					'\tscope.$$ctxValues.set(props.context, props.value);\n',
+					'\tconst __testHydrationContext = props.context;\n\tscope.$$ctxValues.set(__testHydrationContext, props.value);\n\t__testHydrationTrace.provider(__testHydrationContext, scope, CURRENT_SCOPE);\n',
 					id,
 				);
 				traced = replace(

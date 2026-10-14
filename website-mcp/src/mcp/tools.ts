@@ -100,7 +100,7 @@ export function registerRemoteTools(server: McpServer): void {
 		{
 			title: 'Compile Octane source',
 			description:
-				'Compile/validate source with the real Octane compiler. Paste .tsrx (directive blocks, @{ } bodies) or standard .tsx/.jsx; a successful result includes runnable compiled JS plus nonfatal warnings with codes and authored ranges. Fatal parse/compile failures return an error with line/column and a code frame. Use mode \'server\' for SSR output. Set strong (or start the module with "use strong") to check Strong mode: a failed Strong compile also returns every finding in `diagnostics`, each with its code, location, docs url, and suggestions, some carrying source edits (offsets into the pasted source). Explain a code with octane_strong_explain.',
+				'Compile/validate source with the real Octane compiler. Paste .tsrx (directive blocks, @{ } bodies) or standard .tsx/.jsx; a successful result includes runnable compiled JS plus nonfatal warnings with codes and authored ranges. Fatal parse/compile failures return an error with line/column and a code frame. Use mode \'server\' for SSR output. Set strong (or start the module with "use strong") to check Strong mode, which compiles .tsrx only (a .tsx/.jsx module reports OCTANE_STRONG_TSX_MODULE): a failed Strong compile also returns every finding in `diagnostics`, each with its code, location, docs url, and suggestions, some carrying source edits (offsets into the pasted source). Explain a code with octane_strong_explain.',
 			inputSchema: {
 				source: z.string().min(1).max(200_000),
 				filename: z

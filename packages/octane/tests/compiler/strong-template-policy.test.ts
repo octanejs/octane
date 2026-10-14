@@ -1,31 +1,46 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { compile } from 'octane/compiler';
+import { collectDiagnostics, compile } from 'octane/compiler';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
 const strong = (source: string) => `"use strong";\n${source}`;
 
 describe('Strong template authoring checks', () => {
-	it('keeps keyed JSX mapping available in Strong TSX client and server modules', () => {
-		const filename = 'packages/octane/tests/_fixtures/for-strong.tsx';
-		const source = readFileSync(filename, 'utf8');
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, filename, { mode })).not.toThrow();
-			expect(() => compile(source, filename, { mode, strong: true })).not.toThrow();
-		}
-	});
 	it.each(['tsx', 'jsx'])(
-		'preserves keyed %s maps for module and global Strong opt-in',
+		'rejects a %s module that the directive or global Strong opt-in reaches',
 		(extension) => {
+			const filename = `App.${extension}`;
 			const source = `export function App({ items }) { return <ul>{items.map(item => <li key={item.id}>{item.name}</li>)}</ul>; }`;
 			for (const mode of ['client', 'server'] as const) {
-				expect(() => compile(strong(source), `App.${extension}`, { mode })).not.toThrow();
-				expect(() => compile(source, `App.${extension}`, { mode, strong: true })).not.toThrow();
+				expect(() => compile(source, filename, { mode })).not.toThrow();
+				expect(() => compile(strong(source), filename, { mode })).toThrow(
+					`${filename}:1:1: [OCTANE_STRONG_TSX_MODULE]`,
+				);
+				expect(() => compile(source, filename, { mode, strong: true })).toThrow(
+					`${filename}:1:1: [OCTANE_STRONG_TSX_MODULE]`,
+				);
 			}
-			expect(compileToVolarMappings(strong(source), `App.${extension}`).diagnostics).toEqual([]);
+			const [diagnostic, ...rest] = compileToVolarMappings(strong(source), filename).diagnostics;
+			expect(rest).toEqual([]);
+			expect(diagnostic).toMatchObject({ code: 'OCTANE_STRONG_TSX_MODULE', severity: 'error' });
+			expect(strong(source).slice(diagnostic!.start.offset, diagnostic!.end.offset)).toBe(
+				'"use strong"',
+			);
 		},
 	);
+	it.each(['tsx', 'jsx'])('lists the other Strong findings of a %s module', (extension) => {
+		const source = `import { createElement, useRef } from 'octane';
+export function App() { const ref = useRef(0); return <p>{ref.current}</p>; }`;
+		const { diagnostics, error } = collectDiagnostics(source, `App.${extension}`, {
+			strong: true,
+		});
+		expect(error).toBe(null);
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			'OCTANE_STRONG_TSX_MODULE',
+			'OCTANE_STRONG_RENDER_REF_READ',
+			'OCTANE_STRONG_ELEMENT_API',
+		]);
+	});
 	it.each([
 		['inline JSX', 'props.items.map(item => <li>{item.name as string}</li>)'],
 		['computed map', 'props.items["map"](item => <li />)'],
@@ -94,6 +109,66 @@ describe('Strong template authoring checks', () => {
 			expect(compileToVolarMappings(source, 'App.tsrx').diagnostics).toEqual([]);
 		},
 	);
+	const singleItemApp = (loop: string, setup = '', module = '') =>
+		`${module} export function App(props) @{ ${setup} <ul>${loop}</ul> }`;
+	it.each([
+		[
+			'a literal keyed by its item',
+			singleItemApp('@for (const item of [props.value]; key item) { <li /> }'),
+		],
+		[
+			'a literal with a constant key',
+			singleItemApp(`@for (const { id } of [props.value]; key 'row') { <li>{id as string}</li> }`),
+		],
+		[
+			'a literal with a row-root key',
+			singleItemApp('@for (const item of ([props.value] as const)) { <li key={item} /> }'),
+		],
+		[
+			'a local alias',
+			singleItemApp('@for (const item of one; key item) { <li /> }', 'const one = [props.value];'),
+		],
+		[
+			'a module alias',
+			singleItemApp('@for (const item of ONE; key item) { <li /> }', '', `const ONE = ['row'];`),
+		],
+	])('rejects a single-item @for over %s', (_label, source) => {
+		expect(() => compile(source, 'App.tsrx')).not.toThrow();
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(strong(source), 'App.tsrx', { mode })).toThrow(
+				'OCTANE_STRONG_SINGLE_ITEM_FOR',
+			);
+		}
+		expect(compileToVolarMappings(strong(source), 'App.tsrx').diagnostics).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_SINGLE_ITEM_FOR', severity: 'error' }),
+		]);
+	});
+	it.each([
+		[
+			'several items',
+			singleItemApp('@for (const item of [props.a, props.b]; key item) { <li /> }'),
+		],
+		['a spread', singleItemApp('@for (const item of [...props.items]; key item) { <li /> }')],
+		[
+			'an alias that grows',
+			singleItemApp(
+				'@for (const item of one; key item) { <li /> }',
+				'const one = [props.a]; one.push(props.b);',
+			),
+		],
+		[
+			'a shadowed alias',
+			singleItemApp(
+				'@for (const item of one; key item) { <li /> }',
+				'const one = props.items;',
+				`const one = ['row'];`,
+			),
+		],
+	])('allows @for over %s', (_label, source) => {
+		for (const mode of ['client', 'server'] as const)
+			expect(() => compile(strong(source), 'App.tsrx', { mode })).not.toThrow();
+		expect(compileToVolarMappings(strong(source), 'App.tsrx').diagnostics).toEqual([]);
+	});
 	it.each(['suppressHydrationWarning', 'suppressNativeChangeWarning'])(
 		'rejects intrinsic %s including false and object spreads',
 		(prop) => {
@@ -160,11 +235,48 @@ describe('Strong template authoring checks', () => {
 	])('recognizes compatibility APIs from the server entrypoint', (imports) => {
 		const source = `${imports} export function App() { return <div />; }`;
 		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, 'App.tsx', { mode })).not.toThrow();
-			expect(() => compile(source, 'App.tsx', { mode, strong: true })).toThrow(
+			expect(() => compile(source, 'App.tsrx', { mode })).not.toThrow();
+			expect(() => compile(source, 'App.tsrx', { mode, strong: true })).toThrow(
 				'OCTANE_STRONG_COMPAT_IMPORT',
 			);
 		}
+	});
+	it.each([
+		`import { createElement as h } from 'octane';`,
+		String.raw`import { create\u0045lement as h } from 'octane';`,
+		String.raw`import * as Octane from 'octane'; const h = Octane['create\u0045lement'];`,
+		String.raw`import * as Octane from 'octane'; const h = Octane['creat\eElement'];`,
+		`import { Children } from 'octane/server';`,
+		`import * as Octane from 'octane'; const clone = Octane['cloneElement'];`,
+		`import * as Octane from 'octane'; const { isValidElement } = Octane;`,
+		`import { descriptorChildren } from 'octane';`,
+		`import { jsx } from 'octane/jsx-runtime';`,
+		`import { Fragment } from 'octane/strong/jsx-dev-runtime';`,
+	])('rejects element descriptor APIs: %s', (imports) => {
+		const template = `${imports} export function App() @{ <div /> }`;
+		expect(() => compile(template, 'App.tsrx')).not.toThrow();
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(strong(template), 'App.tsrx', { mode })).toThrow(
+				'OCTANE_STRONG_ELEMENT_API',
+			);
+		}
+		expect(compileToVolarMappings(strong(template), 'App.tsrx').diagnostics).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_ELEMENT_API', severity: 'error' }),
+		]);
+		expect(() => slotHooks(strong(`${imports} export const value = 1;`), 'values.ts')).toThrow(
+			'OCTANE_STRONG_ELEMENT_API',
+		);
+	});
+	it.each([
+		`import type { ElementDescriptor } from 'octane'; import { type Children } from 'octane';`,
+		`import type { jsx } from 'octane/jsx-runtime';`,
+		`import { Fragment } from 'octane'; import { createElement } from './adapter';`,
+		`import * as Octane from 'octane'; function helper(Octane) { return Octane.createElement; }`,
+	])('preserves type-only, non-descriptor, and shadowed element names: %s', (imports) => {
+		const source = strong(`${imports} export function App() @{ <div /> }`);
+		for (const mode of ['client', 'server'] as const)
+			expect(() => compile(source, 'App.tsrx', { mode })).not.toThrow();
+		expect(compileToVolarMappings(source, 'App.tsrx').diagnostics).toEqual([]);
 	});
 	it('reuses the parsed module for renderer regions in editor analysis', () => {
 		// The tolerant editor parser accepts shapes a second strict parse rejects;
@@ -240,13 +352,13 @@ describe('Strong template policy lexical boundaries', () => {
 		`import * as Octane from 'octane'; const { flushSync: batch } = Octane; export function App() { return <div />; }`,
 		`import * as Octane from 'octane'; export function App() { const { ['StrictMode']: Boundary } = Octane; return <Boundary><div /></Boundary>; }`,
 	])('rejects namespace compatibility JSX and destructuring', (source) => {
-		expect(() => compile(source, 'App.tsx')).not.toThrow();
-		expect(() => compile(strong(source), 'App.tsx')).toThrow('OCTANE_STRONG_COMPAT_IMPORT');
+		expect(() => compile(source, 'App.tsrx')).not.toThrow();
+		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_COMPAT_IMPORT');
 	});
 
 	it('respects shadowed namespaces in JSX and destructuring', () => {
 		const source = `import * as Octane from 'octane'; export function App(Octane) { const { StrictMode } = Octane; return <Octane.StrictMode><StrictMode /></Octane.StrictMode>; }`;
-		expect(() => compile(strong(source), 'App.tsx')).not.toThrow();
+		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
 	});
 
 	it.each([

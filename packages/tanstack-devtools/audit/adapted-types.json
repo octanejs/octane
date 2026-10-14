@@ -1,7 +1,7 @@
 [
   {
     "path": "index.ts",
-    "sha256": "366597944549d430b8ebab5ab5882e3b330d2cb6501161a5a34583c4f5bac994",
+    "sha256": "2b50a7f94dcd51f98ac17312a61ae4e40db6bf7e73943a6049db5a5a0a34842f",
     "exports": [
       "ClientEventBusConfig",
       "PLUGIN_CONTAINER_ID",
@@ -32,14 +32,14 @@
   },
   {
     "path": "devtools.tsrx",
-    "sha256": "82ebccbce881e029d2e2190887d4434fa757c127aa926efbbbdbc0ea21a08218",
+    "sha256": "2fb621ab23d55870fe56ce20ffb94d6af351ee6f33ab415a85eb6f4ff8a34850",
     "exports": [
       "TanStackDevtools",
       "TanStackDevtoolsFrameworkInit",
       "TanStackDevtoolsFrameworkPlugin"
     ],
     "extraExports": [],
-    "structure": "5d853e1fd9d138a35122719762e890906f79d3ad7fafecdbe377c6789b033c5c",
+    "structure": "c19725210f051baa31e765667e14f66b461679b1247e20a4c552722ea7c2ffbb",
     "pairedUpstream": "devtools.tsx"
   }
 ]

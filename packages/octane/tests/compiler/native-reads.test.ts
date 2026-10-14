@@ -432,7 +432,8 @@ describe('native reads and ordinary hook dependencies', () => {
 			`const value = useMemo(() => scope.get(count$)${deps});`,
 			`import { useMemo } from 'octane';\n${PREFIX}`,
 		);
-		expect(() => compile(source, FILENAME, {})).toThrow(MEMO_READ);
+		for (const options of modes)
+			expect(() => compile(source, FILENAME, options)).toThrow(MEMO_READ);
 		for (const [imported, factory] of [
 			['{ createResource }', 'createResource'],
 			['{ createResource as resource }', 'resource'],
@@ -444,7 +445,8 @@ describe('native reads and ordinary hook dependencies', () => {
 import ${imported} from 'octane/signals';
 const result$ = ${factory}(owner, 'result', describe);`,
 			);
-			expect(() => compile(resource, FILENAME, {})).toThrow(MEMO_READ);
+			for (const options of modes)
+				expect(() => compile(resource, FILENAME, options)).toThrow(MEMO_READ);
 		}
 	});
 
@@ -460,7 +462,7 @@ function readCount$() { return scope.get(count$); }
 		expect(() => compile(source, FILENAME, {})).toThrow(MEMO_READ);
 	});
 
-	it.each(modes)('validates inferred native memo reads and Strong hook policy in %j', (options) => {
+	it.each(modes)('accepts inferred native memo reads in %j', (options) => {
 		const source = app(
 			`const value = useMemo(() => scope.get(count$));
 const alias = memo(readCount$);
@@ -470,11 +472,7 @@ import * as Octane from 'octane';
 ${PREFIX}
 function readCount$() { return scope.get(count$); }`,
 		);
-		if ('strong' in options && options.strong) {
-			expect(() => compile(source, FILENAME, { ...options })).toThrow('OCTANE_STRONG_MANUAL_MEMO');
-		} else {
-			expect(() => compile(source, FILENAME, { ...options })).not.toThrow();
-		}
+		expect(() => compile(source, FILENAME, { ...options })).not.toThrow();
 	});
 
 	it('diagnoses a live read inside a memoized JSX result', () => {

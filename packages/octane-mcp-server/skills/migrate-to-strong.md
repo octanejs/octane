@@ -20,14 +20,15 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
    the run. Note which modules are already clean and which idioms dominate.
 2. **Apply the mechanical rewrites.** Run `octane analyze --strong-preview --fix`
    (add `--dry-run` to preview). It rewrites React's lazy ref initialization to
-   `useLazyRef` and `useMemo`/`useCallback` to plain declarations. Without
+   `useLazyRef`. Manual `useMemo` and `useCallback` calls remain valid. Without
    `--strong-preview`, `--fix` only rewrites modules that are already Strong.
    Review the diff and run the tests before going further.
 3. **Opt in one module.** Put `"use strong"` at the top of the file, before
-   imports. A `.tsx` file keeps a leading `@jsxImportSource` pragma first and
-   needs `jsxImportSource: octane/strong` (tsconfig or pragma) for Strong JSX
-   types; `.tsrx` selects them automatically. Start with modules the preview
-   reported clean, then leaf components, then their parents.
+   imports. Strong compiles `.tsrx`, `.ts`, and `.js` only, so first convert a
+   `.tsx` or `.jsx` module to `.tsrx` (`OCTANE_STRONG_TSX_MODULE`): its markup
+   becomes template JSX and its `.map()` lists become keyed `@for` blocks.
+   `.tsrx` selects the Strong JSX types automatically. Start with modules the
+   preview reported clean, then leaf components, then their parents.
 4. **Fix each finding by code.** `octane analyze <file>` lists every finding in
    the file, not only the first error. For each code, call
    `octane_strong_explain` and apply its replacement or recipe. A finding's
@@ -58,7 +59,6 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
 | `if (ref.current === null) ref.current = create()` | `const ref = useLazyRef(() => create())` (`lazy-ref`) | `OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE` |
 | `useLayoutEffect(() => setWidth(el.current.offsetWidth))` | `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`layout-measurement`) | `OCTANE_STRONG_EFFECT_STATE_UPDATE` |
 | `ref={(el) => { if (el) setWidth(el.offsetWidth); }}` | `ref={el}` and `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`ref-measurement`) | `OCTANE_STRONG_REF_STATE_UPDATE` |
-| `useMemo(() => value, deps)` / `useCallback(fn, deps)` | `const value = …` / `const fn = …` (`manual-memo`) | `OCTANE_STRONG_MANUAL_MEMO` |
 | `latest.current = onTick` read from an effect | `const tick = useEffectEvent(onTick)` (`latest-ref`) | `OCTANE_STRONG_RENDER_REF_WRITE` |
 | `useEffect(() => setName(user.name))` | `useLinkedState(user.id, () => user.name)` (`prop-state`) | `OCTANE_STRONG_EFFECT_STATE_UPDATE` |
 | `window.innerWidth` and other browser reads in render | `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)` (`browser-state`) | `OCTANE_STRONG_RENDER_AMBIENT_READ` |
@@ -68,6 +68,8 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
 | `dangerouslySetInnerHTML={{ __html: html }}` | `dangerouslySetInnerHTML={trustHTML(sanitize(html))}` (`trusted-html`) | `OCTANE_STRONG_UNTRUSTED_HTML` |
 
 The id in parentheses is the `recipe` argument for `octane_strong_explain`.
+Strong mode preserves explicit `useMemo` and `useCallback` dependencies,
+infers omitted dependencies, and accepts `null` for every render.
 Omit effect dependency arrays: they are inferred, and a conflicting explicit
 array is an error (`OCTANE_STRONG_EXPLICIT_DEPENDENCIES` is only a hint when
 the array is equivalent).

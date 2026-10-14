@@ -16,7 +16,6 @@
   "octane.strong-lazy-ref/effect-init": "compiles-keeps-bug",
   "octane.strong-lazy-ref/inline-call": "compiles-keeps-bug",
   "octane.strong-lazy-ref/render-ref-read": "rejected-by-strong",
-  "octane.strong-lazy-ref/use-memo": "rejected-by-strong",
   "octane.strong-lazy-ref/use-ref-argument": "compiles-keeps-bug",
   "octane.strong-managed-class/class-name-write": "rejected-by-strong",
   "octane.strong-managed-class/computed-class-method": "compiles-keeps-bug",

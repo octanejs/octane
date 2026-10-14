@@ -8,7 +8,7 @@
 // keeps it exhaustive: every code the compiler or CLI can report has an entry,
 // and every recipe's `before` reports its codes while its `after` compiles.
 //
-// Text is Markdown. Recipe sources are complete `.tsx` modules without the
+// Text is Markdown. Recipe sources are complete `.tsrx` modules without the
 // `"use strong"` directive, which the test and the renderers add.
 
 /** @typedef {'effects' | 'state' | 'render' | 'templates' | 'dom' | 'coverage'} StrongSectionId */
@@ -131,7 +131,7 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'effects',
 		severity: 'error',
 		detects:
-			"An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.",
+			"An effect or imperative handle dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.",
 		replacement: 'Omit the dependency argument.',
 	},
 	{
@@ -139,17 +139,9 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'effects',
 		severity: 'error',
 		detects:
-			'A built-in dependency hook receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.',
+			'An effect or imperative handle receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.',
 		replacement:
 			'Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.',
-	},
-	{
-		code: 'OCTANE_STRONG_MANUAL_MEMO',
-		section: 'effects',
-		severity: 'error',
-		detects: "A call to Octane's `useMemo` or `useCallback`, including known import aliases.",
-		replacement:
-			'Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.',
 	},
 	{
 		code: 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY',
@@ -331,8 +323,7 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'templates',
 		severity: 'error',
 		detects: 'In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases.',
-		replacement:
-			'Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.',
+		replacement: 'Use `@for` with a stable item key. Data-only mapping remains valid.',
 	},
 	{
 		code: 'OCTANE_STRONG_INDEX_KEY',
@@ -342,6 +333,15 @@ export const STRONG_DIAGNOSTICS = [
 			'An `@for` key uses the loop position as its identity, including arithmetic or text derived from the index.',
 		replacement:
 			'Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.',
+	},
+	{
+		code: 'OCTANE_STRONG_SINGLE_ITEM_FOR',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'An `@for` iterates a one-item array literal, such as `@for (const item of [value]; key item)`, or a `const` holding one that nothing but `@for` headers reads. A one-row loop is a workaround for a keyed remount or a local binding.',
+		replacement:
+			'To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid.',
 	},
 	{
 		code: 'OCTANE_STRONG_HOOK_LOCALITY',
@@ -369,6 +369,15 @@ export const STRONG_DIAGNOSTICS = [
 		replacement: 'Move `"use strong"` to the top of the file, before imports or other code.',
 	},
 	{
+		code: 'OCTANE_STRONG_TSX_MODULE',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'A `.tsx` or `.jsx` module is Strong, through its own `"use strong"` directive or the application\'s `compiler.strong` setting. Its JSX lowers to element descriptors, which render through the generic descriptor renderer instead of compiled templates. Installed dependencies keep their own mode.',
+		replacement:
+			'Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts` or `.js`; `root.render(App, props)` renders an entry point without JSX.',
+	},
+	{
 		code: 'OCTANE_STRONG_SUPPRESSION_PROP',
 		section: 'templates',
 		severity: 'error',
@@ -393,6 +402,15 @@ export const STRONG_DIAGNOSTICS = [
 		detects:
 			'Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, or `StrictMode` from `octane`.',
 		replacement: 'Use normal Octane scheduling and component semantics.',
+	},
+	{
+		code: 'OCTANE_STRONG_ELEMENT_API',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'Imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.',
+		replacement:
+			'Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid.',
 	},
 	{
 		code: 'OCTANE_STRONG_MANAGED_DOM_WRITE',
@@ -459,18 +477,18 @@ export const STRONG_RECIPES = [
 		before: `import { useRef } from 'octane';
 import { Store } from './store';
 
-export function Cart() {
+export function Cart() @{
 	const store = useRef<Store | null>(null);
 	if (store.current === null) store.current = new Store();
-	return <button onClick={() => store.current?.add()}>Add</button>;
+	<button onClick={() => store.current?.add()}>Add</button>
 }
 `,
 		after: `import { useLazyRef } from 'octane';
 import { Store } from './store';
 
-export function Cart() {
+export function Cart() @{
 	const store = useLazyRef(() => new Store());
-	return <button onClick={() => store.current.add()}>Add</button>;
+	<button onClick={() => store.current.add()}>Add</button>
 }
 `,
 		note: '`useLazyRef` runs its factory once, when the hook cell is created, and keeps the ref on later renders. The factory follows the rules of a lazy `useState` initializer. `octane analyze --fix` applies this rewrite when the `useRef` declaration directly precedes the `if`.',
@@ -483,21 +501,21 @@ export function Cart() {
 		codes: ['OCTANE_STRONG_EFFECT_STATE_UPDATE'],
 		before: `import { useLayoutEffect, useRef, useState } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const el = useRef<HTMLSpanElement>(null);
 	const [width, setWidth] = useState(0);
 	useLayoutEffect(() => {
 		setWidth(el.current?.offsetWidth ?? 0);
 	});
-	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+	<span ref={el}>{text + ' (' + width + 'px)'}</span>
 }
 `,
 		after: `import { useLayoutSnapshot, useRef } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const el = useRef<HTMLSpanElement>(null);
 	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
-	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+	<span ref={el}>{text + ' (' + width + 'px)'}</span>
 }
 `,
 		note: '`useLayoutSnapshot` measures after each commit and re-renders before paint only when the value changes. `initial` is the value for the first render and for server rendering. It does not observe later resizes: subscribe to those with an observer in an effect.',
@@ -510,50 +528,26 @@ export function Label({ text }: { text: string }) {
 		codes: ['OCTANE_STRONG_REF_STATE_UPDATE'],
 		before: `import { useState } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const [width, setWidth] = useState(0);
-	return (
-		<span
-			ref={(el) => {
-				if (el) setWidth(el.offsetWidth);
-			}}
-		>
-			{text + ' (' + width + 'px)'}
-		</span>
-	);
+	<span
+		ref={(el) => {
+			if (el) setWidth(el.offsetWidth);
+		}}
+	>
+		{text + ' (' + width + 'px)'}
+	</span>
 }
 `,
 		after: `import { useLayoutSnapshot, useRef } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const el = useRef<HTMLSpanElement>(null);
 	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
-	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+	<span ref={el}>{text + ' (' + width + 'px)'}</span>
 }
 `,
 		note: 'A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state.',
-	},
-	{
-		id: 'manual-memo',
-		title: 'Drop useMemo and useCallback',
-		react: 'const total = useMemo(() => sum(items), [items]);',
-		strong: 'const total = sum(items);',
-		codes: ['OCTANE_STRONG_MANUAL_MEMO'],
-		before: `import { useCallback, useMemo } from 'octane';
-
-export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
-	const total = useMemo(() => items.reduce((sum, item) => sum + item, 0), [items]);
-	const pick = useCallback(() => onPick(total), [onPick, total]);
-	return <button onClick={pick}>{String(total)}</button>;
-}
-`,
-		after: `export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
-	const total = items.reduce((sum, item) => sum + item, 0);
-	const pick = () => onPick(total);
-	return <button onClick={pick}>{String(total)}</button>;
-}
-`,
-		note: 'Strong production builds memoize render calculations from their inputs, and eligible callbacks keep a stable identity in every build until their inferred inputs change. `octane analyze --fix` applies this rewrite.',
 	},
 	{
 		id: 'latest-ref',
@@ -563,25 +557,25 @@ export function Total({ items, onPick }: { items: number[]; onPick: (total: numb
 		codes: ['OCTANE_STRONG_RENDER_REF_WRITE'],
 		before: `import { useEffect, useRef } from 'octane';
 
-export function Ticker({ onTick }: { onTick: () => void }) {
+export function Ticker({ onTick }: { onTick: () => void }) @{
 	const latest = useRef(onTick);
 	latest.current = onTick;
 	useEffect(() => {
 		const id = setInterval(() => latest.current(), 1000);
 		return () => clearInterval(id);
 	}, []);
-	return <span>Ticking</span>;
+	<span>Ticking</span>
 }
 `,
 		after: `import { useEffect, useEffectEvent } from 'octane';
 
-export function Ticker({ onTick }: { onTick: () => void }) {
+export function Ticker({ onTick }: { onTick: () => void }) @{
 	const tick = useEffectEvent(onTick);
 	useEffect(() => {
 		const id = setInterval(() => tick(), 1000);
 		return () => clearInterval(id);
 	});
-	return <span>Ticking</span>;
+	<span>Ticking</span>
 }
 `,
 		note: 'An Effect Event always calls the latest `onTick` without making the effect depend on it.',
@@ -594,19 +588,19 @@ export function Ticker({ onTick }: { onTick: () => void }) {
 		codes: ['OCTANE_STRONG_EFFECT_STATE_UPDATE'],
 		before: `import { useEffect, useState } from 'octane';
 
-export function NameField({ user }: { user: { id: string; name: string } }) {
+export function NameField({ user }: { user: { id: string; name: string } }) @{
 	const [name, setName] = useState('');
 	useEffect(() => {
 		setName(user.name);
 	});
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 `,
 		after: `import { useLinkedState } from 'octane';
 
-export function NameField({ user }: { user: { id: string; name: string } }) {
+export function NameField({ user }: { user: { id: string; name: string } }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 `,
 		note: '`useLinkedState` resets the editable value in the same render whenever its source changes, so there is no frame with the stale value.',
@@ -617,9 +611,9 @@ export function NameField({ user }: { user: { id: string; name: string } }) {
 		react: 'const wide = window.innerWidth > 800;',
 		strong: 'const wide = useSyncExternalStore(subscribe, getWide, () => false);',
 		codes: ['OCTANE_STRONG_RENDER_AMBIENT_READ'],
-		before: `export function Layout() {
+		before: `export function Layout() @{
 	const wide = window.innerWidth > 800;
-	return <main class={wide ? 'wide' : 'narrow'}>Content</main>;
+	<main class={wide ? 'wide' : 'narrow'}>Content</main>
 }
 `,
 		after: `import { useSyncExternalStore } from 'octane';
@@ -633,9 +627,9 @@ function getWide() {
 	return window.innerWidth > 800;
 }
 
-export function Layout() {
+export function Layout() @{
 	const wide = useSyncExternalStore(subscribe, getWide, () => false);
-	return <main class={wide ? 'wide' : 'narrow'}>Content</main>;
+	<main class={wide ? 'wide' : 'narrow'}>Content</main>
 }
 `,
 		note: 'The server snapshot is rendered on the server and during hydration, so both agree.',
@@ -646,26 +640,22 @@ export function Layout() {
 		react: "const id = 'field-' + Math.random();",
 		strong: 'const id = useId();',
 		codes: ['OCTANE_STRONG_RENDER_IMPURE_CALL'],
-		before: `export function Field({ label }: { label: string }) {
+		before: `export function Field({ label }: { label: string }) @{
 	const id = 'field-' + Math.random().toString(36).slice(2);
-	return (
-		<label for={id}>
-			{label}
-			<input id={id} />
-		</label>
-	);
+	<label for={id}>
+		{label as string}
+		<input id={id} />
+	</label>
 }
 `,
 		after: `import { useId } from 'octane';
 
-export function Field({ label }: { label: string }) {
+export function Field({ label }: { label: string }) @{
 	const id = useId();
-	return (
-		<label for={id}>
-			{label}
-			<input id={id} />
-		</label>
-	);
+	<label for={id}>
+		{label as string}
+		<input id={id} />
+	</label>
 }
 `,
 		note: '`useId` is stable across renders and matches between server and client.',
@@ -680,18 +670,18 @@ export function Field({ label }: { label: string }) {
 		before: `import { useEffect, useState } from 'octane';
 import { load } from './api';
 
-export function Profile({ id }: { id: string }) {
+export function Profile({ id }: { id: string }) @{
 	const [name, setName] = useState('');
 	useEffect(() => {
 		load(id).then((profile) => setName(profile.name));
 	});
-	return <p>{name}</p>;
+	<p>{name as string}</p>
 }
 `,
 		after: `import { useEffect, useState } from 'octane';
 import { load } from './api';
 
-export function Profile({ id }: { id: string }) {
+export function Profile({ id }: { id: string }) @{
 	const [name, setName] = useState('');
 	useEffect(() => {
 		let ignore = false;
@@ -702,7 +692,7 @@ export function Profile({ id }: { id: string }) {
 			ignore = true;
 		};
 	});
-	return <p>{name}</p>;
+	<p>{name as string}</p>
 }
 `,
 		note: 'Without the flag, a slow response for an old `id` can overwrite a newer one. For data the render needs, `use()` or a query binding avoids the effect entirely.',
@@ -716,18 +706,18 @@ export function Profile({ id }: { id: string }) {
 		before: `import { useEffect, useReducer } from 'octane';
 import { store } from './store';
 
-export function Count() {
+export function Count() @{
 	const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 	useEffect(() => store.subscribe(() => forceUpdate()));
-	return <span>{String(store.get())}</span>;
+	<span>{String(store.get())}</span>
 }
 `,
 		after: `import { useSyncExternalStore } from 'octane';
 import { store } from './store';
 
-export function Count() {
+export function Count() @{
 	const count = useSyncExternalStore(store.subscribe, store.get, store.get);
-	return <span>{String(count)}</span>;
+	<span>{String(count)}</span>
 }
 `,
 		note: '`useSyncExternalStore` re-checks the snapshot after commit, so a change between render and subscription is not lost.',
@@ -740,15 +730,15 @@ export function Count() {
 		codes: ['OCTANE_STRONG_UNTRUSTED_HTML'],
 		before: `import { sanitize } from './sanitize';
 
-export function Article({ html }: { html: string }) {
-	return <article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />;
+export function Article({ html }: { html: string }) @{
+	<article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />
 }
 `,
 		after: `import { trustHTML } from 'octane';
 import { sanitize } from './sanitize';
 
-export function Article({ html }: { html: string }) {
-	return <article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />;
+export function Article({ html }: { html: string }) @{
+	<article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />
 }
 `,
 		note: '`trustHTML` marks the value as trusted; it does not sanitize. Call it only on sanitized or already trusted HTML.',

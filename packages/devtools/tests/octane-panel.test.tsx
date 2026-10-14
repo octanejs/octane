@@ -11,6 +11,34 @@ import { OctaneDevtoolsEventClient } from '../src/client';
 afterEach(() => cleanup());
 
 describe('OctanePanel', () => {
+	it('requests current snapshots after each tab subscribes, even without app updates', async () => {
+		const client = new OctaneDevtoolsEventClient();
+		const off = client.on('refresh', () => {
+			client.emit('tree', {
+				nodes: [{ id: 1, name: 'IdleApp', kind: 'root', children: [] }],
+			});
+			client.emit('transition', {
+				pendingCount: 0,
+				boundaries: [
+					{ id: 2, branch: 1, state: 'resolved', hasResolved: true, label: 'Idle boundary' },
+				],
+			});
+		});
+		try {
+			render(<OctanePanel client={client} />);
+			expect(await screen.findByText('IdleApp')).toBeInTheDocument();
+
+			screen.getByRole('button', { name: /transitions/i }).click();
+			expect(await screen.findByText('Idle boundary')).toBeInTheDocument();
+			expect(screen.getByText('resolved')).toBeInTheDocument();
+
+			screen.getByRole('button', { name: 'Components' }).click();
+			expect(await screen.findByText('IdleApp')).toBeInTheDocument();
+		} finally {
+			off();
+		}
+	});
+
 	it('defaults to the Components tab and switches to Profiler', async () => {
 		const client = new OctaneDevtoolsEventClient();
 		render(<OctanePanel client={client} />);

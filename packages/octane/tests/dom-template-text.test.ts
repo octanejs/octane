@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRT from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
-import { htext } from '../src/runtime.js';
+import { htext, setText } from '../src/runtime.js';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -32,6 +32,20 @@ const nodeTriples = (container: HTMLElement) => {
 };
 
 describe('compiled fragment and text children', () => {
+	it.each(['', 'server'])(
+		'updates an existing %j text child through a host-only compiled call',
+		(initial) => {
+			const host = document.createElement('span');
+			const text = htext(host, initial);
+			// Older compiled modules retain the host instead of its Text node.
+			for (const value of ['updated', '', 'restored']) {
+				setText(null, value, host);
+				expect(host.textContent).toBe(value);
+				expect(host.firstChild).toBe(text);
+			}
+		},
+	);
+
 	it('does not overwrite existing text when no compiler placeholder was seeded', () => {
 		const host = document.createElement('octane-probe');
 		const owned = document.createTextNode('owned:');

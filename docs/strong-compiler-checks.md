@@ -1,9 +1,14 @@
 # Strong compiler checks
 
 Put `"use strong"` before imports, or enable `compiler: { strong: true }` for
-application-owned modules. Dependencies keep their own mode. These checks apply
-to client, server, and editor compilation. Compatibility modules continue to
-support explicit dependencies, manual memo hooks, and ordinary raw HTML props.
+application-owned modules. Dependencies keep their own mode. Strong compiles
+`.tsrx`, `.ts`, and `.js` modules: a `.tsx` or `.jsx` module that either opt-in
+reaches reports `OCTANE_STRONG_TSX_MODULE`, because its JSX lowers to element
+descriptors instead of compiled templates. These checks apply to client, server,
+and editor compilation. Strong allows `useMemo` and
+`useCallback` with manual dependencies while it infers effect dependencies
+and caches eligible declarations. Compatibility modules also support arbitrary
+effect dependency lists and ordinary raw HTML props.
 
 The [Strong mode guide](https://octanejs.dev/docs/strong-mode) covers adoption
 and migration recipes. The diagnostic tables here are generated from
@@ -23,9 +28,8 @@ edit the catalog, not the tables.
 | [`OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC`](https://octanejs.dev/docs/strong-mode#octane-strong-layout-snapshot-async) | A `useLayoutSnapshot` measurement is an `async` or generator function. It returns a new promise or iterator on every commit, so the snapshot never converges. | Return the measurement synchronously, and read asynchronous render data with `use()` or a query binding. |
 | [`OCTANE_STRONG_EFFECT_CHAIN`](https://octanejs.dev/docs/strong-mode#octane-strong-effect-chain) | An effect reads state written by another effect's own execution or promise continuation in the same component. | Derive the value during render, use `useLinkedState`, or combine the external synchronization in one effect. External subscription and timer callbacks remain event-driven updates. |
 | [`OCTANE_STRONG_UNLINKED_PROP_STATE`](https://octanejs.dev/docs/strong-mode#octane-strong-unlinked-prop-state) | An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture. |
-| [`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`](https://octanejs.dev/docs/strong-mode#octane-strong-explicit-dependencies) | An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved. | Omit the dependency argument. |
-| [`OCTANE_STRONG_UNTRACKED_EFFECT`](https://octanejs.dev/docs/strong-mode#octane-strong-untracked-effect) | A built-in dependency hook receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render. | Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref. |
-| [`OCTANE_STRONG_MANUAL_MEMO`](https://octanejs.dev/docs/strong-mode#octane-strong-manual-memo) | A call to Octane's `useMemo` or `useCallback`, including known import aliases. | Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`. |
+| [`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`](https://octanejs.dev/docs/strong-mode#octane-strong-explicit-dependencies) | An effect or imperative handle dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved. | Omit the dependency argument. |
+| [`OCTANE_STRONG_UNTRACKED_EFFECT`](https://octanejs.dev/docs/strong-mode#octane-strong-untracked-effect) | An effect or imperative handle receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render. | Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref. |
 | [`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`](https://octanejs.dev/docs/strong-mode#octane-strong-effect-event-dependency) | A statically known Effect Event is listed in an explicit hook dependency array. | Remove it. Effect Events are non-reactive, so they never belong in dependencies. |
 | [`OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`](https://octanejs.dev/docs/strong-mode#octane-strong-automatic-memo-unsupported) | A module compiled through the `manualSlots` integration option has a declaration Strong compilation would cache. That option cannot allocate the extra hook slots the cache needs. | Compile the module through the normal Octane integration, or keep it in compatibility mode. |
 <!-- strong-diagnostics:effects:end -->
@@ -66,15 +70,15 @@ returned by same-module custom hooks. They do not prove arbitrary imported
 functions or mutable containers. External subscriptions, event-driven updates,
 and effect cleanup remain supported.
 
-```tsx
+```tsrx
 "use strong";
 import { useEffect, useLinkedState } from 'octane';
 import { subscribe } from './connection';
 
-export function Editor({ user }) {
+export function Editor({ user }) @{
   const [name, setName] = useLinkedState(user.id, () => user.name);
   useEffect(() => subscribe(user.id)); // subscribe returns its cleanup
-  return <input value={name} onInput={event => setName(event.currentTarget.value)} />;
+  <input value={name} onInput={event => setName(event.currentTarget.value)} />
 }
 ```
 
@@ -102,12 +106,12 @@ An asynchronous state update is cancelled or ignored when one of these holds:
   component or module, or held in a ref, is shared by every run of the effect
   and does not count.
 
-```tsx
+```tsrx
 "use strong";
 import { useEffect, useState } from 'octane';
 import { api } from './api';
 
-export function Profile({ id }) {
+export function Profile({ id }) @{
   const [profile, setProfile] = useState(null);
   useEffect(() => {
     let ignore = false;
@@ -118,7 +122,7 @@ export function Profile({ id }) {
       ignore = true;
     };
   });
-  return <p>{profile?.name}</p>;
+  <p>{profile?.name as string}</p>
 }
 ```
 
@@ -210,7 +214,7 @@ declaration caching does not cache an inline `subscribe` such as
 every render; define `subscribe` outside the component or pass a stable store
 method.
 
-```tsx
+```tsrx
 "use strong";
 import { useState, useSyncExternalStore } from 'octane';
 import { cart } from './cart';
@@ -220,17 +224,15 @@ function subscribe(notify) {
   return cart.subscribe(notify);
 }
 
-export function Cart({ save }) {
+export function Cart({ save }) @{
   const [saved, setSaved] = useState(0);
   const items = useSyncExternalStore(subscribe, () => cart.items, () => EMPTY);
-  return (
-    <button onClick={async () => {
-      await save(items);
-      setSaved((current) => current + 1);
-    }}>
-      {items.length} items, saved {saved} times
-    </button>
-  );
+  <button onClick={async () => {
+    await save(items);
+    setSaved((current) => current + 1);
+  }}>
+    {items.length + ' items, saved ' + saved + ' times'}
+  </button>
 }
 ```
 
@@ -289,14 +291,17 @@ render code.
 <!-- strong-diagnostics:templates:start (generated by `pnpm strong:diagnostics` from packages/octane/src/compiler/strong-diagnostics.js) -->
 | Diagnostic | What it detects | Replacement |
 | --- | --- | --- |
-| [`OCTANE_STRONG_MAP_JSX`](https://octanejs.dev/docs/strong-mode#octane-strong-map-jsx) | In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases. | Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid. |
+| [`OCTANE_STRONG_MAP_JSX`](https://octanejs.dev/docs/strong-mode#octane-strong-map-jsx) | In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases. | Use `@for` with a stable item key. Data-only mapping remains valid. |
 | [`OCTANE_STRONG_INDEX_KEY`](https://octanejs.dev/docs/strong-mode#octane-strong-index-key) | An `@for` key uses the loop position as its identity, including arithmetic or text derived from the index. | Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid. |
+| [`OCTANE_STRONG_SINGLE_ITEM_FOR`](https://octanejs.dev/docs/strong-mode#octane-strong-single-item-for) | An `@for` iterates a one-item array literal, such as `@for (const item of [value]; key item)`, or a `const` holding one that nothing but `@for` headers reads. A one-row loop is a workaround for a keyed remount or a local binding. | To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid. |
 | [`OCTANE_STRONG_HOOK_LOCALITY`](https://octanejs.dev/docs/strong-mode#octane-strong-hook-locality) | In `.tsrx`, a built-in hook value, or an effect that depends on it, is declared outside the sole nested `@{…}` block that uses it. | Move the hook into that block, before the JSX or local effect that uses its value. Hooks used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime. |
 | [`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`](https://octanejs.dev/docs/strong-mode#octane-strong-event-handler-locality) | In `.tsrx`, a named native event handler is declared outside the sole deeper nested `@{…}` block that contains its direct `onX` use. | Move the handler into that block, before the JSX that uses it, or inline it. |
 | [`OCTANE_STRONG_DIRECTIVE_PLACEMENT`](https://octanejs.dev/docs/strong-mode#octane-strong-directive-placement) | `"use strong"` appears somewhere other than the module's directive prologue, such as inside a function or after an import. It applies to a whole module, so the misplaced directive enables nothing. | Move `"use strong"` to the top of the file, before imports or other code. |
+| [`OCTANE_STRONG_TSX_MODULE`](https://octanejs.dev/docs/strong-mode#octane-strong-tsx-module) | A `.tsx` or `.jsx` module is Strong, through its own `"use strong"` directive or the application's `compiler.strong` setting. Its JSX lowers to element descriptors, which render through the generic descriptor renderer instead of compiled templates. Installed dependencies keep their own mode. | Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts` or `.js`; `root.render(App, props)` renders an entry point without JSX. |
 | [`OCTANE_STRONG_SUPPRESSION_PROP`](https://octanejs.dev/docs/strong-mode#octane-strong-suppression-prop) | A DOM intrinsic uses `suppressHydrationWarning` or `suppressNativeChangeWarning`, including statically visible object spreads. | Fix the mismatch or use the intended native event. Component props with these names are unaffected. |
 | [`OCTANE_NATIVE_TEXT_ONCHANGE`](https://octanejs.dev/docs/strong-mode#octane-native-text-onchange) | A native text `onChange` handler, which fires on blur rather than per edit. The compatibility-mode warning is an error in Strong mode. | Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid. |
 | [`OCTANE_STRONG_COMPAT_IMPORT`](https://octanejs.dev/docs/strong-mode#octane-strong-compat-import) | Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, or `StrictMode` from `octane`. | Use normal Octane scheduling and component semantics. |
+| [`OCTANE_STRONG_ELEMENT_API`](https://octanejs.dev/docs/strong-mode#octane-strong-element-api) | Imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates. | Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid. |
 <!-- strong-diagnostics:templates:end -->
 
 ```tsrx
@@ -309,8 +314,9 @@ export function Rows({ items }) @{
 }
 ```
 
-The `@for` directive is `.tsrx` syntax. Strong `.tsx` modules keep standard JSX
-lists such as `items.map(item => <Row key={item.id} item={item} />)`.
+Strong modules render every list with `@for`, because Strong does not compile
+`.tsx` or `.jsx`. Convert such a module to `.tsrx`, turning
+`items.map(item => <Row key={item.id} item={item} />)` into a keyed `@for` block.
 
 The event check retains the existing DOM ownership and input-type analysis.
 Dynamic spreads and dynamic input types may need the existing development
@@ -346,16 +352,16 @@ a `class` array counts as literal. Portal targets and markup rendered by another
 component are not matched. Nor are dynamic selectors, selectors with combinators,
 or element-scoped queries such as `panel.querySelector()`.
 
-```tsx
+```tsrx
 "use strong";
 import { useEffect, useRef } from 'octane';
 
-export function Search({ open }) {
+export function Search({ open }) @{
   const input = useRef(null);
   useEffect(() => {
     if (open) input.current.focus();
   });
-  return <input ref={input} className={open ? 'search open' : 'search'} />;
+  <input ref={input} className={open ? 'search open' : 'search'} />
 }
 ```
 
@@ -365,14 +371,14 @@ export function Search({ open }) {
 DOM intrinsic's `dangerouslySetInnerHTML`. The `TrustedHTML` type and `trustHTML`
 helper declare an explicit HTML trust boundary:
 
-```tsx
+```tsrx
 "use strong";
 import { trustHTML } from 'octane';
 import { sanitize } from './html-policy';
 
-export function Article({ html }) {
+export function Article({ html }) @{
   const trusted = trustHTML(sanitize(html));
-  return <article dangerouslySetInnerHTML={trusted} />;
+  <article dangerouslySetInnerHTML={trusted} />
 }
 ```
 
@@ -383,11 +389,9 @@ there are no per-node runtime brand checks, extra DOM wrappers, or changes to
 server serialization and hydration.
 
 Strong `.tsrx` editor/type checking automatically selects the nominal Strong
-JSX types, so imported values and props also need the brand. When checking plain
-`.tsx` directly with TypeScript, use `/** @jsxImportSource octane/strong */` or
-set `jsxImportSource` to `octane/strong`. The string directive alone cannot
-change TypeScript's JSX namespace. `null` and `undefined` remain valid empty
-values; custom component props and foreign renderer JSX keep their own types.
+JSX types, so imported values and props also need the brand. `null` and
+`undefined` remain valid empty values; custom component props and foreign
+renderer JSX keep their own types.
 
 The syntax compiler cannot establish the type of an arbitrary imported value or
 dynamic factory prop. Run the project's `tsrx-tsc --noEmit` check as well as its
@@ -437,8 +441,9 @@ Octane compiles every `.tsrx` module, every `.tsx` module whose JSX goes to
 Octane, and every `.ts` or `.js` module with a runtime import from `octane`.
 A `.tsx` module whose leading `@jsxImportSource` pragma, or the tsconfig's
 `jsxImportSource`, names another library, such as React in a React-hosted
-project, is not counted. Whether a counted module is Strong is decided by the
-project's installed compiler, the same way a build decides it. The setting comes
+project, is not counted. A counted `.tsx` module cannot be Strong, so it stays an
+exception until it becomes `.tsrx`. Whether a counted module is Strong is
+decided by the project's installed compiler, the same way a build decides it. The setting comes
 from `compiler.strong` in `octane.config.ts`. A bundler plugin's inline `strong`
 option overrides that at build time and is not visible to `octane analyze`, so
 keep the setting in `octane.config.ts`.
@@ -446,3 +451,26 @@ keep the setting in `octane.config.ts`.
 With file arguments, `octane analyze` reports regressions for those files only
 and does not judge the rest of the baseline. `--strong-baseline` always measures
 the whole project.
+
+### Strong dependencies
+
+`compiler.strong` applies to the application's own modules only. Installed,
+linked, and workspace packages compile in their own mode, so a Strong module can
+render components that Strong never checked.
+
+```bash
+octane analyze --strong-dependencies
+```
+
+The report starts from every Strong module and follows its imports into other
+packages, including through re-exports such as a package's `index.ts` barrel.
+It follows only the re-exports that pass on a name the Strong module imports. It
+lists, by package, each module that defines an imported name, is compiled by
+Octane, and is not Strong. It also lists the modules on those paths that import
+`octane/react`, since a ReactCompat boundary hosts React components that no
+Octane rule reaches. Packages that Octane does not compile are left out. Import
+aliases and virtual modules from a bundler config are not followed.
+
+The report never fails the run, `--strict` included. The plan for letting
+packages declare Strong mode and letting applications require it is in
+[docs/strong-dependencies-plan.md](strong-dependencies-plan.md).

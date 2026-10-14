@@ -5,8 +5,34 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup, fireEvent } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
+import { OnThisPage } from '../src/components/OnThisPage.tsrx';
 
 afterEach(cleanup);
+
+it('discards an earlier section selection when returning through another page', async () => {
+	const originalUrl = window.location.href;
+	const headings = document.createElement('article');
+	headings.innerHTML = '<h2 id="first">First</h2><h2 id="last">Last</h2>';
+	document.body.appendChild(headings);
+	const sections = [
+		{ id: 'first', title: 'First' },
+		{ id: 'last', title: 'Last' },
+	];
+	try {
+		const mounted = render(OnThisPage, { props: { sections, resetKey: 'a' } });
+		const current = () => mounted.container.querySelector('a[aria-current="true"]')?.textContent;
+		await waitFor(() => expect(current()).toBe('Last'));
+		fireEvent.click(mounted.getByRole('link', { name: 'First' }));
+		expect(current()).toBe('First');
+		mounted.rerender({ props: { sections, resetKey: 'b' } });
+		await waitFor(() => expect(current()).toBe('Last'));
+		mounted.rerender({ props: { sections, resetKey: 'a' } });
+		await waitFor(() => expect(current()).toBe('Last'));
+	} finally {
+		headings.remove();
+		window.history.replaceState(null, '', originalUrl);
+	}
+});
 
 describe('client-side navigation', () => {
 	it('home → differences-from-react via the hero Link, without DOM errors', async () => {

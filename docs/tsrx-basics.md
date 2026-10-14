@@ -891,15 +891,15 @@ is allowed to trust without proving every call body. It also checks where hook
 values and event handlers belong in a template.
 Start with one module by putting `"use strong"` before its imports:
 
-```tsx
+```tsrx
 "use strong";
 
 import { useLinkedState } from 'octane';
 
-export function ProfileEditor({ user }) {
+export function ProfileEditor({ user }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
 
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 
@@ -1184,9 +1184,12 @@ Strong mode; ordinary modules keep their existing behavior.
 The checks follow provable synchronous calls through local helpers and
 `useEffectEvent` results. Creating a callback remains valid. Effect Events are
 non-reactive and should be omitted from hook dependencies. Strong uses automatic
-declaration caching and inferred dependencies: manual memo hooks and conflicting
-dependency arrays are errors. Equivalent arrays preserve their behavior and
-produce a redundancy hint.
+declaration caching. Conflicting dependency arrays on effects or imperative
+handles are errors; equivalent arrays preserve their behavior and produce a
+redundancy hint. `useMemo` and `useCallback` let you control dependencies: each
+accepts explicit arrays, omitted or `undefined` dependencies for inference,
+and `null` for every render. Strong render-purity checks still apply to a
+`useMemo` factory or a callback called during render.
 
 The analysis is deliberately bounded. Factories with unknown return values or
 complex control flow remain opaque. Dependency checks follow literal arrays,
@@ -1240,10 +1243,12 @@ for the exact boundary and why changing event captures still invalidates keyed
 rows.
 
 `"use strong"` only affects its own module. Put it at the top of the file, before
-imports or other code; comments and other directives may come first. In files
-that also use an Octane JSX ownership pragma, keep the pragma first:
+imports or other code; comments and other directives may come first. In a `.ts`
+or `.js` file that also uses an Octane JSX ownership pragma, keep the pragma
+first. Strong compiles `.tsrx`, `.ts`, and `.js` only: a `.tsx` or `.jsx` module
+reports `OCTANE_STRONG_TSX_MODULE`.
 
-```tsx
+```ts
 /** @jsxImportSource octane */
 "use strong";
 

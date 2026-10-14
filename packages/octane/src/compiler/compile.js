@@ -3680,7 +3680,10 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 	const init = unwrapTsExpr(expression);
 	// An arrow/function init is auto-callback's job, not ours.
 	if (FN_TYPES.has(init?.type)) return null;
-	if (!isPropCreationExpr(init, ctx)) return null;
+	const literal =
+		ctx.strongLiteralMemo === true &&
+		(init?.type === 'ObjectExpression' || init?.type === 'ArrayExpression');
+	if (!isPropCreationExpr(init, ctx, literal)) return null;
 	// Every call reached during render must satisfy the same projection contract
 	// the region cache uses. Compatibility-mode member calls fail closed.
 	const immutableProjection = immutableArrayProjection(init, immutableStates);
@@ -3707,7 +3710,7 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 			return null;
 		}
 	}
-	return { init, deps, immutableProjection };
+	return { init, deps, immutableProjection, literal };
 }
 
 // The single-name `const` declarator a calculation can replace, or null.
@@ -3740,6 +3743,8 @@ function closeCalculationReads(
 	componentLocals,
 	ctx,
 	immutableStates = null,
+	literalReads = null,
+	renderRoots = [],
 ) {
 	if (renderReadNames.size === 0) return renderReadNames;
 	const declaredAt = new Map();
@@ -3764,6 +3769,24 @@ function closeCalculationReads(
 		if (decl === undefined) continue;
 		const calculation = autoCalculationOf(decl.init, name, componentLocals, ctx, immutableStates);
 		if (calculation === null) continue;
+		// An allocated local can still be mutated or escape during setup.
+		// Cache only literals read directly as eligible props/refs; other reads
+		// (including callback captures and alias creation) keep their JS lifetime.
+		if (calculation.literal) {
+			const allowed = literalReads?.get(name);
+			if (
+				!allowed ||
+				statements.some(
+					(statement) =>
+						statement.declarations?.[0] !== decl &&
+						collectFreeIdentifiers(statement, [], allowed).has(name),
+				) ||
+				collectFreeIdentifiers(renderRoots, [], allowed).has(name)
+			) {
+				forward.push(name);
+				continue;
+			}
+		}
 		const at = declaredAt.get(name);
 		if (calculation.deps.some((dependency) => declaredAt.get(dependency) > at)) {
 			forward.push(name);
@@ -3796,7 +3819,14 @@ function rewriteAutoCalculation(
 		immutableStates,
 	);
 	if (calculation === null) return stmt;
-	const { init, deps, immutableProjection } = calculation;
+	const { init, deps, immutableProjection, literal } = calculation;
+	// An unrelated update may supply a new props bag with the same fields.
+	// Literal identities depend on the inputs they read, not on that bag.
+	const dependencyNodes = literal
+		? collectDepPaths(init, null, moduleBoundCheckForDeps(ctx, init), () =>
+				requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+			)
+		: deps.map((n) => b.id(n));
 	return {
 		...stmt,
 		declarations: [
@@ -3813,7 +3843,7 @@ function rewriteAutoCalculation(
 								: { _octaneImmutableArrayFilter: immutableProjection }),
 						},
 						b.arrow([], init),
-						b.array(deps.map((n) => b.id(n))),
+						b.array(dependencyNodes),
 					),
 					init,
 				),
@@ -3856,38 +3886,44 @@ const CALCULATION_VALUE_PROOFS = [
  * a pure projection from template evaluation to the end of setup is
  * unobservable. Positions whose evaluation is conditional or deferred keep
  * their expression: directive arms, component children (the child decides
- * whether and when they render), and built-in boundaries. An expression holding
- * JSX keeps its list and descriptor lowering, and event handlers, refs, and
- * keys keep their wiring. A render tree that writes to anything keeps its whole
+ * whether and when they render), and built-in boundaries. Already-evaluated
+ * named literals can still be read at eligible props inside component children;
+ * only their identifier reads are collected there. An expression holding
+ * JSX keeps its list and descriptor lowering, and event handlers and keys keep
+ * their wiring. Ref arrays use the same identity proof as props. A render tree that writes to anything keeps its whole
  * evaluation order.
  *
  * Returns null when nothing moves; otherwise the copy-on-write render nodes,
  * the declarations to append, and their names.
  */
-function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
-	if (ctx.strongMemo !== true || ctx.nativeReads || !ctx.currentComponentLocals) return null;
+function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsOnly = false) {
+	if ((!ctx.strongMemo && !ctx.strongLiteralMemo) || ctx.nativeReads || !ctx.currentComponentLocals)
+		return null;
 	if (renderTreeWrites(jsxNodes)) return null;
 	const declarations = [];
 	const names = [];
-	const nodes = mapNodes(jsxNodes, visitNode);
-	return declarations.length === 0 ? null : { jsxNodes: nodes, declarations, names };
+	const literalReads = new Map();
+	const nodes = mapNodes(jsxNodes, (node) => visitNode(node, false));
+	return declarations.length === 0 && literalReads.size === 0
+		? null
+		: { jsxNodes: nodes, declarations, names, literalReads };
 
-	function visitNode(node) {
+	function visitNode(node, deferred) {
 		switch (node?.type) {
 			case 'JSXElement':
-				return visitElement(node);
+				return visitElement(node, deferred);
 			case 'JSXFragment': {
-				const children = mapNodes(node.children, visitNode);
+				const children = mapNodes(node.children, (child) => visitNode(child, deferred));
 				return children === node.children ? node : { ...node, children };
 			}
 			case 'JSXExpressionContainer':
-				return visitContainer(node);
+				return deferred ? node : visitContainer(node);
 			default:
 				return node;
 		}
 	}
 
-	function visitElement(node) {
+	function visitElement(node, deferred) {
 		const opening = node.openingElement;
 		const tag = opening?.name;
 		const component = isComponentTag(node);
@@ -3908,7 +3944,10 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 				return attribute;
 			}
 			const name = attribute.name.name;
-			if (name === 'key' || name === 'ref' || name === 'children') return attribute;
+			if (name === 'key' || name === 'children') return attribute;
+			const inner = unwrapTsExpr(attribute.value?.expression);
+			if (name === 'ref' && inner?.type !== 'ArrayExpression' && inner?.type !== 'Identifier')
+				return attribute;
 			// The host handoff prepares unbound fields through the ordinary renderer.
 			// Hoisting one outside that preparation makes its writer ineligible.
 			if (
@@ -3919,11 +3958,12 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 				return attribute;
 			if (!component && /^on[A-Z]/.test(name)) return attribute;
 			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
-			const value = visitContainer(attribute.value);
+			const value = visitContainer(attribute.value, true, deferred);
 			return value === attribute.value ? attribute : { ...attribute, value };
 		});
-		// Component children render inside the child, if at all.
-		const children = component ? node.children : mapNodes(node.children, visitNode);
+		// Component children own evaluation. Discover named reads without moving
+		// any expression from those children into the parent's render.
+		const children = mapNodes(node.children, (child) => visitNode(child, deferred || component));
 		if (attributes === opening.attributes && children === node.children) return node;
 		return {
 			...node,
@@ -3932,11 +3972,28 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 		};
 	}
 
-	function visitContainer(container) {
+	function visitContainer(container, prop = false, deferred = false) {
 		const expression = container.expression;
 		const inner = unwrapTsExpr(expression);
 		if (!inner || inner.type === 'JSXEmptyExpression' || containsJsxNode(inner)) return container;
-		if (autoCalculationOf(inner, null, ctx.currentComponentLocals, ctx, immutableStates) === null) {
+		if (prop && inner.type === 'Identifier') {
+			let nodes = literalReads.get(inner.name);
+			if (!nodes) literalReads.set(inner.name, (nodes = new Set()));
+			nodes.add(inner);
+		}
+		if (deferred) return container;
+		const calculation = autoCalculationOf(
+			inner,
+			null,
+			ctx.currentComponentLocals,
+			ctx,
+			immutableStates,
+		);
+		if (
+			calculation === null ||
+			((literalsOnly || !ctx.strongMemo) && !calculation.literal) ||
+			(calculation.literal && !prop)
+		) {
 			return container;
 		}
 		const name = allocCompilerName(ctx, '__calc');
@@ -3945,6 +4002,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 		// A child warm plan runs outside this body, so it keeps the authored prop.
 		(ctx.hoistedRenderCalculations ??= new Map()).set(name, expression);
 		const reference = b.id(name, inner);
+		if (prop) literalReads.set(name, new Set([reference]));
 		for (const proof of CALCULATION_VALUE_PROOFS) {
 			if (inner.metadata?.[proof] === true) reference.metadata[proof] = true;
 		}
@@ -3971,9 +4029,10 @@ function establishesRenderScope(statement) {
 // `return <jsx>` reached after the render-scope proof above gets the same
 // calculations, declared immediately before it. Returns null when nothing moves.
 function hoistStrongReturnCalculations(statements, ctx) {
-	if (ctx.strongMemo !== true || ctx.nativeReads) return null;
+	if ((!ctx.strongMemo && !ctx.strongLiteralMemo) || ctx.nativeReads) return null;
 	let out = null;
 	const names = [];
+	const literalReads = new Map();
 	let established = false;
 	for (let index = 0; index < statements.length; index++) {
 		const statement = statements[index];
@@ -3983,13 +4042,18 @@ function hoistStrongReturnCalculations(statements, ctx) {
 				out ??= statements.slice(0, index);
 				out.push(...hoisted.declarations, { ...statement, argument: hoisted.jsxNodes[0] });
 				names.push(...hoisted.names);
+				for (const [name, reads] of hoisted.literalReads) {
+					let nodes = literalReads.get(name);
+					if (!nodes) literalReads.set(name, (nodes = new Set()));
+					for (const read of reads) nodes.add(read);
+				}
 				continue;
 			}
 		}
 		out?.push(statement);
 		established ||= establishesRenderScope(statement);
 	}
-	return out === null ? null : { statements: out, names };
+	return out === null ? null : { statements: out, names, literalReads };
 }
 
 function mapNodes(nodes, map) {
@@ -4942,7 +5006,9 @@ const CALLBACK_IDENTITY_OWNING_HOOKS = new Set(
 );
 
 function hookOwnsCallbackIdentity(call) {
-	const name = hookShapedCalleeName(call);
+	// After dependency inference, use the resolved hook even when an import
+	// alias looks like a custom hook. Earlier passes still use the spelling.
+	const name = stableHookCallName(call) ?? hookShapedCalleeName(call);
 	return name !== null && CALLBACK_IDENTITY_OWNING_HOOKS.has(name);
 }
 
@@ -11735,6 +11801,14 @@ function compileInternal(
 		splitModuleFunctions,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
+		// Ref and effect lifetimes must not churn on an unrelated dev/HMR render.
+		// Only proven literal props use these caches; region/call caching stays prod-only.
+		strongLiteralMemo:
+			strongModeEnabled &&
+			options?.autoMemo !== false &&
+			mode === 'client' &&
+			options?.__universal == null &&
+			options?.nativeReads !== true,
 		nativeReads: options?.nativeReads === true,
 		opaqueSignalHandles:
 			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
@@ -17851,9 +17925,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	let warmThunk = null;
 	let staticChildOnly = false;
 	let hoistedCalculations = null;
-	if (options && options.autoCallback) {
-		const creations = [];
-		const warmChildren = [];
+	const componentBody = options?.autoCallback === true;
+	const literalsOnly = !componentBody && options?.memoizeRenderLiterals === true;
+	const creations = [];
+	const warmChildren = [];
+	if (componentBody) {
 		// Pass A′ first: use()-fed const chains memoize at their declarations,
 		// so Pass A then sees their trivial identifier arguments as already
 		// stable and the warm plan includes the chain heads. Param names feed
@@ -17869,60 +17945,75 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			creations,
 			puParamNames,
 		);
-		// Auto-calculation runs AFTER Pass A′ so use()-fed chains keep their
-		// Symbol-slot treatment (their rewritten inits are hook-shaped and are
-		// skipped here), and BEFORE Pass A/B so the numeric-slot useMemo it mints is
-		// lowered by the authored inline tier rather than re-wrapped. Client only:
-		// a server render evaluates each body once, so a cache is pure overhead.
-		if (ctx.currentComponentLocals && ctx.mode !== 'server') {
-			// Strong inline render expressions become calculations too (#1610). A
-			// returned-output body lowers its JSX into a record whose holes may be
-			// evaluated later, so it keeps them inline.
-			const hoisted = returnedOutput
-				? null
-				: hoistStrongRenderCalculations(jsxNodes, ctx, immutableStateProvenance);
-			if (hoisted !== null) {
-				jsxNodes = hoisted.jsxNodes;
-				hoistedCalculations = hoisted.declarations;
-				workingStatements = [...workingStatements, ...hoistedCalculations];
-				ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
-			}
-			const renderReadNames = closeCalculationReads(
-				workingStatements,
-				collectRenderReadNames(jsxNodes, ctx),
-				ctx.currentComponentLocals,
-				ctx,
-				immutableStateProvenance,
-			);
-			if (renderReadNames.size > 0) {
-				workingStatements = workingStatements.map((statement) => {
-					const rewritten = rewriteAutoCalculation(
-						statement,
-						ctx.currentComponentLocals,
-						renderReadNames,
-						ctx,
-						immutableStateProvenance,
-					);
-					if (
-						rewritten !== statement &&
-						rewritten.declarations[0].init.callee._octaneImmutableArrayFilter !== undefined
-					) {
-						hasImmutableArrayProjection = true;
-					}
-					if (ctx.autoMemo && rewritten !== statement) {
-						(autoCalculatedDeclarations ??= new Map()).set(
-							statement.declarations[0].id.name,
-							statement,
-						);
-					}
-					return rewritten;
-				});
-				if (ctx.nativeReads)
-					workingStatements = workingStatements.flatMap(
-						(statement) => lowerNativeAutoCalculation(statement, ctx, name) ?? [statement],
-					);
-			}
+	}
+	// Auto-calculation runs AFTER Pass A′ so use()-fed chains keep their
+	// Symbol-slot treatment (their rewritten inits are hook-shaped and are
+	// skipped here), and BEFORE Pass A/B so the numeric-slot useMemo it mints is
+	// lowered by the authored inline tier rather than re-wrapped. Client only:
+	// a server render evaluates each body once, so a cache is pure overhead.
+	if (
+		(componentBody || (literalsOnly && ctx.strongLiteralMemo)) &&
+		ctx.currentComponentLocals &&
+		ctx.mode !== 'server'
+	) {
+		// Strong inline render expressions become calculations too (#1610). A
+		// returned-output body lowers its JSX into a record whose holes may be
+		// evaluated later, so it keeps them inline.
+		const hoisted = returnedOutput
+			? null
+			: hoistStrongRenderCalculations(jsxNodes, ctx, immutableStateProvenance, literalsOnly);
+		if (hoisted !== null) {
+			jsxNodes = hoisted.jsxNodes;
+			hoistedCalculations = hoisted.declarations;
+			workingStatements = [...workingStatements, ...hoistedCalculations];
+			ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
 		}
+		const renderReadNames = closeCalculationReads(
+			workingStatements,
+			collectRenderReadNames(jsxNodes, ctx),
+			ctx.currentComponentLocals,
+			ctx,
+			immutableStateProvenance,
+			hoisted?.literalReads,
+			jsxNodes,
+		);
+		if (renderReadNames.size > 0) {
+			workingStatements = workingStatements.map((statement) => {
+				// A construct helper inherits only the literal cache. Ordinary
+				// calculations and callback stability still require component ownership.
+				if (literalsOnly) {
+					const init = unwrapTsExpr(calculationDeclarator(statement)?.init);
+					if (init?.type !== 'ObjectExpression' && init?.type !== 'ArrayExpression')
+						return statement;
+				}
+				const rewritten = rewriteAutoCalculation(
+					statement,
+					ctx.currentComponentLocals,
+					renderReadNames,
+					ctx,
+					immutableStateProvenance,
+				);
+				if (
+					rewritten !== statement &&
+					rewritten.declarations[0].init.callee._octaneImmutableArrayFilter !== undefined
+				) {
+					hasImmutableArrayProjection = true;
+				}
+				if (ctx.autoMemo && rewritten !== statement) {
+					(autoCalculatedDeclarations ??= new Map()).set(
+						statement.declarations[0].id.name,
+						statement,
+					);
+				}
+				return rewritten;
+			});
+			if (ctx.nativeReads)
+				workingStatements = workingStatements.flatMap(
+					(statement) => lowerNativeAutoCalculation(statement, ctx, name) ?? [statement],
+				);
+		}
+	}
+	if (componentBody) {
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -19273,8 +19364,8 @@ function isTrivialUseArg(n) {
 // the lowering passes) and hook-shaped calls (`use` / `use[A-Z]…` / a tracked
 // `use` import alias — their slot/occurrence bookkeeping must execute on the
 // body proper every pass, so they can never sit behind a cache hit).
-function isPropCreationExpr(expr, ctx) {
-	let found = false;
+function isPropCreationExpr(expr, ctx, includesLiteral = false) {
+	let found = includesLiteral;
 	let blocked = false;
 	walk(expr);
 	return found && !blocked;
@@ -19308,7 +19399,21 @@ function isPropCreationExpr(expr, ctx) {
 				blocked = true;
 				return;
 			}
-			if (FN_TYPES.has(n.type)) return; // does not run during render
+			if (FN_TYPES.has(n.type)) {
+				// A regular function can mutate a containing literal via its receiver,
+				// or retain per-render state on its own function object. Reuse the
+				// callback movement proof before stabilizing either kind of identity.
+				if (
+					includesLiteral &&
+					n.type !== 'ArrowFunctionExpression' &&
+					(!isMovableHookCallback(n) ||
+						hasInlineMemoDirectEval(n) ||
+						(n.id && collectFreeIdentifiers({ ...n, id: null }, []).has(n.id.name)))
+				) {
+					blocked = true;
+				}
+				return; // does not run during render
+			}
 			// Same render-time-call inventory as containsRenderCall: plain and
 			// optional calls, constructions, tagged templates, and dynamic
 			// import() (ESTree flavor; the Babel flavor is a CallExpression).
@@ -21976,6 +22081,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 			collectRenderReadNames(renderedRoots, ctx),
 			ctx.currentComponentLocals,
 			ctx,
+			null,
+			hoisted?.literalReads,
+			renderedRoots,
 		);
 		let autoCalculatedDeclarations = null;
 		let renderScopeEstablished = false;
@@ -27818,9 +27926,7 @@ function inlineRenderableValueDeclarations(valueExpr) {
 	];
 }
 
-// `host` is given for an only-child hole: setText restores its Text there when a
-// page translator took it out (see the runtime's resetOnlyChildHost).
-function emitInlineRenderableUpdate(previous, cachedNode, slowCall, host = null) {
+function emitInlineRenderableUpdate(previous, cachedNode, slowCall) {
 	const V = () => b.id('_v');
 	return b.if(
 		b.logical('||', b.id('_o'), b.binary('!==', previous(), V())),
@@ -27839,7 +27945,6 @@ function emitInlineRenderableUpdate(previous, cachedNode, slowCall, host = null)
 						// Bare renderable booleans are empty; explicit text bindings
 						// retain their ordinary coercion through setText.
 						b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V()),
-						...(host === null ? [] : [host()]),
 					),
 				),
 				b.stmt(b.assignment('=', cachedNode(), slowCall)),
@@ -28858,8 +28963,7 @@ function planJsx(
 		for (const binding of elementBindings) {
 			const key = binding.id;
 			const text = binding.kind === 'textOnlyChild' || binding.kind === 'text';
-			const host =
-				text && !binding.signalDirect && bag.has(`_txt$${key}`) ? `_txt$${key}` : `_el$${key}`;
+			const host = text && !binding.signalDirect ? `_txt$${key}` : `_el$${key}`;
 			if (text && binding.signalDirect)
 				fields.push(bag.letter(`_sig$${key}`), bag.letter(host), '#text-token');
 			if (binding.kind === 'nativeStyle') {
@@ -29641,7 +29745,6 @@ function planJsx(
 									V(),
 									b.id('_t'),
 								),
-								hostExpr,
 							)
 						: b.block([
 								b.stmt(
@@ -30205,10 +30308,6 @@ function makeBag() {
 			}
 			return true;
 		},
-		/** Whether a field for `key` was registered. */
-		has: (key) => byKey.has(key),
-		/** Whether a DOM-host field already holds `host`. */
-		hasHost: (host) => byHost.has(host),
 		/** Seed `key` with a constant expression (no local, no mount write). */
 		constField: (key, expr) => {
 			reg(key, expr);
@@ -30520,15 +30619,6 @@ function directSignalAttributeWriter(bind) {
 		: b.id(`_$${attrBindingHelper(bind)}`);
 }
 
-// A seeded native host's only child is the binding's Text. When no other binding
-// already keeps that host in the bag, keeping the host in place of the Text costs
-// no field: an update passes setText the host and no node, and setText writes the
-// host's first child. Otherwise the Text stays cached and setText receives the
-// shared host, or the excluded host whose Text may follow children it does not own.
-function onlyTextKeepsHost(bind, elVar, bag) {
-	return bind.kind === 'textOnlyChild' && bind.seededText && !bind.mountOnly && !bag.hasHost(elVar);
-}
-
 function emitBindingMount(bind, elVar, bag) {
 	const knownExpression = resolveKnownAttributeSource(bind.expr, (source) =>
 		b.id(bag.local(`_prev$${source.binding.id}`)),
@@ -30667,22 +30757,8 @@ function emitBindingMount(bind, elVar, bag) {
 			// Hydration adopts the server text in either case. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
 			// hydration mismatch re-render).
-			//
-			// Updates also need the host, to replace what a page translator put in place
-			// of the Text (see the runtime's setText). See onlyTextKeepsHost.
-			if (onlyTextKeepsHost(bind, elVar, bag)) {
-				return st(
-					b.block([
-						...mountHost(),
-						b.const('_v', bind.expr),
-						b.stmt(b.call('_$htext', el(), V(), b.literal(1))),
-						b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
-					]),
-				);
-			}
 			return st(
 				b.block([
-					...(bind.mountOnly ? [] : mountHost()),
 					b.const('_v', bind.expr),
 					b.stmt(
 						b.assignment(
@@ -31069,7 +31145,7 @@ function emitBindingMount(bind, elVar, bag) {
 // each changed one through the ordinary setter, then publishes it:
 //
 //   function _c$7(_b) { const _n = _b.next; let _v; _b.$ &= 255;
-//     if ((_v = _n[3]) !== _b) { _$setText(null, _v, _b.f); _b.g = _v; } … }
+//     if ((_v = _n[3]) !== _b) { _$setText(_b.f, _v); _b.g = _v; } … }
 //
 // Handler slots and bundles are written in place unless the runtime passes
 // `careful` (`_f`: an open journal or a dispatch in flight). The bag factory
@@ -31271,14 +31347,7 @@ function registerHoleCommit(ctx, cc, bag, commit, origin) {
 						b.assignment(
 							'=',
 							chv(),
-							b.call(
-								'_$commitHole',
-								b.id('_b'),
-								nextAt(cell + 1),
-								chv(),
-								V(),
-								...(cc.onlyChildText ? [bagFieldNode(bag, `_compHost$${cc.id}`)] : []),
-							),
+							b.call('_$commitHole', b.id('_b'), nextAt(cell + 1), chv(), V()),
 						),
 					),
 					b.stmt(b.assignment('=', chp(), V())),
@@ -31449,19 +31518,7 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 	switch (bind.kind) {
 		case 'text':
 		case 'textOnlyChild':
-			writeCell(
-				cell,
-				() =>
-					bag.has(`_txt$${bind.id}`)
-						? b.call(
-								'_$setText',
-								F('_txt'),
-								V(),
-								...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
-							)
-						: b.call('_$setText', b.literal(null), V(), F('_el')),
-				prev,
-			);
+			writeCell(cell, () => b.call('_$setText', F('_txt'), V()), prev);
 			return recordValue(cell, bind.expr, prev);
 		case 'class': {
 			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
@@ -31744,23 +31801,15 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 		}
 		case 'textOnlyChild':
 		case 'text': {
-			// Only an only-child Text has a host whose whole content it owns. A
-			// sibling-position Text keeps React's HostText write, which a translated
-			// node does not receive either.
-			const write = bag.has(`_txt$${bind.id}`)
-				? b.call(
-						'_$setRenderText',
-						F('_txt'),
-						V(),
-						...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
-					)
-				: b.call('_$setRenderText', b.literal(null), V(), F('_el'));
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
 					b.if(
 						b.binary('!==', F('_prev'), V()),
-						b.block([b.stmt(write), b.stmt(b.assignment('=', F('_prev'), V()))]),
+						b.block([
+							b.stmt(b.call('_$setRenderText', F('_txt'), V())),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
 						null,
 					),
 				]),
@@ -34373,6 +34422,9 @@ function hoistBodyHelper(
 		if (!free.has('arguments') && !free.has('eval')) inheritedEnvNames = envNames;
 	}
 	const helperOptions = {
+		// Only construct blocks provide an entered render scope. Component
+		// children have envNames === null and may be evaluated by their caller.
+		memoizeRenderLiterals: envNames !== null && !mappedItem,
 		keyedSelection,
 		inlineBindingGuards,
 		mappedItem,
@@ -34707,6 +34759,30 @@ function isDirectActivityLongForm(node, ctx = null) {
 			(attrs[0].type === 'Attribute' || attrs[0].type === 'JSXAttribute') &&
 			(attrs[0].name?.name || attrs[0].name) === 'mode')
 	);
+}
+
+// These builtins reject all returned renderables themselves, in every compiler
+// mode. Only an actual package import grants that contract; a shadow does not.
+function isCheckedCompiledBoundary(node, ctx) {
+	const tag = node.openingElement?.name || node.id;
+	let local;
+	let imported;
+	if (tag?.type === 'JSXIdentifier' || tag?.type === 'Identifier') {
+		local = tag;
+		imported = ctx.octaneImportLocals?.get(tag.name);
+	} else if (
+		(tag?.type === 'JSXMemberExpression' || tag?.type === 'MemberExpression') &&
+		tag.computed !== true &&
+		(tag.object.type === 'JSXIdentifier' || tag.object.type === 'Identifier') &&
+		ctx.octaneImportNamespaces?.has(tag.object.name)
+	) {
+		local = tag.object;
+		imported = tag.property.name;
+	}
+	if (imported !== 'CompiledOutlet' && imported !== 'CompiledContext') return false;
+	if (ctx.currentComponentLocals?.has(local.name)) return false;
+	const binding = activityReferenceBinding(local, node, ctx);
+	return binding?.importSource?.value === 'octane';
 }
 
 // ===========================================================================
@@ -35378,8 +35454,9 @@ function makeCompCall(
 	// A same-module compiled callee whose JavaScript return is provably void can
 	// use a Block that omits generic return-value reconciliation. HMR deliberately
 	// keeps the generic path: an update can replace the implementation with a
-	// value-returning body while retaining the wrapper identity.
-	let voidComponent = false;
+	// value-returning body while retaining the wrapper identity. Checked package
+	// boundaries enforce void output at runtime, so their slot is safe in HMR too.
+	let voidComponent = isCheckedCompiledBoundary(node, ctx);
 	// singleRoot: a NON-lite (hooks/`use`) same-module component whose body output
 	// is one plain element. Its componentSlot self-delimits via that element on
 	// client mount — no `comp`/`/comp` markers. (Lite components are already

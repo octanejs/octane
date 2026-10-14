@@ -4747,18 +4747,18 @@ function assertRehomed(scope: any, frag: DocumentFragment): void {
 		scope.__kind === 'portalSlotSlot'
 	) {
 		if (scope.domParent === frag || scope.host === frag)
-			throw new Error(formatClientError(346, 'a slot'));
+			throw new Error(formatClientError(349, 'a slot'));
 		return;
 	}
-	if (scope.block.parentNode === frag) throw new Error(formatClientError(346, 'a Block'));
+	if (scope.block.parentNode === frag) throw new Error(formatClientError(349, 'a Block'));
 	const bag = scope.slots[0];
 	if (bag != null && bag[BINDING_BAG_ARITY] !== undefined)
 		for (const key in bag)
-			if (bag[key] === frag) throw new Error(formatClientError(346, 'a binding bag'));
+			if (bag[key] === frag) throw new Error(formatClientError(349, 'a binding bag'));
 	const slots: any[] | null = scope._slots;
 	if (slots !== null)
 		for (let i = 0; i < slots.length; i++)
-			if (slots[i].domParent === frag) throw new Error(formatClientError(346, 'a try slot'));
+			if (slots[i].domParent === frag) throw new Error(formatClientError(349, 'a try slot'));
 	if (scope.block.disposed !== true)
 		forEachSubtreeChild(scope, (child) => assertRehomed(child, frag));
 }
@@ -4781,17 +4781,10 @@ function placeHydratedText([parent, node, before, replaces]: [
 	Node | null,
 	boolean,
 ]): void {
-	PENDING_HOST_TEXTS?.delete(parent);
 	if (before !== null && before.parentNode !== parent) return;
 	parent.insertBefore(node, before);
 	if (replaces) parent.removeChild(before!);
 }
-
-/**
- * Hosts the server left empty whose only-child text binding has a Text that
- * lands at commit (htext). Until then that binding finds its Text here.
- */
-let PENDING_HOST_TEXTS: WeakMap<Node, Text> | null = null;
 
 /** Queue outgoing content no slot record owns: one `out` entry of its own. */
 function queueRootDeletion(owner: unknown, first: Node | null, last: Node | null): void {
@@ -15632,6 +15625,44 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 	return initializeContext(ctx, defaultValue);
 }
 
+/**
+ * A context identity for compiled children. Read it with use() or useContext(),
+ * and provide it with <CompiledContext context={context} value={value}>.
+ */
+export function createCompiledContext<T>(defaultValue: T): Context<T> {
+	const ctx = function CompiledProvider(_props, _scope): void {
+		throw new TypeError(formatClientError(344));
+	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+/** The children of this provider must be authored between its template tags. */
+export function CompiledContext<T>(
+	props: { context: Context<T>; value: T; children?: unknown },
+	scope: Scope,
+): void {
+	provideContext(scope, props.context, props.value);
+	const children = props.children;
+	if (children == null) return;
+	if (!isChildrenBlock(children)) {
+		throw new TypeError(formatClientError(345));
+	}
+	const dialect = (children as any)[CHILDREN_BODY] ?? children;
+	const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+	if (previous !== dialect) {
+		if (previous !== undefined) {
+			invalidateSharedBodyOutput(scope);
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				const hooks = scope.hooks!;
+				journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
+			}
+		}
+		ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+	}
+	const output = renderSharedBody(children as ComponentBody, undefined, scope, undefined);
+	if (output != null) throw new TypeError(formatClientError(345));
+}
+
 function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	CONTEXT_CHILD = useContextInternal;
 	ctx.$$kind = CONTEXT_TAG;
@@ -20757,7 +20788,7 @@ class HydrationCapability {
 	clientRender(state: TrySlot, errored: boolean | null): void {
 		if (!clientRenderDehydratedTry(state, this) && errored !== null)
 			noteRecoverableHydrationError(
-				() => new Error(errored ? formatClientError(344) : formatClientError(341)),
+				() => new Error(errored ? formatClientError(347) : formatClientError(341)),
 				state.parentBlock,
 			);
 	}
@@ -21789,7 +21820,6 @@ class HydrationCapability {
 		}
 		if (first !== null) this.unclaimedText(el, first, text, loc);
 		const created = this.newText(el, text, loc);
-		(PENDING_HOST_TEXTS ??= new WeakMap()).set(el, created);
 		atCommit(placeHydratedText, [el, created, null, false]);
 		return created;
 	}
@@ -23779,27 +23809,9 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// Do not read nodeValue here: the binding paths already chose this write, and
 	// a DOM text getter can materialize an extra string on every update.
 	//
-	// An only-child text binding passes its host, so a Text that a page translator
-	// took out of it is put back (see resetOnlyChildHost). One parent read, with
-	// no string, confirms a cached Text. A binding that keeps only its host passes
-	// no node: htext seeded the Text as the host's first child, and a first child
-	// that is not a Text means a translator replaced it.
-	if (host !== undefined) {
-		if (node === null) {
-			node = host.firstChild as Text | null;
-			// The Text hydration made for a host the server left empty lands at commit.
-			if (hydrationStarted && node === null) node = PENDING_HOST_TEXTS?.get(host) ?? null;
-			if (node === null || node.nodeType !== 3) {
-				node = document.createTextNode('');
-				resetOnlyChildHost(host, node);
-			}
-		} else if (
-			node.parentNode !== host &&
-			!(hydrationStarted && PENDING_HOST_TEXTS?.get(host) === node)
-		)
-			resetOnlyChildHost(host, node);
-	}
-	const target = node as Text;
+	// Older compiled modules retain only the host. htext creates its Text child
+	// even for an empty value; preserve that calling convention on intact DOM.
+	const target = node ?? (host!.firstChild as Text);
 	// A hydrating render writes no adopted DOM (HydrationCapability.writeText).
 	if (hydrating && currentHydration?.writeText(target, coerceText(value)) === true) return;
 	//
@@ -23817,55 +23829,31 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 }
 
 /**
- * An only-child text binding's Text has left its host: a page translator took
- * it out (Chrome's swaps it for nested `<font>` wrappers holding the
- * translation), so a write to it would never be seen. React's setTextContent
- * replaces such a host's content on the next update. Do the same, putting the
- * binding's own Text back when it still has one, so every cache holding that
- * node stays valid.
- */
-function resetOnlyChildHost(host: Node, node: Text | null): void {
-	const view = host;
-	view.textContent = '';
-	if (node !== null) view.appendChild(node);
-}
-
-/**
  * A render's new text for a Text node the DOM shows (#2043). A root render that
  * may be dropped queues the write for its commit, as bagDone queues a template's
  * commit function; a Block that render discards whole, and a render nothing can
  * drop, write at once. Once a transaction queued a write to `node`, the DOM no
  * longer shows what render last asked for, so every later change queues too and
- * commit applies them in order. An only-child Text passes its host, so a Text a
- * page translator took out is put back (resetOnlyChildHost).
+ * commit applies them in order.
  */
-function renderText(block: Block, node: Text, str: string, host?: Node): void {
+function renderText(block: Block, node: Text, str: string): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(block);
 	if (transaction === null) {
-		if (host !== undefined && node.parentNode !== host) resetOnlyChildHost(host, node);
 		updateTextValue(node, str);
 		return;
 	}
 	const queued = transaction.texts;
 	if (queued === null || !queued.has(node)) {
 		// A hidden Text keeps its value aside (hiddenTextWriter), so the DOM shows ''.
-		if (
-			hiddenTextWriter === null &&
-			node.nodeValue === str &&
-			(host === undefined || node.parentNode === host)
-		)
-			return;
+		if (hiddenTextWriter === null && node.nodeValue === str) return;
 		(transaction.texts ??= new Set()).add(node);
 	}
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	transaction.ops.push(commitText, [node, str, host]);
+	transaction.ops.push(commitText, [node, str]);
 }
 
-function commitText(write: [Text, string, Node | undefined]): void {
-	const node = write[0];
-	const host = write[2];
-	if (host !== undefined && node.parentNode !== host) resetOnlyChildHost(host, node);
-	updateTextValue(node, write[1]);
+function commitText(write: [Text, string]): void {
+	updateTextValue(write[0], write[1]);
 }
 
 /**
@@ -23874,16 +23862,16 @@ function commitText(write: [Text, string, Node | undefined]): void {
  * compares nothing, and a bag the caller publishes next is snapshotted first,
  * as journalText does. Commit functions call setText itself.
  */
-export function setRenderText(node: Text | null, value: any, host?: Node): void {
+export function setRenderText(node: Text, value: any): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
-	if (transaction === null) return setText(node, value, host);
+	if (transaction === null) return setText(node, value);
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
 	if (TRANSITION_JOURNAL !== null) journalBag();
-	transaction.ops.push(commitSetText, [node, value, host]);
+	transaction.ops.push(commitSetText, [node, value]);
 }
 
-function commitSetText(write: [Text | null, unknown, Node | undefined]): void {
-	setText(write[0], write[1], write[2]);
+function commitSetText(write: [Text, unknown]): void {
+	setText(write[0], write[1]);
 }
 
 /**
@@ -33496,6 +33484,40 @@ export function componentSlotVoid(
 	);
 }
 
+function rejectCompiledReturn(_block: Block, _out: unknown, reset?: true): void {
+	if (reset !== true) {
+		throw new TypeError(formatClientError(346));
+	}
+}
+
+/**
+ * Render a dynamically selected compiled component under the current owner.
+ * Use an ordinary dynamic JSX tag when the body can return a renderable.
+ */
+export type CompiledComponent<P = Record<string, never>> = (props: P) => unknown;
+
+export function CompiledOutlet<P>(
+	props: { component: CompiledComponent<P>; props: P },
+	scope: Scope,
+): void {
+	const comp = props.component as ComponentBody<P>;
+	if (typeof comp !== 'function') {
+		throw new TypeError(formatClientError(346));
+	}
+	const block = scope.block;
+	componentSlotImpl(
+		rejectCompiledReturn,
+		scope,
+		0,
+		block.parentNode,
+		comp,
+		comp,
+		props.props,
+		props.props,
+		block.endMarker,
+	);
+}
+
 /**
  * Mount/update a component invoked from JSX. Each invocation creates a Block
  * (so hooks/effects are scoped properly). If the component identity changes
@@ -37427,17 +37449,9 @@ export function bindSignalChild(
 		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
 			? (previous as DirectSignalChildBinding)
 			: null;
-	let cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
-	if (cachedText === null && textToken) {
-		const first = getFirstChild(domParent);
-		// A page translator can replace the token's Text with its own nodes (see
-		// resetOnlyChildHost); clear them so the hole writes a fresh Text, at the
-		// commit of a render that may be dropped.
-		if (first !== null && first.nodeType === 3) cachedText = first as Text;
-		else if (ROOT_RENDER_TRANSACTION !== null && pendingWrites(parentScope.block) !== null)
-			queueRootDeletion(() => resetOnlyChildHost(domParent, null), null, null);
-		else resetOnlyChildHost(domParent, null);
-	}
+	const cachedText =
+		prior?.text ??
+		(previous instanceof Text ? previous : textToken ? (getFirstChild(domParent) as Text) : null);
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
@@ -38847,7 +38861,7 @@ export function childTextHoleUpdate(
 	if (!complex) {
 		if (previous === value) return cachedNode;
 		if (cachedNode != null && value !== null) {
-			setRenderText(cachedNode, value === true ? '' : value, domParent);
+			setRenderText(cachedNode, value === true ? '' : value);
 			return cachedNode;
 		}
 	}
@@ -38968,7 +38982,7 @@ function recordHole(
 			}
 			// A Text this transaction built, or one the slot already wrote: write
 			// it in render order.
-			setRenderText(text, value === true ? '' : value, onlyChild ? domParent : undefined);
+			setRenderText(text, value === true ? '' : value);
 			next[cell] = value;
 			return next;
 		}
@@ -38992,30 +39006,19 @@ function recordHole(
  * The commit half of a hole: publish the Text its render settled on, or write
  * the new value into the committed Text when only the value changed.
  */
-export function commitHole(
-	bag: any,
-	text: any,
-	node: Text,
-	value: unknown,
-	host?: Node,
-): Text | null {
+export function commitHole(bag: any, text: any, node: Text, value: unknown): Text | null {
 	if (text !== bag) return text;
-	setText(node, value === true ? '' : value, host);
+	setText(node, value === true ? '' : value);
 	return node;
 }
 
-// The markerless Text leaves an only-child hole. When a translator already took
-// it out, its replacement is what the host shows; clear that, as React resets a
-// host's text content. A Text the host shows leaves at the commit of a root
-// render over committed DOM; one this render built is still in its frontier.
+// The markerless Text leaves an only-child hole. A Text the host shows leaves at
+// the commit of a root render over committed DOM; one this render built is
+// still in its frontier.
 function removeOnlyChildText(block: Block, host: Node, node: Text): void {
-	const view = node;
-	const parent = view.parentNode;
-	if (parent !== host && parent !== null && (parent as any).$$next !== undefined) view.remove();
-	else if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, host))
-		queueRootDeletion(() => removeOnlyChildText(block, host, node), null, null);
-	else if (parent === host) view.remove();
-	else resetOnlyChildHost(host, null);
+	if (node.parentNode === host && ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, host))
+		queueRootDeletion(() => node.remove(), null, null);
+	else node.remove();
 }
 
 /** The client's text replaces `host`'s kept server content, at its render's commit. */
@@ -39099,7 +39102,7 @@ export function childTextHole(
 			return null;
 		}
 		if (cachedNode !== null) {
-			renderText(parentScope.block, cachedNode, str, domParent);
+			renderText(parentScope.block, cachedNode, str);
 			return cachedNode;
 		}
 		const hydration = hydrating ? activeHydration() : null;
@@ -41428,7 +41431,7 @@ function waitForStreamedArm(
 		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		markArmDiscard(state);
 		if (!clientRenderDehydratedTry(state, currentHydration))
-			noteRecoverableHydrationError(() => new Error(formatClientError(344)), state.parentBlock);
+			noteRecoverableHydrationError(() => new Error(formatClientError(347)), state.parentBlock);
 		return null;
 	}
 	initialSuspenseHydrations!.set(state, taken);
@@ -50473,7 +50476,7 @@ function hydrateRootWithOutputHandler(
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
-			if (protocolSkew) throw new HydrationMismatch(formatClientError(345));
+			if (protocolSkew) throw new HydrationMismatch(formatClientError(348));
 			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
 				owner.initialDocumentSignals = captureInitialDocumentSignals(
 					owner.initialDocumentSignals,

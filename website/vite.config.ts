@@ -3,11 +3,11 @@ import { cpSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { octaneMdx } from '@octanejs/mdx/vite';
-import { threeRenderers } from '@octanejs/three/config';
 import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
 import { nitro } from 'nitro/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
 import { playgroundRuntime } from './playground-runtime.ts';
+import octaneConfig from './octane.config.ts';
 
 // The upstream shadcn CLI fetches registry items directly from /r. Keep the
 // deployed tree derived from the package's checked generated output so website
@@ -148,17 +148,6 @@ const PREBUNDLED = [
 	// @octanejs/three's raw store source, reached through the same deferred
 	// chunk.
 	'@octanejs/three > zustand/vanilla',
-	// Visx primitives are raw workspace sources; these are the runtime
-	// dependencies reached by the site's Bar/Axis/Group/Scale surface.
-	// Resolve them through their owner under pnpm's isolated layout.
-	'@octanejs/visx > classnames',
-	'@octanejs/visx > d3-interpolate',
-	'@octanejs/visx > d3-path',
-	'@octanejs/visx > d3-scale',
-	'@octanejs/visx > d3-shape',
-	'@octanejs/visx > d3-time',
-	'@octanejs/visx > reduce-css-calc',
-	'@octanejs/visx > svg-path-properties',
 	// TanStack DevTools panel-host island. The whole island is reached only
 	// through @octanejs/tanstack-devtools's raw .tsrx source and the host's
 	// internal dynamic import, so Vite's scanner sees none of it. Pre-declare
@@ -200,7 +189,7 @@ export default defineConfig({
 			// existing Octane renderer contract while still shipping through Vite.
 			// devtools: true enables profiling instrumentation in dev (compiled out
 			// of prod) for the /devtools demo route's <TanStackDevtools> panel.
-			octane: { renderers: threeRenderers, devtools: true },
+			octane: { ...octaneConfig.compiler, devtools: true },
 		}),
 		nitro({
 			// Emit .gz/.br siblings for static assets; Nitro's static handler
