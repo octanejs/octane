@@ -39,7 +39,6 @@ export const WRITERS = new Map(
 		clearRootContainer: 'commit',
 		landItemPair: 'commit',
 		landHostPair: 'commit',
-		promoteSelfMarkedItem: 'commit',
 		mappedDeoptItemBody: 'commit',
 		// primitive
 		updateTextValue: 'primitive',

@@ -36143,27 +36143,17 @@ function promoteSelfMarkedItem(block: Block): void {
 		sm.parentNode === null
 	)
 		return;
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (usesFrontier(block, sm.parentNode)) {
-		// A render that dropped leaves its pair pending for the next one.
-		let pair = (PENDING_ITEM_PAIRS ??= new WeakMap()).get(block);
-		if (pair === undefined || pair[0] !== sm) {
-			pair = [sm, document.createComment('it'), document.createComment('/it'), block, null];
-			PENDING_ITEM_PAIRS.set(block, pair);
-		}
-		if (pair[4] !== transaction) {
-			pair[4] = transaction;
-			transaction!.ops.push(landItemPair, pair);
-		}
-		return;
+	// A render that dropped leaves its pair pending for the next one.
+	let pair = PENDING_ITEM_PAIRS?.get(block);
+	if (pair === undefined || pair[0] !== sm)
+		pair = [sm, document.createComment('it'), document.createComment('/it'), block, null];
+	if (!usesFrontier(block, sm.parentNode)) return landItemPair(pair);
+	(PENDING_ITEM_PAIRS ??= new WeakMap()).set(block, pair);
+	const transaction = ROOT_RENDER_TRANSACTION!;
+	if (pair[4] !== transaction) {
+		pair[4] = transaction;
+		transaction.ops.push(landItemPair, pair);
 	}
-	const p = sm.parentNode!;
-	const s = document.createComment('it');
-	const e = document.createComment('/it');
-	p.insertBefore(s, sm);
-	p.insertBefore(e, getNextSibling(sm));
-	block.startMarker = s;
-	block.endMarker = e;
 }
 
 /** Self-marked items whose `it` pair a root render minted: [node, start, end, block, transaction]. */
@@ -36179,7 +36169,7 @@ function itemRange(block: Block): [Node | null, Node | null] {
 
 function landItemPair(pair: any[]): void {
 	const [node, start, end, block] = pair as [Node, Comment, Comment, Block];
-	if (PENDING_ITEM_PAIRS!.get(block) === pair) PENDING_ITEM_PAIRS!.delete(block);
+	if (PENDING_ITEM_PAIRS?.get(block) === pair) PENDING_ITEM_PAIRS.delete(block);
 	const parent = node.parentNode;
 	if (block.disposed || block.startMarker !== node || parent === null) return;
 	parent.insertBefore(start, node);
