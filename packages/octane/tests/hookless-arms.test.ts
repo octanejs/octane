@@ -13,6 +13,7 @@ import {
 	RollbackPlain,
 	RowsHooked,
 	RowsPlain,
+	RowShape,
 	SuspendHooked,
 	SuspendPlain,
 	SwapHooked,
@@ -154,6 +155,52 @@ describe('hookless control-flow arms', () => {
 			set([3, 6, 1, 2], [3, 6]),
 			set([2, 1, 6, 3, 7], []),
 		]);
+	});
+
+	for (const body of [RowsPlain, RowsHooked]) {
+		it(`${body.name}: moves a swapped row intact and removes only that row`, () => {
+			const rows = (ids: number[], on: number[]) => ids.map((id) => ({ id, on: on.includes(id) }));
+			const r = mount(body, { items: rows([1, 2, 3], []) });
+			const render = (ids: number[], on: number[]) =>
+				flushSync(() => r.root.render(body, { items: rows(ids, on) }));
+			const first = r.container.querySelectorAll('li')[0];
+			const last = r.container.querySelectorAll('li')[2];
+			render([1, 2, 3], [2]);
+			const swapped = r.container.querySelector('li.on')!;
+			swapped.setAttribute('aria-label', 'local annotation');
+			render([2, 3, 1], [2]);
+			expect([...r.container.querySelectorAll('li')]).toEqual([swapped, last, first]);
+			expect(swapped.getAttribute('aria-label')).toBe('local annotation');
+			render([3, 1], []);
+			expect([...r.container.querySelectorAll('li')]).toEqual([last, first]);
+			expect(swapped.isConnected).toBe(false);
+			r.unmount();
+			expect(r.container.textContent).toBe('');
+		});
+	}
+
+	it('preserves both hosts when a single-root arm changes to a fragment and back', () => {
+		const r = mount(RowShape, { which: 1 });
+		const section = r.container.querySelector('section')!;
+		const [before, after] = section.querySelectorAll('span');
+		const render = (which: number) => flushSync(() => r.root.render(RowShape, { which }));
+		render(3);
+		const input = section.querySelector('input')!;
+		input.value = 'unsubmitted';
+		render(3);
+		expect(section.querySelector('input')).toBe(input);
+		expect(input.value).toBe('unsubmitted');
+		render(2);
+		expect(section.textContent).toBe('beforefirstsecondafter');
+		expect([...section.children].map((node) => node.tagName)).toEqual(['SPAN', 'B', 'I', 'SPAN']);
+		expect(section.firstElementChild).toBe(before);
+		expect(section.lastElementChild).toBe(after);
+		render(1);
+		expect(section.textContent).toBe('beforeoneafter');
+		expect(section.querySelector('i')).toBeNull();
+		render(0);
+		expect([...section.children]).toEqual([before, after]);
+		r.unmount();
 	});
 
 	it('disconnect and reconnect a hidden arm’s effects with its Activity', async () => {

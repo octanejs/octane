@@ -18135,10 +18135,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			options?.inlineBindingGuards === true,
 			options?.mappedItem === true,
 			options?.inheritedEnvNames ?? null,
-			options?.armInfo != null,
 		);
 	}
-	if (options?.armInfo != null) options.armInfo.flatNative = plan?.flatNative === true;
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	ctx.currentDirtyBindingStates = prevDirtyBindingStates;
@@ -27900,7 +27898,6 @@ function planJsx(
 	inlineBindingGuards = false,
 	mappedItem = false,
 	inheritedEnvNames = null,
-	prepareArm = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -28597,8 +28594,6 @@ function planJsx(
 			}
 		}
 		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
-		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
-		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
 			if (ctx.nativeReads) b.readStyle = requireRuntimeForContext(ctx, 'readNativeDomStyle');
 			if (b.signalHostSources) ctx.runtimeNeeded.add('bindSignalHostPropSources');
@@ -28611,7 +28606,7 @@ function planJsx(
 		// so each source's name literal — not the shared helper — is what claims
 		// that attribute's name (see commitSourceRows). Registered once here; the
 		// literal carries the same authored location on the update path.
-		if (b.kind === 'hostCommit' || b.kind === 'formCommit') {
+		if (b.kind === 'hostCommit') {
 			for (const source of b.sources) {
 				if (source.spread !== true) {
 					registerAttrLoweringOrigin(ctx, source.nameOrigin, null, source.name);
@@ -29495,10 +29490,9 @@ function planJsx(
 			continue;
 		}
 		const structural = ctx.presentationHydration?.structural && ic.bindingSite;
-		if ((ic.liteMask || ic.preparedMask) && !structural) {
+		if (ic.liteMask && !structural) {
 			while (trailing.length < 2) trailing.push(undefinedNode());
 			trailing.push(b.literal(ic.liteMask));
-			if (ic.preparedMask) trailing.push(b.literal(ic.preparedMask));
 		}
 		ctx.runtimeNeeded.add('ifBlock');
 		registerDirectiveOrigin(ctx, org, ['_$ifBlock', ic.thenHelper, ic.elseHelper]);
@@ -30146,10 +30140,9 @@ function planJsx(
 		if (switchAnchor) trailing.push(switchAnchor);
 		else if (swEnv) trailing.push(undefinedNode());
 		if (swEnv) trailing.push(swEnv);
-		if (sc.liteMask || sc.preparedMask) {
+		if (sc.liteMask) {
 			while (trailing.length < 2) trailing.push(undefinedNode());
 			trailing.push(b.literal(sc.liteMask));
-			if (sc.preparedMask) trailing.push(b.literal(sc.preparedMask));
 		}
 		pushAfterStmt(
 			sc.id,
@@ -30252,36 +30245,6 @@ function planJsx(
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
-		// A detached arm may retain only hosts in its own cloned template.
-		// The emitted after array also carries scalar commitTemplate work, so
-		// classify real constructs before emission rather than counting statements.
-		flatNative:
-			prepareArm &&
-			!noTemplate &&
-			// Opaque templates resolve against their actual insertion parent.
-			// A detached fragment has no SVG/MathML destination to consult.
-			templateNamespace !== 'opaque' &&
-			ctx.presentationHydration == null &&
-			allConstructs.length === 0 &&
-			headEmit.head.length === 0 &&
-			headEmit.resources.length === 0 &&
-			elementBindings.every(
-				(binding) =>
-					(single || binding.path.length > 0) &&
-					!binding.beforeConnect &&
-					!(typeof binding.name === 'string' && binding.name.toLowerCase() === 'is') &&
-					((!['class', 'style', 'styleProperty', 'styleProperties'].includes(binding.kind) &&
-						preparedTemplateValueHelper(binding) !== null &&
-						preparedTemplateValueHelper(binding) !== 'prepareTemplateAttribute' &&
-						preparedTemplateValueHelper(binding) !== 'prepareTemplateControl') ||
-						binding.kind === 'ref' ||
-						binding.kind === 'event' ||
-						binding.kind === 'event-bundle' ||
-						binding.kind === 'nativeStyle' ||
-						binding.kind === 'nativeProjection' ||
-						(binding.kind === 'defaultValueUncontrolled' && binding.expr.type === 'Literal')),
-			) &&
-			templateHasOnlyLocalNativeHosts(rootTemplate.parts),
 		mount: mountLines,
 		update: updateLines,
 		everyRender: everyRenderLines,
@@ -31050,8 +31013,6 @@ function emitBindingMount(bind, elVar, bag) {
 				]),
 			);
 		}
-		case 'dangerValue':
-		case 'formValue':
 		case 'hostValue': {
 			return st(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), bind.expr)));
 		}
@@ -31060,30 +31021,6 @@ function emitBindingMount(bind, elVar, bag) {
 			// wrapper is compiler scaffolding rebuilt here.
 			return st(
 				b.stmt(b.assignment('=', local(`_sp$${bind.id}`), b.call('_$snapshotSpread', bind.expr))),
-			);
-		}
-		case 'dangerCommit': {
-			const sources = b.array(
-				bind.sources.map(({ spread, binding }) =>
-					b.array([
-						b.literal(spread === true),
-						b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
-					]),
-				),
-			);
-			return st(
-				b.block([
-					b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', el(), sources)),
-					...mountHost(),
-				]),
-			);
-		}
-		case 'formCommit': {
-			const sources = commitSourceRows(bind.sources, (binding, spread) =>
-				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
-			);
-			return st(
-				b.block([b.stmt(b.call('_$setFormControlSources', el(), sources)), ...mountHost()]),
 			);
 		}
 		case 'hostCommit': {
@@ -32292,8 +32229,6 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 				]),
 			);
 		}
-		case 'dangerValue':
-		case 'formValue':
 		case 'hostValue': {
 			return st(
 				b.block([
@@ -32305,23 +32240,6 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		case 'hostSpread': {
 			// Same wrapper re-derivation as the mount.
 			return st(b.stmt(b.assignment('=', F('_sp'), b.call('_$snapshotSpread', bind.expr))));
-		}
-		case 'dangerCommit': {
-			const sources = b.array(
-				bind.sources.map(({ spread, binding }) =>
-					b.array([
-						b.literal(spread === true),
-						bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
-					]),
-				),
-			);
-			return st(b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', F('_el'), sources)));
-		}
-		case 'formCommit': {
-			const sources = commitSourceRows(bind.sources, (binding, spread) =>
-				bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
-			);
-			return st(b.stmt(b.call('_$setFormControlSources', F('_el'), sources)));
 		}
 		case 'hostCommit': {
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
@@ -33242,11 +33160,6 @@ function emitElementHtml(
 	let directDangerClientBinding = null;
 	const hasNestedJsxChildren =
 		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
-	const resolveDangerouslySetInnerHTMLAcrossSpreads = firstSpreadIdx !== -1;
-	const dangerHtmlClientSources = [];
-	const resolveFormControlsAcrossSpreads =
-		firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select');
-	const formControlClientSources = [];
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
@@ -33303,8 +33216,7 @@ function emitElementHtml(
 		ensureDirectControlSite(hostSignalSite);
 	}
 	let sawRef = false;
-	for (let attrI = 0; attrI < attrs.length; attrI++) {
-		const attr = attrs[attrI];
+	for (const attr of attrs) {
 		if (attr._octaneKnownProjectionSource) continue;
 		if (attr.knownSource) {
 			const binding = {
@@ -33501,16 +33413,6 @@ function emitElementHtml(
 			directChildrenClientBinding = binding;
 			continue;
 		}
-		// If this attr comes AFTER a spread, we MUST emit as a binding (later wins).
-		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
-		// A direct class before the first spread must also be a runtime writer. SSR
-		// resolves the source-ordered class writers to one final attribute; emitting
-		// the direct value as a binding gives hydration the same baseline writer
-		// before a spread optionally overwrites it. If the client spread omits class,
-		// that baseline can warn about and patch a server-only spread class.
-		const classBeforeSpread =
-			attrName === 'class' && firstSpreadIdx !== -1 && attrI < firstSpreadIdx;
-
 		// Attribute-level `ref={expr}` (new TSRX) — replaces the removed
 		// `{ref expr}` child intrinsic. Routes to the existing `kind: 'ref'`
 		// binding emit, which handles both object refs ({ current } pattern)
@@ -33538,33 +33440,18 @@ function emitElementHtml(
 			});
 			continue;
 		}
-		// React-style raw HTML: `dangerouslySetInnerHTML={{ __html: expr }}`. When the
-		// element has no other children (and no spread that could clobber it), take the
-		// `htmlOnlyChild` fast path on the complete value object. Keeping the object
-		// intact lets the runtime validate malformed values before reading `.__html`.
-		// Otherwise pass
-		// the `{__html}` object through a regular attr binding; the runtime's
-		// `dangerouslySetInnerHTML` property path reads `.__html` and sets innerHTML.
+		// Hosts with any runtime spread use the grouped source path above.
+		// Direct raw HTML can take the complete value object on a childless host.
+		// Keeping it intact lets the runtime validate before reading `.__html`.
 		if (attrName === 'dangerouslySetInnerHTML') {
 			const obj = val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 			const expr =
 				obj === null
 					? b.literal(true, 'true', attr)
 					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
-			if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
-				const binding = {
-					id: bindings.length,
-					kind: 'dangerValue',
-					expr,
-					path,
-				};
-				bindings.push(binding);
-				dangerHtmlClientSources.push({ spread: false, binding });
-				continue;
-			}
 			const noChildren =
 				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
-			if (noChildren && !isAfterSpread) {
+			if (noChildren) {
 				bindings.push({
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
@@ -33592,32 +33479,6 @@ function emitElementHtml(
 		// literals and bare booleans (`<input checked/>`) included; nothing
 		// bakes into the template HTML (see controlledKindFor).
 		let ctlKind = controlledKindFor(tag, attrName);
-		if (
-			resolveFormControlsAcrossSpreads &&
-			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
-		) {
-			const sourceExpr =
-				val == null
-					? b.literal(true, 'true', attr)
-					: val.type === 'JSXExpressionContainer'
-						? val.expression
-						: val;
-			const binding = {
-				id: bindings.length,
-				kind: 'formValue',
-				name: attrName,
-				expr: tsrxExprNode(sourceExpr, ctx, componentName, inlinedSubs),
-				path,
-			};
-			bindings.push(binding);
-			formControlClientSources.push({
-				spread: false,
-				name: attrName,
-				nameOrigin: attr.name,
-				binding,
-			});
-			continue;
-		}
 		if (ctlKind !== null) {
 			if (ctlKind === 'defaultValue' && leanDefaultValue) {
 				ctlKind = 'defaultValueUncontrolled';
@@ -33676,13 +33537,11 @@ function emitElementHtml(
 		let inner;
 		if (val == null) {
 			// JSX shorthand is `true`, not an instruction to serialize an empty
-			// attribute. Events and source-ordered writers need the ordinary binding
-			// path; valid static attrs still bake with their real boolean semantics.
+			// attribute. Events need the ordinary binding path; valid static attrs
+			// still bake with their real boolean semantics.
 			if (
 				isEventAttrName(attrName) ||
 				MUST_USE_PROPERTY_PROPS.has(attrName.toLowerCase()) ||
-				isAfterSpread ||
-				classBeforeSpread ||
 				(ctx.dev && needsDevStaticAttrValidation(attrName, true, tag, hostNs))
 			) {
 				inner = b.literal(true, 'true', attr);
@@ -33699,8 +33558,7 @@ function emitElementHtml(
 		inner = resolveStyleExpr(inner, cssHash);
 
 		// `style={...}` — static literal object/string serialises into the HTML
-		// template (unless we're after a spread, which would clobber it); a fixed
-		// literal prefix plus dynamic suffix can avoid a whole-object diff.
+		// template; a fixed literal prefix plus dynamic suffix avoids a whole-object diff.
 		if (attrName === 'style') {
 			if (!ctx.nativeReads && isDirectSignalHandleExpression(inner)) {
 				throw new Error(
@@ -33709,7 +33567,7 @@ function emitElementHtml(
 						'for a one-way whole-style value.',
 				);
 			}
-			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
+			if (inner.type === 'Literal' && typeof inner.value === 'string') {
 				const chunk = ` style="${escapeAttr(inner.value)}"`;
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
 				continue;
@@ -33730,7 +33588,6 @@ function emitElementHtml(
 				continue;
 			}
 			if (
-				!isAfterSpread &&
 				inner.type === 'ObjectExpression' &&
 				objectExprIsStaticLiteral(inner) &&
 				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
@@ -33743,7 +33600,6 @@ function emitElementHtml(
 				continue;
 			}
 			if (
-				firstSpreadIdx === -1 &&
 				ctx._universalRuntimeUnit == null &&
 				!directPropNames.has('suppressHydrationWarning') &&
 				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
@@ -33827,8 +33683,6 @@ function emitElementHtml(
 			continue;
 		}
 
-		// Static literal value? Inline into HTML — UNLESS we're after a spread,
-		// in which case we MUST emit as a binding so source order is preserved.
 		// bakeStaticAttr applies the shared React-parity value tables (aria-*/
 		// enumerated/data-* booleans stringify, boolean attrs canonicalize to
 		// `attr=""`/absent, booleans on non-boolean attrs drop).
@@ -33836,8 +33690,6 @@ function emitElementHtml(
 			inner.type === 'Literal' &&
 			!isEventAttrName(attrName) &&
 			!MUST_USE_PROPERTY_PROPS.has(attrName.toLowerCase()) &&
-			!isAfterSpread &&
-			!classBeforeSpread &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, hostNs))
 		) {
 			const baked = bakeStaticAttr(attrName, inner.value, tag, hostNs);
@@ -33845,8 +33697,7 @@ function emitElementHtml(
 			continue;
 		}
 
-		// Dynamic value — record a binding. (Also reached for literal values that
-		// come after a spread, since those need to win over the spread at runtime.)
+		// Dynamic value — record a binding.
 		const expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 		if (isEventAttrName(attrName) && !(tag.includes('-') && !isDelegatedEventProp(attrName))) {
 			// React-shape: a trailing `Capture` selects the capture phase (fired
@@ -33934,7 +33785,7 @@ function emitElementHtml(
 			}
 		} else if (attrName === 'class') {
 			// (`className` was already normalized to `class` above.)
-			const scalar = firstSpreadIdx === -1 ? scalarStateClass(inner, ctx) : null;
+			const scalar = scalarStateClass(inner, ctx);
 			const binding = {
 				id: bindings.length,
 				kind: 'class',
@@ -34106,23 +33957,6 @@ function emitElementHtml(
 			signalSite: signalHostSources ? hostSignalSite : null,
 		};
 		bindings.push(hostCommitClientBinding);
-	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
-		bindings.push({
-			id: bindings.length,
-			kind: 'dangerCommit',
-			path,
-			origin: node,
-			sources: dangerHtmlClientSources,
-		});
-	}
-	if (!resolveHostPropsAcrossSources && resolveFormControlsAcrossSpreads) {
-		bindings.push({
-			id: bindings.length,
-			kind: 'formCommit',
-			path,
-			origin: node,
-			sources: formControlClientSources,
-		});
 	}
 	if (ctx.dev) {
 		const selectedOption = tag === 'option' && directPropNames.has('selected');
@@ -34915,7 +34749,6 @@ function hoistBodyHelper(
 	keyedSelection = null,
 	inlineBindingGuards = false,
 	mappedItem = false,
-	armInfo = null,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -34985,7 +34818,6 @@ function hoistBodyHelper(
 		keyedSelection,
 		inlineBindingGuards,
 		mappedItem,
-		armInfo,
 		// Only names materialized as this helper's own const captures may ride
 		// the original tuple into a nested arm. A union-only name can instead
 		// name an authored local shadow and must get a fresh environment.
@@ -35121,8 +34953,6 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		thenStmts && { stmts: thenStmts, params: [] },
 		elseStmts && { stmts: elseStmts, params: [] },
 	]);
-	const thenInfo = { flatNative: false };
-	const elseInfo = { flatNative: false };
 	const thenHelperName = thenStmts
 		? hoistBodyHelper(
 				ctx,
@@ -35134,10 +34964,6 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 				cssHash,
 				envNames,
 				directiveKeywordOrigin(ctx, node),
-				null,
-				false,
-				false,
-				thenInfo,
 			)
 		: null;
 
@@ -35153,10 +34979,6 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 			cssHash,
 			envNames,
 			node.alternateKeyword ?? null,
-			null,
-			false,
-			false,
-			elseInfo,
 		);
 	}
 
@@ -35174,7 +34996,6 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		liteMask:
 			(thenStmts !== null && controlFlowArmIsLite(thenStmts) ? 1 : 0) |
 			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0),
-		preparedMask: (thenInfo.flatNative ? 1 : 0) | (elseInfo.flatNative ? 2 : 0),
 		// `@else`'s own keyword — the clause is a BlockStatement starting at `{`.
 		alternateKeyword: node.alternateKeyword ?? null,
 		hostPath: null,
@@ -36337,13 +36158,11 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	);
 	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
 	let liteMask = 0;
-	let preparedMask = 0;
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
 		if ((isDefault || caseRecords.length < 30) && stmts.length > 0 && controlFlowArmIsLite(stmts))
 			liteMask |= isDefault ? 1 : 2 << caseRecords.length;
-		const armInfo = { flatNative: false };
 		const helperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -36354,13 +36173,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 			cssHash,
 			envNames,
 			c.keyword ?? null,
-			null,
-			false,
-			false,
-			armInfo,
 		);
-		if ((isDefault || caseRecords.length < 30) && armInfo.flatNative)
-			preparedMask |= isDefault ? 1 : 2 << caseRecords.length;
 		if (isDefault) {
 			defaultHelper = helperName;
 			defaultKeyword = c.keyword ?? null;
@@ -36394,7 +36207,6 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		defaultHelper,
 		defaultKeyword,
 		liteMask,
-		preparedMask,
 		hostPath: null,
 	};
 }

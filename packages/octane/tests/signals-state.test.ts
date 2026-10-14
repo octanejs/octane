@@ -309,6 +309,37 @@ describe('scoped synchronous signals', () => {
 		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
 	});
 
+	it('withdraws a retained foreign value when the owner of an error reason retires', () => {
+		const data = owner('retained-data');
+		const gate = owner('retiring-gate');
+		const view = owner('retaining-view');
+		const value$ = data.signal$('value', 'private value');
+		const reason$ = gate.signal$('reason', 'closed');
+		const blocked$ = view.signal$('blocked', false);
+		const card$ = view.derived$('card', () => {
+			if (blocked$.get()) throw new Error(reason$.get());
+			return value$.get();
+		});
+		const presented: unknown[] = [];
+		card$.subscribe(() => {
+			const state = card$.snapshot();
+			presented.push(state.status === 'error' ? state.error : state);
+		});
+		expect(card$.get()).toBe('private value');
+		blocked$.set(true);
+		expect(card$.latest(null)).toBe('private value');
+
+		gate.dispose();
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+		expect(presented.at(-1)).toBeInstanceOf(ScopeDisposedError);
+		const atRetirement = [...presented];
+		// The view no longer reads or retains this data; its later disposal
+		// cannot present another version of the already retired card.
+		data.dispose();
+		expect(presented).toEqual(atRetirement);
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
 	it.each([
 		{ blocked: 'pending', indirect: false },
 		{ blocked: 'error', indirect: false },

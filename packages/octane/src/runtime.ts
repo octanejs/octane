@@ -46629,8 +46629,36 @@ function prepareBranch(
 			}
 			const fence = first !== null && first.parentNode === domParent ? first : after;
 			if (fence !== null && fence.parentNode !== domParent) return;
-			retargetPreparedScope(wip.block, wip.block.parentNode, domParent);
-			placeRange(domParent, wip.start, wip.end, fence);
+			const root = getNextSibling(wip.start);
+			if (
+				oldStart === null &&
+				!borrowed &&
+				state.block === wip.block &&
+				wip.start.parentNode === wip.domParent &&
+				wip.end.parentNode === wip.domParent &&
+				root?.nodeType === 1 &&
+				getNextSibling(root) === wip.end &&
+				wip.block.children === null &&
+				wip.block._slots === null &&
+				(wip.block.rare === null || wip.block.rare.vt === null)
+			) {
+				// The accepted private range proves its own leaf. Old compiler masks
+				// could describe multiple hosts and must not grant this ownership.
+				// Publish the final bounds after cleanup: superseded renders still
+				// need the WIP's durable pair for their vacant source position.
+				state.start = null;
+				state.end = root;
+				wip.block.startMarker = wip.block.endMarker = root;
+				wip.block.exclusiveMarkers = false;
+				replaceSharedBlockBoundary(parentScope.block, wip.start, wip.end, root, root);
+				wip.block.parentNode = domParent;
+				domParent.insertBefore(root, fence);
+				wip.domParent.removeChild(wip.start);
+				wip.domParent.removeChild(wip.end);
+			} else {
+				retargetPreparedScope(wip.block, wip.block.parentNode, domParent);
+				placeRange(domParent, wip.start, wip.end, fence);
+			}
 		}
 		// An empty result can retain its durable pair. Otherwise retire exactly
 		// the old range; unrelated siblings are never included in this sweep.

@@ -1,6 +1,7 @@
 import {
 	createElement,
 	createPortal,
+	ErrorBoundary,
 	memo,
 	use,
 	useEffect,
@@ -10,6 +11,46 @@ import {
 	useSyncExternalStore,
 	useTransition,
 } from 'octane';
+
+interface DelayedBoundaryProps {
+	value: PromiseLike<string>;
+	probe: () => void;
+	tail?: PromiseLike<string>;
+}
+
+function ObservePendingBoundary(props: { probe: () => void }) @{
+	props.probe();
+	<></>
+}
+
+function DelayedTail(props: { value?: PromiseLike<string> }) @{
+	const tail = props.value === undefined ? '' : use(props.value);
+	<output id="late-tail">{tail as string}</output>
+}
+
+function DelayedBoundary(props: DelayedBoundaryProps) @{
+	const value = use(props.value);
+	<>
+		<ErrorBoundary fallback={<i>{'Unable to load'}</i>}>
+			<b id="late-loaded">{value as string}</b>
+		</ErrorBoundary>
+		<ObservePendingBoundary probe={props.probe} />
+		<DelayedTail value={props.tail} />
+	</>
+}
+
+export function DelayedBoundaryApp(props: DelayedBoundaryProps) @{
+	<main>
+		@try {
+			<DelayedBoundary value={props.value} probe={props.probe} tail={props.tail} />
+		} @pending {
+			<label id="late-waiting">
+				{'Loading'}
+				<input defaultValue="pending note" />
+			</label>
+		}
+	</main>
+}
 
 function PreservedPanel() @{
 	const [count, setCount] = useState(0);

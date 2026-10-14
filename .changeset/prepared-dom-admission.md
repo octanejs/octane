@@ -8,3 +8,7 @@ now publish together when their owning render is accepted. Discarded renders
 leave existing DOM and user edits intact. Hydration uses one cursor across roots,
 deferred islands and retries and no longer snapshots or replays DOM mutations.
 Preserve ViewTransition and controlled-input behavior at the accepted commit.
+
+Accepted single-host branch swaps now keep only their owned host, reducing DOM
+work across repeated swaps. Drop unused compiled branch metadata and unnecessary
+signal retirement allocations while preserving old compiled output and hydration.

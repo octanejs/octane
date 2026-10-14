@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createElement } from 'octane';
+import { createElement, flushSync, hydrateRoot } from 'octane';
+import { renderToString } from 'octane/server';
 import { mount } from '../_helpers.js';
+import { loadServerFixture } from '../_server-fixture.js';
 import {
 	AliasApplicationOrder,
 	DangerToSpreadChild,
@@ -243,6 +245,104 @@ describe('conformance: final host props across JSX sources', () => {
 			result.unmount();
 		}
 	});
+
+	// The initial snapshot and subsequent source updates must agree across SSR
+	// and the live client, including props whose default is controlled by other props.
+	it.each([true, false])(
+		'adopts form sources from dev=%s SSR and applies new winners',
+		async (dev) => {
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			const server = await loadServerFixture(
+				'packages/octane/tests/conformance/_fixtures/client-host-source-aggregation.tsrx',
+				{ compileOptions: { dev, hmr: false } },
+			);
+			const props = {
+				input: { value: null, defaultValue: 'first input' },
+				textarea: { value: null, defaultValue: 'first textarea' },
+				checkbox: { checked: null, defaultChecked: true },
+			};
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(server.NullishFormCascades, props).html;
+			const input = container.querySelector('#nullish-input') as HTMLInputElement;
+			const textarea = container.querySelector('#nullish-textarea') as HTMLTextAreaElement;
+			const checkbox = container.querySelector('#nullish-checkbox') as HTMLInputElement;
+			const errors: unknown[] = [];
+			const root = hydrateRoot(container, NullishFormCascades, props, {
+				onRecoverableError: (error) => errors.push(error),
+			});
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('#nullish-input')).toBe(input);
+				expect(container.querySelector('#nullish-textarea')).toBe(textarea);
+				expect(container.querySelector('#nullish-checkbox')).toBe(checkbox);
+				expect([input.value, textarea.value, checkbox.checked]).toEqual([
+					'first input',
+					'first textarea',
+					true,
+				]);
+				flushSync(() =>
+					root.render(NullishFormCascades, {
+						input: { value: 'second input', defaultValue: 'ignored' },
+						textarea: { value: 'second textarea', defaultValue: 'ignored' },
+						checkbox: { checked: false, defaultChecked: true },
+					}),
+				);
+				expect([input.value, textarea.value, checkbox.checked]).toEqual([
+					'second input',
+					'second textarea',
+					false,
+				]);
+				expect([input.defaultValue, textarea.defaultValue]).toEqual([
+					'second input',
+					'second textarea',
+				]);
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([true, false])(
+		'adopts spread raw HTML from dev=%s SSR and hands back children',
+		async (dev) => {
+			const server = await loadServerFixture(
+				'packages/octane/tests/conformance/_fixtures/client-host-source-aggregation.tsrx',
+				{ compileOptions: { dev, hmr: false } },
+			);
+			const props = { source: { dangerouslySetInnerHTML: { __html: '<b>first raw</b>' } } };
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(server.DangerToSpreadChild, props).html;
+			const element = container.querySelector('#danger-to-spread-child')!;
+			const raw = element.firstElementChild;
+			const errors: unknown[] = [];
+			const root = hydrateRoot(container, DangerToSpreadChild, props, {
+				onRecoverableError: (error) => errors.push(error),
+			});
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('#danger-to-spread-child')).toBe(element);
+				expect(element.firstElementChild).toBe(raw);
+				expect(element.textContent).toBe('first raw');
+				flushSync(() => root.render(DangerToSpreadChild, { source: { children: 'second child' } }));
+				expect(element.querySelector('b')).toBeNull();
+				expect(element.textContent).toBe('second child');
+				flushSync(() =>
+					root.render(DangerToSpreadChild, {
+						source: { dangerouslySetInnerHTML: { __html: '<strong>third raw</strong>' } },
+					}),
+				);
+				expect(element.querySelector('strong')?.textContent).toBe('third raw');
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
 
 	// Per ReactJSXTransformIntegration-test.js:95. Every enumerable spread
 	// getter, including a symbol getter that cannot become a DOM prop, runs once

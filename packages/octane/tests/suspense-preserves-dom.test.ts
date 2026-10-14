@@ -6,6 +6,7 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
 import type { SupersededArmProps } from './_fixtures/suspense-superseded-arm.tsrx';
 import {
 	ConditionalArmRootSuspensionApp,
+	DelayedBoundaryApp,
 	DescriptorRootSuspensionAfterSiblingApp,
 	HiddenPrimaryRefCatchApp,
 	HiddenInsertionCleanupApp,
@@ -44,6 +45,109 @@ function deferred<T>() {
 function fulfilled<T>(value: T): PromiseLike<T> {
 	return { then() {}, status: 'fulfilled', value } as any;
 }
+
+it('keeps the pending UI untouched while a resumed child builds its error boundary', async () => {
+	const gate = deferred<string>();
+	const seen: { pending: Element | null; loaded: Element | null; mutations: MutationRecord[] }[] =
+		[];
+	let container!: HTMLElement;
+	const observer = new MutationObserver(() => {});
+	const root = mount(DelayedBoundaryApp, {
+		value: gate.promise,
+		probe() {
+			seen.push({
+				pending: container.querySelector('#late-waiting'),
+				loaded: container.querySelector('#late-loaded'),
+				mutations: observer.takeRecords(),
+			});
+		},
+	});
+	container = root.container;
+	const pending = root.find('#late-waiting');
+	const input = pending.querySelector('input')!;
+	input.value = 'keep this note until ready';
+	observer.observe(container, {
+		subtree: true,
+		childList: true,
+		characterData: true,
+		attributes: true,
+	});
+	try {
+		await act(() => gate.resolve('Ready'));
+		expect(seen.length).toBeGreaterThan(0);
+		for (const atRender of seen) {
+			expect(atRender.pending).toBe(pending);
+			expect(atRender.loaded).toBeNull();
+			expect(atRender.mutations).toEqual([]);
+		}
+		expect(root.find('#late-loaded').textContent).toBe('Ready');
+		expect(container.querySelector('#late-waiting')).toBeNull();
+	} finally {
+		observer.disconnect();
+		root.unmount();
+	}
+});
+
+it('keeps a waiting form when a resumed boundary suspends again and drops a superseded retry', async () => {
+	const first = deferred<string>();
+	const tail = deferred<string>();
+	const seen: { pending: Element | null; loaded: Element | null; mutations: MutationRecord[] }[] =
+		[];
+	const observer = new MutationObserver(() => {});
+	let container!: HTMLElement;
+	const probe = () => {
+		seen.push({
+			pending: container.querySelector('#late-waiting'),
+			loaded: container.querySelector('#late-loaded'),
+			mutations: observer.takeRecords(),
+		});
+	};
+	const root = mount(DelayedBoundaryApp, {
+		value: first.promise,
+		tail: tail.promise,
+		probe,
+	});
+	container = root.container;
+	const pending = root.find('#late-waiting');
+	const input = pending.querySelector('input')!;
+	input.value = 'unsubmitted text';
+	observer.observe(container, {
+		subtree: true,
+		childList: true,
+		characterData: true,
+		attributes: true,
+	});
+	try {
+		await act(() => first.resolve('Abandoned'));
+		expect(seen.length).toBeGreaterThan(0);
+		for (const atRender of seen) {
+			expect(atRender.pending).toBe(pending);
+			expect(atRender.loaded).toBeNull();
+			expect(atRender.mutations).toEqual([]);
+		}
+		expect(container.querySelector('#late-waiting')).toBe(pending);
+		expect(pending.querySelector('input')).toBe(input);
+		expect(input.value).toBe('unsubmitted text');
+		expect(container.querySelector('#late-loaded')).toBeNull();
+
+		observer.disconnect();
+		root.update(DelayedBoundaryApp, {
+			value: fulfilled('Current'),
+			tail: fulfilled('Finished'),
+			probe() {},
+		});
+		expect(root.find('#late-loaded').textContent).toBe('Current');
+		expect(root.find('#late-tail').textContent).toBe('Finished');
+		expect(container.querySelector('#late-waiting')).toBeNull();
+		await act(() => tail.resolve('Obsolete'));
+		expect(root.find('#late-loaded').textContent).toBe('Current');
+		expect(root.find('#late-tail').textContent).toBe('Finished');
+		expect(container.textContent).not.toContain('Obsolete');
+	} finally {
+		observer.disconnect();
+		root.unmount();
+	}
+});
 
 it('keeps spread-host text positions while a fresh primary waits for its descendant', async () => {
 	const gate = deferred<string>();

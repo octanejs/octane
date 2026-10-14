@@ -119,6 +119,29 @@ export function RowsHooked(props: { items: Row[] }) @{
 	</ul>
 }
 
+export function RowShape(props: { which: number }) @{
+	<section>
+		<span>{'before'}</span>
+		@switch (props.which) {
+			@case 1: {
+				<b>{'one'}</b>
+			}
+			@case 2: {
+				<>
+					<b>{'first'}</b>
+					<i>{'second'}</i>
+				</>
+			}
+			@case 3: {
+				<input defaultValue="draft" />
+			}
+			@default: {
+			}
+		}
+		<span>{'after'}</span>
+	</section>
+}
+
 type ActivityProps = { mode: 'visible' | 'hidden'; on: boolean; log: Log };
 
 export function ActivityPlain(props: ActivityProps) @{
