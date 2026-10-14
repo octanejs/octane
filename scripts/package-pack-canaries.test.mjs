@@ -933,6 +933,64 @@ describe('packed TSRX TypeScript lanes', () => {
 			);
 		const nativeTsc = [process.execPath, NATIVE_TSC];
 
+		for (const [name, command] of [
+			['TypeScript 5.9', [path.join(repositoryRoot, 'node_modules/.bin/tsrx-tsc')]],
+			['TypeScript 7.1', nativeTsc],
+		]) {
+			test(`${name} checks server sources in Node and still rejects browser imports of excluded server roots`, (context) => {
+				const selectedLane = lane(name);
+				const contentMapper = selectedLane.checker === 'tsc';
+				const directory = realpathSync(createSentinelConsumer(context, { contentMapper }));
+				mkdirSync(path.join(directory, 'node_modules/@types'), { recursive: true });
+				symlinkSync(
+					path.dirname(repositoryRequire.resolve('@types/node/package.json')),
+					path.join(directory, 'node_modules/@types/node'),
+					'junction',
+				);
+				mkdirSync(path.join(directory, 'src'));
+				const client = path.join(directory, 'src/client.tsrx');
+				const server = path.join(directory, 'src/server.tsrx');
+				writeFileSync(client, "export const client = 'client';\n");
+				writeFileSync(
+					server,
+					"import type { Readable } from 'node:stream';\nexport type Stream = Readable;\n",
+				);
+				writeFileSync(
+					path.join(directory, PACKED_TSRX_BROWSER_AMBIENT_FILE),
+					renderPackedTsrxBrowserAmbientProbe(),
+				);
+				const check = (nodeTypes) => {
+					writeFileSync(
+						path.join(directory, PACKED_TSRX_LANE_SENTINEL_PROJECT),
+						JSON.stringify(
+							createPackedTsrxConsumerConfig({
+								contentMapper,
+								consumerSourceFiles: [],
+								nodeTypes,
+								sourcePackageDirectories: ['src'],
+								sourceExcludeFiles: nodeTypes ? [] : ['src/server.tsrx'],
+							}),
+						),
+					);
+					const result = run(directory, command, selectedLane);
+					return { ...result, ...splitPackedTsrxTypecheckOutput(result.stdout) };
+				};
+				const node = check(true);
+				assertPackedTsrxConsumerSucceeded({ ...node, stdout: node.diagnostics }, name);
+				assertPackedTsrxFilesChecked([client, server], node.files, name);
+				const browser = check(false);
+				assertPackedTsrxConsumerSucceeded({ ...browser, stdout: browser.diagnostics }, name);
+				assertPackedTsrxFilesChecked([client], browser.files, name);
+				assert.ok(!browser.files.includes(server));
+
+				writeFileSync(client, "export type { Stream } from './server.tsrx';\n");
+				const leaked = check(false);
+				assert.notEqual(leaked.status, 0);
+				assert.match(leaked.diagnostics, /node:stream/);
+				assertPackedTsrxFilesChecked([client, server], leaked.files, name);
+			});
+		}
+
 		test('TypeScript 7 reports it through the content mapper, and fails the lane without it', (context) => {
 			const native = lane('TypeScript 7.1');
 			const withMapper = createSentinelConsumer(context, { contentMapper: true });

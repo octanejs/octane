@@ -11,7 +11,8 @@ import rehypeShiki from '@shikijs/rehype';
 import * as Octane from 'octane';
 import * as ServerRT from 'octane/server';
 import * as Provider from '@octanejs/mdx';
-import * as ServerProvider from '@octanejs/mdx/server';
+// @ts-expect-error The shared fixture loader compiles the provider graph for SSR.
+import * as ServerProvider from './_fixtures/provider-server.ts?octane-ssr';
 import { compileMdx, type CompileMdxOptions } from '@octanejs/mdx/compile';
 import { evalModuleCode, stripMarkers } from './_helpers';
 

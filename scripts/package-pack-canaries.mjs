@@ -487,6 +487,7 @@ export function createPackedTsrxConsumerConfig({
 	ecmaVersion = 'es2024',
 	nodeTypes = true,
 	sourcePackageDirectories = [],
+	sourceExcludeFiles = [],
 } = {}) {
 	return {
 		...(contentMapper ? { contentMappers: [PACKED_TSRX_CONTENT_MAPPER] } : {}),
@@ -515,6 +516,7 @@ export function createPackedTsrxConsumerConfig({
 			...(nodeTypes ? [] : [PACKED_TSRX_BROWSER_AMBIENT_FILE]),
 			...sourcePackageDirectories.map((directory) => `${directory}/**/*.tsrx`),
 		],
+		...(sourceExcludeFiles.length ? { exclude: sourceExcludeFiles } : {}),
 	};
 }
 

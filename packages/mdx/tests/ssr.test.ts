@@ -10,8 +10,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as ServerRT from 'octane/server';
-import * as ServerProvider from '@octanejs/mdx/server';
+// @ts-expect-error The shared fixture loader compiles the provider graph for SSR.
+import * as ServerProvider from './_fixtures/provider-server.ts?octane-ssr';
 import { compileMdxSync } from '@octanejs/mdx/compile';
+import type { MDXComponents } from '@octanejs/mdx';
 import { evalModuleCode } from './_helpers';
 
 const FIXTURES = join(process.cwd(), 'packages/mdx/tests/_fixtures');
@@ -80,6 +82,57 @@ describe('SSR', () => {
 		const flat = stripMarkers(html);
 		expect(flat).toContain('<h3>Hello, MDX</h3>'); // prop wins
 		expect(flat).toContain('<i>emphasis</i>'); // context still applies
+	});
+
+	it.each([
+		{
+			name: 'merges an object over the parent',
+			components: { h1: 'h3' },
+			disableParentContext: false,
+			emphasis: 'i',
+		},
+		{
+			name: 'replaces the parent with a function result',
+			components: (inherited: MDXComponents) => {
+				expect(inherited).toEqual({ h1: 'h2', em: 'i' });
+				return { h1: 'h3' };
+			},
+			disableParentContext: false,
+			emphasis: 'em',
+		},
+		{
+			name: 'ignores the parent when disabled',
+			components: { h1: 'h3' },
+			disableParentContext: true,
+			emphasis: 'em',
+		},
+		{
+			name: 'passes an empty mapping to a function when disabled',
+			components: (inherited: MDXComponents) => {
+				expect(inherited).toEqual({});
+				return { h1: 'h3' };
+			},
+			disableParentContext: true,
+			emphasis: 'em',
+		},
+	])('nested MDXProvider $name', ({ components, disableParentContext, emphasis }) => {
+		const mod = serverModule('basic.mdx');
+		const { html } = ServerRT.renderToString(ServerProvider.MDXProvider as any, {
+			components: { h1: 'h2', em: 'i' },
+			children: ServerRT.createElement(ServerProvider.MDXProvider as any, {
+				components,
+				disableParentContext,
+				children: ServerRT.createElement(mod.default as any, {}),
+			}),
+		});
+		const flat = stripMarkers(html);
+		expect(flat).toContain('<h3>Hello, MDX</h3>');
+		expect(flat).toContain(`<${emphasis}>emphasis</${emphasis}>`);
+
+		// A later render outside a provider must not inherit this render's mapping.
+		const withoutProvider = stripMarkers(ServerRT.renderToString(mod.default, {}).html);
+		expect(withoutProvider).toContain('<h1>Hello, MDX</h1>');
+		expect(withoutProvider).toContain('<em>emphasis</em>');
 	});
 
 	// The provider route and the prop route produce the SAME payload — the

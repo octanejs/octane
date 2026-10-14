@@ -84,6 +84,11 @@ A mapping can also be passed per-document: `<Doc components={{ h1: FancyHeading 
 Mapping values are octane components or replacement host tag names (`{ em: 'i' }`);
 the special `wrapper` key is the document layout.
 
+The client and server providers are authored as Strong `.tsrx` templates and
+compiled by the consuming application's Octane plugin. This applies to the
+provider boundary; generated MDX document elements still use the value-position
+rendering path described below.
+
 ## API (vs @mdx-js/react)
 
 - `MDXProvider({ components, disableParentContext, children })` — ported;

@@ -1,15 +1,17 @@
+'use strong';
+
 /**
  * @octanejs/mdx/server — the provider layer for SERVER renders.
  *
  * octane's client and server runtimes are separate modules with disjoint
- * context stores, so the client `MDXProvider` (./index.ts, built on `octane`
+ * context stores, so the client `MDXProvider` (./index.tsrx, built on `octane`
  * context) cannot thread a mapping through `renderToString` — its `useContext`
  * runs null-scope on the server and yields the `{}` default. The server
  * runtime has its own full context implementation (`scope.$$ctxValues`,
  * top-down within one render pass), so this entry mirrors the provider layer
  * onto `octane/server` context: same merge, same function-form `components`,
- * same `disableParentContext` — see ./index.ts for the @mdx-js/react port
- * notes. KEEP THE MERGE SEMANTICS IN LOCKSTEP with ./index.ts (both are the
+ * same `disableParentContext` — see ./index.tsrx for the @mdx-js/react port
+ * notes. KEEP THE MERGE SEMANTICS IN LOCKSTEP with ./index.tsrx (both are the
  * same ~40-line port; only the runtime import differs).
  *
  * The compile pipeline points a server-mode document's `providerImportSource`
@@ -18,17 +20,17 @@
  * this `MDXProvider` serializes with the same mapping the client provider
  * produces at hydration. Client bundles never import this module.
  */
-import { createContext, createElement, useContext } from 'octane/server';
-import type { MDXComponents, MDXComponentsProp, MDXProviderProps } from './index.js';
+import { createContext, useContext } from 'octane/server';
+import type { MDXComponents, MDXComponentsProp, MDXProviderProps } from './index.tsrx';
 
-export type { MDXComponents, MDXComponentsProp, MDXProviderProps, MDXProps } from './index.js';
+export type { MDXComponents, MDXComponentsProp, MDXProviderProps, MDXProps } from './index.tsrx';
 
 const emptyComponents: MDXComponents = {};
 const MDXContext = createContext<MDXComponents>(emptyComponents);
 
 /**
  * Server `useMDXComponents`: the provider context merged with (or mapped
- * through) `components`. Same contract as the client export (./index.ts).
+ * through) `components`. Same contract as the client export (./index.tsrx).
  */
 export function useMDXComponents(
 	components?: MDXComponentsProp | null | symbol,
@@ -48,7 +50,7 @@ export function useMDXComponents(
  * document server-rendered under this provider hydrates byte-for-byte into
  * the client `MDXProvider`.
  */
-export function MDXProvider(props: MDXProviderProps): unknown {
+export function MDXProvider(props: MDXProviderProps) @{
 	let allComponents: MDXComponents;
 	if (props.disableParentContext) {
 		allComponents =
@@ -58,8 +60,5 @@ export function MDXProvider(props: MDXProviderProps): unknown {
 	} else {
 		allComponents = useMDXComponents(props.components);
 	}
-	return createElement(MDXContext as any, {
-		value: allComponents,
-		children: props.children,
-	});
+	<MDXContext value={allComponents} children={props.children} />
 }

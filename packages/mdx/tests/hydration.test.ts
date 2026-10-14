@@ -18,7 +18,8 @@ import * as ServerRT from 'octane/server';
 import { compile as octaneCompile } from 'octane/compiler';
 import { compileMdxSync } from '@octanejs/mdx/compile';
 import { MDXProvider } from '@octanejs/mdx';
-import * as ServerProvider from '@octanejs/mdx/server';
+// @ts-expect-error The shared fixture loader compiles the provider graph for SSR.
+import * as ServerProvider from './_fixtures/provider-server.ts?octane-ssr';
 import { evalModuleCode } from './_helpers';
 // @ts-expect-error — .mdx modules are produced by the vite plugin; no ambient types in tests.
 import BasicDoc from './_fixtures/basic.mdx';
@@ -169,5 +170,47 @@ describe('hydration', () => {
 		expect(container.querySelector('h3')?.textContent).toBe('Hello, MDX');
 		expect(container.querySelector('h1')).toBeNull();
 		root.unmount();
+	});
+
+	it('preserves interactive children when the provider mapping changes after hydration', async () => {
+		const counter = serverTsrxModule('counter.tsrx');
+		const mod = serverMdxModule('components.mdx', { './counter.tsrx': counter });
+		const components = { h1: 'h2' };
+		const { html } = ServerRT.renderToString(ServerProvider.MDXProvider as any, {
+			components,
+			children: ServerRT.createElement(mod.default as any, {}),
+		});
+		container.innerHTML = html;
+		const heading = container.querySelector('h2');
+		const button = container.querySelector<HTMLButtonElement>('[data-testid="counter"]')!;
+		expect(heading?.textContent).toBe('Interactive');
+		expect(button.textContent).toBe('count: 2');
+		const children = createElement(ComponentsDoc);
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			MDXProvider,
+			{ components, children },
+			{ onRecoverableError: (error) => recoverable.push(error) },
+		);
+		try {
+			await act(() => {});
+			expect(container.querySelector('h2')).toBe(heading);
+			expect(container.querySelector('[data-testid="counter"]')).toBe(button);
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('count: 3');
+
+			flushSync(() => root.render(MDXProvider, { components: { h1: 'h3' }, children }));
+			expect(container.querySelector('h3')?.textContent).toBe('Interactive');
+			expect(container.querySelector('h2')).toBeNull();
+			expect(container.querySelector('[data-testid="counter"]')).toBe(button);
+			expect(button.textContent).toBe('count: 3');
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('count: 4');
+			expect(recoverable).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+		expect(container.textContent).toBe('');
 	});
 });
