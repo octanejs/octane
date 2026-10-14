@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { octaneMdx } from '@octanejs/mdx/vite';
+import { compileMdx } from '@octanejs/mdx/compile';
 
 function plugin(options?: Parameters<typeof octaneMdx>[0]) {
 	const p = octaneMdx(options);
@@ -19,6 +20,25 @@ const transform = (p: ReturnType<typeof octaneMdx>, code: string, id: string) =>
 	p.transform.call({}, code, id);
 
 describe('octaneMdx() id claiming', () => {
+	it('forwards Strong and generated host mapping options to the compiler', async () => {
+		const options = { strong: true, overridableTags: ['pre'] };
+		const source = '# Heading\n\n```js\nconst x = 1;\n```';
+		const output = await transform(plugin(options), source, '/docs/options.mdx');
+		const direct = await compileMdx(source, '/docs/options.mdx', {
+			...options,
+			dev: false,
+			hmr: false,
+		});
+		expect(output?.code).toBe(direct.code);
+		await expect(
+			transform(
+				plugin(options),
+				'import { createElement } from "octane";\n\n# Heading',
+				'/docs/strong.mdx',
+			),
+		).rejects.toMatchObject({ code: 'OCTANE_STRONG_ELEMENT_API' });
+	});
+
 	it('transforms .mdx and .md modules (md default-on)', async () => {
 		const p = plugin();
 		expect(await transform(p, '# hi\n', '/docs/doc.mdx')).not.toBeNull();

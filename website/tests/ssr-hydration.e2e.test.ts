@@ -1550,6 +1550,21 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					}
 				}
 				expect(frames.some((frame) => frame.opacity > 0)).toBe(true);
+				// The table override forwards native table sections as template children.
+				// Exercise a fresh client mount as well as the initial SSR adoption.
+				await page.click('.sidebar-link[href="/docs/build-tools"]');
+				await page.waitForFunction(
+					() => document.querySelector('.prose h1')?.textContent === 'Build tools',
+				);
+				expect(await page.locator('.table-scroll thead th').allTextContents()).toEqual([
+					'Goal',
+					'Integration',
+				]);
+				expect(await page.locator('.table-scroll tbody td code').allTextContents()).toEqual([
+					'@octanejs/vite-plugin',
+					'@octanejs/rspack-plugin',
+					'@octanejs/rsbuild-plugin',
+				]);
 				const real = errors.filter((error) => !error.includes('Failed to load resource'));
 				expect(real).toEqual([]);
 			} finally {
@@ -1871,13 +1886,62 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		45_000,
 	);
 
+	// Keep disk edits after the concurrent batch so other pages cannot observe
+	// a partially updated document or route graph.
+	it(
+		'hot-updates generated MDX twice while preserving the surrounding interactive page',
+		{ concurrent: false, timeout: 60_000 },
+		async () => {
+			const file = join(WEBSITE, 'src/content/home-sample.mdx');
+			const original = readFileSync(file, 'utf8');
+			const initialText = 'hooks next to output, no rules of hooks';
+			expect(original).toContain(initialText);
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
+				waitForNetworkIdle: true,
+			});
+			try {
+				const sample = page.locator('.hero-code-body');
+				const count = page.locator('.hero-code .demo-count');
+				await count.click();
+				await page.waitForFunction(
+					() => document.querySelector('.demo-count-value')?.textContent === '1',
+				);
+				for (const text of ['first generated template edit', 'second generated template edit']) {
+					writeFileSync(file, original.replace(initialText, text));
+					await page.waitForFunction(
+						(expected) =>
+							document.querySelector('.hero-code-body')?.textContent?.includes(expected),
+						text,
+					);
+					expect(await sample.textContent()).toContain(text);
+					// Reloading or remounting the parent would reset this sibling's state.
+					expect(await count.locator('.demo-count-value').textContent()).toBe('1');
+				}
+				await count.click();
+				await page.waitForFunction(
+					() => document.querySelector('.demo-count-value')?.textContent === '2',
+				);
+				await page.reload({ waitUntil: 'networkidle' });
+				expect(await sample.textContent()).toContain('second generated template edit');
+				await count.click();
+				await page.waitForFunction(
+					() => document.querySelector('.demo-count-value')?.textContent === '1',
+				);
+				expect(errors).toEqual([]);
+			} finally {
+				writeFileSync(file, original);
+				await page.close();
+			}
+		},
+	);
+
 	// Editing a route and the router invalidates both the client and SSR module
 	// graphs. A full reload on that hot server must still hydrate through one
 	// current router graph. Keep this last: Vite's cache-busting timestamps stay
 	// in the server graph for the rest of its lifetime.
 	//
-	// `sequential` is load-bearing, not stylistic: this is the only case that
-	// edits files on disk, so it would corrupt any sibling sharing the dev server.
+	// `sequential` is load-bearing, not stylistic: edits on disk would corrupt
+	// any concurrent sibling sharing the dev server.
 	// Declared last, it runs once the concurrent batch above has drained.
 	it(
 		'hydrates cleanly on reload after HMR edits (hot server)',

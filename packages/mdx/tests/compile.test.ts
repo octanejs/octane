@@ -115,6 +115,44 @@ function moveInputFromSvgToDiv() {
 }
 
 describe('compileMdxSync', () => {
+	it.each([false, true, 'h1', [null], ['Heading']])(
+		'rejects an invalid generated host list %j',
+		(overridableTags) => {
+			expect(() =>
+				compileMdxSync('# Heading', '/docs/options.mdx', {
+					// @ts-expect-error Exercise untyped JavaScript callers of the compiler.
+					overridableTags,
+				}),
+			).toThrow('overridableTags must be an array of host tag names.');
+		},
+	);
+
+	it.each([undefined, ['custom-note'], []])(
+		'supports generated custom hosts with overridable tags %j',
+		(overridableTags) => {
+			const { code } = compileMdxSync('Note', '/docs/custom.mdx', {
+				strong: true,
+				overridableTags,
+				rehypePlugins: [
+					() => (tree: unknown) =>
+						walkTree(tree, (node) => {
+							if (node.type === 'element' && node.tagName === 'p') node.tagName = 'custom-note';
+						}),
+				],
+			});
+			const Doc = evalModuleCode(code, { octane: Octane, '@octanejs/mdx': Provider }).default;
+			try {
+				const { container } = render(Doc, { props: { components: { 'custom-note': 'aside' } } });
+				expect(
+					container.querySelector(overridableTags?.length === 0 ? 'custom-note' : 'aside')
+						?.textContent,
+				).toBe('Note');
+			} finally {
+				cleanup();
+			}
+		},
+	);
+
 	it('emits a compiled octane CLIENT module (no JSX, no MDX runtime)', () => {
 		const { code } = compileMdxSync('# hi\n\nsome *text*\n', '/docs/doc.mdx');
 		expect(code).toContain("from 'octane'");
@@ -185,6 +223,42 @@ describe('compileMdxSync', () => {
 		expect(bare).not.toContain('@octanejs/mdx');
 	});
 
+	it('applies Strong diagnostics at the authored location when enabled', () => {
+		const source =
+			'import {createElement} from "octane";\n\nexport const element = createElement("span");\n\n# Title';
+		expect(compileMdxSync(source, '/docs/strong.mdx').diagnostics).toEqual([]);
+		let diagnostic: any;
+		try {
+			compileMdxSync(source, '/docs/strong.mdx', { strong: true });
+		} catch (error) {
+			diagnostic = error;
+		}
+		expect(diagnostic).toMatchObject({
+			code: 'OCTANE_STRONG_ELEMENT_API',
+			filename: '/docs/strong.mdx',
+			loc: { line: 1, column: 8 },
+			pos: source.indexOf('createElement'),
+		});
+	});
+
+	it.each(['', 'export const title = "Empty";'])(
+		'renders an empty document containing %j',
+		(source) => {
+			const { code } = compileMdxSync(source, '/docs/empty.mdx', {
+				strong: true,
+				overridableTags: [],
+			});
+			const mod = evalModuleCode(code, { octane: Octane, '@octanejs/mdx': Provider });
+			try {
+				const { container } = render(mod.default);
+				expect(container.textContent).toBe('');
+				if (source) expect(mod.title).toBe('Empty');
+			} finally {
+				cleanup();
+			}
+		},
+	);
+
 	it('detects plain-markdown format from the .md extension', () => {
 		// `{x}` / `<Foo/>` are literal text in md format — as source they would be
 		// an expression + a JSX tag and compile very differently (or throw for the
@@ -197,30 +271,33 @@ describe('compileMdxSync', () => {
 		expect(defaultRemarkPlugins).toHaveLength(3);
 	});
 
-	it('returns native-event warnings at the authored MDX JSX range', () => {
-		const source = '# Form\n\n<input onChangeCapture={() => {}} />\n';
-		const result = compileMdxSync(source, '/docs/form.mdx');
-		expect(result.diagnostics).toHaveLength(1);
-		expect(result.diagnostics[0]).toMatchObject({
-			code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
-			severity: 'warning',
-			filename: '/docs/form.mdx',
-			start: {
-				offset: source.indexOf('onChangeCapture'),
-				line: 3,
-				column: 7,
-			},
-			suggestions: [
-				{
-					attribute: 'onInputCapture',
-					start: { offset: source.indexOf('onChangeCapture'), line: 3, column: 7 },
+	it.each([undefined, []])(
+		'returns native-event warnings at the authored MDX JSX range with overridable tags %j',
+		(overridableTags) => {
+			const source = '# Form\n\n<input onChangeCapture={() => {}} />\n';
+			const result = compileMdxSync(source, '/docs/form.mdx', { overridableTags });
+			expect(result.diagnostics).toHaveLength(1);
+			expect(result.diagnostics[0]).toMatchObject({
+				code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
+				severity: 'warning',
+				filename: '/docs/form.mdx',
+				start: {
+					offset: source.indexOf('onChangeCapture'),
+					line: 3,
+					column: 7,
 				},
-			],
-		});
-		expect(result.diagnostics[0].end.offset).toBe(
-			source.indexOf('onChangeCapture') + 'onChangeCapture'.length,
-		);
-	});
+				suggestions: [
+					{
+						attribute: 'onInputCapture',
+						start: { offset: source.indexOf('onChangeCapture'), line: 3, column: 7 },
+					},
+				],
+			});
+			expect(result.diagnostics[0].end.offset).toBe(
+				source.indexOf('onChangeCapture') + 'onChangeCapture'.length,
+			);
+		},
+	);
 
 	it('maps after namespaced attributes and bigint expressions', () => {
 		const source = [

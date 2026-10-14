@@ -8,6 +8,7 @@
 // `with { type: 'json' }` while vite-node has its own JSON handling.
 import { readFileSync } from 'node:fs';
 import rehypeShiki from '@shikijs/rehype';
+import octaneConfig from './octane.config.ts';
 
 // The real TSRX TextMate grammar (name "TSRX", scopeName "source.tsrx" — it
 // tokenizes @{ }, @if/@for/@switch/@try directives, holes, the works). Same
@@ -54,6 +55,10 @@ export const websiteShikiLangs = [
 ];
 
 export const websiteMdxOptions = {
+	strong: octaneConfig.compiler?.strong,
+	// DocPage overrides these hosts; highlighted tokens and other markdown
+	// elements can use static templates on both the server and client.
+	overridableTags: ['table', 'pre'],
 	rehypePlugins: [
 		[
 			rehypeShiki,

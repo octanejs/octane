@@ -6,6 +6,10 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@octanejs/testing-library';
+import * as Octane from 'octane';
+import * as Provider from '@octanejs/mdx';
+import { compileMdxSync } from '@octanejs/mdx/compile';
+import { evalModuleCode } from './_helpers';
 // @ts-expect-error — .mdx modules are produced by the vite plugin; no ambient types in tests.
 import BasicDoc from './_fixtures/basic.mdx';
 // @ts-expect-error — see above.
@@ -42,6 +46,33 @@ describe('markdown rendering', () => {
 		const boxes = [...container.querySelectorAll('input[type="checkbox"]')];
 		expect(boxes).toHaveLength(2);
 		expect(container.querySelector('a')?.getAttribute('href')).toBe('http://www.example.com');
+	});
+
+	it('mounts native table sections inside an overridable table wrapper', () => {
+		const source = '| Name | Value |\n| :--- | ---: |\n| Alpha | `one` |\n| Beta | two |';
+		const { code } = compileMdxSync(source, '/docs/table.mdx', {
+			strong: true,
+			overridableTags: ['table'],
+		});
+		const Doc = evalModuleCode(code, { octane: Octane, '@octanejs/mdx': Provider }).default;
+		function Table(props: { children?: unknown }) {
+			return Octane.createElement(
+				'div',
+				{ className: 'table-scroll' },
+				Octane.createElement('table', null, props.children),
+			);
+		}
+		const { container } = render(Doc, { props: { components: { table: Table } } });
+		const table = container.querySelector('.table-scroll > table')!;
+		expect([...table.querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual([
+			'Name',
+			'Value',
+		]);
+		expect([...table.querySelectorAll('tbody tr')].map((row) => row.textContent)).toEqual([
+			'Alphaone',
+			'Betatwo',
+		]);
+		expect(table.querySelector('td code')?.textContent).toBe('one');
 	});
 
 	it('renders plain .md in markdown format — JSX/expression syntax stays literal text', () => {

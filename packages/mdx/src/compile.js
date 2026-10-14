@@ -16,23 +16,12 @@
  * code to this package's `useMDXComponents` (the octane port of
  * @mdx-js/react's provider).
  *
- * The only adaptation between the two compilers is `recmaOctaneAdapter`, a tiny
- * ESTree pass over MDX's output: MDX's no-layout branch CALLS
- * `_createMdxContent(props)` directly, which bypasses octane's
- * `(props, __s, __extra)` component ABI (the server body would run with
- * `__s === undefined` and lean on scope-recovery). The pass rewrites the bare
- * call to `<_createMdxContent {...props}/>` so both branches mount through the
- * component machinery on client AND server. (The layout branch's
- * `<_createMdxContent {...props}/>` tag needs no help: octane classifies
- * `_`-starting identifier tags as component references, per JSX semantics.)
- *
- * The two former SERVER-mode fixups are gone — their octane gaps are fixed:
- * `ssrComponent` renders a host-tag-STRING comp as a
- * `<!--[--><tag>…</tag><!--]-->` block (the shape the client's componentSlot /
- * de-opt host renderer adopts on hydration), and the server compiler
- * value-lowers a returned fragment through `ssrChild([...])` exactly like the
- * client's descriptor array — so `<_components.h1>` member tags and the
- * document's fragment body take the SAME shape on both sides (hydration-safe).
+ * The final recma pass emits both generated document functions as TSRX
+ * templates. MDX's existing printer handles their JSX, JavaScript and source
+ * locations; a small body handler supplies `@{}` and template control flow.
+ * Both layout branches render the document body through a component boundary.
+ * Optional `overridableTags` specializes generated hosts without changing
+ * authored JSX, named components, or the provider/prop/layout merge rules.
  *
  * Authored in `.js` (like octane's `compiler/vite.js` and @octanejs/stylex's
  * vite entry) so the `…/vite` plugin — which imports this module — loads when a
@@ -94,6 +83,8 @@ import { SourceMapGenerator } from 'source-map';
  * @property {boolean} [hmr] octane compiler HMR wrapping (client only; the vite plugin wires this to serve mode).
  * @property {boolean} [dev] octane compiler dev metadata (client only; same gate as `hmr`).
  * @property {boolean} [profile] octane compiler profiling metadata (client only).
+ * @property {boolean} [strong] Apply Octane Strong diagnostics to the document.
+ * @property {readonly string[]} [overridableTags] Generated host tags that may be replaced through component mappings. Omit to keep every generated host overridable; an empty list makes all generated hosts native. Named components and layouts remain overridable.
  * @property {string | null} [providerImportSource]
  *   Module the emitted document reads the provider mapping from
  *   (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
@@ -195,7 +186,7 @@ function buildMdxOptions(id, options, diagnosticContext) {
 			seedAuthoredJsxAttributeLocations(diagnosticContext),
 			...(options.recmaPlugins ?? []),
 			restoreAuthoredJsxAttributeLocations(diagnosticContext),
-			recmaOctaneAdapter,
+			[recmaOctaneAdapter, { overridableTags: options.overridableTags }],
 		],
 	};
 }
@@ -367,12 +358,53 @@ function octaneStage(mdxFile, authoredSource, id, options, diagnosticContext) {
 	const jsxSource = String(mdxFile.value);
 	const mdxMap = mdxFile.map;
 	const mode = options.mode ?? 'client';
-	const out = octaneCompile(jsxSource, id, {
-		mode,
-		hmr: mode === 'client' && !!options.hmr,
-		dev: mode === 'client' && !!options.dev,
-		profile: mode === 'client' && !!options.profile,
-	});
+	let out;
+	try {
+		out = octaneCompile(jsxSource, id, {
+			mode,
+			hmr: mode === 'client' && !!options.hmr,
+			dev: mode === 'client' && !!options.dev,
+			profile: mode === 'client' && !!options.profile,
+			strong: options.strong,
+		});
+	} catch (error) {
+		if (
+			mdxMap &&
+			typeof error?.loc?.line === 'number' &&
+			typeof error.loc.column === 'number' &&
+			typeof error.pos === 'number'
+		) {
+			const trace = new TraceMap(JSON.parse(JSON.stringify(mdxMap)));
+			const starts = sourceLineStarts(authoredSource);
+			const start = mapDiagnosticPosition(
+				trace,
+				authoredSource,
+				starts,
+				error.loc,
+				GREATEST_LOWER_BOUND,
+			);
+			const end =
+				typeof error.end === 'number'
+					? mapDiagnosticPosition(
+							trace,
+							authoredSource,
+							starts,
+							positionForOffset(jsxSource, sourceLineStarts(jsxSource), error.end),
+							LEAST_UPPER_BOUND,
+						)
+					: null;
+			if (start !== null) {
+				const prefix = `${id}:${error.loc.line}:${error.loc.column + 1}: `;
+				if (error.message.startsWith(prefix)) {
+					error.message = `${id}:${start.line}:${start.column + 1}: ${error.message.slice(prefix.length)}`;
+				}
+				error.loc = { line: start.line, column: start.column };
+				error.pos = start.offset;
+				error.end = Math.max(start.offset, end?.offset ?? start.offset);
+			}
+		}
+		throw error;
+	}
 	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
 	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.
 	// Compose them (most-recent-first) so generated positions trace all the way
@@ -398,51 +430,10 @@ function octaneStage(mdxFile, authoredSource, id, options, diagnosticContext) {
 		id,
 		diagnosticContext.authoredAttributes,
 	);
-	// Fast refresh for documents: octane's compiler only auto-wraps EXPORTED
-	// `@{}`-form components in `hmr(...)` — `MDXContent` (a passthrough function
-	// returning a ternary of descriptors) isn't recognized as one, so the octane
-	// `hmr` flag alone leaves `.mdx` edits as full module invalidations. The
-	// PIPELINE knows the emitted shape, so it appends the registration the
-	// octane compiler emits for `.tsrx` exports: wrap the default export in the
-	// runtime `hmr()`, hand each evaluation's body to the wrapper that importers
-	// and live blocks already hold (kept in `hot.data`, so parents never remount
-	// the document), and self-accept. Importers keep the bindings they linked
-	// against, so the callback invalidates when another export they read
-	// changed or cannot be compared. Appending after the fact keeps the source
-	// map's earlier segments valid (ESM imports hoist).
-	if (mode === 'client' && options.hmr && /\bexport default function MDXContent\b/.test(out.code)) {
-		const namedExports = mdxFile.data.octaneNamedExports;
-		const changed =
-			namedExports === null
-				? '_$mdxModule'
-				: `_$mdxModule && (${[['default', 'MDXContent'], ...namedExports]
-						.map(([name, local]) => `_$mdxModule[${JSON.stringify(name)}] !== ${local}`)
-						.join(' || ')})`;
-		out.code +=
-			"\nimport { hmr as _$mdxHmr, HMR as _$mdxHMR } from 'octane';\n" +
-			'MDXContent = _$mdxHmr(MDXContent);\n' +
-			'if (import.meta.hot) {\n' +
-			'  const _$mdxPrevious = import.meta.hot.data?.__octaneMdxContent;\n' +
-			'  if (_$mdxPrevious) {\n' +
-			'    if (_$mdxPrevious[_$mdxHMR].update(MDXContent)) MDXContent = _$mdxPrevious;\n' +
-			'    else import.meta.hot.invalidate();\n' +
-			'  }\n' +
-			'  if (import.meta.hot.data) import.meta.hot.data.__octaneMdxContent = MDXContent;\n' +
-			'  import.meta.hot.accept((_$mdxModule) => {\n' +
-			`    if (${changed}) import.meta.hot.invalidate();\n` +
-			'  });\n' +
-			'}\n';
-	}
-	// Register the final public binding after the MDX-specific HMR wrapper. The
-	// core compiler may also recognize the generated dispatcher, but its location
-	// belongs to intermediate JSX and its registration precedes this wrapper. This
-	// document-level registration deliberately overrides both with the authored
-	// `.mdx` identity and stable line-one location.
-	if (
-		mode === 'client' &&
-		options.profile &&
-		/\bexport default function MDXContent\b/.test(out.code)
-	) {
+	// Core owns template HMR, including named-export invalidation. Register the
+	// final public binding with the authored document identity instead of its
+	// generated function location. Appending preserves earlier source-map segments.
+	if (mode === 'client' && options.profile && mdxFile.data.octaneDocumentTemplate) {
 		const metadata = {
 			id: `${id}#MDXContent@1:0`,
 			name: 'MDXContent',
@@ -623,42 +614,154 @@ function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id, authoredAt
 
 const MDX_BODY_NAME = '_createMdxContent';
 
-function recmaOctaneAdapter() {
-	/**
-	 * @param {unknown} tree
-	 * @param {{ data: Record<string, unknown> }} file
-	 */
-	return (tree, file) => {
-		walkReplace(/** @type {EstreeNode} */ (tree), adaptNode);
-		file.data.octaneNamedExports = namedExportBindings(/** @type {any} */ (tree));
+/** @param {{ overridableTags?: readonly string[] }} options */
+function recmaOctaneAdapter({ overridableTags }) {
+	if (
+		overridableTags !== undefined &&
+		(!Array.isArray(overridableTags) ||
+			overridableTags.some((tag) => typeof tag !== 'string' || !/^[a-z][\w:.-]*$/.test(tag)))
+	) {
+		throw new TypeError('overridableTags must be an array of host tag names.');
+	}
+	const allowed = overridableTags === undefined ? null : new Set(overridableTags);
+	// recma-stringify and recma-jsx already share this printer extension point.
+	// Keep their JSX handlers and source-map writer; only our synthetic body
+	// needs syntax that ESTree's ordinary JavaScript printer does not know.
+	const settings = this.data('settings') ?? {};
+	this.data('settings', {
+		...settings,
+		handlers: { ...settings.handlers, OctaneTemplateBody: printTemplateBody },
+	});
+	return (tree, file) => ({
+		...tree,
+		body: tree.body.map((statement) => {
+			const fn = statement.type === 'ExportDefaultDeclaration' ? statement.declaration : statement;
+			if (
+				fn.type !== 'FunctionDeclaration' ||
+				(fn.id?.name !== MDX_BODY_NAME && fn.id?.name !== 'MDXContent')
+			)
+				return statement;
+			const body = adaptGeneratedHosts(fn.body, allowed);
+			const last = body.body.at(-1);
+			if (last?.type !== 'ReturnStatement') return statement;
+			const next = {
+				...fn,
+				body: {
+					type: 'OctaneTemplateBody',
+					setup: body.body.slice(0, -1),
+					output: mapNodes(last.argument, adaptNode),
+				},
+			};
+			if (statement.type === 'ExportDefaultDeclaration') {
+				file.data.octaneDocumentTemplate = true;
+				return { ...statement, declaration: next };
+			}
+			return next;
+		}),
+	});
+}
+
+function printTemplateBody(node, state) {
+	state.write('@{\n');
+	for (const statement of node.setup) {
+		this[statement.type](statement, state);
+		state.write('\n');
+	}
+	const output = (expression) => {
+		if (expression.type === 'ConditionalExpression') {
+			state.write('<>@if (');
+			this[expression.test.type](expression.test, state);
+			state.write(') {\n');
+			output(expression.consequent);
+			state.write('\n} @else {\n');
+			output(expression.alternate);
+			state.write('\n}</>');
+		} else if (expression.type === 'JSXElement' || expression.type === 'JSXFragment') {
+			this[expression.type](expression, state);
+		} else {
+			state.write('<>{');
+			this[expression.type](expression, state);
+			state.write('}</>');
+		}
 	};
+	output(node.output);
+	state.write('\n}');
 }
 
 /**
- * The document's named exports as [exportName, localName] pairs, or null when
- * one has no single module binding to compare: a re-export, `export *`, or a
- * destructuring declaration.
- *
- * @param {{ body: any[] }} program
- * @returns {Array<[string, string]> | null}
+ * Only MDX-generated host references have defaults in this local map. Explicit
+ * JSX is deliberately outside the mapping contract, even when its spelling
+ * happens to match a generated reference. Non-identifier tags use MDX aliases.
  */
-function namedExportBindings(program) {
-	/** @type {Array<[string, string]>} */
-	const bindings = [];
-	for (const node of program.body) {
-		if (node.type === 'ExportAllDeclaration') return null;
-		if (node.type !== 'ExportNamedDeclaration') continue;
-		if (node.source) return null;
-		const declaration = node.declaration;
-		for (const { id } of declaration?.declarations ?? (declaration ? [declaration] : [])) {
-			if (id.type !== 'Identifier') return null;
-			bindings.push([id.name, id.name]);
-		}
-		for (const specifier of node.specifiers) {
-			bindings.push([specifier.exported.name ?? specifier.exported.value, specifier.local.name]);
+function adaptGeneratedHosts(body, allowed) {
+	const tags = new Set();
+	const aliases = new Map();
+	for (const statement of body.body) {
+		for (const declaration of statement.declarations ?? []) {
+			if (declaration.id.name === '_components' && declaration.init?.type === 'ObjectExpression') {
+				for (const property of declaration.init.properties) {
+					const name = property.key?.name ?? property.key?.value;
+					if (property.type === 'Property' && property.value?.value === name) tags.add(name);
+				}
+			}
+			if (
+				declaration.init?.type === 'MemberExpression' &&
+				declaration.init.object.name === '_components'
+			) {
+				aliases.set(
+					declaration.id.name,
+					declaration.init.property.name ?? declaration.init.property.value,
+				);
+			}
 		}
 	}
-	return bindings;
+	if (tags.size === 0) return body;
+	return mapNodes(body, (node) => {
+		if (node.type !== 'JSXElement' || node.data?._mdxExplicitJsx) return null;
+		const name = node.openingElement.name;
+		const tag =
+			name.type === 'JSXMemberExpression' && name.object.name === '_components'
+				? name.property.name
+				: name.type === 'JSXIdentifier'
+					? aliases.get(name.name)
+					: undefined;
+		if (!tags.has(tag)) return null;
+		if (allowed !== null && !allowed.has(tag)) {
+			const nativeName = { ...name, type: 'JSXIdentifier', name: tag };
+			return {
+				...node,
+				openingElement: { ...node.openingElement, name: nativeName },
+				closingElement: node.closingElement ? { ...node.closingElement, name: nativeName } : null,
+			};
+		}
+		const child = node.children.length === 1 ? node.children[0] : null;
+		if (
+			child?.type !== 'JSXExpressionContainer' ||
+			child.expression.type !== 'Literal' ||
+			typeof child.expression.value !== 'string'
+		)
+			return null;
+		// MDX's single string child is already a scalar value. Keep it a prop
+		// instead of allocating a template body for every highlighted token.
+		// Appending matches nested JSX children winning over attribute spreads.
+		return {
+			...node,
+			openingElement: {
+				...node.openingElement,
+				selfClosing: true,
+				attributes: [
+					...node.openingElement.attributes,
+					{
+						type: 'JSXAttribute',
+						name: { type: 'JSXIdentifier', name: 'children' },
+						value: child,
+					},
+				],
+			},
+			closingElement: null,
+			children: [],
+		};
+	});
 }
 
 /** @typedef {{ type: string, [key: string]: unknown }} EstreeNode */
@@ -694,31 +797,24 @@ function adaptNode(node) {
 	return null;
 }
 
-/**
- * Depth-first walk that can REPLACE child nodes in place (arrays and single
- * node-valued keys). Skips location metadata keys.
- *
- * @param {EstreeNode} node
- * @param {(n: EstreeNode) => EstreeNode | null} visit
- */
-function walkReplace(node, visit) {
-	for (const key of Object.keys(node)) {
+/** Copy-on-write traversal; upstream and custom recma ASTs remain untouched. */
+function mapNodes(node, visit) {
+	if (!isNode(node)) return node;
+	let result = visit(node) ?? node;
+	for (const key of Object.keys(result)) {
 		if (key === 'loc' || key === 'range' || key === 'position' || key === 'data') continue;
-		const value = node[key];
-		if (Array.isArray(value)) {
-			for (let i = 0; i < value.length; i++) {
-				const child = value[i];
-				if (!isNode(child)) continue;
-				const next = visit(child);
-				if (next !== null) value[i] = next;
-				else walkReplace(child, visit);
-			}
-		} else if (isNode(value)) {
-			const next = visit(value);
-			if (next !== null) node[key] = next;
-			else walkReplace(value, visit);
+		const value = result[key];
+		const next = Array.isArray(value)
+			? value.map((child) => mapNodes(child, visit))
+			: mapNodes(value, visit);
+		if (
+			Array.isArray(value) ? next.some((child, index) => child !== value[index]) : next !== value
+		) {
+			if (result === node) result = { ...node };
+			result[key] = next;
 		}
 	}
+	return result;
 }
 
 /**
