@@ -2818,6 +2818,12 @@ const QUEUE: Block[] = [];
 // another drain. Readers use this epoch to discard cursors into the old layout.
 let QUEUE_REINDEX_EPOCH = 0;
 let scheduled = false;
+// A root's hydration attempt requests the flush here; per-update schedulers
+// set the flag inline rather than add a call.
+function requestFlush(): void {
+	scheduled = true;
+	queueMicrotask(flush);
+}
 let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
@@ -50934,10 +50940,7 @@ function hydrateRootWithOutputHandler(
 		owner.retry = () => {
 			if (!rootBlock.disposed) scheduleRender(rootBlock);
 		};
-		if (!syncFlush && !scheduled) {
-			scheduled = true;
-			queueMicrotask(flush);
-		}
+		if (!syncFlush && !scheduled) requestFlush();
 	};
 	// Only the first attempt has a hydrateRoot caller to receive a refused lease.
 	// A resumed or retried attempt reports it to the root instead.
