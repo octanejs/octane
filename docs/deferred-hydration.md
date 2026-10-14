@@ -568,6 +568,9 @@ bound values before synchronously writing them. The handle's `refresh()` also
 publishes synchronously, including when the enclosing signal batch has not yet
 delivered subscriptions. Use it before a native operation such as
 `form.requestSubmit()` that immediately depends on updated button properties.
+A notification or `refresh()` made while an Octane render is running, such as
+from render code, writes once that render returns, because render never writes
+the document. It lands whether the root commits that render or drops it.
 
 A view that reads only module-scope signal handles may declare no props
 parameter, as in `export function Counter() @{ 'use dom bindings'; … }`.

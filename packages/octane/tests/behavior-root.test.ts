@@ -4306,76 +4306,130 @@ export function ScalarTextHydration(props) @{
 					scope.dispose();
 				}
 			}
-			const duringPreparation = authoredPresentation(
-				'RefreshDuringPreparation',
-				{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },
-				dev,
-				`function PreparationButton(props) @{
+			// A publication inside the hydration render reaches the early program,
+			// which writes nothing until the render slice closes. The accepted
+			// render then fails acceptance against the new early DOM and retries;
+			// the dropped one suspends first. Either way the write lands as the
+			// render returns, and the retry takes over the same nodes.
+			for (const dropped of [false, true]) {
+				const pending = deferred<void>();
+				const duringPreparation = authoredPresentation(
+					'RefreshDuringPreparation',
+					{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },
+					dev,
+					`import { use } from 'octane';
+function PreparationButton(props) @{
  <button title={props.title} onClick={props.onAction} ref={props.onReady}><b>{props.label as string}</b></button>
 }
 export function RefreshDuringPreparation(props) @{ 'use dom bindings';
  <PreparationButton title={props.title} label={props.label} onAction={props.onAction} onReady={props.onReady}/>
+}
+function Wait(props) @{ if (props.suspend) use(props.promise); <i/> }
+export function DroppedPreparation(props) @{
+ <section>
+  <RefreshDuringPreparation title={props.title} label={props.label} onAction={props.onAction} onReady={props.onReady}/>
+  <Wait suspend={props.suspend} promise={props.promise}/>
+ </section>
 }`,
-			);
-			article.innerHTML = duringPreparation.html;
-			const preparationButton = article.querySelector('button')!;
-			const preparationLabel = preparationButton.querySelector('b')!;
-			const preparationRange = {
-				start: article.firstChild!.nextSibling as Comment,
-				end: article.lastChild as Comment,
-			};
-			const preparationBinding = duringPreparation.attach(
-				preparationRange,
-				duringPreparation.state,
-			);
-			let refreshedDuringPreparation = false;
-			try {
-				preparationButton.focus();
-				hydratedRoot = hydrateRoot(
-					article,
-					duringPreparation.loadClient().RefreshDuringPreparation,
-					{
-						...duringPreparation.state.getSnapshot(),
-						title: {
-							toString() {
-								if (!refreshedDuringPreparation) {
-									refreshedDuringPreparation = true;
-									duringPreparation.publish({ title: 'Current early', label: 'Current early' });
-								}
-								return 'Accepted';
-							},
-						},
-					},
-					{ bindingLeases: [preparationBinding] },
 				);
-				expect(article.querySelector('button')).toBe(preparationButton);
-				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild!.nextSibling).toBe(preparationRange.start);
-				expect(article.lastChild).toBe(preparationRange.end);
-				expect(preparationButton.title).toBe('Current early');
-				expect(duringPreparation.cleanup).not.toHaveBeenCalled();
-				expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
-					[preparationButton],
-				]);
-				preparationButton.click();
-				expect(duringPreparation.state.getSnapshot().onAction).toHaveBeenCalledOnce();
-				await act(() => {});
-				expect(article.querySelector('button')).toBe(preparationButton);
-				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild!.nextSibling).toBe(preparationRange.start);
-				expect(article.lastChild).toBe(preparationRange.end);
-				expect(document.activeElement).toBe(preparationButton);
-				expect(preparationButton.title).toBe('Accepted');
-				expect(duringPreparation.cleanup).toHaveBeenCalledOnce();
-				expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
-					[preparationButton],
-					[null],
-					[preparationButton],
-				]);
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				preparationBinding.dispose();
+				const wait = { suspend: false, promise: pending.promise };
+				article.innerHTML = dropped
+					? renderToString(duringPreparation.server.DroppedPreparation, {
+							...duringPreparation.state.getSnapshot(),
+							...wait,
+						}).html
+					: duringPreparation.html;
+				const preparationButton = article.querySelector('button')!;
+				const preparationLabel = preparationButton.querySelector('b')!;
+				const rangeParent = dropped ? article.querySelector('section')! : article;
+				const locateRange = () => ({
+					start: (dropped
+						? rangeParent.firstChild
+						: rangeParent.firstChild!.nextSibling) as Comment,
+					end: (dropped
+						? preparationButton.nextSibling!.nextSibling
+						: rangeParent.lastChild) as Comment,
+				});
+				const preparationRange = locateRange();
+				const preparationBinding = duringPreparation.attach(
+					preparationRange,
+					duringPreparation.state,
+				);
+				const writes = new MutationObserver(() => {});
+				writes.observe(preparationButton, {
+					attributes: true,
+					characterData: true,
+					childList: true,
+					subtree: true,
+				});
+				let duringRender: { title: string; label: string; writes: number } | undefined;
+				try {
+					preparationButton.focus();
+					const client = duringPreparation.loadClient();
+					hydratedRoot = hydrateRoot(
+						article,
+						dropped ? client.DroppedPreparation : client.RefreshDuringPreparation,
+						{
+							...duringPreparation.state.getSnapshot(),
+							title: {
+								toString() {
+									if (duringRender === undefined) {
+										duringPreparation.publish({
+											title: 'Current early',
+											label: 'Current early',
+										});
+										duringRender = {
+											title: preparationButton.title,
+											label: preparationLabel.textContent!,
+											writes: writes.takeRecords().length,
+										};
+									}
+									return 'Accepted';
+								},
+							},
+							...wait,
+							suspend: dropped,
+						},
+						{ bindingLeases: [preparationBinding] },
+					);
+					expect(duringRender).toEqual({ title: 'Early', label: 'Initial', writes: 0 });
+					expect(article.querySelector('button')).toBe(preparationButton);
+					expect(preparationButton.querySelector('b')).toBe(preparationLabel);
+					expect(locateRange().start).toBe(preparationRange.start);
+					expect(locateRange().end).toBe(preparationRange.end);
+					expect(preparationButton.title).toBe('Current early');
+					expect(preparationLabel.textContent).toBe('Current early');
+					expect(duringPreparation.cleanup).not.toHaveBeenCalled();
+					expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
+						[preparationButton],
+					]);
+					preparationButton.click();
+					expect(duringPreparation.state.getSnapshot().onAction).toHaveBeenCalledOnce();
+					if (dropped) {
+						await act(() => {});
+						expect(preparationButton.title).toBe('Current early');
+						expect(duringPreparation.cleanup).not.toHaveBeenCalled();
+						pending.resolve();
+					}
+					await act(() => {});
+					expect(article.querySelector('button')).toBe(preparationButton);
+					expect(preparationButton.querySelector('b')).toBe(preparationLabel);
+					expect(locateRange().start).toBe(preparationRange.start);
+					expect(locateRange().end).toBe(preparationRange.end);
+					expect(document.activeElement).toBe(preparationButton);
+					expect(preparationButton.title).toBe('Accepted');
+					expect(duringPreparation.cleanup).toHaveBeenCalledOnce();
+					expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
+						[preparationButton],
+						[null],
+						[preparationButton],
+					]);
+				} finally {
+					writes.disconnect();
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					preparationBinding.dispose();
+				}
 			}
 			const busyScope = createScope({ scopeKey: `host-publication-retry-${dev}` });
 			const busyHost = authoredPresentation('NativeControlHost', { className: 'early' }, dev);

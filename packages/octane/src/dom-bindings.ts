@@ -5,6 +5,7 @@ import { sanitizeURL } from './sanitize-url.js';
 import { STREAM_SCRIPT_ATTR, SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
 import { BINDING_HANDOFF } from './signals/control-handoff.js';
+import { renderSlice, watchRenderSlices } from './render-slice.js';
 import type { BindingHandoff, BindingHandoffCapability } from './dom-binding-handoff.js';
 import type { createBindingClassGroup } from './dom-binding-classes.js';
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
@@ -791,6 +792,12 @@ export function __adoptBindings<Props>(
 	const drain = (): void => {
 		if (disposed || busy) return;
 		busy = true;
+		// Render never writes the document. A publication inside an Octane render
+		// stays pending, as busy as a drain, until the render slice closes.
+		if (renderSlice?.open) {
+			renderSlice.drains.push(resume);
+			return;
+		}
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
 				let next: BindingValue[];
@@ -978,6 +985,10 @@ export function __adoptBindings<Props>(
 			published?.();
 		}
 	};
+	const resume = (): void => {
+		busy = false;
+		drain();
+	};
 	const refresh = (): void => {
 		if (disposed) return;
 		revision++;
@@ -1090,6 +1101,7 @@ export function __adoptBindings<Props>(
 			}
 		}
 		signal?.addEventListener('abort', dispose, { once: true });
+		watchRenderSlices();
 		const stop = source.subscribe(refresh);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(329));
 		if (disposed) stop();
@@ -1203,6 +1215,12 @@ export function __adoptScalarBindings<Props>(
 	const drain = (): void => {
 		if (disposed || busy) return;
 		busy = true;
+		// Render never writes the document. A publication inside an Octane render
+		// stays pending, as busy as a drain, until the render slice closes.
+		if (renderSlice?.open) {
+			renderSlice.drains.push(resume);
+			return;
+		}
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
 				let next: Array<string | null>;
@@ -1279,6 +1297,10 @@ export function __adoptScalarBindings<Props>(
 			busy = false;
 		}
 	};
+	const resume = (): void => {
+		busy = false;
+		drain();
+	};
 	const refresh = (): void => {
 		if (disposed) return;
 		dirty = true;
@@ -1297,6 +1319,7 @@ export function __adoptScalarBindings<Props>(
 			owned.push([node, __claimBinding(node, bindings[index]!)]);
 		}
 		signal?.addEventListener('abort', dispose, { once: true });
+		watchRenderSlices();
 		const stop = source.subscribe(refresh);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(329));
 		if (disposed) stop();
