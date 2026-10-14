@@ -3986,20 +3986,12 @@ function stageBag(bag: any): any[] {
 
 /**
  * Spare cell arrays. A bag's first stage takes one, and while the pool is
- * short a commit returns its bag's array, so the first update of a newly
- * mounted template allocates nothing. Bags past the pool keep their arrays.
+ * short a queued commit returns its bag's array (runCommitOps), so the first
+ * update of a newly mounted template allocates nothing. Bags past the pool
+ * keep their arrays.
  */
 const BAG_POOL_SIZE = 8;
 const BAG_POOL: any[][] = [[], [], [], [], [], [], [], []];
-
-/** After a commit op: while the pool is short, return an idle bag's cells to it. */
-function releaseBag(target: any): void {
-	// Only a bag has `$`; anything else compares undefined, which is false.
-	if (target?.$ <= BAG_SIZE && target.next !== null) {
-		BAG_POOL.push(target.next);
-		target.next = null;
-	}
-}
 
 /**
  * Record one binding: `next` stays null until a value differs from its
@@ -4071,7 +4063,6 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any) => void): void {
 		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
 	) {
 		commit(bag);
-		if (BAG_POOL.length < BAG_POOL_SIZE) releaseBag(bag);
 		return;
 	}
 	const ops = transaction.ops;
@@ -4113,7 +4104,11 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
 					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
 			}
-			if (BAG_POOL.length < BAG_POOL_SIZE) releaseBag(target);
+			// Only a bag has `$`; any other target compares undefined, which is false.
+			if (BAG_POOL.length < BAG_POOL_SIZE && target?.$ <= BAG_SIZE && target.next !== null) {
+				BAG_POOL.push(target.next);
+				target.next = null;
+			}
 		}
 		return COMMITTING_GENERATION;
 	} finally {
