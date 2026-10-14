@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 const FIXTURE = `
@@ -285,7 +285,10 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 		}
 	});
 
-	it('continues adopting older server markup with an explicit range around each host', () => {
+	it('renders the root on the client when a host item arrives in a range of its own', async () => {
+		// Exactly one host element delimits its item on the wire, so a range
+		// around one is what the server rendered for another value, as an older
+		// server did for every host.
 		const items = [
 			{ id: 'first', label: 'First' },
 			{ id: 'second', label: 'Second' },
@@ -308,17 +311,29 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 			row.parentNode!.insertBefore(document.createComment('['), row);
 			row.parentNode!.insertBefore(document.createComment(']'), row.nextSibling);
 		}
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable: unknown[] = [];
 
-		const root = hydrateRoot(container, client.DescriptorRows, { items, refs, onPick });
+		const root = hydrateRoot(
+			container,
+			client.DescriptorRows,
+			{ items, refs, onPick },
+			{ onRecoverableError: (error) => recoverable.push(error) },
+		);
 		try {
 			flushSync(() => {});
-			expect([...container.querySelectorAll('li')]).toEqual(rows);
-			expect(refs.first.current).toBe(rows[0]);
-			expect(refs.second.current).toBe(rows[1]);
-			flushSync(() => rows[1].querySelector<HTMLButtonElement>('button')!.click());
+			await act(async () => {});
+			const live = [...container.querySelectorAll('li')];
+			expect(live.map((row) => row.textContent)).toEqual(['First', 'Second']);
+			expect(rows.some((row) => row.isConnected)).toBe(false);
+			expect(recoverable).toHaveLength(1);
+			expect(refs.first.current).toBe(live[0]);
+			expect(refs.second.current).toBe(live[1]);
+			flushSync(() => live[1].querySelector<HTMLButtonElement>('button')!.click());
 			expect(onPick).toHaveBeenCalledExactlyOnceWith('second');
 		} finally {
 			root.unmount();
+			errors.mockRestore();
 		}
 	});
 
