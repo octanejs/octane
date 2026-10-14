@@ -43,6 +43,14 @@ export interface CompileMdxOptions {
 	dev?: boolean;
 	/** octane compiler profiling metadata (client only). */
 	profile?: boolean;
+	/** Apply Octane Strong diagnostics to the generated document and authored JavaScript. */
+	strong?: boolean;
+	/**
+	 * Generated host tags that may be replaced through component mappings.
+	 * Omit to keep every generated host overridable; [] makes them all native.
+	 * Named components and layouts retain their existing mapping behavior.
+	 */
+	overridableTags?: readonly string[];
 	/**
 	 * Module the emitted document reads the provider mapping from
 	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /

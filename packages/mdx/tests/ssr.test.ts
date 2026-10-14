@@ -36,6 +36,42 @@ function stripMarkers(html: string): string {
 }
 
 describe('SSR', () => {
+	it.each([undefined, ['h1'], []])(
+		'preserves server mapping precedence with overridable tags %j',
+		(overridableTags) => {
+			const { code } = compileMdxSync(
+				'# Heading\n\nA *word*.\n\n<h1>Literal</h1>\n\n<Widget>Named</Widget>',
+				'/docs/overrides.mdx',
+				{ mode: 'server', strong: true, overridableTags },
+			);
+			const Doc = evalModuleCode(code, {
+				'octane/server': ServerRT,
+				'@octanejs/mdx/server': ServerProvider,
+			}).default;
+			const { html } = ServerRT.renderToString(ServerProvider.MDXProvider as any, {
+				components: { h1: 'h2', em: 'i', Widget: 'strong', wrapper: 'section' },
+				children: ServerRT.createElement(Doc, {
+					components: {
+						h1: 'h3',
+						em: 'b',
+						Widget: 'small',
+						wrapper: (props: { children?: unknown }) =>
+							ServerRT.createElement('main', null, props.children),
+					},
+				}),
+			});
+			const flat = stripMarkers(html);
+			expect(flat).toContain(
+				overridableTags?.length === 0 ? '<h1>Heading</h1>' : '<h3>Heading</h3>',
+			);
+			expect(flat).toContain(overridableTags === undefined ? '<b>word</b>' : '<em>word</em>');
+			expect(flat).toContain('<h1>Literal</h1>');
+			expect(flat).toContain('<small>Named</small>');
+			expect(flat).toContain('<main>');
+			expect(flat).not.toContain('<section>');
+		},
+	);
+
 	it('renderToString renders a markdown document', () => {
 		const mod = serverModule('basic.mdx');
 		const { html } = ServerRT.renderToString(mod.default, {});

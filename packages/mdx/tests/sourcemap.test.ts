@@ -37,10 +37,25 @@ describe('sourcemaps', () => {
 			}
 			throw new Error(`needle not in output: ${needle}`);
 		};
-		const first = originalPositionFor(tracer, genPos('"First"'));
+		const first = originalPositionFor(tracer, genPos('First'));
 		expect(first.line).toBe(1);
-		const later = originalPositionFor(tracer, genPos('"Later"'));
+		const later = originalPositionFor(tracer, genPos('Later'));
 		expect(later.line).toBe(9);
+	});
+
+	it('maps authored expressions when surrounding hosts are specialized', () => {
+		const source = 'import { read } from "./text.js";\n\n# {read()}\n';
+		const { code, map } = compileMdxSync(source, '/docs/read.mdx', { overridableTags: [] });
+		const tracer = new TraceMap(JSON.parse(JSON.stringify(map)));
+		expect(tracer.sources).toEqual(['/docs/read.mdx']);
+		const lines = code.split('\n');
+		const line = lines.findIndex((text) => text.includes('read()'));
+		expect(line).toBeGreaterThan(-1);
+		const location = originalPositionFor(tracer, {
+			line: line + 1,
+			column: lines[line].indexOf('read()'),
+		});
+		expect(location).toMatchObject({ source: '/docs/read.mdx', line: 3, column: 3 });
 	});
 
 	it('returns a valid (if currently empty) map for server compiles', () => {
