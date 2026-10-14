@@ -4593,13 +4593,18 @@ interface SlotNext {
 	bound: any[] | null;
 }
 
-/** The open root render's pending structure for `slot`, queued for its commit. */
-function slotNext(slot: { next: SlotNext | null }): SlotNext {
+/**
+ * The open root render's pending structure for `slot`, queued for its commit:
+ * last, or at `at` in the commit queue (a keyed list's, listNext).
+ */
+function slotNext(slot: { next: SlotNext | null }, at = -1): SlotNext {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	let next = slot.next;
 	if (next === null || next.tx !== tx) {
-		next = slot.next = newSlotNext(tx, null, null);
-		tx.ops.push(applySlotNext, slot);
+		next = slot.next = newSlotNext(tx);
+		const ops = tx.ops;
+		if (at < 0 || at >= ops.length) ops.push(applySlotNext, slot);
+		else ops.splice(at, 0, applySlotNext, slot);
 		// A window that drops truncates what it created; only a structure an
 		// outer window built needs copying back (below).
 		if (TRANSITION_JOURNAL_DEPTH > 1)
@@ -4643,22 +4648,13 @@ function slotFrontier(
  * after the fragment, becomes its owner).
  */
 function queueFrontier(owner: Block | null, parent: Node, before: Node | null): DocumentFragment {
-	const tx = ROOT_RENDER_TRANSACTION!;
-	const next: SlotNext = {
-		tx,
-		out: [],
-		frag: null,
-		root: null,
-		parent: null,
-		before: null,
-		members: null,
-		owner: null,
-		follows: false,
-		bound: null,
-	};
-	tx.ops.push(applyNext, next);
+	const next = newSlotNext(ROOT_RENDER_TRANSACTION!);
+	next.tx.ops.push(applyNext, next);
 	return openFrontier(next, owner, parent, before);
 }
+
+/** A detached arm root's members: none, and nothing adds any (it has no fragment). */
+const NO_MEMBERS: any[] = [];
 
 /** Committed frontiers, empty again: the next renders reuse them (applyNext). */
 const SPARE_FRONTIERS: DocumentFragment[] = [];
@@ -4733,52 +4729,23 @@ function queueSlotDeletion(
 function applySlotNext(slot: { next: SlotNext | null }): void {
 	const next = slot.next;
 	slot.next = null;
-	if (next === null) return;
-	applyNext(next);
-	// Nothing names an applied record once its fragment lets go of it: reuse it.
-	if (SPARE_NEXTS.length < 64) {
-		if (next.frag !== null) (next.frag as any).$$next = undefined;
-		// A list's landed runs are empty again, and nothing names them (placeRun).
-		const out = next.out;
-		for (let i = 0; i < out.length; i += 3)
-			if (out[i] === placeRun && SPARE_FRONTIERS.length < 64 && out[i + 1].firstChild === null)
-				SPARE_FRONTIERS.push(out[i + 1]);
-		out.length = 0;
-		next.frag = next.root = next.parent = next.before = null;
-		next.members = next.bound = null;
-		next.owner = null;
-		next.follows = false;
-		SPARE_NEXTS.push(next);
-	}
+	if (next !== null) applyNext(next);
 }
 
-/** Applied slot records, reset for the next render's (applySlotNext). */
-const SPARE_NEXTS: SlotNext[] = [];
-
-/** A slot's pending structure for `tx`: a spare record, or a new one. */
-function newSlotNext(
-	tx: RootRenderTransaction,
-	parent: Node | null,
-	owner: Block | null,
-): SlotNext {
-	const next = SPARE_NEXTS.pop();
-	if (next === undefined)
-		return {
-			tx,
-			out: [],
-			frag: null,
-			root: null,
-			parent,
-			before: null,
-			members: null,
-			owner,
-			follows: false,
-			bound: null,
-		};
-	next.tx = tx;
-	next.parent = parent;
-	next.owner = owner;
-	return next;
+/** A slot's pending structure for `tx`. */
+function newSlotNext(tx: RootRenderTransaction): SlotNext {
+	return {
+		tx,
+		out: [],
+		frag: null,
+		root: null,
+		parent: null,
+		before: null,
+		members: null,
+		owner: null,
+		follows: false,
+		bound: null,
+	};
 }
 
 function applyNext(next: SlotNext): void {
@@ -4791,20 +4758,11 @@ function applyNext(next: SlotNext): void {
 	}
 	applyOutgoing(out, parent);
 	const members = next.members;
-	const root = next.root;
-	if (root !== null) {
-		// A branch arm's detached root lands alone; nothing names a fragment.
-		if (next.owner!.disposed) return;
-		parent.insertBefore(root, before);
-		const bound = next.bound;
-		if (bound !== null)
-			replaceSharedBlockBoundary(bound[0], bound[1], bound[2], bound[3], bound[4]);
-		return;
-	}
 	// A deletion cleanup can unmount the slot's owner before its content lands.
 	if (members === null || next.owner!.disposed) return;
 	const frag = next.frag;
-	if (frag !== null) parent.insertBefore(frag, before);
+	// A branch arm's detached root lands alone, with no members to rehome.
+	if (frag !== null || next.root !== null) parent.insertBefore(frag ?? next.root!, before);
 	for (let i = 0; i < members.length; i += 2) {
 		const member = members[i];
 		const from = members[i + 1];
@@ -5034,30 +4992,13 @@ function queueRootUnmount(scope: Scope, exclusive: boolean, out?: any[]): void {
 function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | null {
 	const tx = ROOT_RENDER_TRANSACTION;
 	if (tx === null) return null;
-	let next = state.next;
-	if (next !== null && next.tx === tx) {
-		// A nested window that drops restores the log an outer window began.
-		if (
-			TRANSITION_JOURNAL_DEPTH > 1 &&
-			(TRANSITION_JOURNAL_BAGS!.get(next) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
-		) {
-			journalObjectOnce(next);
-			journalObjectOnce(next.out);
-			if (next.members !== null) journalObjectOnce(next.members);
-		}
-		return next;
-	}
-	const end = state.end;
-	const parent = end.parentNode!;
+	if (state.next !== null && state.next.tx === tx) return slotNext(state);
+	const parent = state.end.parentNode!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
-	let owner = parentBlock;
-	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
 	// Its members list starts with its first run (listRun).
-	next = state.next = newSlotNext(tx, parent, owner);
-	const ops = tx.ops;
-	if (at >= ops.length) ops.push(applySlotNext, state);
-	else ops.splice(at, 0, applySlotNext, state);
-	if (TRANSITION_JOURNAL_DEPTH > 1) TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
+	const next = slotNext(state, at);
+	next.parent = parent;
+	next.owner = owningBlock(parentBlock);
 	return next;
 }
 
@@ -5096,7 +5037,7 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
 	const out = next.out;
 	const n = out.length;
 	if (n !== 0 && out[n - 3] === placeRun && out[n - 1] === anchor) return out[n - 2];
-	const frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
+	const frag = document.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.members ??= [];
 	out.push(placeRun, frag, anchor);
@@ -5815,7 +5756,7 @@ function fullForSlotRecord(state: ForSlot, record: ForSlotRecord | null): void {
  * reference for rollback, then give any same-attempt refill a fresh key map.
  * The generic journal still snapshots reordered/partially changed lists.
  */
-function journalForOwnedListClear(state: ForSlot): void {
+function journalForListClear(state: ForSlot): void {
 	const seen = TRANSITION_JOURNAL_BAGS!;
 	// An enclosing window's link record stops gathering links here.
 	const at = seen.get(state) ?? -1;
@@ -36236,27 +36177,17 @@ function promoteSelfMarkedItem(block: Block): void {
 		sm.parentNode === null
 	)
 		return;
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (usesFrontier(block, sm.parentNode)) {
-		// A render that dropped leaves its pair pending for the next one.
-		let pair = (PENDING_ITEM_PAIRS ??= new WeakMap()).get(block);
-		if (pair === undefined || pair[0] !== sm) {
-			pair = [sm, document.createComment('it'), document.createComment('/it'), block, null];
-			PENDING_ITEM_PAIRS.set(block, pair);
-		}
-		if (pair[4] !== transaction) {
-			pair[4] = transaction;
-			transaction!.ops.push(landItemPair, pair);
-		}
-		return;
+	// A render that dropped leaves its pair pending for the next one.
+	let pair = PENDING_ITEM_PAIRS?.get(block);
+	if (pair === undefined || pair[0] !== sm)
+		pair = [sm, document.createComment('it'), document.createComment('/it'), block, null];
+	if (!usesFrontier(block, sm.parentNode)) return landItemPair(pair);
+	(PENDING_ITEM_PAIRS ??= new WeakMap()).set(block, pair);
+	const transaction = ROOT_RENDER_TRANSACTION!;
+	if (pair[4] !== transaction) {
+		pair[4] = transaction;
+		transaction.ops.push(landItemPair, pair);
 	}
-	const p = sm.parentNode!;
-	const s = document.createComment('it');
-	const e = document.createComment('/it');
-	p.insertBefore(s, sm);
-	p.insertBefore(e, getNextSibling(sm));
-	block.startMarker = s;
-	block.endMarker = e;
 }
 
 /** Self-marked items whose `it` pair a root render minted: [node, start, end, block, transaction]. */
@@ -36272,7 +36203,7 @@ function itemRange(block: Block): [Node | null, Node | null] {
 
 function landItemPair(pair: any[]): void {
 	const [node, start, end, block] = pair as [Node, Comment, Comment, Block];
-	if (PENDING_ITEM_PAIRS!.get(block) === pair) PENDING_ITEM_PAIRS!.delete(block);
+	if (PENDING_ITEM_PAIRS?.get(block) === pair) PENDING_ITEM_PAIRS.delete(block);
 	const parent = node.parentNode;
 	if (block.disposed || block.startMarker !== node || parent === null) return;
 	parent.insertBefore(start, node);
@@ -45298,6 +45229,7 @@ function swapBranchFrontier(
 			landing.parent = domParent;
 			landing.before = before;
 			landing.owner = owningBlock(parentBlock);
+			landing.members = NO_MEMBERS;
 			// commitBag self-marked the arm with its root, which lands at commit. A
 			// first arm that suspended before its root lands where its anchor is.
 			if (arm.endMarker !== end) landing.root = arm.startMarker;
@@ -47189,7 +47121,7 @@ export function forBlock<T>(
 			let frag: DocumentFragment | null = null;
 			let sentinel: Comment | null = null;
 			if (next !== null) {
-				frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
+				frag = document.createDocumentFragment();
 				(frag as any).$$next = next;
 				next.members ??= [];
 				next.out.push(placeRun, frag, state.end);
@@ -48276,14 +48208,15 @@ function reconcileKeyed<T>(
 	// Fast path: clear all.
 	if (newLen === 0) {
 		next = listNext(state, parentBlock, at);
-		const ownedRootClear = next !== null && canQueueOwnedListClear(state);
+		// A committed list's rows change nothing before its commit clears them.
 		if (
-			ownedRootClear &&
+			next !== null &&
 			(TRANSITION_JOURNAL_BAGS!.get(state) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
 		)
-			journalForOwnedListClear(state);
+			journalForListClear(state);
 		else if (journalShape) journalForSlot(state);
-		batchClearItems(state, ownedRootClear ? state.items : oldItems, next, ownedRootClear);
+		// The undo holds the old key map; clear only the one the list now has.
+		batchClearItems(state, state.items, next);
 		state.head = null;
 		state.tail = null;
 		state.size = 0;
@@ -48853,108 +48786,6 @@ function reconcileKeyed<T>(
 const RANGE_CLEAR_MIN_ITEMS = 512;
 
 /**
- * Keep an owned list's inert rows connected until the root accepts its render,
- * then release their scopes and remove their host nodes in one DOM operation.
- * Rows with lifecycle work clear through batchClearItems' commit entry, so
- * their cleanup order and connected-DOM observations remain unchanged.
- */
-function canQueueOwnedListClear(state: ForSlot): boolean {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	const parent = state.start.parentNode;
-	if (
-		transaction === null ||
-		transaction.aborted ||
-		ROOT_RENDER_ROLLBACK ||
-		transaction.hydrating === true ||
-		state.adopt !== null ||
-		state.size < 16 ||
-		parent === null ||
-		(parent.nodeType !== 1 && parent.nodeType !== 11) ||
-		state.end.parentNode !== parent ||
-		state.start.previousSibling !== null ||
-		getNextSibling(state.end) !== null
-	)
-		return false;
-	const oldHead = state.head;
-	for (let block = oldHead; block !== null; block = block.nextSibling) {
-		if (
-			!block.mounted ||
-			block.idState.renderOwner !== transaction.owner ||
-			block.startMarker === null ||
-			block.startMarker !== block.endMarker ||
-			block.hooks !== null ||
-			block.effectSlots !== null ||
-			block.cleanups !== null ||
-			block.children !== null ||
-			block._slots !== null ||
-			block.refFields !== null ||
-			block.deoptNode !== null ||
-			block.signalOwner !== undefined ||
-			block.signalTokenEscaped ||
-			(block.rare !== null && block.rare.vt !== null)
-		)
-			return false;
-	}
-	return true;
-}
-
-function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = false): boolean {
-	if (!certified && !canQueueOwnedListClear(state)) return false;
-	const transaction = ROOT_RENDER_TRANSACTION!;
-	const parent = state.start.parentNode!;
-	const oldHead = state.head;
-	retireBlocks(oldHead, transaction, false);
-	const start = state.start;
-	const end = state.end;
-	// The list's log runs this before its later runs land. Outside code may have
-	// changed this parent, so only clear wholesale while these exact old nodes
-	// still occupy its complete content between the original two markers.
-	const clear = () => {
-		let wholeParent =
-			start.parentNode === parent &&
-			end.parentNode === parent &&
-			start.previousSibling === null &&
-			getNextSibling(end) === null;
-		if (wholeParent) {
-			// This walk visits every cleared row: read the native getter directly
-			// instead of calling getNextSibling per row, unless a stage is active.
-			const read = nextSiblingGetter;
-			let node = getNextSibling(start);
-			for (let block = oldHead; block !== null; block = block.nextSibling) {
-				if (node === null || node !== block.startMarker) {
-					wholeParent = false;
-					break;
-				}
-				node = read !== undefined ? read.call(node) : getNextSibling(node);
-			}
-			if (node !== end) wholeParent = false;
-		}
-		for (let block = oldHead; block !== null; block = block.nextSibling) block.disposed = true;
-		// Inert rows run no cleanup, so only removing a focused row can dispatch at
-		// one. Every child of this owned parent is an outgoing row: retire the one
-		// holding the focus the scheduler captured for this pass, not every row. A
-		// drain over several focused documents (an array) retires none; an inert
-		// row's handler belongs to its live list owner.
-		let row: Node | null | undefined = (renderingFocus as FocusSelectionSnapshot | null)?.focused;
-		while (row != null && row.parentNode !== parent)
-			row = row.parentNode ?? (row as ShadowRoot).host;
-		if (row != null) retireEventHostTree(row);
-		if (wholeParent) {
-			parent.textContent = '';
-			parent.appendChild(start);
-			parent.appendChild(end);
-		} else {
-			for (let block = oldHead; block !== null; block = block.nextSibling) {
-				const node = block.startMarker!;
-				if (node.parentNode !== null) node.parentNode!.removeChild(node);
-			}
-		}
-	};
-	out.push(clear, null, null);
-	return true;
-}
-
-/**
  * Bulk-clear a forBlock's items. When the forBlock owns its parent (markers
  * bracket the entire content), uses `textContent = ''` — the fastest DOM clear
  * on Chromium per Ripple's measured advantage on the `clear` op. A shared
@@ -48975,25 +48806,19 @@ function batchClearItems(
 	state: ForSlot,
 	oldItems: Map<any, Block>,
 	next: SlotNext | null = null,
-	ownedRootClear: boolean = false,
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_REMOVE, state.size);
-	// A committed list's rows stay connected until its commit, which clears
-	// them, inert ones in one DOM operation, before its later runs land.
+	const head = state.head;
+	const start = state.start;
+	const end = state.end;
+	const size = state.size;
+	// A committed list's rows stay connected until its commit clears them,
+	// before its later runs land.
 	if (next !== null) {
-		if (!queueOwnedListClear(state, next.out, ownedRootClear)) {
-			const head = state.head;
-			const start = state.start;
-			const end = state.end;
-			const size = oldItems.size;
-			retireBlocks(head, next.tx, false);
-			next.out.push(() => clearItems(head, start, end, size), null, null);
-		}
-		oldItems.clear();
-		return;
-	}
-	clearItems(state.head, state.start, state.end, oldItems.size);
+		retireBlocks(head, next.tx, false);
+		next.out.push(() => clearItems(head, start, end, size), null, null);
+	} else clearItems(head, start, end, size);
 	oldItems.clear();
 }
 
@@ -49008,10 +48833,12 @@ function clearItems(first: Block | null, start: Comment, end: Comment, size: num
 	}
 	TEARDOWN_DEPTH++;
 	try {
-		// Retire every row before any row's cleanup can move focus off another: the
-		// whole span between the list's markers leaves below. Only captured focus
-		// (or no capture at all) can make a row dispatch.
-		if (renderingFocus !== null || !inFlush) retireHostRange(getNextSibling(start), end);
+		// Retire every row before any row's cleanup can move focus off another. Only
+		// captured focus (or no capture at all) can make a row dispatch, and a node
+		// outside code put between the rows keeps its own handlers.
+		if (renderingFocus !== null || !inFlush)
+			for (let b: Block | null = first; b !== null; b = b.nextSibling)
+				if (b.startMarker != null) retireHostRange(b.startMarker, b.endMarker);
 		// Dispose the items before their DOM leaves, like every other deletion:
 		// cleanups observe attached hosts. Walk the intrusive item chain (head →
 		// nextSibling) rather than the Map's iterator: zero allocation and a
@@ -49044,7 +48871,25 @@ function clearItems(first: Block | null, start: Comment, end: Comment, size: num
 		// A commit's earlier deletion cleanup can have unmounted the list itself.
 		const p = start.parentNode;
 		if (p === null) return;
-		if (start.previousSibling === null && getNextSibling(end) === null) {
+		// Clear wholesale only while exactly these rows lie between the markers:
+		// outside code may have added a node there since the render.
+		// getNextSibling, inlined: this visits every row.
+		const read = nextSiblingGetter;
+		let node: Node | null = getNextSibling(start);
+		for (let b: Block | null = first; b !== null && node !== null; b = b.nextSibling) {
+			const last = b.endMarker;
+			node =
+				node !== b.startMarker || last === null
+					? null
+					: read !== undefined
+						? read.call(last)
+						: last.nextSibling;
+		}
+		if (node !== end) {
+			for (let b: Block | null = first; b !== null; b = b.nextSibling)
+				if (b.startMarker != null && b.startMarker.parentNode === p)
+					removeRange(b.startMarker, getNextSibling(b.endMarker!));
+		} else if (start.previousSibling === null && getNextSibling(end) === null) {
 			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
 			(p as Element).textContent = '';
 			p.appendChild(start);
