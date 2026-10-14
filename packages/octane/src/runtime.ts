@@ -4703,47 +4703,27 @@ function queueSlotDeletion(
 function applySlotNext(slot: { next: SlotNext | null }): void {
 	const next = slot.next;
 	slot.next = null;
-	if (next === null) return;
-	applyNext(next);
-	// Nothing names an applied record once its fragment lets go of it: reuse it.
-	if (SPARE_NEXTS.length < 64) {
-		if (next.frag !== null) (next.frag as any).$$next = undefined;
-		next.out.length = 0;
-		next.frag = next.root = next.parent = next.before = null;
-		next.members = next.bound = null;
-		next.owner = null;
-		next.follows = false;
-		SPARE_NEXTS.push(next);
-	}
+	if (next !== null) applyNext(next);
 }
 
-/** Applied slot records, reset for the next render's (applySlotNext). */
-const SPARE_NEXTS: SlotNext[] = [];
-
-/** A slot's pending structure for `tx`: a spare record, or a new one. */
+/** A slot's pending structure for `tx`. */
 function newSlotNext(
 	tx: RootRenderTransaction,
 	parent: Node | null,
 	owner: Block | null,
 ): SlotNext {
-	const next = SPARE_NEXTS.pop();
-	if (next === undefined)
-		return {
-			tx,
-			out: [],
-			frag: null,
-			root: null,
-			parent,
-			before: null,
-			members: null,
-			owner,
-			follows: false,
-			bound: null,
-		};
-	next.tx = tx;
-	next.parent = parent;
-	next.owner = owner;
-	return next;
+	return {
+		tx,
+		out: [],
+		frag: null,
+		root: null,
+		parent,
+		before: null,
+		members: null,
+		owner,
+		follows: false,
+		bound: null,
+	};
 }
 
 function applyNext(next: SlotNext): void {
