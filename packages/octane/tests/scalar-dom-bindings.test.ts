@@ -37,7 +37,7 @@ const NUMBERED = `export function Numbered(props) @{
   </section>
 }`;
 
-// Browser page translation rewrites the server's text leaves before adoption.
+// Fixed text leaves must retain the server topology before adoption.
 const PANEL = `export function Panel(props) @{
   'use dom bindings';
   <div hidden={props.hidden}>
@@ -112,20 +112,6 @@ function translate(leaf: Element, text: string): Element {
 	inner.textContent = text;
 	leaf.replaceChildren(outer);
 	return outer;
-}
-
-function textChildren(leaf: Element) {
-	return [...leaf.childNodes].map((node) => [node.nodeType, node.nodeValue]);
-}
-
-// Page translation can move a text leaf's boundary whitespace between elements.
-function insertBoundaryWhitespace(parent: Element) {
-	for (const before of [...parent.children, null]) {
-		for (const value of ['', '\t', '\n', '\f', '\r', '   ']) {
-			parent.insertBefore(document.createTextNode(value), before);
-		}
-	}
-	return [...parent.childNodes];
 }
 
 function expectChildIdentity(parent: Element, children: readonly ChildNode[]) {
@@ -340,99 +326,41 @@ describe.each([
 		scope.dispose();
 	});
 
-	// Translating again before adoption would flash the source language, so a
-	// translated leaf stays as it is until its value changes.
 	it.each([false, true])(
-		'adopts translated text leaves untouched and replaces each on change (hidden=%s)',
+		'rejects externally wrapped text before reading or subscribing (hidden=%s)',
 		(hidden) => {
-			const { props, root, span, button, adopt } = panel(hidden);
-			const message = translate(span, 'Processing was interrupted.');
-			const label = translate(button, 'Retry');
-			const observer = new MutationObserver(() => {});
-			observer.observe(root, {
-				subtree: true,
-				childList: true,
-				characterData: true,
-				attributes: true,
-			});
+			const { props, root, span, adopt } = panel(hidden);
+			translate(span, 'Processing was interrupted.');
+			const retained = root.innerHTML;
 			const model = source(props);
-			const handle = adopt(model.state);
-			try {
-				expect(observer.takeRecords()).toEqual([]);
-				expect(document.querySelector('span')).toBe(span);
-				expect(document.querySelector('button')).toBe(button);
-				expect([span.firstChild, button.firstChild]).toEqual([message, label]);
-				expect([root.hidden, button.hidden]).toEqual([hidden, hidden]);
-
-				model.publish({ label: 'Fermer' });
-				expect(textChildren(button)).toEqual([[3, 'Fermer']]);
-				expect(span.firstChild).toBe(message);
-				model.publish({ message: 'Nouveau message.', hidden: !hidden });
-				expect(textChildren(span)).toEqual([[3, 'Nouveau message.']]);
-				expect([root.hidden, button.hidden]).toEqual([!hidden, !hidden]);
-				expect(document.querySelector('span')).toBe(span);
-				expect(document.querySelector('button')).toBe(button);
-			} finally {
-				observer.disconnect();
-				handle.dispose();
-			}
+			expect(() => adopt(model.state)).toThrow(/mismatched static element topology/);
+			expect(root.innerHTML).toBe(retained);
+			expect(model.getSnapshot).not.toHaveBeenCalled();
+			expect(model.subscribers.size).toBe(0);
 		},
 	);
 
-	it('replaces a text leaf translated after adoption when its value changes', () => {
-		const { props, span, button, adopt } = panel(false);
-		const model = source(props);
-		const handle = adopt(model.state);
-		try {
-			translate(span, 'Processing was interrupted.');
-			translate(button, 'Retry');
-			model.publish({ message: 'Nouveau message.', label: 'Fermer' });
-			expect(textChildren(span)).toEqual([[3, 'Nouveau message.']]);
-			expect(textChildren(button)).toEqual([[3, 'Fermer']]);
-			model.publish({ message: 'Encore.' });
-			expect(textChildren(span)).toEqual([[3, 'Encore.']]);
-		} finally {
-			handle.dispose();
+	it.each([false, true])('rejects extra whitespace in closed child lists (hidden=%s)', (hidden) => {
+		for (const value of ['', '\t', '\n', '\f', '\r', '   ']) {
+			for (const position of [0, 1, 2]) {
+				const { props, root, adopt } = panel(hidden);
+				root.insertBefore(document.createTextNode(value), root.children[position] ?? null);
+				const retained = [...root.childNodes];
+				const model = source(props);
+				expect(() => adopt(model.state)).toThrow(/mismatched static element topology/);
+				expectChildIdentity(root, retained);
+				expect(model.getSnapshot).not.toHaveBeenCalled();
+				expect(model.subscribers.size).toBe(0);
+			}
 		}
 	});
 
-	it.each([false, true])(
-		'preserves whitespace between fixed elements through adoption and updates (hidden=%s)',
-		(hidden) => {
-			const { props, root, span, button, adopt } = panel(hidden);
-			const children = insertBoundaryWhitespace(root);
-			const childValues = children.map((node) => node.nodeValue);
-			const model = source(props);
-			const handle = adopt(model.state);
-			try {
-				expectChildIdentity(root, children);
-				expect(children.map((node) => node.nodeValue)).toEqual(childValues);
-				expect(model.subscribers.size).toBe(1);
-				model.publish({ message: 'Updated message', label: 'Continue', hidden: !hidden });
-				expect([span.textContent, button.textContent]).toEqual(['Updated message', 'Continue']);
-				expect([root.hidden, button.hidden]).toEqual([!hidden, !hidden]);
-				expect(root.querySelector('span')).toBe(span);
-				expect(root.querySelector('button')).toBe(button);
-				expectChildIdentity(root, children);
-			} finally {
-				handle.dispose();
-			}
-			expect(model.cleanup).toHaveBeenCalledOnce();
-			expect(model.subscribers.size).toBe(0);
-			model.publish({ message: 'After disposal' });
-			expect(span.textContent).toBe('Updated message');
-			expectChildIdentity(root, children);
-			expect(children.map((node) => node.nodeValue)).toEqual(childValues);
-		},
-	);
-
-	it('still refuses a text leaf holding any other element', () => {
+	it('refuses a text leaf holding an element', () => {
 		const { props, span, adopt } = panel(false);
 		for (const leaf of [
 			[document.createElement('b')],
 			[document.createTextNode('Le'), document.createElement('font')],
 			[document.createTextNode(' '), document.createElement('font')],
-			// Translation replaces one Text node with one wrapper.
 			[document.createElement('font'), document.createTextNode(' en plus')],
 		]) {
 			span.replaceChildren(...leaf);
@@ -682,25 +610,37 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 		};
 	}
 
-	it('adopts a translated leaf untouched and replaces it on change', () => {
+	it('rejects externally wrapped text before reading or subscribing', () => {
 		const { props, heading, adopt } = feed();
-		const translated = translate(heading, 'News');
+		translate(heading, 'News');
+		const retained = heading.innerHTML;
 		const model = source(props);
-		const handle = adopt(model.state);
-		try {
-			expect(heading.firstChild).toBe(translated);
-			model.publish({ title: 'Archives' });
-			expect(textChildren(heading)).toEqual([[3, 'Archives']]);
-		} finally {
-			handle.dispose();
+		expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
+		expect(heading.innerHTML).toBe(retained);
+		expect(model.getSnapshot).not.toHaveBeenCalled();
+		expect(model.subscribers.size).toBe(0);
+	});
+
+	it('rejects extra whitespace between closed addressed children', () => {
+		for (const value of ['', '\t', '\n', '\f', '\r', '   ']) {
+			for (const position of [0, 1, 2]) {
+				const { props, heading, adopt } = feed();
+				const header = heading.parentElement!;
+				header.insertBefore(document.createTextNode(value), header.children[position] ?? null);
+				const retained = [...header.childNodes];
+				const model = source(props);
+				expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
+				expectChildIdentity(header, retained);
+				expect(model.getSnapshot).not.toHaveBeenCalled();
+				expect(model.subscribers.size).toBe(0);
+			}
 		}
 	});
 
-	it('preserves whitespace between closed addressed children and leaves open children alone', () => {
+	it('updates owned text while preserving open children through disposal', () => {
 		const { props, heading, adopt } = feed();
+		const text = heading.firstChild;
 		const header = heading.parentElement!;
-		const children = insertBoundaryWhitespace(header);
-		const childValues = children.map((node) => node.nodeValue);
 		const section = header.parentElement!;
 		const external = document.createElement('aside');
 		section.append(document.createComment('external'), external, '\u00a0 unbound ');
@@ -708,14 +648,10 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 		const model = source(props);
 		const handle = adopt(model.state);
 		try {
-			expectChildIdentity(header, children);
-			expect(children.map((node) => node.nodeValue)).toEqual(childValues);
 			expectChildIdentity(section, openChildren);
-			expect(model.subscribers.size).toBe(1);
 			model.publish({ title: 'Archives' });
 			expect(heading.textContent).toBe('Archives');
-			expect(header.querySelector('h2')).toBe(heading);
-			expectChildIdentity(header, children);
+			expect(heading.firstChild).toBe(text);
 			expectChildIdentity(section, openChildren);
 		} finally {
 			handle.dispose();
@@ -724,12 +660,10 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 		expect(model.subscribers.size).toBe(0);
 		model.publish({ title: 'After disposal' });
 		expect(heading.textContent).toBe('Archives');
-		expectChildIdentity(header, children);
-		expect(children.map((node) => node.nodeValue)).toEqual(childValues);
 		expectChildIdentity(section, openChildren);
 	});
 
-	it('still refuses a leaf holding any other element', () => {
+	it('refuses a leaf holding an element', () => {
 		for (const leaf of [
 			[document.createElement('b')],
 			[document.createElement('font'), document.createElement('font')],
