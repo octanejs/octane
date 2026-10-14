@@ -3994,7 +3994,8 @@ const BAG_POOL: any[][] = [[], [], [], [], [], [], [], []];
 
 /** After a commit op: while the pool is short, return an idle bag's cells to it. */
 function releaseBag(target: any): void {
-	if (typeof target?.$ === 'number' && target.$ <= BAG_SIZE && target.next !== null) {
+	// Only a bag has `$`; anything else compares undefined, which is false.
+	if (target?.$ <= BAG_SIZE && target.next !== null) {
 		BAG_POOL.push(target.next);
 		target.next = null;
 	}
