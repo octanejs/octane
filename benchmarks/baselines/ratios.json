@@ -2251,6 +2251,30 @@
     "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
   },
   {
+    "suite": "render-values",
+    "op": "hit_functions",
+    "target": "render-values-inline",
+    "reference": "render-values-reference",
+    "maxRatio": 0,
+    "note": "Direct inline template values must retain narrow capture invalidation: fresh props with an unchanged label create no application function expressions while an unrelated visible tick changes."
+  },
+  {
+    "suite": "render-values",
+    "op": "miss_functions",
+    "target": "render-values-inline",
+    "reference": "render-values-reference",
+    "maxRatio": 1,
+    "note": "A changed captured label may create one compiled body per update, matching the handwritten wrapper; retained DOM, input value and focus must remain correct."
+  },
+  {
+    "suite": "render-values",
+    "op": "descriptor_values",
+    "target": "render-values-inline",
+    "reference": "render-values-reference",
+    "maxRatio": 0,
+    "note": "Direct inline template component props must arrive as callable render bodies, without element descriptors, on both capture hits and misses."
+  },
+  {
     "suite": "hook-memo",
     "op": "named_reads",
     "target": "compiler-cache-shapes",

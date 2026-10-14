@@ -146,6 +146,7 @@ export const BENCHMARK_SUITES = [
 	'codegen-size',
 	'dom-binding-fixed-props',
 	'hook-memo',
+	'render-values',
 	'body-ownership',
 	'dom-attributes',
 	'transition-hooks',
