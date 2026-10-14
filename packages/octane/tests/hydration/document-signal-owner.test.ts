@@ -15,6 +15,34 @@ import {
 } from '../../src/signals/index.js';
 
 describe('browser document signal ownership', () => {
+	it('owns the selected initial document data before the caller mutates its manifest', () => {
+		const owner = { scopeKey: 'copied-document' };
+		const entry = {
+			key: 'g:copied-draft',
+			kind: 'signal' as const,
+			value: ['string', 'initial'] as ['string', string],
+			complete: true,
+		};
+		const hydration = bootstrapStreamedSignalResults({
+			buildId: 'initial-owner-build',
+			documentId: 'initial-owner-response',
+			signalOwner: owner,
+			initialSignals: {
+				version: 1,
+				scopes: [{ version: 1, scopeKey: owner.scopeKey, entries: [entry] }],
+			},
+			target: { __octaneStreamedSignalSelections: { version: 1, identities: [], register() {} } },
+		});
+		try {
+			entry.value[1] = 'mutated';
+			expect(runWithSignalOwner(owner, () => signal$('default', { key: entry.key }).get())).toBe(
+				'initial',
+			);
+		} finally {
+			hydration.dispose();
+		}
+	});
+
 	it('supports global writes before roots and from asynchronous callbacks without a scope', async () => {
 		enableSignalBindings();
 		expect(() =>

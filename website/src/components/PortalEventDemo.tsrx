@@ -1,7 +1,9 @@
+'use strong';
+
 // A toast-shaped portal makes both halves of the contract visible: its DOM is
 // mounted in a sibling target, while delegated events follow the logical
 // Octane tree back through the component that created it.
-import { createPortal, useLayoutEffect, useRef, useState } from 'octane';
+import { createPortal, useLayoutSnapshot, useRef, useState } from 'octane';
 
 interface SavedToastProps {
 	target: HTMLElement;
@@ -64,12 +66,9 @@ function SavedToast(props: SavedToastProps) {
 
 export function PortalEventDemo() @{
 	const portalTargetRef = useRef<HTMLDivElement | null>(null);
-	const [targetReady, setTargetReady] = useState(false);
 	const [showToast, setShowToast] = useState(false);
 	const [parentClicks, setParentClicks] = useState(0);
-	const portalTarget = portalTargetRef.current;
-
-	useLayoutEffect(() => setTargetReady(true), []);
+	const portalTarget = useLayoutSnapshot(() => portalTargetRef.current, { initial: null });
 
 	<>
 		<style>
@@ -148,7 +147,7 @@ export function PortalEventDemo() @{
 					</button>
 					<div class="portal-demo-parent" onClick={() => setParentClicks((count) => count + 1)}>
 						<span>{'Event parent'}</span>
-						@if (targetReady && portalTarget !== null && showToast) {
+						@if (portalTarget !== null && showToast) {
 							<SavedToast target={portalTarget} onDismiss={() => setShowToast(false)} />
 						}
 					</div>

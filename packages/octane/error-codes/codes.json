@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 347,
+  "nextCode": 350,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -1717,7 +1717,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation rewriting framework-owned DOM. External text wrappers and added nodes are unsupported. Add translate=\"no\" to the owned root in the initial server-rendered HTML; for Google page translation, add <meta name=\"google\" content=\"notranslate\"> to the document head. These opt-outs depend on the tool honoring them."
     },
     "287": {
       "message": "This opaque view cannot be constructed without its external owner.",
@@ -1910,7 +1910,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation rewriting framework-owned DOM. External text wrappers and added nodes are unsupported. Add translate=\"no\" to the owned root in the initial server-rendered HTML; for Google page translation, add <meta name=\"google\" content=\"notranslate\"> to the document head. These opt-outs depend on the tool honoring them."
     },
     "319": {
       "message": "DOM bindings cannot adopt an incomplete static element topology.",
@@ -1929,7 +1929,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation rewriting framework-owned DOM. External text wrappers and added nodes are unsupported. Add translate=\"no\" to the owned root in the initial server-rendered HTML; for Google page translation, add <meta name=\"google\" content=\"notranslate\"> to the document head. These opt-outs depend on the tool honoring them."
     },
     "322": {
       "message": "DOM bindings cannot adopt an incomplete addressed element topology.",
@@ -2064,18 +2064,36 @@
       "status": "active"
     },
     "344": {
+      "message": "Provide a compiled context with <CompiledContext context={context}>.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "345": {
+      "message": "CompiledContext requires compiled template children.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "346": {
+      "message": "CompiledOutlet requires a compiled component function with no returned renderable.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "347": {
       "message": "The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
     },
-    "345": {
+    "348": {
       "message": "Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
     },
-    "346": {
+    "349": {
       "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
       "argumentCount": 1,
       "runtime": ["client"],

@@ -1,3 +1,5 @@
+'use strong';
+
 import {
 	OctaneDevtoolsEventClient,
 	type NodeDetail,
@@ -37,6 +39,7 @@ function getProfiler(): ProfilerGlobal | undefined {
 // own re-renders from perpetually changing the profile snapshot — which, with
 // the dedupe below, lets the live view settle when the app is idle.
 const DEVTOOLS_OWN_COMPONENTS = new Set([
+	'OctaneDevtoolsPanel',
 	'OctanePanel',
 	'ComponentsTab',
 	'ProfilerTab',

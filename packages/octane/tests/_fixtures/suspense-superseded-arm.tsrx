@@ -35,12 +35,18 @@ export function KeyedComponentSibling(props: SupersededArmProps) @{
 	</main>
 }
 
+// A real one-row list: this case covers replacing a keyed `@for` row, not a
+// remount, so it does not use a single-item literal.
+function selectionRows(selection: string): string[] {
+	return [selection];
+}
+
 export function KeyedForSibling(props: SupersededArmProps) @{
 	<main>
 		<b>{props.selection as string}</b>
 		@try {
 			<>
-				@for (const selection of [props.selection]; key selection) {
+				@for (const selection of selectionRows(props.selection); key selection) {
 					<span>{selection as string}</span>
 				}
 				@if (props.wait) {

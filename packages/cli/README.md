@@ -78,6 +78,7 @@ octane analyze src/App.tsrx                 # just these
 octane analyze --code OCTANE_HYDRATE_SPLIT_STYLE
 octane analyze --strict                     # warnings fail the run too
 octane analyze --strong-preview             # what Strong mode would reject, by code
+octane analyze --strong-dependencies       # what Strong modules import that is not Strong
 octane analyze --fix                        # apply the compiler's suggested edits
 ```
 
@@ -126,6 +127,14 @@ deleted, and on a listed name that is now Strong or gone
 names and never adds one, so a new exception is always a reviewed edit to the
 file. See
 [Keeping modules Strong](https://github.com/octanejs/octane/blob/main/docs/strong-compiler-checks.md#keeping-modules-strong).
+
+`--strong-dependencies` lists, by package, the Octane modules that Strong
+modules import from other packages, directly or through re-exports, which
+compile without Strong mode, and the `octane/react` (ReactCompat) boundaries
+those imports reach. `compiler.strong` never reaches another package, so this is
+where a Strong application sees the code it renders that Strong does not check.
+It is a report and never fails the run. See
+[Strong dependencies](https://github.com/octanejs/octane/blob/main/docs/strong-compiler-checks.md#strong-dependencies).
 
 ## For agents and CI
 

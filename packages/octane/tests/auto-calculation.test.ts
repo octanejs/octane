@@ -324,7 +324,7 @@ describe('auto-calculation — Strong inline render expressions', () => {
 		compileOptions: { hmr: false, dev: false },
 	});
 	const returned = loadCompiledFixtureSource(STRONG_RETURN_CALCULATIONS, {
-		id: 'strong-return-calculations.tsx',
+		id: 'strong-return-calculations.tsrx',
 		mode: 'client',
 		compileOptions: { hmr: false, dev: false },
 	});
@@ -613,7 +613,7 @@ describe('auto-calculation — chained calculations', () => {
 		compileOptions,
 	});
 	const strongReturnChained = loadCompiledFixtureSource(STRONG_RETURN_CHAINED_CALCULATIONS, {
-		id: 'strong-return-chained-calculations.tsx',
+		id: 'strong-return-chained-calculations.tsrx',
 		mode: 'client',
 		compileOptions,
 	});

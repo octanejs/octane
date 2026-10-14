@@ -11,7 +11,7 @@ type Diagnostic = {
 	suggestions?: Suggestion[];
 };
 
-function strong(source: string, filename = '/src/App.tsx') {
+function strong(source: string, filename = '/src/App.tsrx') {
 	const { diagnostics, error } = collectDiagnostics(`"use strong";\n${source}`, filename);
 	expect(error, String(error)).toBe(null);
 	return diagnostics as Diagnostic[];
@@ -73,7 +73,7 @@ describe("Strong migration guidance for React's lazy ref idiom", () => {
 		expect(fixed).toContain('const store = useLazyRef(() => new Store());');
 		expect(fixed).not.toContain('store.current = new Store()');
 		expect(fixed).not.toContain('??=');
-		expect(() => compile(fixed, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(fixed, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('parenthesizes an object literal factory body', () => {
@@ -242,52 +242,6 @@ export function Name({ name }: { name: string }) {
 	});
 });
 
-describe('Strong migration rewrites for useMemo and useCallback', () => {
-	it.each([
-		['an expression body', 'useMemo(() => items.length, [items])', 'items.length'],
-		['a single return', 'useMemo(() => { return items.length; }, [items])', 'items.length'],
-		[
-			'an object literal',
-			'useMemo(() => ({ size: items.length }), [items])',
-			'({ size: items.length })',
-		],
-		['a lower-precedence body', 'useMemo(() => !items.length, [items])', '(!items.length)'],
-		['a callback', 'useCallback((id: string) => pick(id), [pick])', '(id: string) => pick(id)'],
-		['a callback reference', 'useCallback(pick, [pick])', 'pick'],
-	])('rewrites %s', (_, call, replacement) => {
-		const hook = call.slice(0, call.indexOf('('));
-		const source = `import { ${hook} } from 'octane';
-export function List({ items, pick }: { items: string[]; pick: (id: string) => void }) {
-	const value = ${call};
-	return <div onClick={() => pick(String(value))} />;
-}
-`;
-		const [diagnostic] = errors(source);
-		expect(diagnostic.code).toBe('OCTANE_STRONG_MANUAL_MEMO');
-		const fixed = applyEdits(source, editsOf(diagnostic)!);
-		expect(fixed).toContain(`const value = ${replacement};`);
-		expect(() => compile(fixed, '/src/App.tsx')).not.toThrow();
-	});
-
-	it.each([
-		['several statements', 'useMemo(() => { const n = items.length; return n; }, [items])'],
-		['a parameter', 'useMemo((n?: number) => n ?? items.length, [items])'],
-		['a spread argument', 'useMemo(...[() => items.length, [items]] as const)'],
-	])('describes the replacement without an edit for %s', (_, call) => {
-		const source = `import { useMemo } from 'octane';
-export function List({ items }: { items: string[] }) {
-	const value = ${call};
-	return <div>{String(value)}</div>;
-}
-`;
-		const memo = errors(source).find(
-			(diagnostic) => diagnostic.code === 'OCTANE_STRONG_MANUAL_MEMO',
-		);
-		expect(memo?.suggestions?.[0].message).toBeTruthy();
-		expect(editsOf(memo)).toBeUndefined();
-	});
-});
-
 describe('collectDiagnostics', () => {
 	const CLOCK = `export function Clock() {
 	const now = Date.now();
@@ -301,18 +255,18 @@ describe('collectDiagnostics', () => {
 			['OCTANE_STRONG_RENDER_IMPURE_CALL', 3],
 			['OCTANE_STRONG_RENDER_IMPURE_CALL', 4],
 		]);
-		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsx')).toThrow(
+		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsrx')).toThrow(
 			/:3:\d+: \[OCTANE_STRONG_RENDER_IMPURE_CALL\]/,
 		);
 	});
 
 	it('applies the strong option to a module without the directive', () => {
-		const { diagnostics } = collectDiagnostics(CLOCK, '/src/App.tsx', { strong: true });
+		const { diagnostics } = collectDiagnostics(CLOCK, '/src/App.tsrx', { strong: true });
 		expect(diagnostics.map((diagnostic: Diagnostic) => diagnostic.code)).toEqual([
 			'OCTANE_STRONG_RENDER_IMPURE_CALL',
 			'OCTANE_STRONG_RENDER_IMPURE_CALL',
 		]);
-		expect(collectDiagnostics(CLOCK, '/src/App.tsx').diagnostics).toEqual([]);
+		expect(collectDiagnostics(CLOCK, '/src/App.tsrx').diagnostics).toEqual([]);
 	});
 
 	it('keeps compatibility-mode warnings and returns compile failures as the error', () => {
@@ -377,7 +331,7 @@ export function Loop({ value }) @{
 	});
 
 	it('links a thrown Strong error to its documentation', () => {
-		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsx')).toThrow(
+		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsrx')).toThrow(
 			'See https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call',
 		);
 	});

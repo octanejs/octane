@@ -562,7 +562,7 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
 - The server and the client must use the same version of these markers. The
   seed script names the version the server wrote, and a root whose server used
   another version renders on the client instead of adopting the server HTML,
-  reporting it once through `onRecoverableError` (error #345). Deploy the server
+  reporting it once through `onRecoverableError` (error #348). Deploy the server
   and client bundles from the same Octane version.
 - `<Activity mode="visible">` renders its children normally. A hidden Activity
   does not evaluate or serialize its children on the server; hydratable output

@@ -31,6 +31,41 @@ Applications that use only the Octane runtime do not need this peer.
 scoped state, derived values, async resources, and native component reads.
 The standard compiler handles signals automatically; no extra option is needed.
 
+## Dynamically selected compiled views
+
+In a template, use `CompiledOutlet` when all dynamically selected components
+render compiled Octane output. It owns the selected view inside the surrounding
+tree: hooks, contexts, hydration, and cleanup follow their usual lifetimes.
+
+```tsx
+import { CompiledContext, CompiledOutlet, createCompiledContext, useContext } from 'octane';
+
+const Route = createCompiledContext<string>('home');
+
+function Page({ name }: { name: string }) @{
+  <h1>{name + ': ' + useContext(Route)}</h1>
+}
+
+export function Shell({ screen, name, route }) @{
+  <CompiledContext context={Route} value={route}>
+    <CompiledOutlet key={route} component={screen ?? Page} props={{ name }} />
+  </CompiledContext>
+}
+```
+
+An unchanged component and key retain state; changing either replaces the view
+and runs its cleanups. Use `@try` / `@pending` around the outlet when the
+selected component may suspend. The outlet accepts only a function whose output
+is compiled; it throws for host strings or bodies that return descriptors or
+plain text (including an explicit `null` return). Use an ordinary
+dynamic JSX tag when arbitrary renderables are intentional.
+
+`createCompiledContext` creates a context read by `use` or `useContext`.
+Provide it through `CompiledContext` with children authored between the
+template tags. Rendering the context itself as a provider is an error. Existing
+`createContext` providers continue to accept both compiled and descriptor
+children; compiled contexts are a separate, opt-in contract.
+
 Custom Node build pipelines can opt into project-aware string-child inference
 through `octane/compiler/typescript`. See the
 [type-aware text compilation guide](https://github.com/octanejs/octane/blob/main/docs/compiler-text-inference.md).
