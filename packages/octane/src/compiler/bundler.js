@@ -1026,6 +1026,26 @@ class OctaneBundlerCompiler {
 		return { strong: config || directive, directive, config };
 	}
 
+	/**
+	 * The package that owns a module by its nearest manifest (`null` outside
+	 * any package), and whether `transform` may compile the module or slot its
+	 * hooks, decided as its parse-free gates decide it. `octane analyze` reads
+	 * it to group the dependency modules a Strong module imports by package.
+	 *
+	 * @param {string} code
+	 * @param {string} id
+	 * @returns {{ name: string | null, root: string | null, compiled: boolean }}
+	 */
+	modulePackage(code, id) {
+		const file = nodePath.resolve(this.root, cleanModuleId(id));
+		const { rule } = this._nearestOctanePackageRule(nodePath.dirname(file));
+		return {
+			name: rule?.name ?? null,
+			root: rule?.root ?? null,
+			compiled: this._preflightScope(code, file) !== 'none',
+		};
+	}
+
 	_isInstalledOctaneSource(file, collected) {
 		// Project-owned TS/JS/TSX is always eligible. A linked package is commonly
 		// handed to bundlers as its real path, without a node_modules segment, so
