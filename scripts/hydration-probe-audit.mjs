@@ -35,19 +35,11 @@ const SUITES = [
 // name methods `Class.method`.
 const FAMILIES = {
 	// A component's returned value (#2028 commit 2).
-	returned: ['renderReturnedValue', 'lendRange', 'holdsServerText', 'isUnframedRootRange'],
+	returned: ['renderReturnedValue', 'lendRange'],
 	// De-opt descriptor lists (commit 3).
 	descriptors: ['deoptItemBody', 'renderPreparedChildList', 'buildsList'],
 	// Strong, lite and void component calls (commit 5).
-	components: [
-		'componentSlotImpl',
-		'componentSlotLite',
-		'renderLiteInPlace',
-		'mountUnframedLite',
-		'renderUnframed',
-		'renderInPlace',
-		'parkAtHole',
-	],
+	components: ['componentSlotImpl', 'componentSlotLite'],
 	// Compiled template roots, renderable and text holes, lists and branches (commit 6).
 	templates: ['claimRoots', 'framesSlotContent', 'framedRootRemainder'],
 	holes: [
@@ -74,12 +66,13 @@ const FAMILIES = {
 const BUDGET = {
 	returned: 0,
 	descriptors: 46,
-	components: 10965,
-	templates: 5701,
-	holes: 1008,
+	components: 0,
+	// Strict calls (commit 5) leave the server's ranges to the template roots.
+	templates: 5900,
+	holes: 904,
 	lists: 2114,
-	branches: 249,
-	roots: 34,
+	branches: 216,
+	roots: 32,
 };
 
 const OWNER = new Map();

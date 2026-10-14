@@ -324,6 +324,11 @@ const NATIVE_REFLECT_APPLY = Reflect.apply;
 const NATIVE_ARRAY_SPECIES_GETTER = /* @__PURE__ */ (() =>
 	Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get)();
 
+// The values a compiled `.map()` returns through another receiver's method. The
+// client renders their component items as it renders the native receiver's
+// rows (mappedDeoptItemBody), so they serialize in that row shape too.
+const MAPPED_VALUES = new WeakSet<object>();
+
 /** Server twin of the compiler's guarded native-array map ABI. */
 export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) => any): any {
 	if (arguments.length === 3) {
@@ -343,6 +348,8 @@ export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) 
 				mapped = packed;
 			}
 		}
+		if (mapped !== null && (typeof mapped === 'object' || typeof mapped === 'function'))
+			MAPPED_VALUES.add(mapped);
 		return mapped;
 	}
 	if (
@@ -2373,17 +2380,17 @@ function ssrComponentDescriptor(
 export function ssrChild(
 	v: unknown,
 	scope: SSRScope,
-	// A component's returned value, inside the range that bounds the component's
-	// output (RETURN_IN_RANGE): the client's return slot borrows that range, so
+	// A component's returned value. Inside the range that bounds the component's
+	// output (RETURN_IN_RANGE) the client's return slot borrows that range, so
 	// the value gets no range of its own, and a returned component renders
 	// inside it as the slot's own Block does.
-	inRange?: boolean,
+	returned?: boolean,
 ): string {
 	if (isSignalHandle(v)) {
 		v = readSignalBinding(v);
 	}
 	if (probingDangerHtmlChild(v)) return '';
-	return ssrChildValue(v, scope, true, false, inRange === true && RETURN_IN_RANGE);
+	return ssrChildValue(v, scope, true, false, returned === true);
 }
 
 function ssrReturnedValue(v: unknown, scope: SSRScope): string {
@@ -2410,12 +2417,13 @@ function ssrChildValue(
 	scope: SSRScope,
 	includeKeyedSingle: boolean,
 	selfMarkItem: boolean = false,
-	// The caller's range bounds the value (see ssrChild).
-	inRange: boolean = false,
+	// A component's returned value (see ssrChild).
+	returned: boolean = false,
 ): string {
 	if (v !== null && typeof v === 'object' && SERVER_HTML in v) {
 		return (v as ServerHtml)[SERVER_HTML];
 	}
+	const inRange = returned && RETURN_IN_RANGE;
 	// Every renderable hole serializes to ONE `<!--[-->…<!--]-->` range so the
 	// client's childSlot adopts a uniform marker pair on hydration regardless of
 	// whether the value is a component, an element, a primitive, or empty — and
@@ -2436,15 +2444,17 @@ function ssrChildValue(
 			scope,
 			includeKeyedSingle,
 			false,
-			inRange,
+			returned,
 		);
 	}
+	const mapped = typeof v === 'object' && MAPPED_VALUES.has(v as object);
 	const iterable = iterableChildArray(v);
 	if (iterable !== null) v = iterable;
 	// Arrays, iterables, Fragment descriptors, and keyed single descriptors use the client's
 	// de-opt keyed-list shape: one outer child-slot range plus one range per
 	// flattened leaf. Item rendering disables keyed-single preparation so the
-	// descriptor cannot recursively wrap itself.
+	// descriptor cannot recursively wrap itself. A mapped component item is a
+	// compiled row: its range holds the component's own.
 	const preparedList = prepareSsrDeoptList(v, includeKeyedSingle);
 	if (preparedList !== null) {
 		return withAsyncListScope('child', () => {
@@ -2452,7 +2462,11 @@ function ssrChildValue(
 			for (let i = 0; i < preparedList.items.length; i++) {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
-				out += withSsrDeoptItem(key, i, () => ssrChildValue(item, scope, false, true));
+				const row = mapped && isElementDescriptor(item) && typeof item.type === 'function';
+				out += withSsrDeoptItem(key, i, () => {
+					const html = ssrChildValue(item, scope, false, true);
+					return row ? ssrBlock(html) : html;
+				});
 			}
 			return inRange ? out : ssrBlock(out);
 		});
@@ -2465,7 +2479,7 @@ function ssrChildValue(
 			scope,
 			v as ServerComponent,
 			{},
-			inRange ? 2 : undefined,
+			returned ? 2 : undefined,
 			undefined,
 			true,
 			templateInvocationSite(v),
@@ -2491,7 +2505,7 @@ function ssrChildValue(
 						? html
 						: ssrBlock(html);
 				}
-				return ssrComponentDescriptor(d, scope, 'key', inRange ? 2 : undefined);
+				return ssrComponentDescriptor(d, scope, 'key', returned ? 2 : undefined);
 			};
 			const renderType = () => withAsyncIdentity('child-type', d.type, render);
 			return d.key != null ? withAsyncIdentity('child-key', d.key, renderType, true) : renderType();
@@ -5526,7 +5540,8 @@ export function ssrComponent(
 	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	// true (M3): the sole root of its parent's `@{}` body. 2: the root of a
-	// component's returned value. Either way an enclosing range bounds this output.
+	// component's returned value, which its component's range bounds when it
+	// has one (RETURN_IN_RANGE).
 	inherit?: boolean | 2,
 	key?: unknown,
 	identityScoped?: boolean | 'key',
@@ -5544,8 +5559,13 @@ export function ssrComponent(
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
 	// A returned value renders in its component's range (RETURN_IN_RANGE), except
-	// a keyed element: the client's one-item list, whose item keeps a range.
-	if (inherit === 2 && (key != null || !RETURN_IN_RANGE)) inherit = false;
+	// a keyed element: the client's one-item list, whose item keeps a range. A
+	// renderer is the returning component's own JSX, inline wherever it renders.
+	if (
+		inherit === 2 &&
+		(key != null || (!RETURN_IN_RANGE && invocationSite !== RENDERER_INVOCATION_SITE))
+	)
+		inherit = false;
 	// A fragment renderer renders its enclosing component's JSX under that
 	// component's identity, exactly like the inline HTML the client also folds.
 	const renderer = invocationSite === RENDERER_INVOCATION_SITE;
@@ -9140,7 +9160,7 @@ function runFullFramedPass(
 		// `.ts` root (the shape every @octanejs binding produces) returns a
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
-		body = serverComponentOutput(out, root, serverSignalOwner(FRAME));
+		body = serverComponentOutput(out, root, serverSignalOwner(FRAME), true);
 		if (markers && out !== null && typeof out === 'object') {
 			const marker = (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT];
 			if (marker !== undefined) body = ssrBindingBlock(body, marker);

@@ -169,8 +169,8 @@ describe('a Hydrate wrapper without its server range', () => {
 					? [
 							expect.stringMatching(
 								new RegExp(
-									`^Octane hydration mismatch at ${FILE}:\\d+:\\d+: the client expected a ` +
-										`Hydrate boundary range but the server rendered <p>`,
+									`^Octane hydration mismatch at ${FILE}:6:\\d+: the client expected a ` +
+										`component range but the server rendered <div>`,
 								),
 							),
 						]

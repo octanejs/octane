@@ -6,14 +6,12 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // The server rendered another @if arm whose elements match the client arm's
-// exactly. As in React, which hydrates elements regardless of which component
-// or branch produced them, the client arm adopts those server nodes silently.
-// Its component call has no server range of its own, and a component call
-// that is a hole in that call's template finds its server node by walking the
-// adopted nodes. The server renders the hole's call either framed by its own
-// range or inline, as the other arm's raw markup. A hole the server's element
-// has no node for is a missing node: with no Suspense boundary, the root
-// renders on the client and reports it once.
+// exactly. React hydrates elements regardless of which component or branch
+// produced them, so it adopts those server nodes silently. Octane's server
+// frames every component call, so the client arm's call, which finds the other
+// arm's markup without its range, is a structural mismatch: with no Suspense
+// boundary, the root renders on the client and reports it once. So does a
+// hole the server's element has no node for.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -93,7 +91,7 @@ async function hydrate(
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — a component hole in a template adopted in place ($name)', ({ dev }) => {
+])('hydrateRoot — a component hole in another arm’s matching markup ($name)', ({ dev }) => {
 	const client = dev ? clients.development : clients.production;
 
 	it.each([
@@ -117,7 +115,8 @@ describe.each([
 			name: 'HoleRawElement',
 			html: '<div><i>p</i><em>e</em></div><em>e</em>',
 		},
-	])('adopts the server node of $hole', async ({ name, html }) => {
+	])('renders the root on the client for $hole', async ({ name, html }) => {
+		// OCTANE DIVERGENCE: React adopts the matching server elements.
 		const { host, serverNodes, recoverable } = await hydrate(
 			client,
 			name,
@@ -125,19 +124,18 @@ describe.each([
 			{ on: true },
 		);
 
-		expect(container.firstElementChild).toBe(host);
-		const nodes = [...host.querySelectorAll('*')];
-		expect(markup(host)).toBe(html);
-		expect(nodes).toHaveLength(serverNodes.length);
-		nodes.forEach((node, i) => expect(node).toBe(serverNodes[i]));
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		const live = container.firstElementChild!;
+		expect(markup(live)).toBe(html);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 
 		// Each arm renders over the other as usual afterwards.
 		flushSync(() => root!.render(client[name], { on: false }));
-		expect(markup(host)).toBe(html);
+		expect(markup(live)).toBe(html);
 		flushSync(() => root!.render(client[name], { on: true }));
-		expect(markup(host)).toBe(html);
+		expect(markup(live)).toBe(html);
 	});
 
 	it.each([

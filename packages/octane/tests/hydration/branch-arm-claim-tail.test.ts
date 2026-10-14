@@ -180,25 +180,28 @@ describe.each([
 		expect(warnings()).toEqual([]);
 	});
 
-	it.each([
-		{
-			shape: 'a host its template renders after its last component',
-			name: 'SameContent',
-			kept: '<s>s</s><b>a</b><u>tail</u>',
-		},
-		{
-			shape: 'a component root after another component',
-			name: 'AdoptedAfterClaim',
-			kept: '<s>s</s><i>u</i>',
-		},
-	])('adopts $shape that the server rendered inline', async ({ name, kept }) => {
-		const { div, adopted, recoverable } = await hydrate(name, { server: true }, {});
+	it('adopts a host its template renders after its last component that the server rendered inline', async () => {
+		const { div, adopted, recoverable } = await hydrate('SameContent', { server: true }, {});
 
 		expect(container.firstElementChild).toBe(div);
-		expect(markup(div)).toBe(kept);
+		expect(markup(div)).toBe('<s>s</s><b>a</b><u>tail</u>');
 		expectSame(div.children, adopted);
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
+	});
+
+	// OCTANE DIVERGENCE: component ranges are part of Octane's hydration
+	// protocol. A component the server's arm rendered inline, without the range
+	// of the client's call, is a structural mismatch even where its host
+	// matches, so the root renders on the client where React would adopt.
+	it('renders the root on the client for a component root the server rendered inline', async () => {
+		const { div, adopted, recoverable } = await hydrate('AdoptedAfterClaim', { server: true }, {});
+
+		expect(div.isConnected).toBe(false);
+		expect(adopted.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container)).toBe('<div><s>s</s><i>u</i></div>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
 	// OCTANE DIVERGENCE: Octane's control-flow ranges are part of its hydration

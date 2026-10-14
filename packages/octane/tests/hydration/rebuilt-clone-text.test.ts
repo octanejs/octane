@@ -21,13 +21,6 @@ const LINES = SOURCE.split('\n');
 const HYDRATION_FAILED =
 	/^Hydration failed because the server rendered (HTML|text) didn't match the client/;
 
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index < 0) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
-
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	const copy = node.cloneNode(true) as Element;
@@ -91,12 +84,17 @@ describe.each([
 		return { outer, serverNodes, recoverable, caught };
 	}
 
-	/** The dev warning for the Leaf's `<i>` where the server rendered `actual`. */
-	function structural(line: number, actual: string) {
+	/**
+	 * The dev warning for `branch`'s Leaf call where the server rendered `<b>`:
+	 * the server frames every component call.
+	 */
+	function noRange(branch: string, call = '<Leaf') {
+		const start = LINES.findIndex((line) => line.startsWith(`export function ${branch}(`));
+		const index = LINES.findIndex((line, i) => i > start && line.includes(call));
 		return expect.stringMatching(
 			new RegExp(
-				`^Octane hydration mismatch at ${FILE}:${line}:1: the client expected <i> but the ` +
-					`server rendered ${actual}\\.`,
+				`^Octane hydration mismatch at ${FILE}:${index + 1}:${LINES[index].indexOf(call)}: the ` +
+					'client expected a component range but the server rendered <b>\\.',
 			),
 		);
 	}
@@ -134,7 +132,7 @@ describe.each([
 			const kept = arm ? [outer] : [];
 			expect(serverNodes.filter((node) => node.isConnected)).toEqual(kept);
 			expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
-			expect(warnings()).toEqual(dev ? [structural(lineOf('<i>{read(props.value)'), '<b>')] : []);
+			expect(warnings()).toEqual(dev ? [noRange(name)] : []);
 		},
 	);
 
@@ -200,7 +198,7 @@ describe.each([
 		expect(markup(container.firstElementChild!)).toBe('<i><u>x</u>ok</i>');
 		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
-		expect(warnings()).toEqual(dev ? [structural(lineOf('function SiblingLeaf(') + 1, '<b>')] : []);
+		expect(warnings()).toEqual(dev ? [noRange('SiblingBranch', '<SiblingLeaf')] : []);
 	});
 
 	it('client-renders the root for server text that differs inside a matching element', async () => {

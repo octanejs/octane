@@ -8843,61 +8843,6 @@ function isSsrMarkerlessForItem(node, itemBody) {
 	return jsxChildren.length === 1 && isSingleTemplateHost(jsxChildren[0]);
 }
 
-/**
- * A same-module, single-host component already supplies a complete SSR range.
- *
- * The keyed item can adopt that existing component pair instead of wrapping it
- * again. Its component call then adopts the host through the established
- * singleRoot path. Explicit keys, spread/children overrides, imported or
- * dynamic callees, and additional item statements cannot use that proof.
- * `body` is forItemTemplateBody's output, which the client's single-root proof
- * also reads, so a removed row-key attribute leaves both sides in agreement.
- */
-function canShareSsrComponentItemRange(body, ctx) {
-	if (body.length !== 1) return false;
-	const component = body[0];
-	if (
-		(component?.type !== 'Element' && component?.type !== 'JSXElement') ||
-		!isComponentTag(component)
-	) {
-		return false;
-	}
-
-	const tag = component.openingElement?.name || component.id || component.name;
-	if (
-		(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
-		!ctx.ssrSingleRootComponents?.has(tag.name) ||
-		(component.children || []).length !== 0
-	) {
-		return false;
-	}
-
-	const attributes = component.attributes || component.openingElement?.attributes || [];
-	if (
-		attributes.some((attribute) => {
-			if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
-				return true;
-			}
-			const name = attribute.name?.name || attribute.name;
-			return name === 'key' || name === 'children';
-		})
-	)
-		return false;
-
-	// Split queries keep only stable module-function capture proofs. A shadow
-	// or writable module binding needs its separate component frame on the wire.
-	const binding = ctx.ssrSingleRootComponents.get(tag.name);
-	const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
-		ctx.authoredModuleAst.body,
-	));
-	if (functions.get(tag.name)?.id !== binding) return false;
-	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
-	return (
-		lexical.bindingNodes.has(binding) &&
-		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === lexical.rootScope
-	);
-}
-
 // Direct host-row mounting skips component-render bookkeeping. Keep the proof
 // narrower than markerless item rendering so opaque host lifecycles fail closed.
 const HOST_MOUNT_SAFE_TAGS = new Set([
@@ -13367,7 +13312,6 @@ function compileServer(
 			ast,
 			options?.isDescriptorChildrenImport,
 		),
-		ssrSingleRootComponents: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		output: options?.output,
@@ -13422,23 +13366,6 @@ function compileServer(
 		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
-	// Share an item's component frame only for the authored immutable identity
-	// that split queries can retain. Keep the direct-host shape proof separate
-	// from the client's richer componentInfo records and register forward refs.
-	for (const node of ast.body) {
-		const component =
-			node.type === 'ExportDefaultDeclaration' || node.type === 'ExportNamedDeclaration'
-				? node.declaration
-				: node;
-		if (
-			component?.id &&
-			(isComponentFunction(component) || isReturnJsxFunction(component)) &&
-			singleHostComponentRoot(component)
-		) {
-			ctx.ssrSingleRootComponents.set(component.id.name, component.id);
-		}
-	}
-
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
 	for (const node of ast.body) {
 		const firstStatement = bodyNodes.length;
@@ -14003,7 +13930,9 @@ function ssrCompileBodyWithMapTemps(
 	// by ssrEmitComponent or ssrEmitTsrxExpression.
 	const prevInheritRoot = ctx._ssrInheritRoot;
 	ctx._ssrInheritRoot =
-		((!!(node.body && node.body.type === 'JSXCodeBlock') && !returnedOutput) ||
+		((!!(node.body && node.body.type === 'JSXCodeBlock') &&
+			!returnedOutput &&
+			node.body._octaneHydrateBoundary !== true) ||
 			returnedFragmentRoot) &&
 		inheritSoleCompRoot(bodyNodes, ctx)
 			? true
@@ -15994,9 +15923,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const opaqueChildren = !activityDescriptor && !isFragmentLongForm(node, ctx);
+		// Activity is template syntax even in a `.tsx` return: the client compiles
+		// its children to a children block there, so they stay one here.
 		const descriptorChildren =
 			isDescriptorChildrenTag(node, ctx) ||
-			ctx._tsxValuePos ||
+			(ctx._tsxValuePos && !activityDescriptor) ||
 			(returnedFragmentTemplate && !requiresTemplateNormalization(node, parentNs, true, ctx));
 		if (descriptorChildren) {
 			// VALUE position (a React-style `.tsx` `return <jsx>` body), or an ordinary
@@ -16446,8 +16377,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
 		node,
 	);
-	const sharedItemRange =
-		!bindingSite && (markerlessItem || canShareSsrComponentItemRange(itemBody, ctx));
+	const sharedItemRange = !bindingSite && markerlessItem;
 	const itemHtml =
 		sharedItemRange || bindingSite ? itemCall : ssrCall('ssrBlock', [itemCall], node);
 	let renderItem = itemNeedsIdentity
