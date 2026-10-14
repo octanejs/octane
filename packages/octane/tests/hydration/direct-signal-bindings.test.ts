@@ -39,7 +39,8 @@ describe('opaque host attribute updates', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			['tsrx', 'tsx'].flatMap((ext) =>
-				[false, true].flatMap((strong) =>
+				// Strong compiles only `.tsrx`; a Strong `.tsx` module is a compile error.
+				(ext === 'tsrx' ? [false, true] : [false]).flatMap((strong) =>
 					[false, true].map((hydrate) => ({ dev, ext, strong, hydrate })),
 				),
 			),
@@ -1812,7 +1813,8 @@ describe('mixed live text, attributes, and form controls', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			['tsrx', 'tsx'].flatMap((ext) =>
-				[false, true].flatMap((strong) =>
+				// Strong compiles only `.tsrx`; a Strong `.tsx` module is a compile error.
+				(ext === 'tsrx' ? [false, true] : [false]).flatMap((strong) =>
 					[false, true].map((hydrate) => ({ dev, ext, strong, hydrate })),
 				),
 			),
