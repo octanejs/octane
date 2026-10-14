@@ -158,7 +158,7 @@ describe('loader with the neutral compiler', () => {
 		expect(code).not.toContain('_$template');
 		expect(code).not.toContain('webpackHot');
 		const generated = evaluateCompiledFixtureCode(code, resourcePath, 'server', undefined);
-		expect(renderToString(generated.App, {}).html).toBe('<p>server</p>');
+		expect(renderToString(generated.App, {}).html).toBe('<p>server</p><!--octane-hydration:1-->');
 	});
 
 	it.each([

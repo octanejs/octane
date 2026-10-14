@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { useStateManager as useReactStateManager } from 'react-select';
 import { renderToString } from 'octane/server';
 import { describe, expect, it } from 'vitest';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
 
 import { StateManagerFixture } from './browser/state-manager-fixture.tsrx';
 import { useStateManager } from '../src/index';
@@ -46,7 +47,7 @@ describe('useStateManager SSR parity', () => {
 				rootExportResult = result;
 			},
 		});
-		expect(octane.html).toBe(react);
+		expect(octane.html).toBe(`${react}<!--${HYDRATION_VERSION_MARKER}-->`);
 		expect(rootExportResult?.inputValue).toBe(
 			managerProps.inputValue ?? managerProps.defaultInputValue,
 		);

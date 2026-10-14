@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'octane/server';
+import { HYDRATION_VERSION_MARKER } from '../../../octane/src/hydration-markers.js';
 import OctaneTextareaAutosize from '../../src/index.tsrx';
 import ReactTextareaAutosize from '../../upstream/src/index.tsx';
 
@@ -39,6 +40,8 @@ describe('@octanejs/textarea-autosize SSR React contract', () => {
 		const octane = renderToString(OctaneTextareaAutosize, props).html;
 		const react = renderToStaticMarkup(createElement(ReactTextareaAutosize, props));
 
-		expect(normalizeServerMarkup(octane)).toBe(normalizeServerMarkup(react));
+		expect(normalizeServerMarkup(octane)).toBe(
+			normalizeServerMarkup(react) + `<!--${HYDRATION_VERSION_MARKER}-->`,
+		);
 	});
 });

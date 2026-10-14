@@ -327,7 +327,9 @@ describe('authored host JSX', () => {
 		const r = mount(App);
 		try {
 			expect(r.container.innerHTML).toBe('<div><span>kept</span></div>');
-			expect(renderToString(fixture(source, true).App).html).toBe('<div><span>kept</span></div>');
+			expect(renderToString(fixture(source, true).App).html).toBe(
+				'<div><span>kept</span></div><!--octane-hydration:1-->',
+			);
 		} finally {
 			r.unmount();
 		}

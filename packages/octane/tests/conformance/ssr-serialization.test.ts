@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { HYDRATION_VERSION_MARKER } from '../../src/hydration-markers.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 // Conformance port of facebook/react's SSR serialization matrix —
@@ -40,6 +41,7 @@ import { loadCompiledFixtureSource } from '../_server-fixture.js';
 //     outcome (what serializes) is asserted instead.
 
 const FILE = 'ssr-serialization.tsrx';
+const rootWitness = `<!--${HYDRATION_VERSION_MARKER}-->`;
 
 const SRC = `
 // ---- text children (Elements :72-:282) ----
@@ -246,7 +248,7 @@ function expectContentHydrate(name: string, props?: any) {
 
 describe('conformance: SSR serialization — text children (Elements)', () => {
 	it('renders a div with text (Per ReactDOMServerIntegrationElements-test.js:73)', () => {
-		expect(ssr('DivText')).toBe('<div>Text</div>');
+		expect(ssr('DivText')).toBe('<div>Text</div>' + rootWitness);
 		const e = parse(ssr('DivText')).firstElementChild!;
 		expect(e.childNodes.length).toBe(1);
 		expect(e.firstChild!.nodeType).toBe(3);
@@ -254,18 +256,18 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	});
 
 	it('renders text with flanking whitespace (Per :80)', () => {
-		expect(ssr('FlankWs')).toBe('<div>  Text </div>');
+		expect(ssr('FlankWs')).toBe('<div>  Text </div>' + rootWitness);
 		expectCleanHydrate('FlankWs');
 	});
 
 	it('renders an empty text child as no node (Per :87)', () => {
-		expect(ssr('EmptyText')).toBe('<div></div>');
+		expect(ssr('EmptyText')).toBe('<div></div>' + rootWitness);
 		expect(parse(ssr('EmptyText')).firstElementChild!.childNodes.length).toBe(0);
 		expectCleanHydrate('EmptyText');
 	});
 
 	it('renders multiple empty text children as nothing (Per :92)', () => {
-		expect(ssr('MultiEmptyText')).toBe('<div></div>');
+		expect(ssr('MultiEmptyText')).toBe('<div></div>' + rootWitness);
 	});
 
 	it('hydrates multiple empty text children (Per :92)', () => {
@@ -278,13 +280,13 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	// with `<!-- -->` comments (5 child nodes); octane folds/merges the literal
 	// whitespace run into one text node. The rendered TEXT is identical.
 	it('renders multiple whitespace children (Per :104 — outcome level)', () => {
-		expect(ssr('MultiWs')).toBe('<div>   </div>');
+		expect(ssr('MultiWs')).toBe('<div>   </div>' + rootWitness);
 		expectCleanHydrate('MultiWs');
 		expect(container.querySelector('div')!.textContent).toBe('   ');
 	});
 
 	it('renders text sibling to a node (Per :126)', () => {
-		expect(ssr('TextSibling')).toBe('<div>Text<span>More Text</span></div>');
+		expect(ssr('TextSibling')).toBe('<div>Text<span>More Text</span></div>' + rootWitness);
 		const e = parse(ssr('TextSibling')).firstElementChild!;
 		expect(e.childNodes.length).toBe(2);
 		expect(e.childNodes[0].nodeValue).toBe('Text');
@@ -295,12 +297,12 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	// React's warning half ("<nonstandard> is unrecognized") is a DEV warning —
 	// out of scope; the serialization outcome is what's asserted.
 	it('renders a non-standard element with text (Per :140)', () => {
-		expect(ssr('NonStandardText')).toBe('<nonstandard>Text</nonstandard>');
+		expect(ssr('NonStandardText')).toBe('<nonstandard>Text</nonstandard>' + rootWitness);
 		expectCleanHydrate('NonStandardText');
 	});
 
 	it('renders a custom element with text (Per :163)', () => {
-		expect(ssr('CustomText')).toBe('<custom-element>Text</custom-element>');
+		expect(ssr('CustomText')).toBe('<custom-element>Text</custom-element>' + rootWitness);
 		const e = parse(ssr('CustomText')).firstElementChild!;
 		expect(e.tagName).toBe('CUSTOM-ELEMENT');
 		expect(e.childNodes.length).toBe(1);
@@ -308,13 +310,13 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	});
 
 	it('renders a leading blank child with a text sibling (Per :170)', () => {
-		expect(ssr('LeadingBlank')).toBe('<div>foo</div>');
+		expect(ssr('LeadingBlank')).toBe('<div>foo</div>' + rootWitness);
 		expectCleanHydrate('LeadingBlank');
 		expect(container.querySelector('div')!.textContent).toBe('foo');
 	});
 
 	it('renders a trailing blank child with a text sibling (Per :176)', () => {
-		expect(ssr('TrailingBlank')).toBe('<div>foo</div>');
+		expect(ssr('TrailingBlank')).toBe('<div>foo</div>' + rootWitness);
 		expectCleanHydrate('TrailingBlank');
 		expect(container.querySelector('div')!.textContent).toBe('foo');
 	});
@@ -322,7 +324,7 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	// Adjacent LITERAL text holes are compile-time-folded into the template on
 	// the client, so the server's merged 'foobar' text node adopts cleanly.
 	it('renders an element with two literal text children (Per :182)', () => {
-		expect(ssr('TwoTextLit')).toBe('<div>foobar</div>');
+		expect(ssr('TwoTextLit')).toBe('<div>foobar</div>' + rootWitness);
 		expectCleanHydrate('TwoTextLit');
 		expect(container.querySelector('div')!.textContent).toBe('foobar');
 	});
@@ -338,7 +340,9 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 	});
 
 	it('renders a component returning text between two text nodes (Per :205)', () => {
-		expect(ssr('TextCompText')).toBe('<div>a<!--[--><!--[-->b<!--]--><!--]-->c</div>');
+		expect(ssr('TextCompText')).toBe(
+			'<div>a<!--[--><!--[-->b<!--]--><!--]-->c</div>' + rootWitness,
+		);
 		const e = parse(ssr('TextCompText')).firstElementChild!;
 		expect(e.textContent).toBe('abc');
 		// The component adopts the ordinary range around its primitive return.
@@ -437,7 +441,7 @@ describe('conformance: SSR serialization — null, false, undefined children (El
 
 describe('conformance: SSR serialization — void elements + dangerouslySetInnerHTML (Elements)', () => {
 	it('renders an img (Per :470)', () => {
-		expect(ssr('JustImg')).toBe('<img/>');
+		expect(ssr('JustImg')).toBe('<img/>' + rootWitness);
 		const e = parse(ssr('JustImg')).firstElementChild!;
 		expect(e.tagName).toBe('IMG');
 		expect(e.childNodes.length).toBe(0);
@@ -445,7 +449,7 @@ describe('conformance: SSR serialization — void elements + dangerouslySetInner
 	});
 
 	it('renders a button (Per :477)', () => {
-		expect(ssr('JustButton')).toBe('<button></button>');
+		expect(ssr('JustButton')).toBe('<button></button>' + rootWitness);
 		expectCleanHydrate('JustButton');
 	});
 
@@ -518,7 +522,7 @@ describe('conformance: SSR serialization — newline-eating elements (Elements)'
 
 describe('conformance: SSR serialization — component hierarchies (Elements)', () => {
 	it('renders stateless components (Per :626)', () => {
-		expect(ssr('Stateless')).toBe('<div>foo</div>');
+		expect(ssr('Stateless')).toBe('<div>foo</div>' + rootWitness);
 		expectCleanHydrate('Stateless');
 	});
 
@@ -565,13 +569,13 @@ describe('conformance: SSR serialization — component hierarchies (Elements)', 
 	});
 
 	it('renders a div with a child (Per :705)', () => {
-		expect(ssr('ParentChild')).toBe('<div id="parent"><div id="child"></div></div>');
+		expect(ssr('ParentChild')).toBe('<div id="parent"><div id="child"></div></div>' + rootWitness);
 		expectCleanHydrate('ParentChild');
 	});
 
 	it('renders a div with multiple children (Per :717)', () => {
 		expect(ssr('ParentChildren')).toBe(
-			'<div id="parent"><div id="child1"></div><div id="child2"></div></div>',
+			'<div id="parent"><div id="child1"></div><div id="child2"></div></div>' + rootWitness,
 		);
 		expectCleanHydrate('ParentChildren');
 	});
@@ -648,8 +652,8 @@ describe('conformance: SSR serialization — badly-typed children (Elements)', (
 
 describe('conformance: SSR serialization — string properties (Attributes)', () => {
 	it('renders simple numbers and strings (Per ReactDOMServerIntegrationAttributes-test.js:54/:59)', () => {
-		expect(ssr('WidthDiv', { w: 30 })).toBe('<div width="30"></div>');
-		expect(ssr('WidthDiv', { w: '30' })).toBe('<div width="30"></div>');
+		expect(ssr('WidthDiv', { w: 30 })).toBe('<div width="30"></div>' + rootWitness);
+		expect(ssr('WidthDiv', { w: '30' })).toBe('<div width="30"></div>' + rootWitness);
 		expectCleanHydrate('WidthDiv', { w: 30 });
 	});
 
@@ -801,8 +805,10 @@ describe('conformance: SSR serialization — download (overloaded boolean) (Attr
 
 describe('conformance: SSR serialization — className / htmlFor (Attributes)', () => {
 	it('serializes className strings (Per :243/:248/:263)', () => {
-		expect(ssr('ClsName', { v: 'myClassName' })).toBe('<div class="myClassName"></div>');
-		expect(ssr('ClsName', { v: '' })).toBe('<div class=""></div>');
+		expect(ssr('ClsName', { v: 'myClassName' })).toBe(
+			'<div class="myClassName"></div>' + rootWitness,
+		);
+		expect(ssr('ClsName', { v: '' })).toBe('<div class=""></div>' + rootWitness);
 		expect(
 			parse(ssr('ClsName', { v: null }))
 				.querySelector('div')!
@@ -829,8 +835,8 @@ describe('conformance: SSR serialization — className / htmlFor (Attributes)', 
 	});
 
 	it('serializes htmlFor as for (Per :292/:303)', () => {
-		expect(ssr('HtmlFor', { v: 'myFor' })).toBe('<label for="myFor"></label>');
-		expect(ssr('HtmlFor', { v: '' })).toBe('<label for=""></label>');
+		expect(ssr('HtmlFor', { v: 'myFor' })).toBe('<label for="myFor"></label>' + rootWitness);
+		expect(ssr('HtmlFor', { v: '' })).toBe('<label for=""></label>' + rootWitness);
 		expect(
 			parse(ssr('HtmlFor', { v: null }))
 				.querySelector('label')!
@@ -948,8 +954,8 @@ describe('conformance: SSR serialization — inline styles (Attributes)', () => 
 
 describe('conformance: SSR serialization — aria + unknown attributes (Attributes)', () => {
 	it('serializes aria-label strings and enumerated booleans (Per :507/:513/:518)', () => {
-		expect(ssr('AriaLabel', { v: 'hello' })).toBe('<div aria-label="hello"></div>');
-		expect(ssr('AriaLabel', { v: false })).toBe('<div aria-label="false"></div>');
+		expect(ssr('AriaLabel', { v: 'hello' })).toBe('<div aria-label="hello"></div>' + rootWitness);
+		expect(ssr('AriaLabel', { v: false })).toBe('<div aria-label="false"></div>' + rootWitness);
 		expect(
 			parse(ssr('AriaLabel', { v: null }))
 				.querySelector('div')!
@@ -1064,7 +1070,9 @@ describe('conformance: SSR serialization — uncontrolled form controls', () => 
 	// to the same markup (Per ReactDOMServerIntegrationTextarea-test.js —
 	// controlled halves out of scope per §2).
 	it('serializes textarea children as content (uncontrolled half)', () => {
-		expect(ssr('TextareaChildren', { v: 'hello' })).toBe('<textarea>hello</textarea>');
+		expect(ssr('TextareaChildren', { v: 'hello' })).toBe(
+			'<textarea>hello</textarea>' + rootWitness,
+		);
 		const e = parse(ssr('TextareaChildren', { v: 'hello' })).querySelector('textarea')!;
 		expect(e.value).toBe('hello');
 		expectCleanHydrate('TextareaChildren', { v: 'hello' });

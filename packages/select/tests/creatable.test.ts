@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { useCreatable as useReactCreatable } from 'react-select/creatable';
 import { renderToString } from 'octane/server';
 import { describe, expect, it, vi } from 'vitest';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
 
 import {
 	CreatableFixture,
@@ -51,7 +52,7 @@ function renderPair(overrides: Partial<CreatableResult> = {}) {
 describe('useCreatable parity', () => {
 	it.each(['first', 'last'] as const)('matches React new-option placement: %s', (position) => {
 		const pair = renderPair({ createOptionPosition: position });
-		expect(pair.octaneHTML).toBe(pair.reactHTML);
+		expect(pair.octaneHTML).toBe(`${pair.reactHTML}<!--${HYDRATION_VERSION_MARKER}-->`);
 		expect(pair.octane.options).toEqual(pair.react.options);
 		expect(pair.octane.options?.find((option) => (option as CreatableOption).__isNew__)).toEqual({
 			label: 'Create "New choice"',
@@ -64,7 +65,7 @@ describe('useCreatable parity', () => {
 		'matches React suppression for %#',
 		(overrides) => {
 			const pair = renderPair(overrides);
-			expect(pair.octaneHTML).toBe(pair.reactHTML);
+			expect(pair.octaneHTML).toBe(`${pair.reactHTML}<!--${HYDRATION_VERSION_MARKER}-->`);
 			expect(pair.octane.options).toEqual(pair.react.options);
 		},
 	);

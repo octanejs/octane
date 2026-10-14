@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { useAsync as useReactAsync } from 'react-select/async';
 import { renderToString } from 'octane/server';
 import { describe, expect, it } from 'vitest';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
 
 import { AsyncFixture, type AsyncOption, type AsyncResult } from './browser/async-fixture.tsrx';
 
@@ -28,7 +29,7 @@ describe('useAsync SSR parity', () => {
 					result = next;
 				},
 			});
-			expect(octane.html).toBe(react);
+			expect(octane.html).toBe(`${react}<!--${HYDRATION_VERSION_MARKER}-->`);
 			expect(result?.filterOption).toBeNull();
 		},
 	);

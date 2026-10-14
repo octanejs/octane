@@ -4,6 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup as renderReact } from 'react-dom/server';
 import { components as upstreamComponents } from 'react-select';
 import { renderToString } from 'octane/server';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
 import { describe, expect, it } from 'vitest';
 import { Window } from 'happy-dom';
 
@@ -339,7 +340,9 @@ describe('first default component unit', () => {
 		>;
 		const react = renderReact(React.createElement(ReactComponent, reactProps(props)));
 		const octane = renderToString(LeafFixture, props);
-		expect(canonicalMarkup(octane.html)).toBe(canonicalMarkup(stripStyleTags(react)));
+		expect(canonicalMarkup(octane.html)).toBe(
+			`${canonicalMarkup(stripStyleTags(react))}<!--${HYDRATION_VERSION_MARKER}-->`,
+		);
 		expect(canonicalCSS(octaneCSS(octane.css))).toBe(canonicalCSS(emotionCSS(react)));
 	});
 
@@ -360,7 +363,9 @@ describe('first default component unit', () => {
 			>;
 			const react = renderReact(React.createElement(ReactComponent, reactProps(props)));
 			const octane = renderToString(LeafFixture, props);
-			expect(canonicalMarkup(octane.html)).toBe(canonicalMarkup(stripStyleTags(react)));
+			expect(canonicalMarkup(octane.html)).toBe(
+				`${canonicalMarkup(stripStyleTags(react))}<!--${HYDRATION_VERSION_MARKER}-->`,
+			);
 			expect(canonicalCSS(octaneCSS(octane.css))).toBe(canonicalCSS(emotionCSS(react)));
 		},
 	);

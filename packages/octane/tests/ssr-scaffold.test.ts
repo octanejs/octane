@@ -9,6 +9,7 @@ import {
 	EMPTY_COMMENT,
 } from 'octane/constants';
 import { renderToString } from 'octane/server';
+import { HYDRATION_VERSION_MARKER } from '../src/hydration-markers.js';
 
 describe('SSR scaffold (phase 0)', () => {
 	it('exposes the hydration marker constants via octane/constants', () => {
@@ -23,6 +24,9 @@ describe('SSR scaffold (phase 0)', () => {
 		// renderToString is a single synchronous pass; it returns { html, css }
 		// (head folded into html). A plain string-returning component renders text.
 		const out = renderToString(((_s: any) => '<p>hi</p>') as any);
-		expect(out).toEqual({ html: BLOCK_OPEN + '&lt;p&gt;hi&lt;/p&gt;' + BLOCK_CLOSE, css: '' });
+		expect(out).toEqual({
+			html: `${BLOCK_OPEN}&lt;p&gt;hi&lt;/p&gt;${BLOCK_CLOSE}<!--${HYDRATION_VERSION_MARKER}-->`,
+			css: '',
+		});
 	});
 });

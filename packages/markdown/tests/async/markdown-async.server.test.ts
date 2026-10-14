@@ -7,6 +7,7 @@ import { renderToPipeableStream } from 'react-dom/server';
 import { MarkdownAsync as ReactMarkdownAsync } from 'react-markdown';
 import rehypeStarryNight from 'rehype-starry-night';
 import { describe, expect, it } from 'vitest';
+import { HYDRATION_VERSION_MARKER } from '../../../octane/src/hydration-markers.js';
 import { MarkdownAsync } from '../../src/index';
 
 function normalize(html: string): string {
@@ -31,7 +32,7 @@ describe('MarkdownAsync', function () {
 		}).toThrow(/A component suspended while responding to synchronous input/);
 		const pending = MarkdownAsync({ children: 'a' });
 		expect(pending).toBeInstanceOf(Promise);
-		expect(await renderOctane(await pending)).toBe('<p>a</p>');
+		expect(await renderOctane(await pending)).toBe(`<p>a</p><!--${HYDRATION_VERSION_MARKER}-->`);
 	});
 
 	it('matches the upstream pipeable-stream output fixture', async () => {
@@ -55,7 +56,9 @@ describe('MarkdownAsync', function () {
 			);
 		});
 		expect(react).toBe('<p>a</p>');
-		expect(await renderOctane(await MarkdownAsync({ children: 'a' }))).toBe('<p>a</p>');
+		expect(await renderOctane(await MarkdownAsync({ children: 'a' }))).toBe(
+			react + `<!--${HYDRATION_VERSION_MARKER}-->`,
+		);
 	});
 
 	it('matches exact starry-night highlighted HTML for the upstream fixture', async () => {
@@ -66,6 +69,8 @@ describe('MarkdownAsync', function () {
 		const expected =
 			'<pre><code class="language-js"><span class="pl-en">console</span>.<span class="pl-c1">log</span>(<span class="pl-c1">3.14</span>)\n</code></pre>';
 		expect(renderToStaticMarkup(await ReactMarkdownAsync(props))).toBe(expected);
-		expect(await renderOctane(await MarkdownAsync(props))).toBe(expected);
+		expect(await renderOctane(await MarkdownAsync(props))).toBe(
+			expected + `<!--${HYDRATION_VERSION_MARKER}-->`,
+		);
 	});
 });

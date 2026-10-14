@@ -210,7 +210,7 @@ export function Page(props) @{
 			if (throws) expect(() => render(props)).toThrow(failure);
 			else {
 				expect(render(props)).toBe(
-					'<div title="final" data-middle="mutated <&amp;" data-last="last"></div>',
+					'<div title="final" data-middle="mutated <&amp;" data-last="last"></div><!--octane-hydration:1-->',
 				);
 			}
 			expect(trace).toEqual([
@@ -229,7 +229,7 @@ export function Page(props) @{
 				...(throws ? [] : ['coerce:middle', 'coerce:last']),
 			]);
 			expect(render({ spread: {}, read: () => 'next', finalTitle: 'recovered' })).toBe(
-				'<div title="recovered" data-last="next"></div>',
+				'<div title="recovered" data-last="next"></div><!--octane-hydration:1-->',
 			);
 		},
 	);
@@ -263,7 +263,10 @@ export const render = (props) => renderToString(Page, props).html;
 					id: tracked('id'),
 					last: { for: final === 'final' ? tracked(final) : final, title: null, class: false },
 				}),
-			).toBe(final === 'final' ? '<label id="id" for="final"></label>' : '<label id="id"></label>');
+			).toBe(
+				(final === 'final' ? '<label id="id" for="final"></label>' : '<label id="id"></label>') +
+					'<!--octane-hydration:1-->',
+			);
 			expect(trace).toEqual(final === 'final' ? ['id', 'final'] : ['id']);
 		}
 	});
@@ -302,7 +305,7 @@ export function Page(props) @{
 				'<custom-panel htmlFor="verbatim" for="native" class="a b"></custom-panel>' +
 				'<svg viewBox="0 0 1 1" viewbox="lower"></svg>' +
 				'<svg></svg>' +
-				'<math mathvariant="bold" mathVariant="mixed"></math></main>',
+				'<math mathvariant="bold" mathVariant="mixed"></math></main><!--octane-hydration:1-->',
 		);
 	});
 

@@ -6,6 +6,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MarkdownAsync as ReactMarkdownAsync } from 'react-markdown';
 import { describe, expect, it } from 'vitest';
 import { MarkdownAsync, type Components } from '../../src/index';
+import { HYDRATION_VERSION_MARKER } from '../../../octane/src/hydration-markers.js';
+
+const rootWitness = `<!--${HYDRATION_VERSION_MARKER}-->`;
 
 function normalize(html: string): string {
 	return html
@@ -36,7 +39,7 @@ describe('MarkdownAsync', () => {
 		expect(calls).toEqual(['remark', 'rehype']);
 		calls.length = 0;
 		const react = await ReactMarkdownAsync(props);
-		expect(await renderOctane(octane)).toBe(renderToStaticMarkup(react));
+		expect(await renderOctane(octane)).toBe(renderToStaticMarkup(react) + rootWitness);
 		expect(calls).toEqual(['remark', 'rehype']);
 	});
 

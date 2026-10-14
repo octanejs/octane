@@ -44,10 +44,10 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 
 	it('@for uses direct host roots as item boundaries; @empty still uses the list range', async () => {
 		expect((await RT.renderToString(m.List, { items: ['a', 'b'] })).html).toBe(
-			`<ul>${FOR_ITEMS_OPEN}<li>a</li><li>b</li>${CLOSE}</ul>`,
+			`<ul>${FOR_ITEMS_OPEN}<li>a</li><li>b</li>${CLOSE}</ul><!--octane-hydration:1-->`,
 		);
 		expect((await RT.renderToString(m.List, { items: [] })).html).toBe(
-			`<ul>${FOR_EMPTY_OPEN}<li class="empty">none</li>${CLOSE}</ul>`,
+			`<ul>${FOR_EMPTY_OPEN}<li class="empty">none</li>${CLOSE}</ul><!--octane-hydration:1-->`,
 		);
 	});
 
@@ -192,7 +192,7 @@ describe('SSR Phase 3 — component children (context Provider)', () => {
 describe('SSR Phase 3 — portals', () => {
 	it('emits a site marker for a portal and renders sibling content inline', async () => {
 		const body = (await RT.renderToString(m.WithPortal)).html;
-		expect(body).toBe('<div id="host"><!----><span>inline</span></div>');
+		expect(body).toBe('<div id="host"><!----><span>inline</span></div><!--octane-hydration:1-->');
 	});
 });
 

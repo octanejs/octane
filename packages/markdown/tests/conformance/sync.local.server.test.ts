@@ -7,6 +7,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { describe, expect, it } from 'vitest';
 import Markdown, { type Components, type ExtraProps } from '../../src/index';
+import { HYDRATION_VERSION_MARKER } from '../../../octane/src/hydration-markers.js';
+
+const rootWitness = `<!--${HYDRATION_VERSION_MARKER}-->`;
 
 async function octaneHtml(props: Parameters<typeof Markdown>[0]): Promise<string> {
 	return (await prerender(Markdown as ComponentBody<typeof props>, props)).html
@@ -28,13 +31,13 @@ describe('synchronous public projection', () => {
 		'![alt](javascript:alert(1) "title")',
 		'<i>raw</i>',
 	])('matches the pristine default renderer for %j', async (children) => {
-		expect(await octaneHtml({ children })).toBe(reactHtml({ children }));
+		expect(await octaneHtml({ children })).toBe(reactHtml({ children }) + rootWitness);
 	});
 
 	it('matches pristine plugin-created GFM output', async () => {
 		const children = '~~delete~~\n\n| a | b |\n| - | - |\n| 1 | 2 |';
 		expect(await octaneHtml({ children, remarkPlugins: [remarkGfm] })).toBe(
-			reactHtml({ children, remarkPlugins: [remarkGfm] }),
+			reactHtml({ children, remarkPlugins: [remarkGfm] }) + rootWitness,
 		);
 	});
 
@@ -77,7 +80,7 @@ describe('synchronous public projection', () => {
 				],
 			});
 			const props = { children: 'ignored', rehypePlugins: [plugin] };
-			expect(await octaneHtml(props)).toBe(reactHtml(props));
+			expect(await octaneHtml(props)).toBe(reactHtml(props) + rootWitness);
 		},
 	);
 
@@ -97,6 +100,6 @@ describe('synchronous public projection', () => {
 			],
 		});
 		const props = { children: 'ignored', rehypePlugins: [plugin] };
-		expect(await octaneHtml(props)).toBe(reactHtml(props));
+		expect(await octaneHtml(props)).toBe(reactHtml(props) + rootWitness);
 	});
 });

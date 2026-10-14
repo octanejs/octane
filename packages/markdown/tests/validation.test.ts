@@ -2,6 +2,9 @@ import type { ComponentBody } from 'octane';
 import { prerender } from 'octane/static';
 import { expect, it } from 'vitest';
 import Markdown from '../src/index';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
+
+const rootWitness = `<!--${HYDRATION_VERSION_MARKER}-->`;
 
 async function publicHtml(props: Parameters<typeof Markdown>[0]): Promise<string> {
 	return (await prerender(Markdown as ComponentBody<typeof props>, props)).html.replace(
@@ -14,7 +17,7 @@ it.each([
 	[null, ''],
 	[undefined, ''],
 ])('accepts pinned empty child %j', async function (children, expected) {
-	expect(await publicHtml({ children })).toBe(expected);
+	expect(await publicHtml({ children })).toBe(expected + rootWitness);
 });
 
 it('rejects non-string children with the pinned message', function () {

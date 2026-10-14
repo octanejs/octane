@@ -346,7 +346,9 @@ describe('server renderable values', () => {
 		expect(Lazy.displayName).toBe('Lazy');
 		expect(loader).not.toHaveBeenCalled();
 		expect(getter).not.toHaveBeenCalled();
-		expect((await Static.prerender(Lazy)).html).toBe('<!--[-->loaded<!--]-->');
+		expect((await Static.prerender(Lazy)).html).toBe(
+			'<!--[-->loaded<!--]--><!--octane-hydration:1-->',
+		);
 		expect(Lazy.displayName).toBe('Named');
 		Lazy.displayName = 'Wrapped';
 		expect(Lazy.displayName).toBe('Wrapped');
@@ -505,7 +507,8 @@ describe('server renderable values', () => {
 				Server.createElement('body', null, 'body'),
 			);
 			const documentHtml = Server[api](document).html;
-			expect(documentHtml).toContain('<html><head></head><body>body</body></html>');
+			const version = api === 'renderToString' ? '<!--octane-hydration:1-->' : '';
+			expect(documentHtml).toContain(`<html><head></head><body>body${version}</body></html>`);
 			expect(
 				new DOMParser().parseFromString(documentHtml, 'text/html').head.childNodes.length,
 			).toBe(0);

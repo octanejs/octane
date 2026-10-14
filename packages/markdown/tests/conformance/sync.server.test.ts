@@ -11,6 +11,9 @@ import remarkToc from 'remark-toc';
 import { visit } from 'unist-util-visit';
 import { describe, expect, it } from 'vitest';
 import Markdown, { type Components, type ExtraProps } from '../../src/index';
+import { HYDRATION_VERSION_MARKER } from '../../../octane/src/hydration-markers.js';
+
+const rootWitness = `<!--${HYDRATION_VERSION_MARKER}-->`;
 
 async function octaneHtml(props: Parameters<typeof Markdown>[0]): Promise<string> {
 	return (await prerender(Markdown as ComponentBody<typeof props>, props)).html
@@ -30,7 +33,7 @@ describe('synchronous public projection', () => {
 	it.each([
 		'# heading\n\nA [safe](https://example.com) link.',
 	])('matches the pristine default renderer for %j', async (children) => {
-		expect(await octaneHtml({ children })).toBe(reactHtml({ children }));
+		expect(await octaneHtml({ children })).toBe(reactHtml({ children }) + rootWitness);
 	});
 
 	it.each([
@@ -76,32 +79,32 @@ describe('synchronous public projection', () => {
 		['hash URL', '[](a#javascript:alert(1))', undefined],
 	] as const)('matches pristine sync identity: %s', async (_name, children, remarkPlugins) => {
 		const props = { children, remarkPlugins };
-		expect(await octaneHtml(props)).toBe(reactHtml(props));
+		expect(await octaneHtml(props)).toBe(reactHtml(props) + rootWitness);
 	});
 
 	it('matches pristine rehype-raw behavior', async () => {
 		const props = { children: '<i>a</i>', rehypePlugins: [rehypeRaw] };
-		expect(await octaneHtml(props)).toBe(reactHtml(props));
+		expect(await octaneHtml(props)).toBe(reactHtml(props) + rootWitness);
 	});
 
 	it('matches the exact upstream allowedElements drop fixture', async () => {
 		const props = { children: '# *a*\n* b', allowedElements: ['h1', 'li', 'ul'] };
 		const expected = '<h1></h1>\n<ul>\n<li>b</li>\n</ul>';
 		expect(reactHtml(props)).toBe(expected);
-		expect(await octaneHtml(props)).toBe(expected);
+		expect(await octaneHtml(props)).toBe(expected + rootWitness);
 	});
 
 	it('matches the exact upstream unwrapDisallowed with allowedElements fixture', async () => {
 		const props = { children: '# *a*', unwrapDisallowed: true, allowedElements: ['h1'] };
 		expect(reactHtml(props)).toBe('<h1>a</h1>');
-		expect(await octaneHtml(props)).toBe('<h1>a</h1>');
+		expect(await octaneHtml(props)).toBe('<h1>a</h1>' + rootWitness);
 	});
 
 	it('matches the exact upstream disallowedElements fixture without unwrap', async () => {
 		const props = { children: '# *a*\n* b', disallowedElements: ['em'] };
 		const expected = '<h1></h1>\n<ul>\n<li>b</li>\n</ul>';
 		expect(reactHtml(props)).toBe(expected);
-		expect(await octaneHtml(props)).toBe(expected);
+		expect(await octaneHtml(props)).toBe(expected + rootWitness);
 	});
 
 	it('matches the exact upstream remarkRehypeOptions clobberPrefix footnote output', async () => {
@@ -113,7 +116,7 @@ describe('synchronous public projection', () => {
 		const expected = reactHtml(props);
 		expect(expected).toContain('href="#b-fn-x" id="b-fnref-x"');
 		expect(expected).toContain('<li id="b-fn-x">');
-		expect(await octaneHtml(props)).toBe(expected);
+		expect(await octaneHtml(props)).toBe(expected + rootWitness);
 	});
 
 	it('matches the exact upstream GFM aligned table cell with merged plugin style', async () => {
@@ -129,7 +132,7 @@ describe('synchronous public projection', () => {
 		const expected =
 			'<table><thead><tr><th style="color:red;text-align:left">a</th></tr></thead></table>';
 		expect(reactHtml(props)).toBe(expected);
-		expect(await octaneHtml(props)).toBe(expected);
+		expect(await octaneHtml(props)).toBe(expected + rootWitness);
 	});
 
 	it('matches the exact upstream href urlTransform public-render fixture', async () => {
@@ -141,7 +144,7 @@ describe('synchronous public projection', () => {
 				return '';
 			},
 		};
-		expect(await octaneHtml(props)).toBe('<p><a href="" title="c">a</a></p>');
+		expect(await octaneHtml(props)).toBe('<p><a href="" title="c">a</a></p>' + rootWitness);
 		expect(calls).toEqual([['https://b.com', 'href', 'a']]);
 	});
 
@@ -154,20 +157,20 @@ describe('synchronous public projection', () => {
 				return null;
 			},
 		};
-		expect(await octaneHtml(props)).toBe('<p><img alt="a" title="c"/></p>');
+		expect(await octaneHtml(props)).toBe('<p><img alt="a" title="c"/></p>' + rootWitness);
 		expect(calls).toEqual([['https://b.com', 'src', 'img']]);
 	});
 
 	it('matches the exact upstream remark-gfm single-tilde fixture', async () => {
 		const props = { children: 'a ~b~ c', remarkPlugins: [remarkGfm] };
 		expect(reactHtml(props)).toBe('<p>a <del>b</del> c</p>');
-		expect(await octaneHtml(props)).toBe('<p>a <del>b</del> c</p>');
+		expect(await octaneHtml(props)).toBe('<p>a <del>b</del> c</p>' + rootWitness);
 	});
 
 	it('publicly renders exact unwrapDisallowed with disallowedElements fixture', async () => {
 		const props = { children: '# *a*', unwrapDisallowed: true, disallowedElements: ['em'] };
 		expect(reactHtml(props)).toBe('<h1>a</h1>');
-		expect(await octaneHtml(props)).toBe('<h1>a</h1>');
+		expect(await octaneHtml(props)).toBe('<h1>a</h1>' + rootWitness);
 	});
 
 	it('matches pristine remark-toc output for the upstream fixture', async () => {
@@ -187,7 +190,7 @@ describe('synchronous public projection', () => {
 <h3>c</h3>
 <h2>d</h2>`;
 		expect(reactHtml(props)).toBe(expected);
-		expect(await octaneHtml(props)).toBe(expected);
+		expect(await octaneHtml(props)).toBe(expected + rootWitness);
 	});
 
 	it('passes complete intrinsic props and node while keeping key special', async () => {
@@ -232,7 +235,7 @@ describe('synchronous public projection', () => {
 
 	it('supports intrinsic remapping, null components, and fragments', async () => {
 		expect(await octaneHtml({ children: '# title', components: { h1: 'h2' } })).toBe(
-			'<h2>title</h2>',
+			'<h2>title</h2>' + rootWitness,
 		);
 		const NullParagraph = (() => null) as unknown as ComponentBody<Record<string, unknown>>;
 		expect(
@@ -240,13 +243,13 @@ describe('synchronous public projection', () => {
 				children: 'hidden\n\n## shown',
 				components: { p: NullParagraph },
 			}),
-		).toBe('\n<h2>shown</h2>');
-		expect(await octaneHtml({ children: '# one\n\n## two' })).toBe('<h1>one</h1>\n<h2>two</h2>');
+		).toBe('\n<h2>shown</h2>' + rootWitness);
+		expect(await octaneHtml({ children: '# one\n\n## two' })).toBe('<h1>one</h1>\n<h2>two</h2>' + rootWitness);
 	});
 
 	it('preserves sibling projection and rejects invalid mappings', async () => {
 		expect(await octaneHtml({ children: '- a\n- b\n- c' })).toBe(
-			'<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>',
+			'<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>' + rootWitness,
 		);
 		await expect(
 			octaneHtml({ children: '# bad', components: { h1: 42 as never } }),
@@ -276,7 +279,7 @@ describe('synchronous public projection', () => {
 			}
 			const plain = { children, remarkPlugins };
 			const expected = reactHtml(plain);
-			expect(await octaneHtml({ ...plain, components: components as Components })).toBe(expected);
+			expect(await octaneHtml({ ...plain, components: components as Components })).toBe(expected + rootWitness);
 			expect(calls).toBe(expectedCalls);
 		},
 	);
@@ -295,7 +298,7 @@ describe('synchronous public projection', () => {
 				tree.children.unshift({ type: 'element', tagName, properties, children: [] });
 			};
 			const props = { children, rehypePlugins: [plugin] };
-			expect(await octaneHtml(props)).toBe(reactHtml(props));
+			expect(await octaneHtml(props)).toBe(reactHtml(props) + rootWitness);
 		},
 	);
 
@@ -326,7 +329,7 @@ describe('synchronous public projection', () => {
 		const expected =
 			'<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg"><title>SVG `&lt;circle&gt;` element</title><circle cx="120" cy="120" r="100"></circle><path stroke-miterlimit="-1"></path></svg><p>a</p>';
 		expect(reactHtml(props)).toBe(expected);
-		expect(await octaneHtml(props)).toBe(expected);
+		expect(await octaneHtml(props)).toBe(expected + rootWitness);
 	});
 
 	it('ignores the exact upstream root comment while preserving the paragraph', async () => {
@@ -335,14 +338,14 @@ describe('synchronous public projection', () => {
 		};
 		const props = { children: 'a', rehypePlugins: [plugin] };
 		expect(reactHtml(props)).toBe('<p>a</p>');
-		expect(await octaneHtml(props)).toBe('<p>a</p>');
+		expect(await octaneHtml(props)).toBe('<p>a</p>' + rootWitness);
 	});
 
 	it('matches the exact upstream root-replaced-by-comment empty output', async () => {
 		const plugin = () => () => ({ type: 'comment' as const, value: 'things!' });
 		const props = { children: 'a', rehypePlugins: [plugin] };
 		expect(reactHtml(props)).toBe('');
-		expect(await octaneHtml(props)).toBe('');
+		expect(await octaneHtml(props)).toBe('' + rootWitness);
 	});
 
 	it('passes the complete upstream HAST node including child and source positions', async () => {
@@ -352,7 +355,7 @@ describe('synchronous public projection', () => {
 			const { node: _node, ...rest } = props;
 			return createOctaneElement('em', rest);
 		};
-		expect(await octaneHtml({ children: '*a*', components: { em: Em } })).toBe('<p><em>a</em></p>');
+		expect(await octaneHtml({ children: '*a*', components: { em: Em } })).toBe('<p><em>a</em></p>' + rootWitness);
 		expect(captured).toEqual({
 			type: 'element',
 			tagName: 'em',

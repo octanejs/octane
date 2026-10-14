@@ -8,6 +8,7 @@ import ReactCreatableSelect from 'react-select/creatable';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Window } from 'happy-dom';
 import { renderToString } from 'octane/server';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
 import { describe, expect, it } from 'vitest';
 
 import { SelectFixture, type SelectOption } from './select-fixture.tsrx';
@@ -152,7 +153,9 @@ describe('Select SSR parity', () => {
 				React.createElement(ReactSelect<SelectOption>, props as never),
 			);
 			const octane = renderToString(SelectFixture, props as never);
-			expect(canonicalMarkup(octane.html)).toBe(canonicalMarkup(react));
+			expect(canonicalMarkup(octane.html)).toBe(
+				`${canonicalMarkup(react)}<!--${HYDRATION_VERSION_MARKER}-->`,
+			);
 			expect(canonicalCSS(octaneCSS(octane.css))).toBe(canonicalCSS(emotionCSS(react)));
 		},
 	);
@@ -197,7 +200,9 @@ describe('composed Select entry-point SSR parity', () => {
 			),
 		);
 		const octane = renderToString(OctaneComponent as never, props as never);
-		expect(canonicalMarkup(octane.html)).toBe(canonicalMarkup(react));
+		expect(canonicalMarkup(octane.html)).toBe(
+			`${canonicalMarkup(react)}<!--${HYDRATION_VERSION_MARKER}-->`,
+		);
 		expect(canonicalCSS(octaneCSS(octane.css))).toBe(canonicalCSS(emotionCSS(react)));
 	});
 });
