@@ -3,7 +3,7 @@
 // the template's commit function writes them at commit. These pin what the
 // DOM, memo bail-outs and event dispatch observe when a render is dropped.
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRoot, flushSync, startTransition } from '../src/index.js';
+import { createElement, createRoot, flushSync, startTransition } from '../src/index.js';
 import { act } from './_helpers';
 import {
 	CommitCallback,
@@ -14,6 +14,8 @@ import {
 	MemoHeld,
 	Nested,
 } from './_fixtures/commit-functions.tsrx';
+import { Item, TextHoles } from './_fixtures/text-hole-commit.tsrx';
+import { HostWrites } from './_fixtures/host-commit.tsrx';
 
 const never = () => new Promise<never>(() => {});
 const containers: HTMLElement[] = [];
@@ -229,4 +231,234 @@ describe('commit functions', () => {
 		expect(sibling.title).toBe('two');
 		root.unmount();
 	});
+});
+
+describe('renderable holes commit with their render', () => {
+	const ITEM = createElement(Item, { label: 'item' });
+	const HOST = createElement('i', null, 'host');
+	const text = (value: unknown) =>
+		value === ITEM
+			? 'item'
+			: value === HOST
+				? 'host'
+				: value == null || typeof value === 'boolean'
+					? ''
+					: String(value);
+	// Each hole's position and what it shows for a value's text.
+	const positions: Array<[string, (text: string) => string]> = [
+		['#sibling', (t) => 'before ' + t + ' after'],
+		['#only', (t) => t],
+		['#rows li', (t) => t + '|' + t],
+		['#pairs .one', (t) => t],
+		['#pairs .one-sibling', (t) => 'one' + t],
+		['#root-hole', (t) => t],
+		['#returned', (t) => t],
+	];
+	const shown = (container: HTMLElement) =>
+		positions.map(([selector]) =>
+			[...container.querySelectorAll(selector)].map((node) => node.textContent).join('|'),
+		);
+	const expected = (value: unknown) => positions.map(([, show]) => show(text(value)));
+	// Every change to the container since the last take, named by its kind and
+	// the element it changed.
+	const observe = (container: HTMLElement) => {
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			characterData: true,
+		});
+		return {
+			take: () =>
+				[...records.splice(0), ...observer.takeRecords()].map((record) => {
+					const node = record.target;
+					const element = node.nodeType === 1 ? (node as Element) : node.parentElement;
+					return `${record.type} ${element?.id || element?.className || element?.localName}`;
+				}),
+			disconnect: () => observer.disconnect(),
+		};
+	};
+	// Text changes, empty text, and switches to and from a component and a host.
+	const values = [
+		'a',
+		'b',
+		null,
+		'c',
+		ITEM,
+		'd',
+		7,
+		true,
+		'e',
+		ITEM,
+		null,
+		ITEM,
+		HOST,
+		'f',
+		HOST,
+		ITEM,
+		HOST,
+		null,
+		'g',
+	];
+	type Priority = 'urgent' | 'transition';
+	const update = (render: () => void, priority: Priority) =>
+		act(() => (priority === 'transition' ? startTransition(render) : render()));
+
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`writes no hole's DOM until its render commits (${priority})`, async () => {
+			const container = host();
+			const root = createRoot(container);
+			let observer: ReturnType<typeof observe> | null = null;
+			let during: string[] | null = null;
+			const probe = () => {
+				if (observer !== null) during = observer.take();
+			};
+			flushSync(() => root.render(TextHoles, { value: 'start', probe }));
+			observer = observe(container);
+			try {
+				for (const value of values) {
+					// The previous commit's changes.
+					observer.take();
+					during = null;
+					await update(() => root.render(TextHoles, { value, probe: () => probe() }), priority);
+					// The probe renders after every hole: none had touched the DOM.
+					expect(during).toEqual([]);
+					expect(shown(container)).toEqual(expected(value));
+				}
+			} finally {
+				observer.disconnect();
+				root.unmount();
+			}
+		});
+
+		it(`leaves every hole untouched when its ${priority} render is dropped, and a later render still writes`, async () => {
+			const container = host();
+			const root = createRoot(container);
+			const probe = () => {};
+			for (const committed of ['a', null, ITEM, HOST]) {
+				flushSync(() => root.render(TextHoles, { value: committed, probe }));
+				for (const value of values) {
+					if (value === committed) continue;
+					const observer = observe(container);
+					// A sibling outside every boundary suspends: the root keeps its screen.
+					await update(() => root.render(TextHoles, { value, probe, gate: never() }), priority);
+					expect(observer.take()).toEqual([]);
+					observer.disconnect();
+					expect(shown(container)).toEqual(expected(committed));
+				}
+				flushSync(() => root.render(TextHoles, { value: 'h', probe }));
+				expect(shown(container)).toEqual(expected('h'));
+			}
+			root.unmount();
+		});
+	}
+});
+
+describe('host props, form controls and raw HTML commit with their render', () => {
+	const props = (label: string) => ({
+		label,
+		attrs: { title: label, value: label },
+		html: { dangerouslySetInnerHTML: { __html: '<i>' + label + '</i>' } },
+	});
+	// What each host shows, properties included: a property write leaves no
+	// mutation record.
+	const shown = (container: HTMLElement) => {
+		const input = (id: string) => container.querySelector('#' + id) as HTMLInputElement;
+		return [
+			input('cascade').title,
+			input('cascade').value,
+			input('check').checked,
+			container.querySelector('#raw')!.innerHTML,
+			container.querySelector('#script')!.textContent,
+			input('spread-input').title,
+			input('spread-input').value,
+			input('spread-area').title,
+			input('spread-area').value,
+			container.querySelector('#spread-raw')!.innerHTML,
+		];
+	};
+	const expected = (label: string) => [
+		label,
+		label,
+		label === 'b',
+		'<b>' + label + '</b>',
+		'label ' + label,
+		label,
+		label,
+		label,
+		label,
+		'<i>' + label + '</i>',
+	];
+	const observe = (container: HTMLElement) => {
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			characterData: true,
+		});
+		return {
+			take: () => [...records.splice(0), ...observer.takeRecords()].map((record) => record.type),
+			disconnect: () => observer.disconnect(),
+		};
+	};
+	const labels = ['b', 'c', 'b', 'd'];
+	type Priority = 'urgent' | 'transition';
+	const update = (render: () => void, priority: Priority) =>
+		act(() => (priority === 'transition' ? startTransition(render) : render()));
+
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`writes no host until its render commits (${priority})`, async () => {
+			const container = host();
+			const root = createRoot(container);
+			let observer: ReturnType<typeof observe> | null = null;
+			let during: unknown[] | null = null;
+			let committed = 'a';
+			const probe = () => {
+				// The DOM still shows the committed label while the hosts render.
+				if (observer !== null) during = [...observer.take(), ...shown(container)];
+			};
+			flushSync(() => root.render(HostWrites, { ...props(committed), probe }));
+			observer = observe(container);
+			try {
+				for (const label of labels) {
+					observer.take();
+					during = null;
+					await update(
+						() => root.render(HostWrites, { ...props(label), probe: () => probe() }),
+						priority,
+					);
+					expect(during).toEqual(expected(committed));
+					expect(shown(container)).toEqual(expected(label));
+					committed = label;
+				}
+			} finally {
+				observer.disconnect();
+				root.unmount();
+			}
+		});
+
+		it(`leaves every host untouched when its ${priority} render is dropped`, async () => {
+			const container = host();
+			const root = createRoot(container);
+			const probe = () => {};
+			flushSync(() => root.render(HostWrites, { ...props('a'), probe }));
+			for (const label of labels) {
+				const observer = observe(container);
+				await update(
+					() => root.render(HostWrites, { ...props(label), probe, gate: never() }),
+					priority,
+				);
+				expect(observer.take()).toEqual([]);
+				observer.disconnect();
+				expect(shown(container)).toEqual(expected('a'));
+			}
+			flushSync(() => root.render(HostWrites, { ...props('e'), probe }));
+			expect(shown(container)).toEqual(expected('e'));
+			root.unmount();
+		});
+	}
 });

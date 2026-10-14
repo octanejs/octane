@@ -1061,8 +1061,9 @@ export function App(props) @{ <div><p {...props.attrs}>{props.value}</p><Tag kin
 		enableSignalBindings();
 		const container = document.createElement('div');
 		document.body.appendChild(container);
+		// The root's first commit replaces the container's previous content, as
+		// React's does, so the input the body mounts starts outside it.
 		const input = document.createElement('input');
-		container.appendChild(input);
 		const draft$ = __signalAt('g:draft-candidate', 'server', { key: 'draft-candidate' });
 		let token: unknown;
 		let owner: SignalOwner | null = null;
