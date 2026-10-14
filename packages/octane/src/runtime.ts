@@ -4489,38 +4489,47 @@ function retireRootBlock(block: Block): void {
 		transaction === null ||
 		transaction.aborted ||
 		ROOT_RENDER_ROLLBACK ||
-		block.idState.renderOwner !== transaction.owner ||
-		!retiresVisibly(block)
+		block.idState.renderOwner !== transaction.owner
 	)
 		return;
-	const retired = (transaction.retired ??= new Set());
-	retired.add(block);
-	if (block.pending) {
-		journalRootProperty(block, 'pending', block.pending);
-		block.pending = false;
-	}
+	retireBlocks(block, transaction, true);
 }
 
 /**
- * Whether a deleted Block joins its transaction's retired set. The scheduler
- * skips queued work at or below a retired Block (drainQueue), and a held
- * ViewTransition reads the set for what leaves (vtPreview). A Block with no
- * pending work, scope state, children or signal authority can have none queued.
+ * Add `first` (and with `!single`, its following list rows) to the
+ * transaction's retired set. The scheduler skips queued work at or below a
+ * retired Block (drainQueue), and a held ViewTransition reads the set for what
+ * leaves (vtPreview). A Block with no pending work, scope state, children or
+ * signal authority can have none queued, so it stays out unless the
+ * ViewTransition driver is installed. One loop: a bulk clear visits every row.
  */
-function retiresVisibly(block: Block): boolean {
+function retireBlocks(
+	first: Block | null,
+	transaction: RootRenderTransaction,
+	single: boolean,
+): void {
 	// A truthiness read, which an application without the driver folds away.
-	if (VIEW_TRANSITION_DRIVER) return true;
-	return (
-		block.pending ||
-		block.rare?.updateError === true ||
-		block.hooks !== null ||
-		block.effectSlots !== null ||
-		block.cleanups !== null ||
-		block.children !== null ||
-		block._slots !== null ||
-		block.signalOwner !== undefined ||
-		block.signalTokenEscaped
-	);
+	const all = VIEW_TRANSITION_DRIVER ? true : false;
+	for (let block = first; block !== null; block = single ? null : block.nextSibling) {
+		if (
+			!all &&
+			!block.pending &&
+			block.rare?.updateError !== true &&
+			block.hooks === null &&
+			block.effectSlots === null &&
+			block.cleanups === null &&
+			block.children === null &&
+			block._slots === null &&
+			block.signalOwner === undefined &&
+			!block.signalTokenEscaped
+		)
+			continue;
+		(transaction.retired ??= new Set()).add(block);
+		if (block.pending) {
+			journalRootProperty(block, 'pending', block.pending);
+			block.pending = false;
+		}
+	}
 }
 
 /**
@@ -48859,15 +48868,7 @@ function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = fa
 	const transaction = ROOT_RENDER_TRANSACTION!;
 	const parent = state.start.parentNode!;
 	const oldHead = state.head;
-	// retireRootBlock, inlined: this visits every row of a bulk clear.
-	for (let block = oldHead; block !== null; block = block.nextSibling) {
-		if (!retiresVisibly(block)) continue;
-		(transaction.retired ??= new Set<Block>()).add(block);
-		if (block.pending) {
-			journalRootProperty(block, 'pending', block.pending);
-			block.pending = false;
-		}
-	}
+	retireBlocks(oldHead, transaction, false);
 	const start = state.start;
 	const end = state.end;
 	// The list's log runs this before its later runs land. Outside code may have
@@ -48951,15 +48952,7 @@ function batchClearItems(
 			const start = state.start;
 			const end = state.end;
 			const size = oldItems.size;
-			// retireRootBlock, inlined: this visits every row of a bulk clear.
-			for (let block = head; block !== null; block = block.nextSibling) {
-				if (!retiresVisibly(block)) continue;
-				(next.tx.retired ??= new Set<Block>()).add(block);
-				if (block.pending) {
-					journalRootProperty(block, 'pending', block.pending);
-					block.pending = false;
-				}
-			}
+			retireBlocks(head, next.tx, false);
 			next.out.push(() => clearItems(head, start, end, size), null, null);
 		}
 		oldItems.clear();
