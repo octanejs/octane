@@ -241,7 +241,9 @@ describe('Float evidence (slice 3) — classification contexts', () => {
 		expect(svgTitle.textContent).toBe('svg inline title');
 		expect(document.head.querySelector('title')).toBeNull();
 		// <foreignObject> content is back under HTML rules: resource + hoist.
-		const hoisted = document.head.querySelector('link[href="/fe3-fo-sheet.css"]')!;
+		const hoisted = document.head.querySelector(
+			'link[rel="stylesheet"][href="/fe3-fo-sheet.css"]',
+		)!;
 		expect(hoisted).not.toBeNull();
 		expect(hoisted.getAttribute('data-precedence')).toBe('default');
 		expect(document.head.querySelector('meta[name="fe3-fo-meta"]')).not.toBeNull();
