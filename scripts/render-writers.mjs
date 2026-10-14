@@ -132,7 +132,6 @@ export const WRITERS = new Map(
 		'HydrationCapability.wrapUnframedRoot': 'hydration',
 		'HydrationCapability.insertRoot': 'hydration',
 		'HydrationCapability.htext': 'hydration',
-		'HydrationCapability.unframe': 'hydration',
 		'HydrationCapability.hydrateOnlyChild': 'hydration',
 		'HydrationCapability.hempty': 'hydration',
 		'HydrationCapability.htextSwap': 'hydration',

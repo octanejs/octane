@@ -15574,8 +15574,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// (emitted via `ssrText`). A spread or raw-HTML writer does not change the
 	// client's shape, so it must not change this one: inside RCDATA (<textarea>)
 	// a frame around a primitive would parse as literal text.
+	// A ternary with a JSX arm is a value hole too wherever the client folds it
+	// into one (a returned `.tsx` tree), not an @if.
 	const onlyChild0 =
-		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
+		normChildren.length === 1 &&
+		(normChildren[0].type === 'Text' ||
+			(normChildren[0].type === 'TSRXExpression' &&
+				(ctx._tsxValuePos === true || ctx._ssrFoldedExprHoles === true) &&
+				isConditionalJsx(normChildren[0].expression)))
+			? normChildren[0]
+			: null;
 	const textareaParts = textareaTextParts(tag, selfNs, normChildren, ctx);
 	let childrenExpr;
 	if (authoredStaticScriptContent !== undefined) {
