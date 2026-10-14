@@ -587,7 +587,8 @@ describe('octane analyze Strong coverage', () => {
 				"import { memo } from 'octane';\n" +
 				"import * as Panels from './Panel.tsrx';\n" +
 				"import Toolbar from './Toolbar.tsrx';\n" +
-				"import { Badge as Pill } from './Badge.tsrx';\n" +
+				// A comment's backticks are not code, even inside a clause.
+				"import {\n\t// the `Badge` export\n\tBadge as Pill,\n} from './Badge.tsrx';\n" +
 				"import { Internal } from './Internal.tsrx';\n" +
 				'export const Panel = Panels.Panel;\n' +
 				'export { Pill as Badge };\n' +
