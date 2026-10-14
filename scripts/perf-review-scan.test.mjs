@@ -17,6 +17,7 @@ import {
 } from './perf-review-scan.mjs';
 
 const RUNTIME_SOURCE = new URL('../packages/octane/src/runtime.ts', import.meta.url);
+const SCOPE_SOURCE = new URL('../packages/octane/src/runtime/scope.ts', import.meta.url);
 
 /** Build a one-hunk diff for `file`; lines starting with '+' are added, others are context. */
 function diff(file, lines, start = 10) {
@@ -33,7 +34,10 @@ function scan(lines, file = 'packages/octane/src/runtime.ts', only = []) {
 }
 
 test('the current client runtime keeps every hot class shape fixed in its constructor', () => {
-	assert.deepEqual(checkHotClasses(readFileSync(RUNTIME_SOURCE, 'utf8')), []);
+	const source = readFileSync(SCOPE_SOURCE, 'utf8');
+	const fields = hotClassFields(source);
+	assert.ok(fields.has('pending') && fields.has('slots') && fields.has('rare'));
+	assert.deepEqual(checkHotClasses(source), []);
 });
 
 test('reports declared-but-unassigned, undeclared, and conditional hot-class fields', () => {
@@ -274,7 +278,7 @@ test('flags writes of undeclared fields through Block and Scope receivers', () =
 
 test('every Block and Scope field write in the current runtime targets a declared field', () => {
 	const source = readFileSync(RUNTIME_SOURCE, 'utf8');
-	const hotFields = hotClassFields(source);
+	const hotFields = hotClassFields(readFileSync(SCOPE_SOURCE, 'utf8'));
 	assert.ok(hotFields.has('pending') && hotFields.has('slots') && hotFields.has('rare'));
 	const lines = source.split('\n').map((line) => '+' + line);
 	const findings = scanFiles(parseDiff(diff('packages/octane/src/runtime.ts', lines, 1)), {

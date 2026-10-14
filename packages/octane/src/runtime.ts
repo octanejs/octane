@@ -19,6 +19,73 @@
 // a browser app that has no `@types/node`.
 declare const process: { env: { NODE_ENV?: string } };
 
+import {
+	firstChildGetter,
+	getFirstChild,
+	getNextSibling,
+	seedExpando,
+	initDomOperations,
+	HYDRATION_FRAME,
+	DANGER_HTML_ACTIVE,
+	DANGER_HTML_STATIC_CHILD,
+	DANGER_HTML_SPREAD_CHILD,
+	DEFAULT_VALUE_BASELINE,
+	DEOPT_DESC,
+} from './runtime/dom-operations.js';
+import {
+	HTML_NS,
+	SVG_NS,
+	MATHML_NS,
+	isHtmlCustomElement,
+	isHostElementOfType,
+	inferTagNs,
+	attrNamespace,
+	devWarnAttributeOnce,
+	devValidateAriaProps,
+	devValidateHostProps,
+	coerceAttrValue,
+	formActionAttributeName,
+} from './runtime/host-attributes.js';
+import {
+	discardSubtreeRefAttachesFrom,
+	blockIsAncestorOf,
+	attachLiveFragmentRef,
+	FragmentInstance,
+	fragmentDirectNodes,
+	nodeAfterPortalRange,
+	findHiddenActivity,
+	retainHiddenActivityNode,
+	releaseHiddenActivityNode,
+	activeFragments,
+	attachRef,
+	activityRefState,
+	retainActivityTracking,
+	releaseActivityTracking,
+	activityRefCreated,
+	activityInsertionEffectCreated,
+	activityPortalCreated,
+	applyRefValue,
+	MaximumUpdateDepthError,
+} from './runtime/fragment-refs.js';
+export { FragmentInstance, attachRef };
+import {
+	applyStyleValue,
+	applyStyleProperty,
+	coerceStyleProperty,
+	applyPreparedStyleProperty,
+} from './runtime/host-styles.js';
+
+import { BlockImpl, ScopeImpl, LiteBlockImpl, RENDER_VALID, DEFAULT_CTX } from './runtime/scope.js';
+import {
+	snapshotSpread,
+	isHostPropIdentityKey,
+	isEventKey,
+	hasEarlierPreparedAttributeAlias,
+	resolveHostPropSources,
+	isAggregatedFormControlProp,
+} from './runtime/host-prop-sources.js';
+export { snapshotSpread };
+
 import { hydrating, hydrationStarted, setHydrating, startHydration } from './hydration-flag.js';
 import { resolveHookPath } from './hook-slot-cache.js';
 import type {
@@ -66,17 +133,14 @@ import {
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
 	HYDRATION_TEXT_SEP,
-	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_ATTR_PROPS,
 	VALID_ATTR_NAME,
-	isEnumeratedBooleanAttr,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
-	SVG_ONLY_TAGS,
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
@@ -98,20 +162,20 @@ import { hasOwnProp } from './has-own.js';
 import { postHostTask } from './host-task.js';
 import { hasPendingHostBudget } from './host-budget.js';
 import { headOwnershipKey } from './head-ownership.js';
-import { resourceHintWarning } from './resource-hint-diagnostics.js';
-import {
-	ariaAttributeWarning,
-	isAriaAttributeName,
-	isUnknownAriaAttribute,
-	unknownAriaAttributeWarning,
-} from './aria-diagnostics.js';
-import {
-	booleanAttributeStringWarning,
-	emptyResourceUrlWarning,
-	hostPropertyWarning,
-	invalidHostPropertiesWarning,
-	unsupportedAttributeCoercionWarning,
-} from './host-property-diagnostics.js';
+export {
+	preload,
+	preinit,
+	preconnect,
+	prefetchDNS,
+	preloadModule,
+	preinitModule,
+	stylesheetResource,
+	styleResource,
+	scriptResource,
+	resetFloatResourceState,
+} from './runtime/resources.js';
+import { ariaAttributeWarning, isAriaAttributeName } from './aria-diagnostics.js';
+import { booleanAttributeStringWarning, hostPropertyWarning } from './host-property-diagnostics.js';
 import {
 	applyElementDefaultProps,
 	childElementKey,
@@ -476,8 +540,8 @@ export type ComponentBody<P = any, E = any> = (props: P, scope: Scope, extra: E)
 declare const EFFECT_CLEANUP_VOID_ONLY: unique symbol;
 type EffectCleanup = () => void | { [EFFECT_CLEANUP_VOID_ONLY]: never };
 type EffectFn = () => void | EffectCleanup;
-type Cleanup = () => void;
-type HookSlot = symbol | number;
+export type Cleanup = () => void;
+export type HookSlot = symbol | number;
 
 /** @internal Cross-renderer parent ownership carried on compiler-created region props. */
 export interface RendererRegionOwnerBridge {
@@ -641,14 +705,14 @@ export interface Scope {
 // and loaded/lazy bodies can run a second body in that same Scope, so their
 // per-body caches live in a lazily allocated overflow Map instead of aliasing.
 // The fixed record keeps all four fields in-object with one stable V8 map.
-type CompilerMemoRegion = {
+export type CompilerMemoRegion = {
 	bodyId: number;
 	auto: any[] | undefined;
 	hooks: any[] | undefined;
 	overflow: Map<number, CompilerMemoRegion> | null;
 };
 
-interface ChildScope {
+export interface ChildScope {
 	// withScope uses Symbol per call-site; componentSlotLite uses its numeric slot
 	// index (identity-equality is identical to symbols/strings for the linear-scan
 	// lookup, and the key is only an identity tag — unmount walks `children` directly).
@@ -707,10 +771,6 @@ let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
 // recorder installs the row refresh and applications that never read context
 // omit the refresh graph from their lists.
 let SKIPPED_ROW_REFRESH: typeof refreshSkippedRows | null = null;
-// Record actual committed ref identities only when an Activity is in use. A
-// hidden render may already have replaced its manifest's ref before cleanup;
-// the committed identity is the one that must be disconnected exactly once.
-let activityRefState: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null;
 let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
 // Cells install their own commit drains so apps without these hooks can omit them.
 // Captured updates already passed cell creation and use the same live drains.
@@ -2575,15 +2635,13 @@ function fragmentRootMatches(
 	return true;
 }
 
-type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
-
-const RENDER_VALID = 0;
+export type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
 const RENDER_INVALID = 1;
 const RENDER_RETRYING = 2;
 
-type OutputHandler = (block: Block, value: unknown, reset?: true) => void;
+export type OutputHandler = (block: Block, value: unknown, reset?: true) => void;
 
-interface RootIdState {
+export interface RootIdState {
 	prefix: string;
 	next: number;
 	/** Shared deterministic namespace for lazily used module-signal instances. */
@@ -2739,7 +2797,7 @@ export interface Block extends Scope {
 	crossRenderUpdate: boolean;
 }
 
-interface EffectSlot {
+export interface EffectSlot {
 	deps: any[] | undefined;
 	cleanup: Cleanup | undefined;
 	/** Render token of the latest completed attempt that reached this call site. */
@@ -6935,7 +6993,7 @@ const storeSyncQueue: StoreInst<any>[] = [];
 // during commit, AFTER all renders/DOM insertion and BEFORE layout effects, so
 // callback refs see a connected node and ref.current is populated by the time a
 // layout effect runs — matching React's commit-phase ref attachment.
-interface RefAttach {
+export interface RefAttach {
 	/** Exact queued ref; initial Fragment mounts use the live-ref trampoline below. */
 	ref: any;
 	el: Element | FragmentInstance;
@@ -6949,16 +7007,6 @@ interface SuspenseRefEntry {
 	scope: Scope;
 }
 const refAttachQueue: RefAttach[] = [];
-// A Fragment can re-point its ref during a render-phase replay before the mount
-// commit drains. Preserve that existing live-read contract with a shared callback
-// trampoline. The common drain remains branch-free, and Fragment instances do not
-// allocate a getter closure.
-function attachLiveFragmentRef(instance: FragmentInstance): void {
-	// Portal slots mount after the fragment binding but before commit. Publish all
-	// logically owned child handles before handing the instance to its callback.
-	instance._reapply();
-	attachRef(instance._currentRef, instance);
-}
 
 // Off-screen (WIP) effect capture. While a transition swaps in a NEW subtree that
 // may suspend, that subtree is rendered "off-screen" (its DOM kept out of the slot's
@@ -7230,12 +7278,6 @@ interface OffscreenWip {
 	refDetachCheckpoint: number;
 }
 
-// Live fragment refs need a commit-time child diff even before a listener or
-// observer is installed: each current first-level host child exposes its owning
-// FragmentInstances through `reactFragments`. Apps without fragment refs keep
-// the same single-size-check commit fast path.
-const activeFragments = new Set<FragmentInstance>();
-
 function reapplyFragmentBindings(): void {
 	if (activeFragments.size === 0) return;
 	for (const fi of activeFragments) fi._reapply();
@@ -7331,8 +7373,6 @@ function settleNestedUpdateChain(): void {
 function inNestedUpdateCallback(): boolean {
 	return EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0 || STORE_SYNC_DEPTH > 0;
 }
-
-class MaximumUpdateDepthError extends Error {}
 
 // Development attribution for a block whose nested-update budget was spent by a
 // layout snapshot that changed on every pass, or by signals its accepted renders
@@ -9992,7 +10032,7 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 // If render-phase replays queue several identities for the same target, the last
 // canceled attach is the manifest's current ref and therefore the only one the
 // hide walk can attempt to detach.
-type UncommittedRefAttaches = Map<Element | FragmentInstance, any>;
+export type UncommittedRefAttaches = Map<Element | FragmentInstance, any>;
 
 function refAttachWasDiscarded(
 	uncommitted: UncommittedRefAttaches | null,
@@ -10000,29 +10040,6 @@ function refAttachWasDiscarded(
 	ref: any,
 ): boolean {
 	return uncommitted !== null && uncommitted.get(el) === ref;
-}
-
-function discardSubtreeRefAttachesFrom(
-	queue: RefAttach[],
-	root: Block,
-	uncommitted: UncommittedRefAttaches,
-): void {
-	let write = 0;
-	for (let read = 0; read < queue.length; read++) {
-		const entry = queue[read];
-		const owner = entry.block;
-		if (owner === root || (owner !== null && blockIsAncestorOf(root, owner))) {
-			uncommitted.set(
-				entry.el,
-				entry.ref === attachLiveFragmentRef
-					? (entry.el as FragmentInstance)._currentRef
-					: entry.ref,
-			);
-			continue;
-		}
-		queue[write++] = entry;
-	}
-	queue.length = write;
 }
 
 /**
@@ -11203,14 +11220,6 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 	})();
 }
 
-/** True if `anc` is a STRICT ancestor of `node` in the Block tree. */
-function blockIsAncestorOf(anc: Block, node: Block): boolean {
-	for (let b: Block | null = node.parentBlock; b !== null; b = b.parentBlock) {
-		if (b === anc) return true;
-	}
-	return false;
-}
-
 // React's commit order is a post-order tree walk: a node's descendants fire before it,
 // and disjoint subtrees fire in tree order. We reconstruct that from the flat queues:
 // descendant-before-ancestor via the parentBlock chain; everything else (disjoint
@@ -11660,206 +11669,6 @@ function schedulePostPaint(cb: () => void): void {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Block + Scope creation
-// ---------------------------------------------------------------------------
-
-/**
- * Block class — concrete shape backing the `Block` interface. Allocated via
- * `new` so V8 derives the hidden class from this single constructor, instead
- * of synthesising it from an object-literal site (which V8 can also do but
- * with a less predictable optimisation profile when the literal has many
- * fields). Compiled bodies stamp their dynamic per-call-site keys on the
- * `slots[0]` binding bag, NOT on the Block/Scope instance (see Scope.slots),
- * so every BlockImpl instance shares one hidden class outright. Feature-only
- * fields also start as undefined here, rather than transitioning the shape
- * when a feature first uses them. State that only boundaries, use(),
- * useEffectEvent, ViewTransition, fetch-tree warming or nested commit updates
- * need lives on the lazily allocated `rare` record (BlockRare): every Block
- * pays one pointer for it, and only the Blocks using those features allocate it.
- *
- * The constructor's size is itself a hot-path cost. Moving those fields to
- * `rare` cut its bytecode from 437 to 371 bytes and made cold memo-wall mounts
- * about 5% faster; three dummy fields more (386 bytes) gave that gain back,
- * consistent with V8 inlining a hot callee only within a bytecode budget. Add
- * a field here only when every Block needs it.
- *
- * Type-only declarations leave the fixed-order constructor assignments as the
- * only runtime field definitions, including in consumers that compile source
- * with native class-field semantics. Item-only fields
- * (prev/next sibling, key, itemIndex) sit on every Block as null/0 so root
- * and dynamic blocks share the same shape with for-of item blocks.
- */
-class BlockImpl {
-	// Hot fields first (touched by every renderBlock / reconcile iteration).
-	declare body: ComponentBody;
-	declare props: any;
-	declare extra: any;
-	declare outputHandler: OutputHandler | null;
-	declare memoInChain: boolean;
-	declare parentNode: Node;
-	declare parentBlock: Block | null;
-	declare idState: RootIdState;
-	declare startMarker: Node | null;
-	declare endMarker: Node | null;
-	declare exclusiveMarkers: boolean;
-	declare itemIndex: number;
-	declare createdStamp: number;
-	// Scheduler / lifecycle.
-	declare pending: boolean;
-	declare disposed: boolean;
-	declare mounted: boolean;
-	declare renderStatus: number;
-	declare pendingMode: 'urgent' | 'transition' | null;
-	declare currentRenderMode: 'urgent' | 'transition' | null;
-	declare pendingDeferred: boolean;
-	declare currentRenderDeferred: boolean;
-	declare inactive: boolean;
-	// Hooks + cleanups (per-block state).
-	declare hooks: Map<HookSlot, any> | null;
-	declare cleanups: Cleanup[] | null;
-	declare effectSlots: EffectSlot[] | null;
-	declare children: ChildScope[] | null;
-	declare _slots: any[] | null;
-	declare refFields: string[] | null;
-	declare signalInstanceParent: Scope | null;
-	declare signalInstanceSite: string | undefined;
-	declare signalInstanceValue: unknown;
-	declare signalInstanceHasKey: boolean;
-	declare signalInstanceResolved: string | undefined;
-	declare signalTokenEscaped: boolean;
-	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
-	declare $$ctxValues: Map<Context<any>, any> | null;
-	// Contexts whose value this block's subtree consumes — stamped on this block
-	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
-	// changed version here means "a consumer somewhere at/below me needs the new
-	// value", so the memo bailout descends rather than skipping.
-	declare $$ctxReads: Map<Context<any>, any> | null;
-	// Contexts this block's OWN render directly read (its own body, or an inline
-	// lite descendant that shares this block). The DIRECT signal: a changed
-	// version here means THIS block must re-run; if only $$ctxReads changed, the
-	// block can bail its body and refresh just its consuming child blocks.
-	declare $$ctxDirect: Map<Context<any>, any> | null;
-	// Epoch stamp for the two dep maps — see Block.$$ctxDepsEpoch. Number so the
-	// "unverified" poison (-1) stays inside the same monomorphic field type.
-	declare $$ctxDepsEpoch: number;
-	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
-	declare $$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
-	declare $$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
-	// Armed for React's IMPLICIT same-element bailout (beginWork's
-	// oldProps === newProps skip). Set at value-position component mounts
-	// (childSlot) — the only sites that can receive a cached descriptor back.
-	// Arming makes the block a stamping target (like __memo) so the bail's lazy
-	// consumer refresh has the context deps it needs.
-	declare $$implicitBail: boolean;
-	// Render-loop guard bookkeeping (see the Block interface).
-	declare drainStamp: number;
-	declare drainRenders: number;
-	declare crossRenderUpdate: boolean;
-	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
-	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
-	declare deoptNode: Node | null;
-	// A de-opt descriptor with a `ref` was stamped in this subtree (see Block).
-	declare deoptRefs: boolean;
-	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
-	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
-	declare slots: any[];
-	declare compilerMemo: CompilerMemoRegion | null;
-	// For-block item bookkeeping.
-	declare forSlot: ForSlot | null;
-	declare prevSibling: Block | null;
-	declare nextSibling: Block | null;
-	declare key: any;
-	// Scope contract: a Block is its own scope.
-	declare parent: Scope | null;
-	declare block: Block;
-	// Metadata.
-	declare kind: BlockKind;
-	// Optional render state written by every render. Keep these on the common
-	// Block shape: otherwise ordinary renders fork its V8 map.
-	declare __warmEpisode: number | undefined;
-	declare __thenableDone: boolean | undefined;
-	// Feature-only state, allocated by the first feature that needs it.
-	declare rare: BlockRare | null;
-
-	constructor(
-		kind: BlockKind,
-		parentBlock: Block | null,
-		parentNode: Node,
-		startMarker: Node | null,
-		endMarker: Node | null,
-		body: ComponentBody,
-		props: any,
-		extra: any,
-		outputHandler: OutputHandler | null,
-	) {
-		this.body = body;
-		this.props = props;
-		this.extra = extra;
-		this.outputHandler = outputHandler;
-		// Self-or-ancestor memo flag — OR of our own memo marker with the parent's
-		// flag, so the whole property is resolved in O(1) at creation instead of
-		// re-walked on every context read.
-		this.memoInChain =
-			(body as any)?.__memo === true || (parentBlock !== null && parentBlock.memoInChain === true);
-		this.parentNode = parentNode;
-		this.parentBlock = parentBlock;
-		this.idState = parentBlock?.idState ?? { prefix: '', next: 0 };
-		this.startMarker = startMarker;
-		this.endMarker = endMarker;
-		this.exclusiveMarkers = false;
-		this.itemIndex = 0;
-		this.pending = false;
-		this.disposed = false;
-		this.mounted = false;
-		this.renderStatus = RENDER_VALID;
-		this.pendingMode = null;
-		this.currentRenderMode = null;
-		this.pendingDeferred = false;
-		this.currentRenderDeferred = false;
-		this.inactive = false;
-		this.hooks = null;
-		this.cleanups = null;
-		this.effectSlots = null;
-		this.children = null;
-		this._slots = null;
-		this.refFields = null;
-		this.$$ctxValues = null;
-		this.$$ctxReads = null;
-		this.$$ctxDirect = null;
-		this.$$ctxDepsEpoch = -1;
-		this.$$ctxCache = null;
-		this.$$ctxCacheOwner = null;
-		this.$$implicitBail = false;
-		this.drainStamp = 0;
-		this.drainRenders = 0;
-		this.crossRenderUpdate = false;
-		this.deoptNode = null;
-		this.deoptRefs = false;
-		this.slots = [];
-		this.compilerMemo = null;
-		this.forSlot = null;
-		this.prevSibling = null;
-		this.nextSibling = null;
-		this.key = null;
-		this.parent = null;
-		this.block = this as unknown as Block;
-		this.kind = kind;
-		// Keep its original position after kind; optional fields follow it.
-		this.createdStamp = 0;
-		this.__warmEpisode = undefined;
-		this.__thenableDone = undefined;
-		this.rare = null;
-		this.signalInstanceParent = null;
-		this.signalInstanceSite = undefined;
-		this.signalInstanceValue = undefined;
-		this.signalInstanceHasKey = false;
-		this.signalInstanceResolved = undefined;
-		this.signalTokenEscaped = false;
-		this.signalOwner = undefined;
-	}
-}
-
 /**
  * Per-Block state that only some features use. A Block holds `rare: null` until
  * the first such use allocates this record (blockRare), so ordinary Blocks stay
@@ -11867,7 +11676,7 @@ class BlockImpl {
  * one order, so every record shares one hidden class. Readers that walk
  * parentBlock chains also meet LiteBlockImpl proxies, which carry `rare: null`.
  */
-interface BlockRare {
+export interface BlockRare {
 	// Try/Suspense/Activity boundary registration on the boundary's own blocks.
 	tryHandler: TryHandler | undefined;
 	suspenseHandler:
@@ -11923,69 +11732,6 @@ function blockRare(block: Block): BlockRare {
 		eventCommitted: 0,
 		vt: null,
 	});
-}
-
-/**
- * Plain (non-Block) child Scope. Allocated once per (parent, call-site)
- * pair and reused across re-renders. Class-not-literal so V8 hands every
- * such scope the same hidden class — paired with the BlockImpl shape, the
- * Scope-typed read sites (unmountScope, fireCleanupsOnly, hook lookups via
- * `scope.hooks`) see exactly two stable classes instead of class-vs-literal.
- *
- * Field order matches the prior object-literal at withScope so existing
- * code that walked the keys (now via the indexed `_slots` array — see
- * registerSlot / unmountScope) sees identical structure.
- */
-class ScopeImpl {
-	declare block: Block;
-	declare parent: Scope | null;
-	declare hooks: Map<HookSlot, any> | null;
-	declare cleanups: Cleanup[] | null;
-	declare effectSlots: EffectSlot[] | null;
-	declare children: ChildScope[] | null;
-	declare _slots: any[] | null;
-	declare refFields: string[] | null;
-	declare $$ctxValues: Map<Context<any>, any> | null;
-	declare $$ctxReads: Map<Context<any>, any> | null;
-	declare $$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
-	declare $$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
-	declare mounted: boolean;
-	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
-	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
-	declare slots: any[];
-	declare compilerMemo: CompilerMemoRegion | null;
-	declare signalInstanceParent: Scope | null;
-	declare signalInstanceSite: string | undefined;
-	declare signalInstanceValue: unknown;
-	declare signalInstanceHasKey: boolean;
-	declare signalInstanceResolved: string | undefined;
-	declare signalTokenEscaped: boolean;
-	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
-
-	constructor(parent: Scope, block: Block) {
-		this.block = block;
-		this.parent = parent;
-		this.hooks = null;
-		this.cleanups = null;
-		this.effectSlots = null;
-		this.children = null;
-		this._slots = null;
-		this.refFields = null;
-		this.$$ctxValues = null;
-		this.$$ctxReads = null;
-		this.$$ctxCache = null;
-		this.$$ctxCacheOwner = null;
-		this.mounted = false;
-		this.slots = [];
-		this.compilerMemo = null;
-		this.signalInstanceParent = null;
-		this.signalInstanceSite = undefined;
-		this.signalInstanceValue = undefined;
-		this.signalInstanceHasKey = false;
-		this.signalInstanceResolved = undefined;
-		this.signalTokenEscaped = false;
-		this.signalOwner = undefined;
-	}
 }
 
 function createBlock(
@@ -12911,78 +12657,6 @@ function disposeReturnSlot(block: Block, state: any): void {
 		if (i !== -1) reg.splice(i, 1);
 	}
 	block.slots[0] = undefined as any;
-}
-
-/**
- * Lite component slot: allocates ONLY a per-call-site Scope — no Block, no
- * Comment markers, no CompSlot wrapper. Emitted by octane/compiler at call
- * sites whose callee is a same-module FunctionDeclaration that:
- *   - calls no hooks (lexical free-identifier check)
- *   - has no `use(...)`, no @try, no `children` param
- *   - has no unknown free function calls (catches transitive hooks via helpers)
- * AND the call site itself has no `key=`, no spread props, no JSX children.
- *
- * The Scope shape matches ScopeImpl exactly, so V8 hands every lite scope the
- * same hidden class as the withScope branch and the cross-cutting Scope-typed
- * read sites (unmountScope, useContextInternal) stay clean.
- *
- * Recursion is safe: each call site allocates its OWN Scope (no aliasing of
- * slot-key namespace across recursion depths) — unlike Design (b) same-scope
- * dispatch, which would clobber `_if$N` etc. across nested recursive calls.
- */
-/**
- * Minimal block-shaped object carrying the DOM insertion context for a lite
- * component body. The compiled body reads `__s.block.parentNode` and
- * `__s.block.endMarker` to position its cloned template; without these the
- * body would insert at the PARENT block's range (breaking nesting).
- *
- * Why not reuse BlockImpl: lite components don't
- * need scheduling, suspense, key, or marker bookkeeping. Carrying just the
- * DOM context and inherited ownership keeps the lite path lean. Real Blocks
- * created below this proxy must share its root's ID allocator and render owner;
- * otherwise their independent updates would lose the enclosing root transaction.
- */
-class LiteBlockImpl {
-	declare parentNode: Node;
-	declare endMarker: Node | null;
-	declare parentBlock: Block;
-	declare memoInChain: boolean;
-	declare $$ctxValues: Map<Context<any>, any> | null;
-	declare idState: RootIdState;
-	// Signal-instance fields exist on every Block stand-in: signal key walks
-	// read them polymorphically through scope.block and parentBlock chains.
-	// stampSignalInstance gives it its lite scope's recipe, so descendant walks
-	// keep that level. It has no forSlot field: signal readers test forSlot
-	// loosely, so a stand-in never counts as a list row.
-	declare signalInstanceParent: Scope | null;
-	declare signalInstanceSite: string | undefined;
-	declare signalInstanceValue: unknown;
-	declare signalInstanceHasKey: boolean;
-	declare signalInstanceResolved: string | undefined;
-	// A lite component's stand-in has no range of its own (undefined), so a sole
-	// component root inside it declines to borrow one. A lite control-flow arm's
-	// stand-in carries its arm's bound exactly as an arm Block would: null until
-	// its first render publishes the bound (renderMarkerlessArm).
-	declare startMarker: Node | null | undefined;
-	// Boundary, thenable and transition state never lives on a stand-in. Readers
-	// that walk parentBlock chains see `rare === null` here and move on.
-	declare rare: null;
-
-	constructor(parentNode: Node, endMarker: Node | null, parentBlock: Block) {
-		this.parentNode = parentNode;
-		this.endMarker = endMarker;
-		this.parentBlock = parentBlock;
-		this.memoInChain = parentBlock.memoInChain;
-		this.$$ctxValues = null;
-		this.idState = parentBlock.idState;
-		this.signalInstanceParent = null;
-		this.signalInstanceSite = undefined;
-		this.signalInstanceValue = undefined;
-		this.signalInstanceHasKey = false;
-		this.signalInstanceResolved = undefined;
-		this.startMarker = undefined;
-		this.rare = null;
-	}
 }
 
 export function componentSlotLite<P>(
@@ -18460,11 +18134,6 @@ export function useContext<T>(context: Context<T> | ForeignHostContext<T>): T {
 	return useForeignContext(context, 'useContext');
 }
 
-// Sentinel cached in a consumer's resolved-provider slots to mean "no provider —
-// use the context's default". Distinct from `undefined` (a cache miss) so a
-// resolved default is an O(1) hit rather than a re-walk to the root every read.
-const DEFAULT_CTX: unique symbol = Symbol('octane.ctx.default');
-
 function rendererRegionOwnerForBlock(block: Block | null): RendererRegionOwnerBridge | null {
 	// bindRendererRegionOwner throws unless the block is a top-level root
 	// (kind 'root', no parent), so ancestors below the chain top can never be
@@ -20360,108 +20029,6 @@ export function useId(slot?: HookSlot): string {
 }
 
 // ---------------------------------------------------------------------------
-// DOM operations bootstrap (Svelte's operations.js technique, measured for
-// octane on the js-framework / dbmon / news suites).
-//
-// Two independent tricks, both initialized lazily so importing the runtime in
-// a DOM-less process (compiler tooling, node-only tests) stays safe:
-//
-// 1. `firstChild` / `nextSibling` reads on the runtime's SHARED helpers
-//    (`child`, `sibling`, the hydration cursor walks, range clears) see every
-//    DOM hidden class — element tags, Text, Comment — at ONE call site, so the
-//    property access goes megamorphic. Calling the native accessor through a
-//    cached function reference keeps those sites monomorphic: the C++ accessor
-//    doesn't dispatch on the receiver's map. (Compiled template walks —
-//    `_root.firstChild.nextSibling…` — stay raw property access on purpose:
-//    each generated mount has its own per-template call sites, which V8 keeps
-//    mono/polymorphic already.)
-//
-// 2. The runtime polls expando slots on nodes that mostly DON'T carry them —
-//    `$o<type>` handler bundles + `$$portalParent` on every ancestor of every
-//    delegated event, `$$portalEnd`/`$$deoptKey` in the de-opt child scans,
-//    `$$ctrl`/`__oct_suppress` on form/hydration paths. A read of a property
-//    the object does NOT have walks the whole prototype chain and cannot be
-//    negatively cached as well as a hit. Pre-seeding the key as `undefined` on
-//    the prototype turns every such miss into a fast constant proto hit.
-//    Handler-slot keys are seeded per delegated event type at registration
-//    (delegateEvents / delegateCaptureEvents), the fixed set here.
-// ---------------------------------------------------------------------------
-
-let firstChildGetter: ((this: Node) => ChildNode | null) | undefined;
-let nextSiblingGetter: ((this: Node) => ChildNode | null) | undefined;
-
-function getFirstChild(node: Node): ChildNode | null {
-	// Fallback keeps DOM-less/uninitialized callers correct; the branch is a
-	// single well-predicted check once initDomOperations has run.
-	return firstChildGetter === undefined ? node.firstChild : firstChildGetter.call(node);
-}
-
-function getNextSibling(node: Node): ChildNode | null {
-	if (hydrating && node.nodeType === 8) {
-		const span = (node as HydrationFrameMarker)[HYDRATION_FRAME];
-		if (span !== undefined && !span.published && node.parentNode === null) {
-			if (node === span.end) return span.after as ChildNode | null;
-			return span.first as ChildNode | null;
-		}
-	}
-	return nextSiblingGetter === undefined ? node.nextSibling : nextSiblingGetter.call(node);
-}
-
-/** Pre-seed one expando key on a prototype (see bootstrap comment, trick 2). */
-function seedExpando(proto: object, key: PropertyKey, enumerable = true): void {
-	if (key in proto) return;
-	if (enumerable) (proto as any)[key] = undefined;
-	else Object.defineProperty(proto, key, { value: undefined, writable: true, configurable: true });
-}
-
-let domOperationsReady = false;
-
-/**
- * One-time client bootstrap. Called from every cold entry that precedes DOM
- * work — parseTemplate (first template mount), root creation/hydration, and
- * delegation-target registration — and a no-op everywhere without a DOM.
- */
-function initDomOperations(): void {
-	if (domOperationsReady || typeof Element === 'undefined') return;
-	domOperationsReady = true;
-	const nodeProto = Node.prototype;
-	firstChildGetter = Object.getOwnPropertyDescriptor(nodeProto, 'firstChild')?.get;
-	nextSiblingGetter = Object.getOwnPropertyDescriptor(nodeProto, 'nextSibling')?.get;
-	const elementProto = Element.prototype;
-	if (Object.isExtensible(elementProto)) {
-		// Polled on every delegated event's ancestor walk.
-		seedExpando(elementProto, '$$portalParent');
-		// De-opt child scans poll these on every owned child.
-		seedExpando(elementProto, '$$portalEnd');
-		seedExpando(elementProto, '$$deoptKey');
-		// Controlled-form and hydration-suppression checks.
-		seedExpando(elementProto, '$$ctrl');
-		seedExpando(elementProto, '__oct_suppress');
-		// clone()/drainFrag() fragment-wrapper discriminants.
-		seedExpando(elementProto, '__oct_frag');
-		seedExpando(elementProto, '__oct_vfrag');
-		// Raw HTML ownership is polled by dynamic child slots after the first raw host.
-		// New private keys must not appear in for...in walks over DOM elements.
-		seedExpando(elementProto, DANGER_HTML_ACTIVE, false);
-		seedExpando(elementProto, DANGER_HTML_STATIC_CHILD, false);
-		seedExpando(elementProto, DANGER_HTML_SPREAD_CHILD, false);
-		// De-opt child scans and uncontrolled form baselines also read absent symbols.
-		seedExpando(elementProto, DEOPT_DESC, false);
-		seedExpando(elementProto, DEFAULT_VALUE_BASELINE, false);
-		if (process.env.NODE_ENV !== 'production') {
-			seedExpando(elementProto, '__oct_loc');
-		}
-	}
-	// The de-opt/portal scans also poll Text and Comment children (both inherit
-	// from CharacterData).
-	if (typeof CharacterData !== 'undefined' && Object.isExtensible(CharacterData.prototype)) {
-		seedExpando(CharacterData.prototype, '$$portalEnd');
-		seedExpando(CharacterData.prototype, '$$deoptKey');
-		seedExpando(CharacterData.prototype, DEOPT_DESC, false);
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Templates: inert module token → parse on first mount → clone per instance
 // ---------------------------------------------------------------------------
 
@@ -20909,11 +20476,6 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
 }
 
 type HydrationClaim = HydrationRangeClaim | HydrationPlaceClaim | HydrationRootClaim;
-
-// A client frame owns a logical server span until its containing slot commits.
-// Only the new, detached markers refer to it: adopted server nodes never carry
-// speculative navigation or queued DOM writes.
-const HYDRATION_FRAME = /* @__PURE__ */ Symbol();
 interface HydrationFrame {
 	parent: Node;
 	start: Comment;
@@ -20923,7 +20485,7 @@ interface HydrationFrame {
 	outer: HydrationFrame | null;
 	published: boolean;
 }
-interface HydrationFrameMarker extends Comment {
+export interface HydrationFrameMarker extends Comment {
 	[HYDRATION_FRAME]?: HydrationFrame;
 }
 
@@ -26316,13 +25878,10 @@ export function setHTML(el: Element, value: any): void {
 }
 
 const DANGER_HTML_VALUE = /* @__PURE__ */ Symbol('octane.dangerHTMLValue');
-const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
 // Latched the first time any host actually takes ownership of its children via
 // dangerouslySetInnerHTML. Every childSlot call has to ask whether raw HTML owns
 // its parent; an app that never uses the feature skips the DOM read entirely.
 let DANGER_HTML_EVER_ACTIVE = false;
-const DANGER_HTML_STATIC_CHILD = '__oct_dangerChild';
-const DANGER_HTML_SPREAD_CHILD = '__oct_dangerSpreadChild';
 const DANGER_HTML_RESOLVED_VALUE = '__oct_dangerResolved';
 const DANGER_HTML_RESOLVED_CHILD = '__oct_dangerResolvedChild';
 
@@ -26522,114 +26081,9 @@ function dangerouslySetInnerHTMLOwnsChild(
 	return true;
 }
 
-// Apply a ref attachment. Accepts the three supported shapes:
-//   - function: called with the element (or null on detach)
-//   - object  : `.current` is set to the element (or null on detach)
-//   - array   : each item is attached recursively. Lets multiple owners
-//               observe the same node without the parent juggling refs.
-//               Matches React's `ref={[a, b]}` convention.
-// Called by the compiler-emitted ref binding mount + update paths and
-// by the scope cleanup hook installed at mount time.
-// React 19 callback-ref cleanup. A callback ref may RETURN a cleanup function; when it
-// does, that cleanup runs on detach INSTEAD of calling the ref with null. React keeps
-// the cleanup per ATTACH SITE, so the SAME callback ref attached to several elements
-// (`ref={registerItem}` on every list row) holds one independent cleanup per element.
-// We mirror that by keying cleanups per (ref, target): an outer WeakMap by the ref
-// function, an inner WeakMap by the attached element/FragmentInstance. Detach sites
-// pass the previously-attached target — `attachRef(ref, null, target)` — so the RIGHT
-// cleanup runs (and only that one is forgotten). A targetless detach falls back to the
-// most recent cleanup-producing attach, matching the old single-slot behavior for
-// external callers that attach a ref once. Legacy callback refs (that return nothing)
-// keep the `ref(null)` detach contract.
-const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
-const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
-
-interface ActivityRefState {
+export interface ActivityRefState {
 	connected: any;
 	hidden: boolean;
-}
-
-let activityRefCreated: ((block: Block, target: Element | FragmentInstance) => void) | null = null;
-let activityInsertionEffectCreated: ((block: Block) => void) | null = null;
-let activityRefOwners: WeakMap<Block, boolean> | null = null;
-let liveActivityCount = 0;
-
-export function attachRef(
-	ref: any,
-	el: Element | FragmentInstance | null,
-	prevTarget?: Element | FragmentInstance | null,
-): void {
-	if (ref == null) return;
-	const target = el ?? prevTarget;
-	const activity = target == null || !activityRefState ? undefined : activityRefState.get(target);
-	if (activity !== undefined) {
-		if (el !== null) {
-			activity.hidden = false;
-			activity.connected = ref;
-		} else if (prevTarget != null) {
-			if (activity.hidden && activity.connected !== ref) return;
-			if (activity.connected === ref) activity.connected = null;
-		}
-	}
-	applyRefValue(ref, el, prevTarget);
-}
-
-function applyRefValue(ref: any, el: object | null, prevTarget?: object | null): void {
-	if (ref == null) return;
-	if (
-		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-		__OCTANE_PROFILE_ENABLED__ &&
-		!Array.isArray(ref)
-	)
-		__profileCount(el === null ? ProfileCounter.REF_DETACH : ProfileCounter.REF_ATTACH);
-	if (typeof ref === 'function') {
-		if (el === null) {
-			// Detach: prefer the React-19 cleanup the callback returned when it was
-			// attached to `prevTarget` (falling back to the latest attach's target).
-			const perTarget = refCleanups.get(ref);
-			const target = prevTarget ?? refLastCleanupTarget.get(ref);
-			const cleanup = perTarget !== undefined && target != null ? perTarget.get(target) : undefined;
-			if (cleanup !== undefined) {
-				perTarget!.delete(target as object);
-				if (refLastCleanupTarget.get(ref) === target) refLastCleanupTarget.delete(ref);
-				cleanup();
-			} else {
-				ref(null);
-			}
-		} else {
-			const cleanup = ref(el);
-			if (typeof cleanup === 'function') {
-				let perTarget = refCleanups.get(ref);
-				if (perTarget === undefined) refCleanups.set(ref, (perTarget = new WeakMap()));
-				perTarget.set(el, cleanup as () => void);
-				refLastCleanupTarget.set(ref, el);
-			}
-		}
-		return;
-	}
-	if (Array.isArray(ref)) {
-		if (el !== null) {
-			for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
-			return;
-		}
-		// Release every owner after a cleanup failure, keeping update-depth errors fatal.
-		let error: unknown;
-		let failed = false;
-		for (let i = 0; i < ref.length; i++) {
-			try {
-				applyRefValue(ref[i], el, prevTarget);
-			} catch (caught) {
-				if (caught instanceof MaximumUpdateDepthError) throw caught;
-				if (!failed) {
-					error = caught;
-					failed = true;
-				}
-			}
-		}
-		if (failed) throw error;
-		return;
-	}
-	ref.current = el;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // Fragment refs (React canary `enableFragmentRefs` parity).
@@ -26699,653 +26153,6 @@ export const Activity = /* @__PURE__ */ initializeActivitySentinel() as unknown 
 	key?: string | number | bigint | null | undefined;
 }) => unknown;
 
-export class FragmentInstance {
-	/**
-	 * Sentinel that React's test suite asserts is truthy as a sanity-check
-	 * that the FragmentInstance is bound to its owning Block. Named
-	 * `_ownerBlock` (not React's `_fragmentFiber`) because octane uses
-	 * Blocks, not fibers — same role.
-	 */
-	_ownerBlock: Block;
-	_startMarker: Comment;
-	_endMarker: Comment;
-	_destroyed: boolean;
-	/**
-	 * Committed direct hosts and a reusable scratch set. Swapping the sets at
-	 * each commit avoids allocating per render while ensuring registrations are
-	 * applied only to genuinely new children.
-	 */
-	_children: Set<Element | Text>;
-	_pendingChildren: Set<Element | Text>;
-	/** Following DOM anchor -> logically owned portal ranges; allocated on demand. */
-	_portalAnchors: Map<Node, Set<PortalSlot>> | null;
-	/**
-	 * Registry of listeners added via addEventListener, deduped by
-	 * (type, listener, capture). `null` until the first addEventListener — zero
-	 * listener-registry cost for fragments that never use the listener API.
-	 * Stored bindings apply only when a new direct child joins the fragment.
-	 */
-	_listeners: Array<{
-		type: string;
-		listener: EventListenerOrEventListenerObject;
-		/** Snapshot taken at registration, as EventTarget does; `capture` is a boolean. */
-		options: AddEventListenerOptions;
-		/** Drops this entry when `options.signal` aborts; detached on removal and teardown. */
-		abort: () => void;
-	}> | null;
-	/**
-	 * Observers registered via observeUsing. New direct children inherit each
-	 * observer; retained children are never redundantly observed on commit.
-	 */
-	_observers: Set<{ observe(target: Element): void; unobserve(target: Element): void }> | null;
-	/**
-	 * The ref currently pointed at this instance. Held here (not captured in the
-	 * mount closure) so the unmount cleanup detaches whatever ref is current AND
-	 * the compiler's update path can re-point a changed `<Fragment ref={…}>`.
-	 */
-	_currentRef: any;
-
-	constructor(ownerBlock: Block, startMarker: Comment, endMarker: Comment) {
-		this._ownerBlock = ownerBlock;
-		this._startMarker = startMarker;
-		this._endMarker = endMarker;
-		this._destroyed = false;
-		this._children = new Set();
-		this._pendingChildren = new Set();
-		this._portalAnchors = null;
-		this._listeners = null;
-		this._observers = null;
-		this._currentRef = null;
-		for (const child of fragmentDirectNodes(this)) {
-			this._children.add(child);
-			this._attachChild(child);
-		}
-		activeFragments.add(this);
-	}
-
-	_destroy(): void {
-		this._destroyed = true;
-		activeFragments.delete(this);
-		// React removes listeners and fragment handles from disappearing children,
-		// but does not call observer.unobserve during deletion or fragment teardown.
-		for (const child of this._children) this._detachChild(child);
-		this._children.clear();
-		this._pendingChildren.clear();
-		this._portalAnchors?.clear();
-		this._portalAnchors = null;
-		if (this._listeners !== null) {
-			for (const entry of this._listeners) {
-				entry.options.signal?.removeEventListener('abort', entry.abort);
-			}
-		}
-		this._listeners = null;
-		this._observers = null;
-	}
-
-	/** Associate a foreign portal range with its authored following sibling. */
-	_registerPortal(portal: PortalSlot, anchor: Node): void {
-		if (this._destroyed) return;
-		const anchors = (this._portalAnchors ??= new Map());
-		let portals = anchors.get(anchor);
-		if (portals === undefined) anchors.set(anchor, (portals = new Set()));
-		portals.add(portal);
-	}
-
-	/** Forget a removed portal before its foreign DOM range is torn down. */
-	_unregisterPortal(portal: PortalSlot, anchor: Node): void {
-		const anchors = this._portalAnchors;
-		const portals = anchors?.get(anchor);
-		if (portals === undefined || !portals.delete(portal)) return;
-		if (portals.size === 0) anchors!.delete(anchor);
-		if (anchors!.size === 0) this._portalAnchors = null;
-		let child: ChildNode | null = portal.start?.nextSibling ?? null;
-		while (child !== null && child !== portal.end) {
-			const next = getNextSibling(child);
-			if (
-				(child.nodeType === 1 || child.nodeType === 3) &&
-				this._children.delete(child as Element | Text)
-			) {
-				this._detachChild(child as Element | Text);
-			}
-			child = next;
-		}
-	}
-
-	/** Attach inherited bindings and publish this fragment's public DOM handle. */
-	_attachChild(child: Element | Text): void {
-		if (this._listeners !== null) {
-			for (const entry of this._listeners) {
-				child.addEventListener(entry.type, entry.listener, entry.options);
-			}
-		}
-		if (child.nodeType === 1 && this._observers !== null) {
-			for (const observer of this._observers) observer.observe(child as Element);
-		}
-		const host = child as (Element | Text) & { reactFragments?: Set<FragmentInstance> };
-		(host.reactFragments ??= new Set()).add(this);
-	}
-
-	/** Remove only this fragment's registrations; nested fragment handles stay. */
-	_detachChild(child: Element | Text): void {
-		if (this._listeners !== null) {
-			for (const entry of this._listeners) {
-				child.removeEventListener(entry.type, entry.listener, entry.options);
-			}
-		}
-		(child as (Element | Text) & { reactFragments?: Set<FragmentInstance> }).reactFragments?.delete(
-			this,
-		);
-	}
-
-	/**
-	 * Diff current hosts after each commit. Reattaching a retained listener would
-	 * revive an exhausted `{ once: true }` registration; calling observe again is
-	 * also observable, so only newly inserted children inherit those bindings.
-	 */
-	_reapply(): void {
-		if (this._destroyed) return;
-		const previous = this._children;
-		const current = this._pendingChildren;
-		for (const child of fragmentDirectNodes(this)) {
-			current.add(child);
-			if (!previous.has(child)) this._attachChild(child);
-		}
-		for (const child of previous) {
-			if (!current.has(child)) this._detachChild(child);
-		}
-		previous.clear();
-		this._children = current;
-		this._pendingChildren = previous;
-	}
-
-	// ─── focus / focusLast / blur (Stage 2) ─────────────────────────────
-	/**
-	 * Focus the first element for which the browser actually accepts focus.
-	 * Listening for the focus event handles labels, shadow delegation, disabled
-	 * controls, and programmatically focusable tabIndex=-1 elements correctly.
-	 */
-	focus(options?: FocusOptions): void {
-		if (this._destroyed) return;
-		for (const el of fragmentDescendants(this)) {
-			if (focusFragmentElement(el, options)) return;
-		}
-	}
-
-	/**
-	 * Focus the last programmatically focusable element, trying descendants in
-	 * reverse tree order until the browser accepts one.
-	 */
-	focusLast(options?: FocusOptions): void {
-		if (this._destroyed) return;
-		const descendants = Array.from(fragmentDescendants(this));
-		for (let i = descendants.length - 1; i >= 0; i--) {
-			if (focusFragmentElement(descendants[i], options)) return;
-		}
-	}
-
-	/**
-	 * Blur the focused element only when a logical fragment child owns it,
-	 * including children rendered into foreign portal containers. Each child is
-	 * checked against its own focus root, so shadow-root and iframe portal
-	 * children resolve to the owned element rather than their host or frame.
-	 */
-	blur(): void {
-		if (this._destroyed) return;
-		for (const child of fragmentDirectChildren(this)) {
-			const root = child.getRootNode() as Document | ShadowRoot;
-			const active = root.activeElement;
-			if (active && (child === active || child.contains(active))) {
-				(active as HTMLElement).blur();
-				return;
-			}
-		}
-	}
-
-	// ─── addEventListener / removeEventListener (Stage 3) ───────────────
-	/**
-	 * Attaches a listener to every first-level Element or Text child.
-	 * The (type, listener, capture) tuple is stored so children inserted into
-	 * the fragment later inherit the listener. Deduped by that same tuple,
-	 * matching the DOM's listener identity rules.
-	 *
-	 * Like EventTarget, the options are copied at registration, an already
-	 * aborted signal registers nothing, and aborting the signal ends the
-	 * registration. The children's native listeners carry the same signal, so
-	 * the browser detaches them and the abort handler only drops the entry.
-	 */
-	addEventListener(
-		type: string,
-		listener: EventListenerOrEventListenerObject,
-		options?: AddEventListenerOptions | boolean,
-	): void {
-		if (this._destroyed) return;
-		// A boolean or omitted argument has no members, so these reads are undefined.
-		const given = options as AddEventListenerOptions | undefined;
-		const snapshot: AddEventListenerOptions = {
-			capture: listenerCapturePhase(options),
-			signal: given?.signal,
-			once: given?.once,
-			passive: given?.passive,
-		};
-		if (snapshot.signal?.aborted) return;
-		const listeners = (this._listeners ??= []);
-		for (const e of listeners) {
-			// Native abort removal runs before every abort handler, so an aborted entry
-			// is already gone for an earlier handler that registers the callback again.
-			if (
-				e.type === type &&
-				e.listener === listener &&
-				e.options.capture === snapshot.capture &&
-				!e.options.signal?.aborted
-			) {
-				return; // already registered — no-op (DOM/React dedupe)
-			}
-		}
-		const entry: NonNullable<FragmentInstance['_listeners']>[number] = {
-			type,
-			listener,
-			options: snapshot,
-			abort: () => {
-				const index = listeners.indexOf(entry);
-				if (index >= 0) listeners.splice(index, 1);
-			},
-		};
-		listeners.push(entry);
-		snapshot.signal?.addEventListener('abort', entry.abort, { once: true });
-		for (const child of fragmentDirectNodes(this)) {
-			child.addEventListener(type, listener, snapshot);
-		}
-	}
-
-	/**
-	 * Removes a listener previously added via this FragmentInstance. The
-	 * (type, listener, options.capture) tuple must match the add call — the same
-	 * identity rule EventTarget.removeEventListener uses. Detaches from the
-	 * current children and stops re-applying it to future ones. Unmatched calls
-	 * are a silent no-op (DOM parity).
-	 */
-	removeEventListener(
-		type: string,
-		listener: EventListenerOrEventListenerObject,
-		options?: AddEventListenerOptions | boolean,
-	): void {
-		if (this._destroyed || !this._listeners) return;
-		const wantCapture = listenerCapturePhase(options);
-		for (let i = this._listeners.length - 1; i >= 0; i--) {
-			const entry = this._listeners[i];
-			if (entry.type !== type) continue;
-			if (entry.listener !== listener) continue;
-			if (entry.options.capture !== wantCapture) continue;
-			entry.options.signal?.removeEventListener('abort', entry.abort);
-			for (const child of fragmentDirectNodes(this)) {
-				child.removeEventListener(type, listener, entry.options);
-			}
-			this._listeners.splice(i, 1);
-			return;
-		}
-	}
-
-	// ─── observeUsing / unobserveUsing / getClientRects / getRootNode (Stage 4) ─
-	/**
-	 * Forwards .observe() on the supplied observer (IntersectionObserver,
-	 * ResizeObserver, MutationObserver, or any other with an `observe(target)`
-	 * signature) to every direct fragment child. Lets a single fragment ref
-	 * stand in for "watch this list of siblings" — react-aria's Virtualizer
-	 * and dnd-kit's drop-zone primitives are the canonical clients.
-	 */
-	observeUsing(observer: {
-		observe(target: Element): void;
-		unobserve(target: Element): void;
-	}): void {
-		if (this._destroyed) return;
-		if (process.env.NODE_ENV !== 'production') {
-			let hasText = false;
-			let hasElement = false;
-			for (const child of this._children) {
-				if (child.nodeType === 1) {
-					hasElement = true;
-					break;
-				}
-				if (child.nodeType === 3) hasText = true;
-			}
-			if (hasText && !hasElement) {
-				console.error(
-					'observeUsing() was called on a FragmentInstance with only text children. ' +
-						'Observers do not work on text nodes.',
-				);
-			}
-		}
-		if (!this._observers) this._observers = new Set();
-		this._observers.add(observer);
-		for (const el of fragmentDirectChildren(this)) observer.observe(el);
-	}
-
-	/**
-	 * Stops observing with the given observer: unobserves the current children
-	 * and stops applying it to future ones. An unregistered observer is not
-	 * touched and produces React's diagnostic in development.
-	 */
-	unobserveUsing(observer: {
-		observe(target: Element): void;
-		unobserve(target: Element): void;
-	}): void {
-		if (this._destroyed) return;
-		if (this._observers === null || !this._observers.has(observer)) {
-			if (process.env.NODE_ENV !== 'production') {
-				console.error(
-					'You are calling unobserveUsing() with an observer that is not being observed with this fragment ' +
-						'instance. First attach the observer with observeUsing()',
-				);
-			}
-			return;
-		}
-		this._observers.delete(observer);
-		for (const el of fragmentDirectChildren(this)) observer.unobserve(el);
-	}
-
-	/**
-	 * Concatenates direct host-element and text-node rectangles in logical tree
-	 * order. Text uses Range because Text does not expose getClientRects itself.
-	 */
-	getClientRects(): DOMRect[] {
-		const out: DOMRect[] = [];
-		if (this._destroyed) return out;
-		for (const node of fragmentDirectNodes(this)) {
-			if (node.nodeType === 3) {
-				const range = node.ownerDocument.createRange();
-				range.selectNodeContents(node);
-				// Lightweight DOM environments do not implement Range geometry.
-				if (typeof range.getClientRects !== 'function') continue;
-				const rects = range.getClientRects();
-				for (let i = 0; i < rects.length; i++) out.push(rects[i]);
-			} else {
-				const rects = (node as Element).getClientRects();
-				for (let i = 0; i < rects.length; i++) out.push(rects[i]);
-			}
-		}
-		return out;
-	}
-
-	/**
-	 * Resolve the owning host parent's root, forwarding composed shadow-root
-	 * options. A detached FragmentInstance is its own root, matching React.
-	 */
-	getRootNode(options?: GetRootNodeOptions): Node | FragmentInstance {
-		if (this._destroyed) return this;
-		const parent = this._startMarker.parentNode;
-		return parent === null ? this : parent.getRootNode(options);
-	}
-
-	// ─── compareDocumentPosition / dispatchEvent (Stage 5) ──────────────
-	/**
-	 * Preserve the platform's directional/ancestor bits while returning exact
-	 * CONTAINED_BY for logical children. Empty ranges have no DOM position of
-	 * their own, so their derived result is IMPLEMENTATION_SPECIFIC.
-	 */
-	compareDocumentPosition(other: Node): number {
-		if (this._destroyed) return Node.DOCUMENT_POSITION_DISCONNECTED;
-		const parent = this._startMarker.parentNode;
-		if (parent === null) return Node.DOCUMENT_POSITION_DISCONNECTED;
-
-		let first: Element | Text | null = null;
-		let last: Element | Text | null = null;
-		for (const child of fragmentDirectNodes(this)) {
-			first ??= child;
-			last = child;
-			if (child === other || (child.nodeType === 1 && (child as Element).contains(other))) {
-				return parent.contains(child)
-					? Node.DOCUMENT_POSITION_CONTAINED_BY
-					: Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
-			}
-		}
-
-		if (first === null || last === null) {
-			// A Fragment rendered directly inside a portal has a physical parent
-			// in the foreign container, but its ordering is relative to the portal's
-			// authored host. Portal mounting stamps that logical host on its direct
-			// children, including this Fragment's boundary comment.
-			const logicalParent =
-				(this._startMarker as Comment & { $$portalParent?: Node }).$$portalParent ?? parent;
-			let result = logicalParent.compareDocumentPosition(other);
-			if (logicalParent === other) {
-				result = Node.DOCUMENT_POSITION_CONTAINS;
-			} else if ((result & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0) {
-				const next = fragmentNearestSibling(this._endMarker, true);
-				result =
-					next !== null &&
-					(next === other ||
-						(next.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
-						? Node.DOCUMENT_POSITION_FOLLOWING
-						: Node.DOCUMENT_POSITION_PRECEDING;
-			}
-			return result | Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
-		}
-
-		const firstResult = first.compareDocumentPosition(other);
-		if ((firstResult & Node.DOCUMENT_POSITION_DISCONNECTED) !== 0) return firstResult;
-		const lastResult = last.compareDocumentPosition(other);
-		if (
-			parent.contains(first) &&
-			parent.contains(last) &&
-			(firstResult & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
-			(lastResult & Node.DOCUMENT_POSITION_PRECEDING) !== 0
-		) {
-			return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
-		}
-		// A portal moves its entire Fragment outside the authored host. A node
-		// still inside that host cannot have a trustworthy DOM position relative
-		// to the Fragment's foreign range, so React reports a logical-tree/DOM
-		// mismatch instead of leaking the foreign container's document order.
-		const portalMarker = this._startMarker as Comment & {
-			$$portalParent?: Node;
-			$$portalSourceAnchor?: Node;
-		};
-		const logicalParent = portalMarker.$$portalParent;
-		if (logicalParent !== undefined && logicalParent !== parent && logicalParent.contains(other)) {
-			const sourceAnchor = portalMarker.$$portalSourceAnchor;
-			if (sourceAnchor === undefined) return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
-			const directionMask = Node.DOCUMENT_POSITION_PRECEDING | Node.DOCUMENT_POSITION_FOLLOWING;
-			const logicalDirection = sourceAnchor.compareDocumentPosition(other) & directionMask;
-			if ((firstResult & directionMask) !== logicalDirection) {
-				return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
-			}
-		}
-		return firstResult;
-	}
-
-	/**
-	 * Dispatch bubbling events directly on the parent unless fragment listeners
-	 * or a non-bubbling event require React's temporary fragment-local target.
-	 */
-	dispatchEvent(event: Event): boolean {
-		if (this._destroyed) return true;
-		const parent = this._startMarker.parentNode;
-		if (!parent) return true;
-		const listeners = this._listeners;
-		if (event.bubbles && (listeners === null || listeners.length === 0)) {
-			return parent.dispatchEvent(event);
-		}
-
-		const target = (parent.ownerDocument || document).createTextNode('');
-		if (listeners !== null) {
-			for (const entry of listeners) {
-				target.addEventListener(entry.type, entry.listener, entry.options);
-			}
-		}
-		parent.appendChild(target);
-		try {
-			return target.dispatchEvent(event);
-		} finally {
-			if (listeners !== null) {
-				for (const entry of listeners) {
-					target.removeEventListener(entry.type, entry.listener, entry.options);
-				}
-			}
-			if (target.parentNode === parent) parent.removeChild(target);
-		}
-	}
-
-	// ─── scrollIntoView (Stage 6) ───────────────────────────────────────
-	/**
-	 * Scroll every logical first-level host child so the final scroll position
-	 * settles on the first child by default, or the last child for `false`.
-	 * Empty fragments use their nearest sibling, then their host parent.
-	 */
-	scrollIntoView(alignToTop?: boolean): void {
-		if (typeof alignToTop === 'object') {
-			throw new Error(formatClientError(49));
-		}
-		if (this._destroyed) return;
-		const alignStart = alignToTop !== false;
-		const children = Array.from(fragmentDirectNodes(this));
-		if (children.length === 0) {
-			const following = fragmentNearestSibling(this._endMarker, true);
-			const preceding = fragmentNearestSibling(this._startMarker, false);
-			const target = alignStart
-				? following || preceding || this._startMarker.parentNode
-				: preceding || following;
-			if (target === null || target === undefined || target.nodeType === 9) return;
-			if (target.nodeType === 11) {
-				const host = (target as ShadowRoot).host;
-				if (host) host.scrollIntoView(alignToTop);
-				return;
-			}
-			if (target.nodeType === 3) {
-				scrollFragmentTextNode(target as Text, alignStart);
-			} else {
-				(target as Element).scrollIntoView(alignToTop);
-			}
-			return;
-		}
-
-		for (
-			let index = alignStart ? children.length - 1 : 0;
-			alignStart ? index >= 0 : index < children.length;
-			index += alignStart ? -1 : 1
-		) {
-			const child = children[index];
-			if (child.nodeType === 3) scrollFragmentTextNode(child as Text, alignStart);
-			else (child as Element).scrollIntoView(alignToTop);
-		}
-	}
-}
-
-/**
- * EventTarget.removeEventListener compares on (type, listener, capture-flag).
- * Everything else (once, passive, signal) is "transparent" to identity, so
- * we normalize options down to its capture-flag for the equality test.
- */
-function listenerCapturePhase(o: AddEventListenerOptions | boolean | undefined): boolean {
-	if (o == null) return false;
-	if (typeof o === 'boolean') return o;
-	return !!o.capture;
-}
-
-/**
- * Yield first-level authored host nodes in logical order. Comment boundaries
- * are implementation details; text remains observable to fragment geometry.
- */
-function* fragmentDirectNodes(fi: FragmentInstance): Generator<Element | Text> {
-	const portalAnchors = fi._portalAnchors;
-	let node: ChildNode | null = getNextSibling(fi._startMarker);
-	while (node !== null) {
-		const next = getNextSibling(node);
-		const portals = portalAnchors === null ? undefined : portalAnchors.get(node);
-		if (portals !== undefined) {
-			// A portal containing a Fragment ref may grow around a later independent
-			// portal targeting the same container. Empty entries identify those
-			// foreign ranges without changing the ordinary direct-child fast path.
-			if (portals.size === 0) {
-				const foreignEnd = (node as any).$$portalEnd as Node | undefined;
-				if (foreignEnd !== undefined) {
-					node = nodeAfterPortalRange(node, foreignEnd) as ChildNode | null;
-					continue;
-				}
-			}
-			for (const portal of portals) {
-				// Portals are physically outside Activity's hidden host range. Their
-				// logical Block ancestry, not their target DOM, determines visibility.
-				if (portal.block === null || findHiddenActivity(portal.block) !== null) continue;
-				let child: ChildNode | null = portal.start?.nextSibling ?? null;
-				while (child !== null && child !== portal.end) {
-					const nextChild = getNextSibling(child);
-					if ((child.nodeType === 1 || child.nodeType === 3) && fragmentHostVisible(child)) {
-						yield child as Element | Text;
-					}
-					child = nextChild;
-				}
-			}
-		}
-		if (node === fi._endMarker) return;
-		if ((node.nodeType === 1 || node.nodeType === 3) && fragmentHostVisible(node)) {
-			yield node as Element | Text;
-		}
-		node = next;
-	}
-}
-
-/**
- * First-level host elements are the membership set for fragment listeners,
- * observers, and public `reactFragments` handles.
- */
-function* fragmentDirectChildren(fi: FragmentInstance): Generator<Element> {
-	for (const node of fragmentDirectNodes(fi)) {
-		if (node.nodeType === 1) yield node as Element;
-	}
-}
-
-/** Deep-walk each first-level host subtree without scanning the entire document. */
-function* fragmentDescendants(fi: FragmentInstance): Generator<Element> {
-	for (const top of fragmentDirectChildren(fi)) {
-		yield top;
-		const walker = (top.ownerDocument || document).createTreeWalker(top, 1);
-		let descendant = walker.nextNode() as Element | null;
-		while (descendant) {
-			yield descendant;
-			descendant = walker.nextNode() as Element | null;
-		}
-	}
-}
-
-/** Ask the DOM whether focusing succeeded, including delegated/redirected focus. */
-function focusFragmentElement(node: Element, options?: FocusOptions): boolean {
-	const element = node as HTMLElement;
-	const owner = element.ownerDocument;
-	if (owner.activeElement === element) return true;
-	let focused = false;
-	const onFocus = () => {
-		focused = true;
-	};
-	owner.addEventListener('focus', onFocus, true);
-	try {
-		(element.focus || HTMLElement.prototype.focus).call(element, options);
-	} finally {
-		owner.removeEventListener('focus', onFocus, true);
-	}
-	return focused;
-}
-
-/** Skip implementation-only markers when locating an empty fragment's host sibling. */
-function fragmentNearestSibling(marker: Node, forward: boolean): Element | Text | null {
-	let sibling = forward ? getNextSibling(marker) : marker.previousSibling;
-	while (sibling !== null) {
-		if (sibling.nodeType === 1 || sibling.nodeType === 3) return sibling as Element | Text;
-		sibling = forward ? getNextSibling(sibling) : sibling.previousSibling;
-	}
-	return null;
-}
-
-/** Text nodes expose geometry through Range rather than Element.scrollIntoView. */
-function scrollFragmentTextNode(node: Text, alignToTop: boolean): void {
-	const range = node.ownerDocument.createRange();
-	range.selectNodeContents(node);
-	if (typeof range.getBoundingClientRect !== 'function') return;
-	const rect = range.getBoundingClientRect();
-	const view = node.ownerDocument.defaultView || window;
-	const y = alignToTop ? view.scrollY + rect.top : view.scrollY + rect.bottom - view.innerHeight;
-	view.scrollTo(view.scrollX + rect.left, y);
-}
-
 /**
  * Compiler-emitted helper. Creates a FragmentInstance bound to the supplied
  * marker pair + owning block, attaches the user's ref, and queues both the
@@ -27377,54 +26184,6 @@ export function mountFragmentRef(
 	return fi;
 }
 
-// XML namespaces recognised by the HTML5 parser for attribute names —
-// matches React's setAttribute routing for parity. When an attribute name
-// starts with `xlink:`, `xml:`, or `xmlns:`, we route through setAttributeNS
-// so the resulting attribute's namespaceURI matches what the browser parses
-// out of a static SVG template. Without this, dynamic `xlink:href={…}` would
-// leave attribute.namespaceURI === null while a static `<use xlink:href="…"/>`
-// inside the template would have it set to XLINK_NS — a real divergence.
-const XLINK_NS = 'http://www.w3.org/1999/xlink';
-const XML_NS = 'http://www.w3.org/XML/1998/namespace';
-const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
-// Element namespaces for the de-opt reconciler (the compiled template path uses
-// `template(html, ns)` instead). HTML_NS is what document.createElement produces in
-// an HTML document, so it's the reuse-check baseline for non-SVG elements.
-const SVG_NS = 'http://www.w3.org/2000/svg';
-const MATHML_NS = 'http://www.w3.org/1998/Math/MathML';
-const HTML_NS = 'http://www.w3.org/1999/xhtml';
-
-// A hyphen only marks a custom element in the HTML namespace. SVG contains
-// native hyphenated tags (`font-face`, `missing-glyph`, …), which must keep the
-// ordinary native alias/value tables instead of custom-element raw semantics.
-function isHtmlCustomElement(el: Element): boolean {
-	return el.namespaceURI === HTML_NS && el.localName.indexOf('-') !== -1;
-}
-
-// Whether `el` is the element a host descriptor of `type` builds. HTML tag names
-// are ASCII case-insensitive: createElement('DIV') builds a `div`, and the parser
-// lowercases the server's `<DIV>`, so an HTML element matches any casing of its
-// name. SVG and MathML names are case-sensitive (`foreignObject`), so a foreign
-// element matches only its exact spelling. Canonical spellings match on the
-// first comparison; the lowercase copy and namespace read run only on a miss.
-function isHostElementOfType(el: Element, type: string): boolean {
-	const name = el.localName;
-	return name === type || (name === type.toLowerCase() && el.namespaceURI === HTML_NS);
-}
-
-// Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
-// (`g`, `rect`, `path`, … — SVG_ONLY_TAGS in constants.ts) implies SVG when no
-// namespace was inherited (a component root, a value-position descriptor,
-// portal children). Ambiguous names (`a`, `title`, `script`, `style`) keep the
-// inherited namespace. Mirrors the compiler's nsForSelf so compiled templates
-// and de-opt descriptors namespace identically.
-function inferTagNs(tag: string, inherited: string | undefined): string | undefined {
-	if (tag === 'svg') return SVG_NS;
-	if (tag === 'math') return MATHML_NS;
-	if (inherited === undefined && SVG_ONLY_TAGS.has(tag)) return SVG_NS;
-	return inherited;
-}
-
 // Namespace inherited by a de-opt child from the DOM node it is actually being
 // inserted into. Component children are an opaque compile-time boundary, so the
 // runtime parent is the only authoritative source. `foreignObject` is itself an
@@ -27437,18 +26196,6 @@ function deoptChildNamespace(parent: Node): string | undefined {
 	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
 	if (el.namespaceURI === MATHML_NS) return MATHML_NS;
 	return undefined;
-}
-
-function attrNamespace(name: string): string | null {
-	// Bare `xmlns` is the xmlns namespace itself (rare in practice).
-	if (name === 'xmlns') return XMLNS_NS;
-	const colon = name.indexOf(':');
-	if (colon <= 0) return null;
-	const prefix = name.slice(0, colon);
-	if (prefix === 'xlink') return XLINK_NS;
-	if (prefix === 'xml') return XML_NS;
-	if (prefix === 'xmlns') return XMLNS_NS;
-	return null;
 }
 
 export function setAttribute(
@@ -27683,83 +26430,6 @@ function commitHostAttribute(el: Element, name: string, next: string | null): vo
 	else el.setAttribute(name, next);
 }
 
-// React's `warnedProperties` cache is module-global and keyed by prop name: once
-// one root reports a host-property problem, later roots using the same property
-// stay quiet too. Allocate lazily only after a development-compiled host reaches
-// a warning branch; every call site is build-time guarded, so optimized bundles
-// remove the cache and helper in full.
-let DEV_ATTRIBUTE_WARNINGS: Set<string> | null = null;
-
-function devWarnAttributeOnce(_el: Element, name: string, message: string): void {
-	const warned = (DEV_ATTRIBUTE_WARNINGS ??= new Set());
-	if (warned.has(name)) return;
-	warned.add(name);
-	console.error(message);
-}
-
-function devValidateAriaProps(el: Element, props: Record<string, unknown>): void {
-	if ((el as any).__oct_loc === undefined || isHtmlCustomElement(el)) return;
-	let unknown: string[] | undefined;
-	for (const name of Object.keys(props)) {
-		if (!isAriaAttributeName(name)) continue;
-		const warning = ariaAttributeWarning(name, el.localName);
-		if (warning === null) continue;
-		if (!isUnknownAriaAttribute(name)) {
-			devWarnAttributeOnce(el, name, warning);
-			continue;
-		}
-		if (DEV_ATTRIBUTE_WARNINGS?.has(name)) continue;
-		(DEV_ATTRIBUTE_WARNINGS ??= new Set()).add(name);
-		(unknown ??= []).push(name);
-	}
-	if (unknown !== undefined) {
-		console.error(unknownAriaAttributeWarning(unknown, el.localName));
-	}
-}
-
-function devValidateHostProps(el: Element, props: Record<string, unknown>): void {
-	if ((el as any).__oct_loc === undefined || isHtmlCustomElement(el)) return;
-	const customized = typeof props.is === 'string';
-	(el as any).__oct_custom_is = customized ? props.is : undefined;
-	if (customized) return;
-	let invalid: string[] | undefined;
-	for (const name of Object.keys(props)) {
-		if (
-			name === 'key' ||
-			name === 'ref' ||
-			name === 'children' ||
-			name === 'class' ||
-			name === 'className' ||
-			name === 'style' ||
-			name === 'dangerouslySetInnerHTML' ||
-			isAriaAttributeName(name)
-		) {
-			continue;
-		}
-		const value = props[name];
-		if (name.length > 2 && name[0] === 'o' && name[1] === 'n') {
-			if (typeof value === 'string') {
-				const warning = hostPropertyWarning(name, value);
-				if (warning !== null) devWarnAttributeOnce(el, name, warning);
-			}
-			continue;
-		}
-		const warning = hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
-		if (warning !== null) {
-			devWarnAttributeOnce(el, name, warning);
-			continue;
-		}
-		if (typeof value === 'function' && formActionAttributeName(el, name) !== null) continue;
-		if (typeof value !== 'function' && typeof value !== 'symbol') continue;
-		if (DEV_ATTRIBUTE_WARNINGS?.has(name)) continue;
-		(DEV_ATTRIBUTE_WARNINGS ??= new Set()).add(name);
-		(invalid ??= []).push(name);
-	}
-	if (invalid !== undefined) {
-		console.error(invalidHostPropertiesWarning(invalid, el.localName));
-	}
-}
-
 /**
  * Compiler-admitted native scalar attribute: the name is valid, already aliased,
  * unnamespaced and has no property/boolean/numeric/URL semantics. Keep the
@@ -27954,188 +26624,13 @@ export function prepareTemplateAria(
 	return next;
 }
 
-/**
- * The final attribute string for `(el, name, value)`, or `null` for "absent".
- * One coercion feeds setAttribute's hydration compare AND its write, and the
- * rules mirror the server's ssrAttr byte-for-byte (shared value-type tables in
- * constants.ts) — without the mirror, SSR would omit an attribute (e.g.
- * `hidden` for `hidden={0}`) that hydration then resurrects, flipping the
- * platform state and warning on the divergence.
- */
-function coerceAttrValue(el: Element, name: string, value: any): string | null {
-	// `aria-*` attributes are ENUMERATED (React parity): `false` renders as
-	// "false" (NOT removed) and `true` as "true" (NOT ""). Invalid functions
-	// and symbols are removed with nullish values.
-	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
-		return value == null || typeof value === 'function' || typeof value === 'symbol'
-			? null
-			: String(value);
-	}
-	const t = typeof value;
-	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
-	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
-	// different state), and `true` writes "true". The generic boolean handling
-	// (false → remove) would silently flip e.g. contentEditable={false} back to
-	// inherited editability. Matched case-insensitively (JSX arrives camelCase).
-	if (t === 'boolean' && isEnumeratedBooleanAttr(name)) return value ? 'true' : 'false';
-	// data-* attributes stringify booleans: `data-x={false}` must write "false" —
-	// a dataset consumer reads the string, so removing would lose the value.
-	if (t === 'boolean' && name.startsWith('data-')) return value ? 'true' : 'false';
-	// Function and symbol values are never meaningful attribute text (React
-	// removes them); stringifying a function would leak its source into the DOM.
-	if (t === 'function' || t === 'symbol') {
-		if (
-			process.env.NODE_ENV !== 'production' &&
-			(el as any).__oct_loc !== undefined &&
-			!isHtmlCustomElement(el)
-		) {
-			if (
-				t === 'function' &&
-				name.length > 2 &&
-				name.charCodeAt(0) === 111 /* o */ &&
-				name.charCodeAt(1) === 110 /* n */
-			) {
-				devWarnAttributeOnce(
-					el,
-					name,
-					`Unknown event handler property \`${name}\` was dropped — did you mean ` +
-						`\`on${name.charAt(2).toUpperCase()}${name.slice(3)}\`? (lowercase on* ` +
-						'attributes never write; octane delegates camelCase handlers natively)',
-				);
-			} else {
-				devWarnAttributeOnce(
-					el,
-					name,
-					`Invalid value for prop \`${name}\` on <${el.localName}> tag. ` +
-						'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
-				);
-			}
-		}
-		return null;
-	}
-	// React's value-type tables — custom elements are exempt (raw semantics).
-	if (!isHtmlCustomElement(el)) {
-		const lower = name.toLowerCase();
-		// React's boolean-attr table (constants.ts — REVERSES the 2026-06
-		// native-write adjudication): ANY truthy value renders the canonical
-		// `attr=""` presence form (`disabled="disabled"` → `disabled=""`),
-		// falsy removes (`hidden={0}`, `inert=""` → absent).
-		if (BOOLEAN_ATTR_PROPS.has(lower)) {
-			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
-				const warning = booleanAttributeStringWarning(name, value);
-				if (warning !== null) devWarnAttributeOnce(el, name, warning);
-			}
-			return value ? '' : null;
-		}
-		// The OVERLOADED booleans (download/capture): boolean values get
-		// presence semantics; everything else passes through verbatim below
-		// (`download={0}` → "0", like React).
-		if (t === 'boolean' && (lower === 'download' || lower === 'capture')) {
-			return value ? '' : null;
-		}
-		// Booleans on NON-boolean attributes remove (React: `title={true}` must
-		// never render `title=""`), with the React DEV diagnostic.
-		if (t === 'boolean') {
-			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
-				devWarnAttributeOnce(
-					el,
-					name,
-					`Received \`${value}\` for a non-boolean attribute \`${name}\`. ` +
-						(value === true
-							? `If you want to write it to the DOM, pass a string instead: ` +
-								`${name}="true" or ${name}={value.toString()}.`
-							: `If you used to conditionally omit it with ${name}={condition && value}, ` +
-								`pass ${name}={condition ? value : undefined} instead.`),
-				);
-			}
-			return null;
-		}
-		// Positive-numeric props: below 1 drops — `size="0"` is invalid per the
-		// HTML spec.
-		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(value) >= 1)) {
-			return null;
-		}
-		if ((lower === 'rowspan' || lower === 'start') && Number.isNaN(Number(value))) return null;
-		// Unknown lowercase on* names never write on standard elements (an
-		// event-ish name with a string payload is injection surface, not an
-		// attribute); camelCase onX events compile to delegated bindings and
-		// never reach setAttribute. Custom elements keep them (raw semantics).
-		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
-			return null;
-		}
-	}
-	if (value == null || value === false) return null;
-	// DEV: a plain object stringifies as "[object Object]" — always a bug
-	// (React's unusual-coercion check; arrays keep their join semantics).
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		t === 'object' &&
-		(el as any).__oct_loc !== undefined &&
-		(value as object).toString === Object.prototype.toString
-	) {
-		devWarnAttributeOnce(
-			el,
-			name,
-			`The provided \`${name}\` attribute is an object; it will stringify to ` +
-				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
-		);
-	}
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		t === 'number' &&
-		Number.isNaN(value) &&
-		(el as any).__oct_loc !== undefined
-	) {
-		devWarnAttributeOnce(
-			el,
-			name,
-			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
-		);
-	}
-	let v: string;
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		(el as any).__oct_loc !== undefined &&
-		!isHtmlCustomElement(el)
-	) {
-		try {
-			v = value === true ? '' : String(value);
-		} catch (error) {
-			devWarnAttributeOnce(el, name, unsupportedAttributeCoercionWarning(name, value));
-			throw error;
-		}
-	} else {
-		v = value === true ? '' : String(value);
-	}
-	// An empty `src`/`href`/`<object data>` resolves to the CURRENT PAGE's URL — browsers will
-	// re-fetch the whole document as an image/script/stylesheet. React strips
-	// these (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an
-	// empty href is a legitimate "link to this page".
-	if (
-		v === '' &&
-		(name === 'src' ||
-			(name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA') ||
-			(name === 'data' && el.nodeName === 'OBJECT'))
-	) {
-		if (
-			process.env.NODE_ENV !== 'production' &&
-			(el as any).__oct_loc !== undefined &&
-			!isHtmlCustomElement(el)
-		) {
-			devWarnAttributeOnce(el, 'empty:' + name, emptyResourceUrlWarning(name));
-		}
-		return null;
-	}
-	return v;
-}
-
+// clsx-style `class`/`className` composition — shared with the SSR serializer
+// via css.ts so client and server compose byte-equal class strings (hydration
+// parity). Re-exported here because it is part of the semi-public surface.
 // clsx-style `class`/`className` composition — shared with the SSR serializer
 // via css.ts so client and server compose byte-equal class strings (hydration
 // parity). Re-exported here because it is part of the semi-public surface.
 import {
-	devWarnStyleCoercion,
-	devWarnStyleProperty,
-	mergeClass,
 	normalizeClass,
 	styleName,
 	VIEW_TRANSITION_SCOPE_CSS as VT_SCOPE_CSS,
@@ -28197,15 +26692,6 @@ export function setClassAttr(el: Element, value: unknown, prepared = false): voi
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
 }
-
-// ---------------------------------------------------------------------------
-// Style — object form (keys may be kebab-case `font-size` OR React-style
-// camelCase `fontSize`; see styleName) or a full cssText string. `prev` is the
-// previous value tracked by the compiler so we can diff object→object and only
-// touch the properties that changed.
-// ---------------------------------------------------------------------------
-
-const IMPORTANT_SUFFIX = '!important';
 
 /** Whether a grouped style must compare its complete value during hydration. @internal */
 export function isHydratingStyle(): boolean {
@@ -28376,116 +26862,6 @@ export function setStyleProperties(
 	}
 }
 
-function applyStyleValue(
-	el: HTMLElement | SVGElement,
-	style: CSSStyleDeclaration,
-	value: any,
-	prev: any,
-	prepared = false,
-): void {
-	if (value == null || value === false || value === '') {
-		if (prev && typeof prev === 'object') {
-			for (const key in prev) style.removeProperty(styleName(key));
-		} else if (typeof prev === 'string') {
-			style.cssText = '';
-		}
-		return;
-	}
-
-	if (typeof value === 'string') {
-		if (prev !== value) style.cssText = value;
-		return;
-	}
-
-	// Object form. If prev is an object too, diff per-property — only changed
-	// keys are touched. Otherwise (prev was string / null) reset cssText first
-	// so leftover declarations don't leak across the transition.
-	if (prev && typeof prev === 'object') {
-		for (const k in prev) {
-			if (!(k in value)) style.removeProperty(styleName(k));
-		}
-		for (const k in value) {
-			const v = value[k];
-			if (v === prev[k]) continue;
-			// Booleans clear the property (React parity): `fontFamily: true` must not
-			// set the literal string "true" (a valid font name!).
-			if (v == null || typeof v === 'boolean') style.removeProperty(styleName(k));
-			else if (prepared) applyPreparedStyleProperty(style, k, v);
-			else applyStyleProperty(el, style, k, v);
-		}
-	} else {
-		if (typeof prev === 'string') style.cssText = '';
-		for (const k in value) {
-			const v = value[k];
-			if (v != null && typeof v !== 'boolean') {
-				if (prepared) applyPreparedStyleProperty(style, k, v);
-				else applyStyleProperty(el, style, k, v);
-			}
-		}
-	}
-}
-
-function applyStyleProperty(
-	el: HTMLElement | SVGElement,
-	style: CSSStyleDeclaration,
-	name: string,
-	value: any,
-): void {
-	applyPreparedStyleProperty(style, name, coerceStyleProperty(el, name, value));
-}
-
-function coerceStyleProperty(el: HTMLElement | SVGElement, name: string, value: unknown): string {
-	// React parity: a bare number gets `px` unless it's 0, a custom prop, or unitless.
-	let s: string;
-	if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
-		devWarnStyleProperty(name, value, false);
-		try {
-			s = cssStyleValue(name, value);
-		} catch (error) {
-			devWarnStyleCoercion(name, value);
-			throw error;
-		}
-	} else {
-		s = cssStyleValue(name, value);
-	}
-	return s;
-}
-
-function applyPreparedStyleProperty(style: CSSStyleDeclaration, name: string, s: string): void {
-	const prop = styleName(name);
-	// CodeQL flagged the prior `/\s*!important\s*$/` test+replace combo as
-	// polynomial-regex-on-uncontrolled-input. Same job in linear time using
-	// built-in trimEnd() + endsWith() — no regex, no backtracking risk.
-	const tail = s.trimEnd();
-	if (tail.endsWith(IMPORTANT_SUFFIX)) {
-		style.setProperty(
-			prop,
-			tail.slice(0, tail.length - IMPORTANT_SUFFIX.length).trimEnd(),
-			'important',
-		);
-	} else {
-		style.setProperty(prop, s);
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Spread attributes — `<div {...props}/>`. Iterates the spread object, routes
-// each key to the appropriate setter (class / style / onXxx / attr / ref) and
-// diffs against the previous spread object so keys that vanished get cleared.
-// React 19 shape; only `key`, `ref`, `children` are special-cased.
-// ---------------------------------------------------------------------------
-
-function isEventKey(k: string): boolean {
-	const c = k.charCodeAt(2);
-	return (
-		k.length > 2 &&
-		k.charCodeAt(0) === 111 /*o*/ &&
-		k.charCodeAt(1) === 110 /*n*/ &&
-		c >= 65 /*A*/ &&
-		c <= 90 /*Z*/
-	);
-}
-
 // DOM-stamp prefixes for delegated handlers. Bubble handlers stamp `$o<type>`;
 // capture handlers (`onXxxCapture`) stamp `$ocapture:<type>` so the two phases
 // stay independent on the same element + event type. The namespace must belong to
@@ -28593,188 +26969,18 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	}
 }
 
-/** Snapshot a JSX spread with own-enumerable Object.assign semantics. */
-export function snapshotSpread(value: unknown): Record<string, unknown> | null {
-	if (value == null) return null;
-	const source = Object(value) as Record<PropertyKey, unknown>;
-	const snapshot: Record<string, unknown> = Object.create(null);
-	for (const key of Reflect.ownKeys(source)) {
-		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
-		const next = source[key];
-		// JSX spread evaluates enumerable symbol getters, but DOM prop routing has
-		// no symbol-key surface. Preserve the observable read and discard the key.
-		if (typeof key === 'string') snapshot[key] = next;
-	}
-	return snapshot;
-}
-
-type HostPropSource = readonly [
+export type HostPropSource = readonly [
 	isSpread: boolean,
 	sourceOrName: unknown,
 	value?: unknown,
 	merge?: boolean,
 ];
 
-interface HostPropWriter {
+export interface HostPropWriter {
 	name: string;
 	value: unknown;
 	firstOrder: number;
 	lastOrder: number;
-}
-
-function formActionAttributeName(el: Element, name: string): string | null {
-	if (name === 'action' && el.localName === 'form') return 'action';
-	if (
-		(name === 'formAction' || name === 'formaction') &&
-		(el.localName === 'button' || el.localName === 'input')
-	)
-		return 'formaction';
-	return null;
-}
-
-function isHostPropIdentityKey(name: string): boolean {
-	if (
-		name === 'ref' ||
-		name === 'children' ||
-		name === 'dangerouslySetInnerHTML' ||
-		name === 'suppressHydrationWarning' ||
-		name === 'suppressContentEditableWarning' ||
-		name === 'suppressNativeChangeWarning' ||
-		name === '__octaneNativeChangeDiagnostic' ||
-		name === 'autoFocus' ||
-		name === 'value' ||
-		name === 'defaultValue' ||
-		name === 'checked' ||
-		name === 'defaultChecked' ||
-		name === 'multiple'
-	)
-		return true;
-	return isEventKey(name);
-}
-
-function normalizedHostProp(el: Element, rawName: string): string {
-	if (rawName === 'class' || rawName === 'className') return 'class';
-	const actionName = formActionAttributeName(el, rawName);
-	if (actionName !== null) return actionName;
-	return isHtmlCustomElement(el) ? rawName : (ATTRIBUTE_ALIASES.get(rawName) ?? rawName);
-}
-
-function hasEarlierPreparedAttributeAlias(
-	el: Element,
-	prepared: PreparedHostProps,
-	name: string,
-): boolean {
-	const channel = normalizedHostProp(el, name);
-	// These keys and their values were captured during prepare. Only an earlier
-	// attribute writer can make an unchanged null winner necessary at commit.
-	for (const prior in prepared.attributes) {
-		if (prior === name) return false;
-		if (normalizedHostProp(el, prior) === channel) return true;
-	}
-	return false;
-}
-
-/**
- * Resolve a spread-bearing compiled host's complete prop set before touching
- * the DOM. JSX spread merging is last-writer-wins, but aliases such as
- * className/class, htmlFor/for, and xlinkHref/xlink:href target one native
- * property. Canonical identities ensure a vanished earlier source cannot
- * remove an unchanged later winner, and hydration compares only the final
- * client value against the final server value.
- *
- * A synthesized scope-hash class (4th tuple flag) is not an authored later
- * writer: after identity last-writer-wins, it composes onto the winning class
- * instead of replacing a spread's class. An authored `class` beside a spread
- * stays last-writer-wins because its hash is baked into that authored value
- * and carries no merge flag.
- */
-function resolveHostPropSources(
-	el: Element,
-	sources: readonly HostPropSource[],
-	props: Map<string, HostPropWriter>,
-	readStyle: ((value: unknown) => unknown) | undefined,
-): Record<string, unknown> {
-	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
-	let sourceOrder = 0;
-	function record(rawName: unknown, value: unknown): void {
-		if (typeof rawName !== 'string') return;
-		const order = sourceOrder++;
-		const previous = props.get(rawName);
-		if (previous !== undefined) {
-			previous.value = value;
-			previous.lastOrder = order;
-		} else {
-			props.set(rawName, { name: rawName, value, firstOrder: order, lastOrder: order });
-		}
-	}
-
-	for (const source of sources) {
-		if (!source[0]) {
-			const rawName = source[1];
-			if (
-				source[3] === true &&
-				typeof rawName === 'string' &&
-				(rawName === 'class' || rawName === 'className')
-			) {
-				(classMerges ??= []).push({ rawName, value: source[2], order: sourceOrder++ });
-				continue;
-			}
-			record(rawName, source[2]);
-			continue;
-		}
-		const spread = source[1];
-		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
-		for (const name of Object.keys(Object(spread))) {
-			record(name, (spread as Record<string, unknown>)[name]);
-		}
-	}
-
-	// Source reads are complete. Reuse each raw writer as its normalized winner;
-	// neither Map escapes this call, and no second per-key tuple is needed.
-	const values = new Map<string, HostPropWriter>();
-	const html = el.namespaceURI === 'http://www.w3.org/1999/xhtml';
-	let needsWinningOrderSort = false;
-	for (const writer of props.values()) {
-		const rawName = writer.name;
-		if (rawName === 'key') continue;
-		const identityKey = isHostPropIdentityKey(rawName);
-		const name = identityKey ? rawName : normalizedHostProp(el, rawName);
-		const identity = html && !identityKey ? name.toLowerCase() : name;
-		const previous = values.get(identity);
-		if (previous !== undefined) {
-			if (previous.lastOrder >= writer.lastOrder) continue;
-			// A winning alias can have a later first insertion than this Map entry.
-			needsWinningOrderSort = true;
-		}
-		writer.name =
-			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-				? rawName
-				: name;
-		values.set(identity, writer);
-	}
-	if (classMerges !== null) {
-		for (const extra of classMerges) {
-			const previous = values.get('class');
-			if (previous !== undefined) {
-				previous.value = mergeClass(previous.value, extra.value);
-				previous.lastOrder = extra.order;
-			} else {
-				values.set('class', {
-					name: 'class',
-					value: extra.value,
-					firstOrder: extra.order,
-					lastOrder: extra.order,
-				});
-			}
-		}
-	}
-	const resolved: Record<string, unknown> = Object.create(null);
-	const ordered = needsWinningOrderSort
-		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
-		: values.values();
-	for (const { name, value } of ordered) resolved[name] = value;
-	if (readStyle !== undefined && 'style' in resolved) resolved.style = readStyle(resolved.style);
-	return resolved;
 }
 
 export function setHostPropSources(
@@ -29467,23 +27673,6 @@ export function commitTemplateSignalHostSources(
 		consumeHydrationControl(element, next.controlSnapshot.revision);
 	if (binding.pendingControl) queueSignalHostControlAdoption(binding, binding.resolved.value);
 	return binding;
-}
-
-function isAggregatedFormControlProp(el: Element, name: string): boolean {
-	switch (el.localName) {
-		case 'input':
-			return (
-				name === 'value' ||
-				name === 'defaultValue' ||
-				name === 'checked' ||
-				name === 'defaultChecked'
-			);
-		case 'textarea':
-			return name === 'value' || name === 'defaultValue';
-		case 'select':
-			return name === 'value' || name === 'defaultValue' || name === 'multiple';
-	}
-	return false;
 }
 
 export interface PreparedHostProps {
@@ -33074,13 +31263,6 @@ export function setDefaultValue(
 		input.defaultValue = s;
 	}
 }
-
-/**
- * Compiler-only defaultValue binding for a statically-known input/textarea
- * with no value writer or spread. The element is necessarily uncontrolled, so
- * it needs neither a controlled-state record nor edit/composition listeners.
- */
-const DEFAULT_VALUE_BASELINE = Symbol('octane.defaultValue');
 const DEFAULT_CHECKED_INITIALIZED = Symbol('octane.defaultCheckedInitialized');
 
 export function setDefaultValueUncontrolled(
@@ -33793,7 +31975,7 @@ function reassertControlledIn(form: HTMLFormElement): void {
 // part of the React-tree for context / unmount / event delegation.
 // ---------------------------------------------------------------------------
 
-interface PortalSlot {
+export interface PortalSlot {
 	__kind: 'portalSlotSlot';
 	block: Block | null;
 	target: Element | DocumentFragment | null;
@@ -36921,14 +35103,6 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 	});
 }
 
-// The descriptor that last produced a de-opt host element is stashed on the element
-// as a typed expando, so a re-render can diff props (patchDeoptProps) and match
-// children by key against the live DOM — WITHOUT rebuilding, which would destroy
-// DOM-resident state (input value, focus, selection, scroll, media). A direct
-// property (not a WeakMap) keeps the per-child lookup in reconcileDeoptChildren cheap;
-// `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
-const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
-
 // Whether any of `el`'s current children were created by the de-opt reconciler. Every node it
 // builds carries a `$$deoptKey` stamp (or a descriptor), so ownership is derivable and needs no
 // per-element bookkeeping — which keeps it off the reconcile hot path and off the DOM node's shape.
@@ -37726,16 +35900,6 @@ function settleDeoptVisibility(block: Block): void {
 		const hidden = findHiddenActivity(block);
 		if (hidden !== null) SCHEDULED_VISIBILITY_DRIVER.rehide(hidden);
 	}
-}
-
-// Resume point of an owned-children walk after a foreign portal range: the first
-// node AFTER the range close (`end`). Tolerates a torn range (the close was removed
-// out from under us) by resuming right after `start`, so the walk can never loop.
-// Shared by reconcileDeoptChildren's ownership and ordering walks.
-function nodeAfterPortalRange(start: Node, end: Node): Node | null {
-	let m: Node | null = start;
-	while (m !== null && m !== end) m = getNextSibling(m);
-	return getNextSibling(m ?? start);
 }
 
 // Continue an ordering walk past foreign portal ranges and imperative nodes.
@@ -42226,33 +40390,6 @@ const HIDDEN_DISPLAYS = new WeakMap<HTMLElement, HiddenDisplay>();
 const HIDDEN_TEXTS = new WeakMap<Text, HiddenText>();
 let hiddenDisplayNodes = 0;
 let hiddenTextNodes = 0;
-let HIDDEN_ACTIVITY_NODES: WeakMap<Node, number> | null = null;
-let hiddenActivityNodeOwners = 0;
-
-function retainHiddenActivityNode(node: Node): void {
-	const hidden = (HIDDEN_ACTIVITY_NODES ??= new WeakMap<Node, number>());
-	hidden.set(node, (hidden.get(node) ?? 0) + 1);
-	hiddenActivityNodeOwners++;
-}
-
-function releaseHiddenActivityNode(node: Node): void {
-	const hidden = HIDDEN_ACTIVITY_NODES;
-	const owners = hidden?.get(node);
-	if (owners === undefined) return;
-	if (owners === 1) hidden!.delete(node);
-	else hidden!.set(node, owners - 1);
-	hiddenActivityNodeOwners--;
-}
-
-/** Activity hides exclude their preserved hosts from every Fragment-ref API. */
-function fragmentHostVisible(node: Node): boolean {
-	if (hiddenActivityNodeOwners === 0) return true;
-	const hidden = HIDDEN_ACTIVITY_NODES!;
-	for (let current: Node | null = node; current !== null; current = current.parentNode) {
-		if (hidden.has(current)) return false;
-	}
-	return true;
-}
 
 function enforceHiddenDisplay(el: HTMLElement): void {
 	const hidden = HIDDEN_DISPLAYS.get(el);
@@ -44900,16 +43037,6 @@ function findScheduledVisibilityOwner(
 /** Nearest enclosing SUSPENSE-HIDDEN boundary, if one owns this render. */
 function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
 	return findScheduledVisibilityOwner(block, false);
-}
-
-/** Nearest hidden Activity that owns connected DOM in this block's ancestry. */
-function findHiddenActivity(block: Block | null): ActivitySlot | null {
-	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
-		if (!p.inactive) continue;
-		const candidate = p.rare?.activitySlot;
-		if (candidate !== undefined && candidate.block === p && candidate.hidden) return candidate;
-	}
-	return null;
 }
 
 /**
@@ -47821,7 +45948,7 @@ function renderActivityChildren(_props: unknown, scope: Scope): void {
 	childSlot(scope, 0, block.parentNode, block.parentBlock!.props?.children, block.endMarker);
 }
 
-interface ActivitySlot {
+export interface ActivitySlot {
 	__kind: 'activityBlockSlot';
 	block: Block | null;
 	hidden: boolean;
@@ -47848,84 +45975,6 @@ interface ActivitySlot {
 interface ActivityHiddenDom extends Omit<SuspenseHiddenDom, 'active'> {
 	nextDisplays: Set<HTMLElement>;
 	nextTexts: Set<Text>;
-}
-
-// Only applications using Activity retain portal visibility bookkeeping.
-let activityPortalCreated: ((block: Block) => void) | null = null;
-
-function retainActivityTracking(): void {
-	liveActivityCount++;
-	activityPortalCreated ??= registerActivityPortal;
-	activityRefCreated ??= registerActivityRef;
-	activityInsertionEffectCreated ??= registerActivityInsertionEffect;
-	activityRefState ??= new WeakMap();
-	activityRefOwners ??= new WeakMap();
-}
-
-function releaseActivityTracking(): void {
-	if (--liveActivityCount !== 0) return;
-	activityRefCreated = null;
-	activityInsertionEffectCreated = null;
-	activityPortalCreated = null;
-	const refs = activityRefState;
-	// The block's cleanup runs before descendant ref teardowns. Keep their
-	// committed records until this synchronous deletion/commit finishes, then
-	// remove the optional hooks entirely. A new Activity cancels this release.
-	queueMicrotask(() => {
-		if (liveActivityCount === 0 && activityRefState === refs) {
-			activityRefState = null;
-			activityRefOwners = null;
-		}
-	});
-}
-
-function findActivityRefOwners(block: Block): boolean {
-	let owned = false;
-	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const owner: ActivitySlot | undefined = current.rare?.activitySlot;
-		if (owner !== undefined && owner.block === current) {
-			owner.hasRefs = true;
-			owned = true;
-		}
-	}
-	return owned;
-}
-
-function registerActivityRef(block: Block, target: Element | FragmentInstance): void {
-	const refs = activityRefState!;
-	if (refs.has(target)) return;
-	const owners = activityRefOwners!;
-	let owned = owners.get(block);
-	if (owned === undefined) {
-		// A Block's logical parent is immutable. Cache both positive and negative
-		// ownership, so unrelated ref-heavy trees never repeat the ancestor walk.
-		owned = findActivityRefOwners(block);
-		owners.set(block, owned);
-	}
-	if (owned) refs.set(target, { connected: null, hidden: false });
-}
-
-function registerActivityInsertionEffect(block: Block): void {
-	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const owner: ActivitySlot | undefined = current.rare?.activitySlot;
-		if (owner !== undefined && owner.block === current) owner.hasInsertionEffects = true;
-	}
-}
-
-function registerActivityPortal(block: Block): void {
-	let owners: ActivitySlot[] | null = null;
-	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
-		const owner = parent.rare?.activitySlot;
-		if (owner === undefined || owner.block !== parent) continue;
-		(owner.portals ??= new Set()).add(block);
-		(owners ??= []).push(owner);
-	}
-	if (owners !== null) {
-		const retained = owners;
-		(block.cleanups ??= []).push(() => {
-			for (const owner of retained) owner.portals!.delete(block);
-		});
-	}
 }
 
 function hideActivityHostRange(block: Block, hidden: ActivityHiddenDom): void {
@@ -48803,7 +46852,7 @@ export function switchBlock(
 // Control flow: forBlock with LIS-based keyed reconciliation
 // ---------------------------------------------------------------------------
 
-interface ForSlot {
+export interface ForSlot {
 	__kind: 'forBlockSlot';
 	// A detached host may still be live (Offscreen). The renderer owner tells
 	// rollback whether a cleanup has already disposed the whole list.
@@ -52338,529 +50387,4 @@ export function createIndependentHydrateActivator(
 		}
 		return root;
 	};
-}
-
-// ---------------------------------------------------------------------------
-// Resource hints — React DOM's preload / preinit / preconnect / prefetchDNS.
-// Each call inserts one deduped <link>/<script> into document.head (client).
-// Dedupe key = rel/kind + href, matching React's resource identity model.
-// ---------------------------------------------------------------------------
-
-const _resourceHints = new Set<string>();
-
-/** Known-hint check shared by insertHeadHint and cross-family suppression. */
-function hasHeadHint(key: string): boolean {
-	if (_resourceHints.has(key)) return true;
-	if (typeof document === 'undefined') return false;
-	// SSR dedupe: compare exact attribute VALUES rather than interpolating an
-	// href-derived key into a CSS selector. Quotes/brackets are valid URL text;
-	// treating them as selector syntax could throw before the hint is inserted.
-	const existing = document.head.querySelectorAll('[data-oct-hint]');
-	for (let i = 0; i < existing.length; i++) {
-		if (existing[i].getAttribute('data-oct-hint') === key) {
-			_resourceHints.add(key);
-			return true;
-		}
-	}
-	return false;
-}
-
-function insertHeadHint(key: string, build: () => Element): void {
-	if (typeof document === 'undefined' || hasHeadHint(key)) return;
-	const el = build();
-	el.setAttribute('data-oct-hint', key);
-	document.head.appendChild(el);
-	// Publish dedupe state only after every DOM operation succeeds, so a failed
-	// build/append cannot poison the key and suppress a later valid retry.
-	_resourceHints.add(key);
-}
-
-/**
- * Connection/integrity options seeded by preload for the matching preinit —
- * React carries these onto the initialized resource. Keyed `as:href`; the
- * preinit's own options win on collision. Test-only reset rides
- * resetFloatResourceState.
- */
-let _preloadTransfer: Map<string, Record<string, unknown>> | null = null;
-
-const TRANSFER_OPTION_KEYS = [
-	'crossOrigin',
-	'integrity',
-	'nonce',
-	'fetchPriority',
-	'referrerPolicy',
-] as const;
-
-function stashPreloadTransfer(kind: string, href: string, options: Record<string, unknown>): void {
-	let subset: Record<string, unknown> | null = null;
-	for (const k of TRANSFER_OPTION_KEYS) {
-		const v = options[k];
-		if (v != null) (subset ??= {})[k] = v;
-	}
-	if (subset !== null) (_preloadTransfer ??= new Map()).set(kind + ':' + href, subset);
-}
-
-function takePreloadTransfer(kind: string, href: string): Record<string, unknown> | null {
-	if (_preloadTransfer === null) return null;
-	const key = kind + ':' + href;
-	const found = _preloadTransfer.get(key);
-	if (found === undefined) return null;
-	_preloadTransfer.delete(key);
-	return found;
-}
-
-function guardHintHref(href: unknown): string | null {
-	return typeof href === 'string' && href !== '' ? href : null;
-}
-
-/** The option keys React recognizes on resource hints; everything else drops. */
-const KNOWN_HINT_OPTIONS = new Set([
-	'as',
-	'crossOrigin',
-	'integrity',
-	'nonce',
-	'type',
-	'fetchPriority',
-	'referrerPolicy',
-	'imageSrcSet',
-	'imageSizes',
-	'media',
-]);
-
-function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined): void {
-	if (opts == null) return;
-	for (const k in opts) {
-		if (!KNOWN_HINT_OPTIONS.has(k)) continue;
-		const v = (opts as any)[k];
-		if (v == null || v === false) continue;
-		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
-		const value = v === true ? '' : String(v);
-		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, value));
-	}
-}
-
-/** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
-export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (process.env.NODE_ENV !== 'production') {
-		const warning = resourceHintWarning('preload', href, options);
-		if (warning !== null) console.error(warning);
-	}
-	const guarded = guardHintHref(href);
-	if (guarded === null) return;
-	if (
-		options === null ||
-		typeof options !== 'object' ||
-		!options.as ||
-		typeof options.as !== 'string'
-	)
-		return;
-	const as = options.as;
-	const rawHref = guarded;
-	// Fonts must be fetched anonymously to be reusable by CSS — React enforces
-	// crossorigin="" regardless of the caller's value; so does Octane.
-	if (as === 'font') options = { ...options, crossOrigin: '' };
-	// Connection/integrity options seed the matching future preinit (React's
-	// resource map carries them onto the initialized resource).
-	// A deduped preload must retain the first call's options, even when that
-	// call supplied no transferable metadata.
-	if ((as === 'style' || as === 'script') && !_resourceHints.has('preload:' + as + ':' + rawHref))
-		stashPreloadTransfer(as, rawHref, options);
-	// After the matching external resource is already live (a Float resource or
-	// preinit), a preload adds nothing. Inline style resources share the sheet
-	// identity namespace but cannot consume an external stylesheet preload, so
-	// both entries must survive regardless of discovery order. Inspect DOM only
-	// on this uncommon identity collision and compare attribute values directly:
-	// href text may contain quotes or other CSS-selector metacharacters.
-	if (as === 'style' && resourceState().sheets.has(rawHref)) {
-		const styles = document.head.querySelectorAll('style[data-precedence]');
-		let hasInlineStyle = false;
-		for (let i = 0; i < styles.length; i++) {
-			if (styles[i].getAttribute('data-href') === rawHref) {
-				hasInlineStyle = true;
-				break;
-			}
-		}
-		if (!hasInlineStyle) return;
-	}
-	if (as === 'script' && resourceState().scripts.has(rawHref)) return;
-	// Image preloads with a srcset are keyed by the srcset+sizes pair, not the
-	// fallback href — two responsive preloads for one href stay distinct.
-	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
-	const key =
-		typeof imageSrcSet === 'string' && imageSrcSet !== ''
-			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
-			: 'preload:' + as + ':' + rawHref;
-	const safeHref = sanitizeURL(rawHref);
-	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
-	insertHeadHint(key, () => {
-		const l = document.createElement('link');
-		l.rel = 'preload';
-		// A responsive image preload matches on imagesrcset/imagesizes; the
-		// fallback href would double-fetch, so React (and Octane) omit it.
-		if (!omitHref) l.href = safeHref;
-		applyHintAttrs(l, options);
-		return l;
-	});
-}
-
-/**
- * React DOM `preinit(href, {as: 'style'|'script', …})` — executes/applies the
- * resource. Routes through the Float resource inserts so preinit and the
- * rendered resource forms share ONE identity: a preinit'd stylesheet joins the
- * precedence groups (`precedence` option honored, default `'default'`) and
- * dedupes against `<link rel="stylesheet" precedence>`; a preinit'd script
- * dedupes against `<script async src>`.
- */
-export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (process.env.NODE_ENV !== 'production') {
-		const warning = resourceHintWarning('preinit', href, options);
-		if (warning !== null) console.error(warning);
-	}
-	const guarded = guardHintHref(href);
-	if (guarded === null) return;
-	if (options === null || typeof options !== 'object') return;
-	const as = options?.as;
-	if (as !== 'style' && as !== 'script') return;
-	const rawHref = guarded;
-	const seeded = takePreloadTransfer(as, rawHref);
-	if (as === 'style') {
-		stylesheetResource({
-			...seeded,
-			...options,
-			as: undefined,
-			href: rawHref,
-			precedence: (options as any).precedence ?? 'default',
-		});
-	} else {
-		scriptResource({ ...seeded, ...options, as: undefined, href: undefined, src: rawHref });
-	}
-}
-
-/** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
-export function preconnect(href: string, options?: { crossOrigin?: string }): void {
-	if (process.env.NODE_ENV !== 'production') {
-		const warning = resourceHintWarning('preconnect', href, options);
-		if (warning !== null) console.error(warning);
-	}
-	const rawHref = guardHintHref(href);
-	if (rawHref === null) return;
-	if (options !== null && typeof options !== 'object') options = undefined;
-	else if (options?.crossOrigin !== undefined && typeof options.crossOrigin !== 'string') {
-		options = undefined;
-	}
-	const safeHref = sanitizeURL(rawHref);
-	const corsMode =
-		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
-	insertHeadHint('preconnect:' + corsMode + ':' + rawHref, () => {
-		const l = document.createElement('link');
-		l.rel = 'preconnect';
-		l.href = safeHref;
-		applyHintAttrs(l, options);
-		return l;
-	});
-}
-
-/** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
-export function prefetchDNS(href: string): void {
-	if (process.env.NODE_ENV !== 'production') {
-		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
-		if (warning !== null) console.error(warning);
-	}
-	const rawHref = guardHintHref(href);
-	if (rawHref === null) return;
-	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint('dns-prefetch:' + rawHref, () => {
-		const l = document.createElement('link');
-		l.rel = 'dns-prefetch';
-		l.href = safeHref;
-		return l;
-	});
-}
-
-/**
- * React DOM `preloadModule(href, options?)` — `<link rel="modulepreload">`.
- * Module preloads dedupe by href alone (React's resource identity for modules);
- * options apply as attributes through the shared lenient pass-through.
- */
-export function preloadModule(href: string, options?: Record<string, unknown>): void {
-	if (process.env.NODE_ENV !== 'production') {
-		const warning = resourceHintWarning('preloadModule', href, options);
-		if (warning !== null) console.error(warning);
-	}
-	const rawHref = guardHintHref(href);
-	if (rawHref === null) return;
-	if (options === null || typeof options !== 'object') options = undefined;
-	else if ('as' in options && typeof options.as !== 'string') {
-		options = { ...options, as: undefined };
-	}
-	// A module that preinitModule or a Float script already executes needs no preload.
-	if (hasHeadHint('module:' + rawHref) || resourceState().scripts.has(rawHref)) return;
-	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint('modulepreload:' + rawHref, () => {
-		const l = document.createElement('link');
-		l.rel = 'modulepreload';
-		l.href = safeHref;
-		applyHintAttrs(l, options);
-		return l;
-	});
-}
-
-/**
- * React DOM `preinitModule(href, options?)` — `<script type="module" async src>`.
- * Only the `script` destination exists for module preinit (React's contract);
- * any other `as` fails closed as a no-op rather than executing the module.
- */
-export function preinitModule(
-	href: string,
-	options?: { as?: string } & Record<string, unknown>,
-): void {
-	if (process.env.NODE_ENV !== 'production') {
-		const warning = resourceHintWarning('preinitModule', href, options);
-		if (warning !== null) console.error(warning);
-	}
-	const rawHref = guardHintHref(href);
-	if (rawHref === null) return;
-	if (options != null && typeof options !== 'object') return;
-	if ((options?.as ?? 'script') !== 'script') return;
-	// One executable per src: a live Float script (SSR-seeded or client-
-	// discovered) already satisfies this init.
-	const state = resourceState();
-	if (state.scripts.has(rawHref)) return;
-	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint('module:' + rawHref, () => {
-		const s = document.createElement('script');
-		s.type = 'module';
-		(s as HTMLScriptElement).src = safeHref;
-		(s as HTMLScriptElement).async = true;
-		applyHintAttrs(s, options ? { ...options, as: undefined } : undefined);
-		return s;
-	});
-	state.scripts.add(rawHref);
-}
-
-// ---------------------------------------------------------------------------
-// React Float resources — `<link rel="stylesheet" href precedence>` and
-// `<script async src>` rendered at a component's body root. Unlike per-site
-// hoisted head elements (headBlock), a resource is GLOBAL: keyed by href/src,
-// deduped across the whole page, stylesheet groups ordered by precedence
-// (first-encounter group order, appended within a group), and RETAINED after
-// unmount — unloading a stylesheet or re-running a script is never safe, so
-// React never removes resources and neither does Octane. The one exception is
-// a root that replaces a failed hydration: it discards the resources in the
-// server DOM it clears (hydrationFallbackNodes), as React's clearContainer
-// does for an element container, and since the dedupe state still counts
-// them, its client render does not insert them again. Suspend-until-loaded
-// ("suspensey" commit) is deliberately out of scope. The first client call
-// seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
-// so hydration never duplicates.
-// ---------------------------------------------------------------------------
-
-interface ResourceState {
-	sheets: Set<string>;
-	scripts: Set<string>;
-	/** Last live element of each stylesheet precedence group. */
-	tails: Map<string, Element>;
-	/** Tail of the LAST group in document order — where a new group starts. */
-	lastTail: Element | null;
-}
-
-let _resourceState: ResourceState | null = null;
-
-function resourceState(): ResourceState {
-	if (_resourceState !== null) return _resourceState;
-	const state: ResourceState = {
-		sheets: new Set(),
-		scripts: new Set(),
-		tails: new Map(),
-		lastTail: null,
-	};
-	if (typeof document !== 'undefined') {
-		// Stylesheet links and style resources share one identity namespace and
-		// one precedence-group ordering; querySelectorAll returns document order,
-		// so tails/lastTail land on each group's last member.
-		const sheets = document.querySelectorAll(
-			'link[rel="stylesheet"][data-precedence], style[data-precedence]',
-		);
-		for (let i = 0; i < sheets.length; i++) {
-			const el = sheets[i];
-			const href = el.getAttribute('href') ?? el.getAttribute('data-href');
-			if (href !== null) state.sheets.add(href);
-			state.tails.set(el.getAttribute('data-precedence') as string, el);
-			state.lastTail = el;
-		}
-		// One executable identity per src: classic Float scripts (data-oct-res)
-		// AND preinitModule scripts (data-oct-hint "module:…") share the set.
-		const scripts = document.querySelectorAll('script[data-oct-res], script[data-oct-hint]');
-		for (let i = 0; i < scripts.length; i++) {
-			const el = scripts[i];
-			const hint = el.getAttribute('data-oct-hint');
-			if (hint !== null && !hint.startsWith('module:')) continue;
-			const src = el.getAttribute('src');
-			if (src !== null) state.scripts.add(src);
-		}
-		// Streaming SSR can deliver Float sheets AFTER this state seeded (a late
-		// boundary's wave carrier arriving mid-hydration). The stream's inline
-		// $OCTRH hands each tag to this registrar once it exists, so one live
-		// authority keeps deduping and precedence ordering in both directions;
-		// before any client Float call the inline path inserts directly and the
-		// DOM seeding above adopts what it placed.
-		if (typeof window !== 'undefined') {
-			(window as any).$OCTFR = (el: Element): void => {
-				const href = el.getAttribute('href') ?? el.getAttribute('data-href');
-				if (href === null || state.sheets.has(href)) return;
-				insertPrecedenced(state, el, el.getAttribute('data-precedence') ?? '');
-				state.sheets.add(href);
-			};
-		}
-	}
-	return (_resourceState = state);
-}
-
-/** Insert a sheet-family resource into its precedence group (shared ordering). */
-function insertPrecedenced(state: ResourceState, el: Element, precedence: string): void {
-	const tail = state.tails.get(precedence);
-	if (tail !== undefined && tail.isConnected) {
-		// Existing group: append after its current tail.
-		tail.after(el);
-		if (state.lastTail === tail) state.lastTail = el;
-	} else if (state.lastTail !== null && state.lastTail.isConnected) {
-		// New group: starts after the last existing group, keeping groups
-		// contiguous in first-encounter order.
-		state.lastTail.after(el);
-		state.lastTail = el;
-	} else {
-		document.head.appendChild(el);
-		state.lastTail = el;
-	}
-	state.tails.set(precedence, el);
-}
-
-/** Handled by the resource insert itself; everything else applies as an attribute. */
-const RESOURCE_OWN_ATTRS = new Set(['precedence', 'href', 'src', 'rel', 'async']);
-
-function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
-	for (const k in attrs) {
-		if (RESOURCE_OWN_ATTRS.has(k)) continue;
-		const v = (attrs as any)[k];
-		if (v == null || v === false || typeof v === 'function') continue;
-		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
-		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)));
-	}
-}
-
-function warnInvalidStylesheetResource(reason: string): void {
-	let conflict: string;
-	if (reason === 'missing-href') {
-		conflict = 'requires a non-empty string `href`';
-	} else if (reason === 'empty-href') {
-		conflict = 'has an empty `href`; a stylesheet resource requires a non-empty string `href`';
-	} else {
-		const props = reason === 'onLoad+onError' ? '`onLoad` and `onError`' : '`' + reason + '`';
-		conflict = 'also has ' + props + ', which requires an independently managed stylesheet';
-	}
-	console.error(
-		'A <link rel="stylesheet"> with `precedence` ' +
-			conflict +
-			'. It will not be hoisted or deduplicated; remove the conflicting prop or `precedence`.',
-	);
-}
-
-/** Compiler target for `<link rel="stylesheet" href precedence>` (React Float). */
-export function stylesheetResource(
-	attrs: Record<string, unknown> | null,
-	invalidReason?: string,
-): void {
-	if (process.env.NODE_ENV !== 'production' && invalidReason !== undefined) {
-		warnInvalidStylesheetResource(invalidReason);
-		return;
-	}
-	if (typeof document === 'undefined' || attrs == null) return;
-	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
-	const state = resourceState();
-	// First instance wins, including its non-key props — matching React's
-	// resource identity (later differing props do not retarget a live sheet).
-	if (state.sheets.has(href)) return;
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
-	const l = document.createElement('link');
-	l.rel = 'stylesheet';
-	l.href = sanitizeURL(href);
-	l.setAttribute('data-precedence', precedence);
-	applyResourceAttrs(l, attrs);
-	insertPrecedenced(state, l, precedence);
-	state.sheets.add(href);
-}
-
-/**
- * Compiler target for `<style href precedence>` (React Float style resource).
- * Plain CSS keyed by href identity — shares the stylesheet dedupe namespace and
- * precedence-group ordering with link resources; the CSS ships as the tag's
- * text content and is NOT scoped (scoped CSS owns every other `<style>`).
- */
-export function styleResource(
-	attrs: Record<string, unknown> | null,
-	css: string,
-	development?: boolean,
-): void {
-	if (typeof document === 'undefined' || attrs == null) return;
-	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
-	const state = resourceState();
-	if (state.sheets.has(href)) return;
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		development === true &&
-		hasHeadHint('preload:style:' + href)
-	) {
-		console.error(
-			'A <style> resource with href "' +
-				href +
-				'" follows a stylesheet preload for the same href. ' +
-				'Inline styles cannot consume a stylesheet preload; remove the preload or use a stylesheet link.',
-		);
-	}
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
-	// textContent makes any CSS safe to insert client-side, but the SSR twin
-	// must fail closed on "</style" (raw-text serialization) — surface the same
-	// authoring diagnostic here so SPA-only development still sees it.
-	if (process.env.NODE_ENV !== 'production' && /<\/style/i.test(css)) {
-		console.error(
-			'A <style href precedence> resource contains "</style"; server rendering will skip it. ' +
-				'Load it as a stylesheet link instead.',
-		);
-	}
-	const s = document.createElement('style');
-	s.setAttribute('data-precedence', precedence);
-	s.setAttribute('data-href', href);
-	applyResourceAttrs(s, attrs);
-	s.textContent = css;
-	insertPrecedenced(state, s, precedence);
-	state.sheets.add(href);
-}
-
-/**
- * TEST-ONLY: forget all Float resource identity (this repo's test isolation).
- * Resources are page-global by contract — a real page never resets them.
- */
-export function resetFloatResourceState(): void {
-	_resourceState = null;
-	_preloadTransfer = null;
-	// The streamed-resource registrar closes over the discarded state.
-	if (typeof window !== 'undefined') delete (window as any).$OCTFR;
-}
-
-/** Compiler target for `<script async src>` resources (React Float). */
-export function scriptResource(attrs: Record<string, unknown> | null): void {
-	if (typeof document === 'undefined' || attrs == null) return;
-	const src = attrs.src;
-	if (typeof src !== 'string' || src === '') return;
-	const state = resourceState();
-	if (state.scripts.has(src)) return;
-	const s = document.createElement('script');
-	(s as HTMLScriptElement).src = sanitizeURL(src);
-	(s as HTMLScriptElement).async = true;
-	s.setAttribute('data-oct-res', '');
-	applyResourceAttrs(s, attrs);
-	document.head.appendChild(s);
-	state.scripts.add(src);
 }

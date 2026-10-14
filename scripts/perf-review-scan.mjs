@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RUNTIME = 'packages/octane/src/runtime.ts';
+const SCOPE = 'packages/octane/src/runtime/scope.ts';
 const HOT_CLASSES = ['BlockImpl', 'ScopeImpl', 'LiteBlockImpl'];
 const CONTEXT_LINES = 25;
 
@@ -506,15 +507,19 @@ function readOptions(argv) {
 }
 
 function collect(options) {
+	const localShapes = () => {
+		const file = existsSync(path.join(root(), SCOPE)) ? SCOPE : RUNTIME;
+		const source = path.join(root(), file);
+		return { file, source: existsSync(source) ? readFileSync(source, 'utf8') : null };
+	};
 	if (options.diff !== undefined) {
 		const text = readFileSync(options.diff === '-' ? 0 : options.diff, 'utf8');
-		const runtime = path.join(root(), RUNTIME);
-		// The local checkout stands in for the diff's runtime.ts, so its shape is
+		// The local checkout stands in for the diff's source, so its shape is
 		// only an approximation of the reviewed head's.
 		return {
 			text,
 			exact: false,
-			runtime: () => (existsSync(runtime) ? readFileSync(runtime, 'utf8') : null),
+			runtime: localShapes,
 		};
 	}
 	const unified = `--unified=${CONTEXT_LINES}`;
@@ -532,7 +537,14 @@ function collect(options) {
 				'packages',
 			]),
 			exact: true,
-			runtime: () => git(['show', `${options.head}:${RUNTIME}`]),
+			runtime: () => {
+				// Read only the reviewed revision. An earlier head may still own the
+				// classes in runtime.ts, irrespective of the current checkout.
+				const file = git(['ls-tree', '--name-only', options.head, '--', SCOPE]).trim()
+					? SCOPE
+					: RUNTIME;
+				return { file, source: git(['show', `${options.head}:${file}`]) };
+			},
 		};
 	}
 	const base = resolveBase(options.base);
@@ -545,14 +557,14 @@ function collect(options) {
 		const lines = readFileSync(path.join(root(), file), 'utf8').split('\n');
 		text += `\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => '+' + l).join('\n')}\n`;
 	}
-	return { text, exact: true, runtime: () => readFileSync(path.join(root(), RUNTIME), 'utf8') };
+	return { text, exact: true, runtime: localShapes };
 }
 
-/** Fields a diff declares in runtime.ts, which a stand-in checkout may not have yet. */
+/** Fields the reviewed diff declares, which a stand-in checkout may not have yet. */
 export function addedDeclarations(files) {
 	const fields = new Set();
 	for (const file of files) {
-		if (file.path !== RUNTIME) continue;
+		if (file.path !== RUNTIME && file.path !== SCOPE) continue;
 		for (const hunk of file.hunks) {
 			for (const entry of hunk) {
 				const match = entry.kind === 'add' && /^\s*declare\s+([\w$]+)\??\s*:/.exec(entry.text);
@@ -611,15 +623,16 @@ export function run(argv) {
 	const { text, exact, runtime } = collect(options);
 	const files = parseDiff(text);
 	const scanned = files.filter((file) => isScannedFile(file.path, options.only));
-	const source = scanned.some((file) => writesHotRecords(file.path)) ? runtime() : null;
+	const shape = scanned.some((file) => writesHotRecords(file.path)) ? runtime() : null;
+	const source = shape?.source ?? null;
 	const hotFields = source === null ? null : hotClassFields(source);
 	if (hotFields !== null && !exact)
 		for (const field of addedDeclarations(files)) hotFields.add(field);
 	const findings = scanFiles(files, { only: options.only, hotFields });
-	// The structural check needs the reviewed head's runtime.ts; a pasted diff
+	// The structural check needs the reviewed head's source; a pasted diff
 	// does not carry it, so use --head for that check.
-	if (exact && source !== null && scanned.some((file) => file.path === RUNTIME)) {
-		findings.push(...checkHotClasses(source));
+	if (exact && source !== null && scanned.some((file) => file.path === shape.file)) {
+		findings.push(...checkHotClasses(source, HOT_CLASSES, shape.file));
 	}
 	return findings;
 }

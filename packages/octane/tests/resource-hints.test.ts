@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
+	act,
+	createRoot,
 	preload,
 	preinit,
 	preloadModule,
@@ -9,6 +11,7 @@ import {
 	resetFloatResourceState,
 } from '../src/index.js';
 import * as Server from 'octane/server';
+import { SheetA, SheetHigh } from './_fixtures/float-resources.tsrx';
 
 // React DOM's resource hints: client calls insert deduped tags into
 // document.head; server calls collect into the render's head buffer. The
@@ -22,6 +25,47 @@ afterEach(() => {
 });
 
 describe('resource hints — client', () => {
+	it('public hints and compiled resources keep one precedence order across live and remounted roots', async () => {
+		const containers = [document.createElement('div'), document.createElement('div')];
+		document.body.append(...containers);
+		const roots = containers.map((container) => createRoot(container));
+		try {
+			preinit('/base.css', { as: 'style', precedence: 'default' });
+			const initial = document.head.querySelector('link[rel="stylesheet"][href="/base.css"]')!;
+			expect(initial).not.toBeNull();
+			await act(() => roots[0].render(SheetA, {}));
+			await act(() => roots[1].render(SheetHigh, {}));
+			preinit('/tail.css', { as: 'style', precedence: 'default' });
+			const sheets = () =>
+				Array.from(document.head.querySelectorAll('link[rel="stylesheet"][data-precedence]'));
+			expect(sheets().map((sheet) => sheet.getAttribute('href'))).toEqual([
+				'/base.css',
+				'/tail.css',
+				'/high.css',
+			]);
+			expect(sheets()[0]).toBe(initial);
+			await act(() => {
+				roots[0].unmount();
+				roots[1].unmount();
+			});
+			preload('/high.css', { as: 'style' });
+			preinit('/base.css', { as: 'style', precedence: 'other' });
+			const later = createRoot(containers[0]);
+			roots[0] = later;
+			await act(() => later.render(SheetA, {}));
+			expect(sheets().map((sheet) => sheet.getAttribute('href'))).toEqual([
+				'/base.css',
+				'/tail.css',
+				'/high.css',
+			]);
+			expect(sheets()[0]).toBe(initial);
+			expect(document.head.querySelector('link[rel="preload"][href="/high.css"]')).toBeNull();
+		} finally {
+			await act(() => roots.forEach((root) => root.unmount()));
+			containers.forEach((container) => container.remove());
+		}
+	});
+
 	it('preload inserts one deduped <link rel="preload">', () => {
 		preload('/font.woff2', { as: 'font', crossOrigin: 'anonymous' });
 		preload('/font.woff2', { as: 'font', crossOrigin: 'anonymous' }); // deduped
