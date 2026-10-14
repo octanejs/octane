@@ -204,34 +204,92 @@ describe('textarea children prop stays the live default across updates', () => {
 	// Per ReactDOMTextarea-test.js:186, removing a defaultValue writer clears the
 	// default. Children that take over afterwards own the whole default rather
 	// than appending to the removed writer's text.
-	it.each(MODES)('hands the default from defaultValue to children (%s)', async (mode) => {
-		const mounted = await mount(mode, 'SpreadChildren', SpreadChildren, {
-			rest: { defaultValue: 'X' },
-		});
-		try {
-			const textarea = mounted.container.querySelector('textarea')!;
-			expect(textarea.defaultValue).toBe('X');
+	it.each(
+		MODES.flatMap((mode) =>
+			['B', '', null, undefined].map((children) => ({
+				mode,
+				children,
+				expected: children ?? '',
+			})),
+		),
+	)(
+		'hands the default from defaultValue to children=$children ($mode)',
+		async ({ mode, children, expected }) => {
+			const mounted = await mount(mode, 'SpreadChildren', SpreadChildren, {
+				rest: { defaultValue: 'X' },
+			});
+			try {
+				const textarea = mounted.container.querySelector('textarea')!;
+				expect(textarea.defaultValue).toBe('X');
 
-			mounted.update({ rest: {} });
-			expect(textarea.defaultValue).toBe('');
+				mounted.update({ rest: {} });
+				expect(textarea.defaultValue).toBe('');
 
-			mounted.update({ rest: { defaultValue: 'Y' } });
-			expect(textarea.defaultValue).toBe('Y');
+				mounted.update({ rest: { defaultValue: 'Y' } });
+				expect(textarea.defaultValue).toBe('Y');
+				// Make the live value dirty in both client and hydration modes.
+				textarea.value = 'typed';
 
-			// A client mount writes the initial default through `.value`, so only the
-			// default is asserted here; the live value's dirty flag differs by mode.
-			mounted.update({ rest: { children: 'B' } });
-			expect(textarea.defaultValue).toBe('B');
+				mounted.update({ rest: { children } });
+				expect(textarea.defaultValue).toBe(expected);
+				expect(textarea.value).toBe('typed');
 
-			mounted.update({ rest: { children: 'C' } });
-			expect(textarea.defaultValue).toBe('C');
+				mounted.update({ rest: { children: 'C' } });
+				expect(textarea.defaultValue).toBe('C');
+				expect(textarea.value).toBe('typed');
 
-			mounted.update({ rest: {} });
-			expect(textarea.defaultValue).toBe('');
-		} finally {
-			mounted.unmount();
-		}
-	});
+				mounted.update({ rest: {} });
+				expect(textarea.defaultValue).toBe('');
+			} finally {
+				mounted.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		'retains a textarea default writer during unrelated host updates (%s)',
+		async (mode) => {
+			const mounted = await mount(mode, 'SpreadChildren', SpreadChildren, {
+				rest: { defaultValue: 'Y', title: 'a' },
+			});
+			try {
+				const textarea = mounted.container.querySelector('textarea')!;
+				const defaultText = textarea.firstChild;
+				expect(defaultText?.textContent).toBe('Y');
+				textarea.value = 'typed';
+				mounted.update({ rest: { defaultValue: 'Y', title: 'b' } });
+				expect(textarea.title).toBe('b');
+				expect(textarea.firstChild).toBe(defaultText);
+				expect(textarea.defaultValue).toBe('Y');
+				expect(textarea.value).toBe('typed');
+			} finally {
+				mounted.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		'retains a directly authored textarea default while absent children change (%s)',
+		async (mode) => {
+			const mounted = await mount(mode, 'ChildrenAttrCascade', ChildrenAttrCascade, {
+				value: undefined,
+				control: undefined,
+				fallback: 'Y',
+			});
+			try {
+				const textarea = mounted.container.querySelector('textarea')!;
+				const defaultText = textarea.firstChild;
+				expect(defaultText?.textContent).toBe('Y');
+				textarea.value = 'typed';
+				mounted.update({ value: null, control: undefined, fallback: 'Y' });
+				expect(textarea.firstChild).toBe(defaultText);
+				expect(textarea.defaultValue).toBe('Y');
+				expect(textarea.value).toBe('typed');
+			} finally {
+				mounted.unmount();
+			}
+		},
+	);
 });
 
 describe('textarea signal children beside a signal host prop', () => {

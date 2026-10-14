@@ -31434,6 +31434,7 @@ function applyFormControlValues(
 			// element.
 			else if (!first && !hasChildren && textarea.defaultValue !== '') textarea.defaultValue = '';
 		}
+		if (defaultValue == null) ctrl.dvv = UNCONTROLLED;
 		return;
 	}
 
@@ -39235,6 +39236,7 @@ function prepareOnlyChildText(
 	parent: Node,
 	value: string,
 	previous: Text | null,
+	prospectiveProps?: Record<string, unknown>,
 ): Text | null {
 	const text = value === '' ? null : (previous ?? document.createTextNode(value));
 	// A cloned host inside a renderer-owned preparation fragment has never
@@ -39254,6 +39256,21 @@ function prepareOnlyChildText(
 		parent,
 		accepted: false,
 		publish() {
+			// A prior textarea value writer created the native reset text.
+			// Hand it to this admitted child before inserting its own Text.
+			// The native default setter preserves a user's dirty live value.
+			if (
+				(parent as any).$$ctrl !== undefined &&
+				(parent as Element).localName === 'textarea' &&
+				(parent as Element).namespaceURI === HTML_NS &&
+				prospectiveProps?.value == null &&
+				prospectiveProps?.defaultValue == null &&
+				(text ?? previous)?.parentNode !== parent
+			) {
+				const ctrl = renderControlledState(parent as Element)!;
+				if (ctrl.v !== UNCONTROLLED || (ctrl.dvv !== UNCONTROLLED && ctrl.dvv != null))
+					(parent as HTMLTextAreaElement).defaultValue = '';
+			}
 			if (text === null) {
 				if (previous !== null) previous.remove();
 				else if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, parent);
@@ -39361,21 +39378,35 @@ export function childTextHole(
 			if (cachedNode === null) {
 				const hydration = hydrating ? activeHydration() : null;
 				if (hydration === null) {
-					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null);
+					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null, prospectiveProps);
 				}
 				// React treats a host whose child is a string or number as text content.
 				if ((vt === 'string' || vt === 'number') && hydrateKeepsServerContent(hydration, domParent))
 					return null;
 				return hydrateHempty(hydration, domParent, vt === 'string', siteLoc(parentScope, slotKey));
 			}
-			return prepareOnlyChildText(parentScope, slotKey, domParent, '', cachedNode);
+			return prepareOnlyChildText(
+				parentScope,
+				slotKey,
+				domParent,
+				'',
+				cachedNode,
+				prospectiveProps,
+			);
 		}
 		if (cachedNode !== null) {
-			return prepareOnlyChildText(parentScope, slotKey, domParent, str, cachedNode);
+			return prepareOnlyChildText(
+				parentScope,
+				slotKey,
+				domParent,
+				str,
+				cachedNode,
+				prospectiveProps,
+			);
 		}
 		const hydration = hydrating ? activeHydration() : null;
 		if (hydration === null) {
-			return prepareOnlyChildText(parentScope, slotKey, domParent, str, null);
+			return prepareOnlyChildText(parentScope, slotKey, domParent, str, null, prospectiveProps);
 		}
 		if (hydrateKeepsServerContent(hydration, domParent)) return null;
 		// A server range around an element, component, or list is slot content
