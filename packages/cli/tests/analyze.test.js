@@ -528,7 +528,7 @@ describe('octane analyze Strong coverage', () => {
 			'src/App.tsrx':
 				'"use strong";\n' +
 				"import { Button, Chart, Dialog, Menu, Sheet } from './ui';\n" +
-				"import Toolbar, { Badge, Panel, Wrapped } from '@kit/panel';\n" +
+				"import Toolbar, { Badge, Fancy, Panel, Wrapped } from '@kit/panel';\n" +
 				"import { useStore } from '@kit/store';\n" +
 				"import { format } from 'plain';\n" +
 				"import { Local } from './Local';\n" +
@@ -592,7 +592,13 @@ describe('octane analyze Strong coverage', () => {
 				'export const Panel = Panels.Panel;\n' +
 				'export { Pill as Badge };\n' +
 				'export default Toolbar;\n' +
-				'export const Wrapped = memo(Internal);\n',
+				'export const Wrapped = memo(Internal);\n' +
+				"export { Fancy } from './Fancy.tsrx';\n",
+			// A tagged template builds a new value; it does not rename its tag.
+			'node_modules/@kit/panel/src/Fancy.tsrx':
+				"import { styled } from './styled';\nexport const Fancy = styled`color: red`;\n",
+			'node_modules/@kit/panel/src/styled.ts':
+				'export const styled = (strings: TemplateStringsArray) => () => strings;\n',
 			'node_modules/@kit/panel/src/Panel.tsrx': 'export function Panel() @{ <section /> }\n',
 			'node_modules/@kit/panel/src/Toolbar.tsrx':
 				'export default function Toolbar() @{ <nav /> }\n',
@@ -618,7 +624,13 @@ describe('octane analyze Strong coverage', () => {
 			packages: [
 				{
 					name: '@kit/panel',
-					modules: ['src/Badge.tsrx', 'src/Panel.tsrx', 'src/Toolbar.tsrx', 'src/index.ts'],
+					modules: [
+						'src/Badge.tsrx',
+						'src/Fancy.tsrx',
+						'src/Panel.tsrx',
+						'src/Toolbar.tsrx',
+						'src/index.ts',
+					],
 					importers: ['src/App.tsrx'],
 				},
 				{ name: '@kit/store', modules: ['src/index.ts'], importers: ['src/App.tsrx'] },

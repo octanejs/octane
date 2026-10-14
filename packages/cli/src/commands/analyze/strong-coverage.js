@@ -154,16 +154,17 @@ const TEXT =
 	/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:\\.|[^'\\\n])*'?|"(?:\\.|[^"\\\n])*"?|`(?:\\[\s\S]|[^`\\])*`?/g;
 
 /**
- * `source` with comment and template literal text blanked, keeping its line
- * breaks, so a statement scanner never reads code that is only text, such as a
- * code sample in a template string. Quoted strings stay: a specifier is one,
- * and one ends at its line, so it cannot hold a statement.
+ * `source` with comment and template literal text blanked, so a statement
+ * scanner never reads code that is only text, such as a code sample in a
+ * template string. Line breaks stay, and so do backticks, so a tagged template
+ * never reads as a bare name. Quoted strings stay: a specifier is one, and one
+ * ends at its line, so it cannot hold a statement.
  *
  * @param {string} source
  */
 export function codeOnly(source) {
 	return source.replace(TEXT, (text) =>
-		text[0] === "'" || text[0] === '"' ? text : text.replace(/[^\n]/g, ' '),
+		text[0] === "'" || text[0] === '"' ? text : text.replace(/[^\n`]/g, ' '),
 	);
 }
 
