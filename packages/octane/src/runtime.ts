@@ -4000,8 +4000,9 @@ export function bagRecord(
 	if (next === null) {
 		// The render's first record stages the bag, inline: a changed row costs
 		// its recorders and `C` alone.
-		const state = bag.$;
+		let state = bag.$;
 		if (!changed && state <= BAG_SIZE) return null;
+		const size = state & BAG_SIZE;
 		if (state > BAG_SIZE) next = bagResume(bag);
 		else {
 			next = bag.next;
@@ -4009,23 +4010,24 @@ export function bagRecord(
 				// Packed from the start: the commit function reads every cell.
 				const commit = next;
 				next = bag.next = [];
-				for (let i = state + 3; i > 0; i--) next.push(bag);
-				next[state + 2] = commit;
-			} else next!.fill(bag, 0, state);
-			bag.$ = state | BAG_STAGED;
-			// A render that may be dropped queues `C` now; one that cannot commits
-			// it from the template's trailing bagDone.
-			const transaction = ROOT_RENDER_TRANSACTION;
-			if (
-				transaction !== null &&
-				!hydrating &&
-				(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
-			) {
-				next![state] = s;
-				next![state + 1] = transaction.ops.length;
-				bag.$ = state | BAG_STAGED | BAG_QUEUED;
-				transaction.ops.push(next![state + 2], bag);
-			}
+				for (let i = size + 3; i > 0; i--) next.push(bag);
+				next[size + 2] = commit;
+			} else next!.fill(bag, 0, size);
+			bag.$ = state |= BAG_STAGED;
+		}
+		// A render that may be dropped queues `C` now, a resumed bag included;
+		// one that cannot commits it from the template's trailing bagDone.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (
+			(state & BAG_QUEUED) === 0 &&
+			transaction !== null &&
+			!hydrating &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
+		) {
+			next![size] = s;
+			next![size + 1] = transaction.ops.length;
+			bag.$ = state | BAG_QUEUED;
+			transaction.ops.push(next![size + 2], bag);
 		}
 	}
 	next![cell] = changed ? value : bag;
@@ -4050,33 +4052,15 @@ function bagResume(bag: any): any[] {
 }
 
 /**
- * End of a template render whose records staged the bag without queueing it
- * (bagRecord): commit now, or queue `C`. `careful` tells `C` to journal its
- * handler writes for an open window and to keep the snapshots a dispatch in
- * flight holds (preserveDispatchedBundle); runCommitOps passes it too.
+ * End of a template render whose records staged the bag without queueing it,
+ * a render that cannot be dropped (bagRecord queues every other): commit now.
+ * `careful` tells `C` to journal its handler writes for an open window and to
+ * keep the snapshots a dispatch in flight holds (preserveDispatchedBundle);
+ * runCommitOps passes it too.
  */
 export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean) => void): void {
-	const state = bag.$;
-	if ((state & BAG_QUEUED) !== 0) return;
-	const size = state & BAG_SIZE;
-	const next = bag.next;
-	next[size] = s;
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (
-		transaction === null ||
-		hydrating ||
-		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
-	) {
-		commit(
-			bag,
-			TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
-		);
-		return;
-	}
-	const ops = transaction.ops;
-	next[size + 1] = ops.length;
-	bag.$ = state | BAG_QUEUED;
-	ops.push(commit, bag);
+	bag.next[bag.$ & BAG_SIZE] = s;
+	commit(bag, TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0));
 }
 
 /**
@@ -39188,7 +39172,9 @@ function recordHole(
 	// A first record stages the bag through bagRecord (the bag, which no value
 	// equals, forces it); the hole then writes its own pair of cells.
 	if (bag.$ > BAG_SIZE) {
-		if (next === null) next = bagResume(bag);
+		// Resume through bagRecord, which queues a bag no window queued yet; it
+		// rewrites the hole's pending value in place.
+		if (next === null) next = bagRecord(s, null, cell, bag.next[cell], bag)!;
 		if (next[cell] !== bag) last = next[cell];
 		if (next[cell + 1] !== bag) text = next[cell + 1];
 	}
