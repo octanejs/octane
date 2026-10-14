@@ -66,8 +66,11 @@ shape and `use*` spelling do not disable that optimization:
 new OctaneRspackPlugin({ strong: true });
 ```
 
-Dependencies keep their existing compatibility behavior. Any module can opt in
-on its own by putting `"use strong"` before its imports. Strong analysis is
+Strong compiles `.tsrx`, `.ts`, and `.js` modules, so convert application
+`.tsx` and `.jsx` modules to `.tsrx` first; the build reports
+`OCTANE_STRONG_TSX_MODULE` for any it reaches. Dependencies keep their existing
+compatibility behavior. Any `.tsrx`, `.ts`, or `.js` module can opt in on its
+own by putting `"use strong"` before its imports. Strong analysis is
 bounded: unknown calls are assumed pure, so live accessors must remain in a
 compatibility-mode consumer or receive an actual snapshot.
 

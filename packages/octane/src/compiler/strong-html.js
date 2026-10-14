@@ -1,7 +1,7 @@
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 
-export const STRONG_UNTRUSTED_HTML = 'OCTANE_STRONG_UNTRUSTED_HTML';
-export const STRONG_HTML_MESSAGE =
+const STRONG_UNTRUSTED_HTML = 'OCTANE_STRONG_UNTRUSTED_HTML';
+const STRONG_HTML_MESSAGE =
 	'Strong mode requires a TrustedHTML value for dangerouslySetInnerHTML. Use trustHTML() only for trusted or already sanitized HTML; trustHTML() does not sanitize its input.';
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
 const TRANSPARENT = new Set([
@@ -15,7 +15,7 @@ const TRANSPARENT = new Set([
 
 // Identifier escapes use Unicode; quoted property names also admit hex and
 // escaped letters. Ordinary escapes such as a newline cannot spell this key.
-export function mayHaveStrongHTML(source) {
+function mayHaveStrongHTML(source) {
 	return (
 		source.includes('dangerouslySetInnerHTML') ||
 		/\\(?:u|x|[dageoslySIHTML]|[\r\n\u2028\u2029])/.test(source)
@@ -31,7 +31,7 @@ function propertyName(node) {
 	return node?.type === 'Identifier' || node?.type === 'JSXIdentifier' ? node.name : node?.value;
 }
 
-export function checkStrongHTMLValue(expression, report) {
+function checkStrongHTMLValue(expression, report) {
 	const node = unwrap(expression);
 	if (!node) return;
 	switch (node.type) {
@@ -63,7 +63,7 @@ export function checkStrongHTMLValue(expression, report) {
 }
 // Resolve only a statically visible final writer. An unknown later spread
 // may replace an earlier raw value, so its actual type belongs to TypeScript.
-export function strongHTMLSpreadWriter(expression) {
+function strongHTMLSpreadWriter(expression) {
 	const node = unwrap(expression);
 	if (node?.type !== 'ObjectExpression') return undefined;
 	for (let index = node.properties.length - 1; index >= 0; index--) {

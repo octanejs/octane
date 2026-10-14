@@ -54,14 +54,14 @@ Platform listeners, intervals, observers, connections, and geolocation watches
 acquired in setup must be released by the cleanup
 (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`). Use `useLinkedState` for prop-driven state;
 use a lazy `useState` initializer or an explicit third `useReducer` initializer
-for deliberate initial capture. In `.tsrx`, render lists
-with keyed `@for` and stable item IDs, never position keys. Strong `.tsx` keeps
-standard keyed JSX mapping. DOM suppression props
+for deliberate initial capture. Strong compiles `.tsrx`, `.ts`, and `.js` only
+(a `.tsx` or `.jsx` module reports `OCTANE_STRONG_TSX_MODULE`); render lists
+with keyed `@for` and stable item IDs, never position keys. DOM suppression props
 and Octane compatibility imports (`flushSync`, `unstable_batchedUpdates`,
 `StrictMode`) are errors. Native text `onChange` warnings become errors.
 Strong DOM JSX requires `dangerouslySetInnerHTML={trustHTML(trustedString)}`;
 `trustHTML` marks trust and does not sanitize. Strong `.tsrx` selects branded JSX
-types automatically; plain TypeScript `.tsx` needs `jsxImportSource: octane/strong`.
+types automatically.
 
 In a module with `"use strong"` or application-wide Strong enabled, reading a
 `useRef` object's `current` while rendering is a compiler error

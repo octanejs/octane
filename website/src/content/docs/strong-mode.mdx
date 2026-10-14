@@ -80,23 +80,29 @@ memoization contract in detail. The replacements on this page use hooks from
 To try it in one module, put `"use strong"` at the top of the file, before imports.
 Comments and other directives may come first:
 
-```tsx
+```tsrx
 'use strong';
 
 import { useLinkedState } from 'octane';
 
-export function ProfileEditor({ user }) {
+export function ProfileEditor({ user }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 
-A `.tsx` file that starts with an `@jsxImportSource` pragma keeps the pragma first. The
-directive covers only its own module. Placed anywhere else, such as after an import, it
-enables nothing and reports `OCTANE_STRONG_DIRECTIVE_PLACEMENT`.
+The directive covers only its own module. Placed anywhere else, such as after an import,
+it enables nothing and reports `OCTANE_STRONG_DIRECTIVE_PLACEMENT`.
+
+Strong compiles `.tsrx`, `.ts`, and `.js` modules. JSX in a `.tsx` or `.jsx` module
+lowers to element descriptors rather than compiled templates, so a `.tsx` or `.jsx`
+module that Strong reaches reports
+[`OCTANE_STRONG_TSX_MODULE`](#octane-strong-tsx-module). Rename it to `.tsrx` and write
+its lists and branches with `@for`, `@if`, `@switch`, and `@try`.
 
 To make every application-owned module Strong, set `compiler.strong` in
-`octane.config.ts`:
+`octane.config.ts`. It reaches every application module, so convert the application's
+`.tsx` and `.jsx` modules first:
 
 ```ts
 // octane.config.ts
@@ -115,10 +121,7 @@ see [Build tools](/docs/build-tools#strong-mode). `octane analyze` reads
 config file where you can.
 
 Type checking selects Strong JSX types for Strong `.tsrx` modules automatically, so
-`dangerouslySetInnerHTML` needs a value from `trustHTML`. The `"use strong"` string
-cannot change TypeScript's JSX types for a `.tsx` module: set `jsxImportSource` to
-`octane/strong` in its tsconfig, or start the file with
-`/** @jsxImportSource octane/strong */`.
+`dangerouslySetInnerHTML` needs a value from `trustHTML`.
 
 <h2 id="adopt-strong-mode">Adopt it in an existing app</h2>
 
@@ -134,7 +137,8 @@ Move an existing app over in steps:
    `--strong-preview`, `--fix` only rewrites modules that are already Strong. Add
    `--dry-run` to list the fixes without writing them.
 3. **Opt modules in.** Add `"use strong"` to one module at a time, starting with the ones
-   the preview reports clean. Fix each finding with the
+   the preview reports clean. Convert a `.tsx` or `.jsx` module to `.tsrx` first; the
+   preview reports `OCTANE_STRONG_TSX_MODULE` for it. Fix each finding with the
    [migration recipes](#migration-recipes) and the
    [diagnostic reference](#diagnostic-reference). Each Strong compile error ends with a
    link to its entry on this page, `octane analyze` lists every finding in a file rather
@@ -145,8 +149,8 @@ Move an existing app over in steps:
    file exists, `octane analyze` fails when a module leaves Strong mode or a new module
    is added without it. Run `octane analyze --strong-baseline update` as modules convert.
    It only removes names, so a new exception is a reviewed edit to the file.
-5. **Switch the app on.** When every application module is Strong, set
-   `compiler: { strong: true }` in `octane.config.ts`. New modules are then Strong
+5. **Switch the app on.** When every application module is Strong, and so none is
+   `.tsx` or `.jsx`, set `compiler: { strong: true }` in `octane.config.ts`. New modules are then Strong
    without the directive. Dependencies and separate workspace packages keep their own
    mode, so opt their modules in with the directive.
 
@@ -171,26 +175,26 @@ Strong: `const ref = useLazyRef(() => new Store());`
 
 Reports [`OCTANE_STRONG_RENDER_REF_READ`](#octane-strong-render-ref-read) and [`OCTANE_STRONG_RENDER_REF_WRITE`](#octane-strong-render-ref-write).
 
-```tsx
+```tsrx
 'use strong';
 import { useRef } from 'octane';
 import { Store } from './store';
 
-export function Cart() {
+export function Cart() @{
 	const store = useRef<Store | null>(null);
 	if (store.current === null) store.current = new Store();
-	return <button onClick={() => store.current?.add()}>Add</button>;
+	<button onClick={() => store.current?.add()}>Add</button>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useLazyRef } from 'octane';
 import { Store } from './store';
 
-export function Cart() {
+export function Cart() @{
 	const store = useLazyRef(() => new Store());
-	return <button onClick={() => store.current.add()}>Add</button>;
+	<button onClick={() => store.current.add()}>Add</button>
 }
 ```
 
@@ -204,28 +208,28 @@ Strong: `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { i
 
 Reports [`OCTANE_STRONG_EFFECT_STATE_UPDATE`](#octane-strong-effect-state-update).
 
-```tsx
+```tsrx
 'use strong';
 import { useLayoutEffect, useRef, useState } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const el = useRef<HTMLSpanElement>(null);
 	const [width, setWidth] = useState(0);
 	useLayoutEffect(() => {
 		setWidth(el.current?.offsetWidth ?? 0);
 	});
-	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+	<span ref={el}>{text + ' (' + width + 'px)'}</span>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useLayoutSnapshot, useRef } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const el = useRef<HTMLSpanElement>(null);
 	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
-	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+	<span ref={el}>{text + ' (' + width + 'px)'}</span>
 }
 ```
 
@@ -239,32 +243,30 @@ Strong: `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { i
 
 Reports [`OCTANE_STRONG_REF_STATE_UPDATE`](#octane-strong-ref-state-update).
 
-```tsx
+```tsrx
 'use strong';
 import { useState } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const [width, setWidth] = useState(0);
-	return (
-		<span
-			ref={(el) => {
-				if (el) setWidth(el.offsetWidth);
-			}}
-		>
-			{text + ' (' + width + 'px)'}
-		</span>
-	);
+	<span
+		ref={(el) => {
+			if (el) setWidth(el.offsetWidth);
+		}}
+	>
+		{text + ' (' + width + 'px)'}
+	</span>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useLayoutSnapshot, useRef } from 'octane';
 
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const el = useRef<HTMLSpanElement>(null);
 	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
-	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+	<span ref={el}>{text + ' (' + width + 'px)'}</span>
 }
 ```
 
@@ -278,32 +280,32 @@ Strong: `const tick = useEffectEvent(onTick);`
 
 Reports [`OCTANE_STRONG_RENDER_REF_WRITE`](#octane-strong-render-ref-write).
 
-```tsx
+```tsrx
 'use strong';
 import { useEffect, useRef } from 'octane';
 
-export function Ticker({ onTick }: { onTick: () => void }) {
+export function Ticker({ onTick }: { onTick: () => void }) @{
 	const latest = useRef(onTick);
 	latest.current = onTick;
 	useEffect(() => {
 		const id = setInterval(() => latest.current(), 1000);
 		return () => clearInterval(id);
 	}, []);
-	return <span>Ticking</span>;
+	<span>Ticking</span>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useEffect, useEffectEvent } from 'octane';
 
-export function Ticker({ onTick }: { onTick: () => void }) {
+export function Ticker({ onTick }: { onTick: () => void }) @{
 	const tick = useEffectEvent(onTick);
 	useEffect(() => {
 		const id = setInterval(() => tick(), 1000);
 		return () => clearInterval(id);
 	});
-	return <span>Ticking</span>;
+	<span>Ticking</span>
 }
 ```
 
@@ -317,26 +319,26 @@ Strong: `const [name, setName] = useLinkedState(user.id, () => user.name);`
 
 Reports [`OCTANE_STRONG_EFFECT_STATE_UPDATE`](#octane-strong-effect-state-update).
 
-```tsx
+```tsrx
 'use strong';
 import { useEffect, useState } from 'octane';
 
-export function NameField({ user }: { user: { id: string; name: string } }) {
+export function NameField({ user }: { user: { id: string; name: string } }) @{
 	const [name, setName] = useState('');
 	useEffect(() => {
 		setName(user.name);
 	});
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useLinkedState } from 'octane';
 
-export function NameField({ user }: { user: { id: string; name: string } }) {
+export function NameField({ user }: { user: { id: string; name: string } }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 
@@ -350,15 +352,15 @@ Strong: `const wide = useSyncExternalStore(subscribe, getWide, () => false);`
 
 Reports [`OCTANE_STRONG_RENDER_AMBIENT_READ`](#octane-strong-render-ambient-read).
 
-```tsx
+```tsrx
 'use strong';
-export function Layout() {
+export function Layout() @{
 	const wide = window.innerWidth > 800;
-	return <main class={wide ? 'wide' : 'narrow'}>Content</main>;
+	<main class={wide ? 'wide' : 'narrow'}>Content</main>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useSyncExternalStore } from 'octane';
 
@@ -371,9 +373,9 @@ function getWide() {
 	return window.innerWidth > 800;
 }
 
-export function Layout() {
+export function Layout() @{
 	const wide = useSyncExternalStore(subscribe, getWide, () => false);
-	return <main class={wide ? 'wide' : 'narrow'}>Content</main>;
+	<main class={wide ? 'wide' : 'narrow'}>Content</main>
 }
 ```
 
@@ -387,31 +389,27 @@ Strong: `const id = useId();`
 
 Reports [`OCTANE_STRONG_RENDER_IMPURE_CALL`](#octane-strong-render-impure-call).
 
-```tsx
+```tsrx
 'use strong';
-export function Field({ label }: { label: string }) {
+export function Field({ label }: { label: string }) @{
 	const id = 'field-' + Math.random().toString(36).slice(2);
-	return (
-		<label for={id}>
-			{label}
-			<input id={id} />
-		</label>
-	);
+	<label for={id}>
+		{label as string}
+		<input id={id} />
+	</label>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useId } from 'octane';
 
-export function Field({ label }: { label: string }) {
+export function Field({ label }: { label: string }) @{
 	const id = useId();
-	return (
-		<label for={id}>
-			{label}
-			<input id={id} />
-		</label>
-	);
+	<label for={id}>
+		{label as string}
+		<input id={id} />
+	</label>
 }
 ```
 
@@ -425,26 +423,26 @@ Strong: `let ignore = false; load(id).then((p) => { if (!ignore) setName(p.name)
 
 Reports [`OCTANE_STRONG_EFFECT_DATA_FETCH`](#octane-strong-effect-data-fetch).
 
-```tsx
+```tsrx
 'use strong';
 import { useEffect, useState } from 'octane';
 import { load } from './api';
 
-export function Profile({ id }: { id: string }) {
+export function Profile({ id }: { id: string }) @{
 	const [name, setName] = useState('');
 	useEffect(() => {
 		load(id).then((profile) => setName(profile.name));
 	});
-	return <p>{name}</p>;
+	<p>{name as string}</p>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useEffect, useState } from 'octane';
 import { load } from './api';
 
-export function Profile({ id }: { id: string }) {
+export function Profile({ id }: { id: string }) @{
 	const [name, setName] = useState('');
 	useEffect(() => {
 		let ignore = false;
@@ -455,7 +453,7 @@ export function Profile({ id }: { id: string }) {
 			ignore = true;
 		};
 	});
-	return <p>{name}</p>;
+	<p>{name as string}</p>
 }
 ```
 
@@ -469,26 +467,26 @@ Strong: `const value = useSyncExternalStore(store.subscribe, store.get, store.ge
 
 Reports [`OCTANE_STRONG_WRITE_ONLY_STATE`](#octane-strong-write-only-state).
 
-```tsx
+```tsrx
 'use strong';
 import { useEffect, useReducer } from 'octane';
 import { store } from './store';
 
-export function Count() {
+export function Count() @{
 	const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 	useEffect(() => store.subscribe(() => forceUpdate()));
-	return <span>{String(store.get())}</span>;
+	<span>{String(store.get())}</span>
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { useSyncExternalStore } from 'octane';
 import { store } from './store';
 
-export function Count() {
+export function Count() @{
 	const count = useSyncExternalStore(store.subscribe, store.get, store.get);
-	return <span>{String(count)}</span>;
+	<span>{String(count)}</span>
 }
 ```
 
@@ -502,22 +500,22 @@ Strong: `dangerouslySetInnerHTML={trustHTML(sanitize(html))}`
 
 Reports [`OCTANE_STRONG_UNTRUSTED_HTML`](#octane-strong-untrusted-html).
 
-```tsx
+```tsrx
 'use strong';
 import { sanitize } from './sanitize';
 
-export function Article({ html }: { html: string }) {
-	return <article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />;
+export function Article({ html }: { html: string }) @{
+	<article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />
 }
 ```
 
-```tsx
+```tsrx
 'use strong';
 import { trustHTML } from 'octane';
 import { sanitize } from './sanitize';
 
-export function Article({ html }: { html: string }) {
-	return <article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />;
+export function Article({ html }: { html: string }) @{
+	<article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />
 }
 ```
 
@@ -779,7 +777,7 @@ A statically known `useEffectEvent` result is called during render.
 
 In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases.
 
-**Replacement.** Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.
+**Replacement.** Use `@for` with a stable item key. Data-only mapping remains valid.
 
 <h4 id="octane-strong-index-key">
 	<code>OCTANE_STRONG_INDEX_KEY</code>
@@ -821,6 +819,14 @@ In `.tsrx`, a named native event handler is declared outside the sole deeper nes
 
 **Replacement.** Move `"use strong"` to the top of the file, before imports or other code.
 
+<h4 id="octane-strong-tsx-module">
+	<code>OCTANE_STRONG_TSX_MODULE</code>
+</h4>
+
+A `.tsx` or `.jsx` module is Strong, through its own `"use strong"` directive or the application's `compiler.strong` setting. Its JSX lowers to element descriptors, which render through the generic descriptor renderer instead of compiled templates. Installed dependencies keep their own mode.
+
+**Replacement.** Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts` or `.js`; `root.render(App, props)` renders an entry point without JSX.
+
 <h4 id="octane-strong-suppression-prop">
 	<code>OCTANE_STRONG_SUPPRESSION_PROP</code>
 </h4>
@@ -849,9 +855,9 @@ Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, 
 	<code>OCTANE_STRONG_ELEMENT_API</code>
 </h4>
 
-Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.
+Imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.
 
-**Replacement.** Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.
+**Replacement.** Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid.
 
 <h3 id="diagnostics-dom">DOM ownership and trusted HTML</h3>
 

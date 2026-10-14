@@ -24724,21 +24724,9 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// Do not read nodeValue here: the binding paths already chose this write, and
 	// a DOM text getter can materialize an extra string on every update.
 	//
-	// An only-child text binding passes its host, so a Text that a page translator
-	// took out of it is put back (see resetOnlyChildHost). One parent read, with
-	// no string, confirms a cached Text. A binding that keeps only its host passes
-	// no node: htext seeded the Text as the host's first child, and a first child
-	// that is not a Text means a translator replaced it.
-	if (host !== undefined) {
-		if (node === null) {
-			node = host.firstChild as Text | null;
-			if (node === null || node.nodeType !== 3) {
-				node = document.createTextNode('');
-				resetOnlyChildHost(host, node);
-			}
-		} else if (node.parentNode !== host) resetOnlyChildHost(host, node);
-	}
-	const target = node as Text;
+	// Older compiled modules retain only the host. htext creates its Text child
+	// even for an empty value; preserve that calling convention on intact DOM.
+	const target = node ?? (host!.firstChild as Text);
 	//
 	// View-transition dirty tracking remains at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
@@ -24750,20 +24738,6 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	const text = typeof value === 'string' ? value : coerceText(value);
 	if (hiddenTextWriter !== null && hiddenTextWriter(target, text)) return;
 	target.nodeValue = text;
-}
-
-/**
- * An only-child text binding's Text has left its host: a page translator took
- * it out (Chrome's swaps it for nested `<font>` wrappers holding the
- * translation), so a write to it would never be seen. React's setTextContent
- * replaces such a host's content on the next update. Do the same, putting the
- * binding's own Text back when it still has one, so every cache holding that
- * node stays valid.
- */
-function resetOnlyChildHost(host: Node, node: Text | null): void {
-	const view = host;
-	view.textContent = '';
-	if (node !== null) view.appendChild(node);
 }
 
 const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-binding');
@@ -37483,13 +37457,9 @@ export function bindSignalChild(
 		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
 			? (previous as DirectSignalChildBinding)
 			: null;
-	let cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
-	if (cachedText === null && textToken) {
-		const first = getFirstChild(domParent);
-		// A page translator can replace the token's Text with its own nodes (see
-		// resetOnlyChildHost); clear them so the hole writes a fresh Text.
-		if (first !== null && first.nodeType === 3) cachedText = first as Text;
-	}
+	const cachedText =
+		prior?.text ??
+		(previous instanceof Text ? previous : textToken ? (getFirstChild(domParent) as Text) : null);
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
@@ -37530,15 +37500,7 @@ export function bindSignalChild(
 			}
 		}
 		const text = onlyChild
-			? childTextHole(
-					parentScope,
-					slotKey,
-					domParent,
-					value,
-					cachedText,
-					prospectiveProps,
-					textToken,
-				)
+			? childTextHole(parentScope, slotKey, domParent, value, cachedText, prospectiveProps)
 			: (bindingMarker === undefined
 					? childSlot(
 							parentScope,
@@ -38092,16 +38054,9 @@ export function childSlot(
 							unmountSlot(next, true);
 							return;
 						}
-						// A markerless only-child Text may have been replaced by a
-						// page translator. Retire its displayed replacement on commit,
-						// just as a subsequent text update would reset that host.
-						const translatedText =
-							applied.ownerHost !== null &&
-							applied.text !== null &&
-							applied.text.parentNode !== domParent;
 						const first =
 							applied.ownerHost !== null
-								? applied.block === null && applied.forSlot === null && !translatedText
+								? applied.block === null && applied.forSlot === null
 									? (applied.text ?? applied.hostNode)
 									: getFirstChild(domParent)
 								: applied.start !== null
@@ -38109,7 +38064,7 @@ export function childSlot(
 									: (applied.text ?? applied.hostNode ?? applied.block?.startMarker ?? applied.end);
 						const after =
 							applied.ownerHost !== null
-								? applied.block === null && applied.forSlot === null && !translatedText
+								? applied.block === null && applied.forSlot === null
 									? (first?.nextSibling ?? null)
 									: null
 								: (applied.end ??
@@ -39097,14 +39052,10 @@ function prepareChildText(
 		publish: () => {
 			const old = state.text;
 			if (text === null) {
-				if (old !== null && state.ownerHost === parent) removeOnlyChildText(parent, old);
-				else if (old?.parentNode === parent) parent.removeChild(old);
+				if (old?.parentNode === parent) parent.removeChild(old);
 			} else {
 				if (text.data !== value) text.data = value;
-				if (text.parentNode !== parent) {
-					if (state.ownerHost === parent && old !== null) resetOnlyChildHost(parent, text);
-					else parent.insertBefore(text, state.end);
-				}
+				if (text.parentNode !== parent) parent.insertBefore(text, state.end);
 			}
 			state.text = text;
 			prepared.accepted = true;
@@ -39284,7 +39235,6 @@ function prepareOnlyChildText(
 	parent: Node,
 	value: string,
 	previous: Text | null,
-	previousTextToken = false,
 ): Text | null {
 	const text = value === '' ? null : (previous ?? document.createTextNode(value));
 	// A cloned host inside a renderer-owned preparation fragment has never
@@ -39292,13 +39242,9 @@ function prepareOnlyChildText(
 	// tree; the enclosing slot still decides whether the tree can be admitted.
 	if (!hydrationStarted && PREPARED_PARENTS.has(parent.getRootNode())) {
 		if (text === null) {
-			if (previous !== null) removeOnlyChildText(parent, previous);
-			else if (previousTextToken) resetOnlyChildHost(parent, null);
+			previous?.remove();
 		} else {
-			if (text.parentNode !== parent) {
-				if (parent.firstChild === null) parent.appendChild(text);
-				else resetOnlyChildHost(parent, text);
-			}
+			if (text.parentNode !== parent) parent.appendChild(text);
 			if (text.data !== value) text.data = value;
 		}
 		return text;
@@ -39309,11 +39255,13 @@ function prepareOnlyChildText(
 		accepted: false,
 		publish() {
 			if (text === null) {
-				if (previous !== null) removeOnlyChildText(parent, previous);
-				else if (previousTextToken) resetOnlyChildHost(parent, null);
+				if (previous !== null) previous.remove();
 				else if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, parent);
 			} else {
-				if (text.parentNode !== parent) resetOnlyChildHost(parent, text);
+				if (text.parentNode !== parent) {
+					if (KEPT_TEXT_CONTENT !== null) clearKeptTextContent(KEPT_TEXT_CONTENT, parent);
+					parent.appendChild(text);
+				}
 				if (text.data !== value) text.data = value;
 			}
 			prepared.accepted = true;
@@ -39326,15 +39274,6 @@ function prepareOnlyChildText(
 	};
 	prepareSlot(scope, scope.slots, 'text$' + slotKey, prepared);
 	return text;
-}
-
-// The markerless Text leaves an only-child hole. When a translator already took
-// it out, its replacement is what the host shows; clear that, as React resets a
-// host's text content.
-function removeOnlyChildText(host: Node, node: Text): void {
-	const view = node;
-	if (view.parentNode === host) view.remove();
-	else resetOnlyChildHost(host, null);
 }
 
 // Slow path for an ONLY-CHILD `{expr}` value hole (the value hole is the sole
@@ -39355,7 +39294,7 @@ export function childTextHole(
 	value: unknown,
 	cachedNode: Text | null,
 	prospectiveProps?: Record<string, unknown>,
-	previousTextToken = false,
+	_previousTextToken = false,
 	previous?: unknown,
 ): Text | null {
 	// Calls that cannot author raw HTML can supply their accepted primitive.
@@ -39422,7 +39361,7 @@ export function childTextHole(
 			if (cachedNode === null) {
 				const hydration = hydrating ? activeHydration() : null;
 				if (hydration === null) {
-					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null, previousTextToken);
+					return prepareOnlyChildText(parentScope, slotKey, domParent, '', null);
 				}
 				// React treats a host whose child is a string or number as text content.
 				if ((vt === 'string' || vt === 'number') && hydrateKeepsServerContent(hydration, domParent))
@@ -39455,10 +39394,8 @@ export function childTextHole(
 	// server's `<!--[-->` range (ownsHost is ignored under hydration: server-pair
 	// adoption wins, as in M2), or builds the value as a client mount would when
 	// the server rendered text or nothing there.
-	if (state === undefined && (cachedNode !== null || previousTextToken)) {
-		// A primitive token owns the only-child position even if a translator
-		// replaced its Text before we switch to a component or element.
-		// Transfer that displayed node to the slot; acceptance retires it.
+	if (state === undefined && cachedNode !== null) {
+		// Transfer the displayed primitive to the slot; acceptance retires it.
 		const applied: ChildSlot = {
 			__kind: 'childSlot',
 			start: null,
@@ -39471,7 +39408,7 @@ export function childTextHole(
 			currentComp: null,
 			currentIsBodyFn: false,
 			forSlot: null,
-			hostNode: cachedNode === null ? getFirstChild(domParent) : null,
+			hostNode: null,
 			portal: null,
 		};
 		parentScope.slots[slotKey] = applied;

@@ -24,10 +24,11 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
    `--strong-preview`, `--fix` only rewrites modules that are already Strong.
    Review the diff and run the tests before going further.
 3. **Opt in one module.** Put `"use strong"` at the top of the file, before
-   imports. A `.tsx` file keeps a leading `@jsxImportSource` pragma first and
-   needs `jsxImportSource: octane/strong` (tsconfig or pragma) for Strong JSX
-   types; `.tsrx` selects them automatically. Start with modules the preview
-   reported clean, then leaf components, then their parents.
+   imports. Strong compiles `.tsrx`, `.ts`, and `.js` only, so first convert a
+   `.tsx` or `.jsx` module to `.tsrx` (`OCTANE_STRONG_TSX_MODULE`): its markup
+   becomes template JSX and its `.map()` lists become keyed `@for` blocks.
+   `.tsrx` selects the Strong JSX types automatically. Start with modules the
+   preview reported clean, then leaf components, then their parents.
 4. **Fix each finding by code.** `octane analyze <file>` lists every finding in
    the file, not only the first error. For each code, call
    `octane_strong_explain` and apply its replacement or recipe. A finding's

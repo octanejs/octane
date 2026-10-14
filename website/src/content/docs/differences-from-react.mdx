@@ -107,7 +107,10 @@ Strong mode opts into immutable render snapshots and helps catch detectable
 state, ref, and purity violations. Enable it for a single module with `"use strong"` before its
 imports, or across your application with `compiler: { strong: true }` in
 `octane.config.ts`. The [Strong mode guide](/docs/strong-mode) covers adoption,
-replacements for the React idioms it rejects, and every diagnostic.
+replacements for the React idioms it rejects, and every diagnostic. Strong
+compiles `.tsrx`, `.ts`, and `.js` modules; a `.tsx` or `.jsx` module it reaches
+is a compile error (`OCTANE_STRONG_TSX_MODULE`), because that JSX lowers to
+element descriptors instead of compiled templates.
 
 The compiler rejects state updates during render, synchronous state updates
 while an effect is being set up, and reads and writes of `ref.current` during

@@ -1,11 +1,4 @@
 import { createLexicalAnalysis } from './compile-universal.js';
-import {
-	checkStrongHTMLValue,
-	strongHTMLSpreadWriter,
-	STRONG_UNTRUSTED_HTML,
-	STRONG_HTML_MESSAGE,
-	mayHaveStrongHTML,
-} from './strong-html.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 const COMPAT_EXPORTS = new Set(['flushSync', 'unstable_batchedUpdates', 'StrictMode']);
@@ -39,16 +32,7 @@ export function createStrongTemplatePolicy({
 	const pending = [];
 	const seen = new WeakMap();
 	const jsxReturns = new WeakMap();
-	// Import and property names may contain Unicode/hex/identity escapes or
-	// quoted line continuations. Newline string escapes cannot spell these names.
-	const mayHaveHTML =
-		mayHaveStrongHTML(source) &&
-		(source.includes('createElement') || /\\(?:u|x|[ceaElm]|[\r\n\u2028\u2029])/.test(source));
 	const templateDialect = /\.tsrx(?:[?#]|$)/.test(filename);
-	// Descriptors render through the generic descriptor renderer instead of
-	// compiled templates. `.tsx` and `.jsx` returns lower to descriptors by
-	// design, so only the other dialects reject the APIs.
-	const elementChecks = !/\.[jt]sx(?:[?#]|$)/.test(filename);
 	const domAt =
 		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
 	function add(code, node, message) {
@@ -62,7 +46,7 @@ export function createStrongTemplatePolicy({
 		add(
 			'OCTANE_STRONG_ELEMENT_API',
 			node,
-			`\`${name}\` builds or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates. Write template JSX, pass the component itself (\`icon={Plus}\`), or pass a \`() => @{ … }\` render function; Strong \`.tsx\` modules may keep descriptor APIs.`,
+			`\`${name}\` builds or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates. Write template JSX, pass the component itself (\`icon={Plus}\`), or pass a \`() => @{ … }\` render function.`,
 		);
 	}
 	function namespaceAccess(name, node) {
@@ -72,7 +56,7 @@ export function createStrongTemplatePolicy({
 				node,
 				`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
 			);
-		else if (elementChecks && ELEMENT_EXPORTS.has(name)) elementApi(name, node);
+		else if (ELEMENT_EXPORTS.has(name)) elementApi(name, node);
 	}
 	// `[value]`, but not `[a, b]`, `[...rows]`, or a hole.
 	function singleItemArray(expression) {
@@ -271,7 +255,7 @@ export function createStrongTemplatePolicy({
 						specifier,
 						`\`${name}\` is a compatibility API. Strong mode uses Octane's normal scheduling and component semantics; remove this import.`,
 					);
-				else if (elementChecks && elements?.has(name)) elementApi(name, specifier);
+				else if (elements?.has(name)) elementApi(name, specifier);
 			}
 		} else if (node.type === 'VariableDeclaration') {
 			for (const declaration of node.declarations) {
@@ -299,30 +283,12 @@ export function createStrongTemplatePolicy({
 				namespaceAccess(name, node);
 		} else if (node.type === 'CallExpression') {
 			const callee = unwrap(node.callee);
-			const calleeBinding =
-				mayHaveHTML && callee?.type === 'Identifier' ? resolve(scope, callee.name) : null;
-			const receiver = callee?.type === 'MemberExpression' ? unwrap(callee.object) : null;
 			const name =
 				callee?.type === 'MemberExpression'
 					? callee.computed
 						? staticPrimitiveValue(callee.property, scope)
 						: callee.property?.name
 					: null;
-			const isElementFactory =
-				mayHaveHTML &&
-				((calleeBinding?.kind === 'hook' && calleeBinding.hook === 'createElement') ||
-					(name === 'createElement' &&
-						receiver?.type === 'Identifier' &&
-						resolve(scope, receiver.name)?.kind === 'namespace'));
-			if (
-				isElementFactory &&
-				typeof staticPrimitiveValue(node.arguments[0], scope) === 'string' &&
-				domAt(node)
-			) {
-				checkStrongHTMLValue(strongHTMLSpreadWriter(node.arguments[1]), (value) =>
-					add(STRONG_UNTRUSTED_HTML, value, STRONG_HTML_MESSAGE),
-				);
-			}
 			if (
 				templateDialect &&
 				callee?.type === 'MemberExpression' &&

@@ -1,3 +1,5 @@
+'use strong';
+
 // Small, real Octane components embedded throughout the Core APIs guide.
 // Each demo keeps one concept tangible without depending on a backend.
 //
@@ -719,20 +721,8 @@ export function TransitionDemo() @{
 		value: DASHBOARD_REPORTS.overview,
 	});
 	const [isPending, startTransition] = useTransition();
-	const pendingTab = useRef<DashboardTab | null>(null);
-	const isLoading = isPending && pendingTab.current !== null;
-
-	const openReport = (next: DashboardTab) => {
-		if (selection.id === next || pendingTab.current !== null) return;
-
-		const request = loadDashboardReport(next);
-		pendingTab.current = next;
-		startTransition(async () => {
-			setSelection({ id: next, value: request });
-			await request;
-			pendingTab.current = null;
-		});
-	};
+	const [pendingTab, setPendingTab, getPendingTab] = useState<DashboardTab | null>(null);
+	const isLoading = isPending && pendingTab !== null;
 
 	<DemoFrame
 		id="transition"
@@ -749,6 +739,17 @@ export function TransitionDemo() @{
 			</style>
 			<section aria-busy={isLoading}>
 				@{
+					const openReport = (next: DashboardTab) => {
+						if (selection.id === next || getPendingTab() !== null) return;
+
+						const request = loadDashboardReport(next);
+						setPendingTab(next);
+						startTransition(async () => {
+							setSelection({ id: next, value: request });
+							await request;
+							setPendingTab(null);
+						});
+					};
 					<>
 						<style>
 							.demo-tabs {
@@ -788,7 +789,7 @@ export function TransitionDemo() @{
 									class={[
 										'demo-tab',
 										selection.id === tab && 'demo-tab-selected',
-										isLoading && pendingTab.current === tab && 'demo-tab-pending',
+										isLoading && pendingTab === tab && 'demo-tab-pending',
 									]}
 									role="tab"
 									aria-selected={selection.id === tab}
@@ -802,10 +803,10 @@ export function TransitionDemo() @{
 					</>
 				}
 				<p class="demo-status transition-status" aria-live="polite">
-					@if (isLoading && pendingTab.current !== null) {
+					@if (isLoading && pendingTab !== null) {
 						<span>
 							{'Loading ' +
-								DASHBOARD_REPORTS[pendingTab.current].label +
+								DASHBOARD_REPORTS[pendingTab].label +
 								' — ' +
 								DASHBOARD_REPORTS[selection.id].label +
 								' stays on screen.'}

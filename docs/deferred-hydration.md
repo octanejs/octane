@@ -692,26 +692,34 @@ with their current owner. An application must stop previous manual writers for
 the channels it hands over. Template compatibility is not document or request
 authorization: retain the enclosing application's lifetime and stream fencing.
 
-Fixed and addressed views tolerate extra Text nodes containing only ASCII tab,
-line feed, form feed, carriage return or space in a closed child list; empty
-Text nodes are included. These nodes remain untouched, while other text,
-comments and unexpected elements still fail topology validation.
+Framework-owned text and closed child lists must retain their server topology.
+Additional Text nodes, including empty or whitespace-only nodes, comments, and
+unexpected elements fail topology validation. A browser translator replacing
+text with `<font>` wrappers is a mismatch: error #318 for a fixed view, #321 for
+an addressed view, and #286 for a structural program. Explicitly unbound or
+opaque content retains its existing ownership rules.
 
-Browser page translation is the one text rewrite adoption accepts. Chrome's
-Translate replaces each translated Text node with `<font>` wrappers. Adoption
-keeps that text as it is and writes nothing to it, so the page neither flashes
-back to its source language nor shifts. This holds for a fixed view's text
-leaves and for a structural program's static text and text holes, including
-those in conditional arms and list items. Bound text is replaced with plain
-text the next time its value changes, and the browser may translate it again;
-static text keeps its translation. If the data changed between server rendering
-and adoption, translated bound text shows its server value until that change.
-Any other element in place of server text is still a topology mismatch: error
-#318 for a fixed view, #321 for one with unbound children, and #286 for a
-structural program. To keep text untranslated, such as names, codes or prices,
-add `translate="no"` (or `class="notranslate"`) to its element. That is an
-ordinary static attribute with no runtime cost. The compiler never adds it for
-you, since it would make all dynamic text untranslatable.
+External tools rewriting framework-owned DOM are unsupported both before
+adoption and after activation. Octane does not preserve translated wrappers or
+repair text nodes that an external tool displaces. Keep localization under
+application control and opt owned content out of browser translation in the
+initial server-rendered document, before tools can rewrite deferred or hidden
+views:
+
+```html
+<html translate="no">
+  <head>
+    <meta name="google" content="notranslate" />
+  </head>
+  <!-- Application document -->
+</html>
+```
+
+`translate="no"` can instead be applied to the relevant owned roots when other
+content should remain translatable. The Google meta tag opts the document out
+of Google page translation. These controls depend on the tool honoring them;
+they cannot prevent arbitrary extensions from mutating the DOM. The application
+adds these static attributes and metadata; the compiler does not add them.
 
 `unbound(value)` marks an explicitly external-owned attribute in an opted-in
 view. The ordinary component uses its value during SSR and normal rendering;
