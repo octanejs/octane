@@ -29,7 +29,13 @@ import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { selectMinimalScenarios } from './minimal-gates.mjs';
-import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
+import {
+	exportedNames,
+	isRuntimeModule,
+	renderedRuntimeExports,
+	resolveDeclarationRanges,
+	retainedDeclarations,
+} from './hydration-free-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -188,6 +194,12 @@ const productionDefines = {
 	'process.env.NODE_ENV': JSON.stringify('production'),
 };
 const compiler = createOctaneCompiler({ root: directory });
+// runtime.ts's exports: the names scenarios assert a build renders or drops.
+const runtimeSurface = exportedNames(
+	parseAst(fs.readFileSync(path.join(repository, 'packages/octane/src/runtime.ts'), 'utf8'), {
+		lang: 'ts',
+	}),
+);
 const stat = (value) => ({ median: value, min: value, samples: 1 });
 const forbidden = [
 	['React', /\/node_modules\/react(?:-dom)?\//],
@@ -495,9 +507,6 @@ async function buildSplitScenario(scenario, entry) {
 	);
 	const entryChunk = chunks.find((chunk) => chunk.isEntry);
 	const modules = chunks.flatMap((chunk) => Object.keys(chunk.modules));
-	const runtimeModule = Object.keys(runtime.modules).find((id) =>
-		id.endsWith('/packages/octane/src/runtime.ts'),
-	);
 	const files = chunks.map((chunk) => chunk.code);
 	return {
 		code: files.join('\n'),
@@ -516,7 +525,7 @@ async function buildSplitScenario(scenario, entry) {
 			},
 		],
 		modules,
-		runtimeExports: runtime.modules[runtimeModule].renderedExports,
+		runtimeExports: renderedRuntimeExports(runtime.modules, runtimeSurface),
 	};
 }
 
@@ -624,7 +633,6 @@ async function buildScenario(scenario, entry) {
 	const emittedModules = Object.entries(chunk.modules)
 		.filter(([, module]) => module.renderedLength > 0)
 		.map(([id]) => id);
-	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
 	const serverRuntimeModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/runtime.server.ts'),
 	);
@@ -636,7 +644,10 @@ async function buildScenario(scenario, entry) {
 		code: chunk.code,
 		modules,
 		emittedModules,
-		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
+		runtimeExports: renderedRuntimeExports(
+			Object.fromEntries(modules.map((id) => [id, chunk.modules[id]])),
+			runtimeSurface,
+		),
 		serverRuntimeExports: serverRuntimeModule
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
@@ -740,7 +751,7 @@ try {
 				`${name}: a client that never hydrates retained the binding-marker validator`,
 			);
 		}
-		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
+		const hasRuntime = modules.some(isRuntimeModule);
 		const hasServerRuntime = modules.some((module) =>
 			module.endsWith('/packages/octane/src/runtime.server.ts'),
 		);

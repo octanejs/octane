@@ -246,7 +246,7 @@ export function verifyBundleInputs(scenario, inputs, engineDependency = 'vendore
 	}
 	if (scenario.id === 'engine' || scenario.rendererFree) {
 		const renderer = names.filter((name) =>
-			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|signals\/native-read-(?:client|server)\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
+			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|runtime\/[^/]+\.[jt]s$|signals\/native-read-(?:client|server)\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
 				name,
 			),
 		);
@@ -318,9 +318,12 @@ export function verifyBundleInputs(scenario, inputs, engineDependency = 'vendore
 		}
 	}
 	if (scenario.id === 'native-client' || scenario.id === 'native-server') {
-		const suffix = scenario.id === 'native-client' ? '/src/runtime.ts' : '/src/runtime.server.ts';
+		const native =
+			scenario.id === 'native-client'
+				? /\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/
+				: /\/src\/runtime\.server\.ts$/;
 		assert.ok(
-			names.some((name) => name.endsWith(suffix)),
+			names.some((name) => native.test(name)),
 			`${scenario.id}: native runtime missing`,
 		);
 	}

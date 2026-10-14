@@ -8,12 +8,13 @@ import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const sourceRoot = resolve(process.argv.slice(2).find((arg) => !arg.startsWith('--')) || repo);
 const runtimeFile = join(sourceRoot, 'packages/octane/src/runtime.ts');
 const fixtureFile = join(repo, 'packages/octane/tests/_fixtures/suspense-preserves-dom.tsrx');
-const runtimeSource = await readFile(runtimeFile, 'utf8');
+const runtimeSource = readClientRuntime(runtimeFile);
 const fixtureSource = await readFile(fixtureFile, 'utf8');
 const { compile } = await import(
 	pathToFileURL(join(sourceRoot, 'packages/octane/src/compiler/compile.js'))

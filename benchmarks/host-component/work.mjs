@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 import ts from 'typescript';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const distRoot = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -174,9 +175,7 @@ async function main() {
 			suite: 'host-component',
 			node: process.version,
 			browser: browser.version(),
-			runtimeHash: sha256(
-				readFileSync(new URL('../../packages/octane/src/runtime.ts', import.meta.url)),
-			),
+			runtimeHash: sha256(readClientRuntime()),
 			bundleHash: sha256(source),
 			bundleBytes: Buffer.byteLength(source),
 			trampolineHash,

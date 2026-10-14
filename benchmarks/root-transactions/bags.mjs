@@ -3,18 +3,19 @@
 // Neither variant changes the journal's values, checkpoints, or rollback.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const sourceRoot = resolve(process.argv[2] || repo);
 const sourceFile = join(sourceRoot, 'packages/octane/src/runtime.ts');
-const runtimeSource = await readFile(sourceFile, 'utf8');
+const runtimeSource = readClientRuntime(sourceFile);
 const { compile } = await import(
 	pathToFileURL(join(sourceRoot, 'packages/octane/src/compiler/compile.js'))
 );
