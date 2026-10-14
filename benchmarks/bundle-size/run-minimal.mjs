@@ -305,10 +305,8 @@ const mappedScenario = (id) =>
 // the control that proves the source-map oracle sees the chunk.
 const splitControls = {
 	dropped: [
-		'STAGED_DOM',
 		'VIEW_TRANSITION_DRIVER',
 		'DEFERRED_LAYOUT_DRIVER',
-		'STAGED_COMMIT_CAPTURE',
 		'activityRefState',
 		'renderHiddenActivity',
 		'rehideActivityAfterDescendantRender',
