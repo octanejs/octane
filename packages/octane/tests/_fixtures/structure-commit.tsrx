@@ -274,3 +274,25 @@ export function BoundaryArmsApp(props: BoundaryArmsProps) @{
 		}
 	</main>
 }
+
+export interface SelectProps {
+	rows: string[];
+	values: string[];
+	gate?: PromiseLike<unknown>;
+	probe: () => void;
+}
+
+// A controlled multi-select whose options a keyed list renders.
+export function SelectProbeApp(props: SelectProps) @{
+	<main>
+		<select multiple value={props.values} onChange={() => {}}>
+			@for (const row of props.rows; key row) {
+				<option value={row}>{row as string}</option>
+			}
+		</select>
+		<Probe probe={props.probe} />
+		@if (props.gate) {
+			<Gate gate={props.gate} />
+		}
+	</main>
+}

@@ -8,11 +8,13 @@ import {
 	ListProbeApp,
 	OutsideApp,
 	ResumeApp,
+	SelectProbeApp,
 	StructureApp,
 	type ActivityProps,
 	type BoundaryArmsProps,
 	type ListProps,
 	type OutsideProps,
+	type SelectProps,
 	type StructureProps,
 } from './_fixtures/structure-commit.tsrx';
 
@@ -626,6 +628,46 @@ describe('content outside the container lands at commit', () => {
 				observer.disconnect();
 				app.unmount();
 				target.remove();
+			}
+		});
+	}
+});
+
+describe('a controlled select changes its selection at commit', () => {
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`keeps the committed selection until the render commits (${priority})`, async () => {
+			let during: string[] | null = null;
+			const initial: SelectProps = { rows: ['a', 'b', 'c'], values: ['a'], probe: () => {} };
+			const app = mount(SelectProbeApp, initial);
+			const select = app.find('select') as HTMLSelectElement;
+			const options = [...select.options];
+			const selected = () => [...select.selectedOptions].map((option) => option.value);
+			const render = (props: Partial<SelectProps>) => {
+				during = null;
+				return act(() => {
+					const next = () =>
+						app.root.render(SelectProbeApp, {
+							...initial,
+							probe: () => {
+								during = selected();
+							},
+							...props,
+						});
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			};
+			try {
+				await render({ values: ['b', 'c'], gate: new Promise(() => {}) });
+				expect(during).toEqual(['a']);
+				expect(selected()).toEqual(['a']);
+
+				await render({ rows: ['d', 'b', 'c'], values: ['b', 'c'] });
+				expect(during).toEqual(['a']);
+				expect(selected()).toEqual(['b', 'c']);
+				expect([...select.options].slice(1)).toEqual(options.slice(1));
+			} finally {
+				app.unmount();
 			}
 		});
 	}

@@ -32869,10 +32869,11 @@ export function setCheckedCheckable(el: Element, value: unknown): void {
 
 /**
  * Compiler-emitted binding for a controlled `value` on <select> (single and
- * `multiple`). The target is stored and projected onto the options both
- * IMMEDIATELY (idempotent) and at commit — binding mounts run before the same
- * render's @for/@if constructs, so the commit pass is what sees @for-built
- * options (React resolves selects post-mount the same way).
+ * `multiple`). The target is stored and projected onto the options at commit
+ * (drainControlledSyncs), after the commit has placed the options this render
+ * built, as React resolves selects post-mount. A root render projects nothing
+ * itself, so a render that never commits leaves the selection alone; a write
+ * outside one, such as a commit entry's, also projects at once (idempotent).
  */
 export function setSelectValue(el: Element, value: unknown): void {
 	const sel = el as HTMLSelectElement;
@@ -32923,8 +32924,11 @@ export function setSelectValue(el: Element, value: unknown): void {
 	// user state to preserve and follows the ordinary client-mount path.
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.isFresh(el)) return;
-	projectSelectValue(sel, ctrl.sv, false);
-	if (!ctrl.queued) {
+	// A ViewTransition drain's DOMStage still stages a render's projection
+	// itself. Any other root render leaves the projection to its commit.
+	const now = ROOT_RENDER_TRANSACTION === null || STAGED_DOM !== null;
+	if (now) projectSelectValue(sel, ctrl.sv, false);
+	if (!ctrl.queued || !now) {
 		ctrl.queued = true;
 		queueControlledCommit(SELECT_SYNCS, sel);
 	}
