@@ -1671,6 +1671,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'beginPresentationHydration',
 	'endPresentationHydration',
 	'presentationWrite',
+	'renderWrite',
 	'presentationHostWrite',
 	'presentationStructure',
 	'presentationFailure',
@@ -17600,8 +17601,11 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	// A new, unsupported writer can still render normally, but must reject an
 	// attempted lease before publishing anything. It never opens a frame.
 	if (!supported)
-		return [...body.slice(0, directiveEnd), b.stmt(begin), ...body.slice(directiveEnd)];
-	return [
+		return wrapRenderWriters(
+			[...body.slice(0, directiveEnd), b.stmt(begin), ...body.slice(directiveEnd)],
+			ctx,
+		);
+	const prepared = [
 		...statements.slice(0, directiveEnd),
 		proof.host ? b.let(frame, begin) : b.const(frame, begin),
 		b.let(completed, b.literal(false)),
@@ -17635,6 +17639,61 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 			]),
 		),
 	];
+	return wrapRenderWriters(prepared, ctx);
+}
+
+// A presentation view has no commit function, so its render keeps calling these
+// writers. renderWrite queues each one for the commit of a render that can be
+// dropped (#2043); bound writers go through presentationWrite, which does too.
+const RENDER_WRITE_HELPERS = new Set(
+	[
+		'setAttribute',
+		'setPlainAttribute',
+		'setURLAttribute',
+		'setStringData',
+		'setBooleanAttribute',
+		'setAriaAttribute',
+		'setClassName',
+		'setClassAttr',
+		'setBindingClass',
+		'setStyle',
+		'setStyleProperty',
+		'setStyleProperties',
+		'setFormAction',
+		'setText',
+	].flatMap((name) => [name, `${name}IfChanged`]),
+);
+RENDER_WRITE_HELPERS.add('updateFreshClassName');
+RENDER_WRITE_HELPERS.add('updateFreshClassAttr');
+
+function wrapRenderWriters(statements, ctx) {
+	const helpers = new Map(
+		[...ctx.runtimeNeeded].map((name) => [runtimeAliasForContext(ctx, name), name]),
+	);
+	const visit = (value) => {
+		if (!value || typeof value !== 'object') return value;
+		if (Array.isArray(value)) return value.map(visit);
+		if (!value.type || /Function/.test(value.type)) return value;
+		const result = { ...value };
+		for (const key of Object.keys(value)) {
+			if (key !== 'loc' && key !== 'metadata') result[key] = visit(value[key]);
+		}
+		const helper =
+			value.type === 'CallExpression' && value.callee.type === 'Identifier'
+				? helpers.get(value.callee.name)
+				: undefined;
+		if (helper === undefined || !RENDER_WRITE_HELPERS.has(helper)) return result;
+		return inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'renderWrite'),
+				result.callee,
+				b.literal(helper),
+				...result.arguments,
+			),
+			value,
+		);
+	};
+	return statements.map(visit);
 }
 
 /**
@@ -28050,10 +28109,10 @@ function planJsx(
 	// re-enters the mount branch instead of updating a half-populated bag.
 	// Control-flow-only bodies carry no bag, so all of it is skipped.
 	const bag = makeBag();
-	// #2043: the template's hoisted commit function (see makeCommitPlan).
-	// Presentation views and scalar claim views keep their direct writers.
-	const commit =
-		!noTemplate && !ctx.presentationHydration && !ctx.scalarBindingClaims ? makeCommitPlan() : null;
+	// #2043: the template's hoisted commit function (see makeCommitPlan). A
+	// presentation view keeps its direct writers for hydration to prepare;
+	// renderWrite holds them for a later render's commit (wrapRenderWriters).
+	const commit = !noTemplate && !ctx.presentationHydration ? makeCommitPlan() : null;
 	const BAG_LOCALS_PLACEHOLDER = `    /*__bagLocals__*/`;
 	if (!noTemplate) mountLines.push(BAG_LOCALS_PLACEHOLDER);
 

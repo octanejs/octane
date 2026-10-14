@@ -275,7 +275,7 @@ describe.each([
 	// Components often forward an optional style prop that is unset or a string.
 	// Native and ordinary bindings write those the same way, and a root render
 	// that waits must restore both the attribute and the value later writes diff against.
-	it('writes forwarded unset and string styles in place and restores them while a root render waits', async () => {
+	it('writes forwarded unset and string styles only when a waiting root render commits', async () => {
 		const client = fixture(dev, native);
 		const pending = deferred();
 		let ready = true;
@@ -287,6 +287,10 @@ describe.each([
 		const element = root.find('#target') as HTMLElement;
 		const input = element.querySelector('input')!;
 		input.value = 'retained draft';
+		const written: string[] = [];
+		const writes = new MutationObserver((records) => {
+			for (const record of records) written.push(record.attributeName!);
+		});
 		try {
 			expect(element.hasAttribute('style')).toBe(false);
 			root.update(client.Forwarded, { style: 'color: red; width: 10px;', title: 'string', read });
@@ -294,12 +298,18 @@ describe.each([
 			element.style.borderColor = 'green';
 			const original = element.style.cssText;
 			ready = false;
+			writes.observe(element, { attributes: true });
 			root.update(client.Forwarded, { style: undefined, title: 'waiting', read });
+			// The waiting render records its writes for its commit. It neither
+			// writes the host's style or title nor restores them.
+			expect(writes.takeRecords()).toEqual([]);
 			expect(root.find('#target')).toBe(element);
 			expect(element.style.cssText).toBe(original);
 			expect(element.title).toBe('string');
 			ready = true;
 			await act(() => pending.resolve());
+			for (const record of writes.takeRecords()) written.push(record.attributeName!);
+			expect(written).toEqual(expect.arrayContaining(['style', 'title']));
 			// Unsetting a string style clears the attribute's declarations, as it
 			// would have without the wait, including the edit made outside Octane.
 			expect(element.style.cssText).toBe('');
@@ -322,6 +332,7 @@ describe.each([
 			expect(element.querySelector('input')).toBe(input);
 			expect(input.value).toBe('retained draft');
 		} finally {
+			writes.disconnect();
 			ready = true;
 			pending.resolve();
 			root.unmount();
