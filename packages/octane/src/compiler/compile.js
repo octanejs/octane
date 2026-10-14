@@ -29467,45 +29467,43 @@ function planJsx(
 							),
 						);
 					ctx.runtimeNeeded.add(cc.onlyChildText ? 'childTextHole' : 'textHole');
+					// The unmounted marker (`__s`) is never a value, so only a changed
+					// hole tests it. A staged bag records only a cell this transaction
+					// already moved; a render's own `_n` implies the bag is staged.
 					pushAfterStmt(
 						cc.id,
 						org,
 						b.block([
 							...inlineRenderableValueDeclarations(cc.valueExpr),
 							b.if(
-								b.binary('===', chp(), b.id('__s')),
-								b.block([
-									b.stmt(
-										b.assignment(
-											'=',
-											bagFieldNode(bag, `_chv$${cc.id}`),
-											b.call(cc.onlyChildText ? '_$childTextHole' : '_$textHole', ...holeArgs),
+								b.logical(
+									'||',
+									b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
+									b.conditional(
+										b.binary('===', b.id('_n'), b.literal(null)),
+										b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)),
+										b.binary(
+											'!==',
+											b.member(b.id('_n'), b.literal(cc.commitCell), true),
+											b.id('_b'),
 										),
 									),
-									b.stmt(b.assignment('=', chp(), V())),
-								]),
+								),
 								b.if(
-									// A staged bag records only a cell this transaction already moved.
-									b.logical(
-										'||',
-										b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
-										b.logical(
-											'&&',
-											b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)),
-											b.logical(
-												'||',
-												b.binary('===', b.id('_n'), b.literal(null)),
-												b.binary(
-													'!==',
-													b.member(b.id('_n'), b.literal(cc.commitCell), true),
-													b.id('_b'),
-												),
+									b.binary('===', chp(), b.id('__s')),
+									b.block([
+										b.stmt(
+											b.assignment(
+												'=',
+												bagFieldNode(bag, `_chv$${cc.id}`),
+												b.call(cc.onlyChildText ? '_$childTextHole' : '_$textHole', ...holeArgs),
 											),
 										),
-									),
+										b.stmt(b.assignment('=', chp(), V())),
+									]),
 									record(V()),
-									null,
 								),
+								null,
 							),
 						]),
 					);

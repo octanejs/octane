@@ -4055,7 +4055,10 @@ function stageBag(bag: any): any[] {
 		// Packed from the start: the commit function reads every cell.
 		next = bag.next = [];
 		for (let i = (state & BAG_SIZE) + 2; i > 0; i--) next.push(bag);
-	} else if ((state & BAG_STAGED) === 0) next.fill(bag);
+	} else {
+		// A loop, not fill(): a builtin call costs more than a few cells.
+		for (let i = next.length - 1; i >= 0; i--) next[i] = bag;
+	}
 	bag.$ = state | BAG_STAGED;
 	return next;
 }

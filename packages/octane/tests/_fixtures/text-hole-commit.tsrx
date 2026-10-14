@@ -1,4 +1,4 @@
-import { use, ViewTransition } from 'octane';
+import { startTransition, use, useState, ViewTransition } from 'octane';
 
 function Wait(props: { wait: Promise<unknown> }) @{
 	use(props.wait);
@@ -71,4 +71,42 @@ export function TransitionHoles(props: { value: unknown }) @{
 	<ViewTransition>
 		<TextHoles value={props.value} probe={() => {}} />
 	</ViewTransition>
+}
+
+// One drain renders the rows twice: the parent's urgent update moves their
+// holes, and the owner's transition after it moves them back to the committed
+// value. A class binding before the hole hands it the row's staged cells; a
+// bare row's hole finds its bag staged with no cells in hand.
+interface RevertControls {
+	moved: unknown;
+	committed: unknown;
+	move(): void;
+	setLocal(local: number): void;
+}
+
+function RevertingRowsOwner(props: { step: number; controls: RevertControls }) @{
+	const [local, setLocal] = useState(0);
+	props.controls.setLocal = setLocal;
+	const value = props.step === 1 && local === 0 ? props.controls.moved : props.controls.committed;
+	<div id="reverting">
+		<ul>
+			@for (const row of ['one', 'two']; key row) {
+				<li class={row}>{value}</li>
+			}
+		</ul>
+		<ol>
+			@for (const row of ['one', 'two']; key row) {
+				<li>{value}</li>
+			}
+		</ol>
+	</div>
+}
+
+export function RevertingRows(props: { controls: RevertControls }) @{
+	const [step, setStep] = useState(0);
+	props.controls.move = () => {
+		setStep(1);
+		startTransition(() => props.controls.setLocal(1));
+	};
+	<RevertingRowsOwner step={step} controls={props.controls} />
 }

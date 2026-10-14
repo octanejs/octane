@@ -14,7 +14,7 @@ import {
 	MemoHeld,
 	Nested,
 } from './_fixtures/commit-functions.tsrx';
-import { Item, TextHoles } from './_fixtures/text-hole-commit.tsrx';
+import { Item, RevertingRows, TextHoles } from './_fixtures/text-hole-commit.tsrx';
 import { HostWrites } from './_fixtures/host-commit.tsrx';
 
 const never = () => new Promise<never>(() => {});
@@ -354,6 +354,23 @@ describe('renderable holes commit with their render', () => {
 			root.unmount();
 		});
 	}
+
+	// Production rows guard their holes inline; the dev build always calls the recorder.
+	it('commits the value a row hole last rendered when one drain moves it and moves it back', async () => {
+		const container = host();
+		const root = createRoot(container);
+		const controls = { moved: 'b', committed: 'a' } as Parameters<
+			typeof RevertingRows
+		>[0]['controls'];
+		flushSync(() => root.render(RevertingRows, { controls }));
+		const rows = () => [...container.querySelectorAll('#reverting li')].map((li) => li.textContent);
+		expect(rows()).toEqual(['a', 'a', 'a', 'a']);
+		// The transition's render compares each hole against the cell the urgent
+		// render staged, not only against the committed value.
+		await act(() => controls.move());
+		expect(rows()).toEqual(['a', 'a', 'a', 'a']);
+		root.unmount();
+	});
 });
 
 describe('host props, form controls and raw HTML commit with their render', () => {
