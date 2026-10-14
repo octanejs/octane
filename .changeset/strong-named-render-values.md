@@ -1,5 +1,5 @@
 ---
-'octane': minor
+'octane': patch
 '@octanejs/mcp-server': patch
 ---
 
