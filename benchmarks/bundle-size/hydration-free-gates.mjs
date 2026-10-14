@@ -31,8 +31,8 @@ import assert from 'node:assert/strict';
 // updates), preserveRootCreatedDom, MAPPED_ITEM_ADOPTION, the deopt adopt queue,
 // isRendererHydrationStyle, and the root-container claim are also client paths
 // and are deliberately absent. Development-only hydration diagnostics, such as
-// adoptHTML's HTML normalizers, are absent too: no production bundle retains
-// them, so no hydrating control could prove the oracle sees them.
+// hydration/dev-values.ts, are absent too: no production bundle retains them,
+// so no hydrating control could prove the oracle sees them.
 export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	// The root-local hydration capability. Only hydration entry points construct
 	// it; it is the dispatch boundary for adoption code.

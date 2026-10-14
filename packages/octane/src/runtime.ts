@@ -203,6 +203,20 @@ import {
 	type HydrationReplayIntent,
 } from './hydration/event-capture.js';
 import { isRestoredHydrationTextarea } from './hydration/control-capture.js';
+import {
+	SEED_SITE_DRIVER,
+	seedSite,
+	type SeedSiteDriver,
+	type SeedSites,
+} from './hydration/use-seeds.js';
+import {
+	takeUnpatchedValues,
+	unpatchedAttribute,
+	unpatchedClass,
+	unpatchedHTML,
+	unpatchedStatics,
+	unpatchedStyle,
+} from './hydration/dev-values.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
 	invalidHtmlNestingWithAncestor,
@@ -232,6 +246,7 @@ import {
 	HYDRATE_MARKER_SELECTOR,
 	isRangeOpen,
 	NATIVE_SIGNAL_FRESH_COMMENT,
+	parserNormalizedMatch,
 	selfDelimits,
 	STREAM_SEED_COMMENT,
 	SUSPENSE_RESOLVED_COMMENT,
@@ -2254,11 +2269,14 @@ function componentSourceLoc(body: unknown): string | undefined {
 // ---------------------------------------------------------------------------
 // Hydration VALUE differences, as in React. A server text that differs from the
 // client's does not match the client render (HydrationMismatch), while the
-// server's attributes, class, style and raw HTML are kept, never patched:
-// development lists what differs in one warning per hydration pass, and
-// production compares nothing. `suppressHydrationWarning` on the owning element
-// (React's shallow semantics) keeps a differing server text and silences the
-// attribute warning. It never keeps a structural difference.
+// server's attributes, class, style and raw HTML are kept, never patched: their
+// writers return while hydration adopts their element (HydrationCapability's
+// keepsAttribute, keepsClass, keepsStyle and adoptHTML). Development lists what
+// differs in one warning per hydration pass (hydration/dev-values.ts), and
+// production compares nothing but stale server values (staleServerValues).
+// `suppressHydrationWarning` on the owning element (React's
+// shallow semantics) keeps a differing server text and silences the attribute
+// warning. It never keeps a structural difference.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2269,17 +2287,6 @@ function componentSourceLoc(body: unknown): string | undefined {
  */
 function isHydrationSuppressed(el: Node | null): boolean {
 	return el !== null && (el as any).__oct_suppress === true;
-}
-
-/**
- * How development reports a server value that hydration keeps at `el`:
- *   0 — not at all: production-compiled code records no source location.
- *   1 — not at all: the element suppresses hydration warnings.
- *   2 — in the pass's warning (HydrationCapability.settleValues).
- */
-function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
-	if (isHydrationSuppressed(el)) return 1;
-	return (el as any).__oct_loc !== undefined ? 2 : 0;
 }
 
 /**
@@ -2413,95 +2420,6 @@ function hydrationNodeMatches(server: Node, template: Node): boolean {
 	if (server.nodeType !== template.nodeType) return false;
 	if (server.nodeType !== 1) return true;
 	return (server as Element).localName === (template as Element).localName;
-}
-
-/**
- * DEV ONLY: does an adopted node also match the template's STATIC attributes and nested static
- * element structure? A difference never causes a fallback (production cannot see it); it is
- * reported like React's "won't be patched up" warning and the server's markup is kept. A
- * compiler-specialized mixed style bakes only its static prefix; its exact template path is
- * supplied so that one style attribute waits for the complete-value check. The recursion treats
- * a comment (a `<!>` hole placeholder or marker) or a text/element shift as a match, because
- * template holes do not align 1:1 with server content.
- */
-function hydrationStaticMatches(
-	server: Node,
-	template: Node,
-	partialStyles?: string,
-	path: string = '',
-): boolean {
-	if (server.nodeType !== template.nodeType) return false;
-	if (server.nodeType !== 1) return true;
-	const s = server as Element;
-	const t = template as Element;
-	if (s.localName !== t.localName) return false;
-	const tAttrs = t.attributes;
-	for (let i = 0; i < tAttrs.length; i++) {
-		const a = tAttrs[i];
-		// This optional compiler marker is not authored static structure. Actual
-		// writable bindings validate its identity before adopting their state.
-		if (a.name === HYDRATE_INPUT_ATTR) continue;
-		if (
-			s.getAttribute(a.name) !== a.value &&
-			!(
-				a.name === 'style' &&
-				partialStyles !== undefined &&
-				partialStyles.includes('|' + path + '|')
-			)
-		) {
-			return false;
-		}
-	}
-	let sc = getFirstChild(s);
-	let tc = getFirstChild(t);
-	let childIndex = 0;
-	while (sc !== null && tc !== null) {
-		if (sc.nodeType === 8 || tc.nodeType === 8) return true; // hole / marker — stop comparing
-		if (sc.nodeType !== tc.nodeType) return true; // text↔element shift — ambiguous, stop
-		if (
-			tc.nodeType === 1 &&
-			!hydrationStaticMatches(
-				sc,
-				tc,
-				partialStyles,
-				partialStyles === undefined
-					? ''
-					: path === ''
-						? String(childIndex)
-						: path + '.' + childIndex,
-			)
-		) {
-			return false;
-		}
-		sc = getNextSibling(sc);
-		tc = getNextSibling(tc);
-		childIndex++;
-	}
-	return true; // any leftover could be holes — assume a match
-}
-
-/**
- * DEV ONLY: `server`, adopted for the template root `template` (the root at
- * index `path` of a fragment template, or '' for a single root), keeps its
- * static attributes and markup. Development lists a difference
- * (hydrationStaticMatches) in the pass's one warning, which never changes what
- * is adopted. Every caller checks for development first, so production bundles
- * drop it.
- */
-function unpatchedStatics(
-	hydration: HydrationCapability,
-	server: Node,
-	template: Node,
-	loc: string | undefined,
-	partialStyles: string | undefined,
-	path: string,
-): void {
-	if (!hydrationStaticMatches(server, template, partialStyles, path))
-		(hydration.unpatchedValues ??= new Map()).set(
-			`${loc ? loc + ': ' : ''}static attributes or markup of the server's ` +
-				describeHydrationNode(server),
-			server,
-		);
 }
 
 /**
@@ -17549,7 +17467,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			if (adoptedSlot?.__kind === 'trySlotSlot') {
 				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
 			}
-			hydration.settleValues();
+			hydration.settleTexts();
 			finishRoot(hydration);
 			completed = true;
 		}
@@ -18623,28 +18541,17 @@ function isSuspenseException(x: any): x is SuspenseException {
 }
 
 const HYDRATION_SITE_EVENTS = Symbol('octane.hydration.site-events');
-const HYDRATION_SEED_FACTORY = Symbol('octane.hydration.seed-factory');
-
-interface HydrationSiteEvents {
-	queues: Map<string, number[]>;
-	offsets: Map<string, number>;
-}
 
 interface HydrationSeedArray extends Array<unknown> {
-	[HYDRATION_SITE_EVENTS]?: HydrationSiteEvents;
+	[HYDRATION_SITE_EVENTS]?: SeedSites;
 }
 
-interface HydrationSeedFactory {
-	index: number;
-	factory: (() => unknown) | null;
-	value?: unknown;
-	error?: unknown;
-	failed?: boolean;
-}
-
-interface HydrationSeedThenable extends TrackedThenable {
-	[HYDRATION_SEED_FACTORY]: HydrationSeedFactory;
-}
+/**
+ * Compiler-owned use() sites (hydration/use-seeds.ts), installed by the first
+ * compiled seedOrCreate that a hydration pass seeds. Only that call writes
+ * it, so an app without one folds every read away.
+ */
+let SEED_SITES: SeedSiteDriver | null = null;
 
 /**
  * Hydration uses the server's fulfilled value as the canonical first-render
@@ -18669,34 +18576,16 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 	}
 }
 
-function materializeHydrationSeedFactory(record: HydrationSeedFactory): unknown {
-	if (record.failed === true) throw record.error;
-	if (record.factory !== null) {
-		const factory = record.factory;
-		record.factory = null;
-		try {
-			record.value = factory();
-		} catch (error) {
-			record.failed = true;
-			record.error = error;
-			throw error;
-		}
-	}
-	return record.value;
-}
-
-function getHydrationSeedFactory(thenable: TrackedThenable): HydrationSeedFactory | undefined {
-	try {
-		return (thenable as HydrationSeedThenable)[HYDRATION_SEED_FACTORY];
-	} catch {
-		return undefined;
-	}
-}
-
 /** Compiler-owned direct use() creations consult their server-proven site outcome first. */
 export function seedOrCreate<T>(site: string, factory: () => T): T {
 	const hydration = hydrating ? seedHydration() : null;
-	return hydration === null ? factory() : hydration.seedOrCreate(site, factory);
+	const sites =
+		hydration === null || hydration.seeds === null
+			? undefined
+			: (hydration.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
+	if (sites === undefined) return factory();
+	SEED_SITES = SEED_SITE_DRIVER;
+	return seedSite(sites, hydration!.seedCursor, site, factory);
 }
 
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
@@ -20475,6 +20364,8 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 // `<script data-octane-suspense>` in `hydrateRoot()` and consumed in render
 // order by `useThenable` so a hydrating boundary returns synchronously. They are
 // fields on the hydrateRoot-only capability, so client-only builds discard them.
+// A compiled use() creation's seeded site (seedOrCreate) is hydration/use-seeds.ts,
+// which only an app with such a site ships.
 // Set while adopting a root when a matched range is physically wrapped by an
 // exactly-adjacent marker pair. The post-hydration ownership walk can only
 // remove comments in that shape, so roots without one skip the pass entirely.
@@ -20488,13 +20379,6 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 interface HydratedLiteRange {
 	start: Comment;
 	end: Comment;
-}
-
-/** The class an adopted element's last hydrating writer set (keepsClass). */
-interface PendingHydrationClass {
-	next: string | null;
-	/** Whether an absent class attribute reads as ''. */
-	absentIsEmpty: boolean;
 }
 
 /** A server text whose comparison waits for the pass's render-phase updates (keepsText). */
@@ -20634,7 +20518,7 @@ class HydrationCapability {
 	/**
 	 * Parent captures changed before this dormant boundary activated, so the
 	 * server HTML predates the client's state. Any difference from it, a text or
-	 * attribute value included (unpatched), does not match the client render,
+	 * attribute value included (staleValue), does not match the client render,
 	 * and the boundary's fallback reports nothing (noteRecoverableHydrationError,
 	 * logHydrationMismatch).
 	 */
@@ -20662,15 +20546,8 @@ class HydrationCapability {
 	rootCleanupBoundary: Node | null = null;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
-	/** Development, or stale captures: classes compared once the pass ends (settleValues). */
-	private classes: Map<Element, PendingHydrationClass> | null = null;
 	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
 	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
-	/**
-	 * DEV-only: the server values this pass kept where the client's differ, by
-	 * their warning line, with the node each belongs to (settleValues).
-	 */
-	unpatchedValues: Map<string, Node> | null = null;
 	/**
 	 * The first node of the adopted range whose claim is open (beginClaim),
 	 * until the template that renders that range's content adopts it.
@@ -21558,7 +21435,7 @@ class HydrationCapability {
 	 * server values (staleServerValues). Unless a render-phase update renders
 	 * the text again before the pass ends: React renders a component that
 	 * updates itself while it renders again before it compares the output, so
-	 * the text that render settles on decides, equal or not (settleValues).
+	 * the text that render settles on decides, equal or not (settleTexts).
 	 * Meanwhile the node holds the client's text, and a discarded attempt
 	 * restores the server's. A method, so that bundles which never hydrate do
 	 * not retain it.
@@ -21570,7 +21447,7 @@ class HydrationCapability {
 		text: string,
 		loc: string | undefined,
 	): boolean {
-		const equal = server === text || isTextParserNormalizedMatch(server, text);
+		const equal = server === text || parserNormalizedMatch(server, text);
 		if (!equal) {
 			if (
 				host !== null &&
@@ -21643,47 +21520,19 @@ class HydrationCapability {
 		return parseSeedJson(raw);
 	}
 
-	seedOrCreate<T>(site: string, factory: () => T): T {
-		if (this.seeds === null) return factory();
-		const events = (this.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
-		if (events === undefined) return factory();
-		const queue = events.queues.get(site);
-		if (queue === undefined) return factory();
-		const offset = events.offsets.get(site) ?? 0;
-		events.offsets.set(site, offset + 1);
-		const index = queue[offset];
-		if (index === undefined || index < this.seedCursor) return factory();
-
-		const record: HydrationSeedFactory = { index, factory };
-		const thenable: HydrationSeedThenable = {
-			[HYDRATION_SEED_FACTORY]: record,
-			then(onFulfilled, onRejected) {
-				if (thenable.status === 'fulfilled') {
-					return Promise.resolve(thenable.value).then(onFulfilled, onRejected);
-				}
-				if (thenable.status === 'rejected') {
-					return Promise.reject(thenable.reason).then(onFulfilled, onRejected);
-				}
-				return Promise.resolve(materializeHydrationSeedFactory(record)).then(
-					onFulfilled,
-					onRejected,
-				);
-			},
-		};
-		return thenable as T;
-	}
-
 	useSeed<T>(
 		thenable: TrackedThenable<T>,
 		state: TrackedThenable<any>[],
 		index: number,
 		replaceOnResume: boolean,
 	): T {
-		const factory = getHydrationSeedFactory(thenable);
+		// A compiled site's thenable whose seed is not the next one renders what
+		// its factory makes instead (hydration/use-seeds.ts).
+		const factory = SEED_SITES ? SEED_SITES.factoryOf(thenable) : undefined;
 		if (factory !== undefined && factory.index !== this.seedCursor) {
 			// useThenable allocated the record before seeding this call.
 			CURRENT_BLOCK!.rare!.thenableIdx = index;
-			const usable = materializeHydrationSeedFactory(factory);
+			const usable = SEED_SITES!.materialize(factory);
 			if (
 				replaceOnResume &&
 				usable !== null &&
@@ -21736,25 +21585,6 @@ class HydrationCapability {
 	}
 
 	/**
-	 * `el`, an adopted element, keeps the server's `what` (an attribute, its
-	 * class or style, or its raw HTML), `server`, where the client renders
-	 * `client`: as in React, hydration never patches it. Development lists the
-	 * difference in the pass's one warning (settleValues), unless `el`
-	 * suppresses hydration warnings. Stale server values do not match the
-	 * client render instead (staleServerValues).
-	 */
-	private unpatched(el: Element, what: string, server: unknown, client: unknown): void {
-		if (this.staleServerValues)
-			this.fail((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
-		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
-			(this.unpatchedValues ??= new Map()).set(
-				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
-					`the client ${JSON.stringify(client)}`,
-				el,
-			);
-	}
-
-	/**
 	 * Hydrating, the server rendered no node where `el`'s de-opt children render
 	 * `child`: as React does for a missing node, the nearest fallback owner
 	 * renders on the client. An element the client built holds client children
@@ -21776,28 +21606,22 @@ class HydrationCapability {
 
 	/**
 	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. React 19 keeps the
-	 * server's content (unpatched) and records nothing, so the next render that
-	 * passes an `__html` object rewrites it, even with the same string (setHTML).
+	 * server's content and records nothing, so the next render that passes an
+	 * `__html` object rewrites it, even with the same string (setHTML).
 	 * Production therefore compares nothing, unless the server values are stale
-	 * (staleServerValues), where the raw strings suffice: a spelling difference
-	 * only renders that rare pass on the client. Development compares only to
-	 * warn, and parses the client's HTML in the element's context, so that
-	 * spellings the parser canonicalizes compare equal, as in React. So the
-	 * normalizers never reach a production bundle.
+	 * (staleServerValues), where a difference in the raw strings does not match
+	 * the client render: a spelling difference only renders that rare pass on
+	 * the client. Development lists a difference (hydration/dev-values.ts).
 	 */
 	adoptHTML(el: Element, next: string): void {
-		const script = el.localName === 'script';
-		const server = script ? (el.textContent ?? '') : el.innerHTML;
-		const expected =
-			process.env.NODE_ENV === 'production'
-				? this.staleServerValues
-					? next
-					: server
-				: script
-					? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
-					: normalizeHTMLForHydration(el, next);
-		if (server !== expected)
-			this.unpatched(el, '`dangerouslySetInnerHTML` content', server, expected);
+		if (this.staleServerValues) {
+			if ((el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML) !== next)
+				this.fail(
+					(el as any).__oct_loc,
+					() => `\`dangerouslySetInnerHTML\` content ${JSON.stringify(next)}`,
+					el,
+				);
+		} else if (process.env.NODE_ENV !== 'production') unpatchedHTML(this, el, next);
 	}
 
 	/**
@@ -22473,56 +22297,53 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Whether a hydrating writer sets `el`'s attribute `name` to `next`. Only in
-	 * an element the client built. An adopted element keeps the server's value,
-	 * as in React (unpatched): development compares it, and production compares
-	 * nothing unless the server values are stale (staleServerValues). Values the
-	 * HTML parser normalized compare equal, and so does what an early host
-	 * binding published there.
+	 * Whether `el` keeps its server value where a writer sets the client's: an
+	 * element hydration adopted keeps its attributes, class, style and raw HTML,
+	 * which React never patches. An element the client built takes the client's.
 	 */
-	allowAttribute(el: Element, name: string, next: string | null): boolean {
+	private adopts(el: Element): boolean {
 		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return true;
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return false;
-		// Read through the prototype: a form's named control can shadow its method.
-		const ns = attrNamespace(name);
-		const server = ns
-			? el.getAttributeNS(ns, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
-			: Element.prototype.getAttribute.call(el, name);
-		if (
-			server !== next &&
-			domBindingClaims.get(el)?.get(name) !== server &&
-			!(next !== null && isAttributeParserNormalizedMatch(server, next))
-		)
-			this.unpatched(el, `attribute \`${name}\``, server, next);
-		return false;
+		return !this.freshNodes.has(el);
 	}
 
 	/**
-	 * Whether hydration keeps `el`'s server class where a writer sets `next`
-	 * (`absentIsEmpty`: an absent class attribute reads as ''). An adopted
-	 * element keeps it, as it keeps attributes (allowAttribute). A direct
-	 * binding and spreads can all write one element's class, and only the last
-	 * writer's value is the client's, so the comparison waits for the end of
-	 * the pass (settleValues).
+	 * A stale server value (staleServerValues) that differs from the client's
+	 * does not match the client render, which reports nothing. Production
+	 * compares only stale values, and raw: a spelling difference only renders
+	 * that rare pass on the client. Development lists every other difference
+	 * (hydration/dev-values.ts).
 	 */
-	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return false;
-		if (process.env.NODE_ENV !== 'production' || this.staleServerValues)
-			(this.classes ??= new Map()).set(el, { next, absentIsEmpty });
+	private staleValue(el: Element, differs: boolean): void {
+		if (differs) this.fail((el as any).__oct_loc, () => 'a newer value', el);
+	}
+
+	/** Whether an adopted `el` keeps its server attribute `name` where the client writes `next`. */
+	keepsAttribute(el: Element, name: string, next: string | null): boolean {
+		if (!this.adopts(el)) return false;
+		if (this.staleServerValues)
+			// Read through the prototype: a form's named control can shadow its method.
+			this.staleValue(el, Element.prototype.getAttribute.call(el, name) !== next);
+		else if (process.env.NODE_ENV !== 'production') unpatchedAttribute(this, el, name, next);
 		return true;
 	}
 
 	/**
-	 * Whether hydration keeps `el`'s server style where a writer sets the
+	 * Whether an adopted `el` keeps its server class where a writer sets `next`
+	 * (`absentIsEmpty`: an absent class attribute reads as '').
+	 */
+	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
+		if (!this.adopts(el)) return false;
+		if (this.staleServerValues) {
+			const server = Element.prototype.getAttribute.call(el, 'class');
+			this.staleValue(el, (absentIsEmpty && server === null ? '' : server) !== next);
+		} else if (process.env.NODE_ENV !== 'production') unpatchedClass(this, el, next, absentIsEmpty);
+		return true;
+	}
+
+	/**
+	 * Whether an adopted `el` keeps its server style where a writer sets the
 	 * complete style `value`, or the fixed declarations `entries`, after the
-	 * static declarations `staticCss`. An adopted element keeps it, as it keeps
-	 * attributes (allowAttribute). Comparing canonical cssText, through a
-	 * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
-	 * whitespace) as equal, while it still finds reordered, missing, added and
-	 * empty declarations. What an early host binding published there, single
-	 * declarations or the whole style, is the server's now.
+	 * static declarations `staticCss`.
 	 */
 	keepsStyle(
 		el: HTMLElement | SVGElement,
@@ -22530,45 +22351,14 @@ class HydrationCapability {
 		staticCss?: string,
 		entries?: readonly unknown[],
 	): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return false;
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return true;
-		const style = (el as HTMLElement).style;
-		const server = style.cssText;
-		const expectedStyle = document.createElement('div').style;
-		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
-		if (entries === undefined) applyStyleValue(el, expectedStyle, value, undefined);
-		else {
-			for (let i = 0; i < entries.length; i += 2) {
-				const entry = entries[i + 1];
-				if (entry != null && typeof entry !== 'boolean')
-					applyStyleProperty(el, expectedStyle, entries[i] as string, entry);
-			}
-		}
-		// A declaration that an early host binding published is the server's now.
-		// Removing one can leave an empty style attribute behind, so the
-		// attribute's presence is no longer the server's either.
-		const claims = domBindingClaims.get(el);
-		let removed = false;
-		if (claims !== undefined) {
-			for (const [channel, published] of claims) {
-				if (!channel.startsWith('style:')) continue;
-				const property = channel.slice(6);
-				const value = style.getPropertyValue(property);
-				const priority = style.getPropertyPriority(property);
-				if ((value === '' ? null : value + (priority ? ' !important' : '')) !== published) continue;
-				removed ||= value === '';
-				// An empty value removes the declaration.
-				expectedStyle.setProperty(property, value, priority);
-			}
-		}
-		const expected = expectedStyle.cssText;
-		if (
-			(server !== expected || (!expected && !removed && el.hasAttribute('style'))) &&
-			// So is a whole style that one published.
-			claims?.get('style') !== server
-		)
-			this.unpatched(el, 'style', server, expected);
+		if (!this.adopts(el)) return false;
+		if (this.staleServerValues)
+			this.staleValue(
+				el,
+				el.style.cssText !== expectedStyle(el, value, staticCss, entries).cssText,
+			);
+		else if (process.env.NODE_ENV !== 'production')
+			unpatchedStyle(this, el, expectedStyle(el, value, staticCss, entries));
 		return true;
 	}
 
@@ -22583,21 +22373,20 @@ class HydrationCapability {
 
 	/**
 	 * Runs once a pass adopted its content and its render-phase updates
-	 * settled. Compares the texts those updates rendered again (keepsText) and
-	 * the class each adopted element's last writer set (keepsClass), then
+	 * settled. Compares the texts those updates rendered again (keepsText), then
 	 * publishes development's one warning per pass, as React's, for the server
-	 * values the pass kept where the client's differ (unpatched). A boundary
-	 * whose body adopted a node and then threw to its catch arm has removed it
-	 * since, and it is not compared.
+	 * values the pass kept where the client's differ. A boundary whose body
+	 * adopted a node and then threw to its catch arm has removed it since, and
+	 * it is not compared.
 	 */
-	settleValues(): void {
+	settleTexts(): void {
 		const root = this.rootBlock.parentNode;
 		const texts = this.pendingTexts;
 		if (texts !== null) {
 			this.pendingTexts = null;
 			for (const [node, { server, loc }] of texts) {
 				const text = node.nodeValue!;
-				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
+				if (text !== server && !parserNormalizedMatch(server, text) && root.contains(node))
 					this.fail(
 						loc || (node.parentNode as any)?.__oct_loc,
 						() => `text ${JSON.stringify(text)}`,
@@ -22605,24 +22394,10 @@ class HydrationCapability {
 					);
 			}
 		}
-		const classes = this.classes;
-		if (classes !== null) {
-			this.classes = null;
-			for (const [el, { next, absentIsEmpty }] of classes) {
-				// Read through the prototype: a form's named control can shadow its method.
-				const raw = Element.prototype.getAttribute.call(el, 'class');
-				const server = absentIsEmpty && raw === null ? '' : raw;
-				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
-					this.unpatched(el, 'attribute `class`', server, next);
-			}
+		if (process.env.NODE_ENV !== 'production') {
+			const lines = takeUnpatchedValues(this, root);
+			if (lines !== null) warnHydrationUnpatched(lines);
 		}
-		if (process.env.NODE_ENV === 'production') return;
-		const unpatched = this.unpatchedValues;
-		if (unpatched === null) return;
-		this.unpatchedValues = null;
-		const lines: string[] = [];
-		for (const [line, node] of unpatched) if (root.contains(node)) lines.push(line);
-		if (lines.length !== 0) warnHydrationUnpatched(lines);
 	}
 }
 
@@ -22878,23 +22653,6 @@ function devWarnPlainTextHandle(): void {
 			"`import type { SignalHandle } from 'octane/signals'`, give it a `$` suffix, read it " +
 			'with `.get()`, or enable the `opaqueSignalHandles` compiler option.',
 	);
-}
-
-/**
- * Match ReactDOMComponent's hydration comparison: the HTML parser normalizes
- * CR/CRLF and can either drop U+0000 or turn it into U+FFFD, so both values are
- * normalized by folding newlines and removing null/replacement characters.
- */
-function normalizeParserText(value: string): string {
-	return value.replace(/\r\n?/g, '\n').replace(/[\u0000\uFFFD]/g, '');
-}
-
-function isTextParserNormalizedMatch(server: string | null, client: string): boolean {
-	return server !== null && normalizeParserText(server) === normalizeParserText(client);
-}
-
-function isAttributeParserNormalizedMatch(server: string | null, client: string): boolean {
-	return server !== null && normalizeParserText(server) === normalizeParserText(client);
 }
 
 /**
@@ -25276,45 +25034,6 @@ export function setScriptText(el: Element, value: any): void {
 	}
 }
 
-// SSR replaces only the `s` in case-insensitive opening/closing script tokens.
-// Hydration compares against that serialized spelling after the script-data
-// input normalization applied to server markup; later client updates use
-// textContent directly and therefore need no escape.
-const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
-
-function escapeInlineScriptContentForHydration(value: string): string {
-	return value.replace(
-		INLINE_SCRIPT_TOKEN,
-		(_match, prefix: string, s: string, suffix: string) =>
-			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
-	);
-}
-
-// Unlike ordinary HTML data, script-data preserves character references such as
-// `&amp;` verbatim. Normalize only the input-stream transformations that affect a
-// parsed script Text node: CRLF/CR become LF and NUL becomes U+FFFD.
-const SCRIPT_DATA_NORMALIZATION = /\r\n?|\u0000/g;
-
-function normalizeScriptTextForHydration(value: string): string {
-	return value.replace(SCRIPT_DATA_NORMALIZATION, (match) =>
-		match === '\u0000' ? '\uFFFD' : '\n',
-	);
-}
-
-/** Parse raw HTML in its authored host context for hydration comparison. */
-function normalizeHTMLForHydration(parent: Element, html: string): string {
-	// Match React's comparison boundary: the browser canonicalizes equivalent
-	// spellings such as `<span/>` and `<span></span>` when parsing server HTML.
-	const doc = parent.ownerDocument;
-	const ns = parent.namespaceURI;
-	const testElement =
-		ns === 'http://www.w3.org/2000/svg' || ns === 'http://www.w3.org/1998/Math/MathML'
-			? doc.createElementNS(ns, parent.tagName)
-			: doc.createElement(parent.tagName);
-	testElement.innerHTML = html;
-	return testElement.innerHTML;
-}
-
 /**
  * React-compatible `dangerouslySetInnerHTML`. Hydration keeps an adopted
  * element's server content and records nothing (HydrationCapability.adoptHTML),
@@ -26621,9 +26340,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// the final write. The same helper is used by compiler-baked and SSR attrs.
 	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
 	// An adopted element keeps its server attribute; development compares it with the final
-	// coerced value. The capability guard keeps that read out of ordinary client updates.
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	// coerced value.
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name, ns);
 	if (next === null) {
@@ -26739,8 +26457,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
 			? null
 			: String(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26764,8 +26481,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 			next = null;
 		else next = sanitizeURL(next);
 	}
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26805,8 +26521,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 		}
 		next = typeof value === 'string' ? value : String(value);
 	}
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26826,8 +26541,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	}
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26850,8 +26564,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 		value == null || typeof value === 'function' || typeof value === 'symbol'
 			? null
 			: String(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -27050,8 +26763,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsClass(el, cls, true)) return;
+	if (hydrating && activeHydration()?.keepsClass(el, cls, true)) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -27080,8 +26792,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 // existed).
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsClass(el, cls, false)) return;
+	if (hydrating && activeHydration()?.keepsClass(el, cls, false)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
@@ -27118,8 +26829,7 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	const style = (el as HTMLElement).style;
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, value)) return;
+	if (hydrating && activeHydration()?.keepsStyle(el, value)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
@@ -27141,8 +26851,7 @@ export function setStyleProperty(
 	previous: any,
 	scope: Scope | null = CURRENT_SCOPE,
 ): void {
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, { [name]: value }, staticCss)) return;
+	if (hydrating && activeHydration()?.keepsStyle(el, { [name]: value }, staticCss)) return;
 	const remove = value == null || typeof value === 'boolean';
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
@@ -27180,8 +26889,7 @@ export function setStyleProperties(
 	entries: readonly unknown[],
 	staticCss: string,
 ): void {
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, null, staticCss, entries)) return;
+	if (hydrating && activeHydration()?.keepsStyle(el, null, staticCss, entries)) return;
 	const style = (el as HTMLElement).style;
 	let journaled = false;
 	for (let i = 0; i < entries.length; i += 2) {
@@ -27276,6 +26984,31 @@ function applyStyleProperty(
 	} else {
 		style.setProperty(prop, s);
 	}
+}
+
+/**
+ * The style a writer renders, on a detached declaration block, for hydration
+ * to compare with the server's it keeps (HydrationCapability.keepsStyle): the
+ * complete style `value`, or the fixed declarations `entries`, after the
+ * static declarations `staticCss`.
+ */
+function expectedStyle(
+	el: HTMLElement | SVGElement,
+	value: any,
+	staticCss?: string,
+	entries?: readonly unknown[],
+): CSSStyleDeclaration {
+	const expected = document.createElement('div').style;
+	if (staticCss !== undefined) expected.cssText = staticCss;
+	if (entries === undefined) applyStyleValue(el, expected, value, undefined);
+	else {
+		for (let i = 0; i < entries.length; i += 2) {
+			const entry = entries[i + 1];
+			if (entry != null && typeof entry !== 'boolean')
+				applyStyleProperty(el, expected, entries[i] as string, entry);
+		}
+	}
+	return expected;
 }
 
 // ---------------------------------------------------------------------------
@@ -28614,8 +28347,7 @@ function setHeadAttribute(el: Element, name: string, value: unknown): void {
 			return setAttribute(el, name, value);
 	}
 	const next = coerceAttrValue(el, name, value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (el.getAttribute(name) === next) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
@@ -41948,7 +41680,7 @@ function renderInitialSuspenseHydration(
 		renderBlock(block);
 		if (hydration.deferred !== null) hydration.claimDeferred();
 		drainHydrationRenderPhaseUpdates(block, true);
-		hydration.settleValues();
+		hydration.settleTexts();
 		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
@@ -50986,7 +50718,7 @@ function hydrateRootWithOutputHandler(
 				hydration.suspend(() => {
 					for (const activate of hydration.deferredActivities) activate();
 				});
-			hydration.settleValues();
+			hydration.settleTexts();
 			completed = true;
 		} catch (thrown) {
 			const error = hydration.failure(thrown);

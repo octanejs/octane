@@ -135,6 +135,19 @@ export function selfDelimits(type: unknown, childBlocks: boolean): boolean {
 	return typeof type === 'string' && !childBlocks;
 }
 
+/**
+ * Whether a server text or attribute value matches the client's once the HTML
+ * parser's normalization is undone, as ReactDOMComponent compares them: the
+ * parser folds CR/CRLF to LF and drops U+0000 or turns it into U+FFFD.
+ */
+export function parserNormalizedMatch(server: string | null, client: string): boolean {
+	return server !== null && normalizeParserText(server) === normalizeParserText(client);
+}
+
+function normalizeParserText(value: string): string {
+	return value.replace(/\r\n?/g, '\n').replace(/[\u0000\uFFFD]/g, '');
+}
+
 /** The `useId()` count a `[$:N` or `[$!rN` open records, or -1 when malformed. */
 export function boundaryIdCount(data: string): number {
 	const raw = data.slice(data.charCodeAt(2) === 33 ? 4 : 3);
