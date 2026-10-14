@@ -20,6 +20,7 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { hydrating, hydrationStarted, setHydrating, startHydration } from './hydration-flag.js';
+import { renderSlice, type RenderSlice } from './render-slice.js';
 import { resolveHookPath } from './hook-slot-cache.js';
 import type {
 	LayoutSnapshotOptions,
@@ -4277,6 +4278,8 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	TRANSITION_JOURNAL_DEPTH = 1;
 	OPS_CHECKPOINT = 0;
 	WIP_CAPTURE = transaction.capture;
+	// An early binding program defers its writes until the outermost slice closes.
+	if (renderSlice && frame.previous === null) renderSlice.open = true;
 	return frame;
 }
 
@@ -4294,6 +4297,24 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	TRANSITION_JOURNAL_DEPTH = frame.depth;
 	OPS_CHECKPOINT = frame.opsCheckpoint;
 	WIP_CAPTURE = frame.capture;
+	if (renderSlice && frame.previous === null) closeRenderSlice(renderSlice);
+}
+
+/** Run the early binding drains a closing render slice deferred (render-slice.ts). */
+function closeRenderSlice(slice: RenderSlice): void {
+	slice.open = false;
+	if (slice.drains.length === 0) return;
+	for (const drain of slice.drains.splice(0)) {
+		try {
+			drain();
+		} catch (error) {
+			// The publisher has returned and the program disposed itself. Report the
+			// failure rather than unwind the renderer's frame.
+			queueMicrotask(() => {
+				throw error;
+			});
+		}
+	}
 }
 
 function journalUndo(undo: () => void): void {

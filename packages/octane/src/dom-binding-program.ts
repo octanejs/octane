@@ -58,6 +58,7 @@ import type {
 	BindingControlPrepared,
 } from './dom-binding-controls.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
+import { renderSlice, watchRenderSlices } from './render-slice.js';
 
 export { __methodDep } from './method-dep.js';
 
@@ -1792,6 +1793,12 @@ function bindProgram<Props>(
 		if (transaction.disposed) return;
 		if (busy) return;
 		busy = true;
+		// Render never writes the document. A publication inside an Octane render
+		// stays pending, as busy as a drain, until the render slice closes.
+		if (renderSlice?.open) {
+			renderSlice.drains.push(resume);
+			return;
+		}
 		try {
 			while ((dirty || signalUpdates?.size) && !transaction.disposed) {
 				if (!dirty) {
@@ -1918,6 +1925,10 @@ function bindProgram<Props>(
 				drain();
 			}
 		};
+	const resume = (): void => {
+		busy = false;
+		drain();
+	};
 	const refresh = (): void => {
 		if (transaction.disposed) return;
 		revision++;
@@ -2033,6 +2044,7 @@ function bindProgram<Props>(
 			return handle;
 		}
 		signal?.addEventListener('abort', abort, { once: true });
+		watchRenderSlices();
 		const stop = source.subscribe(refresh);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(299));
 		if (transaction.disposed) stop();
