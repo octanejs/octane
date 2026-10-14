@@ -48,6 +48,7 @@ import {
 	HYDRATION_START,
 	isRangeOpen,
 	RANGE_OPEN_SOURCE,
+	selfDelimits,
 } from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
@@ -2501,7 +2502,7 @@ function ssrChildValue(
 					const props = d.props;
 					const children = d.children;
 					const html = ssrHostElement(type, props, children, scope);
-					return inRange || (selfMarkItem && serverHostHasPrimitiveChildren(children))
+					return inRange || (selfMarkItem && selfDelimits(type, SSR_HOST_CHILD_BLOCKS))
 						? html
 						: ssrBlock(html);
 				}
@@ -2613,6 +2614,7 @@ function ssrHostElement(
 		childrenNamespace,
 		location: undefined,
 	};
+	let childBlocks = false;
 	try {
 		const iterable = iterableChildArray(children);
 		const iterableChildren = iterable !== null;
@@ -2733,9 +2735,10 @@ function ssrHostElement(
 				// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
 				// children are rebuilt by the client de-opt reconciler, so they stay as plain
 				// marker-less markup via `ssrDescriptorContent`.
+				childBlocks = iterableChildren || serverDescNeedsBlocks(children);
 				const build = () =>
 					ssrInNamespace(childrenNamespace, () =>
-						iterableChildren || serverDescNeedsBlocks(children)
+						childBlocks
 							? ssrDeoptBlockChildren(children, scope)
 							: ssrDescriptorContent(children, scope),
 					);
@@ -2767,6 +2770,8 @@ function ssrHostElement(
 		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 	} finally {
 		CURRENT_SSR_ELEMENT = parentElement;
+		// After the children's own hosts wrote theirs.
+		SSR_HOST_CHILD_BLOCKS = childBlocks;
 	}
 }
 
@@ -2855,18 +2860,15 @@ function scriptDescriptorText(v: unknown): string | null {
 	return String(v);
 }
 
-// A host with a primitive or empty actual child stays on the client's raw-host
-// reconciliation path and therefore provides one stable Element boundary. Any
-// object, array, iterable, portal, or render function remains conservatively
-// marked. Classify the very value already read for serialization so public
-// getters and forwarding Proxies cannot lie or be evaluated an extra time.
-function serverHostHasPrimitiveChildren(children: unknown): boolean {
-	return children === null || (typeof children !== 'object' && typeof children !== 'function');
-}
+// Whether the children of the host ssrHostElement serialized last needed a
+// component's range (serverDescNeedsBlocks), which selfDelimits reads for the
+// item that host is, from the children value the serializer already read.
+let SSR_HOST_CHILD_BLOCKS = false;
 
 // Serialize one de-opt keyed item after its established serverDescNeedsBlocks
-// routing. Capture descriptor fields in exactly ssrDescriptorContent's ordinary
-// evaluation order, then decide whether the actual rendered host can self-mark.
+// routing, which found no component in it. Capture descriptor fields in
+// exactly ssrDescriptorContent's ordinary evaluation order. A host is then
+// exactly one element, which delimits the item (selfDelimits).
 function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 	if (value !== null && typeof value === 'object' && (value as any).$$kind === ELEMENT_TAG) {
 		const descriptor = value as ElementDescriptor;
@@ -2874,8 +2876,7 @@ function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 			const type = descriptor.type;
 			const props = descriptor.props;
 			const children = descriptor.children;
-			const html = ssrHostElement(type, props, children, scope);
-			return serverHostHasPrimitiveChildren(children) ? html : ssrBlock(html);
+			return ssrHostElement(type, props, children, scope);
 		}
 	}
 	return ssrBlock(ssrDescriptorContent(value, scope));

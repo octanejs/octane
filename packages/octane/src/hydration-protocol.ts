@@ -21,6 +21,11 @@
 // root of a `@{}` body) has no frame and renders its value in that range. A
 // root's output has no range, so a value the root returns keeps one of its own.
 //
+// A list item has a range of its own unless it renders exactly one host
+// element, which then delimits the item. A compiled `@for` row is one when the
+// compiler proves its body renders one element; a descriptor list decides per
+// item value (selfDelimits).
+//
 // A Suspense boundary is one range whose opening comment carries its state,
 // with the boundary's content directly inside:
 // - `[$:N`  the server rendered the content. N counts the `useId()` values it
@@ -116,6 +121,18 @@ export const RANGE_OPEN_SOURCE = '^\\[(?:$|\\$[:?!]|f[01]|b;)';
 /** Whether a comment's data closes a range. */
 export function isRangeClose(data: string): boolean {
 	return data === ']';
+}
+
+/**
+ * Whether a descriptor list item whose descriptor type is `type` delimits
+ * itself: it is a host element, and nothing in it needs a component's range
+ * (`childBlocks`, each side's descNeedsBlocks over the children it renders).
+ * The client's de-opt reconciler renders such an item as that one element, and
+ * any other item, a host whose children hold a component included, inside a
+ * range of its own.
+ */
+export function selfDelimits(type: unknown, childBlocks: boolean): boolean {
+	return typeof type === 'string' && !childBlocks;
 }
 
 /** The `useId()` count a `[$:N` or `[$!rN` open records, or -1 when malformed. */

@@ -35,7 +35,7 @@ const SUITES = [
 // name methods `Class.method`.
 const FAMILIES = {
 	// A component's returned value (#2028 commit 2).
-	returned: ['renderReturnedValue', 'lendRange'],
+	returned: ['renderReturnedValue'],
 	// De-opt descriptor lists (commit 3).
 	descriptors: ['deoptItemBody', 'renderPreparedChildList', 'buildsList'],
 	// Strong, lite and void component calls (commit 5).
@@ -65,7 +65,7 @@ const FAMILIES = {
 // Misses per family over SUITES at the commit that last lowered each budget.
 const BUDGET = {
 	returned: 0,
-	descriptors: 46,
+	descriptors: 0,
 	components: 0,
 	// Strict calls (commit 5) leave the server's ranges to the template roots.
 	templates: 5900,
