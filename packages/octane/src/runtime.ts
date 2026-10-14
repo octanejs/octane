@@ -3170,7 +3170,12 @@ function inCommitCallback(): boolean {
 	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
 }
 
-function transitionActionBatchForUpdate(): TransitionActionBatch | null {
+/**
+ * The batch an update joins. A state update passes its Block: a render-phase
+ * update belongs to the render processing it, never to an Action.
+ */
+function transitionActionBatchForUpdate(block?: Block): TransitionActionBatch | null {
+	if (CURRENT_BLOCK === block) return null;
 	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
@@ -5284,7 +5289,8 @@ function commitRootRenders(): void {
 	if (HOLDING_ROOT_COMMITS) return;
 	// Finished transitions' signals promote before this commit accepts the
 	// renders that read them; committed readers hear of it once it ends.
-	const signals = PENDING_SIGNAL_PROMOTIONS === null ? null : beginNativeBatch();
+	if (PENDING_SIGNAL_PROMOTIONS === null) return commitRootTransactions();
+	const signals = beginNativeBatch();
 	try {
 		promotePendingSignals();
 		commitRootTransactions();
@@ -8817,7 +8823,7 @@ function drainQueue(): { err: any } | null {
 			for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 		}
 		// Batches that finished during that commit.
-		promotePendingSignals();
+		if (PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
 	}
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrainEnd();
@@ -9718,7 +9724,7 @@ function commitHeldRootRenders(held: RootRenderTransaction[], layout: DeferredLa
 	HELD_REHIDES = null;
 	if (rehides !== null)
 		for (const activity of rehides) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
-	promotePendingSignals();
+	if (PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
 	// A custom-element callback may synchronously replace a root during the
 	// mutation phase. Accept that root's work before resource readiness.
 	acceptDeferredRootTransactions(layout);
@@ -10338,7 +10344,8 @@ export function flushSync<T>(fn: () => T): T {
 			} finally {
 				inFlush = false;
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.endCue();
-				clearFlushedTransitions();
+				if (FLUSHED_TRANSITION_BATCHES.length !== 0 || CONSUMED_TRANSITION_BLOCKS !== null)
+					clearFlushedTransitions();
 				CURRENT_EFFECT_PHASE = effectPhase;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__devtoolsNotifyFlush();
@@ -14023,13 +14030,16 @@ function queueHookUpdate(
 			__profileSchedule(block, type, slot);
 		scheduleRender(block);
 	} else TRANSITION_ROOT_DRIVER!.queue(cell, batch, block, type, slot);
-	markRootUpdated(block);
+	if (TRANSITION_HOLDERS !== null && TRANSITION_HOLDERS.size !== 0) markRootUpdated(block);
 }
 
-/** A user update outside render can unblock a held transition (wakeHeldTransitions). */
+/**
+ * A user update outside render can unblock a held transition
+ * (wakeHeldTransitions). Callers test TRANSITION_HOLDERS first, so an update
+ * with nothing held makes no call.
+ */
 function markRootUpdated(block: Block): void {
-	if (TRANSITION_HOLDERS && TRANSITION_HOLDERS.size !== 0 && CURRENT_BLOCK === null)
-		TRANSITION_ROOT_DRIVER!.wake(block);
+	if (CURRENT_BLOCK === null) TRANSITION_ROOT_DRIVER!.wake(block);
 }
 
 export function useState<T = undefined>(): StateTuple<T | undefined>;
@@ -14090,11 +14100,18 @@ function readStateHook<T>(
 					} catch {
 						// An eager computation is only an optimization. Retry a failure in
 						// render so the component's error boundary owns the exception.
-						queueHookUpdate(cell, block, stateUpdateBatch(block), next, 'state', slot);
+						queueHookUpdate(
+							cell,
+							block,
+							transitionActionBatchForUpdate(block),
+							next,
+							'state',
+							slot,
+						);
 						return;
 					}
 					// Select after evaluating the updater: user code can open an Action.
-					const batch = stateUpdateBatch(block);
+					const batch = transitionActionBatchForUpdate(block);
 					if (Object.is(computed, cell.value)) return;
 					if (batch === null) {
 						if (collectingRefStateUpdates && REF_CALLBACK_DEPTH > 0) {
@@ -14118,24 +14135,20 @@ function readStateHook<T>(
 						)
 							__profileSchedule(block, 'state', slot);
 						scheduleRender(block);
-						markRootUpdated(block);
+						if (TRANSITION_HOLDERS !== null && TRANSITION_HOLDERS.size !== 0)
+							markRootUpdated(block);
 						return;
 					}
 					queueHookUpdate(cell, block, batch, next, 'state', slot);
 					return;
 				}
-				queueHookUpdate(cell, block, stateUpdateBatch(block), next, 'state', slot);
+				queueHookUpdate(cell, block, transitionActionBatchForUpdate(block), next, 'state', slot);
 			},
 			getter: undefined,
 		};
 		ensureHooks(scope).set(slot, s);
 	}
 	return s;
-}
-
-/** A render-phase update belongs to the render processing it, never to an Action. */
-function stateUpdateBatch(block: Block): TransitionActionBatch | null {
-	return CURRENT_BLOCK === block ? null : transitionActionBatchForUpdate();
 }
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
@@ -14358,7 +14371,7 @@ export function useLinkedState<Source, Value>(
 					return;
 				}
 				// Select after evaluating the updater: user code can open an Action.
-				const batch = stateUpdateBatch(block);
+				const batch = transitionActionBatchForUpdate(block);
 				if (batch !== null || state!.queue !== null) {
 					queueHookUpdate(state!, block, batch, next, 'state', slot);
 					return;
@@ -14371,7 +14384,7 @@ export function useLinkedState<Source, Value>(
 					__profileSchedule(block, 'state', slot);
 				state!.value = computed;
 				scheduleRender(block);
-				markRootUpdated(block);
+				if (TRANSITION_HOLDERS !== null && TRANSITION_HOLDERS.size !== 0) markRootUpdated(block);
 			},
 		};
 		ensureHooks(scope).set(slot, state);
@@ -14565,7 +14578,7 @@ function readReducerHook<S, A, I>(
 			// state applies to the actions it receives.
 			dispatch: (action) => {
 				if (block.disposed) return;
-				queueHookUpdate(s!, block, stateUpdateBatch(block), action, 'reducer', slot);
+				queueHookUpdate(s!, block, transitionActionBatchForUpdate(block), action, 'reducer', slot);
 			},
 			getter: undefined,
 		};
