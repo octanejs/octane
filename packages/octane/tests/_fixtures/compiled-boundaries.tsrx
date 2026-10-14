@@ -60,6 +60,20 @@ export function OrdinaryShell(props: { component: () => any }) @{
 	</Ordinary>
 }
 
+function MixedRoute(props: { component: () => any }) @{
+	const Component = props.component;
+	<section>
+		<Component />
+	</section>
+}
+
+export function MixedOutletShell(props: { component: () => any }) @{
+	<main>
+		<CompiledOutlet component={MixedRoute} props={props} />
+		<OrdinaryShell component={props.component} />
+	</main>
+}
+
 export function Shadowed(props: { replacement: () => any }) @{
 	const CompiledOutlet = props.replacement;
 	<main>

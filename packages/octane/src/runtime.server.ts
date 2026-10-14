@@ -5387,7 +5387,9 @@ function renderComponentFramed(
 	rendererListKeys?: ServerSignalListKeys | null,
 	// The owner a template block renders inside (see TEMPLATE_INVOCATION_SITE).
 	enclosingOwner?: SignalRendererOwnerIdentity,
-	output: typeof serverComponentOutput = serverComponentOutput,
+	// Do not default a callback here: parameter initialization enlarges every
+	// recursive frame, reducing the maximum supported nesting of ordinary SSR.
+	compiledOnly?: true,
 ): string {
 	const previous = captureServerComponentContext();
 	const parentScope = parent ?? previous.scope;
@@ -5457,7 +5459,9 @@ function renderComponentFramed(
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			HOOK_PASS = previousHookPass;
 		}
-		const inner = output(out, scope, previous.owner);
+		const inner = compiledOnly
+			? checkedCompiledOutput(out)
+			: serverComponentOutput(out, scope, previous.owner);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
@@ -5520,7 +5524,7 @@ export function ssrComponent(
 	identityScoped?: boolean | 'key',
 	invocationSite?: string,
 	bindingMarker?: string,
-	output?: typeof serverComponentOutput,
+	compiledOnly?: true,
 ): string {
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
 	// original identity for async keys, then use the stable cold body below. A
@@ -5671,7 +5675,7 @@ export function ssrComponent(
 					: invocationSite === undefined
 						? childrenSignalOwner(comp)
 						: authorChildrenSignalOwner(comp, props),
-			output,
+			compiledOnly,
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -6729,7 +6733,7 @@ export function CompiledOutlet(
 			undefined,
 			undefined,
 			undefined,
-			checkedCompiledOutput,
+			true,
 		),
 	);
 }

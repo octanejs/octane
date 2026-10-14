@@ -86,6 +86,21 @@ describe('checked compiled boundaries', () => {
 		}
 	});
 
+	it('allows an ordinary returned descriptor nested inside a compiled outlet and after it', () => {
+		const props = { component: () => createElement('b', null, 'ordinary') };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server.MixedOutletShell, props).html;
+		expect(host.querySelector('section b')?.textContent).toBe('ordinary');
+		expect(host.querySelectorAll('b')).toHaveLength(2);
+		const view = mount(client.MixedOutletShell, props);
+		try {
+			expect(view.container.querySelector('section b')?.textContent).toBe('ordinary');
+			expect(view.container.querySelectorAll('b')).toHaveLength(2);
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('renders a shadowing component with the normal returned-value contract', () => {
 		const replacement = () => createElement('b', null, 'returned by a different component');
 		const view = mount(client.Shadowed, { replacement });
