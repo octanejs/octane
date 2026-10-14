@@ -146,7 +146,8 @@ let executionDepth = 0;
 let pureDepth = 0;
 let batchDepth = 0;
 let flushing = false;
-let retirementError: ScopeDisposedError | undefined;
+/** While an owner retires: the one error state its nodes and their dependents present. */
+let retirement: NodeState<never> | undefined;
 let historicalReader:
 	((node: ScopedNode, read: SignalReadMode) => NodeState | undefined) | undefined;
 const queued = new Set<Work>();
@@ -160,12 +161,7 @@ function notifyNode(node: ReactiveNode): void {
 		node.revision++;
 		node.wakeup?.resolve();
 		node.wakeup = undefined;
-		if (retirementError) {
-			releaseRetention(node);
-			node.state?.resolveWaiting?.();
-			node.state = errorState(retirementError);
-			node.flags |= REACTIVE_DIRTY;
-		}
+		if (retirement) retireState(node);
 		node.owner.trace('invalidate', node);
 		if (node.invalidateAttempt) {
 			if (candidateHooks.defer) {
@@ -654,6 +650,20 @@ export function releaseRetention(node: ScopedNode): void {
 	node.hasLast = false;
 }
 
+/**
+ * Settle a node's waiter, then present the retirement, to be read again, and
+ * retain nothing. Disposal runs this for every node, so it never builds a
+ * value-only node's state only to replace it: once built, that state is plain
+ * and ready, with no waiter and no owners.
+ */
+function retireState(node: ScopedNode): void {
+	node.storedState?.resolveWaiting?.();
+	node.valueOnly = false;
+	node.storedState = retirement;
+	node.flags |= REACTIVE_DIRTY;
+	releaseRetention(node);
+}
+
 function retainOwners(node: ScopedNode): void {
 	const owners = node.lastState?.owners;
 	if (!owners || retainedOwners.get(node) === owners) return;
@@ -666,7 +676,7 @@ function retainOwners(node: ScopedNode): void {
 	}
 }
 
-function revokeRetainedValues(owner: GraphOwner, error: ScopeDisposedError): void {
+function revokeRetainedValues(owner: GraphOwner): void {
 	const nodes = retainedNodes.get(owner);
 	if (!nodes) return;
 	for (const node of nodes) {
@@ -677,7 +687,7 @@ function revokeRetainedValues(owner: GraphOwner, error: ScopeDisposedError): voi
 				if (!origin.retired) (surviving ??= new Set()).add(origin);
 			}
 		}
-		commitState(node, withOwners(errorState(error), surviving));
+		commitState(node, withOwners(retirement!, surviving));
 		if (node.subs) {
 			propagate(node.subs, executionDepth !== 0);
 			shallowPropagate(node.subs);
@@ -1754,8 +1764,8 @@ export function releaseDeclarationView(view: ScopedNode): void {
 }
 
 export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): void {
-	const previousError = retirementError;
-	retirementError = new ScopeDisposedError(owner.scopeKey);
+	const previous = retirement;
+	retirement = errorState(new ScopeDisposedError(owner.scopeKey));
 	try {
 		for (const observer of owner.observers) {
 			// Public subscriptions end silently. Native views must invalidate once so
@@ -1763,18 +1773,14 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			if (observer.native && observer.notify) queued.add(observer.notify);
 			stopObserver(observer);
 		}
-		revokeRetainedValues(owner, retirementError);
+		revokeRetainedValues(owner);
 		for (const node of nodes) {
 			if (node.pending !== undefined) pendingSignals!.drop(node.pending);
 			queued.delete(node);
 			node.wakeup?.resolve();
 			node.wakeup = undefined;
 			node.revision++;
-			// A value-only node has no waiter to settle and retains nothing else.
-			if (node.valueOnly) node.valueOnly = false;
-			else node.state?.resolveWaiting?.();
-			node.state = errorState(retirementError);
-			releaseRetention(node);
+			retireState(node);
 			node.compute = undefined;
 			node.invalidateAttempt = undefined;
 			node.retryRequest = undefined;
@@ -1787,7 +1793,7 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			node.flags = REACTIVE_NONE;
 		}
 	} finally {
-		retirementError = previousError;
+		retirement = previous;
 	}
 }
 
