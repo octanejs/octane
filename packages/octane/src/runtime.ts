@@ -3926,17 +3926,20 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // commit function `C(bag, careful)`. The bag's binding slots hold COMMITTED
 // values, the ones the DOM shows. A render compares each binding against its
 // committed slot, inline in the compiled template, and only a difference calls
-// a recorder. The first one stages the bag: `bag.next` is a reusable array of
-// pending cells, allocated once per bag, whose cells hold the bag itself as the
-// "unchanged" marker until a binding records into them. `C` walks the cells
-// straight-line: it writes each changed cell through the ordinary setter and
-// only then publishes it to the committed slot.
+// a recorder. The first one stages the bag: `bag.next` becomes an array of
+// pending cells, whose cells hold the bag itself as the "unchanged" marker
+// until a binding records into them. `C` walks the cells straight-line: it
+// writes each changed cell through the ordinary setter and only then publishes
+// it to the committed slot.
 //
 // `bag.$` packs the template's cell count (low byte, the bag factory's
-// argument) with the STAGED and QUEUED bits. Until its first stage `bag.next`
-// holds the template's commit function (the factory's last argument); after it,
-// the cells carry three trailing ones: the rendering Scope (for commit-phase
-// error routing), the index of the bag's entry in the root's ops, and `C`.
+// argument) with the STAGED and QUEUED bits. An idle bag's `next` holds the
+// template's commit function (the factory's last argument). A staged bag's
+// cells carry three trailing ones: the rendering Scope (for commit-phase error
+// routing), the index of the bag's entry in the root's ops, and `C`. The cells
+// come from BAG_POOL while it has spares, and while it is short a queued commit
+// returns them (runCommitOps), so a newly mounted template's first update
+// allocates nothing; a bag past the pool keeps its own array.
 //
 // A render that cannot be dropped calls `C` at once, from the template's
 // trailing bagDone: a fresh Block the root attempt discards whole, a render
@@ -3957,6 +3960,8 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 const BAG_SIZE = 255;
 const BAG_STAGED = 256;
 const BAG_QUEUED = 512;
+/** Eight spare cell arrays, seeded at load: see the section comment. */
+const BAG_POOL: any[][] = [[], [], [], [], [], [], [], []];
 /** Ops length when the innermost open window began; 0 for the root window. */
 let OPS_CHECKPOINT = 0;
 const OPS_CHECKPOINTS: number[] = [];
@@ -4014,15 +4019,15 @@ export function bagRecord(
 		else {
 			next = bag.next;
 			if (typeof next === 'function') {
-				// Packed from the start: the commit function reads every cell.
+				// Kept packed: the commit function reads every cell. A longer pooled
+				// array's extra cells go unread.
 				const commit = next;
-				next = bag.next = [];
-				for (let i = size + 3; i > 0; i--) next.push(bag);
+				next = bag.next = BAG_POOL.pop() ?? [];
+				while (next.length < size + 3) next.push(bag);
 				next[size + 2] = commit;
-			} else {
-				// A loop, not fill(): a builtin call costs more than a few cells.
-				for (let i = size - 1; i >= 0; i--) next![i] = bag;
 			}
+			// A loop, not fill(): a builtin call costs more than a few cells.
+			for (let i = size - 1; i >= 0; i--) next![i] = bag;
 			bag.$ = state |= BAG_STAGED;
 		}
 		// A render that may be dropped queues `C` now, a resumed bag included;
@@ -4109,6 +4114,16 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 				if (typeof target?.$ !== 'number') throw error;
 				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
 					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+			}
+			// While the pool is short, an idle bag returns its cells and holds `C`
+			// again. Only a bag has `$`; any other target, null included, compares
+			// undefined.
+			if (BAG_POOL.length < 8 && target?.$ <= BAG_SIZE) {
+				const next = target.next;
+				if (typeof next === 'object') {
+					BAG_POOL.push(next);
+					target.next = next[target.$ + 2];
+				}
 			}
 		}
 		return COMMITTING_GENERATION;
