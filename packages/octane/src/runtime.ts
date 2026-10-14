@@ -733,13 +733,20 @@ let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
 // Captured updates already passed cell creation and use the same live drains.
 let drainEffectEventUpdates: typeof drainQueuedEffectEventUpdates = noop;
 let drainStoreSyncs: typeof drainQueuedStoreSyncs = noop;
-// Only enqueueEffect publishes effect slots. Keep their commit work at that
-// owner, with live calls so the first effects may appear during a ref callback.
+// Only enqueueEffect publishes effect slots, so only it installs their commit
+// work, with live calls so the first effects may appear during a ref callback.
 let drainMutationEffects: typeof drainRegisteredMutationEffects = () => null;
 let runLayoutEffects: typeof runRegisteredLayoutEffects = noop;
 let drainPassivePhase: typeof drainRegisteredPassivePhase = noop;
 let drainDeferredPassiveUnmounts: typeof drainRegisteredPassiveUnmounts = noop;
 let schedulePassiveFlush: typeof scheduleRegisteredPassiveFlush = noop;
+function installEffectDrivers(): void {
+	drainMutationEffects = drainRegisteredMutationEffects;
+	runLayoutEffects = runRegisteredLayoutEffects;
+	drainPassivePhase = drainRegisteredPassivePhase;
+	drainDeferredPassiveUnmounts = drainRegisteredPassiveUnmounts;
+	schedulePassiveFlush = scheduleRegisteredPassiveFlush;
+}
 
 // Native reads are a compiler-selected capability. Ordinary applications keep
 // only driver tests at renderer boundaries, which their minifier removes; no
@@ -764,6 +771,9 @@ let CONTROLLED_RESTORE_DRIVER: {
 // Keep the call targets stable after installation, including after rollback.
 let drainControlledSyncs: typeof drainQueuedControlledSyncs = noop;
 let publishManualFormPending: typeof publishRegisteredManualFormPending = noop;
+function installManualFormPending(): void {
+	publishManualFormPending = publishRegisteredManualFormPending;
+}
 // A PortalSlot installs its consumers before deferred range publication. Keep
 // them installed after the last removal: an event can still be between capture
 // and bubble with a route through the former portal.
@@ -819,6 +829,9 @@ let HYDRATION_DRIVER: HydrationDriver | null = null;
 // Keep every consumer callable: some calls pass the recovery itself as an argument.
 let ROOT_ERROR_HANDLERS: WeakMap<Block, RootErrorHandlers> | null = null;
 let registerRootErrorHandlers: typeof registerEnabledRootErrorHandlers = noop;
+function installRootErrorHandlers(): void {
+	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
+}
 let reportCaughtError: typeof registeredReportCaughtError = noop;
 let reportUncaughtError: typeof registeredReportUncaughtError = () => false;
 let publishInlineCaughtErrorReports: typeof registeredPublishInlineCaughtErrorReports = noop;
@@ -14640,13 +14653,7 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 		// Parallel flat list in declaration order — unmountScope's phase-correct
 		// deletion walk reads it (see Scope.effectSlots).
 		if (scope.effectSlots === null) {
-			if (runLayoutEffects === noop) {
-				drainMutationEffects = drainRegisteredMutationEffects;
-				runLayoutEffects = runRegisteredLayoutEffects;
-				drainPassivePhase = drainRegisteredPassivePhase;
-				drainDeferredPassiveUnmounts = drainRegisteredPassiveUnmounts;
-				schedulePassiveFlush = scheduleRegisteredPassiveFlush;
-			}
+			if (runLayoutEffects === noop) installEffectDrivers();
 			scope.effectSlots = [slotObj];
 		} else scope.effectSlots.push(slotObj);
 		effect = slotObj;
@@ -43574,8 +43581,7 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	// notifies the record exactly once.
 	const submitRec = ACTIVE_SUBMIT_DISPATCH;
 	if (submitRec !== null) {
-		if (publishManualFormPending === noop)
-			publishManualFormPending = publishRegisteredManualFormPending;
+		if (publishManualFormPending === noop) installManualFormPending();
 		submitRec.transitions++;
 	}
 	let result: unknown;
@@ -50414,7 +50420,7 @@ function createRootWithOutputHandler(
 }
 
 export function createRoot(container: RootContainer, options?: RootOptions): Root {
-	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
+	installRootErrorHandlers();
 	return createRootWithOutputHandler(container, options, renderReturnedValue);
 }
 
@@ -50425,7 +50431,7 @@ export function __createRootDefaultOptions(container: RootContainer): Root {
 
 /** Compiler-only root for a statically proven void `@{}` entry component. */
 export function __createVoidRoot(container: RootContainer, options?: RootOptions): Root {
-	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
+	installRootErrorHandlers();
 	return createRootWithOutputHandler(container, options, null);
 }
 
@@ -50565,7 +50571,7 @@ function hydrateRootWithOutputHandler(
 	rootOptions: RootOptions | undefined,
 	outputHandler: OutputHandler | null,
 ): Root {
-	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
+	installRootErrorHandlers();
 	assertValidRootContainer(container);
 	// Leases, presentations and streamed arms below outlive the adoption pass.
 	installHydrationDriver();
