@@ -37,7 +37,7 @@ describe('RenderOptions — nonce', () => {
 			{ nonce: 'abc123' },
 		);
 		expect(out.html).toContain(
-			'<script type="application/json" data-octane-suspense="3" nonce="abc123">',
+			'<script type="application/json" data-octane-suspense nonce="abc123">',
 		);
 	});
 

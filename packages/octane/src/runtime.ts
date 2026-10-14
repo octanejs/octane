@@ -20458,6 +20458,11 @@ function isFloatHeadResource(node: Node): boolean {
  * every entry as exactly `<!--rnh-K--><tag>…</tag><!--/rnh-K-->`; any other
  * shape ends the prefix, and the root adopts from there.
  */
+/** Whether `node` is the comment naming this client's hydration protocol (hydrateRoot). */
+function isProtocolMark(node: Node): boolean {
+	return node.nodeType === 8 && (node as Comment).data === HYDRATION_PROTOCOL_VERSION;
+}
+
 function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node | null {
 	const head =
 		container.nodeType === 9 ? null : (container as Element | DocumentFragment).ownerDocument.head;
@@ -50304,6 +50309,31 @@ function hydrateRootWithOutputHandler(
 	};
 	rootBlock.idState = idState;
 	registerRootErrorHandlers(rootBlock, rootOptions);
+	// The comment that opens the root's output names the hydration protocol its
+	// server spoke. Without it, or with another version, the root renders on the
+	// client instead of adopting ranges it would misread. Like a range's
+	// comments, it stays, and the root's content follows it. Foreign elements and
+	// comments before it stay too, as hydration skips them, but a text node there
+	// is where adoption starts, and fails, as React's does. A root that hydrates
+	// a server-rendered document, or part of one such as a shell's app container,
+	// finds the version that opened the document's output: the HTML parser keeps
+	// it before `<html>`, or moves it into `<head>` after head metadata folded in
+	// before it. An empty container holds no server output at all: adoption
+	// finds nothing there.
+	const served = skipFoldedHeadPrefix(container, getFirstChild(container));
+	let mark = served;
+	let foreignText: Node | null = null;
+	while (mark !== null && !isProtocolMark(mark)) {
+		if (mark.nodeType === 3) foreignText ??= mark;
+		mark = getNextSibling(mark);
+	}
+	let protocolSkew = mark === null && served !== null;
+	if (protocolSkew) {
+		const doc = container.nodeType === 9 ? (container as Document) : container.ownerDocument!;
+		for (const parent of [doc, doc.head])
+			for (let node = parent && getFirstChild(parent); node; node = getNextSibling(node))
+				if (isProtocolMark(node)) protocolSkew = false;
+	}
 	let seeds: unknown[] | null = null;
 	// The root-local counter starts at zero, matching the server render carrying
 	// the same identifierPrefix. Other roots cannot perturb hydration ordering.
@@ -50311,11 +50341,7 @@ function hydrateRootWithOutputHandler(
 	// inline data <script> (and remove it, so it isn't taken for a hydratable
 	// node) and stage them for useThenable to consume in render order.
 	const seedScript = container.querySelector('script[' + SUSPENSE_SCRIPT_ATTR + ']');
-	// The seed script names the hydration protocol its server rendered. Another
-	// version's ranges would be misread, so the root renders on the client.
-	let protocolSkew = false;
 	if (seedScript !== null) {
-		protocolSkew = seedScript.getAttribute(SUSPENSE_SCRIPT_ATTR) !== HYDRATION_PROTOCOL_VERSION;
 		if (!protocolSkew) seeds = parseSeedJson(seedScript.textContent || '[]');
 		seedScript.remove();
 	}
@@ -50383,7 +50409,10 @@ function hydrateRootWithOutputHandler(
 		// Every failed adoption discards its scopes, not the server DOM. Restart
 		// the root-local ID and seed cursors together on the next attempt.
 		idState.next = rootOptions?.identifierSeed ?? 0;
-		const firstNode = skipFoldedHeadPrefix(container, getFirstChild(container));
+		const firstNode =
+			mark === null
+				? skipFoldedHeadPrefix(container, getFirstChild(container))
+				: (foreignText ?? skipFoldedHeadPrefix(container, getNextSibling(mark)));
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
 		// A suspended attempt rolls back, and its retry adopts afresh.
 		hydration.defers = true;

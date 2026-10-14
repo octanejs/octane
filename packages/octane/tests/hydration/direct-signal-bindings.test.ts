@@ -1014,7 +1014,7 @@ export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`
 			);
 			const container = document.createElement('div');
 			document.body.appendChild(container);
-			container.innerHTML = `<div><p>${serverContent}</p><i class="x">t</i></div>`;
+			container.innerHTML = `<!--3--><div><p>${serverContent}</p><i class="x">t</i></div>`;
 			flushSync(() => {
 				root = hydrateRoot(container, client.App, { value: 'a' }, { onRecoverableError() {} });
 			});

@@ -751,7 +751,7 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 	});
 
 	it('onUncaughtError consumes a hydration render error (unowned root)', async () => {
-		container.innerHTML = '<div>server</div>';
+		container.innerHTML = '<!--3--><div>server</div>';
 		const onUncaughtError = vi.fn();
 		let root!: ReturnType<typeof hydrateRoot>;
 		expect(() => {
@@ -786,7 +786,7 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 	});
 
 	it('control: a hydration render error without the option still throws', () => {
-		container.innerHTML = '<div>server</div>';
+		container.innerHTML = '<!--3--><div>server</div>';
 		expect(() => hydrateRoot(container, MountThrower, {})).toThrow('mount-boom');
 	});
 

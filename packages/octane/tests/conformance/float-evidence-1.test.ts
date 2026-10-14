@@ -110,7 +110,7 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 	// instead of an <html> container).
 	it('hydration adopts hoisted non-resource head elements alongside inserted resources', async () => {
 		const r = await Server.renderToString(srv.MixedHead, {});
-		const bodyStart = r.html.indexOf('<main');
+		const bodyStart = r.html.indexOf('<!--3-->');
 		expect(bodyStart).toBeGreaterThan(-1);
 		document.head.insertAdjacentHTML('beforeend', r.html.slice(0, bodyStart));
 		const c = document.createElement('div');
@@ -178,7 +178,7 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 	// removed from the html inline'
 	it('sibling texts survive SSR resource elision and hydrate without mismatch', async () => {
 		const r = await Server.renderToString(srv.TextResourceSiblings, {});
-		const bodyStart = r.html.indexOf('<div class="text-siblings"');
+		const bodyStart = r.html.indexOf('<!--3-->');
 		expect(bodyStart).toBeGreaterThan(-1);
 		const headHtml = r.html.slice(0, bodyStart);
 		const bodyHtml = r.html.slice(bodyStart);

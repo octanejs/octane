@@ -31,7 +31,12 @@ component's body still keeps the server HTML until it resolves. Every
 structural mismatch, a server range without its close included, reaches
 `onRecoverableError` as the same `HydrationMismatch` error.
 
-The seed script names the new version (`data-octane-suspense="3"`). A root whose
-server rendered another version renders on the client and reports error 345
-through `onRecoverableError`, so deploy the server and the client from the same
-Octane version.
+Every hydratable root's server output now opens with a comment naming the
+protocol version, `<!--3-->`, whether or not it seeds `use()` values, and so does
+an independent `<Hydrate>` island's. Head metadata folded into a fragment root
+comes before it, so `head + html` under `headChannel: 'separate'` is still the
+folded output. The comment stays in the DOM, as the range comments do. A root
+whose server rendered another version, or named none, renders on the client and
+reports error 345 through `onRecoverableError`; a root that hydrates an app
+container inside a server-rendered document finds the version before `<html>`.
+Deploy the server and the client from the same Octane version.

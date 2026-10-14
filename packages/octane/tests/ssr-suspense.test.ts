@@ -45,7 +45,7 @@ const m = evalServer(
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
 const seed = (json: string) =>
-	`<script type="application/json" data-octane-suspense="3">${json}</script>`;
+	`<script type="application/json" data-octane-suspense>${json}</script>`;
 
 function expectSeededHydration(
 	html: string,
@@ -1301,7 +1301,7 @@ export function App(props) @{
 
 	it('a bare use(promise) with no @try boundary is awaited and resolved', async () => {
 		const out = await prerender(m.AsyncLeaf, { promise: Promise.resolve('hello') });
-		expect(out.html).toBe('<div id="leaf">hello</div>' + seed('["hello"]'));
+		expect(out.html).toBe('<!--3--><div id="leaf">hello</div>' + seed('["hello"]'));
 	});
 
 	it('leaves a boundary whose use(promise) rejected for the client to render', async () => {
@@ -1383,7 +1383,7 @@ export function App(props) @{
 		// Body text is HTML-escaped as usual…
 		expect(out.html).toContain('<div id="leaf">&lt;/script&gt;&lt;x&gt;</div>');
 		// …and the JSON payload escapes every `<` to < (no literal `<` in it).
-		const json = out.html.match(/data-octane-suspense="3">(.*?)<\/script>$/)![1];
+		const json = out.html.match(/data-octane-suspense>(.*?)<\/script>$/)![1];
 		expect(json).not.toContain('<');
 		expect(JSON.parse(json)).toEqual(['</script><x>']);
 	});
@@ -1407,7 +1407,7 @@ export function App(props) @{
 			'<div id="sibs"><span class="a">A1</span><span class="b">A2</span></div>',
 		);
 		// b must contain ONLY its own seed — not A's values leaking through SERIAL.
-		expect(b.html).toBe('<div id="leaf">B1</div>' + seed('["B1"]'));
+		expect(b.html).toBe('<!--3--><div id="leaf">B1</div>' + seed('["B1"]'));
 	});
 
 	it('non-suspending components emit no seed <script>', async () => {
@@ -1419,7 +1419,7 @@ export function App(props) @{
 			'plain.tsrx',
 		);
 		const out2 = await prerender(plain.Plain);
-		expect(out2.html).toBe('<div id="p">static</div>');
+		expect(out2.html).toBe('<!--3--><div id="p">static</div>');
 		expect(out2.html).not.toContain('data-octane-suspense');
 	});
 

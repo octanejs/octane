@@ -1880,7 +1880,7 @@ describe('renderToReadableStream', () => {
 		});
 		const output = new Response(stream).text();
 		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
-		expect(await output).toBe('shell');
+		expect(await output).toBe('<!--3-->shell');
 		expect(onError).toHaveBeenCalledWith(callbackError);
 	});
 

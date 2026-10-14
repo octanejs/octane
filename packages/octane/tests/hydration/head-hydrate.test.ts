@@ -110,7 +110,7 @@ function appendRenderedRoot(html: string): {
 	const target = document.createElement('div');
 	document.body.appendChild(target);
 	extraContainers.push(target);
-	const bodyStart = html.indexOf('<main');
+	const bodyStart = html.indexOf('<!--3-->');
 	if (bodyStart === -1) throw new Error('Expected ownership fixture body markup');
 	document.head.insertAdjacentHTML('beforeend', html.slice(0, bodyStart));
 	target.innerHTML = html.slice(bodyStart);
@@ -238,7 +238,7 @@ describe('hoisted document metadata — SSR', () => {
 		const htmlPromise = new Response(stream).text();
 		value.resolve('ready');
 		const html = await htmlPromise;
-		const bodyStart = html.indexOf('<section id="streamed-boundary-head"');
+		const bodyStart = html.indexOf('<!--3-->');
 		if (bodyStart === -1) throw new Error('Expected authored streamed-boundary root');
 		document.head.innerHTML = html.slice(0, bodyStart);
 		container.innerHTML = html.slice(bodyStart);
@@ -300,7 +300,7 @@ describe('hoisted document metadata — hydration', () => {
 		const { html } = ServerRT.renderToString(server.Page, { params: {} });
 		// html folds head metadata to the front + body after. A document places the
 		// head part in <head> and the body part in the app container — split there.
-		const bodyStart = html.indexOf('<section');
+		const bodyStart = html.indexOf('<!--3-->');
 		const head = html.slice(0, bodyStart);
 		const body = html.slice(bodyStart);
 		document.head.innerHTML = head;
@@ -465,7 +465,7 @@ export function Page(props: { handlers: Record<string, () => void> }) @{
 
 	it('skips an interposed foreign element and adopts the intended head element', () => {
 		const { html } = ServerRT.renderToString(server.Page, { params: {} });
-		const bodyStart = html.indexOf('<section');
+		const bodyStart = html.indexOf('<!--3-->');
 		document.head.innerHTML = html.slice(0, bodyStart);
 		container.innerHTML = html.slice(bodyStart);
 
@@ -496,7 +496,7 @@ export function Page(props: { handlers: Record<string, () => void> }) @{
 
 	it('creates a missing expected head element without claiming a wrong-tag neighbor', () => {
 		const { html } = ServerRT.renderToString(server.Page, { params: {} });
-		const bodyStart = html.indexOf('<section');
+		const bodyStart = html.indexOf('<!--3-->');
 		document.head.innerHTML = html.slice(0, bodyStart);
 		container.innerHTML = html.slice(bodyStart);
 

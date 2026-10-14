@@ -5,7 +5,7 @@ import { flushEffects } from '../../octane/tests/_helpers';
 import TextareaAutosize from '../src/index.tsrx';
 
 const SERVER_HTML =
-	'<textarea aria-label="Message" placeholder="Write something" style="box-sizing:border-box;font-size:16px;height:55px;line-height:20px;width:120px;">hello</textarea>';
+	'<!--3--><textarea aria-label="Message" placeholder="Write something" style="box-sizing:border-box;font-size:16px;height:55px;line-height:20px;width:120px;">hello</textarea>';
 
 const style = {
 	boxSizing: 'border-box' as const,

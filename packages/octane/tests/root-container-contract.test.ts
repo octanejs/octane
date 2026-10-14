@@ -24,7 +24,7 @@ afterEach(() => {
 describe('public root containers and test environment', () => {
 	it('rebuilds an incompatible host descriptor root without stale insertion anchors', () => {
 		const container = document.createElement('div');
-		container.innerHTML = '<aside>wrong</aside>';
+		container.innerHTML = '<!--3--><aside>wrong</aside>';
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(container, NoscriptChildren);
 		expect(container.querySelector('noscript')?.textContent).toBe(
@@ -159,7 +159,7 @@ describe('public root containers and test environment', () => {
 	it('removes surplus server children and reports their recovery', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const container = document.createElement('div');
-		container.innerHTML = '<span>same<em>extra</em></span>';
+		container.innerHTML = '<!--3--><span>same<em>extra</em></span>';
 		const onRecoverableError = vi.fn();
 		const root = hydrateRoot(container, Label, { label: 'same' }, { onRecoverableError });
 		expect(container.textContent).toBe('same');

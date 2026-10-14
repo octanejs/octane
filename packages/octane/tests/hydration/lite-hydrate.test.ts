@@ -31,7 +31,7 @@ describe('hydrateRoot — hookless lite components (SSR Phase 6)', () => {
 	it('adopts each lite component (same elements), incl. the block-skipped 2nd one', async () => {
 		const { html } = ServerRT.renderToString(server.Shell, { title: 'T', a: 'Alpha', b: 'Beta' });
 		expect(html).toBe(
-			'<div id="shell"><h3>T</h3>' +
+			'<!--3--><div id="shell"><h3>T</h3>' +
 				'<!--[--><span class="badge">Alpha</span><!--]-->' +
 				'<!--[--><span class="badge">Beta</span><!--]-->' +
 				'</div>',

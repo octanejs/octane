@@ -63,9 +63,12 @@ export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
 export const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
 
 /**
- * The range protocol version above. The root seed script carries it as its
- * marker attribute's value, and a root whose server spoke another version
- * renders on the client instead of adopting ranges it would misread.
+ * The range protocol version above. A comment whose data is the version opens
+ * every hydratable root's output, and an independent `<Hydrate>` island's,
+ * whether or not it seeds anything. Only head metadata folded into a fragment
+ * root, or a streamed document's doctype, precedes it. A root whose server
+ * spoke another version, or named none, renders on the client instead of
+ * adopting ranges it would misread. Like a range's comments, it stays.
  */
 export const HYDRATION_PROTOCOL_VERSION = '3';
 

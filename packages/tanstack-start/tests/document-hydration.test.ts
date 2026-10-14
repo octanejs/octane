@@ -1,7 +1,7 @@
 import { flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
 import { StartClient } from '@octanejs/tanstack-start/client';
-import { expect, it } from 'vitest';
+import { expect, it, onTestFinished } from 'vitest';
 import { makeDocumentRouter } from './_fixtures/document-hydration.tsx';
 // @ts-expect-error the shared fixture plugin compiles the router graph for the server
 import * as server from './_fixtures/document-hydration.tsx?octane-ssr';
@@ -16,6 +16,12 @@ it('hydrates the server route in the document shell and activates its original b
 	const { html } = renderToString(server.StartServer, { router: serverRouter });
 	const doc = new DOMParser().parseFromString(html, 'text/html');
 	const container = doc.querySelector('#__app')!;
+	// The document's output opened with the hydration protocol version, before
+	// <html>. The app container moves into this document, so the version does too.
+	const mark = doc.firstChild!;
+	expect(mark.nodeType === Node.COMMENT_NODE && (mark as Comment).data).toBe('3');
+	document.insertBefore(mark, document.documentElement);
+	onTestFinished(() => (mark as Comment).remove());
 	expect(container.querySelectorAll('#counter')).toHaveLength(1);
 	const button = container.querySelector<HTMLButtonElement>('#counter')!;
 	expect(button.textContent?.trim()).toBe('Count: 0');

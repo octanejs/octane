@@ -80,7 +80,7 @@ describe.each([
 			.filter((message: string) => message.includes('hydration mismatch'));
 
 	function hydrate(name: string, paragraph: string, props: Record<string, unknown>) {
-		container.innerHTML = `<div><p>${paragraph}</p><i class="x">t</i></div>`;
+		container.innerHTML = `<!--3--><div><p>${paragraph}</p><i class="x">t</i></div>`;
 		const serverP = container.querySelector('p')!;
 		const tag = container.querySelector('i')!;
 		const serverChildren = [...serverP.childNodes];
@@ -286,7 +286,7 @@ describe.each([
 	it('reports once when the client render of the root suspends', async () => {
 		let resolve!: (text: string) => void;
 		const text = new Promise<string>((r) => (resolve = r));
-		container.innerHTML = '<div><p><b>x</b></p><em>R</em></div>';
+		container.innerHTML = '<!--3--><div><p><b>x</b></p><em>R</em></div>';
 		const em = container.querySelector('em')!;
 		const recovered: unknown[] = [];
 		root = hydrateRoot(

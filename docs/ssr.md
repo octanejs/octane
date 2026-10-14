@@ -240,9 +240,11 @@ A browser environment that neither substitutes the expression nor provides a
 The three buffered renderers return `RenderResult` with `html` and `css`, plus
 optional `head` and `signals` fields:
 
-- `html` — the rendered markup, including hydration markers and, when anything
+- `html` — the rendered markup, opened by a `<!--3-->` comment that names the
+  hydration protocol version, including hydration markers and, when anything
   resolved, an inline `<script type="application/json" data-octane-suspense>`
-  seed that hydration consumes. Hoisted `<title>`/`<meta>`/`<link>` (rendered
+  seed that hydration consumes. `hydrateRoot` renders a root whose output names
+  another version, or none, on the client. Hoisted `<title>`/`<meta>`/`<link>` (rendered
   anywhere in the tree, each preceded by an adoption marker comment) are folded
   in by default — spliced into `<head>` when the render produced a document or a
   fragment beginning with an authored `<head>`, else prepended (React-19 resource

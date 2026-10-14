@@ -95,9 +95,13 @@ export async function renderRouterToStream({
 // transform does). So, for a document render, fold the leading style run into the
 // shell `<head>` and prepend the doctype — what octane's native-injection
 // document mode (and, before it, an explicit relocate transform) used to do. Only
-// the shell prefix (through `</head>`) is buffered; everything after streams
-// straight through, preserving out-of-order boundary flushing. A non-document
-// render (no `</head>`) passes through unchanged.
+// the styles move: the comment naming octane's hydration protocol stays before
+// `<html>`, where hydrateRoot reads it. Only the shell prefix (through `</head>`)
+// is buffered; everything after streams straight through, preserving
+// out-of-order boundary flushing. A non-document render (no `</head>`) passes
+// through unchanged.
+const LEADING_STYLE = /<style\b[\s\S]*?<\/style>/gi;
+
 export function finalizeDocumentShell(
 	source: ReadableStream<Uint8Array>,
 ): ReadableStream<Uint8Array> {
@@ -131,9 +135,14 @@ export function finalizeDocumentShell(
 					if (htmlStart >= 0) {
 						if (htmlStart > 0) {
 							const leading = prefix.slice(0, htmlStart);
+							const styles = leading.match(LEADING_STYLE) ?? [];
 							const doc = prefix.slice(htmlStart);
 							const headClose = doc.indexOf('</head>');
-							prefix = doc.slice(0, headClose) + leading + doc.slice(headClose);
+							prefix =
+								leading.replace(LEADING_STYLE, '') +
+								doc.slice(0, headClose) +
+								styles.join('') +
+								doc.slice(headClose);
 						}
 						if (!/^\s*<!doctype/i.test(prefix)) prefix = '<!DOCTYPE html>' + prefix;
 					}

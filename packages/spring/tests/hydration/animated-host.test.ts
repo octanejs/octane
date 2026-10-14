@@ -16,7 +16,7 @@ describe('React Spring animated host hydration', () => {
 	it('serializes initial values and adopts the existing host before client animation', () => {
 		const container = document.createElement('div');
 		container.innerHTML =
-			'<!--[--><div id="animated-ssr" data-state="initial" style="left:12px;opacity:0.4;"><!--[-->hydrated spring<!--]--></div><!--]-->';
+			'<!--3--><!--[--><div id="animated-ssr" data-state="initial" style="left:12px;opacity:0.4;"><!--[-->hydrated spring<!--]--></div><!--]-->';
 		const serverNode = container.querySelector('#animated-ssr');
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const left = new SpringValue(12);

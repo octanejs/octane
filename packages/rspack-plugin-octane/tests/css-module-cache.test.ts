@@ -177,7 +177,7 @@ function expectRenderedClasses(output: ReturnType<typeof readBuild>, changed: bo
 	const module = serverModule(output);
 	expect(module.isFrozen()).toBe(!changed);
 	expect(module.render()).toBe(
-		`<main class="mapped_root"><span class="${changed ? 'changed_label' : 'mapped_label'}">cache</span><i class="${changed ? 'changed_tail' : 'mapped_tail'}"></i></main>`,
+		`<!--3--><main class="mapped_root"><span class="${changed ? 'changed_label' : 'mapped_label'}">cache</span><i class="${changed ? 'changed_tail' : 'mapped_tail'}"></i></main>`,
 	);
 	expect(output.cssSource).toContain('.mapped_root');
 	expect(output.cssSource).toContain('.changed_label');

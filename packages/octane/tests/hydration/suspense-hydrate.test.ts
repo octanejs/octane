@@ -506,8 +506,8 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	it('seeds the server value so use(promise) returns synchronously (no re-suspend, no rebuild)', async () => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(html).toBe(
-			'<div id="leaf">hello</div>' +
-				'<script type="application/json" data-octane-suspense="3">["hello"]</script>',
+			'<!--3--><div id="leaf">hello</div>' +
+				'<script type="application/json" data-octane-suspense>["hello"]</script>',
 		);
 
 		container.innerHTML = html;
@@ -527,19 +527,18 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	});
 
 	// A server and client from different Octane versions may not agree on what
-	// the server's hydration ranges mean. The root seed script names the
-	// server's protocol version, and a root from another version renders on the
-	// client, reporting why, instead of adopting ranges it would misread.
+	// the server's hydration ranges or seeds mean. The comment that opens the
+	// root's output names the server's protocol version, and a root from another
+	// version renders on the client, reporting why, instead of adopting ranges
+	// it would misread or seeding values it would misplace.
 	it.each([
 		['an older server', ''],
-		['a version 2 server', '="2"'],
-		['a newer server', '="4"'],
-	])('client-renders a root that %s rendered, and reports it', async (_label, version) => {
+		['a version 2 server', '<!--2-->'],
+		['a newer server', '<!--4-->'],
+	])('client-renders a seeded root that %s rendered, and reports it', async (_label, mark) => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('server') });
-		container.innerHTML = html.replace(
-			'data-octane-suspense="3"',
-			'data-octane-suspense' + version,
-		);
+		expect(html).toContain('data-octane-suspense>');
+		container.innerHTML = html.replace('<!--3-->', mark);
 		const div = container.querySelector('#leaf') as HTMLElement;
 		const recoverable: unknown[] = [];
 
@@ -886,8 +885,8 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 			promise: Promise.resolve('Hi'),
 		});
 		expect(html).toBe(
-			'<main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
-				'<script type="application/json" data-octane-suspense="3">["Hi"]</script>',
+			'<!--3--><main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
+				'<script type="application/json" data-octane-suspense>["Hi"]</script>',
 		);
 
 		container.innerHTML = html;

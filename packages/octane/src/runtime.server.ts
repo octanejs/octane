@@ -6070,8 +6070,11 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 						return (
 							'<div' +
 							attrs +
-							(props.__independent === undefined ? '' : ' ' + HYDRATE_INDEPENDENT_ATTR + '=""') +
-							'>' +
+							// An independent island's own root hydrates its children, so they
+							// name the protocol as a root's output does.
+							(props.__independent === undefined
+								? '>'
+								: ' ' + HYDRATE_INDEPENDENT_ATTR + '="">' + PROTOCOL_MARK) +
 							children +
 							seedSidecar +
 							nativeSidecar +
@@ -8645,9 +8648,11 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
 	}).replace(/</g, '\\u003c');
 }
 
-// The root seed script's marker attribute names the hydration protocol
-// version the server rendered (hydration-protocol.ts).
-const ROOT_SEED_ATTR = SUSPENSE_SCRIPT_ATTR + '="' + HYDRATION_PROTOCOL_VERSION + '"';
+// The comment that opens every hydratable root's output names the range
+// protocol its server spoke (hydration-protocol.ts). Folded head metadata
+// precedes it, so `head + html` under `headChannel: 'separate'` stays the
+// folded output.
+const PROTOCOL_MARK = '<!--' + HYDRATION_PROTOCOL_VERSION + '-->';
 
 /**
  * Serialize the resolved `use(thenable)` values (in render order) into an inline
@@ -8658,7 +8663,7 @@ const ROOT_SEED_ATTR = SUSPENSE_SCRIPT_ATTR + '="' + HYDRATION_PROTOCOL_VERSION 
 function serializeSuspenseSeeds(
 	values: unknown[],
 	nonceAttr: string,
-	attr = ROOT_SEED_ATTR,
+	attr = SUSPENSE_SCRIPT_ATTR,
 ): string {
 	// Encode `undefined` (which JSON drops/nulls) through the seed wire escape so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
@@ -9168,6 +9173,9 @@ function runFullFramedPass(
 			const marker = (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT];
 			if (marker !== undefined) body = ssrBindingBlock(body, marker);
 		}
+		// A hydratable root's output opens with the protocol it speaks. Head
+		// metadata folds in before it (isDocumentRoot, isLeadingHeadRoot).
+		if (markers) body = PROTOCOL_MARK + body;
 		nativePassCompleted = true;
 	} catch (err) {
 		err = normalizeThrownServerThenable(err);
@@ -11534,7 +11542,7 @@ function documentTailStart(body: string): number {
 // ReactDOMFizzServer-test.js:237, React canary b740af2). Buffered
 // renderToString/renderToStaticMarkup stay doctype-free, also per React.
 function isDocumentRoot(body: string): boolean {
-	let i = 0;
+	let i = body.startsWith(PROTOCOL_MARK) ? PROTOCOL_MARK.length : 0;
 	while (body.startsWith('<!--[-->', i)) i += 8;
 	if (!body.startsWith('<html', i)) return false;
 	const next = body.charCodeAt(i + 5);
@@ -11545,7 +11553,7 @@ function isDocumentRoot(body: string): boolean {
 // template supplies <html>. That head receives hoisted metadata, but does not
 // make this an <html> root or cause the streaming doctype to be emitted.
 function isLeadingHeadRoot(body: string): boolean {
-	let i = 0;
+	let i = body.startsWith(PROTOCOL_MARK) ? PROTOCOL_MARK.length : 0;
 	while (body.startsWith('<!--[-->', i)) i += 8;
 	if (!body.startsWith('<head', i)) return false;
 	const next = body.charCodeAt(i + 5);

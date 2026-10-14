@@ -331,7 +331,7 @@ describe('Float evidence (slice 3) — style-resource nonce and hoistable lifecy
 	it('hoists non-stylesheet link tags on the server and hydrates them on the client', async () => {
 		// Per ReactDOMFloat-test.js:8937
 		const r = await Server.renderToString(srv.PlainLinkPage, {});
-		const bodyStart = r.html.indexOf('<main');
+		const bodyStart = r.html.indexOf('<!--3-->');
 		expect(bodyStart).toBeGreaterThan(-1);
 		document.head.innerHTML = r.html.slice(0, bodyStart);
 		const c = document.createElement('div');
@@ -402,7 +402,7 @@ describe('Float evidence (slice 3) — style-resource nonce and hoistable lifecy
 			text: 'Owned',
 			attrs: { 'data-server-only': 'stale' },
 		});
-		const bodyStart = result.html.indexOf('<main');
+		const bodyStart = result.html.indexOf('<!--3-->');
 		document.head.innerHTML = result.html.slice(0, bodyStart);
 		const c = document.createElement('div');
 		document.body.appendChild(c);

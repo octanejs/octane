@@ -181,7 +181,7 @@ describe.each([
 				initialDocumentSignals: owner.serialize(),
 				injection: injection.source,
 			} as Server.StreamOptions);
-			expect('html' in result ? result.html : await collect(result.prelude)).toBe('ready');
+			expect('html' in result ? result.html : await collect(result.prelude)).toBe('<!--3-->ready');
 			expect(injection.controller.signal.aborted).toBe(false);
 			expect(injection.cancel).not.toHaveBeenCalled();
 		} finally {

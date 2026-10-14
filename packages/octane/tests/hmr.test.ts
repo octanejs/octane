@@ -544,7 +544,7 @@ describe('hmr — runtime wrapper', () => {
 			}
 		`);
 		const container = document.createElement('div');
-		container.innerHTML = '<main><p id="lede">before</p></main>';
+		container.innerHTML = '<!--3--><main><p id="lede">before</p></main>';
 		document.body.appendChild(container);
 		const adopted = container.firstElementChild;
 		const root = hydrateRoot(container, initial);

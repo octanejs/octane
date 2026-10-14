@@ -11,7 +11,7 @@ import { MarkdownAsync } from '../../src/index';
 
 function normalize(html: string): string {
 	return html
-		.replace(/<!--\[-->|<!--\]-->/g, '')
+		.replace(/<!--3-->|<!--\[-->|<!--\]-->/g, '')
 		.replace(/style="([^"]*);"/g, 'style="$1"')
 		.replace(/<link rel="preload" as="image" href="[^"]*"\/>/g, '');
 }

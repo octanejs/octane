@@ -10,8 +10,7 @@ or `<!--[$!rN-->` a boundary the client renders. The `oct-suspense:`,
 and the arm's own nested range are gone, and so is the range an `@if` or
 `@switch` arm had inside its slot's. Pages carry fewer comment nodes.
 
-The server and the client must come from the same Octane version. The root seed
-script now names the protocol version (`data-octane-suspense="2"`), and a root
-whose server rendered another version renders on the client and reports error
-345 through `onRecoverableError`. A presentation-binding view keeps its own
-boundary and arm shapes.
+The server and the client must come from the same Octane version: a root whose
+server rendered another protocol version renders on the client and reports
+error 345 through `onRecoverableError`. A presentation-binding view keeps its
+own boundary and arm shapes.

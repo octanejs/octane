@@ -2121,6 +2121,13 @@ match the server's arm adopts them, as in React. As in React, a suspension in
 a component's body, before hydration would reach the elements it renders,
 keeps the server HTML even where those elements then mismatch.
 
+Since the ranges are versioned, a root's server output opens with a comment
+naming the hydration protocol version (`<!--3-->`), whether or not it seeds
+`use()` values, and so does an independent `<Hydrate>` island's. A root whose
+server HTML names another version, or none, as HTML from React's server or an
+older Octane does not, renders on the client with one recoverable error
+instead of adopting ranges it would misread. React has no such marker.
+
 Second, development compares a template's static structure and attributes and warns
 about differences, but development-only comparisons never cause a fallback,
 so development and production adopt the same DOM. Production validates a

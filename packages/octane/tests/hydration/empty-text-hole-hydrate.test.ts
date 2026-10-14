@@ -208,7 +208,7 @@ describe('hydrateRoot — misaligned text hole recovery', () => {
 		document.body.appendChild(container);
 		containers.push(container);
 		container.innerHTML =
-			'<div><p><!--[--><button class="after">after</button><!--]--></p><i>sib</i></div>';
+			'<!--3--><div><p><!--[--><button class="after">after</button><!--]--></p><i>sib</i></div>';
 		const button = container.querySelector('button');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const recoverable: unknown[] = [];

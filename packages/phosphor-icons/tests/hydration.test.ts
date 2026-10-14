@@ -9,7 +9,10 @@ describe('@octanejs/phosphor-icons — hydration', () => {
 	it('adopts the server-rendered SVG host and keeps it live', () => {
 		const props = { size: 32, color: 'purple', weight: 'duotone' as const, alt: 'Camera' };
 		const container = document.createElement('div');
-		container.innerHTML = renderReactToString(createReactElement(ReactPhosphor.Camera, props));
+		// This host-only tree serializes as Octane's server would, but for the
+		// comment naming Octane's hydration protocol version, which React omits.
+		container.innerHTML =
+			'<!--3-->' + renderReactToString(createReactElement(ReactPhosphor.Camera, props));
 		document.body.appendChild(container);
 		const serverSvg = container.querySelector('svg')!;
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});

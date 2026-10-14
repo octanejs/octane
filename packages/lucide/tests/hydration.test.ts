@@ -9,7 +9,9 @@ describe('@octanejs/lucide — hydration', () => {
 	it('adopts the server-rendered SVG host', () => {
 		const props = { size: 32, color: 'purple', className: 'hydrated', 'aria-label': 'Camera' };
 		const container = document.createElement('div');
-		container.innerHTML = renderReactToString(createReactElement(ReactCamera, props));
+		// This host-only tree serializes as Octane's server would, but for the
+		// comment naming Octane's hydration protocol version, which React omits.
+		container.innerHTML = '<!--3-->' + renderReactToString(createReactElement(ReactCamera, props));
 		document.body.appendChild(container);
 		const serverSvg = container.querySelector('svg')!;
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});

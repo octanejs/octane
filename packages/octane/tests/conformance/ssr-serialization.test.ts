@@ -168,7 +168,16 @@ const client = loadCompiledFixtureSource(SRC, {
 	compileOptions: { dev: true },
 });
 
-const ssr = (name: string, props?: any) => ServerRT.renderToString(server[name], props).html;
+// Every hydratable root's output opens with the hydration protocol version
+// (hydration-protocol.ts), which React's serialization has no counterpart for:
+// `ssr` compares the rest, and hydration adopts the whole output.
+const PROTOCOL_MARK = '<!--3-->';
+const serverHtml = (name: string, props?: any) => {
+	const { html } = ServerRT.renderToString(server[name], props);
+	expect(html.startsWith(PROTOCOL_MARK)).toBe(true);
+	return html;
+};
+const ssr = (name: string, props?: any) => serverHtml(name, props).slice(PROTOCOL_MARK.length);
 
 // React's serverRender path: parse the server markup with the DOM parser.
 function parse(html: string): HTMLElement {
@@ -199,8 +208,9 @@ const warns = () =>
 
 // Server-render, adopt via hydrateRoot, return before/after for the no-rebuild check.
 function hydrate(name: string, props?: any) {
-	const html = ssr(name, props);
-	container.innerHTML = html;
+	const output = serverHtml(name, props);
+	const html = output.slice(PROTOCOL_MARK.length);
+	container.innerHTML = output;
 	const before = container.innerHTML;
 	hydrateRoot(container, client[name], props);
 	flushSync(() => {});

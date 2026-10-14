@@ -215,7 +215,7 @@ describe('server autofocus survives hydration without stealing focus', () => {
 		const props = { attributes: { autoFocus: true } };
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = '<span id="stale-server-element"></span>';
+		container.innerHTML = '<!--3--><span id="stale-server-element"></span>';
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		let root: ReturnType<typeof hydrateRoot> | undefined;
 		try {

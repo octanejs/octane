@@ -176,7 +176,7 @@ describe('hydrateRoot — STRUCTURAL mismatch with no boundary renders the root 
 	// root component and both sides of the divergence.
 	it('a fragment root over unmatched server markup renders on the client and warns with the root location in dev', async () => {
 		const { serverNodes, recovered, root } = await hydrateOver(
-			'<section id="stale">server</section>',
+			'<!--3--><section id="stale">server</section>',
 			devClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
 			{},
 		);
@@ -642,7 +642,7 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		},
 		{
 			name: 'an unframed string root over stale server markup',
-			html: async () => '<p id="stale">server</p>',
+			html: async () => '<!--3--><p id="stale">server</p>',
 			body: () =>
 				function StringRoot() {
 					return 'client';
@@ -654,7 +654,7 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		},
 		{
 			name: 'a fragment root whose statics do not match the server',
-			html: async () => '<section id="stale">server</section>',
+			html: async () => '<!--3--><section id="stale">server</section>',
 			body: () => prodClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
 			props: {},
 			expected: '<div class="leaf">A</div><input type="text">',
@@ -1218,9 +1218,10 @@ describe.each([
 // an outer value pair wrapping one pair per keyed item. Today's client claims that
 // hole as an @if-lowered block whose branch hosts the keyed list, so every adopted
 // pair sits one nesting level off from where the client expects it. Hydration must
-// never throw over that misalignment — stale server HTML (an older octane version,
-// a cached edge response) is exactly what the fallback exists for — and must leave
-// a tree whose later updates keep working.
+// never throw over that misalignment — stale server HTML that names the current
+// protocol version (a cached edge response) is exactly what the fallback exists
+// for; an older version's falls back at the root — and must leave a tree whose
+// later updates keep working.
 describe.each([
 	{
 		name: 'development compile',
@@ -1256,7 +1257,7 @@ describe.each([
 	}
 
 	const LEGACY_HTML =
-		'<div><button class="next">next</button><div class="host">' +
+		'<!--3--><div><button class="next">next</button><div class="host">' +
 		'<!--[--><!--[--><i>x</i><!--]--><!--[--><i>y</i><!--]--><!--]-->' +
 		'</div></div>';
 

@@ -4312,7 +4312,7 @@ export function RefreshDuringPreparation(props) @{ 'use dom bindings';
 			const preparationButton = article.querySelector('button')!;
 			const preparationLabel = preparationButton.querySelector('b')!;
 			const preparationRange = {
-				start: article.firstChild as Comment,
+				start: article.firstChild!.nextSibling as Comment,
 				end: article.lastChild as Comment,
 			};
 			const preparationBinding = duringPreparation.attach(
@@ -4341,7 +4341,7 @@ export function RefreshDuringPreparation(props) @{ 'use dom bindings';
 				);
 				expect(article.querySelector('button')).toBe(preparationButton);
 				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild).toBe(preparationRange.start);
+				expect(article.firstChild!.nextSibling).toBe(preparationRange.start);
 				expect(article.lastChild).toBe(preparationRange.end);
 				expect(preparationButton.title).toBe('Current early');
 				expect(duringPreparation.cleanup).not.toHaveBeenCalled();
@@ -4353,7 +4353,7 @@ export function RefreshDuringPreparation(props) @{ 'use dom bindings';
 				await act(() => {});
 				expect(article.querySelector('button')).toBe(preparationButton);
 				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild).toBe(preparationRange.start);
+				expect(article.firstChild!.nextSibling).toBe(preparationRange.start);
 				expect(article.lastChild).toBe(preparationRange.end);
 				expect(document.activeElement).toBe(preparationButton);
 				expect(preparationButton.title).toBe('Accepted');
@@ -5283,7 +5283,10 @@ export function TreeHydration(props) @{
 			inputs[1]!.focus();
 			inputs[1]!.setSelectionRange(2, 7, 'backward');
 			fixture.publish({ items: [items[1]!, items[0]!, items[2]!] });
-			const range = { start: container.firstChild as Comment, end: container.lastChild as Comment };
+			const range = {
+				start: container.firstChild!.nextSibling as Comment,
+				end: container.lastChild as Comment,
+			};
 			const binding = fixture.attach(range, fixture.state);
 			try {
 				expect([...container.querySelectorAll('figure')]).toEqual([
@@ -5329,7 +5332,8 @@ export function TreeHydration(props) @{
 			expect(container.querySelector('input')!.value).toBe('First');
 			expect(container.querySelector('figcaption')!.textContent).toBe('First');
 			replacement.dispose({ preserveDOM: false });
-			expect(container.childNodes).toHaveLength(0);
+			// Only the root's protocol version, outside the range, remains.
+			expect(container.innerHTML).toBe('<!--3-->');
 		}
 	});
 
@@ -6258,7 +6262,10 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 			const host = document.createElement('section');
 			container.append(host);
 			host.innerHTML = fixture.html;
-			const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+			const range = {
+				start: host.firstChild!.nextSibling as Comment,
+				end: host.lastChild as Comment,
+			};
 			const handle = fixture.attach(range, fixture.state);
 			const before = host.innerHTML;
 			const inputs = [...host.querySelectorAll('input')];
@@ -6289,7 +6296,7 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 			handle.dispose();
 			fixture.publish({ items, locked: false, onInput: undefined }, false);
 			fixture.attach(range, fixture.state).dispose({ preserveDOM: false });
-			expect(host.childNodes).toHaveLength(0);
+			expect(host.innerHTML).toBe('<!--3-->');
 		}
 		for (const dev of [false, true]) {
 			for (const invalid of [{ unexpected: true }, Symbol('invalid-text'), () => 'invalid']) {
@@ -6566,7 +6573,10 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 		const host = document.createElement('section');
 		container.append(host);
 		host.innerHTML = fixture.html;
-		const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+		const range = {
+			start: host.firstChild!.nextSibling as Comment,
+			end: host.lastChild as Comment,
+		};
 		const rows = [...host.querySelectorAll('figure')];
 		const handle = fixture.attach(range, fixture.state);
 		expect(() => handle.dispose()).toThrow(cleanupFailure);
@@ -6746,7 +6756,10 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 		const host = document.createElement('section');
 		container.append(host);
 		host.innerHTML = fixture.html;
-		const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+		const range = {
+			start: host.firstChild!.nextSibling as Comment,
+			end: host.lastChild as Comment,
+		};
 		const handle = fixture.attach(range, fixture.state, { signal: canceledProjection.signal });
 		const before = host.innerHTML;
 		const abortingText = {
@@ -7430,10 +7443,13 @@ export function NestedParent(props) @{ 'use dom bindings';
 						host.innerHTML = nested.html;
 						const button = host.querySelector('button')!;
 						const child = button.firstElementChild;
-						const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+						const range = {
+							start: host.firstChild!.nextSibling as Comment,
+							end: host.lastChild as Comment,
+						};
 						if (mode === 'missing-close') range.end.remove();
 						else if (mode === 'duplicate') {
-							host.prepend(range.start.cloneNode());
+							range.start.before(range.start.cloneNode());
 							host.append(range.end.cloneNode());
 						} else if (mode === 'sibling-before')
 							range.start.after(document.createTextNode('outside'));
@@ -10323,7 +10339,10 @@ export function Answer() @{
 			const host = document.createElement('section');
 			container.append(host);
 			host.innerHTML = fixture.html;
-			const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+			const range = {
+				start: host.firstChild!.nextSibling as Comment,
+				end: host.lastChild as Comment,
+			};
 			const input = host.querySelector('input')!;
 			input.value = 'Native edit';
 			const handle = fixture.attach(range, fixture.state);
@@ -10379,7 +10398,7 @@ export function Answer() @{
 			container.append(failedHost);
 			failedHost.innerHTML = failing.html;
 			const failedRange = {
-				start: failedHost.firstChild as Comment,
+				start: failedHost.firstChild!.nextSibling as Comment,
 				end: failedHost.lastChild as Comment,
 			};
 			const failedInput = failedHost.querySelector('input');
@@ -11132,7 +11151,10 @@ export function LatestSnapshot() @{ 'use dom bindings'; <p>{count$.latest('fallb
 			const rowHost = document.createElement('section');
 			container.append(rowHost);
 			rowHost.innerHTML = rowFixture.html;
-			const rowRange = { start: rowHost.firstChild as Comment, end: rowHost.lastChild as Comment };
+			const rowRange = {
+				start: rowHost.firstChild!.nextSibling as Comment,
+				end: rowHost.lastChild as Comment,
+			};
 			const row = rowHost.querySelector('figure')!;
 			const rowInput = row.querySelector('input')!;
 			rowInput.value = 'native edit';
