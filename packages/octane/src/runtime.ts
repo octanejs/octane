@@ -36873,8 +36873,12 @@ export function hostComponent(
 			elNs !== undefined
 				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
 				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
-		// A root render that drops forgets the host it created with it.
-		if (ROOT_RENDER_TRANSACTION !== null) {
+		// A root render that drops forgets the host it created with it, unless
+		// it discards the whole Block.
+		if (
+			ROOT_RENDER_TRANSACTION !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || block.createdStamp !== ROOT_DISCARD_STAMP)
+		) {
 			journalRootProperty(scope.slots, slot, undefined);
 			if (scope.children === null) journalRootProperty(scope, 'children', null);
 			else journalObjectOnce(scope.children);
@@ -37117,9 +37121,8 @@ interface DeoptStamped {
 // A render reads the record an earlier pass of the same root render left
 // pending (DeoptOrder): that is what its commit will show.
 function getDeoptDesc(n: Node): ElementDescriptor | undefined {
-	const order: DeoptOrder | undefined = (n as any).$$deoptOrder;
-	if (order !== undefined && order.desc !== null && order.tx === ROOT_RENDER_TRANSACTION)
-		return order.desc;
+	const order = pendingDeoptOrder(n);
+	if (order !== null && order.desc !== null) return order.desc;
 	return (STAGED_DOM ? STAGED_DOM.view(n as Node & DeoptStamped) : (n as Node & DeoptStamped))[
 		DEOPT_DESC
 	];
@@ -37563,7 +37566,9 @@ function reconcileDeoptNode(
 		// createElement, or portaled into an SVG target).
 		const elNs = inferTagNs(value.type, ns);
 		let el: Element;
-		let order: DeoptOrder | null = null;
+		let defer = false;
+		let pending: DeoptOrder | null = null;
+		let desc: ElementDescriptor | null = null;
 		if (
 			prev !== null &&
 			prev.nodeType === 1 &&
@@ -37574,8 +37579,9 @@ function reconcileDeoptNode(
 			// Committed DOM takes the patch at commit, with its children's order.
 			el = prev as Element;
 			if (usesFrontier(ownerBlock, el)) {
-				order = nextDeoptOrder(el, ownerBlock);
-				order.desc = deoptRecord(el, value);
+				defer = true;
+				pending = pendingDeoptOrder(el);
+				desc = changedDeoptRecord(el, value, pending);
 			} else
 				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
 		} else {
@@ -37586,18 +37592,19 @@ function reconcileDeoptNode(
 			if (hydrating) activeHydration()?.markFresh(el);
 			setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
-		if (order === null) setDeoptDesc(el, value);
-		if (!hasHostPropContent(value)) {
-			reconcileDeoptChildren(
-				el,
-				isHtmlTextareaType(value.type, elNs)
-					? textareaChildText(value.children, rejectTextareaChild)
-					: value.children,
-				ownerBlock,
-				order,
-			);
-		}
-		if (order !== null) queueDeoptOrder(order);
+		if (desc === null) setDeoptDesc(el, value);
+		const nodes = hasHostPropContent(value)
+			? null
+			: reconcileDeoptChildren(
+					el,
+					isHtmlTextareaType(value.type, elNs)
+						? textareaChildText(value.children, rejectTextareaChild)
+						: value.children,
+					ownerBlock,
+					defer,
+					pending,
+				);
+		if (desc !== null || nodes !== null) queueDeoptOrder(el, ownerBlock, desc, nodes, null);
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -37614,19 +37621,20 @@ function reconcileDeoptNode(
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
 //
-// A committed host passes its pending record (`order`): the reconcile then
-// writes nothing, and its commit places the children it chose. An earlier pass
-// of the same root render may have chosen them already: the record's `nodes`,
-// not the DOM, are then the children this pass reconciles, in full.
+// A committed host's reconcile (`defer`) writes nothing: it returns the order
+// its commit gives the children, or null when they stay as they are. An
+// earlier pass of the same root render may have chosen them already: the
+// pending record's `nodes`, not the DOM, are then the children it reconciles.
 function reconcileDeoptChildren(
 	el: Element,
 	children: any,
 	ownerBlock: Block,
-	order: DeoptOrder | null,
-): void {
+	defer: boolean,
+	pendingOrder: DeoptOrder | null,
+): Node[] | null {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
-	const pending = order === null ? null : order.nodes;
+	const pending = pendingOrder === null ? null : pendingOrder.nodes;
 	const firstChild = pending === null ? getFirstChild(el) : null;
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
 	// Other shapes still need keyed matching: a lone text node may belong to a
@@ -37643,12 +37651,12 @@ function reconcileDeoptChildren(
 			const hydration = hydrating ? activeHydration() : null;
 			if (hydration !== null && !hydration.isFresh(el)) {
 				hydration.htextSwap(firstChild, String(children));
-			} else if (order !== null) {
+			} else if (defer) {
 				queueDeoptText(firstChild as Text, String(children));
 			} else {
 				updateTextValue(firstChild as Text, String(children));
 			}
-			return;
+			return null;
 		}
 	}
 	// Empty scalar children on an already empty host need no reconciliation
@@ -37658,7 +37666,7 @@ function reconcileDeoptChildren(
 		pending === null &&
 		firstChild === null
 	)
-		return;
+		return null;
 	// The element that owns these children is authoritative. This matters when a
 	// component or dynamic tag made the lexical namespace unknowable, and when an
 	// SVG foreignObject resets its descendants to HTML.
@@ -37684,15 +37692,14 @@ function reconcileDeoptChildren(
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
-				if (order !== null) built.push(node);
+				if (defer) built.push(node);
 				else {
 					if (journal) journalRootChildren(el);
 					(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
 				}
 			}
 		}
-		if (built.length !== 0) order!.nodes = built;
-		return;
+		return built.length !== 0 ? built : null;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
 	// somewhere else, so leave it alone rather than reconciling against an empty list and
@@ -37704,7 +37711,7 @@ function reconcileDeoptChildren(
 		(!hydrating || activeHydration() === null) &&
 		(pending === null ? !hasDeoptOwnedChild(el) : pending.length === 0)
 	) {
-		return;
+		return null;
 	}
 	// Collect only children this reconciler owns. Portal ranges and unstamped
 	// imperatively streamed nodes may coexist with our children; neither belongs
@@ -37718,7 +37725,6 @@ function reconcileDeoptChildren(
 	const unstamped: Node[] = [];
 	if (pending !== null) {
 		// Every node an earlier pass chose is owned and carries its key.
-		hasForeign = order!.skip;
 		for (let i = 0; i < pending.length; i++) {
 			const node = pending[i];
 			const key = (node as any).$$deoptKey;
@@ -37830,8 +37836,8 @@ function reconcileDeoptChildren(
 				);
 			// A speculative attempt's own record restores this removal if the
 			// attempt is discarded; a deferred removal would still run at commit.
-			if ((order !== null || journal) && hydration?.speculative !== true) {
-				if (order === null) journalRootChildren(el);
+			if ((defer || journal) && hydration?.speculative !== true) {
+				if (!defer) journalRootChildren(el);
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
@@ -37839,73 +37845,101 @@ function reconcileDeoptChildren(
 			}
 		}
 	}
-	const skip = hasForeign || singleton;
-	if (order !== null) {
-		order.nodes = result;
-		order.skip = skip;
-	} else
-		placeDeoptChildren(
-			el,
-			result,
-			skip,
-			hydrationOwnsUnstamped === true && !singleton,
-			journal === true,
-		);
+	if (defer) {
+		// Children that keep their nodes and order need no placement.
+		if (pending === null && result.length === owned.length) {
+			let i = 0;
+			while (i < result.length && result[i] === owned[i]) i++;
+			if (i === result.length) return null;
+		}
+		return result;
+	}
+	placeDeoptChildren(
+		el,
+		result,
+		hasForeign || singleton,
+		hydrationOwnsUnstamped === true && !singleton,
+		journal === true,
+	);
+	return null;
 }
 
 /**
  * A committed de-opt node's change in an open root render, written by its
  * commit entry (applyDeoptOrder) after the deletions its reconcile queued: a
  * host's descriptor (`desc`: its props and DEOPT_DESC record, applied in the
- * Scope `owner`) and its children's order (`nodes`, stepping over foreign
- * ranges when `skip`), or a Text's `text`. Null fields are unchanged. A later
- * pass of the same render carries the record forward in a new one, which
- * supersedes it; a window that drops forgets its records with its entries.
+ * Scope `owner`) and its children's order (`nodes`), or a Text's `text`. Null
+ * fields are unchanged. A later pass of the same render queues a new record,
+ * which supersedes it; a window that drops forgets its records with its entries.
  */
 interface DeoptOrder {
 	tx: RootRenderTransaction;
 	el: Node;
 	nodes: Node[] | null;
-	skip: boolean;
 	desc: ElementDescriptor | null;
 	text: string | null;
 	owner: Block | null;
 }
 
-/** `node`'s record for this pass, starting from what an earlier pass left pending. */
-function nextDeoptOrder(node: Node, owner: Block | null): DeoptOrder {
-	const tx = ROOT_RENDER_TRANSACTION!;
-	let pending: DeoptOrder | null = (node as any).$$deoptOrder ?? null;
-	if (pending !== null && pending.tx !== tx) pending = null;
-	return {
-		tx,
-		el: node,
-		nodes: pending && pending.nodes,
-		skip: pending !== null && pending.skip,
-		desc: pending && pending.desc,
-		text: pending && pending.text,
-		owner,
-	};
+/** The record an earlier pass of this root render left on `node`, if any. */
+function pendingDeoptOrder(node: Node): DeoptOrder | null {
+	const order: DeoptOrder | undefined = (node as any).$$deoptOrder;
+	return order !== undefined && order.tx === ROOT_RENDER_TRANSACTION ? order : null;
 }
 
-function queueDeoptOrder(order: DeoptOrder): void {
-	const node = order.el as any;
-	journalRootProperty(node, '$$deoptOrder', node.$$deoptOrder);
-	node.$$deoptOrder = order;
-	order.tx.ops.push(applyDeoptOrder, order);
+/**
+ * The record a committed host's patch commits, or null when its props would
+ * write nothing (equal values, no controlled field to reassert): render then
+ * stamps the record itself. A pending record is always superseded.
+ */
+function changedDeoptRecord(
+	el: Element,
+	d: ElementDescriptor,
+	pending: DeoptOrder | null,
+): ElementDescriptor | null {
+	const prev = getDeoptDesc(el)?.props;
+	const next = d.props;
+	if (pending === null && prev != null && next != null) {
+		let same = true;
+		for (const k in next) {
+			if (k !== 'key' && k !== 'children' && (next[k] !== prev[k] || isControlledHostProp(el, k))) {
+				same = false;
+				break;
+			}
+		}
+		if (same && prev !== next)
+			for (const k in prev)
+				if (k !== 'key' && k !== 'children' && !(k in next)) {
+					same = false;
+					break;
+				}
+		if (same) return null;
+	}
+	return deoptRecord(el, d);
+}
+
+function queueDeoptOrder(
+	node: Node,
+	owner: Block | null,
+	desc: ElementDescriptor | null,
+	nodes: Node[] | null,
+	text: string | null,
+): void {
+	const tx = ROOT_RENDER_TRANSACTION!;
+	const order: DeoptOrder = { tx, el: node, nodes, desc, text, owner };
+	journalRootProperty(node, '$$deoptOrder', (node as any).$$deoptOrder);
+	(node as any).$$deoptOrder = order;
+	tx.ops.push(applyDeoptOrder, order);
 }
 
 /** A committed Text's data, written at commit unless it already shows `data`. */
 function queueDeoptText(node: Text, data: string): void {
-	const pending: DeoptOrder | undefined = (node as any).$$deoptOrder;
-	const shown =
-		pending !== undefined && pending.tx === ROOT_RENDER_TRANSACTION
-			? pending.text
-			: (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue;
-	if (shown === data) return;
-	const order = nextDeoptOrder(node, null);
-	order.text = data;
-	queueDeoptOrder(order);
+	const pending = pendingDeoptOrder(node);
+	if (
+		data !==
+		(pending !== null ? pending.text : (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue)
+	)
+		queueDeoptOrder(node, null, null, null, data);
 }
 
 function applyDeoptOrder(order: DeoptOrder): void {
@@ -37918,7 +37952,8 @@ function applyDeoptOrder(order: DeoptOrder): void {
 		return;
 	}
 	if (order.desc !== null) commitInScope(order.owner!, commitDeoptHost, node, order.desc);
-	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, order.skip, false, false);
+	// Foreign ranges among the children stay where they are.
+	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false, false);
 }
 
 /**
@@ -38549,7 +38584,7 @@ function runtimeHostSiteLoc(block: Block): string {
 // children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
-	let order: DeoptOrder | null = null;
+	let desc: ElementDescriptor | null = null;
 	const hydration = hydrating ? activeHydration() : null;
 	// Component/value boundaries are namespace-transparent. Derive the inherited
 	// namespace from the block's actual DOM parent; explicit <svg>/<math> roots
@@ -38660,20 +38695,18 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	} else if (usesFrontier(block, el)) {
 		// REUSE the committed element — its props change at commit, after its
 		// children's entries. Its childSlot owns the children's structure.
-		order = nextDeoptOrder(el, block);
-		order.nodes = null;
-		order.desc = deoptRecord(el, d);
+		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// REUSE the existing element — diff props in place (no rebuild).
 		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
-	if (order === null) setDeoptDesc(el, d);
+	if (desc === null) setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
 	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
 	if (!hasHostPropContent(d)) deoptHostChildren(block, el, d, elNs);
-	if (order !== null) queueDeoptOrder(order);
+	if (desc !== null) queueDeoptOrder(el, block, desc, null, null);
 }
 
 // Stable render body for a componentSlot whose comp resolved to a HOST tag
