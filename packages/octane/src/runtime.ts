@@ -29246,19 +29246,53 @@ function prepareSignalHostPropSources(
 				presentationMiss(false);
 		}
 		const prepared: Record<string, unknown> = Object.create(null);
+		// A validated receipt transfers this host from a live early owner; its
+		// current attributes are not SSR values to preserve. Normalize here
+		// without recording ordinary hydration's "keep server" decisions. Publish
+		// still waits for the receipt and its native-read witnesses to be accepted.
+		const values: PreparedHostProps = {
+			props: prepared,
+			attributes: null,
+			style: undefined,
+			classes: undefined,
+			controls: null,
+			adopted: false,
+			eventOwner:
+				activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+					? currentExplicitSignalOwner()
+					: null,
+			html: null,
+			complete: true,
+			reassert: false,
+		};
 		for (const name of Object.keys(resolved)) {
 			const value = resolved[name];
-			prepared[name] =
-				name === 'ref' || isEventKey(name)
-					? value
-					: name === 'style'
-						? __normalizeBindingStyle(value)
-						: preparedPresentationAttribute(
-								element,
-								name,
-								value,
-								name === 'class' ? 'class' : 'attr',
-							);
+			if (name === 'ref' || isEventKey(name)) prepared[name] = value;
+			else if (name === 'style') {
+				const normalized = __normalizeBindingStyle(value);
+				prepared[name] = normalized;
+				values.style = { value: normalized, raw: normalized, kept: false };
+			} else {
+				const normalized = preparedPresentationAttribute(
+					element,
+					name,
+					value,
+					name === 'class' ? 'class' : 'attr',
+				);
+				prepared[name] = normalized;
+				if (name === 'class') values.classes = normalized as string | null;
+				else if (name !== 'innerText' && name !== 'textContent') {
+					const attributeName = ATTRIBUTE_ALIASES.get(name) ?? name;
+					let attribute = coerceAttrValue(element, attributeName, normalized);
+					if (attribute !== null)
+						attribute = sanitizeURLAttribute(element.localName, attributeName, attribute);
+					(values.attributes ??= Object.create(null))[name] = attribute;
+				}
+			}
+		}
+		if (process.env.NODE_ENV !== 'production') {
+			devValidateAriaProps(element, prepared);
+			devValidateHostProps(element, prepared);
 		}
 		const prior = previous as SignalHostPropSourcesBinding | undefined;
 		const reusable =
@@ -29280,7 +29314,6 @@ function prepareSignalHostPropSources(
 					hasNestedChildren,
 					readStyle,
 				);
-		const values = prepareHostProps(element, prepared, undefined, scope);
 		let published = false;
 		return {
 			binding,
