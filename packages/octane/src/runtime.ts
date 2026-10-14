@@ -44088,7 +44088,9 @@ export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node
 	)
 		return anchor;
 	const own = document.createComment('');
-	parent.insertBefore(own, anchor);
+	// A committed Block's new slot, as a resumed body's, lands at commit.
+	if (usesFrontier(block, parent)) queueFrontier(block, parent, anchor).appendChild(own);
+	else parent.insertBefore(own, anchor);
 	return own;
 }
 

@@ -180,3 +180,23 @@ export const WRITERS = new Map(
 		scriptResource: 'native',
 	}),
 );
+
+/**
+ * 'fresh' writers that still reach their target through runtime structure
+ * without testing for a frontier (#2043), so a root render can write committed
+ * DOM through them. check-render-writes fails on a writer missing here and on
+ * an entry that no longer needs to be.
+ */
+export const UNGUARDED_FRESH = new Map(
+	Object.entries({
+		clone: 'a template clone, and a hole that replaces its adopted node',
+		htext: 'an only-child text hole seeded into its host',
+		htextSwap: 'a text hole that replaces its placeholder',
+		bindingText: 'a text binding that mints its range',
+		prepareFragmentPortalInterleaving: 'a portal into a target that holds other content',
+		evacuateInterleavedPortalRanges: 'a portal into a target that holds other content',
+		renderFragmentRefDescriptor: "a ref'd Fragment's marker pair",
+		hostStringTagBody: 'a string-tag host built into its Block',
+		frontierSentinel: 'a spare sentinel renamed before it joins a frontier',
+	}),
+);

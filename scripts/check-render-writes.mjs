@@ -7,12 +7,18 @@
  * their receiver type. It is not whole-program escape analysis: a writer is
  * classified by what it writes (see WRITERS), and the structure-commit and
  * ViewTransition suites check the render/commit split at runtime.
+ *
+ * A 'fresh' writer may write a node it made, a fragment, or a node its caller
+ * passed. One that reaches its target through runtime structure (a Block's
+ * parentNode, a slot's markers) can reach committed DOM, so its function must
+ * test for a frontier first (GUARD); UNGUARDED_FRESH lists the writers still
+ * to fix.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importNativeTypeScript } from './octane-tsc/native.mjs';
 import { is, NodeFlags, ScriptTarget, SyntaxKind } from './octane-tsc/native-syntax.mjs';
-import { WRITERS } from './render-writers.mjs';
+import { UNGUARDED_FRESH, WRITERS } from './render-writers.mjs';
 
 const { API, ModuleKind, ModuleResolutionKind, TypeFlags } =
 	await importNativeTypeScript('unstable/sync');
@@ -73,7 +79,12 @@ function owner(node) {
 	return '<top-level>';
 }
 
-export function inspectRenderWrites(text, file = runtimeFile, writers = WRITERS) {
+export function inspectRenderWrites(
+	text,
+	file = runtimeFile,
+	writers = WRITERS,
+	unguarded = UNGUARDED_FRESH,
+) {
 	// TypeScript 7 runs in its own process: `text` reaches it through the API's
 	// file system callbacks.
 	const api = new API({
@@ -99,13 +110,14 @@ export function inspectRenderWrites(text, file = runtimeFile, writers = WRITERS)
 			}),
 			file,
 			writers,
+			unguarded,
 		);
 	} finally {
 		api.close();
 	}
 }
 
-function inspectProgram(program, file, writers) {
+function inspectProgram(program, file, writers, unguarded) {
 	const { checker } = program.getProject();
 	const source = program.getSourceFile(file);
 	if (!source) throw new Error(`Cannot read ${file}`);
@@ -173,14 +185,27 @@ function inspectProgram(program, file, writers) {
 			return 'write';
 		return 'read';
 	}
-	// Whether a write's receiver is a node this function made: the root of its
-	// receiver chain is a local initialized by a creating call.
-	function created(expression) {
-		let node = unwrap(expression);
-		while (is.isPropertyAccessExpression(node) || is.isElementAccessExpression(node))
-			node = unwrap(node.expression);
-		const initial = initializer(node);
-		return initial !== undefined && CREATES.test(unwrap(initial).getText(source));
+	// Where a write's receiver comes from: a node this function made, a fragment,
+	// a parameter (its caller chose it), or a node it read from runtime
+	// structure (a Block's parentNode, a slot's end marker), which may be
+	// committed DOM. A node's style or class list is that node's.
+	function receiver(expression, depth = 0) {
+		const node = unwrap(expression);
+		if (depth > 8) return 'derived';
+		const type = checker.getNonNullableType(checker.getTypeAtLocation(node));
+		if (type.symbol?.name === 'DocumentFragment') return 'fragment';
+		if (is.isPropertyAccessExpression(node))
+			return node.name.text === 'style' || node.name.text === 'classList'
+				? receiver(node.expression, depth + 1)
+				: 'derived';
+		if (is.isCallExpression(node))
+			return CREATES.test(node.getText(source)) ? 'created' : 'derived';
+		if (!is.isIdentifier(node)) return 'derived';
+		const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration?.resolve();
+		if (declaration === undefined) return 'derived';
+		if (is.isParameterDeclaration(declaration)) return 'param';
+		const initial = declaration.initializer;
+		return initial === undefined ? 'derived' : receiver(initial, depth + 1);
 	}
 	function visit(node) {
 		if (is.isPropertyAccessExpression(node) || is.isElementAccessExpression(node)) {
@@ -202,7 +227,7 @@ function inspectProgram(program, file, writers) {
 						owner: owner(node),
 						operation: `${kind}:${key}`,
 						expression: node.getText(source),
-						created: created(node.expression),
+						receiver: receiver(node.expression),
 						guarded: GUARD.test(ownerFunction(node)?.getText(source) ?? ''),
 					});
 				}
@@ -211,9 +236,19 @@ function inspectProgram(program, file, writers) {
 		node.forEachChild(visit);
 	}
 	visit(source);
+	const reaching = writes.filter(
+		(write) =>
+			writers.get(write.owner) === 'fresh' && write.receiver === 'derived' && !write.guarded,
+	);
 	const failures = writes.filter((write) => !writers.has(write.owner));
+	for (const write of reaching)
+		if (!unguarded.has(write.owner)) failures.push({ ...write, unguarded: true });
 	const writing = new Set(writes.map((write) => write.owner));
-	const stale = [...writers.keys()].filter((name) => !writing.has(name));
+	const reached = new Set(reaching.map((write) => write.owner));
+	const stale = [
+		...[...writers.keys()].filter((name) => !writing.has(name)),
+		...[...unguarded.keys()].filter((name) => !reached.has(name)),
+	];
 	return { writes, failures, stale };
 }
 
@@ -231,10 +266,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	} else {
 		for (const finding of failures)
 			console.error(
-				`${path.relative(ROOT, runtimeFile)}:${finding.line}:${finding.column} ${finding.owner}: unclassified DOM ${finding.operation} (${finding.expression})`,
+				`${path.relative(ROOT, runtimeFile)}:${finding.line}:${finding.column} ${finding.owner}: ${finding.unguarded ? 'fresh writer reaches runtime structure without a frontier test:' : 'unclassified'} DOM ${finding.operation} (${finding.expression})`,
 			);
 		for (const name of stale)
-			console.error(`scripts/render-writers.mjs: ${name} no longer writes DOM; remove it`);
+			console.error(
+				`scripts/render-writers.mjs: ${name} ${UNGUARDED_FRESH.has(name) ? 'no longer reaches DOM unguarded' : 'no longer writes DOM'}; remove it`,
+			);
 		if (failures.length !== 0 || stale.length !== 0) process.exitCode = 1;
 		else
 			console.log(

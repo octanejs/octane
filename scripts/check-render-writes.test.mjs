@@ -68,6 +68,7 @@ test('accepts writes in classified writers and reports stale entries', () => {
 	}`,
 		undefined,
 		writers,
+		new Map(),
 	);
 	// A nested declaration cannot reuse a classified writer's name.
 	assert.deepEqual(
@@ -75,4 +76,42 @@ test('accepts writes in classified writers and reports stale entries', () => {
 		[['<nested>.commitHost', 'call:remove']],
 	);
 	assert.deepEqual(stale, ['retired']);
+});
+
+test('a fresh writer that reaches runtime structure must test for a frontier', () => {
+	const writers = new Map([
+		['anchor', 'fresh'],
+		['guarded', 'fresh'],
+		['passed', 'fresh'],
+		['made', 'fresh'],
+	]);
+	const { failures, stale } = inspectRenderWrites(
+		`
+	interface Block { parentNode: Node; endMarker: Node | null }
+	declare function usesFrontier(block: Block, parent: Node): boolean;
+	function anchor(block: Block) {
+	 const parent = block.parentNode;
+	 parent.insertBefore(document.createComment(''), block.endMarker);
+	}
+	function guarded(block: Block) {
+	 const parent = block.parentNode;
+	 if (!usesFrontier(block, parent)) parent.insertBefore(document.createComment(''), block.endMarker);
+	}
+	function passed(parent: Node, before: Node | null) {
+	 parent.insertBefore(document.createComment(''), before);
+	}
+	function made(frag: DocumentFragment) {
+	 const el = document.createElement('p');
+	 el.textContent = 'fresh';
+	 frag.appendChild(el);
+	}`,
+		undefined,
+		writers,
+		new Map([['stillListed', 'fixed since']]),
+	);
+	assert.deepEqual(
+		failures.map((finding) => [finding.owner, finding.operation, finding.unguarded]),
+		[['anchor', 'call:insertBefore', true]],
+	);
+	assert.deepEqual(stale, ['stillListed']);
 });
