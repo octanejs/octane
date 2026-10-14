@@ -148,9 +148,7 @@ describe.each([
 		const onPress = vi.fn();
 		container.innerHTML = ServerRT.renderToString(server.BindingView, { label: 'a' }).html;
 		const expected = markup(container);
-		const close = container.lastChild!;
-		expect(close.nodeType).toBe(Node.COMMENT_NODE);
-		close.remove();
+		stripClose(container);
 
 		const { recoverable, uncaught } = await hydrate('BindingView', { label: 'a', onPress });
 

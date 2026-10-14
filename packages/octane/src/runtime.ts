@@ -226,6 +226,9 @@ import {
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATE_MARKER_SELECTOR,
+	HYDRATION_VERSION,
+	HYDRATION_VERSION_ATTR,
+	HYDRATION_VERSION_MARKER,
 } from './hydration-markers.js';
 import {
 	ACTIVITY_TAG,
@@ -12569,6 +12572,18 @@ function renderBlockInner(block: Block): true | undefined {
 // production bundles containing only `@{}` output to tree-shake this whole
 // return/descriptor/childSlot path.
 let RETURNED_OUTPUT_SCOPE: Scope | null = null;
+// Only compile-proven JSX in the owning body's return can borrow its frame.
+// Weak keys neither pin escaped descriptors nor affect their public shape.
+let returnedComponents: WeakMap<object, Scope> | null = null;
+
+/** @internal A direct call still returns a normal, inspectable JSX value. */
+export function markReturnedComponent<P>(
+	value: ElementDescriptor<P>,
+	scope: unknown,
+): ElementDescriptor<P> {
+	if (isRenderCall(scope)) (returnedComponents ??= new WeakMap()).set(value, scope as Scope);
+	return value;
+}
 
 function setReturnedOutputOwner(state: any, returned: boolean): void {
 	if (state.returnedOutput === returned) return;
@@ -12615,11 +12630,21 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 			(out as any).key == null &&
 			typeof (out as any).type === 'function';
 		const existingRet = block.slots[0] as any;
+		const hydration = hydrating ? activeHydration() : null;
+		const borrows =
+			isComponentDescriptor &&
+			// A legacy return already adopted a physical childSlot frame. Its first
+			// client update must keep that slot and the control state it adopted.
+			(existingRet === undefined || existingRet.__kind === 'componentSlotSlot') &&
+			returnedComponents?.get(out as object) === block &&
+			!hasComponentFlags((out as ElementDescriptor).type, COMPONENT_FLAG_BOUNDARY) &&
+			(hydration === null || hydration.version === HYDRATION_VERSION);
 		let replacedStart: Node | null = null;
 		let replacedEnd: Node | null = null;
 		const useSingleRoot =
 			isComponentDescriptor &&
 			((out as any).type.$$singleRoot === true ||
+				borrows ||
 				(hydrating ? activeHydration()?.passthroughRanges === true : false) ||
 				// STICKY regime: a return slot mounted through the componentSlot route
 				// (most importantly by the passthrough-hydration branch above, whose
@@ -12725,7 +12750,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 						d.__octaneInvocationSite,
 						block.endMarker,
 						true,
-						undefined,
+						borrows || undefined,
 						d.key ?? undefined,
 						hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
 					),
@@ -12740,7 +12765,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 					d.__octaneInvocationSite,
 					block.endMarker,
 					true,
-					undefined,
+					borrows || undefined,
 					d.key ?? undefined,
 					hydrating ? activeHydration() !== null && elementKeyWasProvided(d) : false,
 				);
@@ -13389,7 +13414,9 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 	// the parentBlock chain) whenever a descriptor carrying a ref is stamped
 	// anywhere in this block's subtree, so a ref-free region skips the
 	// whole-DOM descriptor scan.
-	if (block.deoptNode !== null && block.deoptRefs) detachDeoptTreeRefs(block.deoptNode, null);
+	if (block.deoptNode !== null && block.deoptRefs) {
+		detachDeoptTreeRefs(block.deoptNode, null, true, block);
+	}
 	// When THIS call removes the block's entire DOM range below, descendants must
 	// not detach their own ranges first: every non-portal descendant's DOM lies
 	// inside this range (portals always self-detach — unmountScopeChildrenAndSlotsOnly
@@ -17707,7 +17734,13 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		return;
 	}
 	const hydration =
-		preserved?.hydration ?? createHydrationAttempt(block, getNextSibling(state.start), null);
+		preserved?.hydration ??
+		createHydrationAttempt(
+			block,
+			getNextSibling(state.start),
+			null,
+			state.wrapper.getAttribute(HYDRATION_VERSION_ATTR),
+		);
 	// Suspension retains this attempt's seeds; external server values can
 	// become stale before the next attempt resumes.
 	if (!hydration.staleServerValues && hydrateServerValuesStale(state)) {
@@ -17737,6 +17770,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	let nativeRecovery: NativeAdoptionMiss | undefined;
 	let restart: DeferredHydrationSuspension | undefined;
 	try {
+		hydrateCheckVersion(hydration);
 		if (preserved === undefined && state.nativeSeedRaw !== undefined) {
 			hydration.nativeAdoption = ownNativeAdoption(block, state.nativeSeedRaw, () => {
 				state.nativeSeedRaw = undefined;
@@ -20978,6 +21012,8 @@ function hydrationClaim(kind: 'range' | 'place'): HydrationRangeClaim | Hydratio
 interface HydrationAttempt {
 	rootBlock: Block;
 	seeds: unknown[] | null;
+	/** Revision of the server region, retained even when the outer root has committed. */
+	version: string | null;
 	resumeNode: Node | null;
 	resumeClaim: HydrationClaim | null;
 	root: HydrationRootClaim;
@@ -21020,12 +21056,14 @@ function createHydrationAttempt(
 	rootBlock: Block,
 	node: Node | null,
 	seeds: unknown[] | null,
+	version: string | null,
 ): HydrationAttempt {
 	initialSuspenseHydrationRenderer = renderInitialSuspenseHydration;
 	const root: HydrationRootClaim = { kind: 'root', next: undefined, limit: null, outer: null };
 	return {
 		rootBlock,
 		seeds,
+		version,
 		resumeNode: node,
 		resumeClaim: root,
 		root,
@@ -21055,6 +21093,17 @@ function createHydrationAttempt(
 		idStart: 0,
 		seeded: null,
 	};
+}
+
+function hydrateCheckVersion(attempt: HydrationAttempt): void {
+	if (attempt.version !== null && attempt.version !== HYDRATION_VERSION) {
+		hydrateMismatch(
+			attempt,
+			undefined,
+			() => 'a supported hydration version',
+			hydrationCursor.node,
+		);
+	}
 }
 
 /**
@@ -38679,7 +38728,11 @@ function renderPreparedChildList(
 			}
 			if (anchor === null) {
 				let node = domParent.lastChild;
-				while (node !== null && isRendererHydrationStyle(node)) {
+				while (
+					node !== null &&
+					(isRendererHydrationStyle(node) ||
+						(node.nodeType === 8 && (node as Comment).data === HYDRATION_VERSION_MARKER))
+				) {
 					anchor = node;
 					node = node.previousSibling;
 				}
@@ -43184,6 +43237,7 @@ interface InitialSuspenseHydration {
 	end: Comment;
 	idStart: number;
 	seedRaw: string | null;
+	version: string | null;
 	nativeRaw: string | null;
 	/** A stale activation's value checks, retained while an arm waits outside it. */
 	stale?: HydrationValueChecks;
@@ -43261,6 +43315,7 @@ function takeInitialSuspenseHydration(
 			start,
 			end,
 			idStart: 0,
+			version: hydration.version,
 			...payload,
 			consume: () => {
 				initialStreamedPayloads?.delete(owner);
@@ -43308,6 +43363,7 @@ function takeInitialSuspenseHydration(
 		end,
 		idStart,
 		seedRaw,
+		version: hydration.version,
 		nativeRaw,
 	};
 }
@@ -43467,7 +43523,12 @@ function renderInitialSuspenseHydration(
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
-	const hydration = createHydrationAttempt(block, getNextSibling(initial.start), null);
+	const hydration = createHydrationAttempt(
+		block,
+		getNextSibling(initial.start),
+		null,
+		initial.version,
+	);
 	hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydrateParseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
@@ -48274,6 +48335,22 @@ function detachDeoptTreeRefs(
 			queueRefDetach(ref, node as Element);
 		}
 	}
+	// A dynamic host's own slot renders inside this node. Its recursive
+	// teardown (or Suspense hide) owns those refs; only raw hosts own their
+	// whole DOM subtree. An emptied list-item slot may remain after returning
+	// to raw hosts, so it is not enough that a scope merely has slots.
+	const slots = ownerScope?._slots;
+	if (ownerScope?.block.deoptNode === node && slots != null) {
+		for (const slot of slots) {
+			if (
+				(slot.__kind === 'childSlot' &&
+					// Hydrated hosts keep an adopted child frame instead of ownerHost.
+					(slot.ownerHost === node || slot.end?.parentNode === node)) ||
+				(slot.__kind === 'hostTagChildrenSlot' && slot.block.parentNode === node)
+			)
+				return;
+		}
+	}
 	let c: Node | null = getFirstChild(node);
 	while (c !== null) {
 		const rangeEnd = (c as any).$$portalEnd as Node | undefined;
@@ -51669,6 +51746,27 @@ function hydrateRootWithOutputHandler(
 	rootBlock.idState = idState;
 	registerRootErrorHandlers(rootBlock, rootOptions);
 	let seeds: unknown[] | null = null;
+	// Root sidecars never describe a nested island. Each island wrapper carries
+	// its own version; a document's witness lives at the end of its body.
+	const versionParent =
+		container.nodeType === 9
+			? (container as Document).body
+			: container.nodeType === 1 && (container as Element).localName === 'html'
+				? (container as HTMLHtmlElement).querySelector('body')
+				: container;
+	let version =
+		container.nodeType === 1 && (container as Element).hasAttribute(HYDRATE_ID_ATTR)
+			? (container as Element).getAttribute(HYDRATION_VERSION_ATTR)
+			: null;
+	const versionPrefix = HYDRATION_VERSION_MARKER.slice(0, -HYDRATION_VERSION.length);
+	for (let node = versionParent?.lastChild ?? null; node !== null; node = node.previousSibling) {
+		if (node.nodeType === 8 && (node as Comment).data.startsWith(versionPrefix)) {
+			version = (node as Comment).data.slice(versionPrefix.length);
+			// Matching root hydration leaves unclaimed siblings alone. Keep this
+			// witness, too: matching and suspended adoption must make no DOM writes.
+			break;
+		}
+	}
 	// The root-local counter starts at zero, matching the server render carrying
 	// the same identifierPrefix. Other roots cannot perturb hydration ordering.
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
@@ -51744,7 +51842,7 @@ function hydrateRootWithOutputHandler(
 		// the root-local ID and seed cursors together on the next attempt.
 		idState.next = rootOptions?.identifierSeed ?? 0;
 		const firstNode = skipFoldedHeadPrefix(container, getFirstChild(container));
-		const hydration = createHydrationAttempt(rootBlock, firstNode, seeds);
+		const hydration = createHydrationAttempt(rootBlock, firstNode, seeds, version);
 		// A suspended attempt rolls back, and its retry adopts afresh.
 		hydration.defers = true;
 		if (bindingLeases?.length) {
@@ -51770,6 +51868,7 @@ function hydrateRootWithOutputHandler(
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
+			hydrateCheckVersion(hydration);
 			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
 				owner.initialDocumentSignals = captureInitialDocumentSignals(
 					owner.initialDocumentSignals,

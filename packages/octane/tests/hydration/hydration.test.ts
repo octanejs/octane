@@ -33,6 +33,7 @@ function serverModule(): Record<string, any> {
 	});
 }
 const server = serverModule();
+const WIRE_VERSION = '<!--octane-hydration:1-->';
 
 let container: HTMLElement;
 beforeEach(() => {
@@ -55,13 +56,13 @@ async function setup(name: string, clientComp: any, props?: any) {
 describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 	it('static text', async () => {
 		const { html, before, after } = await setup('StaticText', StaticText);
-		expect(html).toBe('<div class="greet">Hello, world</div>');
+		expect(html).toBe('<div class="greet">Hello, world</div>' + WIRE_VERSION);
 		expect(after).toBe(before); // hydration did not touch the DOM
 	});
 
 	it('dynamic attributes + text', async () => {
 		const { html, before, after } = await setup('Attrs', Attrs, { id: 'a', cls: 'c', text: 'hi' });
-		expect(html).toBe('<div id="a" class="c" data-kind="leaf">hi</div>');
+		expect(html).toBe('<div id="a" class="c" data-kind="leaf">hi</div>' + WIRE_VERSION);
 		expect(after).toBe(before);
 	});
 
@@ -256,7 +257,9 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 
 	it('nested elements with text children', async () => {
 		const { html, before, after } = await setup('Mixed', Mixed);
-		expect(html).toBe('<div id="m"><span class="a">A</span><span class="b">B</span></div>');
+		expect(html).toBe(
+			'<div id="m"><span class="a">A</span><span class="b">B</span></div>' + WIRE_VERSION,
+		);
 		expect(after).toBe(before);
 	});
 
@@ -271,7 +274,7 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 describe('hydrateRoot — interactivity', () => {
 	it('attaches event handlers to adopted nodes and updates on click', async () => {
 		const { before, after } = await setup('Counter', Counter, { start: 5 });
-		expect(before).toBe('<button id="btn">5</button>'); // server initial
+		expect(before).toBe('<button id="btn">5</button>' + WIRE_VERSION); // server initial
 		expect(after).toBe(before); // no mismatch on hydrateRoot
 
 		const btn = container.querySelector('#btn') as HTMLButtonElement;
@@ -300,7 +303,7 @@ describe('hydrateRoot — useSyncExternalStore', () => {
 		};
 		// Server rendered the SERVER snapshot.
 		const { html } = ServerRT.renderToString(server.StoreView, { store });
-		expect(html).toBe('<span id="sv">server</span>');
+		expect(html).toBe('<span id="sv">server</span>' + WIRE_VERSION);
 
 		container.innerHTML = html;
 		const before = container.innerHTML;

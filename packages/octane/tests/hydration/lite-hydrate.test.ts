@@ -34,7 +34,7 @@ describe('hydrateRoot — hookless lite components (SSR Phase 6)', () => {
 			'<div id="shell"><h3>T</h3>' +
 				'<!--[--><span class="badge">Alpha</span><!--]-->' +
 				'<!--[--><span class="badge">Beta</span><!--]-->' +
-				'</div>',
+				'</div><!--octane-hydration:1-->',
 		);
 
 		container.innerHTML = html;

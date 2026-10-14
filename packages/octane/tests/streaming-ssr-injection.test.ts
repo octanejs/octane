@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import * as ServerRuntime from 'octane/server';
-import { BLOCK_OPEN, BLOCK_CLOSE } from 'octane/constants';
 import { loadServerFixture } from './_server-fixture.js';
 import {
 	collectPipeableStream,
@@ -284,7 +283,7 @@ describe('streaming injection — fragment renders', () => {
 			chunks.push(decoder.decode(value));
 		}
 		await stream.allReady;
-		expect(chunks).toEqual([BLOCK_OPEN + 'shell' + BLOCK_CLOSE, first, second]);
+		expect(chunks).toEqual([ServerRuntime.renderToString(() => 'shell').html, first, second]);
 	});
 
 	it('rejects pending injected writes and unsubscribes when the web-stream reader cancels', async () => {
@@ -611,7 +610,7 @@ describe('streaming injection — failure modes', () => {
 		aborter.abort(reason);
 		const output = new Response(stream).text();
 		await expect(stream.allReady).rejects.toBe(reason);
-		expect(await output).toBe(BLOCK_OPEN + 'shell' + BLOCK_CLOSE + script);
+		expect(await output).toBe(ServerRuntime.renderToString(() => 'shell').html + script);
 		expect(injection.unsubscribed).toBe(true);
 	});
 

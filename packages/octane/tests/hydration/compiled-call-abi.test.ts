@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createRoot, flushSync, hydrateRoot, type Root } from '../../src/index.js';
+import { act, createRoot, flushSync, hydrateRoot, type Root } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import {
 	KeyedCall,
 	OnlyChildText,
 	OptionalKeyCall,
+	PlainReturnedEditor,
+	ReturnedRows,
+	ReturnedDynamicBoundary,
+	SeededReturnedEditor,
 	SiblingCalls,
 	SiblingText,
 	SoleRootCall,
@@ -28,6 +32,11 @@ const server = loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
 	id: 'compiled-call-abi.tsrx',
 	mode: 'server',
 });
+
+// A real server response produced by e4691c176 before the wire version was
+// introduced. Keep this as input, independent of what the current server emits.
+const LEGACY_ROWS =
+	'<section><i>before</i><!--[f1--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><input data-row="a" value="a"><button data-row="a">a:0</button><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><input data-row="b" value="b"><button data-row="b">b:0</button><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><input data-row="c" value="c"><button data-row="c">c:0</button><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><!--]--><strong>after</strong></section>';
 
 let container: HTMLElement;
 let root: Root | null = null;
@@ -56,12 +65,74 @@ async function start(
 		const adopted = [...container.querySelectorAll('*')];
 		root = hydrateRoot(container, client as any, props);
 		flushSync(() => {});
-		expect([...container.querySelectorAll('*')]).toEqual(adopted);
+		const hydrated = [...container.querySelectorAll('*')];
+		expect(hydrated).toHaveLength(adopted.length);
+		for (const [index, element] of adopted.entries()) expect(hydrated[index]).toBe(element);
 	}
 	return root;
 }
 
 const buttons = () => [...container.querySelectorAll('button')].map((b) => b.textContent);
+
+describe('hydrating returned components from independently generated documents', () => {
+	it('adopts a matching unversioned plain document at an existing sole-root call', async () => {
+		container.innerHTML = '<button class="b">b:0</button>';
+		const button = container.querySelector('button')!;
+		button.focus();
+		const recoverable: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			SoleRootCall as any,
+			{ label: 'b' },
+			{
+				onRecoverableError: (error) => recoverable.push(error),
+			},
+		);
+		await act(() => {});
+		expect(container.querySelector('button')).toBe(button);
+		expect(document.activeElement).toBe(button);
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('b:1');
+		expect(recoverable).toEqual([]);
+	});
+
+	it.each([
+		['without seeded data', 'PlainReturnedEditor', PlainReturnedEditor],
+		['with seeded data', 'SeededReturnedEditor', SeededReturnedEditor],
+	] as const)(
+		'recovers a root built with a newer hydration wire version %s',
+		async (_label, name, Component) => {
+			const data = Object.assign(Promise.resolve('b'), {
+				status: 'fulfilled' as const,
+				value: 'b',
+			});
+			const props = { id: 'b', visible: true, data, onInputRef: vi.fn() };
+			// This document advertises a newer wire encoding that the runtime cannot
+			// interpret. Recovery belongs to this root, with one public report.
+			container.innerHTML =
+				ServerRT.renderToString(server[name], props).html.replace(
+					/<!--octane-hydration:\d+-->/,
+					'',
+				) + '<!--octane-hydration:999-->';
+			const oldInput = container.querySelector('input')!;
+			const oldButton = container.querySelector('button')!;
+			const recoverable: unknown[] = [];
+			root = hydrateRoot(container, Component as any, props, {
+				onRecoverableError: (error) => recoverable.push(error),
+			});
+			await act(() => {});
+			expect(oldInput.isConnected).toBe(false);
+			expect(oldButton.isConnected).toBe(false);
+			expect(recoverable).toHaveLength(1);
+			const input = container.querySelector('input')!;
+			const button = container.querySelector('button')!;
+			expect(input.value).toBe('b');
+			expect(props.onInputRef).toHaveBeenCalledWith('b', input);
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('b:1');
+		},
+	);
+});
 
 describe.each(['render', 'hydrate'] as const)('compiled call ABI (%s)', (mode) => {
 	it('remounts a keyed call only when its key changes', async () => {
@@ -113,6 +184,84 @@ describe.each(['render', 'hydrate'] as const)('compiled call ABI (%s)', (mode) =
 		expect(buttons()).toEqual(['b:1']);
 	});
 
+	it.each(mode === 'hydrate' ? ['current', 'legacy'] : ['current'])(
+		'preserves an editor through returned components, keyed reordering and a neighbouring branch replacement (%s)',
+		async (wire) => {
+			const refs = new Map<string, HTMLInputElement>();
+			const onInputRef = (id: string, node: HTMLInputElement | null) => {
+				if (node) refs.set(id, node);
+				else refs.delete(id);
+			};
+			const props = { ids: ['a', 'b', 'c'], hidden: '', onInputRef };
+			// Type before hydration to distinguish DOM adoption from equivalent markup.
+			let draft: HTMLInputElement;
+			if (mode === 'hydrate') {
+				container.innerHTML =
+					wire === 'legacy'
+						? LEGACY_ROWS
+						: ServerRT.renderToString(server.ReturnedRows, props).html;
+				draft = container.querySelector<HTMLInputElement>('input[data-row="b"]')!;
+				draft.value = 'unfinished b draft';
+				draft.focus();
+				draft.setSelectionRange(3, 9);
+				root = hydrateRoot(container, ReturnedRows as any, props);
+				flushSync(() => {});
+			} else {
+				await start(mode, 'ReturnedRows', ReturnedRows, props);
+				draft = container.querySelector<HTMLInputElement>('input[data-row="b"]')!;
+				draft.value = 'unfinished b draft';
+				draft.focus();
+				draft.setSelectionRange(3, 9);
+			}
+			const before = container.querySelector('i')!;
+			const after = container.querySelector('strong')!;
+			const a = container.querySelector<HTMLInputElement>('input[data-row="a"]')!;
+			const bButton = container.querySelector<HTMLButtonElement>('button[data-row="b"]')!;
+			expect(refs.get('b')).toBe(draft);
+			expect(document.activeElement).toBe(draft);
+			expect([draft.selectionStart, draft.selectionEnd]).toEqual([3, 9]);
+			flushSync(() => bButton.click());
+			expect(bButton.textContent).toBe('b:1');
+
+			flushSync(() =>
+				root!.render(ReturnedRows as any, { ...props, ids: ['c', 'b', 'a'], hidden: 'a' }),
+			);
+			expect(container.querySelector('i')).toBe(before);
+			expect(container.querySelector('strong')).toBe(after);
+			expect(container.querySelector('input[data-row="b"]')).toBe(draft);
+			expect(container.querySelector('button[data-row="b"]')).toBe(bButton);
+			expect(draft.value).toBe('unfinished b draft');
+			expect(refs.get('b')).toBe(draft);
+			expect(refs.has('a')).toBe(false);
+			expect(a.isConnected).toBe(false);
+			expect([...container.querySelector('section')!.children].map((n) => n.textContent)).toEqual([
+				'before',
+				'',
+				'c:0',
+				'',
+				'b:1',
+				'a hidden',
+				'after',
+			]);
+
+			flushSync(() => root!.render(ReturnedRows as any, { ...props, ids: ['b', 'a'] }));
+			expect(container.querySelector('input[data-row="b"]')).toBe(draft);
+			expect(container.querySelector('input[data-row="a"]')).not.toBe(a);
+			expect(refs.get('b')).toBe(draft);
+			expect(refs.has('c')).toBe(false);
+			flushSync(() => bButton.click());
+			expect(bButton.textContent).toBe('b:2');
+			expect([...container.querySelector('section')!.children].map((n) => n.textContent)).toEqual([
+				'before',
+				'',
+				'b:2',
+				'',
+				'a:0',
+				'after',
+			]);
+		},
+	);
+
 	it('keeps anchored and appended sibling calls in source order', async () => {
 		const r = await start(mode, 'SiblingCalls', SiblingCalls, { first: 'x', second: 'y' });
 		const [first, second] = container.querySelectorAll('button');
@@ -127,6 +276,42 @@ describe.each(['render', 'hydrate'] as const)('compiled call ABI (%s)', (mode) =
 		expect(container.querySelectorAll('button')[0]).toBe(first);
 		expect(container.querySelectorAll('button')[1]).toBe(second);
 		expect(buttons()).toEqual(['p:0', 'q:1']);
+	});
+
+	it('keeps sibling content outside a returned dynamic Suspense through replacement and remount', async () => {
+		await start(mode, 'ReturnedDynamicBoundary', ReturnedDynamicBoundary, { boundary: true });
+		const before = container.querySelector('i')!;
+		const after = container.querySelector('strong')!;
+		const first = container.querySelector('b')!;
+		const second = container.querySelector('small')!;
+		expect([...container.querySelector('section')!.children].map((el) => el.textContent)).toEqual([
+			'before',
+			'first',
+			'second',
+			'after',
+		]);
+		flushSync(() => root!.render(ReturnedDynamicBoundary as any, { boundary: false }));
+		expect(container.querySelector('i')).toBe(before);
+		expect(container.querySelector('strong')).toBe(after);
+		expect(first.isConnected).toBe(false);
+		expect(second.isConnected).toBe(false);
+		expect([...container.querySelector('section')!.children].map((el) => el.textContent)).toEqual([
+			'before',
+			'replacement',
+			'after',
+		]);
+		flushSync(() => root!.render(ReturnedDynamicBoundary as any, { boundary: true }));
+		expect(container.querySelector('i')).toBe(before);
+		expect(container.querySelector('strong')).toBe(after);
+		expect([...container.querySelector('section')!.children].map((el) => el.textContent)).toEqual([
+			'before',
+			'first',
+			'second',
+			'after',
+		]);
+		root!.unmount();
+		root = null;
+		expect(container.innerHTML).toBe('');
 	});
 
 	it.each([

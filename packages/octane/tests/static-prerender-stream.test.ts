@@ -7,7 +7,6 @@
 // protocol (a documented non-goal), and no `{ prelude }`-with-holes shape.
 import { describe, it, expect, vi } from 'vitest';
 import * as Server from 'octane/server';
-import { BLOCK_OPEN, BLOCK_CLOSE } from 'octane/constants';
 import { prerender, prerenderToNodeStream } from 'octane/static';
 import { createScope, type ScopeSeed } from 'octane/signals';
 import { loadServerFixture } from './_server-fixture.js';
@@ -183,7 +182,7 @@ describe.each([
 				injection: injection.source,
 			} as Server.StreamOptions);
 			expect('html' in result ? result.html : await collect(result.prelude)).toBe(
-				BLOCK_OPEN + 'ready' + BLOCK_CLOSE,
+				Server.renderToString(() => 'ready').html,
 			);
 			expect(injection.controller.signal.aborted).toBe(false);
 			expect(injection.cancel).not.toHaveBeenCalled();

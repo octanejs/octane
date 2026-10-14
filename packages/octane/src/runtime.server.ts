@@ -48,6 +48,9 @@ import {
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
 	HYDRATION_START,
+	HYDRATION_VERSION,
+	HYDRATION_VERSION_ATTR,
+	HYDRATION_VERSION_MARKER,
 } from './hydration-markers.js';
 import {
 	ACTIVITY_TAG,
@@ -5431,7 +5434,7 @@ function renderComponentFramed(
 	// this output — skip the frame's `<!--[-->…<!--]-->` wrap. The FRAME itself
 	// is still created (use() path keys / seed order unchanged); the client's
 	// componentSlot(inherit) borrows the parent range instead of adopting.
-	inherit?: boolean,
+	inherit?: boolean | 2,
 	instanceKey?: ServerSignalInstanceKey,
 	bindingMarker?: string,
 	// A fragment renderer's frame continues the list keys pending at its call
@@ -5561,12 +5564,14 @@ function retainRendererJobListKeys(frame: Frame, keys: ServerSignalListKeys): vo
  * `@{}` body — emit WITHOUT the surrounding `<!--[-->…<!--]-->` pair (the
  * parent's own range bounds it; the client borrows that range). Applies to
  * both the component branch (frame wrap) and the string-tag branch (ssrBlock).
+ * `inherit=2` is the versioned compiled-return ABI: it borrows for actual
+ * components but keeps runtime-resolved hosts on the descriptor path.
  */
 export function ssrComponent(
 	parent: SSRScope,
 	comp: ServerComponent | string | typeof Activity,
 	props: any,
-	inherit?: boolean,
+	inherit?: boolean | 2,
 	key?: unknown,
 	identityScoped?: boolean | 'key',
 	invocationSite?: string,
@@ -5616,7 +5621,7 @@ export function ssrComponent(
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
 		// Suspense/ErrorBoundary/ViewTransition/Hydrate keep their pair; both sides agree
 		// without retaining the concrete built-ins from this generic path).
-		if (inherit === true && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
+		if (inherit && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
 		// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
 		// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
 		// client renders these — a value-lowered `createElement(obj.tag, …)` routes
@@ -5629,6 +5634,10 @@ export function ssrComponent(
 		// value-position call site (ssrHostElement's content path handles those), or
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
+			// New return borrowing applies only to actual components. The
+			// client keeps a runtime-resolved host on its descriptor childSlot
+			// path. Existing template-body inheritance still supports strings.
+			if (inherit === 2) inherit = false;
 			const tag = comp;
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
 			const childNamespace = parserNamespacesForTag(
@@ -5735,7 +5744,7 @@ export function ssrComponentNS(
 	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
-	inherit?: boolean,
+	inherit?: boolean | 2,
 	key?: unknown,
 	invocationSite?: string,
 	bindingMarker?: string,
@@ -5908,6 +5917,7 @@ function ssrHydrateAttrs(
 			'div',
 		) +
 		ssrAttr(HYDRATE_ID_COUNT_ATTR, idCount, 'div');
+	attrs += ssrAttr(HYDRATION_VERSION_ATTR, HYDRATION_VERSION, 'div');
 	if (streamToken !== null) attrs += ssrAttr(HYDRATE_STREAM_TOKEN_ATTR, streamToken, 'div');
 	if (permanentStaticAncestor) return attrs;
 	if (independent && direct !== null) attrs += ssrIndependentStrategyAttrs(direct);
@@ -5921,6 +5931,7 @@ function ssrHydrateAttrs(
 			name === HYDRATE_ID_ATTR ||
 			name === HYDRATE_WHEN_ATTR ||
 			name === HYDRATE_ID_COUNT_ATTR ||
+			name === HYDRATION_VERSION_ATTR ||
 			name === HYDRATE_STREAM_TOKEN_ATTR ||
 			name === HYDRATE_SEED_ATTR ||
 			name === NATIVE_SIGNAL_SEED_ATTR ||
@@ -9250,6 +9261,15 @@ function runFullFramedPass(
 				resolved.resourceOptions?.onError?.(report.error);
 			}
 		}
+	}
+	// Once per successful hydratable root, including hosted passes and stream
+	// shells. Keep the witness outside component ranges and before a document's
+	// closing body, so its parser never reparents it into a different root.
+	// Failed/discovery passes and static markup cannot publish a wire version.
+	if (markers && nativePassCompleted) {
+		const tail = isDocumentRoot(body) ? documentTailStart(body) : -1;
+		const witness = '<!--' + HYDRATION_VERSION_MARKER + '-->';
+		body = tail === -1 ? body + witness : body.slice(0, tail) + witness + body.slice(tail);
 	}
 	let css = '';
 	for (const [hash, sheet] of cssMap) {

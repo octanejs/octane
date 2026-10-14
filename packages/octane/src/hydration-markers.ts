@@ -26,6 +26,15 @@ export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
 /** Matches any server-rendered deferred hydration boundary wrapper. */
 export const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
 
+// This version is about the shape of hydratable DOM, not the optional use()
+// seed payload or independent-island manifest. In particular a seedless root
+// and a separately activated island must each be able to describe their wire.
+// Unversioned output predates borrowing across compiled returned JSX; it still
+// uses the original @{ } inherit-range convention.
+export const HYDRATION_VERSION = '1';
+export const HYDRATION_VERSION_ATTR = 'data-octane-hydration';
+export const HYDRATION_VERSION_MARKER = 'octane-hydration:1';
+
 // The payloads below stay plain literals rather than deriving the longer ones
 // from the shorter. A bundler does not constant-fold a cross-module template
 // literal, so a derived spelling reaches every output as a runtime concat: it

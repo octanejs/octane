@@ -1685,6 +1685,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'createElementAt',
 	'createElementFromConfig',
 	'createHostElement',
+	'markReturnedComponent',
 	'enableDescriptorFormActions',
 	'enableDescriptorFragmentRefs',
 	'isRenderCall',
@@ -2122,6 +2123,19 @@ function inheritSoleCompRoot(bodyNodes, ctx) {
 		if (name === 'key') return false;
 	}
 	return true;
+}
+
+// Only the owned, direct JSX return has matching server body output. Escaped
+// values, ordered/spread keys and template-normalized roots retain their frames.
+function inheritReturnedCompRoot(bodyNodes, ctx) {
+	if (!inheritSoleCompRoot(bodyNodes, ctx)) return false;
+	const node = bodyNodes[0];
+	return (
+		!requiresTemplateNormalization(node, 'html', true, ctx) &&
+		!(node.attributes || node.openingElement?.attributes || []).some(
+			(attr) => attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute',
+		)
+	);
 }
 
 // Collect the LOCAL names bound to the octane boundary builtins (see
@@ -13981,7 +13995,14 @@ function ssrCompileBodyWithMapTemps(
 	ctx._ssrInheritRoot =
 		((!!(node.body && node.body.type === 'JSXCodeBlock') && !returnedOutput) ||
 			returnedFragmentRoot) &&
-		inheritSoleCompRoot(bodyNodes, ctx);
+		inheritSoleCompRoot(bodyNodes, ctx)
+			? true
+			: !Array.isArray(node.body) &&
+				  node.body?.type === 'BlockStatement' &&
+				  node._octaneDirectCallTwin !== true &&
+				  inheritReturnedCompRoot(bodyNodes, ctx)
+				? 2
+				: false;
 	// Body/sub ROOTS (including fragment-root children) are not host-element
 	// children: the client routes rich holes there through the de-opt value
 	// path (a portal has no host to stamp — see the emitNodeHtml root branch),
@@ -15881,7 +15902,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
 	// comp-call root of a `@{}` body — which is exactly this emit.
-	const inherit = ctx._ssrInheritRoot === true && !node._octaneBindingSite;
+	const inherit = !node._octaneBindingSite ? ctx._ssrInheritRoot || false : false;
 	ctx._ssrInheritRoot = false;
 	// Capture before compiling attributes/children: nested subs temporarily mutate
 	// this context flag. Only this component's immediate children sub inherits the
@@ -16059,13 +16080,13 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	if (explicitNamespace) {
 		args.push(
 			b.literal(componentNs, JSON.stringify(componentNs)),
-			b.literal(inherit, inherit ? 'true' : 'false'),
+			b.literal(inherit),
 			keyExpr ?? undefinedNode(),
 			b.literal(invocationSite),
 		);
 	} else {
 		args.push(
-			b.literal(inherit, inherit ? 'true' : 'false'),
+			b.literal(inherit),
 			keyExpr ?? undefinedNode(),
 			undefinedNode(),
 			b.literal(invocationSite),
@@ -22080,7 +22101,26 @@ function compileReturnJsxFunction(node, ctx, options) {
 						};
 					}
 				}
-				const record = lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash);
+				let record = lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash);
+				// SSR emits this component directly in its returning body's range.
+				// Keep ordinary direct calls inspectable and framed when the value is
+				// eventually rendered elsewhere. Never infer ownership from slot 0.
+				if (
+					ctx.mode !== 'server' &&
+					node._octaneDirectCallTwin !== true &&
+					!node._octaneBindingView &&
+					inheritReturnedCompRoot(
+						normalizeChildren([h.argument], false, ctx).filter((root) => root.type !== 'HeadHoist'),
+						ctx,
+					)
+				) {
+					renderCall ??= renderCallScopeParam(node, ctx);
+					record = b.call(
+						requireRuntimeForContext(ctx, 'markReturnedComponent'),
+						record,
+						cloneAstNode(renderCall.scope),
+					);
+				}
 				if (node._octaneBindingView || !directCallNeedsClientBranch(h.argument, node, ctx)) {
 					return { ...h, argument: record };
 				}

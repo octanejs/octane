@@ -35,6 +35,34 @@ function ActivationSuspendingChild(props) @{
 	</button>
 }
 
+function ActivationReturnedChild(props: {
+	suspend: boolean;
+	promise: Promise<unknown>;
+	onClick: () => void;
+}) {
+	return (
+		<ActivationSuspendingChild
+			suspend={props.suspend}
+			promise={props.promise}
+			onClick={props.onClick}
+		/>
+	);
+}
+
+function ActivationRelay(props: {
+	suspend: boolean;
+	promise: Promise<unknown>;
+	onClick: () => void;
+}) {
+	return (
+		<ActivationReturnedChild
+			suspend={props.suspend}
+			promise={props.promise}
+			onClick={props.onClick}
+		/>
+	);
+}
+
 export function ActivationSuspendingHydration(props) @{
 	<>
 		<span id="activation-shell">{props.shellLabel as string}</span>
@@ -44,11 +72,7 @@ export function ActivationSuspendingHydration(props) @{
 			fallback={<span id="activation-fallback">{'Client fallback'}</span>}
 			onHydrated={props.onHydrated}
 		>
-			<ActivationSuspendingChild
-				suspend={props.suspend}
-				promise={props.promise}
-				onClick={props.onClick}
-			/>
+			<ActivationRelay suspend={props.suspend} promise={props.promise} onClick={props.onClick} />
 		</Hydrate>
 	</>
 }

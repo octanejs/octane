@@ -499,6 +499,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(html).toBe(
 			'<div id="leaf">hello</div>' +
+				'<!--octane-hydration:1-->' +
 				'<script type="application/json" data-octane-suspense>["hello"]</script>',
 		);
 
@@ -845,6 +846,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		});
 		expect(html).toBe(
 			'<main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
+				'<!--octane-hydration:1-->' +
 				'<script type="application/json" data-octane-suspense>["Hi"]</script>',
 		);
 

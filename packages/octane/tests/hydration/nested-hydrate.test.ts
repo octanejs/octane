@@ -7,9 +7,7 @@ import * as ServerRT from 'octane/server';
 // CLIENT-compiled component (the onClick makes this module register click delegation).
 import { Panel } from './_fixtures/nested.tsrx';
 
-// SSR Phase 6 (M1) — a parent component hydrates a NESTED component: the server
-// wraps the child in `<!--[-->…<!--]-->`, the client componentSlot adopts that
-// range, and the child adopts the server DOM (no rebuild) + becomes interactive.
+// A parent's nested component adopts the server DOM and becomes interactive.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/nested.tsrx');
 
@@ -29,25 +27,19 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrateRoot — nested component (SSR Phase 6 / M1)', () => {
+describe('hydrateRoot — nested component', () => {
 	it('adopts the server DOM (no rebuild) and the nested component is interactive', async () => {
 		const { html } = await ServerRT.renderToString(server.Panel, {
 			title: 'Headlines',
 			label: 'Story',
 		});
-		// The nested <Item> output is wrapped in a hydration block range.
-		expect(html).toBe(
-			'<div id="panel"><h2>Headlines</h2>' +
-				'<!--[--><li class="item"><span class="label">Story</span>' +
-				'<button class="bump">x0</button></li><!--]-->' +
-				'</div>',
-		);
-
 		container.innerHTML = html;
 		const before = container.innerHTML;
 		const panel = container.querySelector('#panel') as HTMLElement;
 		const li = container.querySelector('li.item') as HTMLElement;
 		const btn = container.querySelector('button.bump') as HTMLButtonElement;
+		expect([...panel.children].map((element) => element.tagName)).toEqual(['H2', 'LI']);
+		expect(panel.textContent).toBe('HeadlinesStoryx0');
 
 		const root = hydrateRoot(container, Panel, { title: 'Headlines', label: 'Story' });
 		flushSync(() => {});

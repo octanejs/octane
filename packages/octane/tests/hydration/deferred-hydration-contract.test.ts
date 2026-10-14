@@ -109,6 +109,50 @@ describe('deferred hydration contract edges', () => {
 		}
 	});
 
+	it.each([false, true])(
+		'recovers only a deferred island whose wire version is newer (seeded: %s)',
+		async (seeded) => {
+			const when = interaction({ events: 'click' });
+			const promise = Object.assign(Promise.resolve('ready'), {
+				status: 'fulfilled' as const,
+				value: 'ready',
+			});
+			const props = {
+				when,
+				promise,
+				suspend: seeded,
+				shellLabel: 'Outside the island',
+				onClick: vi.fn(),
+				onHydrated: vi.fn(),
+			};
+			container.innerHTML = renderToString(server.ActivationSuspendingHydration, props).html;
+			const shell = container.querySelector('#activation-shell')!;
+			const original = container.querySelector<HTMLButtonElement>('#activation-content')!;
+			const wrapper = original.closest('[data-octane-hydrate-id]')!;
+			wrapper.setAttribute('data-octane-hydration', '999');
+			const recoverable: unknown[] = [];
+			root = hydrateRoot(container, client.ActivationSuspendingHydration, props, {
+				onRecoverableError: (error) => recoverable.push(error),
+			});
+			await act(() => {});
+			expect(container.querySelector('#activation-shell')).toBe(shell);
+			expect(container.querySelector('#activation-content')).toBe(original);
+			expect(props.onClick).not.toHaveBeenCalled();
+
+			await act(() => original.click());
+			expect(container.querySelector('#activation-shell')).toBe(shell);
+			expect(shell.textContent).toBe('Outside the island');
+			expect(container.contains(wrapper)).toBe(true);
+			expect(original.isConnected).toBe(false);
+			expect(recoverable).toHaveLength(1);
+			const button = container.querySelector<HTMLButtonElement>('#activation-content')!;
+			// The triggering event belonged to DOM this runtime could not adopt.
+			expect(props.onClick).not.toHaveBeenCalled();
+			flushSync(() => button.click());
+			expect(props.onClick).toHaveBeenCalledOnce();
+		},
+	);
+
 	for (const dynamic of [false, true]) {
 		it(`captures and replays ${dynamic ? 'dynamic ' : ''}interaction intent dispatched before hydrateRoot`, () => {
 			const when = dynamic

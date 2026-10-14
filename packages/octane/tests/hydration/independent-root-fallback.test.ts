@@ -153,6 +153,57 @@ const scenarios: Scenario[] = [
 // whether it activated before the fallback or activates after it. Until the
 // client render commits, the islands stay where the server DOM has them.
 describe('independent islands across a root hydration fallback', () => {
+	it.each([false, true])(
+		'contains an unsupported island wire version to that island (dev: %s)',
+		async (dev) => {
+			const page = serveIslands(
+				`import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Widget } from './widgets';
+export function App(props) @{
+	<main>
+		<h1>{props.title as string}</h1>
+		<Hydrate independent when={interaction()}><Widget /></Hydrate>
+		<Hydrate independent when={interaction()}><Widget /></Hydrate>
+	</main>
+}`,
+				dev,
+				`unsupported-island-${dev}`,
+				2,
+			);
+			const { container, wrappers, inputs, buttons } = page;
+			const heading = container.querySelector('h1')!;
+			// One independently generated island can use a different protocol from
+			// both its root and the next island. Its original target cannot replay.
+			wrappers[0].setAttribute('data-octane-hydration', '999');
+			let root: Root | undefined;
+			try {
+				root = hydrateRoot(container, page.client.App, { title: 'Server', footer: 'Server' });
+				await settle();
+				expect(container.querySelector('h1')).toBe(heading);
+				expect(wrappers[0].querySelector('input')).toBe(inputs[0]);
+				expect(wrappers[1].querySelector('input')).toBe(inputs[1]);
+				buttons[0].click();
+				await expect.poll(() => inputs[0].isConnected).toBe(false);
+				await settle();
+				expect(container.querySelector('h1')).toBe(heading);
+				expect(wrappers[0].isConnected).toBe(true);
+				expect(wrappers[1].querySelector('input')).toBe(inputs[1]);
+				const replaced = wrappers[0].querySelector('button')!;
+				expect(replaced.textContent).toBe('0');
+				flushSync(() => replaced.click());
+				expect(replaced.textContent).toBe('1');
+				await page.activate(1);
+				expect(wrappers[1].querySelector('input')).toBe(inputs[1]);
+				expect(wrappers[1].querySelector('button')).toBe(buttons[1]);
+				expect(page.errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				page.dispose();
+			}
+		},
+	);
+
 	it.each([false, true].flatMap((dev) => [false, true].map((activated) => ({ dev, activated }))))(
 		'retains a kept island throughout a suspending client fallback render (%j)',
 		async ({ dev, activated }) => {

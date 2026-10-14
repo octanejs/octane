@@ -98,6 +98,9 @@ describe('hydrateRoot — .tsx string-literal expression children', function () 
 	it('client-only mount of the Prettier pattern matches SSR text', function () {
 		const { client, server } = loadPair(PRETTIER_SPACE, 'prettier-space-client.tsx');
 		const { html } = ServerRT.renderToString(server.Example);
+		const serverContainer = document.createElement('div');
+		serverContainer.innerHTML = html;
+		const serverParagraph = serverContainer.querySelector('p')!;
 		const root = createRoot(container);
 		try {
 			flushSync(function () {
@@ -106,10 +109,7 @@ describe('hydrateRoot — .tsx string-literal expression children', function () 
 			expect(container.querySelectorAll('a').length).toBe(1);
 			expect(container.querySelector('p')!.textContent).toBe('Try the items page');
 			expect(container.querySelector('p')!.innerHTML.replace(/<!--[^>]*-->/g, '')).toBe(
-				html
-					.replace(/^<p>/, '')
-					.replace(/<\/p>$/, '')
-					.replace(/<!--[^>]*-->/g, ''),
+				serverParagraph.innerHTML.replace(/<!--[^>]*-->/g, ''),
 			);
 		} finally {
 			root.unmount();

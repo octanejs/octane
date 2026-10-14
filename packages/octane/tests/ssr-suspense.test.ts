@@ -7,6 +7,7 @@ import * as RT from 'octane/server';
 import type { StreamOptions } from 'octane/server';
 import { prerender, type RenderOptions } from 'octane/static';
 import { hydrateRoot, flushSync } from '../src/index.js';
+import { HYDRATION_VERSION_MARKER } from '../src/hydration-markers.js';
 import {
 	Boundary as ClientBoundary,
 	Nested as ClientNested,
@@ -42,6 +43,7 @@ const m = evalServer(
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
+const WIRE_VERSION = '<!--' + HYDRATION_VERSION_MARKER + '-->';
 /** Leads a caught arm, counting the try body's and catch arm's positional seeds. */
 
 const seed = (json: string) =>
@@ -1299,7 +1301,7 @@ export function App(props) @{
 
 	it('a bare use(promise) with no @try boundary is awaited and resolved', async () => {
 		const out = await prerender(m.AsyncLeaf, { promise: Promise.resolve('hello') });
-		expect(out.html).toBe('<div id="leaf">hello</div>' + seed('["hello"]'));
+		expect(out.html).toBe('<div id="leaf">hello</div>' + WIRE_VERSION + seed('["hello"]'));
 	});
 
 	it('reports a rejected use(promise) without exposing its reason in HTML', async () => {
@@ -1382,7 +1384,7 @@ export function App(props) @{
 			'<div id="sibs"><span class="a">A1</span><span class="b">A2</span></div>',
 		);
 		// b must contain ONLY its own seed — not A's values leaking through SERIAL.
-		expect(b.html).toBe('<div id="leaf">B1</div>' + seed('["B1"]'));
+		expect(b.html).toBe('<div id="leaf">B1</div>' + WIRE_VERSION + seed('["B1"]'));
 	});
 
 	it('non-suspending components emit no seed <script>', async () => {
@@ -1394,7 +1396,7 @@ export function App(props) @{
 			'plain.tsrx',
 		);
 		const out2 = await prerender(plain.Plain);
-		expect(out2.html).toBe('<div id="p">static</div>');
+		expect(out2.html).toBe('<div id="p">static</div>' + WIRE_VERSION);
 		expect(out2.html).not.toContain('data-octane-suspense');
 	});
 

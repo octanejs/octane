@@ -22,7 +22,9 @@ describe('independent widget and parent ownership', () => {
 		'preserves an independently owned input through parent hydration and updates (%j)',
 		async ({ dev, parentFirst, kind, stale }) => {
 			const withIds = kind !== 'inline';
-			const widgetDeclarations = `export function Widget() @{ const id = useId(); ${kind === 'signals' ? "const handle = other$.get() === 'A' ? value$ : second$;" : ''} <section ${kind === 'signals' ? 'data-other={other$.get()}' : ''}><label htmlFor={id}>Draft<input id={id} ${kind === 'signals' ? 'value={handle}' : 'defaultValue="server"'} /></label>${kind === 'signals' ? '<p>{length$}</p>' : ''}<button type="button" onClick={record}>Choose</button></section> }
+			const widgetDeclarations = `export function Widget() { return <ReturnedWidget />; }
+function ReturnedWidget() { return <WidgetEditor />; }
+function WidgetEditor() @{ const id = useId(); ${kind === 'signals' ? "const handle = other$.get() === 'A' ? value$ : second$;" : ''} <section ${kind === 'signals' ? 'data-other={other$.get()}' : ''}><label htmlFor={id}>Draft<input id={id} ${kind === 'signals' ? 'value={handle}' : 'defaultValue="server"'} /></label>${kind === 'signals' ? '<p>{length$}</p>' : ''}<button type="button" onClick={record}>Choose</button></section> }
 export function Neighbor() @{ const id = useId(); <label htmlFor={id}>Neighbor<input id={id} /></label> }`;
 			const source = `import { Hydrate, useId } from 'octane';
 import { interaction } from 'octane/hydration';
