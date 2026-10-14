@@ -125,7 +125,6 @@ export const WRITERS = new Map(
 		notifyHydrateBoundary: 'hydration',
 		skipFoldedHeadPrefix: 'hydration',
 		'HydrationCapability.claimStreamTemplate': 'hydration',
-		'HydrationCapability.armRange': 'hydration',
 		'HydrationCapability.adoptBindingText': 'hydration',
 		'HydrationCapability.newText': 'hydration',
 		'HydrationCapability.keepsText': 'hydration',

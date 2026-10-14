@@ -7,6 +7,8 @@ import {
 	createContext,
 	hydrateRoot,
 	flushSync,
+	setTransitionFallbackTimeout,
+	startTransition,
 } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { condition } from 'octane/hydration';
@@ -977,6 +979,89 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		expect(container.querySelector('#states-content')).toBe(content);
 		expect(content.textContent).toBe('server');
 		expect(content.getAttribute('data-id')).toBe(id);
+		expect(recoverable).toEqual([]);
+		root.unmount();
+	});
+
+	it('adopts the content the server rendered without inserting a node', async () => {
+		container.innerHTML = (
+			await prerender(statesServer.BoundaryStates, { value: Promise.resolve('server') })
+		).html;
+		const added: Node[] = [];
+		const observer = new MutationObserver((records) => {
+			for (const record of records) added.push(...record.addedNodes);
+		});
+		observer.observe(container, { childList: true, subtree: true, characterData: true });
+
+		const { root } = await hydrateStates(new Promise<string>(() => {}));
+		observer.disconnect();
+		expect(added).toEqual([]);
+		root.unmount();
+	});
+
+	it('shows its fallback beside the hydrated content while an update suspends', async () => {
+		container.innerHTML = (
+			await prerender(statesServer.BoundaryStates, { value: Promise.resolve('server') })
+		).html;
+		const content = container.querySelector<HTMLElement>('#states-content')!;
+		const { root, recoverable } = await hydrateStates(new Promise<string>(() => {}));
+		const after = container.querySelector<HTMLElement>('#states-after')!;
+
+		// Each pending value suspends the hydrated content again behind one fallback.
+		for (const label of ['first', 'second']) {
+			let resolve!: (value: string) => void;
+			const value = new Promise<string>((done) => (resolve = done));
+			await act(() => root.render(statesClient.BoundaryStates, { value }));
+			// The parent renders again while the content is still pending.
+			await act(() => root.render(statesClient.BoundaryStates, { value }));
+			const fallback = container.querySelector<HTMLElement>('#states-fallback')!;
+			expect(fallback.textContent).toBe('loading');
+			expect(fallback.style.display).toBe('');
+			expect(content.isConnected).toBe(true);
+			expect(content.style.display).toBe('none');
+			expect(after.style.display).toBe('');
+			expect(container.querySelectorAll('#states-fallback')).toHaveLength(1);
+
+			await act(async () => resolve(label));
+			expect(container.querySelector('#states-fallback')).toBeNull();
+			expect(container.querySelector('#states-content')).toBe(content);
+			expect(content.textContent).toBe(label);
+			expect(content.style.display).toBe('');
+			expect(
+				content.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
+			).toBeTruthy();
+		}
+		expect(recoverable).toEqual([]);
+		root.unmount();
+	});
+
+	it('shows its fallback beside the hydrated content when a held transition times out', async () => {
+		container.innerHTML = (
+			await prerender(statesServer.BoundaryStates, { value: Promise.resolve('server') })
+		).html;
+		const content = container.querySelector<HTMLElement>('#states-content')!;
+		const { root, recoverable } = await hydrateStates(new Promise<string>(() => {}));
+		const after = container.querySelector<HTMLElement>('#states-after')!;
+		setTransitionFallbackTimeout(0);
+		try {
+			let resolve!: (value: string) => void;
+			const value = new Promise<string>((done) => (resolve = done));
+			await act(() => startTransition(() => root.render(statesClient.BoundaryStates, { value })));
+			expect(container.querySelector('#states-fallback')).toBeNull();
+			await act(() => new Promise((done) => setTimeout(done, 10)));
+			const fallback = container.querySelector<HTMLElement>('#states-fallback')!;
+			expect(fallback.style.display).toBe('');
+			expect(content.style.display).toBe('none');
+			expect(after.style.display).toBe('');
+
+			await act(async () => resolve('late'));
+			expect(container.querySelector('#states-fallback')).toBeNull();
+			expect(container.querySelector('#states-content')).toBe(content);
+			expect(content.textContent).toBe('late');
+			expect(content.style.display).toBe('');
+		} finally {
+			setTransitionFallbackTimeout(Infinity);
+		}
 		expect(recoverable).toEqual([]);
 		root.unmount();
 	});

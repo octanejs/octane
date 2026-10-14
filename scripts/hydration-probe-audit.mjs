@@ -35,9 +35,9 @@ const SUITES = [
 // name methods `Class.method`.
 const FAMILIES = {
 	// A component's returned value (#2028 commit 2).
-	returned: ['renderReturnedValue', 'lendRange'],
+	returned: ['renderReturnedValue'],
 	// De-opt descriptor lists (commit 3).
-	descriptors: ['deoptItemBody', 'renderPreparedChildList', 'buildsList', 'deoptItemSelfDelimits'],
+	descriptors: ['deoptItemBody', 'renderPreparedChildList', 'buildsList'],
 	// Strong, lite and void component calls (commit 5).
 	components: ['componentSlotImpl', 'componentSlotLite'],
 	// Compiled template roots, renderable and text holes, lists and branches (commit 6).
@@ -68,15 +68,14 @@ const FAMILIES = {
 // Misses per family over SUITES at the commit that last lowered each budget.
 const BUDGET = {
 	returned: 0,
+	descriptors: 0,
 	components: 0,
 	templates: 0,
 	holes: 0,
 	lists: 0,
 	branches: 0,
-	// Commit 6 left two probes to the families whose commits replace them: a
-	// de-opt list item's shape (deoptItemSelfDelimits, commit 3) and an unframed
-	// root return (unframedRoot) or passthrough root's list (commit 10a).
-	descriptors: 316,
+	// Commit 6 left an unframed root return (unframedRoot) and a passthrough
+	// root's lists to commit 10a.
 	roots: 125,
 };
 

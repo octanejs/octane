@@ -139,7 +139,7 @@ export function unpatchedHTML(pass: object, el: Element, next: string): void {
 				(_match, prefix: string, s: string, suffix: string) =>
 					`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
 			)
-			.replace(SCRIPT_DATA_NORMALIZATION, (match) => (match === '\u0000' ? '�' : '\n'));
+			.replace(SCRIPT_DATA_NORMALIZATION, (match) => (match === '\u0000' ? '\uFFFD' : '\n'));
 	} else {
 		server = el.innerHTML;
 		const ns = el.namespaceURI;

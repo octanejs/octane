@@ -247,6 +247,7 @@ import {
 	isRangeOpen,
 	NATIVE_SIGNAL_FRESH_COMMENT,
 	parserNormalizedMatch,
+	selfDelimits,
 	STREAM_SEED_COMMENT,
 	SUSPENSE_RESOLVED_COMMENT,
 } from './hydration-protocol.js';
@@ -20580,7 +20581,10 @@ class HydrationCapability {
 	 * need not follow the server forms of its leading holes there.
 	 */
 	passthroughRoot = false;
-	/** A slot lent a server range whose first render has yet to claim it. */
+	/**
+	 * A de-opt item's slot that borrows the item's server range, whose first
+	 * render has yet to claim it (deoptItemBody).
+	 */
 	lentSlot: ChildSlot | null = null;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
@@ -21022,25 +21026,17 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Bound the arm of a boundary range that ends at `end`, whose content starts
-	 * at `first`, with markers of its own. The server renders a boundary's
-	 * content directly inside its one range (hydration-protocol.ts), while the
-	 * client renders the arm in a range of its own inside the boundary's, where
-	 * it can hide the arm beside a fallback. An attempt that is discarded
-	 * restores the server's range. A presentation-binding view's arm keeps the
-	 * range of its own that opens at `first` (bindingTryState).
+	 * The range a boundary's body adopts on its first render, from `open` to
+	 * `end`: the boundary's own, since the server renders a boundary's content
+	 * directly inside its one range (hydration-protocol.ts). The body borrows it,
+	 * and the first arm that shows beside the body bounds it (mountPendingBody).
+	 * A presentation-binding view's arm keeps the range of its own that opens at
+	 * `first` (bindingTryState).
 	 */
-	armRange(open: Node, first: Node | null, end: Node): [Comment, Comment] {
-		if ((open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first))
-			return [first, this.close(first)];
-		const parent = end.parentNode!;
-		const doc = document;
-		const start = doc.createComment('try-b');
-		const close = doc.createComment('/try-b');
-		this.save(parent);
-		parent.insertBefore(start, first);
-		parent.insertBefore(close, end);
-		return [start, close];
+	armRange(open: Node, first: Node | null, end: Node): readonly [Node, Node] {
+		return (open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first)
+			? [first, this.close(first)]
+			: [open, end];
 	}
 
 	/**
@@ -21227,35 +21223,6 @@ class HydrationCapability {
 			if (inRootHydrationAttempt() && !this.staleServerValues) error.diagnostic = message;
 		}
 		throw error;
-	}
-
-	/**
-	 * A slot for the server range `start`…`end` that a list item or a returning
-	 * component adopted, lent to the child slot that renders its value, so that
-	 * the value hydrates inside that range rather than claiming a range of its
-	 * own. The slot's first render claims the server range as an adopted one.
-	 */
-	lendRange(start: Comment, end: Comment): ChildSlot {
-		const slot: ChildSlot = {
-			__kind: 'childSlot',
-			start,
-			end,
-			ownerHost: null,
-			borrowed: true,
-			compactable: false,
-			block: null,
-			text: null,
-			currentComp: null,
-			currentIsBodyFn: false,
-			forSlot: null,
-			hostNode: null,
-			portal: null,
-			next: null,
-			// childSlot's own slots carry this key; one shape for both.
-			implicitSignal: undefined,
-		};
-		this.lentSlot = slot;
-		return slot;
 	}
 
 	/**
@@ -36214,28 +36181,19 @@ function deoptItemBody(item: any, scope: Scope): void {
 			}
 			block.deoptNode = null;
 		}
-		// Hydration: the server serialized this component-bearing item as ONE
-		// `<!--[-->…<!--]-->` range (ssrChildItem emits no extra block for the
-		// item/childSlot layering, which is client-only structure), and mountItem
-		// already adopted that pair as the item block's markers. Seed the nested
-		// childSlot with the SAME markers so it BORROWS the item's range — without
-		// this it would grab the next `<!--[-->` at the cursor (the component's
-		// return content, one level too deep) as its own, desyncing everything
-		// inside. The cursor already sits on the item's first content node.
-		if (hydration !== null && scope.slots[0] === undefined && hydration.isOpen(block.startMarker)) {
-			const seeded = hydration.lendRange(block.startMarker as Comment, block.endMarker as Comment);
-			scope.slots[0] = seeded;
-			registerSlot(scope, seeded);
-		}
-		// Marker-elision M2: on a CLIENT mount, the nested childSlot BORROWS the
-		// item block's own `<!--it-->` pair as its range instead of minting a
-		// second inner pair (end anchor + lazy start) — the item's markers bound
-		// exactly the content this slot manages. clearChildContent sweeps BETWEEN
-		// markers (never removes them), and the item block still OWNS the pair
-		// (teardown removes it inclusive). Only when the item is comment-marked —
-		// a de-opt list always is (reconcileKeyed runs with singleRoot=false).
+		// Marker-elision M2: the nested childSlot BORROWS the item block's own
+		// pair as its range instead of minting a second inner pair (end anchor +
+		// lazy start) — the item's markers bound exactly the content this slot
+		// manages. clearChildContent sweeps BETWEEN markers (never removes them),
+		// and the item block still OWNS the pair (teardown removes it inclusive).
+		// Only when the item is comment-marked. A component-bearing item never
+		// delimits itself (selfDelimits), so on its first hydrating render the
+		// pair is the server's one range for the item, which mountItem adopted
+		// and the slot's first render claims (lentSlot). Above a passthrough
+		// owner the item's pair is the client's (mountPassthroughListItem).
+		const lent = hydration !== null && stale === null && !hydration.passthroughRanges;
 		if (
-			hydration === null &&
+			(hydration === null || lent) &&
 			scope.slots[0] === undefined &&
 			block.startMarker !== null &&
 			block.endMarker !== null &&
@@ -36260,7 +36218,10 @@ function deoptItemBody(item: any, scope: Scope): void {
 				hostNode: transfer,
 				portal: null,
 				next: null,
+				// childSlot's own slots carry this key; one shape for both.
+				implicitSignal: undefined,
 			};
+			if (lent) hydration!.lentSlot = borrowed;
 			scope.slots[0] = borrowed;
 			registerSlot(scope, borrowed);
 		} else if (transfer !== null && transfer.parentNode !== null) {
@@ -37434,8 +37395,6 @@ function renderPreparedChildList(
 		}
 	}
 	const { items, keys } = preparedList;
-	const markerlessMappedFallback =
-		mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
 	const keySource = compiledMapKey || keys!;
 	const normalizeKey = !!compiledMapKey;
 	const wasMappedNative = state.forSlot.mappedNative === true;
@@ -37505,21 +37464,6 @@ function renderPreparedChildList(
 		}
 		state.forSlot.mappedNative = true;
 	}
-	if (markerlessMappedFallback) {
-		const descriptorBody = body;
-		body = (item: any, scope: Scope): void => {
-			const root = scope.block.startMarker;
-			if (
-				root !== null &&
-				root === scope.block.endMarker &&
-				root.nodeType === 1 &&
-				scope.block.deoptNode === null
-			) {
-				scope.block.deoptNode = root;
-			}
-			descriptorBody(item, scope);
-		};
-	}
 	// `body` is `deoptItemBody` exactly when the compiler supplied no map body
 	// and this is not the mapped fallback — both wrapper assignments above are
 	// guarded by those two conditions. Record it on the slot rather than
@@ -37527,8 +37471,7 @@ function renderPreparedChildList(
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
 	state.forSlot.plainDeopt = plainDeopt ? updateDeoptComponent : null;
 	const fastFlags = compiledMapFlags || 0;
-	const ssrMarkerless =
-		compiledMapBody === undefined ? markerlessMappedFallback || plainDeopt : (fastFlags & 16) !== 0;
+	const ssrMarkerless = compiledMapBody !== undefined && (fastFlags & 16) !== 0;
 	let pure = (fastFlags & 1) !== 0;
 	let lite = false;
 	if (compiledMapBody !== undefined) {
@@ -40653,13 +40596,22 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
  * supersedes leaves the fragment with its own unmount. Hydration and a
  * boundary this render created write in place.
  */
-function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
+function insertArmPair(
+	state: TrySlot | ErrorSlot,
+	start: Node,
+	end: Node,
+	before: Node,
+	// The end of a body that borrowed the boundary's range, which lands before
+	// this arm (mountPendingBody).
+	bound: Node | null = null,
+): Node {
 	const live = before.parentNode!;
 	const parent =
 		live === state.domParent && usesFrontier(state.parentBlock, live)
 			? slotFrontier(state, state.parentBlock, live, before)
 			: live;
 	const at = parent === live ? before : null;
+	if (bound !== null) parent.insertBefore(bound, at);
 	parent.insertBefore(start, at);
 	parent.insertBefore(end, at);
 	return parent;
@@ -41003,6 +40955,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		state.env,
 	);
 	body.idState = state.idState;
+	if (hydrationStarted && start === state.start) body.exclusiveMarkers = true;
 	blockRare(body).tryHandler = (error: unknown) => {
 		switchErrorToCatch(state, error);
 		return state.block;
@@ -41418,6 +41371,8 @@ function createTryBody(
 		state.env,
 	);
 	block.idState = state.idState;
+	// A body that hydrated borrows the boundary's range (armRange).
+	if (hydrationStarted && start === state.start) block.exclusiveMarkers = true;
 	const rare = blockRare(block);
 	rare.trySlot = state;
 	rare.tryHandler = (error: unknown) => {
@@ -41467,8 +41422,10 @@ function mountHiddenTryBody(state: TrySlot): Block {
 interface InitialSuspenseHydration {
 	metadata: ChildNode[];
 	consume?: () => void;
-	start: Comment;
-	end: Comment;
+	/** The range the body adopts (armRange), and its first server node. */
+	start: Node;
+	end: Node;
+	first: Node | null;
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
@@ -41555,6 +41512,7 @@ function takeInitialSuspenseHydration(
 			metadata,
 			start,
 			end,
+			first: start === open ? cursor : getNextSibling(start),
 			idStart: 0,
 			...payload,
 			consume: () => {
@@ -41595,6 +41553,7 @@ function takeInitialSuspenseHydration(
 		metadata,
 		start,
 		end,
+		first: start === open ? cursor : getNextSibling(start),
 		idStart,
 		seedRaw,
 		nativeRaw,
@@ -41701,7 +41660,7 @@ function renderInitialSuspenseHydration(
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
-	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
+	const hydration = new HydrationCapability(block, initial.first, null);
 	hydration.speculative = hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
@@ -42017,9 +41976,15 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
  * are handled separately by hideTryContentAndMountPending. Focus remains owned by
  * the connected hidden host, matching React DOM's hideInstance behavior.
  */
-function hideBlockHostRange(block: Block, hidden: SuspenseHiddenDom): void {
+function hideBlockHostRange(
+	block: Block,
+	hidden: SuspenseHiddenDom,
+	// The boundary's end, which also bounds a body whose own end lands with
+	// the arm this hide shows (mountPendingBody).
+	limit: Node | null = null,
+): void {
 	let node = getNextSibling(block.startMarker!) as ChildNode | null;
-	while (node !== null && node !== block.endMarker) {
+	while (node !== null && node !== block.endMarker && node !== limit) {
 		if (node.nodeType === 1) {
 			const el = node as HTMLElement;
 			if (!hidden.displays.has(el)) {
@@ -42074,7 +42039,7 @@ function hideTryBlock(state: TrySlot): void {
 			releaseTryHide(hidden);
 		});
 	}
-	hideBlockHostRange(block, hidden);
+	hideBlockHostRange(block, hidden, state.end);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42082,7 +42047,7 @@ function rehideTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	const block = state.tryBlock;
 	if (hidden === null || !hidden.active || block === null || block.disposed) return;
-	hideBlockHostRange(block, hidden);
+	hideBlockHostRange(block, hidden, state.end);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42468,10 +42433,19 @@ function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = document.createComment('pend-b');
 		const bEnd = document.createComment('/pend-b');
+		// A body that hydrated borrows the boundary's range (armRange). The first
+		// arm beside it mints the body's own end, which lands with the arm.
+		let bound: Comment | null = null;
+		const kept = hydrationStarted ? state.tryBlock : null;
+		if (kept !== null && kept.endMarker === state.end) {
+			bound = document.createComment('/try-b');
+			journalRootProperty(kept, 'endMarker', state.end);
+			kept.endMarker = bound;
+		}
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
-			insertArmPair(state, bStart, bEnd, state.end),
+			insertArmPair(state, bStart, bEnd, state.end, bound),
 			bStart,
 			bEnd,
 			state.pendingBody,
@@ -47857,19 +47831,6 @@ function mountItemsLinear<T>(
 	}
 }
 
-/**
- * Whether the server rendered a de-opt list's `item` without a range of its
- * own: a host descriptor that renders one element. Until descriptor lists
- * decide that statically on both sides (#2028 P4), the server's shape says.
- */
-function deoptItemSelfDelimits(
-	hydration: HydrationCapability,
-	node: Node | null,
-	item: unknown,
-): boolean {
-	return !hydration.isOpen(node) && isHostDescriptor(item) && !descNeedsBlocks(item);
-}
-
 // A list above a selected hydration owner has no server list frames in the
 // selected container. Give each logical sibling its own client range while
 // leaving the server cursor for the owner inside one of those siblings.
@@ -48846,9 +48807,9 @@ function mountItem<T>(
 	// component-bearing) keeps the `it` pair. A later shape flip promotes the
 	// self-marked block to a minted pair in place (see deoptItemBody).
 	singleRoot: boolean | 2,
-	// True for compiled direct-host items and generic descriptor lists. A pure
-	// descriptor host self-delimits; component/text/empty descriptor items retain
-	// their explicit pair and continue through the marked hydration branch.
+	// A compiled row whose server body the compiler proved a direct host: it has
+	// no range of its own on the wire. A descriptor item (singleRoot 2) decides
+	// by its value instead (selfDelimits).
 	ssrMarkerless: boolean,
 	// Pure-host → blocks upgrade adoption: an existing raw child node this item
 	// should take over IN PLACE (self-marked directly, or markers minted around
@@ -48871,9 +48832,13 @@ function mountItem<T>(
 		// other blocks' server nodes: it builds as a client mount would, below.
 		if (!inserted) {
 			const node = hydration.node;
+			// A descriptor item delimits itself by its value (selfDelimits), as the
+			// server decided for the same value.
+			const descriptor = singleRoot === 2;
 			if (
-				ssrMarkerless &&
-				(singleRoot !== 2 || !forSlot.plainDeopt || deoptItemSelfDelimits(hydration, node, item))
+				descriptor
+					? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
+					: ssrMarkerless
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
 				// direct-host item self-delimits, exactly like the existing client-mount
@@ -48883,8 +48848,7 @@ function mountItem<T>(
 					node !== null &&
 					node !== forSlot.end &&
 					!isBlockOpen(node) &&
-					(singleRoot !== 2 ||
-						!forSlot.plainDeopt ||
+					(!descriptor ||
 						(node.nodeType === 1 &&
 							node.parentNode === parentNode &&
 							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
@@ -48902,7 +48866,7 @@ function mountItem<T>(
 					block.forSlot = forSlot;
 					block.key = key;
 					block.itemIndex = index;
-					if (singleRoot === 2 && forSlot.plainDeopt) block.deoptNode = node;
+					if (descriptor) block.deoptNode = node;
 					renderBlock(block);
 					hydration.node = block.endMarker?.nextSibling ?? getNextSibling(node);
 					return block;
@@ -48937,7 +48901,7 @@ function mountItem<T>(
 					? (forSlot.end.parentNode as any)?.__oct_loc
 					: undefined,
 				() =>
-					forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
+					descriptor && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
 						: 'another list item',
 				hydration.node,
