@@ -4121,14 +4121,12 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
 			}
 			// While the pool is short, an idle bag returns its cells and holds `C`
-			// again. Only a bag has `$`; any other target, null included, compares
-			// undefined.
+			// again: a queued bag's entry always names its staged cells. Only a bag
+			// has `$`; any other target, null included, compares undefined.
 			if (BAG_POOL.length < 8 && target?.$ <= BAG_SIZE) {
 				const next = target.next;
-				if (typeof next === 'object') {
-					BAG_POOL.push(next);
-					target.next = next[target.$ + 2];
-				}
+				BAG_POOL.push(next);
+				target.next = next[target.$ + 2];
 			}
 		}
 		return COMMITTING_GENERATION;
