@@ -697,7 +697,14 @@ line feed, form feed, carriage return or space in a closed child list; empty
 Text nodes are included. These nodes remain untouched, while other text,
 comments and unexpected elements still fail topology validation.
 
-Browser page translation is the one text rewrite adoption accepts. Chrome's
+Inside a fixed or addressed view's scalar text leaf, Text nodes, comments and
+HTML `<font>` wrappers may form a text run. Comments in that leaf do not change
+the surrounding element topology. Adoption synchronizes text/comment-only runs
+with the initial snapshot, preserving their nodes when the displayed text
+already matches. A later value change replaces the whole run, so split text or
+an annotation cannot leave a stale suffix or receive an invisible update.
+
+Browser page translation can also rewrite text leaves. Chrome's
 Translate replaces each translated Text node with `<font>` wrappers. Adoption
 keeps that text as it is and writes nothing to it, so the page neither flashes
 back to its source language nor shifts. This holds for a fixed view's text
@@ -706,6 +713,8 @@ those in conditional arms and list items. Bound text is replaced with plain
 text the next time its value changes, and the browser may translate it again;
 static text keeps its translation. If the data changed between server rendering
 and adoption, translated bound text shows its server value until that change.
+Fixed and addressed scalar leaves preserve the complete FONT-containing run on
+adoption, including adjacent Text nodes and comments, until its bound value changes.
 Any other element in place of server text is still a topology mismatch: error
 #318 for a fixed view, #321 for one with unbound children, and #286 for a
 structural program. To keep text untranslated, such as names, codes or prices,

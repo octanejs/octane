@@ -237,13 +237,17 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
-/** No child, or one: a Text node or the <font> wrapper Chrome Translate puts in its place. */
+/** Text ownership survives annotations and text split by page translation. */
 function isTextLeaf(node: Element): boolean {
-	const first = node.firstChild;
-	return (
-		first === null ||
-		(!first.nextSibling && (first.nodeType === 3 || (first as Element).localName === 'font'))
-	);
+	for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+		if (
+			child.nodeType !== 3 &&
+			child.nodeType !== 8 &&
+			((child as Element).localName !== 'font' || (child as Element).namespaceURI !== namespaces[0])
+		)
+			return false;
+	}
+	return true;
 }
 
 const htmlWhitespace = /^[\t\n\f\r ]*$/;
@@ -419,14 +423,16 @@ function writeFixedScalar(
 	const name = binding[2];
 	if (binding[1] === 'text') {
 		const text = node.firstChild;
-		const current = text?.nodeValue;
 		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
-		else if (current !== value) {
-			if (current !== null) text.nodeValue = value;
-			// A translated leaf's <font> has no nodeValue. It survives the channel's
-			// first write, then is replaced once the value changes.
-			else if (previous !== undefined) node.textContent = value;
-		}
+		else if (text.nodeType === 3 && text.nextSibling === null) {
+			if (text.nodeValue !== value) text.nodeValue = value;
+		} else if (
+			previous !== undefined ||
+			// Preserve translated wrappers on adoption; comments alone must not
+			// prevent synchronization with a newer initial snapshot.
+			(node.firstElementChild === null && node.textContent !== value)
+		)
+			node.textContent = value;
 	} else if (value === null) {
 		if (node.hasAttribute(name)) node.removeAttribute(name);
 	} else if (node.getAttribute(name) !== value) {

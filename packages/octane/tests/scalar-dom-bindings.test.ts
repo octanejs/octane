@@ -55,6 +55,16 @@ export function Feed(props) @{
   </section>
 }`;
 
+const textRuns = [
+	'Original<!--annotation--><!--annotation-->',
+	'<!--annotation-->Original',
+	'Ori<!--annotation-->ginal',
+	' <font>Translated</font>',
+	'Before <font>Translated</font> after',
+	'<font>First</font><font>Second</font>',
+	'<!--annotation--><font><font>Translated</font></font><!--annotation-->',
+];
+
 type View = DomBindings.CompiledBindings<Record<string, unknown>> & {
 	adopt: typeof DomBindings.__adoptBindings;
 };
@@ -396,6 +406,70 @@ describe.each([
 		}
 	});
 
+	it.each(textRuns)('preserves an adopted text run and publishes its whole value: %s', (html) => {
+		const { props, root, span, button, adopt } = panel(false);
+		span.innerHTML = html;
+		const children = [...span.childNodes];
+		const model = source({ ...props, message: 'Original' });
+		const observer = new MutationObserver(() => {});
+		observer.observe(span, { subtree: true, childList: true, characterData: true });
+		const handle = adopt(model.state);
+		try {
+			expectChildIdentity(span, children);
+			expect(observer.takeRecords()).toEqual([]);
+			model.publish({ message: 'Original', hidden: true });
+			expectChildIdentity(span, children);
+			expect(observer.takeRecords()).toEqual([]);
+			model.publish({ message: 'Next' });
+			expect(span.textContent).toBe('Next');
+			expect(span.firstElementChild).toBeNull();
+			expect(root.querySelector('span')).toBe(span);
+			expect(root.querySelector('button')).toBe(button);
+		} finally {
+			observer.disconnect();
+			handle.dispose();
+		}
+		expect(model.subscribers.size).toBe(0);
+		expect(model.cleanup).toHaveBeenCalledOnce();
+		model.publish({ message: 'After disposal' });
+		expect(span.textContent).toBe('Next');
+		const renewed = adopt(model.state);
+		expect(span.textContent).toBe('After disposal');
+		renewed.dispose();
+	});
+
+	it.each(textRuns)('replaces a text run introduced after adoption: %s', (html) => {
+		const { props, span, adopt } = panel(false);
+		const model = source(props);
+		const handle = adopt(model.state);
+		try {
+			span.innerHTML = html;
+			model.publish({ message: 'Next' });
+			expect(span.textContent).toBe('Next');
+			expect(span.firstElementChild).toBeNull();
+			model.publish({ message: '' });
+			expect(span.textContent).toBe('');
+			model.publish({ message: 'Again' });
+			expect(span.textContent).toBe('Again');
+		} finally {
+			handle.dispose();
+		}
+	});
+
+	it.each(['<!--annotation-->', 'Old<!--annotation-->', 'O<!--annotation-->ld'])(
+		'synchronizes the initial value through text annotations: %s',
+		(html) => {
+			const { props, span, adopt } = panel(false);
+			span.innerHTML = html;
+			const handle = adopt(source({ ...props, message: 'Current' }).state);
+			try {
+				expect(span.textContent).toBe('Current');
+			} finally {
+				handle.dispose();
+			}
+		},
+	);
+
 	it.each([false, true])(
 		'preserves whitespace between fixed elements through adoption and updates (hidden=%s)',
 		(hidden) => {
@@ -430,10 +504,9 @@ describe.each([
 		const { props, span, adopt } = panel(false);
 		for (const leaf of [
 			[document.createElement('b')],
-			[document.createTextNode('Le'), document.createElement('font')],
-			[document.createTextNode(' '), document.createElement('font')],
-			// Translation replaces one Text node with one wrapper.
-			[document.createElement('font'), document.createTextNode(' en plus')],
+			[document.createTextNode('Le'), document.createElement('b')],
+			[document.createComment('annotation'), document.createElement('button')],
+			[document.createElementNS('http://www.w3.org/2000/svg', 'font')],
 		]) {
 			span.replaceChildren(...leaf);
 			const model = source(props);
@@ -696,6 +769,25 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 		}
 	});
 
+	it.each(textRuns)('preserves an addressed text run until its value changes: %s', (html) => {
+		const { props, heading, adopt } = feed();
+		heading.innerHTML = html;
+		const children = [...heading.childNodes];
+		const model = source({ ...props, title: 'Original' });
+		const handle = adopt(model.state);
+		try {
+			expectChildIdentity(heading, children);
+			model.publish({ title: 'Original' });
+			expectChildIdentity(heading, children);
+			model.publish({ title: 'Archives' });
+			expect(heading.textContent).toBe('Archives');
+			expect(heading.firstElementChild).toBeNull();
+		} finally {
+			handle.dispose();
+		}
+		expect(model.subscribers.size).toBe(0);
+	});
+
 	it('preserves whitespace between closed addressed children and leaves open children alone', () => {
 		const { props, heading, adopt } = feed();
 		const header = heading.parentElement!;
@@ -732,7 +824,8 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 	it('still refuses a leaf holding any other element', () => {
 		for (const leaf of [
 			[document.createElement('b')],
-			[document.createElement('font'), document.createElement('font')],
+			[document.createElement('font'), document.createElement('b')],
+			[document.createElementNS('http://www.w3.org/2000/svg', 'font')],
 		]) {
 			const { props, heading, adopt } = feed();
 			heading.replaceChildren(...leaf);
