@@ -517,6 +517,152 @@ describe('octane analyze Strong coverage', () => {
 		expect(result.exitCode).toBe(0);
 		expect(existsSync(path.join(root, 'octane-strong-baseline.json'))).toBe(false);
 	});
+
+	it('lists the non-Strong Octane modules that Strong modules import from other packages', async () => {
+		const octane = { peerDependencies: { octane: '*' } };
+		const hook = (/** @type {string} */ name) =>
+			`import { useState } from 'octane';\nexport function ${name}() { return useState(0); }\n`;
+		const { root } = app({
+			'src/App.tsrx':
+				'"use strong";\n' +
+				"import { Button, Chart, Dialog, Menu, Sheet } from './ui';\n" +
+				"import { useStore } from '@kit/store';\n" +
+				"import { format } from 'plain';\n" +
+				"import { Local } from './Local';\n" +
+				'export function App() @{ <Button /> }\n',
+			// The app's own barrel is followed through to the package it re-exports.
+			'src/ui.ts': "export * from '@kit/ui';\n",
+			'src/Local.tsrx': PLAIN,
+			'src/Bridge.tsrx': `"use strong";\nimport { ReactCompat } from 'octane/react';\n${PLAIN}`,
+			// Only Strong modules are followed.
+			'src/Loose.tsrx': `import { Extra } from '@kit/extra';\n${PLAIN}`,
+			'node_modules/@kit/ui/package.json': {
+				name: '@kit/ui',
+				...octane,
+				exports: {
+					'.': { types: './src/index.ts', require: './dist/index.cjs', import: './src/index.ts' },
+				},
+			},
+			// Only the modules that define a name App imports count, not every
+			// module the barrel re-exports.
+			'node_modules/@kit/ui/src/index.ts':
+				"export { Button } from './Button';\n" +
+				"export * from './dialog/index.js';\n" +
+				"export * from './hooks';\n" +
+				"export { Chart } from './Chart';\n" +
+				"export { Unused } from './Unused';\n" +
+				"export * as Menu from './Menu';\n",
+			'node_modules/@kit/ui/src/Button.tsx': 'export function Button() { return <button />; }\n',
+			'node_modules/@kit/ui/src/Menu.tsx':
+				"import { Item } from './MenuItem';\nexport function Root() { return <Item />; }\n",
+			// Menu's own import is its implementation, not something App imports.
+			'node_modules/@kit/ui/src/MenuItem.tsx': 'export function Item() { return <li />; }\n',
+			'node_modules/@kit/ui/src/dialog/index.ts':
+				"export { Dialog } from './Dialog';\nexport { Sheet } from './Sheet';\n",
+			'node_modules/@kit/ui/src/dialog/Sheet.tsx':
+				'export function Sheet() { return <aside />; }\n',
+			'node_modules/@kit/ui/src/dialog/Dialog.tsrx':
+				'"use strong";\nexport function Dialog() @{ <dialog /> }\n',
+			'node_modules/@kit/ui/src/hooks.ts': `import { ReactCompat } from 'octane/react';\n${hook('useHidden')}`,
+			'node_modules/@kit/ui/src/Unused.tsx': 'export function Unused() { return <u />; }\n',
+			'node_modules/@kit/ui/src/Chart.tsx':
+				"import { ReactCompat } from 'octane/react';\nexport function Chart() { return <ReactCompat />; }\n",
+			'node_modules/@kit/store/package.json': {
+				name: '@kit/store',
+				...octane,
+				exports: './src/index.ts',
+			},
+			'node_modules/@kit/store/src/index.ts': hook('useStore'),
+			'node_modules/@kit/extra/package.json': { name: '@kit/extra', ...octane, main: 'index.tsx' },
+			'node_modules/@kit/extra/index.tsx': 'export function Extra() { return <b />; }\n',
+			// Not an Octane package, so its .tsx is not Octane's to make Strong.
+			'node_modules/plain/package.json': { name: 'plain', main: 'index.js' },
+			'node_modules/plain/index.js': "export { format } from './format.tsx';\n",
+			'node_modules/plain/format.tsx': 'export const format = () => <b />;\n',
+		});
+
+		const result = await run(root, ['--strong-dependencies', '--strict']);
+		expect(result.exitCode).toBe(0);
+		expect(result.json().strongDependencies).toEqual({
+			packages: [
+				{ name: '@kit/store', modules: ['src/index.ts'], importers: ['src/App.tsrx'] },
+				{
+					name: '@kit/ui',
+					modules: ['src/Button.tsx', 'src/Chart.tsx', 'src/Menu.tsx', 'src/dialog/Sheet.tsx'],
+					importers: ['src/App.tsrx'],
+				},
+			],
+			reactCompat: [
+				{ package: '@kit/ui', module: 'src/Chart.tsx', importers: ['src/App.tsrx'] },
+				{ package: 'analyzed', module: 'src/Bridge.tsrx', importers: ['src/Bridge.tsrx'] },
+			],
+		});
+	});
+
+	it('resolves Strong dependencies the way a client build does', async () => {
+		const component = (/** @type {string} */ name) =>
+			`export function ${name}() { return <b />; }\n`;
+		const { root } = app({
+			'src/App.tsrx':
+				'"use strong";\n' +
+				"import Kit, { Star, Pair, Duo, Broken } from '@kit/lib';\n" +
+				"import { Server } from '@kit/lib/server';\n" +
+				"import { Ring } from '@kit/lib/icons/ring';\n" +
+				PLAIN,
+			'node_modules/@kit/lib/package.json': {
+				name: '@kit/lib',
+				peerDependencies: { octane: '*' },
+				exports: {
+					// An array lists fallbacks in order.
+					'.': [{ import: './src/index.ts' }, './dist/index.cjs'],
+					// A matched null target excludes the export from client builds.
+					'./server': { browser: null, default: './src/Server.tsx' },
+					// The pattern with the longest prefix wins, whatever the key order.
+					'./*': { require: './dist/*.cjs' },
+					'./icons/*': './src/icons/*.tsx',
+				},
+			},
+			'node_modules/@kit/lib/src/index.ts':
+				"export * from './Star';\n" +
+				// `export *` never passes on a default export.
+				"export * from './Fallback';\n" +
+				"export { default } from './Kit';\n" +
+				"export { Pair } from './pair';\n" +
+				"export { Duo } from './duo';\n" +
+				"export { Broken } from './Broken';\n",
+			'node_modules/@kit/lib/src/Star.tsx': component('Star'),
+			'node_modules/@kit/lib/src/Fallback.tsx':
+				'export default function Fallback() { return <i />; }\n',
+			'node_modules/@kit/lib/src/Kit.tsx': 'export default function Kit() { return <u />; }\n',
+			// A second declarator, and a destructured name, are declared here.
+			'node_modules/@kit/lib/src/pair.tsx':
+				'export const Left = () => <i />, Pair = () => <b />;\n',
+			'node_modules/@kit/lib/src/duo.tsx': 'export const { Duo } = { Duo: () => <u /> };\n',
+			// A module that does not parse fails its own build and is left out.
+			'node_modules/@kit/lib/src/Broken.tsx':
+				'"use strong";\nexport function Broken() { return <div> }\n',
+			'node_modules/@kit/lib/src/Server.tsx': component('Server'),
+			'node_modules/@kit/lib/src/icons/ring.tsx': component('Ring'),
+		});
+
+		const result = await run(root, ['--strong-dependencies']);
+		expect(result.json().strongDependencies).toEqual({
+			packages: [
+				{
+					name: '@kit/lib',
+					modules: [
+						'src/Kit.tsx',
+						'src/Star.tsx',
+						'src/duo.tsx',
+						'src/icons/ring.tsx',
+						'src/pair.tsx',
+					],
+					importers: ['src/App.tsrx'],
+				},
+			],
+			reactCompat: [],
+		});
+	});
 });
 
 describe('octane analyze Strong migration', () => {

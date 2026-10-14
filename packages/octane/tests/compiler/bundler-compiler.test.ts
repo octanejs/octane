@@ -1013,6 +1013,42 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 		}
 	});
 
+	it('reports the package that owns a module and whether transform compiles it', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-module-package-'));
+		try {
+			const manifest = (directory: string, body: object) => {
+				mkdirSync(directory, { recursive: true });
+				writeFileSync(join(directory, 'package.json'), JSON.stringify(body));
+			};
+			manifest(root, { name: 'application', dependencies: { octane: '*' } });
+			const kit = join(root, 'node_modules', '@example', 'kit');
+			manifest(kit, { name: '@example/kit', peerDependencies: { octane: '*' } });
+			const plain = join(root, 'node_modules', 'plain');
+			manifest(plain, { name: 'plain' });
+			const compiler = createOctaneCompiler({ root });
+			const card = 'export function Card() { return <div />; }\n';
+			const constant = 'export const size = 1;\n';
+			const cases = [
+				[COMPONENT, join(root, 'src/App.tsrx'), 'application', root, true],
+				[card, join(kit, 'src/Card.tsx'), '@example/kit', kit, true],
+				[HOOK, join(kit, 'src/use-count.ts'), '@example/kit', kit, true],
+				[constant, join(kit, 'src/size.ts'), '@example/kit', kit, false],
+				[card, join(plain, 'Card.tsx'), 'plain', plain, false],
+			] as const;
+
+			for (const [source, filename, name, packageRoot, compiled] of cases) {
+				expect(compiler.modulePackage(source, filename)).toEqual({
+					name,
+					root: packageRoot,
+					compiled,
+				});
+				expect((compiler.transform(source, filename)?.kind ?? 'none') !== 'none').toBe(compiled);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('keeps Strong directives subordinate to mixed-toolchain ownership', () => {
 		const compiler = createOctaneCompiler({
 			root: '/project',

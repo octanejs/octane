@@ -451,3 +451,26 @@ keep the setting in `octane.config.ts`.
 With file arguments, `octane analyze` reports regressions for those files only
 and does not judge the rest of the baseline. `--strong-baseline` always measures
 the whole project.
+
+### Strong dependencies
+
+`compiler.strong` applies to the application's own modules only. Installed,
+linked, and workspace packages compile in their own mode, so a Strong module can
+render components that Strong never checked.
+
+```bash
+octane analyze --strong-dependencies
+```
+
+The report starts from every Strong module and follows its imports into other
+packages, including through re-exports such as a package's `index.ts` barrel.
+It follows only the re-exports that pass on a name the Strong module imports. It
+lists, by package, each module that defines an imported name, is compiled by
+Octane, and is not Strong. It also lists the modules on those paths that import
+`octane/react`, since a ReactCompat boundary hosts React components that no
+Octane rule reaches. Packages that Octane does not compile are left out. Import
+aliases and virtual modules from a bundler config are not followed.
+
+The report never fails the run, `--strict` included. The plan for letting
+packages declare Strong mode and letting applications require it is in
+[docs/strong-dependencies-plan.md](strong-dependencies-plan.md).

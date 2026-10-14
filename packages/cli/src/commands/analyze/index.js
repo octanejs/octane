@@ -19,6 +19,7 @@ import {
 	writeBaseline,
 } from './strong-coverage.js';
 import { applyFixes, pruneImports } from './fix.js';
+import { findStrongDependencies } from './strong-dependencies.js';
 
 /**
  * @typedef {Object} Finding
@@ -272,6 +273,14 @@ export default defineCommand({
 				'longer exceptions. While the file exists, every run fails on a module that\n' +
 				'is neither Strong nor listed, and on a listed name that is out of date.',
 		},
+		'strong-dependencies': {
+			type: 'boolean',
+			description:
+				"List what Strong modules import from other packages' Octane modules,\n" +
+				'directly or through re-exports, that compiles without Strong mode, by\n' +
+				'package, and the octane/react (ReactCompat) boundaries they reach. A report\n' +
+				'only: it never fails the run.',
+		},
 	},
 
 	async run(ctx, input) {
@@ -301,7 +310,16 @@ export default defineCommand({
 			);
 		}
 		const measureCoverage = baseline !== null || write !== undefined;
-		const { policy, reason } = await loadStrongPolicy(project, { required: measureCoverage });
+		const reportDependencies = input.flags['strong-dependencies'] === true;
+		const { policy, reason } = await loadStrongPolicy(project, {
+			required: measureCoverage || reportDependencies,
+		});
+		const modulePackage = policy?.modulePackage ?? null;
+		if (reportDependencies && modulePackage === null) {
+			throw new CliError(
+				'The installed octane cannot report which package owns a module. Update octane.',
+			);
+		}
 		const jsxImportSource = project.tsconfig?.config?.compilerOptions?.jsxImportSource;
 
 		/** @type {Map<string, string>} */
@@ -354,7 +372,7 @@ export default defineCommand({
 			);
 		}
 
-		if (targets.length === 0 && !measureCoverage) {
+		if (targets.length === 0 && !measureCoverage && !reportDependencies) {
 			ctx.ui.intro('octane analyze');
 			ctx.ui.outro('No Octane modules found.');
 			return { json: { ok: true, analyzed: 0, findings: [] } };
@@ -470,18 +488,16 @@ export default defineCommand({
 			);
 		}
 
-		/** @type {Record<string, unknown> | undefined} */
-		let strongCoverage;
-		if (measureCoverage && policy !== null) {
-			if (whole && project.sourceFiles.length >= SOURCE_FILE_LIMIT) {
-				throw new CliError(
-					`The project has more than ${SOURCE_FILE_LIMIT} source files, so Strong coverage cannot be measured completely.`,
-				);
-			}
-			/** @type {import('./strong-coverage.js').CoverageModule[]} */
-			const modules = [];
-			/** @type {Set<string>} */
-			const unmeasured = new Set();
+		if (measureCoverage && whole && project.sourceFiles.length >= SOURCE_FILE_LIMIT) {
+			throw new CliError(
+				`The project has more than ${SOURCE_FILE_LIMIT} source files, so Strong coverage cannot be measured completely.`,
+			);
+		}
+		/** @type {import('./strong-coverage.js').CoverageModule[]} */
+		const modules = [];
+		/** @type {Set<string>} */
+		const unmeasured = new Set();
+		if ((measureCoverage || reportDependencies) && policy !== null) {
 			for (const absolute of whole ? project.sourceFiles : targets) {
 				const file = projectPath(project.root, absolute);
 				if (file.startsWith('../') || path.isAbsolute(file)) continue;
@@ -504,7 +520,11 @@ export default defineCommand({
 					unmeasured.add(file);
 				}
 			}
+		}
 
+		/** @type {Record<string, unknown> | undefined} */
+		let strongCoverage;
+		if (measureCoverage && policy !== null) {
 			if (write === 'init') {
 				const exceptions = modules.filter((module) => !module.status.strong);
 				if (!ctx.dryRun)
@@ -566,6 +586,19 @@ export default defineCommand({
 
 		render(ctx, selected, targets.length);
 
+		/** @type {ReturnType<typeof findStrongDependencies> | undefined} */
+		let strongDependencies;
+		if (reportDependencies && policy !== null && modulePackage !== null) {
+			strongDependencies = findStrongDependencies({
+				roots: modules.filter((module) => module.status.strong).map((module) => module.absolute),
+				status: policy.status,
+				modulePackage,
+				read,
+				display: (absolute) => projectPath(project.root, absolute),
+			});
+			renderDependencies(ctx, strongDependencies);
+		}
+
 		// Preview findings describe modules that are not Strong yet. They are an
 		// inventory, not a failure, so they are summarized apart.
 		const enforced = selected.filter((finding) => finding.preview !== true);
@@ -602,6 +635,7 @@ export default defineCommand({
 				findings: selected,
 				...(strongCoverage === undefined ? null : { strongCoverage }),
 				...(strongPreview === undefined ? null : { strongPreview }),
+				...(strongDependencies === undefined ? null : { strongDependencies }),
 				...(input.flags.fix ? { fixed: { findings: fixedFindings, files: fixedFiles } } : null),
 			},
 		};
@@ -698,4 +732,36 @@ function renderPreview(ctx, byCode, modules) {
 		ctx.ui.log(`  ${String(count).padStart(4)}  ${code}`);
 	}
 	ctx.ui.log(colors.dim('  Explain a code with `octane explain <CODE>`.'));
+}
+
+/**
+ * Non-Strong dependency modules by package, then the ReactCompat boundaries.
+ *
+ * @param {import('../../kernel/context.js').Ctx} ctx
+ * @param {ReturnType<typeof findStrongDependencies>} report
+ */
+function renderDependencies(ctx, { packages, reactCompat }) {
+	const { colors } = ctx.ui;
+	ctx.ui.log('');
+	if (packages.length === 0) {
+		ctx.ui.log(
+			colors.green('Strong dependencies: every Octane module Strong modules import is Strong.'),
+		);
+	} else {
+		ctx.ui.log(
+			colors.bold(`Strong dependencies: ${packages.length} package(s) compile without Strong mode`),
+		);
+		for (const { name, modules, importers } of packages) {
+			ctx.ui.log(`  ${name}  ${colors.dim(`imported by ${importers.length} Strong module(s)`)}`);
+			for (const module of modules) ctx.ui.log(`    ${module}`);
+		}
+	}
+	if (reactCompat.length > 0) {
+		ctx.ui.log(colors.bold('ReactCompat boundaries reached from Strong modules'));
+		for (const boundary of reactCompat) {
+			ctx.ui.log(
+				`  ${boundary.package}/${boundary.module}  ${colors.dim(`from ${boundary.importers.join(', ')}`)}`,
+			);
+		}
+	}
 }
