@@ -320,7 +320,13 @@ describe('octane analyze Strong coverage', () => {
 
 		const report = (await run(root)).json();
 		expect(report.analyzed).toBe(1);
+		// Strong does not compile `.tsx`, so the module reports that first.
 		expect(report.findings).toEqual([
+			expect.objectContaining({
+				file: 'src/Island.tsx',
+				code: 'OCTANE_STRONG_TSX_MODULE',
+				line: 1,
+			}),
 			expect.objectContaining({
 				file: 'src/Island.tsx',
 				code: 'OCTANE_STRONG_EFFECT_STATE_UPDATE',
@@ -551,7 +557,7 @@ describe('octane analyze Strong migration', () => {
 		'}\n';
 
 	it('reports every Strong violation in a file, not only the first', async () => {
-		const result = await analyze({ 'src/Clock.tsx': CLOCK });
+		const result = await analyze({ 'src/Clock.tsrx': CLOCK });
 
 		expect(result.json().findings).toEqual([
 			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 3 }),
@@ -607,9 +613,10 @@ describe('octane analyze Strong migration', () => {
 		const result = await run(root, ['--strong-preview']);
 		expect(result.exitCode).toBe(0);
 		expect(result.json().strongPreview).toEqual({
-			findings: 2,
+			findings: 3,
 			modules: 1,
 			byCode: {
+				OCTANE_STRONG_TSX_MODULE: 1,
 				OCTANE_STRONG_RENDER_REF_READ: 1,
 				OCTANE_STRONG_RENDER_REF_WRITE: 1,
 			},
@@ -642,9 +649,12 @@ describe('octane analyze Strong migration', () => {
 				'  return <button onClick={add}>{String(total) + String(open)}</button>;\n' +
 				'}\n',
 		);
-		// What remains is reported from the rewritten module: nothing.
-		expect(result.json().findings).toEqual([]);
-		expect(result.json().strongPreview.findings).toBe(0);
+		// What remains is reported from the rewritten module: only the `.tsx`
+		// module itself, which has to become `.tsrx` before it can be Strong.
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_TSX_MODULE', preview: true }),
+		]);
+		expect(result.json().strongPreview.findings).toBe(1);
 	});
 
 	it('falls back to the first error with an older compiler that cannot collect', async () => {

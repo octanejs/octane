@@ -178,31 +178,35 @@ immutable snapshots. That guide covers what it checks and how to adopt it; this 
 covers where the build reads the setting. It is off by default, so you can try it in
 one file:
 
-```tsx
+```tsrx
 'use strong';
 
 import { useLinkedState } from 'octane';
 
-export function ProfileEditor({ user }) {
+export function ProfileEditor({ user }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 
 The directive applies only to its own module. Put it at the top of the file,
 before imports or other code; comments and other directives may come first. When
-a file needs an `@jsxImportSource octane` ownership pragma, put that comment
-first:
+a `.ts` or `.js` file needs an `@jsxImportSource octane` ownership pragma, put
+that comment first:
 
-```tsx
+```ts
 /** @jsxImportSource octane */
 'use strong';
 
 import { useState } from 'octane';
 ```
 
-When the whole application is ready, switch it on in the shared app config used
-by the Vite and Rsbuild integrations:
+Strong compiles `.tsrx`, `.ts`, and `.js` modules. A `.tsx` or `.jsx` module that
+Strong reaches fails the build with
+[`OCTANE_STRONG_TSX_MODULE`](/docs/strong-mode#octane-strong-tsx-module), so convert
+the application's `.tsx` and `.jsx` modules to `.tsrx` before switching Strong on for
+the whole application in the shared app config used by the Vite and Rsbuild
+integrations:
 
 ```ts
 // octane.config.ts

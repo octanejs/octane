@@ -307,14 +307,14 @@ immutable snapshots and has no side effects, and the compiler reports the violat
 can prove. Add `"use strong"` before a module's imports to try it one file at a time,
 or set `compiler: { strong: true }` in `octane.config.ts` to cover your application.
 
-```tsx
+```tsrx
 'use strong';
 
 import { useLinkedState } from 'octane';
 
-export function ProfileEditor({ user }) {
+export function ProfileEditor({ user }) @{
 	const [name, setName] = useLinkedState(user.id, () => user.name);
-	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+	<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
 }
 ```
 

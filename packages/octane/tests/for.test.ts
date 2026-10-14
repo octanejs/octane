@@ -90,7 +90,7 @@ import {
 	type StrongProjectorConstructor,
 	type SnapshotRow,
 } from './_fixtures/for-strong.tsrx';
-import { SnapshotMappedList } from './_fixtures/for-strong.js';
+import { SnapshotMappedList } from './_fixtures/for-mapped.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 const stripComments = (html: string) => html.replace(/<!--[\s\S]*?-->/g, '');
@@ -599,7 +599,7 @@ describe('Strong list methods preserve snapshot and event semantics', () => {
 
 	it.each([
 		['keyed templates', SnapshotMethodList],
-		['returned JSX', SnapshotMappedList],
+		['compatibility returned JSX', SnapshotMappedList],
 	])('updates snapshots, arguments, and captured callbacks in %s', (_dialect, Component) => {
 		const items = [row(1, 'apple'), row(2, 'banana')];
 		const selected: string[] = [];

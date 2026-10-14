@@ -156,7 +156,9 @@ ${extension === 'tsrx' ? '}' : '); }'}`;
 							? [id]
 							: [id, `${id}?octane-bindings=View`, `${id}?octane-bindings=View&octane-mount=1`];
 					for (const moduleId of moduleIds) {
-						const result = () => compile(source, moduleId, { mode, dev, hmr: false, strong: true });
+						// Strong reaches only the `.tsrx` view; a Strong `.tsx` module is an error.
+						const strong = extension === 'tsrx';
+						const result = () => compile(source, moduleId, { mode, dev, hmr: false, strong });
 						if (message === null) expect(result).not.toThrow();
 						else expect(result).toThrow(message);
 					}
@@ -1022,7 +1024,7 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 
 		expect(() => compiler.transform(unowned, '/project/src/Host.tsx')).not.toThrow();
 		expect(() => compiler.transform(owned, '/project/src/Island.tsx')).toThrow(
-			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+			'OCTANE_STRONG_TSX_MODULE',
 		);
 	});
 
@@ -2529,21 +2531,14 @@ describe('requireDirective ownership gate', () => {
 		(environment) => {
 			const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
 			const pragma = '/** @jsxImportSource octane/strong */\n';
-			const trusted =
-				pragma +
-				"'use strong';\nimport { trustHTML } from 'octane';\n" +
-				'export function App() { return <div dangerouslySetInnerHTML={trustHTML("<b>safe</b>")} />; }';
-			expect(compiler.transform(trusted, '/project/src/Strong.tsx', { environment })?.kind).toBe(
-				'compile',
-			);
+			// The pragma claims the `.tsx` module, which Strong then rejects.
 			expect(() =>
 				compiler.transform(
-					pragma +
-						"'use strong';\nexport function Raw() { return <div dangerouslySetInnerHTML={{__html: 'raw'}} />; }",
-					'/project/src/Raw.tsx',
+					pragma + "'use strong';\nexport function App() { return <div />; }",
+					'/project/src/Strong.tsx',
 					{ environment },
 				),
-			).toThrow(/OCTANE_STRONG_UNTRUSTED_HTML/);
+			).toThrow(/OCTANE_STRONG_TSX_MODULE/);
 			expect(
 				compiler.transform(
 					'// @jsxImportSource octane/strong\n' + HOOK,
