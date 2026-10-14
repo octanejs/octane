@@ -73,7 +73,7 @@ export function MemoHeld(props: { label: string; wait: Promise<unknown> | null }
 export function CommitError(props: { title: unknown; sibling: string }) @{
 	<section>
 		@try {
-			<p id="fails" title={props.title}>
+			<p id="fails" title={props.title as string}>
 				{'body'}
 			</p>
 		} @catch (error) {
