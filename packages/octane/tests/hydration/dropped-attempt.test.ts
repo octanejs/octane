@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, flushSync, hydrateRoot, type Root } from '../../src/index.js';
+import { act, flushSync, hasPendingWork, hydrateRoot, type Root } from '../../src/index.js';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
@@ -44,6 +44,7 @@ export function Root(props) @{
 }
 
 export function Arm(props) @{
+	props.log?.push('Arm');
 	<main>
 		<h1>{'shell'}</h1>
 		<section>
@@ -129,5 +130,27 @@ describe('a dropped hydration attempt', () => {
 		expect(container.querySelector('b')?.textContent).toBe('client arm');
 		expect(container.querySelector('i')).toBeNull();
 		expect(recoverable).toHaveLength(1);
+	});
+
+	// The retry its wakeable schedules renders only the boundary, over its server
+	// arm, with the inputs it holds; the component around it does not run again.
+	it('retries only the boundary when its wakeable settles', async () => {
+		container.innerHTML = (await prerender(server.Arm, { ...PROPS, server: false })).html;
+		const em = container.querySelector('em');
+		const log: string[] = [];
+		let resolve!: () => void;
+		const gate = new Promise<void>((done) => (resolve = done));
+		root = hydrateRoot(container, client.Arm, { ...PROPS, server: false, gate, log });
+		await act(async () => {});
+		expect(log).toEqual(['Arm']);
+
+		await act(async () => resolve());
+		await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+		expect(container.querySelector('em')).toBe(em);
+		expect(log).toEqual(['Arm']);
+		// The adopted tree is live, and its parent renders on an update.
+		await act(async () => root!.render(client.Arm, { ...PROPS, text: 'y', server: false, log }));
+		expect(container.querySelector('p')!.textContent).toBe('y');
+		expect(log).toEqual(['Arm', 'Arm']);
 	});
 });
