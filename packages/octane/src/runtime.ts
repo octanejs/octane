@@ -8581,7 +8581,10 @@ function drainQueue(): { err: any } | null {
 			// A first render scheduled by startTransition runs after makeRoot's
 			// construction window. Its hooks and partial DOM still belong to this
 			// uncommitted attempt, and must be discarded if it suspends.
-			if (block.kind === 'root' && !block.mounted) createdInRootRender(block);
+			if (block.kind === 'root' && !block.mounted) {
+				createdInRootRender(block);
+				frontierRootMount(block);
+			}
 			if (block.rare?.updateError) {
 				block.rare.updateError = false;
 				throw maximumUpdateDepthError(block);
@@ -10784,6 +10787,17 @@ function releaseDeferredPassives(capture: DeferredLayoutCapture): void {
 }
 
 /** Accept only roots rendered synchronously by this native mutation phase. */
+/** Commit one root's finished transaction now, leaving the others queued. */
+function commitRootAlone(transaction: RootRenderTransaction): void {
+	const others = ROOT_RENDER_TRANSACTIONS.filter((queued) => queued !== transaction);
+	ROOT_RENDER_TRANSACTIONS = [transaction];
+	try {
+		commitRootRenders();
+	} finally {
+		ROOT_RENDER_TRANSACTIONS = others.concat(ROOT_RENDER_TRANSACTIONS);
+	}
+}
+
 function acceptDeferredRootTransactions(capture: DeferredLayoutCapture): void {
 	if (capture.transactions === null || ROOT_RENDER_TRANSACTIONS.length === 0) return;
 	const foreign: RootRenderTransaction[] = [];
@@ -22223,8 +22237,7 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 				transaction !== null &&
 				block.createdStamp !== transaction.createdStamp &&
 				block instanceof BlockImpl &&
-				block.kind !== 'root' &&
-				block.startMarker !== end &&
+				(block.startMarker === null || block.startMarker !== end) &&
 				MARKERLESS_ARM_RENDERS === 0 &&
 				usesFrontier(block, parent)
 			)
@@ -48954,6 +48967,21 @@ function removeNodes(nodes: readonly Node[]): void {
 	}
 }
 
+/**
+ * A root's scheduled first render (a transition mount, or the retry of a mount
+ * that suspended) builds off-document like a synchronous mount (renderResolved):
+ * its commit clears the container and inserts the root's content.
+ */
+function frontierRootMount(block: Block): void {
+	const container = block.parentNode;
+	if (hydrating || container.nodeType === 9 || (container as any).$$next !== undefined) return;
+	journalRootProperty(block, 'parentNode', container);
+	const next = (queueFrontier(block, container, null) as any).$$next as SlotNext;
+	next.out.push(() => clearRootContainer(container as RootContainer), null, null);
+	block.parentNode = next.frag!;
+	noteFrontierMember(next.frag!, block);
+}
+
 function clearRootContainer(container: RootContainer): void {
 	if (container.nodeType !== 9) {
 		(container as Element | DocumentFragment).textContent = '';
@@ -49263,10 +49291,6 @@ function makeRoot(
 			if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 			if (unmounted) return;
 		}
-		// Only a mount that commits as this call returns builds off-document. One
-		// inside a render or a commit callback lands with a later commit, so it
-		// keeps writing its container as it renders.
-		const commitsNow = !inFlush && ROOT_RENDER_TRANSACTION === null;
 		const frame = beginRootRender(renderOwner);
 		renderOwner.transaction!.rootRequest = true;
 		const previousRoot = rootBlock;
@@ -49297,8 +49321,10 @@ function makeRoot(
 			}
 			let start: Comment | null = null;
 			let end: Comment | null = null;
-			// A synchronous mount builds off-document and lands at commit as one
-			// insert. The container's previous content still leaves first.
+			// A mount builds off-document and lands at its commit as one insert: at
+			// once for a synchronous mount, with a later commit for one inside a
+			// render, a commit callback or a transition. The container's previous
+			// content still leaves first.
 			let frontier: SlotNext | null = null;
 			if (staged) {
 				// A genuine root identity change mounts once beside the outgoing
@@ -49310,12 +49336,7 @@ function makeRoot(
 				frontier.frag!.append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				frontier = renderOwner.hydrationFallback(false);
-			} else if (
-				commitsNow &&
-				container.nodeType !== 9 &&
-				!hydrating &&
-				!(mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0))
-			) {
+			} else if (container.nodeType !== 9 && !hydrating) {
 				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
 				// The container's previous content leaves as the mount lands.
 				frontier.out.push(() => clearRootContainer(container), null, null);
@@ -49415,7 +49436,17 @@ function makeRoot(
 			}
 		} finally {
 			endRootRender(frame);
-			if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
+			if (ROOT_RENDER_TRANSACTION === null) {
+				if (!inFlush) commitRootRenders();
+				// A mount from a commit callback lands with the flush's next commit,
+				// unless a deferred layout holds that flush: then it lands now.
+				else if (
+					DEFERRED_LAYOUT_DRIVER &&
+					DEFERRED_LAYOUT_DRIVER.holdsPendingQueue() &&
+					renderOwner.transaction !== null
+				)
+					commitRootAlone(renderOwner.transaction);
+			}
 		}
 	};
 	root = {
