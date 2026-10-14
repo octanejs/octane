@@ -267,6 +267,7 @@ import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { snapshotSignalValue } from './data-encoding.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
+	STREAM_RETRY_PROP,
 	isRendererStreamBoundaryTemplate,
 	isRendererStreamToken,
 	rendererRangeClose,
@@ -41017,6 +41018,12 @@ function mountHiddenTryBody(state: TrySlot): Block {
 interface InitialSuspenseHydration {
 	metadata: ChildNode[];
 	consume?: () => void;
+	/**
+	 * The template sentinel of a streamed boundary whose content had not arrived
+	 * when hydration reached it (waitForStreamedArm). The rest of the record is
+	 * taken once it has.
+	 */
+	waits?: Element;
 	/** The range the body adopts (armRange), and its first server node. */
 	start: Node;
 	end: Node;
@@ -41078,9 +41085,19 @@ function takeInitialSuspenseHydration(
 		cursor = getNextSibling(cursor);
 	}
 	if (text.startsWith(BOUNDARY_STREAMED)) {
-		// A sentinel still leads a pending boundary, which claimClientArm claims.
+		// A sentinel still leads a pending boundary, whose fallback stays until its
+		// content arrives (waitForStreamedArm).
 		if (cursor?.nodeType === 1 && (cursor as Element).hasAttribute(STREAM_BOUNDARY_ATTR))
-			return null;
+			return {
+				metadata,
+				start: open,
+				end: state.end,
+				first: null,
+				idStart: 0,
+				seedRaw: null,
+				nativeRaw: null,
+				waits: cursor as Element,
+			};
 		const boundaryId = text.slice(BOUNDARY_STREAMED.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		let payload = initialStreamedPayloads?.get(open);
@@ -41098,12 +41115,7 @@ function takeInitialSuspenseHydration(
 				delete stash[boundaryId + '$signals'];
 			}
 		}
-		state.idState = {
-			prefix: state.parentBlock.idState.prefix + 'b' + boundaryId + '-',
-			next: 0,
-			renderOwner: state.parentBlock.idState.renderOwner,
-			signalState: state.parentBlock.idState.signalState,
-		};
+		claimStreamedIds(state, boundaryId);
 		const [start, end] = hydration.armRange(open, cursor, state.end);
 		return {
 			metadata,
@@ -41155,6 +41167,63 @@ function takeInitialSuspenseHydration(
 		seedRaw,
 		nativeRaw,
 	};
+}
+
+/** The ids of streamed boundary `id`, which the server's segment used. */
+function claimStreamedIds(state: TrySlot, id: string): void {
+	const parentIds = state.parentBlock.idState;
+	state.idState = {
+		prefix: parentIds.prefix + 'b' + id + '-',
+		next: 0,
+		renderOwner: parentIds.renderOwner,
+		signalState: parentIds.signalState,
+	};
+}
+
+/**
+ * Whether `state`, a streamed boundary that hydration reached before its
+ * content arrived (InitialSuspenseHydration.waits), still waits. As React
+ * leaves a pending dehydrated boundary, it keeps the server's fallback until
+ * the stream swaps its content in or marks it errored, whose call to the retry
+ * left on its open (STREAM_RETRY_PROP) retries it. Otherwise the boundary
+ * takes its content's record, or, errored, renders on the client and reports
+ * once, as React does. Returns the record to hydrate, or null.
+ */
+function waitForStreamedArm(
+	state: TrySlot,
+	initial: InitialSuspenseHydration,
+): InitialSuspenseHydration | null {
+	const sentinel = initial.waits!;
+	const open = state.start as Comment & { [STREAM_RETRY_PROP]?: () => void };
+	if (sentinel.parentNode === null || sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
+		open[STREAM_RETRY_PROP] = undefined;
+	else {
+		const wait = new Promise<void>((resolve) => (open[STREAM_RETRY_PROP] = resolve));
+		state.pendingThenable = wait as TrackedThenable<void>;
+		resumeOnSettle(wait, () => {
+			if (
+				!state.parentBlock.disposed &&
+				state.pendingThenable === wait &&
+				initialSuspenseHydrations?.get(state) === initial
+			)
+				TRY_OPS!.inBoundary(state, retryInitialSuspenseHydration, initial);
+		});
+		return null;
+	}
+	initialSuspenseHydrations!.delete(state);
+	const taken =
+		sentinel.parentNode === null
+			? takeInitialSuspenseHydration(state, new HydrationCapability(state.parentBlock, null, null))
+			: null;
+	if (taken === null) {
+		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
+		markArmDiscard(state);
+		if (!clientRenderDehydratedTry(state, currentHydration))
+			noteRecoverableHydrationError(() => new Error(formatClientError(344)), state.parentBlock);
+		return null;
+	}
+	initialSuspenseHydrations!.set(state, taken);
+	return taken;
 }
 
 function finishInitialSuspenseHydration(initial: InitialSuspenseHydration): void {
@@ -41221,7 +41290,6 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
  * which swaps the hydration flags, stays on the capability (clientRender).
  */
 function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean {
-	const parentIds = state.parentBlock.idState;
 	const open = hydration.bindingTryState(state.start) ?? (state.start as Comment).data;
 	// Whether the server's render threw rather than suspended; null reports nothing.
 	let errored: boolean | null = null;
@@ -41238,15 +41306,11 @@ function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean
 		if (reason === BOUNDARY_CLIENT_ERROR || reason === BOUNDARY_CLIENT_SUSPENDED)
 			errored = reason === BOUNDARY_CLIENT_ERROR;
 	} else if (open.startsWith(BOUNDARY_STREAMED)) {
-		const sentinel = hydration.streamSentinel(state.start);
-		if (sentinel === null) return false;
-		state.idState = {
-			prefix: parentIds.prefix + 'b' + open.slice(BOUNDARY_STREAMED.length) + '-',
-			next: 0,
-			renderOwner: parentIds.renderOwner,
-			signalState: parentIds.signalState,
-		};
-		if (sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR)) errored = true;
+		// A pending boundary waits for its content instead (waitForStreamedArm).
+		if (!hydration.streamSentinel(state.start)?.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
+			return false;
+		claimStreamedIds(state, open.slice(BOUNDARY_STREAMED.length));
+		errored = true;
 	} else return false;
 	hydration.clientRender(state, errored);
 	return true;
@@ -41297,13 +41361,24 @@ function renderInitialSuspenseHydration(
 ): void {
 	state.pendingThenable = null;
 	if (updated) {
-		// New inputs reached the arm while its hydration was suspended. The
-		// server HTML predates them, so, as React client-renders a dehydrated
-		// boundary that an update reaches, the arm renders on the client from
-		// client data, reporting nothing, and its obsolete wakeable is ignored.
+		// New inputs reached the arm while its hydration was suspended, or its
+		// streamed content had not arrived. The server HTML predates them, so, as
+		// React client-renders a dehydrated boundary that an update reaches, the
+		// arm renders on the client from client data, reporting nothing, and its
+		// obsolete wakeable is ignored.
+		if (initial.waits !== undefined) {
+			(state.start as Comment & { [STREAM_RETRY_PROP]?: () => void })[STREAM_RETRY_PROP] =
+				undefined;
+			claimStreamedIds(state, initial.waits.getAttribute(STREAM_BOUNDARY_ATTR)!);
+		}
 		markArmDiscard(state);
 		clientRenderDehydratedTry(state, currentHydration);
 		return;
+	}
+	if (initial.waits !== undefined) {
+		const taken = waitForStreamedArm(state, initial);
+		if (taken === null) return;
+		initial = taken;
 	}
 	state.idState.next = initial.idStart;
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);

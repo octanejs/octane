@@ -2087,7 +2087,9 @@ As in React:
   scripts, styles and stylesheet links inside them: the client render's own
   elements replace them. A `Document` keeps its doctype.
 - A suspension while hydrating keeps the server HTML; it never causes a
-  fallback.
+  fallback. A streamed boundary whose content has not arrived keeps the
+  server's fallback until the stream swaps the content in, which then
+  hydrates, or until an update reaches it, which renders it on the client.
 
 A boundary that falls back renders from client data. The `use()` values its
 attempt read from the server's seeds are discarded, and so is captured
