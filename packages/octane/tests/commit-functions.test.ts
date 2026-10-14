@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createRoot, flushSync, startTransition } from '../src/index.js';
 import { act } from './_helpers';
 import {
+	CommitCallback,
 	CommitError,
 	Held,
 	HeldDescriptor,
@@ -168,6 +169,47 @@ describe('commit functions', () => {
 		expect(row.textContent).toBe('1:0');
 		expect(row.title).toBe('title:1:0');
 		expect(container.querySelector('#fallback')).toBe(null);
+		root.unmount();
+	});
+
+	it('finishes a commit whose mutation-phase callback re-renders the same root', async () => {
+		if (customElements.get('commit-callback-hook') === undefined) {
+			customElements.define(
+				'commit-callback-hook',
+				class extends HTMLElement {
+					static observedAttributes = ['data-value'];
+					attributeChangedCallback(_name: string, _previous: string | null, value: string) {
+						(this as any).onValue?.(value);
+					}
+				},
+			);
+		}
+		const container = host();
+		const root = createRoot(container);
+		const log: string[] = [];
+		flushSync(() => root.render(CommitCallback, { value: 'before', tail: 'old', log }));
+		const hook = container.querySelector('commit-callback-hook') as HTMLElement & {
+			onValue?: (value: string) => void;
+		};
+		const tail = container.querySelector('#tail')!;
+		let tailDuringCallback = '';
+		hook.onValue = (value) => {
+			if (value !== 'candidate') return;
+			hook.onValue = undefined;
+			tailDuringCallback = tail.textContent!;
+			root.render(CommitCallback, { value: 'newest', tail: 'candidate', log });
+		};
+		log.length = 0;
+		await act(() => root.render(CommitCallback, { value: 'candidate', tail: 'candidate', log }));
+		// The callback runs while the commit writes, before the later sibling
+		// lands; the commit finishes, with its effects, before the new render.
+		expect(tailDuringCallback).toBe('old');
+		expect(log).toEqual(['layout:candidate', 'layout:newest']);
+		expect(tail.textContent).toBe('candidate');
+		expect(hook.getAttribute('data-value')).toBe('newest');
+		await act(() => root.render(CommitCallback, { value: 'later', tail: 'later', log }));
+		expect(container.querySelector('#tail')).toBe(tail);
+		expect(tail.textContent).toBe('later');
 		root.unmount();
 	});
 

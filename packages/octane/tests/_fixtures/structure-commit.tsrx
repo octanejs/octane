@@ -1,4 +1,4 @@
-import { Activity, createPortal, use, useLayoutEffect, useRef } from 'octane';
+import { Activity, ErrorBoundary, createPortal, use, useLayoutEffect, useRef } from 'octane';
 
 // One app that removes content through every structural slot kind: a branch
 // arm, a keyed component, keyed rows, a value hole, and a branch arm inside a
@@ -213,6 +213,86 @@ export function ResumeApp(props: { value: PromiseLike<string>; probe: () => void
 			</>
 		} @pending {
 			<p id="resume-pending">{'pending'}</p>
+		}
+	</main>
+}
+
+function Fails(props: { fail: boolean; id: string }) @{
+	if (props.fail) throw new Error('fails');
+	<b id={props.id}>{props.id}</b>
+}
+
+function Value(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<s>{value}</s>
+}
+
+export interface BoundaryArmsProps {
+	fail: boolean;
+	shown: PromiseLike<string>;
+	waiting: PromiseLike<string>;
+	hold?: PromiseLike<unknown>;
+	gate?: PromiseLike<unknown>;
+}
+
+// Boundaries whose arms a render replaces: a @try and an ErrorBoundary that
+// catch, a resolved @try whose primary suspends, and a @try whose first
+// primary is still pending. They sit in a resolved boundary that holds a
+// transition when `hold` suspends, before a sibling outside every boundary
+// that suspends on `gate`.
+export function BoundaryArmsApp(props: BoundaryArmsProps) @{
+	<main>
+		@try {
+			<>
+				@try {
+					<Fails fail={props.fail} id="try-ok" />
+				} @catch (error) {
+					<i>{'try caught'}</i>
+				}
+				<ErrorBoundary fallback={<i>{'boundary caught'}</i>}>
+					<Fails fail={props.fail} id="boundary-ok" />
+				</ErrorBoundary>
+				@try {
+					<Value value={props.shown} />
+				} @pending {
+					<p>{'shown pending'}</p>
+				}
+				@try {
+					<Value value={props.waiting} />
+				} @pending {
+					<p>{'waiting'}</p>
+				}
+				@if (props.hold) {
+					<Gate gate={props.hold} />
+				}
+			</>
+		} @pending {
+			<p>{'held pending'}</p>
+		}
+		@if (props.gate) {
+			<Gate gate={props.gate} />
+		}
+	</main>
+}
+
+export interface SelectProps {
+	rows: string[];
+	values: string[];
+	gate?: PromiseLike<unknown>;
+	probe: () => void;
+}
+
+// A controlled multi-select whose options a keyed list renders.
+export function SelectProbeApp(props: SelectProps) @{
+	<main>
+		<select multiple value={props.values} onChange={() => {}}>
+			@for (const row of props.rows; key row) {
+				<option value={row}>{row as string}</option>
+			}
+		</select>
+		<Probe probe={props.probe} />
+		@if (props.gate) {
+			<Gate gate={props.gate} />
 		}
 	</main>
 }

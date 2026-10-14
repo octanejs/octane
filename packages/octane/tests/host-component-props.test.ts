@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { flushEffects, mount } from './_helpers';
+import { act, flushEffects, mount } from './_helpers';
 import {
 	createElement,
 	flushSync,
 	hostComponent,
+	startTransition,
+	use,
 	type ComponentBody,
 	type OctaneNode,
 } from '../src/index.js';
@@ -303,4 +305,83 @@ describe('hostComponent — reused host and children', () => {
 			r.unmount();
 		}
 	});
+});
+
+describe('hostComponent writes at commit', () => {
+	interface CommitProps {
+		label: string;
+		late: boolean;
+		gate?: PromiseLike<unknown>;
+		probe: () => void;
+	}
+	const Host: ComponentBody<{ label: string; late: boolean }> = (props, scope) => {
+		hostComponent(scope, 0, 'button', { title: props.label, className: props.label }, null);
+		// A host that first appears under the committed component.
+		if (props.late) hostComponent(scope, 1, 'aside', { title: props.label }, null);
+	};
+	const Probe = (props: { probe: () => void }) => {
+		props.probe();
+		return createElement('u', null, 'probe');
+	};
+	const Gate = (props: { gate: PromiseLike<unknown> }) => {
+		use(props.gate);
+		return null;
+	};
+	const App = (props: CommitProps) =>
+		createElement(
+			'section',
+			null,
+			createElement(Host, { label: props.label, late: props.late }),
+			createElement(Probe, { probe: props.probe }),
+			props.gate ? createElement(Gate, { gate: props.gate }) : null,
+		);
+
+	for (const priority of ['urgent', 'transition'] as const) {
+		it(`applies props and inserts a new host only when the render commits (${priority})`, async () => {
+			let during: MutationRecord[] | null = null;
+			const initial: CommitProps = { label: 'before', late: false, probe: () => {} };
+			const r = mount(App as ComponentBody<CommitProps>, initial);
+			const section = r.find('section');
+			const button = r.find('button');
+			const records: MutationRecord[] = [];
+			const observer = new MutationObserver((batch) => records.push(...batch));
+			observer.observe(section, { attributes: true, childList: true, subtree: true });
+			const mutations = () => {
+				records.push(...observer.takeRecords());
+				return records.splice(0);
+			};
+			const render = (props: Partial<CommitProps>) => {
+				mutations();
+				during = null;
+				return act(() => {
+					const next = () =>
+						r.root.render(App as ComponentBody<CommitProps>, {
+							...initial,
+							probe: () => {
+								during = mutations();
+							},
+							...props,
+						});
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			};
+			try {
+				await render({ label: 'after', late: true, gate: new Promise(() => {}) });
+				expect(during).toEqual([]);
+				expect(mutations()).toEqual([]);
+				expect([button.getAttribute('title'), button.className]).toEqual(['before', 'before']);
+				expect(section.querySelector('aside')).toBe(null);
+
+				await render({ label: 'after', late: true });
+				expect(during).toEqual([]);
+				expect(r.find('button')).toBe(button);
+				expect([button.getAttribute('title'), button.className]).toEqual(['after', 'after']);
+				expect(section.querySelector('aside')!.getAttribute('title')).toBe('after');
+			} finally {
+				observer.disconnect();
+				r.unmount();
+			}
+		});
+	}
 });

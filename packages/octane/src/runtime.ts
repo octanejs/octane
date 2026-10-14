@@ -1544,9 +1544,25 @@ function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, sc
 	const value = SIGNAL_BINDINGS_ENABLED
 		? runWithBlockSignalOwner(scope.parent, () => readNativeDomStyle(props.value))
 		: readNativeDomStyle(props.value);
-	setStyle(props.el, value, scope.slots[0]);
-	journalRootProperty(scope.slots, 0, scope.slots[0]);
-	scope.slots[0] = value;
+	publishNativeStyle([scope.slots, props.el, value], usesFrontier(scope.block, props.el));
+}
+
+/**
+ * Write a native style binding's value and publish it as the committed one,
+ * or, for committed DOM in a root render, queue both for its commit. `write`
+ * is `[committed, el, value]`: the cache holding the value at index 0, or a
+ * scalar binding, which holds it as `style`.
+ */
+function publishNativeStyle(write: any[], atCommit: boolean): void {
+	if (atCommit) {
+		ROOT_RENDER_TRANSACTION!.ops.push(publishNativeStyle, write);
+		return;
+	}
+	const committed = write[0];
+	const key = committed.__kind === 'nativeStyleBinding' ? 'style' : 0;
+	setStyle(write[1], write[2], committed[key]);
+	journalRootProperty(committed, key, committed[key]);
+	committed[key] = write[2];
 }
 
 /**
@@ -1618,11 +1634,15 @@ function writeScalarNativeStyle(
 		binding.el = el;
 		binding.style = undefined;
 	}
+	// A compiler literal is fresh per render and never escapes, and a primitive
+	// is immutable, so either is its own snapshot.
+	if (write === setStyle) {
+		publishNativeStyle([binding, el, value], usesFrontier(owner.block, el));
+		return;
+	}
 	write(el, value, binding.style);
 	if (TRANSITION_JOURNAL !== null)
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-	// A compiler literal is fresh per render and never escapes, and a primitive
-	// is immutable, so either is its own snapshot.
 	binding.style = value;
 }
 
@@ -1664,10 +1684,18 @@ function publishNativeProjection(
 }
 
 function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
-	const values = prepareNativeProjection(props, scope);
-	publishNativeProjection(props, values, scope.slots[0] as unknown[] | undefined);
-	journalRootProperty(scope.slots, 0, scope.slots[0]);
-	scope.slots[0] = values;
+	const write = [scope.slots, props, prepareNativeProjection(props, scope)];
+	if (usesFrontier(scope.block, props.el))
+		ROOT_RENDER_TRANSACTION!.ops.push(commitNativeProjection, write);
+	else commitNativeProjection(write);
+}
+
+/** Publish a projection's prepared values, at commit for committed DOM in a root render. */
+function commitNativeProjection(write: any[]): void {
+	const committed = write[0];
+	publishNativeProjection(write[1], write[2], committed[0]);
+	journalRootProperty(committed, 0, committed[0]);
+	committed[0] = write[2];
 }
 
 function preparedNativeStyleBody(
@@ -3900,7 +3928,9 @@ function retryWokenTransitions(): void {
 
 /** Whether a boundary holds transition work that the render in progress did not fold. */
 function holdsUnrenderedTransition(state: TrySlot): boolean {
-	const hold = TRANSITION_HOLDERS?.get(state);
+	// Most visible renders of a boundary happen while nothing holds.
+	if (TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0) return false;
+	const hold = TRANSITION_HOLDERS.get(state);
 	if (hold === undefined) return false;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	for (const batch of hold.batches)
@@ -4126,25 +4156,45 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any) => void): void {
 }
 
 /**
- * Run a root's queued commit ops in render order. A deletion cleanup that
- * unmounts the root ends the commit; its remaining entries name dead DOM.
+ * The root whose commit ops are running, and the generation they commit for.
+ * A same-component root.render from a mutation-phase callback (a custom
+ * element's) supersedes retry generations, not this commit: it refreshes the
+ * generation, and the commit finishes first, as React's does.
  */
-function runCommitOps(ops: any[], owner: RootRenderOwner, generation: number): void {
-	for (let i = 0; i < ops.length; i += 2) {
-		if (owner.disposed || owner.generation !== generation) break;
-		const target = ops[i + 1];
-		try {
-			ops[i](target);
-		} catch (error) {
-			// React routes a commit-phase error to the nearest boundary and keeps
-			// committing; the failed bag's state was cleared before its first write.
-			// A structural entry's cleanups already route their own errors.
-			if (typeof target?.$ !== 'number') throw error;
-			if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
-				reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+let COMMITTING_OWNER: RootRenderOwner | null = null;
+let COMMITTING_GENERATION = 0;
+
+/**
+ * Run a root's queued commit ops in render order, returning the generation
+ * they committed for. A deletion cleanup that unmounts the root ends the
+ * commit; its remaining entries name dead DOM.
+ */
+function runCommitOps(ops: any[], owner: RootRenderOwner): number {
+	const previousOwner = COMMITTING_OWNER;
+	const previousGeneration = COMMITTING_GENERATION;
+	COMMITTING_OWNER = owner;
+	COMMITTING_GENERATION = owner.generation;
+	try {
+		for (let i = 0; i < ops.length; i += 2) {
+			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
+			const target = ops[i + 1];
+			try {
+				ops[i](target);
+			} catch (error) {
+				// React routes a commit-phase error to the nearest boundary and keeps
+				// committing; the failed bag's state was cleared before its first write.
+				// A structural entry's cleanups already route their own errors.
+				if (typeof target?.$ !== 'number') throw error;
+				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
+					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+			}
 		}
+		return COMMITTING_GENERATION;
+	} finally {
+		ops.length = 0;
+		COMMITTING_OWNER = previousOwner;
+		COMMITTING_GENERATION = previousGeneration;
 	}
-	ops.length = 0;
 }
 
 interface RootRenderOwner {
@@ -4897,7 +4947,9 @@ function dropRootOps(transaction: RootRenderTransaction, from: number, retired: 
  * Whether a root render leaves `block`'s teardown to its commit: a committed
  * Block the render removed from its tree. The range stays connected and
  * untouched until then, so deletion cleanups observe connected DOM and a
- * dropped render restores nothing.
+ * dropped render restores nothing. A Block whose first render suspended (a
+ * hidden primary that never resolved) has never mounted, but an earlier commit
+ * still inserted its range.
  */
 function defersRootUnmount(block: Block): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
@@ -4906,7 +4958,6 @@ function defersRootUnmount(block: Block): boolean {
 		!transaction.aborted &&
 		!ROOT_RENDER_ROLLBACK &&
 		block.idState.renderOwner === transaction.owner &&
-		block.mounted &&
 		!isCreatedInRootRender(transaction, block)
 	);
 }
@@ -5306,9 +5357,9 @@ function commitRootTransactions(): void {
 				(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
 			)
 				TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
-			const acceptedGeneration = owner.generation;
 			// The mutation phase precedes the incoming ref/layout publication.
-			if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
+			const acceptedGeneration =
+				transaction.ops.length !== 0 ? runCommitOps(transaction.ops, owner) : owner.generation;
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
 			if (owner.disposed || owner.generation !== acceptedGeneration) {
 				discardOffscreenCapture(transaction.capture);
@@ -29373,6 +29424,8 @@ interface HeadSlot {
 	handlers?: Map<string, EventListener>;
 	/** Authored attribute keys only; never retain the props' values past a render. */
 	attrNames?: string[];
+	/** A root render's attributes and text for this committed element, until its commit. */
+	next: { tx: RootRenderTransaction; attrs: Record<string, any> | null; text: unknown } | null;
 }
 
 // A shallow HeadSlot snapshot cannot undo mutations to its listener Map or the
@@ -29545,16 +29598,46 @@ export function headBlock(
 				adopted && hydration === null
 					? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNames()
 					: undefined,
+			next: null,
 		};
 		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
 		(scope.cleanups ??= []).push(() => {
+			state!.next = null;
 			removeHeadEventListeners(state!, null);
 			domNode(state!.el).remove();
 			scope.slots[slot] = undefined;
 		});
+	} else {
+		// A root render's update to a committed element waits for its commit.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK && !hydrating) {
+			const pending = state.next;
+			journalRootProperty(state, 'next', pending);
+			state.next = { tx: transaction, attrs, text };
+			if (pending === null || pending.tx !== transaction)
+				transaction.ops.push(commitHeadProps, state);
+			return;
+		}
 	}
+	applyHeadProps(state, tag, attrs, text);
+}
+
+function commitHeadProps(state: HeadSlot): void {
+	const next = state.next;
+	// The owning scope's unmount released it.
+	if (next === null) return;
+	state.next = null;
+	applyHeadProps(state, state.el.localName, next.attrs, next.text);
+}
+
+function applyHeadProps(
+	state: HeadSlot,
+	tag: string,
+	attrs: Record<string, any> | null,
+	text: unknown,
+): void {
 	const el = state.el;
 	if (TRANSITION_JOURNAL !== null) {
 		journalObjectOnce(state);
@@ -29648,8 +29731,14 @@ export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementD
 		// before returning the inline descriptor for this pass.
 		const state = scope.slots[slot] as HeadSlot | undefined;
 		if (state !== undefined) {
-			removeHeadEventListeners(state, null);
-			domNode(state.el).remove();
+			// A root render's teardown of the committed entry lands at commit.
+			if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_TRANSACTION.aborted && !hydrating)
+				queueRootDeletion(() => removeHeadEventListeners(state, null), state.el, state.el);
+			else {
+				removeHeadEventListeners(state, null);
+				domNode(state.el).remove();
+			}
+			journalRootProperty(scope.slots, slot, state);
 			scope.slots[slot] = undefined;
 		}
 		return createElement(props.tag, props.attrs ?? undefined, props.text);
@@ -30005,7 +30094,16 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			SIGNAL_EVENT_OWNERS_RECORDED = true;
 			// Compare queued writes at publication: an earlier preparation may
 			// replace even the authority that is currently committed.
-			if (STAGED_COMMIT_CAPTURE)
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (
+				key === undefined &&
+				transaction !== null &&
+				!transaction.aborted &&
+				!ROOT_RENDER_ROLLBACK &&
+				!hydrating
+			)
+				queueEventOwner(el, owner, transaction);
+			else if (STAGED_COMMIT_CAPTURE)
 				DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
 					if ((el as any).$$signalOwner !== owner) (el as any).$$signalOwner = owner;
 				});
@@ -30019,6 +30117,33 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			}
 		}
 	}
+}
+
+/**
+ * A root render's authority refresh for a committed handler publishes with
+ * its commit, so dispatch before then keeps the committed authority. A later
+ * pass of the same render compares against, and supersedes, the pending one.
+ */
+function queueEventOwner(
+	el: Element,
+	owner: SignalEventOwner,
+	transaction: RootRenderTransaction,
+): void {
+	const pending = (el as any).$$ownerNext as any[] | undefined;
+	const shown =
+		pending !== undefined && pending[2] === transaction ? pending[1] : (el as any).$$signalOwner;
+	if (shown === owner) return;
+	const next = [el, owner, transaction];
+	journalRootProperty(el, '$$ownerNext', pending);
+	(el as any).$$ownerNext = next;
+	transaction.ops.push(publishEventOwner, next);
+}
+
+function publishEventOwner(next: any[]): void {
+	const el = next[0];
+	if (el.$$ownerNext !== next) return;
+	el.$$ownerNext = undefined;
+	el.$$signalOwner = next[1];
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
@@ -32303,10 +32428,11 @@ export function setCheckedCheckable(el: Element, value: unknown): void {
 
 /**
  * Compiler-emitted binding for a controlled `value` on <select> (single and
- * `multiple`). The target is stored and projected onto the options both
- * IMMEDIATELY (idempotent) and at commit — binding mounts run before the same
- * render's @for/@if constructs, so the commit pass is what sees @for-built
- * options (React resolves selects post-mount the same way).
+ * `multiple`). The target is stored and projected onto the options at commit
+ * (drainControlledSyncs), after the commit has placed the options this render
+ * built, as React resolves selects post-mount. A root render projects nothing
+ * itself, so a render that never commits leaves the selection alone; a write
+ * outside one, such as a commit entry's, also projects at once (idempotent).
  */
 export function setSelectValue(el: Element, value: unknown): void {
 	const sel = el as HTMLSelectElement;
@@ -32357,8 +32483,11 @@ export function setSelectValue(el: Element, value: unknown): void {
 	// user state to preserve and follows the ordinary client-mount path.
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.isFresh(el)) return;
-	projectSelectValue(sel, ctrl.sv, false);
-	if (!ctrl.queued) {
+	// A ViewTransition drain's DOMStage still stages a render's projection
+	// itself. Any other root render leaves the projection to its commit.
+	const now = STAGED_DOM ? true : ROOT_RENDER_TRANSACTION === null;
+	if (now) projectSelectValue(sel, ctrl.sv, false);
+	if (!ctrl.queued || !now) {
 		ctrl.queued = true;
 		queueControlledCommit(SELECT_SYNCS, sel);
 	}
@@ -36182,6 +36311,8 @@ interface HostComponentSlot {
 	// Dedicated sub-scope holding the children's childSlot (slot 0), so the children
 	// reconcile/unmount via the Block tree without stamping a derived key on `scope`.
 	childScope: Scope | undefined;
+	/** A root render's props for this committed host, applied by its commit entry. */
+	next: any[] | null;
 }
 
 // Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
@@ -36215,6 +36346,18 @@ export function hostComponent(
 			elNs !== undefined
 				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
 				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
+		// A root render that drops forgets the host it created with it, unless
+		// it discards the whole Block.
+		if (
+			ROOT_RENDER_TRANSACTION !== null &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || block.createdStamp !== ROOT_DISCARD_STAMP)
+		) {
+			journalRootProperty(scope.slots, slot, undefined);
+			if (scope.children === null) journalRootProperty(scope, 'children', null);
+			else journalObjectOnce(scope.children);
+			if (scope.cleanups === null) journalRootProperty(scope, 'cleanups', null);
+			else journalObjectOnce(scope.cleanups);
+		}
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
 		state = {
@@ -36225,6 +36368,7 @@ export function hostComponent(
 			body: undefined,
 			latest: undefined,
 			childScope: undefined,
+			next: null,
 		};
 		scope.slots[slot] = state;
 		// Children render into a dedicated sub-scope (registered on `scope.children` so
@@ -36236,11 +36380,23 @@ export function hostComponent(
 			scope: childScope,
 			at: scope._slots === null ? 0 : scope._slots.length,
 		});
-		domNode(block.parentNode).insertBefore(el, anchor ?? block.endMarker);
-		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
+		// Under a committed Block, the new host lands at commit, from a frontier.
+		const parent = block.parentNode;
+		const before = anchor ?? block.endMarker;
+		if (usesFrontier(block, parent)) {
+			const frag = queueFrontier(block, parent, before);
+			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(el);
+		} else domNode(parent).insertBefore(el, before);
+		(scope.cleanups ??= []).push(() => {
+			state!.next = null;
+			queueRefDetach(state!.ref, state!.el);
+		});
 	}
 	const el = state.el;
-	applyHostProps(el, props, scope, state);
+	// A committed host takes its props at commit, after its children's entries.
+	let next: any[] | null = null;
+	if (state.props !== undefined && usesFrontier(block, el)) next = [state, props, scope];
+	else applyHostProps(state, props, scope);
 	if (typeof childrenBody === 'function') {
 		// The compiled children render-body is a FRESH closure every parent render, but
 		// it is the SAME positional children slot. childSlot keys block-reuse on body
@@ -36266,14 +36422,28 @@ export function hostComponent(
 		// host component.
 		childSlot(state.childScope!, 0, el, childrenBody ?? null, null, false, el);
 	}
+	if (next !== null) {
+		journalRootProperty(state, 'next', state.next);
+		state.next = next;
+		ROOT_RENDER_TRANSACTION!.ops.push(commitHostComponent, next);
+	}
 	return el;
+}
+
+function commitHostComponent(next: any[]): void {
+	const state: HostComponentSlot = next[0];
+	// A later pass of this render, or the host's unmount, superseded it.
+	if (state.next !== next) return;
+	state.next = null;
+	commitInScope(next[2], applyHostProps, state, next[1]);
 }
 
 // Props for a PERSISTENT runtime host (hostComponent), re-applied each render. Unlike
 // setHostProps' identity diff, an unchanged prop is re-asserted against the live
 // target (foreign edits and mutable values included), while the ref is attached once
 // and only re-attached when it changes.
-function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
+function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): void {
+	const el = state.el;
 	const prev = state.props;
 	const compareLive =
 		prev !== undefined && (!hydrating || activeHydration() === null) && !isHtmlCustomElement(el);
@@ -36421,7 +36591,11 @@ function hasDeoptOwnedChild(el: Element): boolean {
 interface DeoptStamped {
 	[DEOPT_DESC]?: ElementDescriptor;
 }
+// A render reads the record an earlier pass of the same root render left
+// pending (DeoptOrder): that is what its commit will show.
 function getDeoptDesc(n: Node): ElementDescriptor | undefined {
+	const order = pendingDeoptOrder(n);
+	if (order !== null && order.desc !== null) return order.desc;
 	return (STAGED_DOM ? STAGED_DOM.view(n as Node & DeoptStamped) : (n as Node & DeoptStamped))[
 		DEOPT_DESC
 	];
@@ -36450,37 +36624,43 @@ function unchangedScopedHostDescriptor(block: Block, d: ElementDescriptor): bool
 }
 
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
-	// Preserve the record committed to this DOM node. A deferred JSX shell can
-	// resolve differently after a Provider update; stamping the shell itself
-	// would make both sides of the next prop diff observe the new record and
-	// would run user code outside render while Suspense detaches subtree refs.
+	stampDeoptDesc(el, deoptRecord(el, d));
+}
+
+// The record to commit for `d`, resolved in render. A deferred JSX shell can
+// resolve differently after a Provider update; stamping the shell itself would
+// make both sides of the next prop diff observe the new record and would run
+// user code outside render while Suspense detaches subtree refs.
+function deoptRecord(el: Element, d: ElementDescriptor): ElementDescriptor {
 	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
-	let record = resolveScopedRecord === undefined ? d : resolveScopedRecord();
-	if ((record as any)[SCOPED_CHILDREN_RESOLVER] !== undefined) {
-		// A deferred-children shell is stable across different resolved trees too.
-		// Retain the actual children used by this host so a later raw-host upgrade
-		// can match the old DOM, without resolving its old keys in the new scope.
-		const children = record.children;
-		const previous = getDeoptDesc(el);
-		record = sameDeoptDesc(previous, record, children)
-			? previous!
-			: {
-					$$kind: ELEMENT_TAG,
-					type: record.type,
-					props: record.props,
-					key: record.key,
-					ref: record.ref,
-					children,
-				};
-	}
+	const record = resolveScopedRecord === undefined ? d : resolveScopedRecord();
+	if ((record as any)[SCOPED_CHILDREN_RESOLVER] === undefined) return record;
+	// A deferred-children shell is stable across different resolved trees too.
+	// Retain the actual children used by this host so a later raw-host upgrade
+	// can match the old DOM, without resolving its old keys in the new scope.
+	const children = record.children;
+	const previous = getDeoptDesc(el);
+	return sameDeoptDesc(previous, record, children)
+		? previous!
+		: {
+				$$kind: ELEMENT_TAG,
+				type: record.type,
+				props: record.props,
+				key: record.key,
+				ref: record.ref,
+				children,
+			};
+}
+
+function stampDeoptDesc(el: Element, record: ElementDescriptor): void {
+	const host = STAGED_DOM
+		? STAGED_DOM.view(el as Element & DeoptStamped)
+		: (el as Element & DeoptStamped);
 	// A held descriptor retry restores host props too. Restore their comparison
 	// record with them or the final retry will mistake aborted props for live ones.
-	if (TRANSITION_JOURNAL !== null) {
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, getDeoptDesc(el));
-	}
-	(STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as Element & DeoptStamped))[
-		DEOPT_DESC
-	] = record;
+	if (TRANSITION_JOURNAL !== null)
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, host[DEOPT_DESC]);
+	host[DEOPT_DESC] = record;
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';
@@ -36844,7 +37024,8 @@ function reconcileDeoptNode(
 			) {
 				return hydration.htextSwap(prev, s);
 			}
-			updateTextValue(prev as Text, s);
+			if (usesFrontier(ownerBlock, prev)) queueDeoptText(prev as Text, s);
+			else updateTextValue(prev as Text, s);
 			return prev;
 		}
 		return (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(s);
@@ -36858,6 +37039,9 @@ function reconcileDeoptNode(
 		// createElement, or portaled into an SVG target).
 		const elNs = inferTagNs(value.type, ns);
 		let el: Element;
+		let defer = false;
+		let pending: DeoptOrder | null = null;
+		let desc: ElementDescriptor | null = null;
 		if (
 			prev !== null &&
 			prev.nodeType === 1 &&
@@ -36865,8 +37049,14 @@ function reconcileDeoptNode(
 			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
 		) {
 			// REUSE the existing element — patch props in place instead of rebuilding.
+			// Committed DOM takes the patch at commit, with its children's order.
 			el = prev as Element;
-			setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
+			if (usesFrontier(ownerBlock, el)) {
+				defer = true;
+				pending = pendingDeoptOrder(el);
+				desc = changedDeoptRecord(el, value, pending);
+			} else
+				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
 		} else {
 			el =
 				elNs !== undefined
@@ -36875,16 +37065,19 @@ function reconcileDeoptNode(
 			if (hydrating) activeHydration()?.markFresh(el);
 			setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
-		setDeoptDesc(el, value);
-		if (!hasHostPropContent(value)) {
-			reconcileDeoptChildren(
-				el,
-				isHtmlTextareaType(value.type, elNs)
-					? textareaChildText(value.children, rejectTextareaChild)
-					: value.children,
-				ownerBlock,
-			);
-		}
+		if (desc === null) setDeoptDesc(el, value);
+		const nodes = hasHostPropContent(value)
+			? null
+			: reconcileDeoptChildren(
+					el,
+					isHtmlTextareaType(value.type, elNs)
+						? textareaChildText(value.children, rejectTextareaChild)
+						: value.children,
+					ownerBlock,
+					defer,
+					pending,
+				);
+		if (desc !== null || nodes !== null) queueDeoptOrder(el, ownerBlock, desc, nodes, null);
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -36900,42 +37093,53 @@ function reconcileDeoptNode(
 // children match by `key`, unkeyed children match positionally (React-shape). Nodes
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
-function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+//
+// A committed host's reconcile (`defer`) writes nothing: it returns the order
+// its commit gives the children, or null when they stay as they are. An
+// earlier pass of the same root render may have chosen them already: the
+// pending record's `nodes`, not the DOM, are then the children it reconciles.
+function reconcileDeoptChildren(
+	el: Element,
+	children: any,
+	ownerBlock: Block,
+	defer: boolean,
+	pendingOrder: DeoptOrder | null,
+): Node[] | null {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
-	// An earlier render of this root left an order for this host: land it now,
-	// so this reconcile reads the children that render chose.
-	const pending: DeoptOrder | undefined = (el as any).$$deoptOrder;
-	if (pending !== undefined && pending.tx === ROOT_RENDER_TRANSACTION) {
-		journalRootChildren(el);
-		applyDeoptOrder(pending);
-	}
+	const pending = pendingOrder === null ? null : pendingOrder.nodes;
+	const firstChild = pending === null ? getFirstChild(el) : null;
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
 	// Other shapes still need keyed matching: a lone text node may belong to a
 	// different array position, a nested wrapper, or independently inserted DOM.
 	const type = typeof children;
 	if ((type === 'string' && children !== '') || type === 'number' || type === 'bigint') {
-		const first = getFirstChild(el);
 		if (
-			first !== null &&
-			first.nodeType === 3 &&
-			getNextSibling(first) === null &&
-			(first as any).$$deoptKey === 0 &&
-			(first as any).$$portalEnd == null
+			firstChild !== null &&
+			firstChild.nodeType === 3 &&
+			getNextSibling(firstChild) === null &&
+			(firstChild as any).$$deoptKey === 0 &&
+			(firstChild as any).$$portalEnd == null
 		) {
 			const hydration = hydrating ? activeHydration() : null;
 			if (hydration !== null && !hydration.isFresh(el)) {
-				hydration.htextSwap(first, String(children));
+				hydration.htextSwap(firstChild, String(children));
+			} else if (defer) {
+				queueDeoptText(firstChild as Text, String(children));
 			} else {
-				updateTextValue(first as Text, String(children));
+				updateTextValue(firstChild as Text, String(children));
 			}
-			return;
+			return null;
 		}
 	}
 	// Empty scalar children on an already empty host need no reconciliation
 	// scratch arrays. Existing DOM must still take the ownership/clearing path.
-	if ((children == null || type === 'boolean' || children === '') && getFirstChild(el) === null)
-		return;
+	if (
+		(children == null || type === 'boolean' || children === '') &&
+		pending === null &&
+		firstChild === null
+	)
+		return null;
 	// The element that owns these children is authoritative. This matters when a
 	// component or dynamic tag made the lexical namespace unknowable, and when an
 	// SVG foreignObject resets its descendants to HTML.
@@ -36949,17 +37153,10 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		(ownerBlock.mounted ||
 			ROOT_RENDER_TRANSACTION.hydrating ||
 			ROOT_RENDER_TRANSACTION.retainedCreated?.has(ownerBlock));
-	// A committed host's children change at its commit (queueDeoptOrder), unless
-	// hydration is adopting them.
-	const deferred =
-		journal &&
-		!(hydrating && activeHydration() !== null) &&
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected;
-	const firstChild = getFirstChild(el);
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
-	if (firstChild === null) {
+	if (pending === null && firstChild === null) {
 		// Hydrating, an adopted host with no server children cannot hold these.
 		if (next.length !== 0 && hydrating) currentHydration!.missingDeoptChild(el, next[0]);
 		saveDeoptChildren(el);
@@ -36968,23 +37165,26 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
-				if (deferred) built.push(node);
+				if (defer) built.push(node);
 				else {
 					if (journal) journalRootChildren(el);
 					(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
 				}
 			}
 		}
-		if (built.length !== 0) queueDeoptOrder(el, built, false, false);
-		return;
+		return built.length !== 0 ? built : null;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
 	// somewhere else, so leave it alone rather than reconciling against an empty list and
 	// sweeping it away. (Going from rendered children to none still clears — the flag is set.)
 	// Hydration is excluded: the children present are the server's, which this reconcile is
 	// adopting, so a client descriptor that renders none must still clear them.
-	if (next.length === 0 && (!hydrating || activeHydration() === null) && !hasDeoptOwnedChild(el)) {
-		return;
+	if (
+		next.length === 0 &&
+		(!hydrating || activeHydration() === null) &&
+		(pending === null ? !hasDeoptOwnedChild(el) : pending.length === 0)
+	) {
+		return null;
 	}
 	// Collect only children this reconciler owns. Portal ranges and unstamped
 	// imperatively streamed nodes may coexist with our children; neither belongs
@@ -36996,6 +37196,16 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	let hydrationOwnsUnstamped: boolean | undefined;
 	let byKey: Map<any, Node> | null = null;
 	const unstamped: Node[] = [];
+	if (pending !== null) {
+		// Every node an earlier pass chose is owned and carries its key.
+		for (let i = 0; i < pending.length; i++) {
+			const node = pending[i];
+			const key = (node as any).$$deoptKey;
+			owned.push(node);
+			if (key != null && !(byKey ??= new Map()).has(key)) byKey.set(key, node);
+			else unstamped.push(node);
+		}
+	}
 	let scan: Node | null = firstChild;
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
@@ -37099,8 +37309,8 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 				);
 			// A speculative attempt's own record restores this removal if the
 			// attempt is discarded; a deferred removal would still run at commit.
-			if (journal && hydration?.speculative !== true) {
-				if (!deferred) journalRootChildren(el);
+			if ((defer || journal) && hydration?.speculative !== true) {
+				if (!defer) journalRootChildren(el);
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
@@ -37108,41 +37318,144 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			}
 		}
 	}
-	const skip = hasForeign || singleton;
-	const adopt = hydrationOwnsUnstamped === true && !singleton;
-	if (deferred) queueDeoptOrder(el, result, skip, adopt);
-	else placeDeoptChildren(el, result, skip, adopt, journal === true);
+	if (defer) {
+		// Children that keep their nodes and order need no placement.
+		if (pending === null && result.length === owned.length) {
+			let i = 0;
+			while (i < result.length && result[i] === owned[i]) i++;
+			if (i === result.length) return null;
+		}
+		return result;
+	}
+	placeDeoptChildren(
+		el,
+		result,
+		hasForeign || singleton,
+		hydrationOwnsUnstamped === true && !singleton,
+		journal === true,
+	);
+	return null;
 }
 
 /**
- * A committed host's children as a root render's deopt reconcile chose them:
- * its commit entry puts them in this order (applyDeoptOrder), after the
- * deletions the reconcile queued. `skip` steps over foreign ranges; `adopt`
- * also takes unstamped hydration children as owned.
+ * A committed de-opt node's change in an open root render, written by its
+ * commit entry (applyDeoptOrder) after the deletions its reconcile queued: a
+ * host's descriptor (`desc`: its props and DEOPT_DESC record, applied in the
+ * Scope `owner`) and its children's order (`nodes`), or a Text's `text`. Null
+ * fields are unchanged. A later pass of the same render queues a new record,
+ * which supersedes it; a window that drops forgets its records with its entries.
  */
 interface DeoptOrder {
 	tx: RootRenderTransaction;
-	el: Element;
-	nodes: Node[];
-	skip: boolean;
-	adopt: boolean;
+	el: Node;
+	nodes: Node[] | null;
+	desc: ElementDescriptor | null;
+	text: string | null;
+	owner: Block | null;
 }
 
-function queueDeoptOrder(el: Element, nodes: Node[], skip: boolean, adopt: boolean): void {
+/** The record an earlier pass of this root render left on `node`, if any. */
+function pendingDeoptOrder(node: Node): DeoptOrder | null {
+	const order: DeoptOrder | undefined = (node as any).$$deoptOrder;
+	return order !== undefined && order.tx === ROOT_RENDER_TRANSACTION ? order : null;
+}
+
+/**
+ * The record a committed host's patch commits, or null when its props would
+ * write nothing (equal values, no controlled field to reassert): render then
+ * stamps the record itself. A pending record is always superseded.
+ */
+function changedDeoptRecord(
+	el: Element,
+	d: ElementDescriptor,
+	pending: DeoptOrder | null,
+): ElementDescriptor | null {
+	const prev = getDeoptDesc(el)?.props;
+	const next = d.props;
+	if (pending === null && prev != null && next != null) {
+		let same = true;
+		for (const k in next) {
+			if (k !== 'key' && k !== 'children' && (next[k] !== prev[k] || isControlledHostProp(el, k))) {
+				same = false;
+				break;
+			}
+		}
+		if (same && prev !== next)
+			for (const k in prev)
+				if (k !== 'key' && k !== 'children' && !(k in next)) {
+					same = false;
+					break;
+				}
+		if (same) return null;
+	}
+	return deoptRecord(el, d);
+}
+
+function queueDeoptOrder(
+	node: Node,
+	owner: Block | null,
+	desc: ElementDescriptor | null,
+	nodes: Node[] | null,
+	text: string | null,
+): void {
 	const tx = ROOT_RENDER_TRANSACTION!;
-	const order: DeoptOrder = { tx, el, nodes, skip, adopt };
-	// A nested window that drops forgets its order with its entry.
-	journalRootProperty(el, '$$deoptOrder', (el as any).$$deoptOrder);
-	(el as any).$$deoptOrder = order;
+	const order: DeoptOrder = { tx, el: node, nodes, desc, text, owner };
+	journalRootProperty(node, '$$deoptOrder', (node as any).$$deoptOrder);
+	(node as any).$$deoptOrder = order;
 	tx.ops.push(applyDeoptOrder, order);
 }
 
+/** A committed Text's data, written at commit unless it already shows `data`. */
+function queueDeoptText(node: Text, data: string): void {
+	const pending = pendingDeoptOrder(node);
+	if (
+		data !==
+		(pending !== null ? pending.text : (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue)
+	)
+		queueDeoptOrder(node, null, null, null, data);
+}
+
 function applyDeoptOrder(order: DeoptOrder): void {
-	const el = order.el;
-	// A later render of this root landed it already.
-	if ((el as any).$$deoptOrder !== order) return;
-	(el as any).$$deoptOrder = undefined;
-	placeDeoptChildren(el, order.nodes, order.skip, order.adopt, false);
+	const node = order.el as any;
+	// A later pass of this render superseded it.
+	if (node.$$deoptOrder !== order) return;
+	node.$$deoptOrder = undefined;
+	if (order.text !== null) {
+		updateTextValue(node, order.text);
+		return;
+	}
+	if (order.desc !== null) commitInScope(order.owner!, commitDeoptHost, node, order.desc);
+	// Foreign ranges among the children stay where they are.
+	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false, false);
+}
+
+/**
+ * Run a commit write in the Scope that rendered it, so the handlers and refs
+ * it installs resolve their owner as they would have in render.
+ */
+function commitInScope<A, B>(
+	scope: Scope,
+	write: (a: A, b: B, scope: Scope) => void,
+	a: A,
+	b: B,
+): void {
+	const previous = CURRENT_SCOPE;
+	CURRENT_SCOPE = scope;
+	try {
+		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined)
+			runWithBlockSignalOwner(scope, () => write(a, b, scope));
+		else write(a, b, scope);
+	} finally {
+		CURRENT_SCOPE = previous;
+	}
+}
+
+function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): void {
+	const committed = (
+		STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as DeoptStamped)
+	)[DEOPT_DESC];
+	setHostProps(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
+	stampDeoptDesc(el, record);
 }
 
 /**
@@ -37420,50 +37733,65 @@ function deoptItemBody(item: any, scope: Scope): void {
 	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
 	if (node !== prev) {
 		journalRootProperty(block, 'deoptNode', block.deoptNode);
-		// Built a fresh node (first mount, or a tag/type change) — insert it at
-		// the old node's position, THEN drop the old one. Insert-before-remove
-		// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
-		// marker, so removing it first would leave `endM` detached and the
-		// insert would throw.
-		if (
-			prev != null &&
-			prev !== node &&
-			(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode === block.parentNode
-		) {
-			if (ROOT_RENDER_TRANSACTION !== null)
+		const parent = block.parentNode;
+		const host = prev === null ? null : (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode;
+		let landing: SlotNext | null = null;
+		if (host !== null && host !== parent && (host as any).$$next !== undefined) {
+			// An earlier pass of this render built `prev` in a frontier that has
+			// not landed: replace it there, and land the replacement in its place.
+			const retired = prev!;
+			if (node !== null) (STAGED_DOM ? STAGED_DOM.view(host) : host).replaceChild(node, retired);
+			else (STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(retired);
+			queueRootDeletion(() => detachDeoptTreeRefs(retired, null), null, null);
+			const bound = ((host as any).$$next as SlotNext).bound;
+			if (bound !== null) bound[3] = bound[4] = node;
+		} else {
+			// Built a fresh node (first mount, or a tag/type change) — insert it at
+			// the old node's position, THEN drop the old one. Insert-before-remove
+			// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
+			// marker, so removing it first would leave `endM` detached and the
+			// insert would throw. Committed DOM takes it at commit, from a frontier.
+			const attached = host === parent;
+			const frontier = usesFrontier(block, parent);
+			if (
+				ROOT_RENDER_TRANSACTION !== null &&
+				!frontier &&
+				(attached || (node !== null && block.mounted))
+			)
 				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(prev) : prev).previousSibling,
-					getNextSibling(prev),
+					parent,
+					attached
+						? (STAGED_DOM ? STAGED_DOM.view(prev!) : prev!).previousSibling
+						: ((STAGED_DOM ? STAGED_DOM.view(endM) : endM)?.previousSibling ??
+								domNode(parent).lastChild),
+					attached ? getNextSibling(prev!) : endM,
 				);
 			if (node !== null) {
-				const parent = block.parentNode;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
+				const before = attached ? prev : endM;
+				if (frontier) {
+					const frag = queueFrontier(block, parent, before);
+					(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
+					landing = (frag as any).$$next;
+				} else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, before);
 			}
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				const retired = prev;
-				queueRootDeletion(() => detachDeoptTreeRefs(retired, null), retired, retired);
-			} else {
-				detachDeoptTreeRefs(prev, null);
-				const parent = block.parentNode;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev);
+			if (attached) {
+				const retired = prev!;
+				if (ROOT_RENDER_TRANSACTION !== null)
+					queueRootDeletion(() => detachDeoptTreeRefs(retired, null), retired, retired);
+				else {
+					detachDeoptTreeRefs(retired, null);
+					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(retired);
+				}
 			}
-		} else if (node !== null) {
-			if (ROOT_RENDER_TRANSACTION !== null && block.mounted) {
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(endM) : endM)?.previousSibling ??
-						domNode(block.parentNode).lastChild,
-					endM,
-				);
-			}
-			const parent = block.parentNode;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, endM);
 		}
 		// Self-marked item rebuilt: the replaced element WAS the range — re-point
-		// both markers at the replacement. (A non-host new value never reaches
-		// here self-marked — the promotion above minted a pair first.)
-		if (prev !== null && block.startMarker === prev) {
+		// both markers at the replacement, as it lands when that is at commit.
+		// The keyed list's own commit entry, which runs first, still moves or
+		// removes the item by the node it shows now. (A non-host new value never
+		// reaches here self-marked — the promotion above minted a pair first.)
+		if (landing !== null && block.startMarker === prev) {
+			landing.bound = [block, prev, prev, node, node];
+		} else if (prev !== null && block.startMarker === prev) {
 			journalRootProperty(block, 'startMarker', block.startMarker);
 			journalRootProperty(block, 'endMarker', block.endMarker);
 			block.startMarker = node;
@@ -37731,6 +38059,7 @@ function runtimeHostSiteLoc(block: Block): string {
 // children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
+	let desc: ElementDescriptor | null = null;
 	const hydration = hydrating ? activeHydration() : null;
 	// Component/value boundaries are namespace-transparent. Derive the inherited
 	// namespace from the block's actual DOM parent; explicit <svg>/<math> roots
@@ -37786,14 +38115,18 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		(elNs !== undefined && el.namespaceURI !== elNs)
 	) {
 		// First render, or the host tag changed at this slot — (re)create the element.
+		// Committed DOM takes the replacement at commit, from a frontier.
+		const parent = block.parentNode;
+		const frontier = el !== null && usesFrontier(block, parent);
 		if (el !== null) {
 			const retired = el;
 			if (ROOT_RENDER_TRANSACTION !== null) {
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(retired) : retired).previousSibling,
-					getNextSibling(retired),
-				);
+				if (!frontier)
+					journalRootRange(
+						parent,
+						(STAGED_DOM ? STAGED_DOM.view(retired) : retired).previousSibling,
+						getNextSibling(retired),
+					);
 				journalRootProperty(block, 'deoptNode', block.deoptNode);
 			}
 			// This Block keeps rendering, so the replaced element retires on its own,
@@ -37829,19 +38162,26 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(d.type as string);
 		if (hydration !== null) hydration.markFresh(el);
 		block.deoptNode = el;
-		const parent = block.parentNode;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
+		if (frontier) {
+			const frag = queueFrontier(block, parent, block.endMarker);
+			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(el);
+		} else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
 		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+	} else if (usesFrontier(block, el)) {
+		// REUSE the committed element — its props change at commit, after its
+		// children's entries. Its childSlot owns the children's structure.
+		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// REUSE the existing element — diff props in place (no rebuild).
 		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
-	setDeoptDesc(el, d);
+	if (desc === null) setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
 	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
 	if (!hasHostPropContent(d)) deoptHostChildren(block, el, d, elNs);
+	if (desc !== null) queueDeoptOrder(el, block, desc, null, null);
 }
 
 // Stable render body for a componentSlot whose comp resolved to a HOST tag
@@ -41492,6 +41832,8 @@ interface TrySlot {
 	passthrough: boolean;
 	/** Stable boundary reset dispatcher; remains safe after unmount. */
 	reset: () => void;
+	/** The arms a root render builds off-document (insertArmPair). */
+	next: SlotNext | null;
 }
 
 /** Catch-only JSX boundaries never preserve a hidden Suspense primary. */
@@ -41514,6 +41856,7 @@ interface ErrorSlot {
 	idState: RootIdState;
 	passthrough: boolean;
 	reset: () => void;
+	next: SlotNext | null;
 }
 
 function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
@@ -41522,19 +41865,50 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 	setTryBranch(state, -1);
 }
 
-/** Detached retry/error callbacks still publish through the owning root journal. */
+/**
+ * Detached retry/error callbacks still publish through the owning root journal.
+ * Their arms build off-document (insertArmPair), so a dropped render restores
+ * only the slot's record; hydration, which writes the server range in place,
+ * restores that range too.
+ */
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		if (
-			domNode(state.start).parentNode === state.domParent &&
-			domNode(state.end).parentNode === state.domParent
-		)
-			journalRootSlot(state, state.domParent, state.start, state.end);
-		else journalObjectOnce(state);
+	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
+	if (
+		hydrating &&
+		domNode(state.start).parentNode === state.domParent &&
+		domNode(state.end).parentNode === state.domParent
+	)
+		journalRootSlot(state, state.domParent, state.start, state.end);
+	else if (frame === null) journalObjectOnce(state);
+	else {
+		// A frame of its own opens a window nothing has snapshotted in yet: one
+		// snapshot per resume, with no lookup.
+		TRANSITION_JOURNAL_BAGS!.set(state, TRANSITION_JOURNAL!.length);
+		TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
 	}
 	return frame;
+}
+
+/**
+ * Insert an arm's marker pair before `before` and return the arm's parent. A
+ * root render that changes a committed boundary (usesFrontier) builds the arm
+ * in the slot's frontier, which its commit inserts before `before`, so a
+ * dropped render leaves the boundary untouched. A fresh arm the same render
+ * supersedes leaves the fragment with its own unmount. Hydration and a
+ * boundary this render created write in place.
+ */
+function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
+	const live = domNode(before).parentNode!;
+	const parent =
+		live === state.domParent && usesFrontier(state.parentBlock, live)
+			? slotFrontier(state, state.parentBlock, live, before)
+			: live;
+	const at = parent === live ? before : null;
+	domNode(parent).insertBefore(start, at);
+	domNode(parent).insertBefore(end, at);
+	return parent;
 }
 
 function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
@@ -41788,6 +42162,7 @@ export function errorBlock(
 			idState: parentBlock.idState,
 			passthrough,
 			reset: () => requestReset(newState),
+			next: null,
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -41838,6 +42213,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	// Only the boundary's first render adopts the server's range.
 	const adopting = hydration !== null && state.branch === -1;
 	setTryBranch(state, 1);
+	let armParent = state.domParent;
 	let start: Node | null = null;
 	let end: Node | null = null;
 	let freshBoundary = false;
@@ -41855,8 +42231,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		} else {
 			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-			domNode(state.domParent).insertBefore(start, state.end);
-			domNode(state.domParent).insertBefore(end, state.end);
+			armParent = insertArmPair(state, start, end, state.end);
 			if (hydration !== null) {
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -41866,7 +42241,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	const body = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		armParent,
 		start,
 		end,
 		state.tryBody,
@@ -41919,6 +42294,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	state.hasResolved = false;
 	setTryBranch(state, 0);
 	state.err = error;
+	let armParent = state.domParent;
 	let start: Node | null = null;
 	let end: Node | null = null;
 	if (!state.passthrough) {
@@ -41932,13 +42308,12 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 			hydration.markFresh(start);
 			hydration.markFresh(end);
 		}
-		domNode(state.domParent).insertBefore(start, state.end);
-		domNode(state.domParent).insertBefore(end, state.end);
+		armParent = insertArmPair(state, start, end, state.end);
 	}
 	const caught = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		armParent,
 		start,
 		end,
 		state.catchBody,
@@ -42115,6 +42490,7 @@ export function tryBlock(
 			idState: parentBlock.idState,
 			passthrough,
 			reset: () => requestReset(newState),
+			next: null,
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -42271,11 +42647,16 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 }
 
-function createTryBody(state: TrySlot, start: Node, end: Node): Block {
+function createTryBody(
+	state: TrySlot,
+	start: Node,
+	end: Node,
+	parent: Node = state.domParent,
+): Block {
 	const block = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		parent,
 		start,
 		end,
 		state.tryBody,
@@ -42321,10 +42702,9 @@ function restartUncommittedTry(state: TrySlot): Block | null {
 function mountHiddenTryBody(state: TrySlot): Block {
 	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-	const anchor = state.block?.startMarker ?? state.end;
-	domNode(state.domParent).insertBefore(start, anchor);
-	domNode(state.domParent).insertBefore(end, anchor);
-	const block = createTryBody(state, start, end);
+	// Before the visible fallback, wherever it is.
+	const armParent = insertArmPair(state, start, end, state.block?.startMarker ?? state.end);
+	const block = createTryBody(state, start, end, armParent);
 	state.detachedRefs = [];
 	hideTryBlock(state);
 	return block;
@@ -42754,6 +43134,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	setTryBranch(state, 1);
 	let bStart: Node;
 	let bEnd: Node;
+	let armParent = state.domParent;
 	// The boundary's open says what its server range holds (hydration-protocol.ts).
 	// A streamed boundary (`[$?id`) whose segment swapped in has its seed JSON
 	// stashed on window.$OCTS[id]. The full id includes its stream namespace, so
@@ -42812,14 +43193,13 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		scopedSeeds = null;
 		bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 		bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
+		armParent = insertArmPair(state, bStart, bEnd, state.end);
 		if (hydration !== null) {
 			hydration.markFresh(bStart);
 			hydration.markFresh(bEnd);
 		}
 	}
-	const b = createTryBody(state, bStart, bEnd);
+	const b = createTryBody(state, bStart, bEnd, armParent);
 	state.block = b;
 	let nativeAdoption: NativeAdoptionState | undefined;
 	if (hydrating && scopedNativeRaw !== undefined && !freshBoundary) {
@@ -43343,12 +43723,10 @@ function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('pend-b');
 		const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/pend-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
-			state.domParent,
+			insertArmPair(state, bStart, bEnd, state.end),
 			bStart,
 			bEnd,
 			state.pendingBody,
@@ -45327,13 +45705,12 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 		hydration.markFresh(bStart);
 		hydration.markFresh(bEnd);
 	}
-	domNode(state.domParent).insertBefore(bStart, state.end);
-	domNode(state.domParent).insertBefore(bEnd, state.end);
+	const armParent = insertArmPair(state, bStart, bEnd, state.end);
 	const reset = () => requestReset(state);
 	const b = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		armParent,
 		bStart,
 		bEnd,
 		state.catchBody,
@@ -51198,6 +51575,7 @@ function makeRoot(
 				if (inFlush && DEFERRED_LAYOUT_DRIVER)
 					DEFERRED_LAYOUT_DRIVER.refreshPublishingOwner(renderOwner);
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
+				if (COMMITTING_OWNER === renderOwner) COMMITTING_GENERATION = renderOwner.generation;
 			}
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
