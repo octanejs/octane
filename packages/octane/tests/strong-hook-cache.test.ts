@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { flushSync, hydrateRoot } from 'octane';
-import { renderToString } from 'octane/server';
+import { createContext, flushSync, hydrateRoot } from 'octane';
+import { createContext as createServerContext, renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 import { act, flushEffects, mount } from './_helpers';
@@ -722,6 +722,86 @@ export function App(props) @{
 	});
 
 	it.each([false, true])(
+		'adopts a nested provider and retains its consumer subscription across unrelated updates (dev=%s)',
+		(dev) => {
+			const source = `"use strong";
+import { createContext, useContext, useEffect } from 'octane';
+import { Outer, subscribe } from './source';
+const Channel = createContext({ name: 'default' });
+function Reader() {
+  const channel = useContext(Channel);
+  useEffect(() => subscribe(channel), [channel]);
+  return <output>{channel.name as string}</output>;
+}
+export function App(props) @{
+  const context = { name: props.name };
+  <Outer value={true}>
+    <Channel value={context}>
+      <input data-revision={props.revision} defaultValue="initial" />
+      <Reader />
+    </Channel>
+  </Outer>
+}`;
+			const lifecycle: string[] = [];
+			const options = {
+				id: '/src/StrongHydratedContext.tsrx',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: {
+					'./source': {
+						Outer: createContext(false),
+						subscribe: ({ name }: { name: string }) => {
+							lifecycle.push('subscribe:' + name);
+							return () => lifecycle.push('unsubscribe:' + name);
+						},
+					},
+				},
+			};
+			const server = loadCompiledFixtureSource(source, {
+				...options,
+				mode: 'server',
+				runtimeModules: {
+					'./source': { ...options.runtimeModules['./source'], Outer: createServerContext(false) },
+				},
+			});
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const props = { name: 'news', revision: 'one' };
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(server.App, props).html;
+			expect(lifecycle).toEqual([]);
+			const input = container.querySelector('input')!;
+			input.value = 'edited before hydration';
+			const root = hydrateRoot(container, client.App, props);
+			try {
+				flushSync(() => {});
+				flushEffects();
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('edited before hydration');
+				expect(container.querySelector('output')?.textContent).toBe('news');
+				expect(lifecycle).toEqual(['subscribe:news']);
+				flushSync(() => root.render(client.App, { ...props, revision: 'two' }));
+				flushEffects();
+				expect(input.dataset.revision).toBe('two');
+				expect(input.value).toBe('edited before hydration');
+				expect(lifecycle).toEqual(['subscribe:news']);
+				flushSync(() => root.render(client.App, { name: 'weather', revision: 'two' }));
+				flushEffects();
+				expect(container.querySelector('output')?.textContent).toBe('weather');
+				expect(lifecycle).toEqual(['subscribe:news', 'unsubscribe:news', 'subscribe:weather']);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+			expect(lifecycle).toEqual([
+				'subscribe:news',
+				'unsubscribe:news',
+				'subscribe:weather',
+				'unsubscribe:weather',
+			]);
+		},
+	);
+
+	it.each([false, true])(
 		'does not retain a ref list mutated during conditional setup (dev=%s)',
 		(dev) => {
 			const { App } = loadCompiledFixtureSource(
@@ -879,8 +959,10 @@ ${close}`,
 	it.each([
 		[false, 'inline'],
 		[false, 'named'],
+		[false, 'nested named'],
 		[true, 'inline'],
 		[true, 'named'],
+		[true, 'nested named'],
 	])('retains a context subscription until a provider value changes (dev=%s, %s)', (dev, form) => {
 		const lifecycle: string[] = [];
 		const { App } = loadCompiledFixtureSource(
@@ -888,6 +970,7 @@ ${close}`,
 "use strong";
 import { createContext, useContext, useEffect, useState } from 'octane';
 import { subscribe } from './subscription';
+import { Outer } from './outer';
 const Channel = createContext({ name: 'default' });
 function Reader() {
   const channel = useContext(Channel);
@@ -896,11 +979,13 @@ function Reader() {
 }
 export function App(props) ${open}
   const [noise, setNoise] = useState(0);
-  ${form === 'named' ? 'const context = { name: props.name };' : ''}
+  ${form !== 'inline' ? 'const context = { name: props.name };' : ''}
   ${render}
   <div>
     <button data-revision={props.revision} onClick={() => setNoise(noise + 1)}>{noise as string}</button>
-    <Channel value={${form === 'named' ? 'context' : '{ name: props.name }'}}><Reader /></Channel>
+    ${form === 'nested named' ? '<Outer value={true}>' : ''}
+      <Channel value={${form !== 'inline' ? 'context' : '{ name: props.name }'}}><Reader /></Channel>
+    ${form === 'nested named' ? '</Outer>' : ''}
   </div>
 ${close}`,
 			{
@@ -908,6 +993,7 @@ ${close}`,
 				mode: 'client',
 				compileOptions: { dev, hmr: false },
 				runtimeModules: {
+					'./outer': { Outer: createContext(false) },
 					'./subscription': {
 						subscribe: (channel: { name: string }) => {
 							lifecycle.push('subscribe:' + channel.name);
@@ -947,6 +1033,64 @@ ${close}`,
 			'unsubscribe:weather',
 		]);
 	});
+
+	it.each([false, true])(
+		'leaves inline child prop evaluation with a component that can withhold children (dev=%s)',
+		(dev) => {
+			const reads: string[] = [];
+			const { App } = loadCompiledFixtureSource(
+				`/** @jsxImportSource octane */
+"use strong";
+import { useState } from 'octane';
+import { read } from './source';
+function Deferred(props) {
+  return props.show ? <>{props.children}</> : <span>hidden</span>;
+}
+function Reader(props) {
+  return <output>{props.value.name as string}</output>;
+}
+export function App(props) ${open}
+  const [revision, setRevision] = useState(0);
+  ${render}
+  <div>
+    <button onClick={() => setRevision(revision + 1)}>{revision as string}</button>
+    <Deferred show={props.show}>
+      <Reader value={{ name: read(props.name) }} />
+    </Deferred>
+  </div>
+${close}`,
+				{
+					id: `/src/StrongDeferredProps.${extension}`,
+					mode: 'client',
+					compileOptions: { dev, hmr: false },
+					runtimeModules: {
+						'./source': {
+							read(name: string) {
+								reads.push(name);
+								return name;
+							},
+						},
+					},
+				},
+			);
+			const mounted = mount(App, { show: false, name: 'news' });
+			try {
+				expect(mounted.find('span').textContent).toBe('hidden');
+				expect(reads).toEqual([]);
+				mounted.click('button');
+				expect(mounted.find('button').textContent).toBe('1');
+				expect(reads).toEqual([]);
+				mounted.update(App, { show: false, name: 'weather' });
+				expect(mounted.find('span').textContent).toBe('hidden');
+				expect(reads).toEqual([]);
+				mounted.update(App, { show: true, name: 'weather' });
+				expect(mounted.find('output').textContent).toBe('weather');
+				expect(reads).toEqual(['weather']);
+			} finally {
+				mounted.unmount();
+			}
+		},
+	);
 
 	it.each(['named', 'inline'])(
 		'keeps a provider subscription for a regular function until its captures change (%s)',
