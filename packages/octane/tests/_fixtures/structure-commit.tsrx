@@ -296,3 +296,25 @@ export function SelectProbeApp(props: SelectProps) @{
 		}
 	</main>
 }
+
+function LateBoundary(props: { value: PromiseLike<string>; probe: () => void }) @{
+	const value = use(props.value);
+	<>
+		<ErrorBoundary fallback={<i>{'late caught'}</i>}>
+			<b id="late-value">{value}</b>
+		</ErrorBoundary>
+		<Probe probe={props.probe} />
+	</>
+}
+
+// A component whose first render suspended before its error boundary: when it
+// resumes, the boundary is new under DOM its earlier render committed.
+export function LateBoundaryApp(props: { value: PromiseLike<string>; probe: () => void }) @{
+	<main>
+		@try {
+			<LateBoundary value={props.value} probe={props.probe} />
+		} @pending {
+			<p id="late-pending">{'pending'}</p>
+		}
+	</main>
+}

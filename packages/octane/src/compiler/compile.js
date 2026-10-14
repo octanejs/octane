@@ -28442,8 +28442,6 @@ function planJsx(
 			}
 		}
 		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
-		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
-		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
 			if (ctx.nativeReads) b.readStyle = requireRuntimeForContext(ctx, 'readNativeDomStyle');
 			if (b.signalHostSources) ctx.runtimeNeeded.add('bindSignalHostPropSources');
@@ -28456,7 +28454,7 @@ function planJsx(
 		// so each source's name literal — not the shared helper — is what claims
 		// that attribute's name (see commitSourceRows). Registered once here; the
 		// literal carries the same authored location on the update path.
-		if (b.kind === 'hostCommit' || b.kind === 'formCommit') {
+		if (b.kind === 'hostCommit') {
 			for (const source of b.sources) {
 				if (source.spread !== true) {
 					registerAttrLoweringOrigin(ctx, source.nameOrigin, null, source.name);
@@ -30624,8 +30622,6 @@ function emitBindingMount(bind, elVar, bag) {
 				]),
 			);
 		}
-		case 'dangerValue':
-		case 'formValue':
 		case 'hostValue': {
 			return st(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), bind.expr)));
 		}
@@ -30634,30 +30630,6 @@ function emitBindingMount(bind, elVar, bag) {
 			// wrapper is compiler scaffolding rebuilt here.
 			return st(
 				b.stmt(b.assignment('=', local(`_sp$${bind.id}`), b.call('_$snapshotSpread', bind.expr))),
-			);
-		}
-		case 'dangerCommit': {
-			const sources = b.array(
-				bind.sources.map(({ spread, binding }) =>
-					b.array([
-						b.literal(spread === true),
-						b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
-					]),
-				),
-			);
-			return st(
-				b.block([
-					b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', el(), sources)),
-					...mountHost(),
-				]),
-			);
-		}
-		case 'formCommit': {
-			const sources = commitSourceRows(bind.sources, (binding, spread) =>
-				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
-			);
-			return st(
-				b.block([b.stmt(b.call('_$setFormControlSources', el(), sources)), ...mountHost()]),
 			);
 		}
 		case 'hostCommit': {
@@ -31031,13 +31003,7 @@ const COMMIT_CONTROLLED_KINDS = new Set([
 ]);
 // Writers that stay in render; a host carrying one keeps its other writers there.
 // So does a host collector that commitBindingKind keeps in render.
-const RENDER_WRITER_KINDS = new Set([
-	'spread',
-	'formCommit',
-	'dangerCommit',
-	'nativeStyle',
-	'nativeProjection',
-]);
+const RENDER_WRITER_KINDS = new Set(['spread', 'nativeStyle', 'nativeProjection']);
 
 function makeCommitPlan() {
 	let size = 0;
@@ -31621,8 +31587,6 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 				]),
 			);
 		}
-		case 'dangerValue':
-		case 'formValue':
 		case 'hostValue': {
 			return st(
 				b.block([
@@ -31634,23 +31598,6 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 		case 'hostSpread': {
 			// Same wrapper re-derivation as the mount.
 			return st(b.stmt(b.assignment('=', F('_sp'), b.call('_$snapshotSpread', bind.expr))));
-		}
-		case 'dangerCommit': {
-			const sources = b.array(
-				bind.sources.map(({ spread, binding }) =>
-					b.array([
-						b.literal(spread === true),
-						bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
-					]),
-				),
-			);
-			return st(b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', F('_el'), sources)));
-		}
-		case 'formCommit': {
-			const sources = commitSourceRows(bind.sources, (binding, spread) =>
-				bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
-			);
-			return st(b.stmt(b.call('_$setFormControlSources', F('_el'), sources)));
 		}
 		case 'hostCommit': {
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
@@ -32570,11 +32517,6 @@ function emitElementHtml(
 	let hostCommitClientBinding = null;
 	const hasNestedJsxChildren =
 		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
-	const resolveDangerouslySetInnerHTMLAcrossSpreads = firstSpreadIdx !== -1;
-	const dangerHtmlClientSources = [];
-	const resolveFormControlsAcrossSpreads =
-		firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select');
-	const formControlClientSources = [];
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
@@ -32879,17 +32821,6 @@ function emitElementHtml(
 				obj === null
 					? b.literal(true, 'true', attr)
 					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
-			if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
-				const binding = {
-					id: bindings.length,
-					kind: 'dangerValue',
-					expr,
-					path,
-				};
-				bindings.push(binding);
-				dangerHtmlClientSources.push({ spread: false, binding });
-				continue;
-			}
 			const noChildren =
 				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
 			if (noChildren && !isAfterSpread) {
@@ -32918,32 +32849,6 @@ function emitElementHtml(
 		// literals and bare booleans (`<input checked/>`) included; nothing
 		// bakes into the template HTML (see controlledKindFor).
 		let ctlKind = controlledKindFor(tag, attrName);
-		if (
-			resolveFormControlsAcrossSpreads &&
-			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
-		) {
-			const sourceExpr =
-				val == null
-					? b.literal(true, 'true', attr)
-					: val.type === 'JSXExpressionContainer'
-						? val.expression
-						: val;
-			const binding = {
-				id: bindings.length,
-				kind: 'formValue',
-				name: attrName,
-				expr: tsrxExprNode(sourceExpr, ctx, componentName, inlinedSubs),
-				path,
-			};
-			bindings.push(binding);
-			formControlClientSources.push({
-				spread: false,
-				name: attrName,
-				nameOrigin: attr.name,
-				binding,
-			});
-			continue;
-		}
 		if (ctlKind !== null) {
 			if (ctlKind === 'defaultValue' && leanDefaultValue) {
 				ctlKind = 'defaultValueUncontrolled';
@@ -33418,23 +33323,6 @@ function emitElementHtml(
 			signalSite: signalHostSources ? hostSignalSite : null,
 		};
 		bindings.push(hostCommitClientBinding);
-	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
-		bindings.push({
-			id: bindings.length,
-			kind: 'dangerCommit',
-			path,
-			origin: node,
-			sources: dangerHtmlClientSources,
-		});
-	}
-	if (!resolveHostPropsAcrossSources && resolveFormControlsAcrossSpreads) {
-		bindings.push({
-			id: bindings.length,
-			kind: 'formCommit',
-			path,
-			origin: node,
-			sources: formControlClientSources,
-		});
 	}
 	if (ctx.dev) {
 		const selectedOption = tag === 'option' && directPropNames.has('selected');

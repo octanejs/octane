@@ -36503,6 +36503,11 @@ function nextDeoptOwnedChild(scan: Node | null, adoptHydrationChildren: boolean)
 // minted around the current node, so the new content — and reorder/teardown —
 // keep a live range after that node is retired. Client-only by construction
 // (hydrated items always adopt the server's pair).
+//
+// A root render mints the pair off-document: its commit inserts it around the
+// node, after the keyed list's own entry has moved that node, and only then
+// re-points the item's markers (landItemPair). Until then the render builds
+// against the pending pair (itemRange).
 function promoteSelfMarkedItem(block: Block): void {
 	const sm = block.startMarker;
 	if (
@@ -36512,18 +36517,49 @@ function promoteSelfMarkedItem(block: Block): void {
 		sm.parentNode === null
 	)
 		return;
-	const p = sm.parentNode!;
-	if (ROOT_RENDER_TRANSACTION !== null) {
-		journalRootRange(p, sm.previousSibling, getNextSibling(sm));
-		journalRootProperty(block, 'startMarker', block.startMarker);
-		journalRootProperty(block, 'endMarker', block.endMarker);
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+		// A render that dropped leaves its pair pending for the next one.
+		let pair = (PENDING_ITEM_PAIRS ??= new WeakMap()).get(block);
+		if (pair === undefined || pair[0] !== sm) {
+			pair = [sm, document.createComment('it'), document.createComment('/it'), block, null];
+			PENDING_ITEM_PAIRS.set(block, pair);
+		}
+		if (pair[4] !== transaction) {
+			pair[4] = transaction;
+			transaction.ops.push(landItemPair, pair);
+		}
+		return;
 	}
+	const p = sm.parentNode!;
 	const s = document.createComment('it');
 	const e = document.createComment('/it');
 	p.insertBefore(s, sm);
 	p.insertBefore(e, getNextSibling(sm));
 	block.startMarker = s;
 	block.endMarker = e;
+}
+
+/** Self-marked items whose `it` pair a root render minted: [node, start, end, block, transaction]. */
+let PENDING_ITEM_PAIRS: WeakMap<Block, any[]> | null = null;
+
+/** The range an item renders into: its markers, or the pair its commit promotes it to. */
+function itemRange(block: Block): [Node | null, Node | null] {
+	const pending = PENDING_ITEM_PAIRS?.get(block);
+	return pending !== undefined && pending[0] === block.startMarker
+		? [pending[1], pending[2]]
+		: [block.startMarker, block.endMarker];
+}
+
+function landItemPair(pair: any[]): void {
+	const [node, start, end, block] = pair as [Node, Comment, Comment, Block];
+	if (PENDING_ITEM_PAIRS!.get(block) === pair) PENDING_ITEM_PAIRS!.delete(block);
+	const parent = node.parentNode;
+	if (block.disposed || block.startMarker !== node || parent === null) return;
+	parent.insertBefore(start, node);
+	parent.insertBefore(end, node.nextSibling);
+	block.startMarker = start;
+	block.endMarker = end;
 }
 
 // `reconcileKeyed` item body for one de-opt array element. A pure host/text item
@@ -36547,6 +36583,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
 	if (needsBlocks || !hostItem) promoteSelfMarkedItem(block);
+	const [itemStart, itemEnd] = itemRange(block);
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
 	// for hooks/reconciliation, which the raw host reconciler can't give it. Delegate to a
@@ -36613,16 +36650,16 @@ function deoptItemBody(item: any, scope: Scope): void {
 		if (
 			hydration === null &&
 			scope.slots[0] === undefined &&
-			block.startMarker !== null &&
-			block.endMarker !== null &&
-			block.startMarker !== block.endMarker &&
-			block.startMarker.nodeType === 8 /* COMMENT_NODE */ &&
-			block.endMarker.nodeType === 8
+			itemStart !== null &&
+			itemEnd !== null &&
+			itemStart !== itemEnd &&
+			itemStart.nodeType === 8 /* COMMENT_NODE */ &&
+			itemEnd.nodeType === 8
 		) {
 			const borrowed: ChildSlot = {
 				__kind: 'childSlot',
-				start: block.startMarker as Comment,
-				end: block.endMarker as Comment,
+				start: itemStart as Comment,
+				end: itemEnd as Comment,
 				ownerHost: null,
 				borrowed: true,
 				compactable: false,
@@ -36649,17 +36686,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// The surrounding list already consumed this descriptor's key. Suppress
 		// the keyed-single list normalization in the nested slot or the same
 		// descriptor would recursively wrap itself forever.
-		childSlot(
-			scope,
-			0,
-			block.parentNode,
-			item,
-			block.endMarker,
-			undefined,
-			undefined,
-			undefined,
-			false,
-		);
+		childSlot(scope, 0, block.parentNode, item, itemEnd, undefined, undefined, undefined, false);
 		return;
 	}
 	// Switching Blocks → pure: unmount the childSlot content the Blocks path mounted
@@ -36669,16 +36696,16 @@ function deoptItemBody(item: any, scope: Scope): void {
 		scope.slots[0] !== null &&
 		(scope.slots[0] as any).__kind === 'childSlot'
 	) {
-		childSlot(scope, 0, block.parentNode, null, block.endMarker);
+		childSlot(scope, 0, block.parentNode, null, itemEnd);
 	}
 	// Pure host/text item → reconcile in place, REUSING the item's existing node so
 	// DOM-resident state (input value, focus, …) survives a re-render. The reuse
 	// candidate is the node from last render (block.deoptNode); on the very first
 	// render under hydration it's instead the server node in the item range (adopt it).
-	const endM = block.endMarker;
+	const endM = itemEnd;
 	let prev = block.deoptNode;
 	if (prev === null && hydration !== null) {
-		const startM = block.startMarker;
+		const startM = itemStart;
 		prev = startM != null ? getNextSibling(startM) : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
@@ -36738,9 +36765,9 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// The keyed list's own commit entry, which runs first, still moves or
 		// removes the item by the node it shows now. (A non-host new value never
 		// reaches here self-marked — the promotion above minted a pair first.)
-		if (landing !== null && block.startMarker === prev) {
+		if (landing !== null && itemStart === prev) {
 			landing.bound = [block, prev, prev, node, node];
-		} else if (prev !== null && block.startMarker === prev) {
+		} else if (prev !== null && itemStart === prev) {
 			journalRootProperty(block, 'startMarker', block.startMarker);
 			journalRootProperty(block, 'endMarker', block.endMarker);
 			block.startMarker = node;
@@ -36851,7 +36878,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 				item.type,
 				item.props,
 				item.__octaneInvocationSite,
-				block.endMarker,
+				itemRange(block)[1],
 				true,
 				hydrating ? activeHydration() === null : true,
 			);
@@ -36861,20 +36888,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 		// An exotic map may replace a keyed component with a host or empty value.
 		// Preserve the item's boundaries before disposing its self-marked child;
 		// the ordinary descriptor reconciler can then fill that same keyed range.
-		const root = block.startMarker;
-		if (
-			root !== null &&
-			root === block.endMarker &&
-			root.nodeType !== 8 &&
-			root.parentNode !== null
-		) {
-			const start = document.createComment('it');
-			const end = document.createComment('/it');
-			root.parentNode!.insertBefore(start, root);
-			root.parentNode!.insertBefore(end, getNextSibling(root));
-			block.startMarker = start;
-			block.endMarker = end;
-		}
+		promoteSelfMarkedItem(block);
 		disposeReturnSlot(block, state);
 		block.deoptNode = null;
 	}
@@ -37248,6 +37262,33 @@ function teardownChildForSlot(state: ChildSlot): void {
 	fs.tail = null;
 	fs.size = 0;
 	state.forSlot = null;
+}
+
+/**
+ * Whether childSlot's pure-host → blocks upgrade adopts `host` for `d`: the same
+ * element type in the same namespace, with no raw HTML on either side.
+ */
+function adoptsPureHost(host: Node, d: ElementDescriptor, domParent: Node): boolean {
+	return (
+		host.nodeType === 1 /* Element */ &&
+		isElementDescriptor(d) &&
+		typeof d.type === 'string' &&
+		isHostElementOfType(host as Element, d.type) &&
+		(host as Element).namespaceURI ===
+			(inferTagNs(d.type, deoptChildNamespace(domParent)) ?? HTML_NS) &&
+		!hasDangerHTML(d.props) &&
+		!hasDangerHTML(getDeoptDesc(host)?.props ?? null)
+	);
+}
+
+/** A markerless slot's pair, around the host it adopted: [host, start, end, parentBlock]. */
+function landHostPair(pair: any[]): void {
+	const [host, start, end, parentBlock] = pair as [Node, Comment, Comment, Block];
+	const parent = host.parentNode;
+	if (parent === null) return;
+	parent.insertBefore(start, host);
+	parent.insertBefore(end, host.nextSibling);
+	replaceSharedBlockBoundary(parentBlock, host, host, start, end);
 }
 
 // One-shot handoff for the pure-host → blocks upgrade (see childSlot's upgrade
@@ -38836,16 +38877,16 @@ export function childSlot(
 		const end = document.createComment('');
 		const host = state.hostNode;
 		const p = host === null ? null : host.parentNode;
-		if (
-			p !== null &&
-			typeof elementType !== 'string' &&
-			ROOT_RENDER_TRANSACTION !== null &&
-			usesFrontier(parentBlock, p)
-		) {
+		// A host descriptor of the host's own type adopts it (the pure-host
+		// upgrade below); a lone keyed host keeps the list regime's in-place pair.
+		const adopts =
+			host !== null &&
+			typeof elementType === 'string' &&
+			(preparedList !== null || adoptsPureHost(host, value as ElementDescriptor, domParent));
+		if (p !== null && !adopts && ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, p)) {
 			// Over committed DOM the pair, and whatever this render puts in it, take
 			// the host's place at commit: the rest of this call renders into the
-			// slot's frontier, as a fresh slot's does (freshSlotEnd). A host
-			// descriptor can adopt the host instead (the pure-host upgrade below).
+			// slot's frontier, as a fresh slot's does (freshSlotEnd).
 			const frag = slotFrontier(state, parentBlock, p, null);
 			frag.append(start, end);
 			const pending = state.next!;
@@ -38855,6 +38896,18 @@ export function childSlot(
 				pending.bound = [parentBlock, host, host, start, end];
 			state.hostNode = null;
 			domParent = frag;
+		} else if (
+			p !== null &&
+			adopts &&
+			preparedList === null &&
+			hydration === null &&
+			ROOT_RENDER_TRANSACTION !== null &&
+			usesFrontier(parentBlock, p)
+		) {
+			// The pure-host upgrade below adopts the host in place. Its commit puts
+			// the pair around it, after any move of the host by its list, and only
+			// then hands the shared bound over (landHostPair).
+			ROOT_RENDER_TRANSACTION.ops.push(landHostPair, [host, start, end, parentBlock]);
 		} else if (p !== null) {
 			p.insertBefore(start, host);
 			p.insertBefore(end, getNextSibling(host!));
@@ -39168,13 +39221,7 @@ export function childSlot(
 			comp === (hostElementBody as unknown as ComponentBody) &&
 			state.block === null &&
 			state.hostNode !== null &&
-			state.hostNode.nodeType === 1 /* Element */ &&
-			isHostElementOfType(state.hostNode as Element, (props as ElementDescriptor).type as string) &&
-			(state.hostNode as Element).namespaceURI ===
-				(inferTagNs((props as ElementDescriptor).type as string, deoptChildNamespace(domParent)) ??
-					HTML_NS) &&
-			!hasDangerHTML((props as ElementDescriptor).props) &&
-			!hasDangerHTML(getDeoptDesc(state.hostNode)?.props ?? null)
+			adoptsPureHost(state.hostNode, props as ElementDescriptor, domParent)
 		) {
 			const el = state.hostNode as Element;
 			state.hostNode = null;
@@ -39218,7 +39265,8 @@ export function childSlot(
 				parentBlock.forSlot !== null &&
 				!parentBlock.exclusiveMarkers &&
 				state.borrowed &&
-				sharesBlockBoundary(parentBlock, state.start, state.end);
+				(sharesBlockBoundary(parentBlock, state.start, state.end) ||
+					itemRange(parentBlock)[1] === state.end);
 			const implicitBail = !isBodyFn || isChildrenBlock(comp);
 			const frag = slotFrontier(
 				state,
@@ -41248,6 +41296,21 @@ export function errorBlock(
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	let state = parentScope.slots[slotKey] as ErrorSlot | undefined;
+	// A boundary new under committed DOM builds in a frontier, as tryBlock's does.
+	if (
+		state === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		parentBlock.createdStamp !== ROOT_RENDER_TRANSACTION.createdStamp
+	) {
+		const end = freshSlotEnd(parentBlock, domParent, anchor);
+		if (end !== null) {
+			try {
+				return errorBlock(parentScope, slotKey, end.parentNode!, tryBody, catchBody, end, env);
+			} finally {
+				settleFreshSlot(parentScope, end, anchor);
+			}
+		}
+	}
 	if (state === undefined) {
 		const passthrough = hydration?.passthroughRanges === true;
 		// As the server frames every boundary, a missing range is a mismatch,
@@ -41827,6 +41890,13 @@ function restartUncommittedTry(state: TrySlot): Block | null {
 	withRefDetachSuppression(refs, () => unmountBlock(old));
 	if (state.parentBlock.disposed || state.tryBlock !== null || state.branch !== 2) return null;
 	return mountHiddenTryBody(state);
+}
+
+/** Mount a discarded primary hidden and retry it, in one render (attachResume). */
+function remountHiddenPrimary(state: TrySlot): void {
+	mountHiddenTryBody(state);
+	if (state.hiddenDom !== null) attemptHiddenReveal(state, 'urgent', 'retry');
+	else commitResume(state);
 }
 
 /** A new primary can render speculatively without destroying its visible fallback. */
@@ -43901,8 +43971,10 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 		if (state.branch === 2 && (state.tryBlock === null || state.tryBlock.disposed)) {
 			// Failed initial adoption discarded its primary. Start client recovery
 			// now, including dependent data discovery, but retain the fallback until
-			// the completed retry can commit under the same root-owned budget.
-			mountHiddenTryBody(state);
+			// the completed retry can commit under the same root-owned budget. The
+			// new hidden primary lands with that retry's commit.
+			inBoundaryRender(state, remountHiddenPrimary);
+			return;
 		}
 		if (state.hiddenDom !== null) {
 			attemptHiddenReveal(state, 'urgent', 'retry');

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createElement, createRoot, startTransition, use } from '../src/index.js';
+import { createElement, createRoot, flushSync, startTransition, use } from '../src/index.js';
 import { act, mount, type MountResult } from './_helpers';
 import {
 	ActivityApp,
 	BoundaryArmsApp,
 	BranchProbeApp,
+	LateBoundaryApp,
 	ListProbeApp,
 	OutsideApp,
 	ResumeApp,
@@ -838,4 +839,142 @@ describe('boundary arms change at commit', () => {
 			}
 		});
 	}
+});
+
+// Count the comment markers named `data` in `root`.
+function markers(root: Node, data: string): number {
+	let count = 0;
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+	for (let node = walker.nextNode(); node !== null; node = walker.nextNode())
+		if ((node as Comment).data === data) count++;
+	return count;
+}
+
+describe('a late error boundary', () => {
+	it('builds an error boundary new under committed DOM off-document', async () => {
+		let resolve!: (value: string) => void;
+		const value = new Promise<string>((done) => {
+			resolve = done;
+		});
+		let during: number | null = null;
+		const app = mount(LateBoundaryApp, {
+			value,
+			probe: () => {
+				during = markers(app.container, 'try');
+			},
+		});
+		try {
+			expect(app.find('#late-pending').textContent).toBe('pending');
+			const before = markers(app.container, 'try');
+			await act(() => resolve('late'));
+			// The resumed render built the new boundary's markers off-document; its
+			// commit inserted them with the content.
+			expect(during).toBe(before);
+			expect(markers(app.container, 'try')).toBe(before + 1);
+			expect(app.find('#late-value').textContent).toBe('late');
+		} finally {
+			app.unmount();
+		}
+	});
+});
+
+// A de-opt list through a value hole, ending in a component that observes the
+// DOM while its siblings render.
+function DeoptChip(props: { id: string }) {
+	return createElement('mark', { id: props.id }, 'chip ' + props.id);
+}
+
+// Every comment in `root`.
+function comments(root: Node): number {
+	let count = 0;
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+	while (walker.nextNode() !== null) count++;
+	return count;
+}
+
+function DeoptList(props: { items: unknown[] }) {
+	return createElement('ul', { id: 'deopt' }, props.items);
+}
+
+function ProbeChip(props: { probe: () => void }) {
+	props.probe();
+	return createElement('mark', { id: 'in' }, 'chip in');
+}
+
+describe('de-opt markers change at commit', () => {
+	it('promotes a self-marked item to its marker pair at commit', () => {
+		let observing = false;
+		let during: MutationRecord[] | null = null;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		// A fresh descriptor each render, so the probe renders after its siblings.
+		const probe = () =>
+			createElement(DeoptProbe, {
+				key: 'probe',
+				probe: () => {
+					if (observing) during = observer.takeRecords();
+				},
+			});
+		const pure = createElement('li', { key: 'a', id: 'a' }, 'a');
+		const chip = createElement(DeoptChip, { key: 'a', id: 'a' });
+		const app = mount(DeoptList as any, {
+			items: [pure, createElement('li', { key: 'b' }, 'b'), probe()],
+		});
+		try {
+			const ul = app.find('#deopt');
+			const before = comments(ul);
+			observer.observe(app.container, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				characterData: true,
+			});
+			observing = true;
+			app.update(DeoptList as any, {
+				items: [chip, createElement('li', { key: 'b' }, 'b'), probe()],
+			});
+			// The item rendered its component against the pair its commit lands.
+			expect(during).toEqual([]);
+			expect(app.find('#a').textContent).toBe('chip a');
+			expect(comments(ul)).toBe(before + 2);
+		} finally {
+			observer.disconnect();
+			app.unmount();
+		}
+	});
+
+	it('adopts an upgraded root host and lands its marker pair at commit', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		let during: MutationRecord[] | null = null;
+		const observer = new MutationObserver(() => {});
+		const probe = () => {
+			during = observer.takeRecords();
+		};
+		try {
+			// A lone pure host renders markerless at the root.
+			flushSync(() => root.render(createElement('div', { id: 'upgrade' }, 'plain')));
+			const host = container.querySelector('#upgrade');
+			expect(comments(container)).toBe(0);
+			observer.observe(container, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				characterData: true,
+			});
+			flushSync(() =>
+				root.render(createElement('div', { id: 'upgrade' }, createElement(ProbeChip, { probe }))),
+			);
+			// The upgrade adopted the host; its pair joined it with the commit.
+			expect(during).toEqual([]);
+			expect(container.querySelector('#upgrade')).toBe(host);
+			expect(container.querySelector('#in')!.textContent).toBe('chip in');
+			expect(comments(container)).toBeGreaterThan(0);
+		} finally {
+			observer.disconnect();
+			root.unmount();
+			container.remove();
+		}
+	});
 });
