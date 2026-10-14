@@ -1868,7 +1868,11 @@ function scheduleNativeRead(target: Block): void {
 	// Native reads belong to a versioned publication frame. Invalidating an
 	// already-held primary retries that frame coherently; it does not supersede
 	// the user's transition like an urgent hook/store update.
-	const retainPriority = !!SCHEDULED_VISIBILITY_DRIVER?.holdsNativeRead(target);
+	// `X && X.y` rather than `X?.y`: a minifier folds the guard when the driver is unused.
+	const retainPriority =
+		SCHEDULED_VISIBILITY_DRIVER && SCHEDULED_VISIBILITY_DRIVER.holdsNativeRead(target)
+			? true
+			: false;
 	if (retainPriority) TRANSITION_DEPTH++;
 	try {
 		// A notification delivered during a flush, such as an accepted render
@@ -1909,13 +1913,16 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 	const block = CURRENT_BLOCK;
 	// Native reads open the invocation frame before a facade can be read.
 	const declared =
-		declaring === undefined ? undefined : NATIVE_READ_DRIVER?.enclosingInvocation(declaring);
+		declaring === undefined || !NATIVE_READ_DRIVER
+			? undefined
+			: NATIVE_READ_DRIVER.enclosingInvocation(declaring);
 	const capture =
 		declared === undefined ? WIP_CAPTURE : (declared.capture as OffscreenCapture | null);
 	// Outside a render, or in a render that publishes without a capture, a
 	// declaration applies immediately.
 	if (block === null || capture === null || ROOT_RENDER_ROLLBACK) return undefined;
-	const invocation = declared ?? NATIVE_READ_DRIVER?.invocation(block);
+	const invocation =
+		declared ?? (NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.invocation(block) : undefined);
 	const current = invocation?.invocationData as SignalDeclarationRenderStage | null | undefined;
 	if (current != null && !current.settled && current.capture === capture) return current;
 	const callbacks: Array<(discarded: boolean) => void> = [];
@@ -1967,7 +1974,7 @@ function inspectNativeReadScope(
 ): import('./devtools-hook.js').DevtoolsNativeReadInspection | null {
 	const current = scope as Scope;
 	// Installed only in profiling builds, where the driver and retries inspect.
-	const inspection = NATIVE_READ_DRIVER?.inspectScope!(current);
+	const inspection = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.inspectScope!(current) : undefined;
 	const block = inspection?.block ?? current.block;
 	const retry =
 		NATIVE_BLOCK_RETRIES?.get(block)?.inspect!() ??
