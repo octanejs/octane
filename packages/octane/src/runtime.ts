@@ -35472,8 +35472,13 @@ function reconcileDeoptNode(
 				defer = true;
 				pending = pendingDeoptOrder(el);
 				desc = changedDeoptRecord(el, value, pending);
-			} else
+			} else {
 				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
+				// Hydration orders an adopted host's children at commit, after what
+				// its reconcile removes.
+				if (hydrating && activeHydration() !== null && ROOT_RENDER_TRANSACTION !== null)
+					defer = true;
+			}
 		} else {
 			// What hydration builds here, as in a `<noscript>` whose server content
 			// is text, is client DOM: it builds with adoption suspended.
@@ -46016,6 +46021,13 @@ function setActivitySuspenseHandler(state: ActivitySlot, hidden: boolean): void 
 	}
 }
 
+/** Give an Activity whose client tree landed from a frontier its adopted markers back. */
+function restoreActivityRange([block, start, end]: [Block, Comment, Comment]): void {
+	if (block.disposed) return;
+	block.startMarker = start;
+	block.endMarker = end;
+}
+
 function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVersion: number): void {
 	enqueueEffectEventCommitAction(() => {
 		if (
@@ -46147,8 +46159,16 @@ export function activityBlock(
 			if (wantHidden) setActivitySuspenseHandler(state, true);
 			hydration.deferredActivities.push(() => {
 				if (b.disposed) return;
+				// The client tree builds off-document and lands between the adopted
+				// markers at commit, which hides it there.
+				if (ROOT_RENDER_TRANSACTION !== null) {
+					const frag = queueFrontier(b, domParent, bEnd);
+					b.parentNode = frag;
+					b.startMarker = b.endMarker = null;
+					noteFrontierMember(frag, b);
+					atCommit(restoreActivityRange, [b, bStart, bEnd]);
+				}
 				hydration.suspend(() => (state!.hidden ? renderHiddenActivity(state!) : renderBlock(b)));
-				// The client tree lands at commit: hide it there.
 				if (state!.hidden) atCommit(hideActivityRange, state!);
 			});
 			hydration.parkPast(bEnd, parentScope);
