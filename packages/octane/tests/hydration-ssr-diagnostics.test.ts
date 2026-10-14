@@ -173,6 +173,30 @@ describe('SSR hydration diagnostics', () => {
 			expect(diagnosticLines(write)).toEqual([]);
 		}));
 
+	it('traces the compiled provider that rejected invalid children', () =>
+		diagnosticCase(async () => {
+			vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '1');
+			const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+			await expect(
+				renderHydrationFixture(
+					'testing-library',
+					'packages/octane/tests/_fixtures/compiled-boundaries.tsrx',
+					'CheckedProvider',
+					{ children: 'not compiled template children' },
+				),
+			).rejects.toThrow('CompiledContext requires compiled template children');
+			const lines = diagnosticLines(write);
+			expect(lines).toHaveLength(1);
+			const diagnostic = JSON.parse(lines[0].slice('[OCTANE_HYDRATION_SSR_TRACE] '.length));
+			expect(diagnostic).toMatchObject({ incomplete: false, diagnosticErrors: 0 });
+			expect(diagnostic.providerWrites).toHaveLength(1);
+			const provider = diagnostic.providerWrites[0];
+			expect(provider.nonNull).toBe(true);
+			expect(diagnostic.events).toContainEqual(
+				expect.objectContaining({ kind: 'context-created', context: provider.context }),
+			);
+		}));
+
 	it('keeps the original thrown object even if diagnostic output is unavailable', () =>
 		diagnosticCase(async () => {
 			vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '1');
