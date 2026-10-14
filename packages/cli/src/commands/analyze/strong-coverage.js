@@ -29,6 +29,11 @@ export const STALE = 'OCTANE_STRONG_COVERAGE_STALE';
  * @property {(source: string, absolute: string) => StrongStatus} status
  * @property {(source: string) => string | null} jsxPragma the leading
  *   `@jsxImportSource` module, read by the compiler's own scanner
+ * @property {((source: string, absolute: string) => ModulePackage) | null} modulePackage
+ *   the package that owns a module and whether Octane compiles it; `null`
+ *   when the installed octane predates the answer
+ *
+ * @typedef {{ name: string | null, root: string | null, compiled: boolean }} ModulePackage
  *
  * @typedef {Object} CoverageModule
  * @property {string} file project-relative, `/`-separated
@@ -111,6 +116,10 @@ export async function loadStrongPolicy(project, { required }) {
 			configured,
 			status: (source, absolute) => compiler.strongModuleStatus(source, absolute),
 			jsxPragma: bundler.findLeadingJsxImportSourcePragma,
+			modulePackage:
+				typeof compiler.modulePackage === 'function'
+					? (source, absolute) => compiler.modulePackage(source, absolute)
+					: null,
 		},
 	};
 }
@@ -136,35 +145,74 @@ export async function loadJsxPragma(root) {
 }
 
 /**
- * An import of octane or one of its subpaths, capturing its clause. The clause
- * may span lines but never reaches into the next `import`, so a semicolon-free
- * module cannot borrow a later import's specifier.
+ * Comments and template literals, whose text is not code, and quoted strings,
+ * which can hold either opener. A template's `${}` is code, but nothing a
+ * statement scanner reads lives there, and a nested template's backticks pair
+ * up inside it.
  */
-const OCTANE_IMPORT =
-	/^\s*import\s+((?:(?!\bimport\b)[^;])*?)\s*\bfrom\s*['"]octane(?:\/[^'"]*)?['"]/gm;
+const TEXT =
+	/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:\\.|[^'\\\n])*'?|"(?:\\.|[^"\\\n])*"?|`(?:\\[\s\S]|[^`\\])*`?/g;
 
 /**
- * Does the module import a runtime binding from octane? TypeScript erases an
- * `import type` clause and a named clause whose every specifier is
- * `type`-marked, so neither leaves anything for the compiler to slot. A
- * default or namespace binding, or any unmarked specifier, survives. Comments
- * in the clause are not specifiers, so they are dropped before it is read.
+ * `source` with comment and template literal text blanked, so a statement
+ * scanner never reads code that is only text, such as a code sample in a
+ * template string. Line breaks stay, and so do a template's backticks, so a
+ * tagged template never reads as a bare name. Quoted strings stay: a specifier
+ * is one, and one ends at its line, so it cannot hold a statement.
  *
  * @param {string} source
  */
-function importsOctaneAtRuntime(source) {
-	for (const [, authored] of source.matchAll(OCTANE_IMPORT)) {
-		const clause = authored.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ' ').trim();
-		if (/^type\b/.test(clause)) continue;
-		const named = /^\{([\s\S]*)\}$/.exec(clause);
-		if (named === null) return true;
-		const specifiers = named[1]
-			.split(',')
-			.map((specifier) => specifier.trim())
-			.filter(Boolean);
-		if (!specifiers.every((specifier) => /^type\s/.test(specifier))) return true;
+export function codeOnly(source) {
+	return source.replace(TEXT, (text) =>
+		text[0] === "'" || text[0] === '"'
+			? text
+			: text.replace(text[0] === '`' ? /[^\n`]/g : /[^\n]/g, ' '),
+	);
+}
+
+/**
+ * An `import … from` or `export … from` statement, capturing its keyword,
+ * clause, and specifier. The clause may span lines but never reaches into the
+ * next statement of either kind, so a semicolon-free module cannot borrow a
+ * later statement's specifier.
+ */
+const STATIC_REQUEST =
+	/^\s*(import|export)\s+((?:(?!\b(?:import|export)\b)[^;])*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm;
+
+/**
+ * The module's imports and re-exports that bind something at runtime, each
+ * with the names it binds as `[name in the target, name here]` pairs, where
+ * `*` stands for the whole target (`* as ns`) or, on both sides, everything it
+ * exports (`export *`). TypeScript erases a `type` clause and every
+ * `type`-marked specifier, so a clause left with no binding leaves no request
+ * behind.
+ *
+ * @param {string} source
+ * @returns {{ request: string, reexport: boolean, bindings: [string, string][] }[]}
+ */
+export function runtimeRequests(source) {
+	const requests = [];
+	for (const [, keyword, authored, request] of codeOnly(source).matchAll(STATIC_REQUEST)) {
+		const clause = authored.trim();
+		const reexport = keyword === 'export';
+		// A re-export clause opens with `*` or `{`; anything else is a
+		// declaration that happens to spell `from '…'`.
+		if (/^type\b/.test(clause) || (reexport && !/^[*{]/.test(clause))) continue;
+		/** @type {[string, string][]} */
+		const bindings = [];
+		const named = /\{([\s\S]*)\}/.exec(clause);
+		for (const specifier of named?.[1].split(',') ?? []) {
+			const [name, local = name] = specifier.trim().split(/\s+as\s+/);
+			if (name && !/^type\s/.test(name)) bindings.push([name.replace(/^['"]|['"]$/g, ''), local]);
+		}
+		const outside = clause.replace(/\{[\s\S]*\}/, '');
+		const namespace = /\*(?:\s+as\s+([\w$]+))?/.exec(outside);
+		if (namespace !== null) bindings.push(['*', namespace[1] ?? '*']);
+		const defaultName = /^([\w$]+)\s*(?:,|$)/.exec(outside.trim());
+		if (defaultName !== null) bindings.push(['default', defaultName[1]]);
+		if (bindings.length > 0) requests.push({ request, reexport, bindings });
 	}
-	return false;
+	return requests;
 }
 
 /**
@@ -197,7 +245,11 @@ export function isOctaneModule(absolute, source, jsxImportSource, policy) {
 		if (pragma !== null) return isOctaneJsxSource(pragma);
 		return jsxImportSource === undefined || isOctaneJsxSource(jsxImportSource);
 	}
-	if (extension === '.ts' || extension === '.js') return importsOctaneAtRuntime(source);
+	if (extension === '.ts' || extension === '.js') {
+		return runtimeRequests(source).some(
+			({ request, reexport }) => !reexport && /^octane(?:\/|$)/.test(request),
+		);
+	}
 	return false;
 }
 

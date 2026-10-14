@@ -1,14 +1,17 @@
 import { createLexicalAnalysis } from './compile-universal.js';
-import {
-	checkStrongHTMLValue,
-	strongHTMLSpreadWriter,
-	STRONG_UNTRUSTED_HTML,
-	STRONG_HTML_MESSAGE,
-	mayHaveStrongHTML,
-} from './strong-html.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 const COMPAT_EXPORTS = new Set(['flushSync', 'unstable_batchedUpdates', 'StrictMode']);
+// APIs that build or inspect element descriptors, by import source.
+const ELEMENT_EXPORTS = new Set([
+	'createElement',
+	'cloneElement',
+	'isValidElement',
+	'Children',
+	'descriptorChildren',
+]);
+const JSX_RUNTIME_EXPORTS = new Set(['jsx', 'jsxs', 'jsxDEV', 'Fragment']);
+const JSX_RUNTIME = /^octane\/(?:strong\/)?jsx(?:-dev)?-runtime$/;
 const SUPPRESSION_PROPS = new Set(['suppressHydrationWarning', 'suppressNativeChangeWarning']);
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration']);
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
@@ -29,11 +32,6 @@ export function createStrongTemplatePolicy({
 	const pending = [];
 	const seen = new WeakMap();
 	const jsxReturns = new WeakMap();
-	// Import and property names may contain Unicode/hex/identity escapes or
-	// quoted line continuations. Newline string escapes cannot spell these names.
-	const mayHaveHTML =
-		mayHaveStrongHTML(source) &&
-		(source.includes('createElement') || /\\(?:u|x|[ceaElm]|[\r\n\u2028\u2029])/.test(source));
 	const templateDialect = /\.tsrx(?:[?#]|$)/.test(filename);
 	const domAt =
 		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
@@ -43,6 +41,62 @@ export function createStrongTemplatePolicy({
 		if (!codes) seen.set(node, (codes = new Set()));
 		codes.add(code);
 		pending.push({ code, node, message });
+	}
+	function elementApi(name, node) {
+		add(
+			'OCTANE_STRONG_ELEMENT_API',
+			node,
+			`\`${name}\` builds or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates. Write template JSX, pass the component itself (\`icon={Plus}\`), or pass a \`() => @{ … }\` render function.`,
+		);
+	}
+	function namespaceAccess(name, node) {
+		if (COMPAT_EXPORTS.has(name))
+			add(
+				'OCTANE_STRONG_COMPAT_IMPORT',
+				node,
+				`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
+			);
+		else if (ELEMENT_EXPORTS.has(name)) elementApi(name, node);
+	}
+	// `[value]`, but not `[a, b]`, `[...rows]`, or a hole.
+	function singleItemArray(expression) {
+		const node = unwrap(expression);
+		return (
+			node?.type === 'ArrayExpression' &&
+			node.elements.length === 1 &&
+			node.elements[0] != null &&
+			node.elements[0].type !== 'SpreadElement'
+		);
+	}
+	function singleItemFor(node) {
+		add(
+			'OCTANE_STRONG_SINGLE_ITEM_FOR',
+			node,
+			'`@for` over a one-item array renders a single row. To remount a subtree when a value changes, key it as in React: wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly.',
+		);
+	}
+	// `const` declarations of one-item literals, and `@for` iterables that are
+	// identifiers, as the visitor meets them.
+	const singleItemConstants = new Set();
+	const iteratedNames = new Set();
+	// A loop over `const rows = [value]` is still one row when no other
+	// identifier in the module spells `rows`, so nothing can add a row or shadow it.
+	function reportSingleItemAliases() {
+		const names = new Set();
+		for (const id of singleItemConstants) names.add(id.name);
+		(function walk(node) {
+			if (!node || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) walk(child);
+				return;
+			}
+			if (node.type === 'Identifier' && !singleItemConstants.has(node) && !iteratedNames.has(node))
+				names.delete(node.name);
+			for (const key in node)
+				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) walk(node[key]);
+		})(ast);
+		for (const identifier of iteratedNames)
+			if (names.has(identifier.name)) singleItemFor(identifier);
 	}
 	function checkKey(expression, scope) {
 		const node = unwrap(expression);
@@ -184,23 +238,30 @@ export function createStrongTemplatePolicy({
 		}
 	}
 	function visit(node, scope) {
-		if (
-			node.type === 'ImportDeclaration' &&
-			(node.source?.value === 'octane' || node.source?.value === 'octane/server') &&
-			node.importKind !== 'type'
-		) {
+		if (node.type === 'ImportDeclaration' && node.importKind !== 'type') {
+			const request = node.source?.value;
+			const octane = request === 'octane' || request === 'octane/server';
+			const elements = octane
+				? ELEMENT_EXPORTS
+				: JSX_RUNTIME.test(request)
+					? JSX_RUNTIME_EXPORTS
+					: null;
 			for (const specifier of node.specifiers ?? []) {
 				const name = specifier.imported?.name ?? specifier.imported?.value;
-				if (specifier.importKind !== 'type' && COMPAT_EXPORTS.has(name))
+				if (specifier.importKind === 'type') continue;
+				if (octane && COMPAT_EXPORTS.has(name))
 					add(
 						'OCTANE_STRONG_COMPAT_IMPORT',
 						specifier,
 						`\`${name}\` is a compatibility API. Strong mode uses Octane's normal scheduling and component semantics; remove this import.`,
 					);
+				else if (elements?.has(name)) elementApi(name, specifier);
 			}
 		} else if (node.type === 'VariableDeclaration') {
 			for (const declaration of node.declarations) {
 				const value = unwrap(declaration.init);
+				if (node.kind === 'const' && declaration.id.type === 'Identifier' && singleItemArray(value))
+					singleItemConstants.add(declaration.id);
 				if (
 					declaration.id.type !== 'ObjectPattern' ||
 					value?.type !== 'Identifier' ||
@@ -212,53 +273,22 @@ export function createStrongTemplatePolicy({
 					const name = property.computed
 						? staticPrimitiveValue(property.key, scope)
 						: (property.key.name ?? property.key.value);
-					if (COMPAT_EXPORTS.has(name))
-						add(
-							'OCTANE_STRONG_COMPAT_IMPORT',
-							property.key,
-							`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
-						);
+					namespaceAccess(name, property.key);
 				}
 			}
 		} else if (node.type === 'MemberExpression') {
 			const object = unwrap(node.object);
 			const name = node.computed ? staticPrimitiveValue(node.property, scope) : node.property?.name;
-			if (
-				object?.type === 'Identifier' &&
-				resolve(scope, object.name)?.kind === 'namespace' &&
-				COMPAT_EXPORTS.has(name)
-			)
-				add(
-					'OCTANE_STRONG_COMPAT_IMPORT',
-					node,
-					`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
-				);
+			if (object?.type === 'Identifier' && resolve(scope, object.name)?.kind === 'namespace')
+				namespaceAccess(name, node);
 		} else if (node.type === 'CallExpression') {
 			const callee = unwrap(node.callee);
-			const calleeBinding =
-				mayHaveHTML && callee?.type === 'Identifier' ? resolve(scope, callee.name) : null;
-			const receiver = callee?.type === 'MemberExpression' ? unwrap(callee.object) : null;
 			const name =
 				callee?.type === 'MemberExpression'
 					? callee.computed
 						? staticPrimitiveValue(callee.property, scope)
 						: callee.property?.name
 					: null;
-			const isElementFactory =
-				mayHaveHTML &&
-				((calleeBinding?.kind === 'hook' && calleeBinding.hook === 'createElement') ||
-					(name === 'createElement' &&
-						receiver?.type === 'Identifier' &&
-						resolve(scope, receiver.name)?.kind === 'namespace'));
-			if (
-				isElementFactory &&
-				typeof staticPrimitiveValue(node.arguments[0], scope) === 'string' &&
-				domAt(node)
-			) {
-				checkStrongHTMLValue(strongHTMLSpreadWriter(node.arguments[1]), (value) =>
-					add(STRONG_UNTRUSTED_HTML, value, STRONG_HTML_MESSAGE),
-				);
-			}
 			if (
 				templateDialect &&
 				callee?.type === 'MemberExpression' &&
@@ -270,6 +300,10 @@ export function createStrongTemplatePolicy({
 					node,
 					'Use a keyed `@for` block to render a list instead of `.map()` returning JSX. Choose a stable item identity for its key.',
 				);
+		} else if (node.type === 'JSXForExpression') {
+			const iterable = unwrap(node.right);
+			if (singleItemArray(iterable)) singleItemFor(node.right);
+			else if (iterable?.type === 'Identifier') iteratedNames.add(iterable);
 		} else if (node.type === 'JSXOpeningElement') {
 			let root = node.name;
 			let member = null;
@@ -280,14 +314,9 @@ export function createStrongTemplatePolicy({
 			if (
 				member &&
 				root?.type === 'JSXIdentifier' &&
-				resolve(scope, root.name)?.kind === 'namespace' &&
-				COMPAT_EXPORTS.has(member.property.name)
+				resolve(scope, root.name)?.kind === 'namespace'
 			)
-				add(
-					'OCTANE_STRONG_COMPAT_IMPORT',
-					member,
-					`\`${member.property.name}\` is a compatibility API. Remove this access in Strong mode.`,
-				);
+				namespaceAccess(member.property.name, member);
 			if (node.name?.type !== 'JSXIdentifier' || !/^[a-z]/.test(node.name.name) || !domAt(node))
 				return;
 			for (const attribute of node.attributes ?? []) {
@@ -301,6 +330,7 @@ export function createStrongTemplatePolicy({
 		enterKey: checkKey,
 		exitKey() {},
 		finish() {
+			if (singleItemConstants.size !== 0 && iteratedNames.size !== 0) reportSingleItemAliases();
 			for (const { code, node, message } of pending) report(code, node, message);
 		},
 	};

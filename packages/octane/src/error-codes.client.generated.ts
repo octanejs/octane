@@ -307,7 +307,10 @@ type ClientErrorArguments = {
 	343: [];
 	344: [];
 	345: [];
-	346: [unknown];
+	346: [];
+	347: [];
+	348: [];
+	349: [unknown];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1348,15 +1351,27 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 344:
 				return formatDevErrorMessage(
-					'The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.',
+					'Provide a compiled context with <CompiledContext context={context}>.',
 					args,
 				);
 			case 345:
+				return formatDevErrorMessage('CompiledContext requires compiled template children.', args);
+			case 346:
+				return formatDevErrorMessage(
+					'CompiledOutlet requires a compiled component function with no returned renderable.',
+					args,
+				);
+			case 347:
+				return formatDevErrorMessage(
+					'The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.',
+					args,
+				);
+			case 348:
 				return formatDevErrorMessage(
 					"Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
 					args,
 				);
-			case 346:
+			case 349:
 				return formatDevErrorMessage(
 					'A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.',
 					args,

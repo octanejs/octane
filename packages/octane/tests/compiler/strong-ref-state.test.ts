@@ -12,7 +12,7 @@ type Diagnostic = {
 	suggestions?: { hook?: string }[];
 };
 
-function errors(source: string, filename = '/src/App.tsx') {
+function errors(source: string, filename = '/src/App.tsrx') {
 	const { diagnostics, error } = collectDiagnostics(`"use strong";\n${source}`, filename);
 	expect(error, String(error)).toBe(null);
 	return (diagnostics as Diagnostic[]).filter((diagnostic) => diagnostic.severity === 'error');
@@ -224,7 +224,7 @@ export function Label({ text }: { text: string }) {
 
 	it('reports nothing outside Strong mode', () => {
 		const source = label('', '(el) => setNode(el)');
-		const { diagnostics, error } = collectDiagnostics(source, '/src/App.tsx');
+		const { diagnostics, error } = collectDiagnostics(source, '/src/App.tsrx');
 		expect(error).toBe(null);
 		expect(diagnostics.map((diagnostic: Diagnostic) => diagnostic.code)).not.toContain(REF);
 	});

@@ -57,7 +57,6 @@ export const WRITERS = new Map(
 		// primitive
 		updateTextValue: 'primitive',
 		setText: 'primitive',
-		resetOnlyChildHost: 'primitive',
 		setScriptText: 'primitive',
 		setHTML: 'primitive',
 		setAttribute: 'primitive',

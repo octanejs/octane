@@ -500,11 +500,11 @@ Native rendering supports DOM client/server. Deep stores, local derived/async ho
 
 Strong mode is an opt-in compiler contract. A Strong module asserts that rendering reads immutable snapshots (props, state, context) and is pure: the same inputs produce the same output, with no state updates, scheduled work, clock or random reads, or `ref.current` access during render. The compiler rejects the violations it can prove with `OCTANE_STRONG_*` compile errors, and it owns memoization and dependency inference. Compatibility mode, the default, keeps React semantics, including `useMemo`, `useCallback`, and explicit dependency arrays.
 
-Enable it per module with `"use strong"` before the imports; comments, other directives, and a leading `@jsxImportSource` pragma may precede it, and a directive anywhere else reports `OCTANE_STRONG_DIRECTIVE_PLACEMENT`. Or set `compiler: { strong: true }` in `octane.config.ts` for all application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` as a plugin option; it wins over the config file, standalone Rspack needs it, and `octane analyze` cannot see it, so prefer the config file. Installed dependencies keep their own mode unless their source opts in. Plain `.tsx` checked with TypeScript needs `jsxImportSource: octane/strong` for the branded `trustHTML` JSX types; Strong `.tsrx` selects them automatically.
+Enable it per module with `"use strong"` before the imports; comments, other directives, and a leading `@jsxImportSource` pragma may precede it, and a directive anywhere else reports `OCTANE_STRONG_DIRECTIVE_PLACEMENT`. Or set `compiler: { strong: true }` in `octane.config.ts` for all application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` as a plugin option; it wins over the config file, standalone Rspack needs it, and `octane analyze` cannot see it, so prefer the config file. Installed dependencies keep their own mode unless their source opts in. Strong compiles `.tsrx`, `.ts`, and `.js` only: a `.tsx` or `.jsx` module it reaches reports `OCTANE_STRONG_TSX_MODULE`, so convert it to `.tsrx`. Strong `.tsrx` selects the branded `trustHTML` JSX types automatically.
 
 In a Strong module:
 
-- `useMemo` and `useCallback` are errors (`OCTANE_STRONG_MANUAL_MEMO`). Write plain `const` calculations and callbacks; the compiler caches eligible ones from their inferred inputs.
+- `useMemo` and `useCallback` may control their own dependencies. Explicit lists are preserved, omitted lists are inferred, and `null` recomputes on every render. The compiler also caches eligible plain `const` calculations and callbacks automatically.
 - Omit dependency arrays. An explicit array that differs from the inferred inputs, or cannot be proven equivalent, is an error; an equivalent array is a hint that never fails a build (`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`). `null` dependencies are an error (`OCTANE_STRONG_UNTRACKED_EFFECT`).
 - Render never reads or writes `ref.current` (`OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE`). Create a value once with `useLazyRef(() => create())` instead of `if (ref.current === null) ref.current = create()`.
 - Effect setup never updates state synchronously (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). Render a DOM measurement from `useLayoutSnapshot(measure, { initial })` instead of setting state in a layout effect, and use `useLinkedState` when state follows a prop.
@@ -527,7 +527,6 @@ Migration recipes, React idiom → Strong replacement:
 - Create a value once: `if (ref.current === null) ref.current = new Store();` → `const ref = useLazyRef(() => new Store());`
 - Render from a DOM measurement: `useLayoutEffect(() => setWidth(el.current.offsetWidth));` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
 - Measure an element from a callback ref: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
-- Drop useMemo and useCallback: `const total = useMemo(() => sum(items), [items]);` → `const total = sum(items);`
 - Read the latest props from an effect: `const latest = useRef(onTick); latest.current = onTick;` → `const tick = useEffectEvent(onTick);`
 - Keep editable state in sync with a prop: `useEffect(() => setName(user.name), [user.name]);` → `const [name, setName] = useLinkedState(user.id, () => user.name);`
 - Render live browser state: `const wide = window.innerWidth > 800;` → `const wide = useSyncExternalStore(subscribe, getWide, () => false);`
@@ -550,7 +549,6 @@ Effects, state, and dependencies:
 - `OCTANE_STRONG_UNLINKED_PROP_STATE`: Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture.
 - `OCTANE_STRONG_EXPLICIT_DEPENDENCIES`: Omit the dependency argument.
 - `OCTANE_STRONG_UNTRACKED_EFFECT`: Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.
-- `OCTANE_STRONG_MANUAL_MEMO`: Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.
 - `OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`: Remove it. Effect Events are non-reactive, so they never belong in dependencies.
 - `OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`: Compile the module through the normal Octane integration, or keep it in compatibility mode.
 
@@ -579,14 +577,17 @@ Render snapshots and determinism:
 
 Lists, templates, and compatibility APIs:
 
-- `OCTANE_STRONG_MAP_JSX`: Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.
+- `OCTANE_STRONG_MAP_JSX`: Use `@for` with a stable item key. Data-only mapping remains valid.
 - `OCTANE_STRONG_INDEX_KEY`: Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.
+- `OCTANE_STRONG_SINGLE_ITEM_FOR`: To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid.
 - `OCTANE_STRONG_HOOK_LOCALITY`: Move the hook into that block, before the JSX or local effect that uses its value. Hooks used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime.
 - `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`: Move the handler into that block, before the JSX that uses it, or inline it.
 - `OCTANE_STRONG_DIRECTIVE_PLACEMENT`: Move `"use strong"` to the top of the file, before imports or other code.
+- `OCTANE_STRONG_TSX_MODULE`: Rename the module to `.tsrx` and write its markup as template JSX, with `@if`, `@for`, `@switch`, and `@try` blocks for control flow. A module without JSX can be `.ts` or `.js`; `root.render(App, props)` renders an entry point without JSX.
 - `OCTANE_STRONG_SUPPRESSION_PROP`: Fix the mismatch or use the intended native event. Component props with these names are unaffected.
 - `OCTANE_NATIVE_TEXT_ONCHANGE`: Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid.
 - `OCTANE_STRONG_COMPAT_IMPORT`: Use normal Octane scheduling and component semantics.
+- `OCTANE_STRONG_ELEMENT_API`: Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid.
 
 DOM ownership and trusted HTML:
 
@@ -615,7 +616,7 @@ See the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 - `useImperativeHandle` infers dependencies from its handle factory when the third argument is omitted; ref identity is still tracked separately.
 - An explicit array is authoritative. `[]` retains mount/reconnect-only or stable-value behavior, `[a, b]` tracks exactly those values, and `null` opts into every-render/recompute behavior.
 - In production compiles, eligible `useMemo`/`useCallback` declarations become inline caches (no per-render closure or deps-array allocation). This is transparent — identical semantics, including `Object.is` dependency compares.
-- These rules describe compatibility mode, the default. A Strong module rejects `useMemo`/`useCallback` (`OCTANE_STRONG_MANUAL_MEMO`), `null` dependencies, and explicit arrays that differ from the inferred inputs; see Strong mode above.
+- These rules also apply to `useMemo` and `useCallback` in Strong mode. Strong effects reject `null` dependencies and explicit arrays that differ from the inferred inputs; see Strong mode above.
 
 ## Async data with use()
 

@@ -59,7 +59,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.59` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.45` | 1 |
 | `@octanejs/markdown` | [`packages/markdown`](../packages/markdown) | framework binding | `0.0.30` | 1 |
-| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.3` | 3 |
+| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.4` | 3 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.63` | 4 |
 | `@octanejs/mobx` | [`packages/mobx`](../packages/mobx) | framework binding | `0.1.45` | 1 |
 | `@octanejs/monaco-editor` | [`packages/monaco-editor`](../packages/monaco-editor) | framework binding | `0.0.33` | 1 |
@@ -104,7 +104,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.61` | 1 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.65` | 1 |
 | `@octanejs/tanstack-query-devtools` | [`packages/tanstack-query-devtools`](../packages/tanstack-query-devtools) | framework binding | `0.0.3` | 2 |
-| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.2.7` | 6 |
+| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.2.7` | 7 |
 | `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.1.7` | 1 |
 | `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.2.8` | 13 |
 | `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.61` | 1 |
@@ -132,7 +132,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.31` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.65` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.16` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.13.2` | 44 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.13.5` | 44 |
 
 ## Private packages
 

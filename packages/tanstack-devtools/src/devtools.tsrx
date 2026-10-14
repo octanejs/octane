@@ -1,3 +1,5 @@
+'use strong';
+
 // Ported from @tanstack/react-devtools 0.10.7
 // (https://github.com/TanStack/devtools/tree/main/packages/react-devtools/src/devtools.tsx).
 //
@@ -138,7 +140,7 @@ export const TanStackDevtools = ({
 	plugins,
 	config,
 	eventBusConfig,
-}: TanStackDevtoolsOctaneInit): Renderable => {
+}: TanStackDevtoolsOctaneInit): Renderable => @{
 	const devToolRef = useRef<HTMLDivElement | null>(null);
 
 	const [pluginContainers, setPluginContainers] = useState<Record<string, HTMLElement>>({});
@@ -190,7 +192,6 @@ export const TanStackDevtools = ({
 					},
 				};
 			}) ?? [],
-		[plugins],
 	);
 
 	const [devtools] = useState(() => {
@@ -214,7 +215,7 @@ export const TanStackDevtools = ({
 		devtools.setConfig({
 			plugins: pluginsMap,
 		});
-	}, [devtools, pluginsMap]);
+	});
 
 	useEffect(() => {
 		if (devToolRef.current) {
@@ -222,36 +223,30 @@ export const TanStackDevtools = ({
 		}
 
 		return () => devtools.unmount();
-	}, [devtools]);
+	});
 
 	const hasPlugins =
 		Object.values(pluginContainers).length > 0 && Object.values(PluginComponents).length > 0;
 	const hasTitles =
 		Object.values(titleContainers).length > 0 && Object.values(TitleComponents).length > 0;
 
-	return (
-		<>
-			<div style={{ position: 'absolute' }} ref={devToolRef} />
+	<>
+		<div style={{ position: 'absolute' }} ref={devToolRef} />
 
-			{hasPlugins
-				? Object.entries(pluginContainers).map(function mapPlugin([key, pluginContainer]) {
-						return (
-							<DevtoolsPortal key={key} target={pluginContainer} content={PluginComponents[key]} />
-						);
-					})
-				: null}
+		@if (hasPlugins) {
+			@for (const [key, pluginContainer] of Object.entries(pluginContainers); key key) {
+				<DevtoolsPortal target={pluginContainer} content={PluginComponents[key]} />
+			}
+		}
 
-			{hasTitles
-				? Object.entries(titleContainers).map(function mapTitle([key, titleContainer]) {
-						return (
-							<DevtoolsPortal key={key} target={titleContainer} content={TitleComponents[key]} />
-						);
-					})
-				: null}
+		@if (hasTitles) {
+			@for (const [key, titleContainer] of Object.entries(titleContainers); key key) {
+				<DevtoolsPortal target={titleContainer} content={TitleComponents[key]} />
+			}
+		}
 
-			{triggerContainer && TriggerComponent
-				? <DevtoolsPortal target={triggerContainer} content={TriggerComponent} />
-				: null}
-		</>
-	);
+		@if (triggerContainer && TriggerComponent) {
+			<DevtoolsPortal target={triggerContainer} content={TriggerComponent} />
+		}
+	</>
 };

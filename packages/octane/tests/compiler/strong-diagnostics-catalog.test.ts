@@ -59,7 +59,7 @@ describe('Strong diagnostic catalog', () => {
 	// compiler actually accepts.
 	for (const recipe of STRONG_RECIPES) {
 		it(`recipe ${recipe.id}: the React idiom reports its codes and the replacement compiles`, () => {
-			const filename = `/src/${recipe.id}.tsx`;
+			const filename = `/src/${recipe.id}.tsrx`;
 			expect([...new Set(errorCodes(recipe.before, filename))].sort()).toEqual(
 				[...recipe.codes].sort(),
 			);

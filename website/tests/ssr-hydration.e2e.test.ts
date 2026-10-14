@@ -20,7 +20,12 @@ import type { ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
-import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
+import {
+	encodePlaygroundHash,
+	MAX_PLAYGROUND_HASH_LENGTH,
+	MAX_PLAYGROUND_SOURCE_LENGTH,
+	PLAYGROUND_SOURCE_LIMIT_ERROR,
+} from '../src/lib/playground-hash.ts';
 import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
 import { LYNX_EXAMPLES } from '../src/content/lynx-examples.ts';
 import {
@@ -70,6 +75,7 @@ const ROUTES = [
 	'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',
+	'/devtools',
 	'/benchmarks',
 	'/playground',
 ];
@@ -976,15 +982,12 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		// times out while the server is still starting.
 		DEV_PORT = await startServerOnFreePort(
 			(port) =>
-				(server = spawnServer([
-					'exec',
-					'vite',
-					'--configLoader',
-					'runner',
-					'--port',
-					String(port),
-					'--strictPort',
-				])),
+				(server = spawnServer(
+					['exec', 'vite', '--configLoader', 'runner', '--port', String(port), '--strictPort'],
+					// Vitest's NODE_ENV=test disables the devtools event client. Run
+					// the dev server in the same environment as an ordinary Vite boot.
+					{ NODE_ENV: 'development' },
+				)),
 			(port) => `http://localhost:${port}/`,
 			60_000,
 		);
@@ -999,6 +1002,11 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 			const warmup = await loadRoute(`http://localhost:${DEV_PORT}`, route, {
 				timeout: 120_000,
 			});
+			if (route === '/devtools') {
+				await warmup.page
+					.getByRole('button', { name: 'Open TanStack Devtools', exact: true })
+					.waitFor();
+			}
 			await warmup.page.close();
 		}
 		// Covers the production-build wait above, the cold dev boot, and the warm-up.
@@ -1019,6 +1027,79 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				const real = errors.filter((e) => !e.includes('Failed to load resource'));
 				expect(real).toEqual([]);
 				expect(main.length).toBeGreaterThan(0);
+			} finally {
+				await page.close();
+			}
+		},
+	);
+
+	it.concurrent(
+		'the devtools demo inspects live state and preserves its panel across host updates',
+		{ timeout: 60_000 },
+		async ({ expect }) => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/devtools', {
+				viewport: { width: 1440, height: 1000 },
+			});
+			const pollOptions = { timeout: PLAYWRIGHT_ACTION_TIMEOUT };
+			try {
+				await page.getByRole('button', { name: 'Open TanStack Devtools', exact: true }).click();
+				await page.getByRole('button', { name: 'Octane', exact: true }).click();
+				const panel = page.locator('.odt-root');
+				await panel.waitFor();
+				const demo = page.locator('main:has(> h1)').filter({
+					has: page.getByRole('heading', { name: 'Octane DevTools demo', exact: true }),
+				});
+				await panel.locator('.odt-tree-row').filter({ hasText: 'Counter' }).click();
+				await demo.getByRole('button', { name: 'count: 0', exact: true }).click();
+				await demo.getByRole('button', { name: 'total += 5 (0)', exact: true }).click();
+				await expect
+					.poll(
+						async () =>
+							(await panel.locator('.odt-kv-val').allTextContents()).map((value) => value.trim()),
+						pollOptions,
+					)
+					.toEqual(['1', '5']);
+				expect(await panel.locator('.odt-tree-row').allTextContents()).not.toEqual(
+					expect.arrayContaining([expect.stringContaining('OctaneDevtoolsPanel')]),
+				);
+
+				await panel.getByRole('button', { name: 'Profiler', exact: true }).click();
+				await demo.getByRole('button', { name: 'count: 1', exact: true }).click();
+				await expect
+					.poll(() => panel.locator('.odt-commit-row').allTextContents(), pollOptions)
+					.toEqual(expect.arrayContaining([expect.stringContaining('Counter')]));
+				await page.getByRole('button', { name: 'Close TanStack Devtools', exact: true }).click();
+				await page.getByRole('button', { name: 'Open TanStack Devtools', exact: true }).click();
+				expect(await panel.locator('.odt-tab-active').textContent()).toBe('Profiler');
+
+				await panel.getByRole('button', { name: 'Transitions & Suspense', exact: true }).click();
+				await demo.locator('input').fill('199');
+				await expect
+					.poll(() => demo.locator('li').allTextContents(), pollOptions)
+					.toEqual(['Item 199']);
+				await expect
+					.poll(() => panel.locator('.odt-stat').textContent(), pollOptions)
+					.toBe('Pending transitions: 0');
+				await expect
+					.poll(() => panel.locator('.odt-boundary').allTextContents(), pollOptions)
+					.toEqual(expect.arrayContaining([expect.stringMatching(/resolved\s*Suspense/)]));
+				expect(await demo.textContent()).toContain('boundary A loaded');
+				expect(await demo.textContent()).toContain('boundary B loaded');
+
+				await panel.getByRole('button', { name: 'Performance', exact: true }).click();
+				await demo.locator('input').fill('198');
+				await expect
+					.poll(() => panel.locator('.odt-h').allTextContents(), pollOptions)
+					.toEqual([
+						'Slowest mounts (self time)',
+						'Queue-delay hotspots',
+						'Recent commit self-time',
+					]);
+
+				await page.locator('.navlinks a[href="/docs"]').click();
+				await page.locator('.prose').waitFor();
+				await panel.waitFor({ state: 'detached' });
+				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
 			} finally {
 				await page.close();
 			}
@@ -1386,15 +1467,17 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 
 	it.concurrent(
 		'resets a new documentation page to the top without animating from the old section',
-		async () => {
+		async ({ expect }) => {
 			const { page, errors } = await loadRoute(
 				`http://localhost:${DEV_PORT}`,
 				'/docs/build-tools',
 				{
 					waitForNetworkIdle: true,
+					viewport: { width: 1100, height: 850 },
 				},
 			);
 			try {
+				await page.evaluate(() => document.fonts.ready);
 				await page.click('.on-this-page a[href="#renderer-targets"]');
 				await page.waitForFunction(
 					() =>
@@ -1406,6 +1489,40 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+				await page.waitForFunction(() => {
+					const indicator = document.querySelector('.on-this-page .toc-indicator')!;
+					const target = document.querySelector('.on-this-page a[href="#renderer-targets"]')!;
+					return (
+						Number(getComputedStyle(indicator).opacity) === 1 &&
+						Math.abs(indicator.getBoundingClientRect().top - target.getBoundingClientRect().top) < 1
+					);
+				});
+
+				// Observe the first rendered frames, not just the final scroll position:
+				// a stale bootstrap can briefly select the last row and animate the bar
+				// upward even though the router has already restored scrollY to zero.
+				await page.evaluate(() => {
+					(window as any).__octaneTocFrames = new Promise((resolve) => {
+						const frames: { active: string | null; opacity: number; offset: number }[] = [];
+						const sample = () => {
+							if (document.querySelector('.prose h1')?.textContent === 'Quick start') {
+								const indicator = document.querySelector('.on-this-page .toc-indicator')!;
+								const first = document.querySelector('.on-this-page a[href="#scaffold"]')!;
+								frames.push({
+									active:
+										document
+											.querySelector('.on-this-page a[aria-current="true"]')
+											?.getAttribute('href') ?? null,
+									opacity: Number(getComputedStyle(indicator).opacity),
+									offset: indicator.getBoundingClientRect().top - first.getBoundingClientRect().top,
+								});
+							}
+							if (frames.length === 12) resolve(frames);
+							else requestAnimationFrame(sample);
+						};
+						requestAnimationFrame(sample);
+					});
+				});
 
 				await page.click('.sidebar-link[href="/docs/quick-start"]');
 				await page.waitForFunction(
@@ -1419,6 +1536,20 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				// The new document is already at its initial position on its first
 				// rendered frame; it must not animate upward from the old page's anchor.
 				expect(await page.evaluate(() => scrollY)).toBe(0);
+				const frames = await page.evaluate(
+					() =>
+						(window as any).__octaneTocFrames as Promise<
+							{ active: string | null; opacity: number; offset: number }[]
+						>,
+				);
+				for (const frame of frames) {
+					if (frame.active !== null) expect(frame.active).toBe('#scaffold');
+					if (frame.opacity > 0) {
+						expect(frame.active).toBe('#scaffold');
+						expect(Math.abs(frame.offset)).toBeLessThan(1);
+					}
+				}
+				expect(frames.some((frame) => frame.opacity > 0)).toBe(true);
 				const real = errors.filter((error) => !error.includes('Failed to load resource'));
 				expect(real).toEqual([]);
 			} finally {
@@ -1448,10 +1579,27 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 						getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
 				);
 
-				await page.click('.on-this-page a[href="#rspack"]');
-				// The first click intentionally starts collapsing the mobile panel. Fire
-				// the competing Link activation through the DOM so this cancellation
-				// test does not race Playwright's hit-testing against that CSS animation.
+				await page.evaluate(async () => {
+					const panel = document.querySelector('.sidebar-panel')!;
+					await Promise.allSettled(panel.getAnimations().map((animation) => animation.finished));
+				});
+				// Hold the real closing animation until the replacement document wins.
+				// Separate browser actions otherwise let the close finish first on a
+				// busy runner, which exercises a completed jump rather than cancellation.
+				const closingAnimations = await page.evaluateHandle(async () => {
+					const panel = document.querySelector<HTMLElement>('.sidebar-panel')!;
+					panel.style.transitionDuration = '60s';
+					document.querySelector<HTMLElement>('.on-this-page a[href="#rspack"]')!.click();
+					await new Promise(requestAnimationFrame);
+					const animations = panel.getAnimations();
+					for (const animation of animations) animation.pause();
+					return animations;
+				});
+				expect(await closingAnimations.evaluate((animations) => animations.length)).toBeGreaterThan(
+					0,
+				);
+				expect(await page.evaluate(() => location.hash)).toBe('');
+				// The closing panel cannot be hit-tested; activate its real router Link.
 				await page.locator('.sidebar-link[href="/docs/quick-start"]').dispatchEvent('click');
 				await page.waitForFunction(
 					() =>
@@ -1461,9 +1609,14 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 
-				// Let the superseded panel-close promise settle. It must not append the
-				// old page's section hash or move the replacement document afterward.
-				await page.waitForTimeout(400);
+				// Release the superseded close. It must not append the old page's
+				// section hash or move the replacement document afterward.
+				await closingAnimations.evaluate(async (animations) => {
+					for (const animation of animations) animation.finish();
+					await Promise.allSettled(animations.map((animation) => animation.finished));
+				});
+				await closingAnimations.dispose();
+				await page.evaluate(() => new Promise(requestAnimationFrame));
 				expect(await page.evaluate(() => location.hash)).toBe('');
 				expect(await page.evaluate(() => scrollY)).toBe(0);
 				const real = errors.filter((error) => !error.includes('Failed to load resource'));
@@ -1637,6 +1790,77 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 			}
 		},
 		30_000,
+	);
+
+	it.concurrent.for([
+		{
+			name: 'an overlimit encoded hash',
+			hash: 'A'.repeat(MAX_PLAYGROUND_HASH_LENGTH + 1),
+			diagnostic: PLAYGROUND_SOURCE_LIMIT_ERROR,
+		},
+		{
+			name: 'an overlimit source payload',
+			hash: Buffer.from(
+				JSON.stringify({ l: 'tsrx', s: 'x'.repeat(MAX_PLAYGROUND_SOURCE_LENGTH + 1) }),
+			).toString('base64'),
+			diagnostic: PLAYGROUND_SOURCE_LIMIT_ERROR,
+		},
+		{ name: 'an unrelated malformed fragment', hash: 'not-a-workspace', diagnostic: '' },
+	])(
+		'playground handles $name before editor imports resolve and clears diagnostics after compilation',
+		{ timeout: 45_000 },
+		async ({ hash, diagnostic }, { expect }) => {
+			const page = await browser.newPage();
+			page.setDefaultTimeout(PLAYWRIGHT_ACTION_TIMEOUT);
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text());
+			});
+			let releaseEditor!: () => void;
+			const editorGate = new Promise<void>((resolve) => {
+				releaseEditor = resolve;
+			});
+			let heldImports = 0;
+			await page.route('**/src/lib/shiki-codemirror.ts*', async (route) => {
+				heldImports++;
+				await editorGate;
+				await route.continue();
+			});
+			try {
+				await page.goto(`http://localhost:${DEV_PORT}/playground#${hash}`, {
+					waitUntil: 'domcontentloaded',
+				});
+				// Hold an actual editor dependency, not a timer: the diagnostic must be
+				// visible while boot is still unable to create either CodeMirror view.
+				await expect
+					.poll(() => heldImports, { timeout: PLAYWRIGHT_ACTION_TIMEOUT })
+					.toBeGreaterThan(0);
+				await page.locator('.pg-loading').waitFor();
+				expect(await page.locator('.pg-grid.ready').count()).toBe(0);
+				if (diagnostic) {
+					await waitForLocatorText(page.locator('.pg-error'), diagnostic);
+				} else {
+					expect(await page.locator('.pg-error').count()).toBe(0);
+				}
+
+				releaseEditor();
+				await page.locator('.pg-grid.ready').waitFor();
+				const preview = page.frameLocator('iframe[title="Playground preview"]');
+				const heading = preview.locator('h2');
+				await waitForLocatorText(heading, 'Count: 0');
+				await page.locator('.pg-error').waitFor({ state: 'detached' });
+				await preview.getByRole('button', { name: 'Increment' }).click();
+				await waitForLocatorText(heading, 'Count: 1');
+				// An unrelated render must not reapply the initial URL diagnostic.
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+				expect(await page.locator('.pg-error').count()).toBe(0);
+				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
+			} finally {
+				releaseEditor();
+				await page.close();
+			}
+		},
 	);
 
 	it.concurrent(
