@@ -3866,11 +3866,10 @@ function discardHeldRoot(owner: RootRenderOwner): void {
 // never reappear. The first write into a bag therefore snapshots the whole bag
 // next to the DOM entry.
 //
-// Controlled `value`/`checked`/`selected` are covered too, but need more than the
-// node: each carries a `default*` mirror and a per-element record of what was
-// last projected. All three go back together — restoring the node alone would
-// leave the record believing it had already projected the new value, so
-// re-projecting it on resume would be skipped as unchanged.
+// A form control's DOM (its live value, checkedness and selection, the default*
+// mirrors, a radio group's other members) takes its writes at commit (#2043),
+// so a dropped render never reached it. Only its projection record and bag are
+// snapshotted, so a resumed render projects again.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const JOURNAL_TEXT = 0;
@@ -4297,26 +4296,14 @@ function journalRootProperty(target: object, key: PropertyKey, oldValue: unknown
 	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, oldValue);
 }
 
-/** Save only a structurally changed slot and its exact, shallow sibling range. */
-function journalRootSlot(
-	state: object,
-	parent: Node,
-	before: Node | null,
-	after: Node | null,
-): void {
+/**
+ * Save a structurally changed slot's record. Its DOM changes at commit, or in
+ * DOM the render created (#2043), so a dropped render left the range as it was.
+ */
+function journalRootSlot(state: object): void {
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
 		return;
-	const seen = TRANSITION_JOURNAL_BAGS!;
-	const at = seen.get(state) ?? -1;
-	// `seen` holds the snapshot's log index, plus one when the range was taken
-	// with it. A plain snapshot (journalObjectOnce) has no range, so take
-	// another with one; replay restores the older snapshot last.
-	if (at >= TRANSITION_JOURNAL_CHECKPOINT && (at & 1) !== 0) return;
-	seen.set(state, TRANSITION_JOURNAL!.length + 1);
-	TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
-	// Strict adoption prepares scopes, never an undo of the early owner's live DOM.
-	if (!hydrationStarted || PRESENTATION_HYDRATION?.revision === undefined)
-		journalRootRange(parent, before, after);
+	journalObjectOnce(state);
 }
 
 /** `parent`'s children after `before` (or from its first) up to, not including, `after`. */
@@ -5495,57 +5482,6 @@ function journalObjectOnce(obj: object): void {
 	TRANSITION_JOURNAL!.push(JOURNAL_BAG, obj, { ...obj }, Array.isArray(obj) ? obj.length : null);
 }
 
-/** Defaults can move a pristine control's caret just like a live-value write. */
-function journalInputSelection(input: HTMLInputElement | HTMLTextAreaElement): void {
-	if (ROOT_RENDER_TRANSACTION !== null && input.ownerDocument.activeElement === input) {
-		const start = input.selectionStart;
-		const end = input.selectionEnd;
-		const direction = input.selectionDirection;
-		if (start !== null && end !== null)
-			journalUndo(() => input.setSelectionRange(start, end, direction ?? undefined));
-	}
-}
-
-/**
- * A controlled input keeps three things in step: the live DOM property, the
- * default mirror used by form.reset()/SSR, and its last projected value record.
- * Capture all three after arming the element but before changing any of them.
- * Hydration never writes an `adopted` control's live value, and restoring it
- * through its setter would mark the control dirty, so its record leaves it out.
- */
-function journalControlled(
-	el: Element,
-	prop: string,
-	defaultProp: string,
-	adopted?: boolean,
-): void {
-	if (prop === 'value') journalInputSelection(el as HTMLInputElement | HTMLTextAreaElement);
-	const log = TRANSITION_JOURNAL!;
-	if (!adopted) log.push(JOURNAL_PROP, el, prop, (el as any)[prop]);
-	log.push(JOURNAL_PROP, el, defaultProp, (el as any)[defaultProp]);
-	const ctrl = renderControlledState(el);
-	if (ctrl !== undefined) journalObjectOnce(ctrl);
-	const input = el as HTMLInputElement;
-	if (prop === 'checked' && input.type === 'radio' && input.name !== '') journalRadioCousins(input);
-	journalBag();
-}
-
-/** Restore defaults without making an untouched uncontrolled control dirty. */
-function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): void {
-	journalInputSelection(input);
-	if (input.localName === 'textarea') {
-		// defaultValue replaces textarea children. Keep the old text-node identity
-		// as well as its reset value when a root attempt is discarded.
-		if (ROOT_RENDER_TRANSACTION !== null) journalRootChildren(input);
-		else TRANSITION_JOURNAL!.push(JOURNAL_PROP, input, 'defaultValue', input.defaultValue);
-		journalBag();
-	} else {
-		// Attribute absence matters too; assigning defaultValue='' on rollback
-		// would create a value attribute that was not previously present.
-		journalAttr(input, 'value');
-	}
-}
-
 /** Find a radio's native group in its document, shadow tree, or containing form. */
 function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
 	const form = input.form;
@@ -5556,45 +5492,6 @@ function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
 	return root.nodeType === 9
 		? (root as Document).getElementsByName(input.name)
 		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
-}
-
-/**
- * Record the cousin a radio write is about to clear.
- *
- * Checking a radio makes the platform uncheck its same-name siblings as a side
- * effect, so a cousin cannot record its own prior state: by the time its binding
- * runs it has already been cleared, and an uncontrolled cousin never records at
- * all. Only a currently-checked cousin can be cleared, and a well-formed group
- * has at most one, so this scans the group but adds at most one entry.
- *
- * Group scope mirrors restoreRadioCousins: same non-empty name, same form owner
- * when there is one. Re-recording a cousin across several writes in one window
- * is harmless — the replay runs newest-first, so the earliest value is the one
- * left standing.
- */
-function journalRadioCousins(input: HTMLInputElement): void {
-	const name = input.name;
-	const group = radioCousins(input);
-	for (let i = 0; i < group.length; i++) {
-		const other = group[i] as HTMLInputElement;
-		if (
-			other === input ||
-			!other.checked ||
-			other.localName !== 'input' ||
-			other.type !== 'radio' ||
-			other.name !== name ||
-			other.form !== input.form
-		) {
-			continue;
-		}
-		TRANSITION_JOURNAL!.push(JOURNAL_PROP, other, 'checked', true);
-	}
-}
-
-function journalControlledOption(option: HTMLOptionElement, withDefault: boolean): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'selected', option.selected);
-	if (withDefault)
-		TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'defaultSelected', option.defaultSelected);
 }
 
 /**
@@ -12977,12 +12874,7 @@ function disposeReturnSlot(block: Block, state: any, out?: any[]): void {
 					: borrowed
 						? end.previousSibling
 						: (end ?? arm?.endMarker ?? first);
-		journalRootSlot(
-			state,
-			parent,
-			borrowed ? state.start : first !== null ? first.previousSibling : parent.lastChild,
-			borrowed ? end : (last?.nextSibling ?? null),
-		);
+		journalObjectOnce(state);
 		const retiredBlock = state.block ?? state.portal?.block ?? state.lite?.block;
 		if (retiredBlock != null) retireRootBlock(retiredBlock);
 		if (state.forSlot != null) {
@@ -23793,7 +23685,6 @@ export function setText(node: Text | null, value: any, host?: Node): void {
  * node stays valid.
  */
 function resetOnlyChildHost(host: Node, node: Text | null): void {
-	if (ROOT_RENDER_TRANSACTION !== null) journalRootRange(host, null, null);
 	const view = host;
 	view.textContent = '';
 	if (node !== null) view.appendChild(node);
@@ -24747,10 +24638,7 @@ export function setScriptText(el: Element, value: any): void {
 	if (first !== null && first === el.lastChild && first.nodeType === 3) {
 		updateTextValue(first as Text, text);
 	} else {
-		if (ROOT_RENDER_TRANSACTION !== null) {
-			journalBag();
-			journalRootRange(el, null, null);
-		}
+		if (ROOT_RENDER_TRANSACTION !== null) journalBag();
 		el.textContent = text;
 	}
 }
@@ -27956,51 +27844,15 @@ interface HeadSlot {
 	next: { tx: RootRenderTransaction; attrs: Record<string, any> | null; text: unknown } | null;
 }
 
-// A shallow HeadSlot snapshot cannot undo mutations to its listener Map or the
-// native registrations. Snapshot once before the first change in a headBlock
-// pass: two different props can resolve to the same native event and handler,
-// which addEventListener deduplicates, so per-prop inverse operations are unsafe.
-function journalHeadEventListeners(state: HeadSlot): void {
-	const before = state.handlers === undefined ? null : new Map(state.handlers);
-	journalUndo(() => {
-		const handlers = state.handlers;
-		if (handlers !== undefined) {
-			for (const [name, listener] of handlers) {
-				const event = eventSlot(name)!;
-				state.el.removeEventListener(event.type, listener, event.capture);
-			}
-			handlers.clear();
-		}
-		if (before !== null) {
-			const restored = handlers ?? (state.handlers = new Map<string, EventListener>());
-			for (const [name, listener] of before) {
-				const event = eventSlot(name)!;
-				state.el.addEventListener(event.type, listener, event.capture);
-				restored.set(name, listener);
-			}
-		}
-	});
-}
-
-function removeHeadEventListeners(
-	state: HeadSlot,
-	attrs: Record<string, any> | null,
-	journalChanges = false,
-): boolean {
+function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | null): void {
 	const handlers = state.handlers;
-	if (handlers === undefined) return false;
-	let journaled = false;
+	if (handlers === undefined) return;
 	for (const [name, listener] of handlers) {
 		if (attrs !== null && name in attrs) continue;
-		if (journalChanges && !journaled) {
-			journalHeadEventListeners(state);
-			journaled = true;
-		}
 		const event = eventSlot(name)!;
 		state.el.removeEventListener(event.type, listener, event.capture);
 		handlers.delete(name);
 	}
-	return journaled;
 }
 
 // Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
@@ -28071,7 +27923,6 @@ function setHeadAttribute(el: Element, name: string, value: unknown): void {
 	const next = coerceAttrValue(el, name, value);
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (el.getAttribute(name) === next) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -28172,9 +28023,7 @@ function applyHeadProps(
 		journalObjectOnce(state);
 		journalBag();
 	}
-	let journaledHandlers =
-		state.handlers !== undefined &&
-		removeHeadEventListeners(state, attrs, TRANSITION_JOURNAL !== null);
+	removeHeadEventListeners(state, attrs);
 	const previousNames = state.attrNames;
 	if (previousNames !== undefined) {
 		for (let i = 0; i < previousNames.length; i++) {
@@ -28196,14 +28045,6 @@ function applyHeadProps(
 				const prevH = hs?.get(k);
 				if (prevH === listener) continue;
 				const nextH = typeof listener === 'function' ? (listener as EventListener) : undefined;
-				if (
-					TRANSITION_JOURNAL !== null &&
-					!journaledHandlers &&
-					(prevH !== undefined || nextH !== undefined)
-				) {
-					journalHeadEventListeners(state);
-					journaledHandlers = true;
-				}
 				if (prevH !== undefined) el.removeEventListener(ev.type, prevH, ev.capture);
 				if (nextH !== undefined) {
 					el.addEventListener(ev.type, nextH, ev.capture);
@@ -28222,13 +28063,7 @@ function applyHeadProps(
 	}
 	if (text != null || tag === 'title') {
 		const t = text == null ? '' : String(text);
-		if (el.textContent !== t) {
-			// textContent replaces child nodes, even when only the text changes.
-			// Retain their identity when a later sibling suspends and this visible
-			// head entry belongs to the held transition boundary.
-			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
-			el.textContent = t;
-		}
+		if (el.textContent !== t) el.textContent = t;
 	}
 }
 
@@ -30729,7 +30564,10 @@ export function setValue(el: Element, value: unknown): void {
 	// discrete event. A fresh structural replacement is client-built and needs
 	// normal projection.
 	const adopted = hydrating && first ? activeHydration() !== null : false;
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue', adopted);
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	ctrl.sawV = true;
 	if (value == null) {
 		if (process.env.NODE_ENV !== 'production' && !first && ctrl.v !== UNCONTROLLED)
@@ -30853,7 +30691,10 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 
 export function setChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	setCheckedState(el as HTMLInputElement, value, ctrl);
 }
 
@@ -30864,7 +30705,10 @@ export function setChecked(el: Element, value: unknown): void {
  */
 export function setCheckedCheckable(el: Element, value: unknown): void {
 	const ctrl = armControlledBase(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	setCheckedState(el as HTMLInputElement, value, ctrl);
 }
 
@@ -30946,13 +30790,6 @@ function projectSelectValue(
 	setDefaultSelected: boolean,
 ): void {
 	const options = sel.options;
-	// The selection lives on the options, not the select, so each one that can
-	// move has to be recorded before the projection walks over it.
-	if (TRANSITION_JOURNAL !== null) {
-		for (let i = 0; i < options.length; i++) {
-			journalControlledOption(options[i], setDefaultSelected);
-		}
-	}
 	if (typeof sv !== 'string') {
 		for (let i = 0; i < options.length; i++) {
 			const option = options[i];
@@ -31005,7 +30842,10 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	}
 	const first = initial ?? !ctrl.sawV;
 	const previousDefault = ctrl.dvv;
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(ctrl);
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	ctrl.sawV = true;
 	ctrl.dvv = value;
 	// Keep pre-hydration edits, but update the reset baseline through the native
@@ -31017,24 +30857,18 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	if (value == null) {
 		if (previousDefault !== UNCONTROLLED && previousDefault != null) {
-			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
 			if (el.localName === 'input') input.removeAttribute('value');
 			else input.defaultValue = '';
 		}
 		return;
 	}
 	const s = toControlledString(value);
-	if (first && !adopted && input.value !== s) {
-		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		input.value = s;
-	}
+	if (first && !adopted && input.value !== s) input.value = s;
 	if (
 		input.defaultValue !== s ||
 		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	) {
-		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
+	)
 		input.defaultValue = s;
-	}
 }
 
 /**
@@ -31050,29 +30884,25 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const previous = (input as any)[DEFAULT_VALUE_BASELINE] as string | null | undefined;
 	const s = value == null ? null : toControlledString(value);
-	if (TRANSITION_JOURNAL !== null)
+	if (TRANSITION_JOURNAL !== null) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, input, DEFAULT_VALUE_BASELINE, previous);
+		journalBag();
+	}
 	(input as any)[DEFAULT_VALUE_BASELINE] = s;
 	const adopted = hydration !== null;
 	if (s === null) {
 		if (previous != null) {
-			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
 			if (el.localName === 'input') input.removeAttribute('value');
 			else input.defaultValue = '';
 		}
 		return;
 	}
-	if (previous === undefined && !adopted && input.value !== s) {
-		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		input.value = s;
-	}
+	if (previous === undefined && !adopted && input.value !== s) input.value = s;
 	if (
 		input.defaultValue !== s ||
 		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	) {
-		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
+	)
 		input.defaultValue = s;
-	}
 }
 
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
@@ -31081,13 +30911,11 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement;
 	const adopted = hydrating ? activeHydration() !== null : false;
 	const first = !ctrl.sawDC;
-	if (first) {
-		if (TRANSITION_JOURNAL !== null) {
-			journalObjectOnce(ctrl);
-			journalBag();
-		}
-		ctrl.sawDC = true;
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
 	}
+	ctrl.sawDC = true;
 	// Adopt the user's live choice, separated from the server's pristine default
 	// so the client baseline below (React's initInput) cannot drag it along.
 	if (adopted && first) input.checked = input.checked;
@@ -31096,22 +30924,11 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	// React initInput marks the live checkedness dirty even when the initial
 	// default is absent. Otherwise, the browser would move a still-pristine
 	// checkbox whenever a later defaultChecked update changes its reset target.
-	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
-		if (TRANSITION_JOURNAL !== null) {
-			TRANSITION_JOURNAL.push(JOURNAL_PROP, input, 'checked', input.checked);
-			if (input.type === 'radio' && input.name !== '' && !!value) journalRadioCousins(input);
-		}
+	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input))
 		input.checked = value == null ? input.checked : !!value;
-	}
 	if (value == null) return;
 	const b = !!value;
-	if (input.defaultChecked !== b) {
-		if (TRANSITION_JOURNAL !== null) {
-			if (input.type === 'radio' && input.name !== '') journalRadioCousins(input);
-			journalAttr(input, 'checked');
-		}
-		input.defaultChecked = b;
-	}
+	if (input.defaultChecked !== b) input.defaultChecked = b;
 }
 
 /**
@@ -31247,16 +31064,7 @@ function applyFormControlValues(
 	const multipleType = typeof multiple;
 	const nextMultiple = !!multiple && multipleType !== 'function' && multipleType !== 'symbol';
 	ctrl.formMultiple = nextMultiple;
-	if (select.multiple !== nextMultiple) {
-		if (TRANSITION_JOURNAL !== null) {
-			// Switching to single selection can clear options before projection.
-			// Restore multiple first, then each option's prior selected state.
-			for (let i = 0; i < select.options.length; i++)
-				journalControlledOption(select.options[i], false);
-			TRANSITION_JOURNAL.push(JOURNAL_PROP, select, 'multiple', select.multiple);
-		}
-		select.multiple = nextMultiple;
-	}
+	if (select.multiple !== nextMultiple) select.multiple = nextMultiple;
 	if (!first && previousMultiple !== nextMultiple && value == null) {
 		if (defaultValue != null) ctrl.dvv = UNCONTROLLED;
 		else projectSelectValue(select, nextMultiple ? new Set<string>() : '', false);
@@ -33637,33 +33445,7 @@ function componentSlotImpl(
 	const replacing = identity !== state.currentComp || keyChanged;
 	const journaledSlot = ROOT_RENDER_TRANSACTION !== null && state.block !== null && replacing;
 	const frontier = journaledSlot && usesFrontier(parentBlock, domParent);
-	if (frontier) journalObjectOnce(state);
-	else if (journaledSlot) {
-		// Owned component markers belong to the replaced range; inherited markers
-		// do not. A self-marked component takes its range from its live Block.
-		if (state.inherited) {
-			journalRootSlot(state, domParent, state.start, state.end);
-		} else {
-			const first = state.start ?? state.block!.startMarker;
-			const last = state.end ?? state.block!.endMarker;
-			if (
-				first !== null &&
-				last !== null &&
-				first.parentNode === domParent &&
-				last.parentNode === domParent
-			) {
-				journalRootSlot(state, domParent, first.previousSibling, getNextSibling(last));
-			} else {
-				const after = state.anchor;
-				journalRootSlot(
-					state,
-					domParent,
-					after === null ? domParent.lastChild : after.previousSibling,
-					after,
-				);
-			}
-		}
-	}
+	if (journaledSlot) journalRootSlot(state);
 	if ((hasKey === true || key !== undefined) && !state.keyed) {
 		if (!journaledSlot) journalRootProperty(state, 'keyed', state.keyed);
 		state.keyed = true;
@@ -34338,7 +34120,7 @@ function clearChildContent(state: ChildSlot): void {
 			state.block?.parentNode ??
 			null;
 		if (parent !== null) {
-			journalRootChildShape(state, parent);
+			journalRootChildShape(state);
 			let first =
 				state.ownerHost !== null || (state.borrowed && state.start === null)
 					? getFirstChild(parent)
@@ -35427,10 +35209,7 @@ function reconcileDeoptChildren(
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				if (defer) built.push(node);
-				else {
-					if (journal) journalRootChildren(el);
-					el.appendChild(node);
-				}
+				else el.appendChild(node);
 			}
 		}
 		return built.length !== 0 ? built : null;
@@ -35566,7 +35345,6 @@ function reconcileDeoptChildren(
 					n,
 				);
 			if (defer || journal) {
-				if (!defer) journalRootChildren(el);
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
@@ -35595,7 +35373,6 @@ function reconcileDeoptChildren(
 		result,
 		hasForeign || singleton,
 		hydrationOwnsUnstamped === true && !singleton,
-		journal === true,
 	);
 	return null;
 }
@@ -35686,7 +35463,7 @@ function applyDeoptOrder(order: DeoptOrder): void {
 	}
 	if (order.desc !== null) commitInScope(order.owner!, commitDeoptHost, node, order.desc);
 	// Foreign ranges among the children stay where they are.
-	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false, false);
+	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false);
 }
 
 /**
@@ -35722,19 +35499,12 @@ function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): 
  * insertion; foreign ranges also must not make every survivor rescan the
  * preceding siblings.
  */
-function placeDeoptChildren(
-	el: Element,
-	result: Node[],
-	skip: boolean,
-	adopt: boolean,
-	journal: boolean,
-): void {
+function placeDeoptChildren(el: Element, result: Node[], skip: boolean, adopt: boolean): void {
 	let cursor: Node | null = getFirstChild(el);
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
 		const at = skip ? nextDeoptOwnedChild(cursor, adopt) : cursor;
 		if (at !== want) {
-			if (journal) journalRootChildren(el);
 			if (renderingFocus === null) el.insertBefore(want, at);
 			else {
 				captureFocusedMovement(el, renderingFocus);
@@ -35891,7 +35661,6 @@ function deoptItemBody(item: any, scope: Scope): void {
 				transfer = stale;
 			} else if (stale.parentNode === block.parentNode) {
 				if (ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(block.parentNode, stale.previousSibling, getNextSibling(stale));
 					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 				} else {
 					detachDeoptTreeRefs(stale, null);
@@ -36000,16 +35769,6 @@ function deoptItemBody(item: any, scope: Scope): void {
 			// insert would throw. Committed DOM takes it at commit, from a frontier.
 			const attached = host === parent;
 			const frontier = usesFrontier(block, parent);
-			if (
-				ROOT_RENDER_TRANSACTION !== null &&
-				!frontier &&
-				(attached || (node !== null && block.mounted))
-			)
-				journalRootRange(
-					parent,
-					attached ? prev!.previousSibling : (endM?.previousSibling ?? parent.lastChild),
-					attached ? getNextSibling(prev!) : endM,
-				);
 			if (node !== null) {
 				const before = attached ? prev : endM;
 				if (frontier) {
@@ -36379,10 +36138,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		const frontier = el !== null && usesFrontier(block, parent);
 		if (el !== null) {
 			const retired = el;
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				if (!frontier) journalRootRange(parent, retired.previousSibling, getNextSibling(retired));
-				journalRootProperty(block, 'deoptNode', block.deoptNode);
-			}
+			journalRootProperty(block, 'deoptNode', block.deoptNode);
 			// This Block keeps rendering, so the replaced element retires on its own,
 			// before its children leave it and can take focus with them.
 			if (ROOT_RENDER_TRANSACTION !== null)
@@ -36996,34 +36752,13 @@ export function mapSlot(
 // List-only reconciliation is separate from childSlot's text/function path so
 // its first-use compilation can remain deferred until a list value reaches it.
 // Slot registration and upgrade ownership have already been established.
-function journalRootChildShape(state: ChildSlot, parent: Node): void {
+function journalRootChildShape(state: ChildSlot): void {
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
 		return;
 	// Compiled holes cache their input after this helper returns. A structural
 	// clear can be the parent's only binding write, so restore that cache too.
 	journalBag();
-	if (state.ownerHost !== null) {
-		journalRootSlot(state, state.ownerHost, null, null);
-	} else if (state.start !== null) {
-		journalRootSlot(
-			state,
-			parent,
-			state.borrowed ? state.start : state.start.previousSibling,
-			state.borrowed ? state.end : (state.end?.nextSibling ?? null),
-		);
-	} else if (state.borrowed && state.block !== null && state.block.startMarker === null) {
-		journalRootSlot(state, parent, null, state.end);
-	} else {
-		const first = state.text ?? state.hostNode ?? state.block?.startMarker ?? state.end;
-		const last = state.end ?? state.block?.endMarker ?? first;
-		const after = last?.nextSibling ?? null;
-		journalRootSlot(
-			state,
-			parent,
-			first !== null ? first.previousSibling : parent.lastChild,
-			after,
-		);
-	}
+	journalObjectOnce(state);
 }
 
 function renderPreparedChildList(
@@ -37883,7 +37618,7 @@ export function childSlot(
 			state.portal === null &&
 			(state.text === null) === (text === '');
 		if (!unchangedList && !unchangedComponent && !unchangedHost && !unchangedText) {
-			journalRootChildShape(state, domParent);
+			journalRootChildShape(state);
 			rootShapeChanged = true;
 		}
 	}
@@ -37945,18 +37680,9 @@ export function childSlot(
 			parentScope.mounted &&
 			!isCreatedInRootRender(transaction, parentBlock)
 		) {
-			// A stable component may have returned undefined until now, so no
-			// previous slot owns this first insertion. Keep the original anchor
-			// outside the undo range; newly minted markers/raw DOM belong inside.
+			// A stable component may have returned undefined until now: its first
+			// slot's hole cache.
 			journalBag();
-			const after = ownsHost === undefined ? (anchor ?? null) : null;
-			const before =
-				ownsHost === undefined
-					? after === null
-						? domParent.lastChild
-						: after.previousSibling
-					: null;
-			journalRootRange(domParent, before, after);
 		}
 		let start: Comment | null;
 		let end: Comment | null;
@@ -38291,7 +38017,7 @@ export function childSlot(
 						// Over committed DOM, the new node waits in the slot's frontier and
 						// takes the old one's place at commit.
 						if (parent !== null) {
-							journalRootChildShape(state, parent);
+							journalRootChildShape(state);
 							const pending = slotNext(state);
 							pending.out.push(() => detachDeoptTreeRefs(prev!, null), prev, prev);
 							pending.follows = true;
@@ -38302,7 +38028,7 @@ export function childSlot(
 						}
 					} else if (parent !== null) {
 						if (ROOT_RENDER_TRANSACTION !== null) {
-							journalRootChildShape(state, parent);
+							journalRootChildShape(state);
 							queueRootDeletion(() => detachDeoptTreeRefs(prev!, null), prev, prev);
 							if (node !== null) parent.insertBefore(node, prev);
 						} else {
@@ -38329,7 +38055,7 @@ export function childSlot(
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
 					if (ROOT_RENDER_TRANSACTION !== null) {
-						journalRootChildShape(state, domParent);
+						journalRootChildShape(state);
 						const outgoing = prev;
 						queueRootDeletion(() => detachDeoptTreeRefs(outgoing, null), prev, prev);
 					} else {
@@ -38772,7 +38498,7 @@ export function textSlot(
 		return;
 	}
 	if (str === '') return;
-	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state, domParent);
+	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state);
 	insertSlotText(state, parentScope.block, domParent, str);
 }
 
@@ -39060,7 +38786,6 @@ export function childTextHole(
 	}
 	if (ROOT_RENDER_TRANSACTION !== null && state === undefined && parentScope.mounted) {
 		journalBag();
-		journalRootRange(domParent, null, null);
 		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 	}
 	// `null` is a primitive here too: ssrChildText serializes every empty value
@@ -40303,20 +40028,13 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 /**
  * Detached retry/error callbacks still publish through the owning root journal.
  * Their arms build off-document (insertArmPair), so a dropped render restores
- * only the slot's record; hydration, which writes the server range in place,
- * restores that range too.
+ * only the slot's record.
  */
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
-	if (
-		hydrating &&
-		state.start.parentNode === state.domParent &&
-		state.end.parentNode === state.domParent
-	)
-		journalRootSlot(state, state.domParent, state.start, state.end);
-	else if (frame === null) journalObjectOnce(state);
+	if (frame === null) journalObjectOnce(state);
 	else {
 		// A frame of its own opens a window nothing has snapshotted in yet: one
 		// snapshot per resume, with no lookup.
@@ -45010,50 +44728,8 @@ function renderBranchSlot(
 			swapBranchFrontier(parentScope, slotKey, state, domParent, next, body, marker, env, lone);
 			return;
 		}
-		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
-			// A lite arm's stand-in carries the bound an arm Block would.
-			const previousBlock = state.block ?? state.lite?.block ?? null;
-			if (state.unfinalized && previousBlock !== null) {
-				// A client arm without a bound owns only its own range before its
-				// anchor; the content in front of that belongs to its siblings.
-				journalRootSlot(
-					state,
-					domParent,
-					pendingArmBefore(previousBlock, domParent),
-					previousBlock.endMarker,
-				);
-			} else if (state.start !== null) {
-				// An owned pair can itself be replaced by an explicit boundary's
-				// completed WIP; borrowed parent markers stay outside this range.
-				journalRootSlot(
-					state,
-					domParent,
-					state.borrowed ? state.start : state.start.previousSibling,
-					state.borrowed ? state.end : (state.end?.nextSibling ?? null),
-				);
-			} else if (state.borrowed && previousBlock?.startMarker == null) {
-				journalRootSlot(state, domParent, null, null);
-			} else {
-				const first = previousBlock?.startMarker ?? null;
-				const last = previousBlock?.endMarker ?? null;
-				if (
-					first !== null &&
-					last !== null &&
-					first.parentNode === domParent &&
-					last.parentNode === domParent
-				) {
-					journalRootSlot(state, domParent, first.previousSibling, getNextSibling(last));
-				} else {
-					const after = state.anchor;
-					journalRootSlot(
-						state,
-						domParent,
-						after === null ? domParent.lastChild : after.previousSibling,
-						after,
-					);
-				}
-			}
-		}
+		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null))
+			journalRootSlot(state);
 		let provisionalAfter: Node | null = null;
 		if (state.unfinalized && state.block !== null) {
 			// The first arm suspended before it could publish a stable boundary. Its
