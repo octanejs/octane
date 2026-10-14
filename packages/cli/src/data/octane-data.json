@@ -3534,6 +3534,11 @@
       "message": "Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "346": {
+      "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {
