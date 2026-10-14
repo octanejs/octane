@@ -301,6 +301,8 @@ describe('keyed lists change their structure at commit', () => {
 // Descriptor children of a pure host reconcile through the de-opt list.
 interface DeoptProps {
 	rows: string[];
+	label: string;
+	tag: 'b' | 'i';
 	gate?: PromiseLike<unknown>;
 	probe: () => void;
 }
@@ -315,37 +317,110 @@ function DeoptGate(props: { gate: PromiseLike<unknown> }) {
 	return null;
 }
 
+function DeoptLeaf(props: { label: string }) {
+	return createElement('em', { title: props.label }, props.label);
+}
+
 function DeoptListApp(props: DeoptProps) {
 	return createElement(
 		'section',
 		null,
 		createElement(
 			'ul',
-			{ id: 'deopt' },
-			props.rows.map((row) => createElement('li', { key: row, id: 'deopt-' + row }, row)),
+			{ id: 'deopt', title: props.label },
+			props.rows.map((row) =>
+				createElement('li', { key: row, id: 'deopt-' + row, className: props.label }, row),
+			),
+		),
+		// A host with a component child renders through a Block of its own.
+		createElement(
+			'div',
+			{ id: 'deopt-host', title: props.label },
+			createElement(DeoptLeaf, { label: props.label }),
+		),
+		createElement('p', { id: 'deopt-text' }, props.label),
+		// This item changes element.
+		createElement(props.tag, { id: 'deopt-item' }, props.label),
+		createElement(DeoptProbe, { probe: props.probe }),
+		props.gate ? createElement(DeoptGate, { gate: props.gate }) : null,
+	);
+}
+
+// Self-marked items (one element each) of a keyed de-opt list.
+interface DeoptItemsProps {
+	rows: string[];
+	swap: string;
+	gate?: PromiseLike<unknown>;
+	probe: () => void;
+}
+
+function DeoptMark() {
+	return null;
+}
+
+function DeoptItemsApp(props: DeoptItemsProps) {
+	return createElement(
+		'section',
+		null,
+		// A component child makes the host's children a list of item Blocks.
+		createElement(
+			'div',
+			{ id: 'items' },
+			props.rows.map((row) =>
+				createElement(row === props.swap ? 'i' : 'b', { key: row, id: 'item-' + row }, row),
+			),
+			createElement(DeoptMark),
 		),
 		createElement(DeoptProbe, { probe: props.probe }),
 		props.gate ? createElement(DeoptGate, { gate: props.gate }) : null,
 	);
 }
 
-describe('de-opt host children change at commit', () => {
+function observeMutations(target: Node) {
+	const records: MutationRecord[] = [];
+	const observer = new MutationObserver((batch) => records.push(...batch));
+	observer.observe(target, {
+		childList: true,
+		subtree: true,
+		characterData: true,
+		attributes: true,
+	});
+	const mutations = () => {
+		records.push(...observer.takeRecords());
+		return records.splice(0);
+	};
+	return { observer, mutations };
+}
+
+describe('de-opt hosts change at commit', () => {
 	for (const priority of ['urgent', 'transition'] as const) {
-		it(`reorders, inserts and removes a host's children at commit only (${priority})`, async () => {
-			const records: MutationRecord[] = [];
-			const observer = new MutationObserver((batch) => records.push(...batch));
-			const mutations = () => {
-				records.push(...observer.takeRecords());
-				return records.splice(0);
-			};
+		it(`patches props, text and children and replaces elements at commit only (${priority})`, async () => {
 			let during: MutationRecord[] | null = null;
-			const initial: DeoptProps = { rows: ['a', 'b', 'c', 'd'], probe: () => {} };
+			const initial: DeoptProps = {
+				rows: ['a', 'b', 'c', 'd'],
+				label: 'before',
+				tag: 'b',
+				probe: () => {},
+			};
 			const app = mount(DeoptListApp, initial);
+			const section = app.find('section');
 			const list = app.find('#deopt');
-			observer.observe(list, { childList: true, subtree: true, characterData: true });
+			const { observer, mutations } = observeMutations(section);
 			const before = [...list.childNodes];
-			const render = (props: Partial<DeoptProps>) =>
-				act(() => {
+			const item = app.find('#deopt-item');
+			const shown = () => [
+				list.getAttribute('title'),
+				[...list.children].map((node) => node.id + '.' + node.className).join(),
+				app.find('#deopt-host').getAttribute('title'),
+				app.find('em').getAttribute('title') + '/' + app.find('em').textContent,
+				app.find('#deopt-text').textContent,
+				app.find('#deopt-item').localName + '/' + app.find('#deopt-item').textContent,
+			];
+			const render = (props: Partial<DeoptProps>) => {
+				// Only what this render writes before its probe counts.
+				mutations();
+				during = null;
+				return act(() => {
 					const next = () =>
 						app.root.render(DeoptListApp, {
 							...initial,
@@ -357,27 +432,86 @@ describe('de-opt host children change at commit', () => {
 					if (priority === 'transition') startTransition(next);
 					else next();
 				});
+			};
+			const change: Partial<DeoptProps> = { rows: ['d', 'x', 'b', 'a'], label: 'after', tag: 'i' };
 			try {
+				const old = shown();
 				mutations();
-				// A sibling suspends: the dropped render leaves the children as they were.
-				await render({ rows: ['d', 'x', 'b', 'a'], gate: new Promise(() => {}) });
+				// A sibling suspends: the dropped render leaves the hosts as they were.
+				await render({ ...change, gate: new Promise(() => {}) });
 				expect(during).toEqual([]);
 				expect(mutations()).toEqual([]);
+				expect(shown()).toEqual(old);
 				expect([...list.childNodes].every((node, i) => node === before[i])).toBe(true);
 				expect(list.childNodes).toHaveLength(before.length);
+				expect(app.find('#deopt-item')).toBe(item);
 
-				await render({ rows: ['d', 'x', 'b', 'a'] });
+				await render(change);
 				expect(during).toEqual([]);
-				expect([...list.children].map((node) => node.id)).toEqual([
-					'deopt-d',
-					'deopt-x',
-					'deopt-b',
-					'deopt-a',
+				expect(shown()).toEqual([
+					'after',
+					'deopt-d.after,deopt-x.after,deopt-b.after,deopt-a.after',
+					'after',
+					'after/after',
+					'after',
+					'i/after',
 				]);
 				for (const id of ['a', 'b', 'd'])
 					expect(app.find('#deopt-' + id)).toBe(
 						before.find((node) => (node as Element).id === 'deopt-' + id),
 					);
+				expect(item.isConnected).toBe(false);
+			} finally {
+				observer.disconnect();
+				app.unmount();
+			}
+		});
+
+		it(`replaces a self-marked item while its keyed list moves it (${priority})`, async () => {
+			let during: MutationRecord[] | null = null;
+			const initial: DeoptItemsProps = { rows: ['a', 'b', 'c'], swap: '', probe: () => {} };
+			const app = mount(DeoptItemsApp, initial);
+			const section = app.find('#items');
+			const { observer, mutations } = observeMutations(app.find('section'));
+			const items = () =>
+				[...section.children]
+					.filter((node) => node.id.startsWith('item-'))
+					.map((node) => node.localName + '#' + node.id);
+			const b = app.find('#item-b');
+			const render = (props: Partial<DeoptItemsProps>) => {
+				// Only what this render writes before its probe counts.
+				mutations();
+				during = null;
+				return act(() => {
+					const next = () =>
+						app.root.render(DeoptItemsApp, {
+							...initial,
+							probe: () => {
+								during = mutations();
+							},
+							...props,
+						});
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			};
+			try {
+				mutations();
+				await render({ rows: ['c', 'a', 'b'], swap: 'a', gate: new Promise(() => {}) });
+				expect(during).toEqual([]);
+				expect(mutations()).toEqual([]);
+				expect(items()).toEqual(['b#item-a', 'b#item-b', 'b#item-c']);
+
+				// The replaced item lands where the list moved it, in one commit.
+				await render({ rows: ['c', 'a', 'b'], swap: 'a' });
+				expect(during).toEqual([]);
+				expect(items()).toEqual(['b#item-c', 'i#item-a', 'b#item-b']);
+
+				await render({ rows: ['b', 'c', 'a'], swap: 'c' });
+				expect(during).toEqual([]);
+				expect(items()).toEqual(['b#item-b', 'i#item-c', 'b#item-a']);
+				expect(app.find('#item-b')).toBe(b);
+				expect(section.querySelectorAll('[id^="item-"]')).toHaveLength(3);
 			} finally {
 				observer.disconnect();
 				app.unmount();

@@ -4126,25 +4126,45 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any) => void): void {
 }
 
 /**
- * Run a root's queued commit ops in render order. A deletion cleanup that
- * unmounts the root ends the commit; its remaining entries name dead DOM.
+ * The root whose commit ops are running, and the generation they commit for.
+ * A same-component root.render from a mutation-phase callback (a custom
+ * element's) supersedes retry generations, not this commit: it refreshes the
+ * generation, and the commit finishes first, as React's does.
  */
-function runCommitOps(ops: any[], owner: RootRenderOwner, generation: number): void {
-	for (let i = 0; i < ops.length; i += 2) {
-		if (owner.disposed || owner.generation !== generation) break;
-		const target = ops[i + 1];
-		try {
-			ops[i](target);
-		} catch (error) {
-			// React routes a commit-phase error to the nearest boundary and keeps
-			// committing; the failed bag's state was cleared before its first write.
-			// A structural entry's cleanups already route their own errors.
-			if (typeof target?.$ !== 'number') throw error;
-			if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
-				reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+let COMMITTING_OWNER: RootRenderOwner | null = null;
+let COMMITTING_GENERATION = 0;
+
+/**
+ * Run a root's queued commit ops in render order, returning the generation
+ * they committed for. A deletion cleanup that unmounts the root ends the
+ * commit; its remaining entries name dead DOM.
+ */
+function runCommitOps(ops: any[], owner: RootRenderOwner): number {
+	const previousOwner = COMMITTING_OWNER;
+	const previousGeneration = COMMITTING_GENERATION;
+	COMMITTING_OWNER = owner;
+	COMMITTING_GENERATION = owner.generation;
+	try {
+		for (let i = 0; i < ops.length; i += 2) {
+			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
+			const target = ops[i + 1];
+			try {
+				ops[i](target);
+			} catch (error) {
+				// React routes a commit-phase error to the nearest boundary and keeps
+				// committing; the failed bag's state was cleared before its first write.
+				// A structural entry's cleanups already route their own errors.
+				if (typeof target?.$ !== 'number') throw error;
+				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
+					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+			}
 		}
+		return COMMITTING_GENERATION;
+	} finally {
+		ops.length = 0;
+		COMMITTING_OWNER = previousOwner;
+		COMMITTING_GENERATION = previousGeneration;
 	}
-	ops.length = 0;
 }
 
 interface RootRenderOwner {
@@ -5306,9 +5326,9 @@ function commitRootTransactions(): void {
 				(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
 			)
 				TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
-			const acceptedGeneration = owner.generation;
 			// The mutation phase precedes the incoming ref/layout publication.
-			if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
+			const acceptedGeneration =
+				transaction.ops.length !== 0 ? runCommitOps(transaction.ops, owner) : owner.generation;
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
 			if (owner.disposed || owner.generation !== acceptedGeneration) {
 				discardOffscreenCapture(transaction.capture);
@@ -20893,6 +20913,7 @@ function initDomOperations(): void {
 		// De-opt child scans poll these on every owned child.
 		seedExpando(elementProto, '$$portalEnd');
 		seedExpando(elementProto, '$$deoptKey');
+		seedExpando(elementProto, '$$deoptOrder', false);
 		// Controlled-form and hydration-suppression checks.
 		seedExpando(elementProto, '$$ctrl');
 		seedExpando(elementProto, '__oct_suppress');
@@ -20916,6 +20937,7 @@ function initDomOperations(): void {
 	if (typeof CharacterData !== 'undefined' && Object.isExtensible(CharacterData.prototype)) {
 		seedExpando(CharacterData.prototype, '$$portalEnd');
 		seedExpando(CharacterData.prototype, '$$deoptKey');
+		seedExpando(CharacterData.prototype, '$$deoptOrder', false);
 		seedExpando(CharacterData.prototype, DEOPT_DESC, false);
 	}
 }
@@ -30444,7 +30466,16 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			SIGNAL_EVENT_OWNERS_RECORDED = true;
 			// Compare queued writes at publication: an earlier preparation may
 			// replace even the authority that is currently committed.
-			if (STAGED_COMMIT_CAPTURE)
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (
+				key === undefined &&
+				transaction !== null &&
+				!transaction.aborted &&
+				!ROOT_RENDER_ROLLBACK &&
+				!hydrating
+			)
+				queueEventOwner(el, owner, transaction);
+			else if (STAGED_COMMIT_CAPTURE)
 				DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
 					if ((el as any).$$signalOwner !== owner) (el as any).$$signalOwner = owner;
 				});
@@ -30458,6 +30489,33 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			}
 		}
 	}
+}
+
+/**
+ * A root render's authority refresh for a committed handler publishes with
+ * its commit, so dispatch before then keeps the committed authority. A later
+ * pass of the same render compares against, and supersedes, the pending one.
+ */
+function queueEventOwner(
+	el: Element,
+	owner: SignalEventOwner,
+	transaction: RootRenderTransaction,
+): void {
+	const pending = (el as any).$$ownerNext as any[] | undefined;
+	const shown =
+		pending !== undefined && pending[2] === transaction ? pending[1] : (el as any).$$signalOwner;
+	if (shown === owner) return;
+	const next = [el, owner, transaction];
+	journalRootProperty(el, '$$ownerNext', pending);
+	(el as any).$$ownerNext = next;
+	transaction.ops.push(publishEventOwner, next);
+}
+
+function publishEventOwner(next: any[]): void {
+	const el = next[0];
+	if (el.$$ownerNext !== next) return;
+	el.$$ownerNext = undefined;
+	el.$$signalOwner = next[1];
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
@@ -36948,7 +37006,12 @@ function hasDeoptOwnedChild(el: Element): boolean {
 interface DeoptStamped {
 	[DEOPT_DESC]?: ElementDescriptor;
 }
+// A render reads the record an earlier pass of the same root render left
+// pending (DeoptOrder): that is what its commit will show.
 function getDeoptDesc(n: Node): ElementDescriptor | undefined {
+	const order: DeoptOrder | undefined = (n as any).$$deoptOrder;
+	if (order !== undefined && order.desc !== null && order.tx === ROOT_RENDER_TRANSACTION)
+		return order.desc;
 	return (STAGED_DOM ? STAGED_DOM.view(n as Node & DeoptStamped) : (n as Node & DeoptStamped))[
 		DEOPT_DESC
 	];
@@ -36977,37 +37040,43 @@ function unchangedScopedHostDescriptor(block: Block, d: ElementDescriptor): bool
 }
 
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
-	// Preserve the record committed to this DOM node. A deferred JSX shell can
-	// resolve differently after a Provider update; stamping the shell itself
-	// would make both sides of the next prop diff observe the new record and
-	// would run user code outside render while Suspense detaches subtree refs.
+	stampDeoptDesc(el, deoptRecord(el, d));
+}
+
+// The record to commit for `d`, resolved in render. A deferred JSX shell can
+// resolve differently after a Provider update; stamping the shell itself would
+// make both sides of the next prop diff observe the new record and would run
+// user code outside render while Suspense detaches subtree refs.
+function deoptRecord(el: Element, d: ElementDescriptor): ElementDescriptor {
 	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
-	let record = resolveScopedRecord === undefined ? d : resolveScopedRecord();
-	if ((record as any)[SCOPED_CHILDREN_RESOLVER] !== undefined) {
-		// A deferred-children shell is stable across different resolved trees too.
-		// Retain the actual children used by this host so a later raw-host upgrade
-		// can match the old DOM, without resolving its old keys in the new scope.
-		const children = record.children;
-		const previous = getDeoptDesc(el);
-		record = sameDeoptDesc(previous, record, children)
-			? previous!
-			: {
-					$$kind: ELEMENT_TAG,
-					type: record.type,
-					props: record.props,
-					key: record.key,
-					ref: record.ref,
-					children,
-				};
-	}
+	const record = resolveScopedRecord === undefined ? d : resolveScopedRecord();
+	if ((record as any)[SCOPED_CHILDREN_RESOLVER] === undefined) return record;
+	// A deferred-children shell is stable across different resolved trees too.
+	// Retain the actual children used by this host so a later raw-host upgrade
+	// can match the old DOM, without resolving its old keys in the new scope.
+	const children = record.children;
+	const previous = getDeoptDesc(el);
+	return sameDeoptDesc(previous, record, children)
+		? previous!
+		: {
+				$$kind: ELEMENT_TAG,
+				type: record.type,
+				props: record.props,
+				key: record.key,
+				ref: record.ref,
+				children,
+			};
+}
+
+function stampDeoptDesc(el: Element, record: ElementDescriptor): void {
+	const host = STAGED_DOM
+		? STAGED_DOM.view(el as Element & DeoptStamped)
+		: (el as Element & DeoptStamped);
 	// A held descriptor retry restores host props too. Restore their comparison
 	// record with them or the final retry will mistake aborted props for live ones.
-	if (TRANSITION_JOURNAL !== null) {
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, getDeoptDesc(el));
-	}
-	(STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as Element & DeoptStamped))[
-		DEOPT_DESC
-	] = record;
+	if (TRANSITION_JOURNAL !== null)
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, host[DEOPT_DESC]);
+	host[DEOPT_DESC] = record;
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';
@@ -37371,7 +37440,8 @@ function reconcileDeoptNode(
 			) {
 				return hydration.htextSwap(prev, s);
 			}
-			updateTextValue(prev as Text, s);
+			if (usesFrontier(ownerBlock, prev)) queueDeoptText(prev as Text, s);
+			else updateTextValue(prev as Text, s);
 			return prev;
 		}
 		return (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(s);
@@ -37385,6 +37455,7 @@ function reconcileDeoptNode(
 		// createElement, or portaled into an SVG target).
 		const elNs = inferTagNs(value.type, ns);
 		let el: Element;
+		let order: DeoptOrder | null = null;
 		if (
 			prev !== null &&
 			prev.nodeType === 1 &&
@@ -37392,8 +37463,13 @@ function reconcileDeoptNode(
 			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
 		) {
 			// REUSE the existing element — patch props in place instead of rebuilding.
+			// Committed DOM takes the patch at commit, with its children's order.
 			el = prev as Element;
-			setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
+			if (usesFrontier(ownerBlock, el)) {
+				order = nextDeoptOrder(el, ownerBlock);
+				order.desc = deoptRecord(el, value);
+			} else
+				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
 		} else {
 			el =
 				elNs !== undefined
@@ -37402,7 +37478,7 @@ function reconcileDeoptNode(
 			if (hydrating) activeHydration()?.markFresh(el);
 			setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
-		setDeoptDesc(el, value);
+		if (order === null) setDeoptDesc(el, value);
 		if (!hasHostPropContent(value)) {
 			reconcileDeoptChildren(
 				el,
@@ -37410,8 +37486,10 @@ function reconcileDeoptNode(
 					? textareaChildText(value.children, rejectTextareaChild)
 					: value.children,
 				ownerBlock,
+				order,
 			);
 		}
+		if (order !== null) queueDeoptOrder(order);
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -37427,32 +37505,43 @@ function reconcileDeoptNode(
 // children match by `key`, unkeyed children match positionally (React-shape). Nodes
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
-function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+//
+// A committed host passes its pending record (`order`): the reconcile then
+// writes nothing, and its commit places the children it chose. An earlier pass
+// of the same root render may have chosen them already, so the record's
+// `nodes`, not the DOM, are the children this pass starts from.
+function reconcileDeoptChildren(
+	el: Element,
+	children: any,
+	ownerBlock: Block,
+	order: DeoptOrder | null,
+): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
-	// An earlier render of this root left an order for this host: land it now,
-	// so this reconcile reads the children that render chose.
-	const pending: DeoptOrder | undefined = (el as any).$$deoptOrder;
-	if (pending !== undefined && pending.tx === ROOT_RENDER_TRANSACTION) {
-		journalRootChildren(el);
-		applyDeoptOrder(pending);
-	}
+	const pending = order === null ? null : order.nodes;
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
 	// Other shapes still need keyed matching: a lone text node may belong to a
 	// different array position, a nested wrapper, or independently inserted DOM.
 	const type = typeof children;
 	if ((type === 'string' && children !== '') || type === 'number' || type === 'bigint') {
-		const first = getFirstChild(el);
+		const first =
+			pending === null
+				? getFirstChild(el)
+				: pending.length === 1 && !order!.skip
+					? pending[0]
+					: null;
 		if (
 			first !== null &&
 			first.nodeType === 3 &&
-			getNextSibling(first) === null &&
+			(pending !== null || getNextSibling(first) === null) &&
 			(first as any).$$deoptKey === 0 &&
 			(first as any).$$portalEnd == null
 		) {
 			const hydration = hydrating ? activeHydration() : null;
 			if (hydration !== null && !hydration.isFresh(el)) {
 				hydration.htextSwap(first, String(children));
+			} else if (order !== null) {
+				queueDeoptText(first as Text, String(children));
 			} else {
 				updateTextValue(first as Text, String(children));
 			}
@@ -37461,7 +37550,10 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	}
 	// Empty scalar children on an already empty host need no reconciliation
 	// scratch arrays. Existing DOM must still take the ownership/clearing path.
-	if ((children == null || type === 'boolean' || children === '') && getFirstChild(el) === null)
+	if (
+		(children == null || type === 'boolean' || children === '') &&
+		(pending === null ? getFirstChild(el) === null : pending.length === 0)
+	)
 		return;
 	// The element that owns these children is authoritative. This matters when a
 	// component or dynamic tag made the lexical namespace unknowable, and when an
@@ -37476,17 +37568,11 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		(ownerBlock.mounted ||
 			ROOT_RENDER_TRANSACTION.hydrating ||
 			ROOT_RENDER_TRANSACTION.retainedCreated?.has(ownerBlock));
-	// A committed host's children change at its commit (queueDeoptOrder), unless
-	// hydration is adopting them.
-	const deferred =
-		journal &&
-		!(hydrating && activeHydration() !== null) &&
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected;
-	const firstChild = getFirstChild(el);
+	const firstChild = pending === null ? getFirstChild(el) : null;
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
-	if (firstChild === null) {
+	if (pending === null ? firstChild === null : pending.length === 0 && !order!.skip) {
 		// Hydrating, an adopted host with no server children cannot hold these.
 		if (next.length !== 0 && hydrating) currentHydration!.missingDeoptChild(el, next[0]);
 		saveDeoptChildren(el);
@@ -37495,14 +37581,17 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
-				if (deferred) built.push(node);
+				if (order !== null) built.push(node);
 				else {
 					if (journal) journalRootChildren(el);
 					(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
 				}
 			}
 		}
-		if (built.length !== 0) queueDeoptOrder(el, built, false, false);
+		if (built.length !== 0) {
+			order!.nodes = built;
+			order!.skip = false;
+		}
 		return;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
@@ -37510,7 +37599,11 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// sweeping it away. (Going from rendered children to none still clears — the flag is set.)
 	// Hydration is excluded: the children present are the server's, which this reconcile is
 	// adopting, so a client descriptor that renders none must still clear them.
-	if (next.length === 0 && (!hydrating || activeHydration() === null) && !hasDeoptOwnedChild(el)) {
+	if (
+		next.length === 0 &&
+		(!hydrating || activeHydration() === null) &&
+		(pending === null ? !hasDeoptOwnedChild(el) : pending.length === 0)
+	) {
 		return;
 	}
 	// Collect only children this reconciler owns. Portal ranges and unstamped
@@ -37523,6 +37616,17 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	let hydrationOwnsUnstamped: boolean | undefined;
 	let byKey: Map<any, Node> | null = null;
 	const unstamped: Node[] = [];
+	if (pending !== null) {
+		// Every node an earlier pass chose is owned and carries its key.
+		hasForeign = order!.skip;
+		for (let i = 0; i < pending.length; i++) {
+			const node = pending[i];
+			const key = (node as any).$$deoptKey;
+			owned.push(node);
+			if (key != null && !(byKey ??= new Map()).has(key)) byKey.set(key, node);
+			else unstamped.push(node);
+		}
+	}
 	let scan: Node | null = firstChild;
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
@@ -37626,8 +37730,8 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 				);
 			// A speculative attempt's own record restores this removal if the
 			// attempt is discarded; a deferred removal would still run at commit.
-			if (journal && hydration?.speculative !== true) {
-				if (!deferred) journalRootChildren(el);
+			if ((order !== null || journal) && hydration?.speculative !== true) {
+				if (order === null) journalRootChildren(el);
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
@@ -37636,40 +37740,106 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		}
 	}
 	const skip = hasForeign || singleton;
-	const adopt = hydrationOwnsUnstamped === true && !singleton;
-	if (deferred) queueDeoptOrder(el, result, skip, adopt);
-	else placeDeoptChildren(el, result, skip, adopt, journal === true);
+	if (order !== null) {
+		order.nodes = result;
+		order.skip = skip;
+	} else
+		placeDeoptChildren(
+			el,
+			result,
+			skip,
+			hydrationOwnsUnstamped === true && !singleton,
+			journal === true,
+		);
 }
 
 /**
- * A committed host's children as a root render's deopt reconcile chose them:
- * its commit entry puts them in this order (applyDeoptOrder), after the
- * deletions the reconcile queued. `skip` steps over foreign ranges; `adopt`
- * also takes unstamped hydration children as owned.
+ * A committed de-opt node's change in an open root render, written by its
+ * commit entry (applyDeoptOrder) after the deletions its reconcile queued: a
+ * host's descriptor (`desc`: its props and DEOPT_DESC record, applied in the
+ * Scope `owner`) and its children's order (`nodes`, stepping over foreign
+ * ranges when `skip`), or a Text's `text`. Null fields are unchanged. A later
+ * pass of the same render carries the record forward in a new one, which
+ * supersedes it; a window that drops forgets its records with its entries.
  */
 interface DeoptOrder {
 	tx: RootRenderTransaction;
-	el: Element;
-	nodes: Node[];
+	el: Node;
+	nodes: Node[] | null;
 	skip: boolean;
-	adopt: boolean;
+	desc: ElementDescriptor | null;
+	text: string | null;
+	owner: Block | null;
 }
 
-function queueDeoptOrder(el: Element, nodes: Node[], skip: boolean, adopt: boolean): void {
+/** `node`'s record for this pass, starting from what an earlier pass left pending. */
+function nextDeoptOrder(node: Node, owner: Block | null): DeoptOrder {
 	const tx = ROOT_RENDER_TRANSACTION!;
-	const order: DeoptOrder = { tx, el, nodes, skip, adopt };
-	// A nested window that drops forgets its order with its entry.
-	journalRootProperty(el, '$$deoptOrder', (el as any).$$deoptOrder);
-	(el as any).$$deoptOrder = order;
-	tx.ops.push(applyDeoptOrder, order);
+	let pending: DeoptOrder | null = (node as any).$$deoptOrder ?? null;
+	if (pending !== null && pending.tx !== tx) pending = null;
+	return {
+		tx,
+		el: node,
+		nodes: pending && pending.nodes,
+		skip: pending !== null && pending.skip,
+		desc: pending && pending.desc,
+		text: pending && pending.text,
+		owner,
+	};
+}
+
+function queueDeoptOrder(order: DeoptOrder): void {
+	const node = order.el as any;
+	journalRootProperty(node, '$$deoptOrder', node.$$deoptOrder);
+	node.$$deoptOrder = order;
+	order.tx.ops.push(applyDeoptOrder, order);
+}
+
+/** A committed Text's data, written at commit unless it already shows `data`. */
+function queueDeoptText(node: Text, data: string): void {
+	const pending: DeoptOrder | undefined = (node as any).$$deoptOrder;
+	const shown =
+		pending !== undefined && pending.tx === ROOT_RENDER_TRANSACTION
+			? pending.text
+			: (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue;
+	if (shown === data) return;
+	const order = nextDeoptOrder(node, null);
+	order.text = data;
+	queueDeoptOrder(order);
 }
 
 function applyDeoptOrder(order: DeoptOrder): void {
-	const el = order.el;
-	// A later render of this root landed it already.
-	if ((el as any).$$deoptOrder !== order) return;
-	(el as any).$$deoptOrder = undefined;
-	placeDeoptChildren(el, order.nodes, order.skip, order.adopt, false);
+	const node = order.el as any;
+	// A later pass of this render superseded it.
+	if (node.$$deoptOrder !== order) return;
+	node.$$deoptOrder = undefined;
+	if (order.text !== null) {
+		updateTextValue(node, order.text);
+		return;
+	}
+	const desc = order.desc;
+	if (desc !== null) {
+		// Handlers and refs resolve their owner as they would have in render.
+		const owner = order.owner!;
+		const previous = CURRENT_SCOPE;
+		CURRENT_SCOPE = owner;
+		try {
+			if (signalDocumentEnabled || owner.idState.renderOwner?.signalOwner !== undefined)
+				runWithBlockSignalOwner(owner, () => commitDeoptHost(node, desc, owner));
+			else commitDeoptHost(node, desc, owner);
+		} finally {
+			CURRENT_SCOPE = previous;
+		}
+	}
+	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, order.skip, false, false);
+}
+
+function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Block): void {
+	const committed = (
+		STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as DeoptStamped)
+	)[DEOPT_DESC];
+	setHostProps(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
+	stampDeoptDesc(el, record);
 }
 
 /**
@@ -37947,50 +38117,65 @@ function deoptItemBody(item: any, scope: Scope): void {
 	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
 	if (node !== prev) {
 		journalRootProperty(block, 'deoptNode', block.deoptNode);
-		// Built a fresh node (first mount, or a tag/type change) — insert it at
-		// the old node's position, THEN drop the old one. Insert-before-remove
-		// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
-		// marker, so removing it first would leave `endM` detached and the
-		// insert would throw.
-		if (
-			prev != null &&
-			prev !== node &&
-			(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode === block.parentNode
-		) {
-			if (ROOT_RENDER_TRANSACTION !== null)
+		const parent = block.parentNode;
+		const host = prev === null ? null : (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode;
+		let landing: SlotNext | null = null;
+		if (host !== null && host !== parent && (host as any).$$next !== undefined) {
+			// An earlier pass of this render built `prev` in a frontier that has
+			// not landed: replace it there, and land the replacement in its place.
+			const retired = prev!;
+			if (node !== null) (STAGED_DOM ? STAGED_DOM.view(host) : host).replaceChild(node, retired);
+			else (STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(retired);
+			queueRootDeletion(() => detachDeoptTreeRefs(retired, null), null, null);
+			const bound = ((host as any).$$next as SlotNext).bound;
+			if (bound !== null) bound[3] = bound[4] = node;
+		} else {
+			// Built a fresh node (first mount, or a tag/type change) — insert it at
+			// the old node's position, THEN drop the old one. Insert-before-remove
+			// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
+			// marker, so removing it first would leave `endM` detached and the
+			// insert would throw. Committed DOM takes it at commit, from a frontier.
+			const attached = host === parent;
+			const frontier = usesFrontier(block, parent);
+			if (
+				ROOT_RENDER_TRANSACTION !== null &&
+				!frontier &&
+				(attached || (node !== null && block.mounted))
+			)
 				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(prev) : prev).previousSibling,
-					getNextSibling(prev),
+					parent,
+					attached
+						? (STAGED_DOM ? STAGED_DOM.view(prev!) : prev!).previousSibling
+						: ((STAGED_DOM ? STAGED_DOM.view(endM) : endM)?.previousSibling ??
+								domNode(parent).lastChild),
+					attached ? getNextSibling(prev!) : endM,
 				);
 			if (node !== null) {
-				const parent = block.parentNode;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
+				const before = attached ? prev : endM;
+				if (frontier) {
+					const frag = queueFrontier(block, parent, before);
+					(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
+					landing = (frag as any).$$next;
+				} else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, before);
 			}
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				const retired = prev;
-				queueRootDeletion(() => detachDeoptTreeRefs(retired, null), retired, retired);
-			} else {
-				detachDeoptTreeRefs(prev, null);
-				const parent = block.parentNode;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev);
+			if (attached) {
+				const retired = prev!;
+				if (ROOT_RENDER_TRANSACTION !== null)
+					queueRootDeletion(() => detachDeoptTreeRefs(retired, null), retired, retired);
+				else {
+					detachDeoptTreeRefs(retired, null);
+					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(retired);
+				}
 			}
-		} else if (node !== null) {
-			if (ROOT_RENDER_TRANSACTION !== null && block.mounted) {
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(endM) : endM)?.previousSibling ??
-						domNode(block.parentNode).lastChild,
-					endM,
-				);
-			}
-			const parent = block.parentNode;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, endM);
 		}
 		// Self-marked item rebuilt: the replaced element WAS the range — re-point
-		// both markers at the replacement. (A non-host new value never reaches
-		// here self-marked — the promotion above minted a pair first.)
-		if (prev !== null && block.startMarker === prev) {
+		// both markers at the replacement, as it lands when that is at commit.
+		// The keyed list's own commit entry, which runs first, still moves or
+		// removes the item by the node it shows now. (A non-host new value never
+		// reaches here self-marked — the promotion above minted a pair first.)
+		if (landing !== null && block.startMarker === prev) {
+			landing.bound = [block, prev, prev, node, node];
+		} else if (prev !== null && block.startMarker === prev) {
 			journalRootProperty(block, 'startMarker', block.startMarker);
 			journalRootProperty(block, 'endMarker', block.endMarker);
 			block.startMarker = node;
@@ -38256,6 +38441,7 @@ function runtimeHostSiteLoc(block: Block): string {
 // children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
+	let order: DeoptOrder | null = null;
 	const hydration = hydrating ? activeHydration() : null;
 	// Component/value boundaries are namespace-transparent. Derive the inherited
 	// namespace from the block's actual DOM parent; explicit <svg>/<math> roots
@@ -38311,14 +38497,18 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		(elNs !== undefined && el.namespaceURI !== elNs)
 	) {
 		// First render, or the host tag changed at this slot — (re)create the element.
+		// Committed DOM takes the replacement at commit, from a frontier.
+		const parent = block.parentNode;
+		const frontier = el !== null && usesFrontier(block, parent);
 		if (el !== null) {
 			const retired = el;
 			if (ROOT_RENDER_TRANSACTION !== null) {
-				journalRootRange(
-					block.parentNode,
-					(STAGED_DOM ? STAGED_DOM.view(retired) : retired).previousSibling,
-					getNextSibling(retired),
-				);
+				if (!frontier)
+					journalRootRange(
+						parent,
+						(STAGED_DOM ? STAGED_DOM.view(retired) : retired).previousSibling,
+						getNextSibling(retired),
+					);
 				journalRootProperty(block, 'deoptNode', block.deoptNode);
 			}
 			// This Block keeps rendering, so the replaced element retires on its own,
@@ -38354,19 +38544,28 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(d.type as string);
 		if (hydration !== null) hydration.markFresh(el);
 		block.deoptNode = el;
-		const parent = block.parentNode;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
+		if (frontier) {
+			const frag = queueFrontier(block, parent, block.endMarker);
+			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(el);
+		} else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
 		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+	} else if (usesFrontier(block, el)) {
+		// REUSE the committed element — its props change at commit, after its
+		// children's entries. Its childSlot owns the children's structure.
+		order = nextDeoptOrder(el, block);
+		order.nodes = null;
+		order.desc = deoptRecord(el, d);
 	} else {
 		// REUSE the existing element — diff props in place (no rebuild).
 		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
-	setDeoptDesc(el, d);
+	if (order === null) setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
 	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
 	if (!hasHostPropContent(d)) deoptHostChildren(block, el, d, elNs);
+	if (order !== null) queueDeoptOrder(order);
 }
 
 // Stable render body for a componentSlot whose comp resolved to a HOST tag
@@ -51711,6 +51910,7 @@ function makeRoot(
 				if (inFlush && DEFERRED_LAYOUT_DRIVER)
 					DEFERRED_LAYOUT_DRIVER.refreshPublishingOwner(renderOwner);
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
+				if (COMMITTING_OWNER === renderOwner) COMMITTING_GENERATION = renderOwner.generation;
 			}
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
