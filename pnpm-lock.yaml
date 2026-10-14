@@ -10931,9 +10931,6 @@ importers:
       '@octanejs/three':
         specifier: workspace:*
         version: link:../packages/three
-      '@octanejs/visx':
-        specifier: workspace:*
-        version: link:../packages/visx
       octane:
         specifier: workspace:*
         version: link:../packages/octane
@@ -10950,6 +10947,9 @@ importers:
       '@lynx-js/web-core':
         specifier: catalog:lynx
         version: 0.22.2(@lynx-js/css-serializer@0.1.6)(tslib@2.8.1)
+      '@octanejs/app-core':
+        specifier: workspace:*
+        version: link:../packages/app-core
       '@octanejs/testing-library':
         specifier: workspace:*
         version: link:../packages/testing-library

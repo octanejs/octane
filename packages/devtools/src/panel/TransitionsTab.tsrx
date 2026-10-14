@@ -1,3 +1,5 @@
+'use strong';
+
 // The Transitions & Suspense tab: subscribes to the app-side bridge's `transition`
 // event (startBridge, which reads the devtools hook's getTransitionState() per
 // flush) and renders the live pending-transition count plus each Suspense boundary's
@@ -20,6 +22,7 @@ export function TransitionsTab(props: { client: OctaneDevtoolsEventClient }): Oc
 
 	useEffect(() => {
 		const off = client.on('transition', (e) => setSnapshot(e.payload));
+		client.emit('refresh', {});
 		return () => off();
 	});
 

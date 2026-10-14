@@ -11,7 +11,9 @@
 // megabytes of assets, so nothing loads until the panel comes into view. The
 // Web and Device tabs then both stay mounted: switching to the QR code and
 // back should not restart the example.
-import { useEffect, useRef, useState } from 'octane';
+'use strong';
+
+import { useEffect, useLayoutSnapshot, useRef, useState } from 'octane';
 import { bundleUrl, loadExample, resolveEntry, type LoadedExample } from './example-data.ts';
 import { DeviceScan } from './DeviceScan.tsrx';
 import { LynxPreview } from './LynxPreview.tsrx';
@@ -50,7 +52,11 @@ interface GoProps {
 export function Go(props: GoProps) @{
 	const panel = useRef<HTMLDivElement | null>(null);
 	const body = useRef<HTMLDivElement | null>(null);
-	const [near, setNear] = useState(false);
+	const [intersecting, setIntersecting] = useState(false);
+	const needsObserver = useLayoutSnapshot(() => typeof IntersectionObserver !== 'undefined', {
+		initial: true,
+	});
+	const near = intersecting || !needsObserver;
 	const [loaded, setLoaded] = useState<LoadedExample | null>(null);
 	const [error, setError] = useState('');
 	const [openFile, setOpenFile] = useState('');
@@ -64,15 +70,11 @@ export function Go(props: GoProps) @{
 	// assets — waits on this.
 	useEffect(() => {
 		const element = panel.current;
-		if (!element || near) return;
-		if (typeof IntersectionObserver === 'undefined') {
-			setNear(true);
-			return;
-		}
+		if (!element || near || typeof IntersectionObserver === 'undefined') return;
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries.some((entry) => entry.isIntersecting)) {
-					setNear(true);
+					setIntersecting(true);
 					observer.disconnect();
 				}
 			},
@@ -426,7 +428,7 @@ export function Go(props: GoProps) @{
 					</div>
 					<div class="go-source">
 						@if (current) {
-							<div class="go-source-code" dangerouslySetInnerHTML={{ __html: current.html }}></div>
+							<div class="go-source-code" dangerouslySetInnerHTML={current.html}></div>
 						} @else if (error) {
 							<p class="go-message go-message-error">
 								{'This example could not be loaded. ' + error}

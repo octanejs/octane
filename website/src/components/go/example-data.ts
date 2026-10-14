@@ -10,6 +10,7 @@
 // than the page that shows it, and only two pages mount a preview at all.
 
 import { LYNX_EXAMPLE_BASE_PATH } from '../../content/lynx-examples.ts';
+import { trustHTML, type TrustedHTML } from 'octane';
 
 /** One buildable entry of an example, as @lynx-js/go-web describes it. */
 export interface TemplateFile {
@@ -32,7 +33,7 @@ export interface ExampleSourceFile {
 	path: string;
 	language: string;
 	/** Shiki output for the file, with dual-theme token variables. */
-	html: string;
+	html: TrustedHTML;
 }
 
 export interface ExampleSource {
@@ -63,9 +64,19 @@ export function loadExampleMetadata(id: string, signal?: AbortSignal): Promise<E
 export async function loadExample(id: string, signal?: AbortSignal): Promise<LoadedExample> {
 	const [metadata, source] = await Promise.all([
 		loadExampleMetadata(id, signal),
-		fetchJson<ExampleSource>(`${exampleRoot(id)}/example-source.json`, signal),
+		fetchJson<{
+			defaultFile: string;
+			files: (Omit<ExampleSourceFile, 'html'> & { html: string })[];
+		}>(`${exampleRoot(id)}/example-source.json`, signal),
 	]);
-	return { metadata, source };
+	return {
+		metadata,
+		source: {
+			...source,
+			// This same-origin sidecar is generated from checked-in examples by Shiki.
+			files: source.files.map((file) => ({ ...file, html: trustHTML(file.html) })),
+		},
+	};
 }
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {

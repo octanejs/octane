@@ -191,6 +191,33 @@ test('rejects an unauthorized adapted implementation body change', async functio
 	}, /change outside the permitted transformations/);
 });
 
+for (const [name, before, after] of [
+	['portal row key', '; key key)', '; key pluginContainer)'],
+	['portal target', 'target={pluginContainer}', 'target={titleContainers[key]}'],
+	['portal content', 'content={PluginComponents[key]}', 'content={TitleComponents[key]}'],
+	['effect dependency', '}, [devtools]);', '}, [config]);'],
+	['misplaced dependency', '}, [devtools]);', '}, [plugins]);'],
+]) {
+	test(`rejects a changed ${name} during Strong adaptation`, async function rejectsStrongDrift(t) {
+		const value = await fixture();
+		t.after(() => rm(value.root, { recursive: true, force: true }));
+		const file = join(value.root, 'packages/tanstack-devtools/src/devtools.tsrx');
+		let source = await readFile(file, 'utf8');
+		if (name.endsWith('dependency')) {
+			source = source.replace(
+				'return () => devtools.unmount();\n\t});',
+				'return () => devtools.unmount();\n\t}, [devtools]);',
+			);
+		}
+		assert.ok(source.includes(before), `fixture must contain ${before}`);
+		await writeFile(file, source.replace(before, after));
+		assert.throws(
+			() => buildTypeInventories(value.root),
+			/change outside the permitted transformations/,
+		);
+	});
+}
+
 test('rejects a skipped adapted type-probe file', async function rejectsSkippedProbe(t) {
 	const value = await fixture();
 	t.after(function cleanup() {

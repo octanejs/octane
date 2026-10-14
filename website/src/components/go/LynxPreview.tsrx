@@ -6,7 +6,9 @@
 // an adaptation of @lynx-js/go-web's own logic and has no framework in it (see
 // ./lynx-view/UPSTREAM.md). This file is only a host element, an effect, and
 // the site's loading and error treatment.
-import { useEffect, useRef, useState } from 'octane';
+'use strong';
+
+import { useEffect, useEffectEvent, useRef, useState } from 'octane';
 import { loadLynxRuntime } from './lynx-runtime.ts';
 import {
 	mountLynxView,
@@ -53,10 +55,8 @@ export function LynxPreview(props: LynxPreviewProps) @{
 	const appliedReloadKey = useRef(props.reloadKey ?? 0);
 	// The mount effect must not depend on the callback's identity: a parent
 	// passing an inline arrow would otherwise tear the whole preview down and
-	// re-download the bundle on every render it triggers. go-web keeps its
-	// equivalent in a ref for the same reason.
-	const report = useRef<LynxPreviewProps['onStateChange']>(props.onStateChange);
-	report.current = props.onStateChange;
+	// re-download the bundle on every render it triggers.
+	const report = useEffectEvent((next: LynxViewState) => props.onStateChange?.(next));
 	const [state, setState] = useState<LynxViewState>({
 		ready: false,
 		rendered: false,
@@ -75,7 +75,7 @@ export function LynxPreview(props: LynxPreviewProps) @{
 			autoGesture: props.autoGesture,
 			onStateChange: (next) => {
 				setState(next);
-				report.current?.(next);
+				report(next);
 			},
 		});
 		view.current = mounted;

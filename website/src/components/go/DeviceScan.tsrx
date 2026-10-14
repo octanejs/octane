@@ -9,7 +9,9 @@
 // It is drawn dark-on-white in both themes. A QR code is scanned by a camera,
 // not read by a person, and inverting it on a dark page costs scans on readers
 // whose scanner does not handle inverted codes.
-import { useEffect, useState } from 'octane';
+'use strong';
+
+import { trustHTML, useEffect, useState, type TrustedHTML } from 'octane';
 
 const LYNX_EXPLORER_GUIDE = 'https://lynx.dev/guide/start/quick-start';
 
@@ -19,7 +21,7 @@ interface DeviceScanProps {
 }
 
 export function DeviceScan(props: DeviceScanProps) @{
-	const [svg, setSvg] = useState('');
+	const [svg, setSvg] = useState<TrustedHTML | null>(null);
 	const [failed, setFailed] = useState(false);
 
 	// Explorer's fullscreen flag: without it the bundle renders inside the
@@ -40,7 +42,7 @@ export function DeviceScan(props: DeviceScanProps) @{
 				}),
 			)
 			.then((markup) => {
-				if (live) setSvg(markup);
+				if (live) setSvg(trustHTML(markup));
 			})
 			.catch(() => {
 				if (live) setFailed(true);
@@ -107,7 +109,7 @@ export function DeviceScan(props: DeviceScanProps) @{
 		<div class="scan">
 			<div class="scan-card">
 				@if (svg) {
-					<div class="scan-code" dangerouslySetInnerHTML={{ __html: svg }}></div>
+					<div class="scan-code" dangerouslySetInnerHTML={svg}></div>
 				} @else {
 					<div class="scan-code scan-code-empty" aria-hidden="true"></div>
 				}

@@ -1,3 +1,5 @@
+'use strong';
+
 // Per-page document titles. Pages call useTitle('Octane — …') and the tab
 // title follows client-side navigation; on unmount the default (home) title is
 // restored, so routes that set nothing — the home page — fall back to the
@@ -16,5 +18,5 @@ export function useTitle(title: string) {
 		return () => {
 			document.title = DEFAULT_TITLE;
 		};
-	}, [title]);
+	});
 }

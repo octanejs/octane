@@ -1,3 +1,5 @@
+'use strong';
+
 // Site search keeps the established header entry point and docs snippets, then
 // adds typed ecosystem results from the generated browser index.
 import { createPortal, useEffect, useRef, useState } from 'octane';
@@ -33,17 +35,17 @@ function scrollToAnchor(id: string) {
 
 function SearchDialog(props: DialogProps) @{
 	const [query, setQuery] = useState('');
-	const [active, setActive] = useState(0);
+	const [active, setActive, getActive] = useState(0);
 	const [index, setIndex] = useState<SiteSearchIndex | null>(null);
 	const [indexFailed, setIndexFailed] = useState(false);
-	const [loadAttempt, setLoadAttempt] = useState(0);
+	const [indexRequest, setIndexRequest] = useState(() => loadSiteSearchIndex());
 	const inputEl = useRef<HTMLInputElement | null>(null);
 	const navigate = useNavigate();
 	const results: SiteSearchResult[] = index ? searchSite(index, query) : [];
 
 	useEffect(() => {
 		let live = true;
-		loadSiteSearchIndex().then(
+		indexRequest.then(
 			(loaded) => {
 				if (!live) return;
 				setIndex(loaded);
@@ -57,7 +59,7 @@ function SearchDialog(props: DialogProps) @{
 		return () => {
 			live = false;
 		};
-	}, [loadAttempt]);
+	});
 
 	useEffect(() => {
 		const previous = document.body.style.overflow;
@@ -155,11 +157,9 @@ function SearchDialog(props: DialogProps) @{
 	const step = (delta: number) => {
 		const count = targetCount;
 		if (!count) return;
-		setActive((current) => {
-			const next = (current + delta + count) % count;
-			reveal(next);
-			return next;
-		});
+		const next = (getActive() + delta + count) % count;
+		setActive(next);
+		reveal(next);
 	};
 
 	const activate = (row: number) => {
@@ -175,7 +175,7 @@ function SearchDialog(props: DialogProps) @{
 	const retryIndex = () => {
 		setIndex(null);
 		setIndexFailed(false);
-		setLoadAttempt((attempt) => attempt + 1);
+		setIndexRequest(loadSiteSearchIndex());
 	};
 
 	const onKeyDown = (event: KeyboardEvent) => {

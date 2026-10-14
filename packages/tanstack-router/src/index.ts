@@ -166,6 +166,8 @@ export { Scripts } from './Scripts.tsrx';
 export { ScriptOnce } from './ScriptOnce.tsrx';
 export { Asset } from './Asset.tsrx';
 export type { AssetProps } from './Asset.tsrx';
+export { getAssetKeys } from './assetKeys.ts';
+export type { AssetKeys } from './assetKeys.ts';
 export { useTags } from './headContentUtils';
 export { Html } from './Html';
 export type { HtmlProps } from './Html';

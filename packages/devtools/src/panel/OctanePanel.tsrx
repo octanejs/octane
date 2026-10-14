@@ -1,7 +1,9 @@
+'use strong';
+
 // The tab shell hosting the Components (P1), Profiler (P2), Transitions (P3),
 // and Performance-model (P4) tabs. This is the plugin's top-level render()
-// node — see ../index.ts. It injects the Octane-branded panel stylesheet once
-// and asks the bridge for a fresh snapshot on mount so tabs populate immediately.
+// node — see ../index.ts. It injects the Octane-branded panel stylesheet once;
+// each tab subscribes before requesting its current snapshot.
 import { useEffect, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { OctaneDevtoolsEventClient } from '../client';
@@ -33,9 +35,6 @@ export function OctanePanel(props: { client: OctaneDevtoolsEventClient }): Octan
 			el.textContent = OCTANE_DEVTOOLS_CSS;
 			document.head.appendChild(el);
 		}
-		// Pull a current snapshot so tabs show data on open, not only after the
-		// next scheduler flush.
-		client.emit('refresh', {});
 	});
 
 	return (

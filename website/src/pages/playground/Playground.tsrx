@@ -30,7 +30,16 @@
 // pure string work), but it does NOT execute — even in the sandbox — until the
 // visitor explicitly presses "Run" on the consent overlay. Your own edits from
 // the default sources auto-run as before.
-import { useState, useRef, useEffect } from 'octane';
+'use strong';
+
+import {
+	useState,
+	useRef,
+	useEffect,
+	useEffectEvent,
+	useLayoutSnapshot,
+	useLinkedState,
+} from 'octane';
 import type { CompileDiagnostic } from 'octane/compiler';
 import { useNavigate } from '@octanejs/tanstack-router';
 import type {
@@ -100,6 +109,16 @@ for (const example of EXAMPLES) {
 export function Playground() @{
 	useTitle('Octane — Playground');
 	const navigate = useNavigate();
+	const replaceHash = useEffectEvent((hash: string) =>
+		navigate({
+			to: '.',
+			search: true,
+			hash,
+			replace: true,
+			resetScroll: false,
+			hashScrollIntoView: false,
+		}),
+	);
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Which compiler artifact the right pane shows.
@@ -108,7 +127,17 @@ export function Playground() @{
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const paneRef = useRef<'editor' | 'result'>('editor');
-	const [error, setError] = useState('');
+	const [initialHash] = useState(() => {
+		const rawHash = typeof window === 'undefined' ? '' : window.location.hash.slice(1);
+		return { rawHash, result: decodePlaygroundHash(rawHash) };
+	});
+	// Keep SSR's empty alert state for hydration, then show invalid URL input
+	// before the editor imports finish. Later compiles own this editable value.
+	const initialDiagnostic = useLayoutSnapshot(
+		() => (initialHash.result.ok ? '' : initialHash.result.error),
+		{ initial: '' },
+	);
+	const [error, setError] = useLinkedState(initialDiagnostic, (value) => value);
 	const [warnings, setWarnings] = useState<CompileDiagnostic[]>([]);
 	const [ready, setReady] = useState(false);
 	const [formatting, setFormatting] = useState(false);
@@ -170,6 +199,7 @@ export function Playground() @{
 		setOutputTarget(next);
 		resultModeRef.current.outputTarget = next;
 		controllerRef.current.syncOutput?.();
+		controllerRef.current.revealAst?.();
 	};
 	const openMobilePreview = () => {
 		selectView('preview');
@@ -189,10 +219,10 @@ export function Playground() @{
 	// Reveal only after the mobile result panel has committed as visible;
 	// scrollIntoView cannot position a node while its panel is display:none.
 	useEffect(() => {
-		if (ready && pane === 'result' && view === 'compiled' && compiledMode === 'ast') {
+		if (pane === 'result' && view === 'compiled' && compiledMode === 'ast') {
 			controllerRef.current.revealAst?.();
 		}
-	}, [ready, pane, view, compiledMode, outputTarget]);
+	});
 
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
@@ -210,11 +240,8 @@ export function Playground() @{
 		let hashDebounceId = 0;
 		// Validate the URL payload before loading CodeMirror, Shiki, or the
 		// compiler. Oversized input is ignored in favor of the bounded defaults.
-		const rawHash = window.location.hash.slice(1);
-		const hashResult = decodePlaygroundHash(rawHash);
+		const { rawHash, result: hashResult } = initialHash;
 		const initial = hashResult.ok ? hashResult.value : null;
-		const initialDiagnostic = hashResult.ok ? '' : hashResult.error;
-		if (initialDiagnostic) setError(initialDiagnostic);
 
 		(async () => {
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
@@ -930,14 +957,7 @@ export function Playground() @{
 						files: wsFiles,
 					});
 					if (!encoded) return;
-					void navigate({
-						to: '.',
-						search: true,
-						hash: encoded,
-						replace: true,
-						resetScroll: false,
-						hashScrollIntoView: false,
-					});
+					void replaceHash(encoded);
 					try {
 						window.sessionStorage.setItem(
 							OWN_HASH_STORAGE_KEY,
@@ -1166,8 +1186,9 @@ export function Playground() @{
 			};
 
 			publishWorkspaceState();
-			void compileAndRun();
-			if (initialDiagnostic) setError(initialDiagnostic);
+			void compileAndRun().then(() => {
+				if (!disposed && paneRef.current === 'result') controllerRef.current.revealAst?.();
+			});
 			setReady(true);
 		})();
 
@@ -1187,7 +1208,7 @@ export function Playground() @{
 			astPreview?.destroy();
 			preview?.destroy();
 		};
-	}, []);
+	});
 
 	<>
 		<style>

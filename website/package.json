@@ -22,13 +22,13 @@
     "@octanejs/tanstack-router": "workspace:*",
     "@octanejs/tanstack-start": "workspace:*",
     "@octanejs/three": "workspace:*",
-    "@octanejs/visx": "workspace:*",
     "octane": "workspace:*",
     "qrcode": "1.5.4",
     "shiki": "catalog:default",
     "three": "catalog:default"
   },
   "devDependencies": {
+    "@octanejs/app-core": "workspace:*",
     "@lynx-js/web-core": "catalog:lynx",
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",

@@ -218,7 +218,9 @@ describe('vite plugin gate routing', () => {
 		const websiteRoot = join(process.cwd(), 'website');
 		const discovered = discoverOctaneSourceDependencies(websiteRoot);
 		expect(discovered).toContain('octane');
-		expect(discovered).toContain('@octanejs/visx');
+		expect(discovered).not.toContain('@octanejs/visx');
+		expect(discovered).toContain('@octanejs/devtools');
+		expect(discovered).toContain('@octanejs/tanstack-devtools');
 		// The website consumes the repository-owned TanStack source packages, so
 		// Vite must transform and keep both packages inside its SSR graph.
 		expect(discovered).toContain('@octanejs/tanstack-router');

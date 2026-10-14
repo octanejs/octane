@@ -1,3 +1,5 @@
+'use strong';
+
 // Clipboard-copy state for a copy button: writes text and flips `copied` to
 // true, reverting after COPY_RESET_MS. A re-copy restarts that window rather
 // than letting the previous click's timer clear the new "Copied" early, and the
@@ -10,7 +12,7 @@ import { COPY_RESET_MS } from '../constants/site.ts';
 export function useCopyToClipboard(): { copied: boolean; copy: (text: string) => void } {
 	const [copied, setCopied] = useState(false);
 	const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	useEffect(() => () => clearTimeout(resetTimer.current), []);
+	useEffect(() => () => clearTimeout(resetTimer.current));
 
 	const copy = async (text: string) => {
 		if (!text) return;

@@ -1,3 +1,5 @@
+'use strong';
+
 import { EventClient } from '@tanstack/devtools-event-client';
 
 export const PLUGIN_ID = 'octane';

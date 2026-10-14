@@ -1,3 +1,5 @@
+'use strong';
+
 // The Performance-model tab: derives aggregate "what's slow" views from the SAME
 // `profile` event the Profiler tab already consumes — no new event, bridge path, or
 // runtime probe. Where the Profiler tab shows a per-commit table, this tab shows
@@ -17,6 +19,7 @@ export function PerfModelTab(props: { client: OctaneDevtoolsEventClient }): Octa
 
 	useEffect(() => {
 		const off = client.on('profile', (e) => setSnapshot(e.payload));
+		client.emit('refresh', {});
 		return () => off();
 	});
 

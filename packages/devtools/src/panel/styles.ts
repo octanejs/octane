@@ -1,3 +1,5 @@
+'use strong';
+
 // Self-contained Octane-branded stylesheet for the DevTools panel. The panel is
 // portaled into the TanStack DevTools host, so the website's `:root` custom
 // properties are not reliably in scope — we inject our own tokens + rules once,

@@ -1,3 +1,5 @@
+'use strong';
+
 // The Profiler tab: subscribes to the app-side bridge's `profile` event (startBridge,
 // which reads globalThis.__OCTANE_PROFILER__ per flush) and renders a ranked
 // self-time table plus a recent-commits list. Absent a profiler global on the app
@@ -16,6 +18,7 @@ export function ProfilerTab(props: { client: OctaneDevtoolsEventClient }): Octan
 
 	useEffect(() => {
 		const off = client.on('profile', (e) => setSnapshot(e.payload));
+		client.emit('refresh', {});
 		return () => off();
 	});
 

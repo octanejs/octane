@@ -162,8 +162,12 @@ describe('bridge', () => {
 		stop();
 	});
 
-	it('emits a profile snapshot from the profiler global on flush', () => {
+	it('emits app tree and profile snapshots without devtools wrappers', () => {
 		const { hook } = installFakeHook();
+		hook.getTree = () => [
+			{ id: 1, name: 'App', kind: 'root', children: [] },
+			{ id: 2, name: 'OctaneDevtoolsPanel', kind: 'component', children: [] },
+		];
 		(globalThis as any).__OCTANE_PROFILER__ = {
 			summary: () => [
 				{
@@ -182,6 +186,7 @@ describe('bridge', () => {
 					averageQueueDelay: 0,
 					dominantCause: 'mount',
 				},
+				{ component: 'OctaneDevtoolsPanel' },
 			],
 			getEvents: () => [
 				{
@@ -195,12 +200,16 @@ describe('bridge', () => {
 					causes: [{ type: 'mount' }],
 					startTime: 0,
 				},
+				{ component: 'OctaneDevtoolsPanel' },
 			],
 		};
 		const client = new OctaneDevtoolsEventClient();
 		const emit = vi.spyOn(client, 'emit');
 		const stop = startBridge(client);
 		hook._fire();
+		expect(emit).toHaveBeenCalledWith('tree', {
+			nodes: [{ id: 1, name: 'App', kind: 'root', children: [] }],
+		});
 		expect(emit).toHaveBeenCalledWith(
 			'profile',
 			expect.objectContaining({

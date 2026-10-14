@@ -20,6 +20,13 @@
       }
     ]
   },
-  "include": ["src/**/*", "tests/**/*.ts", "env.d.ts", "vite.config.ts", "mdx-options.ts"],
+  "include": [
+    "src/**/*",
+    "tests/**/*.ts",
+    "env.d.ts",
+    "vite.config.ts",
+    "octane.config.ts",
+    "mdx-options.ts"
+  ],
   "exclude": ["node_modules"]
 }

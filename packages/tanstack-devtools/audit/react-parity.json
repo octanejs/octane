@@ -43,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ab9e49aca1b2ef196e2cc4ed9a99d5ead2c6894558e09f20899c1d48539176f0"
+      "lockfileSha256": "6df573d6aa854c122b0cea3e8c3be46fb67e3debe9ce0f329a773850bbd87706"
     }
   },
   "lanes": [
@@ -160,7 +160,7 @@
         {
           "path": "packages/tanstack-devtools/src/index.ts",
           "role": "test",
-          "sha256": "366597944549d430b8ebab5ab5882e3b330d2cb6501161a5a34583c4f5bac994",
+          "sha256": "2b50a7f94dcd51f98ac17312a61ae4e40db6bf7e73943a6049db5a5a0a34842f",
           "cases": [
             {
               "id": "types:adapted-octane-compile",
@@ -172,7 +172,7 @@
         {
           "path": "packages/tanstack-devtools/src/devtools.tsrx",
           "role": "support",
-          "sha256": "82ebccbce881e029d2e2190887d4434fa757c127aa926efbbbdbc0ea21a08218"
+          "sha256": "2fb621ab23d55870fe56ce20ffb94d6af351ee6f33ab415a85eb6f4ff8a34850"
         },
         {
           "path": "packages/tanstack-devtools/typetests/adapted/tsconfig.json",
@@ -182,17 +182,17 @@
         {
           "path": "packages/tanstack-devtools/audit/type-parity.json",
           "role": "support",
-          "sha256": "464b2a5b153bd4915257ae1adbe821b49011d667a426fd14c86789dba3ce114f"
+          "sha256": "eb8df5beda4ec86128de704efbede583165a5bab7f02e5f3d43660afdea33f8a"
         },
         {
           "path": "scripts/react-parity/tanstack-devtools-types-lib.mjs",
           "role": "support",
-          "sha256": "d3e76ac8086ff7a5c7539bf2a2b11b55f4e2ffcc3a34e557a7fdc1f11eb3a56c"
+          "sha256": "203c6f1167b52398efa676b70d59d8c2dd7afdde3374364fffeeaf329da7896f"
         },
         {
           "path": "scripts/react-parity/tanstack-devtools-types-lib.test.mjs",
           "role": "support",
-          "sha256": "326a986bac205f3e50d8cba6ceb255674d207d761b78a2fb0f4b4e1684503060"
+          "sha256": "14e2858fc68407e94ba532e5d8448c64ee3c105a939bc3f2bc61123f9d47828a"
         },
         {
           "path": "packages/tanstack-devtools/audit/type-probes/public-api.test-d.ts",
@@ -207,12 +207,12 @@
         {
           "path": "packages/tanstack-devtools/audit/upstream-types.json",
           "role": "support",
-          "sha256": "62d90a8e165ed49292255e32270163c30721f13fcbe56c8eeb01dc4d79fe07f0"
+          "sha256": "005b0aa8a437194c8ee1f9f5b06e2c2598ff204c168b1333db58e3c74cb5c2ac"
         },
         {
           "path": "packages/tanstack-devtools/audit/adapted-types.json",
           "role": "support",
-          "sha256": "5dc34e142311bacbd95a8e4b1c4a34bb56d15bcb063a2b57f2c2e9973e38ce30"
+          "sha256": "e900b27d6cbada580cf85c6a1d6f99113d8e7f04db8f81a4413c7152da540272"
         },
         {
           "path": "packages/tanstack-devtools/audit/upstream-probe-types.json",

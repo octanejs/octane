@@ -1,3 +1,5 @@
+'use strong';
+
 // Two linked views over a normalized benchmark matrix (a BenchCard whose rows
 // are suites and whose series are frameworks, values = ×-vs-Octane geometric
 // mean across operations — Octane is 1× everywhere, lower is better):
@@ -86,7 +88,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 	});
 
 	const [selected, setSelected] = useState(() => new Set(card.series.map((s) => s.key)));
-	const [suite, setSuite] = useState(card.rows[0].op as string);
+	const [suite, setSuite] = useState(() => card.rows[0].op as string);
 	const [mode, setMode] = useState('A' as 'A' | 'B');
 	const [hovered, setHovered] = useState(null as Tip | null);
 

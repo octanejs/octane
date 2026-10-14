@@ -1,4 +1,5 @@
 'use client';
+'use strong';
 
 // OCTANE DIVERGENCE[core-version][conformance:tanstack-devtools-core-version]
 // OCTANE DIVERGENCE[octane-type-names][conformance:tanstack-devtools-octane-type-names]

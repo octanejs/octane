@@ -6,6 +6,14 @@
 // the directory can go back there, and the hysteresis in particular is easy to
 // break in a way no screenshot would catch.
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, waitFor } from '@octanejs/testing-library';
+import { Go } from '../src/components/go/Go.tsrx';
+import { LynxPreview } from '../src/components/go/LynxPreview.tsrx';
+import {
+	mountLynxView,
+	type LynxViewOptions,
+	type LynxViewState,
+} from '../src/components/go/lynx-view/index.ts';
 import { playAutoGesture } from '../src/components/go/lynx-view/auto-gesture.ts';
 import {
 	computeFrameOffset,
@@ -18,6 +26,75 @@ import {
 } from '../src/components/go/lynx-view/mode.ts';
 import type { WebPreviewMode } from '../src/components/go/lynx-view/mode.ts';
 import { LYNX_EXAMPLES } from '../src/content/lynx-examples.ts';
+
+vi.mock('../src/components/go/lynx-view/index.ts', () => ({ mountLynxView: vi.fn() }));
+
+describe('preview bindings', () => {
+	afterEach(() => {
+		cleanup();
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	});
+
+	it('reports controller updates to the latest callback without restarting the preview', async () => {
+		const dispose = vi.fn();
+		const reload = vi.fn();
+		let report: LynxViewOptions['onStateChange'];
+		vi.mocked(mountLynxView).mockImplementation((_host, options) => {
+			report = options.onStateChange;
+			return { dispose, reload };
+		});
+		const first = vi.fn();
+		const next = vi.fn();
+		const props = { src: '/example.web.bundle', label: 'Example', onStateChange: first };
+		const mounted = render(LynxPreview, { props });
+		await waitFor(() => expect(report).toBeTypeOf('function'));
+		const host = mounted.getByRole('figure');
+		mounted.rerender({ props: { ...props, onStateChange: next, reloadKey: 1 } });
+		await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+		const state: LynxViewState = {
+			ready: true,
+			rendered: true,
+			stage: 'rendered',
+			error: null,
+			canRefresh: true,
+		};
+		act(() => report?.(state));
+		expect(next).toHaveBeenCalledWith(state);
+		expect(first).not.toHaveBeenCalled();
+		expect(mounted.getByRole('figure')).toBe(host);
+		expect(mounted.container.querySelector('.lynx-preview')?.getAttribute('data-rendered')).toBe(
+			'true',
+		);
+		expect(dispose).not.toHaveBeenCalled();
+		mounted.unmount();
+		expect(dispose).toHaveBeenCalledOnce();
+	});
+
+	it('loads the highlighted source when intersection observation is unavailable', async () => {
+		vi.stubGlobal('IntersectionObserver', undefined);
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => ({
+				ok: true,
+				json: async () =>
+					url.endsWith('example-metadata.json')
+						? { name: 'Example', files: [], templateFiles: [] }
+						: {
+								defaultFile: 'src/main.ts',
+								files: [
+									{ path: 'src/main.ts', language: 'ts', html: '<pre><code>source</code></pre>' },
+								],
+							},
+			})),
+		);
+		const { container } = render(Go, { props: { example: 'example', label: 'Example' } });
+		await waitFor(() =>
+			expect(container.querySelector('.go-source-code code')?.textContent).toBe('source'),
+		);
+		expect(container.textContent).toContain('This example was not built for the web');
+	});
+});
 
 const PHONE = { designWidth: 375, designHeight: 812 };
 const THRESHOLDS = { fitThresholdScale: 1, fitMinScale: 0.5 };

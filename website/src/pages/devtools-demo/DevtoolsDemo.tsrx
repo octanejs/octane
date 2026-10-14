@@ -1,3 +1,5 @@
+'use strong';
+
 // A small interactive app that exercises useState, useReducer, useTransition, and
 // two Suspense boundaries, with the Octane DevTools panel mounted alongside it (dev
 // only) so every panel tab has live data to show.
@@ -19,13 +21,11 @@ const boundaryAPromise = makeDelayed('boundary A loaded', 400);
 const boundaryBPromise = makeDelayed('boundary B loaded', 800);
 
 function Slow(props: { label: string }): OctaneNode {
-	// Intentionally-slow render so the Profiler / Performance tabs show it. Kept
-	// short so SSR (and a page rendering many of these) still completes quickly.
-	const start = Date.now();
-	while (Date.now() - start < 2) {
-		/* busy-wait ~2ms to register as a slow component */
-	}
-	return <li>{props.label}</li>;
+	// Bounded, deterministic work gives the Profiler a slow render to display
+	// without reading the clock during render.
+	let label = props.label;
+	for (let i = 0; i < 2000; i++) label = label.split('').reverse().reverse().join('');
+	return <li>{label as string}</li>;
 }
 
 function AsyncChild(props: { promise: Promise<string> }): OctaneNode {
