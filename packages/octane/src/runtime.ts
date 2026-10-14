@@ -3914,28 +3914,36 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // Commit functions (#2043 step 1).
 //
 // Render computes, commit writes. For each template the compiler hoists one
-// commit function `C(bag)`. The bag's binding slots hold COMMITTED values, the
-// ones the DOM shows. A render compares each binding against its committed
-// slot, and only the first difference stages the bag: `bag.next` is a reusable
-// array of pending cells, allocated once per bag and filled with the bag itself
-// as the "unchanged" marker. Every later binding of that render records its
-// cell. `C` walks the cells straight-line: it writes each changed cell through
-// the ordinary setter and only then publishes it to the committed slot.
+// commit function `C(bag, careful)`. The bag's binding slots hold COMMITTED
+// values, the ones the DOM shows. A render compares each binding against its
+// committed slot, inline in the compiled template, and only a difference calls
+// a recorder. The first one stages the bag: `bag.next` is a reusable array of
+// pending cells, allocated once per bag, whose cells hold the bag itself as the
+// "unchanged" marker until a binding records into them. `C` walks the cells
+// straight-line: it writes each changed cell through the ordinary setter and
+// only then publishes it to the committed slot.
 //
-// `bag.$` packs the template's cell count (low byte, the bag factory's last
-// argument) with the STAGED and QUEUED bits. `next` carries two trailing
-// cells: the rendering Scope (for commit-phase error routing) and the index of
-// the bag's entry in the root's ops.
+// `bag.$` packs the template's cell count (low byte, the bag factory's
+// argument) with the STAGED and QUEUED bits. Until its first stage `bag.next`
+// holds the template's commit function (the factory's last argument); after it,
+// the cells carry three trailing ones: the rendering Scope (for commit-phase
+// error routing), the index of the bag's entry in the root's ops, and `C`.
 //
-// A render that cannot be dropped calls `C` at once: a fresh Block the root
-// attempt discards whole, a render with no open root transaction, and a
-// hydrating render, whose adoption and mismatch checks live in the setters (on
-// an adopted element they keep the server's value and write nothing). Every
-// other render, urgent included, queues `(C, bag)` on `transaction.ops`, which
-// commitRootRenders runs in render order before deletions, refs and effects.
-// A dropped window truncates the ops back to its checkpoint and clears the
-// dropped bags' state; their committed slots never moved, so nothing goes
-// stale and memo bail-outs keep comparing against what the DOM shows.
+// A render that cannot be dropped calls `C` at once, from the template's
+// trailing bagDone: a fresh Block the root attempt discards whole, a render
+// with no open root transaction, and a hydrating render, whose adoption and
+// mismatch checks live in the setters (on an adopted element they keep the
+// server's value and write nothing). Every other render, urgent included,
+// queues `(C, bag)` on `transaction.ops` as it stages, so a changed row costs
+// its recorders and `C` alone. commitRootRenders runs the ops in render order
+// before deletions, refs and effects. A dropped window truncates the ops back
+// to its checkpoint and clears the dropped bags' state; their committed slots
+// never moved, so nothing goes stale and memo bail-outs keep comparing against
+// what the DOM shows.
+//
+// A bag staged earlier in the same transaction resumes its cells, so a later
+// render must rewrite each one: the compiled template then records every
+// binding (its `_r`), and an unchanged one writes the marker back.
 // ─────────────────────────────────────────────────────────────────────────────
 const BAG_SIZE = 255;
 const BAG_STAGED = 256;
@@ -3962,63 +3970,113 @@ function closeOpsWindow(): void {
 	OPS_CHECKPOINT = OPS_CHECKPOINTS.pop()!;
 }
 
+/** The root transaction a render of `s` may be dropped from, or null to commit at once. */
+function droppableRender(s: Scope): RootRenderTransaction | null {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	return transaction === null ||
+		hydrating ||
+		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
+		? null
+		: transaction;
+}
+
+/**
+ * Whether a commit function takes its careful writers: an open journal records
+ * the writes, and a dispatch in flight keeps snapshots of the handlers it holds
+ * (preserveDispatchedBundle). Otherwise it writes handler slots and bundles
+ * directly. runCommitOps inlines it.
+ */
+function carefulCommit(): boolean {
+	return TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0);
+}
+
 /**
  * The first binding a render records into: a bag staged earlier in this
- * transaction resumes its cells; otherwise its reusable cells are staged.
+ * transaction resumes its cells; otherwise its reusable cells are staged and,
+ * given the rendering Scope of a render that may be dropped, `C` is queued.
+ * bagRecord and bagRecordBundle inline the common case, an idle bag with cells.
  */
-function stageBag(bag: any): any[] {
-	if (bag.$ > BAG_SIZE) return bagResume(bag);
+function stageBag(bag: any, s: Scope | null): any[] {
 	const state = bag.$;
+	if (state > BAG_SIZE) return bagResume(bag);
 	let next = bag.next;
-	if (next === null) {
+	if (typeof next === 'function') {
 		// Packed from the start: the commit function reads every cell.
+		const commit = next;
 		next = bag.next = [];
-		for (let i = (state & BAG_SIZE) + 2; i > 0; i--) next.push(bag);
-	} else if ((state & BAG_STAGED) === 0) next.fill(bag);
+		for (let i = state + 3; i > 0; i--) next.push(bag);
+		next[state + 2] = commit;
+	} else next.fill(bag, 0, state);
 	bag.$ = state | BAG_STAGED;
+	const transaction = s === null ? null : droppableRender(s);
+	if (transaction !== null) {
+		next[state] = s;
+		next[state + 1] = transaction.ops.length;
+		bag.$ = state | BAG_STAGED | BAG_QUEUED;
+		transaction.ops.push(next[state + 2], bag);
+	}
 	return next;
 }
 
 /**
- * Record one binding: `next` stays null until a value differs from its
- * committed slot, or the bag is already staged; from then on every binding
- * writes its cell (the bag itself when it equals the committed value, so a
- * later render can revert a cell).
+ * Record one binding the compiled template found changed, or any binding of a
+ * resumed bag (the bag itself when it equals the committed value, so a later
+ * render can revert a cell). An event binding passes its host and records every
+ * render: under signal ownership a handler's authority refreshes whether or not
+ * it changed, and the commit installs only the handler.
  */
 export function bagRecord(
-	bag: any,
+	s: Scope,
 	next: any[] | null,
 	cell: number,
 	value: unknown,
 	committed: unknown,
+	el?: Element,
 ): any[] | null {
+	const bag = s.slots[0] as any;
+	// setEventHandler(el) publishes only the authority, and only when it moved.
+	if (
+		el !== undefined &&
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS_RECORDED)
+	)
+		setEventHandler(el);
 	if (next === null) {
-		if (value === committed && bag.$ <= BAG_SIZE) return null;
-		next = stageBag(bag);
+		const state = bag.$;
+		if (value === committed && state <= BAG_SIZE) return null;
+		// stageBag for an idle bag in a render that may be dropped
+		// (droppableRender), inline: the row's first change costs no other call.
+		// bagRecordBundle repeats it.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (
+			state <= BAG_SIZE &&
+			transaction !== null &&
+			!hydrating &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
+		) {
+			next = bag.next;
+			if (typeof next === 'function') {
+				const commit = next;
+				next = bag.next = [];
+				for (let i = state + 3; i > 0; i--) next.push(bag);
+				next[state + 2] = commit;
+			} else next!.fill(bag, 0, state);
+			next![state] = s;
+			next![state + 1] = transaction.ops.length;
+			bag.$ = state | BAG_STAGED | BAG_QUEUED;
+			transaction.ops.push(next![state + 2], bag);
+		} else next = stageBag(bag, s);
 	}
-	next[cell] = value === committed ? bag : value;
-	return next;
-}
-
-/** bagRecord with SameValue: event captures keep signed zero and NaN observable. */
-function bagRecordIs(
-	bag: any,
-	next: any[] | null,
-	cell: number,
-	value: unknown,
-	committed: unknown,
-): any[] | null {
-	if (next === null) {
-		if (Object.is(value, committed) && bag.$ <= BAG_SIZE) return null;
-		next = stageBag(bag);
-	}
-	next[cell] = Object.is(value, committed) ? bag : value;
+	next![cell] = value === committed ? bag : value;
 	return next;
 }
 
 /** A binding that reasserts every commit (controlled form properties). */
 export function bagRecordAlways(bag: any, next: any[] | null, cell: number, value: unknown): any[] {
-	if (next === null) next = stageBag(bag);
+	if (next === null) next = stageBag(bag, null);
 	next[cell] = value;
 	return next;
 }
@@ -4035,20 +4093,19 @@ function bagResume(bag: any): any[] {
 	return next;
 }
 
-/** End of a template render with staged cells: commit now, or queue `C`. */
-export function bagDone(s: Scope, bag: any, commit: (bag: any) => void): void {
+/**
+ * End of a template render whose recorders staged the bag without queueing
+ * it: commit now, or queue `C`.
+ */
+export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean) => void): void {
 	const state = bag.$;
 	if ((state & BAG_QUEUED) !== 0) return;
 	const size = state & BAG_SIZE;
 	const next = bag.next;
 	next[size] = s;
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (
-		transaction === null ||
-		hydrating ||
-		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
-	) {
-		commit(bag);
+	const transaction = droppableRender(s);
+	if (transaction === null) {
+		commit(bag, carefulCommit());
 		return;
 	}
 	const ops = transaction.ops;
@@ -4081,7 +4138,11 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
 			const target = ops[i + 1];
 			try {
-				ops[i](target);
+				// A commit function's `careful` flag: inline, as carefulCommit.
+				ops[i](
+					target,
+					TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
+				);
 			} catch (error) {
 				// React routes a commit-phase error to the nearest boundary and keeps
 				// committing; the failed bag's state was cleared before its first write.
@@ -22585,7 +22646,9 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
  * are single characters because a minifier can never shorten object property
  * names — this is the compiled-output size contract with the compiler
  * (compile.js makeBag). Bodies with more than 16 fields pass one inline
- * literal (still real values, 1-char keys) through `bagOf`.
+ * literal (still real values, 1-char keys) through `bagOf`. A body with commit
+ * cells passes their count and its commit function last (see "Commit
+ * functions").
  */
 function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	const hydration = hydrating ? currentHydration : null;
@@ -22608,23 +22671,23 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	return bag;
 }
 
-/* prettier-ignore */ export function bag0(s: Scope, r: Node | null, $ = 0): any { return commitBag(s, r, { __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 0 }); }
-/* prettier-ignore */ export function bag1(s: Scope, r: Node | null, a: any, $ = 0): any { return commitBag(s, r, { a, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 1 }); }
-/* prettier-ignore */ export function bag2(s: Scope, r: Node | null, a: any, b: any, $ = 0): any { return commitBag(s, r, { a, b, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 2 }); }
-/* prettier-ignore */ export function bag3(s: Scope, r: Node | null, a: any, b: any, c: any, $ = 0): any { return commitBag(s, r, { a, b, c, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 3 }); }
-/* prettier-ignore */ export function bag4(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 4 }); }
-/* prettier-ignore */ export function bag5(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 5 }); }
-/* prettier-ignore */ export function bag6(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 6 }); }
-/* prettier-ignore */ export function bag7(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 7 }); }
-/* prettier-ignore */ export function bag8(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 8 }); }
-/* prettier-ignore */ export function bag9(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 9 }); }
-/* prettier-ignore */ export function bag10(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 10 }); }
-/* prettier-ignore */ export function bag11(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 11 }); }
-/* prettier-ignore */ export function bag12(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 12 }); }
-/* prettier-ignore */ export function bag13(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 13 }); }
-/* prettier-ignore */ export function bag14(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 14 }); }
-/* prettier-ignore */ export function bag15(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 15 }); }
-/* prettier-ignore */ export function bag16(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, p: any, $ = 0): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, __journalWindow: 0, $, next: null, [BINDING_BAG_ARITY]: 16 }); }
+/* prettier-ignore */ export function bag0(s: Scope, r: Node | null, $ = 0, next: any = null): any { return commitBag(s, r, { __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 0 }); }
+/* prettier-ignore */ export function bag1(s: Scope, r: Node | null, a: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 1 }); }
+/* prettier-ignore */ export function bag2(s: Scope, r: Node | null, a: any, b: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 2 }); }
+/* prettier-ignore */ export function bag3(s: Scope, r: Node | null, a: any, b: any, c: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 3 }); }
+/* prettier-ignore */ export function bag4(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 4 }); }
+/* prettier-ignore */ export function bag5(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 5 }); }
+/* prettier-ignore */ export function bag6(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 6 }); }
+/* prettier-ignore */ export function bag7(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 7 }); }
+/* prettier-ignore */ export function bag8(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 8 }); }
+/* prettier-ignore */ export function bag9(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 9 }); }
+/* prettier-ignore */ export function bag10(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 10 }); }
+/* prettier-ignore */ export function bag11(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 11 }); }
+/* prettier-ignore */ export function bag12(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 12 }); }
+/* prettier-ignore */ export function bag13(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 13 }); }
+/* prettier-ignore */ export function bag14(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 14 }); }
+/* prettier-ignore */ export function bag15(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 15 }); }
+/* prettier-ignore */ export function bag16(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, p: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 16 }); }
 /* prettier-ignore */ export function bagOf(s: Scope, r: Node | null, bag: any): any { return commitBag(s, r, bag); }
 
 /**
@@ -24864,7 +24927,7 @@ export function bagRecordSignal(
 	}
 	if (next === null) {
 		if (unchanged && bag.$ <= BAG_SIZE) return null;
-		next = stageBag(bag);
+		next = stageBag(bag, scope);
 	}
 	next[cell] = unchanged ? bag : value;
 	return next;
@@ -28716,33 +28779,14 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 const EMPTY_ARGS: any[] = [];
 
 /**
- * Record an event binding (bagRecord). Under signal ownership a handler's
- * authority refreshes every render, changed or not; the commit installs only
- * the handler (setEventSlot, commitEventBundle).
+ * Record a compiled handler bundle, every render (bagRecord's event case): its
+ * authority refreshes under signal ownership, and a changed callback, capture
+ * or argument array records the whole pending bundle, so the commit function
+ * tests its first cell alone. SameValue keeps signed zero and NaN captures
+ * observable; arity N keeps array-reference semantics.
  */
-export function bagRecordEvent(
-	bag: any,
-	next: any[] | null,
-	cell: number,
-	value: unknown,
-	committed: unknown,
-	el: Element,
-): any[] | null {
-	// setEventHandler(el) publishes only the authority, and only when it moved.
-	if (
-		SIGNAL_BINDINGS_ENABLED ||
-		signalDocumentEnabled ||
-		activeSynchronousSignalOwner !== null ||
-		activeSignalOwnerEnvironment !== undefined ||
-		SIGNAL_EVENT_OWNERS_RECORDED
-	)
-		setEventHandler(el);
-	return bagRecord(bag, next, cell, value, committed);
-}
-
-/** Record a compiled handler bundle: its callback, then its captures or argument array. */
 export function bagRecordBundle(
-	bag: any,
+	s: Scope,
 	next: any[] | null,
 	cell: number,
 	d: HandlerBundle,
@@ -28750,12 +28794,50 @@ export function bagRecordBundle(
 	a0?: unknown,
 	a1?: unknown,
 ): any[] | null {
+	const bag = s.slots[0] as any;
+	if (
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		activeSynchronousSignalOwner !== null ||
+		activeSignalOwnerEnvironment !== undefined ||
+		SIGNAL_EVENT_OWNERS_RECORDED
+	)
+		setEventHandler(d.el!);
 	const args = d.args;
-	next = bagRecordEvent(bag, next, cell, fn, d.fn, d.el!);
-	if (typeof args !== 'number')
-		return args === EMPTY_ARGS ? next : bagRecord(bag, next, cell + 1, a0, args);
-	next = bagRecordIs(bag, next, cell + 1, a0, d.a0);
-	return args === 2 || args === -2 ? bagRecordIs(bag, next, cell + 2, a1, d.a1) : next;
+	const pair = args === 2 || args === -2;
+	const changed =
+		fn !== d.fn ||
+		(typeof args === 'number'
+			? !Object.is(a0, d.a0) || (pair && !Object.is(a1, d.a1))
+			: args !== EMPTY_ARGS && a0 !== args);
+	if (next === null) {
+		const state = bag.$;
+		if (!changed && state <= BAG_SIZE) return null;
+		// bagRecord's inline stageBag.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (
+			state <= BAG_SIZE &&
+			transaction !== null &&
+			!hydrating &&
+			(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
+		) {
+			next = bag.next;
+			if (typeof next === 'function') {
+				const commit = next;
+				next = bag.next = [];
+				for (let i = state + 3; i > 0; i--) next.push(bag);
+				next[state + 2] = commit;
+			} else next!.fill(bag, 0, state);
+			next![state] = s;
+			next![state + 1] = transaction.ops.length;
+			bag.$ = state | BAG_STAGED | BAG_QUEUED;
+			transaction.ops.push(next![state + 2], bag);
+		} else next = stageBag(bag, s);
+	}
+	next![cell] = changed ? fn : bag;
+	if (args !== EMPTY_ARGS) next![cell + 1] = changed ? a0 : bag;
+	if (pair) next![cell + 2] = changed ? a1 : bag;
+	return next;
 }
 
 /** Commit a native handler slot; its authority was published at render. */
@@ -28768,7 +28850,8 @@ export function setEventSlot(el: Element, key: string, handler: unknown): void {
 /**
  * Commit a compiled handler bundle from its pending cells: the callback at
  * `cell`, then its captures (a0/a1) or, for arity N, the argument array.
- * Dispatch reads the bundle, so it only ever sees committed values.
+ * Dispatch reads the bundle, so it only ever sees committed values. A commit
+ * function writes the fields itself unless it is careful (carefulCommit).
  */
 export function commitEventBundle(bag: any, d: HandlerBundle, next: any[], cell: number): void {
 	const args = d.args;
@@ -39203,7 +39286,7 @@ function recordHole(
 	let last = prev;
 	let text = node;
 	if (bag.$ > BAG_SIZE) {
-		if (next === null) next = stageBag(bag);
+		if (next === null) next = stageBag(bag, s);
 		if (next[cell] !== bag) last = next[cell];
 		if (next[cell + 1] !== bag) text = next[cell + 1];
 	}
@@ -39213,7 +39296,7 @@ function recordHole(
 	) {
 		if (value === last) return next;
 		if (text !== null && value !== null) {
-			if (next === null) next = stageBag(bag);
+			if (next === null) next = stageBag(bag, s);
 			if (text === node && next[cell + 1] === bag) {
 				next[cell] = value === prev ? bag : value;
 				return next;
@@ -39233,7 +39316,7 @@ function recordHole(
 		if (next !== null) next[cell] = next[cell + 1] = bag;
 		return next;
 	}
-	if (next === null) next = stageBag(bag);
+	if (next === null) next = stageBag(bag, s);
 	// The slot wrote its content itself: commit only publishes the pair.
 	next[cell] = value;
 	next[cell + 1] = text;

@@ -13,6 +13,7 @@ import {
 	HeldSpread,
 	MemoHeld,
 	Nested,
+	Revert,
 } from './_fixtures/commit-functions.tsrx';
 import { Item, TextHoles } from './_fixtures/text-hole-commit.tsrx';
 import { HostWrites } from './_fixtures/host-commit.tsrx';
@@ -171,6 +172,31 @@ describe('commit functions', () => {
 		expect(row.textContent).toBe('1:0');
 		expect(row.title).toBe('title:1:0');
 		expect(container.querySelector('#fallback')).toBe(null);
+		root.unmount();
+	});
+
+	it('commits the committed values when a later render of the transaction reverts a staged row', async () => {
+		const container = host();
+		const root = createRoot(container);
+		const controls = {} as { setStep(step: number): void; setLocal(local: number): void };
+		flushSync(() => root.render(Revert, { controls }));
+		const row = container.querySelector('#revert') as HTMLElement;
+		expect(row.title).toBe('title:0');
+
+		// The urgent render stages the row's new title and text; the transition's
+		// render of the same row, in the same drain, computes the committed ones,
+		// so it must rewrite the cells the urgent render left pending.
+		await act(() => {
+			controls.setStep(1);
+			startTransition(() => controls.setLocal(1));
+		});
+		expect(container.querySelector('#revert')).toBe(row);
+		expect(row.textContent).toBe('0');
+		expect(row.title).toBe('title:0');
+
+		await act(() => controls.setStep(2));
+		expect(row.textContent).toBe('1');
+		expect(row.title).toBe('title:1');
 		root.unmount();
 	});
 
