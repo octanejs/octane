@@ -20,11 +20,16 @@ const FILE = 'component-range-siblings.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 const LINES = SOURCE.split('\n');
 
-/** `FILE:line:column` of the fixture's component `name`, which a mismatch in its output names. */
-function definition(name: string): string {
-	const index = LINES.findIndex((source) => source.startsWith(`function ${name}(`));
-	if (index < 0) throw new Error(`fixture has no function ${name}`);
-	return `${FILE}:${index + 1}:0`;
+/**
+ * `FILE:line:column` of the first `<Tally` call in the fixture's component
+ * `name`. The server frames every component call, so a call whose range the
+ * server did not render names the mismatch.
+ */
+function firstCall(name: string): string {
+	const start = LINES.findIndex((source) => source.startsWith(`function ${name}(`));
+	if (start < 0) throw new Error(`fixture has no function ${name}`);
+	const index = LINES.findIndex((source, i) => i > start && source.includes('<Tally'));
+	return `${FILE}:${index + 1}:${LINES[index].indexOf('<Tally')}`;
 }
 
 /** Element and text markup, ignoring hydration comments. */
@@ -125,9 +130,7 @@ describe.each([
 		expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toEqual(
-			dev
-				? [diagnostic(definition('Tally'), 'a fragment starting with <button>', 'text "server"')]
-				: [],
+			dev ? [diagnostic(firstCall('Wrapper'), 'a component range', 'text "server"')] : [],
 		);
 
 		// Every client-rendered component is live.
@@ -159,7 +162,6 @@ describe.each([
 			name: 'Content',
 			server: { value: '' },
 			client: { value: 'Wrapper' },
-			expected: 'a component range',
 			actual: RANGE_END,
 		},
 		{
@@ -167,7 +169,6 @@ describe.each([
 			name: 'RootContent',
 			server: { value: 'server' },
 			client: { value: 'Wrapper' },
-			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 		{
@@ -175,7 +176,6 @@ describe.each([
 			name: 'Arm',
 			server: { server: true },
 			client: { server: false },
-			expected: 'a fragment starting with <button>',
 			actual: '<b>',
 		},
 		{
@@ -183,7 +183,6 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'TallyThenPlain' },
-			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 		{
@@ -191,7 +190,6 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'PlainThenTally' },
-			expected: 'a fragment starting with <b>',
 			actual: 'text "server"',
 		},
 		{
@@ -199,7 +197,6 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'TallyThenSingle' },
-			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 		{
@@ -207,7 +204,6 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'SingleThenTally' },
-			expected: '<i>',
 			actual: 'text "server"',
 		},
 		{
@@ -215,12 +211,11 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'TallyThenIf' },
-			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 	])(
 		'renders the root on the client and reports once when $when',
-		async ({ name, server: serverProps, client: clientProps, expected, actual }) => {
+		async ({ name, server: serverProps, client: clientProps, actual }) => {
 			const { serverElements, recoverable } = await hydrate(name, serverProps, clientProps);
 
 			expect(markup(container)).toBe(clientMarkup(name, clientProps));
@@ -232,7 +227,7 @@ describe.each([
 							expect.stringMatching(
 								new RegExp(
 									`^Octane hydration mismatch at ${FILE.replace(/\./g, '\\.')}:\\d+:\\d+: ` +
-										`the client expected ${escape(expected)} but the server rendered ` +
+										'the client expected a component range but the server rendered ' +
 										`${escape(actual)}\\.`,
 								),
 							),
@@ -255,9 +250,8 @@ describe.each([
 		expect(markup(container)).toBe(clientMarkup('TwoHoles', props));
 		expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		const loc = definition('Tally');
 		expect(warnings()).toEqual(
-			dev ? [diagnostic(loc, 'a fragment starting with <button>', 'text "one"')] : [],
+			dev ? [diagnostic(firstCall('Wrapper'), 'a component range', 'text "one"')] : [],
 		);
 	});
 

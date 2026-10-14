@@ -1,5 +1,5 @@
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hydrateRoot, flushSync } from '../../src/index.js';
@@ -10,6 +10,7 @@ import {
 	MapList,
 	ReturnMaybeParent,
 	ReturnNullParent,
+	ReturnShapes,
 } from './_fixtures/value-jsx.tsrx';
 
 // Value-position JSX under SSR: React-style render-prop children that return JSX
@@ -135,6 +136,35 @@ describe('value-position JSX — hydration', () => {
 		flushSync(() => {});
 		expect(container.querySelector('#return-filled')).toBeNull();
 		expect(container.querySelector('#after-maybe')).toBe(sibling);
+		root.unmount();
+	});
+
+	// A returned value renders in the range of the call that returned it, on
+	// both sides: hydration adopts every server node and adds none.
+	it('adopts returned text, a returned component and a returned list in place', () => {
+		const props = { text: 'one', items: ['a', 'b'] };
+		const { html } = ServerRT.renderToString(server.ReturnShapes, props);
+		container.innerHTML = html;
+		const section = container.querySelector('#return-shapes')!;
+		const serverNodes = [...section.childNodes];
+		const host = section.querySelector('.returned-host');
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(container, ReturnShapes, props, {
+			onRecoverableError: (error) => recoverable.push(error),
+		});
+		flushSync(() => {});
+		expect(recoverable).toEqual([]);
+		expect(errors).not.toHaveBeenCalled();
+		expect(container.innerHTML).toBe(html);
+		expect(section.childNodes).toHaveLength(serverNodes.length);
+		serverNodes.forEach((node, i) => expect(section.childNodes[i]).toBe(node));
+
+		root.render(ReturnShapes, { text: 'two', items: ['b', 'c'] });
+		flushSync(() => {});
+		expect(section.querySelector('.returned-host')).toBe(host);
+		expect(section.textContent).toBe('twotwobcafter');
+		errors.mockRestore();
 		root.unmount();
 	});
 });

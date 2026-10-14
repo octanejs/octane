@@ -2689,6 +2689,8 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 				// Extraction always compiles an independent widget as a template body.
 				// Keep its server children on that same path even in return-JSX parents,
 				// whose descriptor children would add a range the widget cannot adopt.
+				// A hydrate boundary module never inherits its body's range for a sole
+				// component root, so the server frames that call too.
 				attributes.push(
 					jsxExpressionAttribute(
 						'children',
@@ -2697,6 +2699,7 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 							body: [],
 							render: b.jsx_fragment(node.children ?? []),
 							metadata: { path: [] },
+							_octaneHydrateBoundary: true,
 						}),
 						node,
 					),

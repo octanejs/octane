@@ -96,38 +96,45 @@ describe.each([
 		return recoverable;
 	}
 
-	const structural = (line: number) =>
-		`Octane hydration mismatch at ${FILE}:${line}:1: the client expected <i> but the server ` +
+	const structural = (at: string, expected: string) =>
+		`Octane hydration mismatch at ${FILE}:${at}: the client expected ${expected} but the server ` +
 		'rendered <b>. The nearest Suspense or Hydrate boundary, or the root, will be regenerated ' +
 		'on the client.';
+	// The server frames every component call, so a call names the server's `<b>`
+	// where its range belongs.
+	const noRange = (branch: string, call: string) => {
+		const start = LINES.findIndex((line) => line.startsWith(`export function ${branch}(`));
+		const index = LINES.findIndex((line, i) => i > start && line.includes(call));
+		return structural(`${index + 1}:${LINES[index].indexOf(call)}`, 'a component range');
+	};
 
 	it.each([
 		{
 			site: 'direct bindings',
 			name: 'AttrBranch',
 			clientProps: {},
-			leaf: 'function AttrLeaf(',
+			call: '<AttrLeaf',
 			expected: '<i class="ok" style="color: red;" title="ok">t</i>',
 		},
 		{
 			site: 'suppressHydrationWarning bindings',
 			name: 'SuppressedBranch',
 			clientProps: {},
-			leaf: 'function SuppressedLeaf(',
+			call: '<SuppressedLeaf',
 			expected: '<i class="ok" style="color: red;" title="ok">t</i>',
 		},
 		{
 			site: 'a nested element',
 			name: 'NestedBranch',
 			clientProps: {},
-			leaf: 'function NestedLeaf(',
+			call: '<NestedLeaf',
 			expected: '<i><u class="ok" style="color: red;" title="ok">t</u></i>',
 		},
 		{
 			site: 'spread bindings',
 			name: 'SpreadBranch',
 			clientProps: { rest: { title: 'ok', className: 'ok', style: { color: 'red' } } },
-			leaf: 'function SpreadLeaf(',
+			call: '<SpreadLeaf',
 			expected: '<i class="ok" style="color: red;" title="ok">t</i>',
 		},
 		{
@@ -141,12 +148,12 @@ describe.each([
 					style: { color: 'red' },
 				},
 			},
-			leaf: 'function SpreadLeaf(',
+			call: '<SpreadLeaf',
 			expected: '<i class="ok" style="color: red;" title="ok">t</i>',
 		},
 	])(
 		'renders $site on the client and reports only the structural mismatch',
-		async ({ name, clientProps, leaf, expected }) => {
+		async ({ name, clientProps, call, expected }) => {
 			const served = serve(name, { server: true });
 			const recoverable = await hydrate(name, clientProps);
 
@@ -154,7 +161,7 @@ describe.each([
 			// No boundary: the root renders on the client, so no server node survives.
 			expect(served.filter((node) => node.isConnected)).toEqual([]);
 			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [structural(lineOf(leaf) + 1)] : []);
+			expect(warnings()).toEqual(dev ? [noRange(name, call)] : []);
 		},
 	);
 

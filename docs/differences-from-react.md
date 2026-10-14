@@ -2104,14 +2104,22 @@ Two differences are intentional. Matching React exactly would mean shipping
 and running a structural comparison of everything hydration adopts, which is
 the work compiled templates exist to avoid.
 
-First, control-flow ranges are part of the hydration protocol, as React's
-Suspense markers are part of React's. A client `@if` or `@switch` branch, or a
-catch-only `@try` or `ErrorBoundary`, whose server output has no range of its
-own is a structural mismatch and falls back, even where the elements inside
-it match; React, which has no markers for them, adopts them. (A `@try` with
-`@pending` is a Suspense boundary, so React falls back there too.) The markers
-do not record which arm rendered, so an arm whose elements match the server's
-arm adopts them, as in React.
+First, hydration adopts by structure. Component, hole and control-flow ranges
+are part of the hydration protocol, as React's Suspense markers are part of
+React's: the server frames every component call and renderable hole, and
+renders a value a component returns directly inside that component's range.
+A client component call, `@if` or `@switch` branch, or catch-only `@try` or
+`ErrorBoundary` whose server output has no range of its own is a structural
+mismatch and falls back with one recoverable error, even where the elements
+inside it match; React, which has no markers for them, adopts them. This
+happens when the server rendered a different tree whose DOM happens to match,
+such as another `@if` arm that renders a component's elements inline. In
+development the warning names the call site whose range is missing. (A `@try`
+with `@pending` is a Suspense boundary, so React falls back there too.) The
+markers do not record which arm rendered, so an arm whose ranges and elements
+match the server's arm adopts them, as in React. As in React, a suspension in
+a component's body, before hydration would reach the elements it renders,
+keeps the server HTML even where those elements then mismatch.
 
 Second, development compares a template's static structure and attributes and warns
 about differences, but development-only comparisons never cause a fallback,

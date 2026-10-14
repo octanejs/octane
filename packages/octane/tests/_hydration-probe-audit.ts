@@ -3,6 +3,7 @@
 // range, or adopts server nodes outside a range of their own, is counted per
 // call site and test file and appended to that file as JSON lines when each test
 // file finishes. The runtime reports through auditHydrationProbe (runtime.ts).
+// scripts/hydration-probe-audit.mjs sums them by family against its budgets.
 import { appendFileSync } from 'node:fs';
 import { afterAll, expect } from 'vitest';
 
@@ -10,8 +11,9 @@ const out = process.env.OCTANE_HYDRATION_PROBE_AUDIT!;
 const counts = new Map<string, number>();
 let file = '';
 
-// `at Class.method (path:line:col)` or `at fn (path:line:col)`.
-const FRAME = /^\s*at (?:async )?([^\s(]+) \(/;
+// `at Class.method (path:line:col)`, `at fn [as alias] (path:line:col)` or
+// `at fn (path:line:col)`.
+const FRAME = /^\s*at (?:async )?([^\s(]+)(?: \[as [^\]]+\])? \(/;
 
 (globalThis as any).__OCTANE_HYDRATION_PROBE_AUDIT__ = (kind: string, hit: boolean): void => {
 	const frames = (new Error().stack ?? '').split('\n').slice(1);

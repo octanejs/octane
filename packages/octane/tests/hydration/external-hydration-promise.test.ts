@@ -63,7 +63,7 @@ describe('externally hydrated thenables', () => {
 			external: fulfilled('external', true),
 			ordinary: fulfilled('ordinary'),
 		});
-		expect(html).toContain('data-octane-suspense="2">["ordinary"]</script>');
+		expect(html).toContain('data-octane-suspense="3">["ordinary"]</script>');
 		expect(html).not.toContain('["external"');
 
 		container.innerHTML = html;
