@@ -261,3 +261,30 @@ test('the sorted single file holds the split modules in evaluation order', () =>
 	assert.ok(sorted.indexOf('export function lazy') < sorted.indexOf('let DRIVER'));
 	assert.equal(sorted.length, SOURCE.length);
 });
+
+test('the order search keeps the constraints and puts similar modules within gzip reach', async () => {
+	const { searchOrder } = await import('./split-runtime-order.mjs');
+	let state = 7;
+	const noise = (n) =>
+		Array.from({ length: n }, () =>
+			String.fromCharCode(97 + (((state = (state * 1103515245 + 12345) >>> 0) >>> 16) % 26)),
+		).join('');
+	// a and c emit the same 8 KB; b emits 40 KB of noise, past gzip's 32 KB window.
+	const shared = noise(8192);
+	const runs = [
+		{ key: null, text: 'prefix;' },
+		{ key: 'a', text: shared },
+		{ key: 'b', text: noise(40960) },
+		{ key: 'c', text: shared },
+	];
+	const chunks = { shell: { runs, modules: new Set(['a', 'b', 'c']) } };
+	const before = new Map([
+		['a', new Set()],
+		['b', new Set()],
+		['c', new Set(['a'])],
+	]);
+	const result = searchOrder({ chain: ['a', 'b', 'c'], before, chunks, evals: 200, seeds: 1 });
+	assert.ok(result.order.indexOf('a') < result.order.indexOf('c'));
+	assert.equal(Math.abs(result.order.indexOf('a') - result.order.indexOf('c')), 1);
+	assert.ok(result.after.shell < result.before.shell - 4000);
+});

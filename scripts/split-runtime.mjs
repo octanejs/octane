@@ -9,12 +9,15 @@
  *   node scripts/split-runtime.mjs split          write the facade and modules
  *   node scripts/split-runtime.mjs sorted <file>  write the single-file runtime
  *                                                 reordered into module order
+ *   node scripts/split-runtime.mjs order          search the module order gzip
+ *                                                 compresses best and write it
  *   node scripts/split-runtime.mjs report         module and mutable-state tables
  *   node scripts/split-runtime.mjs where <name>…  the module each name moves to
  *
  * Options: --src <runtime.ts> --map <map.json> --out <src dir> --suggest
- * (--suggest writes the suggested module of every unmapped declaration into
- * the map and drops stale entries).
+ * --evals <n> --seeds <n> (--suggest writes the suggested module of every
+ * unmapped declaration into the map and drops stale entries; --evals and
+ * --seeds tune `order`'s search, see scripts/split-runtime-order.mjs).
  *
  * The split moves source text and changes no statement: each top-level
  * statement is sliced from the TypeScript AST with its leading comments, a
@@ -1170,7 +1173,8 @@ export function emitSorted(model, map, moduleOf, chain) {
 
 /** Formats with the repository's Prettier options for runtime.ts. */
 async function format(file, text) {
-	const options = (await prettier.resolveConfig(RUNTIME)) ?? {};
+	// A file written outside the repository (--out) takes the runtime's config.
+	const options = (await prettier.resolveConfig(file.startsWith(ROOT) ? file : RUNTIME)) ?? {};
 	return prettier.format(text, { ...options, filepath: file });
 }
 
@@ -1263,7 +1267,7 @@ async function main() {
 		for (const u of unmapped) map.modules.find((m) => m.name === u.suggestion).units.push(u.id);
 		const order = new Map(model.units.map((u, i) => [u.id, i]));
 		for (const m of map.modules) m.units.sort((a, b) => order.get(a) - order.get(b));
-		fs.writeFileSync(mapFile, JSON.stringify(map, null, '\t') + '\n');
+		fs.writeFileSync(mapFile, await format(mapFile, JSON.stringify(map)));
 		console.error(`wrote ${unmapped.length} suggestions and dropped ${stale.length} stale entries`);
 	}
 	const blocked = violations.length > 0 || ((unmapped.length || stale.length) && !options.suggest);
@@ -1303,6 +1307,52 @@ async function main() {
 		const out = path.resolve(target ?? src);
 		fs.writeFileSync(out, await format(out, emitSorted(model, map, moduleOf, chain)));
 		console.error(`wrote ${path.relative(process.cwd(), out)}`);
+		return;
+	}
+	if (command === 'order') {
+		// The search measures the split itself, so it writes it in place while it
+		// builds and then restores the single-file runtime.ts.
+		const { buildChunks, searchOrder } = await import('./split-runtime-order.mjs');
+		let chunks;
+		try {
+			for (const [file, text] of emit(model, map, moduleOf, chain)) {
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+				fs.writeFileSync(file, await format(file, text));
+			}
+			chunks = await buildChunks();
+		} finally {
+			fs.rmSync(path.join(path.dirname(src), map.directory), { recursive: true, force: true });
+			fs.writeFileSync(src, model.text);
+		}
+		const before = new Map(chain.map((m) => [m, new Set()]));
+		for (const c of orderConstraints(model, map)) {
+			const [a, b] = [moduleOf.get(c.before.id), moduleOf.get(c.after.id)];
+			if (a !== b && before.has(a) && before.has(b)) before.get(b).add(a);
+		}
+		const result = searchOrder({
+			chain,
+			before,
+			chunks,
+			evals: Number(options.evals ?? 40000),
+			seeds: Number(options.seeds ?? 4),
+		});
+		const rank = new Map(result.order.map((m, i) => [m, i]));
+		const ordered = map.modules
+			.filter((m) => rank.has(m.name))
+			.sort((a, b) => rank.get(a.name) - rank.get(b.name));
+		let next = 0;
+		map.modules = map.modules.map((m) => (rank.has(m.name) ? ordered[next++] : m));
+		fs.writeFileSync(mapFile, await format(mapFile, JSON.stringify(map)));
+		const sum = (sizes, minimal) =>
+			Object.entries(sizes)
+				.filter(([name]) => name.startsWith('minimal/') === minimal)
+				.reduce((total, [, bytes]) => total + bytes, 0);
+		for (const name of ['shell', 'full'])
+			console.error(`${name}: gzip ${result.before[name]} -> ${result.after[name]}`);
+		console.error(
+			`run-minimal Rolldown scenarios: gzip ${sum(result.before, true)} -> ${sum(result.after, true)}`,
+		);
+		console.error(`order: ${result.order.join(' > ')}`);
 		return;
 	}
 	if (command === 'split') {

@@ -310,8 +310,11 @@ const childSlotDeclarations = [
 		Object.values(childSlotControls).flatMap(({ dropped, kept }) => [...dropped, ...kept]),
 	),
 ];
+// `node scripts/split-runtime.mjs order` scores runtime module orders against
+// each Rolldown scenario's chunk and source map, which it reads from here.
+const MAP_DIR = process.env.BUNDLE_SIZE_MAP_DIR;
 const mappedScenario = (id) =>
-	Object.hasOwn(effectControls, id) || Object.hasOwn(childSlotControls, id);
+	Boolean(MAP_DIR) || Object.hasOwn(effectControls, id) || Object.hasOwn(childSlotControls, id);
 // The split shell uses neither ViewTransition nor Activity, so its runtime chunk
 // must drop their optional drivers as a single bundle does; renderBlockInner is
 // the control that proves the source-map oracle sees the chunk.
@@ -640,6 +643,10 @@ async function buildScenario(scenario, entry) {
 	const hookPathModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
 	);
+	if (MAP_DIR) {
+		fs.writeFileSync(path.join(MAP_DIR, `${scenario.id}.js`), chunk.code);
+		fs.writeFileSync(path.join(MAP_DIR, `${scenario.id}.js.map`), chunk.map.toString());
+	}
 	return {
 		code: chunk.code,
 		modules,
