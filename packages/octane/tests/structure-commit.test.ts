@@ -3,12 +3,14 @@ import { createElement, createRoot, startTransition, use } from '../src/index.js
 import { act, mount, type MountResult } from './_helpers';
 import {
 	ActivityApp,
+	BoundaryArmsApp,
 	BranchProbeApp,
 	ListProbeApp,
 	OutsideApp,
 	ResumeApp,
 	StructureApp,
 	type ActivityProps,
+	type BoundaryArmsProps,
 	type ListProps,
 	type OutsideProps,
 	type StructureProps,
@@ -677,4 +679,73 @@ describe('a resumed boundary commits its reveal', () => {
 			app.unmount();
 		}
 	});
+});
+
+describe('boundary arms change at commit', () => {
+	const ready = (value: string) =>
+		({ status: 'fulfilled', value, then() {} }) as unknown as PromiseLike<string>;
+	const never = () => new Promise<string>(() => {});
+
+	for (const priority of ['urgent', 'transition'] as const) {
+		// A transition suspends into a resolved boundary, which holds it; an
+		// urgent render suspends outside every boundary. Either way the render
+		// is dropped after its boundaries built catch, pending and restarted arms.
+		it(`a dropped ${priority} render builds boundary arms without touching committed DOM`, async () => {
+			const initial: BoundaryArmsProps = { fail: false, shown: ready('shown'), waiting: never() };
+			const app = mount(BoundaryArmsApp, initial);
+			const records: MutationRecord[] = [];
+			const observer = new MutationObserver((batch) => records.push(...batch));
+			const render = (props: Partial<BoundaryArmsProps>) =>
+				act(() => {
+					const next = () => app.root.render(BoundaryArmsApp, { ...initial, ...props });
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			const visible = () =>
+				app
+					.findAll('i, p, s')
+					.filter((node) => (node as HTMLElement).style.display !== 'none')
+					.map((node) => node.textContent);
+			try {
+				expect(visible()).toEqual(['shown', 'waiting']);
+				const before = app.html();
+				observer.observe(app.container, {
+					childList: true,
+					subtree: true,
+					attributes: true,
+					characterData: true,
+				});
+				// A transition would hold `shown`'s resolved primary rather than show
+				// its fallback, so only the urgent render suspends it.
+				const change = {
+					fail: true,
+					shown: priority === 'urgent' ? never() : initial.shown,
+					waiting: never(),
+				};
+				const suspend = new Promise(() => {});
+				await render(
+					priority === 'urgent' ? { ...change, gate: suspend } : { ...change, hold: suspend },
+				);
+				records.push(...observer.takeRecords());
+				expect(records.map((record) => `${record.type} ${record.target.nodeName}`)).toEqual([]);
+				expect(app.html()).toBe(before);
+
+				// The render that completes commits the same arms, and the restarted
+				// primary reveals once its value arrives.
+				let resolve!: (value: string) => void;
+				const waiting = new Promise<string>((done) => {
+					resolve = done;
+				});
+				await render({ ...change, waiting });
+				const caught = ['try caught', 'boundary caught'];
+				const shown = priority === 'urgent' ? ['shown pending'] : ['shown'];
+				expect(visible()).toEqual([...caught, ...shown, 'waiting']);
+				await act(() => resolve('arrived'));
+				expect(visible()).toEqual([...caught, ...shown, 'arrived']);
+			} finally {
+				observer.disconnect();
+				app.unmount();
+			}
+		});
+	}
 });
