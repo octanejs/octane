@@ -1,4 +1,4 @@
-import { createElement, memo, startTransition, use, useState } from 'octane';
+import { createElement, memo, startTransition, use, useLayoutEffect, useState } from 'octane';
 
 function Wait(props: { wait: Promise<unknown> }) @{
 	use(props.wait);
@@ -121,5 +121,21 @@ export function Nested(props: { controls: NestedControls; wait: Promise<unknown>
 		} @pending {
 			<p id="fallback">{'loading'}</p>
 		}
+	</section>
+}
+
+function CallbackTail(props: { tail: string }) @{
+	<span id="tail">{props.tail as string}</span>
+}
+
+// A custom element the descriptor renderer writes, before a compiled sibling,
+// so its attribute callback runs between their commit entries.
+export function CommitCallback(props: { value: string; tail: string; log: string[] }) @{
+	useLayoutEffect(() => {
+		props.log.push('layout:' + props.value);
+	});
+	<section>
+		{createElement('commit-callback-hook', { 'data-value': props.value })}
+		<CallbackTail tail={props.tail} />
 	</section>
 }
