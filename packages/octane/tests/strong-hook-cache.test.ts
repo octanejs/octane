@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { flushSync } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 import { act, flushEffects, mount } from './_helpers';
@@ -531,6 +532,229 @@ export function App(props) @{ const read = () => label; const label = props.labe
 			mounted.unmount();
 		}
 	});
+});
+
+describe('Strong ref arrays in template directives', () => {
+	it.each([
+		[false, 'inline'],
+		[false, 'named'],
+		[true, 'inline'],
+		[true, 'named'],
+	])(
+		'keeps conditional refs attached until their inputs or branch change (dev=%s, %s)',
+		(dev, form) => {
+			const { App } = loadCompiledFixtureSource(
+				`"use strong";
+export function App(props) @{
+  <section>
+    @if (props.visible) {
+      ${form === 'named' ? 'const refs = [props.elementRef, props.observe];' : ''}
+      <input ref={${form === 'named' ? 'refs' : '[props.elementRef, props.observe]'}}
+        data-revision={props.revision} defaultValue="initial" />
+    }
+  </section>
+}`,
+				{
+					id: '/src/StrongConditionalRefs.tsrx',
+					mode: 'client',
+					compileOptions: { dev, hmr: false },
+				},
+			);
+			const lifecycle: string[] = [];
+			const first = { current: null as Element | null };
+			const second = { current: null as Element | null };
+			const observe = (element: Element | null) => {
+				lifecycle.push(element ? 'attach' : 'null');
+				return () => lifecycle.push('cleanup');
+			};
+			const mounted = mount(App, { visible: true, revision: 'one', elementRef: first, observe });
+			try {
+				const input = mounted.find('input') as HTMLInputElement;
+				input.value = 'edited';
+				expect(first.current).toBe(input);
+				expect(lifecycle).toEqual(['attach']);
+
+				mounted.update(App, { visible: true, revision: 'two', elementRef: first, observe });
+				expect(mounted.find('input')).toBe(input);
+				expect(input.dataset.revision).toBe('two');
+				expect(input.value).toBe('edited');
+				expect(first.current).toBe(input);
+				expect(lifecycle).toEqual(['attach']);
+
+				mounted.update(App, { visible: true, revision: 'three', elementRef: second, observe });
+				expect(mounted.find('input')).toBe(input);
+				expect(first.current).toBeNull();
+				expect(second.current).toBe(input);
+				expect(lifecycle).toEqual(['attach', 'cleanup', 'attach']);
+				mounted.update(App, { visible: false, revision: 'three', elementRef: second, observe });
+				expect(mounted.container.querySelector('input')).toBeNull();
+				expect(second.current).toBeNull();
+				expect(lifecycle).toEqual(['attach', 'cleanup', 'attach', 'cleanup']);
+
+				mounted.update(App, { visible: true, revision: 'four', elementRef: second, observe });
+				expect(second.current).toBe(mounted.find('input'));
+				expect(second.current).not.toBe(input);
+				expect(lifecycle).toEqual(['attach', 'cleanup', 'attach', 'cleanup', 'attach']);
+			} finally {
+				mounted.unmount();
+			}
+			expect(second.current).toBeNull();
+			expect(lifecycle).toEqual(['attach', 'cleanup', 'attach', 'cleanup', 'attach', 'cleanup']);
+		},
+	);
+
+	it.each([
+		[false, 'inline'],
+		[false, 'named'],
+		[true, 'inline'],
+		[true, 'named'],
+	])(
+		'keeps each keyed row ref attached through row updates and moves (dev=%s, %s)',
+		(dev, form) => {
+			const { App } = loadCompiledFixtureSource(
+				`"use strong";
+export function App(props) @{
+  <ul>@for (const item of props.items; key item.id) {
+    ${form === 'named' ? 'const refs = [item.elementRef, item.observe];' : ''}
+    <li data-id={item.id} data-revision={props.revision}
+      ref={${form === 'named' ? 'refs' : '[item.elementRef, item.observe]'}}>
+      {item.label as string}
+    </li>
+  }</ul>
+}`,
+				{ id: '/src/StrongKeyedRefs.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
+			);
+			const lifecycle: string[] = [];
+			const makeItem = (id: string) => ({
+				id,
+				label: id,
+				elementRef: { current: null as Element | null },
+				observe: (element: Element | null) => {
+					lifecycle.push(id + (element ? ':attach' : ':null'));
+					return () => lifecycle.push(id + ':cleanup');
+				},
+			});
+			const alpha = makeItem('a');
+			const beta = makeItem('b');
+			const items = [alpha, beta];
+			const mounted = mount(App, { items, revision: 'one' });
+			try {
+				const [firstRow, secondRow] = mounted.findAll('li');
+				expect(alpha.elementRef.current).toBe(firstRow);
+				expect(beta.elementRef.current).toBe(secondRow);
+				expect(lifecycle).toEqual(['a:attach', 'b:attach']);
+
+				mounted.update(App, { items, revision: 'two' });
+				expect(firstRow.getAttribute('data-revision')).toBe('two');
+				expect(secondRow.getAttribute('data-revision')).toBe('two');
+				expect(alpha.elementRef.current).toBe(firstRow);
+				expect(beta.elementRef.current).toBe(secondRow);
+				expect(lifecycle).toEqual(['a:attach', 'b:attach']);
+
+				mounted.update(App, { items: [beta, { ...alpha, label: 'updated' }], revision: 'two' });
+				expect(mounted.findAll('li')).toEqual([secondRow, firstRow]);
+				expect(firstRow.textContent).toBe('updated');
+				expect(alpha.elementRef.current).toBe(firstRow);
+				expect(lifecycle).toEqual(['a:attach', 'b:attach']);
+
+				mounted.update(App, { items: [beta], revision: 'two' });
+				expect(alpha.elementRef.current).toBeNull();
+				expect(beta.elementRef.current).toBe(secondRow);
+				expect(lifecycle).toEqual(['a:attach', 'b:attach', 'a:cleanup']);
+			} finally {
+				mounted.unmount();
+			}
+			expect(beta.elementRef.current).toBeNull();
+			expect(lifecycle).toEqual(['a:attach', 'b:attach', 'a:cleanup', 'b:cleanup']);
+		},
+	);
+
+	it('adopts keyed server refs in a conditional and retains them on a live client update', () => {
+		const source = `"use strong";
+export function App(props) @{
+  <section>
+    @if (props.visible) {
+      <div>@for (const item of props.items; key item.id) {
+        <input ref={[item.elementRef, item.observe]} data-revision={props.revision} defaultValue="initial" />
+      }</div>
+    }
+  </section>
+}`;
+		const options = {
+			id: '/src/StrongHydratedRefs.tsrx',
+			compileOptions: { dev: false, hmr: false },
+		};
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const lifecycle: string[] = [];
+		const elementRef = { current: null as Element | null };
+		const observe = (element: Element | null) => {
+			lifecycle.push(element ? 'attach' : 'null');
+			return () => lifecycle.push('cleanup');
+		};
+		const item = { id: 'a', elementRef, observe };
+		const props = { visible: true, revision: 'one', items: [item] };
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = renderToString(server.App, props).html;
+		expect(lifecycle).toEqual([]);
+		expect(elementRef.current).toBeNull();
+		const input = container.querySelector('input')!;
+		input.value = 'edited before hydration';
+		const root = hydrateRoot(container, client.App, props);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('edited before hydration');
+			expect(elementRef.current).toBe(input);
+			expect(lifecycle).toEqual(['attach']);
+			flushSync(() => root.render(client.App, { ...props, revision: 'two' }));
+			expect(input.dataset.revision).toBe('two');
+			expect(input.value).toBe('edited before hydration');
+			expect(elementRef.current).toBe(input);
+			expect(lifecycle).toEqual(['attach']);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+		expect(elementRef.current).toBeNull();
+		expect(lifecycle).toEqual(['attach', 'cleanup']);
+	});
+
+	it.each([false, true])(
+		'does not retain a ref list mutated during conditional setup (dev=%s)',
+		(dev) => {
+			const { App } = loadCompiledFixtureSource(
+				`"use strong";
+export function App(props) @{
+  <section>
+    @if (props.visible) {
+      const refs = [props.elementRef];
+      const alias = refs;
+      alias.push(props.observe);
+      <input ref={refs} data-count={refs.length} data-revision={props.revision} />
+    }
+  </section>
+}`,
+				{ id: '/src/StrongMutableRefs.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
+			);
+			const elementRef = { current: null as Element | null };
+			const observe = () => {};
+			const mounted = mount(App, { visible: true, revision: 'one', elementRef, observe });
+			try {
+				const input = mounted.find('input') as HTMLInputElement;
+				expect(input.dataset.count).toBe('2');
+				expect(elementRef.current).toBe(input);
+				mounted.update(App, { visible: true, revision: 'two', elementRef, observe });
+				expect(input.dataset.revision).toBe('two');
+				expect(input.dataset.count).toBe('2');
+				expect(elementRef.current).toBe(input);
+			} finally {
+				mounted.unmount();
+			}
+			expect(elementRef.current).toBeNull();
+		},
+	);
 });
 
 describe.each([

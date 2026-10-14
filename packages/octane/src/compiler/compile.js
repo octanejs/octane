@@ -3880,7 +3880,7 @@ const CALCULATION_VALUE_PROOFS = [
  * Returns null when nothing moves; otherwise the copy-on-write render nodes,
  * the declarations to append, and their names.
  */
-function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
+function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsOnly = false) {
 	if ((!ctx.strongMemo && !ctx.strongLiteralMemo) || ctx.nativeReads || !ctx.currentComponentLocals)
 		return null;
 	if (renderTreeWrites(jsxNodes)) return null;
@@ -3973,7 +3973,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 		);
 		if (
 			calculation === null ||
-			(!ctx.strongMemo && !calculation.literal) ||
+			((literalsOnly || !ctx.strongMemo) && !calculation.literal) ||
 			(calculation.literal && !prop)
 		) {
 			return container;
@@ -17920,9 +17920,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	let warmThunk = null;
 	let staticChildOnly = false;
 	let hoistedCalculations = null;
-	if (options && options.autoCallback) {
-		const creations = [];
-		const warmChildren = [];
+	const componentBody = options?.autoCallback === true;
+	const literalsOnly = !componentBody && options?.memoizeRenderLiterals === true;
+	const creations = [];
+	const warmChildren = [];
+	if (componentBody) {
 		// Pass A′ first: use()-fed const chains memoize at their declarations,
 		// so Pass A then sees their trivial identifier arguments as already
 		// stable and the warm plan includes the chain heads. Param names feed
@@ -17938,62 +17940,75 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			creations,
 			puParamNames,
 		);
-		// Auto-calculation runs AFTER Pass A′ so use()-fed chains keep their
-		// Symbol-slot treatment (their rewritten inits are hook-shaped and are
-		// skipped here), and BEFORE Pass A/B so the numeric-slot useMemo it mints is
-		// lowered by the authored inline tier rather than re-wrapped. Client only:
-		// a server render evaluates each body once, so a cache is pure overhead.
-		if (ctx.currentComponentLocals && ctx.mode !== 'server') {
-			// Strong inline render expressions become calculations too (#1610). A
-			// returned-output body lowers its JSX into a record whose holes may be
-			// evaluated later, so it keeps them inline.
-			const hoisted = returnedOutput
-				? null
-				: hoistStrongRenderCalculations(jsxNodes, ctx, immutableStateProvenance);
-			if (hoisted !== null) {
-				jsxNodes = hoisted.jsxNodes;
-				hoistedCalculations = hoisted.declarations;
-				workingStatements = [...workingStatements, ...hoistedCalculations];
-				ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
-			}
-			const renderReadNames = closeCalculationReads(
-				workingStatements,
-				collectRenderReadNames(jsxNodes, ctx),
-				ctx.currentComponentLocals,
-				ctx,
-				immutableStateProvenance,
-				hoisted?.literalReads,
-				jsxNodes,
-			);
-			if (renderReadNames.size > 0) {
-				workingStatements = workingStatements.map((statement) => {
-					const rewritten = rewriteAutoCalculation(
-						statement,
-						ctx.currentComponentLocals,
-						renderReadNames,
-						ctx,
-						immutableStateProvenance,
-					);
-					if (
-						rewritten !== statement &&
-						rewritten.declarations[0].init.callee._octaneImmutableArrayFilter !== undefined
-					) {
-						hasImmutableArrayProjection = true;
-					}
-					if (ctx.autoMemo && rewritten !== statement) {
-						(autoCalculatedDeclarations ??= new Map()).set(
-							statement.declarations[0].id.name,
-							statement,
-						);
-					}
-					return rewritten;
-				});
-				if (ctx.nativeReads)
-					workingStatements = workingStatements.flatMap(
-						(statement) => lowerNativeAutoCalculation(statement, ctx, name) ?? [statement],
-					);
-			}
+	}
+	// Auto-calculation runs AFTER Pass A′ so use()-fed chains keep their
+	// Symbol-slot treatment (their rewritten inits are hook-shaped and are
+	// skipped here), and BEFORE Pass A/B so the numeric-slot useMemo it mints is
+	// lowered by the authored inline tier rather than re-wrapped. Client only:
+	// a server render evaluates each body once, so a cache is pure overhead.
+	if (
+		(componentBody || (literalsOnly && ctx.strongLiteralMemo)) &&
+		ctx.currentComponentLocals &&
+		ctx.mode !== 'server'
+	) {
+		// Strong inline render expressions become calculations too (#1610). A
+		// returned-output body lowers its JSX into a record whose holes may be
+		// evaluated later, so it keeps them inline.
+		const hoisted = returnedOutput
+			? null
+			: hoistStrongRenderCalculations(jsxNodes, ctx, immutableStateProvenance, literalsOnly);
+		if (hoisted !== null) {
+			jsxNodes = hoisted.jsxNodes;
+			hoistedCalculations = hoisted.declarations;
+			workingStatements = [...workingStatements, ...hoistedCalculations];
+			ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
 		}
+		const renderReadNames = closeCalculationReads(
+			workingStatements,
+			collectRenderReadNames(jsxNodes, ctx),
+			ctx.currentComponentLocals,
+			ctx,
+			immutableStateProvenance,
+			hoisted?.literalReads,
+			jsxNodes,
+		);
+		if (renderReadNames.size > 0) {
+			workingStatements = workingStatements.map((statement) => {
+				// A construct helper inherits only the literal cache. Ordinary
+				// calculations and callback stability still require component ownership.
+				if (literalsOnly) {
+					const init = unwrapTsExpr(calculationDeclarator(statement)?.init);
+					if (init?.type !== 'ObjectExpression' && init?.type !== 'ArrayExpression')
+						return statement;
+				}
+				const rewritten = rewriteAutoCalculation(
+					statement,
+					ctx.currentComponentLocals,
+					renderReadNames,
+					ctx,
+					immutableStateProvenance,
+				);
+				if (
+					rewritten !== statement &&
+					rewritten.declarations[0].init.callee._octaneImmutableArrayFilter !== undefined
+				) {
+					hasImmutableArrayProjection = true;
+				}
+				if (ctx.autoMemo && rewritten !== statement) {
+					(autoCalculatedDeclarations ??= new Map()).set(
+						statement.declarations[0].id.name,
+						statement,
+					);
+				}
+				return rewritten;
+			});
+			if (ctx.nativeReads)
+				workingStatements = workingStatements.flatMap(
+					(statement) => lowerNativeAutoCalculation(statement, ctx, name) ?? [statement],
+				);
+		}
+	}
+	if (componentBody) {
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -33741,6 +33756,9 @@ function hoistBodyHelper(
 		if (!free.has('arguments') && !free.has('eval')) inheritedEnvNames = envNames;
 	}
 	const helperOptions = {
+		// Only construct blocks provide an entered render scope. Component
+		// children have envNames === null and may be evaluated by their caller.
+		memoizeRenderLiterals: envNames !== null && !mappedItem,
 		keyedSelection,
 		inlineBindingGuards,
 		mappedItem,
