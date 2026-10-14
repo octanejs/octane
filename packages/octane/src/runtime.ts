@@ -3900,7 +3900,9 @@ function retryWokenTransitions(): void {
 
 /** Whether a boundary holds transition work that the render in progress did not fold. */
 function holdsUnrenderedTransition(state: TrySlot): boolean {
-	const hold = TRANSITION_HOLDERS?.get(state);
+	// Most visible renders of a boundary happen while nothing holds.
+	if (TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0) return false;
+	const hold = TRANSITION_HOLDERS.get(state);
 	if (hold === undefined) return false;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	for (const batch of hold.batches)
@@ -42039,14 +42041,21 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		if (
-			domNode(state.start).parentNode === state.domParent &&
-			domNode(state.end).parentNode === state.domParent
-		)
-			journalRootSlot(state, state.domParent, state.start, state.end);
+	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
+	const ranged =
+		domNode(state.start).parentNode === state.domParent &&
+		domNode(state.end).parentNode === state.domParent;
+	if (frame === null) {
+		if (ranged) journalRootSlot(state, state.domParent, state.start, state.end);
 		else journalObjectOnce(state);
+		return frame;
 	}
+	// A frame of its own opens a window nothing has snapshotted in yet: one
+	// snapshot per resume, with no lookup (journalRootSlot's marks).
+	TRANSITION_JOURNAL_BAGS!.set(state, TRANSITION_JOURNAL!.length + (ranged ? 1 : 0));
+	TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
+	if (ranged && (!hydrationStarted || PRESENTATION_HYDRATION?.revision === undefined))
+		journalRootRange(state.domParent, state.start, state.end);
 	return frame;
 }
 
