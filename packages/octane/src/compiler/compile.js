@@ -3872,7 +3872,9 @@ const CALCULATION_VALUE_PROOFS = [
  * a pure projection from template evaluation to the end of setup is
  * unobservable. Positions whose evaluation is conditional or deferred keep
  * their expression: directive arms, component children (the child decides
- * whether and when they render), and built-in boundaries. An expression holding
+ * whether and when they render), and built-in boundaries. Already-evaluated
+ * named literals can still be read at eligible props inside component children;
+ * only their identifier reads are collected there. An expression holding
  * JSX keeps its list and descriptor lowering, and event handlers and keys keep
  * their wiring. Ref arrays use the same identity proof as props. A render tree that writes to anything keeps its whole
  * evaluation order.
@@ -3887,27 +3889,27 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 	const declarations = [];
 	const names = [];
 	const literalReads = new Map();
-	const nodes = mapNodes(jsxNodes, visitNode);
+	const nodes = mapNodes(jsxNodes, (node) => visitNode(node, false));
 	return declarations.length === 0 && literalReads.size === 0
 		? null
 		: { jsxNodes: nodes, declarations, names, literalReads };
 
-	function visitNode(node) {
+	function visitNode(node, deferred) {
 		switch (node?.type) {
 			case 'JSXElement':
-				return visitElement(node);
+				return visitElement(node, deferred);
 			case 'JSXFragment': {
-				const children = mapNodes(node.children, visitNode);
+				const children = mapNodes(node.children, (child) => visitNode(child, deferred));
 				return children === node.children ? node : { ...node, children };
 			}
 			case 'JSXExpressionContainer':
-				return visitContainer(node);
+				return deferred ? node : visitContainer(node);
 			default:
 				return node;
 		}
 	}
 
-	function visitElement(node) {
+	function visitElement(node, deferred) {
 		const opening = node.openingElement;
 		const tag = opening?.name;
 		const component = isComponentTag(node);
@@ -3942,11 +3944,12 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 				return attribute;
 			if (!component && /^on[A-Z]/.test(name)) return attribute;
 			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
-			const value = visitContainer(attribute.value, true);
+			const value = visitContainer(attribute.value, true, deferred);
 			return value === attribute.value ? attribute : { ...attribute, value };
 		});
-		// Component children render inside the child, if at all.
-		const children = component ? node.children : mapNodes(node.children, visitNode);
+		// Component children own evaluation. Discover named reads without moving
+		// any expression from those children into the parent's render.
+		const children = mapNodes(node.children, (child) => visitNode(child, deferred || component));
 		if (attributes === opening.attributes && children === node.children) return node;
 		return {
 			...node,
@@ -3955,7 +3958,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 		};
 	}
 
-	function visitContainer(container, prop = false) {
+	function visitContainer(container, prop = false, deferred = false) {
 		const expression = container.expression;
 		const inner = unwrapTsExpr(expression);
 		if (!inner || inner.type === 'JSXEmptyExpression' || containsJsxNode(inner)) return container;
@@ -3964,6 +3967,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 			if (!nodes) literalReads.set(inner.name, (nodes = new Set()));
 			nodes.add(inner);
 		}
+		if (deferred) return container;
 		const calculation = autoCalculationOf(
 			inner,
 			null,
