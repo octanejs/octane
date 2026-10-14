@@ -38,6 +38,8 @@ export const WRITERS = new Map(
 		clearItems: 'commit',
 		moveBlockBefore: 'commit',
 		removeNodes: 'commit',
+		dropHydrateIdCount: 'commit',
+		placeKeptIsland: 'commit',
 		clearRootContainer: 'commit',
 		landItemPair: 'commit',
 		landHostPair: 'commit',
@@ -120,10 +122,10 @@ export const WRITERS = new Map(
 		mountItemsLinear: 'fresh',
 		mountItem: 'fresh',
 		makeRoot: 'fresh',
+		createHydrateSlot: 'fresh',
 		// hydration
 		clearKeptTextContent: 'hydration',
 		preservePermanentStaticHydrationRange: 'hydration',
-		createHydrateSlot: 'hydration',
 		discardHydrateTail: 'hydration',
 		notifyHydrateBoundary: 'hydration',
 		skipFoldedHeadPrefix: 'hydration',
@@ -138,7 +140,6 @@ export const WRITERS = new Map(
 		finishInitialSuspenseHydration: 'hydration',
 		mountPassthroughListItem: 'hydration',
 		removePassthroughItemRange: 'hydration',
-		keptHydrationIsland: 'hydration',
 		hydrateRootWithOutputHandler: 'hydration',
 		// rollback
 		restoreRootRange: 'rollback',

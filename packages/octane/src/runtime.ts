@@ -17015,6 +17015,21 @@ function installHydrateBoundary(state: HydrateSlot): () => void {
 	return () => teardownHydrateBoundary(state);
 }
 
+/** An island's server wrapper no longer carries the ID count its server render reserved. */
+function dropHydrateIdCount(wrapper: Element): void {
+	wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
+}
+
+/** A seed sidecar after an island's range, which the commit that claims the island removes. */
+function isHydrateSeedSidecar(node: Node): boolean {
+	return (
+		node.nodeType === 1 &&
+		(node as Element).localName === 'script' &&
+		((node as Element).hasAttribute(HYDRATE_SEED_ATTR) ||
+			(node as Element).hasAttribute(NATIVE_SIGNAL_SEED_ATTR))
+	);
+}
+
 function findHydrateSeedSidecar(
 	wrapper: ParentNode,
 	attribute = HYDRATE_SEED_ATTR,
@@ -17046,12 +17061,21 @@ function createHydrateSlot(
 	initializeHydrationEventCapture(wrapper.ownerDocument);
 	const serverPreserved =
 		kept !== null || (hydration !== null && wrapper.parentNode === parentNode);
-	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
-	else parentNode.insertBefore(wrapper, parentBlock.endMarker);
-	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
-	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
+	// A server wrapper names its boundary already; a client one is named before
+	// it is placed.
+	if (!serverPreserved) {
+		wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
 		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
-	if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
+		if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
+	}
+	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
+	else if (kept !== null) {
+		// The kept server wrapper stays where the server put it until the commit
+		// moves it to its place in the client render (placeKeptIsland).
+		const place = document.createComment('');
+		parentNode.insertBefore(place, parentBlock.endMarker);
+		atCommit(placeKeptIsland, [place, wrapper]);
+	} else parentNode.insertBefore(wrapper, parentBlock.endMarker);
 
 	let start: Comment | null = null;
 	let end: Comment | null = null;
@@ -17073,11 +17097,10 @@ function createHydrateSlot(
 			overflow: rootIds,
 			renderOwner: rootIds.renderOwner,
 		};
-		wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
-		// A rolled-back attempt restores the count, so the attempt that replaces
-		// it, a retry or the fallback's client render adopting an independent
-		// wrapper, reserves the same IDs.
-		TRANSITION_JOURNAL?.push(JOURNAL_ATTR, wrapper, HYDRATE_ID_COUNT_ATTR, rawCount);
+		// The commit drops the count, so the attempt that replaces a dropped one,
+		// a retry or the fallback's client render adopting an independent wrapper,
+		// reserves the same IDs.
+		atCommit(dropHydrateIdCount, wrapper);
 	}
 	// An independent root may already have compacted its server ranges. The
 	// parent reserves its IDs but owns only the wrapper, never its child list or
@@ -17087,15 +17110,17 @@ function createHydrateSlot(
 	} else if (serverPreserved && hydration!.isOpen(getFirstChild(wrapper))) {
 		start = getFirstChild(wrapper) as Comment;
 		end = hydration!.close(start);
+		// The commit removes the sidecars, which an attempt that replaces a
+		// dropped one reads again.
 		const seed = findHydrateSeedSidecar(wrapper);
 		if (seed !== null) {
 			seedRaw = seed.textContent || '[]';
-			seed.remove();
+			atCommit(removeNodes, [seed]);
 		}
 		const nativeSeed = findHydrateSeedSidecar(wrapper, NATIVE_SIGNAL_SEED_ATTR);
 		if (nativeSeed !== null) {
 			nativeSeedRaw = nativeSeed.textContent || '';
-			nativeSeed.remove();
+			atCommit(removeNodes, [nativeSeed]);
 		}
 	} else {
 		// The server opens every ordinary wrapper with the boundary's own range. An
@@ -17214,7 +17239,9 @@ function finishRoot(hydration: HydrationCapability): void {
 	let remainder = hydration.rootRemainder === undefined ? hydration.node : hydration.rootRemainder;
 	while (
 		remainder !== null &&
-		(remainder === hydration.rootCleanupBoundary || isRendererHydrationStyle(remainder))
+		(remainder === hydration.rootCleanupBoundary ||
+			isRendererHydrationStyle(remainder) ||
+			isHydrateSeedSidecar(remainder))
 	)
 		remainder = getNextSibling(remainder);
 	if (remainder === null) return;
@@ -17430,8 +17457,8 @@ function discardHydrateTail(state: HydrateSlot, atCommit = false): void {
 	markHydrationDiscard(state.block.idState.renderOwner, wrapper, node, null);
 	while (node !== null) {
 		const next = getNextSibling(node);
-		if (isRendererHydrationStyle(node)) {
-			// Kept.
+		if (isRendererHydrationStyle(node) || isHydrateSeedSidecar(node)) {
+			// Kept: the commit that claims the island removes a sidecar.
 		} else if (atCommit) slotNext(state).out.push(null, node, node);
 		else wrapper.removeChild(node);
 		node = next;
@@ -49101,21 +49128,22 @@ function hydrationFallbackNodes(container: RootContainer): Node[] {
 
 /**
  * Take island `boundaryId`'s server wrapper for the client render replacing a
- * failed hydration, which moves it into place. A rollback of that render puts
- * it back where the server DOM had it. The island lives on its own root, so
- * the render adopts it as hydration would have, and only an island the render
- * no longer has is discarded with the server DOM (installHydrationFallback).
+ * failed hydration, whose commit moves it into place (placeKeptIsland). A
+ * render that never commits leaves it where the server DOM had it. The island
+ * lives on its own root, so the render adopts it as hydration would have, and
+ * only an island the render no longer has is discarded with the server DOM
+ * (installHydrationFallback).
  */
 function keptHydrationIsland(boundaryId: string): Element | null {
 	const islands = ROOT_RENDER_TRANSACTION?.keptIslands;
 	const index =
 		islands?.findIndex((island) => island.getAttribute(HYDRATE_ID_ATTR) === boundaryId) ?? -1;
-	if (index < 0) return null;
-	const wrapper = islands!.splice(index, 1)[0];
-	const parent = wrapper.parentNode!;
-	const next = wrapper.nextSibling;
-	journalUndo(() => parent.insertBefore(wrapper, next));
-	return wrapper;
+	return index < 0 ? null : islands!.splice(index, 1)[0];
+}
+
+/** Move a kept island's server wrapper to `place`, its place in the client render. */
+function placeKeptIsland([place, wrapper]: [Comment, Element]): void {
+	place.parentNode?.replaceChild(wrapper, place);
 }
 
 /** Remove each of `nodes` that is still attached. */
