@@ -10634,10 +10634,6 @@ let PENDING_DEFERRED_LAYOUT: DeferredLayoutCapture | null = null;
 let COMPLETING_DEFERRED_LAYOUT: DeferredLayoutCapture | null = null;
 let DEFERRED_LAYOUT_HELD_WORK: Set<Block> | null = null;
 
-function isRecordingTransitionJournal(): boolean {
-	return TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK && !TRANSITION_JOURNAL_REPLAYING;
-}
-
 function ensureDeferredLayoutDriver(): void {
 	if (!DEFERRED_LAYOUT_DRIVER) {
 		DEFERRED_LAYOUT_DRIVER = {
@@ -12667,7 +12663,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		const borrows =
 			returnHydration !== null &&
 			existingRet === undefined &&
-			(bordersOutput(block, returnHydration) ||
+			(bordersOutput(block) ||
 				(isComponentDescriptor &&
 					(out as ElementDescriptor).__octaneInvocationSite === RENDERER_INVOCATION_SITE &&
 					block.startMarker === null &&
@@ -12841,7 +12837,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
  * has none, nor has a single-root block. Hydrating, neither has the client-built
  * range of a call the server did not frame.
  */
-function bordersOutput(block: Block, hydration: HydrationCapability | null): boolean {
+function bordersOutput(block: Block): boolean {
 	const start = block.startMarker;
 	const end = block.endMarker;
 	return (
@@ -23290,7 +23286,7 @@ function writeAtCommit<T>(writer: (...args: any[]) => T, kind: string, args: any
 	let cached: unknown;
 	if (kind.endsWith('IfChanged')) {
 		// `(value, previous, element, …)`: an unchanged value keeps its cache.
-		if (attributeUnchanged(args[1], args[0], args[2])) return args[1];
+		if (attributeUnchanged(args[1], args[0])) return args[1];
 		cached = args[0];
 	} else if (kind.startsWith('updateFresh')) {
 		cached = normalizeClass(args[0]);
@@ -24695,7 +24691,7 @@ function readSignalInScope(scope: Scope, handle: SignalHandle<unknown>): unknown
 // An identical raw value needs no write, except a first `undefined` over an
 // adopted server element: its cache slot has not yet reconciled the server
 // attribute, which the writer removes. The direct-signal path does the same.
-function attributeUnchanged(previous: unknown, value: unknown, el: Element): boolean {
+function attributeUnchanged(previous: unknown, value: unknown): boolean {
 	if (previous !== value) return false;
 	if (value !== undefined) return true;
 	const hydration = hydrating ? activeHydration() : null;
@@ -24708,7 +24704,7 @@ export function setAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setAttribute(el, name, value);
 	return value;
 }
@@ -24719,7 +24715,7 @@ export function setPlainAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setPlainAttribute(el, name, value);
 	return value;
 }
@@ -24730,7 +24726,7 @@ export function setURLAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setURLAttribute(el, name, value);
 	return value;
 }
@@ -24741,7 +24737,7 @@ export function setStringDataIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setStringData(el, name, value);
 	return value;
 }
@@ -24752,7 +24748,7 @@ export function setBooleanAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setBooleanAttribute(el, name, value);
 	return value;
 }
@@ -24763,19 +24759,19 @@ export function setAriaAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setAriaAttribute(el, name, value);
 	return value;
 }
 
 export function setClassNameIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setClassName(el, value);
 	return value;
 }
 
 export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (attributeUnchanged(previous, value, el)) return previous;
+	if (attributeUnchanged(previous, value)) return previous;
 	setClassAttr(el, value);
 	return value;
 }
@@ -37968,7 +37964,7 @@ export function childSlot(
 			parentScope === RETURNED_OUTPUT_SCOPE &&
 			slotKey === 0 &&
 			anchor === parentBlock.endMarker &&
-			bordersOutput(parentBlock, hydration);
+			bordersOutput(parentBlock);
 		if (hydrationTransparent) {
 			// The selected hydration container begins below this logical return
 			// slot. Keep its lifecycle/block, but leave the server cursor and ranges
