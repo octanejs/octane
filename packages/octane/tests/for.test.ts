@@ -2258,10 +2258,9 @@ describe('large keyed list fills', () => {
 			failKey = false;
 			r.click('#fast-suspending-getter-retry');
 			expect(r.find('#fast-suspending-getter-pending').textContent).toBe('loading');
-			// The retry builds a fresh body, whose discarded prefix leaves with it.
-			expect(abortedPrefixes[1]).toHaveLength(2);
-			expect(abortedPrefixes[1]!.every((row) => !row.isConnected)).toBe(true);
-			expect(abortedPrefixes[1]!.every((row) => row.parentNode === null)).toBe(true);
+			// The retry builds a fresh body off-document too: its discarded prefix
+			// never connects.
+			expect(abortedPrefixes[1]).toHaveLength(0);
 			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
 
 			await act(() => resolve('resolved row 3'));
