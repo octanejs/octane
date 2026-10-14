@@ -569,8 +569,13 @@ describe('octane analyze Strong coverage', () => {
 				"export { Dialog } from './Dialog';\nexport { Sheet } from './Sheet';\n",
 			'node_modules/@kit/ui/src/dialog/Sheet.tsx':
 				'export function Sheet() { return <aside />; }\n',
+			// A Strong dependency answers to the same rule, so what it imports counts.
 			'node_modules/@kit/ui/src/dialog/Dialog.tsrx':
-				'"use strong";\nexport function Dialog() @{ <dialog /> }\n',
+				'"use strong";\n' +
+				"import { Backdrop } from './Backdrop';\n" +
+				'export function Dialog() @{ <dialog><Backdrop /></dialog> }\n',
+			'node_modules/@kit/ui/src/dialog/Backdrop.tsx':
+				"import { ReactCompat } from 'octane/react';\nexport function Backdrop() { return <ReactCompat />; }\n",
 			'node_modules/@kit/ui/src/hooks.ts': `import { ReactCompat } from 'octane/react';\n${hook('useHidden')}`,
 			'node_modules/@kit/ui/src/Unused.tsx': 'export function Unused() { return <u />; }\n',
 			'node_modules/@kit/ui/src/Chart.tsx':
@@ -637,12 +642,19 @@ describe('octane analyze Strong coverage', () => {
 				{ name: '@kit/store', modules: ['src/index.ts'], importers: ['src/App.tsrx'] },
 				{
 					name: '@kit/ui',
-					modules: ['src/Button.tsx', 'src/Chart.tsx', 'src/Menu.tsx', 'src/dialog/Sheet.tsx'],
+					modules: [
+						'src/Button.tsx',
+						'src/Chart.tsx',
+						'src/Menu.tsx',
+						'src/dialog/Backdrop.tsx',
+						'src/dialog/Sheet.tsx',
+					],
 					importers: ['src/App.tsrx'],
 				},
 			],
 			reactCompat: [
 				{ package: '@kit/ui', module: 'src/Chart.tsx', importers: ['src/App.tsrx'] },
+				{ package: '@kit/ui', module: 'src/dialog/Backdrop.tsx', importers: ['src/App.tsrx'] },
 				{ package: 'analyzed', module: 'src/Bridge.tsrx', importers: ['src/Bridge.tsrx'] },
 			],
 		});
