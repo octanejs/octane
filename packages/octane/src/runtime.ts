@@ -37755,7 +37755,7 @@ function reconcileDeoptNode(
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
 //
 // A committed host's reconcile (`defer`) writes nothing: it returns the order
-// its commit gives the children, or null when they stay as they are. An
+// its commit gives the children, or null when nothing can move them. An
 // earlier pass of the same root render may have chosen them already: the
 // pending record's `nodes`, not the DOM, are then the children it reconciles.
 function reconcileDeoptChildren(
@@ -37904,6 +37904,8 @@ function reconcileDeoptChildren(
 	}
 	let up = 0;
 	const result: Node[] = [];
+	// The commit entries this host's children queue run before its own.
+	const entries = defer ? ROOT_RENDER_TRANSACTION!.ops.length : 0;
 	// Hydrating `<html>`, `<head>` or `<body>`, React skips server elements of
 	// another tag, and comments, and leaves them, and what follows the client's
 	// children, in place (HydrationCapability.skipForeign). Host descriptor
@@ -37979,8 +37981,15 @@ function reconcileDeoptChildren(
 		}
 	}
 	if (defer) {
-		// Children that keep their nodes and order need no placement.
-		if (pending === null && result.length === owned.length) {
+		// Children that keep their nodes and order need no placement, unless a
+		// child queued a commit entry: that write can move the child (a custom
+		// element's attribute callback reparents itself), and the order, which
+		// runs after it, puts the child back where this host owns it.
+		if (
+			pending === null &&
+			result.length === owned.length &&
+			ROOT_RENDER_TRANSACTION!.ops.length === entries
+		) {
 			let i = 0;
 			while (i < result.length && result[i] === owned[i]) i++;
 			if (i === result.length) return null;
