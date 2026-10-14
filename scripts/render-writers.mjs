@@ -49,6 +49,8 @@ export const WRITERS = new Map(
 		adoptCheckedness: 'commit',
 		placeMarker: 'commit',
 		placeAtCommit: 'commit',
+		removeOwnedContent: 'commit',
+		discardMarker: 'primitive',
 		clearRootContainer: 'commit',
 		landItemPair: 'commit',
 		landHostPair: 'commit',
@@ -153,8 +155,6 @@ export const WRITERS = new Map(
 		'HydrationCapability.wrapUnframedRoot': 'hydration',
 		'HydrationCapability.insertRoot': 'hydration',
 		finishInitialSuspenseHydration: 'hydration',
-		mountPassthroughListItem: 'hydration',
-		removePassthroughItemRange: 'hydration',
 		hydrateRootWithOutputHandler: 'hydration',
 		// rollback
 		restoreRootRange: 'rollback',

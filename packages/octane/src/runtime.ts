@@ -4841,6 +4841,17 @@ function markerPosition(node: Node | null): Node | null {
 	return node;
 }
 
+/** The parent `node` is in, or for a marker still to be placed, the one it lands in. */
+function markerParent(node: Node): Node | null {
+	return node.parentNode ?? PENDING_MARKERS?.get(node)?.[0] ?? null;
+}
+
+/** Take `node`, a marker a hydrating render minted, out: before its commit places it, or now. */
+function discardMarker(node: Node): void {
+	if (markerPending(node)) PENDING_MARKERS!.delete(node);
+	else (node as ChildNode).remove();
+}
+
 /** The node after `node` in the server DOM, for a marker still to be placed too (markerPosition). */
 function nodeAfter(node: Node): Node | null {
 	return markerPending(node) ? markerPosition(node) : getNextSibling(node);
@@ -37197,7 +37208,7 @@ function renderPreparedChildList(
 					if (
 						owner.forSlot !== null &&
 						owner.endMarker !== null &&
-						owner.endMarker.parentNode === domParent
+						markerParent(owner.endMarker) === domParent
 					) {
 						anchor = owner.endMarker;
 						break;
@@ -37211,14 +37222,10 @@ function renderPreparedChildList(
 					}
 				}
 			}
-			domParent.insertBefore(state.end, anchor);
-			if (passthroughList) {
-				passthroughEnd = state.end;
-				if (TRANSITION_JOURNAL !== null) {
-					const end = state.end;
-					journalUndo(() => end.remove());
-				}
-			}
+			// A hydrating render places the list's markers in the server DOM at commit.
+			if (hydration !== null) placeAtCommit(domParent, state.end, anchor);
+			else domParent.insertBefore(state.end, anchor);
+			if (passthroughList) passthroughEnd = state.end;
 		}
 		if (state.start === null) {
 			state.start = document.createComment('');
@@ -37226,21 +37233,14 @@ function renderPreparedChildList(
 			// INSIDE [start, end] (they become the items) — mint start before
 			// the first of them, not at the tail.
 			const cursor = passthroughList ? hydration!.node : null;
-			domParent.insertBefore(
-				state.start,
-				upgradeArmed
-					? getFirstChild(domParent)
-					: cursor !== null && cursor.parentNode === domParent
-						? cursor
-						: state.end,
-			);
-			if (passthroughList) {
-				passthroughStart = state.start;
-				if (TRANSITION_JOURNAL !== null) {
-					const start = state.start;
-					journalUndo(() => start.remove());
-				}
-			}
+			const before = upgradeArmed
+				? getFirstChild(domParent)
+				: cursor !== null && cursor.parentNode === domParent
+					? cursor
+					: state.end;
+			if (hydration !== null) placeAtCommit(domParent, state.start, before);
+			else domParent.insertBefore(state.start, before);
+			if (passthroughList) passthroughStart = state.start;
 		}
 		state.forSlot = {
 			__kind: 'forBlockSlot',
@@ -37381,11 +37381,11 @@ function renderPreparedChildList(
 			);
 		} catch (error) {
 			if (passthroughStart !== null) {
-				passthroughStart.remove();
+				discardMarker(passthroughStart);
 				state.start = null;
 			}
 			if (passthroughEnd !== null) {
-				passthroughEnd.remove();
+				discardMarker(passthroughEnd);
 				state.end = null;
 			}
 			if (passthroughStart !== null || passthroughEnd !== null) state.forSlot = null;
@@ -47722,7 +47722,8 @@ function mountItemsLinear<T>(
 	// shows fresh rows with their bindings half rolled back underneath them.
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
-	const parentNode = state.end.parentNode!;
+	// A hydrating list's end may still be to place (placeAtCommit).
+	const parentNode = markerParent(state.end)!;
 	// A committed list's rows render off-document and land before its end.
 	const next =
 		ROOT_RENDER_TRANSACTION === null || passthroughList
@@ -47813,14 +47814,13 @@ function mountItemsLinear<T>(
 				!isSuspenseException(error) &&
 				!isHostContextRequest(error) &&
 				!isAdoptionControl(error);
-			if (discardOwnedDom && start !== null && start.parentNode !== null)
-				journalRootChildren(start.parentNode!);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			// A hydrating item adopted server DOM, which a failed attempt leaves.
 			if (block.idState.renderOwner?.signalOwner !== undefined)
 				discardSignalRetryItem(block, error);
 			else unmountBlock(block, !hydrating && !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
-			if (start !== null && end !== null) removePassthroughItemRange(start, end, discardOwnedDom);
+			if (start !== null && end !== null)
+				removePassthroughItemRange(parentNode, start, end, discardOwnedDom);
 		}
 		state.head = null;
 		state.tail = null;
@@ -47851,18 +47851,18 @@ function mountPassthroughListItem<T>(
 	forSlot: ForSlot,
 ): Block {
 	const hydration = activeHydration()!;
+	// The list's own end may still be to place (placeAtCommit): a cursor that
+	// reached where it lands stands at it.
+	const end$ = markerPosition(anchor);
 	const cursor = hydration.node;
-	const before = cursor !== null && cursor.parentNode === parentNode ? cursor : anchor;
+	const before =
+		cursor !== null && cursor.parentNode === parentNode && cursor !== end$ ? cursor : anchor;
 	const start = document.createComment('it');
 	const end = document.createComment('/it');
-	parentNode.insertBefore(start, before);
-	parentNode.insertBefore(end, anchor);
-	if (TRANSITION_JOURNAL !== null) {
-		journalUndo(() => {
-			start.remove();
-			end.remove();
-		});
-	}
+	// The item's range lands in the server DOM at commit: its end, provisionally
+	// at the list's end, moves past what the item adopted once it rendered.
+	placeAtCommit(parentNode, start, before);
+	placeAtCommit(parentNode, end, anchor);
 	const block = createBlock(
 		'control-flow',
 		parentBlock,
@@ -47877,7 +47877,7 @@ function mountPassthroughListItem<T>(
 	block.key = key;
 	block.itemIndex = index;
 	preserveRootCreatedDom(block);
-	const fresh = cursor === null || cursor === anchor;
+	const fresh = cursor === null || cursor === anchor || cursor === end$;
 	const previousPassthrough = hydration.passthroughRanges;
 	hydration.passthroughRanges = true;
 	if (process.env.NODE_ENV !== 'production') auditHydrationProbe('passthrough', false);
@@ -47892,31 +47892,39 @@ function mountPassthroughListItem<T>(
 			!isSuspenseException(error) &&
 			!isHostContextRequest(error) &&
 			!isAdoptionControl(error);
-		if (discardOwnedDom) journalRootChildren(parentNode);
 		unmountBlock(block, false);
-		removePassthroughItemRange(start, end, discardOwnedDom);
+		removePassthroughItemRange(parentNode, start, end, discardOwnedDom);
 		throw error;
 	} finally {
 		hydration.passthroughRanges = previousPassthrough && hydration.passthroughRanges;
 	}
 	const next = hydration.node;
-	parentNode.insertBefore(end, next !== null && next.parentNode === parentNode ? next : anchor);
+	const after = next !== null && next.parentNode === parentNode && next !== end$ ? next : anchor;
+	placeAtCommit(parentNode, end, after);
 	// The owner can advance the cursor to this item's provisional end. The
 	// following logical sibling must start after that end, not inside the item.
-	hydration.node = getNextSibling(end);
+	hydration.node = markerPosition(after);
 	return block;
 }
 
-function removePassthroughItemRange(start: Node, end: Node, discardContents: boolean): void {
-	if (!discardContents) {
-		(start as ChildNode).remove();
-		(end as ChildNode).remove();
-		return;
-	}
-	for (let node: Node | null = start; node !== null;) {
+/**
+ * Take a passthrough item's range out. A hydrating render places it at commit,
+ * so it cancels that, and the server content the item owned (`discard`), from
+ * where the range starts to where it ends, leaves at commit.
+ */
+function removePassthroughItemRange(parent: Node, start: Node, end: Node, discard: boolean): void {
+	const from = markerPosition(start);
+	const to = markerPending(end) ? markerPosition(end) : getNextSibling(end);
+	discardMarker(start);
+	discardMarker(end);
+	if (discard) atCommit(removeOwnedContent, [parent, from, to]);
+}
+
+/** Remove `parent`'s nodes from `from` up to `to`, but a renderer style. */
+function removeOwnedContent([parent, from, to]: [Node, Node | null, Node | null]): void {
+	for (let node = from; node !== null && node !== to;) {
 		const next = getNextSibling(node);
-		if (!isRendererHydrationStyle(node)) (node as ChildNode).remove();
-		if (node === end) break;
+		if (node.parentNode === parent && !isRendererHydrationStyle(node)) (node as ChildNode).remove();
 		node = next;
 	}
 }
