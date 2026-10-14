@@ -21149,25 +21149,17 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Bound the arm of a boundary range that ends at `end`, whose content starts
-	 * at `first`, with markers of its own. The server renders a boundary's
-	 * content directly inside its one range (hydration-protocol.ts), while the
-	 * client renders the arm in a range of its own inside the boundary's, where
-	 * it can hide the arm beside a fallback. An attempt that is discarded
-	 * restores the server's range. A presentation-binding view's arm keeps the
-	 * range of its own that opens at `first` (bindingTryState).
+	 * The range a boundary's body adopts on its first render, from `open` to
+	 * `end`: the boundary's own, since the server renders a boundary's content
+	 * directly inside its one range (hydration-protocol.ts). The body borrows it,
+	 * and the first arm that shows beside the body bounds it (mountPendingBody).
+	 * A presentation-binding view's arm keeps the range of its own that opens at
+	 * `first` (bindingTryState).
 	 */
-	armRange(open: Node, first: Node | null, end: Node): [Comment, Comment] {
-		if ((open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first))
-			return [first, this.close(first)];
-		const parent = end.parentNode!;
-		const doc = document;
-		const start = doc.createComment('try-b');
-		const close = doc.createComment('/try-b');
-		this.save(parent);
-		parent.insertBefore(start, first);
-		parent.insertBefore(close, end);
-		return [start, close];
+	armRange(open: Node, first: Node | null, end: Node): readonly [Node, Node] {
+		return (open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first)
+			? [first, this.close(first)]
+			: [open, end];
 	}
 
 	/**
@@ -40909,13 +40901,22 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
  * supersedes leaves the fragment with its own unmount. Hydration and a
  * boundary this render created write in place.
  */
-function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
+function insertArmPair(
+	state: TrySlot | ErrorSlot,
+	start: Node,
+	end: Node,
+	before: Node,
+	// The end of a body that borrowed the boundary's range, which lands before
+	// this arm (mountPendingBody).
+	bound: Node | null = null,
+): Node {
 	const live = before.parentNode!;
 	const parent =
 		live === state.domParent && usesFrontier(state.parentBlock, live)
 			? slotFrontier(state, state.parentBlock, live, before)
 			: live;
 	const at = parent === live ? before : null;
+	if (bound !== null) parent.insertBefore(bound, at);
 	parent.insertBefore(start, at);
 	parent.insertBefore(end, at);
 	return parent;
@@ -41259,6 +41260,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		state.env,
 	);
 	body.idState = state.idState;
+	if (hydrationStarted && start === state.start) body.exclusiveMarkers = true;
 	blockRare(body).tryHandler = (error: unknown) => {
 		switchErrorToCatch(state, error);
 		return state.block;
@@ -41674,6 +41676,8 @@ function createTryBody(
 		state.env,
 	);
 	block.idState = state.idState;
+	// A body that hydrated borrows the boundary's range (armRange).
+	if (hydrationStarted && start === state.start) block.exclusiveMarkers = true;
 	const rare = blockRare(block);
 	rare.trySlot = state;
 	rare.tryHandler = (error: unknown) => {
@@ -41723,8 +41727,10 @@ function mountHiddenTryBody(state: TrySlot): Block {
 interface InitialSuspenseHydration {
 	metadata: ChildNode[];
 	consume?: () => void;
-	start: Comment;
-	end: Comment;
+	/** The range the body adopts (armRange), and its first server node. */
+	start: Node;
+	end: Node;
+	first: Node | null;
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
@@ -41811,6 +41817,7 @@ function takeInitialSuspenseHydration(
 			metadata,
 			start,
 			end,
+			first: start === open ? cursor : getNextSibling(start),
 			idStart: 0,
 			...payload,
 			consume: () => {
@@ -41851,6 +41858,7 @@ function takeInitialSuspenseHydration(
 		metadata,
 		start,
 		end,
+		first: start === open ? cursor : getNextSibling(start),
 		idStart,
 		seedRaw,
 		nativeRaw,
@@ -41957,7 +41965,7 @@ function renderInitialSuspenseHydration(
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
-	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
+	const hydration = new HydrationCapability(block, initial.first, null);
 	hydration.speculative = hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
@@ -42273,9 +42281,15 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
  * are handled separately by hideTryContentAndMountPending. Focus remains owned by
  * the connected hidden host, matching React DOM's hideInstance behavior.
  */
-function hideBlockHostRange(block: Block, hidden: SuspenseHiddenDom): void {
+function hideBlockHostRange(
+	block: Block,
+	hidden: SuspenseHiddenDom,
+	// The boundary's end, which also bounds a body whose own end lands with
+	// the arm this hide shows (mountPendingBody).
+	limit: Node | null = null,
+): void {
 	let node = getNextSibling(block.startMarker!) as ChildNode | null;
-	while (node !== null && node !== block.endMarker) {
+	while (node !== null && node !== block.endMarker && node !== limit) {
 		if (node.nodeType === 1) {
 			const el = node as HTMLElement;
 			if (!hidden.displays.has(el)) {
@@ -42330,7 +42344,7 @@ function hideTryBlock(state: TrySlot): void {
 			releaseTryHide(hidden);
 		});
 	}
-	hideBlockHostRange(block, hidden);
+	hideBlockHostRange(block, hidden, state.end);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42338,7 +42352,7 @@ function rehideTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	const block = state.tryBlock;
 	if (hidden === null || !hidden.active || block === null || block.disposed) return;
-	hideBlockHostRange(block, hidden);
+	hideBlockHostRange(block, hidden, state.end);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42724,10 +42738,19 @@ function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = document.createComment('pend-b');
 		const bEnd = document.createComment('/pend-b');
+		// A body that hydrated borrows the boundary's range (armRange). The first
+		// arm beside it mints the body's own end, which lands with the arm.
+		let bound: Comment | null = null;
+		const kept = hydrationStarted ? state.tryBlock : null;
+		if (kept !== null && kept.endMarker === state.end) {
+			bound = document.createComment('/try-b');
+			journalRootProperty(kept, 'endMarker', state.end);
+			kept.endMarker = bound;
+		}
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
-			insertArmPair(state, bStart, bEnd, state.end),
+			insertArmPair(state, bStart, bEnd, state.end, bound),
 			bStart,
 			bEnd,
 			state.pendingBody,
