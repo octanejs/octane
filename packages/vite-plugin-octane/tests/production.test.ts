@@ -699,14 +699,23 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		const response = await handler(new Request('http://localhost/pages/error'));
 		expect(response.status).toBe(200);
 		const prodHtml = await response.text();
-		expect(prodHtml).toContain('Fixture failed: Error: fixture root boundary');
+		// As in React, the server never renders an error boundary: the root's
+		// pending arm ships with an instruction to render the boundary on the
+		// client, where the catch arm catches the repeated error.
+		expect(prodHtml).toContain('Loading fixture…');
+		expect(prodHtml).toContain('$OCTRX(');
+		expect(prodHtml).not.toContain('Fixture failed');
 		const stylesheet = findBuiltAsset(path.join(distDir, 'client'), '.css', '.root-catch');
 		expect(stylesheet).toBeTruthy();
 		expect(prodHtml).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
 
 		const devResponse = await fetch(devOrigin + '/pages/error');
 		expect(devResponse.status).toBe(200);
-		expect(bodyRegionOf(await devResponse.text())).toBe(bodyRegionOf(prodHtml));
+		// Each response names its stream boundaries with a token of its own.
+		const boundaryIds = (html: string) => html.replace(/\bos[0-9a-f]{32}-/g, 'os-');
+		expect(boundaryIds(bodyRegionOf(await devResponse.text()))).toBe(
+			boundaryIds(bodyRegionOf(prodHtml)),
+		);
 
 		let browser: import('playwright').Browser | undefined;
 		try {

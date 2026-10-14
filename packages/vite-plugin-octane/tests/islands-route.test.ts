@@ -182,12 +182,12 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 		expect(islands).toContain('data-octane-hydrate-independent');
 	});
 
-	// Only the renderer consumes the signal Action frame and transition coordinator.
+	// Only the renderer consumes a transition's pending signal state (pending.ts).
 	// An islands-only app's pages load signals without it, so its client build moves
-	// them from the signal graph into the renderer. A mixed app keeps them with the
+	// it from the signal graph into the renderer. A mixed app keeps it with the
 	// graph, so its renderer pages without signals carry nothing.
 	it('moves signal Actions into the renderer only when every route is islands', async () => {
-		const frame = /packages\/octane\/src\/signals\/transition-(?:action|coordinator)\.ts$/;
+		const frame = /packages\/octane\/src\/signals\/pending\.ts$/;
 		const placement = (graph: BuiltGraph) => {
 			const loads = (module: RegExp) => {
 				const reached = new Set<string>();
