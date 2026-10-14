@@ -28895,8 +28895,9 @@ function planJsx(
 			if (binding.kind === 'style' || binding.kind === 'styleProperties')
 				ctx.runtimeNeeded.add('commitTemplateStyle');
 			if (binding.kind === 'styleProperty') ctx.runtimeNeeded.add('commitTemplateStyleProperty');
-			if (valueHelper === 'prepareTemplateAttribute')
-				ctx.runtimeNeeded.add(binding.kind === 'formAction' ? 'setFormAction' : 'commitHostProps');
+			if (valueHelper === 'prepareTemplateAttribute') ctx.runtimeNeeded.add('commitHostProps');
+			if (binding.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
+			if (binding.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
 			if (binding.kind === 'hostCommit') {
 				ctx.runtimeNeeded.add(
 					binding.signalHostSources
@@ -31405,8 +31406,9 @@ function preparedTemplateValueHelper(bind) {
 		case 'styleProperty':
 			return 'prepareTemplateStyleProperty';
 		case 'formAction':
+			return 'prepareTemplateFormAction';
 		case 'htmlOnlyChild':
-			return 'prepareTemplateAttribute';
+			return 'prepareTemplateHTML';
 		case 'attr':
 			// The static native-name admission selects this same data writer even
 			// when an opaque expression did not receive a text type proof.
@@ -31713,6 +31715,8 @@ function emitPreparedBinding(bind, bag) {
 				org,
 			);
 		}
+	} else if (bind.kind === 'htmlOnlyChild') {
+		prepared = b.call('_$prepareTemplateHTML', bagFieldNode(bag, `_el$${bind.id}`), b.id('_v'));
 	} else if (bind.kind === 'class') {
 		prepared = b.call(
 			'_$prepareTemplateClass',
@@ -32033,9 +32037,16 @@ function emitPreparedBindingCommit(bind, bag) {
 			attrLoweringToken(b.id('_$setFormAction'), bind),
 			F('_el'),
 			attrLoweringToken(b.literal(bind.name), bind),
-			pending(),
-			F('_prev'),
 			prepared(),
+			F('_prev'),
+			b.literal(true),
+		);
+	} else if (bind.kind === 'htmlOnlyChild') {
+		write = b.call(
+			'_$setDangerouslySetInnerHTML',
+			F('_el'),
+			b.member(prepared(), 'html'),
+			b.member(prepared(), 'adopted'),
 		);
 	} else if (preparedTemplateValueHelper(bind) === 'prepareTemplateAttribute') {
 		write = b.call(
@@ -32067,7 +32078,10 @@ function emitPreparedBindingCommit(bind, bag) {
 							),
 						]
 					: []),
-				b.if(b.binary('!==', prepared(), retained), b.stmt(write), null),
+				// A suppressed URL still needs to release any previous action.
+				bind.kind === 'formAction'
+					? b.stmt(write)
+					: b.if(b.binary('!==', prepared(), retained), b.stmt(write), null),
 				...(bind.kind === 'style' ||
 				preparedTemplateValueHelper(bind) === 'prepareTemplateAttribute'
 					? [

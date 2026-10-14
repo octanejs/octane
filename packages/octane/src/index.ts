@@ -172,6 +172,8 @@ export {
 	prepareHostProps,
 	commitHostProps,
 	prepareTemplateAttribute,
+	prepareTemplateHTML,
+	prepareTemplateFormAction,
 	prepareTemplateControl,
 	prepareTemplateHostSources,
 	commitTemplateHostSources,

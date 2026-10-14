@@ -151,6 +151,32 @@ describe('production form-action reachability', () => {
 			}
 		});
 	});
+
+	it('ships and executes a single raw HTML writer without retaining generic host props', async () => {
+		const text = await bundleApp(
+			`export function App(props: { html: { __html: string } | null }) @{ <section dangerouslySetInnerHTML={props.html} /> }`,
+			`export { flushSync } from 'octane';`,
+		);
+		expect(text).not.toMatch(/function (?:prepareHostProps|commitHostProps|setSpread)\(/);
+		await withDom(async (window) => {
+			const { App, createRoot, flushSync } = await load(text);
+			const container = window.document.createElement('div');
+			window.document.body.append(container);
+			const root = createRoot(container);
+			try {
+				root.render(App, { html: { __html: '<b>first</b>' } });
+				const section = container.querySelector('section')!;
+				expect(section.innerHTML).toBe('<b>first</b>');
+				flushSync(() => root.render(App, { html: { __html: '<i>second</i>' } }));
+				expect(container.querySelector('section')).toBe(section);
+				expect(section.innerHTML).toBe('<i>second</i>');
+				flushSync(() => root.render(App, { html: null }));
+				expect(section.innerHTML).toBe('');
+			} finally {
+				root.unmount();
+			}
+		});
+	});
 });
 
 describe('production controlled-event reachability', () => {

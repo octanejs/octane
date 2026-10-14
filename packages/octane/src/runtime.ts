@@ -26249,6 +26249,24 @@ function validateDangerouslySetInnerHTMLValue(value: unknown): void {
 	}
 }
 
+/** Single compiled raw-HTML writer: read and validate while its cursor is live. */
+export function prepareTemplateHTML(
+	el: Element,
+	value: unknown,
+): { html: { __html: string } | null; adopted: boolean } {
+	validateDangerouslySetInnerHTMLValue(value);
+	const hydration = hydrating ? activeHydration() : null;
+	const adopted = hydration !== null && !hydrateIsFresh(hydration, el);
+	let html: { __html: string } | null = null;
+	if (value != null) {
+		if (VOID_ELEMENTS.has(el.localName)) throw new Error(formatClientError(7, el.localName));
+		const inner = (value as { __html: unknown }).__html;
+		html = { __html: inner == null ? '' : String(inner) };
+		if (adopted) hydrateAdoptHTML(hydration!, el, html.__html);
+	}
+	return { html, adopted };
+}
+
 /** Complete validated write used by direct, spread, and html-only compiler paths. */
 export function setDangerouslySetInnerHTML(el: Element, value: any, adopted = false): void {
 	validateDangerouslySetInnerHTMLValue(value);
@@ -29445,31 +29463,23 @@ export function prepareHostProps(
 					}
 					if (adopted) hydrateAdoptHTML(hydration!, el, html!.__html);
 				}
-			} else if (formActionAttributeName(el, name) !== null) {
-				if (typeof value !== 'function') {
-					const normalizedName = formActionAttributeName(el, name)!;
-					let prepared = coerceAttrValue(el, normalizedName, value);
-					if (prepared !== null)
-						prepared = sanitizeURLAttribute(el.localName, normalizedName, prepared);
-					(attributes ??= Object.create(null))[name] =
-						hydration !== null && !hydrateAllowAttribute(hydration, el, normalizedName, prepared)
-							? undefined
-							: prepared;
-				}
-			} else if (
-				name === 'key' ||
-				isHostPropIdentityKey(name) ||
-				name === 'innerText' ||
-				name === 'textContent' ||
-				name === 'muted' ||
-				name === 'multiple' ||
-				name === 'selected' ||
-				(isHtmlCustomElement(el) && name.startsWith('on'))
-			) {
-				continue;
 			} else {
-				let normalizedName = name;
-				if (!isHtmlCustomElement(el)) normalizedName = ATTRIBUTE_ALIASES.get(name) ?? name;
+				const actionName = formActionAttributeName(el, name);
+				if (
+					actionName !== null
+						? typeof value === 'function'
+						: name === 'key' ||
+							isHostPropIdentityKey(name) ||
+							name === 'innerText' ||
+							name === 'textContent' ||
+							name === 'muted' ||
+							name === 'multiple' ||
+							name === 'selected' ||
+							(isHtmlCustomElement(el) && name.startsWith('on'))
+				)
+					continue;
+				const normalizedName =
+					actionName ?? (isHtmlCustomElement(el) ? name : (ATTRIBUTE_ALIASES.get(name) ?? name));
 				let prepared = coerceAttrValue(el, normalizedName, value);
 				if (prepared !== null)
 					prepared = sanitizeURLAttribute(el.localName, normalizedName, prepared);
@@ -31840,7 +31850,7 @@ export function setFormAction(
 	name: string,
 	value: unknown,
 	_prev: unknown,
-	prepared?: PreparedHostProps,
+	prepared = false,
 ): void {
 	if (typeof value === 'function') {
 		(el as any).$$formAction = value;
@@ -31854,12 +31864,16 @@ export function setFormAction(
 		el.removeAttribute(name);
 		return;
 	}
-	if (prepared === undefined) setFormActionAttribute(el, name, value);
+	if (!prepared) setFormActionAttribute(el, name, value);
 	else {
 		(el as any).$$formAction = undefined;
-		const attribute = prepared.attributes?.[name];
-		if (attribute !== undefined) commitHostAttribute(el, name.toLowerCase(), attribute);
+		if (value !== undefined) commitHostAttribute(el, name.toLowerCase(), value as string | null);
 	}
+}
+
+/** Keep function actions intact; normalize native actions before admission. */
+export function prepareTemplateFormAction(el: Element, name: string, value: unknown): unknown {
+	return typeof value === 'function' ? value : prepareTemplateURL(el, name.toLowerCase(), value);
 }
 
 // A string or nullish action is the native attribute. Clearing the action must
