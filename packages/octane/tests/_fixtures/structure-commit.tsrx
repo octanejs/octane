@@ -318,3 +318,29 @@ export function LateBoundaryApp(props: { value: PromiseLike<string>; probe: () =
 		}
 	</main>
 }
+
+export interface MappedRow {
+	id: number;
+}
+
+export interface MappedProps {
+	rows: { map<T>(callback: (row: MappedRow, index: number) => T): T[] };
+	probe: () => void;
+}
+
+function MappedChip(props: { id: number }) @{
+	<li id={'mapped-' + props.id}>{('chip ' + props.id) as string}</li>
+}
+
+// Rows through an exotic `map`, which can return a host descriptor for a row
+// that the next render maps to a component.
+export function MappedApp(props: MappedProps) @{
+	<main>
+		<ul id="mapped">
+			{props.rows.map((row) => (
+				<MappedChip key={row.id} id={row.id} />
+			))}
+		</ul>
+		<Probe probe={props.probe} />
+	</main>
+}

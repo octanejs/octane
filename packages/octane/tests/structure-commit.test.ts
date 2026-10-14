@@ -7,6 +7,7 @@ import {
 	BranchProbeApp,
 	LateBoundaryApp,
 	ListProbeApp,
+	MappedApp,
 	OutsideApp,
 	ResumeApp,
 	SelectProbeApp,
@@ -14,6 +15,8 @@ import {
 	type ActivityProps,
 	type BoundaryArmsProps,
 	type ListProps,
+	type MappedProps,
+	type MappedRow,
 	type OutsideProps,
 	type SelectProps,
 	type StructureProps,
@@ -902,6 +905,59 @@ function ProbeChip(props: { probe: () => void }) {
 }
 
 describe('de-opt markers change at commit', () => {
+	it('renders a mapped host row that becomes a component against the pair its commit lands', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		let during: MutationRecord[] | null = null;
+		const observer = new MutationObserver(() => {});
+		const probe = () => {
+			during = observer.takeRecords();
+		};
+		const [one, two] = [{ id: 1 }, { id: 2 }];
+		// An exotic map: the second row is a host descriptor, then a component.
+		const rows = (...order: Array<MappedRow | 'host'>): MappedProps['rows'] => ({
+			map<T>(callback: (row: MappedRow, index: number) => T): T[] {
+				return order.map((row, index) =>
+					row === 'host'
+						? (createElement('li', { key: 2, id: 'host' }, 'host') as T)
+						: callback(row, index),
+				);
+			},
+		});
+		const ids = () => [...container.querySelectorAll('#mapped li')].map((li) => li.id);
+		try {
+			flushSync(() => root.render(MappedApp, { rows: rows(one, 'host'), probe }));
+			const host = container.querySelector('#host')!;
+			const chip = container.querySelector('#mapped-1');
+			const markersOfOne = comments(container.querySelector('#mapped')!);
+			observer.observe(container, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				characterData: true,
+			});
+			// The row moves and becomes a component in one render.
+			flushSync(() => root.render(MappedApp, { rows: rows(two, one), probe }));
+			expect(during).toEqual([]);
+			expect(host.isConnected).toBe(false);
+			expect(container.querySelector('#mapped-1')).toBe(chip);
+			expect(ids()).toEqual(['mapped-2', 'mapped-1']);
+			expect(container.querySelector('#mapped-2')!.textContent).toBe('chip 2');
+			// Its range is the pair the commit landed: it moves and leaves whole.
+			flushSync(() => root.render(MappedApp, { rows: rows(one, two), probe }));
+			expect(ids()).toEqual(['mapped-1', 'mapped-2']);
+			flushSync(() => root.render(MappedApp, { rows: rows(one), probe }));
+			expect(ids()).toEqual(['mapped-1']);
+			// The self-marked host had no markers, so only the first row's remain.
+			expect(comments(container.querySelector('#mapped')!)).toBe(markersOfOne);
+		} finally {
+			observer.disconnect();
+			root.unmount();
+			container.remove();
+		}
+	});
+
 	it('promotes a self-marked item to its marker pair at commit', () => {
 		let observing = false;
 		let during: MutationRecord[] | null = null;

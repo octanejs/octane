@@ -112,6 +112,7 @@ export const WRITERS = new Map(
 		swapBranchFrontier: 'fresh',
 		frontierSentinel: 'fresh',
 		releaseFrontierSentinel: 'fresh',
+		mountItemComponentOffDocument: 'fresh',
 		removeAfter: 'fresh',
 		renderBranchSlot: 'fresh',
 		activityBlock: 'fresh',
