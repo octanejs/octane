@@ -188,6 +188,7 @@ import {
 	type NativeReadWitness,
 } from './signals/native-read-collector.js';
 import { createNativeServerReadDriver } from './signals/native-read-server.js';
+import { nativeServerReads } from './signals/read-protocol.js';
 import {
 	NATIVE_SIGNAL_SEED_ATTR,
 	NATIVE_SIGNAL_FRESH_COMMENT,
@@ -453,13 +454,28 @@ function beginActiveNativeReadScope(owner: SSRScope): number {
 
 function ensureNativeServerReadCollector() {
 	return (NATIVE_READ_COLLECTOR ??= createNativeServerReadDriver(
-		(reads) => {
-			NATIVE_SERVER_READS = mergeNativeSeedReads(NATIVE_SERVER_READS, reads);
-		},
-		() => {
-			NATIVE_SERVER_FAILURES++;
-		},
+		recordNativeServerReads,
+		recordNativeServerFailure,
 	));
+}
+
+function recordNativeServerReads(reads: NativeReadWitness): void {
+	NATIVE_SERVER_READS = mergeNativeSeedReads(NATIVE_SERVER_READS, reads);
+}
+
+function recordNativeServerFailure(): void {
+	NATIVE_SERVER_FAILURES++;
+}
+
+/**
+ * Begin a render pass. Wherever signals exist on the server, the graph has
+ * supplied its read driver (signals/server-reads.ts), so the pass collects its
+ * reads for the hydration snapshot whatever this process loaded before.
+ */
+function beginNativeServerPass(): number {
+	if (NATIVE_READ_COLLECTOR === null && nativeServerReads)
+		NATIVE_READ_COLLECTOR = nativeServerReads(recordNativeServerReads, recordNativeServerFailure);
+	return NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
 }
 
 function finishNativeSeedCapture(
@@ -9155,7 +9171,7 @@ function runFullFramedPass(
 	markers: boolean = true,
 ): FullPassResult {
 	const saved = saveAmbient();
-	NATIVE_SERVER_PASS = NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
+	NATIVE_SERVER_PASS = beginNativeServerPass();
 	NATIVE_SERVER_READS = null;
 	NATIVE_SERVER_FAILURES = 0;
 	NATIVE_LOCAL_HOOK_DISPOSES = null;
@@ -9318,7 +9334,7 @@ function runDiscoveryRound(
 	identifierPrefix: string,
 ): { suspended: SuspendedList; deferred: Job[] } {
 	const saved = saveAmbient();
-	NATIVE_SERVER_PASS = NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
+	NATIVE_SERVER_PASS = beginNativeServerPass();
 	NATIVE_SERVER_READS = null;
 	NATIVE_SERVER_FAILURES = 0;
 	NATIVE_LOCAL_HOOK_DISPOSES = null;

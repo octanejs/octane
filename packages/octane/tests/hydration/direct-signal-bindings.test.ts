@@ -359,13 +359,15 @@ export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'retu
 							{ signalOwner: owner, onRecoverableError: (error) => recoverable.push(error) },
 						);
 					});
-					// The signal changed before hydration, so the client's text differs from
-					// the server's: as in React, the root renders on the client from the
-					// signal's current value, and its bindings are live.
-					expect(input.isConnected).toBe(false);
-					expect(recoverable).toHaveLength(1);
+					// The signal changed before hydration. As React hydrates a
+					// useSyncExternalStore value from getServerSnapshot, the root hydrates
+					// the server's value from its snapshot and takes the current one as an
+					// update: the focused input stays, and its bindings are live.
+					expect(container.querySelector('input')).toBe(input);
+					expect(document.activeElement).toBe(input);
+					expect(recoverable).toEqual([]);
 					expect(container.querySelector('p')!.textContent).toBe('entered before hydration');
-					expect(container.querySelector('input')!.value).toBe('entered before hydration');
+					expect(input.value).toBe('entered before hydration');
 				} else {
 					root = createRoot(container);
 					root.render(client.App, { value: 'primitive' });
