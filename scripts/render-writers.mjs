@@ -116,6 +116,7 @@ export const WRITERS = new Map(
 		deoptItemBody: 'fresh',
 		hostElementBody: 'fresh',
 		hostStringTagBody: 'fresh',
+		replaceHostTagChildren: 'fresh',
 		renderPreparedChildList: 'fresh',
 		childSlot: 'fresh',
 		insertSlotText: 'fresh',

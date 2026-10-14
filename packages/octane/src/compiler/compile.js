@@ -11484,6 +11484,7 @@ function compileInternal(
 			},
 			serverBoundaryPreparation?.ast ?? analyzedAst,
 			hasStringChildProofs,
+			strongModeEnabled,
 		);
 		return compiled;
 	}
@@ -11800,6 +11801,7 @@ function compileInternal(
 		privateSplitContextProviders: splitPrivateContexts?.providers,
 		splitModuleFunctions,
 		autoMemo: autoMemoEnabled,
+		strongRenderValues: strongModeEnabled && options?.__universal == null,
 		strongMemo: strongMemoEnabled,
 		// Ref and effect lifetimes must not churn on an unrelated dev/HMR render.
 		// Only proven literal props use these caches; region/call caching stays prod-only.
@@ -13289,6 +13291,7 @@ function compileServer(
 	options,
 	analyzedAst = null,
 	hasStringChildProofs = false,
+	strongModeEnabled = false,
 ) {
 	const parsedAst = analyzedAst ?? adoptParserAst(parseModule(source, filename));
 	const nativeChangeAnalysis =
@@ -13342,6 +13345,7 @@ function compileServer(
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
 		mode: 'server',
+		strongRenderValues: strongModeEnabled,
 		nativeReads: options?.nativeReads === true,
 		opaqueSignalHandles:
 			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
@@ -15973,7 +15977,13 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		// `fallback={<span/>}` or `fallback={(e) => <ErrorFallback/>}` — so esrap
 		// emits a real descriptor instead of raw (unprintable) JSX. Mirrors the
 		// client makeCompCall path; the renderPropChild branch below does the same.
-		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
+		const renderBlock = unwrapTsExpr(inner);
+		inner = resolveStyleExpr(
+			ctx.strongRenderValues && renderBlock.type === 'JSXCodeBlock'
+				? compileRenderBlockValue(renderBlock, ctx)
+				: rewriteJsxValues(inner, ctx),
+			cssHash,
+		);
 		propNodes.push(
 			inheritOriginLoc(
 				b.prop(
@@ -26712,6 +26722,21 @@ function childCodeBlockArrow(block) {
 	return inheritOriginLoc(b.arrow([], block), block);
 }
 
+// Strong's direct component-prop block is render-only, like template children.
+// Reuse the nested-template compiler so setup and captures run in the receiving
+// render scope, and the existing marker keeps it distinct from callable props.
+function compileRenderBlockValue(block, ctx) {
+	const body = rewriteJsxValues(childCodeBlockArrow(block), ctx);
+	ctx.runtimeNeeded.add('markChildrenBlock');
+	const args = [body];
+	if (ctx.mode !== 'server') {
+		const identity = allocCompilerName(ctx, '__renderBody');
+		ctx.hoistedHelpers.push(inheritOriginLoc(b.const(identity, b.object([])), block));
+		args.push(b.id(identity));
+	}
+	return inheritOriginLoc(b.call(rtAlias('markChildrenBlock'), ...args), block);
+}
+
 /**
  * Decide whether a JSX-child expression needs the rich dispatcher
  * (`TSRXExpression` branch in emitElementHtml) rather than the simple text
@@ -35041,6 +35066,12 @@ function collectAutoMemoDependencyExpressions(nodes, templateControlFlow = false
 		if (seen.has(node)) return;
 		seen.add(node);
 		if (isInvariantLiteral(node)) return;
+		// Render-body locals belong to the receiving scope. A flat enclosing
+		// guard cannot reference them or evaluate their setup before rendering.
+		if (templateControlFlow && node.type === 'JSXCodeBlock' && node.body?.length > 0) {
+			safe = false;
+			return;
+		}
 		if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
 			hasComponentValue = true;
 		}
@@ -35282,6 +35313,7 @@ function makeCompCall(
 	const propNodes = [];
 	let hasSpreadProp = false;
 	let hasChildrenProp = false;
+	const renderBlockPropNodes = [];
 	const propDependencyNodes = [];
 	// Simple `key={expr}` sites pass the key separately to componentSlot. When
 	// explicit keys and spreads coexist, keep the complete config ordered and let
@@ -35318,7 +35350,14 @@ function makeCompCall(
 		// Lower any JSX in the prop value to createElement(...) — e.g.
 		// `<Suspense fallback={<span/>}>` or a render-prop returning JSX — so esrap
 		// emits a real descriptor instead of raw (unprintable) JSX.
-		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
+		const renderBlock = unwrapTsExpr(inner);
+		if (ctx.strongRenderValues && renderBlock.type === 'JSXCodeBlock') {
+			renderBlockPropNodes.push(renderBlock);
+			inner = compileRenderBlockValue(renderBlock, ctx);
+		} else {
+			inner = rewriteJsxValues(inner, ctx);
+		}
+		inner = resolveStyleExpr(inner, cssHash);
 		propNodes.push(
 			b.prop(
 				'init',
@@ -35546,7 +35585,10 @@ function makeCompCall(
 					? memoCallee.stableHookfulChild.captures
 					: memoCallee.autoMemoCaptures || [];
 				const deps = new Set(calleeCaptures);
-				const callsiteDeps = collectAutoMemoDependencyExpressions(propDependencyNodes);
+				const callsiteDeps = collectAutoMemoDependencyExpressions(
+					propDependencyNodes,
+					renderBlockPropNodes.length > 0,
+				);
 				for (const dependency of callsiteDeps.dependencies) deps.add(dependency);
 				let depsSafe =
 					callsiteDeps.safe &&
@@ -35587,6 +35629,32 @@ function makeCompCall(
 					} else {
 						// A module/global read at the call site is not a reactive witness.
 						depsSafe = false;
+					}
+				}
+				if (depsSafe && renderBlockPropNodes.length > 0) {
+					// Body reads are deferred until insertion. Witness own data leaves
+					// without invoking hidden accessors; deeper paths keep ordinary entry
+					// semantics rather than evaluating a possibly absent receiver here.
+					const bodyDeps = collectAutoMemoDependencyExpressions(renderBlockPropNodes, true);
+					for (const [key, dependency] of bodyDeps.dependencyNodes) {
+						const member = unwrapTsExpr(dependency);
+						if (member.type !== 'MemberExpression') continue;
+						if (member.object.type !== 'Identifier') {
+							depsSafe = false;
+							break;
+						}
+						callsiteDeps.dependencyNodes.set(
+							key,
+							inheritOriginLoc(
+								b.call(
+									requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+									member.object,
+									b.literal(member.property.name),
+									...methodDepFlags({ guarded: true, read: true }).map((flag) => b.literal(flag)),
+								),
+								member,
+							),
+						);
 					}
 				}
 				if (depsSafe) {
