@@ -143,7 +143,6 @@ export const WRITERS = new Map(
 		// rollback
 		restoreRootRange: 'rollback',
 		restoreRootNodes: 'rollback',
-		journalInputSelection: 'rollback',
 		rollbackTransitionJournal: 'rollback',
 		// unmount
 		disposeReturnSlot: 'unmount',

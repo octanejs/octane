@@ -3887,11 +3887,10 @@ function discardHeldRoot(owner: RootRenderOwner): void {
 // never reappear. The first write into a bag therefore snapshots the whole bag
 // next to the DOM entry.
 //
-// Controlled `value`/`checked`/`selected` are covered too, but need more than the
-// node: each carries a `default*` mirror and a per-element record of what was
-// last projected. All three go back together — restoring the node alone would
-// leave the record believing it had already projected the new value, so
-// re-projecting it on resume would be skipped as unchanged.
+// A form control's DOM (its live value, checkedness and selection, the default*
+// mirrors, a radio group's other members) takes its writes at commit (#2043),
+// so a dropped render never reached it. Only its projection record and bag are
+// snapshotted, so a resumed render projects again.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const JOURNAL_TEXT = 0;
@@ -5516,57 +5515,6 @@ function journalObjectOnce(obj: object): void {
 	TRANSITION_JOURNAL!.push(JOURNAL_BAG, obj, { ...obj }, Array.isArray(obj) ? obj.length : null);
 }
 
-/** Defaults can move a pristine control's caret just like a live-value write. */
-function journalInputSelection(input: HTMLInputElement | HTMLTextAreaElement): void {
-	if (ROOT_RENDER_TRANSACTION !== null && input.ownerDocument.activeElement === input) {
-		const start = input.selectionStart;
-		const end = input.selectionEnd;
-		const direction = input.selectionDirection;
-		if (start !== null && end !== null)
-			journalUndo(() => input.setSelectionRange(start, end, direction ?? undefined));
-	}
-}
-
-/**
- * A controlled input keeps three things in step: the live DOM property, the
- * default mirror used by form.reset()/SSR, and its last projected value record.
- * Capture all three after arming the element but before changing any of them.
- * Hydration never writes an `adopted` control's live value, and restoring it
- * through its setter would mark the control dirty, so its record leaves it out.
- */
-function journalControlled(
-	el: Element,
-	prop: string,
-	defaultProp: string,
-	adopted?: boolean,
-): void {
-	if (prop === 'value') journalInputSelection(el as HTMLInputElement | HTMLTextAreaElement);
-	const log = TRANSITION_JOURNAL!;
-	if (!adopted) log.push(JOURNAL_PROP, el, prop, (el as any)[prop]);
-	log.push(JOURNAL_PROP, el, defaultProp, (el as any)[defaultProp]);
-	const ctrl = renderControlledState(el);
-	if (ctrl !== undefined) journalObjectOnce(ctrl);
-	const input = el as HTMLInputElement;
-	if (prop === 'checked' && input.type === 'radio' && input.name !== '') journalRadioCousins(input);
-	journalBag();
-}
-
-/** Restore defaults without making an untouched uncontrolled control dirty. */
-function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): void {
-	journalInputSelection(input);
-	if (input.localName === 'textarea') {
-		// defaultValue replaces textarea children. Keep the old text-node identity
-		// as well as its reset value when a root attempt is discarded.
-		if (ROOT_RENDER_TRANSACTION !== null) journalRootChildren(input);
-		else TRANSITION_JOURNAL!.push(JOURNAL_PROP, input, 'defaultValue', input.defaultValue);
-		journalBag();
-	} else {
-		// Attribute absence matters too; assigning defaultValue='' on rollback
-		// would create a value attribute that was not previously present.
-		journalAttr(input, 'value');
-	}
-}
-
 /** Find a radio's native group in its document, shadow tree, or containing form. */
 function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
 	const form = input.form;
@@ -5577,45 +5525,6 @@ function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
 	return root.nodeType === 9
 		? (root as Document).getElementsByName(input.name)
 		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
-}
-
-/**
- * Record the cousin a radio write is about to clear.
- *
- * Checking a radio makes the platform uncheck its same-name siblings as a side
- * effect, so a cousin cannot record its own prior state: by the time its binding
- * runs it has already been cleared, and an uncontrolled cousin never records at
- * all. Only a currently-checked cousin can be cleared, and a well-formed group
- * has at most one, so this scans the group but adds at most one entry.
- *
- * Group scope mirrors restoreRadioCousins: same non-empty name, same form owner
- * when there is one. Re-recording a cousin across several writes in one window
- * is harmless — the replay runs newest-first, so the earliest value is the one
- * left standing.
- */
-function journalRadioCousins(input: HTMLInputElement): void {
-	const name = input.name;
-	const group = radioCousins(input);
-	for (let i = 0; i < group.length; i++) {
-		const other = group[i] as HTMLInputElement;
-		if (
-			other === input ||
-			!other.checked ||
-			other.localName !== 'input' ||
-			other.type !== 'radio' ||
-			other.name !== name ||
-			other.form !== input.form
-		) {
-			continue;
-		}
-		TRANSITION_JOURNAL!.push(JOURNAL_PROP, other, 'checked', true);
-	}
-}
-
-function journalControlledOption(option: HTMLOptionElement, withDefault: boolean): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'selected', option.selected);
-	if (withDefault)
-		TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'defaultSelected', option.defaultSelected);
 }
 
 /**
@@ -30959,7 +30868,10 @@ export function setValue(el: Element, value: unknown): void {
 	// discrete event. A fresh structural replacement is client-built and needs
 	// normal projection.
 	const adopted = hydrating && first ? activeHydration() !== null : false;
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue', adopted);
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	ctrl.sawV = true;
 	if (value == null) {
 		if (process.env.NODE_ENV !== 'production' && !first && ctrl.v !== UNCONTROLLED)
@@ -31083,7 +30995,10 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 
 export function setChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	setCheckedState(el as HTMLInputElement, value, ctrl);
 }
 
@@ -31094,7 +31009,10 @@ export function setChecked(el: Element, value: unknown): void {
  */
 export function setCheckedCheckable(el: Element, value: unknown): void {
 	const ctrl = armControlledBase(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	setCheckedState(el as HTMLInputElement, value, ctrl);
 }
 
@@ -31176,13 +31094,6 @@ function projectSelectValue(
 	setDefaultSelected: boolean,
 ): void {
 	const options = sel.options;
-	// The selection lives on the options, not the select, so each one that can
-	// move has to be recorded before the projection walks over it.
-	if (TRANSITION_JOURNAL !== null) {
-		for (let i = 0; i < options.length; i++) {
-			journalControlledOption(options[i], setDefaultSelected);
-		}
-	}
 	if (typeof sv !== 'string') {
 		for (let i = 0; i < options.length; i++) {
 			const option = options[i];
@@ -31235,7 +31146,10 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	}
 	const first = initial ?? !ctrl.sawV;
 	const previousDefault = ctrl.dvv;
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(ctrl);
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	ctrl.sawV = true;
 	ctrl.dvv = value;
 	// Keep pre-hydration edits, but update the reset baseline through the native
@@ -31247,24 +31161,18 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	if (value == null) {
 		if (previousDefault !== UNCONTROLLED && previousDefault != null) {
-			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
 			if (el.localName === 'input') input.removeAttribute('value');
 			else input.defaultValue = '';
 		}
 		return;
 	}
 	const s = toControlledString(value);
-	if (first && !adopted && input.value !== s) {
-		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		input.value = s;
-	}
+	if (first && !adopted && input.value !== s) input.value = s;
 	if (
 		input.defaultValue !== s ||
 		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	) {
-		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
+	)
 		input.defaultValue = s;
-	}
 }
 
 /**
@@ -31280,29 +31188,25 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const previous = (input as any)[DEFAULT_VALUE_BASELINE] as string | null | undefined;
 	const s = value == null ? null : toControlledString(value);
-	if (TRANSITION_JOURNAL !== null)
+	if (TRANSITION_JOURNAL !== null) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, input, DEFAULT_VALUE_BASELINE, previous);
+		journalBag();
+	}
 	(input as any)[DEFAULT_VALUE_BASELINE] = s;
 	const adopted = hydration !== null;
 	if (s === null) {
 		if (previous != null) {
-			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
 			if (el.localName === 'input') input.removeAttribute('value');
 			else input.defaultValue = '';
 		}
 		return;
 	}
-	if (previous === undefined && !adopted && input.value !== s) {
-		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		input.value = s;
-	}
+	if (previous === undefined && !adopted && input.value !== s) input.value = s;
 	if (
 		input.defaultValue !== s ||
 		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	) {
-		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
+	)
 		input.defaultValue = s;
-	}
 }
 
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
@@ -31311,13 +31215,11 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement;
 	const adopted = hydrating ? activeHydration() !== null : false;
 	const first = !ctrl.sawDC;
-	if (first) {
-		if (TRANSITION_JOURNAL !== null) {
-			journalObjectOnce(ctrl);
-			journalBag();
-		}
-		ctrl.sawDC = true;
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
 	}
+	ctrl.sawDC = true;
 	// Adopt the user's live choice, separated from the server's pristine default
 	// so the client baseline below (React's initInput) cannot drag it along.
 	if (adopted && first) input.checked = input.checked;
@@ -31326,22 +31228,11 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	// React initInput marks the live checkedness dirty even when the initial
 	// default is absent. Otherwise, the browser would move a still-pristine
 	// checkbox whenever a later defaultChecked update changes its reset target.
-	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
-		if (TRANSITION_JOURNAL !== null) {
-			TRANSITION_JOURNAL.push(JOURNAL_PROP, input, 'checked', input.checked);
-			if (input.type === 'radio' && input.name !== '' && !!value) journalRadioCousins(input);
-		}
+	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input))
 		input.checked = value == null ? input.checked : !!value;
-	}
 	if (value == null) return;
 	const b = !!value;
-	if (input.defaultChecked !== b) {
-		if (TRANSITION_JOURNAL !== null) {
-			if (input.type === 'radio' && input.name !== '') journalRadioCousins(input);
-			journalAttr(input, 'checked');
-		}
-		input.defaultChecked = b;
-	}
+	if (input.defaultChecked !== b) input.defaultChecked = b;
 }
 
 /**
@@ -31477,16 +31368,7 @@ function applyFormControlValues(
 	const multipleType = typeof multiple;
 	const nextMultiple = !!multiple && multipleType !== 'function' && multipleType !== 'symbol';
 	ctrl.formMultiple = nextMultiple;
-	if (select.multiple !== nextMultiple) {
-		if (TRANSITION_JOURNAL !== null) {
-			// Switching to single selection can clear options before projection.
-			// Restore multiple first, then each option's prior selected state.
-			for (let i = 0; i < select.options.length; i++)
-				journalControlledOption(select.options[i], false);
-			TRANSITION_JOURNAL.push(JOURNAL_PROP, select, 'multiple', select.multiple);
-		}
-		select.multiple = nextMultiple;
-	}
+	if (select.multiple !== nextMultiple) select.multiple = nextMultiple;
 	if (!first && previousMultiple !== nextMultiple && value == null) {
 		if (defaultValue != null) ctrl.dvv = UNCONTROLLED;
 		else projectSelectValue(select, nextMultiple ? new Set<string>() : '', false);
