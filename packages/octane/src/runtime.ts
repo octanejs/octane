@@ -298,6 +298,7 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	beginNativeBatch,
 	endNativeBatch,
+	nativeBatchHooks,
 	nativeProducerPublication,
 	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
 	startEarlySignalHydration,
@@ -29855,7 +29856,10 @@ function reportListenerError(err: unknown): void {
 function maybeFlushDiscrete(type: DelegatedEventType): void {
 	if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0 && pendingRestores.length > 0) {
 		// Commit handler-scheduled work first, so the controlled restore below
-		// compares the DOM against the values the handlers just rendered.
+		// compares the DOM against the values the handlers just rendered. Signal
+		// writes from an event a graph subscriber dispatched still wait in the
+		// graph's queue; admit their renders first.
+		if (nativeBatchHooks) nativeBatchHooks.present();
 		if (!inFlush && hasPendingWork()) {
 			// Native events can fire from commit-phase DOM mutations or effects.
 			// The ambient flush already owns their updates; calling public flushSync

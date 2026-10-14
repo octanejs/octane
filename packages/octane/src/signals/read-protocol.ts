@@ -312,9 +312,10 @@ export function registerNativeReadRebase(rebase: NativeReadRebase): void {
 export interface NativeBatchHooks {
 	startBatch(): void;
 	endBatch(): void;
+	present(): void;
 }
 
-let nativeBatchHooks: NativeBatchHooks | null = null;
+export let nativeBatchHooks: NativeBatchHooks | null = null;
 
 /** Engine registration does not make either renderer import the graph package. */
 export function registerNativeBatchHooks(hooks: NativeBatchHooks): void {

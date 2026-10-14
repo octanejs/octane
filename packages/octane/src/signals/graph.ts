@@ -517,6 +517,17 @@ function presentQueued(): void {
 	if (failed) throw firstError;
 }
 
+/**
+ * A subscriber the graph is still delivering can dispatch an event, whose batch
+ * then closes without a flush: flush never recurses into subscribers. Before
+ * that event restores a controlled field, its presentation observers run, so
+ * the renders its writes caused are admitted first. Public subscribers still
+ * wait for the outer flush.
+ */
+export function presentDuringFlush(): void {
+	if (flushing && batchDepth === 0) presentQueued();
+}
+
 export function readyState<T>(
 	value: T,
 	activity: {
