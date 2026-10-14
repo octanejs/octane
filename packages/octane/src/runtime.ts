@@ -3900,7 +3900,9 @@ function retryWokenTransitions(): void {
 
 /** Whether a boundary holds transition work that the render in progress did not fold. */
 function holdsUnrenderedTransition(state: TrySlot): boolean {
-	const hold = TRANSITION_HOLDERS?.get(state);
+	// Most visible renders of a boundary happen while nothing holds.
+	if (TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0) return false;
+	const hold = TRANSITION_HOLDERS.get(state);
 	if (hold === undefined) return false;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	for (const batch of hold.batches)
@@ -4900,7 +4902,9 @@ function dropRootOps(transaction: RootRenderTransaction, from: number, retired: 
  * Whether a root render leaves `block`'s teardown to its commit: a committed
  * Block the render removed from its tree. The range stays connected and
  * untouched until then, so deletion cleanups observe connected DOM and a
- * dropped render restores nothing.
+ * dropped render restores nothing. A Block whose first render suspended (a
+ * hidden primary that never resolved) has never mounted, but an earlier commit
+ * still inserted its range.
  */
 function defersRootUnmount(block: Block): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
@@ -4909,7 +4913,6 @@ function defersRootUnmount(block: Block): boolean {
 		!transaction.aborted &&
 		!ROOT_RENDER_ROLLBACK &&
 		block.idState.renderOwner === transaction.owner &&
-		block.mounted &&
 		!isCreatedInRootRender(transaction, block)
 	);
 }
@@ -42381,6 +42384,8 @@ interface TrySlot {
 	passthrough: boolean;
 	/** Stable boundary reset dispatcher; remains safe after unmount. */
 	reset: () => void;
+	/** The arms a root render builds off-document (insertArmPair). */
+	next: SlotNext | null;
 }
 
 /** Catch-only JSX boundaries never preserve a hidden Suspense primary. */
@@ -42403,6 +42408,7 @@ interface ErrorSlot {
 	idState: RootIdState;
 	passthrough: boolean;
 	reset: () => void;
+	next: SlotNext | null;
 }
 
 function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
@@ -42411,19 +42417,50 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 	setTryBranch(state, -1);
 }
 
-/** Detached retry/error callbacks still publish through the owning root journal. */
+/**
+ * Detached retry/error callbacks still publish through the owning root journal.
+ * Their arms build off-document (insertArmPair), so a dropped render restores
+ * only the slot's record; hydration, which writes the server range in place,
+ * restores that range too.
+ */
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
-	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
-		if (
-			domNode(state.start).parentNode === state.domParent &&
-			domNode(state.end).parentNode === state.domParent
-		)
-			journalRootSlot(state, state.domParent, state.start, state.end);
-		else journalObjectOnce(state);
+	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
+	if (
+		hydrating &&
+		domNode(state.start).parentNode === state.domParent &&
+		domNode(state.end).parentNode === state.domParent
+	)
+		journalRootSlot(state, state.domParent, state.start, state.end);
+	else if (frame === null) journalObjectOnce(state);
+	else {
+		// A frame of its own opens a window nothing has snapshotted in yet: one
+		// snapshot per resume, with no lookup.
+		TRANSITION_JOURNAL_BAGS!.set(state, TRANSITION_JOURNAL!.length);
+		TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
 	}
 	return frame;
+}
+
+/**
+ * Insert an arm's marker pair before `before` and return the arm's parent. A
+ * root render that changes a committed boundary (usesFrontier) builds the arm
+ * in the slot's frontier, which its commit inserts before `before`, so a
+ * dropped render leaves the boundary untouched. A fresh arm the same render
+ * supersedes leaves the fragment with its own unmount. Hydration and a
+ * boundary this render created write in place.
+ */
+function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
+	const live = domNode(before).parentNode!;
+	const parent =
+		live === state.domParent && usesFrontier(state.parentBlock, live)
+			? slotFrontier(state, state.parentBlock, live, before)
+			: live;
+	const at = parent === live ? before : null;
+	domNode(parent).insertBefore(start, at);
+	domNode(parent).insertBefore(end, at);
+	return parent;
 }
 
 function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
@@ -42677,6 +42714,7 @@ export function errorBlock(
 			idState: parentBlock.idState,
 			passthrough,
 			reset: () => requestReset(newState),
+			next: null,
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -42727,6 +42765,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	// Only the boundary's first render adopts the server's range.
 	const adopting = hydration !== null && state.branch === -1;
 	setTryBranch(state, 1);
+	let armParent = state.domParent;
 	let start: Node | null = null;
 	let end: Node | null = null;
 	let freshBoundary = false;
@@ -42744,8 +42783,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		} else {
 			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-			domNode(state.domParent).insertBefore(start, state.end);
-			domNode(state.domParent).insertBefore(end, state.end);
+			armParent = insertArmPair(state, start, end, state.end);
 			if (hydration !== null) {
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -42755,7 +42793,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 	const body = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		armParent,
 		start,
 		end,
 		state.tryBody,
@@ -42808,6 +42846,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	state.hasResolved = false;
 	setTryBranch(state, 0);
 	state.err = error;
+	let armParent = state.domParent;
 	let start: Node | null = null;
 	let end: Node | null = null;
 	if (!state.passthrough) {
@@ -42821,13 +42860,12 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 			hydration.markFresh(start);
 			hydration.markFresh(end);
 		}
-		domNode(state.domParent).insertBefore(start, state.end);
-		domNode(state.domParent).insertBefore(end, state.end);
+		armParent = insertArmPair(state, start, end, state.end);
 	}
 	const caught = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		armParent,
 		start,
 		end,
 		state.catchBody,
@@ -43004,6 +43042,7 @@ export function tryBlock(
 			idState: parentBlock.idState,
 			passthrough,
 			reset: () => requestReset(newState),
+			next: null,
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -43160,11 +43199,16 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 }
 
-function createTryBody(state: TrySlot, start: Node, end: Node): Block {
+function createTryBody(
+	state: TrySlot,
+	start: Node,
+	end: Node,
+	parent: Node = state.domParent,
+): Block {
 	const block = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		parent,
 		start,
 		end,
 		state.tryBody,
@@ -43210,10 +43254,9 @@ function restartUncommittedTry(state: TrySlot): Block | null {
 function mountHiddenTryBody(state: TrySlot): Block {
 	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-	const anchor = state.block?.startMarker ?? state.end;
-	domNode(state.domParent).insertBefore(start, anchor);
-	domNode(state.domParent).insertBefore(end, anchor);
-	const block = createTryBody(state, start, end);
+	// Before the visible fallback, wherever it is.
+	const armParent = insertArmPair(state, start, end, state.block?.startMarker ?? state.end);
+	const block = createTryBody(state, start, end, armParent);
 	state.detachedRefs = [];
 	hideTryBlock(state);
 	return block;
@@ -43643,6 +43686,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	setTryBranch(state, 1);
 	let bStart: Node;
 	let bEnd: Node;
+	let armParent = state.domParent;
 	// The boundary's open says what its server range holds (hydration-protocol.ts).
 	// A streamed boundary (`[$?id`) whose segment swapped in has its seed JSON
 	// stashed on window.$OCTS[id]. The full id includes its stream namespace, so
@@ -43701,14 +43745,13 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		scopedSeeds = null;
 		bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
 		bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
+		armParent = insertArmPair(state, bStart, bEnd, state.end);
 		if (hydration !== null) {
 			hydration.markFresh(bStart);
 			hydration.markFresh(bEnd);
 		}
 	}
-	const b = createTryBody(state, bStart, bEnd);
+	const b = createTryBody(state, bStart, bEnd, armParent);
 	state.block = b;
 	let nativeAdoption: NativeAdoptionState | undefined;
 	if (hydrating && scopedNativeRaw !== undefined && !freshBoundary) {
@@ -44232,12 +44275,10 @@ function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('pend-b');
 		const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/pend-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
-			state.domParent,
+			insertArmPair(state, bStart, bEnd, state.end),
 			bStart,
 			bEnd,
 			state.pendingBody,
@@ -46216,13 +46257,12 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 		hydration.markFresh(bStart);
 		hydration.markFresh(bEnd);
 	}
-	domNode(state.domParent).insertBefore(bStart, state.end);
-	domNode(state.domParent).insertBefore(bEnd, state.end);
+	const armParent = insertArmPair(state, bStart, bEnd, state.end);
 	const reset = () => requestReset(state);
 	const b = createBlock(
 		'control-flow',
 		state.parentBlock,
-		state.domParent,
+		armParent,
 		bStart,
 		bEnd,
 		state.catchBody,
