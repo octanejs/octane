@@ -202,7 +202,15 @@ describe('renderable holes commit with their render', () => {
 					? ''
 					: String(value);
 	// Each hole's position and what it shows for a value's text.
-	const positions: Array<[string, (text: string) => string]> = [['#returned', (t) => t]];
+	const positions: Array<[string, (text: string) => string]> = [
+		['#sibling', (t) => 'before ' + t + ' after'],
+		['#only', (t) => t],
+		['#rows li', (t) => t + '|' + t],
+		['#pairs .one', (t) => t],
+		['#pairs .one-sibling', (t) => 'one' + t],
+		['#root-hole', (t) => t],
+		['#returned', (t) => t],
+	];
 	const shown = (container: HTMLElement) =>
 		positions.map(([selector]) =>
 			[...container.querySelectorAll(selector)].map((node) => node.textContent).join('|'),

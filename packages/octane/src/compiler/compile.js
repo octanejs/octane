@@ -1712,6 +1712,10 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'updateFreshClassAttr',
 	'textHoleUpdate',
 	'childTextHoleUpdate',
+	'bagHole',
+	'bagChildHole',
+	'commitHole',
+	'setRenderText',
 	'bagRecord',
 	'bagRecordAlways',
 	'bagRecordEvent',
@@ -17488,6 +17492,7 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	]);
 	if (proof.structural) {
 		writers.add('setText');
+		writers.add('setRenderText');
 		writers.add('bindSignalText');
 		writers.add('markDangerouslySetInnerHTMLChildren');
 	}
@@ -27807,7 +27812,7 @@ function emitInlineRenderableUpdate(previous, cachedNode, slowCall, host = null)
 				]),
 				b.stmt(
 					b.call(
-						'_$setText',
+						'_$setRenderText',
 						b.id('_t'),
 						// Bare renderable booleans are empty; explicit text bindings
 						// retain their ordinary coercion through setText.
@@ -28454,7 +28459,7 @@ function planJsx(
 				ctx.runtimeNeeded.add(attrBindingHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
-			ctx.runtimeNeeded.add('setText');
+			ctx.runtimeNeeded.add(b.commitCell >= 0 ? 'setText' : 'setRenderText');
 		}
 		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
@@ -28594,6 +28599,8 @@ function planJsx(
 			if (each) each(c);
 		}
 	};
+	// The cells of the element bindings; the holes' cells follow them.
+	const bindingCells = commit === null ? 0 : commit.size();
 	mountConstructs(forCalls, 'for', { anchorKey: 'forAnchor' });
 	mountConstructs(ifCalls, 'ifHost', { anchorKey: 'ifAnchor' });
 	mountConstructs(compCalls, 'compHost', {
@@ -28610,9 +28617,15 @@ function planJsx(
 				// children (an only child) or range (a sibling or whole-output hole)
 				// that no other binding owns.
 				bag.constField(`_chp$${cc.id}`, 'unset');
+				cc.commitCell =
+					commit !== null && holeCommits(cc, ctx) && commit.size() + 2 <= COMMIT_MAX_CELLS
+						? commit.cells(2)
+						: -1;
+				if (cc.commitCell >= 0) registerHoleCommit(ctx, cc, bag, commit, cc.origin ?? planOrigin);
 			}
 		},
 	});
+	const holes = compCalls.filter((cc) => cc.commitCell >= 0);
 	mountConstructs(tryCalls, 'tryHost', { anchorKey: 'tryAnchor' });
 	mountConstructs(ctx._switchCalls, 'switchHost', { anchorKey: 'switchAnchor' });
 	// Portal hosts — the logical parent of the createPortal JSX position, stashed
@@ -29419,6 +29432,125 @@ function planJsx(
 				pushAfterStmt(cc.id, org, bindChild(cc.valueExpr));
 				continue;
 			}
+			if (cc.commitCell >= 0) {
+				// Render records the hole into its two cells; the commit function
+				// writes or publishes them (registerHoleCommit).
+				const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+				const helper = cc.onlyChildText ? 'bagChildHole' : 'bagHole';
+				ctx.runtimeNeeded.add(helper);
+				// A host that can receive raw HTML checks its child on every render.
+				const always = cc.potentialDangerouslySetInnerHTML ? b.literal(true) : null;
+				const record = (value) =>
+					b.stmt(
+						b.assignment(
+							'=',
+							b.id('_n'),
+							b.call(
+								`_$${helper}`,
+								b.id('_b'),
+								b.id('_n'),
+								b.literal(cc.commitCell),
+								value,
+								chp(),
+								bagFieldNode(bag, `_chv$${cc.id}`),
+								b.id('__s'),
+								b.literal(slotIndex),
+								hostExpr(),
+								...(cc.onlyChildText
+									? optionalCallArgs(always)
+									: [
+											childAnchor ?? b.literal(null),
+											...optionalCallArgs(
+												cc.anchorVar ? b.literal(true) : null,
+												cc.coalesceRange ? b.literal(true) : null,
+												always,
+											),
+										]),
+							),
+						),
+					);
+				if (cc.onlyChildText && cc.autoMemoValue === true && always === null) {
+					// Only a compiler-owned, non-escaping plain data array may skip
+					// descriptor reconciliation; see the ordinary only-child path below.
+					ctx.runtimeNeeded.add('compilerCacheArray');
+					const cached = emitAutoMemoRegion(
+						ctx,
+						['_v'],
+						slotIndex,
+						record(V()),
+						b.binary('!==', chp(), V()),
+						true,
+						undefined,
+						null,
+					);
+					pushAfterStmt(
+						cc.id,
+						org,
+						b.block([
+							b.const('_v', cc.valueExpr),
+							b.if(b.call('_$compilerCacheArray', V(), chp()), cached, record(V())),
+						]),
+					);
+				} else if (inlineBindingGuards && always === null) {
+					// Certified repeated rows mount their hole directly into the fresh
+					// row and call the recorder only for a change, an object, or a bag
+					// this transaction staged: a stable primitive costs no call.
+					const holeArgs = [b.id('__s'), b.literal(slotIndex), hostExpr(), V()];
+					if (cc.onlyChildText) holeArgs.push(b.literal(null));
+					else
+						holeArgs.push(
+							childAnchor ?? b.literal(null),
+							...optionalCallArgs(
+								cc.anchorVar ? b.literal(true) : null,
+								cc.coalesceRange ? b.literal(true) : null,
+							),
+						);
+					ctx.runtimeNeeded.add(cc.onlyChildText ? 'childTextHole' : 'textHole');
+					pushAfterStmt(
+						cc.id,
+						org,
+						b.block([
+							...inlineRenderableValueDeclarations(cc.valueExpr),
+							b.if(
+								b.binary('===', chp(), b.id('__s')),
+								b.block([
+									b.stmt(
+										b.assignment(
+											'=',
+											bagFieldNode(bag, `_chv$${cc.id}`),
+											b.call(cc.onlyChildText ? '_$childTextHole' : '_$textHole', ...holeArgs),
+										),
+									),
+									b.stmt(b.assignment('=', chp(), V())),
+								]),
+								b.if(
+									// A staged bag records only a cell this transaction already moved.
+									b.logical(
+										'||',
+										b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
+										b.logical(
+											'&&',
+											b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)),
+											b.logical(
+												'||',
+												b.binary('===', b.id('_n'), b.literal(null)),
+												b.binary(
+													'!==',
+													b.member(b.id('_n'), b.literal(cc.commitCell), true),
+													b.id('_b'),
+												),
+											),
+										),
+									),
+									record(V()),
+									null,
+								),
+							),
+						]),
+					);
+				} else pushAfterStmt(cc.id, org, record(cc.valueExpr));
+				continue;
+			}
 			// MARKERLESS only-child renderable: append a primitive as a single Text
 			// node (no `<!>`, no slot state). Either the shared helper or the inline
 			// row guard compares its cached value/node before the ordinary child path.
@@ -29456,7 +29588,7 @@ function planJsx(
 					continue;
 				}
 				ctx.runtimeNeeded.add(inlineBindingGuards ? 'childTextHole' : 'childTextHoleUpdate');
-				if (inlineBindingGuards) ctx.runtimeNeeded.add('setText');
+				if (inlineBindingGuards) ctx.runtimeNeeded.add('setRenderText');
 				const updateHole = () =>
 					inlineBindingGuards
 						? emitInlineRenderableUpdate(
@@ -29571,7 +29703,7 @@ function planJsx(
 			}
 			if (inlineBindingGuards) {
 				ctx.runtimeNeeded.add('textHole');
-				ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add('setRenderText');
 				pushAfterStmt(
 					cc.id,
 					org,
@@ -29756,6 +29888,15 @@ function planJsx(
 			__octaneInlineComponent: cc.inlineComponent,
 		});
 	}
+	if (holes.length !== 0) {
+		// After the last hole: commit or queue what the holes recorded.
+		const last = holes.reduce((latest, cc) => (cc.id > latest.id ? cc : latest));
+		pushAfterStmt(
+			last.id,
+			planOrigin,
+			commitDoneStatement(ctx, commitName, planOrigin, false, bindingCells !== 0),
+		);
+	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
 		const org = pc.origin ?? planOrigin;
@@ -29894,9 +30035,12 @@ function planJsx(
 		mount: mountLines,
 		update: updateLines,
 		everyRender:
-			commitName === null
+			commitName === null || bindingCells === 0
 				? everyRenderLines
-				: [...everyRenderLines, commitDoneStatement(ctx, commitName, planOrigin)],
+				: [
+						...everyRenderLines,
+						commitDoneStatement(ctx, commitName, planOrigin, holes.length !== 0),
+					],
 		commitCells: commitName !== null,
 		after: afterStatements,
 		head: headEmit.head,
@@ -31014,29 +31158,99 @@ function emitCommitFunction(ctx, commit, origin) {
 	const writes = commit.writes();
 	if (writes.length === 0) return null;
 	const name = allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
+	const cells = writes.sort((x, y) => x[0] - y[0]).map(([, make]) => make(commit.size()));
 	const body = [
 		b.const('_n', b.member(b.id('_b'), 'next')),
 		b.declaration('let', [b.declarator('_v')]),
 		// Clear the staged state first: a setter that throws leaves the bag idle,
 		// its committed slots still describing the DOM.
 		b.stmt(b.assignment('&=', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS))),
-		...writes.sort((x, y) => x[0] - y[0]).map(([, make]) => make(commit.size())),
+		...cells,
 	];
+	// A body without its own origin (a helper's) takes its first binding's.
 	ctx.hoistedHelpers.push(
-		inheritOriginLoc(b.function_declaration(b.id(name), [b.id('_b')], b.block(body)), origin),
+		inheritOriginLoc(
+			b.function_declaration(b.id(name), [b.id('_b')], b.block(body)),
+			origin?.loc != null ? origin : cells[0],
+		),
 	);
 	return name;
 }
 
-function commitDoneStatement(ctx, name, origin) {
+// `reset` when holes record after it: a bag its commit function already wrote
+// (its state word is back under 256) stages afresh; a queued one keeps its cells.
+// After the holes (`holes`), a bag already queued (512 and up) needs no call.
+function commitDoneStatement(ctx, name, origin, reset = false, holes = false) {
 	ctx.runtimeNeeded.add('bagDone');
+	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b'), b.id(name)));
+	const staged = b.binary('!==', b.id('_n'), b.literal(null));
 	return inheritOriginLoc(
 		b.if(
-			b.binary('!==', b.id('_n'), b.literal(null)),
-			b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b'), b.id(name))),
+			holes
+				? b.logical(
+						'&&',
+						staged,
+						b.binary('<', b.member(b.id('_b'), '$'), b.literal(2 * (COMMIT_MAX_CELLS + 1))),
+					)
+				: staged,
+			reset
+				? b.block([
+						done,
+						b.if(
+							b.binary('<', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS + 1)),
+							b.stmt(b.assignment('=', b.id('_n'), b.literal(null))),
+							null,
+						),
+					])
+				: done,
 			null,
 		),
 		origin,
+	);
+}
+
+// A template's renderable hole commits through two cells (#2043): its raw value
+// and its Text (runtime bagHole). A bound or signal-capable hole keeps its own
+// writer.
+function holeCommits(cc, ctx) {
+	return (
+		!cc.bindingMarker && !(cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads))
+	);
+}
+
+/** The commit half of a hole: publish its pair, or write the committed Text. */
+function registerHoleCommit(ctx, cc, bag, commit, origin) {
+	const cell = cc.commitCell;
+	ctx.runtimeNeeded.add('commitHole');
+	const V = () => b.id('_v');
+	const nextAt = (i) => b.member(b.id('_n'), b.literal(i), true);
+	const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+	const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
+	commit.write(cell, () =>
+		inheritOriginLoc(
+			b.if(
+				b.binary('!==', b.assignment('=', V(), nextAt(cell)), b.id('_b')),
+				b.block([
+					b.stmt(
+						b.assignment(
+							'=',
+							chv(),
+							b.call(
+								'_$commitHole',
+								b.id('_b'),
+								nextAt(cell + 1),
+								chv(),
+								V(),
+								...(cc.onlyChildText ? [bagFieldNode(bag, `_compHost$${cc.id}`)] : []),
+							),
+						),
+					),
+					b.stmt(b.assignment('=', chp(), V())),
+				]),
+				null,
+			),
+			origin,
+		),
 	);
 }
 
@@ -31411,8 +31625,13 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 			// sibling-position Text keeps React's HostText write, which a translated
 			// node does not receive either.
 			const write = bag.has(`_txt$${bind.id}`)
-				? b.call('_$setText', F('_txt'), V(), ...(bind.kind === 'textOnlyChild' ? [F('_el')] : []))
-				: b.call('_$setText', b.literal(null), V(), F('_el'));
+				? b.call(
+						'_$setRenderText',
+						F('_txt'),
+						V(),
+						...(bind.kind === 'textOnlyChild' ? [F('_el')] : []),
+					)
+				: b.call('_$setRenderText', b.literal(null), V(), F('_el'));
 			return st(
 				b.block([
 					b.const('_v', bind.expr),

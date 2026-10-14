@@ -25125,6 +25125,7 @@ export function presentationWrite<T>(
 			kind === 'setEventHandler' ||
 			kind === 'bindSignalText' ||
 			kind === 'setText' ||
+			kind === 'setRenderText' ||
 			kind === 'markDangerouslySetInnerHTMLChildren'
 		)
 			presentationMiss(false);
@@ -25144,7 +25145,7 @@ export function presentationWrite<T>(
 		return undefined as T;
 	}
 	if (kind === 'bindSignalText') return preparePresentationSignalBinding(args, frame, true) as T;
-	if (kind === 'setText') {
+	if (kind === 'setText' || kind === 'setRenderText') {
 		const [node, value, host] = args as [Text | null, unknown, Node | undefined];
 		const text = coerceText(value);
 		// A text binding that keeps only its host passes no Text (see setText), so
@@ -25645,6 +25646,24 @@ function commitText(write: [Text, string, Node | undefined]): void {
 }
 
 /**
+ * setText from a render (#2043): a root render that may be dropped queues the
+ * write for its commit. The caller's raw-value cache chose the write, so render
+ * compares nothing, and a bag the caller publishes next is snapshotted first,
+ * as journalText does. Commit functions call setText itself.
+ */
+export function setRenderText(node: Text | null, value: any, host?: Node): void {
+	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
+	if (transaction === null) return setText(node, value, host);
+	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	transaction.ops.push(commitSetText, [node, value, host]);
+}
+
+function commitSetText(write: [Text | null, unknown, Node | undefined]): void {
+	setText(write[0], write[1], write[2]);
+}
+
+/**
  * The open root render that a write to DOM the screen shows waits for, or null
  * when the write lands at once: nothing can drop the render (no transaction, a
  * rollback, an adopting hydration), or `block` is one the root attempt
@@ -25858,7 +25877,7 @@ function writeDirectSignalBoundText(binding: DirectSignalBinding, value: unknown
 	} else {
 		// Adopted Text can belong to another document. The binding already owns
 		// this cache; checking its realm's constructor again would discard it.
-		setText(binding.text, value);
+		setRenderText(binding.text, value);
 	}
 }
 
@@ -25891,7 +25910,7 @@ function writeDirectSignalText(
 	previous: unknown,
 ): Text {
 	if (previous instanceof Text) {
-		setText(previous, value);
+		setRenderText(previous, value);
 		return previous;
 	}
 	// The compiler owns this distinction: an empty sibling text hole can
@@ -26268,9 +26287,9 @@ export function bindSignalText(
 	if (previous instanceof Text && !isSignalHandle(value)) {
 		if (arguments.length > 6 && previousValue === value) return previous;
 		// A scalar over the Text this hole already owns is bindDirectSignal's
-		// unbound scalar write without its policy dispatch. setText journals the
-		// text and this binding bag.
-		setText(previous, value);
+		// unbound scalar write without its policy dispatch. setRenderText journals
+		// this binding bag.
+		setRenderText(previous, value);
 		return previous;
 	}
 	if (previous === undefined && bindingMarker !== undefined) {
@@ -39399,8 +39418,11 @@ export function bindSignalChild(
 	if (cachedText === null && textToken) {
 		const first = getFirstChild(domParent);
 		// A page translator can replace the token's Text with its own nodes (see
-		// resetOnlyChildHost); clear them so the hole writes a fresh Text.
+		// resetOnlyChildHost); clear them so the hole writes a fresh Text, at the
+		// commit of a render that may be dropped.
 		if (first !== null && first.nodeType === 3) cachedText = first as Text;
+		else if (ROOT_RENDER_TRANSACTION !== null && pendingWrites(parentScope.block) !== null)
+			queueRootDeletion(() => resetOnlyChildHost(domParent, null), null, null);
 		else resetOnlyChildHost(domParent, null);
 	}
 	if (!isSignalHandle(value)) {
@@ -39430,7 +39452,7 @@ export function bindSignalChild(
 				state!.implicitSignal === undefined &&
 				!dangerouslySetInnerHTMLOwnsChild(domParent, value)
 			) {
-				if (previous !== value) setText(node, value === true ? '' : value);
+				if (previous !== value) setRenderText(node, value === true ? '' : value);
 				return value;
 			}
 		}
@@ -40837,7 +40859,7 @@ export function textHoleUpdate(
 	if (!complex) {
 		if (previous === value) return cachedNode;
 		if (cachedNode != null && value !== null) {
-			setText(cachedNode, value === true ? '' : value);
+			setRenderText(cachedNode, value === true ? '' : value);
 			return cachedNode;
 		}
 	}
@@ -40856,11 +40878,157 @@ export function childTextHoleUpdate(
 	if (!complex) {
 		if (previous === value) return cachedNode;
 		if (cachedNode != null && value !== null) {
-			setText(cachedNode, value === true ? '' : value, domParent);
+			setRenderText(cachedNode, value === true ? '' : value, domParent);
 			return cachedNode;
 		}
 	}
 	return childTextHole(parentScope, slotKey, domParent, value, cachedNode);
+}
+
+/**
+ * Record a template's renderable hole (#2043). The hole's two commit cells hold
+ * its raw value (`cell`) and its Text (`cell + 1`), and the bag holds the
+ * committed pair (`prev`, `node`). A primitive into the committed Text records
+ * only the value, which the commit function writes (commitHole). Anything else
+ * renders the slot now (textHole), which builds new content off-document over
+ * committed DOM, and records the Text it settled on: commit only publishes it.
+ * A staged bag's cells are this transaction's pending hole, so a later render
+ * compares against them. An `always` hole renders the slot every time, so the
+ * host's raw-HTML check runs (dangerouslySetInnerHTMLOwnsChild).
+ */
+export function bagHole(
+	bag: any,
+	next: any[] | null,
+	cell: number,
+	value: unknown,
+	prev: unknown,
+	node: Text | null,
+	s: Scope,
+	slotKey: number,
+	domParent: Node,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+	compactable?: boolean,
+	always?: boolean,
+): any[] | null {
+	if (
+		value === prev &&
+		always !== true &&
+		(next === null ? bag.$ <= BAG_SIZE : next[cell] === bag) &&
+		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
+	)
+		return next;
+	return recordHole(
+		bag,
+		next,
+		cell,
+		value,
+		prev,
+		node,
+		s,
+		slotKey,
+		domParent,
+		false,
+		always,
+		anchor,
+		ownEnd,
+		compactable,
+	);
+}
+
+/** bagHole for a host's only child, whose markerless Text childTextHole keeps. */
+export function bagChildHole(
+	bag: any,
+	next: any[] | null,
+	cell: number,
+	value: unknown,
+	prev: unknown,
+	node: Text | null,
+	s: Scope,
+	slotKey: number,
+	domParent: Node,
+	always?: boolean,
+): any[] | null {
+	if (
+		value === prev &&
+		always !== true &&
+		(next === null ? bag.$ <= BAG_SIZE : next[cell] === bag) &&
+		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
+	)
+		return next;
+	return recordHole(bag, next, cell, value, prev, node, s, slotKey, domParent, true, always);
+}
+
+function recordHole(
+	bag: any,
+	next: any[] | null,
+	cell: number,
+	value: unknown,
+	prev: unknown,
+	node: Text | null,
+	s: Scope,
+	slotKey: number,
+	domParent: Node,
+	onlyChild: boolean,
+	always?: boolean,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+	compactable?: boolean,
+): any[] | null {
+	let last = prev;
+	let text = node;
+	if (bag.$ > BAG_SIZE) {
+		if (next === null) next = stageBag(bag);
+		if (next[cell] !== bag) last = next[cell];
+		if (next[cell + 1] !== bag) text = next[cell + 1];
+	}
+	if (
+		always !== true &&
+		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
+	) {
+		if (value === last) return next;
+		if (text !== null && value !== null) {
+			if (next === null) next = stageBag(bag);
+			if (text === node && next[cell + 1] === bag) {
+				next[cell] = value === prev ? bag : value;
+				return next;
+			}
+			// A Text this transaction built, or one the slot already wrote: write
+			// it in render order.
+			setRenderText(text, value === true ? '' : value, onlyChild ? domParent : undefined);
+			next[cell] = value;
+			return next;
+		}
+	}
+	text = onlyChild
+		? childTextHole(s, slotKey, domParent, value, text)
+		: textHole(s, slotKey, domParent, value, anchor, ownEnd, compactable);
+	if (text === node && value === prev) {
+		// Back to the committed pair: nothing pending.
+		if (next !== null) next[cell] = next[cell + 1] = bag;
+		return next;
+	}
+	if (next === null) next = stageBag(bag);
+	// The slot wrote its content itself: commit only publishes the pair.
+	next[cell] = value;
+	next[cell + 1] = text;
+	return next;
+}
+
+/**
+ * The commit half of a hole: publish the Text its render settled on, or write
+ * the new value into the committed Text when only the value changed.
+ */
+export function commitHole(
+	bag: any,
+	text: any,
+	node: Text,
+	value: unknown,
+	host?: Node,
+): Text | null {
+	if (text !== bag) return text;
+	setText(node, value === true ? '' : value, host);
+	return node;
 }
 
 // The markerless Text leaves an only-child hole. When a translator already took
@@ -40967,8 +41135,13 @@ export function childTextHole(
 			if (KEPT_TEXT_CONTENT !== null)
 				clearKeptText(KEPT_TEXT_CONTENT, parentScope.block, domParent);
 			const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
+			const transaction = ROOT_RENDER_TRANSACTION;
+			// A Block this render created builds fresh DOM: skip the frontier test.
 			const parent =
-				ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentScope.block, domParent)
+				transaction !== null &&
+				(parentScope.block.createdStamp !== transaction.createdStamp ||
+					transaction.retainedCreated !== null) &&
+				usesFrontier(parentScope.block, domParent)
 					? queueFrontier(parentScope.block, domParent, null)
 					: domParent;
 			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(tn);

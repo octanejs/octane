@@ -29,6 +29,7 @@ import {
 } from './_fixtures/view-transition-signal-controls.tsrx';
 import { condition } from 'octane/hydration';
 import { SelectStateApp } from './_fixtures/view-transition-host-state.tsrx';
+import { Item, TransitionHoles } from './_fixtures/text-hole-commit.tsrx';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 
@@ -212,6 +213,50 @@ describe('ViewTransition staged commits', () => {
 		expect(container.textContent).toBe('after');
 		expect(events.filter((event) => event === 'layout:after')).toEqual(['layout:after']);
 		expect(recoverable).toEqual([error]);
+	});
+
+	it('keeps every renderable hole’s content until the native update', async () => {
+		const holes = '#sibling, #only, #rows li, #pairs li, #root-hole, #returned';
+		const expected = (t: string) => [
+			'before ' + t + ' after',
+			t,
+			t,
+			t,
+			t,
+			'one' + t,
+			t,
+			'two' + t,
+			t,
+			t,
+		];
+		await act(() => root.render(TransitionHoles, { value: 'first' }));
+		const nodes = [...container.querySelectorAll(holes)];
+		const shown = () => nodes.map((node) => node.textContent);
+		expect(shown()).toEqual(expected('first'));
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, { childList: true, subtree: true, characterData: true });
+		try {
+			let previous = 'first';
+			for (const [index, value] of ['second', createElement(Item, { label: 'item' })].entries()) {
+				startTransition(() => root.render(TransitionHoles, { value }));
+				await vi.waitFor(() => expect(handles).toHaveLength(index + 1));
+				records.push(...observer.takeRecords());
+				expect(records).toEqual([]);
+				expect(shown()).toEqual(expected(previous));
+				await handles[index].update();
+				previous = typeof value === 'string' ? value : 'item';
+				expect(shown()).toEqual(expected(previous));
+				expect([...container.querySelectorAll(holes)]).toEqual(nodes);
+				handles[index].ready.resolve();
+				handles[index].finished.resolve();
+				await act(() => {});
+				records.length = 0;
+				observer.takeRecords();
+			}
+		} finally {
+			observer.disconnect();
+		}
 	});
 
 	it('keeps DOM, event handlers and commit callbacks unchanged until the native update', async () => {
