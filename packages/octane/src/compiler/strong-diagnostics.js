@@ -336,6 +336,15 @@ export const STRONG_DIAGNOSTICS = [
 			'Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.',
 	},
 	{
+		code: 'OCTANE_STRONG_SINGLE_ITEM_FOR',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'An `@for` iterates a one-item array literal, such as `@for (const item of [value]; key item)`, or a `const` holding one that nothing but `@for` headers reads. A one-row loop is a workaround for a keyed remount or a local binding.',
+		replacement:
+			'To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid.',
+	},
+	{
 		code: 'OCTANE_STRONG_HOOK_LOCALITY',
 		section: 'templates',
 		severity: 'error',
@@ -385,6 +394,15 @@ export const STRONG_DIAGNOSTICS = [
 		detects:
 			'Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, or `StrictMode` from `octane`.',
 		replacement: 'Use normal Octane scheduling and component semantics.',
+	},
+	{
+		code: 'OCTANE_STRONG_ELEMENT_API',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.',
+		replacement:
+			'Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.',
 	},
 	{
 		code: 'OCTANE_STRONG_MANAGED_DOM_WRITE',

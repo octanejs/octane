@@ -579,12 +579,14 @@ Lists, templates, and compatibility APIs:
 
 - `OCTANE_STRONG_MAP_JSX`: Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.
 - `OCTANE_STRONG_INDEX_KEY`: Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.
+- `OCTANE_STRONG_SINGLE_ITEM_FOR`: To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid.
 - `OCTANE_STRONG_HOOK_LOCALITY`: Move the hook into that block, before the JSX or local effect that uses its value. Hooks used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime.
 - `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`: Move the handler into that block, before the JSX that uses it, or inline it.
 - `OCTANE_STRONG_DIRECTIVE_PLACEMENT`: Move `"use strong"` to the top of the file, before imports or other code.
 - `OCTANE_STRONG_SUPPRESSION_PROP`: Fix the mismatch or use the intended native event. Component props with these names are unaffected.
 - `OCTANE_NATIVE_TEXT_ONCHANGE`: Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid.
 - `OCTANE_STRONG_COMPAT_IMPORT`: Use normal Octane scheduling and component semantics.
+- `OCTANE_STRONG_ELEMENT_API`: Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.
 
 DOM ownership and trusted HTML:
 

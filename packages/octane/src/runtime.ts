@@ -16453,6 +16453,44 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 	return initializeContext(ctx, defaultValue);
 }
 
+/**
+ * A context identity for compiled children. Read it with use() or useContext(),
+ * and provide it with <CompiledContext context={context} value={value}>.
+ */
+export function createCompiledContext<T>(defaultValue: T): Context<T> {
+	const ctx = function CompiledProvider(_props, _scope): void {
+		throw new TypeError(formatClientError(344));
+	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+/** The children of this provider must be authored between its template tags. */
+export function CompiledContext<T>(
+	props: { context: Context<T>; value: T; children?: unknown },
+	scope: Scope,
+): void {
+	provideContext(scope, props.context, props.value);
+	const children = props.children;
+	if (children == null) return;
+	if (!isChildrenBlock(children)) {
+		throw new TypeError(formatClientError(345));
+	}
+	const dialect = (children as any)[CHILDREN_BODY] ?? children;
+	const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+	if (previous !== dialect) {
+		if (previous !== undefined) {
+			invalidateSharedBodyOutput(scope);
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				const hooks = scope.hooks!;
+				journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
+			}
+		}
+		ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+	}
+	const output = renderSharedBody(children as ComponentBody, undefined, scope, undefined);
+	if (output != null) throw new TypeError(formatClientError(345));
+}
+
 function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
@@ -35268,6 +35306,40 @@ export function componentSlotVoid(
 		inherit,
 		hasKey,
 		invocationSite,
+	);
+}
+
+function rejectCompiledReturn(_block: Block, _out: unknown, reset?: true): void {
+	if (reset !== true) {
+		throw new TypeError(formatClientError(346));
+	}
+}
+
+/**
+ * Render a dynamically selected compiled component under the current owner.
+ * Use an ordinary dynamic JSX tag when the body can return a renderable.
+ */
+export type CompiledComponent<P = Record<string, never>> = (props: P) => unknown;
+
+export function CompiledOutlet<P>(
+	props: { component: CompiledComponent<P>; props: P },
+	scope: Scope,
+): void {
+	const comp = props.component as ComponentBody<P>;
+	if (typeof comp !== 'function') {
+		throw new TypeError(formatClientError(346));
+	}
+	const block = scope.block;
+	componentSlotImpl(
+		rejectCompiledReturn,
+		scope,
+		0,
+		block.parentNode,
+		comp,
+		comp,
+		props.props,
+		props.props,
+		block.endMarker,
 	);
 }
 

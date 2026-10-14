@@ -5387,6 +5387,9 @@ function renderComponentFramed(
 	rendererListKeys?: ServerSignalListKeys | null,
 	// The owner a template block renders inside (see TEMPLATE_INVOCATION_SITE).
 	enclosingOwner?: SignalRendererOwnerIdentity,
+	// Do not default a callback here: parameter initialization enlarges every
+	// recursive frame, reducing the maximum supported nesting of ordinary SSR.
+	compiledOnly?: true,
 ): string {
 	const previous = captureServerComponentContext();
 	const parentScope = parent ?? previous.scope;
@@ -5456,7 +5459,9 @@ function renderComponentFramed(
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			HOOK_PASS = previousHookPass;
 		}
-		const inner = serverComponentOutput(out, scope, previous.owner);
+		const inner = compiledOnly
+			? checkedCompiledOutput(out)
+			: serverComponentOutput(out, scope, previous.owner);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
@@ -5519,6 +5524,7 @@ export function ssrComponent(
 	identityScoped?: boolean | 'key',
 	invocationSite?: string,
 	bindingMarker?: string,
+	compiledOnly?: true,
 ): string {
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
 	// original identity for async keys, then use the stable cold body below. A
@@ -5669,6 +5675,7 @@ export function ssrComponent(
 					: invocationSite === undefined
 						? childrenSignalOwner(comp)
 						: authorChildrenSignalOwner(comp, props),
+			compiledOnly,
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -6673,6 +6680,62 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		defineRemovedContextMembers(ctx);
 	}
 	return ctx;
+}
+
+/** The server counterpart of the client compiled-only context identity. */
+export function createCompiledContext<T>(defaultValue: T): Context<T> {
+	const ctx = function CompiledProvider(_props, _scope): string {
+		throw new TypeError(formatServerError(344));
+	} as Context<T>;
+	ctx.$$kind = CONTEXT_TAG;
+	ctx.defaultValue = defaultValue;
+	registerContext(ctx);
+	if (process.env.NODE_ENV !== 'production') defineRemovedContextMembers(ctx);
+	return ctx;
+}
+
+export function CompiledContext<T>(
+	props: { context: Context<T>; value: T; children?: unknown },
+	scope: SSRScope,
+): string {
+	if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
+	scope.$$ctxValues.set(props.context, props.value);
+	const children = props.children;
+	if (children == null) return ssrHtml('');
+	if (!isChildrenBlock(children)) {
+		throw new TypeError(formatServerError(345));
+	}
+	return ssrHtml(ssrChildrenHtml(children, scope));
+}
+
+function checkedCompiledOutput(out: unknown): string {
+	if (out === undefined) return '';
+	if (out !== null && typeof out === 'object' && SERVER_HTML in out) {
+		return (out as ServerHtml)[SERVER_HTML];
+	}
+	throw new TypeError(formatServerError(346));
+}
+
+export function CompiledOutlet(
+	props: { component: ServerComponent; props: unknown },
+	scope: SSRScope,
+): string {
+	if (typeof props.component !== 'function') {
+		throw new TypeError(formatServerError(346));
+	}
+	return ssrHtml(
+		ssrComponent(
+			scope,
+			props.component,
+			props.props,
+			false,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true,
+		),
+	);
 }
 
 function renderServerContextProvider(

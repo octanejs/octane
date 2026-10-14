@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'octane';
 import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture';
 
-const imports = `"use strong"; import { createElement, useMemo } from 'octane';`;
+// Strong plain modules cannot build element descriptors, so their markup comes
+// from this ordinary module.
+const view = {
+	paragraph: (text: string) => createElement('p', null, text),
+	buttons: (handlers: Record<string, () => void>) =>
+		createElement(
+			'div',
+			null,
+			...Object.entries(handlers).map(([id, onClick]) =>
+				createElement('button', { id, onClick }, id),
+			),
+		),
+};
+const runtimeModules = { './view': view };
+const imports = `"use strong"; import { useMemo } from 'octane';`;
 const calculations = `
   const manual = useMemo(() => props.value, [props.revision]);
   const inferred = useMemo(() => props.value);
@@ -13,8 +28,8 @@ const calculations = `
 `;
 const compiledSource = `${imports}
 export function App(props) @{ ${calculations} <p>{result as string}</p> }`;
-const plainSource = `${imports}
-export function App(props) { ${calculations} return createElement('p', null, result); }`;
+const plainSource = `${imports} import { paragraph } from './view';
+export function App(props) { ${calculations} return paragraph(result); }`;
 
 describe('Strong useMemo dependency control', () => {
 	it.each([
@@ -42,6 +57,7 @@ describe('Strong useMemo dependency control', () => {
 				loadPlainHookFixtureSource(plainSource, {
 					id: '/src/StrongMemo.ts',
 					inlineHookMemo: false,
+					runtimeModules,
 				}),
 		],
 		[
@@ -50,6 +66,7 @@ describe('Strong useMemo dependency control', () => {
 				loadPlainHookFixtureSource(plainSource, {
 					id: '/src/StrongMemo.ts',
 					inlineHookMemo: true,
+					runtimeModules,
 				}),
 		],
 	] as const)(
@@ -102,14 +119,8 @@ export function App(props) @{ ${callbacks}
     <button id="always" onClick={always}>Always</button>
   </div>
 }`;
-const callbackPlainSource = `"use strong"; import { createElement, useCallback } from 'octane';
-export function App(props) { ${callbacks}
-  return createElement('div', null,
-    createElement('button', { id: 'manual', onClick: manual }, 'Manual'),
-    createElement('button', { id: 'inferred', onClick: inferred }, 'Inferred'),
-    createElement('button', { id: 'optional', onClick: optional }, 'Optional'),
-    createElement('button', { id: 'always', onClick: always }, 'Always'));
-}`;
+const callbackPlainSource = `"use strong"; import { useCallback } from 'octane'; import { buttons } from './view';
+export function App(props) { ${callbacks} return buttons({ manual, inferred, optional, always }); }`;
 
 describe('Strong useCallback dependency control', () => {
 	it.each([
@@ -137,6 +148,7 @@ describe('Strong useCallback dependency control', () => {
 				loadPlainHookFixtureSource(callbackPlainSource, {
 					id: '/src/StrongCallbacks.ts',
 					inlineHookMemo: false,
+					runtimeModules,
 				}),
 		],
 		[
@@ -145,6 +157,7 @@ describe('Strong useCallback dependency control', () => {
 				loadPlainHookFixtureSource(callbackPlainSource, {
 					id: '/src/StrongCallbacks.ts',
 					inlineHookMemo: true,
+					runtimeModules,
 				}),
 		],
 	] as const)('honors authored and inferred callback captures in a %s', (_label, load) => {

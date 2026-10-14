@@ -32,7 +32,7 @@ export function Matches() @{
 	useLayoutEffect(() => {
 		if (router.options.scrollRestoration) setupScrollRestoration(router);
 	}, [router]);
-	useTransitioner();
+	useTransitioner(router);
 
 	<InnerWrap>
 		<Suspense fallback={pendingElement}>

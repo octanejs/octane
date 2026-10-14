@@ -34084,6 +34084,30 @@ function isDirectActivityLongForm(node, ctx = null) {
 	);
 }
 
+// These builtins reject all returned renderables themselves, in every compiler
+// mode. Only an actual package import grants that contract; a shadow does not.
+function isCheckedCompiledBoundary(node, ctx) {
+	const tag = node.openingElement?.name || node.id;
+	let local;
+	let imported;
+	if (tag?.type === 'JSXIdentifier' || tag?.type === 'Identifier') {
+		local = tag;
+		imported = ctx.octaneImportLocals?.get(tag.name);
+	} else if (
+		(tag?.type === 'JSXMemberExpression' || tag?.type === 'MemberExpression') &&
+		tag.computed !== true &&
+		(tag.object.type === 'JSXIdentifier' || tag.object.type === 'Identifier') &&
+		ctx.octaneImportNamespaces?.has(tag.object.name)
+	) {
+		local = tag.object;
+		imported = tag.property.name;
+	}
+	if (imported !== 'CompiledOutlet' && imported !== 'CompiledContext') return false;
+	if (ctx.currentComponentLocals?.has(local.name)) return false;
+	const binding = activityReferenceBinding(local, node, ctx);
+	return binding?.importSource?.value === 'octane';
+}
+
 // ===========================================================================
 // Component-as-tag — `<Foo>...</Foo>`, `<ctx.Component>...</ctx.Component>`
 // ===========================================================================
@@ -34753,8 +34777,9 @@ function makeCompCall(
 	// A same-module compiled callee whose JavaScript return is provably void can
 	// use a Block that omits generic return-value reconciliation. HMR deliberately
 	// keeps the generic path: an update can replace the implementation with a
-	// value-returning body while retaining the wrapper identity.
-	let voidComponent = false;
+	// value-returning body while retaining the wrapper identity. Checked package
+	// boundaries enforce void output at runtime, so their slot is safe in HMR too.
+	let voidComponent = isCheckedCompiledBoundary(node, ctx);
 	// singleRoot: a NON-lite (hooks/`use`) same-module component whose body output
 	// is one plain element. Its componentSlot self-delimits via that element on
 	// client mount — no `comp`/`/comp` markers. (Lite components are already
