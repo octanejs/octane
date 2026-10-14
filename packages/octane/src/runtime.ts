@@ -17295,7 +17295,7 @@ function createHydrateSlot(
 					block = block.parentBlock
 				)
 					loc = componentSourceLoc(block.body);
-			hydration!.mismatch(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
+			hydration!.fail(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
 		}
 		start = document.createComment('hydrate');
 		end = document.createComment('/hydrate');
@@ -17450,7 +17450,7 @@ function finishRoot(hydration: HydrationCapability): void {
 	)
 		remainder = getNextSibling(remainder);
 	if (remainder === null) return;
-	hydration.mismatch(
+	hydration.fail(
 		process.env.NODE_ENV !== 'production'
 			? componentSourceLoc(hydration.rootBlock.body)
 			: undefined,
@@ -21031,7 +21031,7 @@ class HydrationCapability {
 		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
 			if (node === null || this.freshNodes.has(node)) return;
 		}
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production'
 				? // A return slot or a list item has no site of its own: name the
 					// returning component, else the list's host.
@@ -21048,8 +21048,8 @@ class HydrationCapability {
 	 * A slot of `scope` at `slotKey` found no server range of its own where it
 	 * hydrates, but `actual`, which the server rendered for something else.
 	 */
-	slotMismatch(scope: Scope, slotKey: number, expected: string, actual: Node | null): never {
-		this.mismatch(
+	failAt(scope: Scope, slotKey: number, expected: string, actual: Node | null): never {
+		this.fail(
 			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) || undefined : undefined,
 			() => expected,
 			actual,
@@ -21291,10 +21291,10 @@ class HydrationCapability {
 		if (open !== null) return open;
 		const actual =
 			anchor !== null && anchor !== scope.block.endMarker ? anchor : this.cursorIn(domParent);
-		if (!this.defers) this.slotMismatch(scope, slotKey, 'a component range', actual);
+		if (!this.defers) this.failAt(scope, slotKey, 'a component range', actual);
 		this.adopting = true;
 		try {
-			this.slotMismatch(scope, slotKey, 'a component range', actual);
+			this.failAt(scope, slotKey, 'a component range', actual);
 		} catch (error) {
 			this.defer(error as HydrationMismatch, false);
 			return null;
@@ -21314,7 +21314,7 @@ class HydrationCapability {
 	branchOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment | null {
 		const open = this.resolveOpen(anchor, domParent);
 		if (open !== null || this.inFreshRange(anchor, domParent)) return open;
-		this.slotMismatch(
+		this.failAt(
 			scope,
 			slotKey,
 			'a branch range',
@@ -21331,7 +21331,7 @@ class HydrationCapability {
 	 * repaired here: the nearest fallback owner discards its server DOM and
 	 * renders on the client (see HydrationMismatch), as React does.
 	 */
-	mismatch(loc: string | undefined, expected: () => string, actual: Node | null): never {
+	fail(loc: string | undefined, expected: () => string, actual: Node | null): never {
 		// A deferred mismatch comes first in React's order: it is the one reported.
 		if (this.deferred !== null && !this.adopting) this.claimDeferred();
 		const error = new HydrationMismatch();
@@ -21431,7 +21431,7 @@ class HydrationCapability {
 			this.node = end;
 			return true;
 		}
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production'
 				? // A return slot or a list item has no site of its own: name the
 					// returning component, else the list's host.
@@ -21477,7 +21477,7 @@ class HydrationCapability {
 			getNextSibling(text) !== end
 		)
 			return;
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production'
 				? siteLoc(scope, slotKey) ||
 						componentSourceLoc(scope.block.body) ||
@@ -21490,35 +21490,6 @@ class HydrationCapability {
 						? 'a portal'
 						: `<${(value as ElementDescriptor).type as string}>`,
 			text,
-		);
-	}
-
-	/**
-	 * A list item's first hydrating render found server content at the cursor
-	 * that cannot be that item: the server rendered fewer items, a bare item
-	 * where this one needs a range of its own, or an item of another tag. The
-	 * list ends at `end`.
-	 */
-	itemMismatch(end: Node, expected: string): never {
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
-			() => expected,
-			this.node,
-		);
-	}
-
-	/**
-	 * A list of `scope` at `slotKey` found the server's other arm on its first
-	 * hydrating render: items (`serverItems`) where the client renders its
-	 * @empty arm, or none where the client has items. The server's content
-	 * starts after `start`.
-	 */
-	listArmMismatch(scope: Scope, slotKey: number, start: Node, serverItems: boolean): never {
-		this.slotMismatch(
-			scope,
-			slotKey,
-			serverItems ? 'an empty list (@empty)' : 'a populated list',
-			getNextSibling(start),
 		);
 	}
 
@@ -21542,16 +21513,25 @@ class HydrationCapability {
 	 * client does not render.
 	 */
 	settleItems(end: Node): void {
+		const from = this.leftover(end);
+		if (from !== null)
+			this.fail(
+				process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
+				() => 'the end of the list',
+				from,
+			);
+	}
+
+	/**
+	 * Where the server content starts that a range's owner left unclaimed when
+	 * it finished rendering: the cursor, when the range's close `end` follows
+	 * it. Null when the cursor is on `end`, or past it.
+	 */
+	private leftover(end: Node): Node | null {
 		const from = this.node;
-		if (from === end) return;
-		let node = from;
-		while (node !== null && node !== end) node = getNextSibling(node);
-		if (node === null) return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
-			() => 'the end of the list',
-			from,
-		);
+		for (let node = from; node !== null && from !== end; node = getNextSibling(node))
+			if (node === end) return from;
+		return null;
 	}
 
 	/**
@@ -21588,17 +21568,14 @@ class HydrationCapability {
 	 * this one, or the whole range when the arm rendered nothing.
 	 */
 	settleArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
-		const from = this.node;
-		let node: Node | null = from;
-		while (node !== null && node !== end) node = getNextSibling(node);
-		// Only server content that precedes `end` is the arm's.
-		if (node === null) return;
-		this.slotMismatch(
-			scope,
-			slotKey,
-			from === first ? 'an empty branch' : 'the end of the branch',
-			from,
-		);
+		const from = this.leftover(end);
+		if (from !== null)
+			this.failAt(
+				scope,
+				slotKey,
+				from === first ? 'an empty branch' : 'the end of the branch',
+				from,
+			);
 	}
 
 	/**
@@ -21649,7 +21626,7 @@ class HydrationCapability {
 			return equal;
 		}
 		if (equal) return true;
-		this.mismatch(
+		this.fail(
 			loc || (host as any)?.__oct_loc,
 			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
 			node,
@@ -21685,7 +21662,7 @@ class HydrationCapability {
 		const kept = str !== '' && first.nodeType === 3;
 		const stale = kept ? getNextSibling(first)! : first;
 		if (stale === end) return;
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) : undefined,
 			() => {
 				const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
@@ -21801,7 +21778,7 @@ class HydrationCapability {
 	 */
 	private unpatched(el: Element, what: string, server: unknown, client: unknown): void {
 		if (this.staleServerValues)
-			this.mismatch((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
+			this.fail((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
 		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
 			(this.unpatchedValues ??= new Map()).set(
 				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
@@ -21820,7 +21797,7 @@ class HydrationCapability {
 	 */
 	missingDeoptChild(el: Element, child: unknown): void {
 		if (!this.isActive() || this.isFresh(el) || el.localName === 'noscript') return;
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 			() =>
 				isHostDescriptor(child)
@@ -22128,7 +22105,7 @@ class HydrationCapability {
 		// child of a newly populated fragment. Build fresh descendants without
 		// consuming that boundary, so its owner can advance the outer cursor.
 		if (isFragment && isBlockClose(cursor)) {
-			this.mismatch(loc, () => 'a non-empty fragment', cursor);
+			this.fail(loc, () => 'a non-empty fragment', cursor);
 		}
 		// A synthetic fragment wrapper has no server counterpart. At a root, compare
 		// its logical static roots before returning the virtual adoption view; otherwise
@@ -22139,7 +22116,7 @@ class HydrationCapability {
 			const remainder = this.fragmentRemainder(template, cursor, loc, partialStyles);
 			if (remainder === undefined) {
 				const fragment = template;
-				this.mismatch(
+				this.fail(
 					process.env.NODE_ENV !== 'production'
 						? componentSourceLoc(this.rootBlock.body)
 						: undefined,
@@ -22150,7 +22127,7 @@ class HydrationCapability {
 			this.claimRootRemainder(framedRemainder === undefined ? remainder : framedRemainder);
 		}
 		if (cursor === null) {
-			this.mismatch(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
+			this.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
 		}
 		if (
 			!isFragment &&
@@ -22160,18 +22137,14 @@ class HydrationCapability {
 		) {
 			const match = this.skipForeign(cursor, template, lazy);
 			if (match === null)
-				this.mismatch(
-					loc,
-					() => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)),
-					cursor,
-				);
+				this.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), cursor);
 			this.node = cursor = match;
 			if (unframedRemainder !== undefined) unframedRemainder = getNextSibling(match);
 		}
 		// The compiled walk descends into the root's children: where it would find
 		// no element, the server rendered fewer nodes than the template has.
 		if (!isFragment && rootWalkMisses(cursor, template, lazy))
-			this.mismatch(
+			this.fail(
 				loc,
 				() => describeHydrationNode(firstElementChild(template ?? resolveLazyTemplate(lazy!))),
 				getFirstChild(cursor),
@@ -22194,7 +22167,7 @@ class HydrationCapability {
 					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			const fragment = template ?? resolveLazyTemplate(lazy!);
-			this.mismatch(
+			this.fail(
 				loc,
 				() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
 				cursor,
@@ -22351,7 +22324,7 @@ class HydrationCapability {
 	 * end of the Text node it adopted).
 	 */
 	private unclaimedText(el: Node, from: ChildNode, text: string | null, loc?: string): never {
-		this.mismatch(
+		this.fail(
 			loc || (el as any).__oct_loc,
 			() =>
 				text === null
@@ -22411,7 +22384,7 @@ class HydrationCapability {
 		if (stale !== null && !textarea) {
 			if (isElementDescriptor(value) && !isHostDescriptor(value))
 				this.renderBeforeMismatch(el, render);
-			this.mismatch(loc, () => 'a renderable range', stale);
+			this.fail(loc, () => 'a renderable range', stale);
 		}
 		if (stale !== null) stale = getNextSibling(stale);
 		this.save(el);
@@ -22425,7 +22398,7 @@ class HydrationCapability {
 		// An element or text the value built is a node the server did not render.
 		for (let node = getFirstChild(el); node !== null; node = getNextSibling(node))
 			if (node.nodeType === 1 || (node.nodeType === 3 && node.nodeValue))
-				this.mismatch(loc, () => 'a renderable range', null);
+				this.fail(loc, () => 'a renderable range', null);
 	}
 
 	/**
@@ -22487,7 +22460,7 @@ class HydrationCapability {
 		// An element where the server's text belongs is a structural difference,
 		// which suppressHydrationWarning never keeps.
 		if (posNode !== null && posNode.nodeType === 1 && (host === null || !this.freshNodes.has(host)))
-			this.mismatch(
+			this.fail(
 				(host as any)?.__oct_loc,
 				() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
 				posNode,
@@ -22638,7 +22611,7 @@ class HydrationCapability {
 	 * fewer nodes there than the client.
 	 */
 	private missingElement(): never {
-		this.mismatch(undefined, () => 'an element', null);
+		this.fail(undefined, () => 'an element', null);
 	}
 
 	/**
@@ -22658,7 +22631,7 @@ class HydrationCapability {
 			for (const [node, { server, loc }] of texts) {
 				const text = node.nodeValue!;
 				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
-					this.mismatch(
+					this.fail(
 						loc || (node.parentNode as any)?.__oct_loc,
 						() => `text ${JSON.stringify(text)}`,
 						document.createTextNode(server ?? ''),
@@ -24200,7 +24173,7 @@ function isEmptyTextSlot(node: Node | null): node is Comment {
  */
 /**
  * From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked).
- * Throws UnclosedHydrationRange when the parent ends first.
+ * Throws a HydrationMismatch when the parent ends first.
  */
 function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment {
 	let nested: Comment[] | null = null;
@@ -24221,7 +24194,11 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 		}
 		node = getNextSibling(node);
 	}
-	throw new UnclosedHydrationRange();
+	// The server closes every range it opens, so something changed its HTML
+	// after rendering, such as a minifier or proxy that strips comments. No
+	// close in the parent can be trusted then, so the nearest intact owner falls
+	// back as for any other mismatch.
+	throw new HydrationMismatch(formatClientError(338));
 }
 
 /**
@@ -24242,20 +24219,6 @@ class HydrationMismatch extends NativeAdoptionMiss {
 		super('', '');
 		this.name = 'HydrationMismatch';
 		this.message = message;
-	}
-}
-
-/**
- * A server range has no closing marker. The server closes every range it
- * opens, so something changed its HTML after rendering, for example a
- * minifier or proxy that strips comments. No close in the parent can be
- * trusted then, and no extent guessed for the range is safe, so the nearest
- * intact owner falls back like any other mismatch.
- */
-class UnclosedHydrationRange extends HydrationMismatch {
-	constructor() {
-		super(formatClientError(338));
-		this.name = 'UnclosedHydrationRange';
 	}
 }
 
@@ -36158,7 +36121,7 @@ function reconcileDeoptChildren(
 				at++;
 			if (at < unstamped.length && unstamped[at].nodeType === 1) up = at;
 			else if (up < unstamped.length)
-				activeHydration()!.mismatch(
+				activeHydration()!.fail(
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `<${child.type as string}>`,
 					unstamped[up],
@@ -36192,7 +36155,7 @@ function reconcileDeoptChildren(
 				el.localName !== 'noscript' &&
 				!hydration.isFresh(el)
 			)
-				hydration.mismatch(
+				hydration.fail(
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `the end of <${el.localName}>`,
 					n,
@@ -36969,7 +36932,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// STRUCTURAL mismatch: the server rendered something other than this host element at
 		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …), or
 		// nothing at all.
-		hydration.mismatch(
+		hydration.fail(
 			process.env.NODE_ENV !== 'production'
 				? (hydration.node === null
 						? (block.parentNode as any).__oct_loc
@@ -37095,7 +37058,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		}
 		if (hydration !== null && (hydration.node !== null || !hydration.isFresh(block.parentNode))) {
 			// STRUCTURAL mismatch, as in hostElementBody.
-			hydration.mismatch(
+			hydration.fail(
 				process.env.NODE_ENV !== 'production'
 					? hydration.node === null
 						? (block.parentNode as any).__oct_loc
@@ -38551,7 +38514,7 @@ export function childSlot(
 			(typeof value === 'string' && cursor?.nodeType === 3) ||
 			unframedComponentRoot;
 		if (!unframedMatch) {
-			hydration.mismatch(
+			hydration.fail(
 				process.env.NODE_ENV !== 'production' ? componentSourceLoc(parentBlock.body) : undefined,
 				() => (preparedList === null ? 'a renderable root' : 'a renderable list range'),
 				cursor,
@@ -45696,7 +45659,7 @@ function renderBranchSlot(
 						// cannot be this branch's own range: the server encoded this slot
 						// differently, such as a value-hole list's outer pair with one pair
 						// per item.
-						hydration.slotMismatch(
+						hydration.failAt(
 							parentScope,
 							slotKey,
 							'a single branch range',
@@ -45753,12 +45716,7 @@ function renderBranchSlot(
 				// An empty client branch, but the server rendered content in this slot
 				// (e.g. an `@else` with content on the server, an empty `@if` on the
 				// client).
-				hydration.slotMismatch(
-					parentScope,
-					slotKey,
-					'an empty branch',
-					getNextSibling(state.start),
-				);
+				hydration.failAt(parentScope, slotKey, 'an empty branch', getNextSibling(state.start));
 			}
 		} else if (body) {
 			// Markerless client mount — pick the boundary by what the branch renders.
@@ -47136,7 +47094,7 @@ export function forBlock<T>(
 			// The server frames every list, so a hydrating list without its range
 			// finds what the server rendered for something else.
 			if (hydration !== null)
-				hydration.slotMismatch(parentScope, slotKey, 'a list range', anchor ?? hydration.node);
+				hydration.failAt(parentScope, slotKey, 'a list range', anchor ?? hydration.node);
 			start = document.createComment('for');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (when a static sibling follows this @for in mixed
@@ -47187,7 +47145,7 @@ export function forBlock<T>(
 	// (hydration-protocol.ts). A plain range is not a list's.
 	const serverMarkerState = hydration?.markerState(state.start) ?? -1;
 	if (serverMarkerState === -1 && hydration !== null)
-		hydration.slotMismatch(parentScope, slotKey, 'a list range', state.start);
+		hydration.failAt(parentScope, slotKey, 'a list range', state.start);
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
@@ -47223,7 +47181,12 @@ export function forBlock<T>(
 				// the content inside the @for range is item blocks (`<!--[-->`), not the
 				// @empty body.
 				if (serverMarkerState === 1)
-					hydration.listArmMismatch(parentScope, slotKey, state.start, true);
+					hydration.failAt(
+						parentScope,
+						slotKey,
+						'an empty list (@empty)',
+						getNextSibling(state.start),
+					);
 				// The server already rendered the @empty content directly inside the
 				// adopted outer range. The empty body borrows that range and adopts from
 				// its first child; no redundant inner pair is necessary.
@@ -47296,7 +47259,7 @@ export function forBlock<T>(
 	// Hydrating, the server rendered no items (its open marker says so) where the
 	// client has items.
 	if (!isEmpty && hydration !== null && serverMarkerState === 0) {
-		hydration.listArmMismatch(parentScope, slotKey, state.start, false);
+		hydration.failAt(parentScope, slotKey, 'a populated list', getNextSibling(state.start));
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
@@ -49235,14 +49198,17 @@ function mountItem<T>(
 				return block;
 			}
 			// The server rendered fewer items than the client, or at the cursor an item
-			// that cannot be this one.
-			hydration.itemMismatch(
-				forSlot.end,
+			// that cannot be this one: a bare item where this one needs a range of its
+			// own, or an item of another tag.
+			hydration.fail(
 				process.env.NODE_ENV !== 'production'
-					? forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
+					? (forSlot.end.parentNode as any)?.__oct_loc
+					: undefined,
+				() =>
+					forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
-						: 'another list item'
-					: '',
+						: 'another list item',
+				hydration.node,
 			);
 		}
 		const block = hydration.suspend(() =>
