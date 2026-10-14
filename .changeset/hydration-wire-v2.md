@@ -12,5 +12,5 @@ and the arm's own nested range are gone, and so is the range an `@if` or
 
 The server and the client must come from the same Octane version: a root whose
 server rendered another protocol version renders on the client and reports
-error 345 through `onRecoverableError`. A presentation-binding view keeps its
+error 348 through `onRecoverableError`. A presentation-binding view keeps its
 own boundary and arm shapes.
