@@ -19,7 +19,7 @@
 //      restoration, devtools) fire.
 import { useLayoutEffect, useState, startTransition } from 'octane';
 import { getLocationChangeInfo, trimPathRight } from '@tanstack/router-core';
-import { useRouter } from './context.ts';
+import type { AnyRouter } from '@tanstack/router-core';
 
 // Resolve the pending render acknowledgement with whether the expected matches
 // rendered, then clear the slot. `owner` is `router._rendered`: `[expected, resolve]`.
@@ -29,8 +29,8 @@ export function settleOwner(owner: Array<any>, rendered: boolean) {
 	settle?.(rendered);
 }
 
-export function useTransitioner() {
-	const router = useRouter() as any;
+export function useTransitioner(routerInstance: AnyRouter) {
+	const router = routerInstance as any;
 	const [, forceRender] = useState<object>();
 
 	const acknowledgement: Array<any> = (router._rendered ??= []);

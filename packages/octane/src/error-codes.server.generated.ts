@@ -241,6 +241,9 @@ type ServerErrorArguments = {
 	334: [unknown];
 	335: [unknown];
 	336: [unknown];
+	344: [];
+	345: [];
+	346: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -990,6 +993,18 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 336:
 				return formatDevErrorMessage(
 					"`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
+					args,
+				);
+			case 344:
+				return formatDevErrorMessage(
+					'Provide a compiled context with <CompiledContext context={context}>.',
+					args,
+				);
+			case 345:
+				return formatDevErrorMessage('CompiledContext requires compiled template children.', args);
+			case 346:
+				return formatDevErrorMessage(
+					'CompiledOutlet requires a compiled component function with no returned renderable.',
 					args,
 				);
 			default:

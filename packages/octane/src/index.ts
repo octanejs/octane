@@ -84,6 +84,10 @@ export {
 	prefetchDNS,
 	// Context
 	createContext,
+	createCompiledContext,
+	CompiledContext,
+	CompiledOutlet,
+	type CompiledComponent,
 	use,
 	useContext,
 	type Context,

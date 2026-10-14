@@ -230,7 +230,7 @@ export function parseNativeSignalManifest(raw: string): NativeSignalManifest {
 	return validateNativeSignalManifest(JSON.parse(raw));
 }
 
-function validateNativeSignalManifest(value: unknown): NativeSignalManifest {
+export function validateNativeSignalManifest(value: unknown): NativeSignalManifest {
 	if (
 		value === null ||
 		typeof value !== 'object' ||

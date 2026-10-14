@@ -1,0 +1,396 @@
+// The read hooks — ports of react-router's useMatch.tsx / useParams / useSearch /
+// useLoaderData / useLoaderDeps / useRouteContext / useNavigate / useCanGoBack /
+// Matches.tsx (useMatches / useParentMatches / useChildMatches). Everything match-
+// shaped funnels through `useMatch`, which subscribes to ONE match store via
+// `router.stores.getMatchStore(routeId)`:
+//   - `from` given → that routeId's match store;
+//   - no `from` → the NEAREST match via `matchContext` (the match id the enclosing
+//     `<Match>` provided) — NOT the leaf match.
+// A missing match throws unless `shouldThrow: false` (upstream invariant).
+// Selectors run through `useStructuralSharing` (replaceEqualDeep against the
+// previous selection when `structuralSharing ?? defaultStructuralSharing`).
+import { useRef, useCallback } from 'octane';
+import { replaceEqualDeep } from '@tanstack/router-core';
+import type { useRouter as StandardUseRouter } from './context';
+import { useStore } from './useStore';
+import { splitSlot, subSlot } from './internal';
+import type {
+	AnyRouter,
+	FromPathOption,
+	RegisteredRouter,
+	ThrowConstraint,
+	ThrowOrOptional,
+	UseLoaderDataResult,
+	UseLoaderDepsResult,
+	UseNavigateResult,
+	UseParamsResult,
+	UseRouteContextOptions,
+	UseRouteContextResult,
+	UseSearchResult,
+} from '@tanstack/router-core';
+import type {
+	UseLoaderDataOptions,
+	UseLoaderDepsOptions,
+	UseLocationBaseOptions,
+	UseLocationResult,
+	UseMatchOptions,
+	UseMatchResult,
+	UseMatchesBaseOptions,
+	UseMatchesResult,
+	UseParamsOptions,
+	UseSearchOptions,
+} from './routeHookTypes';
+import type { StructuralSharingOption } from './structuralSharing';
+
+// Sentinel store + selection for "no match at this id" (upstream's dummyStore).
+const dummyStore = {
+	get() {},
+	subscribe() {
+		return { unsubscribe() {} };
+	},
+};
+
+// Selector wrapper honoring structural sharing: when enabled, the selection is
+// replaceEqualDeep'd against the previous one so deep-equal slices keep their
+// reference (no re-render). Port of react-router's useStructuralSharing.
+function useStructuralSharing(opts: any, router: any, slot: symbol | undefined) {
+	const previousResult = useRef<any>(undefined, subSlot(slot, 'ss'));
+	return (slice: any) => {
+		const selected = opts?.select ? opts.select(slice) : slice;
+		if (opts?.structuralSharing ?? router.options.defaultStructuralSharing) {
+			return (previousResult.current = replaceEqualDeep(previousResult.current, selected));
+		}
+		return selected;
+	};
+}
+
+// Both rendering entries own their contexts; the selectors and slot forwarding stay shared.
+export function createRouterHooks(
+	useRouter: typeof StandardUseRouter,
+	useNearestMatch: () => string | undefined,
+) {
+	function useMatch<
+		TRouter extends AnyRouter = RegisteredRouter,
+		const TFrom extends string | undefined = undefined,
+		TStrict extends boolean = true,
+		TThrow extends boolean = true,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts: UseMatchOptions<
+			TRouter,
+			TFrom,
+			TStrict,
+			ThrowConstraint<TStrict, TThrow>,
+			TSelected,
+			TStructuralSharing
+		>,
+	): ThrowOrOptional<UseMatchResult<TRouter, TFrom, TStrict, TSelected>, TThrow>;
+	function useMatch(opts: any, slot: symbol | undefined): any;
+	function useMatch(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const router = useRouter();
+		// octane has no rules of hooks, so the nearest-match context is read
+		// unconditionally (upstream reads a dummy context when `from` is given).
+		const nearestMatchId = useNearestMatch();
+		const routeId = opts.from ?? (nearestMatchId as string);
+		const matchStore = router.stores.getMatchStore(routeId);
+
+		const selector = useStructuralSharing(opts, router, subSlot(slot, 'm'));
+		const matchSelection = useStore(
+			matchStore ?? dummyStore,
+			(match: any) => (match ? selector(match) : dummyStore),
+			undefined,
+			subSlot(slot, 'm:us'),
+		);
+
+		if (matchSelection !== dummyStore) return matchSelection;
+		if (opts.shouldThrow ?? true) {
+			throw new Error(
+				`Invariant failed: Could not find ${
+					opts.from ? `an active match from "${opts.from}"` : 'a nearest match!'
+				}`,
+			);
+		}
+		return undefined;
+	}
+
+	function useParams<
+		TRouter extends AnyRouter = RegisteredRouter,
+		const TFrom extends string | undefined = undefined,
+		TStrict extends boolean = true,
+		TThrow extends boolean = true,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts: UseParamsOptions<
+			TRouter,
+			TFrom,
+			TStrict,
+			ThrowConstraint<TStrict, TThrow>,
+			TSelected,
+			TStructuralSharing
+		>,
+	): ThrowOrOptional<UseParamsResult<TRouter, TFrom, TStrict, TSelected>, TThrow>;
+	function useParams(opts: any, slot: symbol | undefined): any;
+	function useParams(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		return useMatch(
+			{
+				from: opts.from,
+				strict: opts.strict,
+				shouldThrow: opts.shouldThrow,
+				structuralSharing: opts.structuralSharing,
+				select: (match: any) => {
+					const params = opts.strict === false ? match.params : match._strictParams;
+					return opts.select ? opts.select(params) : params;
+				},
+			},
+			subSlot(slot, 'params'),
+		);
+	}
+
+	function useSearch<
+		TRouter extends AnyRouter = RegisteredRouter,
+		const TFrom extends string | undefined = undefined,
+		TStrict extends boolean = true,
+		TThrow extends boolean = true,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts: UseSearchOptions<
+			TRouter,
+			TFrom,
+			TStrict,
+			ThrowConstraint<TStrict, TThrow>,
+			TSelected,
+			TStructuralSharing
+		>,
+	): ThrowOrOptional<UseSearchResult<TRouter, TFrom, TStrict, TSelected>, TThrow>;
+	function useSearch(opts: any, slot: symbol | undefined): any;
+	function useSearch(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		return useMatch(
+			{
+				from: opts.from,
+				strict: opts.strict,
+				shouldThrow: opts.shouldThrow,
+				structuralSharing: opts.structuralSharing,
+				select: (match: any) => (opts.select ? opts.select(match.search) : match.search),
+			},
+			subSlot(slot, 'search'),
+		);
+	}
+
+	function useLoaderData<
+		TRouter extends AnyRouter = RegisteredRouter,
+		const TFrom extends string | undefined = undefined,
+		TStrict extends boolean = true,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts: UseLoaderDataOptions<TRouter, TFrom, TStrict, TSelected, TStructuralSharing>,
+	): UseLoaderDataResult<TRouter, TFrom, TStrict, TSelected>;
+	function useLoaderData(opts: any, slot: symbol | undefined): any;
+	function useLoaderData(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		return useMatch(
+			{
+				from: opts.from,
+				strict: opts.strict,
+				structuralSharing: opts.structuralSharing,
+				select: (match: any) => (opts.select ? opts.select(match.loaderData) : match.loaderData),
+			},
+			subSlot(slot, 'loader'),
+		);
+	}
+
+	function useLoaderDeps<
+		TRouter extends AnyRouter = RegisteredRouter,
+		const TFrom extends string | undefined = undefined,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts: UseLoaderDepsOptions<TRouter, TFrom, TSelected, TStructuralSharing>,
+	): UseLoaderDepsResult<TRouter, TFrom, TSelected>;
+	function useLoaderDeps(opts: any, slot: symbol | undefined): any;
+	function useLoaderDeps(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const { select, ...rest } = opts;
+		return useMatch(
+			{
+				...rest,
+				select: (match: any) => (select ? select(match.loaderDeps) : match.loaderDeps),
+			},
+			subSlot(slot, 'deps'),
+		);
+	}
+
+	function useRouteContext<
+		TRouter extends AnyRouter = RegisteredRouter,
+		const TFrom extends string | undefined = undefined,
+		TStrict extends boolean = true,
+		TSelected = unknown,
+	>(
+		opts: UseRouteContextOptions<TRouter, TFrom, TStrict, TSelected>,
+	): UseRouteContextResult<TRouter, TFrom, TStrict, TSelected>;
+	function useRouteContext(opts: any, slot: symbol | undefined): any;
+	function useRouteContext(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		return useMatch(
+			{
+				...opts,
+				select: (match: any) => (opts.select ? opts.select(match.context) : match.context),
+			},
+			subSlot(slot, 'ctx'),
+		);
+	}
+
+	function useLocation<
+		TRouter extends AnyRouter = RegisteredRouter,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts?: UseLocationBaseOptions<TRouter, TSelected, TStructuralSharing> &
+			StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+	): UseLocationResult<TRouter, TSelected>;
+	function useLocation(opts: any, slot: symbol | undefined): any;
+	function useLocation(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const router = useRouter();
+		return useStore(
+			router.stores.location,
+			useStructuralSharing(opts, router, subSlot(slot, 'loc')),
+			undefined,
+			subSlot(slot, 'loc:us'),
+		);
+	}
+
+	function useMatches<
+		TRouter extends AnyRouter = RegisteredRouter,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts?: UseMatchesBaseOptions<TRouter, TSelected, TStructuralSharing> &
+			StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+	): UseMatchesResult<TRouter, TSelected>;
+	function useMatches(opts: any, slot: symbol | undefined): any;
+	function useMatches(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const router = useRouter();
+		return useStore(
+			router.stores.matches,
+			useStructuralSharing(opts, router, subSlot(slot, 'matches')),
+			undefined,
+			subSlot(slot, 'matches:us'),
+		);
+	}
+
+	function useParentMatches<
+		TRouter extends AnyRouter = RegisteredRouter,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts?: UseMatchesBaseOptions<TRouter, TSelected, TStructuralSharing> &
+			StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+	): UseMatchesResult<TRouter, TSelected>;
+	function useParentMatches(opts: any, slot: symbol | undefined): any;
+	function useParentMatches(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const contextRouteId = useNearestMatch();
+		return useMatches(
+			{
+				select: (matches: any[]) => {
+					matches = matches.slice(
+						0,
+						matches.findIndex((d: any) => d.routeId === contextRouteId),
+					);
+					return opts.select ? opts.select(matches) : matches;
+				},
+				structuralSharing: opts.structuralSharing,
+			},
+			subSlot(slot, 'parents'),
+		);
+	}
+
+	function useChildMatches<
+		TRouter extends AnyRouter = RegisteredRouter,
+		TSelected = unknown,
+		TStructuralSharing extends boolean = boolean,
+	>(
+		opts?: UseMatchesBaseOptions<TRouter, TSelected, TStructuralSharing> &
+			StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+	): UseMatchesResult<TRouter, TSelected>;
+	function useChildMatches(opts: any, slot: symbol | undefined): any;
+	function useChildMatches(...args: any[]): any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const contextRouteId = useNearestMatch();
+		return useMatches(
+			{
+				select: (matches: any[]) => {
+					matches = matches.slice(matches.findIndex((d: any) => d.routeId === contextRouteId) + 1);
+					return opts.select ? opts.select(matches) : matches;
+				},
+				structuralSharing: opts.structuralSharing,
+			},
+			subSlot(slot, 'children'),
+		);
+	}
+
+	// Returns a STABLE navigate function (upstream useCallback([from, router])) that
+	// forwards to `router.navigate`, defaulting `from` to the hook's option.
+	function useNavigate<
+		TRouter extends AnyRouter = RegisteredRouter,
+		TDefaultFrom extends string = string,
+	>(options?: { from?: FromPathOption<TRouter, TDefaultFrom> }): UseNavigateResult<TDefaultFrom>;
+	function useNavigate(options: any, slot: symbol | undefined): (to: any) => any;
+	function useNavigate(...args: any[]): (to: any) => any {
+		const [user, slot] = splitSlot(args);
+		const opts = user[0] ?? {};
+		const router = useRouter(opts.router ? { router: opts.router } : undefined);
+		return useCallback(
+			(options: any) => router.navigate({ ...options, from: options?.from ?? opts.from }),
+			[opts.from, router],
+			subSlot(slot, 'nav'),
+		);
+	}
+
+	// True when the current history entry isn't the first (there is somewhere to go
+	// back to) — per upstream useCanGoBack (location.state.__TSR_index !== 0).
+	function useCanGoBack(): boolean;
+	function useCanGoBack(...args: any[]): boolean {
+		const [, slot] = splitSlot(args);
+		const router = useRouter();
+		return useStore(
+			router.stores.location,
+			(location: any) => location.state.__TSR_index !== 0,
+			undefined,
+			subSlot(slot, 'back'),
+		);
+	}
+
+	return {
+		useMatch,
+		useParams,
+		useSearch,
+		useLoaderData,
+		useLoaderDeps,
+		useRouteContext,
+		useLocation,
+		useMatches,
+		useParentMatches,
+		useChildMatches,
+		useNavigate,
+		useCanGoBack,
+	};
+}

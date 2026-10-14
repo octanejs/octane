@@ -7,6 +7,16 @@
       "reason": "Checks Octane navigation-blocker integration; it is not same-scenario React execution."
     },
     {
+      "path": "packages/tanstack-router/tests/conformance/compiled-router-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks SSR, DOM adoption, interactivity, and navigation for the opt-in Octane compiled router; it has no React oracle."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/compiled-router.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane compiled provider, outlet, route hooks, pending/error/not-found boundaries, and rejected renderables; it has no React oracle."
+    },
+    {
       "path": "packages/tanstack-router/tests/conformance/concurrent-navigation.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane concurrent navigation lifecycle; it is not same-scenario React execution."

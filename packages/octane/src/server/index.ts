@@ -59,6 +59,7 @@ export {
 	retireSignalOwnerIdentity,
 } from '../signals/owner-context.js';
 export type { SignalOwner, SignalOwnerEnvironment } from '../signals/types.js';
+export type { CompiledComponent } from '../runtime.js';
 export {
 	__registerServerFunction,
 	__serverCall,
@@ -173,6 +174,9 @@ export {
 
 	// Context
 	createContext,
+	createCompiledContext,
+	CompiledContext,
+	CompiledOutlet,
 	use,
 	useContext,
 	ssrIsSuspense,

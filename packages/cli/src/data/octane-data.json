@@ -3524,6 +3524,21 @@
       "message": "A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "344": {
+      "message": "Provide a compiled context with <CompiledContext context={context}>.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "345": {
+      "message": "CompiledContext requires compiled template children.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "346": {
+      "message": "CompiledOutlet requires a compiled component function with no returned renderable.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

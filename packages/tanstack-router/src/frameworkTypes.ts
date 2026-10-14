@@ -30,13 +30,16 @@ declare module '@tanstack/router-core' {
 	}
 
 	interface RouteExtensions<in out TId extends string, in out TFullPath extends string> {
-		useMatch: UseMatchRoute<TId>;
-		useRouteContext: UseRouteContextRoute<TId>;
-		useSearch: UseSearchRoute<TId>;
-		useParams: UseParamsRoute<TId>;
-		useLoaderDeps: UseLoaderDepsRoute<TId>;
-		useLoaderData: UseLoaderDataRoute<TId>;
-		useNavigate: () => UseNavigateResult<TFullPath>;
-		Link: LinkComponentRoute<TFullPath>;
+		// Core base routes are also valid in compiled trees and do not own bound
+		// renderer hooks. The ordinary binding's concrete Route classes provide
+		// each of these members as required properties.
+		useMatch?: UseMatchRoute<TId>;
+		useRouteContext?: UseRouteContextRoute<TId>;
+		useSearch?: UseSearchRoute<TId>;
+		useParams?: UseParamsRoute<TId>;
+		useLoaderDeps?: UseLoaderDepsRoute<TId>;
+		useLoaderData?: UseLoaderDataRoute<TId>;
+		useNavigate?: () => UseNavigateResult<TFullPath>;
+		Link?: LinkComponentRoute<TFullPath>;
 	}
 }

@@ -118,12 +118,12 @@
         {
           "path": "packages/tanstack-router/typetests/public-api.test-d.ts",
           "role": "support",
-          "sha256": "33a073f206813e20b1f896de48bd3e5ff21717bb8bf1b209eff072105896a03b"
+          "sha256": "4b4bc9bb3498ec7f5eba9f281ba564705af3b4344a2581383da7f80a81bb808b"
         },
         {
           "path": "packages/tanstack-router/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "94d0e04c4eda7c1c7e1b5fb1ef012e12f63eedcc08cfd5f9c09a237b69df31c8"
+          "sha256": "22373d341ff7d7c31cd03429ed31d941375519a8511a5dad30dc6e3670fda455"
         }
       ]
     }

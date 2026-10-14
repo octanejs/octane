@@ -12,6 +12,7 @@ import type {
 	AnyContext,
 	AnyRoute,
 	AnyRouter,
+	Constrain,
 	ConstrainLiteral,
 	ErrorComponentProps,
 	NotFoundError,
@@ -233,6 +234,96 @@ export class Route<
 	declare useLoaderData: UseLoaderDataRoute<TId>;
 	declare useNavigate: () => UseNavigateResult<TFullPath>;
 	declare Link: LinkComponentRoute<TFullPath>;
+	// These core combinators return this same binding instance. Only their
+	// children/file metadata changes; the ordinary bound methods stay available.
+	declare addChildren: <const TNewChildren>(
+		children: Constrain<TNewChildren, ReadonlyArray<AnyRoute> | Record<string, AnyRoute>>,
+	) => Route<
+		TRegister,
+		TParentRoute,
+		TPath,
+		TFullPath,
+		TCustomId,
+		TId,
+		TSearchValidator,
+		TParams,
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TNewChildren,
+		TFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>;
+	declare _addFileChildren: <const TNewChildren>(
+		children: TNewChildren,
+	) => Route<
+		TRegister,
+		TParentRoute,
+		TPath,
+		TFullPath,
+		TCustomId,
+		TId,
+		TSearchValidator,
+		TParams,
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TNewChildren,
+		TFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>;
+	declare _addFileTypes: <TNewFileRouteTypes>() => Route<
+		TRegister,
+		TParentRoute,
+		TPath,
+		TFullPath,
+		TCustomId,
+		TId,
+		TSearchValidator,
+		TParams,
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TChildren,
+		TNewFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>;
+	declare lazy: (
+		...args: Parameters<
+			RouteCore<
+				TRegister,
+				TParentRoute,
+				TPath,
+				TFullPath,
+				TCustomId,
+				TId,
+				TSearchValidator,
+				TParams,
+				TRouterContext,
+				TRouteContextFn,
+				TBeforeLoadFn,
+				TLoaderDeps,
+				TLoaderFn,
+				TChildren,
+				TFileRouteTypes,
+				TSSR,
+				TServerMiddlewares,
+				THandlers
+			>['lazy']
+		>
+	) => this;
 
 	/** @deprecated Use the `createRoute` function instead. */
 	constructor(
@@ -313,6 +404,96 @@ export class RootRoute<
 	declare useLoaderData: UseLoaderDataRoute<RootRouteId>;
 	declare useNavigate: () => UseNavigateResult<'/'>;
 	declare Link: LinkComponentRoute<'/'>;
+	// These core combinators return this same binding instance. Only their
+	// children/file metadata changes; the ordinary bound methods stay available.
+	declare addChildren: <const TNewChildren>(
+		children: Constrain<TNewChildren, ReadonlyArray<AnyRoute> | Record<string, AnyRoute>>,
+	) => Route<
+		TRegister,
+		any,
+		'/',
+		'/',
+		string,
+		RootRouteId,
+		TSearchValidator,
+		{},
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TNewChildren,
+		TFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>;
+	declare _addFileChildren: <const TNewChildren>(
+		children: TNewChildren,
+	) => Route<
+		TRegister,
+		any,
+		'/',
+		'/',
+		string,
+		RootRouteId,
+		TSearchValidator,
+		{},
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TNewChildren,
+		TFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>;
+	declare _addFileTypes: <TNewFileRouteTypes>() => Route<
+		TRegister,
+		any,
+		'/',
+		'/',
+		string,
+		RootRouteId,
+		TSearchValidator,
+		{},
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TChildren,
+		TNewFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>;
+	declare lazy: (
+		...args: Parameters<
+			RouteCore<
+				TRegister,
+				any,
+				'/',
+				'/',
+				string,
+				RootRouteId,
+				TSearchValidator,
+				{},
+				TRouterContext,
+				TRouteContextFn,
+				TBeforeLoadFn,
+				TLoaderDeps,
+				TLoaderFn,
+				TChildren,
+				TFileRouteTypes,
+				TSSR,
+				TServerMiddlewares,
+				THandlers
+			>['lazy']
+		>
+	) => this;
 
 	/** @deprecated Use `createRootRoute()` instead. */
 	constructor(
