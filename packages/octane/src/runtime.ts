@@ -2043,6 +2043,7 @@ function replayNativeUnpublishedRefs(capture: OffscreenCapture, owner: RootRende
 			ref: skipped.ref === attachLiveFragmentRef ? attachLiveFragmentRef : entry.ref,
 			el: entry.el,
 			block: entry.scope.block,
+			op: 0,
 		});
 		queued.add(entry.el);
 	}
@@ -4086,6 +4087,8 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean)
  */
 let COMMITTING_OWNER: RootRenderOwner | null = null;
 let COMMITTING_GENERATION = 0;
+/** The index of the commit op running, recorded by the refs it queues (RefAttach.op). */
+let COMMIT_OP = 0;
 
 interface RootRenderOwner {
 	current: Block | null;
@@ -5301,6 +5304,8 @@ function commitRootRenders(): void {
 				// The mutation phase precedes the incoming ref/layout publication.
 				let acceptedGeneration = owner.generation;
 				const ops = transaction.ops;
+				// A ref a commit op queues joins the render's at the op's place.
+				const refsAt = refAttachQueue.length;
 				if (ops.length !== 0) {
 					const previousOwner = COMMITTING_OWNER;
 					const previousGeneration = COMMITTING_GENERATION;
@@ -5310,6 +5315,7 @@ function commitRootRenders(): void {
 						for (let i = 0; i < ops.length; i += 2) {
 							if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
 							const target = ops[i + 1];
+							COMMIT_OP = i;
 							try {
 								// A commit function's `careful` flag, as bagDone passes it.
 								ops[i](
@@ -5339,6 +5345,7 @@ function commitRootRenders(): void {
 						ops.length = 0;
 						COMMITTING_OWNER = previousOwner;
 						COMMITTING_GENERATION = previousGeneration;
+						COMMIT_OP = 0;
 						// Everything this commit retired has left the document (retireEventHostTree).
 						if (previousOwner === null) retiringHostsSince = 0;
 					}
@@ -5348,7 +5355,9 @@ function commitRootRenders(): void {
 					discardOffscreenCapture(transaction.capture);
 					continue;
 				}
+				const split = refAttachQueue.length;
 				spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
+				if (split > refsAt) placeCommitRefs(refsAt, split);
 				if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
 					// A successful replacement may remove a still-dormant leased view.
 					HYDRATION_DRIVER!.retireDetachedBindingLeases(owner);
@@ -7616,6 +7625,28 @@ interface RefAttach {
 	ref: any;
 	el: Element | FragmentInstance;
 	block: Block | null;
+	/**
+	 * Its place in its root render: how many commit ops that render had queued,
+	 * or the index of the commit op that queued it.
+	 */
+	op: number;
+}
+
+/**
+ * A committed host changes its ref at commit, so its attach queues ahead of
+ * every ref its render queued, which spliceOffscreenCapture appends at
+ * `split`. React attaches them all in tree order: move each ref the commit
+ * ops queued (from `from`) to its op's place among the render's, after those
+ * queued before that op.
+ */
+function placeCommitRefs(from: number, split: number): void {
+	const refs = refAttachQueue;
+	let write = from;
+	let read = split;
+	for (const moved of refs.slice(from, split)) {
+		while (read < refs.length && refs[read].op <= moved.op) refs[write++] = refs[read++];
+		refs[write++] = moved;
+	}
 }
 
 interface SuspenseRefEntry {
@@ -10369,10 +10400,12 @@ export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentIns
 	}
 
 	activityRefCreated?.(scope.block, el);
+	const transaction = ROOT_RENDER_TRANSACTION;
 	const entry: RefAttach = {
 		ref,
 		el,
 		block: scope.block,
+		op: transaction !== null ? transaction.ops.length : COMMIT_OP,
 	};
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push(entry);
 	if (WIP_CAPTURE === null && NATIVE_READ_DRIVER) {
