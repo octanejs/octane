@@ -1,6 +1,6 @@
 ---
-'octane': minor
-'@octanejs/tanstack-router': minor
+'octane': patch
+'@octanejs/tanstack-router': patch
 ---
 
 Support checked compiled-only dynamic component and context boundaries on the client and server. Streamed document signal bootstrap validates already-parsed signal manifests directly.
