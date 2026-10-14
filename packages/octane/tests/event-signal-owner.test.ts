@@ -338,6 +338,38 @@ function bundleProps(invoke: (...values: unknown[]) => void, wait = () => {}) {
 }
 
 describe('explicit ownership of compiler-lifted native handlers', () => {
+	it('updates a lifted handler argument on a wide host without changing its callback or owner', () => {
+		const owner = createScope({ scopeKey: 'wide-captured-values' });
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		const seen: { owner: SignalOwner | null; values: unknown[] }[] = [];
+		const invoke = (...values: unknown[]) => seen.push({ owner: currentSignalOwner(), values });
+		const props = bundleProps(invoke);
+		try {
+			runWithSignalOwner(owner, () => root.render(bundles.BundleOwner2, props));
+			const button = container.querySelector('button')!;
+			const host = button.parentElement!;
+			button.click();
+			runWithSignalOwner(owner, () =>
+				flushSync(() => root.render(bundles.BundleOwner2, { ...props, other: 'new' })),
+			);
+			expect(container.querySelector('button')).toBe(button);
+			expect(host.getAttribute('data-value-i')).toBe('valuei');
+			expect(host.getAttribute('data-other-h')).toBe('newh');
+			button.click();
+			expect(seen).toEqual([
+				{ owner, values: ['value', 'other'] },
+				{ owner, values: ['value', 'new'] },
+			]);
+			expect(currentSignalOwner()).toBeNull();
+		} finally {
+			root.unmount();
+			owner.dispose();
+			container.remove();
+		}
+	});
+
 	it.each(bundleCases.flatMap((entry) => [false, true].map((hydrate) => ({ ...entry, hydrate }))))(
 		'refreshes ownership even when callback and captures are unchanged ($kind, hydrate=$hydrate)',
 		({ Button, ServerButton, args, hydrate }) => {

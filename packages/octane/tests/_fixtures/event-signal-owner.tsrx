@@ -86,7 +86,25 @@ export function BundleOwner1({ invoke, value, wait }: BundleOwnerProps) @{
 export function BundleOwner2({ invoke, value, other, wait }: BundleOwnerProps) @{
 	<section>
 		@try {
-			<div>
+			<div
+				data-value-a={value + 'a'}
+				data-value-b={value + 'b'}
+				data-value-c={value + 'c'}
+				data-value-d={value + 'd'}
+				data-value-e={value + 'e'}
+				data-value-f={value + 'f'}
+				data-value-g={value + 'g'}
+				data-value-h={value + 'h'}
+				data-value-i={value + 'i'}
+				data-other-a={other + 'a'}
+				data-other-b={other + 'b'}
+				data-other-c={other + 'c'}
+				data-other-d={other + 'd'}
+				data-other-e={other + 'e'}
+				data-other-f={other + 'f'}
+				data-other-g={other + 'g'}
+				data-other-h={other + 'h'}
+			>
 				<button onClick={() => invoke(value, other)}>read</button>
 				@{
 					wait();

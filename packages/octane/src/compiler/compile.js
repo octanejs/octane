@@ -29033,7 +29033,14 @@ function planJsx(
 	// DOM hosts, subscription tokens and optimistic text nodes increase the
 	// allocation bag but are not bindings. Only independently changed bindings
 	// can repay the sparse reads (a keyed JSX row has 17 slots but only 5).
-	bag.sparsePreparation = templateBindings.length + templateTextHoles.length > BAG_FACTORY_MAX;
+	// Event writers also share one owner and must read the accepted values if
+	// only that owner changes. Their extra presence/fallback checks don't earn
+	// sparse preparation for an otherwise narrow host/text payload. They still
+	// participate in sparse deltas when the actual host/text payload is wide.
+	const hostBindings = templateBindings.filter(
+		(binding) => binding.kind !== 'event' && binding.kind !== 'event-bundle',
+	);
+	bag.sparsePreparation = hostBindings.length + templateTextHoles.length > BAG_FACTORY_MAX;
 	const templateCommit =
 		templateBindings.length === 0 && templateTextHoles.length === 0
 			? null
@@ -29102,6 +29109,14 @@ function planJsx(
 					b.id(templateCommit),
 					[b.id('_b'), b.id('_p'), b.id('__s'), b.id('__eventOwner')],
 					b.block([
+						...(templateHasEvents && bag.sparsePreparation
+							? [
+									b.const(
+										'_ownsEventOwner',
+										b.binary('in', b.literal(bag.letter('_eventOwner')), b.id('_p')),
+									),
+								]
+							: []),
 						...templateBindings.map((binding) => emitPreparedBindingCommit(binding, bag)),
 						...templateTextHoles.map((cc) => {
 							const field = bag.letter(`_chp$${cc.id}`);
@@ -29138,13 +29153,17 @@ function planJsx(
 						}),
 						...(templateHasEvents
 							? [
-									b.stmt(
-										b.assignment(
-											'=',
-											bagFieldNode(bag, '_eventOwner'),
-											bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner'))),
-										),
-									),
+									bag.sparsePreparation
+										? b.if(
+												b.id('_ownsEventOwner'),
+												b.stmt(
+													b.assignment('=', bagFieldNode(bag, '_eventOwner'), b.id('__eventOwner')),
+												),
+												null,
+											)
+										: b.stmt(
+												b.assignment('=', bagFieldNode(bag, '_eventOwner'), b.id('__eventOwner')),
+											),
 								]
 							: []),
 					]),
@@ -31939,12 +31958,35 @@ function emitPreparedBindingCommit(bind, bag) {
 		return emitPreparedBindingWriter(bind, bag, field, prefix);
 	}
 
-	const present = [b.binary('in', b.literal(field), b.id('_p'))];
 	if (bind.kind === 'event' || bind.kind === 'event-bundle') {
-		present.push(b.binary('in', b.literal(bag.letter('_eventOwner')), b.id('_p')));
+		// Preparing an event always saves the handler and all of its arguments
+		// together. Select the bag, not cached values: a preceding host setter
+		// may have synchronously updated the accepted bag before this writer.
+		return inheritOriginLoc(
+			b.block([
+				b.const(
+					'_eventValues',
+					b.conditional(b.binary('in', b.literal(field), b.id('_p')), b.id('_p'), b.id('_b')),
+				),
+				b.if(
+					b.logical(
+						'||',
+						b.binary('!==', b.id('_eventValues'), b.id('_b')),
+						b.id('_ownsEventOwner'),
+					),
+					b.block([emitPreparedBindingWriter(bind, bag, field, prefix)]),
+					null,
+				),
+			]),
+			bindingOrigin(bind),
+		);
 	}
 	return inheritOriginLoc(
-		b.if(orChain(present), b.block([emitPreparedBindingWriter(bind, bag, field, prefix)]), null),
+		b.if(
+			b.binary('in', b.literal(field), b.id('_p')),
+			b.block([emitPreparedBindingWriter(bind, bag, field, prefix)]),
+			null,
+		),
 		bindingOrigin(bind),
 	);
 }
@@ -31952,10 +31994,15 @@ function emitPreparedBindingCommit(bind, bag) {
 function emitPreparedBindingWriter(bind, bag, field, prefix) {
 	const org = bindingOrigin(bind);
 	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
-	const pending = () =>
-		bind.kind === 'event' || bind.kind === 'event-bundle'
-			? bag.preparedRead(b.member(b.id('_p'), field))
-			: b.member(b.id('_p'), field);
+	const eventValues =
+		bag.sparsePreparation && (bind.kind === 'event' || bind.kind === 'event-bundle')
+			? '_eventValues'
+			: '_p';
+	const pending = () => b.member(b.id(eventValues), field);
+	const ownerChanged = () => {
+		const differs = b.binary('!==', bagFieldNode(bag, '_eventOwner'), b.id('__eventOwner'));
+		return bag.sparsePreparation ? b.logical('&&', b.id('_ownsEventOwner'), differs) : differs;
+	};
 	const prepared = () => b.member(b.id('_p'), `_value$${field}`);
 	let write;
 	if (
@@ -32080,25 +32127,21 @@ function emitPreparedBindingWriter(bind, bag, field, prefix) {
 	if (bind.kind === 'event-bundle') {
 		const n = bind.argExprs.length;
 		const fields = bind.argExprs.map((_, i) => bag.letter(`_arg$${bind.id}_${i}`));
-		const args = fields.map((field) => bag.preparedRead(b.member(b.id('_p'), field)));
+		const args = fields.map((field) => b.member(b.id(eventValues), field));
 		const values = n <= 2 ? args : [b.array(args)];
 		const arity = n <= 2 ? String(n) : 'N';
 		return inheritOriginLoc(
 			b.if(
 				orChain([
 					b.binary('!==', F('_prev'), pending()),
-					b.binary(
-						'!==',
-						bagFieldNode(bag, '_eventOwner'),
-						bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner'))),
-					),
+					ownerChanged(),
 					...fields.map((field) =>
 						b.unary(
 							'!',
 							b.call(
 								'_$hookMemoEqual',
 								b.member(b.id('_b'), field),
-								bag.preparedRead(b.member(b.id('_p'), field)),
+								b.member(b.id(eventValues), field),
 							),
 						),
 					),
@@ -32135,11 +32178,7 @@ function emitPreparedBindingWriter(bind, bag, field, prefix) {
 					b.stmt(b.assignment('=', F('_prev'), pending())),
 					...fields.map((field) =>
 						b.stmt(
-							b.assignment(
-								'=',
-								b.member(b.id('_b'), field),
-								bag.preparedRead(b.member(b.id('_p'), field)),
-							),
+							b.assignment('=', b.member(b.id('_b'), field), b.member(b.id(eventValues), field)),
 						),
 					),
 				]),
@@ -32165,15 +32204,7 @@ function emitPreparedBindingWriter(bind, bag, field, prefix) {
 			b.if(
 				orChain([
 					b.binary('!==', F(prefix), pending()),
-					...(bind.kind === 'event'
-						? [
-								b.binary(
-									'!==',
-									bagFieldNode(bag, '_eventOwner'),
-									bag.preparedRead(b.member(b.id('_p'), bag.letter('_eventOwner'))),
-								),
-							]
-						: []),
+					...(bind.kind === 'event' ? [ownerChanged()] : []),
 				]),
 				b.block([b.stmt(write), b.stmt(b.assignment('=', F(prefix), pending()))]),
 				null,

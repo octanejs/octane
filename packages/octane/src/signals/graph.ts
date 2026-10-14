@@ -821,6 +821,17 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			candidate.run(() => candidate.write(this, value));
 			return;
 		}
+		// Unchanged plain values have no graph work to flush. Held writes and
+		// updaters still owe their cancellation/computation even if values match.
+		if (
+			!candidateHooks.urgentWrite &&
+			this instanceof WritableScopedNode &&
+			this.valueOnly &&
+			typeof value !== 'function' &&
+			Object.is(this.last, value) &&
+			!(this.flags & (REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED))
+		)
+			return;
 		signalBatch(() => {
 			refresh(this);
 			const writable = this instanceof WritableScopedNode ? this : undefined;
@@ -854,15 +865,15 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	latest(): T | undefined;
 	latest<F>(fallback: F): T | F;
 	latest<F>(fallback?: F): T | F | undefined {
-		const state = readNode(this, 'latest');
-		if (state.snapshot.status === 'ready') return state.snapshot.value;
+		const snapshot = readNode(this, 'latest').snapshot;
+		if (snapshot.status === 'ready') return snapshot.value;
 		if (
-			state.snapshot.status === 'error' &&
-			(state.snapshot.error instanceof ScopeDisposedError ||
-				state.snapshot.error instanceof SignalFrameError ||
-				isNativeAdoptionMiss(state.snapshot.error))
+			snapshot.status === 'error' &&
+			(snapshot.error instanceof ScopeDisposedError ||
+				snapshot.error instanceof SignalFrameError ||
+				isNativeAdoptionMiss(snapshot.error))
 		) {
-			throw state.snapshot.error;
+			throw snapshot.error;
 		}
 		return fallback;
 	}
@@ -1127,6 +1138,7 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 function refresh(node: ScopedNode): void {
 	assertAlive(node.owner);
 	if (node.evaluating) throw new SignalCycleError(node.key);
+	if (!(node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED))) return;
 	// Dirty dependency checks may execute an async description and its loader
 	// before derivedState runs. They belong to the same pure read boundary as
 	// the computation, including when this derived value was previously cached.

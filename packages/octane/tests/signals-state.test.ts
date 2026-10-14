@@ -113,6 +113,20 @@ describe('scoped synchronous signals', () => {
 		expect(Object.is(values[1], -0)).toBe(true);
 	});
 
+	it('still invokes a setter function when that exact function is the stored value', () => {
+		type Value = { result: string } | ((previous: Value) => Value);
+		const scope = owner();
+		const replace = (previous: Value): Value =>
+			previous === replace ? { result: 'called with current function' } : previous;
+		const value$ = scope.signal$<Value>('function', replace);
+		expect(value$.get()).toBe(replace);
+		const captured = value$.snapshot();
+		value$.set(replace);
+		expect(value$.get()).toEqual({ result: 'called with current function' });
+		expect(value$.latest()).toEqual({ result: 'called with current function' });
+		expect(captured).toMatchObject({ status: 'ready', value: replace });
+	});
+
 	it('does not turn undefined, null, empty text, or false into pending', () => {
 		const scope = owner();
 		for (const [index, value] of [undefined, null, '', false].entries()) {
