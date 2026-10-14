@@ -37,6 +37,6 @@ an independent `<Hydrate>` island's. Head metadata folded into a fragment root
 comes before it, so `head + html` under `headChannel: 'separate'` is still the
 folded output. The comment stays in the DOM, as the range comments do. A root
 whose server rendered another version, or named none, renders on the client and
-reports error 345 through `onRecoverableError`; a root that hydrates an app
+reports error 348 through `onRecoverableError`; a root that hydrates an app
 container inside a server-rendered document finds the version before `<html>`.
 Deploy the server and the client from the same Octane version.
