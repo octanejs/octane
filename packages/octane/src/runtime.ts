@@ -50633,6 +50633,7 @@ function hydrateRootWithOutputHandler(
 		const previousNative = setNativeAdoptionResolver(null);
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
+		let teardown: (() => void) | null = null;
 		try {
 			if (protocolSkew) throw new HydrationMismatch(formatClientError(345));
 			if (owner.initialDocumentSignals !== undefined && NATIVE_SIGNAL_HYDRATION)
@@ -50683,9 +50684,11 @@ function hydrateRootWithOutputHandler(
 					retryPresentationMiss(error, retry);
 				} else {
 					owner.preservePresentation = true;
-					root.unmount();
-					if (!Object.prototype.hasOwnProperty.call(error, 'failure')) throw error;
-					if (!reportUncaughtError(rootBlock, error.failure)) throw error.failure;
+					teardown = () => {
+						root.unmount();
+						if (!Object.prototype.hasOwnProperty.call(error, 'failure')) throw error;
+						if (!reportUncaughtError(rootBlock, error.failure)) throw error.failure;
+					};
 				}
 			} else if (error instanceof NativeAdoptionMiss) {
 				nativeRecovery = error;
@@ -50697,14 +50700,15 @@ function hydrateRootWithOutputHandler(
 				} catch (unhandled) {
 					rollbackRootRender(owner.transaction!);
 					unmountBlock(rootBlock, false);
-					clearRootContainer(container);
-					if (!reportUncaughtError(rootBlock, unhandled)) throw unhandled;
-					return;
+					teardown = () => {
+						clearRootContainer(container);
+						if (!reportUncaughtError(rootBlock, unhandled)) throw unhandled;
+					};
 				}
 				// An unowned root keeps the server screen while its wakeable is
 				// pending. A hosted root still belongs to the external renderer's
 				// retry protocol and must release its claim/delegation registration.
-				if (owner.wakeable === null) root.unmount();
+				if (teardown === null && owner.wakeable === null) teardown = () => root.unmount();
 			}
 		} finally {
 			setNativeAdoptionResolver(previousNative);
@@ -50712,6 +50716,12 @@ function hydrateRootWithOutputHandler(
 			if (previousHydration === null) clearHydrationThrow();
 			endRootRender(frame);
 			if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
+		}
+		// A root the attempt gave up on releases its DOM once its render has
+		// closed: rendering writes none.
+		if (teardown !== null) {
+			teardown();
+			return;
 		}
 		if (nativeRecovery !== undefined && !owner.disposed) {
 			installHydrationFallback(
