@@ -12,3 +12,6 @@ afterEach(() => {
 });
 
 if (process.env.OCTANE_HYDRATION_PROBE_AUDIT) await import('./_hydration-probe-audit.js');
+// ViewTransition writer audit (#2043, `pnpm test:vt-staging-off`): drains run
+// without DOM staging, so a render-time write to committed DOM fails its test.
+if (process.env.OCTANE_VT_STAGING_OFF) (globalThis as any).__OCTANE_VT_STAGING_OFF__ = true;

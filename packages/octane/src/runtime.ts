@@ -9932,6 +9932,13 @@ function vtFlush(
 		stage.enqueue(action, durable),
 	);
 	STAGED_DOM = stage;
+	// Development tests can run the drain unstaged (OCTANE_VT_STAGING_OFF,
+	// tests/_per-test-setup.ts): what still writes at render then fails its
+	// test instead of staging (#2043). Production builds drop this block.
+	if (process.env.NODE_ENV !== 'production' && (globalThis as any).__OCTANE_VT_STAGING_OFF__) {
+		STAGED_DOM = null;
+		STAGED_COMMIT_CAPTURE = stagedCommit.parent;
+	}
 	// An interruption the drain itself causes waits for the drain's end.
 	let draining = true;
 	let interruptRequested = false;
