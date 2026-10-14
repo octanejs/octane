@@ -826,10 +826,11 @@ const sideEffectImport = (from) =>
 		ts.factory.createImportDeclaration(undefined, undefined, ts.factory.createStringLiteral(from)),
 	);
 
-// An import that only orders evaluation. A bare import of a side-effect-free
-// module draws an esbuild warning, and a named one an unused-import error, so
-// it names nothing; verbatimModuleSyntax keeps it through every transpile.
-const orderImport = (from) => importDeclaration(from, []);
+// A link that only orders evaluation: an empty re-export. A bare import of a
+// side-effect-free module draws an esbuild warning, a named one is an unused
+// import, and an ESTree printer rewrites `import {} from` as a bare import.
+// verbatimModuleSyntax keeps it through every transpile.
+const orderLink = (from) => exportDeclaration(from, [], false);
 
 function wrap(text, width = 77) {
 	const lines = [];
@@ -1041,7 +1042,7 @@ export function emit(model, map, moduleOf, chain) {
 		}
 		const link =
 			previous && !fromModules.get(previous)?.some((s) => !s.type)
-				? `// Evaluates after the module it imports; runtime.ts explains the chain.\n${orderImport(base(previous))}`
+				? `// Evaluates after the module it names; runtime.ts explains the chain.\n${orderLink(base(previous))}`
 				: null;
 		const moduleOrder = [...fromModules.keys()].sort(
 			(a, b) =>
@@ -1092,11 +1093,11 @@ export function emit(model, map, moduleOf, chain) {
 			.filter((c, i, all) => all.indexOf(c) === i && !model.header.includes(c));
 		// A bare import in runtime.ts stays bare; any other is only an order pin here.
 		const pin =
-			ts.isImportDeclaration(st) && !st.importClause ? sideEffectImport(from) : orderImport(from);
+			ts.isImportDeclaration(st) && !st.importClause ? sideEffectImport(from) : orderLink(from);
 		pins.push([...comments, pin].join('\n'));
 	}
 	const tail = chain.at(-1);
-	pins.push(orderImport(`./${map.directory}/${path.basename(info.get(tail).file, '.ts')}.js`));
+	pins.push(orderLink(`./${map.directory}/${path.basename(info.get(tail).file, '.ts')}.js`));
 	facade.push(pins.join('\n'));
 	const exportsByModule = new Map();
 	for (const unit of model.units)

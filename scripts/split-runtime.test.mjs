@@ -223,7 +223,7 @@ test('the split moves text unchanged, exports what other modules name, and keeps
 	assert.doesNotMatch(core, /from ["']\.\/extras\.js["']/);
 	assert.match(
 		extras,
-		/^\/\/ The extras module\.\n\n\/\/ Evaluates after [^\n]*\nimport \{\} from ["']\.\/core\.js["'];$/m,
+		/^\/\/ The extras module\.\n\n\/\/ Evaluates after [^\n]*\nexport \{\} from ["']\.\/core\.js["'];$/m,
 	);
 	// Ambient declarations are copied where they are named; relative paths move.
 	assert.match(core, /declare const process/);
@@ -238,7 +238,7 @@ test('the split moves text unchanged, exports what other modules name, and keeps
 	assert.match(facade, /^\/\*\*\n \* Fixture runtime\.\n \*\//);
 	assert.match(
 		facade,
-		/import \{\} from ["']\.\/helper\.js["'];\nimport \{\} from ["']\.\/runtime\/extras\.js["'];/,
+		/export \{\} from ["']\.\/helper\.js["'];\nexport \{\} from ["']\.\/runtime\/extras\.js["'];/,
 	);
 	assert.doesNotMatch(facade, /from ["']\.\/types\.js["'];/);
 	assert.match(facade, /export \{ core, install, SENTINEL \} from ["']\.\/runtime\/core\.js["'];/);

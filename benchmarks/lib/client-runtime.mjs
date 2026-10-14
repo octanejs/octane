@@ -56,16 +56,22 @@ export function readClientRuntime(file = RUNTIME, ref) {
 		return moved.startsWith('.') ? moved : `./${moved}`;
 	};
 
-	// Evaluation order: each module's first import is the one before it, and
-	// runtime.ts imports the last. Modules off that chain load first.
-	const imports = (sf) => sf.statements.filter(ts.isImportDeclaration);
-	let cursor = imports(facade)
+	// Evaluation order: each module first names the one before it, by an import
+	// or an empty re-export, and runtime.ts names the last. Modules off that
+	// chain load first.
+	const links = (sf) =>
+		sf.statements.filter(
+			(st) => (ts.isImportDeclaration(st) || ts.isExportDeclaration(st)) && st.moduleSpecifier,
+		);
+	const isOrderLink = (st) =>
+		ts.isExportDeclaration(st) && st.exportClause?.elements.length === 0 && st.moduleSpecifier;
+	let cursor = links(facade)
 		.map((st) => resolve(facadeFile, st.moduleSpecifier.text))
 		.findLast((target) => modules.has(target));
 	const chain = [];
 	while (modules.has(cursor) && !chain.includes(cursor)) {
 		chain.unshift(cursor);
-		const first = imports(modules.get(cursor))[0];
+		const first = links(modules.get(cursor))[0];
 		cursor = first && resolve(cursor, first.moduleSpecifier.text);
 	}
 	const order = [...[...modules.keys()].filter((f) => !chain.includes(f)), ...chain];
@@ -73,24 +79,24 @@ export function readClientRuntime(file = RUNTIME, ref) {
 	// runtime.ts's surface; a module declaration exports only a name on it.
 	const surface = new Set();
 	const facadeKept = [];
-	for (const st of facade.statements) {
-		if (!ts.isExportDeclaration(st)) continue;
-		if (!modules.has(st.moduleSpecifier && resolve(facadeFile, st.moduleSpecifier.text)))
-			facadeKept.push(st.getText());
-		else for (const el of st.exportClause.elements) surface.add((el.propertyName ?? el.name).text);
-	}
-
 	// External imports, merged per source in runtime.ts's pin order.
 	const external = new Map();
-	for (const st of imports(facade))
-		if (!modules.has(resolve(facadeFile, st.moduleSpecifier.text)))
-			external.set(st.moduleSpecifier.text, { bare: !st.importClause, names: new Map() });
+	for (const st of facade.statements) {
+		const target = st.moduleSpecifier && resolve(facadeFile, st.moduleSpecifier.text);
+		if (ts.isImportDeclaration(st) || isOrderLink(st)) {
+			if (!modules.has(target))
+				external.set(st.moduleSpecifier.text, { bare: !st.importClause, names: new Map() });
+		} else if (!ts.isExportDeclaration(st)) continue;
+		else if (!modules.has(target)) facadeKept.push(st.getText());
+		else for (const el of st.exportClause.elements) surface.add((el.propertyName ?? el.name).text);
+	}
 	const body = [];
 	const ambient = new Set();
 	for (const file of order) {
 		const sf = modules.get(file);
 		const text = sf.getFullText();
 		for (const st of sf.statements) {
+			if (isOrderLink(st)) continue;
 			if (ts.isImportDeclaration(st)) {
 				if (modules.has(resolve(file, st.moduleSpecifier.text))) continue;
 				const spec = fromSource(file, st.moduleSpecifier.text);
