@@ -4623,6 +4623,9 @@ function queueFrontier(owner: Block | null, parent: Node, before: Node | null): 
 	return openFrontier(next, owner, parent, before);
 }
 
+/** A detached arm root's members: none, and nothing adds any (it has no fragment). */
+const NO_MEMBERS: any[] = [];
+
 /** Committed frontiers, empty again: the next renders reuse them (applyNext). */
 const SPARE_FRONTIERS: DocumentFragment[] = [];
 
@@ -4725,20 +4728,11 @@ function applyNext(next: SlotNext): void {
 	}
 	applyOutgoing(out, parent);
 	const members = next.members;
-	const root = next.root;
-	if (root !== null) {
-		// A branch arm's detached root lands alone; nothing names a fragment.
-		if (next.owner!.disposed) return;
-		parent.insertBefore(root, before);
-		const bound = next.bound;
-		if (bound !== null)
-			replaceSharedBlockBoundary(bound[0], bound[1], bound[2], bound[3], bound[4]);
-		return;
-	}
 	// A deletion cleanup can unmount the slot's owner before its content lands.
 	if (members === null || next.owner!.disposed) return;
 	const frag = next.frag;
-	if (frag !== null) parent.insertBefore(frag, before);
+	// A branch arm's detached root lands alone, with no members to rehome.
+	if (frag !== null || next.root !== null) parent.insertBefore(frag ?? next.root!, before);
 	for (let i = 0; i < members.length; i += 2) {
 		const member = members[i];
 		const from = members[i + 1];
@@ -45191,6 +45185,7 @@ function swapBranchFrontier(
 			landing.parent = domParent;
 			landing.before = before;
 			landing.owner = owningBlock(parentBlock);
+			landing.members = NO_MEMBERS;
 			// commitBag self-marked the arm with its root, which lands at commit. A
 			// first arm that suspended before its root lands where its anchor is.
 			if (arm.endMarker !== end) landing.root = arm.startMarker;
