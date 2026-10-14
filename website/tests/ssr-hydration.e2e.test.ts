@@ -1579,10 +1579,27 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 						getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
 				);
 
-				await page.click('.on-this-page a[href="#rspack"]');
-				// The first click intentionally starts collapsing the mobile panel. Fire
-				// the competing Link activation through the DOM so this cancellation
-				// test does not race Playwright's hit-testing against that CSS animation.
+				await page.evaluate(async () => {
+					const panel = document.querySelector('.sidebar-panel')!;
+					await Promise.allSettled(panel.getAnimations().map((animation) => animation.finished));
+				});
+				// Hold the real closing animation until the replacement document wins.
+				// Separate browser actions otherwise let the close finish first on a
+				// busy runner, which exercises a completed jump rather than cancellation.
+				const closingAnimations = await page.evaluateHandle(async () => {
+					const panel = document.querySelector<HTMLElement>('.sidebar-panel')!;
+					panel.style.transitionDuration = '60s';
+					document.querySelector<HTMLElement>('.on-this-page a[href="#rspack"]')!.click();
+					await new Promise(requestAnimationFrame);
+					const animations = panel.getAnimations();
+					for (const animation of animations) animation.pause();
+					return animations;
+				});
+				expect(await closingAnimations.evaluate((animations) => animations.length)).toBeGreaterThan(
+					0,
+				);
+				expect(await page.evaluate(() => location.hash)).toBe('');
+				// The closing panel cannot be hit-tested; activate its real router Link.
 				await page.locator('.sidebar-link[href="/docs/quick-start"]').dispatchEvent('click');
 				await page.waitForFunction(
 					() =>
@@ -1592,9 +1609,14 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 
-				// Let the superseded panel-close promise settle. It must not append the
-				// old page's section hash or move the replacement document afterward.
-				await page.waitForTimeout(400);
+				// Release the superseded close. It must not append the old page's
+				// section hash or move the replacement document afterward.
+				await closingAnimations.evaluate(async (animations) => {
+					for (const animation of animations) animation.finish();
+					await Promise.allSettled(animations.map((animation) => animation.finished));
+				});
+				await closingAnimations.dispose();
+				await page.evaluate(() => new Promise(requestAnimationFrame));
 				expect(await page.evaluate(() => location.hash)).toBe('');
 				expect(await page.evaluate(() => scrollY)).toBe(0);
 				const real = errors.filter((error) => !error.includes('Failed to load resource'));
