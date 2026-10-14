@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import rspack, { type Compiler, type Configuration, type RuleSetRule } from '@rspack/core';
 import { afterEach, describe, expect, it } from 'vitest';
+import { HYDRATION_VERSION_MARKER } from '../../octane/src/hydration-markers.js';
 import type { OctaneRspackPluginOptions } from '../types/index.js';
 import {
 	compile,
@@ -177,7 +178,7 @@ function expectRenderedClasses(output: ReturnType<typeof readBuild>, changed: bo
 	const module = serverModule(output);
 	expect(module.isFrozen()).toBe(!changed);
 	expect(module.render()).toBe(
-		`<main class="mapped_root"><span class="${changed ? 'changed_label' : 'mapped_label'}">cache</span><i class="${changed ? 'changed_tail' : 'mapped_tail'}"></i></main>`,
+		`<main class="mapped_root"><span class="${changed ? 'changed_label' : 'mapped_label'}">cache</span><i class="${changed ? 'changed_tail' : 'mapped_tail'}"></i></main><!--${HYDRATION_VERSION_MARKER}-->`,
 	);
 	expect(output.cssSource).toContain('.mapped_root');
 	expect(output.cssSource).toContain('.changed_label');
