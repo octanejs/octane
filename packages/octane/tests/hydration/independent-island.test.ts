@@ -74,6 +74,13 @@ describe('independent hydration bootstrap', () => {
 		),
 	)('replays commands after the controlled primary commits (%j)', async (variant) => {
 		const { dev, primary, write } = variant;
+		const delayingReplay = write === 'live' && primary !== 'removed';
+		// A slow frame leaves passive replays outstanding even after the primary
+		// has committed. A click on its fresh DOM must queue behind the old intent.
+		if (delayingReplay)
+			vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+				setTimeout(() => callback(performance.now()), 200),
+			);
 		const source = `import { Hydrate, useLayoutEffect } from 'octane';
 import { interaction } from 'octane/hydration';
 import { draft$, send, wait, layout } from './actions';
@@ -198,9 +205,19 @@ function Content() @{
 				expect(live.value).toBe('entered before activation');
 				expect(host.querySelector('output')!.textContent).toBe('entered before activation');
 				expect(errors).toEqual([]);
-				host.querySelector('button')!.click();
+				const liveClick = new MouseEvent('click', {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+				});
+				Object.defineProperty(liveClick, 'timeStamp', { value: 25 });
+				host.querySelector('button')!.dispatchEvent(liveClick);
+				await vi.waitFor(() => expect(sent).toEqual(['entered before activation']));
+				await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
 				expect(sent).toEqual(['entered before activation']);
-				await settle();
+				expect(sentTimeStamps).toEqual([25]);
+				expect(sentAfterLayout).toEqual([true]);
+				expect(scope.get(draft$)).toBe('');
 				expect(live.value).toBe('');
 				expect(host.querySelector('output')!.textContent).toBe('');
 				return;
@@ -215,6 +232,7 @@ function Content() @{
 			expect(sentAfterLayout).toEqual([true]);
 			expect(errors).toEqual([]);
 		} finally {
+			if (delayingReplay) vi.unstubAllGlobals();
 			cleanup();
 			scope.dispose();
 			host.remove();
@@ -1127,6 +1145,11 @@ export function Counter() @{
 	)(
 		'replays input that reaches an island while its first render is pending (%j)',
 		async ({ dev, bindings, disposed, data }) => {
+			const delayingReplay = data === 'client' && !bindings && !disposed;
+			if (delayingReplay)
+				vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+					setTimeout(() => callback(performance.now()), 200),
+				);
 			const app = `import { Hydrate } from 'octane';
 import { interaction } from 'octane/hydration';
 import { Answer } from './Answer.tsrx';
@@ -1276,8 +1299,14 @@ export function Answer() @{
 					expect(host.querySelector('p')!.textContent).toBe('client');
 					expect(first.isConnected).toBe(false);
 					expect(events).toEqual([]);
+					// New commands reverse the discarded pair. This distinguishes them
+					// from stale replays if either lands before the passive drain.
+					host.querySelector<HTMLButtonElement>('[data-second]')!.click();
 					host.querySelector<HTMLButtonElement>('[data-first]')!.click();
-					expect(events).toEqual(['first']);
+					await vi.waitFor(() => expect(events).toEqual(['second', 'first']));
+					await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+					expect(events).toEqual(['second', 'first']);
+					expect(errors).toEqual([]);
 					return;
 				}
 				await vi.waitFor(() => expect(events).toEqual(['first', 'second']));
@@ -1287,6 +1316,7 @@ export function Answer() @{
 				expect(events).toEqual(['first', 'second', 'first']);
 				expect(errors).toEqual([]);
 			} finally {
+				if (delayingReplay) vi.unstubAllGlobals();
 				cleanup();
 				scope.dispose();
 				host.remove();
