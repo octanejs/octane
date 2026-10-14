@@ -27,11 +27,9 @@ import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 const SOURCE = resolve(import.meta.dirname, '../src');
 const PACKAGE_ROOT = resolve(import.meta.dirname, '..');
 const OPTIONAL_DECLARATIONS = [
-	// ViewTransition's staged DOM and the drivers that prepare a staged commit.
-	'STAGED_DOM',
+	// ViewTransition and the layout phase its native update defers.
 	'VIEW_TRANSITION_DRIVER',
 	'DEFERRED_LAYOUT_DRIVER',
-	'STAGED_COMMIT_CAPTURE',
 	// Suspense and Activity visibility, and effect reconnection on reveal.
 	'SCHEDULED_VISIBILITY_DRIVER',
 	'activityRefState',

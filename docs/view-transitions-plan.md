@@ -55,42 +55,32 @@ those measurements do not establish that preparation is free.
 
 ## Architecture
 
-ViewTransition prepares its next tree before the native old capture. An optional
-DOM plan projects structural reads and host writes without changing existing
-native nodes. The finished boundary props select old-capture participation and classes, so a
-nested `update="none"` remains inside its parent's snapshot. Each snapshot
-retains its own name.
-The native update callback publishes the ordered plan once, preserving survivor
-identity and connected deletion cleanup. Ordinary rendering keeps its eager
-native DOM path; host views and mutation plans are allocated only while a
-ViewTransition prepares.
+ViewTransition renders its next tree before the native old capture, as any
+root render does (#2043): new content builds off-document, and the root
+transactions hold their commit (`HOLDING_ROOT_COMMITS`). The finished boundary
+props select old-capture participation and classes, so a nested
+`update="none"` remains inside its parent's snapshot. Each snapshot retains its
+own name. Planning reads the DOM the held commit will leave (`vtPreview`). The
+native update callback commits the held transactions once, preserving survivor
+identity and connected deletion cleanup. A render that would join a held
+commit lands it first; a root unmounted or replaced while it waited drops it.
 
-The structural read seam is `getFirstChild` / `getNextSibling`; these use cached
-native getters normally and the staged view during preparation. Other host
-operations use typed `domNode` views. `pnpm staged-dom:check` resolves DOM members
-through TypeScript (including traceable aliases and casts) and rejects raw host
-operations outside a small, operation-specific native allowlist. The guard and
-mutation tests run in the existing CI workflow tests. Committed geometry,
-resource readiness, imperative public handles, and eager event registration are
-explicit native exceptions. This is static enforcement for typed or traceable
-host receivers, not a proof about arbitrary untyped application code.
-Unchecked `any`, reflective writes such as `Reflect.set`, and destructured
-members can escape that analysis and still require manual review.
-
-`initDomOperations` previously initialized only the two traversal getters. It
-was not a complete read/write operations table. Replacing projected form,
-selector, property and CSSOM semantics with a new table would require a broader
-host API migration. This change consolidates structural access and adds the
-missing enforcement while retaining the tested projection adapter. A future
-operations-table migration must preserve projected form ownership, result
-identity, native scroll geometry, controlled state and rollback contracts.
+No render writes committed DOM, so nothing is staged. `pnpm render-writes:check`
+resolves DOM members through TypeScript (including traceable aliases and casts)
+and requires every native DOM write in the runtime to sit in a function
+classified in `scripts/render-writers.mjs`: commit, primitive, fresh,
+hydration, rollback, unmount or native. Its tests run in the existing CI
+workflow tests. This is static enforcement for typed or traceable host
+receivers, not a proof about arbitrary untyped application code. Unchecked
+`any`, reflective writes such as `Reflect.set`, and destructured members can
+escape that analysis and still require manual review.
 
 DOM observation and controlled-property snapshots during native commits detect
 updates from compiled templates and returned descriptors. A layout capture
 defers new refs and layout bodies until resource readiness. Every
 boundary's visible top-level hosts contribute geometry; layout changes can
 activate clipping ancestors. Temporary capture styles are restored before
-mutation publication and again after the new capture.
+the held commit lands and again after the new capture.
 
 Owner lookups are intentionally recomputed across preparation, publication and
 layout callbacks: portal destinations, scope hosts and CSS participation can

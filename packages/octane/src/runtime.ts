@@ -26,7 +26,6 @@ import type {
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
 import { domBindingClaims } from './dom-binding-claims.js';
-import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import type { BindingHandle } from './dom-bindings.js';
 import {
@@ -687,7 +686,6 @@ function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 // copy keep the code, so a local copy that must stay is `D ? D : null`. Hence
 // these declarations sit here, away from their features. Read every optional
 // driver in this module that way, NATIVE_READ_DRIVER included.
-let STAGED_DOM: DOMStage | null = null;
 let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
 let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
@@ -696,7 +694,6 @@ let DEFERRED_LAYOUT_DRIVER: DeferredLayoutDriver | null = null;
 // A ViewTransition's drain renders without committing: its root transactions
 // commit inside the native update callback (vtFlush).
 let HOLDING_ROOT_COMMITS = false;
-let STAGED_COMMIT_CAPTURE: StagedCommitCapture | null = null;
 // Function form actions are the only submits the runtime intercepts, and
 // setFormAction is the only writer of `$$formAction`. Installing the handler
 // from there keeps the Action/transition graph out of every bundle that only
@@ -1990,11 +1987,6 @@ function acceptNativeCapture(
 ): boolean {
 	if (!NATIVE_READ_DRIVER) return false;
 	const driver = NATIVE_READ_DRIVER;
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => acceptNativeCapture(capture, owner, replayRootRefs))
-	)
-		return true;
 	const native = driver.acceptCapture(capture);
 	if (owner === undefined) return false;
 	const replays = replayRootRefs && driver.replayDeferredRefs(capture, owner);
@@ -2187,15 +2179,13 @@ function takeNativeFreshArm(
 	ids: RootIdState,
 ): RootIdState | null {
 	if (hydration === null) return null;
-	const value =
-		hydration.bindingTryState(open) ??
-		(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data;
+	const value = hydration.bindingTryState(open) ?? (open as Comment).data;
 	const count = value.startsWith(BOUNDARY_CLIENT) ? boundaryIdCount(value) : -1;
 	if (count < 0) return null;
 	reserveHydrationIds(ids, count);
 	// An attempt that is discarded, such as a root's that suspends, restores the
 	// server arm, so the page keeps showing it and the retry finds its marker.
-	hydration.save(domNode(open).parentNode!);
+	hydration.save(open.parentNode!);
 	removeRange(getNextSibling(open), end);
 	hydration.node = end;
 	return {
@@ -2315,7 +2305,7 @@ let KEPT_TEXT_CONTENT: WeakSet<Node> | null = null;
 function clearKeptTextContent(kept: WeakSet<Node>, host: Node): void {
 	if (!kept.delete(host)) return;
 	for (let child = getFirstChild(host); child !== null; child = getFirstChild(host))
-		(STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(child);
+		host.removeChild(child);
 }
 
 /**
@@ -2362,7 +2352,7 @@ function describeHydrationNode(node: Node | null): string {
 	if (node === null) return 'nothing';
 	if (node.nodeType === 1) return `<${(node as Element).localName}>`;
 	if (node.nodeType === 3) {
-		const text = (STAGED_DOM ? STAGED_DOM.view(node as Text) : (node as Text)).nodeValue;
+		const text = (node as Text).nodeValue;
 		// An empty Text node stands for the server's empty text (newText).
 		return text ? `text ${JSON.stringify(text)}` : 'nothing';
 	}
@@ -2444,18 +2434,16 @@ function hydrationStaticMatches(
 	const s = server as Element;
 	const t = template as Element;
 	if (s.localName !== t.localName) return false;
-	const tAttrs = (STAGED_DOM ? STAGED_DOM.view(t) : t).attributes;
+	const tAttrs = t.attributes;
 	for (let i = 0; i < tAttrs.length; i++) {
 		const a = tAttrs[i];
 		// This optional compiler marker is not authored static structure. Actual
 		// writable bindings validate its identity before adopting their state.
-		if ((STAGED_DOM ? STAGED_DOM.view(a) : a).name === HYDRATE_INPUT_ATTR) continue;
+		if (a.name === HYDRATE_INPUT_ATTR) continue;
 		if (
-			(STAGED_DOM ? STAGED_DOM.view(s) : s).getAttribute(
-				(STAGED_DOM ? STAGED_DOM.view(a) : a).name,
-			) !== (STAGED_DOM ? STAGED_DOM.view(a) : a).value &&
+			s.getAttribute(a.name) !== a.value &&
 			!(
-				(STAGED_DOM ? STAGED_DOM.view(a) : a).name === 'style' &&
+				a.name === 'style' &&
 				partialStyles !== undefined &&
 				partialStyles.includes('|' + path + '|')
 			)
@@ -3174,11 +3162,6 @@ function promotePendingSignals(): void {
 	const slots = PENDING_SIGNAL_PROMOTIONS;
 	if (slots === null) return;
 	PENDING_SIGNAL_PROMOTIONS = null;
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => pendingSignals!.promote(slots))
-	)
-		return;
 	pendingSignals!.promote(slots);
 }
 
@@ -4469,15 +4452,15 @@ function restoreRootRange(
 	// markers. That bounded snapshot no longer owns a range in this parent;
 	// walking to a bound that is gone would erase unrelated committed siblings.
 	if (
-		(before !== null && (STAGED_DOM ? STAGED_DOM.view(before) : before).parentNode !== parent) ||
-		(after !== null && (STAGED_DOM ? STAGED_DOM.view(after) : after).parentNode !== parent)
+		(before !== null && before.parentNode !== parent) ||
+		(after !== null && after.parentNode !== parent)
 	)
 		return;
 	const retained = new Set(nodes);
 	let node = before === null ? getFirstChild(parent) : getNextSibling(before);
 	while (node !== null && node !== after) {
 		const next = getNextSibling(node);
-		if (!retained.has(node)) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
+		if (!retained.has(node)) parent.removeChild(node);
 		node = next;
 	}
 	restoreRootNodes(parent, nodes, after);
@@ -4548,12 +4531,8 @@ function inRootHydrationAttempt(): boolean {
 function restoreRootNodes(parent: Node, nodes: Node[], anchor: Node | null): void {
 	for (let i = nodes.length - 1; i >= 0; i--) {
 		const node = nodes[i];
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== parent ||
-			getNextSibling(node) !== anchor
-		) {
-			if (renderingFocus === null)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
+		if (node.parentNode !== parent || getNextSibling(node) !== anchor) {
+			if (renderingFocus === null) parent.insertBefore(node, anchor);
 			else {
 				captureFocusedMovement(parent, renderingFocus);
 				moveFocusedNodeBefore(parent, node, anchor, renderingFocus);
@@ -4704,9 +4683,7 @@ function openFrontier(
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
-	const frag =
-		(!STAGED_DOM && SPARE_FRONTIERS.pop()) ||
-		(STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	const frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.frag = frag;
 	next.members = [];
@@ -4746,14 +4723,9 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 		return false;
 	// A committed Block can still render a slot into fresh DOM, as can a lite
 	// Scope this render created under one: a frontier, which commit inserts.
-	if ((STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).isConnected) return true;
+	if (domParent.isConnected) return true;
 	let node = domParent;
-	for (
-		let parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
-		parent !== null;
-		parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode
-	)
-		node = parent;
+	for (let parent = node.parentNode; parent !== null; parent = node.parentNode) node = parent;
 	return node.nodeType !== 11 || (node as any).$$next === undefined;
 }
 
@@ -4784,15 +4756,14 @@ function applyNext(next: SlotNext): void {
 	let before = next.before;
 	if (next.follows && out.length !== 0) {
 		const first: Node | null = out[out.length - 2];
-		if (first !== null && (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === parent)
-			before = getNextSibling(out[out.length - 1]);
+		if (first !== null && first.parentNode === parent) before = getNextSibling(out[out.length - 1]);
 	}
 	applyOutgoing(out, parent);
 	const members = next.members;
 	// A deletion cleanup can unmount the slot's owner before its content lands.
 	if (members === null || next.owner!.disposed) return;
 	const frag = next.frag;
-	if (frag !== null) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(frag, before);
+	if (frag !== null) parent.insertBefore(frag, before);
 	for (let i = 0; i < members.length; i += 2) {
 		const member = members[i];
 		const from = members[i + 1];
@@ -4820,8 +4791,7 @@ function applyNext(next: SlotNext): void {
 	if (frag === null) return;
 	(frag as any).$$next = undefined;
 	// Nothing names a committed frontier any more (assertRehomed).
-	if (!STAGED_DOM && SPARE_FRONTIERS.length < 64 && getFirstChild(frag) === null)
-		SPARE_FRONTIERS.push(frag);
+	if (SPARE_FRONTIERS.length < 64 && getFirstChild(frag) === null) SPARE_FRONTIERS.push(frag);
 }
 
 /** Point a try, error or portal slot created directly in a committed frontier at its live parent. */
@@ -4882,7 +4852,7 @@ function applyOutgoing(out: any[], parent?: Node): void {
 		if (kind === placeRoots || kind === moveBlockBefore || kind === placeRun) {
 			// A deletion cleanup can unmount the list before the rest of its log.
 			const anchor: Node = out[i + 2];
-			if ((STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).parentNode === parent) {
+			if (anchor.parentNode === parent) {
 				if (kind === placeRoots) placeRoots(parent!, out[i + 1], anchor);
 				else if (kind === placeRun) placeRun(parent!, out[i + 1], anchor);
 				else if (!out[i + 1].disposed) moveBlockBefore(out[i + 1], anchor);
@@ -4891,13 +4861,12 @@ function applyOutgoing(out: any[], parent?: Node): void {
 		}
 		const first: Node | null = out[i + 1];
 		const last: Node | null = out[i + 2];
-		const host = first === null ? null : (STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode;
+		const host = first === null ? null : first.parentNode;
 		if (first === last && host !== null) {
 			// A self-marked root: one node, no range to collect.
 			retireEventHostTree(first!);
 			if (kind !== null) releaseOutgoing(kind);
-			if ((STAGED_DOM ? STAGED_DOM.view(first!) : first!).parentNode === host)
-				(STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(first!);
+			if (first!.parentNode === host) host.removeChild(first!);
 			continue;
 		}
 		const nodes: Node[] = [];
@@ -4911,8 +4880,7 @@ function applyOutgoing(out: any[], parent?: Node): void {
 		if (kind !== null) releaseOutgoing(kind);
 		for (let j = 0; j < nodes.length; j++) {
 			const node = nodes[j];
-			if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === host)
-				(STAGED_DOM ? STAGED_DOM.view(host!) : host!).removeChild(node);
+			if (node.parentNode === host) host!.removeChild(node);
 		}
 	}
 }
@@ -4977,22 +4945,18 @@ function queueRootUnmount(scope: Scope, exclusive: boolean, out?: any[]): void {
 	const end = block.endMarker;
 	let first: Node | null = null;
 	let last: Node | null = null;
-	if (
-		start !== null &&
-		end !== null &&
-		(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode !== null
-	) {
+	if (start !== null && end !== null && start.parentNode !== null) {
 		if (!exclusive) {
 			first = start;
 			last = end;
 		} else if (getNextSibling(start) !== end) {
 			first = getNextSibling(start);
-			last = (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling;
+			last = end.previousSibling;
 		}
 	} else if (block.kind === 'root') {
 		const parent = block.parentNode;
 		first = getFirstChild(parent);
-		last = (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild;
+		last = parent.lastChild;
 	}
 	// A teardown inside an aborted mount keeps that mount's ref suppression.
 	const suppressed = REF_DETACH_SUPPRESSION;
@@ -5043,7 +5007,7 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 		return next;
 	}
 	const end = state.end;
-	const parent = (STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!;
+	const parent = end.parentNode!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
 	let owner = parentBlock;
 	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
@@ -5074,7 +5038,7 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 let DETACHED_ROOT: Comment | null = null;
 
 function newDetachedRoot(): Comment {
-	return (DETACHED_ROOT = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(''));
+	return (DETACHED_ROOT = document.createComment(''));
 }
 
 /** The rows whose detached roots land before `anchor`: the log's last batch, or a new one. */
@@ -5088,7 +5052,7 @@ function listRoots(next: SlotNext, anchor: Node): Block[] {
 }
 
 function placeRoots(parent: Node, rows: Block[], anchor: Node): void {
-	const into = STAGED_DOM ? STAGED_DOM.view(parent) : parent;
+	const into = parent;
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		if (!row.disposed) into.insertBefore(row.startMarker!, anchor);
@@ -5100,7 +5064,7 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
 	const out = next.out;
 	const n = out.length;
 	if (n !== 0 && out[n - 3] === placeRun && out[n - 1] === anchor) return out[n - 2];
-	const frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	const frag = document.createDocumentFragment();
 	(frag as any).$$next = next;
 	out.push(placeRun, frag, anchor);
 	return frag;
@@ -5112,8 +5076,8 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
  * row connects before the next row arrives.
  */
 function placeRun(parent: Node, frag: DocumentFragment, anchor: Node): void {
-	const from = STAGED_DOM ? STAGED_DOM.view(frag) : frag;
-	const into = STAGED_DOM ? STAGED_DOM.view(parent) : parent;
+	const from = frag;
+	const into = parent;
 	for (let node = from.firstChild; node !== null; node = from.firstChild)
 		into.insertBefore(node, anchor);
 	(frag as any).$$next = undefined;
@@ -5527,17 +5491,11 @@ function journalObjectOnce(obj: object): void {
 /** Defaults can move a pristine control's caret just like a live-value write. */
 function journalInputSelection(input: HTMLInputElement | HTMLTextAreaElement): void {
 	if (ROOT_RENDER_TRANSACTION !== null && input.ownerDocument.activeElement === input) {
-		const start = (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionStart;
-		const end = (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionEnd;
-		const direction = (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionDirection;
+		const start = input.selectionStart;
+		const end = input.selectionEnd;
+		const direction = input.selectionDirection;
 		if (start !== null && end !== null)
-			journalUndo(() =>
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).setSelectionRange(
-					start,
-					end,
-					direction ?? undefined,
-				),
-			);
+			journalUndo(() => input.setSelectionRange(start, end, direction ?? undefined));
 	}
 }
 
@@ -5556,23 +5514,12 @@ function journalControlled(
 ): void {
 	if (prop === 'value') journalInputSelection(el as HTMLInputElement | HTMLTextAreaElement);
 	const log = TRANSITION_JOURNAL!;
-	if (!adopted)
-		log.push(JOURNAL_PROP, el, prop, (STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[prop]);
-	log.push(
-		JOURNAL_PROP,
-		el,
-		defaultProp,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[defaultProp],
-	);
+	if (!adopted) log.push(JOURNAL_PROP, el, prop, (el as any)[prop]);
+	log.push(JOURNAL_PROP, el, defaultProp, (el as any)[defaultProp]);
 	const ctrl = renderControlledState(el);
 	if (ctrl !== undefined) journalObjectOnce(ctrl);
 	const input = el as HTMLInputElement;
-	if (
-		prop === 'checked' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== ''
-	)
-		journalRadioCousins(input);
+	if (prop === 'checked' && input.type === 'radio' && input.name !== '') journalRadioCousins(input);
 	journalBag();
 }
 
@@ -5583,13 +5530,7 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
 		// defaultValue replaces textarea children. Keep the old text-node identity
 		// as well as its reset value when a root attempt is discarded.
 		if (ROOT_RENDER_TRANSACTION !== null) journalRootChildren(input);
-		else
-			TRANSITION_JOURNAL!.push(
-				JOURNAL_PROP,
-				input,
-				'defaultValue',
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue,
-			);
+		else TRANSITION_JOURNAL!.push(JOURNAL_PROP, input, 'defaultValue', input.defaultValue);
 		journalBag();
 	} else {
 		// Attribute absence matters too; assigning defaultValue='' on rollback
@@ -5600,19 +5541,14 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
 
 /** Find a radio's native group in its document, shadow tree, or containing form. */
 function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
-	const form = (STAGED_DOM ? STAGED_DOM.view(input) : input).form;
-	if (form !== null) return (STAGED_DOM ? STAGED_DOM.view(form) : form).elements;
-	const root = (STAGED_DOM ? STAGED_DOM.view(input) : input).getRootNode();
+	const form = input.form;
+	if (form !== null) return form.elements;
+	const root = input.getRootNode();
 	// Document.getElementsByName is the common fast path; ShadowRoot and
 	// detached fragments need a tree-local lookup that includes their radios.
 	return root.nodeType === 9
-		? (STAGED_DOM ? STAGED_DOM.view(root as Document) : (root as Document)).getElementsByName(
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name,
-			)
-		: (STAGED_DOM
-				? STAGED_DOM.view(root as Element | DocumentFragment)
-				: (root as Element | DocumentFragment)
-			).querySelectorAll('input[type="radio"]');
+		? (root as Document).getElementsByName(input.name)
+		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
 }
 
 /**
@@ -5630,18 +5566,17 @@ function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
  * left standing.
  */
 function journalRadioCousins(input: HTMLInputElement): void {
-	const name = (STAGED_DOM ? STAGED_DOM.view(input) : input).name;
+	const name = input.name;
 	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
 			other === input ||
-			!(STAGED_DOM ? STAGED_DOM.view(other) : other).checked ||
+			!other.checked ||
 			other.localName !== 'input' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).type !== 'radio' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).name !== name ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).form !==
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).form
+			other.type !== 'radio' ||
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
@@ -5650,19 +5585,9 @@ function journalRadioCousins(input: HTMLInputElement): void {
 }
 
 function journalControlledOption(option: HTMLOptionElement, withDefault: boolean): void {
-	TRANSITION_JOURNAL!.push(
-		JOURNAL_PROP,
-		option,
-		'selected',
-		(STAGED_DOM ? STAGED_DOM.view(option) : option).selected,
-	);
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'selected', option.selected);
 	if (withDefault)
-		TRANSITION_JOURNAL!.push(
-			JOURNAL_PROP,
-			option,
-			'defaultSelected',
-			(STAGED_DOM ? STAGED_DOM.view(option) : option).defaultSelected,
-		);
+		TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'defaultSelected', option.defaultSelected);
 }
 
 /**
@@ -5742,7 +5667,7 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 		journalUndo(() => {
 			seen.delete(state);
 		});
-		journalRootRange(domNode(state.start).parentNode!, state.start, state.end);
+		journalRootRange(state.start.parentNode!, state.start, state.end);
 		// No chain record restores indices here, so rows that already exist keep
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
@@ -5900,7 +5825,7 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	// routed to the enclosing boundary flips it to @catch — disposing this
 	// slot's whole range out from under the restore. Same mid-render teardown
 	// invariant as renderReturnedValue's disposed check: stop here.
-	if (domNode(state.end).parentNode === null) return;
+	if (state.end.parentNode === null) return;
 	state.head = chain === null ? snapshot.head : (chain[0] ?? null);
 	state.tail = chain === null ? snapshot.tail : (chain[chain.length - 1] ?? null);
 	state.size = chain === null ? snapshot.size : chain.length;
@@ -5938,12 +5863,7 @@ function journalText(node: Text, previous: string | null): void {
 
 /** A namespaced attribute (`xlink:href`) journals its name as `[namespace, name]`. */
 function journalAttr(el: Element, name: string, ns?: string | null): void {
-	TRANSITION_JOURNAL!.push(
-		JOURNAL_ATTR,
-		el,
-		ns ? [ns, name] : name,
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name),
-	);
+	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, ns ? [ns, name] : name, el.getAttribute(name));
 	journalBag();
 }
 
@@ -6021,10 +5941,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 			const b = log[i + 3];
 			switch (log[i]) {
 				case JOURNAL_TEXT:
-					(STAGED_DOM ? STAGED_DOM.view(target as Text) : (target as Text)).nodeValue = a;
+					(target as Text).nodeValue = a;
 					break;
 				case JOURNAL_ATTR: {
-					const el = STAGED_DOM ? STAGED_DOM.view(target as Element) : (target as Element);
+					const el = target as Element;
 					// Removal by qualified name also finds a namespaced attribute, but
 					// restoring one (`xlink:href`) must recreate it in its namespace.
 					const name = typeof a === 'string' ? a : a[1];
@@ -6034,8 +5954,7 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 					break;
 				}
 				case JOURNAL_PROP:
-					// DOM properties join the projected rollback; metadata stays ordinary.
-					(STAGED_DOM && target?.nodeType !== undefined ? STAGED_DOM.view(target) : target)[a] = b;
+					target[a] = b;
 					break;
 				case JOURNAL_INPUTS:
 					(target as Block).extra = b;
@@ -6094,11 +6013,11 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 // ─────────────────────────────────────────────────────────────────────────────
 // View Transitions (docs/view-transitions-plan.md, Phase 1).
 //
-// Ordinary renders mutate eagerly. ViewTransition alone prepares against a
-// logical host projection: existing DOM remains committed until the browser's
-// update callback publishes the ordered plan. Resolving the new boundary props
-// before the old snapshot is essential for nested update="none": naming that
-// child speculatively would cut it out of its parent's old image.
+// A ViewTransition batch renders like any root render, building new content
+// off-document, and holds its commit: the DOM stays as committed until the
+// browser's update callback lands it (vtFlush). Resolving the new boundary
+// props before the old snapshot is essential for nested update="none": naming
+// that child speculatively would cut it out of its parent's old image.
 //
 // Activation model (resolved at the end of the wrapped drain):
 //   enter  — a boundary gains visible hosts (subtree inserted or Activity revealed).
@@ -6107,7 +6026,7 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 //            or whose visible host geometry changed.
 // Names: prepared boundary fate selects the old capture. The callback measures
 // committed geometry, resolves activations, and names the new captures. Authored
-// inline names/classes are restored before mutation publication and
+// inline names/classes are restored before the held commit lands and
 // again once the transition's `ready` promise settles.
 //
 // Optional-feature guard: generic scheduler/render paths see only the nullable
@@ -6387,11 +6306,7 @@ function vtGetName(block: Block, props: ViewTransitionProps | null = vtProps(blo
 	if (props?.name != null && props.name !== 'auto') return props.name;
 	if (props?.scope === 'element') {
 		const host = vtScopeHost(block);
-		if (host !== null)
-			return vtScopeName(
-				host,
-				(STAGED_DOM ? STAGED_DOM.view(host as HTMLElement) : (host as HTMLElement)).style,
-			);
+		if (host !== null) return vtScopeName(host, (host as HTMLElement).style);
 	}
 	const state = vtBoundaryState(block);
 	if (state.autoName === '') state.autoName = '‹vt' + ++VT_NAME_SEQ + '›';
@@ -6415,11 +6330,7 @@ function vtScopeHost(block: Block): Element | null {
 		node !== null && node !== end;
 		node = getNextSibling(node)
 	) {
-		if (
-			node.nodeType === 3 &&
-			((STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue ?? '').trim() !== ''
-		)
-			return null;
+		if (node.nodeType === 3 && (node.nodeValue ?? '').trim() !== '') return null;
 	}
 	return els[0];
 }
@@ -6433,12 +6344,7 @@ function vtScopeHost(block: Block): Element | null {
  */
 function vtClosestScope(node: Node | null): Element | null {
 	for (; node !== null; node = vtParent(node)) {
-		if (
-			node.nodeType === 1 &&
-			(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element)).getAttribute(
-				'vt-scope',
-			) === 'element'
-		)
+		if (node.nodeType === 1 && (node as Element).getAttribute('vt-scope') === 'element')
 			return node as Element;
 	}
 	return null;
@@ -6451,7 +6357,7 @@ function vtClosestScope(node: Node | null): Element | null {
 function vtParent(node: Node): Node | null {
 	return node.nodeType === 11 && (node as any).$$next !== undefined
 		? (node as any).$$next.parent
-		: (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
+		: node.parentNode;
 }
 
 function vtContains(host: Node, node: Node | null): boolean {
@@ -6482,7 +6388,7 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 		const physical = vtClosestScope(parent);
 		if (physical !== null) return physical as VTOwner;
 		const owner = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
-		// A staged template clone still belongs to the inert template document.
+		// A template clone still belongs to the inert template document.
 		if (owner.defaultView !== null) return owner as VTOwner;
 	}
 	return null;
@@ -6503,24 +6409,17 @@ const VT_INVALID_SCOPE_WARNED = /* @__PURE__ */ new WeakSet<Block>();
 const VT_SCOPE_STYLED_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 
 function vtInjectScopeStyle(host: Element): void {
-	// Staged insertion may adopt the host into another document. Choose its
-	// stylesheet owner and publish dedupe state only after that insertion commits.
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => vtInjectScopeStyle(host), true)
-	)
-		return;
 	const owner = host.ownerDocument;
 	if (VT_SCOPE_STYLED_DOCUMENTS.has(owner)) return;
 	if (
-		(STAGED_DOM ? STAGED_DOM.view(owner) : owner).querySelector(
+		owner.querySelector(
 			`style[data-octane="${VT_SCOPE_STYLE_ID}"],style[data-href~="octane-${VT_SCOPE_STYLE_ID}"]`,
 		) === null
 	) {
-		const style = (STAGED_DOM ? STAGED_DOM.view(owner) : owner).createElement('style');
-		(STAGED_DOM ? STAGED_DOM.view(style) : style).setAttribute('data-octane', VT_SCOPE_STYLE_ID);
-		(STAGED_DOM ? STAGED_DOM.view(style) : style).textContent = VT_SCOPE_CSS;
-		domNode(owner.head).appendChild(style);
+		const style = owner.createElement('style');
+		style.setAttribute('data-octane', VT_SCOPE_STYLE_ID);
+		style.textContent = VT_SCOPE_CSS;
+		owner.head.appendChild(style);
 	}
 	VT_SCOPE_STYLED_DOCUMENTS.add(owner);
 }
@@ -6538,7 +6437,7 @@ function vtReleaseScopeBoundary(block: Block): void {
 	if (saved.owners.length !== 0) return;
 	if (!VT_DRAIN) vtInterruptOwner(host as VTOwner);
 	if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
-	(STAGED_DOM ? STAGED_DOM.view(host) : host).removeAttribute('vt-scope');
+	host.removeAttribute('vt-scope');
 	if (TRANSITION_JOURNAL !== null) journalUndo(() => VT_SCOPE_OWNERS.set(host, saved));
 	VT_SCOPE_OWNERS.delete(host);
 }
@@ -6576,11 +6475,15 @@ function vtPrepareScopeBoundary(block: Block): void {
 		saved.owners = [...saved.owners, block];
 		state.scopeHost = host;
 	}
-	if ((STAGED_DOM ? STAGED_DOM.view(host) : host).getAttribute('vt-scope') !== 'element') {
+	if (host.getAttribute('vt-scope') !== 'element') {
 		if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
-		(STAGED_DOM ? STAGED_DOM.view(host) : host).setAttribute('vt-scope', 'element');
+		host.setAttribute('vt-scope', 'element');
 	}
-	vtInjectScopeStyle(host);
+	// The commit may adopt a fresh host into another document (an iframe's):
+	// its stylesheet owner is the document the host lands in.
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null) transaction.ops.push(vtInjectScopeStyle, host);
+	else vtInjectScopeStyle(host);
 }
 
 interface ViewTransitionScopeRef {
@@ -6605,7 +6508,6 @@ function vtScopeRefInstance(block: Block, scope: Element): ViewTransitionInstanc
 	if (previous?.scope === scope) return previous.instance;
 	let current: ViewTransitionInstance | null = null;
 	const resolve = (): ViewTransitionInstance => {
-		// Public reads must never expose the staged style projection before commit.
 		const name = vtScopeName(scope);
 		if (current === null || current.name !== name) current = vtCreateInstance(name, scope);
 		return current;
@@ -6727,7 +6629,7 @@ function vtRangeElements(block: Block): Element[] {
 		}
 	} else {
 		// Whole-container regime (root / owns-parent): every element child.
-		const kids = domNode(block.parentNode as Element).children;
+		const kids = (block.parentNode as Element).children;
 		for (let i = 0; i < kids.length; i++) {
 			if (vtHostVisible(kids[i])) els.push(kids[i]);
 		}
@@ -6819,7 +6721,7 @@ function vtApplyStyles(rec: VtRec, cls: string): void {
 	rec.cls = cls === 'auto' || cls === 'none' ? '' : cls;
 	for (let i = 0; i < rec.els.length; i++) {
 		const el = rec.els[i] as HTMLElement;
-		const style = (STAGED_DOM ? STAGED_DOM.view(el) : el).style;
+		const style = el.style;
 		if (style === undefined) continue;
 		if (!rec.styles.has(el)) {
 			rec.styles.set(el, {
@@ -6851,7 +6753,7 @@ function vtRevertNames(recs: VtRec[]): void {
 	if (recs.length === 0) return;
 	const styles = recs[0].styles;
 	for (const [el, saved] of styles) {
-		const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+		const style = (el as HTMLElement).style;
 		style.setProperty('view-transition-name', saved.name, saved.namePriority);
 		style.setProperty('view-transition-class', saved.cls, saved.classPriority);
 	}
@@ -6998,12 +6900,9 @@ function vtObserveChanges(owner: Document, recs: VtRec[]): () => MutationRecord[
 	const controls = new Map<Element, string>();
 	for (const rec of recs) {
 		for (const el of rec.els) {
-			roots.add((STAGED_DOM ? STAGED_DOM.view(el) : el).getRootNode());
-			if ((STAGED_DOM ? STAGED_DOM.view(el) : el).matches('input,textarea,select'))
-				controls.set(el, vtControlValue(el));
-			for (const control of (STAGED_DOM ? STAGED_DOM.view(el) : el).querySelectorAll(
-				'input,textarea,select',
-			)) {
+			roots.add(el.getRootNode());
+			if (el.matches('input,textarea,select')) controls.set(el, vtControlValue(el));
+			for (const control of el.querySelectorAll('input,textarea,select')) {
 				controls.set(control, vtControlValue(control));
 			}
 		}
@@ -7038,11 +6937,7 @@ function vtObserveChanges(owner: Document, recs: VtRec[]): () => MutationRecord[
 			}
 		}
 		const dirty = (target: Node): void => {
-			for (
-				let node: Node | null = target;
-				node !== null;
-				node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode
-			) {
+			for (let node: Node | null = target; node !== null; node = node.parentNode) {
 				const block = hosts.get(node as Element);
 				if (block !== undefined) {
 					VT_DIRTY.add(block);
@@ -7053,11 +6948,7 @@ function vtObserveChanges(owner: Document, recs: VtRec[]): () => MutationRecord[
 		for (const mutation of mutations) dirty(mutation.target);
 		// Value/checked/selection properties do not produce mutation records.
 		for (const [control, before] of controls) {
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(control) : control).isConnected &&
-				vtControlValue(control) !== before
-			)
-				dirty(control);
+			if (control.isConnected && vtControlValue(control) !== before) dirty(control);
 		}
 		return mutations;
 	};
@@ -7067,18 +6958,10 @@ function vtControlValue(el: Element): string {
 	const control = el as HTMLInputElement;
 	if (el.localName === 'select') {
 		let selected = '';
-		for (const option of (STAGED_DOM
-			? STAGED_DOM.view(el as HTMLSelectElement)
-			: (el as HTMLSelectElement)
-		).options)
-			selected += (STAGED_DOM ? STAGED_DOM.view(option) : option).selected ? '1' : '0';
+		for (const option of (el as HTMLSelectElement).options) selected += option.selected ? '1' : '0';
 		return selected;
 	}
-	return (
-		(STAGED_DOM ? STAGED_DOM.view(control) : control).value +
-		'\0' +
-		(STAGED_DOM ? STAGED_DOM.view(control) : control).checked
-	);
+	return control.value + '\0' + control.checked;
 }
 
 /** Only resources introduced or changed by this commit may delay its snapshot. */
@@ -7092,12 +6975,8 @@ function vtWaitForResources(
 	const collect = (node: Node): void => {
 		if (node.nodeType !== 1) return;
 		const el = node as Element;
-		if ((STAGED_DOM ? STAGED_DOM.view(el) : el).matches('img,link[rel="stylesheet"]'))
-			candidates.add(el);
-		for (const child of (STAGED_DOM ? STAGED_DOM.view(el) : el).querySelectorAll(
-			'img,link[rel="stylesheet"]',
-		))
-			candidates.add(child);
+		if (el.matches('img,link[rel="stylesheet"]')) candidates.add(el);
+		for (const child of el.querySelectorAll('img,link[rel="stylesheet"]')) candidates.add(child);
 	};
 	for (const mutation of mutations) {
 		if (mutation.type === 'childList') for (const node of mutation.addedNodes) collect(node);
@@ -7115,7 +6994,7 @@ function vtWaitForResources(
 		if (owner.fonts?.status === 'loading') waits.push(owner.fonts.ready);
 	}
 	for (const el of candidates) {
-		if (!(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected) continue;
+		if (!el.isConnected) continue;
 		if (el.localName === 'img') {
 			// Images outside the participating native scopes cannot affect their
 			// snapshots. Fonts and stylesheets still affect document-wide layout.
@@ -7139,12 +7018,12 @@ function vtWaitForResources(
 		waits.push(
 			new Promise<void>((resolve) => {
 				const done = (): void => {
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener('load', done);
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener('error', done);
+					el.removeEventListener('load', done);
+					el.removeEventListener('error', done);
 					resolve();
 				};
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener('load', done);
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener('error', done);
+				el.addEventListener('load', done);
+				el.addEventListener('error', done);
 				release.push(done);
 			}),
 		);
@@ -9000,9 +8879,7 @@ function activeElementForDocument(doc: Document): Element | null {
 function hasTextSelection(element: HTMLElement): boolean {
 	if (element.localName === 'textarea') return true;
 	if (element.localName !== 'input') return false;
-	switch (
-		(STAGED_DOM ? STAGED_DOM.view(element as HTMLInputElement) : (element as HTMLInputElement)).type
-	) {
+	switch ((element as HTMLInputElement).type) {
 		case 'text':
 		case 'search':
 		case 'tel':
@@ -9038,8 +8915,7 @@ function captureContentEditableSelection(
 				end = length + focusOffset;
 			}
 			if (start !== -1 && end !== -1) break selection;
-			if (node.nodeType === 3)
-				length += (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!.length;
+			if (node.nodeType === 3) length += node.nodeValue!.length;
 			const child = getFirstChild(node);
 			if (child === null) break;
 			parent = node;
@@ -9056,7 +8932,7 @@ function captureContentEditableSelection(
 				break;
 			}
 			node = parent!;
-			parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
+			parent = node.parentNode;
 		}
 	}
 
@@ -9071,22 +8947,19 @@ function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
 		const input = focused as HTMLInputElement | HTMLTextAreaElement;
 		return {
 			focused,
-			start: (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionStart ?? 0,
-			end: (STAGED_DOM ? STAGED_DOM.view(input) : input).selectionEnd ?? 0,
+			start: input.selectionStart ?? 0,
+			end: input.selectionEnd ?? 0,
 			contentEditable: false,
 		};
 	}
-	if (
-		focused.contentEditable === 'true' ||
-		(STAGED_DOM ? STAGED_DOM.view(focused) : focused).getAttribute('contenteditable') === 'true'
-	) {
+	if (focused.contentEditable === 'true' || focused.getAttribute('contenteditable') === 'true') {
 		const selection = focused.ownerDocument.getSelection();
 		if (
 			selection !== null &&
 			selection.anchorNode !== null &&
 			selection.focusNode !== null &&
-			(STAGED_DOM ? STAGED_DOM.view(focused) : focused).contains(selection.anchorNode) &&
-			(STAGED_DOM ? STAGED_DOM.view(focused) : focused).contains(selection.focusNode)
+			focused.contains(selection.anchorNode) &&
+			focused.contains(selection.focusNode)
 		) {
 			const anchorNode = selection.anchorNode;
 			const focusNode = selection.focusNode;
@@ -9102,7 +8975,7 @@ function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
 				}
 				// Below 256 UTF-16 code units, one native prefix walk beats JS traversal;
 				// shared-node offset arithmetic also preserves selection direction.
-				if ((STAGED_DOM ? STAGED_DOM.view(anchorNode) : anchorNode).nodeValue!.length < 256) {
+				if (anchorNode.nodeValue!.length < 256) {
 					const range = focused.ownerDocument.createRange();
 					range.selectNodeContents(focused);
 					range.setEnd(anchorNode, selection.anchorOffset);
@@ -9134,26 +9007,20 @@ function contentEditablePosition(element: HTMLElement, offset: number): [Node, n
 	let node = walker.nextNode();
 	let last: Node | null = null;
 	while (node !== null) {
-		const length = (STAGED_DOM ? STAGED_DOM.view(node) : node).textContent?.length ?? 0;
+		const length = node.textContent?.length ?? 0;
 		if (offset <= length) return [node, offset];
 		offset -= length;
 		last = node;
 		node = walker.nextNode();
 	}
-	return last === null
-		? [element, 0]
-		: [last, (STAGED_DOM ? STAGED_DOM.view(last) : last).textContent?.length ?? 0];
+	return last === null ? [element, 0] : [last, last.textContent?.length ?? 0];
 }
 
 function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 	if (snapshot === null) return;
 	const { focused } = snapshot;
 	const doc = focused.ownerDocument;
-	if (
-		activeElementForDocument(doc) === focused ||
-		!(STAGED_DOM ? STAGED_DOM.view(focused) : focused).isConnected
-	)
-		return;
+	if (activeElementForDocument(doc) === focused || !focused.isConnected) return;
 	if (snapshot.start !== -1) {
 		if (snapshot.contentEditable) {
 			const selection = doc.getSelection();
@@ -9169,29 +9036,26 @@ function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 			}
 		} else {
 			const input = focused as HTMLInputElement | HTMLTextAreaElement;
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).setSelectionRange(
-				snapshot.start,
-				Math.min(snapshot.end, (STAGED_DOM ? STAGED_DOM.view(input) : input).value.length),
-			);
+			input.setSelectionRange(snapshot.start, Math.min(snapshot.end, input.value.length));
 		}
 	}
 	// Refocusing a moved control may scroll every containing element. Preserve
 	// those positions only on this cold, focus-was-actually-lost branch.
 	const ancestors: Array<{ element: HTMLElement; left: number; top: number }> = [];
-	let parent = (STAGED_DOM ? STAGED_DOM.view(focused) : focused).parentElement;
+	let parent = focused.parentElement;
 	while (parent !== null) {
 		ancestors.push({
 			element: parent,
-			left: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).scrollLeft,
-			top: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).scrollTop,
+			left: parent.scrollLeft,
+			top: parent.scrollTop,
 		});
-		parent = (STAGED_DOM ? STAGED_DOM.view(parent) : parent).parentElement;
+		parent = parent.parentElement;
 	}
-	(STAGED_DOM ? STAGED_DOM.view(focused) : focused).focus();
+	focused.focus();
 	for (let i = 0; i < ancestors.length; i++) {
 		const ancestor = ancestors[i];
-		domNode(ancestor.element).scrollLeft = ancestor.left;
-		domNode(ancestor.element).scrollTop = ancestor.top;
+		ancestor.element.scrollLeft = ancestor.left;
+		ancestor.element.scrollTop = ancestor.top;
 	}
 }
 
@@ -9283,8 +9147,8 @@ function restoreFocusedMovements(): void {
 		}
 		for (let j = 0; j < movement.ancestors.length; j++) {
 			const ancestor = movement.ancestors[j];
-			domNode(ancestor.element).scrollLeft = ancestor.left;
-			domNode(ancestor.element).scrollTop = ancestor.top;
+			ancestor.element.scrollLeft = ancestor.left;
+			ancestor.element.scrollTop = ancestor.top;
 		}
 	}
 }
@@ -9301,11 +9165,7 @@ function captureFocusedMovement(parent: Node, snapshots: Exclude<FocusSelectionB
 	} else if (snapshots.focused.ownerDocument === parent.ownerDocument) {
 		snapshot = snapshots;
 	}
-	if (
-		snapshot === null ||
-		!(STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(snapshot.focused)
-	)
-		return;
+	if (snapshot === null || !parent.contains(snapshot.focused)) return;
 	if (renderingFocusMoves !== null) {
 		for (let i = 0; i < renderingFocusMoves.length; i++) {
 			if (renderingFocusMoves[i].snapshot === snapshot) return;
@@ -9313,14 +9173,14 @@ function captureFocusedMovement(parent: Node, snapshots: Exclude<FocusSelectionB
 	}
 	const ancestors: Array<{ element: HTMLElement; left: number; top: number }> = [];
 	for (
-		let ancestor = domNode(snapshot.focused).parentElement;
+		let ancestor = snapshot.focused.parentElement;
 		ancestor !== null;
-		ancestor = (STAGED_DOM ? STAGED_DOM.view(ancestor) : ancestor).parentElement
+		ancestor = ancestor.parentElement
 	) {
 		ancestors.push({
 			element: ancestor,
-			left: (STAGED_DOM ? STAGED_DOM.view(ancestor) : ancestor).scrollLeft,
-			top: (STAGED_DOM ? STAGED_DOM.view(ancestor) : ancestor).scrollTop,
+			left: ancestor.scrollLeft,
+			top: ancestor.scrollTop,
 		});
 	}
 	(renderingFocusMoves ??= []).push({ snapshot, ancestors });
@@ -9419,9 +9279,7 @@ function vtCheckNames(group: VtGroup): void {
 	const names = new Map<string, Element>();
 	for (const rec of group.recs)
 		for (const el of rec.els) {
-			const name = (
-				STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)
-			).style?.getPropertyValue('view-transition-name');
+			const name = (el as HTMLElement).style?.getPropertyValue('view-transition-name');
 			if (!name || name === 'none' || name === 'auto') continue;
 			const other = names.get(name);
 			if (other !== undefined && other !== el && !group.warnedNames.has(name)) {
@@ -9640,18 +9498,13 @@ function vtFinalizeGroup(group: VtGroup, types: string[]): void {
 	const root = owner.documentElement;
 	if (
 		group.owner.nodeType === 9 &&
-		(STAGED_DOM ? STAGED_DOM.view(root) : root).style.getPropertyValue('view-transition-name') ===
-			'' &&
+		root.style.getPropertyValue('view-transition-name') === '' &&
 		typeof root.animate === 'function'
 	) {
-		(STAGED_DOM ? STAGED_DOM.view(root) : root).style.setProperty('view-transition-name', 'none');
+		root.style.setProperty('view-transition-name', 'none');
 		group.restoreRoot = () => {
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(root) : root).style.getPropertyValue(
-					'view-transition-name',
-				) === 'none'
-			)
-				(STAGED_DOM ? STAGED_DOM.view(root) : root).style.removeProperty('view-transition-name');
+			if (root.style.getPropertyValue('view-transition-name') === 'none')
+				root.style.removeProperty('view-transition-name');
 		};
 		cancelledAnimations.push(
 			root.animate(
@@ -9724,11 +9577,7 @@ function vtPreview(held: RootRenderTransaction[]): VtPreview {
 }
 
 function vtLeaving(node: Node, preview: VtPreview): boolean {
-	for (
-		let current: Node | null = node;
-		current !== null;
-		current = (STAGED_DOM ? STAGED_DOM.view(current) : current).parentNode
-	)
+	for (let current: Node | null = node; current !== null; current = current.parentNode)
 		if (preview.leaving.has(current)) return true;
 	return false;
 }
@@ -9743,11 +9592,7 @@ function vtPendingCaptureElements(block: Block, owner: VTOwner, preview: VtPrevi
 			if (start === null || end === null) {
 				if (arrival.parent !== block.parentNode) continue;
 			} else {
-				if (
-					arrival.parent !== (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode ||
-					arrival.anchor === null
-				)
-					continue;
+				if (arrival.parent !== start.parentNode || arrival.anchor === null) continue;
 				let inside = false;
 				for (let node = getNextSibling(start); node !== null; node = getNextSibling(node)) {
 					if (node === arrival.anchor) inside = true;
@@ -9773,11 +9618,6 @@ function vtPendingCaptureElements(block: Block, owner: VTOwner, preview: VtPrevi
 let HELD_REHIDES: Set<ActivitySlot> | null = null;
 
 /**
- * Commit what a ViewTransition's drain held, inside its native update. Its
- * effects run with the staged commit's (publishStagedCommit), whose layout
- * phase waits in `layout` (completeDeferredLayouts).
- */
-/**
  * Release what a ViewTransition's drain held, for its native update: a root
  * unmounted or replaced while the commit waited drops its render. A render
  * the update's own callbacks start joins what stays.
@@ -9795,7 +9635,7 @@ function releaseHeldRootRenders(held: RootRenderTransaction[]): RootRenderTransa
 			continue;
 		}
 		// An early presentation that changed while the commit waited prepares
-		// again before its staged writes can land (commitRootRenders).
+		// again before the update's own callbacks can join its render.
 		if (
 			hydrationStarted &&
 			transaction.capture.presentations !== undefined &&
@@ -9816,6 +9656,10 @@ function releaseHeldRootRenders(held: RootRenderTransaction[]): RootRenderTransa
 	return live;
 }
 
+/**
+ * Commit what a ViewTransition's drain held, inside its native update. Its
+ * layout phase waits in `layout` (completeDeferredLayouts).
+ */
 function commitHeldRootRenders(held: RootRenderTransaction[], layout: DeferredLayoutCapture): void {
 	const later = ROOT_RENDER_TRANSACTIONS;
 	ROOT_RENDER_TRANSACTIONS = held;
@@ -9979,20 +9823,6 @@ function vtFlush(
 	// The batch renders now and commits in the native update. Until then its
 	// root transactions are held, so the old capture reads the DOM as it was.
 	let held: RootRenderTransaction[] = [];
-	// Writes the render itself still makes to committed DOM, and the lifecycle
-	// work around them, stage until that update too.
-	const stage = new DOMStage(captureStagedCommitGuard);
-	const stagedCommit = beginStagedCommitCapture((action, durable) =>
-		stage.enqueue(action, durable),
-	);
-	STAGED_DOM = stage;
-	// Development tests can run the drain unstaged (OCTANE_VT_STAGING_OFF,
-	// tests/_per-test-setup.ts): what still writes at render then fails its
-	// test instead of staging (#2043). Production builds drop this block.
-	if (process.env.NODE_ENV !== 'production' && (globalThis as any).__OCTANE_VT_STAGING_OFF__) {
-		STAGED_DOM = null;
-		STAGED_COMMIT_CAPTURE = stagedCommit.parent;
-	}
 	// An interruption the drain itself causes waits for the drain's end.
 	let draining = true;
 	let interruptRequested = false;
@@ -10047,19 +9877,17 @@ function vtFlush(
 			for (const group of groups.values()) {
 				if (
 					group.owner.nodeType !== 9 &&
-					(!domNode(group.owner).isConnected ||
+					(!group.owner.isConnected ||
 						vtLeaving(group.owner, preview) ||
-						domNode(group.owner as Element).getAttribute('vt-scope') !== 'element')
+						(group.owner as Element).getAttribute('vt-scope') !== 'element')
 				)
 					group.valid = false;
 			}
 		} catch (error) {
 			drainError ??= { error };
 		} finally {
-			STAGED_DOM = null;
 			VT_DRAIN = false;
 			draining = false;
-			endStagedCommitCapture(stagedCommit);
 		}
 	}
 	if (discoveredOwners !== null) {
@@ -10120,18 +9948,15 @@ function vtFlush(
 		const previousFlush = inFlush;
 		inFlush = true;
 		held = releaseHeldRootRenders(held);
-		beginStagedCommitPublication(stagedCommit);
 		try {
 			try {
-				stage.commit();
 				commitHeldRootRenders(held, layoutCapture);
 			} finally {
-				publishStagedCommit(stagedCommit);
+				commitEffects();
 			}
 		} catch (error) {
 			drainError ??= { error };
 		} finally {
-			endStagedCommitPublication(stagedCommit);
 			inFlush = previousFlush;
 			endDeferredLayoutCapture(layoutCapture);
 			VT_DRAIN = false;
@@ -10839,21 +10664,10 @@ interface DeferredLayoutDriver {
 	discardRefs(root: Block, uncommitted: UncommittedRefAttaches): void;
 	holdPassivesBeforeRender(): boolean;
 	holdsPendingQueue(): boolean;
-	stageEffects(): boolean;
-	stageAction(action: () => void, durable?: boolean): boolean;
-	retireHostTree(node: Node): void;
-	stageTeardown(cleanup: Cleanup, phase: number, scope: Scope): boolean;
-	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
-	projectEventBundle(bundle: HandlerBundle): HandlerBundle;
-	projectControlled(state: ControlledState): ControlledState;
-	recordStageEntry(entry: object): void;
-	stageDelegation(target: Node, root: boolean, register: boolean): boolean;
-	refreshPublishingOwner(owner: RootRenderOwner): void;
 	recordRootTransaction(transaction: RootRenderTransaction): void;
 }
 
 interface DeferredLayoutCapture {
-	parent: DeferredLayoutCapture | null;
 	commits: Array<{
 		mutationBatch: PendingEffect[] | null;
 		caughtReports: InlineCaughtErrorReport[] | null;
@@ -10879,269 +10693,8 @@ let PENDING_DEFERRED_LAYOUT: DeferredLayoutCapture | null = null;
 let COMPLETING_DEFERRED_LAYOUT: DeferredLayoutCapture | null = null;
 let DEFERRED_LAYOUT_HELD_WORK: Set<Block> | null = null;
 
-interface StagedCommitCapture {
-	parent: StagedCommitCapture | null;
-	enqueue: (action: () => void, durable?: boolean) => void;
-	queues: OffscreenCapture;
-	passiveUnmounts: Array<Cleanup | TryHandler | Block | null>;
-	adoptions: NativeAdoptionState[];
-	selects: HTMLSelectElement[];
-	defaults: Array<{ el: HTMLSelectElement; value: unknown }>;
-	checks: Element[];
-	autofocus: Element[];
-	bundles: Map<HandlerBundle, HandlerBundle>;
-	controls: Map<ControlledState, ControlledState>;
-	signalHosts?: Map<SignalHostPropSourcesBinding, SignalHostPropSourcesBinding>;
-	retiredHostTrees?: Node[];
-	owners: Map<
-		RootRenderOwner,
-		{
-			generation: number;
-			current: Block | null;
-			guard: () => boolean;
-		}
-	>;
-	guards: Map<object, () => boolean>;
-	registrations: Map<Node, Map<(() => boolean) | undefined, [number, number]>>;
-	published: boolean;
-}
-
-let PUBLISHING_STAGED_COMMIT: StagedCommitCapture | null = null;
-
-function beginStagedCommitPublication(capture: StagedCommitCapture): void {
-	PUBLISHING_STAGED_COMMIT = capture;
-}
-
-function endStagedCommitPublication(capture: StagedCommitCapture): void {
-	if (PUBLISHING_STAGED_COMMIT === capture) PUBLISHING_STAGED_COMMIT = null;
-}
-
-function stagedOwnerGuard(
-	capture: StagedCommitCapture,
-	owner: RootRenderOwner | undefined,
-): (() => boolean) | undefined {
-	if (owner === undefined) return undefined;
-	let receipt = capture.owners.get(owner);
-	if (receipt === undefined) {
-		const current = {
-			generation: owner.generation,
-			current: owner.current,
-			guard: (): boolean => !owner.disposed && owner.generation === current.generation,
-		};
-		receipt = current;
-		capture.owners.set(owner, receipt);
-	}
-	return receipt.guard;
-}
-
-/** Host-plan entries keep the accepted preparation generation of their root. */
-function captureStagedCommitGuard(): (() => boolean) | undefined {
-	const capture = STAGED_COMMIT_CAPTURE;
-	if (capture === null) return undefined;
-	if (ROOT_RENDER_ROLLBACK || TRANSITION_JOURNAL_REPLAYING) return () => false;
-	const ownerGuard = stagedOwnerGuard(
-		capture,
-		CURRENT_BLOCK?.idState.renderOwner ?? CURRENT_SCOPE?.block.idState.renderOwner,
-	);
-	if (TRANSITION_JOURNAL === null) return ownerGuard;
-	// Keep logical rollback writes in the projection but omit both the abandoned
-	// forward operation and its undo from the later native mutation log.
-	let cancelled = false;
-	journalUndo(() => {
-		cancelled = true;
-	});
-	return () => !cancelled && ownerGuard?.() !== false;
-}
-
-/** Capture commit work while the host adapter prepares an ordered mutation plan. */
-function beginStagedCommitCapture(
-	enqueue: (action: () => void, durable?: boolean) => void,
-): StagedCommitCapture {
-	ensureDeferredLayoutDriver();
-	const capture: StagedCommitCapture = {
-		parent: STAGED_COMMIT_CAPTURE,
-		enqueue,
-		queues: createOffscreenCapture(),
-		passiveUnmounts: [],
-		adoptions: [],
-		selects: [],
-		defaults: [],
-		checks: [],
-		autofocus: [],
-		bundles: new Map(),
-		controls: new Map(),
-		owners: new Map(),
-		guards: new Map(),
-		registrations: new Map(),
-		published: false,
-	};
-	STAGED_COMMIT_CAPTURE = capture;
-	return capture;
-}
-
 function isRecordingTransitionJournal(): boolean {
 	return TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK && !TRANSITION_JOURNAL_REPLAYING;
-}
-
-function enqueueStagedAction(
-	capture: StagedCommitCapture,
-	action: () => void,
-	durable = false,
-): void {
-	let cancelled = ROOT_RENDER_ROLLBACK || TRANSITION_JOURNAL_REPLAYING;
-	if (TRANSITION_JOURNAL !== null && !cancelled)
-		journalUndo(() => {
-			cancelled = true;
-		});
-	capture.enqueue(() => {
-		if (!cancelled) action();
-	}, durable);
-}
-
-function endStagedCommitCapture(capture: StagedCommitCapture): void {
-	capture.registrations.clear();
-	try {
-		captureStagedCommitQueues(capture);
-		for (const [owner, receipt] of capture.owners) {
-			receipt.generation = owner.generation;
-			receipt.current = owner.current;
-		}
-	} finally {
-		STAGED_COMMIT_CAPTURE = capture.parent;
-	}
-}
-
-function captureStagedCommitQueues(capture: StagedCommitCapture): void {
-	const queues = capture.queues;
-	for (let phase = 0 as Phase; phase < 3; phase++) {
-		for (const effect of effectQueues[phase]) {
-			const guard = stagedOwnerGuard(capture, effect.scope.block.idState.renderOwner);
-			if (guard !== undefined) capture.guards.set(effect, guard);
-			queues.effects[phase].push(effect);
-		}
-		effectQueues[phase].length = 0;
-	}
-	for (const event of effectEventQueue) {
-		const guard = stagedOwnerGuard(capture, event.block.idState.renderOwner);
-		if (guard !== undefined) capture.guards.set(event, guard);
-		queues.events.push(event);
-	}
-	effectEventQueue.length = 0;
-	for (const action of effectEventCommitActions) queues.eventActions.push(action);
-	effectEventCommitActions.length = 0;
-	for (const ref of refAttachQueue) {
-		const guard = stagedOwnerGuard(capture, ref.block?.idState.renderOwner);
-		if (guard !== undefined) capture.guards.set(ref, guard);
-		queues.refs.push(ref);
-	}
-	refAttachQueue.length = 0;
-	if (refDetachQueue.length > 0) {
-		const detaches = (queues.detaches ??= []);
-		for (const entry of refDetachQueue) detaches.push(entry);
-		refDetachQueue.length = 0;
-	}
-	for (const store of storeSyncQueue) {
-		const guard = stagedOwnerGuard(capture, store.block.idState.renderOwner);
-		if (guard !== undefined) capture.guards.set(store, guard);
-		queues.stores.push(store);
-	}
-	storeSyncQueue.length = 0;
-	for (const entry of pendingPassiveUnmounts) capture.passiveUnmounts.push(entry);
-	pendingPassiveUnmounts.length = 0;
-	if (hydrationStarted && NATIVE_ADOPTION_RELEASES !== null) {
-		for (const adoption of NATIVE_ADOPTION_RELEASES) capture.adoptions.push(adoption);
-		NATIVE_ADOPTION_RELEASES = null;
-	}
-	for (const select of SELECT_SYNCS) capture.selects.push(select);
-	SELECT_SYNCS.length = 0;
-	for (const entry of SELECT_DEFAULT_SYNCS) capture.defaults.push(entry);
-	SELECT_DEFAULT_SYNCS.length = 0;
-	if (DEV_FORM_CHECKS !== null) {
-		for (const element of DEV_FORM_CHECKS) capture.checks.push(element);
-		DEV_FORM_CHECKS.length = 0;
-	}
-	for (const element of AUTOFOCUS_QUEUE) capture.autofocus.push(element);
-	AUTOFOCUS_QUEUE.length = 0;
-}
-
-/** Publish after the ordered host mutations, inside a deferred-layout capture. */
-function publishStagedCommit(capture: StagedCommitCapture): void {
-	if (capture.published) return;
-	capture.published = true;
-	// A custom-element callback may synchronously replace a root during the host
-	// replay. Accept that root's mutation-phase work before resource readiness.
-	if (DEFERRED_LAYOUT_CAPTURE !== null) acceptDeferredRootTransactions(DEFERRED_LAYOUT_CAPTURE);
-	const current = (entry: object): boolean => capture.guards.get(entry)?.() !== false;
-	for (const effects of capture.queues.effects) {
-		for (let i = effects.length - 1; i >= 0; i--) if (!current(effects[i])) effects.splice(i, 1);
-	}
-	capture.queues.events = capture.queues.events.filter(current);
-	capture.queues.eventActions = capture.queues.eventActions.filter(current);
-	capture.queues.refs = capture.queues.refs.filter(current);
-	capture.queues.stores = capture.queues.stores.filter((store) => {
-		if (current(store)) return true;
-		store.queued = false;
-		return false;
-	});
-	spliceOffscreenCapture(capture.queues);
-	for (const entry of capture.passiveUnmounts) pendingPassiveUnmounts.push(entry);
-	capture.passiveUnmounts.length = 0;
-	if (hydrationStarted && capture.adoptions.length > 0) {
-		const releases = (NATIVE_ADOPTION_RELEASES ??= []);
-		for (const adoption of capture.adoptions) releases.push(adoption);
-		capture.adoptions.length = 0;
-	}
-	for (const select of capture.selects) if (current(select)) SELECT_SYNCS.push(select);
-	for (const entry of capture.defaults) if (current(entry)) SELECT_DEFAULT_SYNCS.push(entry);
-	if (DEV_FORM_CHECKS !== null)
-		for (const element of capture.checks) if (current(element)) DEV_FORM_CHECKS.push(element);
-	for (const element of capture.autofocus) if (current(element)) AUTOFOCUS_QUEUE.push(element);
-	capture.selects.length =
-		capture.defaults.length =
-		capture.checks.length =
-		capture.autofocus.length =
-			0;
-	capture.bundles.clear();
-	capture.controls.clear();
-	capture.signalHosts?.clear();
-	commitEffects();
-}
-
-function runStagedTeardown(
-	cleanup: Cleanup,
-	phase: number,
-	handler: TryHandler | null,
-	owner: Block | null,
-	suppressed: RefDetachSuppression | null,
-	scope: Scope,
-): void {
-	const previousHandler = TEARDOWN_HANDLER;
-	const previousOwner = TEARDOWN_BLOCK;
-	const previousErrors = TEARDOWN_ERRORS;
-	const previousSuppressed = REF_DETACH_SUPPRESSION;
-	TEARDOWN_HANDLER = handler;
-	TEARDOWN_BLOCK = owner;
-	TEARDOWN_ERRORS = null;
-	REF_DETACH_SUPPRESSION = suppressed;
-	TEARDOWN_DEPTH++;
-	try {
-		try {
-			if (phase < 0) runEffectLifecycleCallback(cleanup, scope);
-			else runEffectCleanupCallback(cleanup, phase, scope);
-		} catch (error) {
-			reportTeardownError(error);
-		}
-	} finally {
-		TEARDOWN_DEPTH--;
-		try {
-			dispatchTeardownErrors();
-		} finally {
-			TEARDOWN_HANDLER = previousHandler;
-			TEARDOWN_BLOCK = previousOwner;
-			TEARDOWN_ERRORS = previousErrors;
-			REF_DETACH_SUPPRESSION = previousSuppressed;
-		}
-	}
 }
 
 function ensureDeferredLayoutDriver(): void {
@@ -11177,8 +10730,8 @@ function ensureDeferredLayoutDriver(): void {
 				if (DEFERRED_LAYOUT_HELD_WORK?.delete(block)) QUEUE.push(block);
 			},
 			discardRefs(root, uncommitted) {
-				for (let capture = PENDING_DEFERRED_LAYOUT; capture !== null; capture = capture.parent)
-					discardSubtreeRefAttachesFrom(capture.refs, root, uncommitted);
+				const capture = PENDING_DEFERRED_LAYOUT;
+				if (capture !== null) discardSubtreeRefAttachesFrom(capture.refs, root, uncommitted);
 			},
 			holdPassivesBeforeRender() {
 				const capture = COMPLETING_DEFERRED_LAYOUT;
@@ -11199,147 +10752,9 @@ function ensureDeferredLayoutDriver(): void {
 					if (capture.transactions?.has(transaction) !== true) return false;
 				return true;
 			},
-			stageEffects() {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return false;
-				captureStagedCommitQueues(capture);
-				return true;
-			},
-			stageAction(action, durable) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return false;
-				enqueueStagedAction(capture, action, durable);
-				return true;
-			},
-			retireHostTree(node) {
-				// A staged deletion keeps its committed hosts live until it publishes.
-				// One queued action per capture stamps every removed host root, ahead
-				// of the cleanups and DOM removals the capture queued after it. It
-				// runs after the capture ends, so each node stamps immediately.
-				const capture = STAGED_COMMIT_CAPTURE!;
-				let nodes = capture.retiredHostTrees;
-				if (nodes === undefined) {
-					const list: Node[] = (nodes = capture.retiredHostTrees = []);
-					capture.enqueue(() => list.forEach(retireEventHostTree), true);
-				}
-				nodes.push(node);
-			},
-			stageTeardown(cleanup, phase, scope) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return false;
-				const handler = TEARDOWN_HANDLER;
-				const owner = TEARDOWN_BLOCK;
-				const suppressed = REF_DETACH_SUPPRESSION;
-				enqueueStagedAction(
-					capture,
-					() => runStagedTeardown(cleanup, phase, handler, owner, suppressed, scope),
-					true,
-				);
-				return true;
-			},
-			stageDeactivation(slot, scope) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return false;
-				if (isRecordingTransitionJournal()) journalObjectOnce(slot);
-				const cleanup = slot.cleanup;
-				if (cleanup !== undefined) {
-					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-						__profileQueueCleanup(cleanup, scope);
-					const handler = findTryHandler(scope.block);
-					enqueueStagedAction(
-						capture,
-						() => runStagedTeardown(cleanup, slot.phase, handler, scope.block, null, scope),
-						true,
-					);
-				}
-				return true;
-			},
-			projectEventBundle(bundle) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return bundle;
-				let projected = capture.bundles.get(bundle);
-				if (projected === undefined) {
-					projected = { ...bundle };
-					capture.bundles.set(bundle, projected);
-					if (isRecordingTransitionJournal())
-						journalUndo(() => {
-							capture.bundles.delete(bundle);
-						});
-					const next = projected;
-					capture.enqueue(() => {
-						if (_dispatchDepth !== 0) preserveDispatchedBundle(bundle);
-						Object.assign(bundle, next);
-					});
-				}
-				return projected;
-			},
-			projectControlled(state) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return state;
-				let projected = capture.controls.get(state);
-				if (projected === undefined) {
-					const before = { ...state };
-					projected = { ...state };
-					capture.controls.set(state, projected);
-					if (isRecordingTransitionJournal())
-						journalUndo(() => {
-							capture.controls.delete(state);
-						});
-					const next = projected;
-					capture.enqueue(() => {
-						// Composition/event state may advance while a native capture is
-						// pending. Publish only fields changed by the prepared binding.
-						for (const key of Object.keys(next)) {
-							if (!Object.is((next as any)[key], (before as any)[key]))
-								(state as any)[key] = (next as any)[key];
-						}
-					});
-				}
-				return projected;
-			},
-			recordStageEntry(entry) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return;
-				const guard = captureStagedCommitGuard();
-				if (guard !== undefined) capture.guards.set(entry, guard);
-			},
-			refreshPublishingOwner(owner) {
-				const receipt = PUBLISHING_STAGED_COMMIT?.owners.get(owner);
-				if (receipt !== undefined && receipt.current === owner.current)
-					receipt.generation = owner.generation;
-			},
 			recordRootTransaction(transaction) {
 				const capture = DEFERRED_LAYOUT_CAPTURE;
 				if (capture !== null) (capture.transactions ??= new Set()).add(transaction);
-			},
-			stageDelegation(target, root, register) {
-				const capture = STAGED_COMMIT_CAPTURE;
-				if (capture === null) return false;
-				const guard = stagedOwnerGuard(
-					capture,
-					CURRENT_BLOCK?.idState.renderOwner ?? CURRENT_SCOPE?.block.idState.renderOwner,
-				);
-				let owners = capture.registrations.get(target);
-				if (owners === undefined) capture.registrations.set(target, (owners = new Map()));
-				let pending = owners.get(guard);
-				if (pending === undefined) owners.set(guard, (pending = [0, 0]));
-				const index = root ? 1 : 0;
-				if (register) {
-					pending[index]++;
-					// Listener infrastructure follows eager delegation bookkeeping.
-					// A root created by user code survives a suspended outer render;
-					// canceling that attempt must not strand its event registration.
-					return false;
-				} else {
-					const registered = pending[index] > 0;
-					if (registered) pending[index]--;
-					// Unwind a registration introduced by this preparation eagerly.
-					// Existing targets retain their committed handlers until deletion
-					// publishes, including while a staged portal removal is pending.
-					if (registered) return false;
-					enqueueStagedAction(capture, () => unregisterDelegationTarget(target, root), true);
-				}
-				return true;
 			},
 		};
 	}
@@ -11359,7 +10774,6 @@ function beginDeferredLayoutCapture(
 		}
 	}
 	const capture: DeferredLayoutCapture = {
-		parent: DEFERRED_LAYOUT_CAPTURE,
 		commits: [],
 		refs: [],
 		refUpdates: null,
@@ -11379,7 +10793,7 @@ function beginDeferredLayoutCapture(
 }
 
 function endDeferredLayoutCapture(capture: DeferredLayoutCapture): void {
-	DEFERRED_LAYOUT_CAPTURE = capture.parent;
+	if (DEFERRED_LAYOUT_CAPTURE === capture) DEFERRED_LAYOUT_CAPTURE = null;
 }
 
 function deferCommitLayout(
@@ -11467,7 +10881,7 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 	try {
 		capture.completed = true;
 		if (interrupted) capture.retainPassives = false;
-		if (PENDING_DEFERRED_LAYOUT === capture) PENDING_DEFERRED_LAYOUT = capture.parent;
+		if (PENDING_DEFERRED_LAYOUT === capture) PENDING_DEFERRED_LAYOUT = null;
 		const previousFlush = inFlush;
 		inFlush = true;
 		const previousCompleting = COMPLETING_DEFERRED_LAYOUT;
@@ -11580,7 +10994,6 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 
 function commitEffects(): void {
 	if (HOLDING_ROOT_COMMITS) return;
-	if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageEffects()) return;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.COMMIT_EFFECTS);
 	// No-work fast path: every commit queue the drains below consume is empty —
@@ -12933,7 +12346,6 @@ function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
 function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileQueueWork(action);
-	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(action);
 	EFFECT_EVENT_ACTION_TARGET.push(action);
 }
 
@@ -13390,8 +12802,8 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 				frontier = (frag as any).$$next as SlotNext;
 				disposeReturnSlot(block, existingRet, frontier.out);
 				frontier.follows = true;
-				anchor = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-				(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(anchor);
+				anchor = document.createComment('');
+				frag.appendChild(anchor);
 				domParent = frag;
 			} else {
 				disposeReturnSlot(block, existingRet);
@@ -13470,7 +12882,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 			// A single-root call that rendered at the fragment's end inserts before
 			// the Block's end, as an in-place mount does.
 			markerlessBranchRoots(block, domParent, anchor, block.endMarker);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(anchor!);
+			domParent.removeChild(anchor!);
 		}
 		const state = block.slots[0] as any;
 		if (!block.disposed && state !== undefined && state.returnedOutput !== true) {
@@ -13539,19 +12951,15 @@ function disposeReturnSlot(block: Block, state: any, out?: any[]): void {
 			first === null
 				? null
 				: state.ownerHost != null || (borrowed && end === null)
-					? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
+					? parent.lastChild
 					: borrowed
-						? domNode(end).previousSibling
+						? end.previousSibling
 						: (end ?? arm?.endMarker ?? first);
 		journalRootSlot(
 			state,
 			parent,
-			borrowed
-				? state.start
-				: first !== null
-					? (STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling
-					: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild,
-			borrowed ? end : ((STAGED_DOM ? STAGED_DOM.view(last) : last)?.nextSibling ?? null),
+			borrowed ? state.start : first !== null ? first.previousSibling : parent.lastChild,
+			borrowed ? end : (last?.nextSibling ?? null),
 		);
 		const retiredBlock = state.block ?? state.portal?.block ?? state.lite?.block;
 		if (retiredBlock != null) retireRootBlock(retiredBlock);
@@ -13591,8 +12999,8 @@ function disposeReturnSlot(block: Block, state: any, out?: any[]): void {
 		// Fires the content's cleanups and sweeps the nodes between the markers.
 		clearChildContent(state);
 		if (!state.borrowed) {
-			domNode(state.start as ChildNode | null)?.remove();
-			domNode(end as ChildNode | null)?.remove();
+			(state.start as ChildNode | null)?.remove();
+			(end as ChildNode | null)?.remove();
 		}
 	} else {
 		// Component and native control-flow slots release their child lifetime.
@@ -13603,8 +13011,8 @@ function disposeReturnSlot(block: Block, state: any, out?: any[]): void {
 			unmountSlot(state, true);
 		}
 		if (!state.inherited && !state.borrowed) {
-			domNode(state.start as ChildNode | null)?.remove?.();
-			domNode(end as ChildNode | null)?.remove?.();
+			(state.start as ChildNode | null)?.remove?.();
+			(end as ChildNode | null)?.remove?.();
 		}
 	}
 	const reg = block._slots;
@@ -13729,15 +13137,7 @@ export function componentSlotLite<P>(
 		const end = freshSlotEnd(parentScope.block, host, anchor);
 		if (end !== null) {
 			try {
-				componentSlotLite(
-					parentScope,
-					slotKey,
-					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
-					comp,
-					props,
-					invocationSite,
-					end,
-				);
+				componentSlotLite(parentScope, slotKey, end.parentNode!, comp, props, invocationSite, end);
 			} finally {
 				settleFreshSlot(parentScope, end, anchor);
 			}
@@ -14004,14 +13404,14 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		(block.kind === 'root' ||
 			(block.startMarker !== null &&
 				block.endMarker !== null &&
-				domNode(block.startMarker).parentNode !== null));
+				block.startMarker.parentNode !== null));
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom && !removesOwnDom);
 	if (NATIVE_READ_DRIVER && owner?.current === block) NATIVE_READ_DRIVER.clearDeferredRefs(owner);
 	if (!detachDom) return;
 	// Remove DOM range.
 	if (block.startMarker && block.endMarker) {
-		const parent = domNode(block.startMarker).parentNode;
+		const parent = block.startMarker.parentNode;
 		if (parent) {
 			// Borrowed (slot) markers stay put — remove only the content between
 			// them. Owned markers are removed inclusively with the content.
@@ -14020,7 +13420,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 			const stop = excl ? block.endMarker : getNextSibling(block.endMarker);
 			while (n && n !== stop) {
 				const next: Node | null = getNextSibling(n);
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
+				parent.removeChild(n);
 				n = next;
 			}
 		}
@@ -14028,7 +13428,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		// Root block — clear the whole container.
 		let c: Node | null;
 		while ((c = getFirstChild(block.parentNode)) !== null) {
-			domNode(block.parentNode).removeChild(c);
+			block.parentNode.removeChild(c);
 		}
 	}
 	// else: a non-root block with no markers produced no DOM (e.g. a singleRoot
@@ -14107,13 +13507,6 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// commitEffects anyway, deduped by the flag.
 				if (!passiveScheduled) schedulePassiveFlush();
 			} else {
-				// The driver stays installed after a transition. Ordinary teardown
-				// needs no staging call; only an active capture can defer this cleanup.
-				if (
-					STAGED_COMMIT_CAPTURE &&
-					DEFERRED_LAYOUT_DRIVER!.stageTeardown(cleanup, slot.phase, scope) === true
-				)
-					continue;
 				try {
 					runEffectCleanupCallback(cleanup, slot.phase, scope);
 				} catch (err) {
@@ -14150,8 +13543,6 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 	const c = scope.cleanups;
 	if (c !== null)
 		for (let i = c.length - 1; i >= 0; i--) {
-			if (STAGED_COMMIT_CAPTURE && DEFERRED_LAYOUT_DRIVER!.stageTeardown(c[i], -1, scope) === true)
-				continue;
 			try {
 				runEffectLifecycleCallback(c[i], scope);
 			} catch (err) {
@@ -14165,17 +13556,6 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 	const signalOwner = scope.signalOwner;
 	if (signalOwner) {
 		if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
-		// Deferred cleanups must still resolve facade reads in this exact owner.
-		// Retirement follows those callbacks at the same publication boundary.
-		if (
-			STAGED_COMMIT_CAPTURE &&
-			DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-				if (retireUnowned) scope.signalOwner = null;
-				else scope.signalOwner = undefined;
-				retireRendererSignalOwner(signalOwner);
-			}, true)
-		)
-			return;
 		if (retireUnowned) scope.signalOwner = null;
 		else scope.signalOwner = undefined;
 		retireRendererSignalOwner(signalOwner);
@@ -14183,18 +13563,12 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 		retireUnowned &&
 		(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
 	) {
-		if (
-			STAGED_COMMIT_CAPTURE &&
-			DEFERRED_LAYOUT_DRIVER!.stageAction(() => retireUnownedSignalScope(scope), true)
-		)
-			return;
 		retireUnownedSignalScope(scope);
 	}
 }
 
 function retireUnownedSignalScope(scope: Scope): void {
-	// Resolve at publication, after deferred cleanups which may read the first
-	// handle. Null records retirement without allocating speculative authority.
+	// Resolve after the cleanups, which may read the first handle. Null records retirement without allocating speculative authority.
 	const owner = scope.signalOwner;
 	if (owner === false || (owner === undefined && scope.signalTokenEscaped))
 		scope.signalOwner = null;
@@ -16663,27 +16037,24 @@ function hasResettableHmrRange(block: Block): boolean {
 		);
 	}
 	if (start !== end) {
-		return (
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === block.parentNode &&
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === block.parentNode
-		);
+		return start.parentNode === block.parentNode && end.parentNode === block.parentNode;
 	}
 	// A sole-root control-flow or list-item ancestor can borrow this exact node.
 	// Promoting only the hot block would leave the borrowed boundary detached.
 	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
 		if (parent.startMarker === start && parent.endMarker === end) return false;
 	}
-	return (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === block.parentNode;
+	return start.parentNode === block.parentNode;
 }
 
 function promoteHmrBlockRange(block: Block): void {
 	const root = block.startMarker;
 	if (root === null || root !== block.endMarker) return;
 	const parent = block.parentNode;
-	const rangeStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('hmr');
-	const rangeEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/hmr');
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(rangeStart, root);
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(rangeEnd, getNextSibling(root));
+	const rangeStart = document.createComment('hmr');
+	const rangeEnd = document.createComment('/hmr');
+	parent.insertBefore(rangeStart, root);
+	parent.insertBefore(rangeEnd, getNextSibling(root));
 	block.startMarker = rangeStart;
 	block.endMarker = rangeEnd;
 	block.exclusiveMarkers = false;
@@ -17164,22 +16535,19 @@ function permanentStaticHydrationRangeEnd(
 	marker: Comment,
 	expectedStreamToken?: string,
 ): { end: Comment; idCount: number } | null {
-	const parsed = parsePermanentStaticHydrationMarker(
-		(STAGED_DOM ? STAGED_DOM.view(marker) : marker).data,
-	);
+	const parsed = parsePermanentStaticHydrationMarker(marker.data);
 	if (
 		parsed === null ||
 		(expectedStreamToken !== undefined && parsed.streamToken !== expectedStreamToken)
 	)
 		return null;
 	const childClose = rendererRangeClose(getNextSibling(marker));
-	const end = (STAGED_DOM ? STAGED_DOM.view(childClose) : childClose)?.nextSibling;
+	const end = childClose?.nextSibling;
 	const expectedEnd =
 		parsed.streamToken === null
 			? HYDRATE_STATIC_END
 			: HYDRATE_STATIC_END + ':' + parsed.streamToken;
-	return end?.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(end as Comment) : (end as Comment)).data === expectedEnd
+	return end?.nodeType === 8 && (end as Comment).data === expectedEnd
 		? { end: end as Comment, idCount: parsed.idCount }
 		: null;
 }
@@ -17193,8 +16561,8 @@ function preservePermanentStaticHydrationRange(scope: Scope): void {
 	if (range === null) return;
 	reserveHydrationIds(scope.block.idState, range.idCount);
 	hydration.node = getNextSibling(marker);
-	(STAGED_DOM ? STAGED_DOM.view(marker as ChildNode) : (marker as ChildNode)).remove();
-	domNode(range.end).remove();
+	(marker as ChildNode).remove();
+	range.end.remove();
 }
 
 function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
@@ -17451,8 +16819,6 @@ function disposeHydrateInstaller(state: HydrateSlot, cleanup: () => void): void 
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 		transaction.ops.push(runHydrateInstallerCleanup, cleanup);
 		journalObjectOnce(state);
-	} else if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageAction(cleanup, true)) {
-		if (isRecordingTransitionJournal()) journalObjectOnce(state);
 	} else cleanup();
 }
 
@@ -17482,19 +16848,11 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 function teardownHydrateBoundary(state: HydrateSlot): void {
 	const preserved = preservedHydrateActivations?.get(state);
 	if (preserved !== undefined) {
-		// Recursive teardown must recognize these refs as uncommitted even when
-		// observable cleanup waits for staged DOM publication. Restore this logical
-		// state if the preparing transition is abandoned.
+		// Recursive teardown must recognize these refs as uncommitted. Restore
+		// this logical state if the preparing transition is abandoned.
 		if (isRecordingTransitionJournal()) journalObjectOnce(state.block);
 		state.block.mounted = false;
 	}
-	// Abort signals and custom strategy disposers are observable lifetimes. An
-	// abandoned preparation must keep them alive with the still-visible server DOM.
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => teardownHydrateBoundary(state), true)
-	)
-		return;
 	state.initialCaptures = null;
 	cleanupHydrateInstallers(state);
 	cleanupHydrateStreamWait(state);
@@ -17508,19 +16866,17 @@ function teardownHydrateBoundary(state: HydrateSlot): void {
 }
 
 function resolveEventPath(root: Element, path: number[]): Element | null {
-	const streamToken = (STAGED_DOM ? STAGED_DOM.view(root) : root).getAttribute(
-		HYDRATE_STREAM_TOKEN_ATTR,
-	);
+	const streamToken = root.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
 	let node: Element = root;
 	for (let i = 0; i < path.length; i++) {
 		let index = path[i];
-		let next = (STAGED_DOM ? STAGED_DOM.view(node) : node).firstElementChild;
+		let next = node.firstElementChild;
 		while (next !== null) {
 			if (!isRendererStreamBoundaryTemplate(next, streamToken)) {
 				if (index === 0) break;
 				index--;
 			}
-			next = (STAGED_DOM ? STAGED_DOM.view(next) : next).nextElementSibling;
+			next = next.nextElementSibling;
 		}
 		if (next === null) return null;
 		node = next;
@@ -17529,12 +16885,10 @@ function resolveEventPath(root: Element, path: number[]): Element | null {
 }
 
 function hydrateMarkerInteractionEvents(marker: Element): ReadonlyArray<string> | null {
-	const when = (STAGED_DOM ? STAGED_DOM.view(marker) : marker).getAttribute(HYDRATE_WHEN_ATTR);
+	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
 	if (when === 'dynamic') return HYDRATE_SUPPORTED_INTERACTION_EVENTS;
 	if (when !== 'interaction') return null;
-	const custom = (STAGED_DOM ? STAGED_DOM.view(marker) : marker).getAttribute(
-		HYDRATE_INTERACTION_EVENTS_ATTR,
-	);
+	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
 	return custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
 }
 
@@ -17588,7 +16942,7 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		// whose strategy could not yet be evaluated. Resolved boundaries get none.
 		(state.delegatedDynamicIntent ? HYDRATE_SUPPORTED_INTERACTION_EVENTS : []);
 	const events = new Set<string>(ownEvents);
-	const descendants = domNode(state.wrapper).querySelectorAll(HYDRATE_MARKER_SELECTOR);
+	const descendants = state.wrapper.querySelectorAll(HYDRATE_MARKER_SELECTOR);
 	for (let i = 0; i < descendants.length; i++) {
 		const nestedEvents = hydrateMarkerInteractionEvents(descendants[i]);
 		if (nestedEvents !== null) {
@@ -17610,31 +16964,23 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 			rawTarget?.nodeType === 1
 				? (rawTarget as Element)
 				: rawTarget !== null
-					? (STAGED_DOM ? STAGED_DOM.view(rawTarget) : rawTarget).parentElement
+					? rawTarget.parentElement
 					: null;
-		let marker: Element | null =
-			(STAGED_DOM ? STAGED_DOM.view(target) : target)?.closest(HYDRATE_MARKER_SELECTOR) ??
-			state.wrapper;
+		let marker: Element | null = target?.closest(HYDRATE_MARKER_SELECTOR) ?? state.wrapper;
 		let matches = ownEvents.includes(event.type);
 		const delegatedDynamicMarkers: Element[] = [];
-		while (marker !== null && domNode(state.wrapper).contains(marker)) {
+		while (marker !== null && state.wrapper.contains(marker)) {
 			if (marker !== state.wrapper) {
 				const nestedEvents = hydrateMarkerInteractionEvents(marker);
 				if (nestedEvents?.includes(event.type)) {
 					matches = true;
-					if (
-						(STAGED_DOM ? STAGED_DOM.view(marker) : marker).getAttribute(HYDRATE_WHEN_ATTR) ===
-						'dynamic'
-					) {
+					if (marker.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic') {
 						delegatedDynamicMarkers.push(marker);
 					}
 				}
 			}
 			if (marker === state.wrapper) break;
-			marker =
-				domNode((STAGED_DOM ? STAGED_DOM.view(marker) : marker).parentElement)?.closest(
-					HYDRATE_MARKER_SELECTOR,
-				) ?? null;
+			marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
 		}
 		if (!matches) return;
 		for (let i = 0; i < delegatedDynamicMarkers.length; i++) {
@@ -17650,11 +16996,9 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		}
 		requestHydrateBoundary(state);
 	};
-	for (const eventName of events)
-		domNode(state.wrapper).addEventListener(eventName, onIntent, true);
+	for (const eventName of events) state.wrapper.addEventListener(eventName, onIntent, true);
 	return () => {
-		for (const eventName of events)
-			domNode(state.wrapper).removeEventListener(eventName, onIntent, true);
+		for (const eventName of events) state.wrapper.removeEventListener(eventName, onIntent, true);
 	};
 }
 
@@ -17666,13 +17010,10 @@ function isCanonicalHydrateIdCount(value: string | null): boolean {
 function isDormantServerHydrateOwner(element: Element, streamToken: string): boolean {
 	return (
 		element.localName === 'div' &&
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(HYDRATE_STREAM_TOKEN_ATTR) ===
-			streamToken &&
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).hasAttribute(HYDRATE_ID_ATTR) &&
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).hasAttribute(HYDRATE_WHEN_ATTR) &&
-		isCanonicalHydrateIdCount(
-			(STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(HYDRATE_ID_COUNT_ATTR),
-		) &&
+		element.getAttribute(HYDRATE_STREAM_TOKEN_ATTR) === streamToken &&
+		element.hasAttribute(HYDRATE_ID_ATTR) &&
+		element.hasAttribute(HYDRATE_WHEN_ATTR) &&
+		isCanonicalHydrateIdCount(element.getAttribute(HYDRATE_ID_COUNT_ATTR)) &&
 		rendererRangeClose(getFirstChild(element)) !== null
 	);
 }
@@ -17682,23 +17023,23 @@ function hydrateStreamBoundaryOwnedByState(
 	state: HydrateSlot,
 	streamToken: string,
 ): boolean {
-	let owner = (STAGED_DOM ? STAGED_DOM.view(boundary) : boundary).parentElement;
+	let owner = boundary.parentElement;
 	while (owner !== null && owner !== state.wrapper) {
 		// Only a complete token-bound server shape creates an ownership barrier.
 		// Authored lookalike data attributes remain ordinary descendants.
 		if (isDormantServerHydrateOwner(owner, streamToken)) return false;
-		owner = (STAGED_DOM ? STAGED_DOM.view(owner) : owner).parentElement;
+		owner = owner.parentElement;
 	}
 	return owner === state.wrapper;
 }
 
 function hasPendingHydrateStreamReveal(state: HydrateSlot): boolean {
-	const streamToken = domNode(state.wrapper).getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
+	const streamToken = state.wrapper.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
 	if (!isRendererStreamToken(streamToken)) return false;
 	// querySelector is the fast native rejection path for the overwhelmingly
 	// common non-streamed boundary. Only pay the ownership/range-aware JS walk
 	// after proving at least one renderer stream sentinel remains below it.
-	if (domNode(state.wrapper).querySelector(HYDRATE_STREAM_BOUNDARY_SELECTOR) === null) return false;
+	if (state.wrapper.querySelector(HYDRATE_STREAM_BOUNDARY_SELECTOR) === null) return false;
 	const walker = state.wrapper.ownerDocument.createTreeWalker(
 		state.wrapper,
 		HYDRATE_STREAM_SCAN_MASK,
@@ -17715,9 +17056,7 @@ function hasPendingHydrateStreamReveal(state: HydrateSlot): boolean {
 		const boundary = node as Element;
 		if (
 			isRendererStreamBoundaryTemplate(boundary, streamToken) &&
-			!(STAGED_DOM ? STAGED_DOM.view(boundary) : boundary).hasAttribute(
-				HYDRATE_STREAM_ERROR_ATTR,
-			) &&
+			!boundary.hasAttribute(HYDRATE_STREAM_ERROR_ATTR) &&
 			hydrateStreamBoundaryOwnedByState(boundary, state, streamToken)
 		)
 			return true;
@@ -17727,18 +17066,6 @@ function hasPendingHydrateStreamReveal(state: HydrateSlot): boolean {
 
 function cleanupHydrateStreamWait(state: HydrateSlot): void {
 	const cleanup = hydrateStreamWaitCleanups?.get(state);
-	if (
-		cleanup !== undefined &&
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(cleanup, true)
-	) {
-		if (isRecordingTransitionJournal())
-			journalUndo(() => {
-				hydrateStreamWaitCleanups!.set(state, cleanup);
-			});
-		hydrateStreamWaitCleanups?.delete(state);
-		return;
-	}
 	hydrateStreamWaitCleanups?.delete(state);
 	cleanup?.();
 }
@@ -17873,15 +17200,8 @@ function findHydrateSeedSidecar(
 	wrapper: ParentNode,
 	attribute = HYDRATE_SEED_ATTR,
 ): HTMLScriptElement | null {
-	for (
-		let node = (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).firstElementChild;
-		node !== null;
-		node = (STAGED_DOM ? STAGED_DOM.view(node) : node).nextElementSibling
-	) {
-		if (
-			node.localName === 'script' &&
-			(STAGED_DOM ? STAGED_DOM.view(node) : node).hasAttribute(attribute)
-		) {
+	for (let node = wrapper.firstElementChild; node !== null; node = node.nextElementSibling) {
+		if (node.localName === 'script' && node.hasAttribute(attribute)) {
 			return node as HTMLScriptElement;
 		}
 	}
@@ -17902,29 +17222,18 @@ function createHydrateSlot(
 	// still owns it, whether or not it has activated.
 	const kept =
 		hydrationStarted && props.__independent !== undefined ? keptHydrationIsland(boundaryId) : null;
-	const expected = kept ?? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('div');
+	const expected = kept ?? document.createElement('div');
 	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
 	initializeHydrationEventCapture(wrapper.ownerDocument);
 	const serverPreserved =
 		kept !== null ||
-		(hydration !== null &&
-			!hydration.isFresh(wrapper) &&
-			(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).parentNode === parentNode);
+		(hydration !== null && !hydration.isFresh(wrapper) && wrapper.parentNode === parentNode);
 	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
-	else
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-			wrapper,
-			parentBlock.endMarker,
-		);
-	if (!(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).hasAttribute(HYDRATE_ID_ATTR))
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).setAttribute(HYDRATE_ID_ATTR, boundaryId);
-	if (!(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).hasAttribute(HYDRATE_WHEN_ATTR))
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).setAttribute(
-			HYDRATE_WHEN_ATTR,
-			hydrateStrategyType(props.when),
-		);
-	if (props.__independent !== undefined)
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
+	else parentNode.insertBefore(wrapper, parentBlock.endMarker);
+	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
+	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
+		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
+	if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
 
 	let start: Comment | null = null;
 	let end: Comment | null = null;
@@ -17932,9 +17241,7 @@ function createHydrateSlot(
 	let nativeSeedRaw: string | null = null;
 	let idState = parentBlock.idState;
 	if (serverPreserved) {
-		const rawCount = (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).getAttribute(
-			HYDRATE_ID_COUNT_ATTR,
-		);
+		const rawCount = wrapper.getAttribute(HYDRATE_ID_COUNT_ATTR);
 		const parsedCount = rawCount === null ? 0 : Number(rawCount);
 		const idCount = Number.isSafeInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
 		const rootIds = parentBlock.idState;
@@ -17948,7 +17255,7 @@ function createHydrateSlot(
 			overflow: rootIds,
 			renderOwner: rootIds.renderOwner,
 		};
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).removeAttribute(HYDRATE_ID_COUNT_ATTR);
+		wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
 		// A rolled-back attempt restores the count, so the attempt that replaces
 		// it, a retry or the fallback's client render adopting an independent
 		// wrapper, reserves the same IDs.
@@ -17964,13 +17271,13 @@ function createHydrateSlot(
 		end = hydration!.close(start);
 		const seed = findHydrateSeedSidecar(wrapper);
 		if (seed !== null) {
-			seedRaw = (STAGED_DOM ? STAGED_DOM.view(seed) : seed).textContent || '[]';
-			(STAGED_DOM ? STAGED_DOM.view(seed) : seed).remove();
+			seedRaw = seed.textContent || '[]';
+			seed.remove();
 		}
 		const nativeSeed = findHydrateSeedSidecar(wrapper, NATIVE_SIGNAL_SEED_ATTR);
 		if (nativeSeed !== null) {
-			nativeSeedRaw = (STAGED_DOM ? STAGED_DOM.view(nativeSeed) : nativeSeed).textContent || '';
-			(STAGED_DOM ? STAGED_DOM.view(nativeSeed) : nativeSeed).remove();
+			nativeSeedRaw = nativeSeed.textContent || '';
+			nativeSeed.remove();
 		}
 	} else {
 		// The server opens every ordinary wrapper with the boundary's own range. An
@@ -17990,9 +17297,9 @@ function createHydrateSlot(
 					loc = componentSourceLoc(block.body);
 			hydration!.mismatch(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
 		}
-		start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('hydrate');
-		end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/hydrate');
-		(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).append(start, end);
+		start = document.createComment('hydrate');
+		end = document.createComment('/hydrate');
+		wrapper.append(start, end);
 	}
 
 	const block = createBlock(
@@ -18019,8 +17326,7 @@ function createHydrateSlot(
 		parentBlock,
 		props,
 		contextChanged: false,
-		boundaryId:
-			(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
+		boundaryId: wrapper.getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
 		intentBoundary,
 		delegatedDynamicIntent: takeDelegatedDynamicHydrationIntent(wrapper),
 		serverPreserved,
@@ -18088,7 +17394,7 @@ function createHydrateSlot(
 function resumeFreshHydrateSource(source: Block): void {
 	const anchor = source.endMarker;
 	const parent = source.parentNode;
-	const before = anchor ? domNode(anchor).previousSibling : domNode(parent).lastChild;
+	const before = anchor ? anchor.previousSibling : parent.lastChild;
 	try {
 		renderBlock(source);
 	} finally {
@@ -18370,7 +17676,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
  */
 function discardHydrateTail(state: HydrateSlot, atCommit = false): void {
 	const end = state.end!;
-	const wrapper = domNode(end).parentNode;
+	const wrapper = end.parentNode;
 	let node = getNextSibling(end);
 	if (wrapper === null || node === null) return;
 	if (!atCommit) journalRootChildren(wrapper);
@@ -18380,7 +17686,7 @@ function discardHydrateTail(state: HydrateSlot, atCommit = false): void {
 		if (isRendererHydrationStyle(node)) {
 			// Kept.
 		} else if (atCommit) slotNext(state).out.push(null, node, node);
-		else (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).removeChild(node);
+		else wrapper.removeChild(node);
 		node = next;
 	}
 }
@@ -18394,7 +17700,7 @@ function fallBackOffDocument(state: HydrateSlot): void {
 	const block = state.block;
 	const end = state.end!;
 	const first = getNextSibling(state.start!);
-	if (first !== end) slotNext(state).out.push(null, first, domNode(end).previousSibling);
+	if (first !== end) slotNext(state).out.push(null, first, end.previousSibling);
 	const frag = slotFrontier(state, state.parentBlock, state.wrapper, end);
 	journalRootProperty(block, 'parentNode', block.parentNode);
 	journalRootProperty(block, 'startMarker', block.startMarker);
@@ -18478,7 +17784,7 @@ function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 	// click instead of replaying the complete interaction once hydration commits.
 	cleanupHydrateInstallers(state);
 	state.props.onHydrated?.();
-	domNode(state.wrapper).removeAttribute(HYDRATE_WHEN_ATTR);
+	state.wrapper.removeAttribute(HYDRATE_WHEN_ATTR);
 	state.strategy?._o?.(state.boundaryId);
 	const replays = state.replays;
 	state.replays = [];
@@ -18500,7 +17806,7 @@ function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 			originalTarget !== null &&
 			typeof (originalTarget as Node).nodeType === 'number' &&
 			(originalTarget as Node).nodeType === 1 &&
-			domNode(state.wrapper).contains(originalTarget as Node)
+			state.wrapper.contains(originalTarget as Node)
 				? (originalTarget as Element)
 				: resolveEventPath(state.wrapper, replay.path);
 		if (target !== null) {
@@ -20780,31 +20086,16 @@ export function useId(slot?: HookSlot): string {
 //    (delegateEvents / delegateCaptureEvents), the fixed set here.
 // ---------------------------------------------------------------------------
 
-// ViewTransition prepares against a logical DOM (STAGED_DOM) only while its
-// render runs. The class is reachable exclusively from the optional transition
-// driver; ordinary rendering retains native receivers and allocates no host
-// views. Local receivers test the stage inline, `STAGED_DOM ? STAGED_DOM.view(n)
-// : n`, so inactive rendering does not call an identity helper for every host
-// operation and bundles without ViewTransition drop the test. Keep complex
-// receivers on domNode: their getters/calls must run once, before reading the
-// active stage.
-
-function domNode<T extends Node | null | undefined>(node: T): T {
-	return !STAGED_DOM || node == null ? node : (STAGED_DOM.view(node) as T);
-}
-
 let firstChildGetter: ((this: Node) => ChildNode | null) | undefined;
 let nextSiblingGetter: ((this: Node) => ChildNode | null) | undefined;
 
 function getFirstChild(node: Node): ChildNode | null {
-	if (STAGED_DOM) return STAGED_DOM.view(node).firstChild;
 	// Fallback keeps DOM-less/uninitialized callers correct; the branch is a
 	// single well-predicted check once initDomOperations has run.
 	return firstChildGetter === undefined ? node.firstChild : firstChildGetter.call(node);
 }
 
 function getNextSibling(node: Node): ChildNode | null {
-	if (STAGED_DOM) return STAGED_DOM.view(node).nextSibling;
 	return nextSiblingGetter === undefined ? node.nextSibling : nextSiblingGetter.call(node);
 }
 
@@ -20899,35 +20190,27 @@ const LAZY_TEMPLATE = Symbol('octane.lazy-template');
 // Custom elements keep the wrapper: their connectedCallback can synchronously
 // inspect which earlier siblings have already joined the live parent.
 function fragmentTemplate(wrapper: Element): Node {
-	for (const descendant of (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).querySelectorAll(
-		'*',
-	)) {
-		if (
-			descendant.localName.includes('-') ||
-			(STAGED_DOM ? STAGED_DOM.view(descendant) : descendant).hasAttribute('is')
-		) {
+	for (const descendant of wrapper.querySelectorAll('*')) {
+		if (descendant.localName.includes('-') || descendant.hasAttribute('is')) {
 			(wrapper as any).__oct_frag = true;
 			return wrapper;
 		}
 	}
-	const fragment = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+	const fragment = document.createDocumentFragment();
 	let child: Node | null;
-	while ((child = getFirstChild(wrapper)) !== null)
-		(STAGED_DOM ? STAGED_DOM.view(fragment) : fragment).appendChild(child);
+	while ((child = getFirstChild(wrapper)) !== null) fragment.appendChild(child);
 	(fragment as any).__oct_frag = true;
 	return fragment;
 }
 
 function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	initDomOperations();
-	const t = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('template');
+	const t = document.createElement('template');
 	if (ns === 0) {
 		// Multi-root templates carry raw markup: an opaque one because its eventual
 		// namespace is unknown until clone time. Add the wrapper the HTML parser
 		// needs here. Markup that arrives already wrapped parses the same way.
-		(STAGED_DOM ? STAGED_DOM.view(t) : t).innerHTML = frag
-			? `<octane-frag>${html}</octane-frag>`
-			: html;
+		t.innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
 		const root = getFirstChild(t.content) as Element;
 		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
 		// wrapper never exists in the server DOM (the roots render bare), so stamp it
@@ -20945,7 +20228,7 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	// so the caller can drain its children — stamped like <octane-frag> above,
 	// since the synthetic wrapper has no server counterpart either.
 	const wrap = ns === 1 ? 'svg' : 'math';
-	(STAGED_DOM ? STAGED_DOM.view(t) : t).innerHTML = `<${wrap}>${html}</${wrap}>`;
+	t.innerHTML = `<${wrap}>${html}</${wrap}>`;
 	const wrapEl = getFirstChild(t.content) as Element;
 	if (frag) {
 		return fragmentTemplate(wrapEl);
@@ -21279,14 +20562,14 @@ function isRendererHydrationStyle(node: Node): boolean {
 	return (
 		node.nodeType === 1 &&
 		(node as Element).localName === 'style' &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element)).hasAttribute('data-octane')
+		(node as Element).hasAttribute('data-octane')
 	);
 }
 
 /** A hoisted Float stylesheet, script, or resource hint the server stamped for dedupe. */
 function isFloatHeadResource(node: Node): boolean {
 	if (node.nodeType !== 1) return false;
-	const el = STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element);
+	const el = node as Element;
 	const tag = el.localName;
 	return (
 		(tag === 'link' || tag === 'style' || tag === 'script') &&
@@ -21319,14 +20602,10 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
 		const el = head !== null && node.nodeType === 8 ? getNextSibling(node) : null;
 		const end = el === null ? null : getNextSibling(el);
 		if (end === null || end.nodeType !== 8) return node;
-		const key = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
-		if (
-			!key.startsWith('rnh-') ||
-			(STAGED_DOM ? STAGED_DOM.view(end as Comment) : (end as Comment)).data !== '/' + key
-		)
-			return node;
+		const key = (node as Comment).data;
+		if (!key.startsWith('rnh-') || (end as Comment).data !== '/' + key) return node;
 		const next = getNextSibling(end);
-		(STAGED_DOM ? STAGED_DOM.view(head!) : head!).append(node, el!, end);
+		head!.append(node, el!, end);
 		node = next;
 	}
 	return null;
@@ -21487,16 +20766,13 @@ class HydrationCapability {
 	save(parent: Node): void {
 		// An island that activates in a root render that can still drop, such as
 		// a transition, journals them too, so the retry after the drop adopts the
-		// server DOM afresh. A staged drain's DOMStage discards them itself.
-		if (
-			inRootHydrationAttempt() ||
-			(this.undoable && ROOT_RENDER_TRANSACTION !== null && !STAGED_DOM)
-		)
+		// server DOM afresh.
+		if (inRootHydrationAttempt() || (this.undoable && ROOT_RENDER_TRANSACTION !== null))
 			journalRootChildren(parent);
 		if ((!this.speculative && !this.undoable) || (this.saved ??= new Set()).has(parent)) return;
 		this.saved.add(parent);
 		const arm = this.rootBlock;
-		const ranged = arm.startMarker !== null && parent === domNode(arm.startMarker).parentNode;
+		const ranged = arm.startMarker !== null && parent === arm.startMarker.parentNode;
 		const before = ranged ? arm.startMarker : null;
 		const after = ranged ? arm.endMarker : null;
 		const nodes = collectRootRange(parent, before, after);
@@ -21772,7 +21048,7 @@ class HydrationCapability {
 					// returning component, else the list's host.
 					siteLoc(scope, slotKey) ||
 						componentSourceLoc(scope.block.body) ||
-						(domNode(end).parentNode as any).__oct_loc
+						(end.parentNode as any).__oct_loc
 				: undefined,
 			() => 'the end of the component',
 			from,
@@ -21822,13 +21098,11 @@ class HydrationCapability {
 	 */
 	claimStreamTemplate(cursor: Node | null, end: Node): string | null {
 		if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
-		const id = (STAGED_DOM ? STAGED_DOM.view(cursor as Element) : (cursor as Element)).getAttribute(
-			STREAM_BOUNDARY_ATTR,
-		)!;
+		const id = (cursor as Element).getAttribute(STREAM_BOUNDARY_ATTR)!;
 		let stale: Node | null = cursor;
 		while (stale !== null && stale !== end) {
 			const next: Node | null = getNextSibling(stale);
-			(STAGED_DOM ? STAGED_DOM.view(stale as ChildNode) : (stale as ChildNode)).remove();
+			(stale as ChildNode).remove();
 			stale = next;
 		}
 		this.node = end;
@@ -21848,14 +21122,10 @@ class HydrationCapability {
 	beginUnfinishedArm(state: TrySlot, marker: Node): UnfinishedArm | null {
 		let errored: boolean;
 		if (marker.nodeType === 1) {
-			errored = (
-				STAGED_DOM ? STAGED_DOM.view(marker as Element) : (marker as Element)
-			).hasAttribute(HYDRATE_STREAM_ERROR_ATTR);
+			errored = (marker as Element).hasAttribute(HYDRATE_STREAM_ERROR_ATTR);
 			if (!errored) return null;
 		} else {
-			const reason = (
-				STAGED_DOM ? STAGED_DOM.view(marker as Comment) : (marker as Comment)
-			).data.charAt(BOUNDARY_CLIENT.length);
+			const reason = (marker as Comment).data.charAt(BOUNDARY_CLIENT.length);
 			errored = reason === BOUNDARY_CLIENT_ERROR;
 			if (!errored && reason !== BOUNDARY_CLIENT_SUSPENDED) return null;
 		}
@@ -21904,15 +21174,10 @@ class HydrationCapability {
 	 * range of its own that opens at `first` (bindingTryState).
 	 */
 	armRange(open: Node, first: Node | null, end: Node): [Comment, Comment] {
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data.startsWith(
-				BINDING_OPEN_PREFIX,
-			) &&
-			this.isOpen(first)
-		)
+		if ((open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first))
 			return [first, this.close(first)];
-		const parent = domNode(domNode(end).parentNode!);
-		const doc = STAGED_DOM ? STAGED_DOM.view(document) : document;
+		const parent = end.parentNode!;
+		const doc = document;
 		const start = doc.createComment('try-b');
 		const close = doc.createComment('/try-b');
 		this.save(parent);
@@ -21929,23 +21194,15 @@ class HydrationCapability {
 	 * own (armRange).
 	 */
 	bindingTryState(open: Node): string | null {
-		if (
-			!(STAGED_DOM ? STAGED_DOM.view(open as Comment) : (open as Comment)).data.startsWith(
-				BINDING_OPEN_PREFIX,
-			)
-		)
-			return null;
+		if (!(open as Comment).data.startsWith(BINDING_OPEN_PREFIX)) return null;
 		const lead = getNextSibling(open);
 		if (lead?.nodeType === 1) {
-			const sentinel = STAGED_DOM ? STAGED_DOM.view(lead as Element) : (lead as Element);
+			const sentinel = lead as Element;
 			return isRendererStreamBoundaryTemplate(sentinel)
 				? BOUNDARY_STREAMED + sentinel.getAttribute(STREAM_BOUNDARY_ATTR)
 				: HYDRATION_START;
 		}
-		const data =
-			lead?.nodeType === 8
-				? (STAGED_DOM ? STAGED_DOM.view(lead as Comment) : (lead as Comment)).data
-				: '';
+		const data = lead?.nodeType === 8 ? (lead as Comment).data : '';
 		return data.startsWith(SUSPENSE_RESOLVED_COMMENT)
 			? BOUNDARY_CONTENT + data.slice(SUSPENSE_RESOLVED_COMMENT.length)
 			: data.startsWith(STREAM_SEED_COMMENT)
@@ -21994,17 +21251,17 @@ class HydrationCapability {
 		if (!open) return null;
 		const close = this.close(posNode);
 		const existing = getNextSibling(posNode);
-		const host = domNode(posNode).parentNode;
+		const host = posNode.parentNode;
 		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
-			const server = (STAGED_DOM ? STAGED_DOM.view(existing) : existing).nodeValue;
+			const server = existing.nodeValue;
 			if (!this.keepsText(host, existing, server, text, (host as any)?.__oct_loc))
-				(STAGED_DOM ? STAGED_DOM.view(existing) : existing).nodeValue = text;
+				existing.nodeValue = text;
 			return existing as Text;
 		}
 		if (existing !== close) throw new TypeError(formatClientError(72));
 		// An empty range is the server's empty text.
 		const node = this.newText(host, text, (host as any)?.__oct_loc);
-		domNode((STAGED_DOM ? STAGED_DOM.view(close) : close).parentNode)!.insertBefore(node, close);
+		close.parentNode!.insertBefore(node, close);
 		return node;
 	}
 
@@ -22015,9 +21272,8 @@ class HydrationCapability {
 	 * the client's text where that is written. The caller inserts it.
 	 */
 	newText(host: Node | null, text: string, loc: string | undefined): Text {
-		const created = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode('');
-		if (!this.keepsText(host, created, '', text, loc))
-			(STAGED_DOM ? STAGED_DOM.view(created) : created).nodeValue = text;
+		const created = document.createTextNode('');
+		if (!this.keepsText(host, created, '', text, loc)) created.nodeValue = text;
 		return created;
 	}
 
@@ -22032,10 +21288,7 @@ class HydrationCapability {
 	/** The cursor, or `domParent`'s first child when the cursor is elsewhere. */
 	private cursorIn(domParent: Node): Node | null {
 		const cursor = this.node;
-		return cursor === null ||
-			(STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode !== domParent
-			? getFirstChild(domParent)
-			: cursor;
+		return cursor === null || cursor.parentNode !== domParent ? getFirstChild(domParent) : cursor;
 	}
 
 	/**
@@ -22187,7 +21440,7 @@ class HydrationCapability {
 			first === end &&
 			!list.items.some((item) => item != null && typeof item !== 'boolean' && item !== '')
 		) {
-			this.save(domNode(end).parentNode!);
+			this.save(end.parentNode!);
 			this.node = end;
 			return true;
 		}
@@ -22197,7 +21450,7 @@ class HydrationCapability {
 					// returning component, else the list's host.
 					siteLoc(scope, slotKey) ||
 						componentSourceLoc(scope.block.body) ||
-						(domNode(end).parentNode as any)?.__oct_loc
+						(end.parentNode as any)?.__oct_loc
 				: undefined,
 			() =>
 				type !== null
@@ -22233,7 +21486,7 @@ class HydrationCapability {
 			text === null ||
 			text.nodeType !== 3 ||
 			!(list || (value as any)?.$$kind === PORTAL_TAG || isHostDescriptor(value)) ||
-			domNode(text).parentNode !== parent ||
+			text.parentNode !== parent ||
 			getNextSibling(text) !== end
 		)
 			return;
@@ -22261,9 +21514,7 @@ class HydrationCapability {
 	 */
 	itemMismatch(end: Node, expected: string): never {
 		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? (domNode(end).parentNode as any)?.__oct_loc
-				: undefined,
+			process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
 			() => expected,
 			this.node,
 		);
@@ -22310,9 +21561,7 @@ class HydrationCapability {
 		while (node !== null && node !== end) node = getNextSibling(node);
 		if (node === null) return;
 		this.mismatch(
-			process.env.NODE_ENV !== 'production'
-				? (domNode(end).parentNode as any)?.__oct_loc
-				: undefined,
+			process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
 			() => 'the end of the list',
 			from,
 		);
@@ -22440,7 +21689,7 @@ class HydrationCapability {
 			if (inRootHydrationAttempt()) journalText(node as Text, server);
 			if (this.speculative || this.undoable)
 				(this.undo ??= []).push(() => {
-					(STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue = server;
+					node.nodeValue = server;
 				});
 			return equal;
 		}
@@ -22639,9 +21888,7 @@ class HydrationCapability {
 	 */
 	adoptHTML(el: Element, next: string): void {
 		const script = el.localName === 'script';
-		const server = script
-			? ((STAGED_DOM ? STAGED_DOM.view(el) : el).textContent ?? '')
-			: (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML;
+		const server = script ? (el.textContent ?? '') : el.innerHTML;
 		const expected =
 			process.env.NODE_ENV === 'production'
 				? this.staleServerValues
@@ -22676,12 +21923,12 @@ class HydrationCapability {
 	/** Bound an unframed third-party component root so its returned value can adopt it. */
 	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
 		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('unframedRoot', false);
-		const parent = (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode!;
+		const parent = cursor.parentNode!;
 		const remainder = getNextSibling(cursor);
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(start, cursor);
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(end, remainder);
+		const start = document.createComment('');
+		const end = document.createComment('');
+		parent.insertBefore(start, cursor);
+		parent.insertBefore(end, remainder);
 		this.protectRootAnchor(end);
 		this.claimRootRemainder(remainder);
 		return [start, end];
@@ -22807,7 +22054,7 @@ class HydrationCapability {
 				block.startMarker = null;
 			}
 			block.endMarker = null;
-			return domNode(parsed).cloneNode(true);
+			return parsed.cloneNode(true);
 		} finally {
 			this.adopting = false;
 		}
@@ -22815,10 +22062,8 @@ class HydrationCapability {
 
 	/** A detached stand-in for `parent`, where a deferred mismatch's client render lands. */
 	detachedHost(parent: Node): Node {
-		const node = domNode(parent);
-		return node.nodeType === 1
-			? node.cloneNode(false)
-			: (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+		const node = parent;
+		return node.nodeType === 1 ? node.cloneNode(false) : document.createDocumentFragment();
 	}
 
 	/**
@@ -22912,7 +22157,7 @@ class HydrationCapability {
 		const claimsRoot =
 			this.rootRemainder === undefined &&
 			(cursor !== null
-				? (STAGED_DOM ? STAGED_DOM.view(cursor) : cursor).parentNode === this.rootBlock.parentNode
+				? cursor.parentNode === this.rootBlock.parentNode
 				: CURRENT_BLOCK === this.rootBlock);
 		const framedRemainder =
 			claimsRoot && cursor !== null ? this.framedRootRemainder(cursor) : undefined;
@@ -23016,7 +22261,7 @@ class HydrationCapability {
 		template: Node | null,
 		lazy: LazyTemplateRecord | null,
 	): Node | null {
-		const parent = domNode(cursor).parentNode;
+		const parent = cursor.parentNode;
 		if (
 			parent === null ||
 			!(
@@ -23049,7 +22294,7 @@ class HydrationCapability {
 	 * instead be one level inside the template's (passthroughRoot).
 	 */
 	private claimRoots(root: Node, fragment: Node | LazyTemplateRecord | null): boolean {
-		const open = domNode(root).previousSibling;
+		const open = root.previousSibling;
 		const scope = CURRENT_SCOPE;
 		if (
 			scope === null ||
@@ -23080,8 +22325,8 @@ class HydrationCapability {
 	 */
 	insertRoot(root: Node, block: Block): void {
 		const parent = block.parentNode;
-		if ((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode === parent) return;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, block.endMarker);
+		if (root.parentNode === parent) return;
+		parent.insertBefore(root, block.endMarker);
 	}
 
 	/**
@@ -23150,20 +22395,20 @@ class HydrationCapability {
 		if (first !== null && first.nodeType === 3) {
 			const next = getNextSibling(first);
 			if (next !== null) this.unclaimedText(el, next, null, loc);
-			const server = (STAGED_DOM ? STAGED_DOM.view(first as Text) : (first as Text)).nodeValue;
+			const server = (first as Text).nodeValue;
 			// An equal text stays, and still compares again when a render-phase
 			// update renders it again (keepsText).
 			if (
 				(server === text || domBindingClaims.get(el as Element)?.get('#text') !== server) &&
 				!this.keepsText(el, first, server, text, loc)
 			)
-				(STAGED_DOM ? STAGED_DOM.view(first as Text) : (first as Text)).nodeValue = text;
+				(first as Text).nodeValue = text;
 			return first as Text;
 		}
 		if (this.unframe(first)) return this.htext(el, text, loc);
 		if (first !== null) this.unclaimedText(el, first, text, loc);
 		const created = this.newText(el, text, loc);
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(created);
+		el.appendChild(created);
 		return created;
 	}
 
@@ -23175,8 +22420,8 @@ class HydrationCapability {
 	private unframe(first: Node | null): boolean {
 		const end = this.textFrameEnd(first);
 		if (end === null) return false;
-		(STAGED_DOM ? STAGED_DOM.view(first as Comment) : (first as Comment)).remove();
-		(STAGED_DOM ? STAGED_DOM.view(end) : end).remove();
+		(first as Comment).remove();
+		end.remove();
 		return true;
 	}
 
@@ -23242,17 +22487,14 @@ class HydrationCapability {
 		this.save(el);
 		while (stale !== null) {
 			const next = getNextSibling(stale);
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeChild(stale);
+			el.removeChild(stale);
 			stale = next;
 		}
 		this.suspend(() => render(el));
 		if (textarea) return;
 		// An element or text the value built is a node the server did not render.
 		for (let node = getFirstChild(el); node !== null; node = getNextSibling(node))
-			if (
-				node.nodeType === 1 ||
-				(node.nodeType === 3 && (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue)
-			)
+			if (node.nodeType === 1 || (node.nodeType === 3 && node.nodeValue))
 				this.mismatch(loc, () => 'a renderable range', null);
 	}
 
@@ -23267,7 +22509,7 @@ class HydrationCapability {
 	private renderBeforeMismatch(el: Node, render: (parent: Node) => void): void {
 		if (!this.defers) return;
 		try {
-			this.suspend(() => render(domNode(el).cloneNode(false)));
+			this.suspend(() => render(el.cloneNode(false)));
 		} catch (error) {
 			if (isSuspenseException(error) || isAdoptionControl(error) || isHostContextRequest(error))
 				throw error;
@@ -23296,16 +22538,7 @@ class HydrationCapability {
 		if (first.nodeType === 3 && getNextSibling(first) === null) {
 			// With no host, keepsText applies no suppressHydrationWarning, and the
 			// hole already ruled out a host it would write the client's text into.
-			if (
-				!this.keepsText(
-					text ? el : null,
-					first,
-					(STAGED_DOM ? STAGED_DOM.view(first) : first).nodeValue,
-					'',
-					loc,
-				)
-			)
-				(STAGED_DOM ? STAGED_DOM.view(first) : first).nodeValue = '';
+			if (!this.keepsText(text ? el : null, first, first.nodeValue, '', loc)) first.nodeValue = '';
 			return first as Text;
 		}
 		this.unclaimedText(el, first, '', loc);
@@ -23317,14 +22550,11 @@ class HydrationCapability {
 		// Every compiled walk has already resolved its positions (htextSwap mounts
 		// run after them), so replacing the comment moves no later claim.
 		if (isEmptyTextSlot(posNode)) {
-			const empty = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode('');
-			domNode((STAGED_DOM ? STAGED_DOM.view(posNode) : posNode).parentNode!)!.replaceChild(
-				empty,
-				posNode,
-			);
+			const empty = document.createTextNode('');
+			posNode.parentNode!!.replaceChild(empty, posNode);
 			posNode = empty;
 		}
-		const host = (STAGED_DOM ? STAGED_DOM.view(posNode) : posNode)?.parentNode ?? null;
+		const host = posNode?.parentNode ?? null;
 		// An element where the server's text belongs is a structural difference,
 		// which suppressHydrationWarning never keeps.
 		if (posNode !== null && posNode.nodeType === 1 && (host === null || !this.freshNodes.has(host)))
@@ -23334,22 +22564,19 @@ class HydrationCapability {
 				posNode,
 			);
 		if (posNode !== null && posNode.nodeType === 3) {
-			const server = (STAGED_DOM ? STAGED_DOM.view(posNode as Text) : (posNode as Text)).nodeValue;
+			const server = (posNode as Text).nodeValue;
 			// A client-built template's `<!>` reads as the server's empty slot,
 			// swapped for '' above, and takes the client's text.
 			if (!this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
-				(STAGED_DOM ? STAGED_DOM.view(posNode as Text) : (posNode as Text)).nodeValue = text;
+				(posNode as Text).nodeValue = text;
 			return posNode as Text;
 		}
 		// No server text node stands here: the server rendered the hole empty. A
 		// host that keeps that installs an empty tracking node, which later
 		// commits update normally.
 		const created = this.newText(host, text, (host as any)?.__oct_loc);
-		if (posNode !== null && (STAGED_DOM ? STAGED_DOM.view(posNode) : posNode).parentNode !== null) {
-			domNode((STAGED_DOM ? STAGED_DOM.view(posNode) : posNode).parentNode!).insertBefore(
-				created,
-				posNode,
-			);
+		if (posNode !== null && posNode.parentNode !== null) {
+			posNode.parentNode!.insertBefore(created, posNode);
 		}
 		return created;
 	}
@@ -23391,13 +22618,8 @@ class HydrationCapability {
 		// Read through the prototype: a form's named control can shadow its method.
 		const ns = attrNamespace(name);
 		const server = ns
-			? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNS(
-					ns,
-					name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name,
-				)
-			: STAGED_DOM
-				? STAGED_DOM.view(el).getAttribute(name)
-				: Element.prototype.getAttribute.call(el, name);
+			? el.getAttributeNS(ns, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
+			: Element.prototype.getAttribute.call(el, name);
 		if (
 			server !== next &&
 			domBindingClaims.get(el)?.get(name) !== server &&
@@ -23442,11 +22664,9 @@ class HydrationCapability {
 		if (el === null) this.missingElement();
 		if (this.isFresh(el)) return false;
 		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return true;
-		const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+		const style = (el as HTMLElement).style;
 		const server = style.cssText;
-		const expectedStyle = domNode(
-			(STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('div'),
-		).style;
+		const expectedStyle = document.createElement('div').style;
 		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
 		if (entries === undefined) applyStyleValue(el, expectedStyle, value, undefined);
 		else {
@@ -23475,8 +22695,7 @@ class HydrationCapability {
 		}
 		const expected = expectedStyle.cssText;
 		if (
-			(server !== expected ||
-				(!expected && !removed && (STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('style'))) &&
+			(server !== expected || (!expected && !removed && el.hasAttribute('style'))) &&
 			// So is a whole style that one published.
 			claims?.get('style') !== server
 		)
@@ -23503,17 +22722,17 @@ class HydrationCapability {
 	 * since, and it is not compared.
 	 */
 	settleValues(): void {
-		const root = domNode(this.rootBlock.parentNode);
+		const root = this.rootBlock.parentNode;
 		const texts = this.pendingTexts;
 		if (texts !== null) {
 			this.pendingTexts = null;
 			for (const [node, { server, loc }] of texts) {
-				const text = (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue!;
+				const text = node.nodeValue!;
 				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
 					this.mismatch(
-						loc || (domNode(node).parentNode as any)?.__oct_loc,
+						loc || (node.parentNode as any)?.__oct_loc,
 						() => `text ${JSON.stringify(text)}`,
-						(STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(server ?? ''),
+						document.createTextNode(server ?? ''),
 					);
 			}
 		}
@@ -23522,9 +22741,7 @@ class HydrationCapability {
 			this.classes = null;
 			for (const [el, { next, absentIsEmpty }] of classes) {
 				// Read through the prototype: a form's named control can shadow its method.
-				const raw = STAGED_DOM
-					? STAGED_DOM.view(el).getAttribute('class')
-					: Element.prototype.getAttribute.call(el, 'class');
+				const raw = Element.prototype.getAttribute.call(el, 'class');
 				const server = absentIsEmpty && raw === null ? '' : raw;
 				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
 					this.unpatched(el, 'attribute `class`', server, next);
@@ -23630,8 +22847,7 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 		MAPPED_ITEM_ADOPTION.node = null;
 		const lazy =
 			(node as any).nodeType === undefined
-				? ((STAGED_DOM ? STAGED_DOM.view(node as any) : (node as any))[LAZY_TEMPLATE] as
-						LazyTemplateRecord | undefined)
+				? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 				: undefined;
 		const expected = lazy === undefined ? node : resolveLazyTemplate(lazy);
 		if (
@@ -23641,21 +22857,16 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 			for (let child = getFirstChild(adopted); child !== null; child = getNextSibling(child)) {
 				detachDeoptTreeRefs(child, null);
 			}
-			(STAGED_DOM ? STAGED_DOM.view(adopted as Element) : (adopted as Element)).replaceChildren();
+			(adopted as Element).replaceChildren();
 			for (let child = getFirstChild(expected); child !== null; child = getNextSibling(child)) {
-				(STAGED_DOM ? STAGED_DOM.view(adopted) : adopted).appendChild(
-					(STAGED_DOM ? STAGED_DOM.view(child) : child).cloneNode(true),
-				);
+				adopted.appendChild(child.cloneNode(true));
 			}
 			return adopted as T;
 		}
-		const replacement = (STAGED_DOM ? STAGED_DOM.view(expected) : expected).cloneNode(true);
+		const replacement = expected.cloneNode(true);
 		const block = CURRENT_SCOPE!.block;
 		detachDeoptTreeRefs(adopted, null);
-		domNode((STAGED_DOM ? STAGED_DOM.view(adopted) : adopted).parentNode!).replaceChild(
-			replacement,
-			adopted,
-		);
+		adopted.parentNode!.replaceChild(replacement, adopted);
 		if (block.startMarker === adopted) block.startMarker = replacement;
 		if (block.endMarker === adopted) block.endMarker = replacement;
 		block.deoptNode = null;
@@ -23666,8 +22877,7 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 	// Non-compiler callers can still hand clone() an ordinary DOM Node directly.
 	const lazy =
 		(node as any).nodeType === undefined
-			? ((STAGED_DOM ? STAGED_DOM.view(node as any) : (node as any))[LAZY_TEMPLATE] as
-					LazyTemplateRecord | undefined)
+			? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 			: undefined;
 	if (lazy !== undefined) {
 		const hydration = hydrating ? activeHydration() : null;
@@ -23683,14 +22893,14 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 		if (hydration !== null) return hydration.clone(parsed, loc, partialStyles) as T;
 		// A template the client render after a deferred mismatch clones (adoptOrDefer).
 		if (hydrating && currentHydration!.deferred != null) currentHydration!.claimBefore(parsed);
-		return (STAGED_DOM ? STAGED_DOM.view(parsed) : parsed).cloneNode(true) as T;
+		return parsed.cloneNode(true) as T;
 	}
 	const hydration = hydrating ? currentHydration : null;
 	if (hydration !== null) {
 		if (hydration.isActive()) return hydration.clone(node, loc, partialStyles);
 		if (hydration.deferred !== null) hydration.claimBefore(node);
 	}
-	return (STAGED_DOM ? STAGED_DOM.view(node) : node).cloneNode(true) as T;
+	return node.cloneNode(true) as T;
 }
 
 /** Whether a template starts with a host, an element or text, rather than a hole. */
@@ -23710,12 +22920,11 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 	if (hydrationStarted && PRESENTATION_HYDRATION?.revision !== undefined)
 		HYDRATION_DRIVER!.presentationMiss(false);
 	if (root.nodeType === 11) {
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, anchor);
+		parent.insertBefore(root, anchor);
 		return;
 	}
 	let c: Node | null;
-	while ((c = getFirstChild(root)) !== null)
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(c, anchor);
+	while ((c = getFirstChild(root)) !== null) parent.insertBefore(c, anchor);
 }
 
 /**
@@ -23748,7 +22957,7 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 			block.endMarker = root;
 		} else {
 			const parent = block.parentNode;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(root, end);
+			parent.insertBefore(root, end);
 		}
 	}
 	scope.slots[0] = bag;
@@ -23837,12 +23046,12 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
 	if (seeded === 1) {
 		const first = getFirstChild(el);
 		if (first !== null && first.nodeType === 3) {
-			(STAGED_DOM ? STAGED_DOM.view(first as Text) : (first as Text)).nodeValue = text;
+			(first as Text).nodeValue = text;
 			return first as Text;
 		}
 	}
-	const t = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(text);
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(t);
+	const t = document.createTextNode(text);
+	el.appendChild(t);
 	return t;
 }
 
@@ -23865,9 +23074,9 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) return hydration.htextSwap(posNode, text);
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
-	const t = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(text);
-	const parent = (STAGED_DOM ? STAGED_DOM.view(posNode!) : posNode!).parentNode!;
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).replaceChild(t, posNode!);
+	const t = document.createTextNode(text);
+	const parent = posNode!.parentNode!;
+	parent.replaceChild(t, posNode!);
 	return t;
 }
 
@@ -23955,12 +23164,12 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 	// range-marker validator that adoption needs.
 	const adopted = hydration?.adoptBindingText(posNode, text);
 	if (adopted) return adopted;
-	const parent = domNode(posNode)!.parentNode!;
-	const close = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(HYDRATION_END);
-	(STAGED_DOM ? STAGED_DOM.view(posNode as Comment) : (posNode as Comment)).data = marker;
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(close, getNextSibling(posNode!));
-	const node = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(text);
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, close);
+	const parent = posNode!.parentNode!;
+	const close = document.createComment(HYDRATION_END);
+	(posNode as Comment).data = marker;
+	parent.insertBefore(close, getNextSibling(posNode!));
+	const node = document.createTextNode(text);
+	parent.insertBefore(node, close);
 	return node;
 }
 
@@ -24220,8 +23429,7 @@ function displacedWithin(
 function discardedByHydration(node: Node): boolean {
 	if (DISCARDED_HYDRATION_NODES === null) return false;
 	let root = node;
-	for (let parent = domNode(root).parentNode; parent !== null; parent = domNode(parent).parentNode)
-		root = parent;
+	for (let parent = root.parentNode; parent !== null; parent = parent.parentNode) root = parent;
 	return DISCARDED_HYDRATION_NODES.has(root);
 }
 
@@ -24988,11 +24196,9 @@ export function setBindingClass(
 ): void {
 	const snapshot = [normalizeClass(values[0]), values[1].map(normalizeClass)] as const;
 	const classes = [snapshot[0], ...snapshot[1]].filter(Boolean).join(' ');
-	if ((STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute('class') !== classes)
-		setClassAttr(element, classes);
+	if (element.getAttribute('class') !== classes) setClassAttr(element, classes);
 	const serialized = JSON.stringify(snapshot);
-	if ((STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(receipt) !== serialized)
-		setStringData(element, receipt, serialized);
+	if (element.getAttribute(receipt) !== serialized) setStringData(element, receipt, serialized);
 }
 
 /** @internal Attribute-binding comparison ABI for the opt-in class receipt writer. */
@@ -25023,20 +24229,12 @@ export function setBindingClassIfChanged(
 
 /** True if `node` opens a hydration range (hydration-protocol.ts). */
 function isBlockOpen(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		isRangeOpen((STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data)
-	);
+	return node !== null && node.nodeType === 8 && isRangeOpen((node as Comment).data);
 }
 
 /** True if `node` closes a hydration range. */
 function isBlockClose(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data === HYDRATION_END
-	);
+	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_END;
 }
 
 /**
@@ -25045,20 +24243,12 @@ function isBlockClose(node: Node | null): node is Comment {
  * parser can't merge them into one node (see HYDRATION_TEXT_SEP, constants.ts).
  */
 function isTextSeparator(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data === HYDRATION_TEXT_SEP
-	);
+	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_TEXT_SEP;
 }
 
 /** The server's `<!---->` stand-in for an empty sibling-position text hole (ssrTextSlot). */
 function isEmptyTextSlot(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		(STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data === ''
-	);
+	return node !== null && node.nodeType === 8 && (node as Comment).data === '';
 }
 
 /**
@@ -25088,7 +24278,7 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 	let node: Node | null = getNextSibling(open);
 	while (node !== null) {
 		if (node.nodeType === 8) {
-			const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
+			const data = (node as Comment).data;
 			if (data === HYDRATION_END) {
 				const found = node as Comment;
 				if (nested === null || nested.length === 0) {
@@ -25158,7 +24348,7 @@ class DeferredHydrationSuspension extends NativeAdoptionMiss {
 /** -1 = not an @for open, 0 = server @empty, 1 = server items (a binding view's too). */
 function ssrForMarkerState(node: Node): -1 | 0 | 1 {
 	if (node.nodeType !== 8) return -1;
-	const data = (STAGED_DOM ? STAGED_DOM.view(node as Comment) : (node as Comment)).data;
+	const data = (node as Comment).data;
 	if (!data.startsWith(HYDRATION_FOR_PREFIX) || !isRangeOpen(data)) return -1;
 	return data.charCodeAt(HYDRATION_FOR_ARM_INDEX) === 48 ? 0 : 1;
 }
@@ -25169,7 +24359,7 @@ export function child<T extends Node>(node: T): Node | null {
 	// stand-in — a plain object whose `firstChild` is a snapshot property (see
 	// adopt()) — and the native accessor throws on a non-Node receiver. Keep the
 	// plain read on the hydration branch; client mounts always hold a real Node.
-	if (hydrating) return (STAGED_DOM ? STAGED_DOM.view(node) : node).firstChild;
+	if (hydrating) return node.firstChild;
 	return getFirstChild(node);
 }
 
@@ -25205,13 +24395,13 @@ let hiddenStyleWriter:
 
 function updateTextValue(node: Text, value: string): void {
 	if (hiddenTextWriter !== null && hiddenTextWriter(node, value)) return;
-	const previous = (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue;
+	const previous = node.nodeValue;
 	if (previous !== value) {
 		// Descriptor text updates participate in the same held-transition undo
 		// window as compiled text bindings. Reuse the live value just compared;
 		// an authored-value cache cannot restore a later external DOM edit.
 		if (TRANSITION_JOURNAL !== null) journalText(node, previous);
-		(STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue = value;
+		node.nodeValue = value;
 	}
 }
 
@@ -25230,28 +24420,26 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// that is not a Text means a translator replaced it.
 	if (host !== undefined) {
 		if (node === null) {
-			node = (STAGED_DOM ? STAGED_DOM.view(host) : host).firstChild as Text | null;
+			node = host.firstChild as Text | null;
 			if (node === null || node.nodeType !== 3) {
-				node = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode('');
+				node = document.createTextNode('');
 				resetOnlyChildHost(host, node);
 			}
-		} else if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== host)
-			resetOnlyChildHost(host, node);
+		} else if (node.parentNode !== host) resetOnlyChildHost(host, node);
 	}
 	const target = node as Text;
 	//
 	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	if (TRANSITION_JOURNAL !== null)
-		journalText(target, (STAGED_DOM ? STAGED_DOM.view(target) : target).nodeValue);
+	if (TRANSITION_JOURNAL !== null) journalText(target, target.nodeValue);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
 	const text = coerceText(value);
 	if (hiddenTextWriter !== null && hiddenTextWriter(target, text)) return;
-	(STAGED_DOM ? STAGED_DOM.view(target) : target).nodeValue = text;
+	target.nodeValue = text;
 }
 
 /**
@@ -25264,7 +24452,7 @@ export function setText(node: Text | null, value: any, host?: Node): void {
  */
 function resetOnlyChildHost(host: Node, node: Text | null): void {
 	if (ROOT_RENDER_TRANSACTION !== null) journalRootRange(host, null, null);
-	const view = STAGED_DOM ? STAGED_DOM.view(host) : host;
+	const view = host;
 	view.textContent = '';
 	if (node !== null) view.appendChild(node);
 }
@@ -25281,7 +24469,7 @@ function resetOnlyChildHost(host: Node, node: Text | null): void {
 function renderText(block: Block, node: Text, str: string, host?: Node): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(block);
 	if (transaction === null) {
-		if (host !== undefined && domNode(node).parentNode !== host) resetOnlyChildHost(host, node);
+		if (host !== undefined && node.parentNode !== host) resetOnlyChildHost(host, node);
 		updateTextValue(node, str);
 		return;
 	}
@@ -25290,8 +24478,8 @@ function renderText(block: Block, node: Text, str: string, host?: Node): void {
 		// A hidden Text keeps its value aside (hiddenTextWriter), so the DOM shows ''.
 		if (
 			hiddenTextWriter === null &&
-			domNode(node).nodeValue === str &&
-			(host === undefined || domNode(node).parentNode === host)
+			node.nodeValue === str &&
+			(host === undefined || node.parentNode === host)
 		)
 			return;
 		(transaction.texts ??= new Set()).add(node);
@@ -25303,7 +24491,7 @@ function renderText(block: Block, node: Text, str: string, host?: Node): void {
 function commitText(write: [Text, string, Node | undefined]): void {
 	const node = write[0];
 	const host = write[2];
-	if (host !== undefined && domNode(node).parentNode !== host) resetOnlyChildHost(host, node);
+	if (host !== undefined && node.parentNode !== host) resetOnlyChildHost(host, node);
 	updateTextValue(node, write[1]);
 }
 
@@ -25354,9 +24542,7 @@ export function hydrateClaimedBindingCaches(
 	for (let i = 0; i < fields.length; i += 3) {
 		const field = fields[i]!;
 		const node = bag[fields[i + 1] as string] as Node;
-		const element = (
-			node.nodeType === 3 ? (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode : node
-		) as Element;
+		const element = (node.nodeType === 3 ? node.parentNode : node) as Element;
 		const claims = domBindingClaims.get(element);
 		if (claims === undefined) continue;
 		const channel = fields[i + 2] as string;
@@ -25379,10 +24565,7 @@ export function hydrateClaimedBindingCaches(
 		// A whole style must retain its actual CSS so null/removal can clear it;
 		// scalar raw-value caches instead need a value no authored scalar can equal.
 		const value =
-			channel === 'style'
-				? (STAGED_DOM ? STAGED_DOM.view(element as HTMLElement) : (element as HTMLElement)).style
-						.cssText
-				: CLAIMED_BINDING_VALUE;
+			channel === 'style' ? (element as HTMLElement).style.cssText : CLAIMED_BINDING_VALUE;
 		if (typeof field === 'number') {
 			// A scalar native style has no Block and caches its last write itself.
 			const binding = scope.slots[field] as NativeStyleBinding;
@@ -25489,18 +24672,13 @@ function isWritableSignal(value: unknown): value is WritableSignal<unknown> {
 
 function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
 	if (binding.disposed) return;
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => disposeDirectSignalBinding(binding))
-	)
-		return;
 	binding.disposed = true;
 	try {
 		binding.unsubscribe?.();
 	} finally {
 		binding.controlWriterCleanup?.();
 		if (binding.input !== undefined) {
-			domNode(binding.target as Element).removeEventListener('input', binding.input);
+			(binding.target as Element).removeEventListener('input', binding.input);
 		}
 	}
 }
@@ -25514,9 +24692,9 @@ function directSignalControlValue(
 }
 
 function validateDirectSignalControl(element: Element, site: string): void {
-	const actual = (STAGED_DOM ? STAGED_DOM.view(element) : element).getAttribute(HYDRATE_INPUT_ATTR);
+	const actual = element.getAttribute(HYDRATE_INPUT_ATTR);
 	if (actual === null && (!hydrating || activeHydration() === null)) {
-		(STAGED_DOM ? STAGED_DOM.view(element) : element).setAttribute(HYDRATE_INPUT_ATTR, site);
+		element.setAttribute(HYDRATE_INPUT_ATTR, site);
 		return;
 	}
 	if (actual !== site) {
@@ -25683,7 +24861,7 @@ function updateDirectSignalBinding(binding: DirectSignalBinding): void {
 		runWithBlockSignalOwner(binding.scope, () => {
 			const value = readSignalBinding(binding.handle!);
 			if (!Object.is(binding.value, value)) writeDirectSignalBinding(binding, value);
-			if (process.env.NODE_ENV !== 'production' && !STAGED_DOM && binding.target.nodeType === 1)
+			if (process.env.NODE_ENV !== 'production' && binding.target.nodeType === 1)
 				drainDevFormDiagnostics(binding.target as Element);
 		});
 	} catch {
@@ -25711,7 +24889,7 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 		);
 	};
 	binding.input = input;
-	(STAGED_DOM ? STAGED_DOM.view(element) : element).addEventListener('input', input);
+	element.addEventListener('input', input);
 	binding.controlWriterCleanup = registerHydrationControlSignalWriter(
 		element,
 		binding.policy.kind === 'checked' ? 'checked' : 'value',
@@ -25811,15 +24989,7 @@ function createDirectSignalBinding(
 		: false;
 	if (binding.pendingControl) binding.value = initial;
 	if (!binding.pendingControl) writeDirectSignalBinding(binding, initial);
-	if (STAGED_COMMIT_CAPTURE) {
-		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-			runWithBlockSignalOwner(scope, () =>
-				activateDirectSignalBinding(binding, controlSnapshot?.revision),
-			);
-			// A handle can advance while the old native tree is still visible.
-			updateDirectSignalBinding(binding);
-		});
-	} else activateDirectSignalBinding(binding, controlSnapshot?.revision);
+	activateDirectSignalBinding(binding, controlSnapshot?.revision);
 	if (binding.pendingControl) policy.control!.adopt(binding);
 	registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
 	return binding;
@@ -25964,7 +25134,7 @@ export function bindSignalText(
 		const existing = hydrating && activeHydration() !== null ? getNextSibling(position) : null;
 		previous = bindingText(
 			position,
-			existing?.nodeType === 3 ? (STAGED_DOM ? STAGED_DOM.view(existing) : existing).nodeValue : '',
+			existing?.nodeType === 3 ? existing.nodeValue : '',
 			bindingMarker,
 		);
 	}
@@ -26236,18 +25406,14 @@ export function setScriptText(el: Element, value: any): void {
 		return;
 	}
 	const first = getFirstChild(el);
-	if (
-		first !== null &&
-		first === (STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild &&
-		first.nodeType === 3
-	) {
+	if (first !== null && first === el.lastChild && first.nodeType === 3) {
 		updateTextValue(first as Text, text);
 	} else {
 		if (ROOT_RENDER_TRANSACTION !== null) {
 			journalBag();
 			journalRootRange(el, null, null);
 		}
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).textContent = text;
+		el.textContent = text;
 	}
 }
 
@@ -26284,10 +25450,10 @@ function normalizeHTMLForHydration(parent: Element, html: string): string {
 	const ns = parent.namespaceURI;
 	const testElement =
 		ns === 'http://www.w3.org/2000/svg' || ns === 'http://www.w3.org/1998/Math/MathML'
-			? (STAGED_DOM ? STAGED_DOM.view(doc) : doc).createElementNS(ns, parent.tagName)
-			: (STAGED_DOM ? STAGED_DOM.view(doc) : doc).createElement(parent.tagName);
-	(STAGED_DOM ? STAGED_DOM.view(testElement) : testElement).innerHTML = html;
-	return (STAGED_DOM ? STAGED_DOM.view(testElement) : testElement).innerHTML;
+			? doc.createElementNS(ns, parent.tagName)
+			: doc.createElement(parent.tagName);
+	testElement.innerHTML = html;
+	return testElement.innerHTML;
 }
 
 /**
@@ -26307,8 +25473,8 @@ export function setHTML(el: Element, value: any): void {
 		return;
 	}
 	// Fresh wrappers must not replace identical children. Compare accepted authored
-	// HTML, including successful hydration adoption, before entering DOM staging.
-	const host = STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any);
+	// HTML, including successful hydration adoption.
+	const host = el as any;
 	if (host[DANGER_HTML_VALUE] === next) return;
 	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
 	host[DANGER_HTML_VALUE] = next;
@@ -26318,11 +25484,11 @@ export function setHTML(el: Element, value: any): void {
 	if (transaction !== null) {
 		journalBag();
 		transaction.ops.push(commitHTML, [el, next]);
-	} else (STAGED_DOM ? STAGED_DOM.view(el) : el).innerHTML = next;
+	} else el.innerHTML = next;
 }
 
 function commitHTML(write: [Element, string]): void {
-	(STAGED_DOM ? STAGED_DOM.view(write[0]) : write[0]).innerHTML = write[1];
+	write[0].innerHTML = write[1];
 }
 
 function commitScriptText(write: [Element, string]): void {
@@ -26353,21 +25519,16 @@ function validateDangerouslySetInnerHTMLValue(value: unknown): void {
 /** Complete validated write used by direct, spread, and html-only compiler paths. */
 export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 	validateDangerouslySetInnerHTMLValue(value);
-	journalRootProperty(
-		el,
-		DANGER_HTML_ACTIVE,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE],
-	);
-	const wasActive =
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] === true;
+	journalRootProperty(el, DANGER_HTML_ACTIVE, (el as any)[DANGER_HTML_ACTIVE]);
+	const wasActive = (el as any)[DANGER_HTML_ACTIVE] === true;
 	if (value == null) {
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] = false;
+		(el as any)[DANGER_HTML_ACTIVE] = false;
 		// A nullish writer on a never-raw host is semantically absent and must not
 		// erase ordinary children. Transitioning away from an active writer clears
 		// the raw content it owned.
 		if (wasActive) {
 			setHTML(el, null);
-			const host = STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any);
+			const host = el as any;
 			// Ordinary children can now replace the cached empty HTML.
 			if (host[DANGER_HTML_VALUE] !== undefined) {
 				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
@@ -26381,12 +25542,12 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 	}
 	if (
 		value != null &&
-		((STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_STATIC_CHILD] === true ||
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] != null)
+		((el as any)[DANGER_HTML_STATIC_CHILD] === true ||
+			(el as any)[DANGER_HTML_SPREAD_CHILD] != null)
 	) {
 		throw dangerHtmlChildrenError();
 	}
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] = true;
+	(el as any)[DANGER_HTML_ACTIVE] = true;
 	DANGER_HTML_EVER_ACTIVE = true;
 	setHTML(el, value.__html);
 }
@@ -26448,47 +25609,27 @@ export function setDangerouslySetInnerHTMLSources(
 	validateDangerouslySetInnerHTMLValue(resolved);
 	if (
 		hasOwnProp.call(el, DANGER_HTML_RESOLVED_VALUE) &&
-		Object.is(
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_VALUE],
-			resolved,
-		) &&
-		Object.is(
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_CHILD],
-			resolvedChild,
-		)
+		Object.is((el as any)[DANGER_HTML_RESOLVED_VALUE], resolved) &&
+		Object.is((el as any)[DANGER_HTML_RESOLVED_CHILD], resolvedChild)
 	) {
 		return;
 	}
 	// Stamp only the FINAL child source. Spread-local validation runs too early:
 	// when a render transitions raw HTML -> ordinary children, the old raw-HTML
 	// active bit is still present until this commit disables it.
-	journalRootProperty(
-		el,
-		DANGER_HTML_SPREAD_CHILD,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD],
-	);
-	journalRootProperty(
-		el,
-		DANGER_HTML_RESOLVED_VALUE,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_VALUE],
-	);
-	journalRootProperty(
-		el,
-		DANGER_HTML_RESOLVED_CHILD,
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_CHILD],
-	);
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] = resolvedChild;
+	journalRootProperty(el, DANGER_HTML_SPREAD_CHILD, (el as any)[DANGER_HTML_SPREAD_CHILD]);
+	journalRootProperty(el, DANGER_HTML_RESOLVED_VALUE, (el as any)[DANGER_HTML_RESOLVED_VALUE]);
+	journalRootProperty(el, DANGER_HTML_RESOLVED_CHILD, (el as any)[DANGER_HTML_RESOLVED_CHILD]);
+	(el as any)[DANGER_HTML_SPREAD_CHILD] = resolvedChild;
 	setDangerouslySetInnerHTML(el, resolved);
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_VALUE] = resolved;
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_RESOLVED_CHILD] =
-		resolvedChild;
+	(el as any)[DANGER_HTML_RESOLVED_VALUE] = resolved;
+	(el as any)[DANGER_HTML_RESOLVED_CHILD] = resolvedChild;
 }
 
 /** Stamp a compiler-proven non-nullish child onto a potential raw-HTML host. */
 export function markDangerouslySetInnerHTMLChildren(el: Element): void {
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_STATIC_CHILD] = true;
-	if ((STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] === true)
-		throw dangerHtmlChildrenError();
+	(el as any)[DANGER_HTML_STATIC_CHILD] = true;
+	if ((el as any)[DANGER_HTML_ACTIVE] === true) throw dangerHtmlChildrenError();
 }
 
 /**
@@ -26498,11 +25639,7 @@ export function markDangerouslySetInnerHTMLChildren(el: Element): void {
  */
 function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean {
 	if (!DANGER_HTML_EVER_ACTIVE) return false;
-	if (
-		parent.nodeType !== 1 ||
-		(STAGED_DOM ? STAGED_DOM.view(parent as any) : (parent as any))[DANGER_HTML_ACTIVE] !== true
-	)
-		return false;
+	if (parent.nodeType !== 1 || (parent as any)[DANGER_HTML_ACTIVE] !== true) return false;
 	if (value !== null && value !== undefined) throw dangerHtmlChildrenError();
 	return true;
 }
@@ -26783,7 +25920,7 @@ export class FragmentInstance {
 		if (portals === undefined || !portals.delete(portal)) return;
 		if (portals.size === 0) anchors!.delete(anchor);
 		if (anchors!.size === 0) this._portalAnchors = null;
-		let child: ChildNode | null = domNode(portal.start)?.nextSibling ?? null;
+		let child: ChildNode | null = portal.start?.nextSibling ?? null;
 		while (child !== null && child !== portal.end) {
 			const next = getNextSibling(child);
 			if (
@@ -26800,11 +25937,7 @@ export class FragmentInstance {
 	_attachChild(child: Element | Text): void {
 		if (this._listeners !== null) {
 			for (const entry of this._listeners) {
-				(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(
-					entry.type,
-					entry.listener,
-					entry.options,
-				);
+				child.addEventListener(entry.type, entry.listener, entry.options);
 			}
 		}
 		if (child.nodeType === 1 && this._observers !== null) {
@@ -26818,11 +25951,7 @@ export class FragmentInstance {
 	_detachChild(child: Element | Text): void {
 		if (this._listeners !== null) {
 			for (const entry of this._listeners) {
-				(STAGED_DOM ? STAGED_DOM.view(child) : child).removeEventListener(
-					entry.type,
-					entry.listener,
-					entry.options,
-				);
+				child.removeEventListener(entry.type, entry.listener, entry.options);
 			}
 		}
 		(child as (Element | Text) & { reactFragments?: Set<FragmentInstance> }).reactFragments?.delete(
@@ -26885,14 +26014,10 @@ export class FragmentInstance {
 	blur(): void {
 		if (this._destroyed) return;
 		for (const child of fragmentDirectChildren(this)) {
-			const root = (STAGED_DOM ? STAGED_DOM.view(child) : child).getRootNode() as
-				Document | ShadowRoot;
+			const root = child.getRootNode() as Document | ShadowRoot;
 			const active = root.activeElement;
-			if (
-				active &&
-				(child === active || (STAGED_DOM ? STAGED_DOM.view(child) : child).contains(active))
-			) {
-				(STAGED_DOM ? STAGED_DOM.view(active as HTMLElement) : (active as HTMLElement)).blur();
+			if (active && (child === active || child.contains(active))) {
+				(active as HTMLElement).blur();
 				return;
 			}
 		}
@@ -26950,7 +26075,7 @@ export class FragmentInstance {
 		listeners.push(entry);
 		snapshot.signal?.addEventListener('abort', entry.abort, { once: true });
 		for (const child of fragmentDirectNodes(this)) {
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(type, listener, snapshot);
+			child.addEventListener(type, listener, snapshot);
 		}
 	}
 
@@ -26975,11 +26100,7 @@ export class FragmentInstance {
 			if (entry.options.capture !== wantCapture) continue;
 			entry.options.signal?.removeEventListener('abort', entry.abort);
 			for (const child of fragmentDirectNodes(this)) {
-				(STAGED_DOM ? STAGED_DOM.view(child) : child).removeEventListener(
-					type,
-					listener,
-					entry.options,
-				);
+				child.removeEventListener(type, listener, entry.options);
 			}
 			this._listeners.splice(i, 1);
 			return;
@@ -27073,10 +26194,8 @@ export class FragmentInstance {
 	 */
 	getRootNode(options?: GetRootNodeOptions): Node | FragmentInstance {
 		if (this._destroyed) return this;
-		const parent = domNode(this._startMarker).parentNode;
-		return parent === null
-			? this
-			: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).getRootNode(options);
+		const parent = this._startMarker.parentNode;
+		return parent === null ? this : parent.getRootNode(options);
 	}
 
 	// ─── compareDocumentPosition / dispatchEvent (Stage 5) ──────────────
@@ -27087,7 +26206,7 @@ export class FragmentInstance {
 	 */
 	compareDocumentPosition(other: Node): number {
 		if (this._destroyed) return Node.DOCUMENT_POSITION_DISCONNECTED;
-		const parent = domNode(this._startMarker).parentNode;
+		const parent = this._startMarker.parentNode;
 		if (parent === null) return Node.DOCUMENT_POSITION_DISCONNECTED;
 
 		let first: Element | Text | null = null;
@@ -27095,12 +26214,8 @@ export class FragmentInstance {
 		for (const child of fragmentDirectNodes(this)) {
 			first ??= child;
 			last = child;
-			if (
-				child === other ||
-				(child.nodeType === 1 &&
-					(STAGED_DOM ? STAGED_DOM.view(child as Element) : (child as Element)).contains(other))
-			) {
-				return (STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(child)
+			if (child === other || (child.nodeType === 1 && (child as Element).contains(other))) {
+				return parent.contains(child)
 					? Node.DOCUMENT_POSITION_CONTAINED_BY
 					: Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 			}
@@ -27113,9 +26228,7 @@ export class FragmentInstance {
 			// children, including this Fragment's boundary comment.
 			const logicalParent =
 				(this._startMarker as Comment & { $$portalParent?: Node }).$$portalParent ?? parent;
-			let result = (
-				STAGED_DOM ? STAGED_DOM.view(logicalParent) : logicalParent
-			).compareDocumentPosition(other);
+			let result = logicalParent.compareDocumentPosition(other);
 			if (logicalParent === other) {
 				result = Node.DOCUMENT_POSITION_CONTAINS;
 			} else if ((result & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0) {
@@ -27123,23 +26236,19 @@ export class FragmentInstance {
 				result =
 					next !== null &&
 					(next === other ||
-						((STAGED_DOM ? STAGED_DOM.view(next) : next).compareDocumentPosition(other) &
-							Node.DOCUMENT_POSITION_FOLLOWING) !==
-							0)
+						(next.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
 						? Node.DOCUMENT_POSITION_FOLLOWING
 						: Node.DOCUMENT_POSITION_PRECEDING;
 			}
 			return result | Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 		}
 
-		const firstResult = (STAGED_DOM ? STAGED_DOM.view(first) : first).compareDocumentPosition(
-			other,
-		);
+		const firstResult = first.compareDocumentPosition(other);
 		if ((firstResult & Node.DOCUMENT_POSITION_DISCONNECTED) !== 0) return firstResult;
-		const lastResult = (STAGED_DOM ? STAGED_DOM.view(last) : last).compareDocumentPosition(other);
+		const lastResult = last.compareDocumentPosition(other);
 		if (
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(first) &&
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).contains(last) &&
+			parent.contains(first) &&
+			parent.contains(last) &&
 			(firstResult & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
 			(lastResult & Node.DOCUMENT_POSITION_PRECEDING) !== 0
 		) {
@@ -27154,17 +26263,11 @@ export class FragmentInstance {
 			$$portalSourceAnchor?: Node;
 		};
 		const logicalParent = portalMarker.$$portalParent;
-		if (
-			logicalParent !== undefined &&
-			logicalParent !== parent &&
-			(STAGED_DOM ? STAGED_DOM.view(logicalParent) : logicalParent).contains(other)
-		) {
+		if (logicalParent !== undefined && logicalParent !== parent && logicalParent.contains(other)) {
 			const sourceAnchor = portalMarker.$$portalSourceAnchor;
 			if (sourceAnchor === undefined) return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 			const directionMask = Node.DOCUMENT_POSITION_PRECEDING | Node.DOCUMENT_POSITION_FOLLOWING;
-			const logicalDirection =
-				(STAGED_DOM ? STAGED_DOM.view(sourceAnchor) : sourceAnchor).compareDocumentPosition(other) &
-				directionMask;
+			const logicalDirection = sourceAnchor.compareDocumentPosition(other) & directionMask;
 			if ((firstResult & directionMask) !== logicalDirection) {
 				return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 			}
@@ -27178,38 +26281,29 @@ export class FragmentInstance {
 	 */
 	dispatchEvent(event: Event): boolean {
 		if (this._destroyed) return true;
-		const parent = domNode(this._startMarker).parentNode;
+		const parent = this._startMarker.parentNode;
 		if (!parent) return true;
 		const listeners = this._listeners;
 		if (event.bubbles && (listeners === null || listeners.length === 0)) {
 			return parent.dispatchEvent(event);
 		}
 
-		const target = domNode(parent.ownerDocument || document).createTextNode('');
+		const target = (parent.ownerDocument || document).createTextNode('');
 		if (listeners !== null) {
 			for (const entry of listeners) {
-				(STAGED_DOM ? STAGED_DOM.view(target) : target).addEventListener(
-					entry.type,
-					entry.listener,
-					entry.options,
-				);
+				target.addEventListener(entry.type, entry.listener, entry.options);
 			}
 		}
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(target);
+		parent.appendChild(target);
 		try {
 			return target.dispatchEvent(event);
 		} finally {
 			if (listeners !== null) {
 				for (const entry of listeners) {
-					(STAGED_DOM ? STAGED_DOM.view(target) : target).removeEventListener(
-						entry.type,
-						entry.listener,
-						entry.options,
-					);
+					target.removeEventListener(entry.type, entry.listener, entry.options);
 				}
 			}
-			if ((STAGED_DOM ? STAGED_DOM.view(target) : target).parentNode === parent)
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(target);
+			if (target.parentNode === parent) parent.removeChild(target);
 		}
 	}
 
@@ -27230,7 +26324,7 @@ export class FragmentInstance {
 			const following = fragmentNearestSibling(this._endMarker, true);
 			const preceding = fragmentNearestSibling(this._startMarker, false);
 			const target = alignStart
-				? following || preceding || domNode(this._startMarker).parentNode
+				? following || preceding || this._startMarker.parentNode
 				: preceding || following;
 			if (target === null || target === undefined || target.nodeType === 9) return;
 			if (target.nodeType === 11) {
@@ -27294,7 +26388,7 @@ function* fragmentDirectNodes(fi: FragmentInstance): Generator<Element | Text> {
 				// Portals are physically outside Activity's hidden host range. Their
 				// logical Block ancestry, not their target DOM, determines visibility.
 				if (portal.block === null || findHiddenActivity(portal.block) !== null) continue;
-				let child: ChildNode | null = domNode(portal.start)?.nextSibling ?? null;
+				let child: ChildNode | null = portal.start?.nextSibling ?? null;
 				while (child !== null && child !== portal.end) {
 					const nextChild = getNextSibling(child);
 					if ((child.nodeType === 1 || child.nodeType === 3) && fragmentHostVisible(child)) {
@@ -27344,28 +26438,21 @@ function focusFragmentElement(node: Element, options?: FocusOptions): boolean {
 	const onFocus = () => {
 		focused = true;
 	};
-	(STAGED_DOM ? STAGED_DOM.view(owner) : owner).addEventListener('focus', onFocus, true);
+	owner.addEventListener('focus', onFocus, true);
 	try {
-		((STAGED_DOM ? STAGED_DOM.view(element) : element).focus || HTMLElement.prototype.focus).call(
-			element,
-			options,
-		);
+		(element.focus || HTMLElement.prototype.focus).call(element, options);
 	} finally {
-		(STAGED_DOM ? STAGED_DOM.view(owner) : owner).removeEventListener('focus', onFocus, true);
+		owner.removeEventListener('focus', onFocus, true);
 	}
 	return focused;
 }
 
 /** Skip implementation-only markers when locating an empty fragment's host sibling. */
 function fragmentNearestSibling(marker: Node, forward: boolean): Element | Text | null {
-	let sibling = forward
-		? getNextSibling(marker)
-		: (STAGED_DOM ? STAGED_DOM.view(marker) : marker).previousSibling;
+	let sibling = forward ? getNextSibling(marker) : marker.previousSibling;
 	while (sibling !== null) {
 		if (sibling.nodeType === 1 || sibling.nodeType === 3) return sibling as Element | Text;
-		sibling = forward
-			? getNextSibling(sibling)
-			: (STAGED_DOM ? STAGED_DOM.view(sibling) : sibling).previousSibling;
+		sibling = forward ? getNextSibling(sibling) : sibling.previousSibling;
 	}
 	return null;
 }
@@ -27547,8 +26634,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				// mustUseProperty (React parity): the muted ATTRIBUTE doesn't
 				// reflect to the live property post-creation — a dynamic write
 				// must set the property or a playing element never (un)mutes.
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).muted =
-					value && typeof value !== 'function' && typeof value !== 'symbol';
+				(el as any).muted = value && typeof value !== 'function' && typeof value !== 'symbol';
 				return;
 			}
 			break;
@@ -27566,8 +26652,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				// mustUseProperty like `muted`. `multiple` reflects back to the
 				// attribute; `selected` is live option state (the controlled
 				// <select> projection owns it when a select value is armed).
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[name] =
-					value && typeof value !== 'function' && typeof value !== 'symbol';
+				(el as any)[name] = value && typeof value !== 'function' && typeof value !== 'symbol';
 				return;
 			}
 			break;
@@ -27645,17 +26730,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		const type = capture ? name.slice(2, -7) : name.slice(2);
 		const map: Record<string, EventListener> = ((el as any).$$ceListeners ??= {});
 		const prev = map[name];
-		if (prev !== undefined && prev !== value)
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener(type, prev, capture);
+		if (prev !== undefined && prev !== value) el.removeEventListener(type, prev, capture);
 		if (typeof value === 'function') {
-			if (prev !== value)
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(
-					type,
-					value as EventListener,
-					capture,
-				);
+			if (prev !== value) el.addEventListener(type, value as EventListener, capture);
 			map[name] = value as EventListener;
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name); // a listener prop never lands in the markup
+			el.removeAttribute(name); // a listener prop never lands in the markup
 			return;
 		}
 		delete map[name];
@@ -27691,12 +26770,9 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttributeNS(
-				ns,
-				colon >= 0 ? name.slice(colon + 1) : name,
-			);
+			el.removeAttributeNS(ns, colon >= 0 ? name.slice(colon + 1) : name);
 		} else {
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+			el.removeAttribute(name);
 		}
 		return;
 	}
@@ -27711,8 +26787,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	if (ns) (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttributeNS(ns, name, next);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (ns) el.setAttributeNS(ns, name, next);
+	else el.setAttribute(name, next);
 }
 
 // React's `warnedProperties` cache is module-global and keyed by prop name: once
@@ -27807,8 +26883,8 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /** Same scalar contract for a statically proven, unnamespaced native URL sink. */
@@ -27832,8 +26908,8 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /**
@@ -27873,8 +26949,8 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /**
@@ -27894,8 +26970,8 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /**
@@ -27918,8 +26994,8 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 /**
@@ -28133,9 +27209,8 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 			CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
 	)
 		journalAttr(el, 'class');
-	if (value == null || value === false)
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('class');
-	else (STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).className = cls;
+	if (value == null || value === false) el.removeAttribute('class');
+	else (el as any).className = cls;
 }
 
 // Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
@@ -28149,8 +27224,8 @@ export function setClassAttr(el: Element, value: unknown): void {
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && hydration.keepsClass(el, cls, false)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
-	if (cls === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('class');
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('class', cls);
+	if (cls === null) el.removeAttribute('class');
+	else el.setAttribute('class', cls);
 }
 
 // ---------------------------------------------------------------------------
@@ -28181,7 +27256,7 @@ export function canSplitStyleProperties(): boolean {
 }
 
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
-	const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+	const style = (el as HTMLElement).style;
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
 	const hydration = hydrating ? activeHydration() : null;
@@ -28231,7 +27306,7 @@ export function setStyleProperty(
 		else journalBag();
 	}
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
-	const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
 }
@@ -28248,7 +27323,7 @@ export function setStyleProperties(
 ): void {
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && hydration.keepsStyle(el, null, staticCss, entries)) return;
-	const style = (STAGED_DOM ? STAGED_DOM.view(el as HTMLElement) : (el as HTMLElement)).style;
+	const style = (el as HTMLElement).style;
 	let journaled = false;
 	for (let i = 0; i < entries.length; i += 2) {
 		const value = entries[i + 1];
@@ -28444,7 +27519,7 @@ function eventSlot(name: string, el?: Element): ParsedEventSlot | null {
 function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	if (name === 'class' || name === 'className') {
 		if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('class');
+		el.removeAttribute('class');
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
 	} else if (name === 'dangerouslySetInnerHTML') {
@@ -28805,8 +27880,7 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 				binding.hasNestedChildren,
 				binding.readStyle,
 			);
-			if (process.env.NODE_ENV !== 'production' && !STAGED_DOM)
-				drainDevFormDiagnostics(binding.element);
+			if (process.env.NODE_ENV !== 'production') drainDevFormDiagnostics(binding.element);
 		});
 	} catch {
 		scheduleRender(binding.scope.block);
@@ -28912,11 +27986,11 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 	if (!writable) {
 		if (binding.input !== undefined) {
 			const input = binding.input;
-			(STAGED_DOM ? STAGED_DOM.view(element) : element).removeEventListener('input', input);
+			element.removeEventListener('input', input);
 			if (TRANSITION_JOURNAL !== null) {
 				journalUndo(() => {
 					if (!binding.disposed && !binding.scope.block.disposed)
-						(STAGED_DOM ? STAGED_DOM.view(element) : element).addEventListener('input', input);
+						element.addEventListener('input', input);
 				});
 			}
 			binding.input = undefined;
@@ -28942,27 +28016,18 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		);
 	};
 	binding.input = input;
-	(STAGED_DOM ? STAGED_DOM.view(element) : element).addEventListener('input', input);
-	if (TRANSITION_JOURNAL !== null)
-		journalUndo(() =>
-			(STAGED_DOM ? STAGED_DOM.view(element) : element).removeEventListener('input', input),
-		);
+	element.addEventListener('input', input);
+	if (TRANSITION_JOURNAL !== null) journalUndo(() => element.removeEventListener('input', input));
 }
 
 function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): void {
 	if (binding.disposed) return;
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => disposeSignalHostPropSources(binding))
-	)
-		return;
 	binding.disposed = true;
 	for (const unsubscribe of binding.subscriptions.values()) unsubscribe();
 	binding.subscriptions.clear();
 	for (const cleanup of binding.controlWriters.values()) cleanup();
 	binding.controlWriters.clear();
-	if (binding.input !== undefined)
-		domNode(binding.element).removeEventListener('input', binding.input);
+	if (binding.input !== undefined) binding.element.removeEventListener('input', binding.input);
 	queueOwnRefDetach(binding.resolved, binding.element);
 }
 
@@ -29147,24 +28212,10 @@ export function bindSignalHostPropSources(
 			hasNestedChildren,
 			readStyle,
 		);
-	} else if (!STAGED_COMMIT_CAPTURE) {
+	} else {
 		// The resolved props must roll back with the DOM; otherwise a retry
 		// mistakes discarded event/control writes for already committed values.
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
-		binding.sources = sources;
-	}
-	const committed = binding;
-	if (STAGED_COMMIT_CAPTURE) {
-		// Event and signal callbacks retain the committed binding while the host
-		// plan prepares. Only the render reads this projection; publishing it and
-		// switching subscriptions/writers happens after the corresponding writes.
-		const projections = (STAGED_COMMIT_CAPTURE.signalHosts ??= new Map());
-		binding = projections.get(committed);
-		if (binding === undefined) {
-			binding = { ...committed };
-			projections.set(committed, binding);
-			if (isRecordingTransitionJournal()) journalUndo(() => projections.delete(committed));
-		} else if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
 		binding.sources = sources;
 	}
 	const valueControl = winningSignalHostControl(sources, 'value');
@@ -29198,28 +28249,12 @@ export function bindSignalHostPropSources(
 		readStyle,
 		binding.pendingControl,
 	);
-	if (STAGED_COMMIT_CAPTURE) {
-		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-			if (committed.disposed) return;
-			committed.sources = binding.sources;
-			committed.resolved = binding.resolved;
-			committed.pendingControl = binding.pendingControl;
-			runWithBlockSignalOwner(scope, () => {
-				rebindSignalHostSubscriptions(committed, next.handles);
-				syncSignalHostControl(committed);
-			});
-			if (!committed.pendingControl && controlSnapshot !== null)
-				consumeHydrationControl(element, controlSnapshot.revision);
-			updateSignalHostPropSources(committed);
-		});
-	} else {
-		rebindSignalHostSubscriptions(binding, next.handles);
-		syncSignalHostControl(binding);
-		if (!binding.pendingControl && controlSnapshot !== null)
-			consumeHydrationControl(element, controlSnapshot.revision);
-	}
-	if (binding.pendingControl) queueSignalHostControlAdoption(committed, binding.resolved?.value);
-	return committed;
+	rebindSignalHostSubscriptions(binding, next.handles);
+	syncSignalHostControl(binding);
+	if (!binding.pendingControl && controlSnapshot !== null)
+		consumeHydrationControl(element, controlSnapshot.revision);
+	if (binding.pendingControl) queueSignalHostControlAdoption(binding, binding.resolved?.value);
+	return binding;
 }
 
 /**
@@ -29360,19 +28395,15 @@ export function setSpread(
 	SKIP_SPREAD_KEY = skipSpreadKey;
 	if (!skipDangerouslySetInnerHTML) {
 		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] =
-				value.children;
-			if (
-				value.children != null &&
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_ACTIVE] === true
-			) {
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = value.children;
+			if (value.children != null && (el as any)[DANGER_HTML_ACTIVE] === true) {
 				throw dangerHtmlChildrenError();
 			}
 		} else if (
 			prev != null &&
 			Object.prototype.propertyIsEnumerable.call(Object(prev), 'children')
 		) {
-			(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[DANGER_HTML_SPREAD_CHILD] = undefined;
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = undefined;
 		}
 	}
 	setHostProps(
@@ -29622,7 +28653,7 @@ function journalHeadEventListeners(state: HeadSlot): void {
 		if (handlers !== undefined) {
 			for (const [name, listener] of handlers) {
 				const event = eventSlot(name)!;
-				domNode(state.el).removeEventListener(event.type, listener, event.capture);
+				state.el.removeEventListener(event.type, listener, event.capture);
 			}
 			handlers.clear();
 		}
@@ -29630,7 +28661,7 @@ function journalHeadEventListeners(state: HeadSlot): void {
 			const restored = handlers ?? (state.handlers = new Map<string, EventListener>());
 			for (const [name, listener] of before) {
 				const event = eventSlot(name)!;
-				domNode(state.el).addEventListener(event.type, listener, event.capture);
+				state.el.addEventListener(event.type, listener, event.capture);
 				restored.set(name, listener);
 			}
 		}
@@ -29652,7 +28683,7 @@ function removeHeadEventListeners(
 			journaled = true;
 		}
 		const event = eventSlot(name)!;
-		domNode(state.el).removeEventListener(event.type, listener, event.capture);
+		state.el.removeEventListener(event.type, listener, event.capture);
 		handlers.delete(name);
 	}
 	return journaled;
@@ -29668,19 +28699,14 @@ function removeHeadEventListeners(
 function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Element | null {
 	const closeKey = '/' + key;
 	for (let n: Node | null = getFirstChild(head); n !== null; n = getNextSibling(n)) {
-		if (
-			n.nodeType === 8 &&
-			(STAGED_DOM ? STAGED_DOM.view(n as Comment) : (n as Comment)).data === key
-		) {
+		if (n.nodeType === 8 && (n as Comment).data === key) {
 			let candidate: Node | null = getNextSibling(n);
 			let match: Element | null = null;
 			let end: Comment | null = null;
 			let matches = 0;
 			while (candidate !== null) {
 				if (candidate.nodeType === 8) {
-					const marker = (
-						STAGED_DOM ? STAGED_DOM.view(candidate as Comment) : (candidate as Comment)
-					).data;
+					const marker = (candidate as Comment).data;
 					if (marker === closeKey) {
 						end = candidate as Comment;
 						break;
@@ -29695,9 +28721,9 @@ function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Ele
 				}
 				candidate = getNextSibling(candidate);
 			}
-			(STAGED_DOM ? STAGED_DOM.view(n as Comment) : (n as Comment)).remove();
+			(n as Comment).remove();
 			if (end === null) return null;
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).remove();
+			end.remove();
 			// Two same-tag candidates are as unprovable as none.
 			return matches === 1 ? match : null;
 		}
@@ -29731,10 +28757,10 @@ function setHeadAttribute(el: Element, name: string, value: unknown): void {
 	const next = coerceAttrValue(el, name, value);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
-	if ((STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name) === next) return;
+	if (el.getAttribute(name) === next) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
-	if (next === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
-	else (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(name, next);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
 }
 
 export function headBlock(
@@ -29757,7 +28783,7 @@ export function headBlock(
 		let el = adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		const adopted = el !== null;
 		if (el === null) {
-			el = (STAGED_DOM ? STAGED_DOM.view(ownerDocument) : ownerDocument).createElement(tag);
+			el = ownerDocument.createElement(tag);
 			const transaction = ROOT_RENDER_TRANSACTION;
 			if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 				// A root render's new head element joins <head> as it commits,
@@ -29765,9 +28791,9 @@ export function headBlock(
 				const created = el;
 				transaction.ops.push(() => {
 					if ((scope.slots[slot] as HeadSlot | undefined)?.el === created)
-						(STAGED_DOM ? STAGED_DOM.view(head) : head).appendChild(created);
+						head.appendChild(created);
 				}, null);
-			} else (STAGED_DOM ? STAGED_DOM.view(head) : head).appendChild(el);
+			} else head.appendChild(el);
 		}
 		// React 19 does not hydrate a hoisted head element in place: it claims the
 		// server's and sets the client's props on it (setInitialProperties), which
@@ -29777,10 +28803,7 @@ export function headBlock(
 		if (hydration !== null) hydration.markFresh(el!);
 		state = {
 			el,
-			attrNames:
-				adopted && hydration === null
-					? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNames()
-					: undefined,
+			attrNames: adopted && hydration === null ? el.getAttributeNames() : undefined,
 			next: null,
 		};
 		scope.slots[slot] = state;
@@ -29789,7 +28812,7 @@ export function headBlock(
 		(scope.cleanups ??= []).push(() => {
 			state!.next = null;
 			removeHeadEventListeners(state!, null);
-			domNode(state!.el).remove();
+			state!.el.remove();
 			scope.slots[slot] = undefined;
 		});
 	} else {
@@ -29858,10 +28881,9 @@ function applyHeadProps(
 					journalHeadEventListeners(state);
 					journaledHandlers = true;
 				}
-				if (prevH !== undefined)
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener(ev.type, prevH, ev.capture);
+				if (prevH !== undefined) el.removeEventListener(ev.type, prevH, ev.capture);
 				if (nextH !== undefined) {
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(ev.type, nextH, ev.capture);
+					el.addEventListener(ev.type, nextH, ev.capture);
 					(hs ?? (state.handlers = new Map<string, EventListener>())).set(k, nextH);
 				} else {
 					hs?.delete(k);
@@ -29877,12 +28899,12 @@ function applyHeadProps(
 	}
 	if (text != null || tag === 'title') {
 		const t = text == null ? '' : String(text);
-		if ((STAGED_DOM ? STAGED_DOM.view(el) : el).textContent !== t) {
+		if (el.textContent !== t) {
 			// textContent replaces child nodes, even when only the text changes.
 			// Retain their identity when a later sibling suspends and this visible
 			// head entry belongs to the held transition boundary.
 			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).textContent = t;
+			el.textContent = t;
 		}
 	}
 }
@@ -29919,7 +28941,7 @@ export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementD
 				queueRootDeletion(() => removeHeadEventListeners(state, null), state.el, state.el);
 			else {
 				removeHeadEventListeners(state, null);
-				domNode(state.el).remove();
+				state.el.remove();
 			}
 			journalRootProperty(scope.slots, slot, state);
 			scope.slots[slot] = undefined;
@@ -29965,9 +28987,7 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 		_injectedStyles.add(id);
 		return;
 	}
-	const existing = (
-		STAGED_DOM ? STAGED_DOM.view(document) : document
-	).querySelector<HTMLStyleElement>(`style[data-octane="${id}"]`);
+	const existing = document.querySelector<HTMLStyleElement>(`style[data-octane="${id}"]`);
 	if (existing !== null) {
 		// A scope hash derives from its first block's position and content, so an
 		// HMR re-evaluation after editing a later block of the same scope arrives
@@ -29975,8 +28995,7 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 		// already owns in place. A sheet seen for the first time was emitted by
 		// the server (its text may differ only in serialization) and is adopted.
 		if (_injectedStyles.has(id)) {
-			if ((STAGED_DOM ? STAGED_DOM.view(existing) : existing).textContent !== css)
-				(STAGED_DOM ? STAGED_DOM.view(existing) : existing).textContent = css;
+			if (existing.textContent !== css) existing.textContent = css;
 		} else {
 			_injectedStyles.add(id);
 		}
@@ -29992,20 +29011,16 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 	// append a duplicate <style>. React batches same-precedence resources into
 	// one tag whose data-href lists every key (`octane-a octane-b`), so the
 	// resource match is a whitespace-token match, not an exact one.
-	if (
-		(STAGED_DOM ? STAGED_DOM.view(document) : document).querySelector(
-			`style[data-href~="octane-${id}"]`,
-		)
-	) {
+	if (document.querySelector(`style[data-href~="octane-${id}"]`)) {
 		_injectedStyles.add(id);
 		return;
 	}
 	_injectedStyles.add(id);
-	const el = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('style');
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('data-octane', id);
-	if (nonce !== undefined) (STAGED_DOM ? STAGED_DOM.view(el) : el).nonce = nonce;
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).textContent = css;
-	domNode(document.head).appendChild(el);
+	const el = document.createElement('style');
+	el.setAttribute('data-octane', id);
+	if (nonce !== undefined) el.nonce = nonce;
+	el.textContent = css;
+	document.head.appendChild(el);
 }
 
 // ---------------------------------------------------------------------------
@@ -30100,17 +29115,13 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // `args` numeric tag keeps the common dispatch read in the same property slot.
 // Keep the computed brand last in every bundle literal, including dispatch
 // snapshots, so V8 can initialize fn/args from its object-literal boilerplate.
-// Project bundles only during an active staged capture, which initializes the
-// driver before publishing its capture. The driver remains installed afterward;
-// a direct guard avoids an idle projection call or an ordinary self-assignment.
 // A live scope token already captures unchanged authority. Explicit/environment
-// and document owners still refresh it; staged updates must publish in order
-// even when the committed owner matches, because an earlier owner write may be pending.
+// and document owners still refresh it.
 // ---------------------------------------------------------------------------
 
 // Data equality skips dispatch/journal snapshots, never authority publication:
 // a stable callback can move to another owner without changing its captures.
-// Compare staged fields first and keep array-reference semantics for arity N.
+// Compare fields first and keep array-reference semantics for arity N.
 const EMPTY_ARGS: any[] = [];
 
 /**
@@ -30158,7 +29169,7 @@ export function bagRecordBundle(
 
 /** Commit a native handler slot; its authority was published at render. */
 export function setEventSlot(el: Element, key: string, handler: unknown): void {
-	const host = STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any);
+	const host = el as any;
 	if (TRANSITION_JOURNAL !== null) TRANSITION_JOURNAL.push(JOURNAL_PROP, el, key, host[key]);
 	host[key] = handler;
 }
@@ -30175,7 +29186,6 @@ export function commitEventBundle(bag: any, d: HandlerBundle, next: any[], cell:
 	const a0 = count === 0 ? bag : next[cell + 1];
 	const a1 = count === 2 ? next[cell + 2] : bag;
 	if (fn === bag && a0 === bag && a1 === bag) return;
-	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	if (fn !== bag) d.fn = fn;
@@ -30204,7 +29214,6 @@ let retiringHostsSince = 0;
  * within the same task, so the stamp only needs to outlive the task.
  */
 function retireEventHostTree(node: Node): void {
-	if (STAGED_COMMIT_CAPTURE) return DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
 	(node as any).$$retiredEpoch = ++eventRootEpoch;
 	if (retiringHostsSince === 0) {
 		retiringHostsSince = eventRootEpoch;
@@ -30235,15 +29244,10 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 				TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
 		) {
-			TRANSITION_JOURNAL.push(
-				JOURNAL_PROP,
-				el,
-				key,
-				(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[key],
-			);
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, el, key, (el as any)[key]);
 			journalBag();
 		}
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[key] = handler;
+		(el as any)[key] = handler;
 	}
 	// Explicit authority also applies to handlers in modules with no signal bindings.
 	const explicitOwner =
@@ -30266,10 +29270,10 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 					: CURRENT_SCOPE.signalOwner || CURRENT_SCOPE
 				: CURRENT_SCOPE);
 		if (owner !== null) {
-			// Mark that a scope token escaped before queuing publication. A staged
-			// event may be followed by deletion in the same preparation; recording
-			// only at publication would miss that retirement. Discard leaves only
-			// this conservative flag, never an owner or signal state.
+			// Mark that a scope token escaped before queuing its commit. A queued
+			// event may be followed by deletion in the same render; recording only
+			// at commit would miss that retirement. Discard leaves only this
+			// conservative flag, never an owner or signal state.
 			if ((owner instanceof ScopeImpl || owner instanceof BlockImpl) && !owner.signalTokenEscaped)
 				owner.signalTokenEscaped = true;
 			// Later writers must replace explicit authority with the usual scope
@@ -30286,10 +29290,6 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 				!hydrating
 			)
 				queueEventOwner(el, owner, transaction);
-			else if (STAGED_COMMIT_CAPTURE)
-				DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-					if ((el as any).$$signalOwner !== owner) (el as any).$$signalOwner = owner;
-				});
 			else {
 				const previous = (el as any).$$signalOwner as SignalEventOwner | undefined;
 				if (previous !== owner) {
@@ -30335,7 +29335,6 @@ export function evt0(el: Element, key: string, fn: any): HandlerBundle {
 	return d;
 }
 export function evt0u(d: HandlerBundle, fn: any): void {
-	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
@@ -30349,7 +29348,6 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
 			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
@@ -30362,7 +29360,6 @@ export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle 
 	return d;
 }
 export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
-	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn || !Object.is(d.a0, a0)) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
@@ -30377,7 +29374,6 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
 			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
@@ -30390,7 +29386,6 @@ export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): Handl
 	return d;
 }
 export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
-	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn || !Object.is(d.a0, a0) || !Object.is(d.a1, a1)) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
@@ -30406,7 +29401,6 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
 			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
@@ -30432,7 +29426,6 @@ export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBun
 	return d;
 }
 export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
-	if (STAGED_COMMIT_CAPTURE) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
 	if (d.fn !== fn || d.args !== args) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
@@ -30447,7 +29440,6 @@ export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			STAGED_COMMIT_CAPTURE ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
 			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
@@ -30682,7 +29674,6 @@ function registerDelegatedCapture(type: DelegatedEventType, canSeed: boolean): v
  * just bump the refcount.
  */
 function registerDelegationTarget(target: Node, root = false): void {
-	if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageDelegation(target, root, true)) return;
 	initDomOperations();
 	if (root) changeEventRootMembership(target, 1);
 	const prev = _delegationTargets.get(target) || 0;
@@ -30726,7 +29717,6 @@ function registerDelegationTarget(target: Node, root = false): void {
  * Inverse of `registerDelegationTarget`. Last referent detaches all listeners.
  */
 function unregisterDelegationTarget(target: Node, root = false): void {
-	if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageDelegation(target, root, false)) return;
 	if (root) changeEventRootMembership(target, -1);
 	const prev = _delegationTargets.get(target);
 	if (!prev) return;
@@ -30993,19 +29983,14 @@ type PortalEventBoundary = Node & {
 };
 
 function resolvePortalEventOwner(node: DelegatedNode): void {
-	if (
-		node.$$portalParent != null ||
-		(STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === null
-	)
-		return;
+	if (node.$$portalParent != null || node.parentNode === null) return;
 	// assignedSlot/composedPath can put a <slot> next, but a portal range belongs
 	// to the direct child's actual DOM container, not the slot it projects into.
-	const target = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!;
+	const target = node.parentNode!;
 	const ranges = _portalEventRanges.get(target);
 	if (ranges === undefined) return;
 	let owner: PortalSlot | undefined;
-	let previous = (STAGED_DOM ? STAGED_DOM.view(node) : node)
-		.previousSibling as PortalEventBoundary | null;
+	let previous = node.previousSibling as PortalEventBoundary | null;
 	let remainingSkips = ranges.size;
 	while (previous !== null) {
 		const closedStart = previous.$$portalEventStart;
@@ -31017,15 +30002,14 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 			ranges.has(closedRange) &&
 			closedRange.start === closedStart &&
 			closedRange.end === previous &&
-			(STAGED_DOM ? STAGED_DOM.view(closedStart) : closedStart).parentNode === target
+			closedStart.parentNode === target
 		) {
 			// Skip a completed foreign range, including all its content. A valid
 			// backward walk skips each active range at most once. Bounding jumps
 			// also prevents cycles if external DOM code reverses a marker pair;
 			// after that bound, ordinary previousSibling steps always make progress.
 			remainingSkips--;
-			previous = (STAGED_DOM ? STAGED_DOM.view(closedStart) : closedStart)
-				.previousSibling as PortalEventBoundary | null;
+			previous = closedStart.previousSibling as PortalEventBoundary | null;
 			continue;
 		}
 		const range = previous.$$portalEventRange;
@@ -31035,21 +30019,16 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 			ranges.has(range) &&
 			range.start === previous &&
 			end != null &&
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === target &&
-			((STAGED_DOM ? STAGED_DOM.view(previous) : previous).compareDocumentPosition(node) &
-				Node.DOCUMENT_POSITION_FOLLOWING) !==
-				0 &&
-			((STAGED_DOM ? STAGED_DOM.view(node) : node).compareDocumentPosition(end) &
-				Node.DOCUMENT_POSITION_FOLLOWING) !==
-				0
+			end.parentNode === target &&
+			(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
+			(node.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 		) {
 			// The first enclosing start encountered backwards is the innermost
 			// active owner, including foreign ranges interleaved in a Fragment.
 			owner = range;
 			break;
 		}
-		previous = (STAGED_DOM ? STAGED_DOM.view(previous) : previous)
-			.previousSibling as PortalEventBoundary | null;
+		previous = previous.previousSibling as PortalEventBoundary | null;
 	}
 	if (owner === undefined) return;
 	if (ROOT_RENDER_TRANSACTION !== null) {
@@ -31070,8 +30049,7 @@ function prepareRegisteredPortalEventOwners(path: EventTarget[], epoch: number):
 		let logical = node.$$portalParent as DelegatedNode | undefined;
 		while (logical != null && !isEventRoot(logical, epoch) && path.indexOf(logical) < 0) {
 			resolvePortalEventOwner(logical);
-			logical = (logical.$$portalParent ||
-				(STAGED_DOM ? STAGED_DOM.view(logical) : logical).parentNode) as DelegatedNode | undefined;
+			logical = (logical.$$portalParent || logical.parentNode) as DelegatedNode | undefined;
 		}
 	}
 }
@@ -31164,7 +30142,7 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 			} else {
 				// The logical portal host may not be on this native event's path.
 				// Do not force a hidden shadow-root -> host crossing here.
-				node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode as DelegatedNode | null;
+				node = node.parentNode as DelegatedNode | null;
 			}
 		}
 
@@ -31659,9 +30637,7 @@ function snapshotSubmitDispatch(form: HTMLFormElement, event: SubmitEvent): Subm
 	let submitter = event.submitter;
 	let action: unknown = (form as any).$$formAction;
 	if (submitter !== null && submitter !== undefined) {
-		const override =
-			(submitter as any).$$formAction ??
-			(STAGED_DOM ? STAGED_DOM.view(submitter) : submitter).getAttribute('formaction');
+		const override = (submitter as any).$$formAction ?? submitter.getAttribute('formaction');
 		if (override != null) {
 			action = override;
 			// An explicit formAction owns the action input; its submit button is
@@ -31701,9 +30677,7 @@ function publishRegisteredManualFormPending(rec: SubmitDispatchRec): void {
 		method: form.method || 'get',
 		// React reports the form's action PROP here; octane's equivalents are the
 		// intercept function ($$formAction) or the plain attribute.
-		action:
-			(fa.$$formAction as FormStatus['action']) ??
-			(STAGED_DOM ? STAGED_DOM.view(form) : form).getAttribute('action'),
+		action: (fa.$$formAction as FormStatus['action']) ?? form.getAttribute('action'),
 	});
 }
 
@@ -31783,7 +30757,7 @@ export function setFormAction(
 	_prev: unknown,
 ): void {
 	if (typeof value === 'function') {
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$formAction = value;
+		(el as any).$$formAction = value;
 		if (process.env.NODE_ENV !== 'production') queueFormActionAuthoringDiagnostic(el);
 		if (!(el as any).$$formSubmitWired) {
 			(el as any).$$formSubmitWired = true;
@@ -31791,7 +30765,7 @@ export function setFormAction(
 			delegateEvents(['submit']);
 		}
 		// A function action implies a non-native submit; drop any stale attribute.
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute(name);
+		el.removeAttribute(name);
 		return;
 	}
 	setFormActionAttribute(el, name, value);
@@ -31804,7 +30778,7 @@ function setFormActionAttribute(el: Element, name: string, value: unknown, _prev
 	// here (DESCRIPTOR_FORM_ACTION): a compiler classification gap.
 	if (process.env.NODE_ENV !== 'production' && typeof value === 'function')
 		throw new Error(formatClientError(342));
-	(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$formAction = undefined;
+	(el as any).$$formAction = undefined;
 	setAttribute(el, name, value);
 }
 
@@ -32053,12 +31027,6 @@ let AUTOFOCUS_QUEUE: Element[] = [];
 
 function queueControlledCommit<T>(queue: T[], item: T): void {
 	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		item !== null &&
-		(typeof item === 'object' || typeof item === 'function')
-	)
-		DEFERRED_LAYOUT_DRIVER.recordStageEntry(item);
 	queue.push(item);
 	if (ROOT_RENDER_TRANSACTION !== null)
 		journalUndo(() => {
@@ -32069,7 +31037,6 @@ function queueControlledCommit<T>(queue: T[], item: T): void {
 
 function queueDevFormCheck(queue: Element[], el: Element): void {
 	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
-	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(el);
 	queue.push(el);
 	if (ROOT_RENDER_TRANSACTION !== null) {
 		const host = el as any;
@@ -32122,7 +31089,7 @@ export function setAutoFocus(el: Element, value: unknown): void {
 function isTextEntry(el: Element): boolean {
 	if (el.localName === 'textarea') return true;
 	if (el.localName !== 'input') return false;
-	switch ((STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type) {
+	switch ((el as HTMLInputElement).type) {
 		case 'text':
 		case 'search':
 		case 'url':
@@ -32149,13 +31116,13 @@ function onCtrlCompositionStart(e: Event): void {
 		ctrl.compositionEndTask = null;
 	}
 	ctrl.composing = true;
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener('blur', onCtrlCompositionEnd);
+	el.addEventListener('blur', onCtrlCompositionEnd);
 }
 function onCtrlCompositionEnd(e: Event): void {
 	const el = e.currentTarget as Element;
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
 	if (ctrl === undefined) return;
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).removeEventListener('blur', onCtrlCompositionEnd);
+	el.removeEventListener('blur', onCtrlCompositionEnd);
 	if (ctrl.compositionEndTask !== undefined && ctrl.compositionEndTask !== null) {
 		clearTimeout(ctrl.compositionEndTask);
 	}
@@ -32178,13 +31145,8 @@ function onCtrlCompositionEnd(e: Event): void {
 
 /** Get-or-create the shared controlled-state record and restoration listeners. */
 function renderControlledState(el: Element): ControlledState | undefined {
-	const state = (STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$ctrl as
-		ControlledState | undefined;
-	return state === undefined
-		? undefined
-		: DEFERRED_LAYOUT_DRIVER
-			? DEFERRED_LAYOUT_DRIVER.projectControlled(state)
-			: state;
+	const state = (el as any).$$ctrl as ControlledState | undefined;
+	return state;
 }
 
 function armControlledBase(el: Element): ControlledState {
@@ -32212,7 +31174,7 @@ function armControlledBase(el: Element): ControlledState {
 			formMultiple: false,
 			formChildren: false,
 		};
-		(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any)).$$ctrl = ctrl;
+		(el as any).$$ctrl = ctrl;
 		// The restore pass rides the delegated dispatchers — an armed control
 		// must hear its native edit events even when NO component listens
 		// (React attaches root listeners eagerly; octane delegates lazily).
@@ -32230,14 +31192,8 @@ function armControlled(el: Element): ControlledState {
 	// Recheck existing records so a dynamic date-to-text type change can arm IME.
 	if (ctrl.compositionEndTask === undefined && isTextEntry(el)) {
 		ctrl.compositionEndTask = null;
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(
-			'compositionstart',
-			onCtrlCompositionStart,
-		);
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).addEventListener(
-			'compositionend',
-			onCtrlCompositionEnd,
-		);
+		el.addEventListener('compositionstart', onCtrlCompositionStart);
+		el.addEventListener('compositionend', onCtrlCompositionEnd);
 	}
 	return ctrl;
 }
@@ -32259,17 +31215,11 @@ function toControlledString(v: unknown): string {
  * exact string.
  */
 function valueNeedsWrite(el: HTMLInputElement | HTMLTextAreaElement, raw: unknown): boolean {
-	if (
-		(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type ===
-		'number'
-	) {
+	if ((el as HTMLInputElement).type === 'number') {
 		// eslint-disable-next-line eqeqeq
-		return (
-			(raw === 0 && (STAGED_DOM ? STAGED_DOM.view(el) : el).value === '') ||
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).value != (raw as any)
-		);
+		return (raw === 0 && el.value === '') || el.value != (raw as any);
 	}
-	return (STAGED_DOM ? STAGED_DOM.view(el) : el).value !== toControlledString(raw);
+	return el.value !== toControlledString(raw);
 }
 
 // DEV (gated on the dev-compile `__oct_loc` stamp, like the hydration
@@ -32345,10 +31295,7 @@ function hasPotentialFormDiagnostic(el: Element): boolean {
 	if (el.localName === 'select') return ctrl !== undefined && ctrl.sv !== null;
 	if (el.localName === 'input') {
 		const input = el as HTMLInputElement;
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'checkbox' ||
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio'
-		) {
+		if (input.type === 'checkbox' || input.type === 'radio') {
 			return ctrl !== undefined && ctrl.c !== -1;
 		}
 	}
@@ -32356,7 +31303,7 @@ function hasPotentialFormDiagnostic(el: Element): boolean {
 	return (
 		(ctrl !== undefined && ctrl.v !== UNCONTROLLED) ||
 		isUsableEventSlot((el as any).$ochange) ||
-		isUsableEventSlot((STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))['$ocapture:change'])
+		isUsableEventSlot((el as any)['$ocapture:change'])
 	);
 }
 
@@ -32374,7 +31321,7 @@ function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false): void
 		queueDevFormCheck(q, el);
 		if (q.length < DEV_FORM_CHECK_LINEAR_LIMIT) return;
 		for (let i = 0; i < q.length; i++) {
-			domNode(q[i] as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
+			(q[i] as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
 		}
 		return;
 	}
@@ -32476,11 +31423,10 @@ export function setValue(el: Element, value: unknown): void {
 			// PROPERTY first (React initInput order): the write marks the control
 			// DIRTY, so the attribute write below — and any later defaultValue
 			// binding — can never drag the live value along.
-			if ((STAGED_DOM ? STAGED_DOM.view(input) : input).value !== s)
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+			if (input.value !== s) input.value = s;
 			// The value ATTRIBUTE mirrors the controlled value (React's
 			// attribute-syncing cascade: value wins over defaultValue).
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+			input.defaultValue = s;
 			return;
 		}
 	} else {
@@ -32500,16 +31446,15 @@ export function setValue(el: Element, value: unknown): void {
 		// IME: an UNCHANGED rendered value must not cancel an active composition;
 		// a genuinely changed one still wins (React: setState during composition).
 		if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+			input.value = s;
 	}
-	if ((STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue !== s) {
+	if (input.defaultValue !== s) {
 		// Replacing textarea child text between edits splits native Undo groups.
 		// Keep its Text node while mirroring the controlled reset baseline.
-		// Staging owns the reflected defaultValue cache, so keep its property path.
-		const text = !STAGED_DOM && el.localName === 'textarea' ? getFirstChild(el) : null;
+		const text = el.localName === 'textarea' ? getFirstChild(el) : null;
 		if (text !== null && text.nodeType === 3 && getNextSibling(text) === null)
-			domNode(text as Text).data = s;
-		else (STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+			(text as Text).data = s;
+		else input.defaultValue = s;
 	}
 }
 
@@ -32540,12 +31485,8 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		// Hydration re-assigns the live (server or user) selection instead, as
 		// React's initInput does, which separates it from the server default,
 		// including for a later controlled → default flip.
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked =
-			hydrating && activeHydration()?.isFresh(input) === false
-				? (STAGED_DOM ? STAGED_DOM.view(input) : input).checked
-				: b;
-		if ((STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked !== b)
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked = b;
+		input.checked = hydrating && activeHydration()?.isFresh(input) === false ? input.checked : b;
+		if (input.defaultChecked !== b) input.defaultChecked = b;
 		ctrl.sawDC = true;
 		return;
 	}
@@ -32562,11 +31503,7 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 	ctrl.c = b;
 	if (process.env.NODE_ENV !== 'production')
 		queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
-	if (
-		(changed || !inActivationWindow(input)) &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked !== b
-	)
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = b;
+	if ((changed || !inActivationWindow(input)) && input.checked !== b) input.checked = b;
 }
 
 /**
@@ -32579,16 +31516,12 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 	if (target === null) return false;
 	if (input === target) return true;
 	return (
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).type === 'radio' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== '' &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).name ===
-			(STAGED_DOM ? STAGED_DOM.view(target) : target).name &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).form ===
-			(STAGED_DOM ? STAGED_DOM.view(target) : target).form &&
-		((STAGED_DOM ? STAGED_DOM.view(input) : input).form !== null ||
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).getRootNode() ===
-				(STAGED_DOM ? STAGED_DOM.view(target) : target).getRootNode())
+		input.type === 'radio' &&
+		target.type === 'radio' &&
+		input.name !== '' &&
+		input.name === target.name &&
+		input.form === target.form &&
+		(input.form !== null || input.getRootNode() === target.getRootNode())
 	);
 }
 
@@ -32636,7 +31569,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	}
 	if (process.env.NODE_ENV !== 'production' && !first && ctrl.sv === null)
 		devWarnControlledFlip(el, true);
-	if ((STAGED_DOM ? STAGED_DOM.view(sel) : sel).multiple) {
+	if (sel.multiple) {
 		if (!Array.isArray(value)) {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 				console.error(
@@ -32666,9 +31599,8 @@ export function setSelectValue(el: Element, value: unknown): void {
 	// user state to preserve and follows the ordinary client-mount path.
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && !hydration.isFresh(el)) return;
-	// A ViewTransition drain's DOMStage still stages a render's projection
-	// itself. Any other root render leaves the projection to its commit.
-	const now = STAGED_DOM ? true : ROOT_RENDER_TRANSACTION === null;
+	// A root render leaves the projection to its commit.
+	const now = ROOT_RENDER_TRANSACTION === null;
 	if (now) projectSelectValue(sel, ctrl.sv, false);
 	if (!ctrl.queued || !now) {
 		ctrl.queued = true;
@@ -32687,7 +31619,7 @@ function projectSelectValue(
 	sv: string | Set<string>,
 	setDefaultSelected: boolean,
 ): void {
-	const options = (STAGED_DOM ? STAGED_DOM.view(sel) : sel).options;
+	const options = sel.options;
 	// The selection lives on the options, not the select, so each one that can
 	// move has to be recorded before the projection walks over it.
 	if (TRANSITION_JOURNAL !== null) {
@@ -32698,28 +31630,23 @@ function projectSelectValue(
 	if (typeof sv !== 'string') {
 		for (let i = 0; i < options.length; i++) {
 			const option = options[i];
-			const selected = sv.has((STAGED_DOM ? STAGED_DOM.view(option) : option).value);
-			if ((STAGED_DOM ? STAGED_DOM.view(option) : option).selected !== selected)
-				(STAGED_DOM ? STAGED_DOM.view(option) : option).selected = selected;
-			if (setDefaultSelected)
-				(STAGED_DOM ? STAGED_DOM.view(option) : option).defaultSelected = selected;
+			const selected = sv.has(option.value);
+			if (option.selected !== selected) option.selected = selected;
+			if (setDefaultSelected) option.defaultSelected = selected;
 		}
 		return;
 	}
 	let defaultOption: HTMLOptionElement | null = null;
 	for (let i = 0; i < options.length; i++) {
 		const option = options[i];
-		if ((STAGED_DOM ? STAGED_DOM.view(option) : option).value === sv) {
-			(STAGED_DOM ? STAGED_DOM.view(option) : option).selected = true;
-			if (setDefaultSelected)
-				(STAGED_DOM ? STAGED_DOM.view(option) : option).defaultSelected = true;
+		if (option.value === sv) {
+			option.selected = true;
+			if (setDefaultSelected) option.defaultSelected = true;
 			return;
 		}
-		if (defaultOption === null && !(STAGED_DOM ? STAGED_DOM.view(option) : option).disabled)
-			defaultOption = option;
+		if (defaultOption === null && !option.disabled) defaultOption = option;
 	}
-	if (defaultOption !== null)
-		(STAGED_DOM ? STAGED_DOM.view(defaultOption) : defaultOption).selected = true;
+	if (defaultOption !== null) defaultOption.selected = true;
 }
 
 /**
@@ -32733,9 +31660,7 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	const hydration = hydrating ? activeHydration() : null;
 	if (el.localName === 'select') {
 		const first = ctrl.dvv === UNCONTROLLED;
-		const multiple = (
-			STAGED_DOM ? STAGED_DOM.view(el as HTMLSelectElement) : (el as HTMLSelectElement)
-		).multiple;
+		const multiple = (el as HTMLSelectElement).multiple;
 		const changedMultiple = ctrl.formMultiple !== multiple;
 		if (first || changedMultiple) {
 			if (TRANSITION_JOURNAL !== null) {
@@ -32767,25 +31692,22 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	if (value == null) {
 		if (previousDefault !== UNCONTROLLED && previousDefault != null) {
 			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-			if (el.localName === 'input')
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).removeAttribute('value');
-			else (STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = '';
+			if (el.localName === 'input') input.removeAttribute('value');
+			else input.defaultValue = '';
 		}
 		return;
 	}
 	const s = toControlledString(value);
-	if (first && !adopted && (STAGED_DOM ? STAGED_DOM.view(input) : input).value !== s) {
+	if (first && !adopted && input.value !== s) {
 		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+		input.value = s;
 	}
 	if (
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue !== s ||
-		(s === '' &&
-			el.localName === 'input' &&
-			!(STAGED_DOM ? STAGED_DOM.view(input) : input).hasAttribute('value'))
+		input.defaultValue !== s ||
+		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
 	) {
 		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+		input.defaultValue = s;
 	}
 }
 
@@ -32800,39 +31722,30 @@ const DEFAULT_CHECKED_INITIALIZED = Symbol('octane.defaultCheckedInitialized');
 export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	const hydration = hydrating ? activeHydration() : null;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
-	const previous = (STAGED_DOM ? STAGED_DOM.view(input as any) : (input as any))[
-		DEFAULT_VALUE_BASELINE
-	] as string | null | undefined;
+	const previous = (input as any)[DEFAULT_VALUE_BASELINE] as string | null | undefined;
 	const s = value == null ? null : toControlledString(value);
 	if (TRANSITION_JOURNAL !== null)
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, input, DEFAULT_VALUE_BASELINE, previous);
-	(STAGED_DOM ? STAGED_DOM.view(input as any) : (input as any))[DEFAULT_VALUE_BASELINE] = s;
+	(input as any)[DEFAULT_VALUE_BASELINE] = s;
 	const adopted = hydration !== null && !hydration.isFresh(el);
 	if (s === null) {
 		if (previous != null) {
 			if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-			if (el.localName === 'input')
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).removeAttribute('value');
-			else (STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = '';
+			if (el.localName === 'input') input.removeAttribute('value');
+			else input.defaultValue = '';
 		}
 		return;
 	}
-	if (
-		previous === undefined &&
-		!adopted &&
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).value !== s
-	) {
+	if (previous === undefined && !adopted && input.value !== s) {
 		if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).value = s;
+		input.value = s;
 	}
 	if (
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue !== s ||
-		(s === '' &&
-			el.localName === 'input' &&
-			!(STAGED_DOM ? STAGED_DOM.view(input) : input).hasAttribute('value'))
+		input.defaultValue !== s ||
+		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
 	) {
 		if (TRANSITION_JOURNAL !== null) journalDefaultValue(input);
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultValue = s;
+		input.defaultValue = s;
 	}
 }
 
@@ -32851,10 +31764,7 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	}
 	// Adopt the user's live choice, separated from the server's pristine default
 	// so the client baseline below (React's initInput) cannot drag it along.
-	if (adopted && first)
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = (
-			STAGED_DOM ? STAGED_DOM.view(input) : input
-		).checked;
+	if (adopted && first) input.checked = input.checked;
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
 	// React initInput marks the live checkedness dirty even when the initial
@@ -32862,34 +31772,19 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	// checkbox whenever a later defaultChecked update changes its reset target.
 	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
 		if (TRANSITION_JOURNAL !== null) {
-			TRANSITION_JOURNAL.push(
-				JOURNAL_PROP,
-				input,
-				'checked',
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).checked,
-			);
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== '' &&
-				!!value
-			)
-				journalRadioCousins(input);
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, input, 'checked', input.checked);
+			if (input.type === 'radio' && input.name !== '' && !!value) journalRadioCousins(input);
 		}
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).checked =
-			value == null ? (STAGED_DOM ? STAGED_DOM.view(input) : input).checked : !!value;
+		input.checked = value == null ? input.checked : !!value;
 	}
 	if (value == null) return;
 	const b = !!value;
-	if ((STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked !== b) {
+	if (input.defaultChecked !== b) {
 		if (TRANSITION_JOURNAL !== null) {
-			if (
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== ''
-			)
-				journalRadioCousins(input);
+			if (input.type === 'radio' && input.name !== '') journalRadioCousins(input);
 			journalAttr(input, 'checked');
 		}
-		(STAGED_DOM ? STAGED_DOM.view(input) : input).defaultChecked = b;
+		input.defaultChecked = b;
 	}
 }
 
@@ -33017,12 +31912,7 @@ function applyFormControlValues(
 			// initial value. Clearing it under a live child binding would detach
 			// that binding's Text node, and later updates would write outside the
 			// element.
-			else if (
-				!first &&
-				!childrenOwned &&
-				(STAGED_DOM ? STAGED_DOM.view(textarea) : textarea).defaultValue !== ''
-			)
-				(STAGED_DOM ? STAGED_DOM.view(textarea) : textarea).defaultValue = '';
+			else if (!first && !childrenOwned && textarea.defaultValue !== '') textarea.defaultValue = '';
 		}
 		return;
 	}
@@ -33031,20 +31921,15 @@ function applyFormControlValues(
 	const multipleType = typeof multiple;
 	const nextMultiple = !!multiple && multipleType !== 'function' && multipleType !== 'symbol';
 	ctrl.formMultiple = nextMultiple;
-	if ((STAGED_DOM ? STAGED_DOM.view(select) : select).multiple !== nextMultiple) {
+	if (select.multiple !== nextMultiple) {
 		if (TRANSITION_JOURNAL !== null) {
 			// Switching to single selection can clear options before projection.
 			// Restore multiple first, then each option's prior selected state.
-			for (let i = 0; i < (STAGED_DOM ? STAGED_DOM.view(select) : select).options.length; i++)
-				journalControlledOption((STAGED_DOM ? STAGED_DOM.view(select) : select).options[i], false);
-			TRANSITION_JOURNAL.push(
-				JOURNAL_PROP,
-				select,
-				'multiple',
-				(STAGED_DOM ? STAGED_DOM.view(select) : select).multiple,
-			);
+			for (let i = 0; i < select.options.length; i++)
+				journalControlledOption(select.options[i], false);
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, select, 'multiple', select.multiple);
 		}
-		(STAGED_DOM ? STAGED_DOM.view(select) : select).multiple = nextMultiple;
+		select.multiple = nextMultiple;
 	}
 	if (!first && previousMultiple !== nextMultiple && value == null) {
 		if (defaultValue != null) ctrl.dvv = UNCONTROLLED;
@@ -33068,9 +31953,7 @@ function nativeTextChangeMessage(
 	const changeProp = hasBubbleChange ? 'onChange' : 'onChangeCapture';
 	const inputProp = hasBubbleChange ? 'onInput' : 'onInputCapture';
 	const host =
-		el.localName === 'textarea'
-			? '<textarea>'
-			: `<input type="${(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type}">`;
+		el.localName === 'textarea' ? '<textarea>' : `<input type="${(el as HTMLInputElement).type}">`;
 	const controlledHint = controlled
 		? ' Because this field is controlled, edits are restored before the later native ' +
 			'change can run; use `defaultValue` for editable commit-only behavior.'
@@ -33094,8 +31977,8 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	if (
 		host.readOnly === true ||
 		host.disabled === true ||
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('readonly') ||
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('disabled')
+		el.hasAttribute('readonly') ||
+		el.hasAttribute('disabled')
 	)
 		return null;
 	// An aria-hidden control is a form-interop MIRROR (AT-hidden and, by the
@@ -33103,7 +31986,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	// radix-style libraries render behind a custom control): users cannot reach
 	// it, so handler-less controlled props are the intended wiring, not the
 	// authoring mistake this diagnostic exists to catch.
-	if ((STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('aria-hidden') === 'true') return null;
+	if (el.getAttribute('aria-hidden') === 'true') return null;
 
 	const hasInput =
 		isUsableEventSlot(host.$oinput as EventSlot) ||
@@ -33122,13 +32005,13 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 				return null;
 			const phase = hasBubbleChange ? (hasCaptureChange ? 'both' : 'bubble') : 'capture';
 			return {
-				signature: `native-change:${el.localName}:${(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type}:${phase}:${controlled ? 'controlled' : 'uncontrolled'}`,
+				signature: `native-change:${el.localName}:${(el as HTMLInputElement).type}:${phase}:${controlled ? 'controlled' : 'uncontrolled'}`,
 				message: nativeTextChangeMessage(el, hasBubbleChange, controlled),
 			};
 		}
 		if (!controlled) return null;
 		return {
-			signature: `controlled-text-missing:${el.localName}:${(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).type}`,
+			signature: `controlled-text-missing:${el.localName}:${(el as HTMLInputElement).type}`,
 			message:
 				'You provided a `value` prop to a form field without an `onInput` handler. This ' +
 				'will render a read-only field. If the field should be mutable use ' +
@@ -33156,9 +32039,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 
 	const input = el as HTMLInputElement;
 	const checkable =
-		input.localName === 'input' &&
-		((STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'checkbox' ||
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio');
+		input.localName === 'input' && (input.type === 'checkbox' || input.type === 'radio');
 	if (!checkable || ctrl === undefined || ctrl.c === -1) return null;
 	const hasClick =
 		isUsableEventSlot(host.$oclick as EventSlot) ||
@@ -33166,7 +32047,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	if (hasClick || hasInput || hasChange || hasHydrationControlSignalWriter(el, 'checked'))
 		return null;
 	return {
-		signature: `controlled-checkable-missing:${(STAGED_DOM ? STAGED_DOM.view(input) : input).type}`,
+		signature: `controlled-checkable-missing:${input.type}`,
 		message:
 			'You provided a `checked` prop to a checkbox or radio without an `onClick`, ' +
 			'`onInput`, or `onChange` handler. This will render a read-only field. Set a ' +
@@ -33213,27 +32094,23 @@ function drainDevFormDiagnostics(target?: Element): void {
 					...(submitter
 						? {
 								formAction: action,
-								type: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('type') ?? undefined,
-								name: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('name') ?? undefined,
-								formMethod:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('formmethod') ?? undefined,
-								formEncType:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('formenctype') ?? undefined,
-								formTarget:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('formtarget') ?? undefined,
+								type: el.getAttribute('type') ?? undefined,
+								name: el.getAttribute('name') ?? undefined,
+								formMethod: el.getAttribute('formmethod') ?? undefined,
+								formEncType: el.getAttribute('formenctype') ?? undefined,
+								formTarget: el.getAttribute('formtarget') ?? undefined,
 							}
 						: {
 								action,
-								method: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('method') ?? undefined,
-								encType:
-									(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('enctype') ?? undefined,
-								target: (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('target') ?? undefined,
+								method: el.getAttribute('method') ?? undefined,
+								encType: el.getAttribute('enctype') ?? undefined,
+								target: el.getAttribute('target') ?? undefined,
 							}),
 				};
 			}
 			const children =
 				authoring.authoringChildren === 'textarea'
-					? (STAGED_DOM ? STAGED_DOM.view(el) : el).textContent
+					? el.textContent
 					: authoring.authoringChildren === 'option'
 						? {}
 						: undefined;
@@ -33270,7 +32147,7 @@ function drainQueuedControlledSyncs(): void {
 		for (let i = 0; i < q.length; i++) {
 			// Focus only if the commit actually connected the element (a caught
 			// mount error may have torn the subtree down before this drain).
-			if (domNode(q[i]).isConnected) domNode(q[i] as HTMLElement).focus();
+			if (q[i].isConnected) (q[i] as HTMLElement).focus();
 		}
 	}
 	if (SELECT_DEFAULT_SYNCS.length > 0) {
@@ -33281,7 +32158,7 @@ function drainQueuedControlledSyncs(): void {
 			const ctrl = (sel as any).$$ctrl as ControlledState | undefined;
 			if (ctrl !== undefined && ctrl.sv !== null) continue; // controlled value owns the selection
 			const v = q[i].value;
-			const sv = (STAGED_DOM ? STAGED_DOM.view(sel) : sel).multiple
+			const sv = sel.multiple
 				? Array.isArray(v)
 					? new Set<string>(v.map(toControlledString))
 					: null
@@ -33310,8 +32187,7 @@ function drainQueuedControlledSyncs(): void {
  */
 function restoreControlledElement(el: Element): void {
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
-	if (ctrl === undefined || ctrl.composing || !(STAGED_DOM ? STAGED_DOM.view(el) : el).isConnected)
-		return;
+	if (ctrl === undefined || ctrl.composing || !el.isConnected) return;
 	if (el.localName === 'select') {
 		if (ctrl.sv !== null) projectSelectValue(el as HTMLSelectElement, ctrl.sv, false);
 		return;
@@ -33321,48 +32197,37 @@ function restoreControlledElement(el: Element): void {
 		ctrl.v !== UNCONTROLLED &&
 		valueNeedsWrite(el as HTMLInputElement | HTMLTextAreaElement, ctrl.v)
 	) {
-		(STAGED_DOM ? STAGED_DOM.view(el as HTMLInputElement) : (el as HTMLInputElement)).value =
-			toControlledString(ctrl.v);
+		(el as HTMLInputElement).value = toControlledString(ctrl.v);
 	}
 }
 
 function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): void {
 	if (ctrl.c !== -1) {
-		if ((STAGED_DOM ? STAGED_DOM.view(input) : input).checked !== ctrl.c)
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = ctrl.c;
+		if (input.checked !== ctrl.c) input.checked = ctrl.c;
 		// A radio's drift flips its GROUP cousins too (checking one unchecks
 		// another) — restore every armed cousin to ITS rendered state
 		// (React's updateNamedCousins).
-		if (
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).type === 'radio' &&
-			(STAGED_DOM ? STAGED_DOM.view(input) : input).name !== ''
-		)
-			restoreRadioCousins(input);
+		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
 	}
 }
 
 function restoreRadioCousins(input: HTMLInputElement): void {
-	const name = (STAGED_DOM ? STAGED_DOM.view(input) : input).name;
+	const name = input.name;
 	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
 			other === input ||
 			other.localName !== 'input' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).type !== 'radio' ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).name !== name ||
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).form !==
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).form
+			other.type !== 'radio' ||
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
 		const octrl = (other as any).$$ctrl as ControlledState | undefined;
-		if (
-			octrl !== undefined &&
-			octrl.c !== -1 &&
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).checked !== octrl.c
-		) {
-			(STAGED_DOM ? STAGED_DOM.view(other) : other).checked = octrl.c;
+		if (octrl !== undefined && octrl.c !== -1 && other.checked !== octrl.c) {
+			other.checked = octrl.c;
 		}
 	}
 }
@@ -33372,12 +32237,9 @@ function restoreControlledStates(): void {
 	if (pendingRestores.length === 0) return;
 	// A handler inside a render/commit cannot flush its own update. The ambient
 	// owner restores after its complete cascade.
-	// A prepared view transition owns projected control values until publication;
-	// restoring the physical snapshot now would overwrite that pending edit.
 	// A first root render can be active without entering the scheduler's flush.
 	if (
 		inFlush ||
-		STAGED_DOM ||
 		_dispatchDepth !== 0 ||
 		ROOT_RENDER_TRANSACTION !== null ||
 		(DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.capturing())
@@ -33604,11 +32466,6 @@ function registerPortalTarget(portal: PortalSlot): void {
 
 function registerPortalEventRange(target: Node, portal: PortalSlot): void {
 	installPortalEvents();
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => registerPortalEventRange(target, portal))
-	)
-		return;
 	let ranges = _portalEventRanges.get(target);
 	if (ranges === undefined) {
 		ranges = new Set();
@@ -33622,11 +32479,6 @@ function registerPortalEventRange(target: Node, portal: PortalSlot): void {
 }
 
 function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
-	if (
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(() => unregisterPortalEventRange(target, portal), true)
-	)
-		return;
 	const start = portal.start as PortalEventBoundary | null;
 	const end = portal.end as PortalEventBoundary | null;
 	// Clear, never `delete`: deleting an expando from a DOM wrapper drops it into
@@ -33756,7 +32608,7 @@ function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
 		for (const candidate of activeFragments) {
 			if (
 				candidate._ownerBlock === block &&
-				domNode(candidate._startMarker).previousSibling === start &&
+				candidate._startMarker.previousSibling === start &&
 				getNextSibling(candidate._endMarker) === end
 			) {
 				fragment = candidate;
@@ -33779,11 +32631,7 @@ function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
 	let after: ChildNode | null = firstForeign;
 	while (after !== null) {
 		const foreignEnd = (after as any).$$portalEnd as Node | undefined;
-		if (
-			foreignEnd === undefined ||
-			(STAGED_DOM ? STAGED_DOM.view(foreignEnd) : foreignEnd).parentNode !== target
-		)
-			break;
+		if (foreignEnd === undefined || foreignEnd.parentNode !== target) break;
 		foreignStarts.push(after);
 		after = getNextSibling(foreignEnd);
 	}
@@ -33792,7 +32640,7 @@ function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
 	let cursor: ChildNode | null = tail;
 	while (cursor !== null) {
 		const next: ChildNode | null = getNextSibling(cursor);
-		(STAGED_DOM ? STAGED_DOM.view(target) : target).insertBefore(cursor, after);
+		target.insertBefore(cursor, after);
 		if (cursor === end) break;
 		cursor = next;
 	}
@@ -33810,21 +32658,12 @@ function evacuateInterleavedPortalRanges(portal: PortalSlot): void {
 	const start = portal.start;
 	const end = portal.end;
 	const target = portal.target;
-	if (
-		start === null ||
-		end === null ||
-		target === null ||
-		(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode !== target
-	)
-		return;
+	if (start === null || end === null || target === null || end.parentNode !== target) return;
 	const destination = getNextSibling(end);
 	let node: ChildNode | null = getNextSibling(start);
 	while (node !== null && node !== end) {
 		const foreignEnd = (node as any).$$portalEnd as Node | undefined;
-		if (
-			foreignEnd === undefined ||
-			(STAGED_DOM ? STAGED_DOM.view(foreignEnd) : foreignEnd).parentNode !== target
-		) {
+		if (foreignEnd === undefined || foreignEnd.parentNode !== target) {
 			node = getNextSibling(node);
 			continue;
 		}
@@ -33832,7 +32671,7 @@ function evacuateInterleavedPortalRanges(portal: PortalSlot): void {
 		let cursor: Node | null = node;
 		while (cursor !== null) {
 			const next: Node | null = getNextSibling(cursor);
-			(STAGED_DOM ? STAGED_DOM.view(target) : target).insertBefore(cursor, destination);
+			target.insertBefore(cursor, destination);
 			if (cursor === foreignEnd) break;
 			cursor = next;
 		}
@@ -33898,21 +32737,15 @@ function registerValuePortalFragmentOwners(
 	for (const fragment of activeFragments) {
 		const owner = fragment._ownerBlock;
 		if (owner !== parentBlock && !blockIsAncestorOf(owner, parentBlock)) continue;
+		if (fragment._startMarker.parentNode !== anchor.parentNode) continue;
 		if (
-			domNode(fragment._startMarker).parentNode !==
-			(STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).parentNode
-		)
-			continue;
-		if (
-			(domNode(fragment._startMarker).compareDocumentPosition(anchor) &
-				Node.DOCUMENT_POSITION_FOLLOWING) ===
+			(fragment._startMarker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) ===
 			0
 		) {
 			continue;
 		}
 		if (
-			(domNode(fragment._endMarker).compareDocumentPosition(anchor) &
-				Node.DOCUMENT_POSITION_PRECEDING) ===
+			(fragment._endMarker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_PRECEDING) ===
 			0
 		) {
 			continue;
@@ -33964,8 +32797,8 @@ function renderPortalState(
 		// First mount, changed key, a different child element type, or the portal
 		// moved to a different target → (re)build.
 		if (state !== null) teardownPortalState(state);
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('portal');
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/portal');
+		const start = document.createComment('portal');
+		const end = document.createComment('/portal');
 		// Mark the range so the raw de-opt reconciler treats it as FOREIGN content:
 		// a portal may target an octane-managed element, and its nodes must survive
 		// the target owner's re-renders (React parity — portals coexist with the
@@ -33977,8 +32810,8 @@ function renderPortalState(
 			transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK
 				? queueFrontier(parentBlock, target, null)
 				: target;
-		(STAGED_DOM ? STAGED_DOM.view(into) : into).appendChild(start);
-		(STAGED_DOM ? STAGED_DOM.view(into) : into).appendChild(end);
+		into.appendChild(start);
+		into.appendChild(end);
 		// The portal owns its start/end markers (default exclusiveMarkers=false), so
 		// unmountBlock removes them WITH the content — toggling a portal on/off never
 		// leaves orphan `<!--portal-->` comments in a persistent target (e.g.
@@ -35319,7 +34152,7 @@ function componentSlotImpl(
 					outputHandler,
 					parentScope,
 					slotKey,
-					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					end.parentNode!,
 					body,
 					identity,
 					props,
@@ -35476,13 +34309,13 @@ function componentSlotImpl(
 			start = null;
 			end = null;
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('comp');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/comp');
+			start = document.createComment('comp');
+			end = document.createComment('/comp');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (e.g. when this slot lives in a multi-root template
 			// and must sit before its enclosing block's endMarker).
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
 		state = {
 			__kind: 'componentSlotSlot',
@@ -35517,23 +34350,16 @@ function componentSlotImpl(
 			if (
 				first !== null &&
 				last !== null &&
-				(STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === domParent &&
-				(STAGED_DOM ? STAGED_DOM.view(last) : last).parentNode === domParent
+				first.parentNode === domParent &&
+				last.parentNode === domParent
 			) {
-				journalRootSlot(
-					state,
-					domParent,
-					(STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling,
-					getNextSibling(last),
-				);
+				journalRootSlot(state, domParent, first.previousSibling, getNextSibling(last));
 			} else {
 				const after = state.anchor;
 				journalRootSlot(
 					state,
 					domParent,
-					after === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling,
+					after === null ? domParent.lastChild : after.previousSibling,
 					after,
 				);
 			}
@@ -35607,10 +34433,7 @@ function componentSlotImpl(
 				unmountBlock(state.block);
 				if (parentBlock.disposed) return;
 				if (state.start === null) {
-					while (getFirstChild(domParent))
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(
-							getFirstChild(domParent)!,
-						);
+					while (getFirstChild(domParent)) domParent.removeChild(getFirstChild(domParent)!);
 				}
 			} else if (state.singleRoot) {
 				// Self-marked block — unmountBlock removes exactly the root element
@@ -35628,10 +34451,10 @@ function componentSlotImpl(
 				const after = getNextSibling(state.end!);
 				unmountBlock(state.block);
 				if (parentBlock.disposed) return;
-				const newStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('comp');
-				const newEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/comp');
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(newStart, after);
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(newEnd, after);
+				const newStart = document.createComment('comp');
+				const newEnd = document.createComment('/comp');
+				domParent.insertBefore(newStart, after);
+				domParent.insertBefore(newEnd, after);
 				state.start = newStart;
 				state.end = newEnd;
 			}
@@ -35645,9 +34468,7 @@ function componentSlotImpl(
 			// or THROW during render (e.g. `use(rejectedPromise)`): then it inserts
 			// nothing, so we leave start/end null and unmountBlock no-ops for it
 			// (rather than capturing a stale sibling).
-			const before = state.anchor
-				? domNode(state.anchor).previousSibling
-				: (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+			const before = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
 			const b = createBlock(
 				'dynamic',
 				parentBlock,
@@ -35671,9 +34492,7 @@ function componentSlotImpl(
 				if (replaced) hydration!.renderUpdate(b);
 				else renderBlock(b);
 			} finally {
-				const last = state.anchor
-					? domNode(state.anchor).previousSibling
-					: (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+				const last = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
 				if (last !== null && last !== before) {
 					b.startMarker = last;
 					b.endMarker = last;
@@ -35887,9 +34706,9 @@ function renderFrontierBlock(
 	signalInstanceKey?: SignalInstanceKey,
 	retryLocation?: SignalRetryLocation,
 ): Block {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(label);
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + label);
-	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).append(start, end);
+	const start = document.createComment(label);
+	const end = document.createComment('/' + label);
+	frag.append(start, end);
 	const block = createBlock(
 		'dynamic',
 		parentBlock,
@@ -35918,7 +34737,7 @@ function renderFrontierBlock(
 		renderBlock(block);
 	} catch (error) {
 		discardFrontierBlock(block, parentBlock, error, retryLocation);
-		removeAfter(frag, (STAGED_DOM ? STAGED_DOM.view(start) : start).previousSibling, null);
+		removeAfter(frag, start.previousSibling, null);
 		throw error;
 	}
 	return block;
@@ -35990,11 +34809,7 @@ function swapComponentFrontier(
 		// Borrowed parent markers stay; only the content between them leaves.
 		first = state.start === null ? getFirstChild(domParent) : getNextSibling(state.start);
 		if (first === state.end) first = null;
-		else
-			last =
-				state.end === null
-					? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-					: domNode(state.end).previousSibling;
+		else last = state.end === null ? domParent.lastChild : state.end.previousSibling;
 		before = state.end;
 	} else {
 		first = state.start ?? oldStart;
@@ -36095,10 +34910,7 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 			const target = (WIP_CAPTURE.renderCleanups ??= []);
 			for (const cleanup of cleanups) target.push(cleanup);
 		} else {
-			for (const cleanup of cleanups) {
-				if (!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.stageAction(() => cleanup(false)))
-					cleanup(false);
-			}
+			for (const cleanup of cleanups) cleanup(false);
 		}
 	}
 }
@@ -36221,9 +35033,9 @@ function clearChildContent(state: ChildSlot): void {
 			return;
 		const parent =
 			state.ownerHost ??
-			domNode(state.start)?.parentNode ??
-			domNode(state.text)?.parentNode ??
-			domNode(state.hostNode)?.parentNode ??
+			state.start?.parentNode ??
+			state.text?.parentNode ??
+			state.hostNode?.parentNode ??
 			state.block?.parentNode ??
 			null;
 		if (parent !== null) {
@@ -36239,14 +35051,10 @@ function clearChildContent(state: ChildSlot): void {
 					? null
 					: state.start !== null || state.borrowed
 						? state.end
-						: ((STAGED_DOM ? STAGED_DOM.view(first) : first)?.nextSibling ?? null);
+						: (first?.nextSibling ?? null);
 			if (first === after) first = null;
 			const last =
-				first === null
-					? null
-					: after === null
-						? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
-						: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling;
+				first === null ? null : after === null ? parent.lastChild : after.previousSibling;
 			const oldBlock = state.block;
 			const oldList = state.forSlot;
 			const oldHost = state.hostNode;
@@ -36293,7 +35101,7 @@ function clearChildContent(state: ChildSlot): void {
 		while (n !== null) {
 			const next: Node | null = getNextSibling(n);
 			if (!hadBlock) detachDeoptTreeRefs(n, null);
-			(STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(n);
+			host.removeChild(n);
 			n = next;
 		}
 		// An owns-parent slot has no markers in any value regime EXCEPT a live
@@ -36311,13 +35119,13 @@ function clearChildContent(state: ChildSlot): void {
 		// (unmountBlock's deoptNode hook + the slot walk), so detach here only on
 		// the blockless path — the pure-host node (or hydrated leftovers), whose
 		// subtree may carry stamped refs.
-		const parent = domNode(state.start).parentNode;
+		const parent = state.start.parentNode;
 		if (parent !== null) {
 			let n: Node | null = getNextSibling(state.start);
 			while (n !== null && n !== state.end) {
 				const next: Node | null = getNextSibling(n);
 				if (!hadBlock) detachDeoptTreeRefs(n, null);
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(n);
+				parent.removeChild(n);
 				n = next;
 			}
 		}
@@ -36326,14 +35134,14 @@ function clearChildContent(state: ChildSlot): void {
 		// (A MARKED pure-host node never appears here: the marked host branch of
 		// childSlot mints `start` before it ever sets `hostNode`, so a live marked
 		// hostNode is always swept by the marker-range branch above.)
-		domNode(state.text).remove();
-	} else if (state.hostNode !== null && domNode(state.hostNode).parentNode !== null) {
+		state.text.remove();
+	} else if (state.hostNode !== null && state.hostNode.parentNode !== null) {
 		// ANCHORLESS pure-host slot (end === null, no markers): remove the
 		// self-delimiting node directly — the marker sweep above has nothing to
 		// anchor on. Reached via disposeReturnSlot's kind-flip teardown; childSlot's
 		// own mode flips promote to markers before ever clearing.
 		detachDeoptTreeRefs(state.hostNode, null);
-		domNode(domNode(state.hostNode).parentNode!).removeChild(state.hostNode);
+		state.hostNode.parentNode!.removeChild(state.hostNode);
 	}
 	state.text = null;
 	state.currentComp = null;
@@ -36474,10 +35282,8 @@ function markInputCheckedness(input: HTMLInputElement): void {
 	// React initializes even an input with no checked/defaultChecked prop. Mark
 	// its live property dirty so a baseline added on a reused host stays a reset
 	// target rather than changing the user's current choice.
-	(STAGED_DOM ? STAGED_DOM.view(input) : input).checked = (
-		STAGED_DOM ? STAGED_DOM.view(input) : input
-	).checked;
-	(STAGED_DOM ? STAGED_DOM.view(input as any) : (input as any))[DEFAULT_CHECKED_INITIALIZED] = true;
+	input.checked = input.checked;
+	(input as any)[DEFAULT_CHECKED_INITIALIZED] = true;
 }
 
 interface HostComponentSlot {
@@ -36526,9 +35332,7 @@ export function hostComponent(
 		// hostStringTagBody does for a component tag that resolves to a host string.
 		const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
 		const el =
-			elNs !== undefined
-				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
-				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
+			elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
 		// A root render that drops forgets the host it created with it, unless
 		// it discards the whole Block.
 		if (
@@ -36568,8 +35372,8 @@ export function hostComponent(
 		const before = anchor ?? block.endMarker;
 		if (usesFrontier(block, parent)) {
 			const frag = queueFrontier(block, parent, before);
-			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(el);
-		} else domNode(parent).insertBefore(el, before);
+			frag.appendChild(el);
+		} else parent.insertBefore(el, before);
 		(scope.cleanups ??= []).push(() => {
 			state!.next = null;
 			queueRefDetach(state!.ref, state!.el);
@@ -36687,11 +35491,7 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 			// Compare the current target, not a same-named previous prop: another
 			// alias can have won or disappeared, and foreign code can edit the DOM.
 			// Mutable class arrays/objects still pass through normalization.
-			if (
-				!compareLive ||
-				typeof v !== 'string' ||
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('class') !== v
-			) {
+			if (!compareLive || typeof v !== 'string' || el.getAttribute('class') !== v) {
 				setClassAttr(el, v);
 			}
 		} else if (name === 'style') {
@@ -36708,11 +35508,7 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 					delegateEvents([ev.type]);
 				}
 				const handler = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
-				if (
-					!compareLive ||
-					(STAGED_DOM ? STAGED_DOM.view(el as any) : (el as any))[ev.key] !== handler
-				)
-					setEventHandler(el, ev.key, handler);
+				if (!compareLive || (el as any)[ev.key] !== handler) setEventHandler(el, ev.key, handler);
 			} else if (prev === undefined || name !== 'autoFocus' || isHtmlCustomElement(el)) {
 				// These string attributes have no coercion, property projection, or
 				// URL policy. Matching live values need neither a write nor an undo
@@ -36728,9 +35524,7 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 						name === 'htmlFor' ||
 						name.startsWith('data-') ||
 						name.startsWith('aria-')) &&
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(
-						name === 'htmlFor' ? 'for' : name,
-					) === v
+					el.getAttribute(name === 'htmlFor' ? 'for' : name) === v
 				)
 					continue;
 				setAttribute(el, name, v);
@@ -36779,9 +35573,7 @@ interface DeoptStamped {
 function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 	const order = pendingDeoptOrder(n);
 	if (order !== null && order.desc !== null) return order.desc;
-	return (STAGED_DOM ? STAGED_DOM.view(n as Node & DeoptStamped) : (n as Node & DeoptStamped))[
-		DEOPT_DESC
-	];
+	return (n as Node & DeoptStamped)[DEOPT_DESC];
 }
 function sameDeoptDesc(
 	previous: ElementDescriptor | undefined,
@@ -36836,9 +35628,7 @@ function deoptRecord(el: Element, d: ElementDescriptor): ElementDescriptor {
 }
 
 function stampDeoptDesc(el: Element, record: ElementDescriptor): void {
-	const host = STAGED_DOM
-		? STAGED_DOM.view(el as Element & DeoptStamped)
-		: (el as Element & DeoptStamped);
+	const host = el as Element & DeoptStamped;
 	// A held descriptor retry restores host props too. Restore their comparison
 	// record with them or the final retry will mistake aborted props for live ones.
 	if (TRANSITION_JOURNAL !== null)
@@ -36897,25 +35687,14 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 		let start: Comment;
 		let end: Comment;
 		const opening = hydration?.node;
-		if (
-			opening?.nodeType === 8 &&
-			(STAGED_DOM ? STAGED_DOM.view(opening as Comment) : (opening as Comment)).data === 'frag'
-		) {
+		if (opening?.nodeType === 8 && (opening as Comment).data === 'frag') {
 			start = opening as Comment;
 			let depth = 1;
 			let cursor: Node | null = getNextSibling(start);
 			while (cursor !== null) {
 				if (cursor.nodeType === 8) {
-					if (
-						(STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data === 'frag'
-					)
-						depth++;
-					else if (
-						(STAGED_DOM ? STAGED_DOM.view(cursor as Comment) : (cursor as Comment)).data ===
-							'/frag' &&
-						--depth === 0
-					)
-						break;
+					if ((cursor as Comment).data === 'frag') depth++;
+					else if ((cursor as Comment).data === '/frag' && --depth === 0) break;
 				}
 				cursor = getNextSibling(cursor);
 			}
@@ -36923,10 +35702,10 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 			end = cursor as Comment;
 			hydration!.node = getNextSibling(start);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('frag');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/frag');
-			domNode(block.parentNode).insertBefore(start, block.endMarker);
-			domNode(block.parentNode).insertBefore(end, block.endMarker);
+			start = document.createComment('frag');
+			end = document.createComment('/frag');
+			block.parentNode.insertBefore(start, block.endMarker);
+			block.parentNode.insertBefore(end, block.endMarker);
 		}
 		instance = mountFragmentRef(scope, start, end, descriptor.ref);
 		block.slots[0] = { a: instance };
@@ -37201,17 +35980,14 @@ function reconcileDeoptNode(
 		const s = String(value);
 		if (prev !== null && prev.nodeType === 3 /* Text */) {
 			const hydration = hydrating ? activeHydration() : null;
-			if (
-				hydration !== null &&
-				!hydration.isFresh((STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!)
-			) {
+			if (hydration !== null && !hydration.isFresh(prev.parentNode!)) {
 				return hydration.htextSwap(prev, s);
 			}
 			if (usesFrontier(ownerBlock, prev)) queueDeoptText(prev as Text, s);
 			else updateTextValue(prev as Text, s);
 			return prev;
 		}
-		return (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(s);
+		return document.createTextNode(s);
 	}
 	if (isHostDescriptor(value)) {
 		// `<svg>` opens the SVG namespace; descendants inherit it (a `foreignObject`
@@ -37243,8 +36019,8 @@ function reconcileDeoptNode(
 		} else {
 			el =
 				elNs !== undefined
-					? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, value.type)
-					: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(value.type);
+					? document.createElementNS(elNs, value.type)
+					: document.createElement(value.type);
 			if (hydrating) activeHydration()?.markFresh(el);
 			setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
@@ -37332,7 +36108,7 @@ function reconcileDeoptChildren(
 	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
 	const journal =
 		ROOT_RENDER_TRANSACTION !== null &&
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).parentNode !== null &&
+		el.parentNode !== null &&
 		(ownerBlock.mounted ||
 			ROOT_RENDER_TRANSACTION.hydrating ||
 			ROOT_RENDER_TRANSACTION.retainedCreated?.has(ownerBlock));
@@ -37351,7 +36127,7 @@ function reconcileDeoptChildren(
 				if (defer) built.push(node);
 				else {
 					if (journal) journalRootChildren(el);
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).appendChild(node);
+					el.appendChild(node);
 				}
 			}
 		}
@@ -37499,7 +36275,7 @@ function reconcileDeoptChildren(
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {
 				detachDeoptTreeRefs(n, null);
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).removeChild(n);
+				el.removeChild(n);
 			}
 		}
 	}
@@ -37600,10 +36376,7 @@ function queueDeoptOrder(
 /** A committed Text's data, written at commit unless it already shows `data`. */
 function queueDeoptText(node: Text, data: string): void {
 	const pending = pendingDeoptOrder(node);
-	if (
-		data !==
-		(pending !== null ? pending.text : (STAGED_DOM ? STAGED_DOM.view(node) : node).nodeValue)
-	)
+	if (data !== (pending !== null ? pending.text : node.nodeValue))
 		queueDeoptOrder(node, null, null, null, data);
 }
 
@@ -37643,9 +36416,7 @@ function commitInScope<A, B>(
 }
 
 function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): void {
-	const committed = (
-		STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as DeoptStamped)
-	)[DEOPT_DESC];
+	const committed = (el as DeoptStamped)[DEOPT_DESC];
 	setHostProps(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
 	stampDeoptDesc(el, record);
 }
@@ -37670,7 +36441,7 @@ function placeDeoptChildren(
 		if (at !== want) {
 			saveDeoptChildren(el);
 			if (journal) journalRootChildren(el);
-			if (renderingFocus === null) (STAGED_DOM ? STAGED_DOM.view(el) : el).insertBefore(want, at);
+			if (renderingFocus === null) el.insertBefore(want, at);
 			else {
 				captureFocusedMovement(el, renderingFocus);
 				moveFocusedNodeBefore(el, want, at, renderingFocus);
@@ -37738,23 +36509,19 @@ function promoteSelfMarkedItem(block: Block): void {
 		sm === null ||
 		sm !== block.endMarker ||
 		sm.nodeType === 8 /* COMMENT_NODE — i.e. already a pair */ ||
-		(STAGED_DOM ? STAGED_DOM.view(sm) : sm).parentNode === null
+		sm.parentNode === null
 	)
 		return;
-	const p = (STAGED_DOM ? STAGED_DOM.view(sm) : sm).parentNode!;
+	const p = sm.parentNode!;
 	if (ROOT_RENDER_TRANSACTION !== null) {
-		journalRootRange(
-			p,
-			(STAGED_DOM ? STAGED_DOM.view(sm) : sm).previousSibling,
-			getNextSibling(sm),
-		);
+		journalRootRange(p, sm.previousSibling, getNextSibling(sm));
 		journalRootProperty(block, 'startMarker', block.startMarker);
 		journalRootProperty(block, 'endMarker', block.endMarker);
 	}
-	const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-	const e = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
-	(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(s, sm);
-	(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(e, getNextSibling(sm));
+	const s = document.createComment('it');
+	const e = document.createComment('/it');
+	p.insertBefore(s, sm);
+	p.insertBefore(e, getNextSibling(sm));
 	block.startMarker = s;
 	block.endMarker = e;
 }
@@ -37808,21 +36575,17 @@ function deoptItemBody(item: any, scope: Scope): void {
 				stale.nodeType === 1 /* Element */ &&
 				hostItem &&
 				isHostElementOfType(stale as Element, itemType as string) &&
-				(STAGED_DOM ? STAGED_DOM.view(stale) : stale).parentNode === block.parentNode
+				stale.parentNode === block.parentNode
 			) {
 				transfer = stale;
-			} else if ((STAGED_DOM ? STAGED_DOM.view(stale) : stale).parentNode === block.parentNode) {
+			} else if (stale.parentNode === block.parentNode) {
 				if (ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(
-						block.parentNode,
-						(STAGED_DOM ? STAGED_DOM.view(stale) : stale).previousSibling,
-						getNextSibling(stale),
-					);
+					journalRootRange(block.parentNode, stale.previousSibling, getNextSibling(stale));
 					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 				} else {
 					detachDeoptTreeRefs(stale, null);
 					const parent = block.parentNode;
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(stale);
+					parent.removeChild(stale);
 				}
 			}
 			block.deoptNode = null;
@@ -37876,15 +36639,12 @@ function deoptItemBody(item: any, scope: Scope): void {
 			};
 			scope.slots[0] = borrowed;
 			registerSlot(scope, borrowed);
-		} else if (
-			transfer !== null &&
-			(STAGED_DOM ? STAGED_DOM.view(transfer) : transfer).parentNode !== null
-		) {
+		} else if (transfer !== null && transfer.parentNode !== null) {
 			// The borrowed-slot preconditions didn't hold (no marker pair) — the
 			// transfer has no receiving slot; fall back to the old teardown.
 			detachDeoptTreeRefs(transfer, null);
-			const parent = (STAGED_DOM ? STAGED_DOM.view(transfer) : transfer).parentNode!;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(transfer);
+			const parent = transfer.parentNode!;
+			parent.removeChild(transfer);
 		}
 		// The surrounding list already consumed this descriptor's key. Suppress
 		// the keyed-single list normalization in the nested slot or the same
@@ -37926,14 +36686,14 @@ function deoptItemBody(item: any, scope: Scope): void {
 	if (node !== prev) {
 		journalRootProperty(block, 'deoptNode', block.deoptNode);
 		const parent = block.parentNode;
-		const host = prev === null ? null : (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode;
+		const host = prev === null ? null : prev.parentNode;
 		let landing: SlotNext | null = null;
 		if (host !== null && host !== parent && (host as any).$$next !== undefined) {
 			// An earlier pass of this render built `prev` in a frontier that has
 			// not landed: replace it there, and land the replacement in its place.
 			const retired = prev!;
-			if (node !== null) (STAGED_DOM ? STAGED_DOM.view(host) : host).replaceChild(node, retired);
-			else (STAGED_DOM ? STAGED_DOM.view(host) : host).removeChild(retired);
+			if (node !== null) host.replaceChild(node, retired);
+			else host.removeChild(retired);
 			queueRootDeletion(() => detachDeoptTreeRefs(retired, null), null, null);
 			const bound = ((host as any).$$next as SlotNext).bound;
 			if (bound !== null) bound[3] = bound[4] = node;
@@ -37952,19 +36712,16 @@ function deoptItemBody(item: any, scope: Scope): void {
 			)
 				journalRootRange(
 					parent,
-					attached
-						? (STAGED_DOM ? STAGED_DOM.view(prev!) : prev!).previousSibling
-						: ((STAGED_DOM ? STAGED_DOM.view(endM) : endM)?.previousSibling ??
-								domNode(parent).lastChild),
+					attached ? prev!.previousSibling : (endM?.previousSibling ?? parent.lastChild),
 					attached ? getNextSibling(prev!) : endM,
 				);
 			if (node !== null) {
 				const before = attached ? prev : endM;
 				if (frontier) {
 					const frag = queueFrontier(block, parent, before);
-					(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
+					frag.appendChild(node);
 					landing = (frag as any).$$next;
-				} else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, before);
+				} else parent.insertBefore(node, before);
 			}
 			if (attached) {
 				const retired = prev!;
@@ -37972,7 +36729,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 					queueRootDeletion(() => detachDeoptTreeRefs(retired, null), retired, retired);
 				else {
 					detachDeoptTreeRefs(retired, null);
-					(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(retired);
+					parent.removeChild(retired);
 				}
 			}
 		}
@@ -38075,18 +36832,13 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 				// the component renders into before that node is retired.
 				promoteSelfMarkedItem(block);
 				journalRootProperty(block, 'deoptNode', stale);
-				const attached =
-					(STAGED_DOM ? STAGED_DOM.view(stale) : stale).parentNode === block.parentNode;
+				const attached = stale.parentNode === block.parentNode;
 				if (attached && ROOT_RENDER_TRANSACTION !== null) {
-					journalRootRange(
-						block.parentNode,
-						(STAGED_DOM ? STAGED_DOM.view(stale) : stale).previousSibling,
-						getNextSibling(stale),
-					);
+					journalRootRange(block.parentNode, stale.previousSibling, getNextSibling(stale));
 					queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 				} else {
 					detachDeoptTreeRefs(stale, null);
-					if (attached) domNode(block.parentNode).removeChild(stale);
+					if (attached) block.parentNode.removeChild(stale);
 				}
 				block.deoptNode = null;
 			}
@@ -38114,15 +36866,12 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 			root !== null &&
 			root === block.endMarker &&
 			root.nodeType !== 8 &&
-			(STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode !== null
+			root.parentNode !== null
 		) {
-			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-			const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
-			domNode((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode!).insertBefore(start, root);
-			domNode((STAGED_DOM ? STAGED_DOM.view(root) : root).parentNode!).insertBefore(
-				end,
-				getNextSibling(root),
-			);
+			const start = document.createComment('it');
+			const end = document.createComment('/it');
+			root.parentNode!.insertBefore(start, root);
+			root.parentNode!.insertBefore(end, getNextSibling(root));
 			block.startMarker = start;
 			block.endMarker = end;
 		}
@@ -38295,7 +37044,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 			process.env.NODE_ENV !== 'production'
 				? (hydration.node === null
 						? (block.parentNode as any).__oct_loc
-						: (domNode(hydration.node).parentNode as any)?.__oct_loc) || runtimeHostSiteLoc(block)
+						: (hydration.node.parentNode as any)?.__oct_loc) || runtimeHostSiteLoc(block)
 				: undefined,
 			() => `<${String(d.type)}>`,
 			hydration.node,
@@ -38313,12 +37062,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		if (el !== null) {
 			const retired = el;
 			if (ROOT_RENDER_TRANSACTION !== null) {
-				if (!frontier)
-					journalRootRange(
-						parent,
-						(STAGED_DOM ? STAGED_DOM.view(retired) : retired).previousSibling,
-						getNextSibling(retired),
-					);
+				if (!frontier) journalRootRange(parent, retired.previousSibling, getNextSibling(retired));
 				journalRootProperty(block, 'deoptNode', block.deoptNode);
 			}
 			// This Block keeps rendering, so the replaced element retires on its own,
@@ -38342,22 +37086,19 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 			if (ROOT_RENDER_TRANSACTION !== null) queueRootDeletion(detach, retired, retired);
 			else {
 				detach();
-				(STAGED_DOM ? STAGED_DOM.view(retired) : retired).remove();
+				retired.remove();
 			}
 		}
 		el =
 			elNs !== undefined
-				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(
-						elNs,
-						d.type as string,
-					)
-				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(d.type as string);
+				? document.createElementNS(elNs, d.type as string)
+				: document.createElement(d.type as string);
 		if (hydration !== null) hydration.markFresh(el);
 		block.deoptNode = el;
 		if (frontier) {
 			const frag = queueFrontier(block, parent, block.endMarker);
-			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(el);
-		} else (STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
+			frag.appendChild(el);
+		} else parent.insertBefore(el, block.endMarker);
 		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
 	} else if (usesFrontier(block, el)) {
 		// REUSE the committed element — its props change at commit, after its
@@ -38429,7 +37170,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 				process.env.NODE_ENV !== 'production'
 					? hydration.node === null
 						? (block.parentNode as any).__oct_loc
-						: (domNode(hydration.node).parentNode as any)?.__oct_loc
+						: (hydration.node.parentNode as any)?.__oct_loc
 					: undefined,
 				() => `<${tag}>`,
 				hydration.node,
@@ -38437,14 +37178,11 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		}
 		// Client mount. (The tag is FIXED for this block's life — componentSlot
 		// tears down + remounts on a tag change — so no localName re-check.)
-		el =
-			elNs !== undefined
-				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
-				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
+		el = elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
 		if (hydration !== null) hydration.markFresh(el);
 		block.deoptNode = el;
 		const parent = block.parentNode;
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(el, block.endMarker);
+		parent.insertBefore(el, block.endMarker);
 		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
 	} else {
 		// Re-render, same tag — diff props in place against the stamped descriptor.
@@ -38927,21 +37665,19 @@ function journalRootChildShape(state: ChildSlot, parent: Node): void {
 		journalRootSlot(
 			state,
 			parent,
-			state.borrowed ? state.start : domNode(state.start).previousSibling,
-			state.borrowed ? state.end : (domNode(state.end)?.nextSibling ?? null),
+			state.borrowed ? state.start : state.start.previousSibling,
+			state.borrowed ? state.end : (state.end?.nextSibling ?? null),
 		);
 	} else if (state.borrowed && state.block !== null && state.block.startMarker === null) {
 		journalRootSlot(state, parent, null, state.end);
 	} else {
 		const first = state.text ?? state.hostNode ?? state.block?.startMarker ?? state.end;
 		const last = state.end ?? state.block?.endMarker ?? first;
-		const after = (STAGED_DOM ? STAGED_DOM.view(last) : last)?.nextSibling ?? null;
+		const after = last?.nextSibling ?? null;
 		journalRootSlot(
 			state,
 			parent,
-			first !== null
-				? (STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling
-				: (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild,
+			first !== null ? first.previousSibling : parent.lastChild,
 			after,
 		);
 	}
@@ -38986,7 +37722,7 @@ function renderPreparedChildList(
 		// A text-mode sole-child write wiped the host wholesale and took the
 		// minted markers with it. Anchoring the new list on those detached
 		// comments would insert into a null parent — drop them and re-mint.
-		if (state.end !== null && domNode(state.end).parentNode === null) {
+		if (state.end !== null && state.end.parentNode === null) {
 			state.end = null;
 			state.start = null;
 		}
@@ -38994,48 +37730,48 @@ function renderPreparedChildList(
 			// OWNS-PARENT slot entering array mode: ForSlot requires a real
 			// marker pair (reconcileKeyed anchors on it) — mint it lazily,
 			// appended at the element's tail. One-way, like the promotion above.
-			state.end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+			state.end = document.createComment('');
 			let anchor: Node | null = null;
 			if (passthroughList) {
 				for (let owner: Block | null = parentBlock; owner !== null; owner = owner.parentBlock) {
 					if (
 						owner.forSlot !== null &&
 						owner.endMarker !== null &&
-						domNode(owner.endMarker).parentNode === domParent
+						owner.endMarker.parentNode === domParent
 					) {
 						anchor = owner.endMarker;
 						break;
 					}
 				}
 				if (anchor === null) {
-					let node = (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+					let node = domParent.lastChild;
 					while (node !== null && isRendererHydrationStyle(node)) {
 						anchor = node;
-						node = (STAGED_DOM ? STAGED_DOM.view(node) : node).previousSibling;
+						node = node.previousSibling;
 					}
 				}
 			}
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(state.end, anchor);
+			domParent.insertBefore(state.end, anchor);
 			if (passthroughList) {
 				hydration!.markFresh(state.end);
 				passthroughEnd = state.end;
 				if (TRANSITION_JOURNAL !== null) {
 					const end = state.end;
-					journalUndo(() => (STAGED_DOM ? STAGED_DOM.view(end) : end).remove());
+					journalUndo(() => end.remove());
 				}
 			}
 		}
 		if (state.start === null) {
-			state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+			state.start = document.createComment('');
 			// Upgrade adoption: the element's existing raw children must sit
 			// INSIDE [start, end] (they become the items) — mint start before
 			// the first of them, not at the tail.
 			const cursor = passthroughList ? hydration!.node : null;
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
+			domParent.insertBefore(
 				state.start,
 				upgradeArmed
 					? getFirstChild(domParent)
-					: cursor !== null && domNode(cursor).parentNode === domParent
+					: cursor !== null && cursor.parentNode === domParent
 						? cursor
 						: state.end,
 			);
@@ -39044,7 +37780,7 @@ function renderPreparedChildList(
 				passthroughStart = state.start;
 				if (TRANSITION_JOURNAL !== null) {
 					const start = state.start;
-					journalUndo(() => (STAGED_DOM ? STAGED_DOM.view(start) : start).remove());
+					journalUndo(() => start.remove());
 				}
 			}
 		}
@@ -39205,11 +37941,11 @@ function renderPreparedChildList(
 			);
 		} catch (error) {
 			if (passthroughStart !== null) {
-				(STAGED_DOM ? STAGED_DOM.view(passthroughStart) : passthroughStart).remove();
+				passthroughStart.remove();
 				state.start = null;
 			}
 			if (passthroughEnd !== null) {
-				(STAGED_DOM ? STAGED_DOM.view(passthroughEnd) : passthroughEnd).remove();
+				passthroughEnd.remove();
 				state.end = null;
 			}
 			if (passthroughStart !== null || passthroughEnd !== null) state.forSlot = null;
@@ -39240,12 +37976,12 @@ function renderPreparedChildList(
 		const leftovers = state.forSlot.adopt;
 		for (let i = 0; i < leftovers.length; i++) {
 			const n = leftovers[i].node;
-			if ((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode !== null) {
+			if (n.parentNode !== null) {
 				if (ROOT_RENDER_TRANSACTION !== null) {
 					queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 				} else {
 					detachDeoptTreeRefs(n, null);
-					domNode((STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode!).removeChild(n);
+					n.parentNode!.removeChild(n);
 				}
 			}
 		}
@@ -39409,13 +38145,11 @@ export function bindSignalChild(
 		// A primitive whose Text node is the host's first child becomes the token.
 		// A previous token or a client mount's empty template proves that position;
 		// otherwise compare once, because hydration can keep unclaimed server
-		// content ahead of the node it adopted. A staged ViewTransition render has
-		// not placed the node yet.
+		// content ahead of the node it adopted.
 		return text !== null &&
 			type !== 'object' &&
 			type !== 'function' &&
 			parentScope.slots[slotKey] === undefined &&
-			!STAGED_DOM &&
 			(textToken ||
 				(previous === null && !parentScope.mounted && !hydrating) ||
 				getFirstChild(domParent) === text)
@@ -39662,7 +38396,7 @@ export function childSlot(
 				childSlot(
 					parentScope,
 					slotKey,
-					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					end.parentNode!,
 					value,
 					end,
 					false,
@@ -39863,7 +38597,7 @@ export function childSlot(
 		hydration !== null &&
 		parentBlock === hydration.rootBlock &&
 		hydration.node !== null &&
-		domNode(hydration.node).parentNode === domParent &&
+		hydration.node.parentNode === domParent &&
 		preparedList === null &&
 		typeof elementType === 'function' &&
 		!hydration.isOpen(anchor ?? null) &&
@@ -39925,8 +38659,8 @@ export function childSlot(
 			const before =
 				ownsHost === undefined
 					? after === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling
+						? domParent.lastChild
+						: after.previousSibling
 					: null;
 			journalRootRange(domParent, before, after);
 		}
@@ -39978,15 +38712,11 @@ export function childSlot(
 		} else if (bindingMarker !== undefined) {
 			// An authored binding value retains its ordinary child-slot lifecycle,
 			// but its range must remain addressable even while empty or primitive.
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(bindingMarker);
-			end =
-				ownEnd && anchor != null
-					? (anchor as Comment)
-					: (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(HYDRATION_END);
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).data = HYDRATION_END;
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			if (end !== anchor)
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			start = document.createComment(bindingMarker);
+			end = ownEnd && anchor != null ? (anchor as Comment) : document.createComment(HYDRATION_END);
+			end.data = HYDRATION_END;
+			domParent.insertBefore(start, anchor ?? null);
+			if (end !== anchor) domParent.insertBefore(end, anchor ?? null);
 		} else if (ownEnd && anchor != null) {
 			// Client mount, dedicated placeholder: reuse the slot's own `<!>` as the end
 			// marker — content inserts before it just the same. Saves a comment + an
@@ -40028,8 +38758,8 @@ export function childSlot(
 					);
 				else hydration.save(ownsHost);
 			}
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			end = document.createComment('');
+			domParent.insertBefore(end, anchor ?? null);
 			if (hydration !== null && parentBlock === hydration.rootBlock)
 				hydration.protectRootAnchor(end);
 		}
@@ -40102,10 +38832,10 @@ export function childSlot(
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
 	if (state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
+		const start = document.createComment('');
+		const end = document.createComment('');
 		const host = state.hostNode;
-		const p = host === null ? null : (STAGED_DOM ? STAGED_DOM.view(host) : host).parentNode;
+		const p = host === null ? null : host.parentNode;
 		if (
 			p !== null &&
 			typeof elementType !== 'string' &&
@@ -40117,7 +38847,7 @@ export function childSlot(
 			// slot's frontier, as a fresh slot's does (freshSlotEnd). A host
 			// descriptor can adopt the host instead (the pure-host upgrade below).
 			const frag = slotFrontier(state, parentBlock, p, null);
-			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).append(start, end);
+			frag.append(start, end);
 			const pending = state.next!;
 			pending.out.push(() => detachDeoptTreeRefs(host!, null), host, host);
 			pending.follows = true;
@@ -40126,14 +38856,14 @@ export function childSlot(
 			state.hostNode = null;
 			domParent = frag;
 		} else if (p !== null) {
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(start, host);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).insertBefore(end, getNextSibling(host!));
+			p.insertBefore(start, host);
+			p.insertBefore(end, getNextSibling(host!));
 			replaceSharedBlockBoundary(parentBlock, host, host, start, end);
 		} else {
 			// Defensive — anchorless is only entered after a successful pure-host
 			// render, so a live host should always exist. Pin at the call's anchor.
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
 		state.start = start;
 		state.end = end;
@@ -40208,7 +38938,7 @@ export function childSlot(
 					queueRootDeletion(() => detachDeoptTreeRefs(outgoing, null), outgoing, outgoing);
 				} else {
 					detachDeoptTreeRefs(n, null);
-					(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(n);
+					domParent.removeChild(n);
 				}
 				n = next;
 			}
@@ -40247,8 +38977,7 @@ export function childSlot(
 				const prev = state.hostNode;
 				const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 				if (node !== prev) {
-					const parent =
-						prev === null ? null : (STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode;
+					const parent = prev === null ? null : prev.parentNode;
 					if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, parent ?? domParent)) {
 						// Over committed DOM, the new node waits in the slot's frontier and
 						// takes the old one's place at commit.
@@ -40260,25 +38989,20 @@ export function childSlot(
 						}
 						if (node !== null) {
 							const frag = slotFrontier(state, parentBlock, parent ?? domParent, anchor ?? null);
-							(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
+							frag.appendChild(node);
 						}
 					} else if (parent !== null) {
 						if (ROOT_RENDER_TRANSACTION !== null) {
 							journalRootChildShape(state, parent);
 							queueRootDeletion(() => detachDeoptTreeRefs(prev!, null), prev, prev);
-							if (node !== null)
-								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
+							if (node !== null) parent.insertBefore(node, prev);
 						} else {
-							if (node !== null)
-								(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, prev);
+							if (node !== null) parent.insertBefore(node, prev);
 							detachDeoptTreeRefs(prev!, null);
-							(STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(prev!);
+							parent.removeChild(prev!);
 						}
 					} else if (node !== null) {
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
-							node,
-							anchor ?? null,
-						);
+						domParent.insertBefore(node, anchor ?? null);
 					}
 				}
 				state.hostNode = node;
@@ -40294,18 +39018,14 @@ export function childSlot(
 			}
 			const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 			if (node !== prev) {
-				if (
-					prev != null &&
-					prev !== node &&
-					(STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode !== null
-				) {
+				if (prev != null && prev !== node && prev.parentNode !== null) {
 					if (ROOT_RENDER_TRANSACTION !== null) {
 						journalRootChildShape(state, domParent);
 						const outgoing = prev;
 						queueRootDeletion(() => detachDeoptTreeRefs(outgoing, null), prev, prev);
 					} else {
 						detachDeoptTreeRefs(prev, null);
-						domNode((STAGED_DOM ? STAGED_DOM.view(prev) : prev).parentNode!).removeChild(prev);
+						prev.parentNode!.removeChild(prev);
 					}
 				}
 				// Over committed DOM in a root render, the new node, and the slot's
@@ -40315,17 +39035,13 @@ export function childSlot(
 						? slotFrontier(state, parentBlock, domParent, state.end)
 						: null;
 				if (state.start === null) {
-					state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-					if (frag !== null) (STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(state.start);
-					else
-						(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(
-							state.start,
-							state.end,
-						);
+					state.start = document.createComment('');
+					if (frag !== null) frag.appendChild(state.start);
+					else domParent.insertBefore(state.start, state.end);
 				}
 				if (node !== null) {
-					if (frag !== null) (STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(node);
-					else domNode(domNode(state.start).parentNode!).insertBefore(node, state.end);
+					if (frag !== null) frag.appendChild(node);
+					else state.start.parentNode!.insertBefore(node, state.end);
 				}
 			}
 			state.hostNode = node;
@@ -40577,8 +39293,8 @@ export function childSlot(
 			// First component in this slot — mint the lower-bound marker now so
 			// clearChildContent can sweep a (possibly multi-node) component body.
 			// (An OWNS-PARENT slot needs neither bound: clears sweep the element.)
-			state.start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(state.start, state.end);
+			state.start = document.createComment('');
+			domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock(
 			'dynamic',
@@ -40648,7 +39364,7 @@ export function childSlot(
 		if (state.text !== null) {
 			if (ROOT_RENDER_TRANSACTION !== null) clearChildContent(state);
 			else {
-				domNode(state.text).remove();
+				state.text.remove();
 				state.text = null;
 			}
 		}
@@ -40666,22 +39382,14 @@ export function childSlot(
 		if (n !== null && n !== state.end && n.nodeType === 3) {
 			state.text = n as Text;
 			hydration.node = getNextSibling(n);
-			if (
-				!hydration.keepsText(
-					domParent,
-					n,
-					(STAGED_DOM ? STAGED_DOM.view(n) : n).nodeValue,
-					str,
-					loc,
-				)
-			)
+			if (!hydration.keepsText(domParent, n, n.nodeValue, str, loc))
 				updateTextValue(n as Text, str);
 			return;
 		}
 		// An adopted range without text is what the server rendered for empty text.
 		if (adoptedRange && getNextSibling(state.start!) === state.end) {
 			const tn = hydration.newText(domParent, str, loc);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
+			domParent.insertBefore(tn, state.end);
 			state.text = tn;
 			return;
 		}
@@ -40695,15 +39403,15 @@ export function childSlot(
  * the slot's content goes, after the outgoing content leaves.
  */
 function insertSlotText(state: ChildSlot, parentBlock: Block, domParent: Node, str: string): void {
-	const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
+	const tn = document.createTextNode(str);
 	state.text = tn;
 	if (ROOT_RENDER_TRANSACTION === null || !usesFrontier(parentBlock, domParent)) {
-		(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(tn, state.end);
+		domParent.insertBefore(tn, state.end);
 		return;
 	}
 	const owned = state.ownerHost !== null || (state.borrowed && state.start === null);
 	const frag = slotFrontier(state, parentBlock, domParent, owned ? null : state.end);
-	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(tn);
+	frag.appendChild(tn);
 }
 
 // A `{expr}` value-hole slot whose value is USUALLY a primitive (text) — what the
@@ -40983,7 +39691,7 @@ export function commitHole(
 // host's text content. A Text the host shows leaves at the commit of a root
 // render over committed DOM; one this render built is still in its frontier.
 function removeOnlyChildText(block: Block, host: Node, node: Text): void {
-	const view = STAGED_DOM ? STAGED_DOM.view(node) : node;
+	const view = node;
 	const parent = view.parentNode;
 	if (parent !== host && parent !== null && (parent as any).$$next !== undefined) view.remove();
 	else if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, host))
@@ -41081,7 +39789,7 @@ export function childTextHole(
 		if (hydration === null) {
 			if (KEPT_TEXT_CONTENT !== null)
 				clearKeptText(KEPT_TEXT_CONTENT, parentScope.block, domParent);
-			const tn = (STAGED_DOM ? STAGED_DOM.view(document) : document).createTextNode(str);
+			const tn = document.createTextNode(str);
 			const transaction = ROOT_RENDER_TRANSACTION;
 			// A Block this render created builds fresh DOM: skip the frontier test.
 			const parent =
@@ -41091,7 +39799,7 @@ export function childTextHole(
 				usesFrontier(parentScope.block, domParent)
 					? queueFrontier(parentScope.block, domParent, null)
 					: domParent;
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(tn);
+			parent.appendChild(tn);
 			return tn;
 		}
 		if (hydration.keepsServerContent(domParent)) return null;
@@ -41998,11 +40706,7 @@ function releaseHiddenActivityNode(node: Node): void {
 function fragmentHostVisible(node: Node): boolean {
 	if (hiddenActivityNodeOwners === 0) return true;
 	const hidden = HIDDEN_ACTIVITY_NODES!;
-	for (
-		let current: Node | null = node;
-		current !== null;
-		current = (STAGED_DOM ? STAGED_DOM.view(current) : current).parentNode
-	) {
+	for (let current: Node | null = node; current !== null; current = current.parentNode) {
 		if (hidden.has(current)) return false;
 	}
 	return true;
@@ -42011,7 +40715,7 @@ function fragmentHostVisible(node: Node): boolean {
 function enforceHiddenDisplay(el: HTMLElement): void {
 	const hidden = HIDDEN_DISPLAYS.get(el);
 	const priority = hidden !== undefined && hidden.importantOwners > 0 ? 'important' : '';
-	const style = (STAGED_DOM ? STAGED_DOM.view(el) : el).style;
+	const style = el.style;
 	if (
 		style.getPropertyValue('display') !== 'none' ||
 		style.getPropertyPriority('display') !== priority
@@ -42020,15 +40724,9 @@ function enforceHiddenDisplay(el: HTMLElement): void {
 }
 
 function restoreHiddenDisplayValue(el: HTMLElement | SVGElement, display: HiddenDisplay): void {
-	if (display.value === '') (STAGED_DOM ? STAGED_DOM.view(el) : el).style.removeProperty('display');
-	else
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).style.setProperty(
-			'display',
-			display.value,
-			display.priority,
-		);
-	if (!display.hadStyle && (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('style') === '')
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).removeAttribute('style');
+	if (display.value === '') el.style.removeProperty('display');
+	else el.style.setProperty('display', display.value, display.priority);
+	if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
 }
 
 /** Apply an authored style against its real previous value, underneath the hide. */
@@ -42058,15 +40756,14 @@ function writeHiddenStyle(
 	}
 	restoreHiddenDisplayValue(el, hidden);
 	try {
-		if (property === undefined)
-			applyStyleValue(el, (STAGED_DOM ? STAGED_DOM.view(el) : el).style, value, previous);
+		if (property === undefined) applyStyleValue(el, el.style, value, previous);
 		else if (value == null || typeof value === 'boolean')
-			(STAGED_DOM ? STAGED_DOM.view(el) : el).style.removeProperty(styleName(property));
-		else applyStyleProperty(el, (STAGED_DOM ? STAGED_DOM.view(el) : el).style, property, value);
+			el.style.removeProperty(styleName(property));
+		else applyStyleProperty(el, el.style, property, value);
 	} finally {
-		hidden.value = (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyValue('display');
-		hidden.priority = (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyPriority('display');
-		hidden.hadStyle = (STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('style');
+		hidden.value = el.style.getPropertyValue('display');
+		hidden.priority = el.style.getPropertyPriority('display');
+		hidden.hadStyle = el.hasAttribute('style');
 		enforceHiddenDisplay(el as HTMLElement);
 	}
 	return true;
@@ -42089,9 +40786,9 @@ function retainHiddenDisplay(el: HTMLElement, important: boolean): void {
 		HIDDEN_DISPLAYS.set(el, {
 			owners: 1,
 			importantOwners: important ? 1 : 0,
-			value: (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyValue('display'),
-			priority: (STAGED_DOM ? STAGED_DOM.view(el) : el).style.getPropertyPriority('display'),
-			hadStyle: (STAGED_DOM ? STAGED_DOM.view(el) : el).hasAttribute('style'),
+			value: el.style.getPropertyValue('display'),
+			priority: el.style.getPropertyPriority('display'),
+			hadStyle: el.hasAttribute('style'),
 		});
 	} else {
 		existing.owners++;
@@ -42114,8 +40811,7 @@ function releaseHiddenDisplay(el: HTMLElement, important: boolean, restore = tru
 }
 
 function enforceHiddenText(text: Text): void {
-	if ((STAGED_DOM ? STAGED_DOM.view(text) : text).data !== '')
-		(STAGED_DOM ? STAGED_DOM.view(text) : text).data = '';
+	if (text.data !== '') text.data = '';
 }
 
 function retainHiddenText(text: Text): void {
@@ -42123,7 +40819,7 @@ function retainHiddenText(text: Text): void {
 	if (existing === undefined) {
 		hiddenTextNodes++;
 		hiddenTextWriter = writeHiddenText;
-		HIDDEN_TEXTS.set(text, { owners: 1, data: (STAGED_DOM ? STAGED_DOM.view(text) : text).data });
+		HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
 	} else existing.owners++;
 }
 
@@ -42133,7 +40829,7 @@ function releaseHiddenText(text: Text, restore = true): void {
 	if (--saved.owners === 0) {
 		HIDDEN_TEXTS.delete(text);
 		if (--hiddenTextNodes === 0) hiddenTextWriter = null;
-		if (restore) (STAGED_DOM ? STAGED_DOM.view(text) : text).data = saved.data;
+		if (restore) text.data = saved.data;
 	} else {
 		enforceHiddenText(text);
 	}
@@ -42312,8 +41008,8 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
 	if (
 		hydrating &&
-		domNode(state.start).parentNode === state.domParent &&
-		domNode(state.end).parentNode === state.domParent
+		state.start.parentNode === state.domParent &&
+		state.end.parentNode === state.domParent
 	)
 		journalRootSlot(state, state.domParent, state.start, state.end);
 	else if (frame === null) journalObjectOnce(state);
@@ -42335,14 +41031,14 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
  * boundary this render created write in place.
  */
 function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
-	const live = domNode(before).parentNode!;
+	const live = before.parentNode!;
 	const parent =
 		live === state.domParent && usesFrontier(state.parentBlock, live)
 			? slotFrontier(state, state.parentBlock, live, before)
 			: live;
 	const at = parent === live ? before : null;
-	domNode(parent).insertBefore(start, at);
-	domNode(parent).insertBefore(end, at);
+	parent.insertBefore(start, at);
+	parent.insertBefore(end, at);
 	return parent;
 }
 
@@ -42425,7 +41121,7 @@ function mountPassthroughCatch(
 		const hydration = hydrating ? activeHydration() : null;
 		if (freshFallback && hydration !== null) {
 			const parent = state.domParent;
-			const last = (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild;
+			const last = parent.lastChild;
 			hydration.suspend(() => renderBlock(block));
 			let node = last !== null ? getNextSibling(last) : getFirstChild(parent);
 			while (node !== null) {
@@ -42562,8 +41258,8 @@ export function errorBlock(
 		let start: Comment;
 		let end: Comment;
 		if (passthrough) {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('passthrough-try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/passthrough-try');
+			start = document.createComment('passthrough-try');
+			end = document.createComment('/passthrough-try');
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -42572,10 +41268,10 @@ export function errorBlock(
 				errorBlock(parentScope, slotKey, domParent, tryBody, catchBody, anchor, env),
 			);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			start = document.createComment('try');
+			end = document.createComment('/try');
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
 		let newState: ErrorSlot;
 		newState = {
@@ -42664,8 +41360,8 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 			[start, end] = hydration!.armRange(state.start, getNextSibling(state.start), state.end);
 			hydration!.node = getNextSibling(start);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
+			start = document.createComment('try-b');
+			end = document.createComment('/try-b');
 			armParent = insertArmPair(state, start, end, state.end);
 			if (hydration !== null) {
 				hydration.markFresh(start);
@@ -42733,8 +41429,8 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	let start: Node | null = null;
 	let end: Node | null = null;
 	if (!state.passthrough) {
-		start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
-		end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
+		start = document.createComment('catch-b');
+		end = document.createComment('/catch-b');
 		if (hydration !== null) {
 			if (hydration.isClose(state.end)) {
 				removeRange(getNextSibling(state.start), state.end);
@@ -42833,7 +41529,7 @@ export function tryBlock(
 				return tryBlock(
 					parentScope,
 					slotKey,
-					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
+					end.parentNode!,
 					tryBody,
 					catchBody,
 					pendingBody,
@@ -42868,8 +41564,8 @@ export function tryBlock(
 			? null
 			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
 		if (passthrough) {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('passthrough-try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/passthrough-try');
+			start = document.createComment('passthrough-try');
+			end = document.createComment('/passthrough-try');
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -42888,13 +41584,13 @@ export function tryBlock(
 				),
 			);
 		} else {
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try');
-			end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try');
+			start = document.createComment('try');
+			end = document.createComment('/try');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (e.g. when this slot lives in a mixed-children
 			// template and must sit before its in-template static-sibling anchor).
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
 		}
 		let newState: TrySlot;
 		newState = {
@@ -43135,8 +41831,8 @@ function restartUncommittedTry(state: TrySlot): Block | null {
 
 /** A new primary can render speculatively without destroying its visible fallback. */
 function mountHiddenTryBody(state: TrySlot): Block {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
+	const start = document.createComment('try-b');
+	const end = document.createComment('/try-b');
 	// Before the visible fallback, wherever it is.
 	const armParent = insertArmPair(state, start, end, state.block?.startMarker ?? state.end);
 	const block = createTryBody(state, start, end, armParent);
@@ -43196,7 +41892,7 @@ function takeInitialSuspenseHydration(
 	// The boundary's open says what its server range holds (hydration-protocol.ts).
 	const open = state.start as Comment;
 	const binding = hydration.bindingTryState(open);
-	const text = binding ?? (STAGED_DOM ? STAGED_DOM.view(open) : open).data;
+	const text = binding ?? open.data;
 	let cursor = getNextSibling(open);
 	const metadata: ChildNode[] = [];
 	// A binding view's comment that says what the server rendered leads its arm.
@@ -43206,12 +41902,7 @@ function takeInitialSuspenseHydration(
 	}
 	if (text.startsWith(BOUNDARY_STREAMED)) {
 		// A sentinel still leads a pending boundary, which mountTry claims.
-		if (
-			cursor?.nodeType === 1 &&
-			(STAGED_DOM ? STAGED_DOM.view(cursor as Element) : (cursor as Element)).hasAttribute(
-				STREAM_BOUNDARY_ATTR,
-			)
-		)
+		if (cursor?.nodeType === 1 && (cursor as Element).hasAttribute(STREAM_BOUNDARY_ATTR))
 			return null;
 		const boundaryId = text.slice(BOUNDARY_STREAMED.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
@@ -43257,13 +41948,12 @@ function takeInitialSuspenseHydration(
 		const script = cursor as Element;
 		if (
 			script.localName !== 'script' ||
-			(STAGED_DOM ? STAGED_DOM.view(script) : script).getAttribute('type') !== 'application/json' ||
-			!(STAGED_DOM ? STAGED_DOM.view(script) : script).hasAttribute(attr)
+			script.getAttribute('type') !== 'application/json' ||
+			!script.hasAttribute(attr)
 		)
 			continue;
-		if (attr === SUSPENSE_RESOLVED_SEED_ATTR)
-			seedRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
-		else nativeRaw = (STAGED_DOM ? STAGED_DOM.view(script) : script).textContent;
+		if (attr === SUSPENSE_RESOLVED_SEED_ATTR) seedRaw = script.textContent;
+		else nativeRaw = script.textContent;
 		metadata.push(script);
 		cursor = getNextSibling(script);
 	}
@@ -43289,7 +41979,7 @@ function takeInitialSuspenseHydration(
 }
 
 function finishInitialSuspenseHydration(initial: InitialSuspenseHydration): void {
-	for (const node of initial.metadata) (STAGED_DOM ? STAGED_DOM.view(node) : node).remove();
+	for (const node of initial.metadata) node.remove();
 	initial.consume?.();
 }
 
@@ -43343,7 +42033,7 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
  */
 function clientRenderDehydratedTry(state: TrySlot, outer: HydrationCapability | null): boolean {
 	initialSuspenseHydrations?.delete(state);
-	const parent = domNode(state.domParent);
+	const parent = state.domParent;
 	journalRootChildren(parent);
 	outer?.save(parent);
 	markHydrationDiscard(
@@ -43583,9 +42273,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	let freshBoundary = false;
 	const start = state.start;
 	const first = getNextSibling(start);
-	const open = adopting
-		? (hydration!.bindingTryState(start) ?? (STAGED_DOM ? STAGED_DOM.view(start) : start).data)
-		: '';
+	const open = adopting ? (hydration!.bindingTryState(start) ?? start.data) : '';
 	let streamedBoundaryId: string | null = null;
 	let unfinished: UnfinishedArm | null = null;
 	if (open.startsWith(BOUNDARY_STREAMED)) {
@@ -43626,8 +42314,8 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 		hydration!.node = getNextSibling(bStart);
 	} else {
 		scopedSeeds = null;
-		bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('try-b');
-		bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/try-b');
+		bStart = document.createComment('try-b');
+		bEnd = document.createComment('/try-b');
 		armParent = insertArmPair(state, bStart, bEnd, state.end);
 		if (hydration !== null) {
 			hydration.markFresh(bStart);
@@ -44085,7 +42773,6 @@ function hideTryContentAndMountPendingInner(
 		const action = () => deactivateSuspensePrimary(state, persistent, uncommittedRefs);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileQueueWork(action);
-		if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(action);
 		if (WIP_CAPTURE === null) effectEventCommitActions.push(action);
 		else {
 			// A later sibling can suspend after this nested fallback was selected.
@@ -44156,8 +42843,8 @@ function deactivateSuspensePrimary(
 /** Mount the current @pending helper without changing the preserved try body. */
 function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
-		const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('pend-b');
-		const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/pend-b');
+		const bStart = document.createComment('pend-b');
+		const bEnd = document.createComment('/pend-b');
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
@@ -45077,7 +43764,7 @@ function flushStagedRevealsIfReady(): void {
 
 function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
 	if (a === b) return 0;
-	const position = domNode(a.start).compareDocumentPosition(b.start);
+	const position = a.start.compareDocumentPosition(b.start);
 	if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
 	if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
 	return 0;
@@ -45592,12 +44279,10 @@ function findAncestorForm(block: Block): HTMLFormElement | null {
 	// Start above the range: a single-root Block's start is its own root element,
 	// which may be the <form> this component renders.
 	const start = block.startMarker;
-	let n: Node | null = start
-		? (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode
-		: (block.parentNode ?? null);
+	let n: Node | null = start ? start.parentNode : (block.parentNode ?? null);
 	while (n) {
 		if ((n as any).nodeName === 'FORM') return n as HTMLFormElement;
-		n = (STAGED_DOM ? STAGED_DOM.view(n) : n).parentNode;
+		n = n.parentNode;
 	}
 	return null;
 }
@@ -46121,8 +44806,8 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 	}
 	setTryBranch(state, 0);
 	state.err = err;
-	const bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('catch-b');
-	const bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/catch-b');
+	const bStart = document.createComment('catch-b');
+	const bEnd = document.createComment('/catch-b');
 	if (hydration !== null) {
 		// Hydrating, but the server rendered a DIFFERENT arm in this slot (the
 		// try body threw on the CLIENT), so the catch arm is a client-fresh
@@ -46333,8 +45018,8 @@ export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node
 		(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
 	)
 		return anchor;
-	const own = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('');
-	(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(own, anchor);
+	const own = document.createComment('');
+	parent.insertBefore(own, anchor);
 	return own;
 }
 
@@ -46412,9 +45097,7 @@ function finalizeMarkerlessBranch(
 	state.unfinalized = false;
 	if (state.borrowed && state.start === null) return;
 	const first = before ? getNextSibling(before) : getFirstChild(domParent);
-	const last = after
-		? (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling
-		: (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild;
+	const last = after ? after.previousSibling : domParent.lastChild;
 	// One current element is not a sole root when an empty sibling slot can
 	// later produce more output at the same provisional insertion anchor.
 	if (
@@ -46439,8 +45122,8 @@ function finalizeMarkerlessBranch(
  */
 function pendingArmBefore(block: Block, domParent: Node): Node | null {
 	const first = block.startMarker;
-	const node = first !== null && domNode(first).parentNode === domParent ? first : block.endMarker;
-	return node ? domNode(node).previousSibling : domNode(domParent).lastChild;
+	const node = first !== null && first.parentNode === domParent ? first : block.endMarker;
+	return node ? node.previousSibling : domParent.lastChild;
 }
 
 /**
@@ -46483,10 +45166,10 @@ function delimitMarkerlessBranch(
 	first: Node | null,
 	after: Node | null,
 ): void {
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, first ?? after);
-	(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, after);
+	const start = document.createComment(marker);
+	const end = document.createComment('/' + marker);
+	domParent.insertBefore(start, first ?? after);
+	domParent.insertBefore(end, after);
 	const block = scope.block;
 	block.startMarker = start;
 	block.endMarker = end;
@@ -46591,7 +45274,7 @@ function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
 	const end = arm.endMarker;
 	releaseLiteArm(scope);
 	// As unmountBlock does, remove the range after its cleanups ran.
-	if (detachDom && start !== null && end !== null && domNode(start).parentNode !== null)
+	if (detachDom && start !== null && end !== null && start.parentNode !== null)
 		removeRange(exclusive ? getNextSibling(start) : start, exclusive ? end : getNextSibling(end));
 }
 
@@ -46679,11 +45362,7 @@ function swapBranchFrontier(
 		if (old !== null && !fresh) {
 			first = state.start === null ? getFirstChild(domParent) : getNextSibling(state.start);
 			if (first === state.end) first = null;
-			else
-				last =
-					state.end === null
-						? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-						: domNode(state.end).previousSibling;
+			else last = state.end === null ? domParent.lastChild : state.end.previousSibling;
 		}
 	} else if (fresh) {
 		before = state.next!.before;
@@ -46692,9 +45371,9 @@ function swapBranchFrontier(
 	} else if (state.unfinalized) {
 		// A pending arm owns only what a resumed leaf inserted before its anchor.
 		before = oldEnd;
-		if (oldStart != null && oldStart !== before && domNode(oldStart).parentNode === domParent) {
+		if (oldStart != null && oldStart !== before && oldStart.parentNode === domParent) {
 			first = oldStart;
-			last = domNode(before!).previousSibling;
+			last = before!.previousSibling;
 		}
 	} else {
 		// A self-marked root. A nested sole-root branch can replace it without
@@ -46713,14 +45392,9 @@ function swapBranchFrontier(
 				? state.next.frag
 				: null;
 	// The slot's pair, already built in this render's fragment.
-	const pairInFrag =
-		frag !== null && paired && state.end !== null && domNode(state.end).parentNode === frag;
+	const pairInFrag = frag !== null && paired && state.end !== null && state.end.parentNode === frag;
 	// The fragment's content before the incoming arm's: the fresh arm's, if any.
-	const mark = pairInFrag
-		? domNode(state.end!).previousSibling
-		: frag === null
-			? null
-			: (STAGED_DOM ? STAGED_DOM.view(frag) : frag).lastChild;
+	const mark = pairInFrag ? state.end!.previousSibling : frag === null ? null : frag.lastChild;
 	let arm: Block | null = null;
 	let suspended: unknown = null;
 	let pending = false;
@@ -46763,8 +45437,8 @@ function swapBranchFrontier(
 		} else if (paired) {
 			// A committed pair stays the slot's; the arm bounds its own content
 			// inside it, so discarding the arm never reaches committed nodes.
-			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
+			const start = document.createComment(marker);
+			frag!.insertBefore(start, content);
 			arm.startMarker = start;
 			arm.exclusiveMarkers = true;
 		} else if (
@@ -46779,7 +45453,7 @@ function swapBranchFrontier(
 		} else if (
 			suspended === null &&
 			content !== end &&
-			content === (STAGED_DOM ? STAGED_DOM.view(end) : end).previousSibling &&
+			content === end.previousSibling &&
 			content!.nodeType === 1 &&
 			markerlessBranchRoots(arm, frag!, end) <= 1
 		) {
@@ -46789,8 +45463,8 @@ function swapBranchFrontier(
 			arm.startMarker = content;
 			arm.endMarker = content;
 		} else {
-			const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-			(STAGED_DOM ? STAGED_DOM.view(frag!) : frag!).insertBefore(start, content);
+			const start = document.createComment(marker);
+			frag!.insertBefore(start, content);
 			arm.startMarker = start;
 			arm.exclusiveMarkers = true;
 		}
@@ -46828,9 +45502,9 @@ function swapBranchFrontier(
 	} else if (bound !== null) {
 		// Empty output cannot bound itself: the ancestor moves to a pair.
 		const pair = slotFrontier(state, parentBlock, domParent, before);
-		const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-		const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-		(STAGED_DOM ? STAGED_DOM.view(pair) : pair).append(start, end);
+		const start = document.createComment(marker);
+		const end = document.createComment('/' + marker);
+		pair.append(start, end);
 		state.start = start;
 		state.end = end;
 	} else {
@@ -46855,9 +45529,9 @@ let SPARE_SENTINEL: Comment | null = null;
 function frontierSentinel(frag: DocumentFragment, data: string): Comment {
 	let end = SPARE_SENTINEL;
 	SPARE_SENTINEL = null;
-	if (end === null) end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(data);
-	else domNode(end).data = data;
-	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(end);
+	if (end === null) end = document.createComment(data);
+	else end.data = data;
+	frag.appendChild(end);
 	return end;
 }
 
@@ -46872,7 +45546,7 @@ function releaseFrontierSentinel(
 	before: Node | null,
 ): void {
 	markerlessBranchRoots(scope, frag, end, before);
-	(STAGED_DOM ? STAGED_DOM.view(frag) : frag).removeChild(end);
+	frag.removeChild(end);
 	SPARE_SENTINEL = end;
 }
 
@@ -46894,7 +45568,7 @@ function freshSlotEnd(
 
 /** What anchored on a fresh slot's sentinel inserts where the slot lands. */
 function settleFreshSlot(parentScope: Scope, end: Comment, anchor: Node | null | undefined): void {
-	const frag = (STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode;
+	const frag = end.parentNode;
 	if (frag !== null)
 		releaseFrontierSentinel(parentScope, frag as DocumentFragment, end, anchor ?? null);
 }
@@ -46904,7 +45578,7 @@ function removeAfter(frag: DocumentFragment, after: Node | null, until: Node | n
 	let node = after === null ? getFirstChild(frag) : getNextSibling(after);
 	while (node !== null && node !== until) {
 		const following = getNextSibling(node);
-		(STAGED_DOM ? STAGED_DOM.view(frag) : frag).removeChild(node);
+		frag.removeChild(node);
 		node = following;
 	}
 }
@@ -46969,8 +45643,8 @@ function renderBranchSlot(
 				journalRootSlot(
 					state,
 					domParent,
-					state.borrowed ? state.start : domNode(state.start).previousSibling,
-					state.borrowed ? state.end : (domNode(state.end)?.nextSibling ?? null),
+					state.borrowed ? state.start : state.start.previousSibling,
+					state.borrowed ? state.end : (state.end?.nextSibling ?? null),
 				);
 			} else if (state.borrowed && previousBlock?.startMarker == null) {
 				journalRootSlot(state, domParent, null, null);
@@ -46980,23 +45654,16 @@ function renderBranchSlot(
 				if (
 					first !== null &&
 					last !== null &&
-					(STAGED_DOM ? STAGED_DOM.view(first) : first).parentNode === domParent &&
-					(STAGED_DOM ? STAGED_DOM.view(last) : last).parentNode === domParent
+					first.parentNode === domParent &&
+					last.parentNode === domParent
 				) {
-					journalRootSlot(
-						state,
-						domParent,
-						(STAGED_DOM ? STAGED_DOM.view(first) : first).previousSibling,
-						getNextSibling(last),
-					);
+					journalRootSlot(state, domParent, first.previousSibling, getNextSibling(last));
 				} else {
 					const after = state.anchor;
 					journalRootSlot(
 						state,
 						domParent,
-						after === null
-							? (STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).lastChild
-							: (STAGED_DOM ? STAGED_DOM.view(after) : after).previousSibling,
+						after === null ? domParent.lastChild : after.previousSibling,
 						after,
 					);
 				}
@@ -47021,8 +45688,7 @@ function renderBranchSlot(
 			if (owningBlock(parentBlock).disposed) return;
 			while (node !== null && node !== provisionalAfter) {
 				const nextNode = getNextSibling(node);
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode === domParent)
-					(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).removeChild(node);
+				if (node.parentNode === domParent) domParent.removeChild(node);
 				node = nextNode;
 			}
 		} else if (state.unfinalized && state.lite !== null) {
@@ -47067,10 +45733,10 @@ function renderBranchSlot(
 			// own boundary. Publish a durable replacement before rendering the
 			// incoming arm: a nested Suspense may otherwise observe that removed
 			// host and pass a detached insertion anchor to its try block.
-			const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-			const e = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(s, after);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(e, after);
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
+			domParent.insertBefore(s, after);
+			domParent.insertBefore(e, after);
 			state.start = s;
 			state.end = e;
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
@@ -47092,7 +45758,7 @@ function renderBranchSlot(
 				const start = state.start as Comment;
 				if (
 					hydration !== null &&
-					(STAGED_DOM ? STAGED_DOM.view(start) : start).data.startsWith(BINDING_OPEN_PREFIX) &&
+					start.data.startsWith(BINDING_OPEN_PREFIX) &&
 					hydration.isOpen(getNextSibling(start))
 				) {
 					inner = getNextSibling(state.start) as Comment;
@@ -47215,10 +45881,10 @@ function renderBranchSlot(
 			// An enclosing sole-root block borrowed the old element. Empty output
 			// cannot self-delimit, so promote both the slot and every exact borrower
 			// to one shared pair rather than leaving an ancestor on a detached node.
-			const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment(marker);
-			const e = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/' + marker);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(s, after);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(e, after);
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
+			domParent.insertBefore(s, after);
+			domParent.insertBefore(e, after);
 			state.start = s;
 			state.end = e;
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
@@ -47818,15 +46484,7 @@ export function activityBlock(
 		const end = freshSlotEnd(parentBlock, domParent, anchor);
 		if (end !== null) {
 			try {
-				activityBlock(
-					parentScope,
-					slotKey,
-					(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode!,
-					mode,
-					body,
-					end,
-					env,
-				);
+				activityBlock(parentScope, slotKey, end.parentNode!, mode, body, end, env);
 			} finally {
 				settleFreshSlot(parentScope, end, anchor);
 			}
@@ -47850,10 +46508,10 @@ export function activityBlock(
 			);
 			return;
 		} else {
-			bStart = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('activity');
-			bEnd = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/activity');
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(bStart, anchor ?? null);
-			(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(bEnd, anchor ?? null);
+			bStart = document.createComment('activity');
+			bEnd = document.createComment('/activity');
+			domParent.insertBefore(bStart, anchor ?? null);
+			domParent.insertBefore(bEnd, anchor ?? null);
 		}
 		const b = createBlock(
 			'control-flow',
@@ -48231,15 +46889,13 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 			) {
 				continue;
 			}
-			const staged =
-				!!STAGED_COMMIT_CAPTURE && DEFERRED_LAYOUT_DRIVER!.stageDeactivation(e, scope) === true;
 			if (typeof e.cleanup === 'function') {
 				const cleanup = e.cleanup;
 				// Clear it BEFORE firing so unmountScope's effect-slot walk sees
 				// no cleanup and won't re-run it.
 				e.cleanup = undefined;
 				try {
-					if (!staged) runEffectCleanupCallback(cleanup, e.phase, scope);
+					runEffectCleanupCallback(cleanup, e.phase, scope);
 				} catch (err) {
 					if (err instanceof MaximumUpdateDepthError) throw err;
 					const handler = findTryHandler(scope.block);
@@ -48501,7 +47157,7 @@ export function forBlock<T>(
 				forBlock(
 					parentScope,
 					slotKey,
-					(STAGED_DOM ? STAGED_DOM.view(fresh) : fresh).parentNode!,
+					fresh.parentNode!,
 					items,
 					getKey,
 					itemBody,
@@ -48532,7 +47188,7 @@ export function forBlock<T>(
 		} else if (
 			hydration !== null &&
 			hydration.isOpen(hydration.node) &&
-			domNode(hydration.node).parentNode === domParent
+			hydration.node.parentNode === domParent
 		) {
 			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
 			// owning body (e.g. a `@try { @for }` arm or a component whose body is a
@@ -48566,19 +47222,19 @@ export function forBlock<T>(
 			// finds what the server rendered for something else.
 			if (hydration !== null)
 				hydration.slotMismatch(parentScope, slotKey, 'a list range', anchor ?? hydration.node);
-			start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('for');
+			start = document.createComment('for');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (when a static sibling follows this @for in mixed
 			// children, the compiler emits a `<!>` anchor at the @for's source-order
 			// index and threads it here so the markers land BEFORE the sibling).
 			if (ownEnd === true && anchor?.nodeType === 8) {
 				end = anchor as Comment;
-				(STAGED_DOM ? STAGED_DOM.view(end) : end).data = '/for';
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, end);
+				end.data = '/for';
+				domParent.insertBefore(start, end);
 			} else {
-				end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/for');
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(start, anchor ?? null);
-				(STAGED_DOM ? STAGED_DOM.view(domParent) : domParent).insertBefore(end, anchor ?? null);
+				end = document.createComment('/for');
+				domParent.insertBefore(start, anchor ?? null);
+				domParent.insertBefore(end, anchor ?? null);
 			}
 		}
 		state = {
@@ -48666,7 +47322,7 @@ export function forBlock<T>(
 			let frag: DocumentFragment | null = null;
 			let sentinel: Comment | null = null;
 			if (next !== null) {
-				frag = (STAGED_DOM ? STAGED_DOM.view(document) : document).createDocumentFragment();
+				frag = document.createDocumentFragment();
 				(frag as any).$$next = next;
 				next.out.push(placeRun, frag, state.end);
 				sentinel = frontierSentinel(frag, '/for');
@@ -48923,12 +47579,12 @@ function fastHostListParent(
 		!Array.isArray(items) ||
 		items.length < FAST_HOST_LIST_MIN_ITEMS ||
 		(hydrating && activeHydration() !== null) ||
-		domNode(state.end).parentNode === null ||
-		domNode(state.start).parentNode !== domNode(state.end).parentNode
+		state.end.parentNode === null ||
+		state.start.parentNode !== state.end.parentNode
 	) {
 		return null;
 	}
-	return domNode(state.end).parentNode;
+	return state.end.parentNode;
 }
 
 /** Mount certified host-only rows without the full component render machinery. */
@@ -49006,7 +47662,7 @@ function mountFastHostItems<T>(
 			block.mounted = true;
 			if (rows !== null) rows.push(block);
 			else {
-				const root = (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling!;
+				const root = anchor.previousSibling!;
 				block.startMarker = root;
 				block.endMarker = root;
 			}
@@ -49030,7 +47686,7 @@ function mountFastHostItems<T>(
 			// child scopes, so dispose it before unwinding the completed prefix.
 			// commitBag self-marked a detached row already.
 			if (current.slots[0] !== undefined && rows === null) {
-				const root = (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling;
+				const root = anchor.previousSibling;
 				if (root !== null && root !== state.start) {
 					current.startMarker = root;
 					current.endMarker = root;
@@ -49209,7 +47865,7 @@ function removeRange(from: Node | null, end: Node | null): void {
 	let n: Node | null = from;
 	while (n !== null && n !== end) {
 		const next: Node | null = getNextSibling(n);
-		(STAGED_DOM ? STAGED_DOM.view(n as ChildNode) : (n as ChildNode)).remove();
+		(n as ChildNode).remove();
 		n = next;
 	}
 }
@@ -49489,7 +48145,7 @@ function mountItemsLinear<T>(
 	// shows fresh rows with their bindings half rolled back underneath them.
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
-	const parentNode = domNode(state.end).parentNode!;
+	const parentNode = state.end.parentNode!;
 	// A committed list's rows render off-document and land before its end.
 	const next =
 		ROOT_RENDER_TRANSACTION === null || passthroughList
@@ -49529,11 +48185,7 @@ function mountItemsLinear<T>(
 						if (renderingFocus !== null) {
 							captureFocusedMovement(parentNode, renderingFocus);
 							moveFocusedNodeBefore(parentNode, adoptNode, anchor, renderingFocus);
-						} else
-							(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-								adoptNode,
-								anchor,
-							);
+						} else parentNode.insertBefore(adoptNode, anchor);
 					}
 				}
 			}
@@ -49584,8 +48236,8 @@ function mountItemsLinear<T>(
 				!isSuspenseException(error) &&
 				!isHostContextRequest(error) &&
 				!isAdoptionControl(error);
-			if (discardOwnedDom && start !== null && domNode(start).parentNode !== null)
-				journalRootChildren(domNode(start).parentNode!);
+			if (discardOwnedDom && start !== null && start.parentNode !== null)
+				journalRootChildren(start.parentNode!);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			if (block.idState.renderOwner?.signalOwner !== undefined)
 				discardSignalRetryItem(block, error);
@@ -49622,15 +48274,15 @@ function mountPassthroughListItem<T>(
 ): Block {
 	const hydration = activeHydration()!;
 	const cursor = hydration.node;
-	const before = cursor !== null && domNode(cursor).parentNode === parentNode ? cursor : anchor;
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
-	(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(start, before);
-	(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(end, anchor);
+	const before = cursor !== null && cursor.parentNode === parentNode ? cursor : anchor;
+	const start = document.createComment('it');
+	const end = document.createComment('/it');
+	parentNode.insertBefore(start, before);
+	parentNode.insertBefore(end, anchor);
 	if (TRANSITION_JOURNAL !== null) {
 		journalUndo(() => {
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).remove();
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).remove();
+			start.remove();
+			end.remove();
 		});
 	}
 	const block = createBlock(
@@ -49670,10 +48322,7 @@ function mountPassthroughListItem<T>(
 		hydration.passthroughRanges = previousPassthrough && hydration.passthroughRanges;
 	}
 	const next = hydration.node;
-	(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-		end,
-		next !== null && domNode(next).parentNode === parentNode ? next : anchor,
-	);
+	parentNode.insertBefore(end, next !== null && next.parentNode === parentNode ? next : anchor);
 	// The owner can advance the cursor to this item's provisional end. The
 	// following logical sibling must start after that end, not inside the item.
 	hydration.node = getNextSibling(end);
@@ -49692,14 +48341,13 @@ function mountPassthroughListItem<T>(
 
 function removePassthroughItemRange(start: Node, end: Node, discardContents: boolean): void {
 	if (!discardContents) {
-		(STAGED_DOM ? STAGED_DOM.view(start as ChildNode) : (start as ChildNode)).remove();
-		(STAGED_DOM ? STAGED_DOM.view(end as ChildNode) : (end as ChildNode)).remove();
+		(start as ChildNode).remove();
+		(end as ChildNode).remove();
 		return;
 	}
 	for (let node: Node | null = start; node !== null;) {
 		const next = getNextSibling(node);
-		if (!isRendererHydrationStyle(node))
-			(STAGED_DOM ? STAGED_DOM.view(node as ChildNode) : (node as ChildNode)).remove();
+		if (!isRendererHydrationStyle(node)) (node as ChildNode).remove();
 		if (node === end) break;
 		node = next;
 	}
@@ -49728,7 +48376,7 @@ function reconcileKeyed<T>(
 	const oldItems = state.items;
 	const oldSize = state.size;
 	const newLen = items.length;
-	const parentNode = domNode(state.end).parentNode!;
+	const parentNode = state.end.parentNode!;
 	// Where this reconcile's commit entry goes if it changes the list's structure
 	// (listNext), and that entry's pending structure once it does.
 	const at = ROOT_RENDER_TRANSACTION === null ? 0 : ROOT_RENDER_TRANSACTION.ops.length;
@@ -50354,7 +49002,7 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  */
 function canQueueOwnedListClear(state: ForSlot): boolean {
 	const transaction = ROOT_RENDER_TRANSACTION;
-	const parent = domNode(state.start).parentNode;
+	const parent = state.start.parentNode;
 	if (
 		transaction === null ||
 		transaction.aborted ||
@@ -50364,8 +49012,8 @@ function canQueueOwnedListClear(state: ForSlot): boolean {
 		state.size < 16 ||
 		parent === null ||
 		(parent.nodeType !== 1 && parent.nodeType !== 11) ||
-		domNode(state.end).parentNode !== parent ||
-		domNode(state.start).previousSibling !== null ||
+		state.end.parentNode !== parent ||
+		state.start.previousSibling !== null ||
 		getNextSibling(state.end) !== null
 	)
 		return false;
@@ -50393,7 +49041,7 @@ function canQueueOwnedListClear(state: ForSlot): boolean {
 function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = false): boolean {
 	if (!certified && !canQueueOwnedListClear(state)) return false;
 	const transaction = ROOT_RENDER_TRANSACTION!;
-	const parent = domNode(state.start).parentNode!;
+	const parent = state.start.parentNode!;
 	const oldHead = state.head;
 	// retireRootBlock, inlined: this visits every row of a bulk clear.
 	const retired = (transaction.retired ??= new Set<Block>());
@@ -50411,14 +49059,14 @@ function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = fa
 	// still occupy its complete content between the original two markers.
 	const clear = () => {
 		let wholeParent =
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode === parent &&
-			(STAGED_DOM ? STAGED_DOM.view(end) : end).parentNode === parent &&
-			(STAGED_DOM ? STAGED_DOM.view(start) : start).previousSibling === null &&
+			start.parentNode === parent &&
+			end.parentNode === parent &&
+			start.previousSibling === null &&
 			getNextSibling(end) === null;
 		if (wholeParent) {
 			// This walk visits every cleared row: read the native getter directly
 			// instead of calling getNextSibling per row, unless a stage is active.
-			const read = STAGED_DOM ? undefined : nextSiblingGetter;
+			const read = nextSiblingGetter;
 			let node = getNextSibling(start);
 			for (let block = oldHead; block !== null; block = block.nextSibling) {
 				if (node === null || node !== block.startMarker) {
@@ -50436,18 +49084,17 @@ function queueOwnedListClear(state: ForSlot, out: any[], certified: boolean = fa
 		// drain over several focused documents (an array) retires none; an inert
 		// row's handler belongs to its live list owner.
 		let row: Node | null | undefined = (renderingFocus as FocusSelectionSnapshot | null)?.focused;
-		while (row != null && domNode(row).parentNode !== parent)
-			row = domNode(row).parentNode ?? (row as ShadowRoot).host;
+		while (row != null && row.parentNode !== parent)
+			row = row.parentNode ?? (row as ShadowRoot).host;
 		if (row != null) retireEventHostTree(row);
 		if (wholeParent) {
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).textContent = '';
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(start);
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).appendChild(end);
+			parent.textContent = '';
+			parent.appendChild(start);
+			parent.appendChild(end);
 		} else {
 			for (let block = oldHead; block !== null; block = block.nextSibling) {
 				const node = block.startMarker!;
-				if ((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode !== null)
-					domNode((STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!).removeChild(node);
+				if (node.parentNode !== null) node.parentNode!.removeChild(node);
 			}
 		}
 	};
@@ -50547,20 +49194,18 @@ function clearItems(first: Block | null, start: Comment, end: Comment, size: num
 			}
 		}
 		// A commit's earlier deletion cleanup can have unmounted the list itself.
-		const p = domNode(start).parentNode;
+		const p = start.parentNode;
 		if (p === null) return;
-		if (domNode(start).previousSibling === null && getNextSibling(end) === null) {
+		if (start.previousSibling === null && getNextSibling(end) === null) {
 			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
-			(STAGED_DOM ? STAGED_DOM.view(p as Element) : (p as Element)).textContent = '';
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(start);
-			(STAGED_DOM ? STAGED_DOM.view(p) : p).appendChild(end);
+			(p as Element).textContent = '';
+			p.appendChild(start);
+			p.appendChild(end);
 		} else if (size < RANGE_CLEAR_MIN_ITEMS) {
 			// Shared parent (other JSX interleaved) — detach the marker span directly.
 			// Each removal takes a whole item subtree, so this is one call per ITEM,
 			// not per node.
 			removeRange(getNextSibling(start), end);
-		} else if (STAGED_DOM) {
-			STAGED_DOM.clearBetween(start, end);
 		} else {
 			// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
 			const range = document.createRange();
@@ -50631,7 +49276,7 @@ function mountItem<T>(
 					(singleRoot !== 2 ||
 						!forSlot.plainDeopt ||
 						(node.nodeType === 1 &&
-							domNode(node).parentNode === parentNode &&
+							node.parentNode === parentNode &&
 							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
 				) {
 					const block = createBlock(
@@ -50649,7 +49294,7 @@ function mountItem<T>(
 					block.itemIndex = index;
 					if (singleRoot === 2 && forSlot.plainDeopt) block.deoptNode = node;
 					renderBlock(block);
-					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
+					hydration.node = block.endMarker?.nextSibling ?? getNextSibling(node);
 					return block;
 				}
 			} else if (hydration.isOpen(node)) {
@@ -50781,29 +49426,22 @@ function mountItem<T>(
 		// and promote it to start === end. From now on `block.endMarker` is the
 		// actual element (so subsequent body re-renders insert nothing — the
 		// update path mutates the cached _b._el$N refs directly).
-		const root = (
-			anchor === null
-				? (STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).lastChild
-				: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling
-		)!;
+		const root = (anchor === null ? parentNode.lastChild : anchor.previousSibling)!;
 		block.startMarker = root;
 		block.endMarker = root;
 		return block;
 	}
-	const start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('it');
-	const end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/it');
+	const start = document.createComment('it');
+	const end = document.createComment('/it');
 	if (adoptNode !== null) {
 		// Adoption: wrap the existing raw node in this item's markers where it
 		// already sits (identity/focus/input state survive) instead of building
 		// at the anchor.
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(start, adoptNode);
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(
-			end,
-			getNextSibling(adoptNode),
-		);
+		parentNode.insertBefore(start, adoptNode);
+		parentNode.insertBefore(end, getNextSibling(adoptNode));
 	} else {
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(start, anchor);
-		(STAGED_DOM ? STAGED_DOM.view(parentNode) : parentNode).insertBefore(end, anchor);
+		parentNode.insertBefore(start, anchor);
+		parentNode.insertBefore(end, anchor);
 	}
 	const block = createBlock(
 		'control-flow',
@@ -50859,15 +49497,13 @@ function discardThrownItem(
 
 /** The node before `anchor` in `parent`, or its last child for a null anchor. */
 function lastBefore(parent: Node, anchor: Node | null): ChildNode | null {
-	return anchor === null
-		? (STAGED_DOM ? STAGED_DOM.view(parent) : parent).lastChild
-		: (STAGED_DOM ? STAGED_DOM.view(anchor) : anchor).previousSibling;
+	return anchor === null ? parent.lastChild : anchor.previousSibling;
 }
 
 function moveBlockBefore(block: Block, anchor: Node): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_MOVE);
-	const parent = domNode(block.startMarker!).parentNode!;
+	const parent = block.startMarker!.parentNode!;
 	const end = block.endMarker!;
 	let n: Node | null = block.startMarker!;
 	if (renderingFocus !== null) {
@@ -50887,7 +49523,7 @@ function moveBlockBefore(block: Block, anchor: Node): void {
 	while (n) {
 		const isEnd = n === end;
 		const next: Node | null = getNextSibling(n);
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(n, anchor);
+		parent.insertBefore(n, anchor);
 		if (isEnd) break;
 		n = next;
 	}
@@ -50927,81 +49563,13 @@ function moveFocusedNodeBefore(
 	} else if (snapshots.focused.ownerDocument === node.ownerDocument) {
 		snapshot = snapshots;
 	}
-	if (!STAGED_DOM) {
-		moveNativeNodeBefore(
-			parent,
-			node,
-			anchor,
-			snapshot?.focused ?? null,
-			snapshot?.contentEditable ?? false,
-		);
-		return;
-	}
-	const focused = snapshot?.focused ?? null;
-	let containsFocused = node === focused;
-	if (!containsFocused && focused !== null && node.nodeType === 1) {
-		let candidate: Element | undefined = focused;
-		do {
-			if (STAGED_DOM.view(node as Element).contains(candidate)) {
-				containsFocused = true;
-				break;
-			}
-			candidate = (STAGED_DOM.view(candidate).getRootNode() as ShadowRoot).host;
-		} while (candidate !== undefined);
-	}
-	if (!containsFocused) {
-		(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(node, anchor);
-		return;
-	}
-
-	const moveBefore = (
-		STAGED_DOM
-			? STAGED_DOM.view(parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-			: (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-	).moveBefore;
-	// Chromium's state-preserving move keeps input composition alive but still
-	// collapses live Range selections inside a moved content-editable subtree.
-	if (!snapshot!.contentEditable && typeof moveBefore === 'function') {
-		moveBefore.call(parent, node, anchor);
-		return;
-	}
-
-	// Rotate only siblings of the same projected parent. Restoration can move
-	// an editing node across parents, which requires inserting that node itself.
-	if (
-		STAGED_DOM.view(node).parentNode !== parent ||
-		(anchor !== null && STAGED_DOM.view(anchor).parentNode !== parent)
-	) {
-		STAGED_DOM.view(parent).insertBefore(node, anchor);
-		return;
-	}
-
-	// insertBefore detaches an existing node, which ends a trusted keyboard
-	// composition even when the commit later restores focus. Older Chromium,
-	// Samsung Internet, and editable Range selections instead keep the focused
-	// node attached and rotate only its intervening siblings around it.
-	if (node === anchor || getNextSibling(node) === anchor) return;
-	if (
-		anchor === null ||
-		((STAGED_DOM ? STAGED_DOM.view(node) : node).compareDocumentPosition(anchor) &
-			Node.DOCUMENT_POSITION_FOLLOWING) !==
-			0
-	) {
-		let cursor = getNextSibling(node);
-		while (cursor !== anchor) {
-			const next = getNextSibling(cursor!);
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(cursor!, node);
-			cursor = next;
-		}
-	} else {
-		const end = getNextSibling(node);
-		let cursor: Node | null = anchor;
-		while (cursor !== node) {
-			const next: Node | null = getNextSibling(cursor!);
-			(STAGED_DOM ? STAGED_DOM.view(parent) : parent).insertBefore(cursor!, end);
-			cursor = next;
-		}
-	}
+	moveNativeNodeBefore(
+		parent,
+		node,
+		anchor,
+		snapshot?.focused ?? null,
+		snapshot?.contentEditable ?? false,
+	);
 }
 
 /**
@@ -51389,10 +49957,7 @@ function isDocumentResource(node: Node): boolean {
 	return (
 		name === 'script' ||
 		name === 'style' ||
-		(name === 'link' &&
-			(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element))
-				.getAttribute('rel')
-				?.toLowerCase() === 'stylesheet')
+		(name === 'link' && (node as Element).getAttribute('rel')?.toLowerCase() === 'stylesheet')
 	);
 }
 
@@ -51431,38 +49996,33 @@ function hydrationFallbackNodes(container: RootContainer): Node[] {
 function keptHydrationIsland(boundaryId: string): Element | null {
 	const islands = ROOT_RENDER_TRANSACTION?.keptIslands;
 	const index =
-		islands?.findIndex((island) => domNode(island).getAttribute(HYDRATE_ID_ATTR) === boundaryId) ??
-		-1;
+		islands?.findIndex((island) => island.getAttribute(HYDRATE_ID_ATTR) === boundaryId) ?? -1;
 	if (index < 0) return null;
 	const wrapper = islands!.splice(index, 1)[0];
-	const parent = domNode(wrapper).parentNode!;
-	const next = domNode(wrapper).nextSibling;
-	journalUndo(() => domNode(parent).insertBefore(wrapper, next));
+	const parent = wrapper.parentNode!;
+	const next = wrapper.nextSibling;
+	journalUndo(() => parent.insertBefore(wrapper, next));
 	return wrapper;
 }
 
 /** Remove each of `nodes` that is still attached. */
 function removeNodes(nodes: readonly Node[]): void {
 	for (const node of nodes) {
-		const parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
-		if (parent !== null) (STAGED_DOM ? STAGED_DOM.view(parent) : parent).removeChild(node);
+		const parent = node.parentNode;
+		if (parent !== null) parent.removeChild(node);
 	}
 }
 
 function clearRootContainer(container: RootContainer): void {
 	if (container.nodeType !== 9) {
-		(STAGED_DOM
-			? STAGED_DOM.view(container as Element | DocumentFragment)
-			: (container as Element | DocumentFragment)
-		).textContent = '';
+		(container as Element | DocumentFragment).textContent = '';
 		return;
 	}
 	// A document's textContent setter is a no-op. Preserve its doctype while
 	// releasing renderer-owned content, so future roots keep the document mode.
 	for (let child = getFirstChild(container); child !== null;) {
 		const next = getNextSibling(child);
-		if (child.nodeType !== 10)
-			(STAGED_DOM ? STAGED_DOM.view(container) : container).removeChild(child);
+		if (child.nodeType !== 10) container.removeChild(child);
 		child = next;
 	}
 }
@@ -51565,7 +50125,7 @@ export function devHtmlNesting(
 						(slot.head?.startMarker as Element & { __oct_loc?: string })?.__oct_loc ===
 							childLocation
 					) {
-						parent = domNode(slot.start).parentNode;
+						parent = slot.start.parentNode;
 						break;
 					}
 				}
@@ -51581,7 +50141,7 @@ export function devHtmlNesting(
 						? invalidHtmlNestingWithParent(childTag, element.localName, childLocation, location)
 						: invalidHtmlNestingWithAncestor(childTag, actualAncestors, childLocation, location);
 				if (message !== null) break;
-				parent = (STAGED_DOM ? STAGED_DOM.view(element) : element).parentNode;
+				parent = element.parentNode;
 			}
 		} else {
 			message =
@@ -51630,14 +50190,13 @@ function validateRootHtmlNesting(
 		) {
 			return;
 		}
-		const root = (STAGED_DOM ? STAGED_DOM.view(content as Element) : (content as Element))
-			.firstElementChild;
+		const root = (content as Element).firstElementChild;
 		if (root === null) return;
 		if (invalidHtmlNestingWithParent(root.localName, element.localName) !== null) {
 			devHtmlNesting(root.localName, [element.localName]);
 			return;
 		}
-		let child = (STAGED_DOM ? STAGED_DOM.view(root) : root).firstElementChild;
+		let child = root.firstElementChild;
 		const ancestors = [root.localName, element.localName];
 		while (child !== null && child.namespaceURI === 'http://www.w3.org/1999/xhtml') {
 			if (invalidHtmlNestingWithAncestor(child.localName, ancestors) !== null) {
@@ -51645,7 +50204,7 @@ function validateRootHtmlNesting(
 				return;
 			}
 			ancestors.splice(ancestors.length - 1, 0, child.localName);
-			child = (STAGED_DOM ? STAGED_DOM.view(child) : child).firstElementChild;
+			child = child.firstElementChild;
 		}
 	}
 }
@@ -51779,7 +50338,7 @@ function makeRoot(
 			!previousRoot.disposed &&
 			!isCreatedInRootRender(renderOwner.transaction!, previousRoot);
 		const oldFirst = staged ? getFirstChild(container) : null;
-		const oldLast = staged ? (STAGED_DOM ? STAGED_DOM.view(container) : container).lastChild : null;
+		const oldLast = staged ? container.lastChild : null;
 		journalUndo(() => {
 			rootBlock = previousRoot;
 			currentBody = previousBody;
@@ -51804,17 +50363,16 @@ function makeRoot(
 				// A genuine root identity change mounts once beside the outgoing
 				// screen, built off-document: its commit inserts it after the outgoing
 				// screen, whose focused hosts stay connected until then.
-				start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('root');
-				end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/root');
+				start = document.createComment('root');
+				end = document.createComment('/root');
 				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
-				(STAGED_DOM ? STAGED_DOM.view(frontier.frag!) : frontier.frag!).append(start, end);
+				frontier.frag!.append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				renderOwner.hydrationFallback(false);
 			} else if (
 				commitsNow &&
 				container.nodeType !== 9 &&
 				!hydrating &&
-				!STAGED_DOM &&
 				!(mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0))
 			) {
 				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
@@ -52007,10 +50565,8 @@ function makeRoot(
 				Object.is(currentKey, nextKey)
 			) {
 				// A same-component request supersedes retry generations without
-				// invalidating a prepared DOM plan for that still-current root.
+				// invalidating a prepared commit for that still-current root.
 				// Identity replacements and unmounts never refresh its receipt.
-				if (inFlush && DEFERRED_LAYOUT_DRIVER)
-					DEFERRED_LAYOUT_DRIVER.refreshPublishingOwner(renderOwner);
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
 				if (COMMITTING_OWNER === renderOwner) COMMITTING_GENERATION = renderOwner.generation;
 			}
@@ -52236,11 +50792,7 @@ function installHydrationFallback(
 			return;
 		}
 		const transaction = ROOT_RENDER_TRANSACTION!;
-		const islands = Array.from(
-			(STAGED_DOM ? STAGED_DOM.view(container) : container).querySelectorAll(
-				'[' + HYDRATE_INDEPENDENT_ATTR + ']',
-			),
-		);
+		const islands = Array.from(container.querySelectorAll('[' + HYDRATE_INDEPENDENT_ATTR + ']'));
 		const unadopted = (transaction.keptIslands = islands.slice());
 		ids.next = idSeed;
 		// Rolling back a render that never commits restores exactly these nodes.
@@ -52402,10 +50954,7 @@ function hydrateRootWithOutputHandler(
 					)
 				: (snapshotSignalValue(rootOptions.initialDocumentSignals) as ScopeSeed);
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
-	const nativeRaw =
-		nativeSidecar === null
-			? undefined
-			: (STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar).textContent || '';
+	const nativeRaw = nativeSidecar === null ? undefined : nativeSidecar.textContent || '';
 	const nativeManifest =
 		nativeRaw !== undefined && NATIVE_SIGNAL_HYDRATION
 			? materializeNativeSignalManifest(
@@ -52413,7 +50962,7 @@ function hydrateRootWithOutputHandler(
 					initialDocumentSignals,
 				)
 			: nativeRaw;
-	(STAGED_DOM ? STAGED_DOM.view(nativeSidecar) : nativeSidecar)?.remove();
+	nativeSidecar?.remove();
 	const ownerToken = claimRootContainer(container);
 	registerDelegationTarget(container, true);
 	let rootBlock = createBlock(
@@ -52450,35 +50999,21 @@ function hydrateRootWithOutputHandler(
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
 	// inline data <script> (and remove it, so it isn't taken for a hydratable
 	// node) and stage them for useThenable to consume in render order.
-	const seedScript = (STAGED_DOM ? STAGED_DOM.view(container) : container).querySelector(
-		'script[' + SUSPENSE_SCRIPT_ATTR + ']',
-	);
+	const seedScript = container.querySelector('script[' + SUSPENSE_SCRIPT_ATTR + ']');
 	// The seed script names the hydration protocol its server rendered. Another
 	// version's ranges would be misread, so the root renders on the client.
 	let protocolSkew = false;
 	if (seedScript !== null) {
-		protocolSkew =
-			(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).getAttribute(SUSPENSE_SCRIPT_ATTR) !==
-			HYDRATION_PROTOCOL_VERSION;
-		if (!protocolSkew)
-			seeds = parseSeedJson(
-				(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).textContent || '[]',
-			);
-		(STAGED_DOM ? STAGED_DOM.view(seedScript) : seedScript).remove();
+		protocolSkew = seedScript.getAttribute(SUSPENSE_SCRIPT_ATTR) !== HYDRATION_PROTOCOL_VERSION;
+		if (!protocolSkew) seeds = parseSeedJson(seedScript.textContent || '[]');
+		seedScript.remove();
 	}
 	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
 	// are protocol sidecars rather than authored component output, so remove only
 	// direct children carrying the renderer-owned marker before root adoption.
-	for (
-		let child = (STAGED_DOM ? STAGED_DOM.view(container) : container).firstElementChild;
-		child !== null;
-	) {
-		const next = (STAGED_DOM ? STAGED_DOM.view(child) : child).nextElementSibling;
-		if (
-			child.localName === 'script' &&
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).hasAttribute(STREAM_SCRIPT_ATTR)
-		)
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).remove();
+	for (let child = container.firstElementChild; child !== null;) {
+		const next = child.nextElementSibling;
+		if (child.localName === 'script' && child.hasAttribute(STREAM_SCRIPT_ATTR)) child.remove();
 		child = next;
 	}
 	const root = makeRoot(
@@ -52579,7 +51114,7 @@ function hydrateRootWithOutputHandler(
 			}
 			if (
 				firstNode?.nodeType === 8 &&
-				(STAGED_DOM ? STAGED_DOM.view(firstNode as Comment) : (firstNode as Comment)).data ===
+				(firstNode as Comment).data ===
 					(body as ComponentBody & { [BINDING_VIEW_ROOT]?: string })[BINDING_VIEW_ROOT]
 			) {
 				// A marked entry view has one compiler-owned root pair, even when its
@@ -52807,9 +51342,9 @@ function hasHeadHint(key: string): boolean {
 	// SSR dedupe: compare exact attribute VALUES rather than interpolating an
 	// href-derived key into a CSS selector. Quotes/brackets are valid URL text;
 	// treating them as selector syntax could throw before the hint is inserted.
-	const existing = domNode(document.head).querySelectorAll('[data-oct-hint]');
+	const existing = document.head.querySelectorAll('[data-oct-hint]');
 	for (let i = 0; i < existing.length; i++) {
-		if (domNode(existing[i]).getAttribute('data-oct-hint') === key) {
+		if (existing[i].getAttribute('data-oct-hint') === key) {
 			_resourceHints.add(key);
 			return true;
 		}
@@ -52820,8 +51355,8 @@ function hasHeadHint(key: string): boolean {
 function insertHeadHint(key: string, build: () => Element): void {
 	if (typeof document === 'undefined' || hasHeadHint(key)) return;
 	const el = build();
-	(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('data-oct-hint', key);
-	domNode(document.head).appendChild(el);
+	el.setAttribute('data-oct-hint', key);
+	document.head.appendChild(el);
 	// Publish dedupe state only after every DOM operation succeeds, so a failed
 	// build/append cannot poison the key and suppress a later valid retry.
 	_resourceHints.add(key);
@@ -52887,10 +51422,7 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 		if (v == null || v === false) continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
 		const value = v === true ? '' : String(v);
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(
-			name,
-			sanitizeURLAttribute(el.localName, name, value),
-		);
+		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, value));
 	}
 }
 
@@ -52927,10 +51459,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	// on this uncommon identity collision and compare attribute values directly:
 	// href text may contain quotes or other CSS-selector metacharacters.
 	if (as === 'style' && resourceState().sheets.has(rawHref)) {
-		const styles = domNode(document.head).querySelectorAll('style[data-precedence]');
+		const styles = document.head.querySelectorAll('style[data-precedence]');
 		let hasInlineStyle = false;
 		for (let i = 0; i < styles.length; i++) {
-			if (domNode(styles[i]).getAttribute('data-href') === rawHref) {
+			if (styles[i].getAttribute('data-href') === rawHref) {
 				hasInlineStyle = true;
 				break;
 			}
@@ -52948,11 +51480,11 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	const safeHref = sanitizeURL(rawHref);
 	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
 	insertHeadHint(key, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'preload';
+		const l = document.createElement('link');
+		l.rel = 'preload';
 		// A responsive image preload matches on imagesrcset/imagesizes; the
 		// fallback href would double-fetch, so React (and Octane) omit it.
-		if (!omitHref) (STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		if (!omitHref) l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -53007,9 +51539,9 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 	const corsMode =
 		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
 	insertHeadHint('preconnect:' + corsMode + ':' + rawHref, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'preconnect';
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		const l = document.createElement('link');
+		l.rel = 'preconnect';
+		l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -53025,9 +51557,9 @@ export function prefetchDNS(href: string): void {
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('dns-prefetch:' + rawHref, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'dns-prefetch';
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		const l = document.createElement('link');
+		l.rel = 'dns-prefetch';
+		l.href = safeHref;
 		return l;
 	});
 }
@@ -53052,9 +51584,9 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 	if (hasHeadHint('module:' + rawHref) || resourceState().scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('modulepreload:' + rawHref, () => {
-		const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'modulepreload';
-		(STAGED_DOM ? STAGED_DOM.view(l) : l).href = safeHref;
+		const l = document.createElement('link');
+		l.rel = 'modulepreload';
+		l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -53083,11 +51615,10 @@ export function preinitModule(
 	if (state.scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('module:' + rawHref, () => {
-		const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('script');
-		(STAGED_DOM ? STAGED_DOM.view(s) : s).type = 'module';
-		(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).src =
-			safeHref;
-		(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).async = true;
+		const s = document.createElement('script');
+		s.type = 'module';
+		(s as HTMLScriptElement).src = safeHref;
+		(s as HTMLScriptElement).async = true;
 		applyHintAttrs(s, options ? { ...options, as: undefined } : undefined);
 		return s;
 	});
@@ -53134,31 +51665,24 @@ function resourceState(): ResourceState {
 		// Stylesheet links and style resources share one identity namespace and
 		// one precedence-group ordering; querySelectorAll returns document order,
 		// so tails/lastTail land on each group's last member.
-		const sheets = (STAGED_DOM ? STAGED_DOM.view(document) : document).querySelectorAll(
+		const sheets = document.querySelectorAll(
 			'link[rel="stylesheet"][data-precedence], style[data-precedence]',
 		);
 		for (let i = 0; i < sheets.length; i++) {
 			const el = sheets[i];
-			const href =
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('href') ??
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-href');
+			const href = el.getAttribute('href') ?? el.getAttribute('data-href');
 			if (href !== null) state.sheets.add(href);
-			state.tails.set(
-				(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-precedence') as string,
-				el,
-			);
+			state.tails.set(el.getAttribute('data-precedence') as string, el);
 			state.lastTail = el;
 		}
 		// One executable identity per src: classic Float scripts (data-oct-res)
 		// AND preinitModule scripts (data-oct-hint "module:…") share the set.
-		const scripts = (STAGED_DOM ? STAGED_DOM.view(document) : document).querySelectorAll(
-			'script[data-oct-res], script[data-oct-hint]',
-		);
+		const scripts = document.querySelectorAll('script[data-oct-res], script[data-oct-hint]');
 		for (let i = 0; i < scripts.length; i++) {
 			const el = scripts[i];
-			const hint = (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-oct-hint');
+			const hint = el.getAttribute('data-oct-hint');
 			if (hint !== null && !hint.startsWith('module:')) continue;
-			const src = (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('src');
+			const src = el.getAttribute('src');
 			if (src !== null) state.scripts.add(src);
 		}
 		// Streaming SSR can deliver Float sheets AFTER this state seeded (a late
@@ -53169,15 +51693,9 @@ function resourceState(): ResourceState {
 		// DOM seeding above adopts what it placed.
 		if (typeof window !== 'undefined') {
 			(window as any).$OCTFR = (el: Element): void => {
-				const href =
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('href') ??
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-href');
+				const href = el.getAttribute('href') ?? el.getAttribute('data-href');
 				if (href === null || state.sheets.has(href)) return;
-				insertPrecedenced(
-					state,
-					el,
-					(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute('data-precedence') ?? '',
-				);
+				insertPrecedenced(state, el, el.getAttribute('data-precedence') ?? '');
 				state.sheets.add(href);
 			};
 		}
@@ -53188,17 +51706,17 @@ function resourceState(): ResourceState {
 /** Insert a sheet-family resource into its precedence group (shared ordering). */
 function insertPrecedenced(state: ResourceState, el: Element, precedence: string): void {
 	const tail = state.tails.get(precedence);
-	if (tail !== undefined && (STAGED_DOM ? STAGED_DOM.view(tail) : tail).isConnected) {
+	if (tail !== undefined && tail.isConnected) {
 		// Existing group: append after its current tail.
-		(STAGED_DOM ? STAGED_DOM.view(tail) : tail).after(el);
+		tail.after(el);
 		if (state.lastTail === tail) state.lastTail = el;
-	} else if (state.lastTail !== null && domNode(state.lastTail).isConnected) {
+	} else if (state.lastTail !== null && state.lastTail.isConnected) {
 		// New group: starts after the last existing group, keeping groups
 		// contiguous in first-encounter order.
-		domNode(state.lastTail).after(el);
+		state.lastTail.after(el);
 		state.lastTail = el;
 	} else {
-		domNode(document.head).appendChild(el);
+		document.head.appendChild(el);
 		state.lastTail = el;
 	}
 	state.tails.set(precedence, el);
@@ -53213,10 +51731,7 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 		const v = (attrs as any)[k];
 		if (v == null || v === false || typeof v === 'function') continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
-		(STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute(
-			name,
-			sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)),
-		);
+		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)));
 	}
 }
 
@@ -53254,10 +51769,10 @@ export function stylesheetResource(
 	// resource identity (later differing props do not retarget a live sheet).
 	if (state.sheets.has(href)) return;
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
-	const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
-	(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'stylesheet';
-	(STAGED_DOM ? STAGED_DOM.view(l) : l).href = sanitizeURL(href);
-	(STAGED_DOM ? STAGED_DOM.view(l) : l).setAttribute('data-precedence', precedence);
+	const l = document.createElement('link');
+	l.rel = 'stylesheet';
+	l.href = sanitizeURL(href);
+	l.setAttribute('data-precedence', precedence);
 	applyResourceAttrs(l, attrs);
 	insertPrecedenced(state, l, precedence);
 	state.sheets.add(href);
@@ -53301,11 +51816,11 @@ export function styleResource(
 				'Load it as a stylesheet link instead.',
 		);
 	}
-	const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('style');
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).setAttribute('data-precedence', precedence);
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).setAttribute('data-href', href);
+	const s = document.createElement('style');
+	s.setAttribute('data-precedence', precedence);
+	s.setAttribute('data-href', href);
 	applyResourceAttrs(s, attrs);
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).textContent = css;
+	s.textContent = css;
 	insertPrecedenced(state, s, precedence);
 	state.sheets.add(href);
 }
@@ -53328,12 +51843,11 @@ export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof src !== 'string' || src === '') return;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
-	const s = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('script');
-	(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).src =
-		sanitizeURL(src);
-	(STAGED_DOM ? STAGED_DOM.view(s as HTMLScriptElement) : (s as HTMLScriptElement)).async = true;
-	(STAGED_DOM ? STAGED_DOM.view(s) : s).setAttribute('data-oct-res', '');
+	const s = document.createElement('script');
+	(s as HTMLScriptElement).src = sanitizeURL(src);
+	(s as HTMLScriptElement).async = true;
+	s.setAttribute('data-oct-res', '');
 	applyResourceAttrs(s, attrs);
-	domNode(document.head).appendChild(s);
+	document.head.appendChild(s);
 	state.scripts.add(src);
 }
