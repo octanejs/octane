@@ -4784,6 +4784,57 @@ function assertRehomed(scope: any, frag: DocumentFragment): void {
 		forEachSubtreeChild(scope, (child) => assertRehomed(child, frag));
 }
 
+/**
+ * Markers a hydrating render minted over the server DOM it adopts, which its
+ * commit places, each before the node it names (placeAtCommit). A render that
+ * never commits leaves the server DOM without them.
+ */
+let PENDING_MARKERS: WeakMap<Node, [parent: Node, before: Node | null]> | null = null;
+
+/**
+ * Put `node`, a marker a hydrating render minted, before `before` in `parent`
+ * at commit. A later call before the commit moves it.
+ */
+function placeAtCommit(parent: Node, node: Node, before: Node | null): void {
+	if (ROOT_RENDER_TRANSACTION === null) {
+		parent.insertBefore(node, before);
+		return;
+	}
+	const pending = (PENDING_MARKERS ??= new WeakMap());
+	const queued = pending.has(node);
+	pending.set(node, [parent, before]);
+	if (!queued) ROOT_RENDER_TRANSACTION.ops.push(placeMarker, node);
+}
+
+function placeMarker(node: Node): void {
+	const placement = PENDING_MARKERS?.get(node);
+	if (placement === undefined) return;
+	const [parent, before] = placement;
+	PENDING_MARKERS!.delete(node);
+	// A marker it goes before that is still to be placed lands first.
+	if (before !== null && PENDING_MARKERS!.has(before)) placeMarker(before);
+	parent.insertBefore(node, before);
+}
+
+/** Whether `node` is a marker still to be placed (placeAtCommit). */
+function markerPending(node: Node): boolean {
+	return PENDING_MARKERS !== null && node.parentNode === null && PENDING_MARKERS.has(node);
+}
+
+/**
+ * Where `node` stands in the server DOM: itself, or for a marker still to be
+ * placed, the node it goes before, past any other such marker.
+ */
+function markerPosition(node: Node | null): Node | null {
+	while (node !== null && markerPending(node)) node = PENDING_MARKERS!.get(node)![1];
+	return node;
+}
+
+/** The node after `node` in the server DOM, for a marker still to be placed too (markerPosition). */
+function nodeAfter(node: Node): Node | null {
+	return markerPending(node) ? markerPosition(node) : getNextSibling(node);
+}
+
 /** Run `fn(arg)` at the open root render's commit, or now outside one. */
 function atCommit<T>(fn: (arg: T) => void, arg: T): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
@@ -21143,7 +21194,7 @@ class HydrationCapability {
 	 * boundary left it.
 	 */
 	parkPast(close: Node, parent: Scope): void {
-		if (!parent.block.disposed) this.node = getNextSibling(close);
+		if (!parent.block.disposed) this.node = nodeAfter(close);
 	}
 
 	/**
@@ -38084,9 +38135,11 @@ export function childSlot(
 					);
 			}
 			end = document.createComment('');
-			domParent.insertBefore(end, anchor ?? null);
-			if (hydration !== null && parentBlock === hydration.rootBlock)
-				hydration.protectRootAnchor(end);
+			// Hydration places the slot's marker in the server DOM it adopts at commit.
+			if (hydration !== null) {
+				placeAtCommit(domParent, end, anchor ?? null);
+				if (parentBlock === hydration.rootBlock) hydration.protectRootAnchor(end);
+			} else domParent.insertBefore(end, anchor ?? null);
 		}
 		state = {
 			__kind: 'childSlot',
@@ -38629,7 +38682,8 @@ export function childSlot(
 			// clearChildContent can sweep a (possibly multi-node) component body.
 			// (An OWNS-PARENT slot needs neither bound: clears sweep the element.)
 			state.start = document.createComment('');
-			domParent.insertBefore(state.start, state.end);
+			if (hydration !== null && !hydratingUpdate) placeAtCommit(domParent, state.start, state.end);
+			else domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock(
 			'dynamic',

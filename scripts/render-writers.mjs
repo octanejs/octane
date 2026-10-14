@@ -47,6 +47,8 @@ export const WRITERS = new Map(
 		placeKeptIsland: 'commit',
 		commitTextValue: 'commit',
 		adoptCheckedness: 'commit',
+		placeMarker: 'commit',
+		placeAtCommit: 'commit',
 		clearRootContainer: 'commit',
 		landItemPair: 'commit',
 		landHostPair: 'commit',
