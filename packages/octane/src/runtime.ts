@@ -50670,12 +50670,11 @@ export function createIndependentHydrateActivator(
 // Each call inserts one deduped <link>/<script> into document.head (client).
 // Dedupe key = rel/kind + href, matching React's resource identity model.
 //
-// A call made while a root renders runs at that render's commit, in render
-// order with the Float resources below (atCommit), so the render writes no
-// head entry and a dropped render inserts none (#2043). The whole call waits,
-// not just its insert: each identity check and preload transfer then sees
-// the requests before it, exactly as calls made outside a render do. Only
-// the development warning stays with the call.
+// As in React DOM, a hint inserts the moment it is called, even while a root
+// renders: starting the fetch early is the hint's whole purpose, so a render
+// that later throws or is dropped leaves its hints behind. These are the only
+// render-time head writers, and scripts/render-writers.mjs classifies them as
+// `hint`. A resource element waits for its commit (requestResourceElement).
 // ---------------------------------------------------------------------------
 
 const _resourceHints = new Set<string>();
@@ -50777,10 +50776,6 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreload, [href, options]);
-}
-
-function commitPreload([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (
@@ -50841,21 +50836,18 @@ function commitPreload([href, options]: [string, { as: string } & Record<string,
 
 /**
  * React DOM `preinit(href, {as: 'style'|'script', …})` — executes/applies the
- * resource. Routes through the Float resource inserts so preinit and the
- * rendered resource forms share ONE identity: a preinit'd stylesheet joins the
- * precedence groups (`precedence` option honored, default `'default'`) and
- * dedupes against `<link rel="stylesheet" precedence>`; a preinit'd script
- * dedupes against `<script async src>`.
+ * resource. It shares ONE identity with the rendered resource forms: a
+ * preinit'd stylesheet joins the precedence groups (`precedence` option
+ * honored, default `'default'`) and dedupes against
+ * `<link rel="stylesheet" precedence>`; a preinit'd script dedupes against
+ * `<script async src>`. Like React's preinitStyle and preinitScript, it inserts
+ * its element when called, not at a commit.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreinit, [href, options]);
-}
-
-function commitPreinit([href, options]: [string, { as: string } & Record<string, unknown>]): void {
 	const guarded = guardHintHref(href);
 	if (guarded === null) return;
 	if (options === null || typeof options !== 'object') return;
@@ -50863,16 +50855,17 @@ function commitPreinit([href, options]: [string, { as: string } & Record<string,
 	if (as !== 'style' && as !== 'script') return;
 	const rawHref = guarded;
 	const seeded = takePreloadTransfer(as, rawHref);
+	if (typeof document === 'undefined') return;
+	const state = resourceState();
+	const attrs = { ...seeded, ...options, as: undefined };
 	if (as === 'style') {
-		stylesheetResource({
-			...seeded,
-			...options,
-			as: undefined,
-			href: rawHref,
-			precedence: (options as any).precedence ?? 'default',
-		});
-	} else {
-		scriptResource({ ...seeded, ...options, as: undefined, href: undefined, src: rawHref });
+		if (state.sheets.has(rawHref)) return;
+		const precedence = String((options as any).precedence ?? 'default');
+		insertPrecedenced(state, stylesheetLink(rawHref, precedence, attrs), precedence);
+		state.sheets.add(rawHref);
+	} else if (!state.scripts.has(rawHref)) {
+		document.head.appendChild(asyncScript(rawHref, attrs));
+		state.scripts.add(rawHref);
 	}
 }
 
@@ -50882,10 +50875,6 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreconnect, [href, options]);
-}
-
-function commitPreconnect([href, options]: [string, { crossOrigin?: string } | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options !== null && typeof options !== 'object') options = undefined;
@@ -50910,10 +50899,6 @@ export function prefetchDNS(href: string): void {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPrefetchDNS, href);
-}
-
-function commitPrefetchDNS(href: string): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
@@ -50935,10 +50920,6 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreloadModule, [href, options]);
-}
-
-function commitPreloadModule([href, options]: [string, Record<string, unknown> | undefined]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
@@ -50970,13 +50951,6 @@ export function preinitModule(
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);
 	}
-	atCommit(commitPreinitModule, [href, options]);
-}
-
-function commitPreinitModule([href, options]: [
-	string,
-	({ as?: string } & Record<string, unknown>) | undefined,
-]): void {
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options != null && typeof options !== 'object') return;
@@ -51013,10 +50987,13 @@ function commitPreinitModule([href, options]: [
 // seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
 // so hydration never duplicates.
 //
-// A render reads the committed identity only: a resource the page already has
-// costs a set lookup, and any other joins the render's commit (atCommit),
-// where the identity check runs again. The first request in render order
-// therefore wins, and a dropped render inserts nothing (#2043).
+// The element waits for its render's commit, as React's acquireResource runs
+// in the mutation phase (#2043). A render reads the committed identity only,
+// so a resource the page already has costs a set lookup; the identity check
+// runs again at commit, where the first request in render order wins. As in
+// React's getResource, a stylesheet the document lacks also starts loading
+// while the render discovers it, through a style preload; a style or script
+// resource writes nothing until its commit.
 // ---------------------------------------------------------------------------
 
 interface ResourceState {
@@ -51114,6 +51091,75 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 	}
 }
 
+/** A detached `<link rel="stylesheet">` for a resource or a preinit. */
+function stylesheetLink(href: string, precedence: string, attrs: Record<string, unknown>): Element {
+	const l = document.createElement('link');
+	l.rel = 'stylesheet';
+	l.href = sanitizeURL(href);
+	l.setAttribute('data-precedence', precedence);
+	applyResourceAttrs(l, attrs);
+	return l;
+}
+
+/** A detached `<script async src>` for a resource or a preinit. */
+function asyncScript(src: string, attrs: Record<string, unknown>): Element {
+	const s = document.createElement('script');
+	(s as HTMLScriptElement).src = sanitizeURL(src);
+	(s as HTMLScriptElement).async = true;
+	s.setAttribute('data-oct-res', '');
+	applyResourceAttrs(s, attrs);
+	return s;
+}
+
+/**
+ * Insert a resource element at the open root render's commit, or now outside
+ * one. React acquires a resource only for a fiber that commits, so a dropped
+ * render queues nothing that runs, and an arm that failed or was replaced
+ * leaves only its hints: the element is skipped when its requesting Block has
+ * unmounted. That arm's deletion may be queued after this entry, so the entry
+ * first moves behind everything its render queued.
+ */
+function requestResourceElement<T>(insert: (arg: T) => void, arg: T): void {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction === null) insert(arg);
+	else transaction.ops.push(commitResourceElement, [insert, arg, CURRENT_BLOCK, transaction.ops]);
+}
+
+function commitResourceElement(entry: [(arg: any) => void, any, Block | null, any[] | null]): void {
+	const ops = entry[3];
+	if (ops !== null) {
+		entry[3] = null;
+		ops.push(commitResourceElement, entry);
+	} else if (!blockSubtreeDisposed(entry[2])) entry[0](entry[1]);
+}
+
+/**
+ * React's getResource: a stylesheet resource the document lacks starts
+ * loading as the render discovers it, through a style preload keyed like
+ * `preload(href, {as: 'style'})`, which stays even if the render never
+ * commits. Its options seed a later preinit, as a preload's do.
+ */
+function preloadStylesheetResource(href: string, attrs: Record<string, unknown>): void {
+	const key = 'preload:style:' + href;
+	if (hasHeadHint(key)) return;
+	stashPreloadTransfer('style', href, attrs);
+	const safeHref = sanitizeURL(href);
+	insertHeadHint(key, () => {
+		const l = document.createElement('link');
+		l.rel = 'preload';
+		l.href = safeHref;
+		l.setAttribute('as', 'style');
+		applyResourceAttrs(l, {
+			crossOrigin: attrs.crossOrigin,
+			integrity: attrs.integrity,
+			media: attrs.media,
+			hrefLang: attrs.hrefLang,
+			referrerPolicy: attrs.referrerPolicy,
+		});
+		return l;
+	});
+}
+
 function warnInvalidStylesheetResource(reason: string): void {
 	let conflict: string;
 	if (reason === 'missing-href') {
@@ -51143,7 +51189,8 @@ export function stylesheetResource(
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
-	atCommit(commitStylesheetResource, attrs);
+	preloadStylesheetResource(href, attrs);
+	requestResourceElement(commitStylesheetResource, attrs);
 }
 
 function commitStylesheetResource(attrs: Record<string, unknown>): void {
@@ -51153,12 +51200,7 @@ function commitStylesheetResource(attrs: Record<string, unknown>): void {
 	// resource identity (later differing props do not retarget a live sheet).
 	if (state.sheets.has(href)) return;
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
-	const l = document.createElement('link');
-	l.rel = 'stylesheet';
-	l.href = sanitizeURL(href);
-	l.setAttribute('data-precedence', precedence);
-	applyResourceAttrs(l, attrs);
-	insertPrecedenced(state, l, precedence);
+	insertPrecedenced(state, stylesheetLink(href, precedence, attrs), precedence);
 	state.sheets.add(href);
 }
 
@@ -51176,7 +51218,7 @@ export function styleResource(
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
-	atCommit(commitStyleResource, [attrs, css, development]);
+	requestResourceElement(commitStyleResource, [attrs, css, development]);
 }
 
 function commitStyleResource([attrs, css, development]: [
@@ -51234,18 +51276,13 @@ export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const src = attrs.src;
 	if (typeof src !== 'string' || src === '' || resourceState().scripts.has(src)) return;
-	atCommit(commitScriptResource, attrs);
+	requestResourceElement(commitScriptResource, attrs);
 }
 
 function commitScriptResource(attrs: Record<string, unknown>): void {
 	const src = attrs.src as string;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
-	const s = document.createElement('script');
-	(s as HTMLScriptElement).src = sanitizeURL(src);
-	(s as HTMLScriptElement).async = true;
-	s.setAttribute('data-oct-res', '');
-	applyResourceAttrs(s, attrs);
-	document.head.appendChild(s);
+	document.head.appendChild(asyncScript(src, attrs));
 	state.scripts.add(src);
 }

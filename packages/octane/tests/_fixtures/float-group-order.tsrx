@@ -103,9 +103,9 @@ function Exploding(props) @{
 	<span class="never">{props.arm ? (boom() as string) : 'x'}</span>
 }
 
-// Resources are page-global and never removed: an arm that registers its sheet
-// and then fails while rendering a child keeps the sheet, exactly like the
-// server (registration precedes child evaluation there too).
+// An arm that requests its sheet and then fails while rendering a child never
+// commits: as in React DOM, its sheet's preload stays and the sheet does not
+// insert.
 export function FailingArm(props) @{
 	<div class="failing-host">
 		@try {

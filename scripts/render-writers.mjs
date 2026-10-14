@@ -18,6 +18,11 @@
  *   native     Outside rendering: imperative handles, form and focus
  *              plumbing, ViewTransition naming in the native update, style
  *              injection, hot reload.
+ *   hint       A React-parity resource hint, which inserts into
+ *              document.head when called, mid-render included: preload,
+ *              preinit and the rest, and the style preload a stylesheet
+ *              resource issues as it renders (React's getResource). The
+ *              resource elements themselves are commit writers.
  */
 export const WRITERS = new Map(
 	Object.entries({
@@ -46,18 +51,8 @@ export const WRITERS = new Map(
 		landItemPair: 'commit',
 		landHostPair: 'commit',
 		mappedDeoptItemBody: 'commit',
-		commitPreload: 'commit',
-		commitPreconnect: 'commit',
-		commitPrefetchDNS: 'commit',
-		commitPreloadModule: 'commit',
-		commitPreinitModule: 'commit',
-		insertHeadHint: 'commit',
-		applyHintAttrs: 'commit',
-		commitStylesheetResource: 'commit',
 		commitStyleResource: 'commit',
 		commitScriptResource: 'commit',
-		insertPrecedenced: 'commit',
-		applyResourceAttrs: 'commit',
 		commitHiddenStyle: 'commit',
 		// primitive
 		updateTextValue: 'primitive',
@@ -96,6 +91,8 @@ export const WRITERS = new Map(
 		restoreHiddenDisplayValue: 'primitive',
 		enforceHiddenText: 'primitive',
 		releaseHiddenText: 'primitive',
+		insertPrecedenced: 'primitive',
+		applyResourceAttrs: 'primitive',
 		// fresh
 		renderReturnedValue: 'fresh',
 		fragmentTemplate: 'fresh',
@@ -142,6 +139,8 @@ export const WRITERS = new Map(
 		makeRoot: 'fresh',
 		createHydrateSlot: 'fresh',
 		'HydrationCapability.adoptText': 'fresh',
+		stylesheetLink: 'fresh',
+		asyncScript: 'fresh',
 		// hydration
 		clearKeptTextContent: 'hydration',
 		discardHydrateTail: 'hydration',
@@ -181,6 +180,16 @@ export const WRITERS = new Map(
 		restoreControlledElement: 'native',
 		restoreCheckedState: 'native',
 		restoreRadioCousins: 'native',
+		// hint
+		preload: 'hint',
+		preinit: 'hint',
+		preconnect: 'hint',
+		prefetchDNS: 'hint',
+		preloadModule: 'hint',
+		preinitModule: 'hint',
+		insertHeadHint: 'hint',
+		applyHintAttrs: 'hint',
+		preloadStylesheetResource: 'hint',
 	}),
 );
 

@@ -303,7 +303,7 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 		await act(() => {
 			mountInto(AttrSheet);
 		});
-		const el = document.head.querySelector('link[href="/attr.css"]')!;
+		const el = document.head.querySelector('link[rel="stylesheet"][href="/attr.css"]')!;
 		expect(el.getAttribute('data-precedence')).toBe('default');
 		expect(el.getAttribute('crossorigin')).toBe('anonymous');
 		expect(el.getAttribute('media')).toBe('all');
@@ -311,6 +311,17 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 		expect(el.getAttribute('referrerpolicy')).toBe('origin');
 		expect(el.getAttribute('data-foo')).toBe('"quoted"');
 		expect(el.hasAttribute('precedence')).toBe(false);
+		// React's getResource preloads the sheet as it renders, with only the
+		// options a fetch needs (ReactFiberConfigDOM: crossOrigin, integrity,
+		// media, hrefLang, referrerPolicy).
+		const preload = document.head.querySelector('link[rel="preload"][href="/attr.css"]')!;
+		expect(preload.getAttribute('as')).toBe('style');
+		expect(preload.getAttribute('crossorigin')).toBe('anonymous');
+		expect(preload.getAttribute('media')).toBe('all');
+		expect(preload.getAttribute('integrity')).toBe('somehash');
+		expect(preload.getAttribute('referrerpolicy')).toBe('origin');
+		expect(preload.hasAttribute('data-foo')).toBe(false);
+		expect(preload.hasAttribute('data-precedence')).toBe(false);
 	});
 
 	// Per ReactDOMFloat-test.js:2936 — 'does not preload nomodule scripts'
