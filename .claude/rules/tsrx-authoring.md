@@ -118,7 +118,8 @@ a built index array instead.
 To remount a subtree when a value changes, key it as in React: wrap it in
 `<Fragment key={value}>…</Fragment>`, or key its only element or component. A
 new key resets the state, effects, and caught `@try` errors inside. Do not use
-a single-item `@for (const x of [value]; key x)` for this.
+a single-item `@for (const x of [value]; key x)` for this; Strong mode rejects
+it as `OCTANE_STRONG_SINGLE_ITEM_FOR`.
 
 ## Refs
 

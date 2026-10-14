@@ -789,6 +789,14 @@ An `@for` key uses the loop position as its identity, including arithmetic or te
 
 **Replacement.** Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.
 
+<h4 id="octane-strong-single-item-for">
+	<code>OCTANE_STRONG_SINGLE_ITEM_FOR</code>
+</h4>
+
+An `@for` iterates a one-item array literal, such as `@for (const item of [value]; key item)`, or a `const` holding one that nothing but `@for` headers reads. A one-row loop is a workaround for a keyed remount or a local binding.
+
+**Replacement.** To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or put `key` on its only element or component. To render one value, render it directly. Literals with two or more items and spreads stay valid.
+
 <h4 id="octane-strong-hook-locality">
 	<code>OCTANE_STRONG_HOOK_LOCALITY</code>
 </h4>
@@ -836,6 +844,14 @@ A native text `onChange` handler, which fires on blur rather than per edit. The 
 Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, or `StrictMode` from `octane`.
 
 **Replacement.** Use normal Octane scheduling and component semantics.
+
+<h4 id="octane-strong-element-api">
+	<code>OCTANE_STRONG_ELEMENT_API</code>
+</h4>
+
+Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.
+
+**Replacement.** Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.
 
 <h3 id="diagnostics-dom">DOM ownership and trusted HTML</h3>
 

@@ -52,8 +52,14 @@ export function TryBody(props: { a: boolean; b: boolean }) @{
 	</main>
 }
 
+// A real one-row list: this case covers a `@for` row's fragment root, not a
+// remount, so it does not use a single-item literal.
+function oneRow(): string[] {
+	return ['row'];
+}
+
 export function ForRow(props: { a: boolean; b: boolean }) @{
-	const rows = ['row'];
+	const rows = oneRow();
 	<main>
 		@for (const row of rows; key row) {
 			<>
