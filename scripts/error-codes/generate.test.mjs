@@ -194,6 +194,37 @@ test('requires every active surface code to have a valid literal call site', () 
 	);
 });
 
+test('tracks active and retired client codes across extracted runtime modules', () => {
+	const input = catalog();
+	const filename = 'runtime/fragment-refs.ts';
+	assert.doesNotThrow(() =>
+		validateRuntimeUsages(input, [[filename, 'throw new Error(formatClientError(1, value));']]),
+	);
+	assert.throws(
+		() => validateRuntimeUsages(input, [[filename, 'void formatServerError(1, value);']]),
+		/cannot use the server formatter in the client runtime/,
+	);
+	const retired = catalog({ codes: { 1: { ...input.codes[1], status: 'retired' } } });
+	assert.throws(
+		() =>
+			validateRuntimeUsages(retired, [[filename, 'throw new Error(formatClientError(1, value));']]),
+		/references retired code 1/,
+	);
+	assert.throws(
+		() => validateRuntimeUsages(input, [['runtime/helper.ts', 'throw new Error("uncatalogued");']]),
+		/constructs Error without a direct formatClientError/,
+	);
+	// Only the client runtime directory is covered; a similarly named directory
+	// or a nested non-runtime fixture cannot satisfy an active-code requirement.
+	for (const outside of ['runtime-helper/helper.ts', 'runtime/tests/helper.ts']) {
+		assert.throws(
+			() =>
+				validateRuntimeUsages(input, [[outside, 'throw new Error(formatClientError(1, value));']]),
+			/has no runtime call site/,
+		);
+	}
+});
+
 test('enforces coded messages in covered signal, hydration, and DOM binding modules', () => {
 	const shared = catalog({
 		codes: {

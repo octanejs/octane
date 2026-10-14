@@ -288,13 +288,18 @@ const effectDeclarations = Object.values(effectControls).flat();
 // the control that proves the source-map oracle sees the chunk.
 const splitControls = {
 	dropped: [
-		'beginStagedCommitCapture',
-		'VIEW_TRANSITION_DRIVER',
-		'DEFERRED_LAYOUT_DRIVER',
-		'STAGED_COMMIT_CAPTURE',
-		'activityRefState',
-		'renderHiddenActivity',
-		'rehideActivityAfterDescendantRender',
+		{
+			source: 'runtime.ts',
+			names: [
+				'beginStagedCommitCapture',
+				'VIEW_TRANSITION_DRIVER',
+				'DEFERRED_LAYOUT_DRIVER',
+				'STAGED_COMMIT_CAPTURE',
+				'renderHiddenActivity',
+				'rehideActivityAfterDescendantRender',
+			],
+		},
+		{ source: 'runtime/fragment-refs.ts', names: ['activityRefState'] },
 	],
 	kept: ['renderBlockInner'],
 };
@@ -345,7 +350,10 @@ const effectRanges = selectedScenarios.some(({ id }) => Object.hasOwn(effectCont
 	? runtimeRanges(effectDeclarations)
 	: [];
 const splitRanges = selectedScenarios.some(({ bundler }) => bundler === 'vite-split')
-	? runtimeRanges([...splitControls.dropped, ...splitControls.kept])
+	? [
+			...splitControls.dropped.flatMap(({ source, names }) => declarationRanges(source, names)),
+			...runtimeRanges(splitControls.kept),
+		]
 	: [];
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
@@ -509,7 +517,7 @@ async function buildSplitScenario(scenario, entry) {
 	const retained = retainedDeclarations(runtime.map, splitRanges);
 	assert.deepEqual(
 		[
-			...splitControls.dropped.filter((name) => retained.has(name)),
+			...splitControls.dropped.flatMap(({ names }) => names.filter((name) => retained.has(name))),
 			...splitControls.kept.filter((name) => !retained.has(name)),
 		],
 		[],
