@@ -22,7 +22,7 @@
 export const WRITERS = new Map(
 	Object.entries({
 		// commit
-		applyNext: 'commit',
+		applySlotNext: 'commit',
 		applyOutgoing: 'commit',
 		placeRoots: 'commit',
 		placeRun: 'commit',

@@ -3943,7 +3943,7 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // cells carry three trailing ones: the rendering Scope (for commit-phase error
 // routing), the index of the bag's entry in the root's ops, and `C`. The cells
 // come from BAG_POOL while it has spares, and while it is short a queued commit
-// returns them (runCommitOps), so a newly mounted template's first update
+// returns them (commitRootRenders), so a newly mounted template's first update
 // allocates nothing; a bag past the pool keeps its own array.
 //
 // A render that cannot be dropped calls `C` at once, from the template's
@@ -4076,7 +4076,7 @@ function bagResume(bag: any): any[] {
  * a render that cannot be dropped (bagRecord queues every other): commit now.
  * `careful` tells `C` to journal its handler writes for an open window and to
  * keep the snapshots a dispatch in flight holds (preserveDispatchedBundle);
- * runCommitOps passes it too.
+ * commitRootRenders passes it too.
  */
 export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean) => void): void {
 	bag.next[bag.$ & BAG_SIZE] = s;
@@ -4091,53 +4091,6 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean)
  */
 let COMMITTING_OWNER: RootRenderOwner | null = null;
 let COMMITTING_GENERATION = 0;
-
-/**
- * Run a root's queued commit ops in render order, returning the generation
- * they committed for. A deletion cleanup that unmounts the root ends the
- * commit; its remaining entries name dead DOM.
- */
-function runCommitOps(ops: any[], owner: RootRenderOwner): number {
-	const previousOwner = COMMITTING_OWNER;
-	const previousGeneration = COMMITTING_GENERATION;
-	COMMITTING_OWNER = owner;
-	COMMITTING_GENERATION = owner.generation;
-	try {
-		for (let i = 0; i < ops.length; i += 2) {
-			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
-			const target = ops[i + 1];
-			try {
-				// A commit function's `careful` flag, as bagDone passes it.
-				ops[i](
-					target,
-					TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
-				);
-			} catch (error) {
-				// React routes a commit-phase error to the nearest boundary and keeps
-				// committing; the failed bag's state was cleared before its first write.
-				// A structural entry's cleanups already route their own errors.
-				if (typeof target?.$ !== 'number') throw error;
-				if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
-					reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
-			}
-			// While the pool is short, an idle bag returns its cells and holds `C`
-			// again: a queued bag's entry always names its staged cells. Only a bag
-			// has `$`; any other target, null included, compares undefined.
-			if (BAG_POOL.length < 8 && target?.$ <= BAG_SIZE) {
-				const next = target.next;
-				BAG_POOL.push(next);
-				target.next = next[target.$ + 2];
-			}
-		}
-		return COMMITTING_GENERATION;
-	} finally {
-		ops.length = 0;
-		COMMITTING_OWNER = previousOwner;
-		COMMITTING_GENERATION = previousGeneration;
-		// Everything this commit retired has left the document (retireEventHostTree).
-		if (previousOwner === null) retiringHostsSince = 0;
-	}
-}
 
 interface RootRenderOwner {
 	current: Block | null;
@@ -4186,7 +4139,7 @@ interface RootRenderTransaction {
 	retired: Set<Block> | null;
 	structures: Map<object, number> | null;
 	/**
-	 * The commit queue: `(fn, target)` pairs that runCommitOps runs in render
+	 * The commit queue: `(fn, target)` pairs that commitRootRenders runs in render
 	 * order, before refs and layout effects. A template queues `(C, bag)`
 	 * (bagDone); a slot whose structure changed queues `(applySlotNext, slot)`
 	 * when it starts reconciling, ahead of its descendants' entries. A dropped
@@ -4591,18 +4544,24 @@ interface SlotNext {
 	bound: any[] | null;
 }
 
-/**
- * The open root render's pending structure for `slot`, queued for its commit:
- * last, or at `at` in the commit queue (a keyed list's, listNext).
- */
-function slotNext(slot: { next: SlotNext | null }, at = -1): SlotNext {
+/** The open root render's pending structure for `slot`, queued for its commit. */
+function slotNext(slot: { next: SlotNext | null }): SlotNext {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	let next = slot.next;
 	if (next === null || next.tx !== tx) {
-		next = slot.next = newSlotNext(tx);
-		const ops = tx.ops;
-		if (at < 0 || at >= ops.length) ops.push(applySlotNext, slot);
-		else ops.splice(at, 0, applySlotNext, slot);
+		next = slot.next = {
+			tx,
+			out: [],
+			frag: null,
+			root: null,
+			parent: null,
+			before: null,
+			members: null,
+			owner: null,
+			follows: false,
+			bound: null,
+		};
+		tx.ops.push(applySlotNext, slot);
 		// A window that drops truncates what it created; only a structure an
 		// outer window built needs copying back (below).
 		if (TRANSITION_JOURNAL_DEPTH > 1)
@@ -4646,15 +4605,27 @@ function slotFrontier(
  * after the fragment, becomes its owner).
  */
 function queueFrontier(owner: Block | null, parent: Node, before: Node | null): DocumentFragment {
-	const next = newSlotNext(ROOT_RENDER_TRANSACTION!);
-	next.tx.ops.push(applyNext, next);
+	const tx = ROOT_RENDER_TRANSACTION!;
+	const next: SlotNext = {
+		tx,
+		out: [],
+		frag: null,
+		root: null,
+		parent: null,
+		before: null,
+		members: null,
+		owner: null,
+		follows: false,
+		bound: null,
+	};
+	tx.ops.push(applySlotNext, { next });
 	return openFrontier(next, owner, parent, before);
 }
 
 /** A detached arm root's members: none, and nothing adds any (it has no fragment). */
 const NO_MEMBERS: any[] = [];
 
-/** Committed frontiers, empty again: the next renders reuse them (applyNext). */
+/** Committed frontiers, empty again: the next renders reuse them (applySlotNext). */
 const SPARE_FRONTIERS: DocumentFragment[] = [];
 
 function openFrontier(
@@ -4727,26 +4698,7 @@ function queueSlotDeletion(
 function applySlotNext(slot: { next: SlotNext | null }): void {
 	const next = slot.next;
 	slot.next = null;
-	if (next !== null) applyNext(next);
-}
-
-/** A slot's pending structure for `tx`. */
-function newSlotNext(tx: RootRenderTransaction): SlotNext {
-	return {
-		tx,
-		out: [],
-		frag: null,
-		root: null,
-		parent: null,
-		before: null,
-		members: null,
-		owner: null,
-		follows: false,
-		bound: null,
-	};
-}
-
-function applyNext(next: SlotNext): void {
+	if (next === null) return;
 	const out = next.out;
 	const parent = next.parent!;
 	let before = next.before;
@@ -4993,10 +4945,25 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	if (state.next !== null && state.next.tx === tx) return slotNext(state);
 	const parent = state.end.parentNode!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
+	let owner = parentBlock;
+	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
 	// Its members list starts with its first run (listRun).
-	const next = slotNext(state, at);
-	next.parent = parent;
-	next.owner = owningBlock(parentBlock);
+	const next: SlotNext = (state.next = {
+		tx,
+		out: [],
+		frag: null,
+		root: null,
+		parent,
+		before: null,
+		members: null,
+		owner,
+		follows: false,
+		bound: null,
+	});
+	const ops = tx.ops;
+	if (at >= ops.length) ops.push(applySlotNext, state);
+	else ops.splice(at, 0, applySlotNext, state);
+	if (TRANSITION_JOURNAL_DEPTH > 1) TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
 	return next;
 }
 
@@ -5043,7 +5010,7 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
 }
 
 /**
- * Land a fresh run's rows, whose members applyNext then rehomes. Each node
+ * Land a fresh run's rows, whose members applySlotNext then rehomes. Each node
  * goes in on its own, as React places each new row: a custom element in a
  * row connects before the next row arrives.
  */
@@ -5224,105 +5191,147 @@ function releaseRootLeases(owner: RootRenderOwner, root: Block | null): void {
 	}
 }
 
+/**
+ * Commit every finished root render, in order. Each runs its queued commit ops
+ * in render order (the mutation phase); a deletion cleanup that unmounts the
+ * root ends that commit, as its remaining entries name dead DOM.
+ */
 function commitRootRenders(): void {
 	if (HOLDING_ROOT_COMMITS) return;
 	// Finished transitions' signals promote before this commit accepts the
 	// renders that read them; committed readers hear of it once it ends.
-	if (PENDING_SIGNAL_PROMOTIONS === null) return commitRootTransactions();
-	const signals = beginNativeBatch();
+	const promoting = PENDING_SIGNAL_PROMOTIONS !== null;
+	const signals = promoting ? beginNativeBatch() : null;
 	try {
-		promotePendingSignals();
-		commitRootTransactions();
-	} finally {
-		endNativeBatch(signals);
-	}
-}
-
-function commitRootTransactions(): void {
-	const transactions = ROOT_RENDER_TRANSACTIONS;
-	if (transactions.length === 0) return;
-	ROOT_RENDER_TRANSACTIONS = [];
-	for (const transaction of transactions) {
-		// A root still rendering (a nested flushSync) commits when its render ends.
-		if (transaction.rendering !== 0) {
-			ROOT_RENDER_TRANSACTIONS.push(transaction);
-			continue;
-		}
-		const owner = transaction.owner;
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileRootEnter(transaction, owner);
-		try {
-			// A hold reached outside a drained origin (dropTransitionRender).
-			if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
-				TRANSITION_ROOT_DRIVER.drop(transaction);
-			if (transaction.aborted || owner.disposed) {
-				if (owner.transaction === transaction) owner.transaction = null;
+		if (promoting) promotePendingSignals();
+		const transactions = ROOT_RENDER_TRANSACTIONS;
+		if (transactions.length !== 0) ROOT_RENDER_TRANSACTIONS = [];
+		for (const transaction of transactions) {
+			// A root still rendering (a nested flushSync) commits when its render ends.
+			if (transaction.rendering !== 0) {
+				ROOT_RENDER_TRANSACTIONS.push(transaction);
 				continue;
 			}
-			// This is the native acceptance point. Validate before any deletion,
-			// ref, or effect callback can observe the render. A later callback
-			// write starts another transaction and does not revoke this snapshot.
-			if (
-				(hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
-				(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture))
-			) {
-				const presentationChanged = hydrationStarted
-					? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
-					: false;
-				rollbackRootRender(transaction);
+			const owner = transaction.owner;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootEnter(transaction, owner);
+			try {
+				// A hold reached outside a drained origin (dropTransitionRender).
+				if (transaction.holders !== null && TRANSITION_ROOT_DRIVER)
+					TRANSITION_ROOT_DRIVER.drop(transaction);
+				if (transaction.aborted || owner.disposed) {
+					if (owner.transaction === transaction) owner.transaction = null;
+					continue;
+				}
+				// This is the native acceptance point. Validate before any deletion,
+				// ref, or effect callback can observe the render. A later callback
+				// write starts another transaction and does not revoke this snapshot.
+				if (
+					(hydrationStarted && !HYDRATION_DRIVER!.currentPresentations(transaction.capture)) ||
+					(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture))
+				) {
+					const presentationChanged = hydrationStarted
+						? !HYDRATION_DRIVER!.currentPresentations(transaction.capture)
+						: false;
+					rollbackRootRender(transaction);
+					if (owner.transaction === transaction) owner.transaction = null;
+					if (!owner.disposed) {
+						owner.wakeable = null;
+						owner.generation++;
+						if (presentationChanged) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
+						else owner.retry();
+					}
+					continue;
+				}
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileRootCommitted(transaction);
 				if (owner.transaction === transaction) owner.transaction = null;
-				if (!owner.disposed) {
+				// The root request committed, unless a held transition keeps it waiting.
+				if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
 					owner.wakeable = null;
 					owner.generation++;
-					if (presentationChanged) HYDRATION_DRIVER!.retryPresentations(transaction.capture);
-					else owner.retry();
 				}
-				continue;
+				if (owner.wakeable === null) {
+					owner.retryKey = null;
+					owner.nativeRetry?.clear();
+					// Claimed owners belong to accepted scopes. Unvisited branches from
+					// an earlier pending attempt have no continuing consumer.
+					if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
+				}
+				const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
+				if (transaction.cells !== null) commitHookCells(transaction.cells);
+				// Values dropped rounds created were for work that has now committed.
+				if (
+					transaction.batches !== null &&
+					(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
+				)
+					TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
+				// The mutation phase precedes the incoming ref/layout publication.
+				let acceptedGeneration = owner.generation;
+				const ops = transaction.ops;
+				if (ops.length !== 0) {
+					const previousOwner = COMMITTING_OWNER;
+					const previousGeneration = COMMITTING_GENERATION;
+					COMMITTING_OWNER = owner;
+					COMMITTING_GENERATION = acceptedGeneration;
+					try {
+						for (let i = 0; i < ops.length; i += 2) {
+							if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
+							const target = ops[i + 1];
+							try {
+								// A commit function's `careful` flag, as bagDone passes it.
+								ops[i](
+									target,
+									TRANSITION_JOURNAL !== null ||
+										(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
+								);
+							} catch (error) {
+								// React routes a commit-phase error to the nearest boundary and keeps
+								// committing; the failed bag's state was cleared before its first write.
+								// A structural entry's cleanups already route their own errors.
+								if (typeof target?.$ !== 'number') throw error;
+								if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
+									reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
+							}
+							// While the pool is short, an idle bag returns its cells and holds `C`
+							// again: a queued bag's entry always names its staged cells. Only a bag
+							// has `$`; any other target, null included, compares undefined.
+							if (BAG_POOL.length < 8 && target?.$ <= BAG_SIZE) {
+								const next = target.next;
+								BAG_POOL.push(next);
+								target.next = next[target.$ + 2];
+							}
+						}
+						acceptedGeneration = COMMITTING_GENERATION;
+					} finally {
+						ops.length = 0;
+						COMMITTING_OWNER = previousOwner;
+						COMMITTING_GENERATION = previousGeneration;
+						// Everything this commit retired has left the document (retireEventHostTree).
+						if (previousOwner === null) retiringHostsSince = 0;
+					}
+				}
+				if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
+				if (owner.disposed || owner.generation !== acceptedGeneration) {
+					discardOffscreenCapture(transaction.capture);
+					continue;
+				}
+				spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
+				if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
+					// A successful replacement may remove a still-dormant leased view.
+					HYDRATION_DRIVER!.retireDetachedBindingLeases(owner);
+				}
+			} finally {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileRootExit();
+				// Committed or dropped, its queue is empty: the owner's next transaction
+				// reuses it rather than allocating one.
+				if (transaction.ops.length === 0 && owner.transaction !== transaction)
+					owner.spareOps = transaction.ops;
 			}
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileRootCommitted(transaction);
-			if (owner.transaction === transaction) owner.transaction = null;
-			// The root request committed, unless a held transition keeps it waiting.
-			if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
-				owner.wakeable = null;
-				owner.generation++;
-			}
-			if (owner.wakeable === null) {
-				owner.retryKey = null;
-				owner.nativeRetry?.clear();
-				// Claimed owners belong to accepted scopes. Unvisited branches from
-				// an earlier pending attempt have no continuing consumer.
-				if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
-			}
-			const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
-			if (transaction.cells !== null) commitHookCells(transaction.cells);
-			// Values dropped rounds created were for work that has now committed.
-			if (
-				transaction.batches !== null &&
-				(TRANSITION_HOLDERS === null || TRANSITION_HOLDERS.size === 0)
-			)
-				TRANSITION_HARVEST = TRANSITION_CELL_HARVEST = null;
-			// The mutation phase precedes the incoming ref/layout publication.
-			const acceptedGeneration =
-				transaction.ops.length !== 0 ? runCommitOps(transaction.ops, owner) : owner.generation;
-			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
-			if (owner.disposed || owner.generation !== acceptedGeneration) {
-				discardOffscreenCapture(transaction.capture);
-				continue;
-			}
-			spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
-			if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
-				// A successful replacement may remove a still-dormant leased view.
-				HYDRATION_DRIVER!.retireDetachedBindingLeases(owner);
-			}
-		} finally {
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileRootExit();
-			// Committed or dropped, its queue is empty: the owner's next transaction
-			// reuses it rather than allocating one.
-			if (transaction.ops.length === 0 && owner.transaction !== transaction)
-				owner.spareOps = transaction.ops;
 		}
+	} finally {
+		if (promoting) endNativeBatch(signals);
 	}
 }
 
@@ -9530,8 +9539,7 @@ function vtPreview(held: RootRenderTransaction[]): VtPreview {
 				range(target[1], target[2]);
 				continue;
 			}
-			const next: SlotNext | null =
-				kind === applySlotNext ? target.next : kind === applyNext ? target : null;
+			const next: SlotNext | null = kind === applySlotNext ? target.next : null;
 			if (next === null) continue;
 			const out = next.out;
 			for (let j = 0; j < out.length; j += 3) {
@@ -14053,7 +14061,11 @@ function readStateHook<T>(
 						return;
 					}
 					// Select after evaluating the updater: user code can open an Action.
-					const batch = transitionActionBatchForUpdate(block);
+					// A handler or flushSync outside any Action selects none (inline).
+					const batch =
+						ACTIVE_TRANSITION_ACTION_BATCH === null && (_dispatchDepth > 0 || syncFlush)
+							? null
+							: transitionActionBatchForUpdate(block);
 					if (Object.is(computed, cell.value)) return;
 					if (batch === null) {
 						if (collectingRefStateUpdates && REF_CALLBACK_DEPTH > 0) {
@@ -28839,7 +28851,7 @@ function retireEventHostTree(node: Node): void {
 	if (retiringHostsSince === 0) {
 		retiringHostsSince = eventRootEpoch;
 		// A commit detaches what it retires before it ends, and resets the epoch
-		// then (runCommitOps); a retirement outside one lasts its task.
+		// then (commitRootRenders); a retirement outside one lasts its task.
 		if (COMMITTING_OWNER === null)
 			queueMicrotask(() => {
 				retiringHostsSince = 0;
@@ -44667,7 +44679,7 @@ function findTryHandler(block: Block | null): TryHandler | null {
 		if (h && b.rare!.trySlot?.catchBody !== null) return h;
 		b = b.parentBlock;
 	}
-	return rendererRegionTryHandler(origin);
+	return RENDERER_REGION_OWNER_COUNT === 0 ? null : rendererRegionTryHandler(origin);
 }
 
 /**
@@ -48831,7 +48843,9 @@ function clearItems(first: Block | null, start: Comment, end: Comment, size: num
 	// cleanup error dispatches to its boundary only after the list is cleared, so a
 	// boundary re-render cannot dispose the list while this still writes through it.
 	if (first !== null && TEARDOWN_DEPTH === 0) {
-		TEARDOWN_HANDLER = findTryHandler(first.parentBlock) ?? rendererRegionTryHandler(first);
+		TEARDOWN_HANDLER =
+			findTryHandler(first.parentBlock) ??
+			(RENDERER_REGION_OWNER_COUNT === 0 ? null : rendererRegionTryHandler(first));
 		TEARDOWN_BLOCK = first;
 	}
 	TEARDOWN_DEPTH++;
