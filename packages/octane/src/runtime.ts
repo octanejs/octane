@@ -40834,6 +40834,7 @@ export function tryBlock(
 			inBoundary: inBoundaryRender,
 			resumeError: handleResumeError,
 			hiddenActivity: findHiddenActivity,
+			take: takeInitialSuspenseHydration,
 		};
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
 	if (
@@ -41183,10 +41184,11 @@ interface InitialSuspenseHydration {
 	consume?: () => void;
 	/**
 	 * The template sentinel of a streamed boundary whose content had not arrived
-	 * when hydration reached it (waitForStreamedArm). The rest of the record is
-	 * taken once it has.
+	 * when hydration reached it (waitForStreamedArm), and the hydration that
+	 * reached it, which reads the rest of the record once it has.
 	 */
 	waits?: Element;
+	reader?: HydrationCapability;
 	/** The range the body adopts (armRange), and its first server node. */
 	start: Node;
 	end: Node;
@@ -41229,6 +41231,8 @@ interface TryOps {
 	inBoundary: typeof inBoundaryRender;
 	resumeError: typeof handleResumeError;
 	hiddenActivity: typeof findHiddenActivity;
+	/** The record a streamed boundary takes once its content arrived (waitForStreamedArm). */
+	take: typeof takeInitialSuspenseHydration;
 }
 let TRY_OPS: TryOps | null = null;
 
@@ -41260,6 +41264,7 @@ function takeInitialSuspenseHydration(
 				seedRaw: null,
 				nativeRaw: null,
 				waits: cursor as Element,
+				reader: hydration,
 			};
 		const boundaryId = text.slice(BOUNDARY_STREAMED.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
@@ -41374,10 +41379,7 @@ function waitForStreamedArm(
 		return null;
 	}
 	initialSuspenseHydrations!.delete(state);
-	const taken =
-		sentinel.parentNode === null
-			? takeInitialSuspenseHydration(state, new HydrationCapability(state.parentBlock, null, null))
-			: null;
+	const taken = sentinel.parentNode === null ? TRY_OPS!.take(state, initial.reader!) : null;
 	if (taken === null) {
 		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		markArmDiscard(state);
