@@ -4646,10 +4646,12 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	let owner = parentBlock;
 	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
 	if (owner.createdStamp === transaction.createdStamp && !transaction.retainedCreated?.has(owner)) {
-		if (!hydrationStarted || transaction.hydrating !== true) return false;
+		if (!hydrationStarted) return false;
 		// A root's hydrating attempt creates every Block, and the server DOM they
 		// adopted stays untouched until it commits. What a slot builds on the
-		// client over that DOM goes through a frontier too.
+		// client over that DOM goes through a frontier too, as it does in a
+		// boundary's hydration attempt in a later render.
+		if (transaction.hydrating !== true) return hydrating && domParent.isConnected;
 		const container = transaction.owner.current?.parentNode;
 		return container != null && container.contains(domParent);
 	}
@@ -30786,6 +30788,9 @@ export function setValue(el: Element, value: unknown): void {
 			input.defaultValue = s;
 			return;
 		}
+		// The adopted control's mirror takes the client value at commit.
+		atCommit(mirrorDefaultValue, [input, s]);
+		return;
 	} else {
 		if (process.env.NODE_ENV !== 'production' && ctrl.v === UNCONTROLLED)
 			devWarnControlledFlip(el, true);
@@ -30802,17 +30807,80 @@ export function setValue(el: Element, value: unknown): void {
 		// the reset button's default action, i.e. any script-dispatched click.
 		// IME: an UNCHANGED rendered value must not cancel an active composition;
 		// a genuinely changed one still wins (React: setState during composition).
-		if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
-			input.value = s;
+		const update: ControlledValueWrite = [
+			input,
+			value,
+			s,
+			!(ctrl.composing && Object.is(prev, value)),
+		];
+		// A hydrating render-phase update writes its adopted control at commit.
+		if (hydrating && activeHydration() !== null) atCommit(writeControlledValue, update);
+		else writeControlledValue(update);
+		return;
 	}
-	if (input.defaultValue !== s) {
-		// Replacing textarea child text between edits splits native Undo groups.
-		// Keep its Text node while mirroring the controlled reset baseline.
-		const text = el.localName === 'textarea' ? getFirstChild(el) : null;
-		if (text !== null && text.nodeType === 3 && getNextSibling(text) === null)
-			(text as Text).data = s;
-		else input.defaultValue = s;
-	}
+	mirrorDefaultValue([input, s]);
+}
+
+type ControlledValueWrite = [
+	input: HTMLInputElement | HTMLTextAreaElement,
+	value: unknown,
+	s: string,
+	live: boolean,
+];
+
+/** A controlled value's update (setValue): the live value, then the attribute mirror. */
+function writeControlledValue([input, value, s, live]: ControlledValueWrite): void {
+	if (live && valueNeedsWrite(input, value)) input.value = s;
+	mirrorDefaultValue([input, s]);
+}
+
+/**
+ * The value attribute, or a textarea's text, mirrors controlled value `s`
+ * (React's attribute-syncing cascade). Replacing textarea child text between
+ * edits splits native Undo groups, so its Text node stays.
+ */
+function mirrorDefaultValue([input, s]: [HTMLInputElement | HTMLTextAreaElement, string]): void {
+	if (input.defaultValue === s) return;
+	const text = input.localName === 'textarea' ? getFirstChild(input) : null;
+	if (text !== null && text.nodeType === 3 && getNextSibling(text) === null)
+		(text as Text).data = s;
+	else input.defaultValue = s;
+}
+
+/**
+ * Hydration's first writes to an adopted checkable, at commit: the live
+ * checkedness is re-assigned, which separates it from the server default as
+ * React's initInput does, and the default takes `baseline` unless it is null.
+ */
+function adoptCheckedness([input, reassign, baseline]: [
+	HTMLInputElement,
+	boolean,
+	boolean | null,
+]): void {
+	// eslint-disable-next-line no-self-assign
+	if (reassign) input.checked = input.checked;
+	if (baseline !== null && input.defaultChecked !== baseline) input.defaultChecked = baseline;
+}
+
+/** An uncontrolled control loses its default (setDefaultValue). */
+function clearDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): void {
+	if (input.localName === 'input') input.removeAttribute('value');
+	else input.defaultValue = '';
+}
+
+/** Run `fn` at commit when `deferred`, a hydrating render's write to adopted DOM, else now. */
+function atCommitIf<T>(deferred: boolean, fn: (arg: T) => void, arg: T): void {
+	if (deferred) atCommit(fn, arg);
+	else fn(arg);
+}
+
+/** Hydration's default for an adopted uncontrolled `input`, `s`, at commit (setDefaultValue). */
+function adoptDefaultValue([input, s]: [HTMLInputElement | HTMLTextAreaElement, string]): void {
+	if (
+		input.defaultValue !== s ||
+		(s === '' && input.localName === 'input' && !input.hasAttribute('value'))
+	)
+		input.defaultValue = s;
 }
 
 /**
@@ -30841,10 +30909,14 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
 		// Hydration re-assigns the live (server or user) selection instead, as
 		// React's initInput does, which separates it from the server default,
-		// including for a later controlled → default flip.
-		input.checked = hydrating && activeHydration() !== null ? input.checked : b;
-		if (input.defaultChecked !== b) input.defaultChecked = b;
+		// including for a later controlled → default flip: at commit.
 		ctrl.sawDC = true;
+		if (hydrating && activeHydration() !== null) {
+			atCommit(adoptCheckedness, [input, true, b]);
+			return;
+		}
+		input.checked = b;
+		if (input.defaultChecked !== b) input.defaultChecked = b;
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
@@ -31049,19 +31121,17 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	if (ctrl.v !== UNCONTROLLED) return;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	if (value == null) {
-		if (previousDefault !== UNCONTROLLED && previousDefault != null) {
-			if (el.localName === 'input') input.removeAttribute('value');
-			else input.defaultValue = '';
-		}
+		if (previousDefault !== UNCONTROLLED && previousDefault != null)
+			atCommitIf(adopted, clearDefaultValue, input);
 		return;
 	}
 	const s = toControlledString(value);
-	if (first && !adopted && input.value !== s) input.value = s;
-	if (
-		input.defaultValue !== s ||
-		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	)
-		input.defaultValue = s;
+	if (adopted) {
+		atCommit(adoptDefaultValue, [input, s]);
+		return;
+	}
+	if (first && input.value !== s) input.value = s;
+	adoptDefaultValue([input, s]);
 }
 
 /**
@@ -31084,18 +31154,15 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	(input as any)[DEFAULT_VALUE_BASELINE] = s;
 	const adopted = hydration !== null;
 	if (s === null) {
-		if (previous != null) {
-			if (el.localName === 'input') input.removeAttribute('value');
-			else input.defaultValue = '';
-		}
+		if (previous != null) atCommitIf(adopted, clearDefaultValue, input);
 		return;
 	}
-	if (previous === undefined && !adopted && input.value !== s) input.value = s;
-	if (
-		input.defaultValue !== s ||
-		(s === '' && el.localName === 'input' && !input.hasAttribute('value'))
-	)
-		input.defaultValue = s;
+	if (adopted) {
+		atCommit(adoptDefaultValue, [input, s]);
+		return;
+	}
+	if (previous === undefined && input.value !== s) input.value = s;
+	adoptDefaultValue([input, s]);
 }
 
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
@@ -31110,8 +31177,12 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	}
 	ctrl.sawDC = true;
 	// Adopt the user's live choice, separated from the server's pristine default
-	// so the client baseline below (React's initInput) cannot drag it along.
-	if (adopted && first) input.checked = input.checked;
+	// so the client baseline (React's initInput) cannot drag it along, at commit.
+	if (adopted) {
+		const baseline = ctrl.c === -1 && value != null ? !!value : null;
+		if (first || baseline !== null) atCommit(adoptCheckedness, [input, first, baseline]);
+		return;
+	}
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
 	// React initInput marks the live checkedness dirty even when the initial
