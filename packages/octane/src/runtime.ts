@@ -16405,8 +16405,8 @@ function preservePermanentStaticHydrationRange(scope: Scope): void {
 	if (range === null) return;
 	reserveHydrationIds(scope.block.idState, range.idCount);
 	hydration.node = getNextSibling(marker);
-	(marker as ChildNode).remove();
-	range.end.remove();
+	// The untouched range keeps its server markers until the commit.
+	atCommit(removeNodes, [marker, range.end]);
 }
 
 function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
@@ -20237,6 +20237,13 @@ interface HydratedLiteRange {
 interface PendingHydrationText {
 	server: string | null;
 	loc: string | undefined;
+	/** The text the client rendered last, which settleTexts compares. */
+	text: string;
+}
+
+/** Write `text` into `node` at commit (HydrationCapability.writeText). */
+function commitTextValue([node, text]: [Text, string]): void {
+	node.nodeValue = text;
 }
 
 // Client-reachable code reads this only behind the `hydrating` flag
@@ -21149,8 +21156,9 @@ class HydrationCapability {
 	 * the text again before the pass ends: React renders a component that
 	 * updates itself while it renders again before it compares the output, so
 	 * the text that render settles on decides, equal or not (settleTexts).
-	 * Meanwhile the node holds the client's text. A method, so that bundles
-	 * which never hydrate do not retain it.
+	 * Meanwhile the node keeps the server's text, and the record the client's
+	 * (writeText). A method, so that bundles which never hydrate do not retain
+	 * it.
 	 */
 	keepsText(
 		host: Node | null,
@@ -21169,8 +21177,8 @@ class HydrationCapability {
 		// the common pass rendersAgain's walk.
 		if (QUEUE.length !== 0 && node !== null && node.nodeType === 3 && this.rendersAgain()) {
 			const pending = (this.pendingTexts ??= new Map());
-			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc });
-			return equal;
+			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc, text });
+			return true;
 		}
 		if (equal) return true;
 		this.fail(
@@ -21761,7 +21769,7 @@ class HydrationCapability {
 				(server === text || domBindingClaims.get(el as Element)?.get('#text') !== server) &&
 				!this.keepsText(el, first, server, text, loc)
 			)
-				(first as Text).nodeValue = text;
+				this.adoptText(first as Text, text);
 			return first as Text;
 		}
 		if (first !== null) this.unclaimedText(el, first, text, loc);
@@ -21894,7 +21902,8 @@ class HydrationCapability {
 		if (first.nodeType === 3 && getNextSibling(first) === null) {
 			// With no host, keepsText applies no suppressHydrationWarning, and the
 			// hole already ruled out a host it would write the client's text into.
-			if (!this.keepsText(text ? el : null, first, first.nodeValue, '', loc)) first.nodeValue = '';
+			if (!this.keepsText(text ? el : null, first, first.nodeValue, '', loc))
+				this.adoptText(first as Text, '');
 			return first as Text;
 		}
 		this.unclaimedText(el, first, '', loc);
@@ -21924,7 +21933,7 @@ class HydrationCapability {
 			// A client-built template's `<!>` reads as the server's empty slot,
 			// swapped for '' above, and takes the client's text.
 			if (!this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
-				(posNode as Text).nodeValue = text;
+				this.adoptText(posNode as Text, text);
 			return posNode as Text;
 		}
 		// No server text node stands here: the server rendered the hole empty. A
@@ -21934,6 +21943,25 @@ class HydrationCapability {
 		if (posNode !== null && host !== null)
 			atCommit(placeHydratedText, [host, created, posNode, false]);
 		return created;
+	}
+
+	/**
+	 * Give `node`, a Text this pass adopted, the client's `text`: the record a
+	 * render-phase update compares at the end of the pass (keepsText), or else
+	 * a write at commit. Returns false for a Text no document holds, which the
+	 * caller writes now.
+	 */
+	writeText(node: Text, text: string): boolean {
+		const pending = this.pendingTexts?.get(node);
+		if (pending !== undefined) pending.text = text;
+		else if (node.isConnected) atCommit(commitTextValue, [node, text]);
+		else return false;
+		return true;
+	}
+
+	/** writeText, writing a Text no document holds now. */
+	private adoptText(node: Text, text: string): void {
+		if (!this.writeText(node, text)) node.nodeValue = text;
 	}
 
 	sibling(node: Node, count: number): Node | null {
@@ -22028,8 +22056,7 @@ class HydrationCapability {
 		const texts = this.pendingTexts;
 		if (texts !== null) {
 			this.pendingTexts = null;
-			for (const [node, { server, loc }] of texts) {
-				const text = node.nodeValue!;
+			for (const [node, { server, loc, text }] of texts) {
 				if (text !== server && !parserNormalizedMatch(server, text))
 					this.fail(
 						loc || (node.parentNode as any)?.__oct_loc,
@@ -23752,9 +23779,15 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 				node = document.createTextNode('');
 				resetOnlyChildHost(host, node);
 			}
-		} else if (node.parentNode !== host) resetOnlyChildHost(host, node);
+		} else if (
+			node.parentNode !== host &&
+			!(hydrationStarted && PENDING_HOST_TEXTS?.get(host) === node)
+		)
+			resetOnlyChildHost(host, node);
 	}
 	const target = node as Text;
+	// A hydrating render writes no adopted DOM (HydrationCapability.writeText).
+	if (hydrating && currentHydration?.writeText(target, coerceText(value)) === true) return;
 	//
 	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
@@ -27993,17 +28026,30 @@ function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | 
 	}
 }
 
+/**
+ * The head marker pairs a render claimed, each with the op that removes them at
+ * its commit: a claim lasts while that op is still queued, so a dropped or
+ * committed render releases it.
+ */
+let HEAD_CLAIMS: WeakMap<Comment, [ops: unknown[], at: number, pair: Comment[]]> | null = null;
+
+function claimedHeadMarker(marker: Comment): boolean {
+	const claim = HEAD_CLAIMS?.get(marker);
+	return claim !== undefined && claim[0][claim[1] + 1] === claim[2];
+}
+
 // Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
-// remove the pair so a later mount can't re-match it, and return the element. A foreign
-// node can be injected between the marker and the server element (extensions,
-// analytics, or document transforms); never claim or mutate it merely because it
-// is adjacent. Nested, missing, or reordered delimiters make the interval
-// unprovable, so recovery creates fresh metadata without claiming a same-tag node.
-// Returns null on a fresh client render or when the expected element is missing.
+// claim the pair so a later mount can't re-match it, and return the element. The
+// commit removes the pair. A foreign node can be injected between the marker and
+// the server element (extensions, analytics, or document transforms); never claim
+// or mutate it merely because it is adjacent. Nested, missing, or reordered
+// delimiters make the interval unprovable, so recovery creates fresh metadata
+// without claiming a same-tag node. Returns null on a fresh client render or when
+// the expected element is missing.
 function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Element | null {
 	const closeKey = '/' + key;
 	for (let n: Node | null = getFirstChild(head); n !== null; n = getNextSibling(n)) {
-		if (n.nodeType === 8 && (n as Comment).data === key) {
+		if (n.nodeType === 8 && (n as Comment).data === key && !claimedHeadMarker(n as Comment)) {
 			let candidate: Node | null = getNextSibling(n);
 			let match: Element | null = null;
 			let end: Comment | null = null;
@@ -28025,9 +28071,18 @@ function adoptServerHeadEl(head: HTMLHeadElement, key: string, tag: string): Ele
 				}
 				candidate = getNextSibling(candidate);
 			}
-			(n as Comment).remove();
+			const pair = end === null ? [n as Comment] : [n as Comment, end];
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (transaction === null) removeNodes(pair);
+			else {
+				(HEAD_CLAIMS ??= new WeakMap()).set(n as Comment, [
+					transaction.ops,
+					transaction.ops.length,
+					pair,
+				]);
+				transaction.ops.push(removeNodes, pair);
+			}
 			if (end === null) return null;
-			end.remove();
 			// Two same-tag candidates are as unprovable as none.
 			return matches === 1 ? match : null;
 		}
