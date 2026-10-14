@@ -1509,8 +1509,10 @@ export function attachObserver(
 	state?: NodeState,
 ): () => void {
 	const observer = new SignalObserver(node, notify, native, state);
-	linkDependency(node, observer, ++trackingCycle);
+	// Link last: no call follows it, so an exhausted native stack cannot leave
+	// a linked observer whose stop never reached the caller.
 	node.owner.observers.add(observer);
+	linkDependency(node, observer, ++trackingCycle);
 	return () => stopObserver(observer);
 }
 
@@ -1534,14 +1536,16 @@ function runObserver(observer: SignalObserver): void {
 
 /** A retiring owner keeps the observer in its set, which it then clears at once. */
 export function stopObserver(observer: SignalObserver, retiring?: boolean): void {
-	if (!observer.node) return;
+	const node = observer.node;
+	if (!node) return;
 	queued.delete(observer);
+	if (!retiring) node.owner.observers.delete(observer);
+	while (observer.deps) unlink(observer.deps, observer);
+	// Cleared last, so a stop the native stack interrupts can run again.
 	observer.flags = REACTIVE_NONE;
-	if (!retiring) observer.node.owner.observers.delete(observer);
 	observer.node = undefined;
 	observer.notify = undefined;
 	observer.previous = undefined;
-	while (observer.deps) unlink(observer.deps, observer);
 }
 
 /**

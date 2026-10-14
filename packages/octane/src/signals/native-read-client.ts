@@ -69,6 +69,8 @@ interface RenderFrame {
 
 type CandidateSet = Map<Consumer, Candidate>;
 
+function noop(): void {}
+
 /**
  * Hydration registers this as the NativeReadRebase. A consumer whose committed
  * render alone holds a released historical read moves it to the unchanged live
@@ -161,8 +163,10 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		for (const source of candidate.reads.keys()) {
 			const subscription = consumer.subscriptions.get(source);
 			if (subscription !== undefined && --subscription.leases === 0) {
-				consumer.subscriptions.delete(source);
+				// Forget it only once stopped: an exhausted native stack can interrupt
+				// the stop, and disposeConsumer then finishes it.
 				subscription.dispose();
+				consumer.subscriptions.delete(source);
 			}
 		}
 		candidate.reads.clear();
@@ -175,6 +179,9 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		consumer.committed = null;
 		for (const candidate of consumer.pending) release(candidate);
 		consumer.pending.clear();
+		// Only a release the native stack interrupted leaves one behind.
+		for (const subscription of consumer.subscriptions.values()) subscription.dispose();
+		consumer.subscriptions.clear();
 		// The WeakMap entry does not keep the Scope alive. Deleting it also makes
 		// an accidental later read unable to recover a retired consumer.
 		consumers.delete(consumer.scope);
@@ -230,12 +237,14 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		}
 		candidate.reads.set(source, version);
 		const consumer = candidate.consumer;
-		let subscription = consumer.subscriptions.get(source);
+		const subscription = consumer.subscriptions.get(source);
 		if (subscription === undefined) {
-			subscription = { leases: 0, dispose: source.subscribe(consumer.notify) };
-			consumer.subscriptions.set(source, subscription);
-		}
-		subscription.leases++;
+			// Record the lease before subscribing, so a release always finds what
+			// an exhausted native stack left, never an observer it cannot stop.
+			const leased = { leases: 1, dispose: noop };
+			consumer.subscriptions.set(source, leased);
+			leased.dispose = source.subscribe(consumer.notify);
+		} else subscription.leases++;
 	});
 
 	function put(target: CandidateSet, candidate: Candidate): void {
