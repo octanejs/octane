@@ -592,6 +592,71 @@ describe('octane analyze Strong coverage', () => {
 			],
 		});
 	});
+
+	it('resolves Strong dependencies the way a client build does', async () => {
+		const component = (/** @type {string} */ name) =>
+			`export function ${name}() { return <b />; }\n`;
+		const { root } = app({
+			'src/App.tsrx':
+				'"use strong";\n' +
+				"import Kit, { Star, Pair, Duo, Broken } from '@kit/lib';\n" +
+				"import { Server } from '@kit/lib/server';\n" +
+				"import { Ring } from '@kit/lib/icons/ring';\n" +
+				PLAIN,
+			'node_modules/@kit/lib/package.json': {
+				name: '@kit/lib',
+				peerDependencies: { octane: '*' },
+				exports: {
+					// An array lists fallbacks in order.
+					'.': [{ import: './src/index.ts' }, './dist/index.cjs'],
+					// A matched null target excludes the export from client builds.
+					'./server': { browser: null, default: './src/Server.tsx' },
+					// The pattern with the longest prefix wins, whatever the key order.
+					'./*': { require: './dist/*.cjs' },
+					'./icons/*': './src/icons/*.tsx',
+				},
+			},
+			'node_modules/@kit/lib/src/index.ts':
+				"export * from './Star';\n" +
+				// `export *` never passes on a default export.
+				"export * from './Fallback';\n" +
+				"export { default } from './Kit';\n" +
+				"export { Pair } from './pair';\n" +
+				"export { Duo } from './duo';\n" +
+				"export { Broken } from './Broken';\n",
+			'node_modules/@kit/lib/src/Star.tsx': component('Star'),
+			'node_modules/@kit/lib/src/Fallback.tsx':
+				'export default function Fallback() { return <i />; }\n',
+			'node_modules/@kit/lib/src/Kit.tsx': 'export default function Kit() { return <u />; }\n',
+			// A second declarator, and a destructured name, are declared here.
+			'node_modules/@kit/lib/src/pair.tsx':
+				'export const Left = () => <i />, Pair = () => <b />;\n',
+			'node_modules/@kit/lib/src/duo.tsx': 'export const { Duo } = { Duo: () => <u /> };\n',
+			// A module that does not parse fails its own build and is left out.
+			'node_modules/@kit/lib/src/Broken.tsx':
+				'"use strong";\nexport function Broken() { return <div> }\n',
+			'node_modules/@kit/lib/src/Server.tsx': component('Server'),
+			'node_modules/@kit/lib/src/icons/ring.tsx': component('Ring'),
+		});
+
+		const result = await run(root, ['--strong-dependencies']);
+		expect(result.json().strongDependencies).toEqual({
+			packages: [
+				{
+					name: '@kit/lib',
+					modules: [
+						'src/Kit.tsx',
+						'src/Star.tsx',
+						'src/duo.tsx',
+						'src/icons/ring.tsx',
+						'src/pair.tsx',
+					],
+					importers: ['src/App.tsrx'],
+				},
+			],
+			reactCompat: [],
+		});
+	});
 });
 
 describe('octane analyze Strong migration', () => {

@@ -10,7 +10,7 @@ const EXTENSIONS = ['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.mts', '.mjs'];
 /**
  * The target a package's `exports` gives `subpath` under client conditions. A
  * `*` in a key stands for the rest of the subpath, which replaces the `*` in
- * its target.
+ * its target. As in Node, the pattern with the longest prefix wins.
  *
  * @param {any} exports
  * @param {string} subpath `.` or `./…`
@@ -18,40 +18,55 @@ const EXTENSIONS = ['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.mts', '.mjs'];
  */
 function exportTarget(exports, subpath) {
 	const entries =
-		typeof exports === 'string' || !Object.keys(exports).some((key) => key.startsWith('.'))
+		typeof exports === 'string' ||
+		Array.isArray(exports) ||
+		!Object.keys(exports).some((key) => key.startsWith('.'))
 			? { '.': exports }
 			: exports;
-	if (Object.hasOwn(entries, subpath)) return conditionTarget(entries[subpath]);
-	for (const [key, value] of Object.entries(entries)) {
+	if (Object.hasOwn(entries, subpath)) return conditionTarget(entries[subpath]) ?? null;
+	let best = '';
+	for (const key of Object.keys(entries)) {
 		const star = key.indexOf('*');
-		const suffix = key.slice(star + 1);
 		if (
-			star === -1 ||
-			subpath.length < key.length - 1 ||
-			!subpath.startsWith(key.slice(0, star)) ||
-			!subpath.endsWith(suffix)
+			star !== -1 &&
+			subpath.length >= key.length - 1 &&
+			subpath.startsWith(key.slice(0, star)) &&
+			subpath.endsWith(key.slice(star + 1)) &&
+			(star > best.indexOf('*') || (star === best.indexOf('*') && key.length > best.length))
 		) {
-			continue;
+			best = key;
 		}
-		const matched = subpath.slice(star, subpath.length - suffix.length);
-		return conditionTarget(value)?.replaceAll('*', matched) ?? null;
 	}
-	return null;
+	if (best === '') return null;
+	const star = best.indexOf('*');
+	const matched = subpath.slice(star, subpath.length - (best.length - star - 1));
+	return conditionTarget(entries[best])?.replaceAll('*', matched) ?? null;
 }
 
 /**
+ * A target under client conditions. `null` is a target that excludes the
+ * export; `undefined` means no condition matched, so the caller tries its next
+ * one. An array lists fallbacks in order.
+ *
  * @param {any} value
- * @returns {string | null}
+ * @returns {string | null | undefined}
  */
 function conditionTarget(value) {
-	if (typeof value === 'string') return value;
-	if (value === null || typeof value !== 'object') return null;
+	if (typeof value === 'string' || value === null) return value;
+	if (Array.isArray(value)) {
+		for (const fallback of value) {
+			const target = conditionTarget(fallback);
+			if (typeof target === 'string') return target;
+		}
+		return null;
+	}
+	if (typeof value !== 'object') return null;
 	for (const [condition, nested] of Object.entries(value)) {
 		if (!CONDITIONS.has(condition)) continue;
 		const target = conditionTarget(nested);
-		if (target !== null) return target;
+		if (target !== undefined) return target;
 	}
-	return null;
+	return undefined;
 }
 
 /**
@@ -100,11 +115,12 @@ function resolveRequest(request, importer) {
 
 /**
  * An export the module declares itself, capturing `default`, a declared name,
- * or a local `export { … }` list, which a following `from` would make a
- * re-export instead.
+ * a variable declaration's destructuring pattern or the rest of its line, or a
+ * local `export { … }` list, which a following `from` would make a re-export
+ * instead.
  */
 const LOCAL_EXPORT =
-	/^\s*export\s+(?:(default)\b|(?:declare\s+)?(?:async\s+)?(?:function\*?|(?:abstract\s+)?class|const|let|var|enum)\s+([\w$]+)|\{([^}]*)\}(?!\s*from\b))/gm;
+	/^\s*export\s+(?:(default)\b|(?:declare\s+)?(?:async\s+)?(?:function\*?|(?:abstract\s+)?class|enum)\s+([\w$]+)|(?:declare\s+)?(?:const|let|var)\s+(\{[^}]*\}|\[[^\]]*\]|[^;\n]*)|\{([^}]*)\}(?!\s*from\b))/gm;
 
 /**
  * Does the module declare one of `names` itself, rather than pass it on from
@@ -115,16 +131,21 @@ const LOCAL_EXPORT =
  */
 function declaresAny(source, names) {
 	if (names === null) return true;
-	for (const [, isDefault, declared, list] of source.matchAll(LOCAL_EXPORT)) {
+	for (const [, isDefault, declared, variables, list] of source.matchAll(LOCAL_EXPORT)) {
+		// Every identifier in a variable declaration counts, so a destructured
+		// name or a second declarator does. Reading initializers too can only
+		// keep a module in the report, never drop one.
 		const exported =
-			list === undefined
-				? [isDefault ? 'default' : declared]
-				: list.split(',').map((specifier) =>
-						specifier
-							.trim()
-							.split(/\s+as\s+/)
-							.pop(),
-					);
+			variables !== undefined
+				? (variables.match(/[A-Za-z_$][\w$]*/g) ?? [])
+				: list === undefined
+					? [isDefault ? 'default' : declared]
+					: list.split(',').map((specifier) =>
+							specifier
+								.trim()
+								.split(/\s+as\s+/)
+								.pop(),
+						);
 		if (exported.some((name) => name !== undefined && names.has(name))) return true;
 	}
 	return false;
@@ -141,8 +162,10 @@ function declaresAny(source, names) {
 function taken(bindings, wanted) {
 	const names = new Set();
 	for (const [name, local] of bindings) {
-		// `export *` passes on whatever is wanted through it.
-		if (local === '*') return wanted;
+		// `export *` passes on whatever is wanted through it, except `default`.
+		if (local === '*') {
+			return wanted === null ? null : new Set([...wanted].filter((name) => name !== 'default'));
+		}
 		if (wanted !== null && !wanted.has(local)) continue;
 		if (name === '*') return null;
 		names.add(name);
@@ -196,6 +219,20 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 		return module;
 	};
 
+	/**
+	 * @param {string} source
+	 * @param {string} absolute
+	 */
+	const notStrong = (source, absolute) => {
+		try {
+			return !status(source, absolute).strong;
+		} catch {
+			// It does not parse, so it fails its own build. Like the coverage
+			// measurement, the report leaves it out.
+			return false;
+		}
+	};
+
 	/** @type {Map<string, { name: string, modules: Set<string>, importers: Set<string> }>} */
 	const packages = new Map();
 	/** @type {Map<string, { package: string, module: string, importers: Set<string> }>} */
@@ -217,7 +254,7 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 			const { owner, source } = from;
 			// A module that only passes names on is a step, not a dependency.
 			const provides = declaresAny(source, wanted);
-			if (provides && owner.compiled && owner.root !== home && !status(source, absolute).strong) {
+			if (provides && owner.compiled && owner.root !== home && notStrong(source, absolute)) {
 				const group = packages.get(from.name) ?? {
 					name: from.name,
 					modules: new Set(),
