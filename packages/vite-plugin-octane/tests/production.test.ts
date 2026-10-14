@@ -711,8 +711,8 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 
 		const devResponse = await fetch(devOrigin + '/pages/error');
 		expect(devResponse.status).toBe(200);
-		// Each response names its stream boundaries with a token of its own.
-		const boundaryIds = (html: string) => html.replace(/\bos[0-9a-f]{32}-/g, 'os-');
+		// Each response names its stream boundaries with ids of its own.
+		const boundaryIds = (html: string) => html.replace(/\bos[0-9a-f]{32}-\d+-\d+/g, 'os-id');
 		expect(boundaryIds(bodyRegionOf(await devResponse.text()))).toBe(
 			boundaryIds(bodyRegionOf(prodHtml)),
 		);
