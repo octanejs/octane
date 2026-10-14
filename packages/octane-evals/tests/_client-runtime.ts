@@ -47,7 +47,6 @@ export {
 	setRenderText,
 	bagRecord,
 	bagRecordAlways,
-	bagRecordBundle,
 	bagRecordSignal,
 	bagRecordHost,
 	bagDone,

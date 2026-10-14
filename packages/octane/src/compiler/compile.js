@@ -1718,7 +1718,6 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'setRenderText',
 	'bagRecord',
 	'bagRecordAlways',
-	'bagRecordBundle',
 	'bagRecordSignal',
 	'bagRecordHost',
 	'bagDone',
@@ -31135,7 +31134,7 @@ function commitRuntimeHelpers(bind) {
 	if (bind.signalDirect) return ['bagRecordSignal'];
 	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitHostSources'];
 	if (bind.kind === 'event') return ['bagRecord', 'setEventSlot'];
-	if (bind.kind === 'event-bundle') return ['bagRecordBundle', 'commitEventBundle'];
+	if (bind.kind === 'event-bundle') return ['bagRecord', 'commitEventBundle'];
 	return [COMMIT_CONTROLLED_KINDS.has(bind.kind) ? 'bagRecordAlways' : 'bagRecord'];
 }
 
@@ -31272,8 +31271,8 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 			),
 		);
 	const record = (helper, i, value, ...rest) => assignNext(helper, b.id('_b'), i, value, rest);
-	// bagRecord and bagRecordBundle take the rendering Scope (the bag is its
-	// slot 0), so their first record can queue the commit function.
+	// bagRecord takes the rendering Scope (the bag is its slot 0), so its first
+	// record can queue the commit function.
 	const recordScope = (helper, i, value, ...rest) =>
 		assignNext(helper, b.id('__s'), i, value, rest);
 	// A value binding calls bagRecord only when it changed, or when the bag
@@ -31533,12 +31532,14 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 						: bind.argExprs.map((_, i) => field(`a${i}`, nextAt(cell + 1 + i)))),
 				],
 			);
-			// The committed callback and captures are the dispatched bundle's own.
+			// The committed callback and captures are the dispatched bundle's own:
+			// the bundle passes itself as bagRecord's committed value and host.
 			return recordScope(
-				'bagRecordBundle',
+				'bagRecord',
 				cell,
-				bundle(),
 				bind.fnExpr,
+				bundle(),
+				bundle(),
 				...(n > 2 ? [b.array(bind.argExprs.slice())] : bind.argExprs),
 			);
 		}

@@ -3994,7 +3994,7 @@ function carefulCommit(): boolean {
  * The first binding a render records into: a bag staged earlier in this
  * transaction resumes its cells; otherwise its reusable cells are staged and,
  * given the rendering Scope of a render that may be dropped, `C` is queued.
- * bagRecord and bagRecordBundle inline the common case, an idle bag with cells.
+ * bagRecord inlines the common case, an idle bag with cells.
  */
 function stageBag(bag: any, s: Scope | null): any[] {
 	const state = bag.$;
@@ -4021,9 +4021,16 @@ function stageBag(bag: any, s: Scope | null): any[] {
 /**
  * Record one binding the compiled template found changed, or any binding of a
  * resumed bag (the bag itself when it equals the committed value, so a later
- * render can revert a cell). An event binding passes its host and records every
- * render: under signal ownership a handler's authority refreshes whether or not
- * it changed, and the commit installs only the handler.
+ * render can revert a cell).
+ *
+ * Event bindings record every render: under signal ownership a handler's
+ * authority refreshes whether or not it changed, and the commit installs only
+ * the handler. A native handler passes its host as `el`. A compiled handler
+ * bundle passes itself as both `committed` and `el`, then its captures (or,
+ * for arity N, its argument array): a change to any of them records the whole
+ * pending bundle, so the commit function tests its first cell alone. SameValue
+ * keeps signed zero and NaN captures observable; arity N keeps array-reference
+ * semantics.
  */
 export function bagRecord(
 	s: Scope,
@@ -4031,25 +4038,40 @@ export function bagRecord(
 	cell: number,
 	value: unknown,
 	committed: unknown,
-	el?: Element,
+	el?: Element | HandlerBundle,
+	a0?: unknown,
+	a1?: unknown,
 ): any[] | null {
 	const bag = s.slots[0] as any;
-	// setEventHandler(el) publishes only the authority, and only when it moved.
-	if (
-		el !== undefined &&
-		(SIGNAL_BINDINGS_ENABLED ||
+	let changed = value !== committed;
+	let args: HandlerBundle['args'] | undefined;
+	if (el !== undefined) {
+		let host = el as Element;
+		if (el === committed) {
+			const d = el as HandlerBundle;
+			host = d.el!;
+			args = d.args;
+			changed =
+				value !== d.fn ||
+				(typeof args === 'number'
+					? !Object.is(a0, d.a0) || ((args === 2 || args === -2) && !Object.is(a1, d.a1))
+					: args !== EMPTY_ARGS && a0 !== args);
+		}
+		// setEventHandler(host) publishes only the authority, and only when it moved.
+		if (
+			SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS_RECORDED)
-	)
-		setEventHandler(el);
+			SIGNAL_EVENT_OWNERS_RECORDED
+		)
+			setEventHandler(host);
+	}
 	if (next === null) {
 		const state = bag.$;
-		if (value === committed && state <= BAG_SIZE) return null;
+		if (!changed && state <= BAG_SIZE) return null;
 		// stageBag for an idle bag in a render that may be dropped
 		// (droppableRender), inline: the row's first change costs no other call.
-		// bagRecordBundle repeats it.
 		const transaction = ROOT_RENDER_TRANSACTION;
 		if (
 			state <= BAG_SIZE &&
@@ -4070,7 +4092,11 @@ export function bagRecord(
 			transaction.ops.push(next![state + 2], bag);
 		} else next = stageBag(bag, s);
 	}
-	next![cell] = value === committed ? bag : value;
+	next![cell] = changed ? value : bag;
+	if (args !== undefined) {
+		if (args !== EMPTY_ARGS) next![cell + 1] = changed ? a0 : bag;
+		if (args === 2 || args === -2) next![cell + 2] = changed ? a1 : bag;
+	}
 	return next;
 }
 
@@ -28777,68 +28803,6 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // a stable callback can move to another owner without changing its captures.
 // Compare fields first and keep array-reference semantics for arity N.
 const EMPTY_ARGS: any[] = [];
-
-/**
- * Record a compiled handler bundle, every render (bagRecord's event case): its
- * authority refreshes under signal ownership, and a changed callback, capture
- * or argument array records the whole pending bundle, so the commit function
- * tests its first cell alone. SameValue keeps signed zero and NaN captures
- * observable; arity N keeps array-reference semantics.
- */
-export function bagRecordBundle(
-	s: Scope,
-	next: any[] | null,
-	cell: number,
-	d: HandlerBundle,
-	fn: unknown,
-	a0?: unknown,
-	a1?: unknown,
-): any[] | null {
-	const bag = s.slots[0] as any;
-	if (
-		SIGNAL_BINDINGS_ENABLED ||
-		signalDocumentEnabled ||
-		activeSynchronousSignalOwner !== null ||
-		activeSignalOwnerEnvironment !== undefined ||
-		SIGNAL_EVENT_OWNERS_RECORDED
-	)
-		setEventHandler(d.el!);
-	const args = d.args;
-	const pair = args === 2 || args === -2;
-	const changed =
-		fn !== d.fn ||
-		(typeof args === 'number'
-			? !Object.is(a0, d.a0) || (pair && !Object.is(a1, d.a1))
-			: args !== EMPTY_ARGS && a0 !== args);
-	if (next === null) {
-		const state = bag.$;
-		if (!changed && state <= BAG_SIZE) return null;
-		// bagRecord's inline stageBag.
-		const transaction = ROOT_RENDER_TRANSACTION;
-		if (
-			state <= BAG_SIZE &&
-			transaction !== null &&
-			!hydrating &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
-		) {
-			next = bag.next;
-			if (typeof next === 'function') {
-				const commit = next;
-				next = bag.next = [];
-				for (let i = state + 3; i > 0; i--) next.push(bag);
-				next[state + 2] = commit;
-			} else next!.fill(bag, 0, state);
-			next![state] = s;
-			next![state + 1] = transaction.ops.length;
-			bag.$ = state | BAG_STAGED | BAG_QUEUED;
-			transaction.ops.push(next![state + 2], bag);
-		} else next = stageBag(bag, s);
-	}
-	next![cell] = changed ? fn : bag;
-	if (args !== EMPTY_ARGS) next![cell + 1] = changed ? a0 : bag;
-	if (pair) next![cell + 2] = changed ? a1 : bag;
-	return next;
-}
 
 /** Commit a native handler slot; its authority was published at render. */
 export function setEventSlot(el: Element, key: string, handler: unknown): void {
