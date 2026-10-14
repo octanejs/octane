@@ -31327,11 +31327,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Octane adapts React's lazy-rejection client recovery to its supported public @try/@catch boundary: rejection replaces the streamed lazy fallback with the catch outcome.",
+      "rationale": "As in React, a lazy component that rejects on the server keeps the streamed fallback and marks its @try boundary for a client render.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
-          "testName": "replaces a streamed lazy fallback with the public catch outcome on rejection",
+          "testName": "keeps a streamed lazy fallback for a client render on rejection",
           "modes": ["server-stream", "production-compile"]
         }
       ]
@@ -33114,11 +33114,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "A rejection after the fallback has streamed publishes the supported catch arm and hydration adopts that streamed error result without replacing its DOM.",
+      "rationale": "A rejection after the fallback has streamed marks the boundary errored; hydration adopts the shell, renders the boundary on the client, and reports the error once.",
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "hydrates a streamed catch arm in place and consumes the superseded client rejection",
+          "testName": "client-renders a streamed boundary whose use() rejected, and reports it",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
       ]
@@ -44217,11 +44217,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Replacing the upstream class boundary with Octane's supported @catch surface, a rejected Promise Usable selects the catch arm and streams the rejection message.",
+      "rationale": "With Octane's @try boundary in place of the upstream class boundary, a rejected Promise Usable keeps the streamed fallback and marks the boundary errored for a client render, as in React.",
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "streams the @catch arm when the promise rejects",
+          "testName": "keeps the fallback and marks the boundary errored when the promise rejects",
           "modes": ["server-stream", "production-compile"]
         }
       ]
