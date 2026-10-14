@@ -693,6 +693,9 @@ let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
 let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
 let DEFERRED_LAYOUT_DRIVER: DeferredLayoutDriver | null = null;
+// A ViewTransition's drain renders without committing: its root transactions
+// commit inside the native update callback (vtFlush).
+let HOLDING_ROOT_COMMITS = false;
 let STAGED_COMMIT_CAPTURE: StagedCommitCapture | null = null;
 // Function form actions are the only submits the runtime intercepts, and
 // setFormAction is the only writer of `$$formAction`. Installing the handler
@@ -4211,6 +4214,10 @@ interface RootRenderTransaction {
 	aborted: boolean;
 	rootRequest: boolean;
 	hydrating?: boolean;
+	/** A ViewTransition holds its commit for the native update (vtFlush). */
+	held?: boolean;
+	/** The owner generation that commit was prepared for (refreshPendingOwner). */
+	heldGeneration?: number;
 	/**
 	 * A catch arm caught an error in this render (setTryBranch). The client
 	 * render that replaces a failed hydration then commits without reporting
@@ -4275,6 +4282,11 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	)
 		return null;
 	let transaction = owner.transaction;
+	// A render can't join a ViewTransition's held commit: that commit lands first.
+	if (VIEW_TRANSITION_DRIVER && transaction !== null && transaction.held) {
+		VIEW_TRANSITION_DRIVER.interrupt();
+		transaction = owner.transaction;
+	}
 	if (transaction === null) {
 		owner.nativeRetry?.clear();
 		const capture = createOffscreenCapture();
@@ -5218,6 +5230,7 @@ function releaseRootLeases(owner: RootRenderOwner, root: Block | null): void {
 }
 
 function commitRootRenders(): void {
+	if (HOLDING_ROOT_COMMITS) return;
 	// Finished transitions' signals promote before this commit accepts the
 	// renders that read them; committed readers hear of it once it ends.
 	const signals = PENDING_SIGNAL_PROMOTIONS === null ? null : beginNativeBatch();
@@ -5240,9 +5253,6 @@ function commitRootTransactions(): void {
 			continue;
 		}
 		const owner = transaction.owner;
-		const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
-			? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
-			: undefined;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileRootEnter(transaction, owner);
 		try {
@@ -5276,10 +5286,6 @@ function commitRootTransactions(): void {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileRootCommitted(transaction);
 			if (owner.transaction === transaction) owner.transaction = null;
-			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
-				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
-				STAGED_COMMIT_CAPTURE.owners.get(owner)!.presentation = transaction;
-			}
 			// The root request committed, unless a held transition keeps it waiting.
 			if (transaction.rootRequest && TRANSITION_HOLDERS?.has(owner) !== true) {
 				owner.wakeable = null;
@@ -5303,13 +5309,7 @@ function commitRootTransactions(): void {
 			const acceptedGeneration = owner.generation;
 			// The mutation phase precedes the incoming ref/layout publication.
 			if (transaction.ops.length !== 0) runCommitOps(transaction.ops, owner, acceptedGeneration);
-			if (NATIVE_READ_DRIVER) {
-				if (
-					!DEFERRED_LAYOUT_DRIVER ||
-					!DEFERRED_LAYOUT_DRIVER.stageAction(() => NATIVE_READ_DRIVER!.pruneDeferredRefs(owner))
-				)
-					NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
-			}
+			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.pruneDeferredRefs(owner);
 			if (owner.disposed || owner.generation !== acceptedGeneration) {
 				discardOffscreenCapture(transaction.capture);
 				continue;
@@ -5317,19 +5317,11 @@ function commitRootTransactions(): void {
 			spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
 			if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
 				// A successful replacement may remove a still-dormant leased view.
-				// Inspect native containment only after staged DOM publication. Retiring
-				// against projected removal would stop still-visible early interactions.
-				const driver = HYDRATION_DRIVER!;
-				if (
-					!DEFERRED_LAYOUT_DRIVER ||
-					!DEFERRED_LAYOUT_DRIVER.stageAction(() => driver.retireDetachedBindingLeases(owner))
-				)
-					driver.retireDetachedBindingLeases(owner);
+				HYDRATION_DRIVER!.retireDetachedBindingLeases(owner);
 			}
 		} finally {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileRootExit();
-			finishStagedOwner?.();
 			// Committed or dropped, its queue is empty: the owner's next transaction
 			// reuses it rather than allocating one.
 			if (transaction.ops.length === 0 && owner.transaction !== transaction)
@@ -6202,7 +6194,6 @@ type VTDocument = Document & {
 
 interface VTCapture {
 	interrupt: () => void;
-	stagedCommit: StagedCommitCapture;
 	ready: Promise<void>;
 	release: () => void;
 	completed: boolean;
@@ -6387,7 +6378,7 @@ function vtScopeHost(block: Block): Element | null {
  * "no scope" here or hydrated trees would capture differently from mounted ones.
  */
 function vtClosestScope(node: Node | null): Element | null {
-	for (; node !== null; node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode) {
+	for (; node !== null; node = vtParent(node)) {
 		if (
 			node.nodeType === 1 &&
 			(STAGED_DOM ? STAGED_DOM.view(node as Element) : (node as Element)).getAttribute(
@@ -6399,6 +6390,21 @@ function vtClosestScope(node: Node | null): Element | null {
 	return null;
 }
 
+/**
+ * A node's parent as the held commit will leave it: content a render built
+ * off-document stands where its frontier lands.
+ */
+function vtParent(node: Node): Node | null {
+	return node.nodeType === 11 && (node as any).$$next !== undefined
+		? (node as any).$$next.parent
+		: (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode;
+}
+
+function vtContains(host: Node, node: Node | null): boolean {
+	for (; node !== null; node = vtParent(node)) if (node === host) return true;
+	return false;
+}
+
 /** Logical declarations bound their physical hosts, including portaled descendants. */
 function vtScopeForBlock(block: Block): VTOwner | null {
 	for (let ancestor: Block | null = block; ancestor !== null; ancestor = ancestor.parentBlock) {
@@ -6407,17 +6413,11 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 		if (host === null) return null;
 		if (ancestor !== block) {
 			const parent = block.parentNode;
-			if (parent !== host && !(STAGED_DOM ? STAGED_DOM.view(host) : host).contains(parent)) {
+			if (!vtContains(host, parent)) {
 				// A composite child may produce the scope host itself; its parent
 				// is outside the host even though its rendered range is owned here.
 				const elements = vtRangeElements(block);
-				if (
-					elements.length === 0 ||
-					elements.some(
-						(element) =>
-							element !== host && !(STAGED_DOM ? STAGED_DOM.view(host) : host).contains(element),
-					)
-				)
+				if (elements.length === 0 || elements.some((element) => !vtContains(host, element)))
 					return null;
 			}
 		}
@@ -6656,11 +6656,7 @@ function vtMarkDirtyFromCurrentBlock(): void {
 /** Whether a retained visibility boundary owns this host or one of its ancestors. */
 function vtHostVisible(element: Element): boolean {
 	if (hiddenDisplayNodes === 0) return true;
-	for (
-		let node: Node | null = element;
-		node !== null;
-		node = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode
-	) {
+	for (let node: Node | null = element; node !== null; node = vtParent(node)) {
 		if (node.nodeType === 1 && HIDDEN_DISPLAYS.has(node as HTMLElement)) return false;
 	}
 	return true;
@@ -7181,11 +7177,10 @@ function vtOwnerDocument(owner: VTOwner): VTDocument {
 	return (owner.nodeType === 9 ? owner : owner.ownerDocument!) as VTDocument;
 }
 
-function vtBeginCapture(interrupt: () => void, stagedCommit: StagedCommitCapture): VTCapture {
+function vtBeginCapture(interrupt: () => void): VTCapture {
 	let release!: () => void;
 	const capture: VTCapture = {
 		interrupt,
-		stagedCommit,
 		ready: new Promise<void>((resolve) => {
 			release = resolve;
 		}),
@@ -7446,6 +7441,8 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 				vtFlush();
 				return true;
 			}
+			// A flush with nothing to render mutates nothing an animation captured.
+			if (QUEUE.length === 0 && ROOT_RENDER_TRANSACTIONS.length === 0) return false;
 			const owners = vtQueuedOwners();
 			const handles = vtActiveHandles(owners);
 			if (handles.size > 0) {
@@ -7477,9 +7474,9 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		},
 		interrupt: vtInterrupt,
 		refreshPendingOwner(owner) {
-			const receipt = VT_CAPTURE?.stagedCommit.owners.get(owner);
-			if (receipt !== undefined && receipt.current === owner.current)
-				receipt.generation = owner.generation;
+			const transaction = owner.transaction;
+			if (transaction !== null && transaction.heldGeneration !== undefined)
+				transaction.heldGeneration = owner.generation;
 		},
 		wouldWrap: vtWouldWrap,
 		wrapResume(work, getBlocks) {
@@ -8841,15 +8838,21 @@ function drainQueue(): { err: any } | null {
 	}
 	QUEUE.length = 0;
 	QUEUE_REINDEX_EPOCH++;
-	commitRootRenders();
-	// Several sibling setters can share one hidden range. Re-scan it once after
-	// the wave's commit inserted its content, before refs or layout effects can
-	// observe it. No Activity update means no collection on the ordinary path.
-	if (activitiesToRehide !== null) {
-		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
+	if (HOLDING_ROOT_COMMITS) {
+		// The held commit re-scans these once it lands (commitHeldRootRenders).
+		if (activitiesToRehide !== null)
+			for (const activity of activitiesToRehide) (HELD_REHIDES ??= new Set()).add(activity);
+	} else {
+		commitRootRenders();
+		// Several sibling setters can share one hidden range. Re-scan it once after
+		// the wave's commit inserted its content, before refs or layout effects can
+		// observe it. No Activity update means no collection on the ordinary path.
+		if (activitiesToRehide !== null) {
+			for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
+		}
+		// Batches that finished during that commit.
+		promotePendingSignals();
 	}
-	// Batches that finished during that commit.
-	promotePendingSignals();
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrainEnd();
 	return pendingError;
@@ -9333,6 +9336,7 @@ function flushWork(): void {
 			if (focused !== null) restoreQueuedFocusSelection(focused);
 			commitEffects();
 			if (
+				!HOLDING_ROOT_COMMITS &&
 				(!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.capturing()) &&
 				(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0)
 			)
@@ -9614,6 +9618,196 @@ function vtFinalizeGroup(group: VtGroup, types: string[]): void {
 	}
 }
 
+/** What a held commit removes and inserts, read before it lands (vtFlush). */
+interface VtPreview {
+	leaving: Set<Node>;
+	arrivals: Array<{ parent: Node; anchor: Node | null; nodes: Node }>;
+}
+
+function vtPreview(held: RootRenderTransaction[]): VtPreview {
+	const leaving = new Set<Node>();
+	const arrivals: VtPreview['arrivals'] = [];
+	const range = (first: Node | null, last: Node | null): void => {
+		for (let node = first; node !== null; node = getNextSibling(node)) {
+			leaving.add(node);
+			if (node === last) break;
+		}
+	};
+	for (const transaction of held) {
+		if (transaction.retired !== null)
+			for (const block of transaction.retired)
+				if (block.startMarker !== null) range(block.startMarker, block.endMarker);
+		const ops = transaction.ops;
+		for (let i = 0; i < ops.length; i += 2) {
+			const kind = ops[i];
+			const target = ops[i + 1];
+			if (kind === applyOutgoing) {
+				range(target[1], target[2]);
+				continue;
+			}
+			const next: SlotNext | null =
+				kind === applySlotNext ? target.next : kind === applyNext ? target : null;
+			if (next === null) continue;
+			const out = next.out;
+			for (let j = 0; j < out.length; j += 3) {
+				const entry = out[j];
+				if (entry === placeRun)
+					arrivals.push({ parent: next.parent!, anchor: out[j + 2], nodes: out[j + 1] });
+				else if (entry === placeRoots)
+					for (const row of out[j + 1] as Block[])
+						arrivals.push({ parent: next.parent!, anchor: out[j + 2], nodes: row.startMarker! });
+				else if (entry !== moveBlockBefore) range(out[j + 1], out[j + 2]);
+			}
+			if (next.frag !== null && next.members !== null && next.parent !== null)
+				arrivals.push({
+					parent: next.parent,
+					anchor: next.follows && out.length !== 0 ? out[out.length - 2] : next.before,
+					nodes: next.frag,
+				});
+		}
+	}
+	return { leaving, arrivals };
+}
+
+function vtLeaving(node: Node, preview: VtPreview): boolean {
+	for (
+		let current: Node | null = node;
+		current !== null;
+		current = (STAGED_DOM ? STAGED_DOM.view(current) : current).parentNode
+	)
+		if (preview.leaving.has(current)) return true;
+	return false;
+}
+
+/** vtCaptureElements once the held commit lands: without what leaves, with what arrives. */
+function vtPendingCaptureElements(block: Block, owner: VTOwner, preview: VtPreview): Element[] {
+	const els = vtRangeElements(block).filter((element) => !vtLeaving(element, preview));
+	if (!inInactiveSubtree(block)) {
+		const start = block.startMarker;
+		const end = block.endMarker;
+		for (const arrival of preview.arrivals) {
+			if (start === null || end === null) {
+				if (arrival.parent !== block.parentNode) continue;
+			} else {
+				if (
+					arrival.parent !== (STAGED_DOM ? STAGED_DOM.view(start) : start).parentNode ||
+					arrival.anchor === null
+				)
+					continue;
+				let inside = false;
+				for (let node = getNextSibling(start); node !== null; node = getNextSibling(node)) {
+					if (node === arrival.anchor) inside = true;
+					if (inside || node === end) break;
+				}
+				if (!inside) continue;
+			}
+			const nodes = arrival.nodes;
+			if (nodes.nodeType === 11) {
+				for (let node = getFirstChild(nodes); node !== null; node = getNextSibling(node))
+					if (node.nodeType === 1 && vtHostVisible(node as Element)) els.push(node as Element);
+			} else if (nodes.nodeType === 1 && vtHostVisible(nodes as Element))
+				els.push(nodes as Element);
+		}
+	}
+	return els.filter((element) => {
+		const nearest = vtClosestScope(element);
+		return owner.nodeType === 9 ? nearest === null : nearest === owner;
+	});
+}
+
+/** Activities a held drain re-hides once its commit lands (drainQueue). */
+let HELD_REHIDES: Set<ActivitySlot> | null = null;
+
+/**
+ * Commit what a ViewTransition's drain held, inside its native update. Its
+ * effects run with the staged commit's (publishStagedCommit), whose layout
+ * phase waits in `layout` (completeDeferredLayouts).
+ */
+/**
+ * Release what a ViewTransition's drain held, for its native update: a root
+ * unmounted or replaced while the commit waited drops its render. A render
+ * the update's own callbacks start joins what stays.
+ */
+function releaseHeldRootRenders(held: RootRenderTransaction[]): RootRenderTransaction[] {
+	const live: RootRenderTransaction[] = [];
+	for (const transaction of held) {
+		transaction.held = false;
+		const owner = transaction.owner;
+		if (owner.disposed || owner.generation !== transaction.heldGeneration) {
+			if (!transaction.aborted) {
+				rollbackRootRender(transaction);
+				if (owner.transaction === transaction) owner.transaction = null;
+			}
+			continue;
+		}
+		// An early presentation that changed while the commit waited prepares
+		// again before its staged writes can land (commitRootRenders).
+		if (
+			hydrationStarted &&
+			transaction.capture.presentations !== undefined &&
+			(!HYDRATION_DRIVER!.currentPresentations(transaction.capture) ||
+				(NATIVE_READ_DRIVER && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
+		) {
+			rollbackRootRender(transaction);
+			if (owner.transaction === transaction) owner.transaction = null;
+			owner.generation++;
+			HYDRATION_DRIVER!.retryPresentations(transaction.capture);
+			// Rollback restored the preceding root props as well as child scopes.
+			// Reapply this still-current public request, including its gate.
+			if (transaction.rootRequest) owner.retry();
+			continue;
+		}
+		live.push(transaction);
+	}
+	return live;
+}
+
+function commitHeldRootRenders(held: RootRenderTransaction[], layout: DeferredLayoutCapture): void {
+	const later = ROOT_RENDER_TRANSACTIONS;
+	ROOT_RENDER_TRANSACTIONS = held;
+	const focus = held.length === 0 ? null : captureHeldFocusSelection(held);
+	const previous = renderingFocus;
+	const previousMoves = renderingFocusMoves;
+	renderingFocus = focus;
+	renderingFocusMoves = null;
+	try {
+		commitRootRenders();
+	} finally {
+		try {
+			restoreFocusedMovements();
+		} finally {
+			renderingFocusMoves = previousMoves;
+			renderingFocus = previous;
+			ROOT_RENDER_TRANSACTIONS = later.concat(ROOT_RENDER_TRANSACTIONS);
+		}
+	}
+	if (focus !== null) restoreQueuedFocusSelection(focus);
+	const rehides = HELD_REHIDES;
+	HELD_REHIDES = null;
+	if (rehides !== null)
+		for (const activity of rehides) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
+	promotePendingSignals();
+	// A custom-element callback may synchronously replace a root during the
+	// mutation phase. Accept that root's work before resource readiness.
+	acceptDeferredRootTransactions(layout);
+}
+
+function captureHeldFocusSelection(held: RootRenderTransaction[]): FocusSelectionBatch {
+	let snapshots: FocusSelectionBatch = null;
+	const documents: Document[] = [];
+	for (const transaction of held) {
+		const doc = transaction.owner.current?.parentNode.ownerDocument;
+		if (doc == null || documents.includes(doc)) continue;
+		documents.push(doc);
+		const snapshot = captureFocusSelection(doc);
+		if (snapshot === null) continue;
+		if (snapshots === null) snapshots = snapshot;
+		else if (Array.isArray(snapshots)) snapshots.push(snapshot);
+		else snapshots = [snapshots, snapshot];
+	}
+	return snapshots;
+}
+
 /** One logical batch publishes once, even when several native scopes capture it. */
 function vtFlush(
 	work: () => void = flushWork,
@@ -9727,19 +9921,37 @@ function vtFlush(
 	});
 	// A native start may throw before returning a consumer of this promise.
 	updateResult.catch(() => {});
+	const capture = vtBeginCapture(interrupt);
+	// The batch renders now and commits in the native update. Until then its
+	// root transactions are held, so the old capture reads the DOM as it was.
+	let held: RootRenderTransaction[] = [];
+	// Writes the render itself still makes to committed DOM, and the lifecycle
+	// work around them, stage until that update too.
 	const stage = new DOMStage(captureStagedCommitGuard);
 	const stagedCommit = beginStagedCommitCapture((action, durable) =>
 		stage.enqueue(action, durable),
 	);
-	const capture = vtBeginCapture(interrupt, stagedCommit);
 	STAGED_DOM = stage;
+	// An interruption the drain itself causes waits for the drain's end.
+	let draining = true;
+	let interruptRequested = false;
+	HOLDING_ROOT_COMMITS = true;
 	VT_DRAIN = true;
 	try {
 		work();
 	} catch (error) {
 		drainError = { error };
 	} finally {
+		HOLDING_ROOT_COMMITS = false;
+		held = ROOT_RENDER_TRANSACTIONS;
+		ROOT_RENDER_TRANSACTIONS = [];
+		for (const transaction of held) {
+			transaction.held = true;
+			transaction.heldGeneration = transaction.owner.generation;
+		}
 		try {
+			// Plan against the DOM the held commit will leave.
+			const preview = vtPreview(held);
 			for (const block of VT_REGISTRY) {
 				if (block.disposed) continue;
 				if (vtProps(block)?.scope === 'element') hasScopedBoundary = true;
@@ -9751,7 +9963,7 @@ function vtFlush(
 						!queuedBlocks.some((source) => blockIsAncestorOf(source, block)))
 				)
 					continue;
-				if (vtCaptureElements(block, owner).length > 0)
+				if (vtPendingCaptureElements(block, owner, preview).length > 0)
 					getGroup(owner).planned.set(block, vtProps(block));
 			}
 			if (unmeasured !== null)
@@ -9766,7 +9978,7 @@ function vtFlush(
 					if (
 						owner !== null &&
 						discoveredOwners.has(owner) &&
-						vtCaptureElements(block, owner).length > 0
+						vtPendingCaptureElements(block, owner, preview).length > 0
 					)
 						groups.get(owner)!.planned.set(block, vtProps(block));
 				}
@@ -9775,6 +9987,7 @@ function vtFlush(
 				if (
 					group.owner.nodeType !== 9 &&
 					(!domNode(group.owner).isConnected ||
+						vtLeaving(group.owner, preview) ||
 						domNode(group.owner as Element).getAttribute('vt-scope') !== 'element')
 				)
 					group.valid = false;
@@ -9784,12 +9997,13 @@ function vtFlush(
 		} finally {
 			STAGED_DOM = null;
 			VT_DRAIN = false;
+			draining = false;
 			endStagedCommitCapture(stagedCommit);
 		}
 	}
 	if (discoveredOwners !== null) {
-		// Staging is detached now: measure the committed old hosts using saved
-		// ownership/props rather than the blocks' already-prepared next state.
+		// Measure the committed old hosts using saved ownership/props rather
+		// than the blocks' already-rendered next state.
 		for (const owner of discoveredOwners) {
 			const group = groups.get(owner)!;
 			if (!group.valid) continue;
@@ -9844,11 +10058,12 @@ function vtFlush(
 		);
 		const previousFlush = inFlush;
 		inFlush = true;
+		held = releaseHeldRootRenders(held);
 		beginStagedCommitPublication(stagedCommit);
 		try {
 			try {
-				rejectStagedPresentations(stagedCommit);
 				stage.commit();
+				commitHeldRootRenders(held, layoutCapture);
 			} finally {
 				publishStagedCommit(stagedCommit);
 			}
@@ -9950,6 +10165,10 @@ function vtFlush(
 		}
 	};
 	function interrupt(): void {
+		if (draining) {
+			interruptRequested = true;
+			return;
+		}
 		if (interrupted) return;
 		interrupted = true;
 		cancelWait?.();
@@ -9970,8 +10189,9 @@ function vtFlush(
 	// commit (uncaught, or collected by act()); publish the prepared work and
 	// rethrow rather than starting an animation whose rejection would demote
 	// the error to a recoverable report.
-	if (drainError !== null) {
+	if (drainError !== null || interruptRequested) {
 		interrupt();
+		if (drainError === null) return;
 		throw drainError.error;
 	}
 	if (participants.length === 0) {
@@ -10565,7 +10785,6 @@ interface DeferredLayoutDriver {
 	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
 	projectEventBundle(bundle: HandlerBundle): HandlerBundle;
 	projectControlled(state: ControlledState): ControlledState;
-	enterRootCommit(owner: RootRenderOwner): (() => void) | undefined;
 	recordStageEntry(entry: object): void;
 	stageDelegation(target: Node, root: boolean, register: boolean): boolean;
 	refreshPublishingOwner(owner: RootRenderOwner): void;
@@ -10619,7 +10838,6 @@ interface StagedCommitCapture {
 			generation: number;
 			current: Block | null;
 			guard: () => boolean;
-			presentation?: RootRenderTransaction;
 		}
 	>;
 	guards: Map<object, () => boolean>;
@@ -10627,7 +10845,6 @@ interface StagedCommitCapture {
 	published: boolean;
 }
 
-let STAGED_COMMIT_OWNER: RootRenderOwner | undefined;
 let PUBLISHING_STAGED_COMMIT: StagedCommitCapture | null = null;
 
 function beginStagedCommitPublication(capture: StagedCommitCapture): void {
@@ -10636,34 +10853,6 @@ function beginStagedCommitPublication(capture: StagedCommitCapture): void {
 
 function endStagedCommitPublication(capture: StagedCommitCapture): void {
 	if (PUBLISHING_STAGED_COMMIT === capture) PUBLISHING_STAGED_COMMIT = null;
-}
-
-function rejectStagedPresentations(capture: StagedCommitCapture): void {
-	for (const [owner, receipt] of capture.owners) {
-		const transaction = receipt.presentation;
-		if (
-			transaction === undefined ||
-			owner.disposed ||
-			owner.generation !== receipt.generation ||
-			((!hydrationStarted || HYDRATION_DRIVER!.currentPresentations(transaction.capture)) &&
-				(!NATIVE_READ_DRIVER || NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
-		)
-			continue;
-		// These scopes were accepted only into the deferred host plan. Reopen
-		// their original journal while every native operation is still guarded.
-		const pending = owner.transaction;
-		owner.transaction = transaction;
-		try {
-			rollbackRootRender(transaction);
-		} finally {
-			owner.transaction = pending;
-		}
-		owner.generation++;
-		HYDRATION_DRIVER!.retryPresentations(transaction.capture);
-		// Rollback restored the preceding root props as well as child scopes.
-		// Reapply this still-current public request, including its hydration gate.
-		if (transaction.rootRequest) owner.retry();
-	}
 }
 
 function stagedOwnerGuard(
@@ -10691,9 +10880,7 @@ function captureStagedCommitGuard(): (() => boolean) | undefined {
 	if (ROOT_RENDER_ROLLBACK || TRANSITION_JOURNAL_REPLAYING) return () => false;
 	const ownerGuard = stagedOwnerGuard(
 		capture,
-		STAGED_COMMIT_OWNER ??
-			CURRENT_BLOCK?.idState.renderOwner ??
-			CURRENT_SCOPE?.block.idState.renderOwner,
+		CURRENT_BLOCK?.idState.renderOwner ?? CURRENT_SCOPE?.block.idState.renderOwner,
 	);
 	if (TRANSITION_JOURNAL === null) return ownerGuard;
 	// Keep logical rollback writes in the projection but omit both the abandoned
@@ -11049,14 +11236,6 @@ function ensureDeferredLayoutDriver(): void {
 				}
 				return projected;
 			},
-			enterRootCommit(owner) {
-				if (!STAGED_COMMIT_CAPTURE) return undefined;
-				const previous = STAGED_COMMIT_OWNER;
-				STAGED_COMMIT_OWNER = owner;
-				return () => {
-					STAGED_COMMIT_OWNER = previous;
-				};
-			},
 			recordStageEntry(entry) {
 				const capture = STAGED_COMMIT_CAPTURE;
 				if (capture === null) return;
@@ -11077,9 +11256,7 @@ function ensureDeferredLayoutDriver(): void {
 				if (capture === null) return false;
 				const guard = stagedOwnerGuard(
 					capture,
-					STAGED_COMMIT_OWNER ??
-						CURRENT_BLOCK?.idState.renderOwner ??
-						CURRENT_SCOPE?.block.idState.renderOwner,
+					CURRENT_BLOCK?.idState.renderOwner ?? CURRENT_SCOPE?.block.idState.renderOwner,
 				);
 				let owners = capture.registrations.get(target);
 				if (owners === undefined) capture.registrations.set(target, (owners = new Map()));
@@ -11341,6 +11518,7 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 }
 
 function commitEffects(): void {
+	if (HOLDING_ROOT_COMMITS) return;
 	if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageEffects()) return;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.COMMIT_EFFECTS);
@@ -33914,13 +34092,9 @@ function renderPortalState(
 		// container's own children). See reconcileDeoptChildren.
 		(start as any).$$portalEnd = end;
 		// A root render builds the portal off-document; its commit appends it.
-		// ViewTransitions still measure a portal where it renders (#2043 step 3).
 		const transaction = ROOT_RENDER_TRANSACTION;
 		const into =
-			transaction !== null &&
-			!transaction.aborted &&
-			!ROOT_RENDER_ROLLBACK &&
-			!VIEW_TRANSITION_DRIVER
+			transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK
 				? queueFrontier(parentBlock, target, null)
 				: target;
 		(STAGED_DOM ? STAGED_DOM.view(into) : into).appendChild(start);
@@ -41877,8 +42051,9 @@ function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 	// or effects from the now-abandoned replacement.
 	if (ROOT_RENDER_TRANSACTION === null) commitRootRenders();
 	// A timeout or passive error can enter without any scheduled Block. Its
-	// captured ref/effect work still needs the existing commit drain to run.
-	if (!syncFlush && !scheduled) {
+	// captured ref/effect work still needs the existing commit drain to run. A
+	// held drain's commit runs that work itself.
+	if (!syncFlush && !scheduled && !HOLDING_ROOT_COMMITS) {
 		scheduled = true;
 		queueMicrotask(flush);
 	}
@@ -43785,11 +43960,7 @@ function inBoundaryRender<A extends unknown[]>(
 	run: (state: TrySlot, ...args: A) => void,
 	...args: A
 ): void {
-	// ViewTransitions still stage a resume's DOM as it renders (#2043 step 3).
-	const frame =
-		ROOT_RENDER_TRANSACTION === null && !VIEW_TRANSITION_DRIVER
-			? beginDetachedBoundaryRender(state)
-			: null;
+	const frame = ROOT_RENDER_TRANSACTION === null ? beginDetachedBoundaryRender(state) : null;
 	try {
 		run(state, ...args);
 	} catch (error) {
@@ -51530,9 +51701,9 @@ function makeRoot(
 				// A same-component request supersedes retry generations without
 				// invalidating a prepared DOM plan for that still-current root.
 				// Identity replacements and unmounts never refresh its receipt.
-				if (inFlush) {
-					if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.refreshPublishingOwner(renderOwner);
-				} else if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
+				if (inFlush && DEFERRED_LAYOUT_DRIVER)
+					DEFERRED_LAYOUT_DRIVER.refreshPublishingOwner(renderOwner);
+				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
 			}
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
