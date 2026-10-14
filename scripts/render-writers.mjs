@@ -33,7 +33,6 @@ export const WRITERS = new Map(
 		placeDeoptChildren: 'commit',
 		insertArmPair: 'commit',
 		removeRange: 'commit',
-		queueOwnedListClear: 'commit',
 		clearItems: 'commit',
 		moveBlockBefore: 'commit',
 		removeNodes: 'commit',
