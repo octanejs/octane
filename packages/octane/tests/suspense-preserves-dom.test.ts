@@ -8,6 +8,7 @@ import {
 	ConditionalArmRootSuspensionApp,
 	DelayedBoundaryApp,
 	DescriptorRootSuspensionAfterSiblingApp,
+	ResumedTemplateApp,
 	HiddenPrimaryRefCatchApp,
 	HiddenInsertionCleanupApp,
 	IndependentRefApp,
@@ -43,6 +44,36 @@ function deferred<T>() {
 function fulfilled<T>(value: T): PromiseLike<T> {
 	return { then() {}, status: 'fulfilled', value } as any;
 }
+
+it('mounts a resumed child template at commit, never into the hidden primary', async () => {
+	const gate = deferred<string>();
+	const mutations: MutationRecord[][] = [];
+	const observer = new MutationObserver(() => {});
+	const root = mount(ResumedTemplateApp, {
+		value: gate.promise,
+		probe() {
+			mutations.push(observer.takeRecords());
+		},
+	});
+	observer.observe(root.container, {
+		subtree: true,
+		childList: true,
+		characterData: true,
+		attributes: true,
+	});
+	try {
+		await act(() => gate.resolve('Ready'));
+		// The retry renders both children before the probe: none of it reached the page.
+		expect(mutations.length).toBeGreaterThan(0);
+		for (const atRender of mutations) expect(atRender).toEqual([]);
+		expect(root.find('#resumed-leaf').textContent).toBe('Ready');
+		expect(root.find('#resumed-first').textContent).toBe('Ready');
+		expect(root.container.querySelector('#late-waiting')).toBeNull();
+	} finally {
+		observer.disconnect();
+		root.unmount();
+	}
+});
 
 it('keeps the pending UI untouched while a resumed child builds its error boundary', async () => {
 	const gate = deferred<string>();

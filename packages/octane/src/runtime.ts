@@ -22217,7 +22217,19 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 			block.endMarker = root;
 		} else {
 			const parent = block.parentNode;
-			parent.insertBefore(root, end);
+			const transaction = ROOT_RENDER_TRANSACTION;
+			// A committed Block's first mount (a resumed body's) lands at commit.
+			if (
+				transaction !== null &&
+				block.createdStamp !== transaction.createdStamp &&
+				block instanceof BlockImpl &&
+				block.kind !== 'root' &&
+				block.startMarker !== end &&
+				MARKERLESS_ARM_RENDERS === 0 &&
+				usesFrontier(block, parent)
+			)
+				queueFrontier(block, parent, end).appendChild(root);
+			else parent.insertBefore(root, end);
 		}
 	}
 	scope.slots[0] = bag;
@@ -44185,6 +44197,12 @@ function finalizeMarkerlessBranch(
 }
 
 /**
+ * Open markerless arm renders. Such an arm bounds what its render inserted in
+ * place (finalizeMarkerlessBranch), so a resumed Block inside one mounts in place.
+ */
+let MARKERLESS_ARM_RENDERS = 0;
+
+/**
  * The node before the content of a client arm without a bound
  * (`unfinalized`). It inserted nothing, so that is whatever precedes its
  * insertion anchor now.
@@ -44214,6 +44232,7 @@ function renderMarkerlessArm(
 	const after = block.endMarker;
 	const before = pendingArmBefore(block, domParent);
 	state.unfinalized = true;
+	MARKERLESS_ARM_RENDERS++;
 	try {
 		if (scope === block) renderBlock(block);
 		else renderLiteArm(scope, body!, env);
@@ -44221,6 +44240,8 @@ function renderMarkerlessArm(
 		if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
 			finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, false);
 		throw error;
+	} finally {
+		MARKERLESS_ARM_RENDERS--;
 	}
 	finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, true);
 }

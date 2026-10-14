@@ -39,6 +39,35 @@ function DelayedBoundary(props: DelayedBoundaryProps) @{
 	</>
 }
 
+function ResumedLeaf(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<span id="resumed-leaf">{value as string}</span>
+}
+
+function ResumedPair(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<>
+		<em id="resumed-first">{value as string}</em>
+		<strong>{'second'}</strong>
+	</>
+}
+
+// A child that suspended on its first render mounts its template on the
+// retry: a single root, a two-root template, and a try body revealed after it.
+export function ResumedTemplateApp(props: DelayedBoundaryProps) @{
+	<main>
+		@try {
+			<>
+				<ResumedLeaf value={props.value} />
+				<ResumedPair value={props.value} />
+				<ObservePendingBoundary probe={props.probe} />
+			</>
+		} @pending {
+			<label id="late-waiting">{'Loading'}</label>
+		}
+	</main>
+}
+
 export function DelayedBoundaryApp(props: DelayedBoundaryProps) @{
 	<main>
 		@try {
