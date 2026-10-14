@@ -327,6 +327,7 @@ import {
 	currentSignalOwner,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
+	signalOwnerUse,
 	supersedeSignalOwner,
 } from './signals/owner-context.js';
 import { createSignalHookSites } from './signals/declaration-path.js';
@@ -1238,6 +1239,7 @@ function trackSignalRetryListKeys<T>(
 export function enableSignalBindings(abi = 1, potentialOnly = false): void {
 	if (abi !== 1) throw new TypeError(formatClientError(74));
 	SIGNAL_BINDINGS_ENABLED = true;
+	signalOwnerUse.active = true;
 	SIGNAL_CHILD = bindImplicitSignalChild;
 	SIGNAL_COMMIT_RETRY = retryPendingCommit;
 	if (!potentialOnly) enableSignalDocument(abi);
@@ -3975,14 +3977,13 @@ function closeOpsWindow(): void {
  * resumed bag (the bag itself when it equals the committed value, so a later
  * render can revert a cell).
  *
- * Event bindings record every render: under signal ownership a handler's
- * authority refreshes whether or not it changed, and the commit installs only
- * the handler. A native handler passes its host as `el`. A compiled handler
- * bundle passes itself as both `committed` and `el`, then its captures (or,
- * for arity N, its argument array): a change to any of them records the whole
- * pending bundle, so the commit function tests its first cell alone. SameValue
- * keeps signed zero and NaN captures observable; arity N keeps array-reference
- * semantics.
+ * A compiled handler bundle compares itself in the template and passes its
+ * new callback, or the bag (unchanged) against the bag as its committed value,
+ * then itself and its captures (or, for arity N, its argument array): a change
+ * records the whole pending bundle, so the commit function tests its first cell
+ * alone. A handler's signal authority refreshes in the template, through
+ * setEventHandler, which this recorder never names: a template without
+ * handlers does not retain it.
  */
 export function bagRecord(
 	s: Scope,
@@ -3990,35 +3991,12 @@ export function bagRecord(
 	cell: number,
 	value: unknown,
 	committed: unknown,
-	el?: Element | HandlerBundle,
+	bundle?: HandlerBundle,
 	a0?: unknown,
 	a1?: unknown,
 ): any[] | null {
 	const bag = s.slots[0] as any;
-	let changed = value !== committed;
-	let args: HandlerBundle['args'] | undefined;
-	if (el !== undefined) {
-		let host = el as Element;
-		if (el === committed) {
-			const d = el as HandlerBundle;
-			host = d.el!;
-			args = d.args;
-			changed =
-				value !== d.fn ||
-				(typeof args === 'number'
-					? !Object.is(a0, d.a0) || ((args === 2 || args === -2) && !Object.is(a1, d.a1))
-					: args !== EMPTY_ARGS && a0 !== args);
-		}
-		// setEventHandler(host) publishes only the authority, and only when it moved.
-		if (
-			SIGNAL_BINDINGS_ENABLED ||
-			signalDocumentEnabled ||
-			activeSynchronousSignalOwner !== null ||
-			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS_RECORDED
-		)
-			setEventHandler(host);
-	}
+	const changed = value !== committed;
 	if (next === null) {
 		// The render's first record stages the bag, inline: a changed row costs
 		// its recorders and `C` alone.
@@ -4051,7 +4029,8 @@ export function bagRecord(
 		}
 	}
 	next![cell] = changed ? value : bag;
-	if (args !== undefined) {
+	if (bundle !== undefined) {
+		const args = bundle.args;
 		if (args !== EMPTY_ARGS) next![cell + 1] = changed ? a0 : bag;
 		if (args === 2 || args === -2) next![cell + 2] = changed ? a1 : bag;
 	}

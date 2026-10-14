@@ -48,6 +48,7 @@ export {
 	bagRecord,
 	bagRecordSignal,
 	bagRecordHost,
+	signalOwnerUse,
 	bagDone,
 	setEventSlot,
 	commitEventBundle,

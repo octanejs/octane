@@ -1719,6 +1719,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bagRecord',
 	'bagRecordSignal',
 	'bagRecordHost',
+	'signalOwnerUse',
 	'bagDone',
 	'setEventSlot',
 	'commitEventBundle',
@@ -28788,6 +28789,8 @@ function planJsx(
 		else updateLines.push(updateEmit);
 	}
 	updateLines.push(...deferredCommitLines);
+	if (commit?.owners)
+		updateLines.unshift(inheritOriginLoc(commitOwnersDeclaration(ctx), planOrigin));
 	if (commit?.resumed)
 		updateLines.unshift(inheritOriginLoc(commitResumedDeclaration(), planOrigin));
 	const commitName = commit !== null ? emitCommitFunction(ctx, commit, planOrigin) : null;
@@ -31088,6 +31091,8 @@ function makeCommitPlan() {
 		careful: false,
 		/** An update binding compares inline, so the update branch declares `_r`. */
 		resumed: false,
+		/** A handler compares inline, so the update branch declares `_o`. */
+		owners: false,
 		/** Register a binding's commit statement once (keyed selection re-emits it). */
 		write: (cell, make) => {
 			if (!writes.some((entry) => entry[0] === cell)) writes.push([cell, make]);
@@ -31132,8 +31137,10 @@ function commitBindingKind(bind) {
 function commitRuntimeHelpers(bind) {
 	if (bind.signalDirect) return ['bagRecordSignal'];
 	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitHostSources'];
-	if (bind.kind === 'event') return ['bagRecord', 'setEventSlot'];
-	if (bind.kind === 'event-bundle') return ['bagRecord', 'commitEventBundle'];
+	if (bind.kind === 'event')
+		return ['bagRecord', 'setEventSlot', 'setEventHandler', 'signalOwnerUse'];
+	if (bind.kind === 'event-bundle')
+		return ['bagRecord', 'commitEventBundle', 'setEventHandler', 'signalOwnerUse'];
 	return ['bagRecord'];
 }
 
@@ -31175,6 +31182,12 @@ function emitCommitFunction(ctx, commit, origin) {
 /** `_r`: an earlier render of this transaction staged the bag (see bagRecord). */
 function commitResumedDeclaration() {
 	return b.const('_r', b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)));
+}
+
+/** `_o`: something may give a handler signal authority (see bagRecord). */
+function commitOwnersDeclaration(ctx) {
+	ctx.runtimeNeeded.add('signalOwnerUse');
+	return b.const('_o', b.member(b.id('_$signalOwnerUse'), 'active'));
 }
 
 // A render whose recorders staged the bag without queueing it (its state word
@@ -31283,6 +31296,18 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 		const test = b.logical('||', b.binary('!==', local(), committed()), b.id('_r'));
 		const stmt = b.if(test, recordScope('bagRecord', i, local(), committed()), null);
 		return local === V ? b.block([b.const('_v', value), stmt]) : stmt;
+	};
+	// A handler refreshes its signal authority every render once anything can
+	// give it one (`_o`; setEventHandler moves only an authority that changed),
+	// and records when it changed or its bag resumed (`_r`). Handlers are never
+	// deferred, so they always land in the update branch that declares both.
+	const recordHandler = (locals, host, changes, call) => {
+		commit.resumed = commit.owners = true;
+		return b.block([
+			...locals,
+			b.if(b.id('_o'), b.stmt(b.call('_$setEventHandler', host)), null),
+			changes.length === 0 ? call() : b.if(orChain([b.id('_r'), ...changes]), call(), null),
+		]);
 	};
 	// Handler slots and bundles: written in place unless the commit is careful.
 	const carefulWrite = (i, careful, writes) => {
@@ -31513,7 +31538,9 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
 			// The committed handler is the one installed on the host.
-			return recordScope('bagRecord', cell, value, slot(), F('_el'));
+			return recordHandler([b.const('_v', value)], F('_el'), [b.binary('!==', V(), slot())], () =>
+				recordScope('bagRecord', cell, V(), slot()),
+			);
 		}
 		case 'event-bundle': {
 			const n = bind.argExprs.length;
@@ -31531,15 +31558,40 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 						: bind.argExprs.map((_, i) => field(`a${i}`, nextAt(cell + 1 + i)))),
 				],
 			);
-			// The committed callback and captures are the dispatched bundle's own:
-			// the bundle passes itself as bagRecord's committed value and host.
-			return recordScope(
-				'bagRecord',
-				cell,
-				bind.fnExpr,
-				bundle(),
-				bundle(),
-				...(n > 2 ? [b.array(bind.argExprs.slice())] : bind.argExprs),
+			// The committed callback and captures are the dispatched bundle's own,
+			// compared here (SameValue keeps signed zero and NaN captures observable).
+			// bagRecord sees the change (`_c`) as its new callback against the bag;
+			// an arity-N argument array is fresh every render, so it always records.
+			const capture = (i) => b.id(`_a${i}`);
+			const held = (name) => b.member(b.id('_e'), name);
+			const captures = n > 2 ? [b.array(bind.argExprs.slice())] : bind.argExprs;
+			const changed =
+				n > 2
+					? null
+					: orChain([
+							b.binary('!==', V(), held('fn')),
+							...captures.map((_, i) =>
+								b.unary('!', b.call(b.member(b.id('Object'), 'is'), capture(i), held(`a${i}`))),
+							),
+						]);
+			return recordHandler(
+				[
+					b.const('_v', bind.fnExpr),
+					...captures.map((arg, i) => b.const(`_a${i}`, arg)),
+					b.const('_e', bundle()),
+					...(changed === null ? [] : [b.const('_c', changed)]),
+				],
+				held('el'),
+				changed === null ? [] : [b.id('_c')],
+				() =>
+					recordScope(
+						'bagRecord',
+						cell,
+						changed === null ? V() : b.conditional(b.id('_c'), V(), b.id('_b')),
+						b.id('_b'),
+						b.id('_e'),
+						...captures.map((_, i) => capture(i)),
+					),
 			);
 		}
 		case 'formAction':
