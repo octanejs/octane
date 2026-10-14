@@ -16674,6 +16674,15 @@ const CHILDREN_CAPTURES: unique symbol = Symbol.for('octane.childrenCaptures') a
 // belongs to another document owner, which scopeSignalOwner never links.
 const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
 
+// Fresh captures from one authored body reuse its slots. A different compiled
+// body has a different slot layout and must replace that scope. Untagged render
+// functions retain their existing positional reconciliation contract.
+function sameRenderBody(previous: ComponentBody, next: ComponentBody): boolean {
+	const previousBody = (previous as any)[CHILDREN_BODY];
+	const nextBody = (next as any)[CHILDREN_BODY];
+	return previousBody === undefined || nextBody === undefined || previousBody === nextBody;
+}
+
 /**
  * Compiler-emitted: attach markerless single-host-root metadata while a fresh
  * component function is still being initialized. The compiler only calls this
@@ -36818,9 +36827,6 @@ interface HostComponentSlot {
 	// The props applied last render — diffed against the next render so props/events that
 	// DISAPPEARED get removed (not left stale on the reused element).
 	props: any;
-	// Stable delegating children body + its current target (see hostComponent).
-	body: ComponentBody | undefined;
-	latest: ComponentBody | null | undefined;
 	// Dedicated sub-scope holding the children's childSlot (slot 0), so the children
 	// reconcile/unmount via the Block tree without stamping a derived key on `scope`.
 	childScope: Scope | undefined;
@@ -36864,8 +36870,6 @@ export function hostComponent(
 			anchor: null,
 			ref: undefined,
 			props: undefined,
-			body: undefined,
-			latest: undefined,
 			childScope: undefined,
 		};
 		scope.slots[slot] = state;
@@ -36883,20 +36887,10 @@ export function hostComponent(
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
-	if (typeof childrenBody === 'function') {
-		// The compiled children render-body is a FRESH closure every parent render, but
-		// it is the SAME positional children slot. childSlot keys block-reuse on body
-		// identity, so handing it the raw closure would re-mount (and DOM-duplicate) the
-		// children — a `@for`/`@if` block especially — on every re-render. Pass a STABLE
-		// delegating body whose target we update each render, so childSlot reconciles.
-		state.latest = childrenBody as ComponentBody;
-		if (state.body === undefined) {
-			state.body = (props, scope, extra) => state!.latest!(props, scope, extra);
-		}
-		childSlot(state.childScope!, 0, el, state.body, null, false, el);
-	} else if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
-		// createElement/descriptor callers already supply a renderable value. Let
-		// childSlot reconcile it directly instead of assuming every child is callable.
+	if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
+		// Tagged bodies carry source identity and ownership through to childSlot;
+		// a delegating wrapper would hide both. Descriptor callers also already
+		// supply a renderable value, so reconcile it directly.
 		//
 		// A TSX value position can go null between renders (`{cond ? <x/> : null}`),
 		// unlike the compiled TSRX body which is statically present or absent. Once
@@ -38506,7 +38500,8 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 // Block whose range is all of `el`'s content — parentNode = el, no markers —
 // reused across renders with the body swapped in place (the compiled closure is
 // fresh each parent render but is the same slot child; mirrors childSlot's
-// isBodyFn reconcile). A render prop that RETURNS a renderable instead of
+// isBodyFn reconcile). A different compiled body token replaces that Block.
+// A render prop that RETURNS a renderable instead of
 // rendering imperatively is handled by renderBlock's return-slot (childSlot,
 // marker-wrapped — matching the server's ssrChild normalization of a de-opt
 // return). Non-function children (hand-rolled descriptors only; the compiler
@@ -38518,7 +38513,29 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 	if (kids == null) return;
 	if (typeof kids === 'function') {
 		let state = block.slots[0] as { __kind: 'hostTagChildrenSlot'; block: Block } | undefined;
-		if (state === undefined) {
+		if (state === undefined || !sameRenderBody(state.block.body, kids as ComponentBody)) {
+			if (state !== undefined) {
+				// This markerless body owns all host children. Save that range so a
+				// replacement that suspends after inserting DOM can roll back whole.
+				journalRootSlot(state, el, null, null);
+				if (
+					ROOT_RENDER_TRANSACTION !== null &&
+					!ROOT_RENDER_TRANSACTION.aborted &&
+					!ROOT_RENDER_ROLLBACK
+				) {
+					deferRootReplacement(
+						state.block,
+						el,
+						getFirstChild(el),
+						(STAGED_DOM ? STAGED_DOM.view(el) : el).lastChild,
+					);
+				} else {
+					unmountBlock(state.block, false);
+					let child: Node | null;
+					while ((child = getFirstChild(el)) !== null)
+						(STAGED_DOM ? STAGED_DOM.view(el) : el).removeChild(child);
+				}
+			}
 			const child = createBlock(
 				'dynamic',
 				block,
@@ -38530,13 +38547,16 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 				undefined,
 				renderReturnedValue,
 			);
-			state = { __kind: 'hostTagChildrenSlot', block: child };
-			block.slots[0] = state;
-			// unmountScope's catch-all slot branch unmounts `state.block`, firing the
-			// children's cleanups; the DOM goes away with `el` (the block has no
-			// markers of its own to sweep).
-			registerSlot(block, state);
+			if (state === undefined) {
+				state = { __kind: 'hostTagChildrenSlot', block: child };
+				block.slots[0] = state;
+				// unmountScope's catch-all slot branch owns the children's cleanup.
+				registerSlot(block, state);
+			} else {
+				state.block = child;
+			}
 		} else {
+			if (state.block.body !== kids) journalRootProperty(state.block, 'body', state.block.body);
 			state.block.body = kids as ComponentBody;
 		}
 		renderBlock(state.block);
@@ -39744,7 +39764,10 @@ export function childSlot(
 		const unchangedComponent =
 			state.block !== null &&
 			component !== null &&
-			(component === state.currentComp || (typeof value === 'function' && state.currentIsBodyFn));
+			(component === state.currentComp ||
+				(typeof value === 'function' &&
+					state.currentIsBodyFn &&
+					sameRenderBody(state.currentComp!, component)));
 		const unchangedHost =
 			pureHost &&
 			state.hostNode !== null &&
@@ -40234,9 +40257,14 @@ export function childSlot(
 		// identity always differs — but it is the SAME slot child. Reconcile by SLOT like
 		// componentSlot: swap the block's body in place and re-render, instead of
 		// re-mounting on every identity change (which, once effects re-render the tree,
-		// loops unboundedly). Component switches arrive as DESCRIPTORS (comp = value.type),
-		// never as a bare function, so this never short-circuits a real component swap.
-		if (isBodyFn && state.block !== null && state.currentIsBodyFn) {
+		// loops unboundedly). Compiler-owned source tokens distinguish fresh captures
+		// from a different authored body, whose slot layout needs a replacement.
+		if (
+			isBodyFn &&
+			state.block !== null &&
+			state.currentIsBodyFn &&
+			sameRenderBody(state.currentComp!, comp)
+		) {
 			// Compiler-generated children are render functions too, so a fresh parent
 			// render must still swap their body in place (preserving descendant state).
 			// But an identity-equal tagged function is the exact same cached child value:
