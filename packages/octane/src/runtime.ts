@@ -4563,13 +4563,18 @@ interface SlotNext {
 	bound: any[] | null;
 }
 
-/** The open root render's pending structure for `slot`, queued for its commit. */
-function slotNext(slot: { next: SlotNext | null }): SlotNext {
+/**
+ * The open root render's pending structure for `slot`, queued for its commit:
+ * last, or at `at` in the commit queue (a keyed list's, listNext).
+ */
+function slotNext(slot: { next: SlotNext | null }, at = -1): SlotNext {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	let next = slot.next;
 	if (next === null || next.tx !== tx) {
-		next = slot.next = newSlotNext(tx, null, null);
-		tx.ops.push(applySlotNext, slot);
+		next = slot.next = newSlotNext(tx);
+		const ops = tx.ops;
+		if (at < 0 || at >= ops.length) ops.push(applySlotNext, slot);
+		else ops.splice(at, 0, applySlotNext, slot);
 		// A window that drops truncates what it created; only a structure an
 		// outer window built needs copying back (below).
 		if (TRANSITION_JOURNAL_DEPTH > 1)
@@ -4613,20 +4618,8 @@ function slotFrontier(
  * after the fragment, becomes its owner).
  */
 function queueFrontier(owner: Block | null, parent: Node, before: Node | null): DocumentFragment {
-	const tx = ROOT_RENDER_TRANSACTION!;
-	const next: SlotNext = {
-		tx,
-		out: [],
-		frag: null,
-		root: null,
-		parent: null,
-		before: null,
-		members: null,
-		owner: null,
-		follows: false,
-		bound: null,
-	};
-	tx.ops.push(applyNext, next);
+	const next = newSlotNext(ROOT_RENDER_TRANSACTION!);
+	next.tx.ops.push(applyNext, next);
 	return openFrontier(next, owner, parent, before);
 }
 
@@ -4707,20 +4700,16 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 }
 
 /** A slot's pending structure for `tx`. */
-function newSlotNext(
-	tx: RootRenderTransaction,
-	parent: Node | null,
-	owner: Block | null,
-): SlotNext {
+function newSlotNext(tx: RootRenderTransaction): SlotNext {
 	return {
 		tx,
 		out: [],
 		frag: null,
 		root: null,
-		parent,
+		parent: null,
 		before: null,
 		members: null,
-		owner,
+		owner: null,
 		follows: false,
 		bound: null,
 	};
@@ -4979,30 +4968,13 @@ function queueRootUnmount(scope: Scope, exclusive: boolean, out?: any[]): void {
 function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | null {
 	const tx = ROOT_RENDER_TRANSACTION;
 	if (tx === null) return null;
-	let next = state.next;
-	if (next !== null && next.tx === tx) {
-		// A nested window that drops restores the log an outer window began.
-		if (
-			TRANSITION_JOURNAL_DEPTH > 1 &&
-			(TRANSITION_JOURNAL_BAGS!.get(next) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
-		) {
-			journalObjectOnce(next);
-			journalObjectOnce(next.out);
-			if (next.members !== null) journalObjectOnce(next.members);
-		}
-		return next;
-	}
-	const end = state.end;
-	const parent = end.parentNode!;
+	if (state.next !== null && state.next.tx === tx) return slotNext(state);
+	const parent = state.end.parentNode!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
-	let owner = parentBlock;
-	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
 	// Its members list starts with its first run (listRun).
-	next = state.next = newSlotNext(tx, parent, owner);
-	const ops = tx.ops;
-	if (at >= ops.length) ops.push(applySlotNext, state);
-	else ops.splice(at, 0, applySlotNext, state);
-	if (TRANSITION_JOURNAL_DEPTH > 1) TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
+	const next = slotNext(state, at);
+	next.parent = parent;
+	next.owner = owningBlock(parentBlock);
 	return next;
 }
 
