@@ -4115,6 +4115,8 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 		ops.length = 0;
 		COMMITTING_OWNER = previousOwner;
 		COMMITTING_GENERATION = previousGeneration;
+		// Everything this commit retired has left the document (retireEventHostTree).
+		if (previousOwner === null) retiringHostsSince = 0;
 	}
 }
 
@@ -4543,18 +4545,7 @@ function slotNext(slot: { next: SlotNext | null }): SlotNext {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	let next = slot.next;
 	if (next === null || next.tx !== tx) {
-		next = slot.next = {
-			tx,
-			out: [],
-			frag: null,
-			root: null,
-			parent: null,
-			before: null,
-			members: null,
-			owner: null,
-			follows: false,
-			bound: null,
-		};
+		next = slot.next = newSlotNext(tx, null, null);
 		tx.ops.push(applySlotNext, slot);
 		// A window that drops truncates what it created; only a structure an
 		// outer window built needs copying back (below).
@@ -4689,7 +4680,47 @@ function queueSlotDeletion(
 function applySlotNext(slot: { next: SlotNext | null }): void {
 	const next = slot.next;
 	slot.next = null;
-	if (next !== null) applyNext(next);
+	if (next === null) return;
+	applyNext(next);
+	// Nothing names an applied record once its fragment lets go of it: reuse it.
+	if (SPARE_NEXTS.length < 64) {
+		if (next.frag !== null) (next.frag as any).$$next = undefined;
+		next.out.length = 0;
+		next.frag = next.root = next.parent = next.before = null;
+		next.members = next.bound = null;
+		next.owner = null;
+		next.follows = false;
+		SPARE_NEXTS.push(next);
+	}
+}
+
+/** Applied slot records, reset for the next render's (applySlotNext). */
+const SPARE_NEXTS: SlotNext[] = [];
+
+/** A slot's pending structure for `tx`: a spare record, or a new one. */
+function newSlotNext(
+	tx: RootRenderTransaction,
+	parent: Node | null,
+	owner: Block | null,
+): SlotNext {
+	const next = SPARE_NEXTS.pop();
+	if (next === undefined)
+		return {
+			tx,
+			out: [],
+			frag: null,
+			root: null,
+			parent,
+			before: null,
+			members: null,
+			owner,
+			follows: false,
+			bound: null,
+		};
+	next.tx = tx;
+	next.parent = parent;
+	next.owner = owner;
+	return next;
 }
 
 function applyNext(next: SlotNext): void {
@@ -4954,7 +4985,7 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 		) {
 			journalObjectOnce(next);
 			journalObjectOnce(next.out);
-			journalObjectOnce(next.members!);
+			if (next.members !== null) journalObjectOnce(next.members);
 		}
 		return next;
 	}
@@ -4963,18 +4994,8 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
 	let owner = parentBlock;
 	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
-	next = state.next = {
-		tx,
-		out: [],
-		frag: null,
-		root: null,
-		parent,
-		before: null,
-		members: [],
-		owner,
-		follows: false,
-		bound: null,
-	};
+	// Its members list starts with its first run (listRun).
+	next = state.next = newSlotNext(tx, parent, owner);
 	const ops = tx.ops;
 	if (at >= ops.length) ops.push(applySlotNext, state);
 	else ops.splice(at, 0, applySlotNext, state);
@@ -5019,6 +5040,7 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
 	if (n !== 0 && out[n - 3] === placeRun && out[n - 1] === anchor) return out[n - 2];
 	const frag = document.createDocumentFragment();
 	(frag as any).$$next = next;
+	next.members ??= [];
 	out.push(placeRun, frag, anchor);
 	return frag;
 }
@@ -9518,11 +9540,12 @@ function vtPreview(held: RootRenderTransaction[]): VtPreview {
 						arrivals.push({ parent: next.parent!, anchor: out[j + 2], nodes: row.startMarker! });
 				else if (entry !== moveBlockBefore) range(out[j + 1], out[j + 2]);
 			}
-			if (next.frag !== null && next.members !== null && next.parent !== null)
+			const nodes = next.root ?? (next.members !== null ? next.frag : null);
+			if (nodes !== null && next.parent !== null)
 				arrivals.push({
 					parent: next.parent,
 					anchor: next.follows && out.length !== 0 ? out[out.length - 2] : next.before,
-					nodes: next.frag,
+					nodes,
 				});
 		}
 	}
@@ -28842,9 +28865,12 @@ function retireEventHostTree(node: Node): void {
 	(node as any).$$retiredEpoch = ++eventRootEpoch;
 	if (retiringHostsSince === 0) {
 		retiringHostsSince = eventRootEpoch;
-		queueMicrotask(() => {
-			retiringHostsSince = 0;
-		});
+		// A commit detaches what it retires before it ends, and resets the epoch
+		// then (runCommitOps); a retirement outside one lasts its task.
+		if (COMMITTING_OWNER === null)
+			queueMicrotask(() => {
+				retiringHostsSince = 0;
+			});
 	}
 }
 
@@ -47093,6 +47119,7 @@ export function forBlock<T>(
 			if (next !== null) {
 				frag = document.createDocumentFragment();
 				(frag as any).$$next = next;
+				next.members ??= [];
 				next.out.push(placeRun, frag, state.end);
 				sentinel = frontierSentinel(frag, '/for');
 			}
