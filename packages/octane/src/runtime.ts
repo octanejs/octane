@@ -13335,7 +13335,10 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 		return;
 	}
 	if (TEARDOWN_DEPTH === 0) {
-		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		// rendererRegionTryHandler's test, inline: a document with no region bridge.
+		TEARDOWN_HANDLER =
+			findTryHandler(block.parentBlock) ??
+			(RENDERER_REGION_OWNER_COUNT === 0 ? null : rendererRegionTryHandler(block));
 		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
@@ -18174,6 +18177,8 @@ function rendererRegionOwnerForBlock(block: Block | null): RendererRegionOwnerBr
 }
 
 function rendererRegionTryHandler(block: Block | null): ((error: unknown) => void) | null {
+	// Every top-level teardown asks; a document with no region bridge has none.
+	if (RENDERER_REGION_OWNER_COUNT === 0) return null;
 	const bridge = rendererRegionOwnerForBlock(block);
 	if (bridge === null) return null;
 	return (error) => {
