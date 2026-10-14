@@ -1796,17 +1796,21 @@ describe.each([
 			{ from: 'p', to: 'undefined', text: '', server: '<p>' },
 			{ from: 'inner', to: null, text: '', server: '<b>' },
 			{ from: 'list', to: null, text: '', server: undefined },
-			{ from: 'textThenP', to: null, text: '', server: 'text "A"' },
+			// An only-child hole names the first element of the range it finds.
+			{ from: 'textThenP', to: null, text: '', server: 'text "A"', onlyChild: '<p>' },
 			{ from: 'textThenP', to: 'text', text: 'A', server: '<p>' },
 		])(
 			'renders the root on the client for a server $from and a client $to value, reporting it once',
-			async ({ from, to, text, server: serverDescription }) => {
+			async ({ from, to, text, server: serverDescription, onlyChild }) => {
 				const s = hydrate({ kind: from, v: 'A', tail: 't' }, { kind: to, v: 'A', tail: 't' });
 				try {
 					expect(survivors(s.serverNodes)).toEqual([]);
 					const parent = s.parent();
 					expect(markup(parent)).toBe(text + tailHtml('t'));
-					await expectReported(s.recovered, serverDescription);
+					await expectReported(
+						s.recovered,
+						name === 'Hole' && onlyChild !== undefined ? onlyChild : serverDescription,
+					);
 
 					// The client-rendered tree updates like any other.
 					s.render({ kind: 'text', v: 'B', tail: 't' });

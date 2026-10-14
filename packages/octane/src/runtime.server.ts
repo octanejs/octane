@@ -2527,6 +2527,8 @@ function ssrChildValue(
 // it); empty renders nothing (the host is sole-child, so there's no sibling cursor
 // to keep aligned).
 export function ssrChildText(v: unknown, scope: SSRScope): string {
+	// A signal's primitive value is the host's text too.
+	if (isSignalHandle(v)) v = readSignalBinding(v);
 	if (probingDangerHtmlChild(v)) return '';
 	if (v == null || v === false || v === true) return '';
 	if (typeof v === 'object' || typeof v === 'function') return ssrChild(v, scope);

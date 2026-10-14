@@ -37,7 +37,7 @@ const FAMILIES = {
 	// A component's returned value (#2028 commit 2).
 	returned: ['renderReturnedValue', 'lendRange'],
 	// De-opt descriptor lists (commit 3).
-	descriptors: ['deoptItemBody', 'renderPreparedChildList', 'buildsList'],
+	descriptors: ['deoptItemBody', 'renderPreparedChildList', 'buildsList', 'deoptItemSelfDelimits'],
 	// Strong, lite and void component calls (commit 5).
 	components: ['componentSlotImpl', 'componentSlotLite'],
 	// Compiled template roots, renderable and text holes, lists and branches (commit 6).
@@ -50,13 +50,16 @@ const FAMILIES = {
 		'unclaimedText',
 		'adoptBindingText',
 	],
-	lists: ['mountItem', 'forBlock', 'mountPassthroughListItem', 'mountItemsLinear'],
+	lists: ['mountItem', 'forBlock'],
 	branches: ['branchOpen', 'settleArmTail', 'renderBranchSlot', 'activityBlock'],
 	// Root entry and `<Hydrate>` islands (commit 10a).
 	roots: [
+		// A passthrough root's lists (range-boundary.test.ts) go with its root.
+		'mountPassthroughListItem',
 		'hydrateRootWithOutputHandler',
 		'createHydrateSlot',
 		'wrapUnframedRoot',
+		'unframedRoot',
 		'adopt',
 		'retry',
 	],
@@ -65,14 +68,16 @@ const FAMILIES = {
 // Misses per family over SUITES at the commit that last lowered each budget.
 const BUDGET = {
 	returned: 0,
-	descriptors: 46,
 	components: 0,
-	// Strict calls (commit 5) leave the server's ranges to the template roots.
-	templates: 5900,
-	holes: 904,
-	lists: 2114,
-	branches: 216,
-	roots: 32,
+	templates: 0,
+	holes: 0,
+	lists: 0,
+	branches: 0,
+	// Commit 6 left two probes to the families whose commits replace them: a
+	// de-opt list item's shape (deoptItemSelfDelimits, commit 3) and an unframed
+	// root return (unframedRoot) or passthrough root's list (commit 10a).
+	descriptors: 316,
+	roots: 125,
 };
 
 const OWNER = new Map();

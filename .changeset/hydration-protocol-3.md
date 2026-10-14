@@ -10,18 +10,24 @@ components it returns in turn: a component returning `<em>` serializes as
 A component that is a `@for` or `.map()` item's only content now keeps its own
 range inside the item's, also when `.map()` runs another collection's `map`
 method. A keyed or configured `<Activity>` in a `.tsx` component's returned JSX
-passes its children to the server as a children block, as the client does. On
-the client, a component's returned value renders inside the component's own
-markers on a fresh mount too, so it adds no anchor comments.
+passes its children to the server as a children block, as the client does. An
+element's only child that is a signal holding text, or a ternary with a JSX arm
+in a `.tsx` component's returned JSX, serializes as the element's bare text when
+its value is text, as the client renders it. On the client, a component's
+returned value renders inside the component's own markers on a fresh mount
+too, so it adds no anchor comments.
 
 Hydration now adopts by structure. The server frames every component call, and
 a client call whose range the server did not render is a structural mismatch:
 the nearest Suspense or `<Hydrate>` boundary, or the root, renders on the client
 and reports one recoverable error, and the development warning names the call
-site. React adopts such a tree when its DOM happens to match, as when the server
-rendered another branch that renders a component's elements inline. As in
-React, a suspension in a component's body still keeps the server HTML until it
-resolves.
+site. So does a list, branch or text hole whose server range has another shape:
+a list range without its item marker, a range around each row of a list whose
+rows are one element each, a branch whose server arm is longer than the
+client's, or a range where an element's only child is text. React adopts such a
+tree when its DOM happens to match, as when the server rendered another branch
+that renders a component's elements inline. As in React, a suspension in a
+component's body still keeps the server HTML until it resolves.
 
 The seed script names the new version (`data-octane-suspense="3"`). A root whose
 server rendered another version renders on the client and reports error 345

@@ -120,26 +120,47 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 		}
 	});
 
-	it('also adopts legacy per-item pairs when the client can self-delimit rows', () => {
+	// OCTANE DIVERGENCE: rows of one element are self-delimiting on the wire, so
+	// an older server's per-row range is another list shape. The root renders on
+	// the client and reports one recoverable error.
+	it('renders the root on the client for legacy per-item pairs around self-delimiting rows', async () => {
 		const items = [
 			{ id: 1, name: 'Alpha' },
 			{ id: 2, name: 'Beta' },
 		];
-		const { html } = ServerRT.renderToString(server.List, { items, onPick: () => {} });
+		const onPick = vi.fn();
+		const { html } = ServerRT.renderToString(server.List, { items, onPick });
 		container.innerHTML = html;
 		const rows = [...container.querySelectorAll('li.row')];
 		for (const row of rows) {
 			row.parentNode!.insertBefore(document.createComment('['), row);
 			row.parentNode!.insertBefore(document.createComment(']'), row.nextSibling);
 		}
-		const before = container.innerHTML;
-
-		const root = hydrateRoot(container, List, { items, onPick: () => {} });
-		flushSync(() => {});
-
-		expect(container.innerHTML).toBe(before);
-		expect([...container.querySelectorAll('li.row')]).toEqual(rows);
-		root.unmount();
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			List,
+			{ items, onPick },
+			{
+				onRecoverableError: (error: unknown) => recoverable.push(error),
+			},
+		);
+		try {
+			flushSync(() => {});
+			await act(async () => {});
+			expect(recoverable).toHaveLength(1);
+			expect(rows.some((row) => row.isConnected)).toBe(false);
+			expect([...container.querySelectorAll('li.row .name')].map((n) => n.textContent)).toEqual([
+				'Alpha',
+				'Beta',
+			]);
+			flushSync(() => (container.querySelector('li.row button') as HTMLButtonElement).click());
+			expect(onPick).toHaveBeenCalledExactlyOnceWith(1);
+		} finally {
+			root.unmount();
+			errors.mockRestore();
+		}
 	});
 
 	it('adopts stateful component rows and preserves their identity through keyed updates', () => {
