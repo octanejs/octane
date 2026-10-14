@@ -87,6 +87,33 @@ for (const mode of ['render', 'hydrate'] as const) {
 			expect(container.querySelector('[data-callback]')!.textContent).toBe('two:payload');
 		});
 
+		it('preserves deferred render bodies through TypeScript expression wrappers', () => {
+			const hiddenRead = vi.fn(() => {
+				throw new Error('Wrapped content has not been inserted');
+			});
+			const app = start('WrappedRenderValues', {
+				visible: false,
+				get label() {
+					return hiddenRead();
+				},
+			});
+			expect([...container.querySelectorAll('section')].map((node) => node.dataset.kind)).toEqual([
+				'body',
+				'body',
+				'body',
+			]);
+			expect(container.querySelector('span')).toBeNull();
+			expect(hiddenRead).not.toHaveBeenCalled();
+			app.update({ visible: true, label: 'one' });
+			const spans = [...container.querySelectorAll('span')];
+			expect(spans.map((node) => node.textContent)).toEqual(['one', 'one', 'one']);
+			app.update({ visible: true, label: 'two' });
+			for (const [index, span] of spans.entries()) {
+				expect(container.querySelectorAll('span')[index]).toBe(span);
+				expect(span.textContent).toBe('two');
+			}
+		});
+
 		it('evaluates only inserted content under the receiver context and retains captured updates', () => {
 			const events: string[] = [];
 			const evaluate = vi.fn();
@@ -439,6 +466,24 @@ for (const mode of ['render', 'hydrate'] as const) {
 		});
 	});
 }
+
+it('classifies TypeScript-wrapped blocks as render bodies on the server', () => {
+	container = document.createElement('div');
+	container.innerHTML = Server.renderToString(server.WrappedRenderValues, {
+		visible: true,
+		label: 'server',
+	}).html;
+	expect([...container.querySelectorAll('section')].map((node) => node.dataset.kind)).toEqual([
+		'body',
+		'body',
+		'body',
+	]);
+	expect([...container.querySelectorAll('span')].map((node) => node.textContent)).toEqual([
+		'server',
+		'server',
+		'server',
+	]);
+});
 
 it.each(['client', 'server'] as const)(
 	'retains the descriptor contract outside Strong mode (%s)',

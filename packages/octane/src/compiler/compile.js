@@ -16004,9 +16004,10 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		// `fallback={<span/>}` or `fallback={(e) => <ErrorFallback/>}` — so esrap
 		// emits a real descriptor instead of raw (unprintable) JSX. Mirrors the
 		// client makeCompCall path; the renderPropChild branch below does the same.
+		const renderBlock = unwrapTsExpr(inner);
 		inner = resolveStyleExpr(
-			ctx.strongRenderValues && inner.type === 'JSXCodeBlock'
-				? compileRenderBlockValue(inner, ctx)
+			ctx.strongRenderValues && renderBlock.type === 'JSXCodeBlock'
+				? compileRenderBlockValue(renderBlock, ctx)
 				: rewriteJsxValues(inner, ctx),
 			cssHash,
 		);
@@ -34637,9 +34638,10 @@ function makeCompCall(
 		// Lower any JSX in the prop value to createElement(...) — e.g.
 		// `<Suspense fallback={<span/>}>` or a render-prop returning JSX — so esrap
 		// emits a real descriptor instead of raw (unprintable) JSX.
-		if (ctx.strongRenderValues && inner.type === 'JSXCodeBlock') {
-			renderBlockPropNodes.push(inner);
-			inner = compileRenderBlockValue(inner, ctx);
+		const renderBlock = unwrapTsExpr(inner);
+		if (ctx.strongRenderValues && renderBlock.type === 'JSXCodeBlock') {
+			renderBlockPropNodes.push(renderBlock);
+			inner = compileRenderBlockValue(renderBlock, ctx);
 		} else {
 			inner = rewriteJsxValues(inner, ctx);
 		}

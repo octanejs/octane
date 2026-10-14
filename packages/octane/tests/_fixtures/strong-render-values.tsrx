@@ -22,6 +22,44 @@ function Slot(props: { content: OctaneNode; visible: boolean; channel: string })
 	</Channel>
 }
 
+export function WrappedRenderValues(props: { label: string; visible: boolean }) @{
+	<div>
+		<Slot
+			visible={props.visible}
+			channel="receiver"
+			content={
+				(
+					@{
+						<span>{props.label}</span>
+					}
+				) as OctaneNode
+			}
+		/>
+		<Slot
+			visible={props.visible}
+			channel="receiver"
+			content={
+				(
+					@{
+						<span>{props.label}</span>
+					}
+				) satisfies OctaneNode
+			}
+		/>
+		<Slot
+			visible={props.visible}
+			channel="receiver"
+			content={
+				(
+					@{
+						<span>{props.label}</span>
+					}
+				)!
+			}
+		/>
+	</div>
+}
+
 export function NamedRenderValue(props: {
 	label: string;
 	visible: boolean;
