@@ -50,13 +50,16 @@ const FAMILIES = {
 		'unclaimedText',
 		'adoptBindingText',
 	],
-	lists: ['mountItem', 'forBlock', 'mountPassthroughListItem', 'mountItemsLinear'],
+	lists: ['mountItem', 'forBlock'],
 	branches: ['branchOpen', 'settleArmTail', 'renderBranchSlot', 'activityBlock'],
 	// Root entry and `<Hydrate>` islands (commit 10a).
 	roots: [
+		// A passthrough root's lists (range-boundary.test.ts) go with its root.
+		'mountPassthroughListItem',
 		'hydrateRootWithOutputHandler',
 		'createHydrateSlot',
 		'wrapUnframedRoot',
+		'unframedRoot',
 		'adopt',
 		'retry',
 	],
@@ -67,12 +70,13 @@ const BUDGET = {
 	returned: 0,
 	descriptors: 0,
 	components: 0,
-	// Strict calls (commit 5) leave the server's ranges to the template roots.
-	templates: 5900,
-	holes: 904,
-	lists: 2114,
-	branches: 216,
-	roots: 32,
+	templates: 0,
+	holes: 0,
+	lists: 0,
+	branches: 0,
+	// Commit 6 left an unframed root return (unframedRoot) and a passthrough
+	// root's lists to commit 10a.
+	roots: 125,
 };
 
 const OWNER = new Map();

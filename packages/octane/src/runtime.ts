@@ -20709,17 +20709,6 @@ class HydrationCapability {
 	 * render has yet to claim it (deoptItemBody).
 	 */
 	lentSlot: ChildSlot | null = null;
-	/**
-	 * The adopted @if/@switch arm that renderAdoptedArm is rendering. Null once
-	 * the arm clones a template of its own, whose roots the cursor rests on.
-	 */
-	private arm: Block | null = null;
-	/**
-	 * Where the last server range that one of `arm`'s own slots claimed parked
-	 * the cursor, and how many slots `arm` had then.
-	 */
-	private armTail: Node | null = null;
-	private armSlots = 0;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
@@ -21072,15 +21061,6 @@ class HydrationCapability {
 	}
 
 	/**
-	 * The open marker of the server range that a renderable hole adopts on its
-	 * first render, at `anchor`, where its compiled walk found the server node
-	 * for its own placeholder, or null for any other node.
-	 */
-	holeOpen(anchor: Node | null | undefined): Comment | null {
-		return isBlockOpen(anchor ?? null) ? (anchor as Comment) : null;
-	}
-
-	/**
 	 * Whether the dynamic range that `end` closes was built on the client, so
 	 * its body builds rather than adopts.
 	 */
@@ -21281,12 +21261,17 @@ class HydrationCapability {
 		return created;
 	}
 
+	/**
+	 * The open marker of the server range a slot adopts on its first render: at
+	 * `anchor`, where its compiled walk found the slot's placeholder, or, for an
+	 * appended slot or the sole slot of a range, at the cursor in `domParent`.
+	 * The server frames every slot (protocol 3), so null is a structural
+	 * mismatch unless the slot renders in a range the client built.
+	 */
 	resolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
 		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
 		const cursor = this.cursorIn(domParent);
-		const open = cursor !== null && isBlockOpen(cursor);
-		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('resolveOpen', open);
-		return open ? (cursor as Comment) : null;
+		return isBlockOpen(cursor) ? cursor : null;
 	}
 
 	/** The cursor, or `domParent`'s first child when the cursor is elsewhere. */
@@ -21306,10 +21291,10 @@ class HydrationCapability {
 	 * on the client, into detached DOM.
 	 */
 	callOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment | null {
-		if (isBlockOpen(anchor)) return anchor as Comment;
-		const cursor = this.cursorIn(domParent);
-		if (isBlockOpen(cursor)) return cursor as Comment;
-		const actual = anchor !== null && anchor !== scope.block.endMarker ? anchor : cursor;
+		const open = this.resolveOpen(anchor, domParent);
+		if (open !== null) return open;
+		const actual =
+			anchor !== null && anchor !== scope.block.endMarker ? anchor : this.cursorIn(domParent);
 		if (!this.defers) this.slotMismatch(scope, slotKey, 'a component range', actual);
 		this.adopting = true;
 		try {
@@ -21351,6 +21336,8 @@ class HydrationCapability {
 	 * renders on the client (see HydrationMismatch), as React does.
 	 */
 	mismatch(loc: string | undefined, expected: () => string, actual: Node | null): never {
+		// A deferred mismatch comes first in React's order: it is the one reported.
+		if (this.deferred !== null && !this.adopting) this.claimDeferred();
 		const error = new HydrationMismatch();
 		if (process.env.NODE_ENV !== 'production') {
 			// A mismatch that a template's adoption defers is reported only when the
@@ -21550,65 +21537,33 @@ class HydrationCapability {
 	 * boundary left it.
 	 */
 	parkPast(close: Node, parent: Scope): void {
-		if (parent.block.disposed) return;
-		const next = (this.node = getNextSibling(close));
-		if (parent === this.arm) {
-			this.armTail = next;
-			this.armSlots = parent.slots.length;
-		}
+		if (!parent.block.disposed) this.node = getNextSibling(close);
 	}
 
 	/**
 	 * First render of an @if or @switch arm into the server range it adopted,
-	 * `block`'s own. Returns the node from which whatever the server rendered
-	 * belongs to no client node (settleArmTail), with the cursor parked on it:
-	 * the first node after the roots of the arm's own template, which records
-	 * them as the range's content (claimRoots), or else where the arm's last
-	 * slot parked the cursor after the range it claimed. Null when a later slot
-	 * adopted without either, since the cursor then rests on the roots it
-	 * adopted.
+	 * `block`'s own. The cursor ends after what the arm adopted: past the roots
+	 * of its own template (claimRoots), or past the range its last slot claimed.
 	 */
-	renderAdoptedArm(block: Block): Node | null {
-		const outerArm = this.arm;
-		const outerTail = this.armTail;
-		const outerSlots = this.armSlots;
+	renderAdoptedArm(block: Block): void {
 		const outerClaim = this.beginClaim(getNextSibling(block.startMarker!));
-		this.arm = block;
-		this.armTail = null;
-		let parked: Node | null = null;
 		let claimed: Node | null | undefined;
 		try {
 			renderBlock(block);
-			if (this.arm === block && this.armSlots === block.slots.length) parked = this.armTail;
 		} finally {
 			claimed = this.endClaim(outerClaim);
-			this.arm = outerArm;
-			this.armTail = outerTail;
-			this.armSlots = outerSlots;
 		}
-		// The cursor rests on the roots the arm's own template adopted, or inside
-		// them: step it past them, as a range claim parks it.
-		return claimed == null ? parked : (this.node = claimed);
+		if (claimed != null) this.node = claimed;
 	}
 
 	/**
 	 * Runs after a branch's first hydrating render, which adopted the server's
-	 * arm range from `first` to `end`, when the cursor did not reach `end`.
-	 * Every slot the arm renders parks the cursor past the range it claimed, so
-	 * once the arm has claimed something, a server range at the cursor is one
-	 * that nothing in the arm claimed: the server rendered another arm here,
-	 * longer than this one. So is any server content at `parked`, where the arm
-	 * parked the cursor after its own template's roots, or after its last
-	 * slot's range or in-place root (renderAdoptedArm). An arm that rendered
-	 * nothing leaves the cursor on `first`, and the whole range is then the
-	 * server's other arm. The cursor does not move past the elements and text
-	 * that a template adopts, so at an element or text node it cannot otherwise
-	 * tell what the arm adopted from what the server rendered for another arm:
-	 * `parked` does, and anything else stays.
+	 * arm range from `first` to `end`, when the cursor did not reach `end`:
+	 * what is left is content the server rendered for another arm, longer than
+	 * this one, or the whole range when the arm rendered nothing.
 	 */
-	settleArmTail(scope: Scope, slotKey: number, first: Node, end: Node, parked: Node | null): void {
+	settleArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
 		const from = this.node;
-		if (!this.isOpen(from) && (parked === null || from !== parked)) return;
 		let node: Node | null = from;
 		while (node !== null && node !== end) node = getNextSibling(node);
 		// Only server content that precedes `end` is the arm's.
@@ -21895,6 +21850,15 @@ class HydrationCapability {
 		this.rootCleanupBoundary = node;
 	}
 
+	/**
+	 * Whether a root's return slot finds no server range at `anchor` or the
+	 * cursor: a root that renders text, nothing, or a third-party component's
+	 * markup there (wrapUnframedRoot).
+	 */
+	unframedRoot(anchor: Node | null): boolean {
+		return !isBlockOpen(anchor) && !this.isOpen(this.node);
+	}
+
 	/** Bound an unframed third-party component root so its returned value can adopt it. */
 	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
 		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('unframedRoot', false);
@@ -21953,7 +21917,7 @@ class HydrationCapability {
 			node !== null && node !== cursor;
 			node = getNextSibling(node)
 		) {
-			if (this.isOpen(node)) {
+			if (isBlockOpen(node)) {
 				if (depth === 0) outerOpen = node;
 				depth++;
 			} else if (this.isClose(node) && depth > 0) {
@@ -22121,8 +22085,6 @@ class HydrationCapability {
 		partialStyles?: string,
 	): Node {
 		let cursor = this.node;
-		// The arm's own template: its roots may follow the arm's last claim.
-		if (this.arm !== null && CURRENT_SCOPE?.block === this.arm) this.arm = null;
 		const isFragment =
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
 		// Lite/no-template wrappers can render the logical root while sharing the
@@ -22288,7 +22250,8 @@ class HydrationCapability {
 				return this.passthroughRoot;
 			}
 		}
-		this.claimEnd = getNextSibling(this.isOpen(node) ? this.close(node) : node);
+		// The last root steps over its server range, as the compiled walk does.
+		this.claimEnd = getNextSibling(isBlockOpen(node) ? this.close(node) : node);
 		return true;
 	}
 
@@ -22323,40 +22286,9 @@ class HydrationCapability {
 		)
 			return false;
 		const first = getFirstChild(el);
-		if (
-			first === null ||
-			(first.nodeType === 3 && getNextSibling(first) === null) ||
-			this.textFrameEnd(first) !== null
-		)
-			return false;
+		if (first === null || (first.nodeType === 3 && getNextSibling(first) === null)) return false;
 		(KEPT_TEXT_CONTENT ??= new WeakSet()).add(el);
 		return true;
-	}
-
-	/**
-	 * The close of the frame `first` opens, when it is an exact text-only or
-	 * empty `<!--[-->…<!--]-->` frame around all of its host's content: a sole
-	 * primitive the server framed (e.g. a spread or ternary child), which is
-	 * the host's text as a bare one is.
-	 */
-	private textFrameEnd(first: Node | null): Comment | null {
-		if (!this.isOpen(first)) return null;
-		const child = getNextSibling(first);
-		const end = child?.nodeType === 3 ? getNextSibling(child) : child;
-		return this.isClose(end) && getNextSibling(end) === null ? end : null;
-	}
-
-	/**
-	 * Whether the server framed `el`'s only child in a `<!--[-->…<!--]-->` range
-	 * holding something other than one text node or nothing. htext unwraps a
-	 * text-only frame; any other framed content belongs to a child slot.
-	 */
-	framesSlotContent(el: Node): boolean {
-		const first = getFirstChild(el);
-		if (!this.isOpen(first)) return false;
-		let next = getNextSibling(first);
-		if (next !== null && next.nodeType === 3) next = getNextSibling(next);
-		return !this.isClose(next);
 	}
 
 	/**
@@ -22380,24 +22312,10 @@ class HydrationCapability {
 				(first as Text).nodeValue = text;
 			return first as Text;
 		}
-		if (this.unframe(first)) return this.htext(el, text, loc);
 		if (first !== null) this.unclaimedText(el, first, text, loc);
 		const created = this.newText(el, text, loc);
 		el.appendChild(created);
 		return created;
-	}
-
-	/**
-	 * Unwrap the text frame `first` opens (textFrameEnd), if any, so that the
-	 * text hole adopts, compares and suppresses as for bare text, without
-	 * child-slot state (htext, hempty). Whether it did.
-	 */
-	private unframe(first: Node | null): boolean {
-		const end = this.textFrameEnd(first);
-		if (end === null) return false;
-		(first as Comment).remove();
-		end.remove();
-		return true;
 	}
 
 	/**
@@ -22416,9 +22334,21 @@ class HydrationCapability {
 					: text === ''
 						? 'nothing'
 						: `text ${JSON.stringify(text)}`,
-			// Name a server range by the content it frames.
-			(this.isOpen(from) ? getNextSibling(from) : null) ?? from,
+			// Name a server range by the content it frames: its first element.
+			isBlockOpen(from) ? this.framedContent(from) : from,
 		);
+	}
+
+	/** The first element in the server range `open` starts, else its first node. */
+	private framedContent(open: Comment): Node {
+		const end = this.close(open);
+		for (
+			let node = getNextSibling(open);
+			node !== null && node !== end;
+			node = getNextSibling(node)
+		)
+			if (node.nodeType === 1) return node;
+		return getNextSibling(open) ?? open;
 	}
 
 	/**
@@ -22443,7 +22373,7 @@ class HydrationCapability {
 		render: (parent: Node) => void,
 	): void {
 		let stale = getFirstChild(el);
-		if (this.isOpen(stale)) {
+		if (isBlockOpen(stale)) {
 			this.node = stale;
 			render(el);
 			return;
@@ -22509,7 +22439,6 @@ class HydrationCapability {
 		const first = getFirstChild(el);
 		if (first === null || (el as Element).localName === 'textarea' || this.freshNodes.has(el))
 			return null;
-		if (this.unframe(first)) return this.hempty(el, text, loc);
 		if (first.nodeType === 3 && getNextSibling(first) === null) {
 			// With no host, keepsText applies no suppressHydrationWarning, and the
 			// hole already ruled out a host it would write the client's text into.
@@ -38543,6 +38472,7 @@ export function childSlot(
 			rootShapeChanged = true;
 		}
 	}
+	// A root's return slot with no server range at its anchor or the cursor.
 	const unframedComponentRoot =
 		state === undefined &&
 		hydration !== null &&
@@ -38551,15 +38481,13 @@ export function childSlot(
 		hydration.node.parentNode === domParent &&
 		preparedList === null &&
 		typeof elementType === 'function' &&
-		!hydration.isOpen(anchor ?? null) &&
-		!hydration.isOpen(hydration.node);
+		hydration.unframedRoot(anchor ?? null);
 	if (
 		state === undefined &&
 		hydration !== null &&
 		!hydrationTransparent &&
 		parentBlock === hydration.rootBlock &&
-		!hydration.isOpen(anchor ?? null) &&
-		!hydration.isOpen(hydration.node)
+		hydration.unframedRoot(anchor ?? null)
 	) {
 		// Generic root returns normally serialize as one hydratable range. Plain
 		// strings/null are the two unframed root forms; accept their matching DOM.
@@ -38638,7 +38566,8 @@ export function childSlot(
 			adoptedRange = hydration !== null;
 		} else if (unframedComponentRoot) {
 			[start, end] = hydration!.wrapUnframedRoot(hydration!.node!);
-		} else if (hydration !== null && (start = hydration.holeOpen(anchor))) {
+		} else if (hydration !== null && isBlockOpen(anchor ?? null)) {
+			start = anchor as Comment;
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
 			// server's `<!--[-->`. Adopt that `<!--[-->…<!--]-->` range as our markers
 			// and point the cursor at the first content node for the Block's clone()
@@ -38647,7 +38576,7 @@ export function childSlot(
 			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
 			hydration.node = getNextSibling(start);
 			adoptedRange = true;
-		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
+		} else if (hydration !== null && isBlockOpen(hydration.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
 			// anchor is the block's end-marker (not a `<!--[-->`), but the CURSOR sits
 			// on the server's range-open. Adopt from the cursor. This is what lets a
@@ -38859,6 +38788,9 @@ export function childSlot(
 			compiledMapDeps,
 			mappedFallback,
 		);
+		// Past the list's adopted range, as after a component's (below).
+		if (hydration !== null && !state.borrowed && state.end !== null)
+			hydration.parkPast(state.end, parentScope);
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
@@ -39754,11 +39686,7 @@ export function childTextHole(
 			return tn;
 		}
 		if (hydration.keepsServerContent(domParent)) return null;
-		// A server range around an element, component, or list is slot content
-		// markerless text cannot adopt: childSlot below adopts that range and
-		// discards what the text cannot use.
-		if (!hydration.framesSlotContent(domParent))
-			return hydration.htext(domParent, str, siteLoc(parentScope, slotKey));
+		return hydration.htext(domParent, str, siteLoc(parentScope, slotKey));
 	}
 	// Object/function value (or already in slot mode, or text the server framed
 	// slot content around on its first hydrating render): hand off to childSlot in
@@ -45740,7 +45668,7 @@ function renderBranchSlot(
 					// hydration minted (a swap) holds client content only: build the branch
 					// into it as client DOM.
 					if (hydration !== null) {
-						if (hydration.isOpen(state.start)) hydration.node = first = getNextSibling(state.start);
+						if (isBlockOpen(state.start)) hydration.node = first = getNextSibling(state.start);
 						else rebuild = true;
 					}
 				}
@@ -45764,11 +45692,11 @@ function renderBranchSlot(
 					hydration!.suspend(() => renderBlock(b));
 					hydration!.node = getNextSibling(state.end as Node);
 				} else if (first !== null) {
-					const parked = hydration!.renderAdoptedArm(b);
+					hydration!.renderAdoptedArm(b);
 					// The server may have rendered another arm here, longer than this one
 					// or one this arm renders nothing of.
 					if (hydration!.node !== bEnd)
-						hydration!.settleArmTail(parentScope, slotKey, first!, bEnd, parked);
+						hydration!.settleArmTail(parentScope, slotKey, first!, bEnd);
 				} else {
 					renderBlock(b);
 				}
@@ -47128,28 +47056,15 @@ export function forBlock<T>(
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
-		if (hydration !== null && hydration.isOpen(anchor ?? null)) {
-			// Hydration: the server wrapped the whole @for in a `<!--[-->…<!--]-->`
-			// range (anchor resolved to the outer `<!--[-->`). Adopt it as the slot
-			// markers and point the cursor at the first item's `<!--[-->` so the
-			// empty→fill mount below adopts each item via mountItem.
-			start = anchor as Comment;
-			end = hydration.close(anchor as Node);
-			hydration.node = getNextSibling(start);
-		} else if (
-			hydration !== null &&
-			hydration.isOpen(hydration.node) &&
-			hydration.node.parentNode === domParent
-		) {
-			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
-			// owning body (e.g. a `@try { @for }` arm or a component whose body is a
-			// bare @for), so the compiler emitted no anchor — but mountTry/renderBlock
-			// parked the CURSOR on the server's `<!--[-->`. Adopt from the cursor, the
-			// same way childSlot does for a sole renderable hole. A cursor outside
-			// `domParent` belongs to another range (resolveOpen applies the same rule).
-			start = hydration.node as Comment;
-			end = hydration.close(hydration.node as Node);
-			hydration.node = getNextSibling(start);
+		const open = hydration?.resolveOpen(anchor ?? null, domParent) ?? null;
+		if (open !== null) {
+			// Hydration: the server wrapped the whole @for in a `<!--[f…-->…<!--]-->`
+			// range, at the anchor or, for a sole @for of its body, at the cursor.
+			// Adopt it as the slot's markers and point the cursor at the first
+			// item so that the empty→fill mount below adopts each item (mountItem).
+			start = open;
+			end = hydration!.close(open);
+			hydration!.node = getNextSibling(start);
 		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
 			hydration.suspend(() =>
 				forBlock(
@@ -47219,10 +47134,11 @@ export function forBlock<T>(
 	// including a zero-item list that already has a retained slot, or one that
 	// kept no items after a fill threw.
 	if (hydration !== null && state.size === 0) hydration.node = getNextSibling(state.start);
-	// New direct-host list output carries its server-selected arm on the existing
-	// outer open comment. Legacy/general list ranges return -1 and retain the
-	// content-shape checks used before markerless SSR items existed.
+	// The list's open says which arm the server rendered: items or @empty
+	// (hydration-protocol.ts). A plain range is not a list's.
 	const serverMarkerState = hydration?.markerState(state.start) ?? -1;
+	if (serverMarkerState === -1 && hydration !== null)
+		hydration.slotMismatch(parentScope, slotKey, 'a list range', state.start);
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
@@ -47257,10 +47173,7 @@ export function forBlock<T>(
 				// The server rendered a populated list where the client renders @empty:
 				// the content inside the @for range is item blocks (`<!--[-->`), not the
 				// @empty body.
-				if (
-					serverMarkerState === 1 ||
-					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start)))
-				)
+				if (serverMarkerState === 1)
 					hydration.listArmMismatch(parentScope, slotKey, state.start, true);
 				// The server already rendered the @empty content directly inside the
 				// adopted outer range. The empty body borrows that range and adopts from
@@ -47331,19 +47244,9 @@ export function forBlock<T>(
 			__profileCount(ProfileCounter.FOR_EMPTY_UNMOUNT);
 		state.emptyBlock = null;
 	}
-	// Hydrating, the server rendered no items (its open marker says so, or, on a legacy
-	// marker, the node right after `start` is not an item's `<!--[-->` but @empty content)
-	// where the client has items.
-	if (
-		!isEmpty &&
-		hydration !== null &&
-		(serverMarkerState === 0 ||
-			(serverMarkerState === -1 &&
-				((flags || 0) & 16) === 0 &&
-				getNextSibling(state.start) !== null &&
-				getNextSibling(state.start) !== state.end &&
-				!hydration.isOpen(getNextSibling(state.start))))
-	) {
+	// Hydrating, the server rendered no items (its open marker says so) where the
+	// client has items.
+	if (!isEmpty && hydration !== null && serverMarkerState === 0) {
 		hydration.listArmMismatch(parentScope, slotKey, state.start, false);
 	}
 	const f = flags || 0;
@@ -49217,14 +49120,16 @@ function mountItem<T>(
 			if (
 				descriptor
 					? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
-					: ssrMarkerless && !hydration.isOpen(node)
+					: ssrMarkerless
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
 				// direct-host item self-delimits, exactly like the existing client-mount
-				// singleRoot path. A de-opt item adopts only an element of its own tag.
+				// singleRoot path: its template adopts the element at the cursor. A
+				// de-opt item adopts only an element of its own tag.
 				if (
 					node !== null &&
 					node !== forSlot.end &&
+					!isBlockOpen(node) &&
 					(!descriptor ||
 						(node.nodeType === 1 &&
 							node.parentNode === parentNode &&
@@ -49248,11 +49153,9 @@ function mountItem<T>(
 					hydration.node = block.endMarker?.nextSibling ?? getNextSibling(node);
 					return block;
 				}
-			} else if (descriptor ? isBlockOpen(node) : hydration.isOpen(node)) {
+			} else if (isBlockOpen(node)) {
 				// Hydration: the server wraps each GENERAL-SHAPE item in its own
-				// `<!--[-->…<!--]-->` range. A compiled row also accepts this legacy
-				// marked encoding where a current direct-host client could have adopted
-				// markerlessly, which keeps mixed-version/dev hydration recoverable.
+				// `<!--[-->…<!--]-->` range.
 				const itemEnd = hydration.close(node as Node);
 				hydration.node = getNextSibling(node!);
 				const block = createBlock(
