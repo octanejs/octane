@@ -2583,7 +2583,8 @@ function ssrHostElement(
 	children: any,
 	scope: SSRScope,
 	rawInner?: string,
-	frame?: 'item' | 'child',
+	frame?: 'item' | 'raw-item' | 'child',
+	descriptorOutput?: { hasBlocks: boolean },
 ): string {
 	// A descriptor tag is concatenated into the response verbatim — validate it
 	// like React does (Invalid tag → throw) so a hostile/buggy dynamic tag (e.g.
@@ -2608,8 +2609,14 @@ function ssrHostElement(
 	try {
 		// Decide ownership from the same traversal that serializes these children:
 		// probing an accessor or iterable again can change its public value.
-		const selfMarkedItem = frame === 'item' && serverHostHasPrimitiveChildren(children);
-		let blockChildren = false;
+		const isItem = frame === 'item' || frame === 'raw-item';
+		const selfMarkedItem = isItem && serverHostHasPrimitiveChildren(children);
+		// Only keyed raw hosts need proof that their serialized descendants did
+		// not introduce an owned range. Carry it through this traversal alone.
+		const output = isItem && !selfMarkedItem ? { hasBlocks: false } : descriptorOutput;
+		// Only normal descriptor serialization establishes whether a host is
+		// block-free. Raw HTML and native control overrides bypass that proof.
+		let blockChildren: boolean | undefined;
 		const iterable = iterableChildArray(children);
 		const iterableChildren = iterable !== null;
 		if (iterable !== null) children = iterable;
@@ -2683,18 +2690,19 @@ function ssrHostElement(
 				throw new Error(formatServerError(31));
 			}
 			const inner = ssrTextareaValue(props.value != null ? props.value : props.defaultValue);
+			if (output && !serverHostHasPrimitiveChildren(children)) output.hasBlocks = true;
 			return ssrDescriptorHostFrame(
 				'<' + tag + attrs + '>' + inner + '</' + tag + '>',
 				frame,
 				selfMarkedItem,
-				false,
+				undefined,
 			);
 		}
 		if (VOID_ELEMENTS.has(semanticTag) && hasDangerHTML) {
 			throw new Error(formatServerError(7, semanticTag));
 		}
 		if (VOID_ELEMENTS.has(semanticTag) && !hasChildren) {
-			return ssrDescriptorHostFrame('<' + tag + attrs + '/>', frame, selfMarkedItem, false);
+			return ssrDescriptorHostFrame('<' + tag + attrs + '/>', frame, selfMarkedItem, undefined);
 		}
 		let inner = '';
 		if (hasDangerHTML) {
@@ -2737,9 +2745,15 @@ function ssrHostElement(
 				const build = () =>
 					ssrInNamespace(childrenNamespace, () => {
 						blockChildren = iterableChildren || serverDescNeedsBlocks(children);
-						return blockChildren
-							? ssrDeoptBlockChildren(children, scope)
-							: ssrDescriptorContent(children, scope);
+						if (blockChildren) {
+							if (output) output.hasBlocks = true;
+							return ssrDeoptBlockChildren(children, scope);
+						}
+						const html = ssrDescriptorContent(children, scope, output);
+						// Accessors may change from host/text at classification to a
+						// component while rendering. Keep the older wrapper in that case.
+						if (output?.hasBlocks) blockChildren = undefined;
+						return html;
 					});
 				// A controlled <select> projects `selected` onto the options serialized
 				// inside its children (compiled options included — the scope is global).
@@ -2750,6 +2764,11 @@ function ssrHostElement(
 						? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
 						: build();
 			}
+		}
+		// Preserve the established behavior when native controls, raw text, or
+		// raw HTML bypassed descriptor serialization.
+		if (blockChildren === undefined && output && !serverHostHasPrimitiveChildren(children)) {
+			output.hasBlocks = true;
 		}
 		// <option> assembles via ssrOption so an active select scope can mark it
 		// ` selected` (its value prop already serialized as a plain attribute).
@@ -2780,11 +2799,13 @@ function ssrHostElement(
 
 function ssrDescriptorHostFrame(
 	html: string,
-	frame: 'item' | 'child' | undefined,
+	frame: 'item' | 'raw-item' | 'child' | undefined,
 	selfMarkedItem: boolean,
-	blockChildren: boolean,
+	blockChildren: boolean | undefined,
 ): string {
-	if (frame === undefined || selfMarkedItem) return html;
+	if (frame === undefined || selfMarkedItem || (frame !== 'child' && blockChildren === false)) {
+		return html;
+	}
 	const child = ssrBlock(html);
 	return frame === 'item' && blockChildren ? ssrBlock(child) : child;
 }
@@ -2890,8 +2911,9 @@ function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 			const type = descriptor.type;
 			const props = descriptor.props;
 			const children = descriptor.children;
-			const html = ssrHostElement(type, props, children, scope);
-			return serverHostHasPrimitiveChildren(children) ? html : ssrBlock(html);
+			// This item was already routed as raw: historically it has at most
+			// one wrapper even if a child accessor reveals a component on this read.
+			return ssrHostElement(type, props, children, scope, undefined, 'raw-item');
 		}
 	}
 	return ssrBlock(ssrDescriptorContent(value, scope));
@@ -2912,9 +2934,13 @@ function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 // reconciler drops as it adopts them. Adjacency looks through nested arrays and
 // empty values, so it is tracked in SSR_DESCRIPTOR_TEXT_TAIL rather than read
 // back from the output, whose concatenation V8 would have to flatten per child.
-function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
+function ssrDescriptorContent(
+	v: unknown,
+	scope: SSRScope,
+	output?: { hasBlocks: boolean },
+): string {
 	SSR_DESCRIPTOR_TEXT_TAIL = false;
-	return ssrDescriptorPart(v, scope);
+	return ssrDescriptorPart(v, scope, output);
 }
 
 // Whether the de-opt content serialized so far ends with a text node. Each
@@ -2922,27 +2948,32 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 // leave it unchanged.
 let SSR_DESCRIPTOR_TEXT_TAIL = false;
 
-function ssrDescriptorPart(v: unknown, scope: SSRScope): string {
+function ssrDescriptorPart(v: unknown, scope: SSRScope, output?: { hasBlocks: boolean }): string {
 	if (v == null || v === false || v === true || v === '') return '';
 	if (typeof v === 'object' && SERVER_HTML in v) {
 		SSR_DESCRIPTOR_TEXT_TAIL = false;
+		if (output) output.hasBlocks = true;
 		return (v as ServerHtml)[SERVER_HTML];
 	}
 	if (Array.isArray(v)) {
 		let out = '';
-		for (let i = 0; i < v.length; i++) out += ssrDescriptorPart(v[i], scope);
+		for (let i = 0; i < v.length; i++) out += ssrDescriptorPart(v[i], scope, output);
 		return out;
 	}
 	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
 		const d = v as ElementDescriptor;
-		const html =
-			typeof d.type === 'string'
-				? ssrHostElement(d.type, d.props, d.children, scope)
-				: ssrComponentDescriptor(d, scope);
+		let html: string;
+		if (typeof d.type === 'string') {
+			html = ssrHostElement(d.type, d.props, d.children, scope, undefined, undefined, output);
+		} else {
+			if (output) output.hasBlocks = true;
+			html = ssrComponentDescriptor(d, scope);
+		}
 		SSR_DESCRIPTOR_TEXT_TAIL = false;
 		return html;
 	}
 	if (typeof v === 'function') {
+		if (output) output.hasBlocks = true;
 		// A host descriptor can receive a compiler-generated children block through
 		// an uncompiled wrapper. Its transient function identity must not become part
 		// of the streamed async boundary key used for a later retry.

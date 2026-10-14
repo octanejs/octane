@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { createContext, createElement, flushSync, hydrateRoot } from '../../src/index.js';
+import {
+	createContext,
+	createElement,
+	createPortal,
+	flushSync,
+	hydrateRoot,
+} from '../../src/index.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 const FIXTURE = `
@@ -172,6 +178,9 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 			container.dataset.descriptorListTest = '';
 			document.body.appendChild(container);
 			container.innerHTML = html;
+			const list = container.querySelector('#descriptor-list')!;
+			// Each native row already delimits its subtree. Only the surrounding list needs a range.
+			expect([...list.childNodes].filter((node) => node.nodeType === 8)).toHaveLength(2);
 			const rows = [...container.querySelectorAll<HTMLLIElement>('li')];
 			const betaInput = rows[1].querySelector('input') as HTMLInputElement;
 			betaInput.value = 'typed before hydration';
@@ -308,15 +317,26 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 			row.parentNode!.insertBefore(document.createComment('['), row);
 			row.parentNode!.insertBefore(document.createComment(']'), row.nextSibling);
 		}
+		const input = rows[1].querySelector('input')!;
+		input.value = 'typed into an older response';
+		input.focus();
 
 		const root = hydrateRoot(container, client.DescriptorRows, { items, refs, onPick });
 		try {
 			flushSync(() => {});
 			expect([...container.querySelectorAll('li')]).toEqual(rows);
+			expect(container.querySelector('[data-input="second"]')).toBe(input);
+			expect(input.value).toBe('typed into an older response');
+			expect(document.activeElement).toBe(input);
 			expect(refs.first.current).toBe(rows[0]);
 			expect(refs.second.current).toBe(rows[1]);
 			flushSync(() => rows[1].querySelector<HTMLButtonElement>('button')!.click());
 			expect(onPick).toHaveBeenCalledExactlyOnceWith('second');
+			flushSync(() =>
+				root.render(client.DescriptorRows, { items: [items[1], items[0]], refs, onPick }),
+			);
+			expect([...container.querySelectorAll('li')]).toEqual([rows[1], rows[0]]);
+			expect(input.value).toBe('typed into an older response');
 		} finally {
 			root.unmount();
 		}
@@ -491,6 +511,171 @@ describe('descriptor list serialization preserves observable child evaluation', 
 
 		expect(html).toContain('<li>value-2</li>');
 		expect(reads).toBe(2);
+	});
+
+	it('keeps an owned range when an indexed child becomes a component during serialization', () => {
+		let reads = 0;
+		const children: unknown[] = ['seed'];
+		const serverInner = () =>
+			ServerRuntime.createElement('input', { 'data-changing-child': '', defaultValue: 'server' });
+		Object.defineProperty(children, '0', {
+			configurable: true,
+			enumerable: true,
+			get() {
+				reads++;
+				return reads === 1 ? 'inspected' : ServerRuntime.createElement(serverInner, null);
+			},
+		});
+		const first = ServerRuntime.createElement('li', { key: 'first' }, children);
+		const second = ServerRuntime.createElement('li', { key: 'second' }, 'tail');
+		const container = document.createElement('div');
+		container.dataset.descriptorListTest = '';
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(() => [first, second]).html;
+		expect(reads).toBe(2);
+		const rows = [...container.querySelectorAll('li')];
+		const input = container.querySelector<HTMLInputElement>('input')!;
+		input.value = 'typed before hydration';
+		const Inner = () =>
+			createElement('input', { 'data-changing-child': '', defaultValue: 'server' });
+		const App = ({ reverse }: { reverse: boolean }) => {
+			const a = createElement('li', { key: 'first' }, [createElement(Inner, null)]);
+			const b = createElement('li', { key: 'second' }, 'tail');
+			return reverse ? [b, a] : [a, b];
+		};
+		const errors = vi.fn();
+		const root = hydrateRoot(container, App, { reverse: false }, { onRecoverableError: errors });
+		try {
+			flushSync(() => {});
+			expect([...container.querySelectorAll('li')]).toEqual(rows);
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('typed before hydration');
+			flushSync(() => root.render(App, { reverse: true }));
+			expect([...container.querySelectorAll('li')]).toEqual([rows[1], rows[0]]);
+			expect(input.value).toBe('typed before hydration');
+			expect(errors).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('retains a portal returned by an accessor-backed row component on adoption and reorder', () => {
+		const container = document.createElement('div');
+		const portalTarget = document.createElement('aside');
+		container.dataset.descriptorListTest = '';
+		portalTarget.dataset.descriptorListTest = '';
+		const foreign = document.createElement('span');
+		foreign.textContent = 'foreign';
+		portalTarget.appendChild(foreign);
+		document.body.append(container, portalTarget);
+		let reads = 0;
+		const children: unknown[] = ['seed'];
+		const serverInner = () =>
+			ServerRuntime.createPortal(
+				ServerRuntime.createElement('input', { 'data-portaled-row': '', defaultValue: 'server' }),
+				portalTarget,
+			);
+		Object.defineProperty(children, '0', {
+			configurable: true,
+			enumerable: true,
+			get() {
+				reads++;
+				return reads === 1
+					? 'inspected'
+					: ServerRuntime.createElement(serverInner, { key: 'inner' });
+			},
+		});
+		container.innerHTML = ServerRuntime.renderToString(() => [
+			ServerRuntime.createElement('li', { key: 'first' }, children),
+			ServerRuntime.createElement('li', { key: 'second' }, 'tail'),
+		]).html;
+		expect(reads).toBe(2);
+		const rows = [...container.querySelectorAll('li')];
+		expect(portalTarget.childNodes).toHaveLength(1);
+		const Inner = () =>
+			createPortal(
+				createElement('input', { 'data-portaled-row': '', defaultValue: 'server' }),
+				portalTarget,
+			);
+		const App = ({ reverse }: { reverse: boolean }) => {
+			const a = createElement('li', { key: 'first' }, [createElement(Inner, { key: 'inner' })]);
+			const b = createElement('li', { key: 'second' }, 'tail');
+			return reverse ? [b, a] : [a, b];
+		};
+		const errors = vi.fn();
+		const root = hydrateRoot(container, App, { reverse: false }, { onRecoverableError: errors });
+		try {
+			flushSync(() => {});
+			expect([...container.querySelectorAll('li')]).toEqual(rows);
+			expect(portalTarget.firstChild).toBe(foreign);
+			const input = portalTarget.querySelector('input')!;
+			input.value = 'typed in portal';
+			flushSync(() => root.render(App, { reverse: true }));
+			expect([...container.querySelectorAll('li')]).toEqual([rows[1], rows[0]]);
+			expect(portalTarget.querySelector('input')).toBe(input);
+			expect(input.value).toBe('typed in portal');
+			expect(errors).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+		}
+		expect([...portalTarget.childNodes]).toEqual([foreign]);
+	});
+
+	it('adopts a raw-routed host that reveals block children after a mixed-list sibling', () => {
+		const serverLead = () =>
+			ServerRuntime.createElement('li', { 'data-route-row': 'lead' }, 'lead');
+		const serverInner = () =>
+			ServerRuntime.createElement('input', { 'data-route-input': '', defaultValue: 'server' });
+		let reads = 0;
+		const row = {
+			...ServerRuntime.createElement('li', { key: 'first', 'data-route-row': 'first' }, 'seed'),
+			get children() {
+				reads++;
+				return reads === 1 ? 'inspected' : ServerRuntime.createElement(serverInner, null);
+			},
+		};
+		const container = document.createElement('div');
+		container.dataset.descriptorListTest = '';
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(() =>
+			ServerRuntime.createElement('ul', null, [
+				ServerRuntime.createElement(serverLead, { key: 'lead' }),
+				row,
+				ServerRuntime.createElement('li', { key: 'tail', 'data-route-row': 'tail' }, 'tail'),
+			]),
+		).html;
+		expect(reads).toBe(2);
+		const rows = [...container.querySelectorAll('li')];
+		const input = container.querySelector<HTMLInputElement>('input')!;
+		input.value = 'typed into mixed-list response';
+		input.focus();
+		const Lead = () => createElement('li', { 'data-route-row': 'lead' }, 'lead');
+		const Inner = () => createElement('input', { 'data-route-input': '', defaultValue: 'server' });
+		const App = ({ reverse }: { reverse: boolean }) => {
+			const lead = createElement(Lead, { key: 'lead' });
+			const first = createElement(
+				'li',
+				{ key: 'first', 'data-route-row': 'first' },
+				createElement(Inner, null),
+			);
+			const tail = createElement('li', { key: 'tail', 'data-route-row': 'tail' }, 'tail');
+			return createElement('ul', null, reverse ? [lead, tail, first] : [lead, first, tail]);
+		};
+		const errors = vi.fn();
+		const root = hydrateRoot(container, App, { reverse: false }, { onRecoverableError: errors });
+		try {
+			flushSync(() => {});
+			expect([...container.querySelectorAll('li')]).toEqual(rows);
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('typed into mixed-list response');
+			expect(document.activeElement).toBe(input);
+			flushSync(() => root.render(App, { reverse: true }));
+			expect([...container.querySelectorAll('li')]).toEqual([rows[0], rows[2], rows[1]]);
+			expect(input.value).toBe('typed into mixed-list response');
+			expect(errors).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('materializes iterable descriptor children without probing their iterator twice', () => {
