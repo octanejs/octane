@@ -2251,8 +2251,9 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 			'ancestor reparented',
 			'throwing replacement',
 		] as const) {
-			it(`does not claim a textarea ${mutation} by its own retirement cleanup (${dev ? 'dev' : 'prod'})`, async () => {
-				for (const retirement of ['own', 'later', 'mixed', 'owner disposed'] as const) {
+			for (const retirement of ['own', 'later', 'mixed', 'owner disposed'] as const) {
+				it(`does not claim a textarea ${mutation} by ${retirement} retirement cleanup (${dev ? 'dev' : 'prod'})`, async () => {
+					let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
 					const laterRetirement = retirement !== 'own';
 					const scope = createScope({
 						scopeKey: `native-textarea-own-retirement-${mutation}-${dev}-${retirement}`,
@@ -2416,9 +2417,12 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 						if (secondScope !== scope) secondScope.dispose();
 						scope.dispose();
 					}
-				}
-				for (const knownStylex of [false, true]) {
-					for (const nextComponent of ['same', 'different'] as const) {
+				});
+			}
+			for (const knownStylex of [false, true]) {
+				for (const nextComponent of ['same', 'different'] as const) {
+					it(`does not claim a layout ${mutation} by retirement cleanup (${dev ? 'dev' : 'prod'}, ${knownStylex ? 'stylex' : 'native'}, ${nextComponent} successor)`, async () => {
+						let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
 						const layoutScope = createScope({
 							scopeKey: `host-source-retirement-${mutation}-${dev}-${knownStylex}-${nextComponent}`,
 						});
@@ -2615,9 +2619,9 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 							layoutBinding.dispose();
 							layoutScope.dispose();
 						}
-					}
+					});
 				}
-			});
+			}
 		}
 
 		for (const failing of ['first', 'second'] as const) {
@@ -3011,707 +3015,737 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 		}
 	}
 
-	it('attaches to existing DOM without replacing nodes or mutating protected attributes', async () => {
-		container.setAttribute('data-external-owner', 'stream');
-		container.innerHTML =
-			'<article id="existing" data-owned="server" aria-live="polite"><button>Action</button></article>';
-		const article = container.firstElementChild!;
-		const button = article.firstElementChild!;
-		const initialMarkup = container.innerHTML;
-		const initialAttributes = [...container.attributes].map(({ name, value }) => [name, value]);
+	describe('attaching behavior to externally owned DOM', () => {
+		async function attachArticle() {
+			container.setAttribute('data-external-owner', 'stream');
+			container.innerHTML =
+				'<article id="existing" data-owned="server" aria-live="polite"><button>Action</button></article>';
+			const article = container.firstElementChild!;
+			const button = article.firstElementChild!;
+			const initialMarkup = container.innerHTML;
+			const initialAttributes = [...container.attributes].map(({ name, value }) => [name, value]);
 
-		const root = attach();
-		await root.ready;
+			const root = attach();
+			await root.ready;
 
-		expect(root.container).toBe(container);
-		expect(root.signal.aborted).toBe(false);
-		expect(container.innerHTML).toBe(initialMarkup);
-		expect([...container.attributes].map(({ name, value }) => [name, value])).toEqual(
-			initialAttributes,
-		);
-		expect(container.firstElementChild).toBe(article);
-		expect(article.firstElementChild).toBe(button);
-		expect(article.getAttribute('data-owned')).toBe('server');
-		expect(article.getAttribute('aria-live')).toBe('polite');
-		for (const dev of [false, true]) {
-			const fixture = authoredBindings(dev);
-			article.innerHTML = fixture.html;
-			const action = article.querySelector('button')!;
-			const nodes = [action, ...action.querySelectorAll('*')];
-			expect(action.hidden).toBe(true);
-			action.hidden = false;
-			action.style.marginLeft = '7px';
-			const evaluationOrder: string[] = [];
-			const binding = fixture.attachOrdered(
-				() => {
-					evaluationOrder.push('root');
-					return action;
-				},
-				() => {
-					evaluationOrder.push('source');
-					return fixture.state;
-				},
-				() => {
-					evaluationOrder.push('options');
-					return undefined;
-				},
+			expect(root.container).toBe(container);
+			expect(root.signal.aborted).toBe(false);
+			expect(container.innerHTML).toBe(initialMarkup);
+			expect([...container.attributes].map(({ name, value }) => [name, value])).toEqual(
+				initialAttributes,
 			);
-			try {
-				expect(evaluationOrder).toEqual(['root', 'source', 'options']);
-				fixture.publish({
-					type: 'button',
-					disabled: true,
-					active: true,
-					label: 'Stop',
-					classes: ['action', ['active'], { busy: true }],
-					opacity: 0.5,
-					width: 12,
-					tone: 'red',
-				});
-				expect(action.type).toBe('button');
-				expect(action.disabled).toBe(true);
-				expect(action.getAttribute('aria-disabled')).toBe('true');
-				expect(action.getAttribute('aria-label')).toBe('Stop');
-				expect(action.getAttribute('data-active')).toBe('');
-				expect(action.className).toBe('action active busy');
-				expect(action.style.opacity).toBe('0.5');
-				expect(action.style.width).toBe('12px');
-				expect(action.style.getPropertyValue('--tone')).toBe('red');
-				expect([...action.querySelectorAll('span')].map((node) => node.hidden)).toEqual([
-					true,
-					false,
-				]);
-				fixture.publish(
-					{
-						type: 'submit',
-						disabled: false,
-						active: false,
-						label: 'Send',
-						classes: '',
-						opacity: null,
-						width: 0,
-						tone: null,
+			expect(container.firstElementChild).toBe(article);
+			expect(article.firstElementChild).toBe(button);
+			expect(article.getAttribute('data-owned')).toBe('server');
+			expect(article.getAttribute('aria-live')).toBe('polite');
+
+			return article;
+		}
+		it('preserves existing nodes and protected attributes', async () => {
+			await attachArticle();
+		});
+		for (const dev of [false, true]) {
+			it(`native binding ordered evaluation and fixed attributes (${dev ? 'dev' : 'prod'})`, async () => {
+				const article = await attachArticle();
+
+				const fixture = authoredBindings(dev);
+				article.innerHTML = fixture.html;
+				const action = article.querySelector('button')!;
+				const nodes = [action, ...action.querySelectorAll('*')];
+				expect(action.hidden).toBe(true);
+				action.hidden = false;
+				action.style.marginLeft = '7px';
+				const evaluationOrder: string[] = [];
+				const binding = fixture.attachOrdered(
+					() => {
+						evaluationOrder.push('root');
+						return action;
 					},
-					false,
+					() => {
+						evaluationOrder.push('source');
+						return fixture.state;
+					},
+					() => {
+						evaluationOrder.push('options');
+						return undefined;
+					},
 				);
-				binding.refresh();
-				expect(action.type).toBe('submit');
-				expect(action.disabled).toBe(false);
-				expect(action.getAttribute('aria-disabled')).toBe('false');
-				expect(action.hasAttribute('data-active')).toBe(false);
-				expect(action.getAttribute('class')).toBe('');
-				expect(action.style.opacity).toBe('');
-				expect(action.style.width).toBe('0px');
-				expect(action.style.getPropertyValue('--tone')).toBe('');
-				expect(action.hidden).toBe(false);
-				expect(action.style.marginLeft).toBe('7px');
-				expect([action, ...action.querySelectorAll('*')]).toEqual(nodes);
-			} finally {
-				binding.dispose();
-			}
+				try {
+					expect(evaluationOrder).toEqual(['root', 'source', 'options']);
+					fixture.publish({
+						type: 'button',
+						disabled: true,
+						active: true,
+						label: 'Stop',
+						classes: ['action', ['active'], { busy: true }],
+						opacity: 0.5,
+						width: 12,
+						tone: 'red',
+					});
+					expect(action.type).toBe('button');
+					expect(action.disabled).toBe(true);
+					expect(action.getAttribute('aria-disabled')).toBe('true');
+					expect(action.getAttribute('aria-label')).toBe('Stop');
+					expect(action.getAttribute('data-active')).toBe('');
+					expect(action.className).toBe('action active busy');
+					expect(action.style.opacity).toBe('0.5');
+					expect(action.style.width).toBe('12px');
+					expect(action.style.getPropertyValue('--tone')).toBe('red');
+					expect([...action.querySelectorAll('span')].map((node) => node.hidden)).toEqual([
+						true,
+						false,
+					]);
+					fixture.publish(
+						{
+							type: 'submit',
+							disabled: false,
+							active: false,
+							label: 'Send',
+							classes: '',
+							opacity: null,
+							width: 0,
+							tone: null,
+						},
+						false,
+					);
+					binding.refresh();
+					expect(action.type).toBe('submit');
+					expect(action.disabled).toBe(false);
+					expect(action.getAttribute('aria-disabled')).toBe('false');
+					expect(action.hasAttribute('data-active')).toBe(false);
+					expect(action.getAttribute('class')).toBe('');
+					expect(action.style.opacity).toBe('');
+					expect(action.style.width).toBe('0px');
+					expect(action.style.getPropertyValue('--tone')).toBe('');
+					expect(action.hidden).toBe(false);
+					expect(action.style.marginLeft).toBe('7px');
+					expect([action, ...action.querySelectorAll('*')]).toEqual(nodes);
+				} finally {
+					binding.dispose();
+				}
+			}, 15000);
 		}
 		for (const dev of [false, true]) {
-			const fixture = authoredControlBindings(dev);
-			article.innerHTML = fixture.html;
-			const form = article.querySelector('form')!;
-			const textarea = form.querySelector('textarea')!;
-			const hidden = form.querySelector('input')!;
-			const label = form.querySelector('label')!;
-			const status = form.querySelector('span')!;
-			textarea.value = 'User draft before activation';
-			textarea.setSelectionRange(4, 9, 'backward');
-			hidden.value = 'native-token';
-			const external = document.createElement('canvas');
-			form.insertBefore(external, textarea);
-			form.classList.add('native-measured');
-			textarea.classList.add('external-height');
-			fixture.publish({ expanded: false, mode: 'sending', invalid: true });
-			const binding = fixture.attach(form, fixture.state);
-			try {
+			it(`controlled form binding and mount ordering (${dev ? 'dev' : 'prod'})`, async () => {
+				const article = await attachArticle();
+
+				const fixture = authoredControlBindings(dev);
+				article.innerHTML = fixture.html;
+				const form = article.querySelector('form')!;
+				const textarea = form.querySelector('textarea')!;
+				const hidden = form.querySelector('input')!;
+				const label = form.querySelector('label')!;
+				const status = form.querySelector('span')!;
+				textarea.value = 'User draft before activation';
+				textarea.setSelectionRange(4, 9, 'backward');
+				hidden.value = 'native-token';
+				const external = document.createElement('canvas');
+				form.insertBefore(external, textarea);
+				form.classList.add('native-measured');
+				textarea.classList.add('external-height');
+				fixture.publish({ expanded: false, mode: 'sending', invalid: true });
+				const binding = fixture.attach(form, fixture.state);
+				try {
+					expect(form.classList.contains('expanded')).toBe(false);
+					expect(form.classList.contains('compact')).toBe(true);
+					expect(form.classList.contains('atom-shared')).toBe(true);
+					expect(form.classList.contains('theme')).toBe(true);
+					expect(form.classList.contains('native-measured')).toBe(true);
+					expect(textarea.classList.contains('composer-large')).toBe(false);
+					expect(textarea.classList.contains('external-height')).toBe(true);
+					expect(form.getAttribute('data-mode')).toBe('sending');
+					expect(textarea.getAttribute('aria-invalid')).toBe('true');
+					expect(textarea.value).toBe('User draft before activation');
+					expect([
+						textarea.selectionStart,
+						textarea.selectionEnd,
+						textarea.selectionDirection,
+					]).toEqual([4, 9, 'backward']);
+					expect(hidden.value).toBe('native-token');
+					fixture.publish({
+						expanded: true,
+						disabled: true,
+						draft: 'Late draft',
+						status: 'Late status',
+					});
+					expect(form.classList.contains('expanded')).toBe(true);
+					expect(textarea.disabled).toBe(true);
+					expect(textarea.value).toBe('User draft before activation');
+					expect(status.textContent).toBe('Ready');
+					expect(label.textContent).toBe('Message');
+					expect(form.querySelector('textarea')).toBe(textarea);
+					expect(form.querySelector('canvas')).toBe(external);
+				} finally {
+					binding.dispose();
+				}
 				expect(form.classList.contains('expanded')).toBe(false);
-				expect(form.classList.contains('compact')).toBe(true);
+				expect(form.classList.contains('compact')).toBe(false);
 				expect(form.classList.contains('atom-shared')).toBe(true);
-				expect(form.classList.contains('theme')).toBe(true);
 				expect(form.classList.contains('native-measured')).toBe(true);
 				expect(textarea.classList.contains('composer-large')).toBe(false);
 				expect(textarea.classList.contains('external-height')).toBe(true);
-				expect(form.getAttribute('data-mode')).toBe('sending');
-				expect(textarea.getAttribute('aria-invalid')).toBe('true');
-				expect(textarea.value).toBe('User draft before activation');
-				expect([
-					textarea.selectionStart,
-					textarea.selectionEnd,
-					textarea.selectionDirection,
-				]).toEqual([4, 9, 'backward']);
-				expect(hidden.value).toBe('native-token');
-				fixture.publish({
-					expanded: true,
-					disabled: true,
-					draft: 'Late draft',
-					status: 'Late status',
-				});
+				expect(fixture.cleanup).toHaveBeenCalledOnce();
+				const replacement = fixture.attach(form, fixture.state);
 				expect(form.classList.contains('expanded')).toBe(true);
-				expect(textarea.disabled).toBe(true);
-				expect(textarea.value).toBe('User draft before activation');
-				expect(status.textContent).toBe('Ready');
-				expect(label.textContent).toBe('Message');
 				expect(form.querySelector('textarea')).toBe(textarea);
-				expect(form.querySelector('canvas')).toBe(external);
-			} finally {
-				binding.dispose();
-			}
-			expect(form.classList.contains('expanded')).toBe(false);
-			expect(form.classList.contains('compact')).toBe(false);
-			expect(form.classList.contains('atom-shared')).toBe(true);
-			expect(form.classList.contains('native-measured')).toBe(true);
-			expect(textarea.classList.contains('composer-large')).toBe(false);
-			expect(textarea.classList.contains('external-height')).toBe(true);
-			expect(fixture.cleanup).toHaveBeenCalledOnce();
-			const replacement = fixture.attach(form, fixture.state);
-			expect(form.classList.contains('expanded')).toBe(true);
-			expect(form.querySelector('textarea')).toBe(textarea);
-			replacement.dispose();
+				replacement.dispose();
+			}, 15000);
 		}
 		for (const dev of [false, true]) {
-			const fixture = authoredPresentation(
-				'LoginPresentation',
-				{
-					label: 'Email',
-					error: '',
-					pending: false,
-					submitLabel: 'Continue',
-				},
-				dev,
-			);
-			article.innerHTML = fixture.html;
-			const form = article.querySelector('form')!;
-			const input = form.querySelector('input')!;
-			const button = form.querySelector('button')!;
-			input.value = 'typed@example.com';
-			fixture.publish({ error: 'Check this address', submitLabel: 'Try again' });
-			const binding = fixture.attach(form, fixture.state);
-			try {
-				expect(form.querySelector('input')).toBe(input);
-				expect(input.value).toBe('typed@example.com');
-				expect(form.querySelector('p')!.textContent).toBe('Check this address');
-				expect(button.textContent).toBe('Try again');
-				fixture.publish({ pending: true, error: '', submitLabel: 'Signing in…' });
-				expect(form.querySelector('button')).toBe(button);
-				expect(button.disabled).toBe(true);
-				expect(input.disabled).toBe(true);
-				expect(button.querySelector('svg')).not.toBeNull();
-				expect(button.querySelector('span')!.textContent).toBe('Signing in…');
-				fixture.publish({ pending: false, submitLabel: 'Continue' });
-				expect(button.querySelector('svg')).toBeNull();
-				expect(input.value).toBe('typed@example.com');
-			} finally {
-				binding.dispose();
-			}
-			const adjacent = authoredPresentation('AdjacentPresentation', { first: '', last: '' }, dev);
-			article.innerHTML = adjacent.html;
-			const paragraph = article.querySelector('p')!;
-			const text = adjacent.attach(paragraph, adjacent.state);
-			try {
-				adjacent.publish({ first: '<one>', last: '&two' });
-				expect(paragraph.textContent).toBe('Before <one>&two after');
-				expect(paragraph.children).toHaveLength(0);
-				adjacent.publish({ first: '', last: '' });
-				expect(paragraph.textContent).toBe('Before  after');
-			} finally {
-				text.dispose();
-			}
+			it(`login binding updates and detaches (${dev ? 'dev' : 'prod'})`, async () => {
+				const article = await attachArticle();
+
+				const fixture = authoredPresentation(
+					'LoginPresentation',
+					{
+						label: 'Email',
+						error: '',
+						pending: false,
+						submitLabel: 'Continue',
+					},
+					dev,
+				);
+				article.innerHTML = fixture.html;
+				const form = article.querySelector('form')!;
+				const input = form.querySelector('input')!;
+				const button = form.querySelector('button')!;
+				input.value = 'typed@example.com';
+				fixture.publish({ error: 'Check this address', submitLabel: 'Try again' });
+				const binding = fixture.attach(form, fixture.state);
+				try {
+					expect(form.querySelector('input')).toBe(input);
+					expect(input.value).toBe('typed@example.com');
+					expect(form.querySelector('p')!.textContent).toBe('Check this address');
+					expect(button.textContent).toBe('Try again');
+					fixture.publish({ pending: true, error: '', submitLabel: 'Signing in…' });
+					expect(form.querySelector('button')).toBe(button);
+					expect(button.disabled).toBe(true);
+					expect(input.disabled).toBe(true);
+					expect(button.querySelector('svg')).not.toBeNull();
+					expect(button.querySelector('span')!.textContent).toBe('Signing in…');
+					fixture.publish({ pending: false, submitLabel: 'Continue' });
+					expect(button.querySelector('svg')).toBeNull();
+					expect(input.value).toBe('typed@example.com');
+				} finally {
+					binding.dispose();
+				}
+				const adjacent = authoredPresentation('AdjacentPresentation', { first: '', last: '' }, dev);
+				article.innerHTML = adjacent.html;
+				const paragraph = article.querySelector('p')!;
+				const text = adjacent.attach(paragraph, adjacent.state);
+				try {
+					adjacent.publish({ first: '<one>', last: '&two' });
+					expect(paragraph.textContent).toBe('Before <one>&two after');
+					expect(paragraph.children).toHaveLength(0);
+					adjacent.publish({ first: '', last: '' });
+					expect(paragraph.textContent).toBe('Before  after');
+				} finally {
+					text.dispose();
+				}
+			}, 15000);
 		}
 		for (const dev of [false, true]) {
-			for (const destructured of [false, true]) {
-				for (const tag of ['button', 'svg']) {
-					for (const classes of [
-						"['base', props.active && 'active']",
-						'{ base: true, active: props.active }',
-					]) {
-						const fixture = authoredPresentation(
-							'FreshClass',
-							{ title: 'server', active: false },
-							dev,
-							`export function FreshClass(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
+			it(`projected attributes and consumed sources (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const destructured of [false, true]) {
+					for (const tag of ['button', 'svg']) {
+						for (const classes of [
+							"['base', props.active && 'active']",
+							'{ base: true, active: props.active }',
+						]) {
+							const fixture = authoredPresentation(
+								'FreshClass',
+								{ title: 'server', active: false },
+								dev,
+								`export function FreshClass(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
  const title = ${destructured ? 'header' : 'props.title'};
  const activate = () => props.onAction?.(title);
  const click = activate;
  const ready = (node) => props.onReady?.(node);
  <${tag} title={title} className={${classes}} ref={ready} onClick={click}/>
 }`,
+							);
+							article.innerHTML = fixture.html;
+							const element = article.querySelector(tag)!;
+							fixture.publish({ title: 'early', active: true });
+							const binding = fixture.attach(element, fixture.state);
+							const readyViews: Array<[string | null, string | null]> = [];
+							const onAction = vi.fn();
+							const onReady = vi.fn((node: Element | null) => {
+								if (node) readyViews.push([node.getAttribute('class'), node.getAttribute('title')]);
+							});
+							try {
+								expect(element.getAttribute('class')).toBe('base active');
+								const client = fixture.loadClient();
+								hydratedRoot = hydrateRoot(
+									article,
+									client.FreshClass,
+									{ title: 'early', active: true, onReady, onAction },
+									{ bindingLeases: [binding] },
+								);
+								flushSync(() => {});
+								flushEffects();
+								expect(article.querySelector(tag)).toBe(element);
+								expect(onReady).toHaveBeenCalledExactlyOnceWith(element);
+								expect(readyViews).toEqual([['base active', 'early']]);
+								element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+								expect(onAction).toHaveBeenCalledExactlyOnceWith('early');
+								expect(fixture.cleanup).toHaveBeenCalledOnce();
+								fixture.publish({ title: 'stale', active: false });
+								binding.refresh();
+								expect(element.getAttribute('class')).toBe('base active');
+								expect(element.getAttribute('title')).toBe('early');
+								hydratedRoot.render(client.FreshClass, {
+									title: 'live',
+									active: false,
+									onReady,
+									onAction,
+								});
+								flushSync(() => {});
+								expect(element.getAttribute('class')).toBe('base');
+								expect(element.getAttribute('title')).toBe('live');
+								onAction.mockClear();
+								element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+								expect(onAction).toHaveBeenCalledExactlyOnceWith('live');
+								if (destructured) {
+									hydratedRoot.render(client.FreshClass, { active: false, onReady, onAction });
+									flushSync(() => {});
+									expect(element.getAttribute('title')).toBe('default title');
+									onAction.mockClear();
+									element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+									expect(onAction).toHaveBeenCalledExactlyOnceWith('default title');
+								}
+							} finally {
+								hydratedRoot?.unmount();
+								hydratedRoot = undefined;
+								binding.dispose();
+							}
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+						}
+					}
+					for (const failure of [null, 'read', 'coercion']) {
+						const scope = createScope({ scopeKey: `projected-handoff-${dev}-${failure}` });
+						const height$ = scope.signal$<unknown>('height', 2);
+						const projected = authoredPresentation(
+							'ProjectedAction',
+							{ height$, title: 'early', onReady: (_element: Element | null) => {} },
+							dev,
+							`import 'octane/signals'; import * as stylex from 'binding-styles';
+const styles = stylex.create({ height: height => ({ className: 'sized', style: { height } }) });
+export function ProjectedAction(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
+ <button aria-label="Action" title={${destructured ? 'header' : 'props.title'}} sx={styles.height(props.height$)} ref={props.onReady}/>
+}`,
+							{
+								'binding-styles': {
+									create: (config: unknown) => config,
+									props: (value: unknown) => value,
+								},
+							},
+							{
+								knownAttributeSpreads: [
+									{
+										source: 'binding-styles',
+										imported: '*',
+										members: ['props'],
+										fields: ['className', 'style'],
+										style: 'object',
+										jsxAttribute: 'sx',
+									},
+								],
+							},
 						);
-						article.innerHTML = fixture.html;
-						const element = article.querySelector(tag)!;
-						fixture.publish({ title: 'early', active: true });
-						const binding = fixture.attach(element, fixture.state);
-						const readyViews: Array<[string | null, string | null]> = [];
-						const onAction = vi.fn();
-						const onReady = vi.fn((node: Element | null) => {
-							if (node) readyViews.push([node.getAttribute('class'), node.getAttribute('title')]);
-						});
+						article.innerHTML = projected.html;
+						const action = article.querySelector('button')!;
+						const binding = runWithSignalOwner(scope, () =>
+							projected.attach(action, projected.state),
+						);
 						try {
-							expect(element.getAttribute('class')).toBe('base active');
-							const client = fixture.loadClient();
+							height$.set(3);
+							expect(action.style.height).toBe('3px');
+							const error = new Error(`Failed ${failure} during presentation preparation`);
+							const onUncaughtError = vi.fn();
+							const readyViews: string[][] = [];
+							const onReady = vi.fn((element: Element | null) => {
+								if (element instanceof HTMLButtonElement)
+									readyViews.push([element.title, element.className, element.style.height]);
+							});
 							hydratedRoot = hydrateRoot(
 								article,
-								client.FreshClass,
-								{ title: 'early', active: true, onReady, onAction },
-								{ bindingLeases: [binding] },
+								projected.loadClient().ProjectedAction,
+								{
+									title: 'prepared',
+									onReady,
+									height$:
+										failure === 'read'
+											? scope.derived$<unknown>('failure', () => {
+													throw error;
+												})
+											: failure === 'coercion'
+												? scope.signal$('failure', {
+														toString() {
+															throw error;
+														},
+													})
+												: height$,
+								},
+								{ signalOwner: scope, bindingLeases: [binding], onUncaughtError },
 							);
 							flushSync(() => {});
 							flushEffects();
-							expect(article.querySelector(tag)).toBe(element);
-							expect(onReady).toHaveBeenCalledExactlyOnceWith(element);
-							expect(readyViews).toEqual([['base active', 'early']]);
-							element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-							expect(onAction).toHaveBeenCalledExactlyOnceWith('early');
-							expect(fixture.cleanup).toHaveBeenCalledOnce();
-							fixture.publish({ title: 'stale', active: false });
-							binding.refresh();
-							expect(element.getAttribute('class')).toBe('base active');
-							expect(element.getAttribute('title')).toBe('early');
-							hydratedRoot.render(client.FreshClass, {
-								title: 'live',
-								active: false,
-								onReady,
-								onAction,
-							});
-							flushSync(() => {});
-							expect(element.getAttribute('class')).toBe('base');
-							expect(element.getAttribute('title')).toBe('live');
-							onAction.mockClear();
-							element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-							expect(onAction).toHaveBeenCalledExactlyOnceWith('live');
-							if (destructured) {
-								hydratedRoot.render(client.FreshClass, { active: false, onReady, onAction });
+							if (failure === null) {
+								expect(onUncaughtError).not.toHaveBeenCalled();
+								expect(onReady).toHaveBeenCalledOnce();
+								expect(onReady).toHaveBeenCalledWith(action);
+								expect(readyViews).toEqual([['prepared', 'sized', '3px']]);
+								height$.set(4);
 								flushSync(() => {});
-								expect(element.getAttribute('title')).toBe('default title');
-								onAction.mockClear();
-								element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-								expect(onAction).toHaveBeenCalledExactlyOnceWith('default title');
+								expect(action.style.height).toBe('4px');
+							} else {
+								expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(error);
+								expect(onReady).not.toHaveBeenCalled();
+								expect(action.title).toBe('early');
 							}
 						} finally {
 							hydratedRoot?.unmount();
 							hydratedRoot = undefined;
 							binding.dispose();
+							scope.dispose();
 						}
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
 					}
 				}
-				for (const failure of [null, 'read', 'coercion']) {
-					const scope = createScope({ scopeKey: `projected-handoff-${dev}-${failure}` });
-					const height$ = scope.signal$<unknown>('height', 2);
-					const projected = authoredPresentation(
-						'ProjectedAction',
-						{ height$, title: 'early', onReady: (_element: Element | null) => {} },
+			}, 15000);
+			it(`projected source across pending replacement and acceptance (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const outcome of [
+					'replace',
+					'replace-staged',
+					'replace-staged-superseded',
+					'accept',
+					'retry',
+				]) {
+					const discard = outcome === 'retry';
+					const scope = createScope({ scopeKey: `early-action-hydration-${dev}-${outcome}` });
+					const draft = scope.signal$('draft', '');
+					const generating = scope.signal$('generating', false);
+					const accent = scope.signal$('accent', 'red');
+					let request = new AbortController();
+					const cancel = vi.fn(() => {
+						request.abort();
+						generating.set(false);
+					});
+					const send = vi.fn();
+					const props: ActionPresentationProps = {
+						type: scope.derived$('type', () => (generating.get() ? 'button' : 'submit')),
+						disabled: scope.derived$('disabled', () => !generating.get() && draft.get() === ''),
+						label: scope.derived$('label', () => (generating.get() ? 'Stop' : 'Send')),
+						sendHidden: generating,
+						stopHidden: scope.derived$('stop-hidden', () => !generating.get()),
+						classes: scope.derived$('classes', () =>
+							generating.get() ? 'is-generating' : 'is-idle',
+						),
+						height$: scope.derived$('height', () => (generating.get() ? 24 : 16)),
+						opacity$: scope.derived$('opacity', () => (generating.get() ? 0.5 : 1)),
+						accent$: accent,
+						onAction(event) {
+							event.preventDefault();
+							if (generating.get()) cancel();
+							else send();
+						},
+					};
+					const fixture = authoredPresentation(
+						'ActionPresentation',
+						props,
 						dev,
-						`import 'octane/signals'; import * as stylex from 'binding-styles';
-const styles = stylex.create({ height: height => ({ className: 'sized', style: { height } }) });
-export function ProjectedAction(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
- <button aria-label="Action" title={${destructured ? 'header' : 'props.title'}} sx={styles.height(props.height$)} ref={props.onReady}/>
-}`,
-						{
-							'binding-styles': {
-								create: (config: unknown) => config,
-								props: (value: unknown) => value,
-							},
-						},
-						{
-							knownAttributeSpreads: [
-								{
-									source: 'binding-styles',
-									imported: '*',
-									members: ['props'],
-									fields: ['className', 'style'],
-									style: 'object',
-									jsxAttribute: 'sx',
-								},
-							],
-						},
+						`import 'octane/signals';\n${presentationSource}`,
 					);
-					article.innerHTML = projected.html;
+					fixture.cleanup.mockImplementation(() => accent.set('blue'));
+					const pending = deferred<void>();
+					const onHydrated = vi.fn();
+					const readyViews: Array<{
+						type: string;
+						label: string | null;
+						disabled: boolean;
+						classes: string;
+						height: string;
+						opacity: string;
+						color: string;
+					}> = [];
+					const onReady = vi.fn((element: Element | null) => {
+						if (element instanceof HTMLButtonElement) {
+							readyViews.push({
+								type: element.type,
+								label: element.getAttribute('aria-label'),
+								disabled: element.disabled,
+								classes: element.className,
+								height: element.style.height,
+								opacity: element.style.opacity,
+								color: element.style.color,
+							});
+						}
+					});
+					const applicationProps = {
+						...props,
+						when: interaction({ events: 'click' }),
+						suspend: false,
+						promise: pending.promise,
+						onHydrated,
+						onReady,
+					};
+					article.innerHTML = renderToString(fixture.server.ActionHydration, applicationProps).html;
 					const action = article.querySelector('button')!;
-					const binding = runWithSignalOwner(scope, () =>
-						projected.attach(action, projected.state),
-					);
-					try {
-						height$.set(3);
-						expect(action.style.height).toBe('3px');
-						const error = new Error(`Failed ${failure} during presentation preparation`);
-						const onUncaughtError = vi.fn();
-						const readyViews: string[][] = [];
-						const onReady = vi.fn((element: Element | null) => {
-							if (element instanceof HTMLButtonElement)
-								readyViews.push([element.title, element.className, element.style.height]);
+					const icons = [...action.querySelectorAll('span')];
+					const binding = runWithSignalOwner(scope, () => fixture.attach(action, fixture.state));
+					const viewTransitions = outcome.startsWith('replace-staged')
+						? installViewTransitionMocks()
+						: undefined;
+					const nativeUpdates: Array<{
+						update: () => void | Promise<void>;
+						ready: ReturnType<typeof deferred<void>>;
+						finished: ReturnType<typeof deferred<void>>;
+					}> = [];
+					if (viewTransitions !== undefined)
+						Object.defineProperty(document, 'startViewTransition', {
+							configurable: true,
+							value(input: { update: () => void | Promise<void> }) {
+								const ready = deferred<void>();
+								const finished = deferred<void>();
+								nativeUpdates.push({ update: input.update, ready, finished });
+								return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
+							},
 						});
+					try {
+						expect(action.disabled).toBe(true);
+						expect([action.className, action.style.height, action.style.opacity]).toEqual([
+							'is-idle',
+							'16px',
+							'1',
+						]);
+						draft.set('Early draft');
+						expect(action.disabled).toBe(false);
+						generating.set(true);
+						expect(action.type).toBe('button');
+						expect(action.getAttribute('aria-disabled')).toBe('false');
+						expect(action.getAttribute('aria-label')).toBe('Stop');
+						expect([action.className, action.style.height, action.style.opacity]).toEqual([
+							'is-generating',
+							'24px',
+							'0.5',
+						]);
+						expect(icons.map((icon) => icon.hidden)).toEqual([true, false]);
+						const client = fixture.loadClient();
 						hydratedRoot = hydrateRoot(
 							article,
-							projected.loadClient().ProjectedAction,
-							{
-								title: 'prepared',
-								onReady,
-								height$:
-									failure === 'read'
-										? scope.derived$<unknown>('failure', () => {
-												throw error;
-											})
-										: failure === 'coercion'
-											? scope.signal$('failure', {
-													toString() {
-														throw error;
-													},
-												})
-											: height$,
-							},
-							{ signalOwner: scope, bindingLeases: [binding], onUncaughtError },
+							client.ActionHydration,
+							{ ...applicationProps, suspend: true },
+							{ signalOwner: scope, bindingLeases: [binding] },
 						);
 						flushSync(() => {});
 						flushEffects();
-						if (failure === null) {
-							expect(onUncaughtError).not.toHaveBeenCalled();
-							expect(onReady).toHaveBeenCalledOnce();
-							expect(onReady).toHaveBeenCalledWith(action);
-							expect(readyViews).toEqual([['prepared', 'sized', '3px']]);
-							height$.set(4);
-							flushSync(() => {});
-							expect(action.style.height).toBe('4px');
-						} else {
-							expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(error);
-							expect(onReady).not.toHaveBeenCalled();
-							expect(action.title).toBe('early');
-						}
-					} finally {
-						hydratedRoot?.unmount();
-						hydratedRoot = undefined;
-						binding.dispose();
-						scope.dispose();
-					}
-				}
-			}
-			for (const outcome of [
-				'replace',
-				'replace-staged',
-				'replace-staged-superseded',
-				'accept',
-				'retry',
-			]) {
-				const discard = outcome === 'retry';
-				const scope = createScope({ scopeKey: `early-action-hydration-${dev}-${outcome}` });
-				const draft = scope.signal$('draft', '');
-				const generating = scope.signal$('generating', false);
-				const accent = scope.signal$('accent', 'red');
-				let request = new AbortController();
-				const cancel = vi.fn(() => {
-					request.abort();
-					generating.set(false);
-				});
-				const send = vi.fn();
-				const props: ActionPresentationProps = {
-					type: scope.derived$('type', () => (generating.get() ? 'button' : 'submit')),
-					disabled: scope.derived$('disabled', () => !generating.get() && draft.get() === ''),
-					label: scope.derived$('label', () => (generating.get() ? 'Stop' : 'Send')),
-					sendHidden: generating,
-					stopHidden: scope.derived$('stop-hidden', () => !generating.get()),
-					classes: scope.derived$('classes', () =>
-						generating.get() ? 'is-generating' : 'is-idle',
-					),
-					height$: scope.derived$('height', () => (generating.get() ? 24 : 16)),
-					opacity$: scope.derived$('opacity', () => (generating.get() ? 0.5 : 1)),
-					accent$: accent,
-					onAction(event) {
-						event.preventDefault();
-						if (generating.get()) cancel();
-						else send();
-					},
-				};
-				const fixture = authoredPresentation(
-					'ActionPresentation',
-					props,
-					dev,
-					`import 'octane/signals';\n${presentationSource}`,
-				);
-				fixture.cleanup.mockImplementation(() => accent.set('blue'));
-				const pending = deferred<void>();
-				const onHydrated = vi.fn();
-				const readyViews: Array<{
-					type: string;
-					label: string | null;
-					disabled: boolean;
-					classes: string;
-					height: string;
-					opacity: string;
-					color: string;
-				}> = [];
-				const onReady = vi.fn((element: Element | null) => {
-					if (element instanceof HTMLButtonElement) {
-						readyViews.push({
-							type: element.type,
-							label: element.getAttribute('aria-label'),
-							disabled: element.disabled,
-							classes: element.className,
-							height: element.style.height,
-							opacity: element.style.opacity,
-							color: element.style.color,
-						});
-					}
-				});
-				const applicationProps = {
-					...props,
-					when: interaction({ events: 'click' }),
-					suspend: false,
-					promise: pending.promise,
-					onHydrated,
-					onReady,
-				};
-				article.innerHTML = renderToString(fixture.server.ActionHydration, applicationProps).html;
-				const action = article.querySelector('button')!;
-				const icons = [...action.querySelectorAll('span')];
-				const binding = runWithSignalOwner(scope, () => fixture.attach(action, fixture.state));
-				const viewTransitions = outcome.startsWith('replace-staged')
-					? installViewTransitionMocks()
-					: undefined;
-				const nativeUpdates: Array<{
-					update: () => void | Promise<void>;
-					ready: ReturnType<typeof deferred<void>>;
-					finished: ReturnType<typeof deferred<void>>;
-				}> = [];
-				if (viewTransitions !== undefined)
-					Object.defineProperty(document, 'startViewTransition', {
-						configurable: true,
-						value(input: { update: () => void | Promise<void> }) {
-							const ready = deferred<void>();
-							const finished = deferred<void>();
-							nativeUpdates.push({ update: input.update, ready, finished });
-							return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
-						},
-					});
-				try {
-					expect(action.disabled).toBe(true);
-					expect([action.className, action.style.height, action.style.opacity]).toEqual([
-						'is-idle',
-						'16px',
-						'1',
-					]);
-					draft.set('Early draft');
-					expect(action.disabled).toBe(false);
-					generating.set(true);
-					expect(action.type).toBe('button');
-					expect(action.getAttribute('aria-disabled')).toBe('false');
-					expect(action.getAttribute('aria-label')).toBe('Stop');
-					expect([action.className, action.style.height, action.style.opacity]).toEqual([
-						'is-generating',
-						'24px',
-						'0.5',
-					]);
-					expect(icons.map((icon) => icon.hidden)).toEqual([true, false]);
-					const client = fixture.loadClient();
-					hydratedRoot = hydrateRoot(
-						article,
-						client.ActionHydration,
-						{ ...applicationProps, suspend: true },
-						{ signalOwner: scope, bindingLeases: [binding] },
-					);
-					flushSync(() => {});
-					flushEffects();
-					expect(action.getAttribute('aria-label')).toBe('Stop');
-					expect(action.disabled).toBe(false);
-					action.click();
-					flushSync(() => {});
-					flushEffects();
-					await act(() => {});
-					expect(onHydrated).not.toHaveBeenCalled();
-					expect(onReady).not.toHaveBeenCalled();
-					expect(fixture.cleanup).not.toHaveBeenCalled();
-					expect(article.querySelector('#action-fallback')).toBeNull();
-					expect(request.signal.aborted).toBe(true);
-					expect(cancel).toHaveBeenCalledOnce();
-					expect(send).not.toHaveBeenCalled();
-					expect(action.type).toBe('submit');
-					expect(action.getAttribute('aria-label')).toBe('Send');
-					expect(icons.map((icon) => icon.hidden)).toEqual([false, true]);
-					if (outcome === 'replace' || viewTransitions !== undefined) {
-						const replace = (label = 'Account') =>
-							hydratedRoot!.render(client.LoginPresentation, {
-								label,
-								error: '',
-								pending: false,
-								submitLabel: 'Continue',
-							});
-						if (viewTransitions !== undefined) {
-							startTransition(() => {
-								addTransitionType('replace');
-								replace();
-							});
-							await vi.waitFor(() => expect(nativeUpdates).toHaveLength(1));
-							expect(article.querySelector('button')).toBe(action);
-							expect(article.querySelector('form')).toBeNull();
-							expect(fixture.cleanup).not.toHaveBeenCalled();
-							action.click();
-							expect(send).toHaveBeenCalledOnce();
-							if (outcome === 'replace-staged-superseded') {
-								replace('Newest account');
-								flushSync(() => {});
-								expect(article.querySelector('label')?.textContent).toBe('Newest account');
-								expect(fixture.cleanup).toHaveBeenCalledOnce();
-							}
-							await nativeUpdates[0].update();
-							nativeUpdates[0].ready.resolve();
-							nativeUpdates[0].finished.resolve();
-						} else replace();
-						flushSync(() => {});
-						flushEffects();
-						expect(article.querySelector('form')).not.toBeNull();
-						expect(article.querySelector('label')?.textContent).toBe(
-							outcome === 'replace-staged-superseded' ? 'Newest account' : 'Account',
-						);
-						expect(action.isConnected).toBe(false);
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
-						const retiredMarkup = action.outerHTML;
-						generating.set(true);
-						accent.set('green');
-						fixture.publish({ label: scope.signal$('replacement-label', 'Late early label') });
-						binding.refresh();
-						flushSync(() => {});
-						expect(action.outerHTML).toBe(retiredMarkup);
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						expect(action.getAttribute('aria-label')).toBe('Stop');
+						expect(action.disabled).toBe(false);
 						action.click();
-						expect(cancel).toHaveBeenCalledOnce();
-						expect(send).toHaveBeenCalledTimes(viewTransitions !== undefined ? 1 : 0);
-						await act(() => pending.resolve());
-						expect(article.querySelector('form')).not.toBeNull();
-						expect(onHydrated).not.toHaveBeenCalled();
-						expect(onReady).not.toHaveBeenCalled();
-						binding.dispose();
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
-						continue;
-					}
-					let accepted = pending;
-					if (discard) {
-						hydratedRoot.render(client.ActionHydration, {
-							...applicationProps,
-							when: never(),
-							suspend: true,
-						});
 						flushSync(() => {});
 						flushEffects();
-						await act(() => pending.resolve());
+						await act(() => {});
 						expect(onHydrated).not.toHaveBeenCalled();
 						expect(onReady).not.toHaveBeenCalled();
 						expect(fixture.cleanup).not.toHaveBeenCalled();
+						expect(article.querySelector('#action-fallback')).toBeNull();
+						expect(request.signal.aborted).toBe(true);
+						expect(cancel).toHaveBeenCalledOnce();
+						expect(send).not.toHaveBeenCalled();
+						expect(action.type).toBe('submit');
+						expect(action.getAttribute('aria-label')).toBe('Send');
+						expect(icons.map((icon) => icon.hidden)).toEqual([false, true]);
+						if (outcome === 'replace' || viewTransitions !== undefined) {
+							const replace = (label = 'Account') =>
+								hydratedRoot!.render(client.LoginPresentation, {
+									label,
+									error: '',
+									pending: false,
+									submitLabel: 'Continue',
+								});
+							if (viewTransitions !== undefined) {
+								startTransition(() => {
+									addTransitionType('replace');
+									replace();
+								});
+								await vi.waitFor(() => expect(nativeUpdates).toHaveLength(1));
+								expect(article.querySelector('button')).toBe(action);
+								expect(article.querySelector('form')).toBeNull();
+								expect(fixture.cleanup).not.toHaveBeenCalled();
+								action.click();
+								expect(send).toHaveBeenCalledOnce();
+								if (outcome === 'replace-staged-superseded') {
+									replace('Newest account');
+									flushSync(() => {});
+									expect(article.querySelector('label')?.textContent).toBe('Newest account');
+									expect(fixture.cleanup).toHaveBeenCalledOnce();
+								}
+								await nativeUpdates[0].update();
+								nativeUpdates[0].ready.resolve();
+								nativeUpdates[0].finished.resolve();
+							} else replace();
+							flushSync(() => {});
+							flushEffects();
+							expect(article.querySelector('form')).not.toBeNull();
+							expect(article.querySelector('label')?.textContent).toBe(
+								outcome === 'replace-staged-superseded' ? 'Newest account' : 'Account',
+							);
+							expect(action.isConnected).toBe(false);
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							const retiredMarkup = action.outerHTML;
+							generating.set(true);
+							accent.set('green');
+							fixture.publish({ label: scope.signal$('replacement-label', 'Late early label') });
+							binding.refresh();
+							flushSync(() => {});
+							expect(action.outerHTML).toBe(retiredMarkup);
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							action.click();
+							expect(cancel).toHaveBeenCalledOnce();
+							expect(send).toHaveBeenCalledTimes(viewTransitions !== undefined ? 1 : 0);
+							await act(() => pending.resolve());
+							expect(article.querySelector('form')).not.toBeNull();
+							expect(onHydrated).not.toHaveBeenCalled();
+							expect(onReady).not.toHaveBeenCalled();
+							binding.dispose();
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							continue;
+						}
+						let accepted = pending;
+						if (discard) {
+							hydratedRoot.render(client.ActionHydration, {
+								...applicationProps,
+								when: never(),
+								suspend: true,
+							});
+							flushSync(() => {});
+							flushEffects();
+							await act(() => pending.resolve());
+							expect(onHydrated).not.toHaveBeenCalled();
+							expect(onReady).not.toHaveBeenCalled();
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							request = new AbortController();
+							generating.set(true);
+							expect(action.getAttribute('aria-label')).toBe('Stop');
+							action.click();
+							expect(request.signal.aborted).toBe(true);
+							expect(cancel).toHaveBeenCalledTimes(2);
+							expect(send).not.toHaveBeenCalled();
+							accepted = deferred<void>();
+							hydratedRoot.render(client.ActionHydration, {
+								...applicationProps,
+								when: condition(true),
+								suspend: true,
+								promise: accepted.promise,
+							});
+							flushSync(() => {});
+							flushEffects();
+						}
 						request = new AbortController();
 						generating.set(true);
 						expect(action.getAttribute('aria-label')).toBe('Stop');
+						await act(() => accepted.resolve());
+						expect(onHydrated).toHaveBeenCalledOnce();
+						expect(readyViews).toEqual([
+							{
+								type: 'button',
+								label: 'Stop',
+								disabled: false,
+								classes: 'is-generating',
+								height: '24px',
+								opacity: '0.5',
+								color: 'blue',
+							},
+						]);
+						expect(article.querySelector('button')).toBe(action);
+						expect([...action.querySelectorAll('span')]).toEqual(icons);
+						expect(draft.get()).toBe('Early draft');
+						expect(generating.get()).toBe(true);
+						expect(action.disabled).toBe(false);
+						expect(action.getAttribute('aria-label')).toBe('Stop');
+						expect(icons.map((icon) => icon.hidden)).toEqual([true, false]);
+						expect(cancel).toHaveBeenCalledTimes(discard ? 2 : 1);
+						expect(send).not.toHaveBeenCalled();
+						fixture.publish({ label: scope.signal$('retired-label', 'Stale early label') });
+						binding.refresh();
+						expect(action.getAttribute('aria-label')).toBe('Stop');
+						accent.set('green');
+						flushSync(() => {});
+						expect(action.style.color).toBe('green');
 						action.click();
 						expect(request.signal.aborted).toBe(true);
-						expect(cancel).toHaveBeenCalledTimes(2);
+						expect(cancel).toHaveBeenCalledTimes(discard ? 3 : 2);
 						expect(send).not.toHaveBeenCalled();
-						accepted = deferred<void>();
-						hydratedRoot.render(client.ActionHydration, {
-							...applicationProps,
-							when: condition(true),
-							suspend: true,
-							promise: accepted.promise,
-						});
 						flushSync(() => {});
-						flushEffects();
+						expect(action.getAttribute('aria-label')).toBe('Send');
+						expect([action.className, action.style.height, action.style.opacity]).toEqual([
+							'is-idle',
+							'16px',
+							'1',
+						]);
+						hydratedRoot.unmount();
+						hydratedRoot = undefined;
+						const retiredMarkup = action.outerHTML;
+						generating.set(true);
+						expect(action.outerHTML).toBe(retiredMarkup);
+						action.click();
+						expect(cancel).toHaveBeenCalledTimes(discard ? 3 : 2);
+						expect(send).not.toHaveBeenCalled();
+					} finally {
+						binding.dispose();
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						scope.dispose();
+						for (const update of nativeUpdates) {
+							update.ready.resolve();
+							update.finished.resolve();
+						}
+						viewTransitions?.restore();
 					}
-					request = new AbortController();
-					generating.set(true);
-					expect(action.getAttribute('aria-label')).toBe('Stop');
-					await act(() => accepted.resolve());
-					expect(onHydrated).toHaveBeenCalledOnce();
-					expect(readyViews).toEqual([
-						{
-							type: 'button',
-							label: 'Stop',
-							disabled: false,
-							classes: 'is-generating',
-							height: '24px',
-							opacity: '0.5',
-							color: 'blue',
-						},
-					]);
-					expect(article.querySelector('button')).toBe(action);
-					expect([...action.querySelectorAll('span')]).toEqual(icons);
-					expect(draft.get()).toBe('Early draft');
-					expect(generating.get()).toBe(true);
-					expect(action.disabled).toBe(false);
-					expect(action.getAttribute('aria-label')).toBe('Stop');
-					expect(icons.map((icon) => icon.hidden)).toEqual([true, false]);
-					expect(cancel).toHaveBeenCalledTimes(discard ? 2 : 1);
-					expect(send).not.toHaveBeenCalled();
-					fixture.publish({ label: scope.signal$('retired-label', 'Stale early label') });
-					binding.refresh();
-					expect(action.getAttribute('aria-label')).toBe('Stop');
-					accent.set('green');
-					flushSync(() => {});
-					expect(action.style.color).toBe('green');
-					action.click();
-					expect(request.signal.aborted).toBe(true);
-					expect(cancel).toHaveBeenCalledTimes(discard ? 3 : 2);
-					expect(send).not.toHaveBeenCalled();
-					flushSync(() => {});
-					expect(action.getAttribute('aria-label')).toBe('Send');
-					expect([action.className, action.style.height, action.style.opacity]).toEqual([
-						'is-idle',
-						'16px',
-						'1',
-					]);
-					hydratedRoot.unmount();
-					hydratedRoot = undefined;
-					const retiredMarkup = action.outerHTML;
-					generating.set(true);
-					expect(action.outerHTML).toBe(retiredMarkup);
-					action.click();
-					expect(cancel).toHaveBeenCalledTimes(discard ? 3 : 2);
-					expect(send).not.toHaveBeenCalled();
-				} finally {
-					binding.dispose();
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					scope.dispose();
-					for (const update of nativeUpdates) {
-						update.ready.resolve();
-						update.finished.resolve();
-					}
-					viewTransitions?.restore();
 				}
-			}
-			for (const [delayed, failureKind, handled] of [
-				[true, 'read', true],
-				[true, 'coercion', true],
-				[true, 'coercion', false],
-				[true, 'null', true],
-				[true, 'undefined', true],
-				[false, 'read', true],
-				[false, 'coercion', true],
-				[false, 'coercion', false],
-				[false, 'null', true],
-				[false, 'undefined', true],
-			] as const) {
-				const failure =
-					failureKind === 'null'
-						? null
-						: failureKind === 'undefined'
-							? undefined
-							: new Error(
-									`Authored ${failureKind} during ${delayed ? 'delayed' : 'sync'} preparation`,
-								);
-				const earlyAction = vi.fn();
-				const earlyRef = vi.fn();
-				const normalAction = vi.fn();
-				const normalRef = vi.fn();
-				const onUncaughtError = vi.fn();
-				const fixture = authoredPresentation(
-					'ErrorPresentation',
-					{
-						model: { title: 'Early' },
-						label: 'Body',
-						onAction: earlyAction,
-						onReady: earlyRef,
-					},
-					dev,
-					`import { Hydrate } from 'octane';
+			}, 15000);
+			it(`projected reads and coercions fail at the owner (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const [delayed, failureKind, handled] of [
+					[true, 'read', true],
+					[true, 'coercion', true],
+					[true, 'coercion', false],
+					[true, 'null', true],
+					[true, 'undefined', true],
+					[false, 'read', true],
+					[false, 'coercion', true],
+					[false, 'coercion', false],
+					[false, 'null', true],
+					[false, 'undefined', true],
+				] as const) {
+					const failure =
+						failureKind === 'null'
+							? null
+							: failureKind === 'undefined'
+								? undefined
+								: new Error(
+										`Authored ${failureKind} during ${delayed ? 'delayed' : 'sync'} preparation`,
+									);
+					const earlyAction = vi.fn();
+					const earlyRef = vi.fn();
+					const normalAction = vi.fn();
+					const normalRef = vi.fn();
+					const onUncaughtError = vi.fn();
+					const fixture = authoredPresentation(
+						'ErrorPresentation',
+						{
+							model: { title: 'Early' },
+							label: 'Body',
+							onAction: earlyAction,
+							onReady: earlyRef,
+						},
+						dev,
+						`import { Hydrate } from 'octane';
 export function ErrorPresentation(props) @{ 'use dom bindings';
  <button title={props.model.title} onClick={props.onAction} ref={props.onReady}><b>{props.label as string}</b></button>
 }
@@ -3720,241 +3754,252 @@ export function ErrorHydration(props) @{
   <ErrorPresentation model={props.model} label={props.label} onAction={props.onAction} onReady={props.onReady}/>
  </Hydrate>
 }`,
-				);
-				const props = { ...fixture.state.getSnapshot(), when: never() };
-				article.innerHTML = delayed
-					? renderToString(fixture.server.ErrorHydration, props).html
-					: fixture.html;
-				const button = article.querySelector('button')!;
-				const child = button.firstElementChild;
-				const binding = fixture.attach(button, fixture.state);
-				const model =
-					failureKind === 'read'
-						? {
-								get title(): string {
-									throw failure;
-								},
-							}
-						: {
-								title: {
-									toString() {
+					);
+					const props = { ...fixture.state.getSnapshot(), when: never() };
+					article.innerHTML = delayed
+						? renderToString(fixture.server.ErrorHydration, props).html
+						: fixture.html;
+					const button = article.querySelector('button')!;
+					const child = button.firstElementChild;
+					const binding = fixture.attach(button, fixture.state);
+					const model =
+						failureKind === 'read'
+							? {
+									get title(): string {
 										throw failure;
 									},
-								},
+								}
+							: {
+									title: {
+										toString() {
+											throw failure;
+										},
+									},
+								};
+					const normal = { ...props, model, onAction: normalAction, onReady: normalRef };
+					const options = { bindingLeases: [binding], ...(handled ? { onUncaughtError } : {}) };
+					try {
+						const client = fixture.loadClient();
+						if (delayed) {
+							hydratedRoot = hydrateRoot(article, client.ErrorHydration, normal, options);
+							await act(() => {});
+							const activate = () =>
+								act(() => {
+									hydratedRoot!.render(client.ErrorHydration, { ...normal, when: condition(true) });
+								});
+							if (handled) await activate();
+							else await expect(activate()).rejects.toBe(failure);
+						} else {
+							const activate = () => {
+								hydratedRoot = hydrateRoot(article, client.ErrorPresentation, normal, options);
 							};
-				const normal = { ...props, model, onAction: normalAction, onReady: normalRef };
-				const options = { bindingLeases: [binding], ...(handled ? { onUncaughtError } : {}) };
-				try {
-					const client = fixture.loadClient();
-					if (delayed) {
-						hydratedRoot = hydrateRoot(article, client.ErrorHydration, normal, options);
-						await act(() => {});
-						const activate = () =>
-							act(() => {
-								hydratedRoot!.render(client.ErrorHydration, { ...normal, when: condition(true) });
-							});
-						if (handled) await activate();
-						else await expect(activate()).rejects.toBe(failure);
-					} else {
-						const activate = () => {
-							hydratedRoot = hydrateRoot(article, client.ErrorPresentation, normal, options);
-						};
-						if (handled) expect(activate).not.toThrow();
-						else {
-							let caught: unknown;
-							try {
-								activate();
-							} catch (error) {
-								caught = error;
+							if (handled) expect(activate).not.toThrow();
+							else {
+								let caught: unknown;
+								try {
+									activate();
+								} catch (error) {
+									caught = error;
+								}
+								expect(caught).toBe(failure);
 							}
-							expect(caught).toBe(failure);
 						}
+						if (handled) expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(failure);
+						expect(article.querySelector('button')).toBe(button);
+						expect(button.firstElementChild).toBe(child);
+						expect(button.title).toBe('Early');
+						expect(normalRef).not.toHaveBeenCalled();
+						expect(earlyRef.mock.calls).toEqual([[button]]);
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						fixture.publish({ model: { title: 'Still early' } });
+						expect(button.title).toBe('Still early');
+						button.click();
+						expect(earlyAction).toHaveBeenCalledOnce();
+						expect(normalAction).not.toHaveBeenCalled();
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
 					}
-					if (handled) expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(failure);
-					expect(article.querySelector('button')).toBe(button);
-					expect(button.firstElementChild).toBe(child);
-					expect(button.title).toBe('Early');
-					expect(normalRef).not.toHaveBeenCalled();
-					expect(earlyRef.mock.calls).toEqual([[button]]);
-					expect(fixture.cleanup).not.toHaveBeenCalled();
-					fixture.publish({ model: { title: 'Still early' } });
-					expect(button.title).toBe('Still early');
-					button.click();
-					expect(earlyAction).toHaveBeenCalledOnce();
-					expect(normalAction).not.toHaveBeenCalled();
-				} finally {
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					binding.dispose();
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					expect(earlyRef.mock.calls).toEqual([[button], [null]]);
 				}
-				expect(fixture.cleanup).toHaveBeenCalledOnce();
-				expect(earlyRef.mock.calls).toEqual([[button], [null]]);
-			}
-			const refusedRest = authoredPresentation(
-				'RefusedRestTree',
-				{ label: 'Early', onAction: vi.fn(), onReady: vi.fn() },
-				dev,
-				`export function GenericRest({ label, ...rest }) @{ 'use dom bindings';
+			}, 15000);
+			it(`unknown rest child refuses adoption without mutation (${dev ? 'dev' : 'prod'})`, async () => {
+				const article = await attachArticle();
+				const refusedRest = authoredPresentation(
+					'RefusedRestTree',
+					{ label: 'Early', onAction: vi.fn(), onReady: vi.fn() },
+					dev,
+					`export function GenericRest({ label, ...rest }) @{ 'use dom bindings';
  <button title={label} {...rest} />
 }
 export function RefusedRestTree(props) @{ 'use dom bindings';
  <section><GenericRest label={props.label} onClick={props.onAction} ref={props.onReady} /></section>
 }`,
-			);
-			article.innerHTML = refusedRest.html;
-			const refusedButton = article.querySelector('button')!;
-			const refusedBinding = refusedRest.attach(article.firstElementChild!, refusedRest.state);
-			try {
-				const markup = article.innerHTML;
-				// The generic spread can supply children in normal rendering. Its
-				// bindSignalChild writer has no strict-adoption proof even though this
-				// extracted callsite has a closed, safe native-rest key set.
-				expect(() =>
-					hydrateRoot(
-						article,
-						refusedRest.loadClient().RefusedRestTree,
-						refusedRest.state.getSnapshot(),
-						{ bindingLeases: [refusedBinding] },
-					),
-				).toThrow(/binding lease|presentation|handoff/i);
-				expect(article.innerHTML).toBe(markup);
-				expect(article.querySelector('button')).toBe(refusedButton);
-				expect(refusedRest.cleanup).not.toHaveBeenCalled();
-				expect(refusedRest.state.getSnapshot().onReady.mock.calls).toEqual([[refusedButton]]);
-				refusedRest.publish({ label: 'Still early' });
-				expect(refusedButton.title).toBe('Still early');
-				refusedButton.click();
-				expect(refusedRest.state.getSnapshot().onAction).toHaveBeenCalledOnce();
-			} finally {
-				refusedBinding.dispose();
-			}
-			for (const shape of ['same', 'extra', 'missing', 'order', 'symbol']) {
-				const scope = createScope({ scopeKey: `rest-handoff-${dev}-${shape}` });
-				const aria = scope.signal$('aria', 'Early aria');
-				const onAction = vi.fn((event: Event) => event.preventDefault());
-				const onReady = vi.fn();
-				const initial = {
-					classes: 'early',
-					style: { color: 'red', width: 10 },
-					title: 'Early',
-					label: 'Label',
-					'aria-label': aria,
-					onClick: onAction,
-					ref: onReady,
-				};
-				const fixture = authoredPresentation(
-					'ClosedRest',
-					initial,
-					dev,
-					`export function ClosedRest({ classes, style, title, label, ...rest }) @{ 'use dom bindings';
- <button class={classes} style={style} title={title} {...rest}><b>{label as string}</b></button>
-}`,
-					{},
-					{},
-					Object.keys(initial),
 				);
-				article.innerHTML = fixture.html;
-				const button = article.querySelector('button')!;
-				const child = button.querySelector('b')!;
-				const binding = fixture.attach(button, fixture.state);
-				const next: Record<string | symbol, unknown> = {
-					...initial,
-					classes: 'normal',
-					style: { height: 20 },
-					title: 'Normal',
-				};
-				if (shape === 'extra') next['data-extra'] = 'unexpected';
-				if (shape === 'missing') delete next['aria-label'];
-				if (shape === 'order') {
-					delete next.title;
-					next.title = 'Normal';
-				}
-				if (shape === 'symbol') next[Symbol('unexpected')] = true;
+				article.innerHTML = refusedRest.html;
+				const refusedButton = article.querySelector('button')!;
+				const refusedBinding = refusedRest.attach(article.firstElementChild!, refusedRest.state);
 				try {
-					const takeOver = () =>
-						hydrateRoot(article, fixture.loadClient().ClosedRest, next, {
-							bindingLeases: [binding],
-						});
-					if (shape === 'same') {
-						hydratedRoot = takeOver();
-						flushSync(() => {});
-						flushEffects();
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
-						expect(button.className).toBe('normal');
-						expect(button.style.height).toBe('20px');
-						expect(button.style.color).toBe('');
-						expect(button.style.width).toBe('');
-						expect(button.title).toBe('Normal');
-						expect(onReady.mock.calls).toEqual([[button], [null], [button]]);
-						aria.set('Normal aria');
-						flushSync(() => {});
-						expect(button.getAttribute('aria-label')).toBe('Normal aria');
-						fixture.publish({ title: 'Retired' });
-						binding.refresh();
-						expect(button.title).toBe('Normal');
-					} else {
-						const before = button.outerHTML;
-						expect(takeOver).toThrow(/binding lease|presentation|handoff/i);
-						expect(button.outerHTML).toBe(before);
-						expect(fixture.cleanup).not.toHaveBeenCalled();
-						expect(onReady.mock.calls).toEqual([[button]]);
-						fixture.publish({ title: 'Still early' });
-						expect(button.title).toBe('Still early');
-					}
-					expect(article.querySelector('button')).toBe(button);
-					expect(button.querySelector('b')).toBe(child);
-					expect(
-						button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
-					).toBe(false);
-					expect(onAction).toHaveBeenCalledOnce();
+					const markup = article.innerHTML;
+					// The generic spread can supply children in normal rendering. Its
+					// bindSignalChild writer has no strict-adoption proof even though this
+					// extracted callsite has a closed, safe native-rest key set.
+					expect(() =>
+						hydrateRoot(
+							article,
+							refusedRest.loadClient().RefusedRestTree,
+							refusedRest.state.getSnapshot(),
+							{ bindingLeases: [refusedBinding] },
+						),
+					).toThrow(/binding lease|presentation|handoff/i);
+					expect(article.innerHTML).toBe(markup);
+					expect(article.querySelector('button')).toBe(refusedButton);
+					expect(refusedRest.cleanup).not.toHaveBeenCalled();
+					expect(refusedRest.state.getSnapshot().onReady.mock.calls).toEqual([[refusedButton]]);
+					refusedRest.publish({ label: 'Still early' });
+					expect(refusedButton.title).toBe('Still early');
+					refusedButton.click();
+					expect(refusedRest.state.getSnapshot().onAction).toHaveBeenCalledOnce();
 				} finally {
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					binding.dispose();
-					scope.dispose();
+					refusedBinding.dispose();
 				}
-				expect(onReady.mock.calls).toEqual(
-					shape === 'same' ? [[button], [null], [button], [null]] : [[button], [null]],
-				);
-			}
-			for (const outcome of [
-				'pending',
-				'pending-unmount',
-				'staged',
-				'staged-unmount',
-				'staged-signal',
-				'staged-signal-aba',
-			]) {
-				const staged = outcome.startsWith('staged');
-				const changedSignal = outcome.startsWith('staged-signal');
-				const signalABA = outcome.endsWith('aba');
-				const unmount = outcome.endsWith('unmount');
-				const scope = createScope({ scopeKey: `rest-pending-${dev}-${outcome}` });
-				const earlyAria = scope.signal$('early', 'Early aria');
-				const normalAria = scope.signal$('normal', 'Prepared aria');
-				const earlyAction = vi.fn((event: Event) => event.preventDefault());
-				const normalAction = vi.fn((event: Event) => event.preventDefault());
-				const earlyRef = vi.fn();
-				const refLabels: Array<string | null> = [];
-				const normalRef = vi.fn((node: Element | null) => {
-					if (node !== null) refLabels.push(node.getAttribute('aria-label'));
-				});
-				const onHydrated = vi.fn();
-				const pending = deferred<void>();
-				let publication = false;
-				let coercions = 0;
-				const fixture = authoredPresentation(
-					'RestTree',
-					{
+			}, 15000);
+			it(`closed rest ownership for changed property shapes (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const shape of ['same', 'extra', 'missing', 'order', 'symbol']) {
+					const scope = createScope({ scopeKey: `rest-handoff-${dev}-${shape}` });
+					const aria = scope.signal$('aria', 'Early aria');
+					const onAction = vi.fn((event: Event) => event.preventDefault());
+					const onReady = vi.fn();
+					const initial = {
 						classes: 'early',
 						style: { color: 'red', width: 10 },
 						title: 'Early',
-						aria: earlyAria,
-						onAction: earlyAction,
-						onReady: earlyRef,
-					},
-					dev,
-					`import { Hydrate, use } from 'octane';
+						label: 'Label',
+						'aria-label': aria,
+						onClick: onAction,
+						ref: onReady,
+					};
+					const fixture = authoredPresentation(
+						'ClosedRest',
+						initial,
+						dev,
+						`export function ClosedRest({ classes, style, title, label, ...rest }) @{ 'use dom bindings';
+ <button class={classes} style={style} title={title} {...rest}><b>{label as string}</b></button>
+}`,
+						{},
+						{},
+						Object.keys(initial),
+					);
+					article.innerHTML = fixture.html;
+					const button = article.querySelector('button')!;
+					const child = button.querySelector('b')!;
+					const binding = fixture.attach(button, fixture.state);
+					const next: Record<string | symbol, unknown> = {
+						...initial,
+						classes: 'normal',
+						style: { height: 20 },
+						title: 'Normal',
+					};
+					if (shape === 'extra') next['data-extra'] = 'unexpected';
+					if (shape === 'missing') delete next['aria-label'];
+					if (shape === 'order') {
+						delete next.title;
+						next.title = 'Normal';
+					}
+					if (shape === 'symbol') next[Symbol('unexpected')] = true;
+					try {
+						const takeOver = () =>
+							hydrateRoot(article, fixture.loadClient().ClosedRest, next, {
+								bindingLeases: [binding],
+							});
+						if (shape === 'same') {
+							hydratedRoot = takeOver();
+							flushSync(() => {});
+							flushEffects();
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							expect(button.className).toBe('normal');
+							expect(button.style.height).toBe('20px');
+							expect(button.style.color).toBe('');
+							expect(button.style.width).toBe('');
+							expect(button.title).toBe('Normal');
+							expect(onReady.mock.calls).toEqual([[button], [null], [button]]);
+							aria.set('Normal aria');
+							flushSync(() => {});
+							expect(button.getAttribute('aria-label')).toBe('Normal aria');
+							fixture.publish({ title: 'Retired' });
+							binding.refresh();
+							expect(button.title).toBe('Normal');
+						} else {
+							const before = button.outerHTML;
+							expect(takeOver).toThrow(/binding lease|presentation|handoff/i);
+							expect(button.outerHTML).toBe(before);
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							expect(onReady.mock.calls).toEqual([[button]]);
+							fixture.publish({ title: 'Still early' });
+							expect(button.title).toBe('Still early');
+						}
+						expect(article.querySelector('button')).toBe(button);
+						expect(button.querySelector('b')).toBe(child);
+						expect(
+							button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
+						).toBe(false);
+						expect(onAction).toHaveBeenCalledOnce();
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+						scope.dispose();
+					}
+					expect(onReady.mock.calls).toEqual(
+						shape === 'same' ? [[button], [null], [button], [null]] : [[button], [null]],
+					);
+				}
+			}, 15000);
+			it(`generic host handoff after suspension (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const outcome of [
+					'pending',
+					'pending-unmount',
+					'staged',
+					'staged-unmount',
+					'staged-signal',
+					'staged-signal-aba',
+				]) {
+					const staged = outcome.startsWith('staged');
+					const changedSignal = outcome.startsWith('staged-signal');
+					const signalABA = outcome.endsWith('aba');
+					const unmount = outcome.endsWith('unmount');
+					const scope = createScope({ scopeKey: `rest-pending-${dev}-${outcome}` });
+					const earlyAria = scope.signal$('early', 'Early aria');
+					const normalAria = scope.signal$('normal', 'Prepared aria');
+					const earlyAction = vi.fn((event: Event) => event.preventDefault());
+					const normalAction = vi.fn((event: Event) => event.preventDefault());
+					const earlyRef = vi.fn();
+					const refLabels: Array<string | null> = [];
+					const normalRef = vi.fn((node: Element | null) => {
+						if (node !== null) refLabels.push(node.getAttribute('aria-label'));
+					});
+					const onHydrated = vi.fn();
+					const pending = deferred<void>();
+					let publication = false;
+					let coercions = 0;
+					const fixture = authoredPresentation(
+						'RestTree',
+						{
+							classes: 'early',
+							style: { color: 'red', width: 10 },
+							title: 'Early',
+							aria: earlyAria,
+							onAction: earlyAction,
+							onReady: earlyRef,
+						},
+						dev,
+						`import { Hydrate, use } from 'octane';
 export function RestChild({ classes, style, title, ...rest }) @{ 'use dom bindings';
  <button class={classes} style={style} title={title} {...rest}><b>Action</b></button>
 }
@@ -3970,173 +4015,177 @@ export function RestHydration(props) @{
   <Wait suspend={props.suspend} promise={props.promise}/>
  </Hydrate>
 }`,
-				);
-				const guard = (value: string) => ({
-					toString() {
-						if (publication) throw new Error('authored coercion during publication');
-						coercions++;
-						return value;
-					},
-				});
-				const classes = [
-					Object.defineProperty({}, 'normal', {
-						enumerable: true,
-						get() {
-							if (publication) throw new Error('authored class getter during publication');
-							return true;
-						},
-					}),
-				];
-				const props = {
-					...fixture.state.getSnapshot(),
-					when: staged ? never() : condition(true),
-					suspend: false,
-					promise: pending.promise,
-					onHydrated,
-				};
-				article.innerHTML = renderToString(fixture.server.RestHydration, props).html;
-				const button = article.querySelector('button')!;
-				const child = button.firstElementChild;
-				const binding = fixture.attach(article.querySelector('section')!, fixture.state);
-				const normal = {
-					...props,
-					classes,
-					style: { height: guard('20px') },
-					title: guard('Normal'),
-					aria: normalAria,
-					onAction: normalAction,
-					onReady: normalRef,
-				};
-				const transitions = staged ? installViewTransitionMocks() : undefined;
-				const updates: Array<{
-					update: () => void | Promise<void>;
-					ready: ReturnType<typeof deferred<void>>;
-					finished: ReturnType<typeof deferred<void>>;
-				}> = [];
-				if (staged)
-					Object.defineProperty(document, 'startViewTransition', {
-						configurable: true,
-						value(input: { update: () => void | Promise<void> }) {
-							const ready = deferred<void>();
-							const finished = deferred<void>();
-							updates.push({ update: input.update, ready, finished });
-							return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
+					);
+					const guard = (value: string) => ({
+						toString() {
+							if (publication) throw new Error('authored coercion during publication');
+							coercions++;
+							return value;
 						},
 					});
-				try {
-					const client = fixture.loadClient();
-					hydratedRoot = hydrateRoot(
-						article,
-						client.RestHydration,
-						{ ...normal, suspend: !staged },
-						{ bindingLeases: [binding] },
-					);
-					flushSync(() => {});
-					flushEffects();
-					await act(() => {});
-					if (staged) {
-						startTransition(() => {
-							addTransitionType('adopt-rest');
-							hydratedRoot!.render(client.RestHydration, { ...normal, when: condition(true) });
+					const classes = [
+						Object.defineProperty({}, 'normal', {
+							enumerable: true,
+							get() {
+								if (publication) throw new Error('authored class getter during publication');
+								return true;
+							},
+						}),
+					];
+					const props = {
+						...fixture.state.getSnapshot(),
+						when: staged ? never() : condition(true),
+						suspend: false,
+						promise: pending.promise,
+						onHydrated,
+					};
+					article.innerHTML = renderToString(fixture.server.RestHydration, props).html;
+					const button = article.querySelector('button')!;
+					const child = button.firstElementChild;
+					const binding = fixture.attach(article.querySelector('section')!, fixture.state);
+					const normal = {
+						...props,
+						classes,
+						style: { height: guard('20px') },
+						title: guard('Normal'),
+						aria: normalAria,
+						onAction: normalAction,
+						onReady: normalRef,
+					};
+					const transitions = staged ? installViewTransitionMocks() : undefined;
+					const updates: Array<{
+						update: () => void | Promise<void>;
+						ready: ReturnType<typeof deferred<void>>;
+						finished: ReturnType<typeof deferred<void>>;
+					}> = [];
+					if (staged)
+						Object.defineProperty(document, 'startViewTransition', {
+							configurable: true,
+							value(input: { update: () => void | Promise<void> }) {
+								const ready = deferred<void>();
+								const finished = deferred<void>();
+								updates.push({ update: input.update, ready, finished });
+								return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
+							},
 						});
-						await vi.waitFor(() => expect(updates).toHaveLength(1));
-					}
-					expect(button.title).toBe('Early');
-					expect(button.style.color).toBe('red');
-					expect(button.getAttribute('aria-label')).toBe('Early aria');
-					expect(earlyRef.mock.calls).toEqual([[button]]);
-					expect(normalRef).not.toHaveBeenCalled();
-					expect(fixture.cleanup).not.toHaveBeenCalled();
-					expect(
-						button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
-					).toBe(false);
-					expect(earlyAction).toHaveBeenCalledOnce();
-					expect(normalAction).not.toHaveBeenCalled();
-					const preparedCoercions = coercions;
-					if (changedSignal) {
-						normalAria.set('Changed while staged');
-						if (signalABA) normalAria.set('Prepared aria');
-					} else if (staged) publication = true;
-					if (unmount) {
-						hydratedRoot.unmount();
-						hydratedRoot = undefined;
-					}
-					if (staged) {
-						await updates[0].update();
-						updates[0].ready.resolve();
-						updates[0].finished.resolve();
-						await act(() => {});
-					} else await act(() => pending.resolve());
-					if (unmount) {
-						expect(article.querySelector('button')).toBeNull();
-						expect(normalRef).not.toHaveBeenCalled();
-						expect(onHydrated).not.toHaveBeenCalled();
-					} else {
-						expect(article.querySelector('button')).toBe(button);
-						expect(button.firstElementChild).toBe(child);
-						expect(button.title).toBe('Normal');
-						expect(button.className).toBe('normal');
-						expect(button.style.height).toBe('20px');
-						expect(button.style.color).toBe('');
-						expect(button.style.width).toBe('');
-						expect(button.getAttribute('aria-label')).toBe(
-							changedSignal && !signalABA ? 'Changed while staged' : 'Prepared aria',
+					try {
+						const client = fixture.loadClient();
+						hydratedRoot = hydrateRoot(
+							article,
+							client.RestHydration,
+							{ ...normal, suspend: !staged },
+							{ bindingLeases: [binding] },
 						);
-						expect(earlyRef.mock.calls).toEqual([[button], [null]]);
-						expect(normalRef).toHaveBeenCalledExactlyOnceWith(button);
-						expect(refLabels).toEqual([
-							changedSignal && !signalABA ? 'Changed while staged' : 'Prepared aria',
-						]);
-						if (changedSignal) expect(coercions).toBeGreaterThan(preparedCoercions);
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
-						expect(onHydrated).toHaveBeenCalledOnce();
+						flushSync(() => {});
+						flushEffects();
+						await act(() => {});
+						if (staged) {
+							startTransition(() => {
+								addTransitionType('adopt-rest');
+								hydratedRoot!.render(client.RestHydration, { ...normal, when: condition(true) });
+							});
+							await vi.waitFor(() => expect(updates).toHaveLength(1));
+						}
+						expect(button.title).toBe('Early');
+						expect(button.style.color).toBe('red');
+						expect(button.getAttribute('aria-label')).toBe('Early aria');
+						expect(earlyRef.mock.calls).toEqual([[button]]);
+						expect(normalRef).not.toHaveBeenCalled();
+						expect(fixture.cleanup).not.toHaveBeenCalled();
 						expect(
 							button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
 						).toBe(false);
-						expect(normalAction).toHaveBeenCalledOnce();
 						expect(earlyAction).toHaveBeenCalledOnce();
+						expect(normalAction).not.toHaveBeenCalled();
+						const preparedCoercions = coercions;
+						if (changedSignal) {
+							normalAria.set('Changed while staged');
+							if (signalABA) normalAria.set('Prepared aria');
+						} else if (staged) publication = true;
+						if (unmount) {
+							hydratedRoot.unmount();
+							hydratedRoot = undefined;
+						}
+						if (staged) {
+							await updates[0].update();
+							updates[0].ready.resolve();
+							updates[0].finished.resolve();
+							await act(() => {});
+						} else await act(() => pending.resolve());
+						if (unmount) {
+							expect(article.querySelector('button')).toBeNull();
+							expect(normalRef).not.toHaveBeenCalled();
+							expect(onHydrated).not.toHaveBeenCalled();
+						} else {
+							expect(article.querySelector('button')).toBe(button);
+							expect(button.firstElementChild).toBe(child);
+							expect(button.title).toBe('Normal');
+							expect(button.className).toBe('normal');
+							expect(button.style.height).toBe('20px');
+							expect(button.style.color).toBe('');
+							expect(button.style.width).toBe('');
+							expect(button.getAttribute('aria-label')).toBe(
+								changedSignal && !signalABA ? 'Changed while staged' : 'Prepared aria',
+							);
+							expect(earlyRef.mock.calls).toEqual([[button], [null]]);
+							expect(normalRef).toHaveBeenCalledExactlyOnceWith(button);
+							expect(refLabels).toEqual([
+								changedSignal && !signalABA ? 'Changed while staged' : 'Prepared aria',
+							]);
+							if (changedSignal) expect(coercions).toBeGreaterThan(preparedCoercions);
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							expect(onHydrated).toHaveBeenCalledOnce();
+							expect(
+								button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
+							).toBe(false);
+							expect(normalAction).toHaveBeenCalledOnce();
+							expect(earlyAction).toHaveBeenCalledOnce();
+							publication = false;
+							normalAria.set('Accepted update');
+							flushSync(() => {});
+							expect(button.getAttribute('aria-label')).toBe('Accepted update');
+						}
+					} finally {
 						publication = false;
-						normalAria.set('Accepted update');
-						flushSync(() => {});
-						expect(button.getAttribute('aria-label')).toBe('Accepted update');
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+						scope.dispose();
+						for (const update of updates) {
+							update.ready.resolve();
+							update.finished.resolve();
+						}
+						transitions?.restore();
 					}
-				} finally {
-					publication = false;
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					binding.dispose();
-					scope.dispose();
-					for (const update of updates) {
-						update.ready.resolve();
-						update.finished.resolve();
-					}
-					transitions?.restore();
 				}
-			}
-			for (const outcome of [
-				'ready',
-				'empty',
-				'empty resume',
-				'retire',
-				'resume',
-				'abort',
-				'scalar retry',
-				'object',
-				'function',
-				'function handle',
-				'duck',
-				'read-error',
-			]) {
-				const scope = createScope({ scopeKey: `scalar-text-handoff-${dev}-${outcome}` });
-				const value = scope.signal$('value', outcome.startsWith('empty') ? '' : 'server');
-				const pending = deferred<void>();
-				const onReady = vi.fn();
-				const onHydrated = vi.fn();
-				const fixture = authoredPresentation(
-					'ScalarTextPresentation',
-					{ value: value.get() as unknown, onReady },
-					dev,
-					`import { Hydrate, use } from 'octane';
+			}, 15000);
+			it(`known source handoff and async retries (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const outcome of [
+					'ready',
+					'empty',
+					'empty resume',
+					'retire',
+					'resume',
+					'abort',
+					'scalar retry',
+					'object',
+					'function',
+					'function handle',
+					'duck',
+					'read-error',
+				]) {
+					const scope = createScope({ scopeKey: `scalar-text-handoff-${dev}-${outcome}` });
+					const value = scope.signal$('value', outcome.startsWith('empty') ? '' : 'server');
+					const pending = deferred<void>();
+					const onReady = vi.fn();
+					const onHydrated = vi.fn();
+					const fixture = authoredPresentation(
+						'ScalarTextPresentation',
+						{ value: value.get() as unknown, onReady },
+						dev,
+						`import { Hydrate, use } from 'octane';
 export function ScalarTextPresentation(props) @{ 'use dom bindings';
  <p ref={props.onReady}>{props.value as string}</p>
 }
@@ -4147,297 +4196,313 @@ export function ScalarTextHydration(props) @{
   <TextSuffix suspend={props.suspend} promise={props.promise} />
  </Hydrate>
 }`,
-				);
-				const application = {
-					...fixture.state.getSnapshot(),
-					when: never(),
-					suspend: false,
-					promise: pending.promise,
-					onHydrated,
-				};
-				const refused = ['object', 'function', 'function handle', 'duck', 'read-error'].includes(
-					outcome,
-				);
-				article.innerHTML = refused
-					? fixture.html
-					: renderToString(fixture.server.ScalarTextHydration, application).html;
-				const paragraph = article.querySelector('p')!;
-				fixture.publish({ value }, false);
-				const binding = runWithSignalOwner(scope, () =>
-					fixture.attach(paragraph, {
-						getSnapshot: fixture.state.getSnapshot,
-						subscribe(notify) {
-							const stop = fixture.state.subscribe(notify);
-							return () => {
-								stop();
-								if (outcome === 'retire') value.set('during retirement');
-							};
-						},
-					}),
-				);
-				const client = fixture.loadClient();
-				try {
-					if (!outcome.startsWith('empty')) value.set('before hydration');
-					expect(paragraph.textContent).toBe(value.get());
-					const text = [...paragraph.childNodes].find((node) => node.nodeType === 3);
-					onReady.mockClear();
-					if (refused) {
-						const failure = new Error('scalar signal read failed');
-						const duck = { get: vi.fn(() => 'not a signal') };
-						const invalid =
-							outcome === 'object'
-								? scope.signal$('invalid', { unsupported: true })
-								: outcome === 'function'
-									? () => 'not scalar'
-									: outcome === 'function handle'
-										? scope.signal$('invalid', () => 'not scalar')
-										: outcome === 'duck'
-											? duck
-											: scope.derived$('invalid', () => {
-													throw failure;
-												});
-						expect(() =>
-							hydrateRoot(
-								article,
-								client.ScalarTextPresentation,
-								{ value: invalid, onReady },
-								{ signalOwner: scope, bindingLeases: [binding] },
-							),
-						).toThrow(outcome === 'read-error' ? failure : /binding leases/);
-						expect(duck.get).not.toHaveBeenCalled();
-						expect(onReady).not.toHaveBeenCalled();
-						expect(fixture.cleanup).not.toHaveBeenCalled();
-						value.set('early owner survives refusal');
+					);
+					const application = {
+						...fixture.state.getSnapshot(),
+						when: never(),
+						suspend: false,
+						promise: pending.promise,
+						onHydrated,
+					};
+					const refused = ['object', 'function', 'function handle', 'duck', 'read-error'].includes(
+						outcome,
+					);
+					article.innerHTML = refused
+						? fixture.html
+						: renderToString(fixture.server.ScalarTextHydration, application).html;
+					const paragraph = article.querySelector('p')!;
+					fixture.publish({ value }, false);
+					const binding = runWithSignalOwner(scope, () =>
+						fixture.attach(paragraph, {
+							getSnapshot: fixture.state.getSnapshot,
+							subscribe(notify) {
+								const stop = fixture.state.subscribe(notify);
+								return () => {
+									stop();
+									if (outcome === 'retire') value.set('during retirement');
+								};
+							},
+						}),
+					);
+					const client = fixture.loadClient();
+					try {
+						if (!outcome.startsWith('empty')) value.set('before hydration');
+						expect(paragraph.textContent).toBe(value.get());
+						const text = [...paragraph.childNodes].find((node) => node.nodeType === 3);
+						onReady.mockClear();
+						if (refused) {
+							const failure = new Error('scalar signal read failed');
+							const duck = { get: vi.fn(() => 'not a signal') };
+							const invalid =
+								outcome === 'object'
+									? scope.signal$('invalid', { unsupported: true })
+									: outcome === 'function'
+										? () => 'not scalar'
+										: outcome === 'function handle'
+											? scope.signal$('invalid', () => 'not scalar')
+											: outcome === 'duck'
+												? duck
+												: scope.derived$('invalid', () => {
+														throw failure;
+													});
+							expect(() =>
+								hydrateRoot(
+									article,
+									client.ScalarTextPresentation,
+									{ value: invalid, onReady },
+									{ signalOwner: scope, bindingLeases: [binding] },
+								),
+							).toThrow(outcome === 'read-error' ? failure : /binding leases/);
+							expect(duck.get).not.toHaveBeenCalled();
+							expect(onReady).not.toHaveBeenCalled();
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							value.set('early owner survives refusal');
+							expect(article.querySelector('p')).toBe(paragraph);
+							expect(paragraph.textContent).toBe('early owner survives refusal');
+							continue;
+						}
+						hydratedRoot = hydrateRoot(
+							article,
+							client.ScalarTextHydration,
+							{ ...application, value },
+							{ signalOwner: scope, bindingLeases: [binding] },
+						);
+						const suspended =
+							outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
+						await act(() =>
+							hydratedRoot!.render(client.ScalarTextHydration, {
+								...application,
+								value,
+								when: condition(true),
+								suspend: suspended,
+							}),
+						);
+						if (suspended) {
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							expect(onHydrated).not.toHaveBeenCalled();
+							expect(onReady).not.toHaveBeenCalled();
+							await act(() => value.set('during suspension'));
+							expect(paragraph.textContent).toBe('during suspension');
+							if (outcome === 'abort')
+								await act(() =>
+									hydratedRoot!.render(client.ScalarTextHydration, { ...application, value }),
+								);
+							if (outcome === 'scalar retry')
+								await act(() =>
+									hydratedRoot!.render(client.ScalarTextHydration, {
+										...application,
+										value: 'scalar retry',
+										when: condition(true),
+										suspend: true,
+									}),
+								);
+							await act(() => pending.resolve());
+						}
 						expect(article.querySelector('p')).toBe(paragraph);
-						expect(paragraph.textContent).toBe('early owner survives refusal');
-						continue;
+						if (text) expect([...paragraph.childNodes]).toContain(text);
+						if (outcome === 'abort') {
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							expect(onHydrated).not.toHaveBeenCalled();
+							value.set('early owner remains active');
+							expect(paragraph.textContent).toBe('early owner remains active');
+							continue;
+						}
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						expect(onHydrated).toHaveBeenCalledOnce();
+						expect(paragraph.textContent).toBe(
+							outcome === 'scalar retry' ? 'scalar retry' : value.get(),
+						);
+						value.set('accepted direct update');
+						expect(paragraph.textContent).toBe(
+							outcome === 'scalar retry' ? 'scalar retry' : 'accepted direct update',
+						);
+						await act(() =>
+							hydratedRoot!.render(client.ScalarTextHydration, {
+								...application,
+								when: condition(true),
+								value: 'scalar replacement',
+							}),
+						);
+						value.set('retired original');
+						expect(paragraph.textContent).toBe('scalar replacement');
+						const replacement = scope.signal$('replacement', 'new handle');
+						await act(() =>
+							hydratedRoot!.render(client.ScalarTextHydration, {
+								...application,
+								when: condition(true),
+								value: replacement,
+							}),
+						);
+						replacement.set('new direct update');
+						expect(paragraph.textContent).toBe('new direct update');
+						hydratedRoot.unmount();
+						hydratedRoot = undefined;
+						replacement.set('after unmount');
+						expect(paragraph.textContent).toBe('new direct update');
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+						scope.dispose();
 					}
-					hydratedRoot = hydrateRoot(
-						article,
-						client.ScalarTextHydration,
-						{ ...application, value },
-						{ signalOwner: scope, bindingLeases: [binding] },
-					);
-					const suspended =
-						outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
-					await act(() =>
-						hydratedRoot!.render(client.ScalarTextHydration, {
-							...application,
-							value,
-							when: condition(true),
-							suspend: suspended,
-						}),
-					);
-					if (suspended) {
-						expect(fixture.cleanup).not.toHaveBeenCalled();
-						expect(onHydrated).not.toHaveBeenCalled();
-						expect(onReady).not.toHaveBeenCalled();
-						await act(() => value.set('during suspension'));
-						expect(paragraph.textContent).toBe('during suspension');
-						if (outcome === 'abort')
-							await act(() =>
-								hydratedRoot!.render(client.ScalarTextHydration, { ...application, value }),
-							);
-						if (outcome === 'scalar retry')
-							await act(() =>
-								hydratedRoot!.render(client.ScalarTextHydration, {
-									...application,
-									value: 'scalar retry',
-									when: condition(true),
-									suspend: true,
-								}),
-							);
-						await act(() => pending.resolve());
-					}
-					expect(article.querySelector('p')).toBe(paragraph);
-					if (text) expect([...paragraph.childNodes]).toContain(text);
-					if (outcome === 'abort') {
-						expect(fixture.cleanup).not.toHaveBeenCalled();
-						expect(onHydrated).not.toHaveBeenCalled();
-						value.set('early owner remains active');
-						expect(paragraph.textContent).toBe('early owner remains active');
-						continue;
-					}
-					expect(fixture.cleanup).toHaveBeenCalledOnce();
-					expect(onHydrated).toHaveBeenCalledOnce();
-					expect(paragraph.textContent).toBe(
-						outcome === 'scalar retry' ? 'scalar retry' : value.get(),
-					);
-					value.set('accepted direct update');
-					expect(paragraph.textContent).toBe(
-						outcome === 'scalar retry' ? 'scalar retry' : 'accepted direct update',
-					);
-					await act(() =>
-						hydratedRoot!.render(client.ScalarTextHydration, {
-							...application,
-							when: condition(true),
-							value: 'scalar replacement',
-						}),
-					);
-					value.set('retired original');
-					expect(paragraph.textContent).toBe('scalar replacement');
-					const replacement = scope.signal$('replacement', 'new handle');
-					await act(() =>
-						hydratedRoot!.render(client.ScalarTextHydration, {
-							...application,
-							when: condition(true),
-							value: replacement,
-						}),
-					);
-					replacement.set('new direct update');
-					expect(paragraph.textContent).toBe('new direct update');
-					hydratedRoot.unmount();
-					hydratedRoot = undefined;
-					replacement.set('after unmount');
-					expect(paragraph.textContent).toBe('new direct update');
-				} finally {
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					binding.dispose();
-					scope.dispose();
 				}
-			}
-			const duringPreparation = authoredPresentation(
-				'RefreshDuringPreparation',
-				{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },
-				dev,
-				`function PreparationButton(props) @{
+			}, 15000);
+			it(`refreshing bindings during host preparation (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				const duringPreparation = authoredPresentation(
+					'RefreshDuringPreparation',
+					{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },
+					dev,
+					`function PreparationButton(props) @{
  <button title={props.title} onClick={props.onAction} ref={props.onReady}><b>{props.label as string}</b></button>
 }
 export function RefreshDuringPreparation(props) @{ 'use dom bindings';
  <PreparationButton title={props.title} label={props.label} onAction={props.onAction} onReady={props.onReady}/>
 }`,
-			);
-			article.innerHTML = duringPreparation.html;
-			const preparationButton = article.querySelector('button')!;
-			const preparationLabel = preparationButton.querySelector('b')!;
-			const rootWitness = article.lastChild!;
-			const preparationRange = {
-				start: article.firstChild as Comment,
-				end: rootWitness.previousSibling as Comment,
-			};
-			const preparationBinding = duringPreparation.attach(
-				preparationRange,
-				duringPreparation.state,
-			);
-			let refreshedDuringPreparation = false;
-			try {
-				preparationButton.focus();
-				hydratedRoot = hydrateRoot(
-					article,
-					duringPreparation.loadClient().RefreshDuringPreparation,
-					{
-						...duringPreparation.state.getSnapshot(),
-						title: {
-							toString() {
-								if (!refreshedDuringPreparation) {
-									refreshedDuringPreparation = true;
-									duringPreparation.publish({ title: 'Current early', label: 'Current early' });
-								}
-								return 'Accepted';
+				);
+				article.innerHTML = duringPreparation.html;
+				const preparationButton = article.querySelector('button')!;
+				const preparationLabel = preparationButton.querySelector('b')!;
+				const rootWitness = article.lastChild!;
+				const preparationRange = {
+					start: article.firstChild as Comment,
+					end: rootWitness.previousSibling as Comment,
+				};
+				const preparationBinding = duringPreparation.attach(
+					preparationRange,
+					duringPreparation.state,
+				);
+				let refreshedDuringPreparation = false;
+				try {
+					preparationButton.focus();
+					hydratedRoot = hydrateRoot(
+						article,
+						duringPreparation.loadClient().RefreshDuringPreparation,
+						{
+							...duringPreparation.state.getSnapshot(),
+							title: {
+								toString() {
+									if (!refreshedDuringPreparation) {
+										refreshedDuringPreparation = true;
+										duringPreparation.publish({ title: 'Current early', label: 'Current early' });
+									}
+									return 'Accepted';
+								},
 							},
 						},
+						{ bindingLeases: [preparationBinding] },
+					);
+					expect(article.querySelector('button')).toBe(preparationButton);
+					expect(preparationButton.querySelector('b')).toBe(preparationLabel);
+					expect(article.firstChild).toBe(preparationRange.start);
+					expect(article.lastChild).toBe(rootWitness);
+					expect(rootWitness.previousSibling).toBe(preparationRange.end);
+					expect(preparationButton.title).toBe('Current early');
+					expect(duringPreparation.cleanup).not.toHaveBeenCalled();
+					expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
+						[preparationButton],
+					]);
+					preparationButton.click();
+					expect(duringPreparation.state.getSnapshot().onAction).toHaveBeenCalledOnce();
+					await act(() => {});
+					expect(article.querySelector('button')).toBe(preparationButton);
+					expect(preparationButton.querySelector('b')).toBe(preparationLabel);
+					expect(article.firstChild).toBe(preparationRange.start);
+					expect(article.lastChild).toBe(rootWitness);
+					expect(rootWitness.previousSibling).toBe(preparationRange.end);
+					expect(document.activeElement).toBe(preparationButton);
+					expect(preparationButton.title).toBe('Accepted');
+					expect(duringPreparation.cleanup).toHaveBeenCalledOnce();
+					expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
+						[preparationButton],
+						[null],
+						[preparationButton],
+					]);
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					preparationBinding.dispose();
+				}
+			}, 15000);
+			it(`in-progress early publication retries as a host (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				const busyScope = createScope({ scopeKey: `host-publication-retry-${dev}` });
+				const busyHost = authoredPresentation('NativeControlHost', { className: 'early' }, dev);
+				const busyProps = {
+					className: 'early',
+					draft: busyScope.signal$('draft', 'preserved child draft'),
+					placeholder: busyScope.signal$('placeholder', 'Message'),
+					readOnly: busyScope.signal$('readonly', false),
+					disabled: busyScope.signal$('disabled', false),
+					required: busyScope.signal$('required', false),
+				};
+				article.innerHTML = renderToString(busyHost.server.NativeControlLayout, busyProps).html;
+				const busyForm = article.querySelector('form')!;
+				const busyTextarea = busyForm.querySelector('textarea')!;
+				const busyParagraph = busyForm.querySelector('p')!;
+				const busyClient = busyHost.loadClient();
+				const busyReady = vi.fn();
+				const busyError = vi.fn();
+				let beginDuringSnapshot = false;
+				let busyBinding: DomBindings.BindingHandle;
+				busyBinding = busyHost.attach(busyForm, {
+					getSnapshot() {
+						if (beginDuringSnapshot) {
+							beginDuringSnapshot = false;
+							hydratedRoot = hydrateRoot(
+								article,
+								busyClient.NativeControlLayout,
+								{
+									...busyProps,
+									className: 'accepted after publication',
+									onReady: busyReady,
+								},
+								{
+									signalOwner: busyScope,
+									bindingLeases: [busyBinding],
+									onUncaughtError: busyError,
+								},
+							);
+						}
+						return busyHost.state.getSnapshot();
 					},
-					{ bindingLeases: [preparationBinding] },
-				);
-				expect(article.querySelector('button')).toBe(preparationButton);
-				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild).toBe(preparationRange.start);
-				expect(article.lastChild).toBe(rootWitness);
-				expect(rootWitness.previousSibling).toBe(preparationRange.end);
-				expect(preparationButton.title).toBe('Current early');
-				expect(duringPreparation.cleanup).not.toHaveBeenCalled();
-				expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
-					[preparationButton],
-				]);
-				preparationButton.click();
-				expect(duringPreparation.state.getSnapshot().onAction).toHaveBeenCalledOnce();
-				await act(() => {});
-				expect(article.querySelector('button')).toBe(preparationButton);
-				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild).toBe(preparationRange.start);
-				expect(article.lastChild).toBe(rootWitness);
-				expect(rootWitness.previousSibling).toBe(preparationRange.end);
-				expect(document.activeElement).toBe(preparationButton);
-				expect(preparationButton.title).toBe('Accepted');
-				expect(duringPreparation.cleanup).toHaveBeenCalledOnce();
-				expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
-					[preparationButton],
-					[null],
-					[preparationButton],
-				]);
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				preparationBinding.dispose();
-			}
-			const busyScope = createScope({ scopeKey: `host-publication-retry-${dev}` });
-			const busyHost = authoredPresentation('NativeControlHost', { className: 'early' }, dev);
-			const busyProps = {
-				className: 'early',
-				draft: busyScope.signal$('draft', 'preserved child draft'),
-				placeholder: busyScope.signal$('placeholder', 'Message'),
-				readOnly: busyScope.signal$('readonly', false),
-				disabled: busyScope.signal$('disabled', false),
-				required: busyScope.signal$('required', false),
-			};
-			article.innerHTML = renderToString(busyHost.server.NativeControlLayout, busyProps).html;
-			const busyForm = article.querySelector('form')!;
-			const busyTextarea = busyForm.querySelector('textarea')!;
-			const busyParagraph = busyForm.querySelector('p')!;
-			const busyClient = busyHost.loadClient();
-			const busyReady = vi.fn();
-			const busyError = vi.fn();
-			let beginDuringSnapshot = false;
-			let busyBinding: DomBindings.BindingHandle;
-			busyBinding = busyHost.attach(busyForm, {
-				getSnapshot() {
-					if (beginDuringSnapshot) {
-						beginDuringSnapshot = false;
-						hydratedRoot = hydrateRoot(
-							article,
-							busyClient.NativeControlLayout,
-							{
-								...busyProps,
-								className: 'accepted after publication',
-								onReady: busyReady,
-							},
-							{ signalOwner: busyScope, bindingLeases: [busyBinding], onUncaughtError: busyError },
-						);
-					}
-					return busyHost.state.getSnapshot();
-				},
-				subscribe: busyHost.state.subscribe,
-			});
-			try {
-				beginDuringSnapshot = true;
-				busyHost.publish({ className: 'early publication in progress' });
-				expect(busyForm.className).toBe('early publication in progress');
-				expect(busyHost.cleanup).not.toHaveBeenCalled();
-				expect(busyReady).not.toHaveBeenCalled();
-				await act(() => {});
-				expect(busyError).not.toHaveBeenCalled();
-				expect(article.querySelector('form')).toBe(busyForm);
-				expect(busyForm.querySelector('textarea')).toBe(busyTextarea);
-				expect(busyForm.querySelector('p')).toBe(busyParagraph);
-				expect(busyTextarea.value).toBe('preserved child draft');
-				expect(busyForm.className).toBe('accepted after publication');
-				expect(busyHost.cleanup).toHaveBeenCalledOnce();
-				expect(busyReady).toHaveBeenCalledExactlyOnceWith(busyForm);
-				busyHost.publish({ className: 'retired publication' });
-				busyBinding.refresh();
-				expect(busyForm.className).toBe('accepted after publication');
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				busyBinding.dispose();
-				busyScope.dispose();
-			}
-			const tree = authoredPresentation(
-				'TreePresentation',
-				{ active: false, label: 'Server', detail: ' detail', onAction: vi.fn() },
-				dev,
-				`function TreeLabel(props) @{
+					subscribe: busyHost.state.subscribe,
+				});
+				try {
+					beginDuringSnapshot = true;
+					busyHost.publish({ className: 'early publication in progress' });
+					expect(busyForm.className).toBe('early publication in progress');
+					expect(busyHost.cleanup).not.toHaveBeenCalled();
+					expect(busyReady).not.toHaveBeenCalled();
+					await act(() => {});
+					expect(busyError).not.toHaveBeenCalled();
+					expect(article.querySelector('form')).toBe(busyForm);
+					expect(busyForm.querySelector('textarea')).toBe(busyTextarea);
+					expect(busyForm.querySelector('p')).toBe(busyParagraph);
+					expect(busyTextarea.value).toBe('preserved child draft');
+					expect(busyForm.className).toBe('accepted after publication');
+					expect(busyHost.cleanup).toHaveBeenCalledOnce();
+					expect(busyReady).toHaveBeenCalledExactlyOnceWith(busyForm);
+					busyHost.publish({ className: 'retired publication' });
+					busyBinding.refresh();
+					expect(busyForm.className).toBe('accepted after publication');
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					busyBinding.dispose();
+					busyScope.dispose();
+				}
+			}, 15000);
+			it(`preserves prepared local and nested tree children (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				const tree = authoredPresentation(
+					'TreePresentation',
+					{ active: false, label: 'Server', detail: ' detail', onAction: vi.fn() },
+					dev,
+					`function TreeLabel(props) @{
  <span>{props.label as string}{props.children}</span>
 }
 export function TreePresentation(props) @{ 'use dom bindings';
@@ -4449,148 +4514,156 @@ export function TreePresentation(props) @{ 'use dom bindings';
   }
  </button>
 }`,
-			);
-			article.innerHTML = tree.html;
-			const treeButton = article.querySelector('button')!;
-			const treeBinding = tree.attach(treeButton, tree.state);
-			try {
-				tree.publish({ active: true, label: 'Early' });
-				const label = treeButton.querySelector('span')!;
-				const detail = treeButton.querySelector('em')!;
-				const text = label.childNodes[1];
-				expect(treeButton.textContent).toBe('Early detail');
-				treeButton.focus();
-				const onReady = vi.fn();
-				const client = tree.loadClient();
-				hydratedRoot = hydrateRoot(
-					article,
-					client.TreePresentation,
-					{ ...tree.state.getSnapshot(), onReady },
-					{ bindingLeases: [treeBinding] },
 				);
-				flushSync(() => {});
-				flushEffects();
-				expect(article.querySelector('button')).toBe(treeButton);
-				expect(treeButton.querySelector('span')).toBe(label);
-				expect(treeButton.querySelector('em')).toBe(detail);
-				expect(label.childNodes[1]).toBe(text);
-				expect(document.activeElement).toBe(treeButton);
-				expect(onReady).toHaveBeenCalledExactlyOnceWith(treeButton);
-				expect(tree.cleanup).toHaveBeenCalledOnce();
-				tree.publish({ active: false, label: 'Retired' });
-				treeBinding.refresh();
-				expect(treeButton.textContent).toBe('Early detail');
-				treeButton.click();
-				expect(tree.state.getSnapshot().onAction).toHaveBeenCalledOnce();
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				treeBinding.dispose();
-			}
-			const importedChild = `export function ImportedLabel(props) @{ 'use dom bindings';
+				article.innerHTML = tree.html;
+				const treeButton = article.querySelector('button')!;
+				const treeBinding = tree.attach(treeButton, tree.state);
+				try {
+					tree.publish({ active: true, label: 'Early' });
+					const label = treeButton.querySelector('span')!;
+					const detail = treeButton.querySelector('em')!;
+					const text = label.childNodes[1];
+					expect(treeButton.textContent).toBe('Early detail');
+					treeButton.focus();
+					const onReady = vi.fn();
+					const client = tree.loadClient();
+					hydratedRoot = hydrateRoot(
+						article,
+						client.TreePresentation,
+						{ ...tree.state.getSnapshot(), onReady },
+						{ bindingLeases: [treeBinding] },
+					);
+					flushSync(() => {});
+					flushEffects();
+					expect(article.querySelector('button')).toBe(treeButton);
+					expect(treeButton.querySelector('span')).toBe(label);
+					expect(treeButton.querySelector('em')).toBe(detail);
+					expect(label.childNodes[1]).toBe(text);
+					expect(document.activeElement).toBe(treeButton);
+					expect(onReady).toHaveBeenCalledExactlyOnceWith(treeButton);
+					expect(tree.cleanup).toHaveBeenCalledOnce();
+					tree.publish({ active: false, label: 'Retired' });
+					treeBinding.refresh();
+					expect(treeButton.textContent).toBe('Early detail');
+					treeButton.click();
+					expect(tree.state.getSnapshot().onAction).toHaveBeenCalledOnce();
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					treeBinding.dispose();
+				}
+			}, 15000);
+			it(`imported binding trees retain their actual node identity (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				const importedChild = `export function ImportedLabel(props) @{ 'use dom bindings';
  @if (props.active) { <span>{props.label as string}</span> }
  @else { <b>{props.label as string}</b> }
 }`;
-			const importedParent = `import { ImportedLabel } from './imported-label.tsrx';
+				const importedParent = `import { ImportedLabel } from './imported-label.tsrx';
 export function ImportedTree(props) @{ 'use dom bindings';
  <button type="button" onClick={props.onAction} ref={props.onReady}>
   <ImportedLabel active={props.active} label={props.label} />
   <ImportedLabel active={!props.active} label={props.detail} />
  </button>
 }`;
-			const importedRequest = `./imported-label.tsrx?octane-bindings=ImportedLabel&octane-mount=1&octane-props=${encodeURIComponent(JSON.stringify([1, ['active', 'label']]))}`;
-			const importedOptions = { compileOptions: { dev, hmr: false } };
-			const imported = authoredPresentation(
-				'ImportedTree',
-				{ active: false, label: 'Server', detail: ' Other', onAction: vi.fn() },
-				dev,
-				importedParent,
-				{
-					'./imported-label.tsrx': loadCompiledFixtureSource(importedChild, {
-						...importedOptions,
-						id: '/src/imported-label.tsrx',
-						mode: 'server',
-					}),
-					[importedRequest]: loadCompiledFixtureSource(importedChild, {
-						...importedOptions,
-						id: '/src/' + importedRequest.slice(2),
-						mode: 'client',
-						runtimeModules: {
-							'octane/dom-binding-program': DomBindingPrograms,
-							'octane/dom-binding-signals': DomBindingSignals,
-						},
-					}),
-				},
-			);
-			article.innerHTML = imported.html;
-			const importedButton = article.querySelector('button')!;
-			const importedBinding = imported.attach(importedButton, imported.state);
-			try {
-				imported.publish({ active: true, label: 'Early' });
-				const labels = [...importedButton.children];
-				const client = loadCompiledFixtureSource(importedParent, {
-					// A production Vite build reports the imported view's memo proof.
-					compileOptions: { dev, hmr: false, isCompilerMemoImport: () => true },
-					id: '/src/dom-presentation.tsrx',
-					mode: 'client',
-					runtimeModules: {
+				const importedRequest = `./imported-label.tsrx?octane-bindings=ImportedLabel&octane-mount=1&octane-props=${encodeURIComponent(JSON.stringify([1, ['active', 'label']]))}`;
+				const importedOptions = { compileOptions: { dev, hmr: false } };
+				const imported = authoredPresentation(
+					'ImportedTree',
+					{ active: false, label: 'Server', detail: ' Other', onAction: vi.fn() },
+					dev,
+					importedParent,
+					{
 						'./imported-label.tsrx': loadCompiledFixtureSource(importedChild, {
 							...importedOptions,
 							id: '/src/imported-label.tsrx',
+							mode: 'server',
+						}),
+						[importedRequest]: loadCompiledFixtureSource(importedChild, {
+							...importedOptions,
+							id: '/src/' + importedRequest.slice(2),
 							mode: 'client',
+							runtimeModules: {
+								'octane/dom-binding-program': DomBindingPrograms,
+								'octane/dom-binding-signals': DomBindingSignals,
+							},
 						}),
 					},
-				});
-				const onReady = vi.fn();
-				hydratedRoot = hydrateRoot(
-					article,
-					client.ImportedTree,
-					{ ...imported.state.getSnapshot(), onReady },
-					{ bindingLeases: [importedBinding] },
 				);
-				flushSync(() => {});
-				flushEffects();
-				expect(article.querySelector('button')).toBe(importedButton);
-				expect([...importedButton.children]).toEqual(labels);
-				expect(importedButton.textContent).toBe('Early Other');
-				expect(onReady).toHaveBeenCalledExactlyOnceWith(importedButton);
-				expect(imported.cleanup).toHaveBeenCalledOnce();
-				importedButton.click();
-				expect(imported.state.getSnapshot().onAction).toHaveBeenCalledOnce();
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				importedBinding.dispose();
-			}
-			for (const outcome of [
-				'changed',
-				'aba',
-				'unmount',
-				'staged',
-				'staged-aba',
-				'staged-unmount',
-				'lag',
-				'lag-unmount',
-				'unsupported',
-			]) {
-				const staged = outcome.startsWith('staged');
-				const lag = outcome.startsWith('lag');
-				const aba = outcome.endsWith('aba');
-				const unmount = outcome.endsWith('unmount');
-				const model = {
-					active: outcome === 'unsupported',
-					label: outcome === 'unsupported' ? '' : 'Server',
-				};
-				const pending = deferred<void>();
-				const onAction = vi.fn();
-				const onReady = vi.fn();
-				const onHydrated = vi.fn();
-				const onUncaughtError = vi.fn();
-				const fixture = authoredPresentation(
-					'PendingTree',
-					{ model, onAction },
-					dev,
-					`import { Hydrate, use } from 'octane';
+				article.innerHTML = imported.html;
+				const importedButton = article.querySelector('button')!;
+				const importedBinding = imported.attach(importedButton, imported.state);
+				try {
+					imported.publish({ active: true, label: 'Early' });
+					const labels = [...importedButton.children];
+					const client = loadCompiledFixtureSource(importedParent, {
+						// A production Vite build reports the imported view's memo proof.
+						compileOptions: { dev, hmr: false, isCompilerMemoImport: () => true },
+						id: '/src/dom-presentation.tsrx',
+						mode: 'client',
+						runtimeModules: {
+							'./imported-label.tsrx': loadCompiledFixtureSource(importedChild, {
+								...importedOptions,
+								id: '/src/imported-label.tsrx',
+								mode: 'client',
+							}),
+						},
+					});
+					const onReady = vi.fn();
+					hydratedRoot = hydrateRoot(
+						article,
+						client.ImportedTree,
+						{ ...imported.state.getSnapshot(), onReady },
+						{ bindingLeases: [importedBinding] },
+					);
+					flushSync(() => {});
+					flushEffects();
+					expect(article.querySelector('button')).toBe(importedButton);
+					expect([...importedButton.children]).toEqual(labels);
+					expect(importedButton.textContent).toBe('Early Other');
+					expect(onReady).toHaveBeenCalledExactlyOnceWith(importedButton);
+					expect(imported.cleanup).toHaveBeenCalledOnce();
+					importedButton.click();
+					expect(imported.state.getSnapshot().onAction).toHaveBeenCalledOnce();
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					importedBinding.dispose();
+				}
+			}, 15000);
+			it(`retained imported trees through versioned retries (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				for (const outcome of [
+					'changed',
+					'aba',
+					'unmount',
+					'staged',
+					'staged-aba',
+					'staged-unmount',
+					'lag',
+					'lag-unmount',
+					'unsupported',
+				]) {
+					const staged = outcome.startsWith('staged');
+					const lag = outcome.startsWith('lag');
+					const aba = outcome.endsWith('aba');
+					const unmount = outcome.endsWith('unmount');
+					const model = {
+						active: outcome === 'unsupported',
+						label: outcome === 'unsupported' ? '' : 'Server',
+					};
+					const pending = deferred<void>();
+					const onAction = vi.fn();
+					const onReady = vi.fn();
+					const onHydrated = vi.fn();
+					const onUncaughtError = vi.fn();
+					const fixture = authoredPresentation(
+						'PendingTree',
+						{ model, onAction },
+						dev,
+						`import { Hydrate, use } from 'octane';
 ${
 	outcome === 'unsupported'
 		? `function Label(props) @{
@@ -4612,212 +4685,218 @@ export function TreeHydration(props) @{
   <Wait suspend={props.suspend} promise={props.promise}/>
  </Hydrate>
 }`,
-				);
-				const props = {
-					model,
-					onAction,
-					onReady,
-					onHydrated,
-					when: staged ? never() : condition(true),
-					suspend: false,
-					promise: pending.promise,
-				};
-				article.innerHTML = renderToString(fixture.server.TreeHydration, props).html;
-				const button = article.querySelector('button')!;
-				const binding = fixture.attach(button, fixture.state);
-				const viewTransitions = staged ? installViewTransitionMocks() : undefined;
-				const nativeUpdates: Array<{
-					update: () => void | Promise<void>;
-					ready: ReturnType<typeof deferred<void>>;
-					finished: ReturnType<typeof deferred<void>>;
-				}> = [];
-				if (staged)
-					Object.defineProperty(document, 'startViewTransition', {
-						configurable: true,
-						value(input: { update: () => void | Promise<void> }) {
-							const ready = deferred<void>();
-							const finished = deferred<void>();
-							nativeUpdates.push({ update: input.update, ready, finished });
-							return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
-						},
-					});
-				try {
-					const client = fixture.loadClient();
-					hydratedRoot = hydrateRoot(
-						article,
-						client.TreeHydration,
-						{ ...props, suspend: !staged },
-						{ bindingLeases: [binding], onUncaughtError },
 					);
-					flushSync(() => {});
-					flushEffects();
-					await act(() => {});
-					if (staged) {
-						startTransition(() => {
-							addTransitionType('adopt-tree');
-							hydratedRoot!.render(client.TreeHydration, { ...props, when: condition(true) });
+					const props = {
+						model,
+						onAction,
+						onReady,
+						onHydrated,
+						when: staged ? never() : condition(true),
+						suspend: false,
+						promise: pending.promise,
+					};
+					article.innerHTML = renderToString(fixture.server.TreeHydration, props).html;
+					const button = article.querySelector('button')!;
+					const binding = fixture.attach(button, fixture.state);
+					const viewTransitions = staged ? installViewTransitionMocks() : undefined;
+					const nativeUpdates: Array<{
+						update: () => void | Promise<void>;
+						ready: ReturnType<typeof deferred<void>>;
+						finished: ReturnType<typeof deferred<void>>;
+					}> = [];
+					if (staged)
+						Object.defineProperty(document, 'startViewTransition', {
+							configurable: true,
+							value(input: { update: () => void | Promise<void> }) {
+								const ready = deferred<void>();
+								const finished = deferred<void>();
+								nativeUpdates.push({ update: input.update, ready, finished });
+								return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
+							},
 						});
-						await vi.waitFor(() => expect(nativeUpdates).toHaveLength(1));
-					}
-					expect(onReady).not.toHaveBeenCalled();
-					expect(fixture.cleanup).not.toHaveBeenCalled();
-					model.active = true;
-					model.label = 'Early';
-					if (lag) {
-						const before = button.innerHTML;
-						await act(() => pending.resolve());
-						expect(article.querySelector('button')).toBe(button);
-						expect(button.innerHTML).toBe(before);
+					try {
+						const client = fixture.loadClient();
+						hydratedRoot = hydrateRoot(
+							article,
+							client.TreeHydration,
+							{ ...props, suspend: !staged },
+							{ bindingLeases: [binding], onUncaughtError },
+						);
+						flushSync(() => {});
+						flushEffects();
+						await act(() => {});
+						if (staged) {
+							startTransition(() => {
+								addTransitionType('adopt-tree');
+								hydratedRoot!.render(client.TreeHydration, { ...props, when: condition(true) });
+							});
+							await vi.waitFor(() => expect(nativeUpdates).toHaveLength(1));
+						}
 						expect(onReady).not.toHaveBeenCalled();
 						expect(fixture.cleanup).not.toHaveBeenCalled();
+						model.active = true;
+						model.label = 'Early';
+						if (lag) {
+							const before = button.innerHTML;
+							await act(() => pending.resolve());
+							expect(article.querySelector('button')).toBe(button);
+							expect(button.innerHTML).toBe(before);
+							expect(onReady).not.toHaveBeenCalled();
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							button.click();
+							expect(onAction).toHaveBeenCalledOnce();
+							if (unmount) {
+								hydratedRoot.unmount();
+								hydratedRoot = undefined;
+								fixture.publish({ model });
+								await act(() => {});
+								expect(article.querySelector('button')).toBeNull();
+								expect(onReady).not.toHaveBeenCalled();
+								expect(onHydrated).not.toHaveBeenCalled();
+								continue;
+							}
+							onAction.mockClear();
+						}
+						fixture.publish({ model });
+						if (aba) {
+							model.active = false;
+							fixture.publish({ model });
+						}
+						const label = button.querySelector(aba ? 'b' : 'span')!;
+						expect(label.textContent).toBe('Early');
+						button.focus();
 						button.click();
 						expect(onAction).toHaveBeenCalledOnce();
 						if (unmount) {
 							hydratedRoot.unmount();
 							hydratedRoot = undefined;
-							fixture.publish({ model });
+						}
+						if (staged) {
+							await nativeUpdates[0].update();
+							nativeUpdates[0].ready.resolve();
+							nativeUpdates[0].finished.resolve();
 							await act(() => {});
+						} else await act(() => pending.resolve());
+						if (outcome === 'unsupported') {
+							expect(onUncaughtError).toHaveBeenCalledOnce();
+							expect(article.querySelector('button')).toBe(button);
+							expect(button.querySelector('span')).toBe(label);
+							expect(onReady).not.toHaveBeenCalled();
+							expect(onHydrated).not.toHaveBeenCalled();
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							model.label = 'Still early';
+							fixture.publish({ model });
+							expect(button.textContent).toBe('Still early');
+							button.click();
+							expect(onAction).toHaveBeenCalledTimes(2);
+							continue;
+						}
+						if (unmount) {
 							expect(article.querySelector('button')).toBeNull();
 							expect(onReady).not.toHaveBeenCalled();
 							expect(onHydrated).not.toHaveBeenCalled();
-							continue;
+						} else {
+							expect(article.querySelector('button')).toBe(button);
+							expect(button.querySelector(aba ? 'b' : 'span')).toBe(label);
+							expect(document.activeElement).toBe(button);
+							expect(onReady, outcome).toHaveBeenCalledExactlyOnceWith(button);
+							expect(onHydrated).toHaveBeenCalledOnce();
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							button.click();
+							expect(onAction).toHaveBeenCalledTimes(2);
+							// A later commit must not publish a discarded scope's deferred deletion.
+							hydratedRoot!.render(client.TreeHydration, { ...props, when: condition(true) });
+							await act(() => {});
+							expect(article.querySelector('button')).toBe(button);
+							expect(button.querySelector(aba ? 'b' : 'span')).toBe(label);
+							expect(onReady).toHaveBeenCalledExactlyOnceWith(button);
 						}
-						onAction.mockClear();
-					}
-					fixture.publish({ model });
-					if (aba) {
-						model.active = false;
-						fixture.publish({ model });
-					}
-					const label = button.querySelector(aba ? 'b' : 'span')!;
-					expect(label.textContent).toBe('Early');
-					button.focus();
-					button.click();
-					expect(onAction).toHaveBeenCalledOnce();
-					if (unmount) {
-						hydratedRoot.unmount();
+					} finally {
+						hydratedRoot?.unmount();
 						hydratedRoot = undefined;
+						binding.dispose();
+						for (const update of nativeUpdates) {
+							update.ready.resolve();
+							update.finished.resolve();
+						}
+						viewTransitions?.restore();
 					}
-					if (staged) {
-						await nativeUpdates[0].update();
-						nativeUpdates[0].ready.resolve();
-						nativeUpdates[0].finished.resolve();
-						await act(() => {});
-					} else await act(() => pending.resolve());
-					if (outcome === 'unsupported') {
-						expect(onUncaughtError).toHaveBeenCalledOnce();
-						expect(article.querySelector('button')).toBe(button);
-						expect(button.querySelector('span')).toBe(label);
-						expect(onReady).not.toHaveBeenCalled();
-						expect(onHydrated).not.toHaveBeenCalled();
-						expect(fixture.cleanup).not.toHaveBeenCalled();
-						model.label = 'Still early';
-						fixture.publish({ model });
-						expect(button.textContent).toBe('Still early');
-						button.click();
-						expect(onAction).toHaveBeenCalledTimes(2);
-						continue;
-					}
-					if (unmount) {
-						expect(article.querySelector('button')).toBeNull();
-						expect(onReady).not.toHaveBeenCalled();
-						expect(onHydrated).not.toHaveBeenCalled();
-					} else {
-						expect(article.querySelector('button')).toBe(button);
-						expect(button.querySelector(aba ? 'b' : 'span')).toBe(label);
-						expect(document.activeElement).toBe(button);
-						expect(onReady, outcome).toHaveBeenCalledExactlyOnceWith(button);
-						expect(onHydrated).toHaveBeenCalledOnce();
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
-						button.click();
-						expect(onAction).toHaveBeenCalledTimes(2);
-						// A later commit must not publish a discarded scope's deferred deletion.
-						hydratedRoot!.render(client.TreeHydration, { ...props, when: condition(true) });
-						await act(() => {});
-						expect(article.querySelector('button')).toBe(button);
-						expect(button.querySelector(aba ? 'b' : 'span')).toBe(label);
-						expect(onReady).toHaveBeenCalledExactlyOnceWith(button);
-					}
+				}
+			}, 15000);
+			it(`login hydration preserves an uncontrolled draft (${dev ? 'dev' : 'prod'})`, async () => {
+				let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
+				const article = await attachArticle();
+				const login = authoredPresentation(
+					'LoginPresentation',
+					{
+						label: 'Email',
+						error: '',
+						pending: false,
+						submitLabel: 'Continue',
+					},
+					dev,
+				);
+				article.innerHTML = login.html;
+				const loginForm = article.querySelector('form')!;
+				const loginInput = article.querySelector('input')!;
+				loginInput.value = 'Uncontrolled draft';
+				const loginBinding = login.attach(loginForm, login.state);
+				try {
+					hydratedRoot = hydrateRoot(
+						article,
+						login.loadClient().LoginPresentation,
+						login.state.getSnapshot(),
+						{ bindingLeases: [loginBinding] },
+					);
+					flushSync(() => {});
+					flushEffects();
+					expect(article.querySelector('form')).toBe(loginForm);
+					expect(article.querySelector('input')).toBe(loginInput);
+					expect(loginInput.value).toBe('Uncontrolled draft');
+					expect(login.cleanup).toHaveBeenCalledOnce();
 				} finally {
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
-					binding.dispose();
-					for (const update of nativeUpdates) {
-						update.ready.resolve();
-						update.finished.resolve();
-					}
-					viewTransitions?.restore();
+					loginBinding.dispose();
 				}
-			}
-			const login = authoredPresentation(
-				'LoginPresentation',
-				{
-					label: 'Email',
-					error: '',
-					pending: false,
-					submitLabel: 'Continue',
-				},
-				dev,
-			);
-			article.innerHTML = login.html;
-			const loginForm = article.querySelector('form')!;
-			const loginInput = article.querySelector('input')!;
-			loginInput.value = 'Uncontrolled draft';
-			const loginBinding = login.attach(loginForm, login.state);
-			try {
-				hydratedRoot = hydrateRoot(
-					article,
-					login.loadClient().LoginPresentation,
-					login.state.getSnapshot(),
-					{ bindingLeases: [loginBinding] },
-				);
-				flushSync(() => {});
-				flushEffects();
-				expect(article.querySelector('form')).toBe(loginForm);
-				expect(article.querySelector('input')).toBe(loginInput);
-				expect(loginInput.value).toBe('Uncontrolled draft');
-				expect(login.cleanup).toHaveBeenCalledOnce();
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				loginBinding.dispose();
-			}
-			// Native controlled-value ownership is excluded from the structural proof.
-			const structural = authoredPresentation(
-				'LoginPresentation',
-				{ label: 'Email', error: '', pending: false, submitLabel: 'Continue', draft: '' },
-				dev,
-				presentationSource.replace(
-					'<input name="email"',
-					'<input value={props.draft} name="email"',
-				),
-			);
-			article.innerHTML = structural.html;
-			const form = article.querySelector('form')!;
-			const structuralBinding = structural.attach(form, structural.state);
-			try {
-				const before = form.outerHTML;
-				expect(() =>
-					hydrateRoot(
-						article,
-						structural.loadClient().LoginPresentation,
-						structural.state.getSnapshot(),
-						{
-							bindingLeases: [structuralBinding],
-						},
+			}, 15000);
+			it(`structural binding changes refuse the claimed form (${dev ? 'dev' : 'prod'})`, async () => {
+				const article = await attachArticle();
+				const structural = authoredPresentation(
+					'LoginPresentation',
+					{ label: 'Email', error: '', pending: false, submitLabel: 'Continue', draft: '' },
+					dev,
+					presentationSource.replace(
+						'<input name="email"',
+						'<input value={props.draft} name="email"',
 					),
-				).toThrow(/structural|fixed native/i);
-				expect(article.querySelector('form')).toBe(form);
-				expect(form.outerHTML).toBe(before);
-				structural.publish({ pending: true });
-				expect(form.querySelector('button')!.disabled).toBe(true);
-				expect(form.querySelector('svg')).not.toBeNull();
-			} finally {
-				structuralBinding.dispose();
-			}
+				);
+				article.innerHTML = structural.html;
+				const form = article.querySelector('form')!;
+				const structuralBinding = structural.attach(form, structural.state);
+				try {
+					const before = form.outerHTML;
+					expect(() =>
+						hydrateRoot(
+							article,
+							structural.loadClient().LoginPresentation,
+							structural.state.getSnapshot(),
+							{
+								bindingLeases: [structuralBinding],
+							},
+						),
+					).toThrow(/structural|fixed native/i);
+					expect(article.querySelector('form')).toBe(form);
+					expect(form.outerHTML).toBe(before);
+					structural.publish({ pending: true });
+					expect(form.querySelector('button')!.disabled).toBe(true);
+					expect(form.querySelector('svg')).not.toBeNull();
+				} finally {
+					structuralBinding.dispose();
+				}
+			}, 15000);
 		}
-		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures.
-	}, 15_000);
+	});
 
 	describe('a page translated by the browser', () => {
 		const source = `export function Notice(props) @{ 'use dom bindings';
