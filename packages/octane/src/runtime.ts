@@ -41114,6 +41114,9 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	// Render-phase updates drained during hydration re-render a try body that
 	// is still hydrating.
 	const hydration = hydrating ? activeHydration() : null;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const opsFrom = transaction === null ? 0 : transaction.ops.length;
+	const retiredFrom = transaction?.retired?.size ?? 0;
 	if (capture !== null) WIP_CAPTURE = capture;
 	try {
 		if (hydration !== null) hydration.renderTryBody(block, state.catchBody !== null);
@@ -41136,7 +41139,14 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 			if (isSuspenseException(renderError)) {
 				if (state.propagateSuspense) throw renderError;
 				handleSuspense(state, renderError.thenable, block, journalCheckpoint);
-			} else switchToCatch(state, renderError, true);
+			} else {
+				// The catch arm replaces the body, so none of the work its render queued
+				// reaches the page: its bag writes, structure and resources (#2043).
+				// Hints it requested went in when it requested them, as React's do.
+				if (transaction !== null && transaction === ROOT_RENDER_TRANSACTION && !transaction.aborted)
+					dropRootOps(transaction, opsFrom, retiredFrom);
+				switchToCatch(state, renderError, true);
+			}
 		} else {
 			if (capture !== null) spliceOffscreenCapture(capture);
 			// Ready content supersedes the old wakeable. A render that skipped the
@@ -44192,6 +44202,29 @@ function switchToCatch(state: TrySlot, err: any, reportInline = false): void {
 	}
 }
 
+/**
+ * Drop the commit work queued for a try body the catch arm replaces: its bags'
+ * writes and its slots' structure, from any render of it in this transaction
+ * (#2043). None of it may reach the page.
+ */
+function dropBodyOps(transaction: RootRenderTransaction, body: Block): void {
+	const ops = transaction.ops;
+	for (let i = 0; i < ops.length; i += 2) {
+		const target = ops[i + 1];
+		const slot = ops[i] === applySlotNext;
+		const owner: Block | null | undefined = slot
+			? target.next?.owner
+			: typeof target?.$ === 'number' && target.$ > BAG_SIZE
+				? target.next[target.$ & BAG_SIZE]?.block
+				: null;
+		if (owner == null || !blockIsAncestor(body, owner)) continue;
+		if (slot) target.next = null;
+		else target.$ &= BAG_SIZE;
+		ops[i] = noop;
+		ops[i + 1] = null;
+	}
+}
+
 function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): void {
 	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
@@ -44216,6 +44249,9 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 	// the second pass is pure waste).
 	const oldTry = state.tryBlock;
 	const priorVisible = state.block;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (oldTry !== null && transaction !== null && !transaction.aborted)
+		dropBodyOps(transaction, oldTry);
 	if (oldTry) {
 		let suppressedRefs: SuspenseRefEntry[] | null = null;
 		if (hadDetachedRefs) {
