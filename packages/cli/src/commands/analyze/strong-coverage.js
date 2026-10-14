@@ -145,6 +145,32 @@ export async function loadJsxPragma(root) {
 }
 
 /**
+ * Comments and template literals, whose text is not code, and quoted strings,
+ * which can hold either opener. A template's `${}` is code, but nothing a
+ * statement scanner reads lives there, and a nested template's backticks pair
+ * up inside it.
+ */
+const TEXT =
+	/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:\\.|[^'\\\n])*'?|"(?:\\.|[^"\\\n])*"?|`(?:\\[\s\S]|[^`\\])*`?/g;
+
+/**
+ * `source` with comment and template literal text blanked, so a statement
+ * scanner never reads code that is only text, such as a code sample in a
+ * template string. Line breaks stay, and so do a template's backticks, so a
+ * tagged template never reads as a bare name. Quoted strings stay: a specifier
+ * is one, and one ends at its line, so it cannot hold a statement.
+ *
+ * @param {string} source
+ */
+export function codeOnly(source) {
+	return source.replace(TEXT, (text) =>
+		text[0] === "'" || text[0] === '"'
+			? text
+			: text.replace(text[0] === '`' ? /[^\n`]/g : /[^\n]/g, ' '),
+	);
+}
+
+/**
  * An `import … from` or `export … from` statement, capturing its keyword,
  * clause, and specifier. The clause may span lines but never reaches into the
  * next statement of either kind, so a semicolon-free module cannot borrow a
@@ -159,16 +185,15 @@ const STATIC_REQUEST =
  * `*` stands for the whole target (`* as ns`) or, on both sides, everything it
  * exports (`export *`). TypeScript erases a `type` clause and every
  * `type`-marked specifier, so a clause left with no binding leaves no request
- * behind. Comments in the clause are not specifiers, so they are dropped
- * before it is read.
+ * behind.
  *
  * @param {string} source
  * @returns {{ request: string, reexport: boolean, bindings: [string, string][] }[]}
  */
 export function runtimeRequests(source) {
 	const requests = [];
-	for (const [, keyword, authored, request] of source.matchAll(STATIC_REQUEST)) {
-		const clause = authored.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ' ').trim();
+	for (const [, keyword, authored, request] of codeOnly(source).matchAll(STATIC_REQUEST)) {
+		const clause = authored.trim();
 		const reexport = keyword === 'export';
 		// A re-export clause opens with `*` or `{`; anything else is a
 		// declaration that happens to spell `from '…'`.

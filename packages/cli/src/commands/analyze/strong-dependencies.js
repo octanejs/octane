@@ -1,7 +1,7 @@
 import { realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { readInstalled } from '../../kernel/project.js';
-import { runtimeRequests } from './strong-coverage.js';
+import { codeOnly, runtimeRequests } from './strong-coverage.js';
 
 /** The conditions a client build resolves a package's `exports` with. */
 const CONDITIONS = new Set(['browser', 'import', 'module', 'default']);
@@ -114,41 +114,62 @@ function resolveRequest(request, importer) {
 }
 
 /**
- * An export the module declares itself, capturing `default`, a declared name,
- * a variable declaration's destructuring pattern or the rest of its line, or a
- * local `export { … }` list, which a following `from` would make a re-export
- * instead.
+ * An export the module declares itself, capturing `default` and the binding a
+ * bare `export default name` names, a declared name, a variable declaration's
+ * destructuring pattern or the rest of its line, or a local `export { … }`
+ * list, which a following `from` would make a re-export instead.
  */
 const LOCAL_EXPORT =
-	/^\s*export\s+(?:(default)\b|(?:declare\s+)?(?:async\s+)?(?:function\*?|(?:abstract\s+)?class|enum)\s+([\w$]+)|(?:declare\s+)?(?:const|let|var)\s+(\{[^}]*\}|\[[^\]]*\]|[^;\n]*)|\{([^}]*)\}(?!\s*from\b))/gm;
+	/^\s*export\s+(?:(default)\b(?:\s+([\w$]+)\s*;?\s*$)?|(?:declare\s+)?(?:async\s+)?(?:function\*?|(?:abstract\s+)?class|enum)\s+([\w$]+)|(?:declare\s+)?(?:const|let|var)\s+(\{[^}]*\}|\[[^\]]*\]|[^;\n]*)|\{([^}]*)\}(?!\s*from\b))/gm;
+
+/** `name = binding` or `name = binding.member`, the whole of a declaration. */
+const ALIAS = /^([\w$]+)\s*=\s*([\w$]+)(?:\.([\w$]+))?$/;
 
 /**
- * Does the module declare one of `names` itself, rather than pass it on from
- * another module? `null` asks for the whole module, which always counts.
+ * How the module exports `names`: `provides` when it declares one itself, and
+ * `renamed`, for each imported binding that an export of one of them only
+ * renames (`export const X = binding`, `= ns.member`, `export { binding as X }`
+ * or `export default binding`), the members read from it, `null` for the whole
+ * binding. A renamed binding passes its import's names on, as a re-export
+ * does. `null` names ask for the whole module, which always counts.
  *
  * @param {string} source
  * @param {Set<string> | null} names
+ * @param {Set<string>} imported the bindings the module's imports declare
  */
-function declaresAny(source, names) {
-	if (names === null) return true;
-	for (const [, isDefault, declared, variables, list] of source.matchAll(LOCAL_EXPORT)) {
-		// Every identifier in a variable declaration counts, so a destructured
-		// name or a second declarator does. Reading initializers too can only
-		// keep a module in the report, never drop one.
+function ownExports(source, names, imported) {
+	let provides = names === null;
+	/** @type {Map<string, Set<string> | null>} */
+	const renamed = new Map();
+	for (const [, isDefault, binding, declared, variables, list] of codeOnly(source).matchAll(
+		LOCAL_EXPORT,
+	)) {
+		const alias = variables === undefined ? null : ALIAS.exec(variables.trim());
+		/** @type {[string | undefined, string?, string?][]} exported name, binding, member */
 		const exported =
-			variables !== undefined
-				? (variables.match(/[A-Za-z_$][\w$]*/g) ?? [])
-				: list === undefined
-					? [isDefault ? 'default' : declared]
-					: list.split(',').map((specifier) =>
-							specifier
-								.trim()
-								.split(/\s+as\s+/)
-								.pop(),
-						);
-		if (exported.some((name) => name !== undefined && names.has(name))) return true;
+			list !== undefined
+				? list.split(',').map((specifier) => {
+						const [local, name = local] = specifier.trim().split(/\s+as\s+/);
+						return [name, local];
+					})
+				: alias !== null
+					? [[alias[1], alias[2], alias[3]]]
+					: variables !== undefined
+						? // Every identifier in any other declaration counts, so a
+							// destructured name or a second declarator does. Reading
+							// initializers too can only keep a module in the report.
+							(variables.match(/[A-Za-z_$][\w$]*/g) ?? []).map((name) => [name])
+						: [[isDefault ? 'default' : declared, binding]];
+		for (const [name, local, member] of exported) {
+			if (name === undefined || (names !== null && !names.has(name))) continue;
+			if (local === undefined || !imported.has(local)) provides = true;
+			else if (member === undefined) renamed.set(local, null);
+			else if (renamed.get(local) !== null) {
+				renamed.set(local, (renamed.get(local) ?? new Set()).add(member));
+			}
+		}
 	}
-	return false;
+	return { provides, renamed };
 }
 
 /**
@@ -174,16 +195,37 @@ function taken(bindings, wanted) {
 }
 
 /**
+ * The names an import's `bindings` take from its target for the exports that
+ * only rename them (see ownExports). `null` is every name.
+ *
+ * @param {[string, string][]} bindings
+ * @param {Map<string, Set<string> | null>} renamed
+ * @returns {Set<string> | null}
+ */
+function takenByRenames(bindings, renamed) {
+	const names = new Set();
+	for (const [name, local] of bindings) {
+		if (!renamed.has(local)) continue;
+		const members = renamed.get(local);
+		// A namespace passes on the members its exports read, or all of itself.
+		if (name !== '*') names.add(name);
+		else if (members == null) return null;
+		else for (const member of members) names.add(member);
+	}
+	return names;
+}
+
+/**
  * What Strong modules import from other packages that does not compile under
  * Strong mode, and the `octane/react` (ReactCompat) boundaries they reach.
  *
  * Each Strong module's own imports are followed one step, and from there only
- * the re-exports that pass on a name it imports, because a re-export hands the
- * importer the very module it names while a dependency's own imports are its
- * implementation. A module counts when it declares one of the names taken
- * from it, Octane compiles it, it belongs to a package other than its Strong
- * importer's, and it is not Strong. The last three answers come from the
- * project's compiler.
+ * the re-exports that pass on a name it imports, including an import that an
+ * export only renames, because a re-export hands the importer the very module
+ * it names while a dependency's own imports are its implementation. A module
+ * counts when it declares one of the names taken from it, Octane compiles it,
+ * it belongs to a package other than its Strong importer's, and it is not
+ * Strong. The last three answers come from the project's compiler.
  *
  * @param {{
  *   roots: string[],
@@ -252,8 +294,14 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 			if (seen.has(key) || from === null) return;
 			seen.add(key);
 			const { owner, source } = from;
+			const requests = runtimeRequests(source);
+			const imported = new Set(
+				requests.flatMap(({ reexport, bindings }) =>
+					reexport ? [] : bindings.map(([, local]) => local),
+				),
+			);
 			// A module that only passes names on is a step, not a dependency.
-			const provides = declaresAny(source, wanted);
+			const { provides, renamed } = ownExports(source, wanted, imported);
 			if (provides && owner.compiled && owner.root !== home && notStrong(source, absolute)) {
 				const group = packages.get(from.name) ?? {
 					name: from.name,
@@ -264,7 +312,7 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 				group.importers.add(importer);
 				packages.set(from.name, group);
 			}
-			for (const { request, reexport, bindings } of runtimeRequests(source)) {
+			for (const { request, reexport, bindings } of requests) {
 				if (/^octane\/react(?:\/|$)/.test(request)) {
 					if (!provides) continue;
 					const boundary = reactCompat.get(absolute) ?? {
@@ -276,8 +324,11 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 					reactCompat.set(absolute, boundary);
 					continue;
 				}
-				if ((!reexport && absolute !== root) || /^octane(?:\/|$)/.test(request)) continue;
-				const names = taken(bindings, wanted);
+				if (/^octane(?:\/|$)/.test(request)) continue;
+				const names =
+					reexport || absolute === root
+						? taken(bindings, wanted)
+						: takenByRenames(bindings, renamed);
 				const target = names?.size === 0 ? null : resolveRequest(request, absolute);
 				if (target !== null) visit(target, names);
 			}

@@ -360,6 +360,8 @@ describe('octane analyze Strong coverage', () => {
 			'src/mixed.ts':
 				"import { type OctaneNode, useState } from 'octane';\nexport function useNode(): OctaneNode { return useState(null)[0]; }\n",
 			'src/math.ts': 'export const add = (a: number, b: number) => a + b;\n',
+			// A code sample's import is text, so the module never imports octane.
+			'src/sample.ts': "export const SAMPLE = `\nimport { useState } from 'octane';\n`;\n",
 			'src/env.d.ts': "import 'octane';\n",
 		});
 
@@ -526,9 +528,15 @@ describe('octane analyze Strong coverage', () => {
 			'src/App.tsrx':
 				'"use strong";\n' +
 				"import { Button, Chart, Dialog, Menu, Sheet } from './ui';\n" +
+				"import Toolbar, { Badge, Fancy, Panel, Wrapped } from '@kit/panel';\n" +
 				"import { useStore } from '@kit/store';\n" +
 				"import { format } from 'plain';\n" +
 				"import { Local } from './Local';\n" +
+				// A code sample's imports are text, not dependencies.
+				'const SAMPLE = `\n' +
+				"import { ReactCompat } from 'octane/react';\n" +
+				"import { Extra } from '@kit/extra';\n" +
+				'`;\n' +
 				'export function App() @{ <Button /> }\n',
 			// The app's own barrel is followed through to the package it re-exports.
 			'src/ui.ts': "export * from '@kit/ui';\n",
@@ -567,6 +575,36 @@ describe('octane analyze Strong coverage', () => {
 			'node_modules/@kit/ui/src/Unused.tsx': 'export function Unused() { return <u />; }\n',
 			'node_modules/@kit/ui/src/Chart.tsx':
 				"import { ReactCompat } from 'octane/react';\nexport function Chart() { return <ReactCompat />; }\n",
+			'node_modules/@kit/panel/package.json': {
+				name: '@kit/panel',
+				...octane,
+				exports: './src/index.ts',
+			},
+			// An export that only renames an import passes its module on, as a
+			// re-export does. One that builds a new value is declared here, and
+			// what it builds from is its implementation.
+			'node_modules/@kit/panel/src/index.ts':
+				"import { memo } from 'octane';\n" +
+				"import * as Panels from './Panel.tsrx';\n" +
+				"import Toolbar from './Toolbar.tsrx';\n" +
+				// A comment's backticks are not code, even inside a clause.
+				"import {\n\t// the `Badge` export\n\tBadge as Pill,\n} from './Badge.tsrx';\n" +
+				"import { Internal } from './Internal.tsrx';\n" +
+				'export const Panel = Panels.Panel;\n' +
+				'export { Pill as Badge };\n' +
+				'export default Toolbar;\n' +
+				'export const Wrapped = memo(Internal);\n' +
+				"export { Fancy } from './Fancy.tsrx';\n",
+			// A tagged template builds a new value; it does not rename its tag.
+			'node_modules/@kit/panel/src/Fancy.tsrx':
+				"import { styled } from './styled';\nexport const Fancy = styled`color: red`;\n",
+			'node_modules/@kit/panel/src/styled.ts':
+				'export const styled = (strings: TemplateStringsArray) => () => strings;\n',
+			'node_modules/@kit/panel/src/Panel.tsrx': 'export function Panel() @{ <section /> }\n',
+			'node_modules/@kit/panel/src/Toolbar.tsrx':
+				'export default function Toolbar() @{ <nav /> }\n',
+			'node_modules/@kit/panel/src/Badge.tsrx': 'export function Badge() @{ <b /> }\n',
+			'node_modules/@kit/panel/src/Internal.tsrx': 'export function Internal() @{ <i /> }\n',
 			'node_modules/@kit/store/package.json': {
 				name: '@kit/store',
 				...octane,
@@ -585,6 +623,17 @@ describe('octane analyze Strong coverage', () => {
 		expect(result.exitCode).toBe(0);
 		expect(result.json().strongDependencies).toEqual({
 			packages: [
+				{
+					name: '@kit/panel',
+					modules: [
+						'src/Badge.tsrx',
+						'src/Fancy.tsrx',
+						'src/Panel.tsrx',
+						'src/Toolbar.tsrx',
+						'src/index.ts',
+					],
+					importers: ['src/App.tsrx'],
+				},
 				{ name: '@kit/store', modules: ['src/index.ts'], importers: ['src/App.tsrx'] },
 				{
 					name: '@kit/ui',
