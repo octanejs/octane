@@ -46,7 +46,6 @@ export {
 	commitHole,
 	setRenderText,
 	bagRecord,
-	bagRecordAlways,
 	bagRecordSignal,
 	bagRecordHost,
 	bagDone,

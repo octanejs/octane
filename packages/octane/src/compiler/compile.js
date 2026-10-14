@@ -1717,7 +1717,6 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'commitHole',
 	'setRenderText',
 	'bagRecord',
-	'bagRecordAlways',
 	'bagRecordSignal',
 	'bagRecordHost',
 	'bagDone',
@@ -31135,7 +31134,7 @@ function commitRuntimeHelpers(bind) {
 	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitHostSources'];
 	if (bind.kind === 'event') return ['bagRecord', 'setEventSlot'];
 	if (bind.kind === 'event-bundle') return ['bagRecord', 'commitEventBundle'];
-	return [COMMIT_CONTROLLED_KINDS.has(bind.kind) ? 'bagRecordAlways' : 'bagRecord'];
+	return ['bagRecord'];
 }
 
 function commitCellCount(bind) {
@@ -31388,7 +31387,7 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 				),
 			null,
 		);
-		return record(
+		return recordScope(
 			'bagRecordHost',
 			cell,
 			sources,
@@ -31550,7 +31549,8 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 			if (COMMIT_CONTROLLED_KINDS.has(bind.kind)) {
 				// A controlled property reasserts on every commit (React's contract).
 				writeCell(cell, () => b.call(callee(), F('_el'), V()), null);
-				return record('bagRecordAlways', cell, bind.expr);
+				// The bag is no committed value, so the binding records every render.
+				return recordScope('bagRecord', cell, bind.expr, b.id('_b'));
 			}
 			// attr / stringData / booleanAttr / ariaAttr
 			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V()), prev, bind.expr);

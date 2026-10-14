@@ -3970,54 +3970,6 @@ function closeOpsWindow(): void {
 	OPS_CHECKPOINT = OPS_CHECKPOINTS.pop()!;
 }
 
-/** The root transaction a render of `s` may be dropped from, or null to commit at once. */
-function droppableRender(s: Scope): RootRenderTransaction | null {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	return transaction === null ||
-		hydrating ||
-		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
-		? null
-		: transaction;
-}
-
-/**
- * Whether a commit function takes its careful writers: an open journal records
- * the writes, and a dispatch in flight keeps snapshots of the handlers it holds
- * (preserveDispatchedBundle). Otherwise it writes handler slots and bundles
- * directly. runCommitOps inlines it.
- */
-function carefulCommit(): boolean {
-	return TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0);
-}
-
-/**
- * The first binding a render records into: a bag staged earlier in this
- * transaction resumes its cells; otherwise its reusable cells are staged and,
- * given the rendering Scope of a render that may be dropped, `C` is queued.
- * bagRecord inlines the common case, an idle bag with cells.
- */
-function stageBag(bag: any, s: Scope | null): any[] {
-	const state = bag.$;
-	if (state > BAG_SIZE) return bagResume(bag);
-	let next = bag.next;
-	if (typeof next === 'function') {
-		// Packed from the start: the commit function reads every cell.
-		const commit = next;
-		next = bag.next = [];
-		for (let i = state + 3; i > 0; i--) next.push(bag);
-		next[state + 2] = commit;
-	} else next.fill(bag, 0, state);
-	bag.$ = state | BAG_STAGED;
-	const transaction = s === null ? null : droppableRender(s);
-	if (transaction !== null) {
-		next[state] = s;
-		next[state + 1] = transaction.ops.length;
-		bag.$ = state | BAG_STAGED | BAG_QUEUED;
-		transaction.ops.push(next[state + 2], bag);
-	}
-	return next;
-}
-
 /**
  * Record one binding the compiled template found changed, or any binding of a
  * resumed bag (the bag itself when it equals the committed value, so a later
@@ -4068,42 +4020,41 @@ export function bagRecord(
 			setEventHandler(host);
 	}
 	if (next === null) {
+		// The render's first record stages the bag, inline: a changed row costs
+		// its recorders and `C` alone.
 		const state = bag.$;
 		if (!changed && state <= BAG_SIZE) return null;
-		// stageBag for an idle bag in a render that may be dropped
-		// (droppableRender), inline: the row's first change costs no other call.
-		const transaction = ROOT_RENDER_TRANSACTION;
-		if (
-			state <= BAG_SIZE &&
-			transaction !== null &&
-			!hydrating &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
-		) {
+		if (state > BAG_SIZE) next = bagResume(bag);
+		else {
 			next = bag.next;
 			if (typeof next === 'function') {
+				// Packed from the start: the commit function reads every cell.
 				const commit = next;
 				next = bag.next = [];
 				for (let i = state + 3; i > 0; i--) next.push(bag);
 				next[state + 2] = commit;
 			} else next!.fill(bag, 0, state);
-			next![state] = s;
-			next![state + 1] = transaction.ops.length;
-			bag.$ = state | BAG_STAGED | BAG_QUEUED;
-			transaction.ops.push(next![state + 2], bag);
-		} else next = stageBag(bag, s);
+			bag.$ = state | BAG_STAGED;
+			// A render that may be dropped queues `C` now; one that cannot commits
+			// it from the template's trailing bagDone.
+			const transaction = ROOT_RENDER_TRANSACTION;
+			if (
+				transaction !== null &&
+				!hydrating &&
+				(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
+			) {
+				next![state] = s;
+				next![state + 1] = transaction.ops.length;
+				bag.$ = state | BAG_STAGED | BAG_QUEUED;
+				transaction.ops.push(next![state + 2], bag);
+			}
+		}
 	}
 	next![cell] = changed ? value : bag;
 	if (args !== undefined) {
 		if (args !== EMPTY_ARGS) next![cell + 1] = changed ? a0 : bag;
 		if (args === 2 || args === -2) next![cell + 2] = changed ? a1 : bag;
 	}
-	return next;
-}
-
-/** A binding that reasserts every commit (controlled form properties). */
-export function bagRecordAlways(bag: any, next: any[] | null, cell: number, value: unknown): any[] {
-	if (next === null) next = stageBag(bag, null);
-	next[cell] = value;
 	return next;
 }
 
@@ -4120,8 +4071,10 @@ function bagResume(bag: any): any[] {
 }
 
 /**
- * End of a template render whose recorders staged the bag without queueing
- * it: commit now, or queue `C`.
+ * End of a template render whose records staged the bag without queueing it
+ * (bagRecord): commit now, or queue `C`. `careful` tells `C` to journal its
+ * handler writes for an open window and to keep the snapshots a dispatch in
+ * flight holds (preserveDispatchedBundle); runCommitOps passes it too.
  */
 export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean) => void): void {
 	const state = bag.$;
@@ -4129,9 +4082,16 @@ export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean)
 	const size = state & BAG_SIZE;
 	const next = bag.next;
 	next[size] = s;
-	const transaction = droppableRender(s);
-	if (transaction === null) {
-		commit(bag, carefulCommit());
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (
+		transaction === null ||
+		hydrating ||
+		(TRANSITION_JOURNAL_DEPTH === 1 && s.block.createdStamp === ROOT_DISCARD_STAMP)
+	) {
+		commit(
+			bag,
+			TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
+		);
 		return;
 	}
 	const ops = transaction.ops;
@@ -4164,7 +4124,7 @@ function runCommitOps(ops: any[], owner: RootRenderOwner): number {
 			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
 			const target = ops[i + 1];
 			try {
-				// A commit function's `careful` flag: inline, as carefulCommit.
+				// A commit function's `careful` flag, as bagDone passes it.
 				ops[i](
 					target,
 					TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
@@ -24951,12 +24911,8 @@ export function bagRecordSignal(
 			unchanged = bound && Object.is(prior!.value, read);
 		}
 	}
-	if (next === null) {
-		if (unchanged && bag.$ <= BAG_SIZE) return null;
-		next = stageBag(bag, scope);
-	}
-	next[cell] = unchanged ? bag : value;
-	return next;
+	// The bag, which no binding value equals, marks the cell unchanged.
+	return bagRecord(scope, next, cell, unchanged ? bag : value, bag);
 }
 
 /**
@@ -27947,7 +27903,7 @@ export function bindSignalHostPropSources(
  * winning style here, so this render observes it.
  */
 export function bagRecordHost(
-	bag: any,
+	s: Scope,
 	next: any[] | null,
 	cell: number,
 	sources: readonly HostPropSource[],
@@ -27974,7 +27930,8 @@ export function bagRecordHost(
 		}
 		if (found) readStyle(style);
 	}
-	return bagRecordAlways(bag, next, cell, sources);
+	// Recorded every render: the bag is no committed value.
+	return bagRecord(s, next, cell, sources, s.slots[0])!;
 }
 
 /**
@@ -28815,7 +28772,7 @@ export function setEventSlot(el: Element, key: string, handler: unknown): void {
  * Commit a compiled handler bundle from its pending cells: the callback at
  * `cell`, then its captures (a0/a1) or, for arity N, the argument array.
  * Dispatch reads the bundle, so it only ever sees committed values. A commit
- * function writes the fields itself unless it is careful (carefulCommit).
+ * function writes the fields itself unless it is careful (bagDone).
  */
 export function commitEventBundle(bag: any, d: HandlerBundle, next: any[], cell: number): void {
 	const args = d.args;
@@ -39249,8 +39206,10 @@ function recordHole(
 ): any[] | null {
 	let last = prev;
 	let text = node;
+	// A first record stages the bag through bagRecord (the bag, which no value
+	// equals, forces it); the hole then writes its own pair of cells.
 	if (bag.$ > BAG_SIZE) {
-		if (next === null) next = stageBag(bag, s);
+		if (next === null) next = bagResume(bag);
 		if (next[cell] !== bag) last = next[cell];
 		if (next[cell + 1] !== bag) text = next[cell + 1];
 	}
@@ -39260,7 +39219,7 @@ function recordHole(
 	) {
 		if (value === last) return next;
 		if (text !== null && value !== null) {
-			if (next === null) next = stageBag(bag, s);
+			if (next === null) next = bagRecord(s, null, cell, value, bag)!;
 			if (text === node && next[cell + 1] === bag) {
 				next[cell] = value === prev ? bag : value;
 				return next;
@@ -39280,7 +39239,7 @@ function recordHole(
 		if (next !== null) next[cell] = next[cell + 1] = bag;
 		return next;
 	}
-	if (next === null) next = stageBag(bag, s);
+	if (next === null) next = bagRecord(s, null, cell, value, bag)!;
 	// The slot wrote its content itself: commit only publishes the pair.
 	next[cell] = value;
 	next[cell + 1] = text;
