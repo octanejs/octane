@@ -48845,9 +48845,18 @@ function clearItems(first: Block | null, start: Comment, end: Comment, size: num
 		if (p === null) return;
 		// Clear wholesale only while exactly these rows lie between the markers:
 		// outside code may have added a node there since the render.
-		let node = getNextSibling(start);
-		for (let b: Block | null = first; b !== null && node !== null; b = b.nextSibling)
-			node = node === b.startMarker && b.endMarker !== null ? getNextSibling(b.endMarker) : null;
+		// getNextSibling, inlined: this visits every row.
+		const read = nextSiblingGetter;
+		let node: Node | null = getNextSibling(start);
+		for (let b: Block | null = first; b !== null && node !== null; b = b.nextSibling) {
+			const last = b.endMarker;
+			node =
+				node !== b.startMarker || last === null
+					? null
+					: read !== undefined
+						? read.call(last)
+						: last.nextSibling;
+		}
 		if (node !== end) {
 			for (let b: Block | null = first; b !== null; b = b.nextSibling)
 				if (b.startMarker != null && b.startMarker.parentNode === p)
