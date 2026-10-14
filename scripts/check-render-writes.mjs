@@ -32,6 +32,14 @@ const MUTATORS = new Set(
  setCustomValidity scrollTo scrollBy scrollIntoView`.split(/\s+/),
 );
 
+// Calls that make a node, so a fresh writer may write into what they return.
+const CREATES =
+	/^(?:document\.|[\w$]+\.ownerDocument!?\.|[\w$]+\.)?(?:create(?:Element|ElementNS|Comment|TextNode|DocumentFragment)|cloneNode|importNode|slotFrontier|queueFrontier)\b|^(?:slotFrontier|queueFrontier|clone|fragmentTemplate|parseTemplate)\(/;
+// A fresh writer that writes a node it did not make first asks whether the
+// render could reach committed DOM there.
+const GUARD =
+	/\b(?:usesFrontier|slotFrontier|queueFrontier|pendingWrites|ROOT_RENDER_TRANSACTION)\b/;
+
 function unwrap(node) {
 	while (
 		is.isAsExpression(node) ||
@@ -41,6 +49,13 @@ function unwrap(node) {
 	)
 		node = node.expression;
 	return node;
+}
+
+function ownerFunction(node) {
+	for (let current = node.parent; current !== undefined; current = current.parent)
+		if ((is.isFunctionDeclaration(current) || is.isMethodDeclaration(current)) && current.name)
+			return current;
+	return undefined;
 }
 
 function owner(node) {
@@ -158,6 +173,15 @@ function inspectProgram(program, file, writers) {
 			return 'write';
 		return 'read';
 	}
+	// Whether a write's receiver is a node this function made: the root of its
+	// receiver chain is a local initialized by a creating call.
+	function created(expression) {
+		let node = unwrap(expression);
+		while (is.isPropertyAccessExpression(node) || is.isElementAccessExpression(node))
+			node = unwrap(node.expression);
+		const initial = initializer(node);
+		return initial !== undefined && CREATES.test(unwrap(initial).getText(source));
+	}
 	function visit(node) {
 		if (is.isPropertyAccessExpression(node) || is.isElementAccessExpression(node)) {
 			const argumentType = is.isElementAccessExpression(node)
@@ -178,6 +202,8 @@ function inspectProgram(program, file, writers) {
 						owner: owner(node),
 						operation: `${kind}:${key}`,
 						expression: node.getText(source),
+						created: created(node.expression),
+						guarded: GUARD.test(ownerFunction(node)?.getText(source) ?? ''),
 					});
 				}
 			}
