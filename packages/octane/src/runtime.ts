@@ -1544,9 +1544,25 @@ function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, sc
 	const value = SIGNAL_BINDINGS_ENABLED
 		? runWithBlockSignalOwner(scope.parent, () => readNativeDomStyle(props.value))
 		: readNativeDomStyle(props.value);
-	setStyle(props.el, value, scope.slots[0]);
-	journalRootProperty(scope.slots, 0, scope.slots[0]);
-	scope.slots[0] = value;
+	publishNativeStyle([scope.slots, props.el, value], usesFrontier(scope.block, props.el));
+}
+
+/**
+ * Write a native style binding's value and publish it as the committed one,
+ * or, for committed DOM in a root render, queue both for its commit. `write`
+ * is `[committed, el, value]`: the cache holding the value at index 0, or a
+ * scalar binding, which holds it as `style`.
+ */
+function publishNativeStyle(write: any[], atCommit: boolean): void {
+	if (atCommit) {
+		ROOT_RENDER_TRANSACTION!.ops.push(publishNativeStyle, write);
+		return;
+	}
+	const committed = write[0];
+	const key = committed.__kind === 'nativeStyleBinding' ? 'style' : 0;
+	setStyle(write[1], write[2], committed[key]);
+	journalRootProperty(committed, key, committed[key]);
+	committed[key] = write[2];
 }
 
 /**
@@ -1618,11 +1634,15 @@ function writeScalarNativeStyle(
 		binding.el = el;
 		binding.style = undefined;
 	}
+	// A compiler literal is fresh per render and never escapes, and a primitive
+	// is immutable, so either is its own snapshot.
+	if (write === setStyle) {
+		publishNativeStyle([binding, el, value], usesFrontier(owner.block, el));
+		return;
+	}
 	write(el, value, binding.style);
 	if (TRANSITION_JOURNAL !== null)
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-	// A compiler literal is fresh per render and never escapes, and a primitive
-	// is immutable, so either is its own snapshot.
 	binding.style = value;
 }
 
@@ -1664,10 +1684,18 @@ function publishNativeProjection(
 }
 
 function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
-	const values = prepareNativeProjection(props, scope);
-	publishNativeProjection(props, values, scope.slots[0] as unknown[] | undefined);
-	journalRootProperty(scope.slots, 0, scope.slots[0]);
-	scope.slots[0] = values;
+	const write = [scope.slots, props, prepareNativeProjection(props, scope)];
+	if (usesFrontier(scope.block, props.el))
+		ROOT_RENDER_TRANSACTION!.ops.push(commitNativeProjection, write);
+	else commitNativeProjection(write);
+}
+
+/** Publish a projection's prepared values, at commit for committed DOM in a root render. */
+function commitNativeProjection(write: any[]): void {
+	const committed = write[0];
+	publishNativeProjection(write[1], write[2], committed[0]);
+	journalRootProperty(committed, 0, committed[0]);
+	committed[0] = write[2];
 }
 
 function preparedNativeStyleBody(
@@ -29837,6 +29865,8 @@ interface HeadSlot {
 	handlers?: Map<string, EventListener>;
 	/** Authored attribute keys only; never retain the props' values past a render. */
 	attrNames?: string[];
+	/** A root render's attributes and text for this committed element, until its commit. */
+	next: { tx: RootRenderTransaction; attrs: Record<string, any> | null; text: unknown } | null;
 }
 
 // A shallow HeadSlot snapshot cannot undo mutations to its listener Map or the
@@ -30009,16 +30039,46 @@ export function headBlock(
 				adopted && hydration === null
 					? (STAGED_DOM ? STAGED_DOM.view(el) : el).getAttributeNames()
 					: undefined,
+			next: null,
 		};
 		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
 		(scope.cleanups ??= []).push(() => {
+			state!.next = null;
 			removeHeadEventListeners(state!, null);
 			domNode(state!.el).remove();
 			scope.slots[slot] = undefined;
 		});
+	} else {
+		// A root render's update to a committed element waits for its commit.
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK && !hydrating) {
+			const pending = state.next;
+			journalRootProperty(state, 'next', pending);
+			state.next = { tx: transaction, attrs, text };
+			if (pending === null || pending.tx !== transaction)
+				transaction.ops.push(commitHeadProps, state);
+			return;
+		}
 	}
+	applyHeadProps(state, tag, attrs, text);
+}
+
+function commitHeadProps(state: HeadSlot): void {
+	const next = state.next;
+	// The owning scope's unmount released it.
+	if (next === null) return;
+	state.next = null;
+	applyHeadProps(state, state.el.localName, next.attrs, next.text);
+}
+
+function applyHeadProps(
+	state: HeadSlot,
+	tag: string,
+	attrs: Record<string, any> | null,
+	text: unknown,
+): void {
 	const el = state.el;
 	if (TRANSITION_JOURNAL !== null) {
 		journalObjectOnce(state);
@@ -30112,8 +30172,14 @@ export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementD
 		// before returning the inline descriptor for this pass.
 		const state = scope.slots[slot] as HeadSlot | undefined;
 		if (state !== undefined) {
-			removeHeadEventListeners(state, null);
-			domNode(state.el).remove();
+			// A root render's teardown of the committed entry lands at commit.
+			if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_TRANSACTION.aborted && !hydrating)
+				queueRootDeletion(() => removeHeadEventListeners(state, null), state.el, state.el);
+			else {
+				removeHeadEventListeners(state, null);
+				domNode(state.el).remove();
+			}
+			journalRootProperty(scope.slots, slot, state);
 			scope.slots[slot] = undefined;
 		}
 		return createElement(props.tag, props.attrs ?? undefined, props.text);
@@ -36770,6 +36836,8 @@ interface HostComponentSlot {
 	// Dedicated sub-scope holding the children's childSlot (slot 0), so the children
 	// reconcile/unmount via the Block tree without stamping a derived key on `scope`.
 	childScope: Scope | undefined;
+	/** A root render's props for this committed host, applied by its commit entry. */
+	next: any[] | null;
 }
 
 // Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
@@ -36803,6 +36871,14 @@ export function hostComponent(
 			elNs !== undefined
 				? (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(elNs, tag)
 				: (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement(tag);
+		// A root render that drops forgets the host it created with it.
+		if (ROOT_RENDER_TRANSACTION !== null) {
+			journalRootProperty(scope.slots, slot, undefined);
+			if (scope.children === null) journalRootProperty(scope, 'children', null);
+			else journalObjectOnce(scope.children);
+			if (scope.cleanups === null) journalRootProperty(scope, 'cleanups', null);
+			else journalObjectOnce(scope.cleanups);
+		}
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
 		state = {
@@ -36813,6 +36889,7 @@ export function hostComponent(
 			body: undefined,
 			latest: undefined,
 			childScope: undefined,
+			next: null,
 		};
 		scope.slots[slot] = state;
 		// Children render into a dedicated sub-scope (registered on `scope.children` so
@@ -36824,11 +36901,23 @@ export function hostComponent(
 			scope: childScope,
 			at: scope._slots === null ? 0 : scope._slots.length,
 		});
-		domNode(block.parentNode).insertBefore(el, anchor ?? block.endMarker);
-		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
+		// Under a committed Block, the new host lands at commit, from a frontier.
+		const parent = block.parentNode;
+		const before = anchor ?? block.endMarker;
+		if (usesFrontier(block, parent)) {
+			const frag = queueFrontier(block, parent, before);
+			(STAGED_DOM ? STAGED_DOM.view(frag) : frag).appendChild(el);
+		} else domNode(parent).insertBefore(el, before);
+		(scope.cleanups ??= []).push(() => {
+			state!.next = null;
+			queueRefDetach(state!.ref, state!.el);
+		});
 	}
 	const el = state.el;
-	applyHostProps(el, props, scope, state);
+	// A committed host takes its props at commit, after its children's entries.
+	let next: any[] | null = null;
+	if (state.props !== undefined && usesFrontier(block, el)) next = [state, props, scope];
+	else applyHostProps(state, props, scope);
 	if (typeof childrenBody === 'function') {
 		// The compiled children render-body is a FRESH closure every parent render, but
 		// it is the SAME positional children slot. childSlot keys block-reuse on body
@@ -36854,14 +36943,28 @@ export function hostComponent(
 		// host component.
 		childSlot(state.childScope!, 0, el, childrenBody ?? null, null, false, el);
 	}
+	if (next !== null) {
+		journalRootProperty(state, 'next', state.next);
+		state.next = next;
+		ROOT_RENDER_TRANSACTION!.ops.push(commitHostComponent, next);
+	}
 	return el;
+}
+
+function commitHostComponent(next: any[]): void {
+	const state: HostComponentSlot = next[0];
+	// A later pass of this render, or the host's unmount, superseded it.
+	if (state.next !== next) return;
+	state.next = null;
+	commitInScope(next[2], applyHostProps, state, next[1]);
 }
 
 // Props for a PERSISTENT runtime host (hostComponent), re-applied each render. Unlike
 // setHostProps' identity diff, an unchanged prop is re-asserted against the live
 // target (foreign edits and mutable values included), while the ref is attached once
 // and only re-attached when it changes.
-function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
+function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): void {
+	const el = state.el;
 	const prev = state.props;
 	const compareLive =
 		prev !== undefined && (!hydrating || activeHydration() === null) && !isHtmlCustomElement(el);
@@ -37820,24 +37923,32 @@ function applyDeoptOrder(order: DeoptOrder): void {
 		updateTextValue(node, order.text);
 		return;
 	}
-	const desc = order.desc;
-	if (desc !== null) {
-		// Handlers and refs resolve their owner as they would have in render.
-		const owner = order.owner!;
-		const previous = CURRENT_SCOPE;
-		CURRENT_SCOPE = owner;
-		try {
-			if (signalDocumentEnabled || owner.idState.renderOwner?.signalOwner !== undefined)
-				runWithBlockSignalOwner(owner, () => commitDeoptHost(node, desc, owner));
-			else commitDeoptHost(node, desc, owner);
-		} finally {
-			CURRENT_SCOPE = previous;
-		}
-	}
+	if (order.desc !== null) commitInScope(order.owner!, commitDeoptHost, node, order.desc);
 	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, order.skip, false, false);
 }
 
-function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Block): void {
+/**
+ * Run a commit write in the Scope that rendered it, so the handlers and refs
+ * it installs resolve their owner as they would have in render.
+ */
+function commitInScope<A, B>(
+	scope: Scope,
+	write: (a: A, b: B, scope: Scope) => void,
+	a: A,
+	b: B,
+): void {
+	const previous = CURRENT_SCOPE;
+	CURRENT_SCOPE = scope;
+	try {
+		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined)
+			runWithBlockSignalOwner(scope, () => write(a, b, scope));
+		else write(a, b, scope);
+	} finally {
+		CURRENT_SCOPE = previous;
+	}
+}
+
+function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): void {
 	const committed = (
 		STAGED_DOM ? STAGED_DOM.view(el as Element & DeoptStamped) : (el as DeoptStamped)
 	)[DEOPT_DESC];

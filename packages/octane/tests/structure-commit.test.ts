@@ -580,6 +580,54 @@ describe('content outside the container lands at commit', () => {
 			}
 			expect(titles()).toHaveLength(0);
 		});
+
+		it(`updates a committed head element only when its render commits (${priority})`, async () => {
+			const target = document.createElement('aside');
+			document.body.appendChild(target);
+			let during: MutationRecord[] | null = null;
+			const initial: OutsideProps = {
+				show: true,
+				label: `head-${priority}`,
+				target,
+				probe: () => {},
+			};
+			const app = mount(OutsideApp, initial);
+			const title = [...document.head.querySelectorAll('title')].find(
+				(node) => node.textContent === initial.label,
+			)!;
+			const { observer, mutations } = observeMutations(document.head);
+			const render = (props: Partial<OutsideProps>) => {
+				mutations();
+				during = null;
+				return act(() => {
+					const next = () =>
+						app.root.render(OutsideApp, {
+							...initial,
+							probe: () => {
+								during = mutations();
+							},
+							...props,
+						});
+					if (priority === 'transition') startTransition(next);
+					else next();
+				});
+			};
+			try {
+				await render({ label: 'next', gate: new Promise(() => {}) });
+				expect(during).toEqual([]);
+				expect(mutations()).toEqual([]);
+				expect(title.textContent).toBe(initial.label);
+
+				await render({ label: 'next' });
+				expect(during).toEqual([]);
+				expect(title.isConnected).toBe(true);
+				expect(title.textContent).toBe('next');
+			} finally {
+				observer.disconnect();
+				app.unmount();
+				target.remove();
+			}
+		});
 	}
 });
 
