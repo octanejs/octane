@@ -22307,6 +22307,21 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 	if (hydrating && activeHydration() !== null && (root as any).__oct_vfrag === true) return;
 	if (hydrationStarted && PRESENTATION_HYDRATION?.revision !== undefined)
 		HYDRATION_DRIVER!.presentationMiss(false);
+	// A committed Block's first mount (a resumed body's) lands at commit, as
+	// commitBag's single root does.
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const block = CURRENT_SCOPE?.block;
+	if (
+		transaction !== null &&
+		block !== undefined &&
+		block.createdStamp !== transaction.createdStamp &&
+		block instanceof BlockImpl &&
+		block.parentNode === parent &&
+		usesFrontier(block, parent)
+	) {
+		parent = queueFrontier(block, parent, anchor);
+		anchor = null;
+	}
 	if (root.nodeType === 11) {
 		parent.insertBefore(root, anchor);
 		return;
@@ -22354,7 +22369,6 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 				block.createdStamp !== transaction.createdStamp &&
 				block instanceof BlockImpl &&
 				(block.startMarker === null || block.startMarker !== end) &&
-				MARKERLESS_ARM_RENDERS === 0 &&
 				usesFrontier(block, parent)
 			)
 				queueFrontier(block, parent, end).appendChild(root);
@@ -37156,7 +37170,15 @@ function renderPreparedChildList(
 					}
 				}
 			}
-			domParent.insertBefore(state.end, anchor);
+			// A committed host's new list builds off-document: its commit appends it.
+			if (
+				!passthroughList &&
+				!upgradeArmed &&
+				hydration === null &&
+				usesFrontier(parentBlock, domParent)
+			)
+				slotFrontier(state, parentBlock, domParent, null).appendChild(state.end);
+			else domParent.insertBefore(state.end, anchor);
 			if (passthroughList) {
 				passthroughEnd = state.end;
 				if (TRANSITION_JOURNAL !== null) {
@@ -37171,14 +37193,12 @@ function renderPreparedChildList(
 			// INSIDE [start, end] (they become the items) — mint start before
 			// the first of them, not at the tail.
 			const cursor = passthroughList ? hydration!.node : null;
-			domParent.insertBefore(
-				state.start,
-				upgradeArmed
-					? getFirstChild(domParent)
-					: cursor !== null && cursor.parentNode === domParent
-						? cursor
-						: state.end,
-			);
+			if (upgradeArmed) domParent.insertBefore(state.start, getFirstChild(domParent));
+			else
+				state.end.parentNode!.insertBefore(
+					state.start,
+					cursor !== null && cursor.parentNode === domParent ? cursor : state.end,
+				);
 			if (passthroughList) {
 				passthroughStart = state.start;
 				if (TRANSITION_JOURNAL !== null) {
@@ -44639,12 +44659,6 @@ function finalizeMarkerlessBranch(
 }
 
 /**
- * Open markerless arm renders. Such an arm bounds what its render inserted in
- * place (finalizeMarkerlessBranch), so a resumed Block inside one mounts in place.
- */
-let MARKERLESS_ARM_RENDERS = 0;
-
-/**
  * The node before the content of a client arm without a bound
  * (`unfinalized`). It inserted nothing, so that is whatever precedes its
  * insertion anchor now.
@@ -44672,20 +44686,121 @@ function renderMarkerlessArm(
 ): void {
 	const block = scope.block;
 	const after = block.endMarker;
-	const before = pendingArmBefore(block, domParent);
+	// The retry of an arm over committed DOM builds off-document: in a frontier
+	// its commit inserts before `after`, ending at a sentinel its pending
+	// structure anchors on until then (moveArmPending).
+	let parent = domParent;
+	let end = after;
+	if (!hydrating && usesFrontier(block.parentBlock!, domParent)) {
+		const frag = queueFrontier(block.parentBlock, domParent, after);
+		end = frontierSentinel(frag, '');
+		moveArmPending(scope, domParent, after, frag, end);
+		moveToFrontier(scope, domParent, after, frag, end);
+		parent = frag;
+	}
+	const before = pendingArmBefore(block, parent);
 	state.unfinalized = true;
-	MARKERLESS_ARM_RENDERS++;
 	try {
 		if (scope === block) renderBlock(block);
 		else renderLiteArm(scope, body!, env);
 	} catch (error) {
-		if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
-			finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, false);
+		if ((before ? getNextSibling(before) : getFirstChild(parent)) !== end)
+			finalizeMarkerlessBranch(state, parent, scope, marker, before, end, false);
+		if (parent !== domParent) settleArmFrontier(scope, parent, end!, after);
 		throw error;
-	} finally {
-		MARKERLESS_ARM_RENDERS--;
 	}
-	finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, true);
+	finalizeMarkerlessBranch(state, parent, scope, marker, before, end, true);
+	if (parent !== domParent) settleArmFrontier(scope, parent, end!, after);
+}
+
+/**
+ * Move an unfinalized arm's pending structure, anchored on `after` in
+ * `domParent`, onto a frontier's sentinel `end`. It owns no DOM yet, so its
+ * retry renders there; its commit rehomes it (applySlotNext).
+ */
+function moveArmPending(
+	scope: Scope,
+	domParent: Node,
+	after: Node | null,
+	frag: DocumentFragment,
+	end: Node,
+): void {
+	const slots = scope._slots;
+	if (slots !== null)
+		for (let i = 0; i < slots.length; i++) {
+			const slot = slots[i];
+			if (
+				slot.anchor !== after ||
+				(slot.__kind !== 'ifBlockSlot' &&
+					slot.__kind !== 'switchBlockSlot' &&
+					slot.__kind !== 'componentSlotSlot')
+			)
+				continue;
+			journalRootProperty(slot, 'anchor', slot.anchor);
+			slot.anchor = end;
+			const arm = slot.block ?? slot.lite;
+			if (arm != null && arm.block.parentNode === domParent) {
+				moveArmPending(arm, domParent, after, frag, end);
+				moveToFrontier(arm, domParent, after, frag, end);
+			}
+		}
+	const children = scope.children;
+	if (children !== null)
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i].scope;
+			const block = child.block;
+			if (block !== scope.block && block.parentNode === domParent && block.endMarker === after) {
+				moveArmPending(child, domParent, after, frag, end);
+				moveToFrontier(child, domParent, after, frag, end);
+			}
+		}
+}
+
+function moveToFrontier(
+	scope: Scope,
+	domParent: Node,
+	after: Node | null,
+	frag: DocumentFragment,
+	end: Node,
+): void {
+	const block = scope.block;
+	journalRootProperty(block, 'parentNode', domParent);
+	block.parentNode = frag;
+	if (block.endMarker === after) {
+		journalRootProperty(block, 'endMarker', after);
+		block.endMarker = end;
+	}
+	noteFrontierMember(frag, scope);
+}
+
+/** What still anchors on an arm frontier's sentinel inserts where the arm lands. */
+function settleArmFrontier(scope: Scope, frag: Node, end: Node, after: Node | null): void {
+	retargetArmPending(scope, end, after);
+	if (scope.block.endMarker === end) scope.block.endMarker = after;
+	frag.removeChild(end);
+	SPARE_SENTINEL = end as Comment;
+}
+
+/** Point what moveArmPending moved onto sentinel `from`, nested arms included, at `to`. */
+function retargetArmPending(scope: Scope, from: Node, to: Node | null): void {
+	const slots = scope._slots;
+	if (slots !== null)
+		for (let i = 0; i < slots.length; i++) {
+			const slot = slots[i];
+			if (slot.anchor === from) slot.anchor = to;
+			const arm = slot.block ?? slot.lite;
+			if (arm == null) continue;
+			retargetArmPending(arm, from, to);
+			if (arm.block.endMarker === from) arm.block.endMarker = to;
+		}
+	const children = scope.children;
+	if (children !== null)
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i].scope;
+			if (child.block === scope.block) continue;
+			retargetArmPending(child, from, to);
+			if (child.block.endMarker === from) child.block.endMarker = to;
+		}
 }
 
 /** Bound a markerless arm's content, from `first` up to `after`, with a marker pair. */
