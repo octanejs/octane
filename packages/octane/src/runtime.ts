@@ -16911,6 +16911,8 @@ interface HydrateSlot {
 	independent: boolean;
 	/** Server-claim captures, retained only until a preserved boundary activates. */
 	initialCaptures: HydrateInitialCaptures | null;
+	/** A root render's client fallback, built off-document (fallBackOffDocument). */
+	next: SlotNext | null;
 }
 
 // Created only for the rare activation that races a renderer stream. Keep the
@@ -17427,13 +17429,7 @@ function beginProceduralHydratePrefetch(state: HydrateSlot): Promise<void> | nul
 
 function cleanupHydrateStrategy(state: HydrateSlot): void {
 	const cleanup = state.strategyCleanup;
-	if (
-		cleanup !== null &&
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(cleanup, true)
-	) {
-		if (isRecordingTransitionJournal()) journalObjectOnce(state);
-	} else cleanup?.();
+	if (cleanup !== null) disposeHydrateInstaller(state, cleanup);
 	state.strategyCleanup = null;
 	state.gate = null;
 }
@@ -17441,14 +17437,27 @@ function cleanupHydrateStrategy(state: HydrateSlot): void {
 function cleanupHydrateInstallers(state: HydrateSlot): void {
 	cleanupHydrateStrategy(state);
 	const cleanup = state.prefetchCleanup;
-	if (
-		cleanup !== null &&
-		DEFERRED_LAYOUT_DRIVER &&
-		DEFERRED_LAYOUT_DRIVER.stageAction(cleanup, true)
-	) {
-		if (isRecordingTransitionJournal()) journalObjectOnce(state);
-	} else cleanup?.();
+	if (cleanup !== null) disposeHydrateInstaller(state, cleanup);
 	state.prefetchCleanup = null;
+}
+
+/**
+ * Dispose a strategy or prefetch installer. A root render disposes it as it
+ * commits, so a render that drops, such as a transition that suspends, keeps
+ * the island's subscriptions with its still-visible server DOM.
+ */
+function disposeHydrateInstaller(state: HydrateSlot, cleanup: () => void): void {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
+		transaction.ops.push(runHydrateInstallerCleanup, cleanup);
+		journalObjectOnce(state);
+	} else if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageAction(cleanup, true)) {
+		if (isRecordingTransitionJournal()) journalObjectOnce(state);
+	} else cleanup();
+}
+
+function runHydrateInstallerCleanup(cleanup: () => void): void {
+	cleanup();
 }
 
 function invalidateHydrateActivation(state: HydrateSlot): void {
@@ -18039,6 +18048,7 @@ function createHydrateSlot(
 		replays: [],
 		independent: props.__independent !== undefined,
 		initialCaptures: null,
+		next: null,
 	};
 	if (nativeSeedRaw !== null) state.nativeSeedRaw = nativeSeedRaw;
 	if (serverPreserved && !state.independent) {
@@ -18315,12 +18325,17 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 				getNextSibling(state.start),
 				state.end,
 			);
-			discardHydrateTail(state);
+			// A root render over the committed page builds the client render
+			// off-document, and its commit replaces the server's nodes with it, so a
+			// render that drops leaves them as they are.
+			const offDocument = usesFrontier(state.parentBlock, state.wrapper);
+			discardHydrateTail(state, offDocument);
 			// None of the failed attempt's refs attached: dispose its scopes without
 			// detaching them.
 			const refs: SuspenseRefEntry[] = [];
 			collectVisibleSubtreeRefs(block, refs);
-			withRefDetachSuppression(refs, () => resetScopeChildren(block));
+			withRefDetachSuppression(refs, () => resetScopeChildren(block, !offDocument));
+			if (offDocument) fallBackOffDocument(state);
 			block.deoptNode = null;
 			caught = catchesInHydrationFallback(() => renderBlock(block));
 		} catch (error) {
@@ -18353,19 +18368,47 @@ function activateHydrateBoundary(state: HydrateSlot): void {
  * as React deletes a dehydrated boundary's whole content. A renderer's
  * hydration style is not content.
  */
-function discardHydrateTail(state: HydrateSlot): void {
+function discardHydrateTail(state: HydrateSlot, atCommit = false): void {
 	const end = state.end!;
 	const wrapper = domNode(end).parentNode;
 	let node = getNextSibling(end);
 	if (wrapper === null || node === null) return;
-	journalRootChildren(wrapper);
+	if (!atCommit) journalRootChildren(wrapper);
 	markHydrationDiscard(state.block.idState.renderOwner, wrapper, node, null);
 	while (node !== null) {
 		const next = getNextSibling(node);
-		if (!isRendererHydrationStyle(node))
-			(STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).removeChild(node);
+		if (isRendererHydrationStyle(node)) {
+			// Kept.
+		} else if (atCommit) slotNext(state).out.push(null, node, node);
+		else (STAGED_DOM ? STAGED_DOM.view(wrapper) : wrapper).removeChild(node);
 		node = next;
 	}
+}
+
+/**
+ * Point an island's Block at a frontier for its client fallback: the commit
+ * removes the server's nodes in its range, inserts the client render before
+ * the range's end and gives the Block back its markers.
+ */
+function fallBackOffDocument(state: HydrateSlot): void {
+	const block = state.block;
+	const end = state.end!;
+	const first = getNextSibling(state.start!);
+	if (first !== end) slotNext(state).out.push(null, first, domNode(end).previousSibling);
+	const frag = slotFrontier(state, state.parentBlock, state.wrapper, end);
+	journalRootProperty(block, 'parentNode', block.parentNode);
+	journalRootProperty(block, 'startMarker', block.startMarker);
+	journalRootProperty(block, 'endMarker', block.endMarker);
+	block.parentNode = frag;
+	block.startMarker = block.endMarker = null;
+	noteFrontierMember(frag, block);
+	ROOT_RENDER_TRANSACTION!.ops.push(restoreHydrateRange, state);
+}
+
+function restoreHydrateRange(state: HydrateSlot): void {
+	if (state.block.disposed) return;
+	state.block.startMarker = state.start;
+	state.block.endMarker = state.end;
 }
 
 /**
@@ -21442,7 +21485,14 @@ class HydrationCapability {
 	 * `parent` is the arm's parent.
 	 */
 	save(parent: Node): void {
-		if (inRootHydrationAttempt()) journalRootChildren(parent);
+		// An island that activates in a root render that can still drop, such as
+		// a transition, journals them too, so the retry after the drop adopts the
+		// server DOM afresh. A staged drain's DOMStage discards them itself.
+		if (
+			inRootHydrationAttempt() ||
+			(this.undoable && ROOT_RENDER_TRANSACTION !== null && !STAGED_DOM)
+		)
+			journalRootChildren(parent);
 		if ((!this.speculative && !this.undoable) || (this.saved ??= new Set()).has(parent)) return;
 		this.saved.add(parent);
 		const arm = this.rootBlock;
@@ -51743,10 +51793,12 @@ function makeRoot(
 			let frontier: SlotNext | null = null;
 			if (staged) {
 				// A genuine root identity change mounts once beside the outgoing
-				// screen. Keep its focused hosts connected until the new tree succeeds.
+				// screen, built off-document: its commit inserts it after the outgoing
+				// screen, whose focused hosts stay connected until then.
 				start = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('root');
 				end = (STAGED_DOM ? STAGED_DOM.view(document) : document).createComment('/root');
-				(STAGED_DOM ? STAGED_DOM.view(container) : container).append(start, end);
+				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
+				(STAGED_DOM ? STAGED_DOM.view(frontier.frag!) : frontier.frag!).append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				renderOwner.hydrationFallback(false);
 			} else if (
