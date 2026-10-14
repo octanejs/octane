@@ -268,7 +268,8 @@ export function createLazyRoute<
 
 export function createLazyFileRoute<
 	TFilePath extends keyof FileRoutesByPath,
-	TRoute extends FileRoutesByPath[TFilePath]['preLoaderRoute'],
+	TRoute extends FileRoutesByPath[TFilePath]['preLoaderRoute'] & AnyRoute =
+		FileRoutesByPath[TFilePath]['preLoaderRoute'],
 >(id: TFilePath): (opts: LazyRouteOptions) => LazyRoute<TRoute> {
 	if (typeof id === 'object') {
 		return new LazyRoute<TRoute>(id) as any;

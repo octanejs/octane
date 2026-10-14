@@ -3,6 +3,7 @@ import {
 	createMemoryHistory,
 	createRootRoute,
 	createRoute,
+	createLazyFileRoute,
 	createRouter,
 	getRouteApi,
 	linkOptions,
@@ -29,6 +30,22 @@ declare module '@octanejs/tanstack-router' {
 	interface Register {
 		router: typeof router;
 	}
+	interface FileRoutesByPath {
+		'/posts/$postId': {
+			id: '/posts/$postId';
+			path: 'posts/$postId';
+			fullPath: '/posts/$postId';
+			parentRoute: typeof rootRoute;
+			preLoaderRoute: typeof postRoute;
+		};
+		'/posts/$postId/comments/$commentId': {
+			id: '/posts/$postId/comments/$commentId';
+			path: 'comments/$commentId';
+			fullPath: '/posts/$postId/comments/$commentId';
+			parentRoute: typeof postRoute;
+			preLoaderRoute: typeof commentRoute;
+		};
+	}
 }
 
 expectTypeOf(postRoute.fullPath).toEqualTypeOf<'/posts/$postId'>();
@@ -47,6 +64,9 @@ expectTypeOf(rootRoute._addFileChildren({ posts }).useNavigate).toEqualTypeOf(
 expectTypeOf(posts._addFileTypes<unknown>().useParams()).toEqualTypeOf<{ postId: string }>();
 declare const lazyPost: Parameters<typeof postRoute.lazy>[0];
 expectTypeOf(postRoute.lazy(lazyPost).useParams()).toEqualTypeOf<{ postId: string }>();
+expectTypeOf(createLazyFileRoute('/posts/$postId')({}).useParams()).toEqualTypeOf<{
+	postId: string;
+}>();
 
 const postApi = getRouteApi('/posts/$postId');
 expectTypeOf(postApi.id).toEqualTypeOf<'/posts/$postId'>();
