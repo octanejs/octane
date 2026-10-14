@@ -1,5 +1,13 @@
 # @octanejs/tanstack-devtools
 
+## 0.0.60
+
+### Patch Changes
+
+- 525c4d5: Use Strong-compatible templates for devtools panels and keyed plugin portals while preserving plugin state and lifecycle behavior.
+
+  Refresh each panel tab after it subscribes so unchanged app data remains visible when switching tabs.
+
 ## 0.0.59
 
 ### Patch Changes

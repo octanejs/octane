@@ -1,5 +1,14 @@
 # @octanejs/tanstack-router
 
+## 0.2.8
+
+### Patch Changes
+
+- 55376d8: Support checked compiled-only dynamic component and context boundaries on the client and server. Streamed document signal bootstrap validates already-parsed signal manifests directly.
+
+  Add an opt-in `@octanejs/tanstack-router/compiled` entry for compiled route trees, pending and error handling, lazy imports, and matching router hooks. The existing descriptor-capable router entry remains compatible.
+- 525c4d5: Export `getAssetKeys` so custom head renderers can preserve the router's stable content-based asset identity and hydration ownership.
+
 ## 0.2.7
 
 ### Patch Changes

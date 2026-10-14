@@ -1,5 +1,13 @@
 # @octanejs/cli
 
+## 0.2.3
+
+### Patch Changes
+
+- d8e2d9f: Add `octane analyze --strong-dependencies`. It lists, by package, the Octane modules that Strong modules import from other packages, directly or through re-exports, which compile without Strong mode. It also lists the `octane/react` (ReactCompat) boundaries those imports reach. The report never fails the run.
+- a133016: `octane analyze` no longer reads an `import` or `export` written inside a template literal or a comment, such as a code sample, as a real statement. A sample that mentions `octane/react` no longer counts as a ReactCompat boundary, and a module that mentions `octane` only in a sample no longer counts toward Strong coverage. `--strong-dependencies` also follows an import that a module only re-exports under another name, through `export const X = ns.Member`, `export { binding as X }`, or `export default binding`. It now reports the module that defines the component, not the entry that renames it.
+- 74f22dd: `octane analyze --strong-dependencies` now follows the imports of every Strong module it reaches in a dependency, not only those of the project's own Strong modules. A non-Strong module, or an `octane/react` boundary, behind a Strong dependency module is reported. Previously the report stopped at the first Strong layer, so an empty report did not prove that everything the project renders is Strong.
+
 ## 0.2.2
 
 ### Patch Changes

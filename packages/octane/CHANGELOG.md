@@ -1,5 +1,24 @@
 # octane
 
+## 0.13.6
+
+### Patch Changes
+
+- 55376d8: Support checked compiled-only dynamic component and context boundaries on the client and server. Streamed document signal bootstrap validates already-parsed signal manifests directly.
+
+  Add an opt-in `@octanejs/tanstack-router/compiled` entry for compiled route trees, pending and error handling, lazy imports, and matching router hooks. The existing descriptor-capable router entry remains compatible.
+- d8e2d9f: Add `modulePackage(code, id)` to the bundler compiler. It returns the package that owns a module and whether `transform` compiles the module or slots its hooks. `octane analyze --strong-dependencies` uses it.
+- 1f4ccb8: Strong mode now rejects element descriptor APIs with `OCTANE_STRONG_ELEMENT_API`: importing or reaching `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. Descriptors render through the generic descriptor renderer instead of compiled templates. Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports stay valid.
+
+  Strong `.tsrx` modules also reject a single-item `@for`, such as `@for (const item of [value]; key item)`, with `OCTANE_STRONG_SINGLE_ITEM_FOR`. A `const` holding a one-item literal that nothing but `@for` headers reads is rejected too. To remount a subtree when a value changes, wrap it in `<Fragment key={value}>…</Fragment>` or key its only element or component. To render one value, render it directly.
+- 479118f: Compile direct inline `@{ ... }` component props in Strong DOM templates as render-only bodies, without authored arrow wrappers or element descriptors. Preserve narrow dependencies for simple captured leaves, and keep setup, context, state, and cleanup owned by each receiving insertion. Ordinary JSX and blocks in other value positions retain their descriptor behavior.
+
+  Expose the `render-values` benchmark through the MCP benchmark tool.
+- 55139ec: Strong mode now compiles only `.tsrx`, `.ts`, and `.js` modules. A `.tsx` or `.jsx` module reports `OCTANE_STRONG_TSX_MODULE` when its own `"use strong"` directive or the application's `compiler.strong` setting reaches it, because its JSX lowers to element descriptors that render through the generic descriptor renderer instead of compiled templates. Rename the module to `.tsrx` and write its markup as template JSX, with keyed `@for` blocks in place of `.map()` lists. A module without JSX can stay `.ts` or `.js`, where `root.render(App, props)` renders an entry point. Installed dependencies keep their own mode.
+
+  `OCTANE_STRONG_ELEMENT_API` now applies to every Strong module. `collectDiagnostics` and `octane analyze --strong-preview` still list a `.tsx` module's other Strong findings next to the new code, so the conversion's remaining work shows up at once. The Strong migration recipes, the MCP server's recipes and skills, and the docs examples are written as `.tsrx`.
+- 0bb503f: Remove browser-translation DOM accommodation from binding adoption and text updates. Framework-owned text and closed child lists must retain their original topology; applications should opt owned content out of browser translation in their initial server-rendered HTML. Preserve existing compiled host-based text writer calls and unrelated topology validation, journaling, and performance improvements.
+
 ## 0.13.5
 
 ### Patch Changes

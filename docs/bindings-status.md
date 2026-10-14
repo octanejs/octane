@@ -395,7 +395,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/devtools
 
-[`packages/devtools`](../packages/devtools) `0.0.52` — ports `octane@workspace`. Status data: [`packages/devtools/status.json`](../packages/devtools/status.json).
+[`packages/devtools`](../packages/devtools) `0.0.53` — ports `octane@workspace`. Status data: [`packages/devtools/status.json`](../packages/devtools/status.json).
 
 Octane-native DevTools plugin (not an upstream port): renders live runtime diagnostics into a TanStack Devtools host via @tanstack/devtools-event-client. P1 ships the Components tree + state inspector.
 
@@ -855,7 +855,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/mdx
 
-[`packages/mdx`](../packages/mdx) `0.1.63` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
+[`packages/mdx`](../packages/mdx) `0.1.64` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
 
 The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context with Strong client/server provider templates. Generated MDX document elements retain value-position rendering. The octane website runs on it.
 
@@ -1569,7 +1569,7 @@ Scope/evidence last checked: 2026-08-13.
 
 ## @octanejs/tanstack-devtools
 
-[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.59` — ports `@tanstack/react-devtools@0.10.12`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
+[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.60` — ports `@tanstack/react-devtools@0.10.12`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
 
 Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.
 
@@ -1649,7 +1649,7 @@ Scope/evidence last checked: 2026-09-30.
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.2.7` — ports `@tanstack/react-router@1.170.41`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.2.8` — ports `@tanstack/react-router@1.170.41`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.
 
@@ -1672,7 +1672,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.7` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.8` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 

@@ -249,7 +249,7 @@
     },
     {
       "name": "@octanejs/devtools",
-      "version": "0.0.52",
+      "version": "0.0.53",
       "category": "Developer Tools",
       "upstream": { "package": "octane", "version": "workspace" },
       "surface": "Octane-native DevTools plugin (not an upstream port): renders live runtime diagnostics into a TanStack Devtools host via @tanstack/devtools-event-client. P1 ships the Components tree + state inspector.",
@@ -646,7 +646,7 @@
     },
     {
       "name": "@octanejs/mdx",
-      "version": "0.1.63",
+      "version": "0.1.64",
       "category": "Content",
       "upstream": { "package": "@mdx-js/mdx", "version": "3.1.1" },
       "surface": "The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context with Strong client/server provider templates. Generated MDX document elements retain value-position rendering. The octane website runs on it.",
@@ -1224,7 +1224,7 @@
     },
     {
       "name": "@octanejs/tanstack-devtools",
-      "version": "0.0.59",
+      "version": "0.0.60",
       "category": "Developer Tools",
       "upstream": { "package": "@tanstack/react-devtools", "version": "0.10.12" },
       "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
@@ -1280,7 +1280,7 @@
     },
     {
       "name": "@octanejs/tanstack-router",
-      "version": "0.2.7",
+      "version": "0.2.8",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router", "version": "1.170.41" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
@@ -1294,7 +1294,7 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.3" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
