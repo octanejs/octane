@@ -31032,8 +31032,9 @@ function emitBindingMount(bind, elVar, bag) {
 //   { const _v = row.label; if (_v !== _b.g || _r) _n = _$bagRecord(__s, _n, 3, _v, _b.g); }
 //
 // `_r` is true when an earlier render of this transaction staged the bag, whose
-// cells this render must rewrite. Event bindings and handler bundles call their
-// recorder every render: signal ownership refreshes a handler's authority.
+// cells this render must rewrite. A handler compares the same way; once anything
+// can give it signal authority (`_o`), it also refreshes that authority through
+// setEventHandler every render.
 // The template's hoisted commit function walks the cells straight-line, writes
 // each changed one through the ordinary setter, then publishes it:
 //
@@ -31184,7 +31185,7 @@ function commitResumedDeclaration() {
 	return b.const('_r', b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)));
 }
 
-/** `_o`: something may give a handler signal authority (see bagRecord). */
+/** `_o`: something may give a handler signal authority (signalOwnerUse). */
 function commitOwnersDeclaration(ctx) {
 	ctx.runtimeNeeded.add('signalOwnerUse');
 	return b.const('_o', b.member(b.id('_$signalOwnerUse'), 'active'));
