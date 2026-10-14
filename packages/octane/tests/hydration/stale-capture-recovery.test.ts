@@ -77,9 +77,13 @@ describe.each([
 		await act(async () => {});
 	}
 
+	/** The server's first `<em>`, before hydration (activate). */
+	let served: HTMLElement | null = null;
+
 	/** Hydrate a dormant boundary over its own server HTML, then change its captures. */
 	async function activate(name: string, serverProps: object, clientProps: object) {
 		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+		served = container.querySelector('em');
 		await hydrate(name, serverProps as Record<string, unknown>);
 		flushSync(() => root!.render(client[name], clientProps));
 		await act(async () => {});
@@ -210,6 +214,50 @@ describe.each([
 		expect(values(em)).toEqual(blue);
 		flushSync(() => root!.render(client.DormantSuppressed, { v: 'green' }));
 		expect(values(em)).toEqual({ text: 'green', title: 'green', class: 'green', color: 'green' });
+	});
+
+	// Each kind of value the server kept is compared on its own: one that the
+	// changed captures moved renders the boundary on the client, and captures
+	// that moved no value, such as a new handler, keep the server's element.
+	const kept = { title: 't', tone: 'a', width: '1px' };
+	const look = (el: HTMLElement) => ({
+		title: el.title,
+		tone: el.className,
+		width: el.style.width,
+	});
+
+	it.each([
+		{ value: 'attribute', change: { title: 'u' } },
+		{ value: 'class', change: { tone: 'b' } },
+		{ value: 'style', change: { width: '2px' } },
+	])(
+		'renders the boundary on the client without a report when only its $value changed',
+		async ({ change }) => {
+			const onPress = () => {};
+			await activate('DormantValues', { ...kept, onPress }, { ...kept, ...change, onPress });
+
+			const em = container.querySelector('em')!;
+			expect(look(em)).toEqual({ ...kept, ...change });
+			expect(served!.isConnected).toBe(false);
+			expect(recoverable).toEqual([]);
+			expect(warnings()).toEqual([]);
+		},
+	);
+
+	it('keeps the server element when the captures changed but none of its values did', async () => {
+		const pressed: string[] = [];
+		await activate(
+			'DormantValues',
+			{ ...kept, onPress: () => pressed.push('server') },
+			{ ...kept, onPress: () => pressed.push('client') },
+		);
+
+		expect(container.querySelector('em')).toBe(served);
+		expect(look(served!)).toEqual(kept);
+		served!.click();
+		expect(pressed).toEqual(['client']);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
 	});
 
 	it('shows the pending arm while the newer HTML waits for a value in the same @try arm', async () => {
