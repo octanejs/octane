@@ -132,6 +132,12 @@ describe('ViewTransition staged commits', () => {
 			expect(select.options).toHaveLength(options.length);
 			options.forEach((option, index) => expect(select.options[index]).toBe(option));
 			expect(input.value).toBe('user draft');
+			// A user edit while the transition is held restores the committed
+			// selection, not the one the held render asked for.
+			options[1]!.selected = true;
+			select.dispatchEvent(new Event('change', { bubbles: true }));
+			await act(async () => {});
+			expectSelection([options[0]!]);
 			if (cancel) {
 				flushSync(() =>
 					root.render(SelectStateApp, {
