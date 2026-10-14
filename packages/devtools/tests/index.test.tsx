@@ -1,5 +1,6 @@
 /** @jsxImportSource octane */
 import { afterEach, describe, expect, it } from 'vitest';
+import { act, cleanup, render, screen } from '@octanejs/testing-library';
 import { octaneDevtools } from '../src/index';
 
 type Listener = () => void;
@@ -24,6 +25,7 @@ function installFakeHook() {
 }
 
 afterEach(() => {
+	cleanup();
 	delete (globalThis as unknown as { __OCTANE_DEVTOOLS__?: unknown }).__OCTANE_DEVTOOLS__;
 });
 
@@ -49,5 +51,18 @@ describe('octaneDevtools', () => {
 		expect(getSubscribeCalls()).toBe(1);
 		expect(first).toBeTruthy();
 		expect(second).toBeTruthy();
+	});
+
+	it('keeps the selected panel tab when the host renders the plugin again', async () => {
+		const plugin = octaneDevtools();
+		const { rerender } = render(plugin.render());
+		expect(screen.getByText(/no mounted roots yet/i)).toBeTruthy();
+		act(() => screen.getByRole('button', { name: /profiler/i }).click());
+		expect(await screen.findByText(/no profiling data/i)).toBeTruthy();
+
+		rerender(plugin.render());
+
+		expect(screen.getByText(/no profiling data/i)).toBeTruthy();
+		expect(screen.queryByText(/no mounted roots yet/i)).toBeNull();
 	});
 });

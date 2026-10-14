@@ -150,12 +150,33 @@ function stripAdditiveExports(source) {
 }
 
 function canonicalizeAdapterSource(source, fileName) {
-	let text = stripOctaneMarkers(source);
+	let text = stripOctaneMarkers(source).replace(/^['"]use strong['"];\s*$/gm, '');
 	if (fileName === 'index.ts' || fileName.endsWith('/index.ts')) {
 		text = stripAdditiveExports(text);
 	}
 	text = normalizeFrameworkNames(text);
 	text = text
+		.replace(
+			/=>\s*@\{([\s\S]*)\n\t<>([\s\S]*)\n\t<\/>\n\};\s*$/,
+			'=> {$1\nreturn (<>$2\n\t</>);\n};',
+		)
+		.replace(
+			/@if \((hasPlugins|hasTitles)\) \{\s*@for \(const \[key, (\w+)\] of Object\.entries\((\w+)\); key key\) \{\s*<DevtoolsPortal target=\{\2\} content=\{(\w+)\[key\]\} \/>\s*\}\s*\}/g,
+			'{$1 ? Object.entries($3).map(([key, $2]) => createPortal(<>{$4[key]}</>, $2)) : null}',
+		)
+		.replace(
+			/@if \(triggerContainer && TriggerComponent\) \{\s*<DevtoolsPortal target=\{triggerContainer\} content=\{TriggerComponent\} \/>\s*\}/g,
+			'{triggerContainer && TriggerComponent ? createPortal(<>{TriggerComponent}</>, triggerContainer) : null}',
+		)
+		.replace(/(\}\) \?\? \[\]),\s*\[plugins\](?=\s*,?\s*\))/g, '$1')
+		.replace(
+			/(useEffect\(\(\) => \{\s*devtools\.setConfig\(\{\s*plugins: pluginsMap,?\s*\}\);?\s*\}),\s*\[devtools,\s*pluginsMap\](?=\s*,?\s*\))/g,
+			'$1',
+		)
+		.replace(
+			/(useEffect\(\(\) => \{\s*if \(devToolRef\.current\) \{\s*devtools\.mount\(devToolRef\.current\);?\s*\}\s*return \(\) => devtools\.unmount\(\);?\s*\}),\s*\[devtools\](?=\s*,?\s*\))/g,
+			'$1',
+		)
 		.replace(
 			/import React,\s*\{\s*useEffect,\s*useMemo,\s*useRef,\s*useState\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g,
 			"import { createPortal, useEffect, useMemo, useRef, useState } from '#renderable-runtime';\n",
@@ -207,6 +228,11 @@ function canonicalizeAdapterSource(source, fileName) {
 		)
 		.replace(/: RenderableNode =>/g, ': RenderableNode | null =>')
 		.replace(/useRef<HTMLDivElement>\(null\)/g, 'useRef<HTMLDivElement | null>(null)');
+	if (/@(?:\{|if\b|for\b)/.test(text)) {
+		throw new Error(
+			`${fileName}: template contains a change outside the permitted transformations`,
+		);
+	}
 	return text;
 }
 

@@ -4,7 +4,9 @@
 // the document on a target with enough scroll-margin-top to clear the sticky
 // header. `resetKey` scopes the highlight to one page identity so a client
 // navigation between hosts that share an id cannot briefly light the new list.
-import { useEffect, useLayoutEffect, useRef, useState } from 'octane';
+'use strong';
+
+import { useEffect, useEffectEvent, useLayoutEffect, useLinkedState, useRef } from 'octane';
 
 export interface TocSection {
 	id: string;
@@ -65,17 +67,12 @@ export function OnThisPage(props: {
 	const sections = props.sections;
 	const resetKey = props.resetKey ?? '';
 
-	// The active section id is stored WITH the reset key that measured it, and
-	// only counts for that key: a client navigation to another host page that
-	// shares a section id (e.g. #next-steps) must not light the new TOC — or
-	// slide the indicator to a same-named row — before the new page's own
-	// scroll-spy has run. Deriving (rather than clearing in an effect) keeps the
-	// very first render of the new page clean; the setter bails on no-change so
-	// the per-frame scroll spy doesn't re-render every scroll step.
-	const [active, setActive] = useState({ key: '', id: '' });
-	const activeId = active.key === resetKey ? active.id : '';
-	const setActiveId = (id: string) =>
-		setActive((prev) => (prev.key === resetKey && prev.id === id ? prev : { key: resetKey, id }));
+	// A new page discards its predecessor's clicked/scroll-tracked selection,
+	// including a return to a page identity that was visited earlier.
+	const [activeId, setActive] = useLinkedState(resetKey, () => '');
+	const setActiveId = useEffectEvent((id: string, key = resetKey) => {
+		if (key === resetKey) setActive(id);
+	});
 	const tocTrack = useRef<HTMLDivElement | null>(null);
 	// A TOC click claims its target here so the scroll-spy can hold that row lit
 	// through the smooth scroll instead of walking the highlight through every
@@ -97,14 +94,13 @@ export function OnThisPage(props: {
 	// a stale promise cannot focus old DOM or append its hash to the winning route.
 	const navigationSequence = useRef(0);
 	const currentResetKey = useRef(resetKey);
-	currentResetKey.current = resetKey;
-	useEffect(
-		() => () => {
+	useLayoutEffect(() => {
+		currentResetKey.current = resetKey;
+		return () => {
 			navigationSequence.current++;
-		},
-		[resetKey],
-	);
-	const armClickRelease = () => {
+		};
+	});
+	const armClickRelease = useEffectEvent(() => {
 		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
 		clickTimer.current = window.setTimeout(() => {
 			const id = clickLock.current;
@@ -127,7 +123,7 @@ export function OnThisPage(props: {
 			// rather than leaving the clicked row lit until the next scroll.
 			measureRef.current?.();
 		}, CLICK_SETTLE_MS);
-	};
+	});
 
 	// Scroll-spy: the active section is the last heading whose top has crossed a
 	// line just below the sticky header. Reads are coalesced into one rAF so
@@ -158,11 +154,9 @@ export function OnThisPage(props: {
 				if (heading.getBoundingClientRect().top <= activationLine) current = heading.id;
 				else break;
 			}
-			// At the very bottom of a scrollable page, force the final section: a
-			// short trailing section whose heading can't reach the activation line
-			// could otherwise never light up.
+			// A short trailing section may never reach the activation line.
 			if (isAtPageBottom()) current = headings[headings.length - 1].id;
-			setActiveId(current);
+			setActiveId(current, resetKey);
 		};
 		// The rAF wrapper owns the frame bookkeeping — measure() itself must not
 		// touch it, because the click-lock fallback also calls measure() directly
@@ -177,8 +171,10 @@ export function OnThisPage(props: {
 			}
 		};
 
-		measure();
 		measureRef.current = measure;
+		// Router restoration follows its render acknowledgement. Use the same
+		// coalesced frame for the first measurement so it sees the restored scroll.
+		onScroll();
 		window.addEventListener('scroll', onScroll, { passive: true });
 		window.addEventListener('resize', onScroll, { passive: true });
 		return () => {
@@ -189,7 +185,7 @@ export function OnThisPage(props: {
 			if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
 			clickLock.current = null;
 		};
-	}, [resetKey]);
+	});
 
 	// Slide the accent indicator onto the active row: measure its real position
 	// within the track and hand the numbers to CSS, which animates the transform
@@ -202,9 +198,8 @@ export function OnThisPage(props: {
 	// sitting on the active row instead of animating in from the old value.
 	// Geometry can also shift with NO activeId change when a title rewraps, a
 	// font swaps, or the responsive sidebar opens. The ResizeObserver therefore
-	// watches both the track (overall layout) and link (its own box). resetKey is
-	// a dependency so a route change re-targets the new nodes even when the new
-	// page's active id is identical.
+	// watches both the track (overall layout) and link (its own box). Page resets
+	// clear activeId until the new page's first measurement is available.
 	useLayoutEffect(() => {
 		const track = tocTrack.current;
 		if (!track) return;
@@ -253,7 +248,7 @@ export function OnThisPage(props: {
 		observer.observe(track);
 		observer.observe(link);
 		return () => observer.disconnect();
-	}, [activeId, resetKey]);
+	});
 
 	// Smooth-scroll to a heading, honoring reduced-motion, and move focus there
 	// (without a second scroll jump) so keyboard and screen-reader users land in
