@@ -4717,12 +4717,7 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 	// Nothing names an applied record once its fragment lets go of it: reuse it.
 	if (SPARE_NEXTS.length < 64) {
 		if (next.frag !== null) (next.frag as any).$$next = undefined;
-		// A list's landed runs are empty again, and nothing names them (placeRun).
-		const out = next.out;
-		for (let i = 0; i < out.length; i += 3)
-			if (out[i] === placeRun && SPARE_FRONTIERS.length < 64 && out[i + 1].firstChild === null)
-				SPARE_FRONTIERS.push(out[i + 1]);
-		out.length = 0;
+		next.out.length = 0;
 		next.frag = next.root = next.parent = next.before = null;
 		next.members = next.bound = null;
 		next.owner = null;
@@ -5075,7 +5070,7 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
 	const out = next.out;
 	const n = out.length;
 	if (n !== 0 && out[n - 3] === placeRun && out[n - 1] === anchor) return out[n - 2];
-	const frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
+	const frag = document.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.members ??= [];
 	out.push(placeRun, frag, anchor);
@@ -47154,7 +47149,7 @@ export function forBlock<T>(
 			let frag: DocumentFragment | null = null;
 			let sentinel: Comment | null = null;
 			if (next !== null) {
-				frag = SPARE_FRONTIERS.pop() || document.createDocumentFragment();
+				frag = document.createDocumentFragment();
 				(frag as any).$$next = next;
 				next.members ??= [];
 				next.out.push(placeRun, frag, state.end);
