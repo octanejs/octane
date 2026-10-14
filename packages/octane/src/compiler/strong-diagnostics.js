@@ -387,6 +387,15 @@ export const STRONG_DIAGNOSTICS = [
 		replacement: 'Use normal Octane scheduling and component semantics.',
 	},
 	{
+		code: 'OCTANE_STRONG_ELEMENT_API',
+		section: 'templates',
+		severity: 'error',
+		detects:
+			'Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.',
+		replacement:
+			'Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.',
+	},
+	{
 		code: 'OCTANE_STRONG_MANAGED_DOM_WRITE',
 		section: 'dom',
 		severity: 'error',

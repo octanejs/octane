@@ -585,6 +585,7 @@ Lists, templates, and compatibility APIs:
 - `OCTANE_STRONG_SUPPRESSION_PROP`: Fix the mismatch or use the intended native event. Component props with these names are unaffected.
 - `OCTANE_NATIVE_TEXT_ONCHANGE`: Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid.
 - `OCTANE_STRONG_COMPAT_IMPORT`: Use normal Octane scheduling and component semantics.
+- `OCTANE_STRONG_ELEMENT_API`: Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.
 
 DOM ownership and trusted HTML:
 

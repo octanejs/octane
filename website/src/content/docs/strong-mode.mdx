@@ -837,6 +837,14 @@ Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, 
 
 **Replacement.** Use normal Octane scheduling and component semantics.
 
+<h4 id="octane-strong-element-api">
+	<code>OCTANE_STRONG_ELEMENT_API</code>
+</h4>
+
+Outside `.tsx` and `.jsx`, imports or known namespace accesses for `createElement`, `cloneElement`, `isValidElement`, `Children`, or `descriptorChildren` from `octane`, or for `jsx`, `jsxs`, `jsxDEV`, or `Fragment` from an Octane JSX runtime entry. The module creates or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates.
+
+**Replacement.** Write template JSX, pass the component itself (`icon={Plus}`), or pass a `() => @{ … }` render function. Type-only imports such as `ElementDescriptor` stay valid, and `.tsx` modules, whose JSX lowers to descriptors by design, may keep these APIs.
+
 <h3 id="diagnostics-dom">DOM ownership and trusted HTML</h3>
 
 <h4 id="octane-strong-managed-dom-write">

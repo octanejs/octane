@@ -9,6 +9,16 @@ import {
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 const COMPAT_EXPORTS = new Set(['flushSync', 'unstable_batchedUpdates', 'StrictMode']);
+// APIs that build or inspect element descriptors, by import source.
+const ELEMENT_EXPORTS = new Set([
+	'createElement',
+	'cloneElement',
+	'isValidElement',
+	'Children',
+	'descriptorChildren',
+]);
+const JSX_RUNTIME_EXPORTS = new Set(['jsx', 'jsxs', 'jsxDEV', 'Fragment']);
+const JSX_RUNTIME = /^octane\/(?:strong\/)?jsx(?:-dev)?-runtime$/;
 const SUPPRESSION_PROPS = new Set(['suppressHydrationWarning', 'suppressNativeChangeWarning']);
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration']);
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
@@ -35,6 +45,10 @@ export function createStrongTemplatePolicy({
 		mayHaveStrongHTML(source) &&
 		(source.includes('createElement') || /\\(?:u|x|[ceaElm]|[\r\n\u2028\u2029])/.test(source));
 	const templateDialect = /\.tsrx(?:[?#]|$)/.test(filename);
+	// Descriptors render through the generic descriptor renderer instead of
+	// compiled templates. `.tsx` and `.jsx` returns lower to descriptors by
+	// design, so only the other dialects reject the APIs.
+	const elementChecks = !/\.[jt]sx(?:[?#]|$)/.test(filename);
 	const domAt =
 		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
 	function add(code, node, message) {
@@ -43,6 +57,22 @@ export function createStrongTemplatePolicy({
 		if (!codes) seen.set(node, (codes = new Set()));
 		codes.add(code);
 		pending.push({ code, node, message });
+	}
+	function elementApi(name, node) {
+		add(
+			'OCTANE_STRONG_ELEMENT_API',
+			node,
+			`\`${name}\` builds or inspects element descriptors, which render through the generic descriptor renderer instead of compiled templates. Write template JSX, pass the component itself (\`icon={Plus}\`), or pass a \`() => @{ … }\` render function; Strong \`.tsx\` modules may keep descriptor APIs.`,
+		);
+	}
+	function namespaceAccess(name, node) {
+		if (COMPAT_EXPORTS.has(name))
+			add(
+				'OCTANE_STRONG_COMPAT_IMPORT',
+				node,
+				`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
+			);
+		else if (elementChecks && ELEMENT_EXPORTS.has(name)) elementApi(name, node);
 	}
 	function checkKey(expression, scope) {
 		const node = unwrap(expression);
@@ -184,19 +214,24 @@ export function createStrongTemplatePolicy({
 		}
 	}
 	function visit(node, scope) {
-		if (
-			node.type === 'ImportDeclaration' &&
-			(node.source?.value === 'octane' || node.source?.value === 'octane/server') &&
-			node.importKind !== 'type'
-		) {
+		if (node.type === 'ImportDeclaration' && node.importKind !== 'type') {
+			const request = node.source?.value;
+			const octane = request === 'octane' || request === 'octane/server';
+			const elements = octane
+				? ELEMENT_EXPORTS
+				: JSX_RUNTIME.test(request)
+					? JSX_RUNTIME_EXPORTS
+					: null;
 			for (const specifier of node.specifiers ?? []) {
 				const name = specifier.imported?.name ?? specifier.imported?.value;
-				if (specifier.importKind !== 'type' && COMPAT_EXPORTS.has(name))
+				if (specifier.importKind === 'type') continue;
+				if (octane && COMPAT_EXPORTS.has(name))
 					add(
 						'OCTANE_STRONG_COMPAT_IMPORT',
 						specifier,
 						`\`${name}\` is a compatibility API. Strong mode uses Octane's normal scheduling and component semantics; remove this import.`,
 					);
+				else if (elementChecks && elements?.has(name)) elementApi(name, specifier);
 			}
 		} else if (node.type === 'VariableDeclaration') {
 			for (const declaration of node.declarations) {
@@ -212,27 +247,14 @@ export function createStrongTemplatePolicy({
 					const name = property.computed
 						? staticPrimitiveValue(property.key, scope)
 						: (property.key.name ?? property.key.value);
-					if (COMPAT_EXPORTS.has(name))
-						add(
-							'OCTANE_STRONG_COMPAT_IMPORT',
-							property.key,
-							`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
-						);
+					namespaceAccess(name, property.key);
 				}
 			}
 		} else if (node.type === 'MemberExpression') {
 			const object = unwrap(node.object);
 			const name = node.computed ? staticPrimitiveValue(node.property, scope) : node.property?.name;
-			if (
-				object?.type === 'Identifier' &&
-				resolve(scope, object.name)?.kind === 'namespace' &&
-				COMPAT_EXPORTS.has(name)
-			)
-				add(
-					'OCTANE_STRONG_COMPAT_IMPORT',
-					node,
-					`\`${name}\` is a compatibility API. Remove this access in Strong mode.`,
-				);
+			if (object?.type === 'Identifier' && resolve(scope, object.name)?.kind === 'namespace')
+				namespaceAccess(name, node);
 		} else if (node.type === 'CallExpression') {
 			const callee = unwrap(node.callee);
 			const calleeBinding =
@@ -280,14 +302,9 @@ export function createStrongTemplatePolicy({
 			if (
 				member &&
 				root?.type === 'JSXIdentifier' &&
-				resolve(scope, root.name)?.kind === 'namespace' &&
-				COMPAT_EXPORTS.has(member.property.name)
+				resolve(scope, root.name)?.kind === 'namespace'
 			)
-				add(
-					'OCTANE_STRONG_COMPAT_IMPORT',
-					member,
-					`\`${member.property.name}\` is a compatibility API. Remove this access in Strong mode.`,
-				);
+				namespaceAccess(member.property.name, member);
 			if (node.name?.type !== 'JSXIdentifier' || !/^[a-z]/.test(node.name.name) || !domAt(node))
 				return;
 			for (const attribute of node.attributes ?? []) {

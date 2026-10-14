@@ -166,6 +166,44 @@ describe('Strong template authoring checks', () => {
 			);
 		}
 	});
+	it.each([
+		`import { createElement as h } from 'octane';`,
+		`import { Children } from 'octane/server';`,
+		`import * as Octane from 'octane'; const clone = Octane['cloneElement'];`,
+		`import * as Octane from 'octane'; const { isValidElement } = Octane;`,
+		`import { descriptorChildren } from 'octane';`,
+		`import { jsx } from 'octane/jsx-runtime';`,
+		`import { Fragment } from 'octane/strong/jsx-dev-runtime';`,
+	])('rejects element descriptor APIs outside Strong TSX: %s', (imports) => {
+		const template = `${imports} export function App() @{ <div /> }`;
+		expect(() => compile(template, 'App.tsrx')).not.toThrow();
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(strong(template), 'App.tsrx', { mode })).toThrow(
+				'OCTANE_STRONG_ELEMENT_API',
+			);
+		}
+		expect(compileToVolarMappings(strong(template), 'App.tsrx').diagnostics).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_ELEMENT_API', severity: 'error' }),
+		]);
+		expect(() => slotHooks(strong(`${imports} export const value = 1;`), 'values.ts')).toThrow(
+			'OCTANE_STRONG_ELEMENT_API',
+		);
+		for (const extension of ['tsx', 'jsx']) {
+			const source = `${imports} export function App() { return <div />; }`;
+			expect(() => compile(strong(source), `App.${extension}`)).not.toThrow();
+		}
+	});
+	it.each([
+		`import type { ElementDescriptor } from 'octane'; import { type Children } from 'octane';`,
+		`import type { jsx } from 'octane/jsx-runtime';`,
+		`import { Fragment } from 'octane'; import { createElement } from './adapter';`,
+		`import * as Octane from 'octane'; function helper(Octane) { return Octane.createElement; }`,
+	])('preserves type-only, non-descriptor, and shadowed element names: %s', (imports) => {
+		const source = strong(`${imports} export function App() @{ <div /> }`);
+		for (const mode of ['client', 'server'] as const)
+			expect(() => compile(source, 'App.tsrx', { mode })).not.toThrow();
+		expect(compileToVolarMappings(source, 'App.tsrx').diagnostics).toEqual([]);
+	});
 	it('reuses the parsed module for renderer regions in editor analysis', () => {
 		// The tolerant editor parser accepts shapes a second strict parse rejects;
 		// region analysis must report diagnostics for them rather than throw.
