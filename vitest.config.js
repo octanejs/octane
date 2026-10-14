@@ -5192,30 +5192,11 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
-				// octaneMdx() owns `.mdx`/`.md` (it runs the FULL pipeline — @mdx-js/mdx →
-				// octane compile — and returns final JS); octane() compiles the `.tsrx`
-				// fixtures embedded in documents and the test files. The binding's own
-				// `.ts` sources call hooks with EXPLICIT slot symbols (as does
-				// @octanejs/testing-library, which the tests mount through) — both declare
-				// manual hook slots in their package.json, so the auto-slotting pass skips
-				// them.
-				plugins: [octaneMdx(), octane()],
+				// Documents own their MDX pipeline; the provider graph and embedded
+				// fixtures need the matching client or server Octane codegen.
+				plugins: [octaneServerFixtures(import.meta.dirname), octaneMdx(), octane()],
 				resolve: {
 					alias: [
-						{
-							find: /^@octanejs\/mdx$/,
-							replacement: resolve(import.meta.dirname, 'packages/mdx/src/index.ts'),
-						},
-						{
-							// `compile`/`vite` are Node-loadable `.js` (see packages/mdx/src/vite.js);
-							// the runtime entries (`server`, …) stay `.ts`.
-							find: /^@octanejs\/mdx\/(compile|vite)$/,
-							replacement: resolve(import.meta.dirname, 'packages/mdx/src') + '/$1.js',
-						},
-						{
-							find: /^@octanejs\/mdx\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/mdx/src') + '/$1.ts',
-						},
 						{
 							find: /^@octanejs\/testing-library$/,
 							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
@@ -5228,7 +5209,7 @@ export default defineConfig({
 				},
 			},
 			{
-				plugins: [octane()],
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
 				test: {
 					name: 'docusaurus',
 					include: [
