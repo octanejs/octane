@@ -410,8 +410,7 @@ interface RegionInstance {
 	arm: number;
 	child: FragmentInstance | null;
 	items: Map<string, FragmentInstance> | null;
-	/** `undefined` while adopted translated text awaits its first written value. */
-	text: Text | null | undefined;
+	text: Text | null;
 	signal?: BindingSignalConnection;
 	signalPlan?: RegionPlan;
 	signalFrame?: number;
@@ -866,12 +865,7 @@ function resolveFragment(
 				mismatch();
 			if (proof[4] !== null) cursors.set(index, node.firstChild);
 		} else if (proof[1] === 'text') {
-			// Chrome Translate wraps translated text in <font> elements. The marker id
-			// already hashes this template text, so only the slot is checked then.
-			if (
-				node.nodeType === 3 ? node.nodeValue !== proof[2] : (node as Element).localName !== 'font'
-			)
-				mismatch();
+			if (node.nodeType !== 3 || node.nodeValue !== proof[2]) mismatch();
 		} else {
 			const childRange = rangeAt(node, parent === -1 ? range.end : null);
 			const marker = parseBindingMarker(childRange.start.data);
@@ -950,14 +944,8 @@ function adoptRegion(region: RegionInstance, id: string, transaction: Transactio
 		const end = range.end;
 		const text = range.start.nextSibling;
 		if (text !== end) {
-			if (text?.nextSibling !== end) mismatch();
-			// Chrome Translate's <font> wrappers stay until the value changes.
-			region.text =
-				text.nodeType === 3
-					? (text as Text)
-					: (text as Element).localName === 'font'
-						? undefined
-						: mismatch();
+			if (text?.nodeType !== 3 || text.nextSibling !== end) mismatch();
+			region.text = text as Text;
 		}
 	} else if (definition.kind === 'try') {
 		transaction.tryRegions!.adopt(region, definition, id, transaction);
@@ -1558,23 +1546,13 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 
 function writeText(region: RegionInstance, value: string): void {
 	const text = region.text;
-	if (text == null) {
-		// Adopted translated text stays; the detached node only records its value.
-		if (text === undefined || value !== '') {
+	if (text === null) {
+		if (value !== '') {
 			const end = region.range.end;
 			const node = (region.text = end.ownerDocument.createTextNode(value));
-			if (text === null) end.parentNode!.insertBefore(node, end);
+			end.parentNode!.insertBefore(node, end);
 		}
-	} else if (text.data !== value) {
-		text.data = value;
-		const range = region.range;
-		const end = range.end;
-		// Translation displaced the node, so its range is replaced only now that the value changed.
-		if (text.nextSibling !== end) {
-			removeRange(range, true);
-			end.parentNode!.insertBefore(text, end);
-		}
-	}
+	} else if (text.data !== value) text.data = value;
 }
 
 function writeOperation(
@@ -1609,13 +1587,7 @@ function writeOperation(
 				)),
 			);
 		style.write(value as string | null);
-	} else
-		__writeBinding(
-			instance.nodes[operation[0]] as Element,
-			operation,
-			value as string | null,
-			previous,
-		);
+	} else __writeBinding(instance.nodes[operation[0]] as Element, operation, value as string | null);
 	if (!transaction.disposed && !instance.disposed) instance.previous[index] = value;
 }
 

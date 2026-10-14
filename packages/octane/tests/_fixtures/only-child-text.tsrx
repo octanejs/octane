@@ -10,8 +10,7 @@ declare module 'octane/jsx-runtime' {
 	}
 }
 
-// A page translator rewrites the text a host owns; each click moves every host
-// to the next message so the following render must replace that text.
+// Each click advances through nonempty, empty, and restored text.
 const MESSAGES = ['Hello', 'Goodbye', '', 'Welcome back'];
 const IDS = [1, 2];
 
@@ -23,7 +22,6 @@ export function TextBinding() @{
 	</div>
 }
 
-// The class binding already keeps the span, so the text binding keeps its Text.
 export function ClassedTextBinding() @{
 	const [n, setN] = useState(0);
 	<div>

@@ -1,24 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as ServerRT from 'octane/server';
 import { flushSync, hydrateRoot } from '../../src/index.js';
-import { translateTextHosts } from '../_page-translation.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import {
 	ClassedTextBinding,
 	KeyedRows,
 	RenderableHole,
 	TextBinding,
-} from '../_fixtures/translated-text.tsrx';
-import { SpreadHost } from '../_fixtures/translated-text-spread.tsrx';
-
-// A page translator usually runs after hydration, over the server's Text nodes
-// the client adopted. The next update must replace the translation with the new
-// message, as React's setTextContent does, rather than write a node no longer on
-// the page.
+} from '../_fixtures/only-child-text.tsrx';
+import { SpreadHost } from '../_fixtures/only-child-text-spread.tsrx';
 
 const server = {
-	...loadServerFixture('packages/octane/tests/_fixtures/translated-text.tsrx'),
-	...loadServerFixture('packages/octane/tests/_fixtures/translated-text-spread.tsrx'),
+	...loadServerFixture('packages/octane/tests/_fixtures/only-child-text.tsrx'),
+	...loadServerFixture('packages/octane/tests/_fixtures/only-child-text-spread.tsrx'),
 };
 
 afterEach(() => {
@@ -34,9 +28,9 @@ const cases = [
 	{ name: 'SpreadHost', client: SpreadHost, selector: '#hole', after: ['Goodbye'] },
 ] as const;
 
-describe('hydrated only-child text hosts after page translation', () => {
+describe('hydrated only-child text hosts', () => {
 	for (const { name, client, selector, after } of cases) {
-		it(`${name} replaces the translated server text on the next update`, () => {
+		it(`${name} adopts server text and keeps updating through empty text`, () => {
 			const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const { html } = ServerRT.renderToString(server[name]);
 			const container = document.createElement('div');
@@ -49,18 +43,20 @@ describe('hydrated only-child text hosts after page translation', () => {
 			expect(host.firstChild).toBe(serverText);
 			expect(container.querySelector(selector)).toBe(host);
 
-			translateTextHosts(container, selector);
-			expect(host.textContent).toMatch(/^\[fr\] /);
 			flushSync(() => (container.querySelector('button') as HTMLButtonElement).click());
 
 			const hosts = [...container.querySelectorAll(selector)];
 			expect(hosts.map((node) => node.textContent).slice(0, after.length)).toEqual(after);
-			expect(container.querySelector('font')).toBe(null);
 			expect(container.querySelector(selector)).toBe(host);
+			expect(host.firstChild).toBe(serverText);
 
-			// The restored host keeps updating without another translation.
 			flushSync(() => (container.querySelector('button') as HTMLButtonElement).click());
 			expect(container.querySelector(selector)!.textContent).toBe(name === 'KeyedRows' ? '1' : '');
+			flushSync(() => (container.querySelector('button') as HTMLButtonElement).click());
+			expect(container.querySelector(selector)!.textContent).toBe(
+				name === 'KeyedRows' ? 'Welcome back1' : 'Welcome back',
+			);
+			expect(container.querySelector(selector)).toBe(host);
 			expect(errors).not.toHaveBeenCalled();
 			root.unmount();
 		});

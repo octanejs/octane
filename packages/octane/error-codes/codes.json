@@ -1717,7 +1717,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation rewriting framework-owned DOM. External text wrappers and added nodes are unsupported. Add translate=\"no\" to the owned root in the initial server-rendered HTML; for Google page translation, add <meta name=\"google\" content=\"notranslate\"> to the document head. These opt-outs depend on the tool honoring them."
     },
     "287": {
       "message": "This opaque view cannot be constructed without its external owner.",
@@ -1910,7 +1910,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation rewriting framework-owned DOM. External text wrappers and added nodes are unsupported. Add translate=\"no\" to the owned root in the initial server-rendered HTML; for Google page translation, add <meta name=\"google\" content=\"notranslate\"> to the document head. These opt-outs depend on the tool honoring them."
     },
     "319": {
       "message": "DOM bindings cannot adopt an incomplete static element topology.",
@@ -1929,7 +1929,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation rewriting framework-owned DOM. External text wrappers and added nodes are unsupported. Add translate=\"no\" to the owned root in the initial server-rendered HTML; for Google page translation, add <meta name=\"google\" content=\"notranslate\"> to the document head. These opt-outs depend on the tool honoring them."
     },
     "322": {
       "message": "DOM bindings cannot adopt an incomplete addressed element topology.",

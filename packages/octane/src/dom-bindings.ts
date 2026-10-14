@@ -135,12 +135,7 @@ export type BindingScalarChannels = readonly [
 	accepts: (binding: BindingOperation) => boolean,
 	normalize: (binding: BindingOperation, value: unknown) => string | null,
 	/** Returns the value left in the DOM, which the legacy handoff publishes. */
-	write: (
-		node: Element,
-		binding: BindingOperation,
-		value: string | null,
-		previous?: BindingValue,
-	) => string | null,
+	write: (node: Element, binding: BindingOperation, value: string | null) => string | null,
 ];
 
 /** @internal Whole styles carry canonical snapshots; scalar channels remain strings. */
@@ -237,23 +232,10 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
-/** No child, or one: a Text node or the <font> wrapper Chrome Translate puts in its place. */
+/** No child, or exactly one Text node. */
 function isTextLeaf(node: Element): boolean {
 	const first = node.firstChild;
-	return (
-		first === null ||
-		(!first.nextSibling && (first.nodeType === 3 || (first as Element).localName === 'font'))
-	);
-}
-
-const htmlWhitespace = /^[\t\n\f\r ]*$/;
-
-// Translators can move boundary whitespace outside the text hosts they rewrite.
-function skipBindingWhitespace(node: ChildNode | null): ChildNode | null {
-	while (node !== null && node.nodeType === 3 && htmlWhitespace.test(node.nodeValue!)) {
-		node = node.nextSibling;
-	}
-	return node;
+	return first === null || (!first.nextSibling && first.nodeType === 3);
 }
 
 function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
@@ -278,12 +260,12 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 			throw new Error(formatClientError(318));
 		}
 		if (i !== 0) {
-			cursors[parent] = skipBindingWhitespace(node.nextSibling);
+			cursors[parent] = node.nextSibling;
 			childIndices[parent]++;
 		}
 		nodes.push(node);
 		childIndices.push(0);
-		cursors.push(text || children === null ? null : skipBindingWhitespace(node.firstChild));
+		cursors.push(text || children === null ? null : node.firstChild);
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		if (childIndices[i] !== (descriptor.nodes[i]![3] ?? 0)) {
@@ -354,13 +336,9 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 		}
 		if (parent !== -1) {
 			childCounts[parent]++;
-			if (cursors[parent] !== undefined) cursors[parent] = skipBindingWhitespace(node.nextSibling);
+			if (cursors[parent] !== undefined) cursors[parent] = node.nextSibling;
 		}
-		cursors.push(
-			text || children === null || openChildren
-				? undefined
-				: skipBindingWhitespace(node.firstChild),
-		);
+		cursors.push(text || children === null || openChildren ? undefined : node.firstChild);
 	}
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		if (childCounts[i] !== (descriptor.nodes[i]![3] ?? 0)) {
@@ -414,19 +392,12 @@ function writeFixedScalar(
 	node: Element,
 	binding: BindingOperation,
 	value: string | null,
-	previous?: BindingValue,
 ): string | null {
 	const name = binding[2];
 	if (binding[1] === 'text') {
 		const text = node.firstChild;
-		const current = text?.nodeValue;
 		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
-		else if (current !== value) {
-			if (current !== null) text.nodeValue = value;
-			// A translated leaf's <font> has no nodeValue. It survives the channel's
-			// first write, then is replaced once the value changes.
-			else if (previous !== undefined) node.textContent = value;
-		}
+		else if (text.nodeValue !== value) text.nodeValue = value;
 	} else if (value === null) {
 		if (node.hasAttribute(name)) node.removeAttribute(name);
 	} else if (node.getAttribute(name) !== value) {
@@ -471,7 +442,6 @@ function write(
 	node: Element,
 	binding: BindingOperation,
 	value: string | null,
-	previous?: BindingValue,
 ): string | null | void {
 	const name = binding[2];
 	if (binding[1] === 'classToken') {
@@ -498,7 +468,7 @@ function write(
 			if (style.getPropertyValue(name) !== text || style.getPropertyPriority(name) !== priority)
 				style.setProperty(name, text, priority);
 		}
-	} else return writeFixedScalar(node, binding, value, previous);
+	} else return writeFixedScalar(node, binding, value);
 }
 
 export { normalize as __normalizeBinding, write as __writeBinding };
@@ -763,7 +733,7 @@ export function __adoptBindings<Props>(
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
 				style.write(prepared as string | null);
-			} else written = write(nodes[binding[0]]!, binding, prepared as string | null, last);
+			} else written = write(nodes[binding[0]]!, binding, prepared as string | null);
 			if (!disposed) {
 				previous[i] = prepared;
 				// Only fixed scalar, URL and style channels participate in this legacy
@@ -1286,7 +1256,7 @@ export function __adoptScalarBindings<Props>(
 			const last = previous[i];
 			if (value === last) continue;
 			const binding = bindings[i]!;
-			const published = writeChannel(nodes[binding[0]]!, binding, value, last);
+			const published = writeChannel(nodes[binding[0]]!, binding, value);
 			if (!disposed) {
 				previous[i] = value;
 				const node = owned[i]![0];
