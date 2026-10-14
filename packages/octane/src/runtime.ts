@@ -2218,7 +2218,7 @@ function takeNativeFreshArm(
 	discardServerArm(state);
 	hydration.node = state.end;
 	return {
-		prefix: ids.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
+		prefix: ids.prefix + 'n' + takeClientRootId() + '-',
 		next: 0,
 		renderOwner: ids.renderOwner,
 	};
@@ -2493,6 +2493,11 @@ interface RootIdState {
 // hydrateRoot deliberately does NOT consume this counter — its prefix/counter
 // must remain byte-identical to the server render it adopts.
 let nextClientRootId = 0;
+// A client root, and each boundary arm the client renders in place of the
+// server's, takes one id once.
+function takeClientRootId(): string {
+	return (nextClientRootId++).toString(36);
+}
 
 export interface Block extends Scope {
 	kind: BlockKind;
@@ -4296,6 +4301,15 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	WIP_CAPTURE = transaction.capture;
 	// An early binding program defers its writes until the outermost slice closes.
 	if (renderSlice && frame.previous === null) renderSlice.open = true;
+	return frame;
+}
+
+// A root's hydration attempt adopts server DOM, so it discards no created Block.
+function beginHydratingRootRender(owner: RootRenderOwner): RootRenderFrame | null {
+	const frame = beginRootRender(owner);
+	owner.transaction!.rootRequest = true;
+	owner.transaction!.hydrating = true;
+	ROOT_DISCARD_STAMP = -1;
 	return frame;
 }
 
@@ -7439,6 +7453,21 @@ let passiveScheduled = false;
 // Monotonic enqueue counter — tags each PendingEffect with its DFS pre-order position
 // so the effect drains can reconstruct React's post-order (see comparePostOrder).
 let commitSeq = 0;
+// A notification deferred until a retry reveals its subtree runs its passive
+// effect again, after the revealed child's effects.
+function requeuePassiveEffect(scope: Scope, effect: EffectSlot): void {
+	effectQueues[PASSIVE].push({
+		scope,
+		slot: effect.slot,
+		fn: effect.connectedFn!,
+		order: effect.order,
+		revision: effect.revision,
+		args: effect.connectedArgs,
+		phase: PASSIVE,
+		seq: commitSeq++,
+	});
+	if (!passiveScheduled) schedulePassiveFlush();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useSyncExternalStore commit-sync queue (React's `updateStoreInstance` shape).
@@ -17573,7 +17602,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		state.nativeSeedRaw = undefined;
 		state.hydrated = false;
 		state.idState = block.idState = {
-			prefix: state.idState.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
+			prefix: state.idState.prefix + 'n' + takeClientRootId() + '-',
 			next: 0,
 			renderOwner: state.idState.renderOwner,
 		};
@@ -17714,17 +17743,7 @@ function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 		const effect = scope.effectSlots!.find((entry) => entry.connectedFn === notifyHydrateBoundary)!;
 		(retryBatch.afterCommit ??= []).push(() => {
 			if (scope.block.disposed || state.didNotify || !effect.active) return;
-			effectQueues[PASSIVE].push({
-				scope,
-				slot: effect.slot,
-				fn: effect.connectedFn!,
-				order: effect.order,
-				revision: effect.revision,
-				args: effect.connectedArgs,
-				phase: PASSIVE,
-				seq: commitSeq++,
-			});
-			if (!passiveScheduled) schedulePassiveFlush();
+			requeuePassiveEffect(scope, effect);
 		});
 		return;
 	}
@@ -41676,7 +41695,7 @@ function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean
 		if (count < 0) return false;
 		reserveHydrationIds(state.idState, count);
 		state.idState = {
-			prefix: state.idState.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
+			prefix: state.idState.prefix + 'n' + takeClientRootId() + '-',
 			next: 0,
 			renderOwner: state.idState.renderOwner,
 		};
@@ -50406,8 +50425,7 @@ function createRootWithOutputHandler(
 	// registered later (via `delegateEvents`) will back-attach automatically.
 	registerDelegationTarget(container, true);
 	// Lazy root: the block is created on the first `.render()` call.
-	const rootPrefix =
-		(options?.identifierPrefix ?? '') + 'r' + (nextClientRootId++).toString(36) + '-';
+	const rootPrefix = (options?.identifierPrefix ?? '') + 'r' + takeClientRootId() + '-';
 	return makeRoot(
 		container,
 		null,
@@ -50789,10 +50807,7 @@ function hydrateRootWithOutputHandler(
 			registerRootErrorHandlers(rootBlock, rootOptions);
 			owner.adopt!(rootBlock);
 		}
-		const frame = beginRootRender(owner);
-		owner.transaction!.rootRequest = true;
-		owner.transaction!.hydrating = true;
-		ROOT_DISCARD_STAMP = -1;
+		const frame = beginHydratingRootRender(owner);
 		createdInRootRender(rootBlock);
 		journalRootProperty(idState, 'next', idState.next);
 		// Every failed adoption discards its scopes, not the server DOM. Restart
@@ -50981,17 +50996,7 @@ export function createIndependentHydrateActivator(
 							const effect = scope.effectSlots!.find((entry) => entry.connectedFn === notify)!;
 							(retryBatch.afterCommit ??= []).push(() => {
 								if (intents === null || scope.block.disposed || !effect.active) return;
-								effectQueues[PASSIVE].push({
-									scope,
-									slot: effect.slot,
-									fn: effect.connectedFn!,
-									order: effect.order,
-									revision: effect.revision,
-									args: effect.connectedArgs,
-									phase: PASSIVE,
-									seq: commitSeq++,
-								});
-								if (!passiveScheduled) schedulePassiveFlush();
+								requeuePassiveEffect(scope, effect);
 							});
 							return;
 						}
