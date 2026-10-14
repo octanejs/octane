@@ -31421,8 +31421,6 @@ function maybeFlushDiscrete(type: DelegatedEventType): void {
 
 function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 	if (!event.bubbles || event.cancelBubble || (type.flags & EVENT_BUBBLE) === 0) {
-		if (event.bubbles && (type.flags & EVENT_BUBBLE) !== 0 && CONTROLLED_RESTORE_DRIVER)
-			CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
 		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		return;
 	}
@@ -31480,6 +31478,7 @@ function closeNativeEventBatch(
 	event: Event,
 	batch: ReturnType<typeof beginNativeEventBatch>,
 	waitsForBubble: boolean,
+	type: DelegatedEventType,
 ): void {
 	if (batch === null) return;
 	const previousScope = CURRENT_SCOPE;
@@ -31488,7 +31487,13 @@ function closeNativeEventBatch(
 	CURRENT_BLOCK = null;
 	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
 	try {
-		endNativeEventBatch(event, batch, waitsForBubble, reportListenerError);
+		endNativeEventBatch(
+			event,
+			batch,
+			waitsForBubble,
+			reportListenerError,
+			pendingRestores.length !== 0 && (type.flags & EVENT_DISCRETE) !== 0,
+		);
 	} catch (error) {
 		reportListenerError(error);
 	} finally {
@@ -31584,7 +31589,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		}
 		// Only this bubble queue sets currentTarget here; the capture queue clears its own.
 		if (propagationStarted) clearCurrentTarget(event);
-		closeNativeEventBatch(event, nativeBatch, false);
+		closeNativeEventBatch(event, nativeBatch, false, type);
 		_dispatchDepth--;
 		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 	}
@@ -31642,10 +31647,21 @@ function dispatchDelegatedCapture(
 			endDelegatedPropagation(event, stop, immediate);
 			clearCurrentTarget(event);
 		}
+		if (
+			event.bubbles &&
+			event.cancelBubble &&
+			(type.flags & EVENT_BUBBLE) !== 0 &&
+			CONTROLLED_RESTORE_DRIVER
+		) {
+			// This capture stopped the bubble that would arm the form restore.
+			// Arm it before closing signal work, as in dispatchDelegated.
+			CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
+		}
 		closeNativeEventBatch(
 			event,
 			nativeBatch,
 			event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
+			type,
 		);
 		_dispatchDepth--;
 		CAPTURE_FINISH(event, type);

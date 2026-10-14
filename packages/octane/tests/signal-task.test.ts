@@ -232,6 +232,116 @@ describe('signal producer task admission', () => {
 		expect(input.value).toBe('imperative');
 	});
 
+	it.each([
+		[false, false, false],
+		[true, false, false],
+		[false, true, false],
+		[true, true, false],
+		[false, false, true],
+		[true, true, true],
+	])(
+		'commits a controlled edit before the next stream result (already queued: %s, derived: %s, stopped capture: %s)',
+		async (alreadyQueued, derived, capture) => {
+			const owner = scope();
+			const text$ = owner.signal$('text', '');
+			const display$ = derived ? owner.derived$('display', () => text$.get()) : text$;
+			let complete!: () => void;
+			const completion = new Promise<void>((resolve) => {
+				complete = resolve;
+			});
+			const request = query(
+				'open-controlled-subscriber',
+				async function* () {
+					yield 0;
+					await completion;
+				},
+				{ kind: 'stream' },
+			);
+			const value$ = createResource(owner, 'open', () => request(undefined));
+			const container = mount(() =>
+				createElement(
+					'section',
+					null,
+					createElement('input', {
+						value: display$.get(),
+						[capture ? 'onInputCapture' : 'onInput']: (event: Event) => {
+							text$.set((event.target as HTMLInputElement).value);
+							if (capture) event.stopPropagation();
+						},
+					}),
+					createElement('output', null, display$.get()),
+				),
+			);
+			const input = container.querySelector('input')!;
+			let edit!: () => void;
+			const edited = new Promise<void>((resolve) => {
+				edit = resolve;
+			});
+			const stop = value$.subscribe(() => {
+				const snapshot = value$.snapshot();
+				if (snapshot.status !== 'ready' || snapshot.complete) return;
+				if (alreadyQueued) text$.set('intermediate');
+				input.value = 'typed';
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+				edit();
+			});
+			try {
+				await edited;
+				await microtasks();
+				expect(input.value).toBe('typed');
+				expect(container.querySelector('output')!.textContent).toBe('typed');
+			} finally {
+				stop();
+				complete();
+			}
+		},
+	);
+
+	it('keeps a producer root at task priority during an unrelated subscriber click', async () => {
+		const owner = scope();
+		let complete!: () => void;
+		const completion = new Promise<void>((resolve) => {
+			complete = resolve;
+		});
+		const request = query(
+			'separate-controlled-subscriber',
+			async function* () {
+				yield 0;
+				await completion;
+			},
+			{ kind: 'stream' },
+		);
+		const value$ = createResource(owner, 'open', () => request(undefined));
+		const editor = mount(() => createElement('button', { onClick: () => {} }, 'no change'));
+		const button = editor.querySelector('button')!;
+		let edit!: () => void;
+		const edited = new Promise<void>((resolve) => {
+			edit = resolve;
+		});
+		// Subscribe first, so producer publication has also queued the background
+		// reader by the time this subscriber dispatches its unrelated click.
+		const stop = value$.subscribe(() => {
+			const snapshot = value$.snapshot();
+			if (snapshot.status !== 'ready' || snapshot.complete) return;
+			button.click();
+			edit();
+		});
+		const background = mount(() => createElement('output', null, String(value$.latest(-1))));
+		try {
+			expect(background.textContent).toBe('-1');
+			await edited;
+			await microtasks();
+			expect(editor.textContent).toBe('no change');
+			expect(background.textContent).toBe('-1');
+			await hostTask();
+			await act(() => {});
+			expect(background.textContent).toBe('0');
+		} finally {
+			stop();
+			complete();
+		}
+	});
+
 	it('does not publish a queued producer render after unmount', async () => {
 		const owner = scope();
 		const value$ = producer(owner, 'query', 1);

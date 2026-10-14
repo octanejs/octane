@@ -1,4 +1,4 @@
-import { beginNativeBatch, endNativeBatch, type NativeBatchHooks } from './read-protocol.js';
+import { beginNativeBatch, type NativeBatchHooks } from './read-protocol.js';
 
 interface NativeEventBatch {
 	hooks: NativeBatchHooks | null;
@@ -22,13 +22,17 @@ export function beginNativeEventBatch(event: Event): NativeEventBatch | null {
 	return batch;
 }
 
-function finish(event: Event, batch: NativeEventBatch): void {
+function finish(event: Event, batch: NativeEventBatch, controlledRestore: boolean): void {
 	if (batch.closed) return;
 	batch.closed = true;
 	if (events?.get(event) === batch) events.delete(event);
 	const hooks = batch.hooks;
 	batch.hooks = null;
-	endNativeBatch(hooks);
+	// A controlled restore is already a synchronous admission boundary for all
+	// ready renders. Derived signals can stay dirty across repeated writes, so
+	// their own revision alone does not prove what the event changed.
+	if (controlledRestore) hooks?.endEventBatch();
+	else hooks?.endBatch();
 }
 
 export function endNativeEventBatch(
@@ -36,10 +40,11 @@ export function endNativeEventBatch(
 	batch: NativeEventBatch | null,
 	waitsForBubble: boolean,
 	onError: (error: unknown) => void,
+	controlledRestore: boolean,
 ): void {
 	if (batch === null || batch.closed || --batch.depth !== 0) return;
 	if (!waitsForBubble) {
-		finish(event, batch);
+		finish(event, batch, controlledRestore);
 		return;
 	}
 	// Capture and bubble are separate native callbacks. Usually the bubble walk
@@ -55,7 +60,7 @@ export function endNativeEventBatch(
 	const fallback = () => {
 		if (batch.depth !== 0 || batch.closed) return;
 		try {
-			finish(event, batch);
+			finish(event, batch, controlledRestore);
 		} catch (error) {
 			onError(error);
 		}

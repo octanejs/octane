@@ -340,6 +340,7 @@ export function registerNativeReadRebase(rebase: NativeReadRebase): void {
 export interface NativeBatchHooks {
 	startBatch(): void;
 	endBatch(): void;
+	endEventBatch(): void;
 }
 
 let nativeBatchHooks: NativeBatchHooks | null = null;

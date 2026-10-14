@@ -8,6 +8,7 @@ import {
 	assertAlive,
 	assertWritable,
 	derivedState,
+	endEventSignalBatch,
 	endSignalBatch,
 	historicalBindingRead,
 	inspectNativeNode,
@@ -106,7 +107,11 @@ interface FrameData {
 
 let activeFrames: Map<ScopeImpl, AdoptionFrameImpl> | undefined;
 
-registerNativeBatchHooks({ startBatch: startSignalBatch, endBatch: endSignalBatch });
+registerNativeBatchHooks({
+	startBatch: startSignalBatch,
+	endBatch: endSignalBatch,
+	endEventBatch: endEventSignalBatch,
+});
 registerNativeSignalHydration();
 
 function requireKey(key: string, label: string): void {

@@ -16,6 +16,7 @@ import {
 } from './errors.js';
 import {
 	NATIVE_DOM_VALUE,
+	NATIVE_TRANSITION_CONSUMER,
 	getNativeCandidate,
 	forwardNativeTransitionConsumer,
 	getNativeReadObserver,
@@ -28,6 +29,7 @@ import {
 	setNativeReadObserver,
 	type NativeReadInspection,
 	type NativeReadSource,
+	type NativeTransitionNotify,
 } from './read-protocol.js';
 import {
 	SIGNAL_BINDING_READ,
@@ -458,6 +460,33 @@ export function startSignalBatch(): void {
 
 export function endSignalBatch(): void {
 	if (--batchDepth === 0) flush();
+}
+
+/** Finish render notifications while a nested input still owns its urgency. */
+export function endEventSignalBatch(): void {
+	endSignalBatch();
+	if (!flushing || batchDepth !== 0) return;
+	// A public subscriber can dispatch an input while the outer graph flush is
+	// running. Ordinary flush() cannot recurse into subscribers, but delaying
+	// these render notifications would restore controlled fields to stale props.
+	// Marked presentation observers only schedule/admit their owning renders.
+	let failed = false;
+	let firstError: unknown;
+	for (const work of queued) {
+		if (
+			work instanceof SignalObserver &&
+			(work.notify as NativeTransitionNotify | undefined)?.[NATIVE_TRANSITION_CONSUMER]
+		) {
+			queued.delete(work);
+			try {
+				runObserver(work);
+			} catch (error) {
+				if (!failed) firstError = error;
+				failed = true;
+			}
+		}
+	}
+	if (failed) throw firstError;
 }
 
 export function signalBatch<T>(run: () => T): T {
