@@ -36621,13 +36621,37 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 			// This render may already have replaced the Block (replaceHostTagChildren).
 			const pending = state.next !== null && state.next.tx === ROOT_RENDER_TRANSACTION;
 			child = pending ? state.incoming! : state.block;
-			if (sameRenderBody(child.body, kids)) child.body = kids;
-			else child = replaceHostTagChildren(state, block, el, kids, pending);
+			if (sameRenderBody(child.body, kids)) return renderWithBody(child, kids);
+			child = replaceHostTagChildren(state, block, el, kids, pending);
 		}
 		renderBlock(child);
 		return;
 	}
 	childSlot(block, 1, el, kids, null, false, el);
+}
+
+/**
+ * Render `block` with `body`, a fresh capture of the authored body it holds.
+ * A root render that can be dropped lands the body at its commit (landBody):
+ * until then the Block keeps its committed body, so an update of its own
+ * after a dropped render reads the committed captures.
+ */
+function renderWithBody(block: Block, body: ComponentBody): void {
+	const committed = block.body;
+	block.body = body;
+	const transaction =
+		committed === body || ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(block);
+	if (transaction === null) return renderBlock(block);
+	try {
+		renderBlock(block);
+	} finally {
+		block.body = committed;
+	}
+	transaction.ops.push(landBody, [block, body]);
+}
+
+function landBody(write: [Block, ComponentBody]): void {
+	write[0].body = write[1];
 }
 
 /** A string-tag host's function children: one markerless Block owning all of the host's content. */
@@ -36663,8 +36687,10 @@ function replaceHostTagChildren(
 		unmountBlock(state.incoming!, false);
 		removeAfter(state.next!.frag!, null, null);
 	} else {
-		queueSlotDeletion(state, state.block, getFirstChild(el), el.lastChild);
-		ROOT_RENDER_TRANSACTION!.ops.push(landHostTagChildren, state);
+		// The swap is the outgoing range's deletion cleanup, so it lands with the
+		// slot's structure and drops with it (dropRootOps, dropBodyOps).
+		retireRootBlock(state.block);
+		slotNext(state).out.push(() => landHostTagChildren(state), getFirstChild(el), el.lastChild);
 	}
 	return (state.incoming = hostTagChildrenBlock(block, slotFrontier(state, block, el, null), body));
 }
@@ -36684,6 +36710,7 @@ function hostTagChildrenBlock(block: Block, parent: Node, body: ComponentBody): 
 }
 
 function landHostTagChildren(state: HostTagChildrenSlot): void {
+	unmountBlock(state.block, false);
 	state.block = state.incoming!;
 	state.incoming = null;
 }
