@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { createElement, useState } from 'octane';
 
 // A `ref` arriving through a spread (`{...props.attrs}`) must behave exactly like
 // a direct `ref={}`: attach on mount, run a callback's React-19 cleanup-return
@@ -54,4 +54,23 @@ export function SpreadSharedHost(props: SharedHostProps) @{
 			<span class="detail">{props.label as string}</span>
 		}
 	</section>
+}
+
+interface ReadingHostProps extends SpreadProps {
+	read: () => string;
+}
+
+function SpreadReader(props: { read: () => string }) @{
+	const value = props.read();
+	<span>{value as string}</span>
+}
+
+export function SpreadReadingHost(props: ReadingHostProps) @{
+	<label {...props.attrs}>
+		<SpreadReader read={props.read} />
+	</label>
+}
+
+export function DescriptorReadingHost(props: ReadingHostProps) {
+	return createElement('label', props.attrs, createElement(SpreadReader, { read: props.read }));
 }

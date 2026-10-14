@@ -28874,16 +28874,7 @@ export function commitTemplateHostSources(
 	}
 	const tag = el.localName;
 	const form = tag === 'input' || tag === 'textarea' || tag === 'select';
-	setSpread(
-		el,
-		next.values.props,
-		next.previous?.props,
-		scope,
-		true,
-		form,
-		next.values,
-		next.previous,
-	);
+	commitPreparedHostProps(el, next.values, next.previous, scope, true, form);
 	commitDangerouslySetInnerHTMLSources(
 		el,
 		next.resolved.dangerouslySetInnerHTML ?? null,
@@ -29299,10 +29290,12 @@ function prepareSignalHostPropSources(
 				runWithBlockSignalOwner(scope, () => {
 					// A whole-style takeover replaces the early owner's complete style,
 					// including properties absent from the accepted snapshot.
-					setSpread(
+					commitPreparedHostProps(
 						element,
-						prepared,
-						'style' in prepared ? { style: '' } : undefined,
+						values,
+						'style' in prepared
+							? { props: { style: '' }, style: { value: '', raw: '', kept: false } }
+							: undefined,
 						scope,
 						true,
 					);
@@ -29601,7 +29594,7 @@ export function commitHostProps(
 	previous: PreparedHostProps | undefined,
 	scope?: Scope,
 ): void {
-	setSpread(el, next.props, previous?.props, scope, false, false, next, previous);
+	commitPreparedHostProps(el, next, previous, scope);
 	// A fresh descriptor input owns its native state even without a checked
 	// writer. Freeze its live choice before a later defaultChecked can follow
 	// the browser's pristine-default cascade. Compiled single-attribute programs
@@ -29653,20 +29646,19 @@ export function prepareTemplateControl(
 	return { value, normalized, adopted };
 }
 
-export function setSpread(
+// A commit reads only the immutable prop snapshot, never the caller's raw
+// spread. Keep the raw entry point below independent so descriptor-only apps
+// do not retain its getter/coercion and hydration paths.
+function commitPreparedHostProps(
 	el: Element,
-	value: any,
-	prev: any,
+	prepared: PreparedHostProps,
+	previousPrepared: Pick<PreparedHostProps, 'props' | 'style'> | undefined,
 	mountScope?: Scope,
 	skipDangerouslySetInnerHTML = false,
 	skipFormControls = false,
-	prepared?: PreparedHostProps,
-	previousPrepared?: PreparedHostProps,
 ): void {
-	if (process.env.NODE_ENV !== 'production' && value != null && prepared === undefined) {
-		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
-		devValidateHostProps(el, Object(value) as Record<string, unknown>);
-	}
+	const value = prepared.props;
+	const prev = previousPrepared?.props;
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
 	// connected node — same React-19 timing as element/fragment refs. Updates
@@ -29679,41 +29671,30 @@ export function setSpread(
 	// de-opt/host paths, and ssrSpread (which skips the key entirely, so writing an
 	// attribute here would itself manufacture the very server/client divergence the
 	// flag exists to suppress). A vanished key is reset by the removal loop below.
-	if (
-		value != null &&
-		Object.prototype.propertyIsEnumerable.call(Object(value), 'suppressHydrationWarning')
-	) {
+	if (value !== null && 'suppressHydrationWarning' in value) {
 		(el as any).__oct_suppress = value.suppressHydrationWarning === true;
 	}
 	if (
 		process.env.NODE_ENV !== 'production' &&
-		value != null &&
-		Object.prototype.propertyIsEnumerable.call(Object(value), 'suppressNativeChangeWarning')
+		value !== null &&
+		'suppressNativeChangeWarning' in value
 	) {
 		(el as any).__oct_native_change_suppressed = value.suppressNativeChangeWarning === true;
 	}
 	if (
 		process.env.NODE_ENV !== 'production' &&
-		value != null &&
-		Object.prototype.propertyIsEnumerable.call(Object(value), '__octaneNativeChangeDiagnostic')
+		value !== null &&
+		'__octaneNativeChangeDiagnostic' in value
 	) {
 		setNativeChangeDiagnosticMetadata(el, value.__octaneNativeChangeDiagnostic);
 	}
 	if (!skipDangerouslySetInnerHTML) {
-		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
+		if (value !== null && 'children' in value) {
 			(el as any)[DANGER_HTML_SPREAD_CHILD] = value.children;
-			if (
-				value.children != null &&
-				(prepared !== undefined
-					? value.dangerouslySetInnerHTML != null
-					: (el as any)[DANGER_HTML_ACTIVE] === true)
-			) {
+			if (value.children != null && value.dangerouslySetInnerHTML != null) {
 				throw dangerHtmlChildrenError();
 			}
-		} else if (
-			prev != null &&
-			Object.prototype.propertyIsEnumerable.call(Object(prev), 'children')
-		) {
+		} else if (prev != null && Object.hasOwn(prev, 'children')) {
 			(el as any)[DANGER_HTML_SPREAD_CHILD] = undefined;
 		}
 	}
@@ -29721,7 +29702,7 @@ export function setSpread(
 	// the removal that mirrors its SET path — class, style, innerHTML, suppress flag,
 	// event slot, aliased/namespaced attribute).
 	if (prev) {
-		for (const k of Object.keys(Object(prev))) {
+		for (const k of Object.keys(prev)) {
 			if (k === 'key' || k === 'children') continue;
 			if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
 			if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
@@ -29739,8 +29720,8 @@ export function setSpread(
 				if (prev.ref != null && prev.ref !== nextRef) queueRefDetach(prev.ref, el);
 				continue;
 			}
-			if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), k)) continue;
-			if (k === 'style' && prepared !== undefined)
+			if (value !== null && k in value) continue;
+			if (k === 'style')
 				commitTemplateStyle(
 					el as HTMLElement,
 					{ value: null, kept: false },
@@ -29754,12 +29735,10 @@ export function setSpread(
 		return;
 	}
 	// A fresh props cache is not a snapshot of attributes already present in SSR.
-	const hydration = prev === undefined && hydrating ? activeHydration() : null;
-	const initialHydration =
-		prev === undefined &&
-		(prepared?.adopted ?? (hydration !== null && !hydrateIsFresh(hydration, el)));
-	const reassert = prepared?.reassert === true;
-	for (const k of Object.keys(Object(value))) {
+	const initialHydration = prev === undefined && prepared.adopted;
+	const reassert = prepared.reassert;
+	// snapshotSpread made this a null-prototype own-enumerable string-key record.
+	for (const k in value) {
 		if (k === 'key' || k === 'children') continue;
 		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
 		if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
@@ -29788,13 +29767,11 @@ export function setSpread(
 			if (v === pv && !initialHydration && !reassert) continue;
 			// Hydration-aware + SVG-safe class write (suppress/warn parity with a
 			// direct class binding); nullish/false removes the attribute.
-			if (prepared === undefined) setClassAttr(el, v);
-			else if (prepared.classes !== undefined) commitHostAttribute(el, 'class', prepared.classes);
+			if (prepared.classes !== undefined) commitHostAttribute(el, 'class', prepared.classes);
 			continue;
 		}
 		if (k === 'style') {
-			if (prepared === undefined) setStyle(el as HTMLElement, v, pv);
-			else if (prepared.style !== undefined)
+			if (prepared.style !== undefined)
 				commitTemplateStyle(el as HTMLElement, prepared.style, previousPrepared?.style);
 			continue;
 		}
@@ -29802,13 +29779,13 @@ export function setSpread(
 		// explicitly disables an earlier JSX writer. It must not be identity-skipped
 		// against the absent previous value on mount.
 		if (k === 'dangerouslySetInnerHTML') {
-			setDangerouslySetInnerHTML(el, prepared === undefined ? v : prepared.html, prepared?.adopted);
+			setDangerouslySetInnerHTML(el, prepared.html, prepared.adopted);
 			continue;
 		}
 		const actionName = formActionAttributeName(el, k);
 		if (actionName !== null) {
 			if (v === pv && !initialHydration && !reassert) continue;
-			if (typeof v !== 'function' && prepared !== undefined) {
+			if (typeof v !== 'function') {
 				(el as any).$$formAction = undefined;
 				const attribute = prepared.attributes?.[k];
 				if (attribute !== undefined) commitHostAttribute(el, actionName, attribute);
@@ -29825,7 +29802,7 @@ export function setSpread(
 			(!reassert ||
 				(v == null &&
 					!isHtmlCustomElement(el) &&
-					!hasEarlierPreparedAttributeAlias(el, prepared!, k)))
+					!hasEarlierPreparedAttributeAlias(el, prepared, k)))
 		)
 			continue;
 		const ev = eventSlot(k, el);
@@ -29846,7 +29823,7 @@ export function setSpread(
 				process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v,
 				true,
 				mountScope,
-				prepared?.eventOwner,
+				prepared.eventOwner,
 			);
 			continue;
 		}
@@ -29854,8 +29831,7 @@ export function setSpread(
 		// An absent initial spread must not turn a later update into a mount.
 		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
 		if (
-			prepared?.attributes !== null &&
-			prepared?.attributes !== undefined &&
+			prepared.attributes !== null &&
 			Object.prototype.hasOwnProperty.call(prepared.attributes, k)
 		) {
 			const next = prepared.attributes[k];
@@ -29863,7 +29839,139 @@ export function setSpread(
 				const name = isHtmlCustomElement(el) ? k : (ATTRIBUTE_ALIASES.get(k) ?? k);
 				commitHostAttribute(el, name, next);
 			}
-		} else setAttribute(el, k, v, prepared?.adopted, prepared?.controls?.[k]);
+		} else setAttribute(el, k, v, prepared.adopted, prepared.controls?.[k]);
+	}
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
+}
+
+/**
+ * Raw spread ABI for existing compiled programs and explicit callers. Do not
+ * snapshot or pre-normalize these props: their getters and previous values
+ * must still be read in the original diff order. Prepared hosts use the writer
+ * above, which never calls this path.
+ */
+export function setSpread(
+	el: Element,
+	value: any,
+	prev: any,
+	mountScope?: Scope,
+	skipDangerouslySetInnerHTML = false,
+	skipFormControls = false,
+): void {
+	if (process.env.NODE_ENV !== 'production' && value != null) {
+		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
+		devValidateHostProps(el, Object(value) as Record<string, unknown>);
+	}
+	if (
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), 'suppressHydrationWarning')
+	) {
+		(el as any).__oct_suppress = value.suppressHydrationWarning === true;
+	}
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), 'suppressNativeChangeWarning')
+	) {
+		(el as any).__oct_native_change_suppressed = value.suppressNativeChangeWarning === true;
+	}
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), '__octaneNativeChangeDiagnostic')
+	) {
+		setNativeChangeDiagnosticMetadata(el, value.__octaneNativeChangeDiagnostic);
+	}
+	if (!skipDangerouslySetInnerHTML) {
+		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = value.children;
+			if (value.children != null && (el as any)[DANGER_HTML_ACTIVE] === true) {
+				throw dangerHtmlChildrenError();
+			}
+		} else if (
+			prev != null &&
+			Object.prototype.propertyIsEnumerable.call(Object(prev), 'children')
+		) {
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = undefined;
+		}
+	}
+	if (prev) {
+		for (const k of Object.keys(Object(prev))) {
+			if (k === 'key' || k === 'children') continue;
+			if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
+			if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
+			if (k === 'ref') {
+				const nextRef = value ? value.ref : undefined;
+				if (prev.ref != null && prev.ref !== nextRef) queueRefDetach(prev.ref, el);
+				continue;
+			}
+			if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), k)) continue;
+			removeHostProp(el, k, prev[k]);
+		}
+	}
+	if (value == null) {
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
+		return;
+	}
+	const hydration = prev === undefined && hydrating ? activeHydration() : null;
+	const initialHydration = hydration !== null && !hydrateIsFresh(hydration, el);
+	for (const k of Object.keys(Object(value))) {
+		if (k === 'key' || k === 'children') continue;
+		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
+		if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
+		const v = value[k];
+		const pv = prev ? prev[k] : undefined;
+		if (k === 'ref') {
+			if (v === pv) continue;
+			if (mountScope) queueRefAttach(mountScope, v, el);
+			else attachRef(v, el);
+			continue;
+		}
+		if (
+			k === 'suppressHydrationWarning' ||
+			k === 'suppressNativeChangeWarning' ||
+			k === '__octaneNativeChangeDiagnostic'
+		)
+			continue; // JS-only state stamped before the loops (see above)
+		if (k === 'class' || k === 'className') {
+			if (v === pv && !initialHydration) continue;
+			setClassAttr(el, v);
+			continue;
+		}
+		if (k === 'style') {
+			setStyle(el as HTMLElement, v, pv);
+			continue;
+		}
+		if (k === 'dangerouslySetInnerHTML') {
+			setDangerouslySetInnerHTML(el, v);
+			continue;
+		}
+		const actionName = formActionAttributeName(el, k);
+		if (actionName !== null) {
+			if (v === pv && !initialHydration) continue;
+			DESCRIPTOR_FORM_ACTION(el, actionName, v, pv);
+			continue;
+		}
+		if (v === pv && !isControlledHostProp(el, k) && !initialHydration) continue;
+		const ev = eventSlot(k, el);
+		if (ev) {
+			if (v === pv) continue;
+			if (ev.capture) {
+				if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
+			} else if (!_delegated.has(ev.type)) {
+				delegateEvents([ev.type]);
+			}
+			setEventHandler(
+				el,
+				ev.key,
+				process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v,
+				true,
+				mountScope,
+			);
+			continue;
+		}
+		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
+		setAttribute(el, k, v);
 	}
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
 }

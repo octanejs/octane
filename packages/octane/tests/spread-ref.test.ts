@@ -1,6 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
-import { SpreadToggle, SpreadDirect, SpreadSharedHost } from './_fixtures/spread-ref.tsrx';
+import { describe, it, expect, vi } from 'vitest';
+import { act, mount } from './_helpers';
+import { createRoot, hydrateRoot } from '../src/index.js';
+import { renderToString } from 'octane/server';
+import { loadServerFixture } from './_server-fixture.js';
+import {
+	DescriptorReadingHost,
+	SpreadDirect,
+	SpreadReadingHost,
+	SpreadSharedHost,
+	SpreadToggle,
+} from './_fixtures/spread-ref.tsrx';
 
 describe('spread-supplied ref (React 19 parity with ref={})', () => {
 	it('callback ref via spread runs its cleanup-return on conditional detach + unmount', () => {
@@ -204,4 +213,124 @@ describe('spread-supplied ref (React 19 parity with ref={})', () => {
 		root.unmount();
 		expect(log.at(-1)).toBe('second:cleanup');
 	});
+
+	for (const [name, Component] of Object.entries({ SpreadReadingHost, DescriptorReadingHost })) {
+		it.each([false, true])(
+			`${name} removes only committed refs and keeps the newest host props after suspension (hydrate=%s)`,
+			async (hydrate) => {
+				const container = document.createElement('div');
+				document.body.appendChild(container);
+				const calls: Array<Element | null> = [];
+				const firstRef = (element: Element | null) => calls.push(element);
+				const staleRef = vi.fn();
+				const firstClick = vi.fn();
+				const latestClick = vi.fn();
+				const initial = {
+					attrs: {
+						htmlFor: 'first-input',
+						className: 'first',
+						title: 'first title',
+						ref: firstRef,
+						onClick: firstClick,
+					},
+					read: () => 'first',
+				};
+				if (hydrate) {
+					const server = await loadServerFixture('packages/octane/tests/_fixtures/spread-ref.tsrx');
+					container.innerHTML = renderToString(server[name], initial).html;
+				}
+				const serverLabel = container.querySelector('label');
+				const errors: unknown[] = [];
+				const root = hydrate
+					? hydrateRoot(container, Component, initial, {
+							onRecoverableError: (error) => errors.push(error),
+						})
+					: createRoot(container);
+				try {
+					await act(() => {
+						if (!hydrate) root.render(Component, initial);
+					});
+					const label = container.querySelector('label')!;
+					if (hydrate) expect(label).toBe(serverLabel);
+					expect(calls).toEqual([label]);
+
+					const superseded = Promise.withResolvers<void>();
+					await act(() =>
+						root.render(Component, {
+							attrs: {
+								for: 'stale-input',
+								class: 'stale',
+								title: 'stale title',
+								ref: staleRef,
+								onClick: latestClick,
+							},
+							read: () => {
+								throw superseded.promise;
+							},
+						}),
+					);
+					expect(container.querySelector('label')).toBe(label);
+					expect([label.htmlFor, label.className, label.title, label.textContent]).toEqual([
+						'first-input',
+						'first',
+						'first title',
+						'first',
+					]);
+					expect(calls).toEqual([label]);
+					expect(staleRef).not.toHaveBeenCalled();
+					label.click();
+					expect(firstClick).toHaveBeenCalledOnce();
+					expect(latestClick).not.toHaveBeenCalled();
+
+					// Values that were safe during render must never be read from user
+					// objects again after a later child has finished reading its data.
+					let finishedReading = false;
+					const title = {
+						toString() {
+							if (finishedReading) throw new Error('late title coercion');
+							return 'latest title';
+						},
+					};
+					await act(() =>
+						root.render(Component, {
+							attrs: {
+								for: 'latest-input',
+								class: 'latest',
+								title,
+								onClick: latestClick,
+							},
+							read: () => {
+								finishedReading = true;
+								return 'latest';
+							},
+						}),
+					);
+					expect(container.querySelector('label')).toBe(label);
+					expect([label.htmlFor, label.className, label.title, label.textContent]).toEqual([
+						'latest-input',
+						'latest',
+						'latest title',
+						'latest',
+					]);
+					expect(calls).toEqual([label, null]);
+					label.click();
+					expect(firstClick).toHaveBeenCalledOnce();
+					expect(latestClick).toHaveBeenCalledOnce();
+					await act(() => superseded.resolve());
+					expect([label.htmlFor, label.className, label.title, label.textContent]).toEqual([
+						'latest-input',
+						'latest',
+						'latest title',
+						'latest',
+					]);
+					expect(staleRef).not.toHaveBeenCalled();
+					expect(calls).toEqual([label, null]);
+					expect(errors).toEqual([]);
+				} finally {
+					root.unmount();
+					container.remove();
+				}
+			},
+		);
+	}
 });
