@@ -27,7 +27,9 @@ rows are one element each, a branch whose server arm is longer than the
 client's, or a range where an element's only child is text. React adopts such a
 tree when its DOM happens to match, as when the server rendered another branch
 that renders a component's elements inline. As in React, a suspension in a
-component's body still keeps the server HTML until it resolves.
+component's body still keeps the server HTML until it resolves. Every
+structural mismatch, a server range without its close included, reaches
+`onRecoverableError` as the same `HydrationMismatch` error.
 
 The seed script names the new version (`data-octane-suspense="3"`). A root whose
 server rendered another version renders on the client and reports error 345

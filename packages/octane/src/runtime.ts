@@ -203,6 +203,20 @@ import {
 	type HydrationReplayIntent,
 } from './hydration/event-capture.js';
 import { isRestoredHydrationTextarea } from './hydration/control-capture.js';
+import {
+	SEED_SITE_DRIVER,
+	seedSite,
+	type SeedSiteDriver,
+	type SeedSites,
+} from './hydration/use-seeds.js';
+import {
+	takeUnpatchedValues,
+	unpatchedAttribute,
+	unpatchedClass,
+	unpatchedHTML,
+	unpatchedStatics,
+	unpatchedStyle,
+} from './hydration/dev-values.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
 	invalidHtmlNestingWithAncestor,
@@ -232,6 +246,8 @@ import {
 	HYDRATE_MARKER_SELECTOR,
 	isRangeOpen,
 	NATIVE_SIGNAL_FRESH_COMMENT,
+	parserNormalizedMatch,
+	selfDelimits,
 	STREAM_SEED_COMMENT,
 	SUSPENSE_RESOLVED_COMMENT,
 } from './hydration-protocol.js';
@@ -2253,11 +2269,14 @@ function componentSourceLoc(body: unknown): string | undefined {
 // ---------------------------------------------------------------------------
 // Hydration VALUE differences, as in React. A server text that differs from the
 // client's does not match the client render (HydrationMismatch), while the
-// server's attributes, class, style and raw HTML are kept, never patched:
-// development lists what differs in one warning per hydration pass, and
-// production compares nothing. `suppressHydrationWarning` on the owning element
-// (React's shallow semantics) keeps a differing server text and silences the
-// attribute warning. It never keeps a structural difference.
+// server's attributes, class, style and raw HTML are kept, never patched: their
+// writers return while hydration adopts their element (HydrationCapability's
+// keepsAttribute, keepsClass, keepsStyle and adoptHTML). Development lists what
+// differs in one warning per hydration pass (hydration/dev-values.ts), and
+// production compares nothing but stale server values (staleServerValues).
+// `suppressHydrationWarning` on the owning element (React's
+// shallow semantics) keeps a differing server text and silences the attribute
+// warning. It never keeps a structural difference.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2268,17 +2287,6 @@ function componentSourceLoc(body: unknown): string | undefined {
  */
 function isHydrationSuppressed(el: Node | null): boolean {
 	return el !== null && (el as any).__oct_suppress === true;
-}
-
-/**
- * How development reports a server value that hydration keeps at `el`:
- *   0 — not at all: production-compiled code records no source location.
- *   1 — not at all: the element suppresses hydration warnings.
- *   2 — in the pass's warning (HydrationCapability.settleValues).
- */
-function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
-	if (isHydrationSuppressed(el)) return 1;
-	return (el as any).__oct_loc !== undefined ? 2 : 0;
 }
 
 /**
@@ -2412,95 +2420,6 @@ function hydrationNodeMatches(server: Node, template: Node): boolean {
 	if (server.nodeType !== template.nodeType) return false;
 	if (server.nodeType !== 1) return true;
 	return (server as Element).localName === (template as Element).localName;
-}
-
-/**
- * DEV ONLY: does an adopted node also match the template's STATIC attributes and nested static
- * element structure? A difference never causes a fallback (production cannot see it); it is
- * reported like React's "won't be patched up" warning and the server's markup is kept. A
- * compiler-specialized mixed style bakes only its static prefix; its exact template path is
- * supplied so that one style attribute waits for the complete-value check. The recursion treats
- * a comment (a `<!>` hole placeholder or marker) or a text/element shift as a match, because
- * template holes do not align 1:1 with server content.
- */
-function hydrationStaticMatches(
-	server: Node,
-	template: Node,
-	partialStyles?: string,
-	path: string = '',
-): boolean {
-	if (server.nodeType !== template.nodeType) return false;
-	if (server.nodeType !== 1) return true;
-	const s = server as Element;
-	const t = template as Element;
-	if (s.localName !== t.localName) return false;
-	const tAttrs = t.attributes;
-	for (let i = 0; i < tAttrs.length; i++) {
-		const a = tAttrs[i];
-		// This optional compiler marker is not authored static structure. Actual
-		// writable bindings validate its identity before adopting their state.
-		if (a.name === HYDRATE_INPUT_ATTR) continue;
-		if (
-			s.getAttribute(a.name) !== a.value &&
-			!(
-				a.name === 'style' &&
-				partialStyles !== undefined &&
-				partialStyles.includes('|' + path + '|')
-			)
-		) {
-			return false;
-		}
-	}
-	let sc = getFirstChild(s);
-	let tc = getFirstChild(t);
-	let childIndex = 0;
-	while (sc !== null && tc !== null) {
-		if (sc.nodeType === 8 || tc.nodeType === 8) return true; // hole / marker — stop comparing
-		if (sc.nodeType !== tc.nodeType) return true; // text↔element shift — ambiguous, stop
-		if (
-			tc.nodeType === 1 &&
-			!hydrationStaticMatches(
-				sc,
-				tc,
-				partialStyles,
-				partialStyles === undefined
-					? ''
-					: path === ''
-						? String(childIndex)
-						: path + '.' + childIndex,
-			)
-		) {
-			return false;
-		}
-		sc = getNextSibling(sc);
-		tc = getNextSibling(tc);
-		childIndex++;
-	}
-	return true; // any leftover could be holes — assume a match
-}
-
-/**
- * DEV ONLY: `server`, adopted for the template root `template` (the root at
- * index `path` of a fragment template, or '' for a single root), keeps its
- * static attributes and markup. Development lists a difference
- * (hydrationStaticMatches) in the pass's one warning, which never changes what
- * is adopted. Every caller checks for development first, so production bundles
- * drop it.
- */
-function unpatchedStatics(
-	hydration: HydrationCapability,
-	server: Node,
-	template: Node,
-	loc: string | undefined,
-	partialStyles: string | undefined,
-	path: string,
-): void {
-	if (!hydrationStaticMatches(server, template, partialStyles, path))
-		(hydration.unpatchedValues ??= new Map()).set(
-			`${loc ? loc + ': ' : ''}static attributes or markup of the server's ` +
-				describeHydrationNode(server),
-			server,
-		);
 }
 
 /**
@@ -17318,7 +17237,7 @@ function createHydrateSlot(
 					block = block.parentBlock
 				)
 					loc = componentSourceLoc(block.body);
-			hydration!.mismatch(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
+			hydration!.fail(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
 		}
 		start = document.createComment('hydrate');
 		end = document.createComment('/hydrate');
@@ -17473,7 +17392,7 @@ function finishRoot(hydration: HydrationCapability): void {
 	)
 		remainder = getNextSibling(remainder);
 	if (remainder === null) return;
-	hydration.mismatch(
+	hydration.fail(
 		process.env.NODE_ENV !== 'production'
 			? componentSourceLoc(hydration.rootBlock.body)
 			: undefined,
@@ -17571,7 +17490,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			if (adoptedSlot?.__kind === 'trySlotSlot') {
 				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
 			}
-			hydration.settleValues();
+			hydration.settleTexts();
 			finishRoot(hydration);
 			completed = true;
 		}
@@ -18645,28 +18564,17 @@ function isSuspenseException(x: any): x is SuspenseException {
 }
 
 const HYDRATION_SITE_EVENTS = Symbol('octane.hydration.site-events');
-const HYDRATION_SEED_FACTORY = Symbol('octane.hydration.seed-factory');
-
-interface HydrationSiteEvents {
-	queues: Map<string, number[]>;
-	offsets: Map<string, number>;
-}
 
 interface HydrationSeedArray extends Array<unknown> {
-	[HYDRATION_SITE_EVENTS]?: HydrationSiteEvents;
+	[HYDRATION_SITE_EVENTS]?: SeedSites;
 }
 
-interface HydrationSeedFactory {
-	index: number;
-	factory: (() => unknown) | null;
-	value?: unknown;
-	error?: unknown;
-	failed?: boolean;
-}
-
-interface HydrationSeedThenable extends TrackedThenable {
-	[HYDRATION_SEED_FACTORY]: HydrationSeedFactory;
-}
+/**
+ * Compiler-owned use() sites (hydration/use-seeds.ts), installed by the first
+ * compiled seedOrCreate that a hydration pass seeds. Only that call writes
+ * it, so an app without one folds every read away.
+ */
+let SEED_SITES: SeedSiteDriver | null = null;
 
 /**
  * Hydration uses the server's fulfilled value as the canonical first-render
@@ -18691,34 +18599,16 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 	}
 }
 
-function materializeHydrationSeedFactory(record: HydrationSeedFactory): unknown {
-	if (record.failed === true) throw record.error;
-	if (record.factory !== null) {
-		const factory = record.factory;
-		record.factory = null;
-		try {
-			record.value = factory();
-		} catch (error) {
-			record.failed = true;
-			record.error = error;
-			throw error;
-		}
-	}
-	return record.value;
-}
-
-function getHydrationSeedFactory(thenable: TrackedThenable): HydrationSeedFactory | undefined {
-	try {
-		return (thenable as HydrationSeedThenable)[HYDRATION_SEED_FACTORY];
-	} catch {
-		return undefined;
-	}
-}
-
 /** Compiler-owned direct use() creations consult their server-proven site outcome first. */
 export function seedOrCreate<T>(site: string, factory: () => T): T {
 	const hydration = hydrating ? seedHydration() : null;
-	return hydration === null ? factory() : hydration.seedOrCreate(site, factory);
+	const sites =
+		hydration === null || hydration.seeds === null
+			? undefined
+			: (hydration.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
+	if (sites === undefined) return factory();
+	SEED_SITES = SEED_SITE_DRIVER;
+	return seedSite(sites, hydration!.seedCursor, site, factory);
 }
 
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
@@ -20497,6 +20387,8 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 // `<script data-octane-suspense>` in `hydrateRoot()` and consumed in render
 // order by `useThenable` so a hydrating boundary returns synchronously. They are
 // fields on the hydrateRoot-only capability, so client-only builds discard them.
+// A compiled use() creation's seeded site (seedOrCreate) is hydration/use-seeds.ts,
+// which only an app with such a site ships.
 // Set while adopting a root when a matched range is physically wrapped by an
 // exactly-adjacent marker pair. The post-hydration ownership walk can only
 // remove comments in that shape, so roots without one skip the pass entirely.
@@ -20510,13 +20402,6 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 interface HydratedLiteRange {
 	start: Comment;
 	end: Comment;
-}
-
-/** The class an adopted element's last hydrating writer set (keepsClass). */
-interface PendingHydrationClass {
-	next: string | null;
-	/** Whether an absent class attribute reads as ''. */
-	absentIsEmpty: boolean;
 }
 
 /** A server text whose comparison waits for the pass's render-phase updates (keepsText). */
@@ -20656,7 +20541,7 @@ class HydrationCapability {
 	/**
 	 * Parent captures changed before this dormant boundary activated, so the
 	 * server HTML predates the client's state. Any difference from it, a text or
-	 * attribute value included (unpatched), does not match the client render,
+	 * attribute value included (staleValue), does not match the client render,
 	 * and the boundary's fallback reports nothing (noteRecoverableHydrationError,
 	 * logHydrationMismatch).
 	 */
@@ -20684,15 +20569,8 @@ class HydrationCapability {
 	rootCleanupBoundary: Node | null = null;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
-	/** Development, or stale captures: classes compared once the pass ends (settleValues). */
-	private classes: Map<Element, PendingHydrationClass> | null = null;
 	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
 	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
-	/**
-	 * DEV-only: the server values this pass kept where the client's differ, by
-	 * their warning line, with the node each belongs to (settleValues).
-	 */
-	unpatchedValues: Map<string, Node> | null = null;
 	/**
 	 * The first node of the adopted range whose claim is open (beginClaim),
 	 * until the template that renders that range's content adopts it.
@@ -20726,7 +20604,10 @@ class HydrationCapability {
 	 * need not follow the server forms of its leading holes there.
 	 */
 	passthroughRoot = false;
-	/** A slot lent a server range whose first render has yet to claim it. */
+	/**
+	 * A de-opt item's slot that borrows the item's server range, whose first
+	 * render has yet to claim it (deoptItemBody).
+	 */
 	lentSlot: ChildSlot | null = null;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
@@ -21054,7 +20935,7 @@ class HydrationCapability {
 		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
 			if (node === null || this.freshNodes.has(node)) return;
 		}
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production'
 				? // A return slot or a list item has no site of its own: name the
 					// returning component, else the list's host.
@@ -21071,8 +20952,8 @@ class HydrationCapability {
 	 * A slot of `scope` at `slotKey` found no server range of its own where it
 	 * hydrates, but `actual`, which the server rendered for something else.
 	 */
-	slotMismatch(scope: Scope, slotKey: number, expected: string, actual: Node | null): never {
-		this.mismatch(
+	failAt(scope: Scope, slotKey: number, expected: string, actual: Node | null): never {
+		this.fail(
 			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) || undefined : undefined,
 			() => expected,
 			actual,
@@ -21168,25 +21049,17 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Bound the arm of a boundary range that ends at `end`, whose content starts
-	 * at `first`, with markers of its own. The server renders a boundary's
-	 * content directly inside its one range (hydration-protocol.ts), while the
-	 * client renders the arm in a range of its own inside the boundary's, where
-	 * it can hide the arm beside a fallback. An attempt that is discarded
-	 * restores the server's range. A presentation-binding view's arm keeps the
-	 * range of its own that opens at `first` (bindingTryState).
+	 * The range a boundary's body adopts on its first render, from `open` to
+	 * `end`: the boundary's own, since the server renders a boundary's content
+	 * directly inside its one range (hydration-protocol.ts). The body borrows it,
+	 * and the first arm that shows beside the body bounds it (mountPendingBody).
+	 * A presentation-binding view's arm keeps the range of its own that opens at
+	 * `first` (bindingTryState).
 	 */
-	armRange(open: Node, first: Node | null, end: Node): [Comment, Comment] {
-		if ((open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first))
-			return [first, this.close(first)];
-		const parent = end.parentNode!;
-		const doc = document;
-		const start = doc.createComment('try-b');
-		const close = doc.createComment('/try-b');
-		this.save(parent);
-		parent.insertBefore(start, first);
-		parent.insertBefore(close, end);
-		return [start, close];
+	armRange(open: Node, first: Node | null, end: Node): readonly [Node, Node] {
+		return (open as Comment).data.startsWith(BINDING_OPEN_PREFIX) && this.isOpen(first)
+			? [first, this.close(first)]
+			: [open, end];
 	}
 
 	/**
@@ -21314,10 +21187,10 @@ class HydrationCapability {
 		if (open !== null) return open;
 		const actual =
 			anchor !== null && anchor !== scope.block.endMarker ? anchor : this.cursorIn(domParent);
-		if (!this.defers) this.slotMismatch(scope, slotKey, 'a component range', actual);
+		if (!this.defers) this.failAt(scope, slotKey, 'a component range', actual);
 		this.adopting = true;
 		try {
-			this.slotMismatch(scope, slotKey, 'a component range', actual);
+			this.failAt(scope, slotKey, 'a component range', actual);
 		} catch (error) {
 			this.defer(error as HydrationMismatch, false);
 			return null;
@@ -21337,7 +21210,7 @@ class HydrationCapability {
 	branchOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment | null {
 		const open = this.resolveOpen(anchor, domParent);
 		if (open !== null || this.inFreshRange(anchor, domParent)) return open;
-		this.slotMismatch(
+		this.failAt(
 			scope,
 			slotKey,
 			'a branch range',
@@ -21354,7 +21227,7 @@ class HydrationCapability {
 	 * repaired here: the nearest fallback owner discards its server DOM and
 	 * renders on the client (see HydrationMismatch), as React does.
 	 */
-	mismatch(loc: string | undefined, expected: () => string, actual: Node | null): never {
+	fail(loc: string | undefined, expected: () => string, actual: Node | null): never {
 		// A deferred mismatch comes first in React's order: it is the one reported.
 		if (this.deferred !== null && !this.adopting) this.claimDeferred();
 		const error = new HydrationMismatch();
@@ -21373,35 +21246,6 @@ class HydrationCapability {
 			if (inRootHydrationAttempt() && !this.staleServerValues) error.diagnostic = message;
 		}
 		throw error;
-	}
-
-	/**
-	 * A slot for the server range `start`…`end` that a list item or a returning
-	 * component adopted, lent to the child slot that renders its value, so that
-	 * the value hydrates inside that range rather than claiming a range of its
-	 * own. The slot's first render claims the server range as an adopted one.
-	 */
-	lendRange(start: Comment, end: Comment): ChildSlot {
-		const slot: ChildSlot = {
-			__kind: 'childSlot',
-			start,
-			end,
-			ownerHost: null,
-			borrowed: true,
-			compactable: false,
-			block: null,
-			text: null,
-			currentComp: null,
-			currentIsBodyFn: false,
-			forSlot: null,
-			hostNode: null,
-			portal: null,
-			next: null,
-			// childSlot's own slots carry this key; one shape for both.
-			implicitSignal: undefined,
-		};
-		this.lentSlot = slot;
-		return slot;
 	}
 
 	/**
@@ -21454,7 +21298,7 @@ class HydrationCapability {
 			this.node = end;
 			return true;
 		}
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production'
 				? // A return slot or a list item has no site of its own: name the
 					// returning component, else the list's host.
@@ -21500,7 +21344,7 @@ class HydrationCapability {
 			getNextSibling(text) !== end
 		)
 			return;
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production'
 				? siteLoc(scope, slotKey) ||
 						componentSourceLoc(scope.block.body) ||
@@ -21513,35 +21357,6 @@ class HydrationCapability {
 						? 'a portal'
 						: `<${(value as ElementDescriptor).type as string}>`,
 			text,
-		);
-	}
-
-	/**
-	 * A list item's first hydrating render found server content at the cursor
-	 * that cannot be that item: the server rendered fewer items, a bare item
-	 * where this one needs a range of its own, or an item of another tag. The
-	 * list ends at `end`.
-	 */
-	itemMismatch(end: Node, expected: string): never {
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
-			() => expected,
-			this.node,
-		);
-	}
-
-	/**
-	 * A list of `scope` at `slotKey` found the server's other arm on its first
-	 * hydrating render: items (`serverItems`) where the client renders its
-	 * @empty arm, or none where the client has items. The server's content
-	 * starts after `start`.
-	 */
-	listArmMismatch(scope: Scope, slotKey: number, start: Node, serverItems: boolean): never {
-		this.slotMismatch(
-			scope,
-			slotKey,
-			serverItems ? 'an empty list (@empty)' : 'a populated list',
-			getNextSibling(start),
 		);
 	}
 
@@ -21565,16 +21380,25 @@ class HydrationCapability {
 	 * client does not render.
 	 */
 	settleItems(end: Node): void {
+		const from = this.leftover(end);
+		if (from !== null)
+			this.fail(
+				process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
+				() => 'the end of the list',
+				from,
+			);
+	}
+
+	/**
+	 * Where the server content starts that a range's owner left unclaimed when
+	 * it finished rendering: the cursor, when the range's close `end` follows
+	 * it. Null when the cursor is on `end`, or past it.
+	 */
+	private leftover(end: Node): Node | null {
 		const from = this.node;
-		if (from === end) return;
-		let node = from;
-		while (node !== null && node !== end) node = getNextSibling(node);
-		if (node === null) return;
-		this.mismatch(
-			process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
-			() => 'the end of the list',
-			from,
-		);
+		for (let node = from; node !== null && from !== end; node = getNextSibling(node))
+			if (node === end) return from;
+		return null;
 	}
 
 	/**
@@ -21611,17 +21435,14 @@ class HydrationCapability {
 	 * this one, or the whole range when the arm rendered nothing.
 	 */
 	settleArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
-		const from = this.node;
-		let node: Node | null = from;
-		while (node !== null && node !== end) node = getNextSibling(node);
-		// Only server content that precedes `end` is the arm's.
-		if (node === null) return;
-		this.slotMismatch(
-			scope,
-			slotKey,
-			from === first ? 'an empty branch' : 'the end of the branch',
-			from,
-		);
+		const from = this.leftover(end);
+		if (from !== null)
+			this.failAt(
+				scope,
+				slotKey,
+				from === first ? 'an empty branch' : 'the end of the branch',
+				from,
+			);
 	}
 
 	/**
@@ -21637,7 +21458,7 @@ class HydrationCapability {
 	 * server values (staleServerValues). Unless a render-phase update renders
 	 * the text again before the pass ends: React renders a component that
 	 * updates itself while it renders again before it compares the output, so
-	 * the text that render settles on decides, equal or not (settleValues).
+	 * the text that render settles on decides, equal or not (settleTexts).
 	 * Meanwhile the node holds the client's text, and a discarded attempt
 	 * restores the server's. A method, so that bundles which never hydrate do
 	 * not retain it.
@@ -21649,7 +21470,7 @@ class HydrationCapability {
 		text: string,
 		loc: string | undefined,
 	): boolean {
-		const equal = server === text || isTextParserNormalizedMatch(server, text);
+		const equal = server === text || parserNormalizedMatch(server, text);
 		if (!equal) {
 			if (
 				host !== null &&
@@ -21672,7 +21493,7 @@ class HydrationCapability {
 			return equal;
 		}
 		if (equal) return true;
-		this.mismatch(
+		this.fail(
 			loc || (host as any)?.__oct_loc,
 			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
 			node,
@@ -21708,7 +21529,7 @@ class HydrationCapability {
 		const kept = str !== '' && first.nodeType === 3;
 		const stale = kept ? getNextSibling(first)! : first;
 		if (stale === end) return;
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) : undefined,
 			() => {
 				const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
@@ -21722,47 +21543,19 @@ class HydrationCapability {
 		return parseSeedJson(raw);
 	}
 
-	seedOrCreate<T>(site: string, factory: () => T): T {
-		if (this.seeds === null) return factory();
-		const events = (this.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
-		if (events === undefined) return factory();
-		const queue = events.queues.get(site);
-		if (queue === undefined) return factory();
-		const offset = events.offsets.get(site) ?? 0;
-		events.offsets.set(site, offset + 1);
-		const index = queue[offset];
-		if (index === undefined || index < this.seedCursor) return factory();
-
-		const record: HydrationSeedFactory = { index, factory };
-		const thenable: HydrationSeedThenable = {
-			[HYDRATION_SEED_FACTORY]: record,
-			then(onFulfilled, onRejected) {
-				if (thenable.status === 'fulfilled') {
-					return Promise.resolve(thenable.value).then(onFulfilled, onRejected);
-				}
-				if (thenable.status === 'rejected') {
-					return Promise.reject(thenable.reason).then(onFulfilled, onRejected);
-				}
-				return Promise.resolve(materializeHydrationSeedFactory(record)).then(
-					onFulfilled,
-					onRejected,
-				);
-			},
-		};
-		return thenable as T;
-	}
-
 	useSeed<T>(
 		thenable: TrackedThenable<T>,
 		state: TrackedThenable<any>[],
 		index: number,
 		replaceOnResume: boolean,
 	): T {
-		const factory = getHydrationSeedFactory(thenable);
+		// A compiled site's thenable whose seed is not the next one renders what
+		// its factory makes instead (hydration/use-seeds.ts).
+		const factory = SEED_SITES ? SEED_SITES.factoryOf(thenable) : undefined;
 		if (factory !== undefined && factory.index !== this.seedCursor) {
 			// useThenable allocated the record before seeding this call.
 			CURRENT_BLOCK!.rare!.thenableIdx = index;
-			const usable = materializeHydrationSeedFactory(factory);
+			const usable = SEED_SITES!.materialize(factory);
 			if (
 				replaceOnResume &&
 				usable !== null &&
@@ -21815,25 +21608,6 @@ class HydrationCapability {
 	}
 
 	/**
-	 * `el`, an adopted element, keeps the server's `what` (an attribute, its
-	 * class or style, or its raw HTML), `server`, where the client renders
-	 * `client`: as in React, hydration never patches it. Development lists the
-	 * difference in the pass's one warning (settleValues), unless `el`
-	 * suppresses hydration warnings. Stale server values do not match the
-	 * client render instead (staleServerValues).
-	 */
-	private unpatched(el: Element, what: string, server: unknown, client: unknown): void {
-		if (this.staleServerValues)
-			this.mismatch((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
-		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
-			(this.unpatchedValues ??= new Map()).set(
-				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
-					`the client ${JSON.stringify(client)}`,
-				el,
-			);
-	}
-
-	/**
 	 * Hydrating, the server rendered no node where `el`'s de-opt children render
 	 * `child`: as React does for a missing node, the nearest fallback owner
 	 * renders on the client. An element the client built holds client children
@@ -21843,7 +21617,7 @@ class HydrationCapability {
 	 */
 	missingDeoptChild(el: Element, child: unknown): void {
 		if (!this.isActive() || this.isFresh(el) || el.localName === 'noscript') return;
-		this.mismatch(
+		this.fail(
 			process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 			() =>
 				isHostDescriptor(child)
@@ -21855,28 +21629,22 @@ class HydrationCapability {
 
 	/**
 	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. React 19 keeps the
-	 * server's content (unpatched) and records nothing, so the next render that
-	 * passes an `__html` object rewrites it, even with the same string (setHTML).
+	 * server's content and records nothing, so the next render that passes an
+	 * `__html` object rewrites it, even with the same string (setHTML).
 	 * Production therefore compares nothing, unless the server values are stale
-	 * (staleServerValues), where the raw strings suffice: a spelling difference
-	 * only renders that rare pass on the client. Development compares only to
-	 * warn, and parses the client's HTML in the element's context, so that
-	 * spellings the parser canonicalizes compare equal, as in React. So the
-	 * normalizers never reach a production bundle.
+	 * (staleServerValues), where a difference in the raw strings does not match
+	 * the client render: a spelling difference only renders that rare pass on
+	 * the client. Development lists a difference (hydration/dev-values.ts).
 	 */
 	adoptHTML(el: Element, next: string): void {
-		const script = el.localName === 'script';
-		const server = script ? (el.textContent ?? '') : el.innerHTML;
-		const expected =
-			process.env.NODE_ENV === 'production'
-				? this.staleServerValues
-					? next
-					: server
-				: script
-					? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
-					: normalizeHTMLForHydration(el, next);
-		if (server !== expected)
-			this.unpatched(el, '`dangerouslySetInnerHTML` content', server, expected);
+		if (this.staleServerValues) {
+			if ((el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML) !== next)
+				this.fail(
+					(el as any).__oct_loc,
+					() => `\`dangerouslySetInnerHTML\` content ${JSON.stringify(next)}`,
+					el,
+				);
+		} else if (process.env.NODE_ENV !== 'production') unpatchedHTML(this, el, next);
 	}
 
 	/**
@@ -22151,7 +21919,7 @@ class HydrationCapability {
 		// child of a newly populated fragment. Build fresh descendants without
 		// consuming that boundary, so its owner can advance the outer cursor.
 		if (isFragment && isBlockClose(cursor)) {
-			this.mismatch(loc, () => 'a non-empty fragment', cursor);
+			this.fail(loc, () => 'a non-empty fragment', cursor);
 		}
 		// A synthetic fragment wrapper has no server counterpart. At a root, compare
 		// its logical static roots before returning the virtual adoption view; otherwise
@@ -22162,7 +21930,7 @@ class HydrationCapability {
 			const remainder = this.fragmentRemainder(template, cursor, loc, partialStyles);
 			if (remainder === undefined) {
 				const fragment = template;
-				this.mismatch(
+				this.fail(
 					process.env.NODE_ENV !== 'production'
 						? componentSourceLoc(this.rootBlock.body)
 						: undefined,
@@ -22173,7 +21941,7 @@ class HydrationCapability {
 			this.claimRootRemainder(framedRemainder === undefined ? remainder : framedRemainder);
 		}
 		if (cursor === null) {
-			this.mismatch(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
+			this.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
 		}
 		if (
 			!isFragment &&
@@ -22183,18 +21951,14 @@ class HydrationCapability {
 		) {
 			const match = this.skipForeign(cursor, template, lazy);
 			if (match === null)
-				this.mismatch(
-					loc,
-					() => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)),
-					cursor,
-				);
+				this.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), cursor);
 			this.node = cursor = match;
 			if (unframedRemainder !== undefined) unframedRemainder = getNextSibling(match);
 		}
 		// The compiled walk descends into the root's children: where it would find
 		// no element, the server rendered fewer nodes than the template has.
 		if (!isFragment && rootWalkMisses(cursor, template, lazy))
-			this.mismatch(
+			this.fail(
 				loc,
 				() => describeHydrationNode(firstElementChild(template ?? resolveLazyTemplate(lazy!))),
 				getFirstChild(cursor),
@@ -22217,7 +21981,7 @@ class HydrationCapability {
 					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			const fragment = template ?? resolveLazyTemplate(lazy!);
-			this.mismatch(
+			this.fail(
 				loc,
 				() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
 				cursor,
@@ -22374,7 +22138,7 @@ class HydrationCapability {
 	 * end of the Text node it adopted).
 	 */
 	private unclaimedText(el: Node, from: ChildNode, text: string | null, loc?: string): never {
-		this.mismatch(
+		this.fail(
 			loc || (el as any).__oct_loc,
 			() =>
 				text === null
@@ -22434,7 +22198,7 @@ class HydrationCapability {
 		if (stale !== null && !textarea) {
 			if (isElementDescriptor(value) && !isHostDescriptor(value))
 				this.renderBeforeMismatch(el, render);
-			this.mismatch(loc, () => 'a renderable range', stale);
+			this.fail(loc, () => 'a renderable range', stale);
 		}
 		if (stale !== null) stale = getNextSibling(stale);
 		this.save(el);
@@ -22448,7 +22212,7 @@ class HydrationCapability {
 		// An element or text the value built is a node the server did not render.
 		for (let node = getFirstChild(el); node !== null; node = getNextSibling(node))
 			if (node.nodeType === 1 || (node.nodeType === 3 && node.nodeValue))
-				this.mismatch(loc, () => 'a renderable range', null);
+				this.fail(loc, () => 'a renderable range', null);
 	}
 
 	/**
@@ -22510,7 +22274,7 @@ class HydrationCapability {
 		// An element where the server's text belongs is a structural difference,
 		// which suppressHydrationWarning never keeps.
 		if (posNode !== null && posNode.nodeType === 1 && (host === null || !this.freshNodes.has(host)))
-			this.mismatch(
+			this.fail(
 				(host as any)?.__oct_loc,
 				() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
 				posNode,
@@ -22556,56 +22320,53 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Whether a hydrating writer sets `el`'s attribute `name` to `next`. Only in
-	 * an element the client built. An adopted element keeps the server's value,
-	 * as in React (unpatched): development compares it, and production compares
-	 * nothing unless the server values are stale (staleServerValues). Values the
-	 * HTML parser normalized compare equal, and so does what an early host
-	 * binding published there.
+	 * Whether `el` keeps its server value where a writer sets the client's: an
+	 * element hydration adopted keeps its attributes, class, style and raw HTML,
+	 * which React never patches. An element the client built takes the client's.
 	 */
-	allowAttribute(el: Element, name: string, next: string | null): boolean {
+	private adopts(el: Element): boolean {
 		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return true;
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return false;
-		// Read through the prototype: a form's named control can shadow its method.
-		const ns = attrNamespace(name);
-		const server = ns
-			? el.getAttributeNS(ns, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
-			: Element.prototype.getAttribute.call(el, name);
-		if (
-			server !== next &&
-			domBindingClaims.get(el)?.get(name) !== server &&
-			!(next !== null && isAttributeParserNormalizedMatch(server, next))
-		)
-			this.unpatched(el, `attribute \`${name}\``, server, next);
-		return false;
+		return !this.freshNodes.has(el);
 	}
 
 	/**
-	 * Whether hydration keeps `el`'s server class where a writer sets `next`
-	 * (`absentIsEmpty`: an absent class attribute reads as ''). An adopted
-	 * element keeps it, as it keeps attributes (allowAttribute). A direct
-	 * binding and spreads can all write one element's class, and only the last
-	 * writer's value is the client's, so the comparison waits for the end of
-	 * the pass (settleValues).
+	 * A stale server value (staleServerValues) that differs from the client's
+	 * does not match the client render, which reports nothing. Production
+	 * compares only stale values, and raw: a spelling difference only renders
+	 * that rare pass on the client. Development lists every other difference
+	 * (hydration/dev-values.ts).
 	 */
-	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return false;
-		if (process.env.NODE_ENV !== 'production' || this.staleServerValues)
-			(this.classes ??= new Map()).set(el, { next, absentIsEmpty });
+	private staleValue(el: Element, differs: boolean): void {
+		if (differs) this.fail((el as any).__oct_loc, () => 'a newer value', el);
+	}
+
+	/** Whether an adopted `el` keeps its server attribute `name` where the client writes `next`. */
+	keepsAttribute(el: Element, name: string, next: string | null): boolean {
+		if (!this.adopts(el)) return false;
+		if (this.staleServerValues)
+			// Read through the prototype: a form's named control can shadow its method.
+			this.staleValue(el, Element.prototype.getAttribute.call(el, name) !== next);
+		else if (process.env.NODE_ENV !== 'production') unpatchedAttribute(this, el, name, next);
 		return true;
 	}
 
 	/**
-	 * Whether hydration keeps `el`'s server style where a writer sets the
+	 * Whether an adopted `el` keeps its server class where a writer sets `next`
+	 * (`absentIsEmpty`: an absent class attribute reads as '').
+	 */
+	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
+		if (!this.adopts(el)) return false;
+		if (this.staleServerValues) {
+			const server = Element.prototype.getAttribute.call(el, 'class');
+			this.staleValue(el, (absentIsEmpty && server === null ? '' : server) !== next);
+		} else if (process.env.NODE_ENV !== 'production') unpatchedClass(this, el, next, absentIsEmpty);
+		return true;
+	}
+
+	/**
+	 * Whether an adopted `el` keeps its server style where a writer sets the
 	 * complete style `value`, or the fixed declarations `entries`, after the
-	 * static declarations `staticCss`. An adopted element keeps it, as it keeps
-	 * attributes (allowAttribute). Comparing canonical cssText, through a
-	 * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
-	 * whitespace) as equal, while it still finds reordered, missing, added and
-	 * empty declarations. What an early host binding published there, single
-	 * declarations or the whole style, is the server's now.
+	 * static declarations `staticCss`.
 	 */
 	keepsStyle(
 		el: HTMLElement | SVGElement,
@@ -22613,45 +22374,14 @@ class HydrationCapability {
 		staticCss?: string,
 		entries?: readonly unknown[],
 	): boolean {
-		if (el === null) this.missingElement();
-		if (this.isFresh(el)) return false;
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return true;
-		const style = (el as HTMLElement).style;
-		const server = style.cssText;
-		const expectedStyle = document.createElement('div').style;
-		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
-		if (entries === undefined) applyStyleValue(el, expectedStyle, value, undefined);
-		else {
-			for (let i = 0; i < entries.length; i += 2) {
-				const entry = entries[i + 1];
-				if (entry != null && typeof entry !== 'boolean')
-					applyStyleProperty(el, expectedStyle, entries[i] as string, entry);
-			}
-		}
-		// A declaration that an early host binding published is the server's now.
-		// Removing one can leave an empty style attribute behind, so the
-		// attribute's presence is no longer the server's either.
-		const claims = domBindingClaims.get(el);
-		let removed = false;
-		if (claims !== undefined) {
-			for (const [channel, published] of claims) {
-				if (!channel.startsWith('style:')) continue;
-				const property = channel.slice(6);
-				const value = style.getPropertyValue(property);
-				const priority = style.getPropertyPriority(property);
-				if ((value === '' ? null : value + (priority ? ' !important' : '')) !== published) continue;
-				removed ||= value === '';
-				// An empty value removes the declaration.
-				expectedStyle.setProperty(property, value, priority);
-			}
-		}
-		const expected = expectedStyle.cssText;
-		if (
-			(server !== expected || (!expected && !removed && el.hasAttribute('style'))) &&
-			// So is a whole style that one published.
-			claims?.get('style') !== server
-		)
-			this.unpatched(el, 'style', server, expected);
+		if (!this.adopts(el)) return false;
+		if (this.staleServerValues)
+			this.staleValue(
+				el,
+				el.style.cssText !== expectedStyle(el, value, staticCss, entries).cssText,
+			);
+		else if (process.env.NODE_ENV !== 'production')
+			unpatchedStyle(this, el, expectedStyle(el, value, staticCss, entries));
 		return true;
 	}
 
@@ -22661,51 +22391,36 @@ class HydrationCapability {
 	 * fewer nodes there than the client.
 	 */
 	private missingElement(): never {
-		this.mismatch(undefined, () => 'an element', null);
+		this.fail(undefined, () => 'an element', null);
 	}
 
 	/**
 	 * Runs once a pass adopted its content and its render-phase updates
-	 * settled. Compares the texts those updates rendered again (keepsText) and
-	 * the class each adopted element's last writer set (keepsClass), then
+	 * settled. Compares the texts those updates rendered again (keepsText), then
 	 * publishes development's one warning per pass, as React's, for the server
-	 * values the pass kept where the client's differ (unpatched). A boundary
-	 * whose body adopted a node and then threw to its catch arm has removed it
-	 * since, and it is not compared.
+	 * values the pass kept where the client's differ. A boundary whose body
+	 * adopted a node and then threw to its catch arm has removed it since, and
+	 * it is not compared.
 	 */
-	settleValues(): void {
+	settleTexts(): void {
 		const root = this.rootBlock.parentNode;
 		const texts = this.pendingTexts;
 		if (texts !== null) {
 			this.pendingTexts = null;
 			for (const [node, { server, loc }] of texts) {
 				const text = node.nodeValue!;
-				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
-					this.mismatch(
+				if (text !== server && !parserNormalizedMatch(server, text) && root.contains(node))
+					this.fail(
 						loc || (node.parentNode as any)?.__oct_loc,
 						() => `text ${JSON.stringify(text)}`,
 						document.createTextNode(server ?? ''),
 					);
 			}
 		}
-		const classes = this.classes;
-		if (classes !== null) {
-			this.classes = null;
-			for (const [el, { next, absentIsEmpty }] of classes) {
-				// Read through the prototype: a form's named control can shadow its method.
-				const raw = Element.prototype.getAttribute.call(el, 'class');
-				const server = absentIsEmpty && raw === null ? '' : raw;
-				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
-					this.unpatched(el, 'attribute `class`', server, next);
-			}
+		if (process.env.NODE_ENV !== 'production') {
+			const lines = takeUnpatchedValues(this, root);
+			if (lines !== null) warnHydrationUnpatched(lines);
 		}
-		if (process.env.NODE_ENV === 'production') return;
-		const unpatched = this.unpatchedValues;
-		if (unpatched === null) return;
-		this.unpatchedValues = null;
-		const lines: string[] = [];
-		for (const [line, node] of unpatched) if (root.contains(node)) lines.push(line);
-		if (lines.length !== 0) warnHydrationUnpatched(lines);
 	}
 }
 
@@ -22961,23 +22676,6 @@ function devWarnPlainTextHandle(): void {
 			"`import type { SignalHandle } from 'octane/signals'`, give it a `$` suffix, read it " +
 			'with `.get()`, or enable the `opaqueSignalHandles` compiler option.',
 	);
-}
-
-/**
- * Match ReactDOMComponent's hydration comparison: the HTML parser normalizes
- * CR/CRLF and can either drop U+0000 or turn it into U+FFFD, so both values are
- * normalized by folding newlines and removing null/replacement characters.
- */
-function normalizeParserText(value: string): string {
-	return value.replace(/\r\n?/g, '\n').replace(/[\u0000\uFFFD]/g, '');
-}
-
-function isTextParserNormalizedMatch(server: string | null, client: string): boolean {
-	return server !== null && normalizeParserText(server) === normalizeParserText(client);
-}
-
-function isAttributeParserNormalizedMatch(server: string | null, client: string): boolean {
-	return server !== null && normalizeParserText(server) === normalizeParserText(client);
 }
 
 /**
@@ -24223,7 +23921,7 @@ function isEmptyTextSlot(node: Node | null): node is Comment {
  */
 /**
  * From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked).
- * Throws UnclosedHydrationRange when the parent ends first.
+ * Throws a HydrationMismatch when the parent ends first.
  */
 function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment {
 	let nested: Comment[] | null = null;
@@ -24244,7 +23942,11 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 		}
 		node = getNextSibling(node);
 	}
-	throw new UnclosedHydrationRange();
+	// The server closes every range it opens, so something changed its HTML
+	// after rendering, such as a minifier or proxy that strips comments. No
+	// close in the parent can be trusted then, so the nearest intact owner falls
+	// back as for any other mismatch.
+	throw new HydrationMismatch(formatClientError(338));
 }
 
 /**
@@ -24265,20 +23967,6 @@ class HydrationMismatch extends NativeAdoptionMiss {
 		super('', '');
 		this.name = 'HydrationMismatch';
 		this.message = message;
-	}
-}
-
-/**
- * A server range has no closing marker. The server closes every range it
- * opens, so something changed its HTML after rendering, for example a
- * minifier or proxy that strips comments. No close in the parent can be
- * trusted then, and no extent guessed for the range is safe, so the nearest
- * intact owner falls back like any other mismatch.
- */
-class UnclosedHydrationRange extends HydrationMismatch {
-	constructor() {
-		super(formatClientError(338));
-		this.name = 'UnclosedHydrationRange';
 	}
 }
 
@@ -25367,45 +25055,6 @@ export function setScriptText(el: Element, value: any): void {
 		}
 		el.textContent = text;
 	}
-}
-
-// SSR replaces only the `s` in case-insensitive opening/closing script tokens.
-// Hydration compares against that serialized spelling after the script-data
-// input normalization applied to server markup; later client updates use
-// textContent directly and therefore need no escape.
-const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
-
-function escapeInlineScriptContentForHydration(value: string): string {
-	return value.replace(
-		INLINE_SCRIPT_TOKEN,
-		(_match, prefix: string, s: string, suffix: string) =>
-			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
-	);
-}
-
-// Unlike ordinary HTML data, script-data preserves character references such as
-// `&amp;` verbatim. Normalize only the input-stream transformations that affect a
-// parsed script Text node: CRLF/CR become LF and NUL becomes U+FFFD.
-const SCRIPT_DATA_NORMALIZATION = /\r\n?|\u0000/g;
-
-function normalizeScriptTextForHydration(value: string): string {
-	return value.replace(SCRIPT_DATA_NORMALIZATION, (match) =>
-		match === '\u0000' ? '\uFFFD' : '\n',
-	);
-}
-
-/** Parse raw HTML in its authored host context for hydration comparison. */
-function normalizeHTMLForHydration(parent: Element, html: string): string {
-	// Match React's comparison boundary: the browser canonicalizes equivalent
-	// spellings such as `<span/>` and `<span></span>` when parsing server HTML.
-	const doc = parent.ownerDocument;
-	const ns = parent.namespaceURI;
-	const testElement =
-		ns === 'http://www.w3.org/2000/svg' || ns === 'http://www.w3.org/1998/Math/MathML'
-			? doc.createElementNS(ns, parent.tagName)
-			: doc.createElement(parent.tagName);
-	testElement.innerHTML = html;
-	return testElement.innerHTML;
 }
 
 /**
@@ -26714,9 +26363,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// the final write. The same helper is used by compiler-baked and SSR attrs.
 	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
 	// An adopted element keeps its server attribute; development compares it with the final
-	// coerced value. The capability guard keeps that read out of ordinary client updates.
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	// coerced value.
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name, ns);
 	if (next === null) {
@@ -26832,8 +26480,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
 			? null
 			: String(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26857,8 +26504,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 			next = null;
 		else next = sanitizeURL(next);
 	}
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26898,8 +26544,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 		}
 		next = typeof value === 'string' ? value : String(value);
 	}
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26919,8 +26564,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	}
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26943,8 +26587,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 		value == null || typeof value === 'function' || typeof value === 'symbol'
 			? null
 			: String(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -27143,8 +26786,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsClass(el, cls, true)) return;
+	if (hydrating && activeHydration()?.keepsClass(el, cls, true)) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -27173,8 +26815,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 // existed).
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsClass(el, cls, false)) return;
+	if (hydrating && activeHydration()?.keepsClass(el, cls, false)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
@@ -27211,8 +26852,7 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	const style = (el as HTMLElement).style;
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, value)) return;
+	if (hydrating && activeHydration()?.keepsStyle(el, value)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
@@ -27234,8 +26874,7 @@ export function setStyleProperty(
 	previous: any,
 	scope: Scope | null = CURRENT_SCOPE,
 ): void {
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, { [name]: value }, staticCss)) return;
+	if (hydrating && activeHydration()?.keepsStyle(el, { [name]: value }, staticCss)) return;
 	const remove = value == null || typeof value === 'boolean';
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
@@ -27273,8 +26912,7 @@ export function setStyleProperties(
 	entries: readonly unknown[],
 	staticCss: string,
 ): void {
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && hydration.keepsStyle(el, null, staticCss, entries)) return;
+	if (hydrating && activeHydration()?.keepsStyle(el, null, staticCss, entries)) return;
 	const style = (el as HTMLElement).style;
 	let journaled = false;
 	for (let i = 0; i < entries.length; i += 2) {
@@ -27369,6 +27007,31 @@ function applyStyleProperty(
 	} else {
 		style.setProperty(prop, s);
 	}
+}
+
+/**
+ * The style a writer renders, on a detached declaration block, for hydration
+ * to compare with the server's it keeps (HydrationCapability.keepsStyle): the
+ * complete style `value`, or the fixed declarations `entries`, after the
+ * static declarations `staticCss`.
+ */
+function expectedStyle(
+	el: HTMLElement | SVGElement,
+	value: any,
+	staticCss?: string,
+	entries?: readonly unknown[],
+): CSSStyleDeclaration {
+	const expected = document.createElement('div').style;
+	if (staticCss !== undefined) expected.cssText = staticCss;
+	if (entries === undefined) applyStyleValue(el, expected, value, undefined);
+	else {
+		for (let i = 0; i < entries.length; i += 2) {
+			const entry = entries[i + 1];
+			if (entry != null && typeof entry !== 'boolean')
+				applyStyleProperty(el, expected, entries[i] as string, entry);
+		}
+	}
+	return expected;
 }
 
 // ---------------------------------------------------------------------------
@@ -28707,8 +28370,7 @@ function setHeadAttribute(el: Element, name: string, value: unknown): void {
 			return setAttribute(el, name, value);
 	}
 	const next = coerceAttrValue(el, name, value);
-	const hydration = hydrating ? activeHydration() : null;
-	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	if (el.getAttribute(name) === next) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
@@ -36181,7 +35843,7 @@ function reconcileDeoptChildren(
 				at++;
 			if (at < unstamped.length && unstamped[at].nodeType === 1) up = at;
 			else if (up < unstamped.length)
-				activeHydration()!.mismatch(
+				activeHydration()!.fail(
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `<${child.type as string}>`,
 					unstamped[up],
@@ -36215,7 +35877,7 @@ function reconcileDeoptChildren(
 				el.localName !== 'noscript' &&
 				!hydration.isFresh(el)
 			)
-				hydration.mismatch(
+				hydration.fail(
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `the end of <${el.localName}>`,
 					n,
@@ -36579,28 +36241,19 @@ function deoptItemBody(item: any, scope: Scope): void {
 			}
 			block.deoptNode = null;
 		}
-		// Hydration: the server serialized this component-bearing item as ONE
-		// `<!--[-->…<!--]-->` range (ssrChildItem emits no extra block for the
-		// item/childSlot layering, which is client-only structure), and mountItem
-		// already adopted that pair as the item block's markers. Seed the nested
-		// childSlot with the SAME markers so it BORROWS the item's range — without
-		// this it would grab the next `<!--[-->` at the cursor (the component's
-		// return content, one level too deep) as its own, desyncing everything
-		// inside. The cursor already sits on the item's first content node.
-		if (hydration !== null && scope.slots[0] === undefined && hydration.isOpen(block.startMarker)) {
-			const seeded = hydration.lendRange(block.startMarker as Comment, block.endMarker as Comment);
-			scope.slots[0] = seeded;
-			registerSlot(scope, seeded);
-		}
-		// Marker-elision M2: on a CLIENT mount, the nested childSlot BORROWS the
-		// item block's own `<!--it-->` pair as its range instead of minting a
-		// second inner pair (end anchor + lazy start) — the item's markers bound
-		// exactly the content this slot manages. clearChildContent sweeps BETWEEN
-		// markers (never removes them), and the item block still OWNS the pair
-		// (teardown removes it inclusive). Only when the item is comment-marked —
-		// a de-opt list always is (reconcileKeyed runs with singleRoot=false).
+		// Marker-elision M2: the nested childSlot BORROWS the item block's own
+		// pair as its range instead of minting a second inner pair (end anchor +
+		// lazy start) — the item's markers bound exactly the content this slot
+		// manages. clearChildContent sweeps BETWEEN markers (never removes them),
+		// and the item block still OWNS the pair (teardown removes it inclusive).
+		// Only when the item is comment-marked. A component-bearing item never
+		// delimits itself (selfDelimits), so on its first hydrating render the
+		// pair is the server's one range for the item, which mountItem adopted
+		// and the slot's first render claims (lentSlot). Above a passthrough
+		// owner the item's pair is the client's (mountPassthroughListItem).
+		const lent = hydration !== null && stale === null && !hydration.passthroughRanges;
 		if (
-			hydration === null &&
+			(hydration === null || lent) &&
 			scope.slots[0] === undefined &&
 			itemStart !== null &&
 			itemEnd !== null &&
@@ -36625,7 +36278,10 @@ function deoptItemBody(item: any, scope: Scope): void {
 				hostNode: transfer,
 				portal: null,
 				next: null,
+				// childSlot's own slots carry this key; one shape for both.
+				implicitSignal: undefined,
 			};
+			if (lent) hydration!.lentSlot = borrowed;
 			scope.slots[0] = borrowed;
 			registerSlot(scope, borrowed);
 		} else if (transfer !== null && transfer.parentNode !== null) {
@@ -37006,7 +36662,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// STRUCTURAL mismatch: the server rendered something other than this host element at
 		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …), or
 		// nothing at all.
-		hydration.mismatch(
+		hydration.fail(
 			process.env.NODE_ENV !== 'production'
 				? (hydration.node === null
 						? (block.parentNode as any).__oct_loc
@@ -37132,7 +36788,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		}
 		if (hydration !== null && (hydration.node !== null || !hydration.isFresh(block.parentNode))) {
 			// STRUCTURAL mismatch, as in hostElementBody.
-			hydration.mismatch(
+			hydration.fail(
 				process.env.NODE_ENV !== 'production'
 					? hydration.node === null
 						? (block.parentNode as any).__oct_loc
@@ -37803,8 +37459,6 @@ function renderPreparedChildList(
 		}
 	}
 	const { items, keys } = preparedList;
-	const markerlessMappedFallback =
-		mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
 	const keySource = compiledMapKey || keys!;
 	const normalizeKey = !!compiledMapKey;
 	const wasMappedNative = state.forSlot.mappedNative === true;
@@ -37874,21 +37528,6 @@ function renderPreparedChildList(
 		}
 		state.forSlot.mappedNative = true;
 	}
-	if (markerlessMappedFallback) {
-		const descriptorBody = body;
-		body = (item: any, scope: Scope): void => {
-			const root = scope.block.startMarker;
-			if (
-				root !== null &&
-				root === scope.block.endMarker &&
-				root.nodeType === 1 &&
-				scope.block.deoptNode === null
-			) {
-				scope.block.deoptNode = root;
-			}
-			descriptorBody(item, scope);
-		};
-	}
 	// `body` is `deoptItemBody` exactly when the compiler supplied no map body
 	// and this is not the mapped fallback — both wrapper assignments above are
 	// guarded by those two conditions. Record it on the slot rather than
@@ -37896,8 +37535,7 @@ function renderPreparedChildList(
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
 	state.forSlot.plainDeopt = plainDeopt ? updateDeoptComponent : null;
 	const fastFlags = compiledMapFlags || 0;
-	const ssrMarkerless =
-		compiledMapBody === undefined ? markerlessMappedFallback || plainDeopt : (fastFlags & 16) !== 0;
+	const ssrMarkerless = compiledMapBody !== undefined && (fastFlags & 16) !== 0;
 	let pure = (fastFlags & 1) !== 0;
 	let lite = false;
 	if (compiledMapBody !== undefined) {
@@ -38615,7 +38253,7 @@ export function childSlot(
 			(typeof value === 'string' && cursor?.nodeType === 3) ||
 			unframedComponentRoot;
 		if (!unframedMatch) {
-			hydration.mismatch(
+			hydration.fail(
 				process.env.NODE_ENV !== 'production' ? componentSourceLoc(parentBlock.body) : undefined,
 				() => (preparedList === null ? 'a renderable root' : 'a renderable list range'),
 				cursor,
@@ -41029,13 +40667,22 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
  * supersedes leaves the fragment with its own unmount. Hydration and a
  * boundary this render created write in place.
  */
-function insertArmPair(state: TrySlot | ErrorSlot, start: Node, end: Node, before: Node): Node {
+function insertArmPair(
+	state: TrySlot | ErrorSlot,
+	start: Node,
+	end: Node,
+	before: Node,
+	// The end of a body that borrowed the boundary's range, which lands before
+	// this arm (mountPendingBody).
+	bound: Node | null = null,
+): Node {
 	const live = before.parentNode!;
 	const parent =
 		live === state.domParent && usesFrontier(state.parentBlock, live)
 			? slotFrontier(state, state.parentBlock, live, before)
 			: live;
 	const at = parent === live ? before : null;
+	if (bound !== null) parent.insertBefore(bound, at);
 	parent.insertBefore(start, at);
 	parent.insertBefore(end, at);
 	return parent;
@@ -41394,6 +41041,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		state.env,
 	);
 	body.idState = state.idState;
+	if (hydrationStarted && start === state.start) body.exclusiveMarkers = true;
 	blockRare(body).tryHandler = (error: unknown) => {
 		switchErrorToCatch(state, error);
 		return state.block;
@@ -41809,6 +41457,8 @@ function createTryBody(
 		state.env,
 	);
 	block.idState = state.idState;
+	// A body that hydrated borrows the boundary's range (armRange).
+	if (hydrationStarted && start === state.start) block.exclusiveMarkers = true;
 	const rare = blockRare(block);
 	rare.trySlot = state;
 	rare.tryHandler = (error: unknown) => {
@@ -41865,8 +41515,10 @@ function mountHiddenTryBody(state: TrySlot): Block {
 interface InitialSuspenseHydration {
 	metadata: ChildNode[];
 	consume?: () => void;
-	start: Comment;
-	end: Comment;
+	/** The range the body adopts (armRange), and its first server node. */
+	start: Node;
+	end: Node;
+	first: Node | null;
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
@@ -41953,6 +41605,7 @@ function takeInitialSuspenseHydration(
 			metadata,
 			start,
 			end,
+			first: start === open ? cursor : getNextSibling(start),
 			idStart: 0,
 			...payload,
 			consume: () => {
@@ -41993,6 +41646,7 @@ function takeInitialSuspenseHydration(
 		metadata,
 		start,
 		end,
+		first: start === open ? cursor : getNextSibling(start),
 		idStart,
 		seedRaw,
 		nativeRaw,
@@ -42099,7 +41753,7 @@ function renderInitialSuspenseHydration(
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
-	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
+	const hydration = new HydrationCapability(block, initial.first, null);
 	hydration.speculative = hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
@@ -42128,7 +41782,7 @@ function renderInitialSuspenseHydration(
 		renderBlock(block);
 		if (hydration.deferred !== null) hydration.claimDeferred();
 		drainHydrationRenderPhaseUpdates(block, true);
-		hydration.settleValues();
+		hydration.settleTexts();
 		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
@@ -42415,9 +42069,15 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
  * are handled separately by hideTryContentAndMountPending. Focus remains owned by
  * the connected hidden host, matching React DOM's hideInstance behavior.
  */
-function hideBlockHostRange(block: Block, hidden: SuspenseHiddenDom): void {
+function hideBlockHostRange(
+	block: Block,
+	hidden: SuspenseHiddenDom,
+	// The boundary's end, which also bounds a body whose own end lands with
+	// the arm this hide shows (mountPendingBody).
+	limit: Node | null = null,
+): void {
 	let node = getNextSibling(block.startMarker!) as ChildNode | null;
-	while (node !== null && node !== block.endMarker) {
+	while (node !== null && node !== block.endMarker && node !== limit) {
 		if (node.nodeType === 1) {
 			const el = node as HTMLElement;
 			if (!hidden.displays.has(el)) {
@@ -42472,7 +42132,7 @@ function hideTryBlock(state: TrySlot): void {
 			releaseTryHide(hidden);
 		});
 	}
-	hideBlockHostRange(block, hidden);
+	hideBlockHostRange(block, hidden, state.end);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42480,7 +42140,7 @@ function rehideTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	const block = state.tryBlock;
 	if (hidden === null || !hidden.active || block === null || block.disposed) return;
-	hideBlockHostRange(block, hidden);
+	hideBlockHostRange(block, hidden, state.end);
 	hideSuspensePortalRanges(block, hidden);
 }
 
@@ -42866,10 +42526,19 @@ function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = document.createComment('pend-b');
 		const bEnd = document.createComment('/pend-b');
+		// A body that hydrated borrows the boundary's range (armRange). The first
+		// arm beside it mints the body's own end, which lands with the arm.
+		let bound: Comment | null = null;
+		const kept = hydrationStarted ? state.tryBlock : null;
+		if (kept !== null && kept.endMarker === state.end) {
+			bound = document.createComment('/try-b');
+			journalRootProperty(kept, 'endMarker', state.end);
+			kept.endMarker = bound;
+		}
 		const b = createBlock(
 			'control-flow',
 			state.parentBlock,
-			insertArmPair(state, bStart, bEnd, state.end),
+			insertArmPair(state, bStart, bEnd, state.end, bound),
 			bStart,
 			bEnd,
 			state.pendingBody,
@@ -45791,7 +45460,7 @@ function renderBranchSlot(
 						// cannot be this branch's own range: the server encoded this slot
 						// differently, such as a value-hole list's outer pair with one pair
 						// per item.
-						hydration.slotMismatch(
+						hydration.failAt(
 							parentScope,
 							slotKey,
 							'a single branch range',
@@ -45848,12 +45517,7 @@ function renderBranchSlot(
 				// An empty client branch, but the server rendered content in this slot
 				// (e.g. an `@else` with content on the server, an empty `@if` on the
 				// client).
-				hydration.slotMismatch(
-					parentScope,
-					slotKey,
-					'an empty branch',
-					getNextSibling(state.start),
-				);
+				hydration.failAt(parentScope, slotKey, 'an empty branch', getNextSibling(state.start));
 			}
 		} else if (body) {
 			// Markerless client mount — pick the boundary by what the branch renders.
@@ -47231,7 +46895,7 @@ export function forBlock<T>(
 			// The server frames every list, so a hydrating list without its range
 			// finds what the server rendered for something else.
 			if (hydration !== null)
-				hydration.slotMismatch(parentScope, slotKey, 'a list range', anchor ?? hydration.node);
+				hydration.failAt(parentScope, slotKey, 'a list range', anchor ?? hydration.node);
 			start = document.createComment('for');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (when a static sibling follows this @for in mixed
@@ -47282,7 +46946,7 @@ export function forBlock<T>(
 	// (hydration-protocol.ts). A plain range is not a list's.
 	const serverMarkerState = hydration?.markerState(state.start) ?? -1;
 	if (serverMarkerState === -1 && hydration !== null)
-		hydration.slotMismatch(parentScope, slotKey, 'a list range', state.start);
+		hydration.failAt(parentScope, slotKey, 'a list range', state.start);
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
@@ -47318,7 +46982,12 @@ export function forBlock<T>(
 				// the content inside the @for range is item blocks (`<!--[-->`), not the
 				// @empty body.
 				if (serverMarkerState === 1)
-					hydration.listArmMismatch(parentScope, slotKey, state.start, true);
+					hydration.failAt(
+						parentScope,
+						slotKey,
+						'an empty list (@empty)',
+						getNextSibling(state.start),
+					);
 				// The server already rendered the @empty content directly inside the
 				// adopted outer range. The empty body borrows that range and adopts from
 				// its first child; no redundant inner pair is necessary.
@@ -47391,7 +47060,7 @@ export function forBlock<T>(
 	// Hydrating, the server rendered no items (its open marker says so) where the
 	// client has items.
 	if (!isEmpty && hydration !== null && serverMarkerState === 0) {
-		hydration.listArmMismatch(parentScope, slotKey, state.start, false);
+		hydration.failAt(parentScope, slotKey, 'a populated list', getNextSibling(state.start));
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
@@ -48255,19 +47924,6 @@ function mountItemsLinear<T>(
 		}
 		adopt!.length = remaining;
 	}
-}
-
-/**
- * Whether the server rendered a de-opt list's `item` without a range of its
- * own: a host descriptor that renders one element. Until descriptor lists
- * decide that statically on both sides (#2028 P4), the server's shape says.
- */
-function deoptItemSelfDelimits(
-	hydration: HydrationCapability,
-	node: Node | null,
-	item: unknown,
-): boolean {
-	return !hydration.isOpen(node) && isHostDescriptor(item) && !descNeedsBlocks(item);
 }
 
 // A list above a selected hydration owner has no server list frames in the
@@ -49246,9 +48902,9 @@ function mountItem<T>(
 	// component-bearing) keeps the `it` pair. A later shape flip promotes the
 	// self-marked block to a minted pair in place (see deoptItemBody).
 	singleRoot: boolean | 2,
-	// True for compiled direct-host items and generic descriptor lists. A pure
-	// descriptor host self-delimits; component/text/empty descriptor items retain
-	// their explicit pair and continue through the marked hydration branch.
+	// A compiled row whose server body the compiler proved a direct host: it has
+	// no range of its own on the wire. A descriptor item (singleRoot 2) decides
+	// by its value instead (selfDelimits).
 	ssrMarkerless: boolean,
 	// Pure-host → blocks upgrade adoption: an existing raw child node this item
 	// should take over IN PLACE (self-marked directly, or markers minted around
@@ -49271,9 +48927,13 @@ function mountItem<T>(
 		// other blocks' server nodes: it builds as a client mount would, below.
 		if (!inserted) {
 			const node = hydration.node;
+			// A descriptor item delimits itself by its value (selfDelimits), as the
+			// server decided for the same value.
+			const descriptor = singleRoot === 2;
 			if (
-				ssrMarkerless &&
-				(singleRoot !== 2 || !forSlot.plainDeopt || deoptItemSelfDelimits(hydration, node, item))
+				descriptor
+					? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
+					: ssrMarkerless
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
 				// direct-host item self-delimits, exactly like the existing client-mount
@@ -49283,8 +48943,7 @@ function mountItem<T>(
 					node !== null &&
 					node !== forSlot.end &&
 					!isBlockOpen(node) &&
-					(singleRoot !== 2 ||
-						!forSlot.plainDeopt ||
+					(!descriptor ||
 						(node.nodeType === 1 &&
 							node.parentNode === parentNode &&
 							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
@@ -49302,7 +48961,7 @@ function mountItem<T>(
 					block.forSlot = forSlot;
 					block.key = key;
 					block.itemIndex = index;
-					if (singleRoot === 2 && forSlot.plainDeopt) block.deoptNode = node;
+					if (descriptor) block.deoptNode = node;
 					renderBlock(block);
 					hydration.node = block.endMarker?.nextSibling ?? getNextSibling(node);
 					return block;
@@ -49330,14 +48989,17 @@ function mountItem<T>(
 				return block;
 			}
 			// The server rendered fewer items than the client, or at the cursor an item
-			// that cannot be this one.
-			hydration.itemMismatch(
-				forSlot.end,
+			// that cannot be this one: a bare item where this one needs a range of its
+			// own, or an item of another tag.
+			hydration.fail(
 				process.env.NODE_ENV !== 'production'
-					? forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
+					? (forSlot.end.parentNode as any)?.__oct_loc
+					: undefined,
+				() =>
+					descriptor && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
-						: 'another list item'
-					: '',
+						: 'another list item',
+				hydration.node,
 			);
 		}
 		const block = hydration.suspend(() =>
@@ -51145,7 +50807,7 @@ function hydrateRootWithOutputHandler(
 				hydration.suspend(() => {
 					for (const activate of hydration.deferredActivities) activate();
 				});
-			hydration.settleValues();
+			hydration.settleTexts();
 			completed = true;
 		} catch (thrown) {
 			const error = hydration.failure(thrown);
