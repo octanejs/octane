@@ -2649,7 +2649,7 @@ export interface Block extends Scope {
 	 */
 	inactive: boolean;
 	/** Direct (own) context reads this render — drives memo invalidation alongside $$ctxReads. */
-	$$ctxDirect: Map<Context<any>, any> | null;
+	$$ctxDirect: Map<Context<any>, DirectContextRead> | null;
 	/**
 	 * The context epoch at which this block's $$ctxReads/$$ctxDirect
 	 * entries were last known consistent with live context versions: sampled when
@@ -12306,7 +12306,7 @@ class BlockImpl {
 	// lite descendant that shares this block). The DIRECT signal: a changed
 	// version here means THIS block must re-run; if only $$ctxReads changed, the
 	// block can bail its body and refresh just its consuming child blocks.
-	declare $$ctxDirect: Map<Context<any>, any> | null;
+	declare $$ctxDirect: Map<Context<any>, DirectContextRead> | null;
 	// Epoch stamp for the two dep maps — see Block.$$ctxDepsEpoch. Number so the
 	// "unverified" poison (-1) stays inside the same monomorphic field type.
 	declare $$ctxDepsEpoch: number;
@@ -16412,6 +16412,8 @@ export interface Context<T> {
 	 * changed", so an unpaired bump strands consumers.
 	 */
 	$$version: number;
+	/** Local-provider provenance; -1 after any external version write. */
+	$$providerVersion?: number;
 }
 
 /**
@@ -16495,6 +16497,7 @@ function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
+	ctx.$$providerVersion = 0;
 	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
 		// Octane has no render-prop Consumer (slot-keyed hooks make use()/useContext
@@ -16646,6 +16649,10 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 	// Local values roll back with their screen; the global invalidation epoch
 	// stays monotone so another root's committed Provider is never rewound.
 	if (had) {
+		// An external/older renderer's forced invalidation must stay conservative,
+		// including when a local provider changes before a consumer checks it.
+		context.$$providerVersion =
+			context.$$providerVersion === context.$$version ? context.$$version + 1 : -1;
 		context.$$version++;
 		bumpContextEpoch();
 	}
@@ -19112,14 +19119,51 @@ function promoteMemoAncestry(scope: Scope): void {
 	forEachSubtreeChild(scope, promoteMemoAncestry);
 }
 
-function recordContextDependency(block: Block | null, context: Context<any>): void {
+type DirectContextRead = number | { version: number; owner: Scope; value: unknown };
+
+function recordContextDependency(
+	block: Block | null,
+	context: Context<any>,
+): DirectContextRead | undefined {
 	if (block === null || !block.memoInChain) return;
 	SKIPPED_ROW_REFRESH = refreshSkippedRows;
-	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
+	const direct = (block.$$ctxDirect ??= new Map());
+	const previous = direct.get(context);
+	// Stamp before resolving: hosted context reads may suspend or throw.
+	direct.set(context, context.$$version);
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
 			(current.$$ctxReads ??= new Map()).set(context, context.$$version);
 		}
+	}
+	return previous;
+}
+
+function recordLocalContextValue(
+	reader: Scope | null,
+	block: Block | null,
+	context: Context<any>,
+	value: unknown,
+	previous: DirectContextRead | undefined,
+): void {
+	if (reader === null || block === null || !block.memoInChain) return;
+	// A replayed, hosted, or unresolved read keeps the coarse dependency. So
+	// does a block that reads this Context through more than one local provider.
+	if (typeof previous === 'number' || context.$$providerVersion !== context.$$version) return;
+	const cache = reader.$$ctxCache;
+	const owner =
+		cache === context
+			? reader.$$ctxCacheOwner
+			: cache !== null && reader.$$ctxCacheOwner === null
+				? (cache as Map<Context<any>, Scope | typeof DEFAULT_CTX>).get(context)
+				: undefined;
+	if (owner === null || owner === undefined || owner === DEFAULT_CTX) return;
+	if (previous !== undefined) {
+		if (previous.owner !== owner || !Object.is(previous.value, value)) return;
+		previous.version = context.$$version;
+		block.$$ctxDirect!.set(context, previous);
+	} else {
+		block.$$ctxDirect!.set(context, { version: context.$$version, owner, value });
 	}
 }
 
@@ -19350,8 +19394,10 @@ function readContextFrom<T>(reader: Scope | null, block: Block | null, context: 
 
 /** @internal Live context reader rooted at a captured DOM boundary scope. */
 export function readContextFromScope<T>(scope: Scope, context: Context<T>): T {
-	recordContextDependency(scope.block, context);
-	return readContextFrom(scope, scope.block, context);
+	const previous = recordContextDependency(scope.block, context);
+	const value = readContextFrom(scope, scope.block, context);
+	recordLocalContextValue(scope, scope.block, context, value, previous);
+	return value;
 }
 
 /** @internal Cold adapter query; native render and hide paths pay no extra work. */
@@ -19385,8 +19431,10 @@ function useContextInternal<T>(context: Context<T>): T {
 	// would stamp nothing. `memoInChain` is precomputed at block creation, so the
 	// common no-memo tree pays a single boolean test instead of an ancestor walk
 	// per `use()` call.
-	recordContextDependency(CURRENT_BLOCK, context);
-	return readContextFrom(CURRENT_SCOPE, CURRENT_BLOCK, context);
+	const previous = recordContextDependency(CURRENT_BLOCK, context);
+	const value = readContextFrom(CURRENT_SCOPE, CURRENT_BLOCK, context);
+	recordLocalContextValue(CURRENT_SCOPE, CURRENT_BLOCK, context, value, previous);
+	return value;
 }
 
 // ---------------------------------------------------------------------------
@@ -40974,8 +41022,18 @@ function ctxDepsChanged(block: Block): boolean {
 function ctxDirectChanged(block: Block): boolean {
 	const direct = block.$$ctxDirect;
 	if (direct === null) return false;
-	for (const [ctx, version] of direct) {
-		if (ctx.$$version !== version) return true;
+	for (const [ctx, read] of direct) {
+		const version = typeof read === 'number' ? read : read.version;
+		if (ctx.$$version === version) continue;
+		// Versions belong to the Context, not to one provider. Another provider
+		// can change while this consumer's nearest value remains unchanged.
+		if (
+			typeof read === 'number' ||
+			ctx.$$providerVersion !== ctx.$$version ||
+			!Object.is(read.owner.$$ctxValues?.get(ctx), read.value)
+		)
+			return true;
+		read.version = ctx.$$version;
 	}
 	return false;
 }
@@ -41104,7 +41162,8 @@ function restampCtxDeps(block: Block): void {
 			}
 		}
 		if (hasDirect) {
-			for (const [ctx, v] of direct!) {
+			for (const [ctx, read] of direct!) {
+				const v = typeof read === 'number' ? read : read.version;
 				const cur = m.get(ctx);
 				if (cur !== v) {
 					const live = (ctx as any).$$version;
