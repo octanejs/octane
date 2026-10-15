@@ -13,9 +13,11 @@
  * Reconciliation: LIS-based keyed list inside forBlock (ported from Ripple's patchKeyedChildrenComplex).
  */
 
-// This module is the runtime's facade. The runtime itself lives in ./runtime/,
-// one module per concept; scripts/split-runtime.map.json names the module of
-// every declaration. The exports below are the runtime's surface, unchanged.
+// This module is the runtime's facade. The runtime lives in ./runtime/, one
+// module per concept, and those modules are the source to edit. The exports
+// below are the runtime's surface. `node scripts/split-runtime.mjs check`
+// enforces the rules below on the split layout; the tool's map and its other
+// commands were for the one-time split.
 //
 // The links before them pin evaluation order. First come this runtime's
 // dependencies, in the order the single-file runtime imported them, then the
