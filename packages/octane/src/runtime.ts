@@ -25931,12 +25931,14 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				// Hydration adopts the user's pre-hydration selection, and an adopted
 				// select keeps its server `multiple` like any server attribute. An
 				// armed select value still reasserts through its controlled commit queue.
-				if (
-					hydrating &&
-					CURSOR !== null &&
-					(name === 'selected' || CURSOR.keepsAttribute(el, name, next ? '' : null))
-				)
+				if (hydrating && CURSOR !== null) {
+					if (name === 'multiple') {
+						CURSOR.adopts(el);
+						if (process.env.NODE_ENV !== 'production')
+							unpatchedAttribute(CURSOR, el, name, next ? '' : null);
+					}
 					return;
+				}
 				// mustUseProperty like `muted`. `multiple` reflects back to the
 				// attribute; `selected` is live option state (the controlled
 				// <select> projection owns it when a select value is armed).
