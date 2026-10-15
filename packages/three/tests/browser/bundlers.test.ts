@@ -755,4 +755,46 @@ describe('Three Canvas bundler and browser integration', () => {
 			await browser.close();
 		}
 	}, 60_000);
+
+	it('commits DOM updates from a mesh click before native dispatch returns', async () => {
+		const browser = await launchBrowser(webglLaunchOptions());
+		const page = await browser.newPage({ viewport: { width: 192, height: 160 } });
+		try {
+			await page.goto(viteOrigin, { waitUntil: 'load' });
+			await page.waitForFunction(
+				() =>
+					(globalThis as typeof globalThis & { __octaneThreeSceneReady?: boolean })
+						.__octaneThreeSceneReady === true,
+			);
+			await page.evaluate(() => {
+				(
+					globalThis as typeof globalThis & { __octaneThreeState?: { advance(time: number): void } }
+				).__octaneThreeState?.advance(1 / 60);
+			});
+			const bounds = await page.locator('canvas').boundingBox();
+			if (bounds === null) throw new Error('Canvas had no browser bounds.');
+			const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+			await page.mouse.move(center.x, center.y);
+			await page.mouse.down();
+			// Keep dispatch and both observations in one JavaScript task so a queued
+			// microtask cannot make an asynchronous DOM update appear synchronous.
+			const observed = await page.evaluate(({ x, y }) => {
+				const proof = globalThis as typeof globalThis & { __octaneThreeSelectOnClick?: boolean };
+				const app = document.querySelector<HTMLElement>('[data-octane-three-app="ready"]');
+				const canvas = app?.querySelector('canvas');
+				if (app == null || canvas == null) throw new Error('The Three app did not mount.');
+				proof.__octaneThreeSelectOnClick = true;
+				let inLaterListener: string | undefined;
+				app.addEventListener('click', () => (inLaterListener = app.dataset.selection), {
+					once: true,
+				});
+				canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y }));
+				return { inLaterListener, afterDispatch: app.dataset.selection };
+			}, center);
+			expect(observed).toEqual({ inLaterListener: 'selected', afterDispatch: 'selected' });
+		} finally {
+			await page.close();
+			await browser.close();
+		}
+	}, 60_000);
 });

@@ -8449,6 +8449,11 @@ export function flushSync<T>(fn: () => T): T {
 	return fn();
 }
 
+/** @internal The server has no DOM event scheduler. */
+export function __createDiscreteEventListener(listener: EventListener): EventListener {
+	return listener;
+}
+
 // Children-block tagging — same contract as the client runtime (runtime.ts):
 // the compiler tags element/text children lowered to a render function so
 // `isChildrenBlock` can tell them from a user render-prop child. Both runtimes

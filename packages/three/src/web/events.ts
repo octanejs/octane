@@ -1,4 +1,6 @@
-import { flushSync } from 'octane';
+'use strong';
+
+import { __createDiscreteEventListener } from 'octane';
 import type { RootState, RootStore } from '../core/store.js';
 import {
 	createEvents,
@@ -26,12 +28,12 @@ export function createPointerEvents(store: RootStore): EventManager<HTMLElement>
 	const { handlePointer } = createEvents(store);
 	const handlers = Object.fromEntries(
 		(Object.keys(DOM_EVENTS) as Array<keyof typeof DOM_EVENTS>).map((name) => {
-			const handleEvent = handlePointer(name);
+			const listener = handlePointer(name);
 			return [
 				name,
 				getThreeEventPriority(name) === 'discrete'
-					? (event: Event) => flushSync(() => handleEvent(event))
-					: handleEvent,
+					? __createDiscreteEventListener(listener)
+					: listener,
 			];
 		}),
 	) as unknown as Events;

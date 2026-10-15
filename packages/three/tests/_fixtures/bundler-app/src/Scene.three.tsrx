@@ -13,6 +13,7 @@ type ThreeBrowserProof = typeof globalThis & {
 	__octaneThreePointerId?: number;
 	__octaneThreeRemoveOnDown?: boolean;
 	__octaneThreeReleaseOnUp?: boolean;
+	__octaneThreeSelectOnClick?: boolean;
 };
 
 function BrowserAsset(props) @{
@@ -23,7 +24,7 @@ function BrowserAsset(props) @{
 	<group name={'browser-asset-' + props.copy + ':' + asset.trim()} />
 }
 
-export function Scene() @{
+export function Scene({ onSelect }: { onSelect?: () => void }) @{
 	const proof = globalThis as ThreeBrowserProof;
 	const state = useThree((value) => value);
 	const [visible, setVisible] = useThreeState(true);
@@ -76,7 +77,10 @@ export function Scene() @{
 						event.target.releasePointerCapture(event.pointerId);
 					}
 				}}
-				onClick={(event) => record('click', event)}
+				onClick={(event) => {
+					record('click', event);
+					if (proof.__octaneThreeSelectOnClick === true) onSelect?.();
+				}}
 			>
 				<boxGeometry args={[2, 2, 2]} />
 				<meshBasicMaterial color={16711680} toneMapped={false} />
