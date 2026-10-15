@@ -11,25 +11,9 @@ export interface RenderWriteAllowance {
 	reason: string;
 }
 
-const FIRST_MOUNT =
-	"A root's first client render over a container that holds other DOM mounts into it in place.";
 const HYDRATING = 'A hydrating render writes the server DOM it adopts.';
 
 export const RENDER_WRITE_ALLOWLIST: readonly RenderWriteAllowance[] = [
-	...[
-		'childSlot',
-		'clearRootContainer',
-		'deoptItemBody',
-		'drainFrag',
-		'hostElementBody',
-		'mountItem',
-		'renderPreparedChildList',
-		'setAttribute',
-	].flatMap((writer) =>
-		['root-container-contract.test.ts', 'hydration/returned-host-root-hydrate.test.ts'].map(
-			(file) => ({ file, writer, owner: 'structure', reason: FIRST_MOUNT }),
-		),
-	),
 	{
 		file: 'hydration/activity-hydrate.test.ts',
 		writer: 'enforceHiddenDisplay',

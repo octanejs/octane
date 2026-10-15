@@ -1,4 +1,4 @@
-import { createElement, useState } from 'octane';
+import { createElement, use, useState } from 'octane';
 
 export function DocumentView(props: { label: string }) @{
 	const [count, setCount] = useState(0);
@@ -6,6 +6,30 @@ export function DocumentView(props: { label: string }) @{
 		<head />
 		<body>
 			<button onClick={() => setCount(count + 1)}>{`${props.label}:${count}`}</button>
+		</body>
+	</html>
+}
+
+// Its title hoists to the head, between the server's ownership markers.
+export function HoistedTitleDocument(props: { label: string }) @{
+	<html lang="en">
+		<head />
+		<body>
+			<title>{props.label as string}</title>
+			<p>{props.label as string}</p>
+		</body>
+	</html>
+}
+
+// Suspends its first render until `gate` settles.
+export function GatedDocument(props: { gate: PromiseLike<unknown>; label: string }) @{
+	use(props.gate);
+	<html lang="en">
+		<head>
+			<title>{props.label as string}</title>
+		</head>
+		<body>
+			<p>{props.label as string}</p>
 		</body>
 	</html>
 }

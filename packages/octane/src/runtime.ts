@@ -4538,13 +4538,12 @@ function openFrontier(
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
-	// A container in another document, such as one a client render replacing a
-	// document's failed hydration owns, builds in a fragment of that document.
-	const doc = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument;
+	// A container in another document, such as a document root's, builds in a
+	// fragment of that document.
+	const doc = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
+	const spare = SPARE_FRONTIERS.pop();
 	const frag =
-		doc === null || doc === document
-			? SPARE_FRONTIERS.pop() || document.createDocumentFragment()
-			: doc.createDocumentFragment();
+		spare !== undefined && spare.ownerDocument === doc ? spare : doc.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.frag = frag;
 	next.members = [];
@@ -4913,6 +4912,8 @@ function queueRootUnmount(scope: Scope, exclusive: boolean, out?: any[]): void {
 	} else if (block.kind === 'root') {
 		const parent = block.parentNode;
 		first = getFirstChild(parent);
+		// A document keeps its doctype (clearRootContainer).
+		if (first !== null && first.nodeType === 10) first = getNextSibling(first);
 		last = parent.lastChild;
 	}
 	// A teardown inside an aborted mount keeps that mount's ref suppression.
@@ -49736,7 +49737,7 @@ function removeNodes(nodes: readonly Node[]): void {
  */
 function frontierRootMount(block: Block): void {
 	const container = block.parentNode;
-	if (hydrating || container.nodeType === 9 || (container as any).$$next !== undefined) return;
+	if (hydrating || (container as any).$$next !== undefined) return;
 	journalRootProperty(block, 'parentNode', container);
 	const next = (queueFrontier(block, container, null) as any).$$next as SlotNext;
 	next.out.push(() => clearRootContainer(container as RootContainer), null, null);
@@ -50098,9 +50099,10 @@ function makeRoot(
 				frontier.frag!.append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				frontier = renderOwner.hydrationFallback(false);
-			} else if (container.nodeType !== 9 && !hydrating) {
+			} else if (!hydrating) {
 				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
-				// The container's previous content leaves as the mount lands.
+				// The container's previous content leaves as the mount lands, all but
+				// a document's doctype (clearRootContainer).
 				frontier.out.push(() => clearRootContainer(container), null, null);
 			} else {
 				clearRootContainer(container);
