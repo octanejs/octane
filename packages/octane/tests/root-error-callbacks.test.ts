@@ -752,12 +752,15 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 
 	it('onUncaughtError consumes a hydration render error (unowned root)', async () => {
 		container.innerHTML = '<!--3--><div>server</div>';
-		const onUncaughtError = vi.fn();
+		// The server DOM has left when the report arrives, as React clears the
+		// container before it reports.
+		const onUncaughtError = vi.fn((_error: unknown) => container.innerHTML);
 		let root!: ReturnType<typeof hydrateRoot>;
 		expect(() => {
 			root = hydrateRoot(container, MountThrower, {}, { onUncaughtError });
 		}).not.toThrow();
 		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect(onUncaughtError.mock.results[0].value).toBe('');
 		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('mount-boom');
 		// The failed adoption was discarded; the returned root stays usable.
 		expect(container.textContent).toBe('');

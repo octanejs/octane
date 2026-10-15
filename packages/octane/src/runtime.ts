@@ -4680,7 +4680,7 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 		// boundary's hydration attempt in a later render.
 		if (transaction.hydrating !== true) return hydrating && domParent.isConnected;
 		const container = transaction.owner.current?.parentNode;
-		return container != null && container.contains(domParent);
+		return (container != null && container.contains(domParent)) || domParent.isConnected;
 	}
 	// A committed Block can still render a slot into fresh DOM, as can a lite
 	// Scope this render created under one: a frontier, which commit inserts.
@@ -5043,7 +5043,8 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	const tx = ROOT_RENDER_TRANSACTION;
 	if (tx === null) return null;
 	if (state.next !== null && state.next.tx === tx) return slotNext(state);
-	const parent = state.end.parentNode!;
+	// A hydrating list's end may still be to place (placeAtCommit).
+	const parent = markerParent(state.end)!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
 	let owner = parentBlock;
 	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
@@ -37338,9 +37339,11 @@ function renderPreparedChildList(
 					}
 				}
 			}
-			// A hydrating render places the list's markers in the server DOM at commit;
-			// a committed host's new list builds off-document, and its commit appends it.
-			if (hydration !== null) placeAtCommit(domParent, state.end, anchor);
+			// A hydrating render places the list's markers in the server DOM at commit,
+			// also where it builds the list with adoption suspended; a committed host's
+			// new list builds off-document, and its commit appends it.
+			if (hydration !== null || (hydrating && domParent.isConnected))
+				placeAtCommit(domParent, state.end, anchor);
 			else if (!passthroughList && !upgradeArmed && usesFrontier(parentBlock, domParent))
 				slotFrontier(state, parentBlock, domParent, null).appendChild(state.end);
 			else domParent.insertBefore(state.end, anchor);
@@ -37357,7 +37360,8 @@ function renderPreparedChildList(
 				: cursor !== null && cursor.parentNode === domParent
 					? cursor
 					: state.end;
-			if (hydration !== null) placeAtCommit(domParent, state.start, before);
+			if (hydration !== null || (hydrating && domParent.isConnected))
+				placeAtCommit(domParent, state.start, before);
 			else (upgradeArmed ? domParent : state.end.parentNode!).insertBefore(state.start, before);
 			if (passthroughList) passthroughStart = state.start;
 		}
@@ -40688,8 +40692,16 @@ function mountPassthroughCatch(
 	state.block = block;
 	try {
 		const hydration = hydrating ? activeHydration() : null;
-		if (freshFallback && hydration !== null) hydration.suspend(() => renderBlock(block));
-		else renderBlock(block);
+		if (freshFallback && hydration !== null) {
+			// The fallback builds off-document and lands at commit, after the server
+			// content it replaces has left (removeOwnedContent).
+			if (ROOT_RENDER_TRANSACTION !== null) {
+				const frag = queueFrontier(block, state.domParent, null);
+				block.parentNode = frag;
+				noteFrontierMember(frag, block);
+			}
+			hydration.suspend(() => renderBlock(block));
+		} else renderBlock(block);
 	} finally {
 		if (reportInline && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
 	}
@@ -50022,7 +50034,7 @@ function makeRoot(
 			if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 			if (unmounted) return;
 		}
-		const frame = beginRootRender(renderOwner);
+		let frame = beginRootRender(renderOwner);
 		renderOwner.transaction!.rootRequest = true;
 		const previousRoot = rootBlock;
 		const previousBody = currentBody;
@@ -50094,10 +50106,6 @@ function makeRoot(
 			rootBlock.idState = idState;
 			renderOwner.current = rootBlock;
 			createdInRootRender(rootBlock);
-			// A fallback rendering in place shares its container with the server's
-			// nodes until it commits: a rollback must not clear the container.
-			if (renderOwner.hydrationFallback !== undefined && frontier === null)
-				preserveRootCreatedDom(rootBlock);
 			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
@@ -50135,9 +50143,12 @@ function makeRoot(
 					validateRootHtmlNesting(container, body, frontier?.frag ?? container);
 				}
 			} catch (error) {
+				let failed = false;
 				try {
 					handleRenderError(mountedRoot, error);
 				} catch (unhandled) {
+					failed = true;
+					error = unhandled;
 					const transaction = renderOwner.transaction;
 					if (transaction !== null) rollbackRootRender(transaction);
 					// Match the scheduled-render failure path: discard the failed tree
@@ -50149,11 +50160,17 @@ function makeRoot(
 					// render, so the option must not behave differently from a scheduled
 					// render's unhandled error.
 					if (rootBlock !== null && !rootBlock.disposed) unmountBlock(rootBlock);
-					renderOwner.hydrationFallback?.(true);
-					if (!reportUncaughtError(mountedRoot, unhandled)) throw unhandled;
+				}
+				// The render closes before the root releases the DOM it leaves:
+				// rendering writes none.
+				endRootRender(frame);
+				frame = null;
+				if (!failed) {
+					if (renderOwner.wakeable === null) root.unmount();
 					return;
 				}
-				if (renderOwner.wakeable === null) root.unmount();
+				renderOwner.hydrationFallback?.(true);
+				if (!reportUncaughtError(mountedRoot, error)) throw error;
 				return;
 			}
 			if (staged) {
