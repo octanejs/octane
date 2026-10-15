@@ -15849,14 +15849,37 @@ export function renderClientContextProvider<T>(
 		const dialect =
 			typeof children === 'function' ? ((children as any)[CHILDREN_BODY] ?? children) : 2;
 		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		let liveEnd: Node | null | undefined;
 		if (previous !== dialect) {
 			if (previous !== undefined && (previous === 2 || dialect === 2)) {
-				resetScopeChildren(scope);
+				const block = scope.block;
+				const parent = block.parentNode;
+				// Over committed DOM the outgoing children leave at commit, after their
+				// cleanups, and the incoming ones build in a frontier that lands before
+				// the Provider's end.
+				const live = ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, parent);
+				resetScopeChildren(scope, !live);
 				// The reset runs user cleanups, so it can throw into the enclosing boundary and
 				// switch it to its catch arm — which disposes this block. Rendering children
 				// into a disposed block writes into the catch range, so bail out here, as every
 				// other mid-render teardown site does after `unmountBlock`.
-				if (scope.block.disposed) return;
+				if (block.disposed) return;
+				if (live) {
+					liveEnd = block.endMarker;
+					const first =
+						block.startMarker !== null ? getNextSibling(block.startMarker) : getFirstChild(parent);
+					if (first !== liveEnd)
+						queueRootDeletion(
+							null,
+							first,
+							liveEnd === null ? parent.lastChild : liveEnd.previousSibling,
+						);
+					const frag = queueFrontier(block, parent, liveEnd);
+					journalRootProperty(block, 'parentNode', parent);
+					block.parentNode = frag;
+					block.endMarker = null;
+					noteFrontierMember(frag, scope);
+				}
 			} else if (previous !== undefined) {
 				// A different body reused the same DOM/control slots. Its predecessor's
 				// output dependencies no longer prove what those slots contain. Hook
@@ -15869,7 +15892,14 @@ export function renderClientContextProvider<T>(
 			}
 			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
 		}
-		renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
+		if (liveEnd === undefined)
+			renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
+		else
+			try {
+				renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
+			} finally {
+				scope.block.endMarker = liveEnd;
+			}
 	}
 }
 
