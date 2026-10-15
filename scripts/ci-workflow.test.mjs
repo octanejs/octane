@@ -27,9 +27,11 @@ const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.conf
 const parityVitestModule = await import(
 	pathToFileURL(path.join(REPO, 'vitest.react-parity.config.js'))
 );
-const { configureShardedProjects, default: shardedVitestConfig } = await import(
-	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
-);
+const {
+	configureShardedProjects,
+	ISOLATED_COMPILER_SPEC,
+	default: shardedVitestConfig,
+} = await import(pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js')));
 const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
 const releaseWorkflow = readFileSync(path.join(REPO, '.github/workflows/release.yml'), 'utf8');
 const draftWorkflow = readFileSync(
@@ -756,13 +758,16 @@ describe('CI workflow aggregation', () => {
 	});
 
 	test('keeps isolated compiler coverage in the required Node integration lane', () => {
-		const project = baseVitestModule.default.test.projects.find(
+		const spec = ISOLATED_COMPILER_SPEC;
+		assert.ok(existsSync(path.join(REPO, spec)));
+		const baseProject = baseVitestModule.default.test.projects.find(
 			({ test }) => test?.name === 'octane',
 		);
-		assert.equal(project.testExecution.group, 'heavy-node');
-		assert.equal(project.testExecution.include.length, 1);
-		const [spec] = project.testExecution.include;
-		assert.ok(existsSync(path.join(REPO, spec)));
+		const shardedProject = shardedVitestConfig.test.projects.find(
+			({ test }) => test?.name === 'octane',
+		);
+		assert.equal(baseProject.testExecution, undefined);
+		assert.deepEqual(shardedProject?.test.include, baseProject.test.include);
 		const owners = (projects) =>
 			projects.filter((entry) => projectSelects(entry, spec, REPO)).map(({ test }) => test.name);
 		assert.deepEqual(owners(baseVitestModule.default.test.projects), ['octane']);
