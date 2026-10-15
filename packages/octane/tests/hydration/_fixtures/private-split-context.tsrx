@@ -67,6 +67,17 @@ export function App(props: Props) @{
 	</main>
 }
 
+export function SurroundingProvider(props: Props) @{
+	<Theme value={props.value}>
+		<main>
+			<Reader />
+			<Hydrate when={props.when} onHydrated={props.onHydrated}>
+				<Editor onEffect={props.onEffect} when={props.when} value={props.value} />
+			</Hydrate>
+		</main>
+	</Theme>
+}
+
 export function Pending(props: Props) @{
 	<Suspense fallback={<p id="split-context-pending">{'pending'}</p>}>
 		<Hydrate when={props.when} prefetch={props.prefetch}>

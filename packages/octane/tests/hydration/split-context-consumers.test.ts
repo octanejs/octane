@@ -129,6 +129,54 @@ describe('Context providers across split hydration', { timeout: 15_000 }, () => 
 		expect(host.childNodes.length).toBe(0);
 	});
 
+	it('keeps an outer provider live when it changes before and after its deferred reader activates', async () => {
+		const onEffect = vi.fn(),
+			onHydrated = vi.fn();
+		const recoverable: unknown[] = [];
+		const props = { when: condition(false), value: 'server', onEffect, onHydrated };
+		container().innerHTML = renderToString(server.SurroundingProvider, props).html;
+		const eager = host.querySelector('.split-context-eager')!;
+		const value = host.querySelector('#split-context-value')!;
+		const input = host.querySelector<HTMLInputElement>('#split-context-draft')!;
+		input.value = 'typed before hydration';
+		root = hydrateRoot(host, client.SurroundingProvider, props, {
+			onRecoverableError: (error) => recoverable.push(error),
+		});
+		await act(() => {});
+		expect(onEffect).not.toHaveBeenCalled();
+		expect(value.textContent).toBe('server');
+
+		await act(() => root!.render(client.SurroundingProvider, { ...props, value: 'before' }));
+		expect(eager.textContent).toBe('before');
+		await act(() =>
+			root!.render(client.SurroundingProvider, { ...props, when: load(), value: 'before' }),
+		);
+		await vi.waitFor(() => expect(onHydrated).toHaveBeenCalledOnce(), SPLIT_CHILD_LOAD);
+		expect(host.querySelector('#split-context-value')).toBe(value);
+		expect(value.textContent).toBe('before');
+		expect(value.getAttribute('title')).toBe('before');
+		const button = host.querySelector<HTMLButtonElement>('#split-context-action')!;
+		await act(() => button.click());
+		expect(button.textContent).toBe('1');
+
+		await act(() =>
+			root!.render(client.SurroundingProvider, { ...props, when: load(), value: 'after' }),
+		);
+		expect(host.querySelector('.split-context-eager')).toBe(eager);
+		expect(eager.textContent).toBe('after');
+		expect(host.querySelector('#split-context-value')).toBe(value);
+		expect(value.textContent).toBe('after');
+		expect(value.getAttribute('title')).toBe('after');
+		expect(host.querySelector('#split-context-draft')).toBe(input);
+		expect(input.value).toBe('typed before hydration');
+		expect(host.querySelector('#split-context-action')).toBe(button);
+		expect(button.textContent).toBe('1');
+		expect(onEffect.mock.calls).toEqual([['mount']]);
+		expect(recoverable).toEqual([]);
+		root.unmount();
+		expect(onEffect.mock.calls).toEqual([['mount'], ['cleanup']]);
+	});
+
 	it('retries suspended split content with the current provider and retires obsolete work', async () => {
 		let release!: () => void;
 		const pending = new Promise<void>((done) => {

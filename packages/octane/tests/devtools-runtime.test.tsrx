@@ -1,10 +1,10 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { createRoot, useState } from 'octane';
+import { createContext, createRoot, useContext, useState } from 'octane';
 import { act, mount } from './_helpers';
-import type { OctaneDevtoolsHook } from '../src/devtools-hook';
+import type { DevtoolsTreeNode, OctaneDevtoolsHook } from '../src/devtools-hook';
 
-function Leaf(props) @{
-	<span>{props.count as string}</span>
+function Leaf(props: { count: number }) @{
+	<span>{String(props.count)}</span>
 }
 
 function CounterApp() @{
@@ -13,6 +13,18 @@ function CounterApp() @{
 		<button onClick={() => setCount(count + 1)}>inc</button>
 		<Leaf count={count} />
 	</div>
+}
+
+const InspectorTheme = createContext({ value: 'default', owner: 'anonymous' });
+
+function ThemeReader() @{
+	<p>{useContext(InspectorTheme).value as string}</p>
+}
+
+function ThemeApp(props: { value: { value: string; owner: string } }) @{
+	<InspectorTheme value={props.value}>
+		<ThemeReader />
+	</InspectorTheme>
 }
 
 function hook(): OctaneDevtoolsHook {
@@ -27,7 +39,7 @@ describe('runtime devtools instrumentation (profile build)', () => {
 	});
 
 	it('registers a mounted root and exposes it as a named tree', () => {
-		const { unmount } = mount(<CounterApp />);
+		const { unmount } = mount(CounterApp);
 		const roots = hook().getTree();
 		const app = roots.find((r) => r.name === 'CounterApp');
 		expect(app).toBeDefined();
@@ -45,7 +57,7 @@ describe('runtime devtools instrumentation (profile build)', () => {
 		const off = hook().subscribe(() => {
 			flushes++;
 		});
-		const { container, unmount } = mount(<CounterApp />);
+		const { container, unmount } = mount(CounterApp);
 		const before = flushes;
 		act(() => {
 			(container.querySelector('button') as HTMLButtonElement).click();
@@ -53,6 +65,27 @@ describe('runtime devtools instrumentation (profile build)', () => {
 		expect(flushes).toBeGreaterThan(before);
 		off();
 		unmount();
+	});
+
+	it('previews the actual provider value when the value itself has a value property', () => {
+		const rendered = mount(ThemeApp, { value: { value: 'blue', owner: 'page' } });
+		function contextPreviews(tree: DevtoolsTreeNode[]): unknown[] {
+			return tree.flatMap((node) => [
+				...hook()
+					.inspect(node.id)!
+					.context.map((entry) => entry.value),
+				...contextPreviews(node.children),
+			]);
+		}
+		try {
+			expect(rendered.find('p').textContent).toBe('blue');
+			expect(contextPreviews(hook().getTree())).toEqual([{ value: 'blue', owner: 'page' }]);
+			rendered.update(ThemeApp, { value: { value: 'green', owner: 'user' } });
+			expect(rendered.find('p').textContent).toBe('green');
+			expect(contextPreviews(hook().getTree())).toEqual([{ value: 'green', owner: 'user' }]);
+		} finally {
+			rendered.unmount();
+		}
 	});
 
 	it('notifies subscribers when an effect-free first render reaches its deferred commit', async () => {
@@ -85,7 +118,7 @@ describe('runtime devtools instrumentation (profile build)', () => {
 	});
 
 	it('notifies subscribers when a script-dispatched click reaches its microtask commit', async () => {
-		const rendered = mount(<CounterApp />);
+		const rendered = mount(CounterApp);
 		let off = () => {};
 		try {
 			await Promise.resolve();
