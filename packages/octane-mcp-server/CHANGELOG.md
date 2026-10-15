@@ -1,5 +1,16 @@
 # @octanejs/mcp-server
 
+## 0.3.5
+
+### Patch Changes
+
+- 479118f: Compile direct inline `@{ ... }` component props in Strong DOM templates as render-only bodies, without authored arrow wrappers or element descriptors. Preserve narrow dependencies for simple captured leaves, and keep setup, context, state, and cleanup owned by each receiving insertion. Ordinary JSX and blocks in other value positions retain their descriptor behavior.
+
+  Expose the `render-values` benchmark through the MCP benchmark tool.
+- 55139ec: Strong mode now compiles only `.tsrx`, `.ts`, and `.js` modules. A `.tsx` or `.jsx` module reports `OCTANE_STRONG_TSX_MODULE` when its own `"use strong"` directive or the application's `compiler.strong` setting reaches it, because its JSX lowers to element descriptors that render through the generic descriptor renderer instead of compiled templates. Rename the module to `.tsrx` and write its markup as template JSX, with keyed `@for` blocks in place of `.map()` lists. A module without JSX can stay `.ts` or `.js`, where `root.render(App, props)` renders an entry point. Installed dependencies keep their own mode.
+
+  `OCTANE_STRONG_ELEMENT_API` now applies to every Strong module. `collectDiagnostics` and `octane analyze --strong-preview` still list a `.tsx` module's other Strong findings next to the new code, so the conversion's remaining work shows up at once. The Strong migration recipes, the MCP server's recipes and skills, and the docs examples are written as `.tsrx`.
+
 ## 0.3.4
 
 ### Patch Changes

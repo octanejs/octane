@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { createRoot, flushSync, resetFloatResourceState } from '../src/index.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createRoot, flushSync, hydrateRoot, resetFloatResourceState } from '../src/index.js';
+import { renderToString } from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture';
 
 // A @try body that throws is replaced by its catch arm. Whatever the failed
@@ -39,6 +40,39 @@ export function LeafBody(props) @{
 			<Leaf expose={props.expose} />
 		} @catch (err) {
 			<p id="leaf-caught">{'caught'}</p>
+		}
+	</main>
+}
+function GlobalBoom() @{
+	if ((globalThis as any).__failedBodyBang) throw new Error('boom');
+	<i>{'ok'}</i>
+}
+function UpdatingField(props) @{
+	const [value, setValue] = useState(props.value);
+	if (value !== 'updated' && (globalThis as any).__failedBodyBang) setValue('updated');
+	<input id="updating" value={value} onInput={() => {}} />
+}
+export function UpdatingBody(props) @{
+	<main>
+		@try {
+			<section>
+				<UpdatingField value={props.value} />
+				<GlobalBoom />
+			</section>
+		} @catch (err) {
+			<p id="updating-caught">{'caught'}</p>
+		}
+	</main>
+}
+export function HydratingBody(props) @{
+	<main>
+		@try {
+			<section>
+				<input id="adopted" defaultValue={props.value} />
+				<GlobalBoom />
+			</section>
+		} @catch (err) {
+			<p id="hydrated-caught">{'caught'}</p>
 		}
 	</main>
 }
@@ -88,6 +122,99 @@ describe.each([false, true])('a @try body that throws in an urgent render (dev=%
 		} finally {
 			root.unmount();
 			container.remove();
+		}
+	});
+
+	it('commits none of a hydrating body’s adoption writes when it throws', () => {
+		const client = loadCompiledFixtureSource(SOURCE, {
+			id: `try-failed-body-ops-${dev}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+		});
+		const server = loadCompiledFixtureSource(SOURCE, {
+			id: `try-failed-body-ops-${dev}.tsrx`,
+			mode: 'server',
+			compileOptions: { dev, hmr: false },
+		});
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		(globalThis as any).__failedBodyBang = false;
+		host.innerHTML = renderToString(server.HydratingBody, { value: 'server' }).html;
+		const input = host.querySelector('#adopted') as HTMLInputElement;
+		expect(input.getAttribute('value')).toBe('server');
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(host, { subtree: true, attributes: true });
+		const errors: unknown[] = [];
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		(globalThis as any).__failedBodyBang = true;
+		const root = hydrateRoot(
+			host,
+			client.HydratingBody,
+			{ value: 'client' },
+			{
+				onRecoverableError: (error) => errors.push(error),
+			},
+		);
+		try {
+			flushSync(() => {});
+			records.push(...observer.takeRecords());
+			expect(host.querySelector('#hydrated-caught')).not.toBeNull();
+			// The failed body's adoption write never reached the server input.
+			expect(input.getAttribute('value')).toBe('server');
+			expect(records.some((r) => r.target === input)).toBe(false);
+		} finally {
+			(globalThis as any).__failedBodyBang = false;
+			observer.disconnect();
+			consoleError.mockRestore();
+			root.unmount();
+			host.remove();
+		}
+	});
+
+	it('commits none of a hydrating render-phase update’s write when the body throws', () => {
+		const client = loadCompiledFixtureSource(SOURCE, {
+			id: `try-failed-body-ops-${dev}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+		});
+		const server = loadCompiledFixtureSource(SOURCE, {
+			id: `try-failed-body-ops-${dev}.tsrx`,
+			mode: 'server',
+			compileOptions: { dev, hmr: false },
+		});
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		(globalThis as any).__failedBodyBang = false;
+		host.innerHTML = renderToString(server.UpdatingBody, { value: 'server' }).html;
+		const input = host.querySelector('#updating') as HTMLInputElement;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(host, { subtree: true, attributes: true });
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		(globalThis as any).__failedBodyBang = true;
+		const root = hydrateRoot(
+			host,
+			client.UpdatingBody,
+			{ value: 'server' },
+			{
+				onRecoverableError: () => {},
+			},
+		);
+		try {
+			flushSync(() => {});
+			records.push(...observer.takeRecords());
+			expect(host.querySelector('#updating-caught')).not.toBeNull();
+			// The update's controlled write, queued for commit, never reached the input.
+			expect(input.value).toBe('server');
+			expect(input.getAttribute('value')).toBe('server');
+			expect(records.some((r) => r.target === input)).toBe(false);
+		} finally {
+			(globalThis as any).__failedBodyBang = false;
+			observer.disconnect();
+			consoleError.mockRestore();
+			root.unmount();
+			host.remove();
 		}
 	});
 

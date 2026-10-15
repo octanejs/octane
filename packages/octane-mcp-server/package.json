@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mcp-server",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"

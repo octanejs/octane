@@ -1165,6 +1165,15 @@ const SUITES = [
 	},
 
 	{
+		// Direct render bodies retain narrow captured-leaf invalidation.
+		name: 'render-values',
+		cwd: 'hook-memo',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => ['--render-values'] }],
+	},
+
+	{
 		// Same-source production body ownership and context cache controls.
 		name: 'body-ownership',
 		cwd: 'hook-memo',

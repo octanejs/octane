@@ -15943,6 +15943,15 @@ const CHILDREN_CAPTURES: unique symbol = Symbol.for('octane.childrenCaptures') a
 // belongs to another document owner, which scopeSignalOwner never links.
 const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
 
+// Fresh captures from one authored body reuse its slots. A different compiled
+// body has a different slot layout and must replace that scope. Untagged render
+// functions retain their existing positional reconciliation contract.
+function sameRenderBody(previous: ComponentBody, next: ComponentBody): boolean {
+	const previousBody = (previous as any)[CHILDREN_BODY];
+	const nextBody = (next as any)[CHILDREN_BODY];
+	return previousBody === undefined || nextBody === undefined || previousBody === nextBody;
+}
+
 /**
  * Compiler-emitted: attach markerless single-host-root metadata while a fresh
  * component function is still being initialized. The compiler only calls this
@@ -22382,6 +22391,21 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 	if (hydrating && activeHydration() !== null && (root as any).__oct_vfrag === true) return;
 	if (hydrationStarted && PRESENTATION_HYDRATION?.revision !== undefined)
 		HYDRATION_DRIVER!.presentationMiss(false);
+	// A committed Block's first mount (a resumed body's) lands at commit, as
+	// commitBag's single root does.
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const block = CURRENT_SCOPE?.block;
+	if (
+		transaction !== null &&
+		block !== undefined &&
+		block.createdStamp !== transaction.createdStamp &&
+		block instanceof BlockImpl &&
+		block.parentNode === parent &&
+		usesFrontier(block, parent)
+	) {
+		parent = queueFrontier(block, parent, anchor);
+		anchor = null;
+	}
 	if (root.nodeType === 11) {
 		parent.insertBefore(root, anchor);
 		return;
@@ -22429,7 +22453,6 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 				block.createdStamp !== transaction.createdStamp &&
 				block instanceof BlockImpl &&
 				(block.startMarker === null || block.startMarker !== end) &&
-				MARKERLESS_ARM_RENDERS === 0 &&
 				usesFrontier(block, parent)
 			)
 				queueFrontier(block, parent, end).appendChild(root);
@@ -34786,9 +34809,6 @@ interface HostComponentSlot {
 	// The props applied last render — diffed against the next render so props/events that
 	// DISAPPEARED get removed (not left stale on the reused element).
 	props: any;
-	// Stable delegating children body + its current target (see hostComponent).
-	body: ComponentBody | undefined;
-	latest: ComponentBody | null | undefined;
 	// Dedicated sub-scope holding the children's childSlot (slot 0), so the children
 	// reconcile/unmount via the Block tree without stamping a derived key on `scope`.
 	childScope: Scope | undefined;
@@ -34844,8 +34864,6 @@ export function hostComponent(
 			anchor: null,
 			ref: undefined,
 			props: undefined,
-			body: undefined,
-			latest: undefined,
 			childScope: undefined,
 			next: null,
 		};
@@ -34876,20 +34894,10 @@ export function hostComponent(
 	let next: any[] | null = null;
 	if (state.props !== undefined && usesFrontier(block, el)) next = [state, props, scope];
 	else applyHostProps(state, props, scope);
-	if (typeof childrenBody === 'function') {
-		// The compiled children render-body is a FRESH closure every parent render, but
-		// it is the SAME positional children slot. childSlot keys block-reuse on body
-		// identity, so handing it the raw closure would re-mount (and DOM-duplicate) the
-		// children — a `@for`/`@if` block especially — on every re-render. Pass a STABLE
-		// delegating body whose target we update each render, so childSlot reconciles.
-		state.latest = childrenBody as ComponentBody;
-		if (state.body === undefined) {
-			state.body = (props, scope, extra) => state!.latest!(props, scope, extra);
-		}
-		childSlot(state.childScope!, 0, el, state.body, null, false, el);
-	} else if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
-		// createElement/descriptor callers already supply a renderable value. Let
-		// childSlot reconcile it directly instead of assuming every child is callable.
+	if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
+		// Tagged bodies carry source identity and ownership through to childSlot;
+		// a delegating wrapper would hide both. Descriptor callers also already
+		// supply a renderable value, so reconcile it directly.
 		//
 		// A TSX value position can go null between renders (`{cond ? <x/> : null}`),
 		// unlike the compiled TSRX body which is statically present or absent. Once
@@ -36685,7 +36693,8 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 // Block whose range is all of `el`'s content — parentNode = el, no markers —
 // reused across renders with the body swapped in place (the compiled closure is
 // fresh each parent render but is the same slot child; mirrors childSlot's
-// isBodyFn reconcile). A render prop that RETURNS a renderable instead of
+// isBodyFn reconcile). A different compiled body token replaces that Block.
+// A render prop that RETURNS a renderable instead of
 // rendering imperatively is handled by renderBlock's return-slot (childSlot,
 // marker-wrapped — matching the server's ssrChild normalization of a de-opt
 // return). Non-function children (hand-rolled descriptors only; the compiler
@@ -36696,32 +36705,117 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 	const kids = d.children;
 	if (kids == null) return;
 	if (typeof kids === 'function') {
-		let state = block.slots[0] as { __kind: 'hostTagChildrenSlot'; block: Block } | undefined;
+		const state = block.slots[0] as HostTagChildrenSlot | undefined;
+		let child: Block;
 		if (state === undefined) {
-			const child = createBlock(
-				'dynamic',
-				block,
-				el,
-				null,
-				null,
-				kids as ComponentBody,
-				{},
-				undefined,
-				renderReturnedValue,
-			);
-			state = { __kind: 'hostTagChildrenSlot', block: child };
-			block.slots[0] = state;
-			// unmountScope's catch-all slot branch unmounts `state.block`, firing the
+			child = hostTagChildrenBlock(block, el, kids);
+			const slot: HostTagChildrenSlot = {
+				__kind: 'hostTagChildrenSlot',
+				block: child,
+				next: null,
+				incoming: null,
+			};
+			block.slots[0] = slot;
+			// unmountScope's catch-all slot branch unmounts `slot.block`, firing the
 			// children's cleanups; the DOM goes away with `el` (the block has no
 			// markers of its own to sweep).
-			registerSlot(block, state);
+			registerSlot(block, slot);
 		} else {
-			state.block.body = kids as ComponentBody;
+			// This render may already have replaced the Block (replaceHostTagChildren).
+			const pending = state.next !== null && state.next.tx === ROOT_RENDER_TRANSACTION;
+			child = pending ? state.incoming! : state.block;
+			if (sameRenderBody(child.body, kids)) return renderWithBody(child, kids);
+			child = replaceHostTagChildren(state, block, el, kids, pending);
 		}
-		renderBlock(state.block);
+		renderBlock(child);
 		return;
 	}
 	childSlot(block, 1, el, kids, null, false, el);
+}
+
+/**
+ * Render `block` with `body`, a fresh capture of the authored body it holds.
+ * A root render that can be dropped lands the body at its commit (landBody):
+ * until then the Block keeps its committed body, so an update of its own
+ * after a dropped render reads the committed captures.
+ */
+function renderWithBody(block: Block, body: ComponentBody): void {
+	const committed = block.body;
+	block.body = body;
+	const transaction =
+		committed === body || ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(block);
+	if (transaction === null) return renderBlock(block);
+	try {
+		renderBlock(block);
+	} finally {
+		block.body = committed;
+	}
+	transaction.ops.push(landBody, [block, body]);
+}
+
+function landBody(write: [Block, ComponentBody]): void {
+	write[0].body = write[1];
+}
+
+/** A string-tag host's function children: one markerless Block owning all of the host's content. */
+interface HostTagChildrenSlot {
+	__kind: 'hostTagChildrenSlot';
+	block: Block;
+	/** Pending structure in the open root render (SlotNext). */
+	next: SlotNext | null;
+	/** The Block that render's commit puts in place of `block` (landHostTagChildren). */
+	incoming: Block | null;
+}
+
+/**
+ * A different authored body has a different slot layout, so it replaces the
+ * children's Block (#2068). Over committed DOM the incoming Block builds in the
+ * slot's frontier, and the commit unmounts the outgoing Block, removes its
+ * nodes and lands the frontier; a dropped render leaves the committed Block.
+ */
+function replaceHostTagChildren(
+	state: HostTagChildrenSlot,
+	block: Block,
+	el: Element,
+	body: ComponentBody,
+	pending: boolean,
+): Block {
+	if (!usesFrontier(block, el)) {
+		unmountBlock(state.block, false);
+		el.textContent = '';
+		return (state.block = hostTagChildrenBlock(block, el, body));
+	}
+	if (pending) {
+		// An earlier replacement in this render: its Block is still in the fragment.
+		unmountBlock(state.incoming!, false);
+		removeAfter(state.next!.frag!, null, null);
+	} else {
+		// The swap is the outgoing range's deletion cleanup, so it lands with the
+		// slot's structure and drops with it (dropRootOps, dropBodyOps).
+		retireRootBlock(state.block);
+		slotNext(state).out.push(() => landHostTagChildren(state), getFirstChild(el), el.lastChild);
+	}
+	return (state.incoming = hostTagChildrenBlock(block, slotFrontier(state, block, el, null), body));
+}
+
+function hostTagChildrenBlock(block: Block, parent: Node, body: ComponentBody): Block {
+	return createBlock(
+		'dynamic',
+		block,
+		parent,
+		null,
+		null,
+		body,
+		{},
+		undefined,
+		renderReturnedValue,
+	);
+}
+
+function landHostTagChildren(state: HostTagChildrenSlot): void {
+	unmountBlock(state.block, false);
+	state.block = state.incoming!;
+	state.incoming = null;
 }
 
 // Tear down a childSlot's de-opt keyed list when the slot leaves array mode (a
@@ -37245,9 +37339,13 @@ function renderPreparedChildList(
 					}
 				}
 			}
-			// A hydrating render places the list's markers in the server DOM at
-			// commit, also where it builds the list with adoption suspended.
-			if (hydrating && domParent.isConnected) placeAtCommit(domParent, state.end, anchor);
+			// A hydrating render places the list's markers in the server DOM at commit,
+			// also where it builds the list with adoption suspended; a committed host's
+			// new list builds off-document, and its commit appends it.
+			if (hydration !== null || (hydrating && domParent.isConnected))
+				placeAtCommit(domParent, state.end, anchor);
+			else if (!passthroughList && !upgradeArmed && usesFrontier(parentBlock, domParent))
+				slotFrontier(state, parentBlock, domParent, null).appendChild(state.end);
 			else domParent.insertBefore(state.end, anchor);
 			if (passthroughList) passthroughEnd = state.end;
 		}
@@ -37262,8 +37360,9 @@ function renderPreparedChildList(
 				: cursor !== null && cursor.parentNode === domParent
 					? cursor
 					: state.end;
-			if (hydrating && domParent.isConnected) placeAtCommit(domParent, state.start, before);
-			else domParent.insertBefore(state.start, before);
+			if (hydration !== null || (hydrating && domParent.isConnected))
+				placeAtCommit(domParent, state.start, before);
+			else (upgradeArmed ? domParent : state.end.parentNode!).insertBefore(state.start, before);
 			if (passthroughList) passthroughStart = state.start;
 		}
 		state.forSlot = {
@@ -37999,7 +38098,10 @@ export function childSlot(
 		const unchangedComponent =
 			state.block !== null &&
 			component !== null &&
-			(component === state.currentComp || (typeof value === 'function' && state.currentIsBodyFn));
+			(component === state.currentComp ||
+				(typeof value === 'function' &&
+					state.currentIsBodyFn &&
+					sameRenderBody(state.currentComp!, component)));
 		const unchangedHost =
 			pureHost &&
 			state.hostNode !== null &&
@@ -38504,9 +38606,14 @@ export function childSlot(
 		// identity always differs — but it is the SAME slot child. Reconcile by SLOT like
 		// componentSlot: swap the block's body in place and re-render, instead of
 		// re-mounting on every identity change (which, once effects re-render the tree,
-		// loops unboundedly). Component switches arrive as DESCRIPTORS (comp = value.type),
-		// never as a bare function, so this never short-circuits a real component swap.
-		if (isBodyFn && state.block !== null && state.currentIsBodyFn) {
+		// loops unboundedly). Compiler-owned source tokens distinguish fresh captures
+		// from a different authored body, whose slot layout needs a replacement.
+		if (
+			isBodyFn &&
+			state.block !== null &&
+			state.currentIsBodyFn &&
+			sameRenderBody(state.currentComp!, comp)
+		) {
 			// Compiler-generated children are render functions too, so a fresh parent
 			// render must still swap their body in place (preserving descendant state).
 			// But an identity-equal tagged function is the exact same cached child value:
@@ -44729,12 +44836,6 @@ function finalizeMarkerlessBranch(
 }
 
 /**
- * Open markerless arm renders. Such an arm bounds what its render inserted in
- * place (finalizeMarkerlessBranch), so a resumed Block inside one mounts in place.
- */
-let MARKERLESS_ARM_RENDERS = 0;
-
-/**
  * The node before the content of a client arm without a bound
  * (`unfinalized`). It inserted nothing, so that is whatever precedes its
  * insertion anchor now.
@@ -44762,20 +44863,129 @@ function renderMarkerlessArm(
 ): void {
 	const block = scope.block;
 	const after = block.endMarker;
-	const before = pendingArmBefore(block, domParent);
+	// The retry of an arm over committed DOM builds off-document: in a frontier
+	// its commit inserts before `after`, ending at a sentinel its pending
+	// structure anchors on until then (moveArmPending).
+	let parent = domParent;
+	let end = after;
+	if (!hydrating && usesFrontier(block.parentBlock!, domParent)) {
+		const frag = queueFrontier(block.parentBlock, domParent, after);
+		end = frontierSentinel(frag, '');
+		moveArmPending(scope, domParent, after, frag, end);
+		moveToFrontier(scope, domParent, after, frag, end);
+		parent = frag;
+	}
+	const before = pendingArmBefore(block, parent);
 	state.unfinalized = true;
-	MARKERLESS_ARM_RENDERS++;
 	try {
 		if (scope === block) renderBlock(block);
 		else renderLiteArm(scope, body!, env);
 	} catch (error) {
-		if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
-			finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, false);
+		if ((before ? getNextSibling(before) : getFirstChild(parent)) !== end)
+			finalizeMarkerlessBranch(state, parent, scope, marker, before, end, false);
+		if (parent !== domParent) settleArmFrontier(scope, parent, end!, after);
 		throw error;
-	} finally {
-		MARKERLESS_ARM_RENDERS--;
 	}
-	finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, true);
+	finalizeMarkerlessBranch(state, parent, scope, marker, before, end, true);
+	if (parent !== domParent) settleArmFrontier(scope, parent, end!, after);
+}
+
+/**
+ * Move an unfinalized arm's pending structure, anchored on `after` in
+ * `domParent`, onto a frontier's sentinel `end`. It owns no DOM yet, so its
+ * retry renders there; its commit rehomes it (applySlotNext).
+ */
+function moveArmPending(
+	scope: Scope,
+	domParent: Node,
+	after: Node | null,
+	frag: DocumentFragment,
+	end: Node,
+): void {
+	const slots = scope._slots;
+	if (slots !== null)
+		for (let i = 0; i < slots.length; i++) {
+			const slot = slots[i];
+			if (
+				slot.anchor !== after ||
+				(slot.__kind !== 'ifBlockSlot' &&
+					slot.__kind !== 'switchBlockSlot' &&
+					slot.__kind !== 'componentSlotSlot')
+			)
+				continue;
+			journalRootProperty(slot, 'anchor', slot.anchor);
+			slot.anchor = end;
+			const arm = slot.block ?? slot.lite;
+			if (arm != null && arm.block.parentNode === domParent) {
+				moveArmPending(arm, domParent, after, frag, end);
+				moveToFrontier(arm, domParent, after, frag, end);
+			}
+		}
+	const children = scope.children;
+	if (children !== null)
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i].scope;
+			const block = child.block;
+			if (block !== scope.block && block.parentNode === domParent && block.endMarker === after) {
+				moveArmPending(child, domParent, after, frag, end);
+				moveToFrontier(child, domParent, after, frag, end);
+			}
+		}
+}
+
+function moveToFrontier(
+	scope: Scope,
+	domParent: Node,
+	after: Node | null,
+	frag: DocumentFragment,
+	end: Node,
+): void {
+	const block = scope.block;
+	journalRootProperty(block, 'parentNode', domParent);
+	block.parentNode = frag;
+	if (block.endMarker === after) {
+		journalRootProperty(block, 'endMarker', after);
+		block.endMarker = end;
+	}
+	noteFrontierMember(frag, scope);
+}
+
+/** What still anchors on an arm frontier's sentinel inserts where the arm lands. */
+function settleArmFrontier(scope: Scope, frag: Node, end: Node, after: Node | null): void {
+	if (scope.block.endMarker === end) scope.block.endMarker = after;
+	releaseFrontierSentinel(scope, frag as DocumentFragment, end as Comment, after);
+}
+
+/**
+ * Point what anchors on sentinel `from` under `scope` at `to`: its slots, and
+ * the arms and children still pending on it, nested ones included. One with a
+ * bound of its own holds its content's anchors inside that bound.
+ */
+function retargetPending(scope: Scope, from: Node, to: Node | null): void {
+	const slots = scope._slots;
+	if (slots !== null)
+		for (let i = 0; i < slots.length; i++) {
+			const slot = slots[i];
+			if (slot.anchor === from) {
+				journalRootProperty(slot, 'anchor', from);
+				slot.anchor = to;
+			}
+			const arm = slot.block ?? slot.lite;
+			if (arm != null && arm.block.endMarker === from) retargetPendingBlock(arm, from, to);
+		}
+	const children = scope.children;
+	if (children !== null)
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i].scope;
+			if (child.block !== scope.block && child.block.endMarker === from)
+				retargetPendingBlock(child, from, to);
+		}
+}
+
+function retargetPendingBlock(scope: Scope, from: Node, to: Node | null): void {
+	retargetPending(scope, from, to);
+	journalRootProperty(scope.block, 'endMarker', from);
+	scope.block.endMarker = to;
 }
 
 /** Bound a markerless arm's content, from `first` up to `after`, with a marker pair. */
@@ -45192,8 +45402,9 @@ function frontierSentinel(frag: DocumentFragment, data: string): Comment {
 }
 
 /**
- * Retire a frontier sentinel once `scope` rendered before it: the root slots
- * anchored on it insert before `before` instead, where the content lands.
+ * Retire a frontier sentinel once `scope` rendered before it: what still
+ * anchors on it, at any depth, inserts before `before` instead, where the
+ * content lands.
  */
 function releaseFrontierSentinel(
 	scope: Scope,
@@ -45201,7 +45412,7 @@ function releaseFrontierSentinel(
 	end: Comment,
 	before: Node | null,
 ): void {
-	markerlessBranchRoots(scope, frag, end, before);
+	retargetPending(scope, end, before);
 	frag.removeChild(end);
 	SPARE_SENTINEL = end;
 }

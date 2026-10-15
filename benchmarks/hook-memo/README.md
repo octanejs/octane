@@ -107,6 +107,34 @@ dependency tree. Keep those dependencies, hashes, and runner options identical
 for a before/after comparison. A nonstandard parser loader must be disclosed
 with the result.
 
+## Direct render values
+
+```sh
+node benchmarks/bench.mjs render-values --quick --ratios
+node benchmarks/hook-memo/run.mjs --render-values
+```
+
+`render-values.tsrx` compares a direct `content={@{ ... }}` component prop with
+the handwritten `content={() => @{ ... }}` form under Strong production
+compilation. A surrounding component displays a changing tick and forwards fresh
+props to each value-producing child. The captured label stays equal for 32
+updates and then changes for 32 updates. The same span and uncontrolled
+input survive, typed input and focus remain intact, and teardown empties the
+container. Clean and observed bundles must produce the same values.
+
+The existing post-tree-shaking observer counts application function expressions.
+Ratio guards require no new function on an unchanged captured label, at most
+one on a changed label, and callable render values at the receiving component.
+The wrapper is reported as a same-run control, with no requirement that it stay
+less efficient. These are source creation events, not measured heap allocations
+or a CPU improvement. In particular, they do not count native property-descriptor
+allocations from the guarded capture probes. Automatic memoization operates on
+template regions: putting the changing tick and the content prop in one region can invalidate both. This
+guard preserves narrow captures in the value-producing child; it does not promise
+independent caching of every prop expression. Complete consumer bundle and timing
+comparisons remain separate measurements; this scenario does not impose a byte
+threshold.
+
 ## Compiler cache shapes
 
 The `compiler-cache-shapes` target is a separate production fixture. It enables
