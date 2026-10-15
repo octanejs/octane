@@ -1646,7 +1646,10 @@ function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor {
 }
 
 /** Retain the exact range adopted by the client without attaching its ref. */
-function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: SSRScope): string {
+function renderFragmentRefDescriptor(
+	descriptor: Pick<ElementDescriptor, 'ref' | 'children'>,
+	scope: SSRScope,
+): string {
 	return ssrHtml(
 		ssrFragmentMarker(true, descriptor.ref) +
 			ssrChild(descriptor.children, scope) +
@@ -5697,6 +5700,32 @@ export function ssrComponentNS(
 	} finally {
 		NEXT_COMPONENT_NAMESPACE = previous;
 	}
+}
+
+/** Server counterpart of componentSlotFromConfig's ordered config boundary. */
+export function ssrComponentFromConfig(
+	parent: SSRScope,
+	comp: ServerComponent | string | typeof Fragment | typeof Activity,
+	config: any,
+	invocationSite: string,
+	namespace: 'html' | 'svg' | 'mathml' | null = null,
+): string {
+	const key = hasElementConfigKey(config) ? '' + config.key : undefined;
+	const props = copyElementConfig(config);
+	applyElementDefaultProps(comp, props);
+	const body =
+		comp === Fragment
+			? props.ref != null || hasOwnProp.call(props, 'ref')
+				? renderFragmentRefDescriptor
+				: renderFragmentConfig
+			: comp;
+	return namespace === null
+		? ssrComponent(parent, body, props, false, key, undefined, invocationSite)
+		: ssrComponentNS(parent, body, props, namespace, false, key, invocationSite);
+}
+
+function renderFragmentConfig(props: { children?: unknown }, scope: SSRScope): string {
+	return ssrHtml(ssrChild(props.children, scope));
 }
 
 /** Run a renderable hole under a lexically proven parser namespace. */

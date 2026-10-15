@@ -42,3 +42,10 @@ export function WrappedRenderValue(props: Props) @{
 		<WrappedContent {...props} />
 	</main>
 }
+
+export function KeyedChild(props: { label: string }) @{
+	<div>
+		<input defaultValue="draft" />
+		<span>{props.label as string}</span>
+	</div>
+}
