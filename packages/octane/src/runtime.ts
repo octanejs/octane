@@ -28256,7 +28256,9 @@ export function headBlock(
 		(scope.cleanups ??= []).push(() => {
 			state!.next = null;
 			removeHeadEventListeners(state!, null);
-			state!.el.remove();
+			// A hydration attempt that is discarded leaves the server's element in
+			// place, for the next attempt to claim.
+			if (!adopted || !hydrating || activeHydration() === null) state!.el.remove();
 			scope.slots[slot] = undefined;
 		});
 		// The claimed element takes the client's props once hydration ends: at
@@ -46359,7 +46361,9 @@ export function activityBlock(
 			state.hidden = true;
 			setActivitySuspenseHandler(state, true);
 			renderHiddenActivity(state);
-			hideActivityRange(state);
+			// Adopted server hosts hide at commit, as the client tree above does.
+			if (adopted) atCommit(hideActivityRange, state);
+			else hideActivityRange(state);
 		} else {
 			renderBlock(b);
 		}
@@ -50086,7 +50090,9 @@ function makeRoot(
 				frontier.frag!.append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				frontier = renderOwner.hydrationFallback(false);
-			} else if (container.nodeType !== 9 && !hydrating) {
+			} else if (container.nodeType !== 9) {
+				// A client root renders on the client even while another root hydrates
+				// around it (its Blocks render with that adoption suspended).
 				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
 				// The container's previous content leaves as the mount lands.
 				frontier.out.push(() => clearRootContainer(container), null, null);

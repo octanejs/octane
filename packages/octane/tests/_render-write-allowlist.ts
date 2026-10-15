@@ -14,7 +14,6 @@ export interface RenderWriteAllowance {
 const STYLE = 'Compiled split-style bindings call setStyle/setStyleProperty during render.';
 const FIRST_MOUNT =
 	"A root's first client render over a container that holds other DOM mounts into it in place.";
-const HYDRATING = 'A hydrating render writes the server DOM it adopts.';
 
 export const RENDER_WRITE_ALLOWLIST: readonly RenderWriteAllowance[] = [
 	...['applyStyleValue', 'applyStyleProperty', 'setStyleProperty'].map((writer) => ({
@@ -43,22 +42,4 @@ export const RENDER_WRITE_ALLOWLIST: readonly RenderWriteAllowance[] = [
 			(file) => ({ file, writer, owner: 'structure', reason: FIRST_MOUNT }),
 		),
 	),
-	{
-		file: 'hydration/activity-hydrate.test.ts',
-		writer: 'enforceHiddenDisplay',
-		owner: 'hydration',
-		reason: 'A hidden Activity hides the server host it hydrates during render.',
-	},
-	...['clearRootContainer', 'commitBag', 'setAttribute'].map((writer) => ({
-		file: 'hydration/root-reentry.test.ts',
-		writer,
-		owner: 'hydration',
-		reason: HYDRATING,
-	})),
-	{
-		file: 'hydration/root-suspended-clone-mismatch.test.ts',
-		writer: '(anonymous)',
-		owner: 'hydration',
-		reason: "A rolled-back hydrating attempt's cleanup removes server nodes during render.",
-	},
 ];

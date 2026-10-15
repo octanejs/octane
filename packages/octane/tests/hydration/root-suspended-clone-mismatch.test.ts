@@ -313,6 +313,8 @@ describe.each([true, false])('suspended root that falls back during hydration (d
 			if (resume !== undefined) {
 				expect(doc.head).toBe(serverHead);
 				expect(doc.body).toBe(serverBody);
+				// The suspended attempt claimed the server's hoisted element and left it.
+				expect(serverHead.querySelectorAll('meta[name="side"]')).toHaveLength(1);
 				expect(doc.querySelectorAll('head, body')).toHaveLength(2);
 				expect(doc.body.textContent).toBe('serverok{}');
 				expect(recoverable).toEqual([]);
