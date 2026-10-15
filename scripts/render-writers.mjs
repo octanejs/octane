@@ -140,7 +140,7 @@ export const WRITERS = new Map(
 		mountItem: 'fresh',
 		makeRoot: 'fresh',
 		createHydrateSlot: 'fresh',
-		'HydrationCapability.adoptText': 'fresh',
+		adoptText: 'fresh',
 		stylesheetLink: 'fresh',
 		asyncScript: 'fresh',
 		// hydration
