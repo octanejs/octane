@@ -4,6 +4,7 @@
 // Children, and the Fragment and Activity sentinels.
 
 import { enableDescriptorFormActions } from './host-props.js';
+import { enableDescriptorCustomHosts } from './deopt.js';
 import { hasOwnProp } from '../has-own.js';
 import {
 	applyElementDefaultProps,
@@ -468,6 +469,7 @@ export function createElement<P>(
 function enableDescriptorCapabilities(): void {
 	enableDescriptorFormActions();
 	enableDescriptorFragmentRefs();
+	enableDescriptorCustomHosts();
 }
 
 /** @internal Compiler-emitted host descriptor: its props were classified statically. */

@@ -647,8 +647,6 @@ export interface SlotNext {
 	before: Node | null;
 	/** Blocks, lite stand-ins and slots created directly in their frontier. */
 	members: any[] | null;
-	/** Initial host writes, grouped by the exact fragment or detached row which connects them. */
-	writes?: Map<Node | Block, any[]>;
 	/** The Block whose slot this is: a deletion cleanup can dispose it first. */
 	owner: Block | null;
 	/**

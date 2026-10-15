@@ -1,4 +1,4 @@
-import { createElement, createPortal } from 'octane';
+import { createElement, createPortal, use } from 'octane';
 
 // A compiled single-root component: returning `<Solo/>` from a plain function
 // takes renderBlock's markerless componentSlotSlot return path — the OTHER
@@ -56,6 +56,41 @@ export function EditorRows(props: { tag: string; labels: readonly string[] }) @{
 			<li>{createElement(props.tag, { 'data-label': label })}</li>
 		}
 	</ul>
+}
+
+interface RetryRowsProps {
+	rows: readonly { id: string; tag: string; label: string }[];
+	gate?: PromiseLike<string>;
+}
+
+function RetryRowsTail(props: { gate?: PromiseLike<string> }) @{
+	const label = props.gate ? use(props.gate) : 'ready';
+	<output>{label as string}</output>
+}
+
+export function SingleEditorRetryRows(props: RetryRowsProps) @{
+	<main>
+		<ul>
+			@for (const row of props.rows; key row.id) {
+				<li data-id={row.id}>{createElement(row.tag, { 'data-label': row.label })}</li>
+			}
+		</ul>
+		<RetryRowsTail gate={props.gate} />
+	</main>
+}
+
+export function MultipleEditorRetryRows(props: RetryRowsProps) @{
+	<main>
+		<ul>
+			@for (const row of props.rows; key row.id) {
+				<>
+					<li data-id={row.id}>{createElement(row.tag, { 'data-label': row.label })}</li>
+					<li>row end</li>
+				</>
+			}
+		</ul>
+		<RetryRowsTail gate={props.gate} />
+	</main>
 }
 
 function NewEditor(props: { tag: string }) {

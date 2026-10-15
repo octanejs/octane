@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { createElement } from '../src/index.js';
-import { App, ConditionalEditor, EditorRows } from './_fixtures/anchorless-host.tsrx';
+import {
+	App,
+	ConditionalEditor,
+	EditorRows,
+	SingleEditorRetryRows,
+	MultipleEditorRetryRows,
+} from './_fixtures/anchorless-host.tsrx';
 
 // A LONE PURE-HOST descriptor at a value position (a pass-through component's
 // return, a host descriptor rendered at a root) mounts ANCHORLESS — no comment
@@ -153,6 +159,62 @@ describe('anchorless lone pure-host value', () => {
 			expect(r.find('li')).toBe(survivor);
 		} finally {
 			r.unmount();
+		}
+	});
+
+	it.each([
+		['single', SingleEditorRetryRows],
+		['multiple', MultipleEditorRetryRows],
+	] as const)('drops abandoned custom receipts on a %s-host keyed retry', async (kind, Rows) => {
+		const events: string[] = [];
+		const tag = `retry-${kind}-editor`;
+		customElements.define(
+			tag,
+			class extends HTMLElement {
+				static observedAttributes = ['data-label'];
+				attributeChangedCallback() {
+					events.push(`attribute:${this.getAttribute('data-label')}`);
+				}
+				connectedCallback() {
+					events.push(`connect:${this.getAttribute('data-label')}`);
+				}
+			},
+		);
+		let resume!: (value: string) => void;
+		const gate = new Promise<string>((resolve) => {
+			resume = resolve;
+		});
+		const first = { id: 'a', tag: 'input', label: 'first' };
+		const root = mount(Rows, { rows: [first] });
+		try {
+			const survivor = root.find('[data-id="a"]');
+			const input = survivor.querySelector('input')!;
+			input.value = 'keep my draft';
+			root.update(Rows, { rows: [first, { id: 'b', tag, label: 'abandoned' }], gate });
+			expect(root.find('[data-id="a"]')).toBe(survivor);
+			expect(input.value).toBe('keep my draft');
+			expect(root.container.querySelector('[data-id="b"]')).toBeNull();
+			expect(events).toEqual([]);
+
+			root.update(Rows, { rows: [first, { id: 'b', tag: 'span', label: 'replacement' }] });
+			await act(() => resume('late'));
+			expect(root.find('[data-id="a"]')).toBe(survivor);
+			expect(root.find('[data-id="b"] span').getAttribute('data-label')).toBe('replacement');
+			expect(input.value).toBe('keep my draft');
+			expect(events).toEqual([]);
+
+			root.update(Rows, {
+				rows: [
+					first,
+					{ id: 'b', tag: 'span', label: 'replacement' },
+					{ id: 'c', tag, label: 'current' },
+				],
+			});
+			expect(events).toEqual(['attribute:current', 'connect:current']);
+			expect(root.find('[data-id="a"]')).toBe(survivor);
+			expect(input.value).toBe('keep my draft');
+		} finally {
+			root.unmount();
 		}
 	});
 

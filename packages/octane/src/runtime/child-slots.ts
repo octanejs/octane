@@ -90,6 +90,7 @@ import {
 	prepareDeoptList,
 	iterableChildArray,
 	reconcileDeoptNode,
+	descriptorCustomHosts,
 	itemRange,
 	descNeedsBlocks,
 	hostElementBody,
@@ -1075,6 +1076,7 @@ export function childSlot(
 			// this very frontier for its initial custom-element writes. Keep the
 			// live domParent for namespaces and marker placement below.
 			const placement =
+				descriptorCustomHosts &&
 				ROOT_RENDER_TRANSACTION !== null &&
 				state.next?.tx === ROOT_RENDER_TRANSACTION &&
 				state.hostNode === null &&

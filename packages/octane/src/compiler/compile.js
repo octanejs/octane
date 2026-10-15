@@ -1684,6 +1684,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'createElementAt',
 	'createElementFromConfig',
 	'createHostElement',
+	'enableDescriptorCustomHosts',
 	'enableDescriptorFormActions',
 	'enableDescriptorFragmentRefs',
 	'isRenderCall',
@@ -25028,12 +25029,14 @@ function descriptorTagKind(ctx, nameNode, componentTag) {
 	return lexical.resolveBinding(scope, name)?.scope === lexical.rootScope ? kind : 'dynamic';
 }
 
-// Descriptor hosts reach a function form action, and Fragment descriptors a ref,
-// only through the element factory that built them. Compiled JSX names its props
-// statically, so it installs a capability only when a prop or spread can select
-// it; public factories install every capability themselves.
+// Public factories install every descriptor capability. For compiled JSX the tag
+// proves whether custom-host handling can be reached; props/spreads separately
+// decide form actions and Fragment refs.
 function classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs) {
 	if (ctx.mode === 'server') return; // the server renders descriptors without installers
+	const kind = descriptorTagKind(ctx, nameNode, componentTag);
+	if (kind === 'dynamic' || (kind === 'host' && String(nameNode.name ?? nameNode).includes('-')))
+		addDescriptorCapability(ctx, 'enableDescriptorCustomHosts');
 	let spread = false;
 	let action = false;
 	let ref = false;
@@ -25046,7 +25049,6 @@ function classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs) {
 		}
 	}
 	if (!spread && !action && !ref) return;
-	const kind = descriptorTagKind(ctx, nameNode, componentTag);
 	if (kind === 'component') return; // props reach a component, never a host or Fragment
 	if (kind !== 'fragment' && (action || spread))
 		addDescriptorCapability(ctx, 'enableDescriptorFormActions');

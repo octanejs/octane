@@ -24,6 +24,7 @@ import { renderBlock } from './signal-owners.js';
 import { queueRefDetach, type FragmentInstance, mountFragmentRef } from './refs.js';
 import {
 	ROOT_RENDER_ROLLBACK,
+	COMMITTING_GENERATION,
 	journalRootProperty,
 	retireRootBlock,
 	renderingFocus,
@@ -133,6 +134,14 @@ import {
 	DEFAULT_CHECKED_INITIALIZED,
 	isControlledHostProp,
 } from './forms.js';
+
+// Public element factories and descriptor JSX whose tag may be custom enable
+// this path. Native-only compiled descriptor bundles can omit its host writer.
+export let descriptorCustomHosts:
+	((ownerBlock: Block, placement: Node, order: DeoptOrder) => void) | undefined;
+export function enableDescriptorCustomHosts(): void {
+	descriptorCustomHosts = prepareFrontierHost;
+}
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -1018,7 +1027,7 @@ export function reconcileDeoptNode(
 			// Even off-document, custom setters may call back into the application.
 			// Admit those writes with the slot so unmount can revoke the frontier
 			// before its newly created host is connected.
-			if (ROOT_RENDER_TRANSACTION !== null && isHtmlCustomElement(el)) {
+			if (descriptorCustomHosts && ROOT_RENDER_TRANSACTION !== null && isHtmlCustomElement(el)) {
 				defer = true;
 				freshCustom = true;
 				desc = deoptRecord(el, value);
@@ -1039,35 +1048,7 @@ export function reconcileDeoptNode(
 				);
 		if (desc !== null || nodes !== null) {
 			const order = queueDeoptOrder(el, owner, desc, nodes, null);
-			if (freshCustom) {
-				// A retained Block may open a frontier without moving its own parent.
-				// Child descriptors are not attached yet, so use the outer slot's
-				// actual placement destination, even through fresh native wrappers.
-				const root = placement.getRootNode() as any;
-				if (root.$$next?.tx === order.tx) {
-					queueFrontierHost(root.$$next, root, order);
-				} else {
-					// A fresh nested host may not have been attached to its parent's DOM
-					// yet. Its rendering Block (or a fresh ancestor) still names the
-					// frontier which will connect it. A later slot frontier needs no
-					// early commit: this order already precedes that slot's entry.
-					for (let block: Block | null = ownerBlock; block !== null; block = block.parentBlock) {
-						const root = block.parentNode.getRootNode() as any;
-						if (root.$$next?.tx === order.tx) {
-							queueFrontierHost(root.$$next, root, order);
-							break;
-						}
-						if (block.createdStamp !== order.tx.createdStamp) break;
-						const next = block.forSlot?.next;
-						if (next?.tx === order.tx) {
-							// A compiled single-host row has no fragment. Its own root
-							// lands during the list's outgoing work, after earlier removals.
-							queueFrontierHost(next, block, order);
-							break;
-						}
-					}
-				}
-			}
+			if (freshCustom) descriptorCustomHosts!(ownerBlock, placement, order);
 		}
 		return el;
 	}
@@ -1335,7 +1316,6 @@ interface DeoptOrder {
 	desc: ElementDescriptor | null;
 	text: string | null;
 	owner: Block | null;
-	commit?: (order: DeoptOrder) => void;
 }
 
 /** The record an earlier pass of this root render left on `node`, if any. */
@@ -1390,12 +1370,55 @@ function queueDeoptOrder(
 	return order;
 }
 
+function prepareFrontierHost(ownerBlock: Block, placement: Node, order: DeoptOrder): void {
+	// Child descriptors are not attached yet, so use the outer slot's actual
+	// destination even when a retained Block kept its parent in live DOM.
+	const root = placement.getRootNode() as any;
+	if (root.$$next?.tx === order.tx) {
+		queueFrontierHost(root.$$next, root, order);
+	} else {
+		// A fresh nested host's ancestor still names the frontier connecting it.
+		// A later slot frontier needs no early commit: this order precedes its entry.
+		for (let block: Block | null = ownerBlock; block !== null; block = block.parentBlock) {
+			const root = block.parentNode.getRootNode() as any;
+			if (root.$$next?.tx === order.tx) {
+				queueFrontierHost(root.$$next, root, order);
+				break;
+			}
+			if (block.createdStamp !== order.tx.createdStamp) break;
+			const next = block.forSlot?.next;
+			if (next?.tx === order.tx) {
+				// A compiled single-host row lands during the list's outgoing work.
+				queueFrontierHost(next, block, order);
+				break;
+			}
+		}
+	}
+}
+
 function queueFrontierHost(next: SlotNext, from: Node | Block, order: DeoptOrder): void {
-	order.commit = applyDeoptOrder;
-	const groups = (next.writes ??= new Map());
-	const writes = groups.get(from);
-	if (writes === undefined) groups.set(from, [order]);
-	else writes.push(order);
+	const target = from as (Node | Block) & {
+		$$initialHosts?: { orders: DeoptOrder[]; commit: () => boolean };
+	};
+	let receipt = target.$$initialHosts;
+	if (receipt === undefined) {
+		const orders: DeoptOrder[] = [];
+		target.$$initialHosts = receipt = {
+			orders,
+			commit() {
+				// Clear before callbacks: they may start a new render. A pooled
+				// fragment must not retain orders from the run it just connected.
+				target.$$initialHosts = undefined;
+				for (let i = 0; i < orders.length; i++) {
+					applyDeoptOrder(orders[i]);
+					if (next.owner!.disposed || next.tx.owner.generation !== COMMITTING_GENERATION)
+						return false;
+				}
+				return true;
+			},
+		};
+	}
+	receipt.orders.push(order);
 }
 
 /** A committed Text's data, written at commit unless it already shows `data`. */

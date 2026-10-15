@@ -364,20 +364,6 @@ export function noteFrontierMember(parent: Node, member: object): void {
 	if (next !== undefined) next.members!.push(member, parent);
 }
 
-// A fresh host's user callbacks must see its props before its frontier connects.
-// Keep the host writer on the member so ordinary compiled roots don't retain
-// the descriptor renderer. List runs commit only their own members.
-export function commitFrontierMembers(next: SlotNext, from: Node | Block): boolean {
-	const writes = next.writes!.get(from);
-	if (writes === undefined) return true;
-	for (let i = 0; i < writes.length; i++) {
-		const write = writes[i];
-		write.commit(write);
-		if (next.owner!.disposed || next.tx.owner.generation !== COMMITTING_GENERATION) return false;
-	}
-	return true;
-}
-
 /**
  * Whether a slot of `parentBlock` that changes structure in the open root
  * render writes through a frontier: its owner's DOM is live. Hydration that is
@@ -439,17 +425,12 @@ export function applySlotNext(slot: { next: SlotNext | null }): void {
 		const first: Node | null = out[out.length - 2];
 		if (first !== null && first.parentNode === parent) before = getNextSibling(out[out.length - 1]);
 	}
-	applyOutgoing(out, parent, next);
+	if (!applyOutgoing(out, parent, next)) return;
 	const members = next.members;
 	// A deletion cleanup can unmount the slot's owner before its content lands.
-	if (
-		members === null ||
-		next.owner!.disposed ||
-		next.tx.owner.generation !== COMMITTING_GENERATION
-	)
-		return;
+	if (members === null || next.owner!.disposed) return;
 	const frag = next.frag;
-	if (frag !== null && next.writes !== undefined && !commitFrontierMembers(next, frag)) return;
+	if ((frag as any)?.$$initialHosts?.commit() === false) return;
 	// A branch arm's detached root lands alone, with no members to rehome.
 	if (frag !== null || next.root !== null) parent.insertBefore(frag ?? next.root!, before);
 	for (let i = 0; i < members.length; i += 2) {
@@ -624,17 +605,19 @@ export function queueRootDeletion(owner: unknown, first: Node | null, last: Node
  * order, so each lands against the DOM the render saw: a survivor moves before
  * its anchor, and a run's fragment goes into `parent` before its anchor.
  */
-export function applyOutgoing(out: any[], parent?: Node, next?: SlotNext): void {
-	for (let i = 0; i < out.length; i += 3) {
+export function applyOutgoing(out: any[], parent?: Node, next?: SlotNext): boolean {
+	for (let i = 0; ; i += 3) {
 		// A new host's callbacks can replace this root midway through a list's
-		// outgoing work. Do not process later runs from the invalidated commit.
-		if (next !== undefined && next.tx.owner.generation !== COMMITTING_GENERATION) return;
+		// outgoing work. Also check after the final deletion, before its frontier
+		// lands. Other commit entries may not carry a slot.
+		if (next !== undefined && next.tx.owner.generation !== COMMITTING_GENERATION) return false;
+		if (i >= out.length) return true;
 		const kind = out[i];
 		if (kind === placeRoots || kind === moveBlockBefore || kind === placeRun) {
 			// A deletion cleanup can unmount the list before the rest of its log.
 			const anchor: Node = out[i + 2];
 			if (anchor.parentNode === parent) {
-				if (kind === placeRoots) placeRoots(parent!, out[i + 1], anchor, next!);
+				if (kind === placeRoots) placeRoots(parent!, out[i + 1], anchor);
 				else if (kind === placeRun) placeRun(parent!, out[i + 1], anchor);
 				else if (!out[i + 1].disposed) moveBlockBefore(out[i + 1], anchor);
 			}
@@ -829,12 +812,12 @@ export function listRoots(next: SlotNext, anchor: Node): Block[] {
 	return rows;
 }
 
-export function placeRoots(parent: Node, rows: Block[], anchor: Node, next: SlotNext): void {
+export function placeRoots(parent: Node, rows: Block[], anchor: Node): void {
 	const into = parent;
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		if (!row.disposed) {
-			if (next.writes !== undefined && !commitFrontierMembers(next, row)) return;
+			if ((row as any).$$initialHosts?.commit() === false) return;
 			into.insertBefore(row.startMarker!, anchor);
 		}
 	}

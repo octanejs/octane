@@ -329,7 +329,6 @@ import {
 	BAG_POOL,
 	queueFrontier,
 	noteFrontierMember,
-	commitFrontierMembers,
 	queueRootDeletion,
 	dropRootOps,
 	journalObjectOnce,
@@ -1056,8 +1055,7 @@ export function retireBlocks(
  * row connects before the next row arrives.
  */
 export function placeRun(parent: Node, frag: DocumentFragment, anchor: Node): void {
-	const next: SlotNext = (frag as any).$$next;
-	if (next.writes !== undefined && !commitFrontierMembers(next, frag)) return;
+	if ((frag as any).$$initialHosts?.commit() === false) return;
 	const from = frag;
 	const into = parent;
 	for (let node = from.firstChild; node !== null; node = from.firstChild)
