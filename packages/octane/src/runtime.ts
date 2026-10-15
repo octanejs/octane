@@ -16473,14 +16473,28 @@ export function CompiledContext<T>(
 ): void {
 	provideContext(scope, props.context, props.value);
 	const children = props.children;
-	if (children == null) return;
+	if (children == null) {
+		// Children it rendered before still occupy the scope. Record the empty dialect, as the
+		// descriptor Provider does: a rolled-back transition can restore their DOM, which the
+		// next body must then clear rather than mount beside.
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== undefined && previous !== 2) {
+			resetScopeChildren(scope);
+			if (scope.block.disposed) return;
+			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, 2);
+		}
+		return;
+	}
 	if (!isChildrenBlock(children)) {
 		throw new TypeError(formatClientError(345));
 	}
 	const dialect = (children as any)[CHILDREN_BODY] ?? children;
 	const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 	if (previous !== dialect) {
-		if (previous !== undefined) {
+		if (previous === 2) {
+			resetScopeChildren(scope);
+			if (scope.block.disposed) return;
+		} else if (previous !== undefined) {
 			invalidateSharedBodyOutput(scope);
 			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 				const hooks = scope.hooks!;
@@ -16543,7 +16557,9 @@ export function renderClientContextProvider<T>(
 	// flip instead: the two sides are structurally different code, which is the same
 	// contract React gives an element-type change.
 	const children = props.children;
-	if (children != null) {
+	// Empty children on a Provider that has rendered some still reconcile, as a
+	// descriptor hole, so the previous children are removed rather than kept.
+	if (children != null || scope.hooks?.get(CHILDREN_DIALECT_SLOT) !== undefined) {
 		// Compiled closures carry their stable source-body identity. Their function
 		// identity changes when a parent supplies fresh captures, but their output
 		// still owns the same slots and may retain its auto-memo dependencies.
