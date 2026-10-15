@@ -674,10 +674,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: {
-					group: 'heavy-node',
-					include: ['packages/octane/tests/compiler/compiler-vite-options.test.ts'],
-				},
 				test: {
 					name: 'octane',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
