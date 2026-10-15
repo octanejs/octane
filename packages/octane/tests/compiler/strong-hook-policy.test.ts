@@ -287,12 +287,15 @@ export function App(props) @{
 		const result = slotHooks(source, '/src/useOptions.ts');
 		expect(result?.code.startsWith('#!/usr/bin/env node')).toBe(true);
 	});
-	it('rejects manually managed slots only when a declaration needs a generated cache', () => {
-		const source = `"use strong"; import { useEffect } from 'octane'; export function useOptions(value: string) { const options = { value }; useEffect(() => console.log(options)); }`;
-		expect(() => slotHooks(source, '/src/useOptions.ts', { manualSlots: true })).toThrow(
-			'OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED',
-		);
-	});
+	it.each([false, true])(
+		'rejects generated caches with manual slots (inline=%s)',
+		(inlineHookMemo) => {
+			const source = `"use strong"; import { useEffect } from 'octane'; export function useOptions(value: string) { const options = { value }; useEffect(() => console.log(options)); }`;
+			expect(() =>
+				slotHooks(source, '/src/useOptions.ts', { manualSlots: true, inlineHookMemo }),
+			).toThrow('OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED');
+		},
+	);
 
 	it.each([
 		['', 'useEffect(() => console.log(props.value), [])', EXPLICIT],

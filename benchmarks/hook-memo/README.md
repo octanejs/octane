@@ -16,8 +16,9 @@ variants use client production compilation with HMR, development metadata, and
 automatic region memoization disabled. The latter ensures an unrelated `tick`
 prop reaches every fixture body rather than being absorbed by another cache.
 Plain TypeScript hooks go through the real `slotHooks` entry point with the same
-explicit on/off setting. A separate manual-slot module uses `manualSlots: true`,
-matching bindings whose slots must not be automatically rewritten.
+explicit on/off setting. Separate ordinary and Strong manual-slot modules use
+`manualSlots: true`, matching bindings whose slots must not be automatically
+rewritten. Both must retain the same allocation-free memo hits.
 
 ## Scenarios and semantic controls
 
@@ -74,8 +75,10 @@ and that update has work of its own. Since root render transactions landed
 closures and opens a transaction whose undo log and offscreen capture (eight
 arrays) are allocated even when empty, which is 2 functions and 10 arrays per
 render in both compiler variants. A hook-free `Driver` control runs the identical
-phase sequence, and every scenario's ops are reported net of the driver's
-same-phase counts. A scenario that would fall below the driver fails the run.
+phase sequence, and each render phase's ops are reported net of the driver's
+same-phase counts. A render phase that would fall below the driver fails the run.
+Unmount reports absolute counts: component cleanup need not match the driver's,
+so those rows are not comparable to historical net teardown rows.
 The raw per-phase counters stay in the JSON metadata. The driver keeps its own
 `driver_*` ops, and two guards pin its hit-phase functions and arrays at the
 current root-update cost, so that path cannot grow silently either. Without the
