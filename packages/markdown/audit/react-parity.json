@@ -124,7 +124,7 @@
         {
           "path": "packages/markdown/audit/adapted-case-crosswalk.json",
           "role": "support",
-          "sha256": "51d6f86f392292fe1c78674a5c1ee99b5653821641fbc59f01100a0127b1dfbf"
+          "sha256": "df5f666091a689ed08237b7720991160094b4ad1a3c16ae3068d86956c3e9d14"
         },
         {
           "path": "scripts/react-parity/react-markdown-runtime-inventory.mjs",
@@ -150,7 +150,7 @@
         {
           "path": "packages/markdown/tests/parity/differential.test.ts",
           "role": "test",
-          "sha256": "08944b4886f59ea44d5f07a133e32d99a0254ba35e7e9393793539755eab39b9",
+          "sha256": "cb609474256c011543d7b8e2ac238fbc90bce139b03d5ea13f7f42a647e3d2ef",
           "cases": [
             {
               "id": "react-markdown:differential:sync",

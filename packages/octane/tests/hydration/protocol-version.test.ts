@@ -38,8 +38,14 @@ export function Page() @{
 }
 `;
 
-const server = loadCompiledFixtureSource<any>(SOURCE, { id: 'protocol-version.tsrx', mode: 'server' });
-const client = loadCompiledFixtureSource<any>(SOURCE, { id: 'protocol-version.tsrx', mode: 'client' });
+const server = loadCompiledFixtureSource<any>(SOURCE, {
+	id: 'protocol-version.tsrx',
+	mode: 'server',
+});
+const client = loadCompiledFixtureSource<any>(SOURCE, {
+	id: 'protocol-version.tsrx',
+	mode: 'client',
+});
 
 const PROPS = { title: 'list', items: ['a', 'b'] };
 const MARK = '<!--3-->';
