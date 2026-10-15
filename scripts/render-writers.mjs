@@ -13,7 +13,6 @@
  *              goes through the slot's pending structure (`next`, list logs,
  *              DeoptOrder) instead.
  *   hydration  Adopts or repairs server DOM while hydrating.
- *   rollback   The transition journal restoring what a dropped render changed.
  *   unmount    Removes an unmounting tree outside a root render.
  *   native     Outside rendering: imperative handles, form and focus
  *              plumbing, ViewTransition naming in the native update, style
@@ -155,8 +154,6 @@ export const WRITERS = new Map(
 		'HydrationCapability.insertRoot': 'hydration',
 		finishInitialSuspenseHydration: 'hydration',
 		hydrateRootWithOutputHandler: 'hydration',
-		// rollback
-		rollbackTransitionJournal: 'rollback',
 		// unmount
 		disposeReturnSlot: 'unmount',
 		unmountBlockInner: 'unmount',

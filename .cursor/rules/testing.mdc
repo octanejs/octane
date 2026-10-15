@@ -139,8 +139,8 @@ never the stack.
   the list is rebuilt.
 
 A hand-written body over the compiler ABI follows the same rule: stage text
-with `setRenderText`, place roots through a bag factory, and write anything
-else from a layout effect.
+with `setRenderText` and a style with `setRenderStyle`, place roots through a
+bag factory, and write anything else from a layout effect.
 
 `scripts/scaffold-react-port.mjs` turns a React test file into a triage skeleton
 of in-scope `it.todo`s plus out-of-scope reasons. Resolve or remove every todo
