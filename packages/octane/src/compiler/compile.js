@@ -1548,8 +1548,9 @@ function scriptExecutionOption(
 			jsxAttrRawName(attr) !== 'executeOnMount'
 		)
 			continue;
-		const value =
-			attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
+		const value = unwrapTsExpr(
+			attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
+		);
 		const tag = elementTagName(node) || jsxTagName(node);
 		const loc = attr.loc?.start;
 		const at = loc

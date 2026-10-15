@@ -171,8 +171,8 @@ export function PendingExecutingScript(props: { pending: Promise<void> }) @{
 
 export function OwnedAsyncScripts() @{
 	<section data-owned-scripts>
-		<script executeOnMount async src="/execution.js" nonce="owned-nonce" />
-		<script executeOnMount async src="/execution.js" nonce="owned-nonce" />
+		<script executeOnMount={true as const} async src="/execution.js" nonce="owned-nonce" />
+		<script executeOnMount={true satisfies boolean} async src="/execution.js" nonce="owned-nonce" />
 	</section>
 }
 
@@ -193,8 +193,8 @@ export function PendingDescriptorScript(props: { pending: Promise<void> }) @{
 
 export function OrdinaryAsyncScripts() @{
 	<section>
-		<script executeOnMount={false} async src="/ordinary-resource.js" />
-		<script executeOnMount={false} async src="/ordinary-resource.js" />
+		<script executeOnMount={false as const} async src="/ordinary-resource.js" />
+		<script executeOnMount={false satisfies boolean} async src="/ordinary-resource.js" />
 	</section>
 }
 

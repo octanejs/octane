@@ -1027,8 +1027,22 @@ describe('script executeOnMount authoring contract', () => {
 	it.each(['client', 'server'] as const)(
 		'rejects unsupported %s script execution options',
 		(mode) => {
+			for (const expression of [
+				'active',
+				'(active)',
+				'active as boolean',
+				'(active as boolean)',
+				'active satisfies boolean',
+				'active!',
+			])
+				expect(() =>
+					compile(
+						`export function App({active}) @{ <script executeOnMount={${expression}} /> }`,
+						'script-option.tsrx',
+						{ mode },
+					),
+				).toThrow(/executeOnMount requires a static boolean on a native <script> template/);
 			for (const source of [
-				'export function App({active}) @{ <script executeOnMount={active} /> }',
 				'export function App() @{ <script executeOnMount="true" /> }',
 				'export function App() @{ <div executeOnMount /> }',
 			])
@@ -1067,7 +1081,17 @@ describe('script executeOnMount authoring contract', () => {
 	it.each(['client', 'server'] as const)(
 		'accepts literal true and false without changing component props in %s output',
 		(mode) => {
-			for (const option of ['', '={true}', '={false}']) {
+			for (const option of [
+				'',
+				...['true', 'false'].flatMap((value) => [
+					`={${value}}`,
+					`={(${value})}`,
+					`={${value} as const}`,
+					`={(${value} as const)}`,
+					`={${value} satisfies boolean}`,
+					`={${value}!}`,
+				]),
+			]) {
 				expect(
 					compile(
 						`export function App() @{ <script executeOnMount${option} /> }`,
