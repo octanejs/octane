@@ -205,3 +205,120 @@ export const UNGUARDED_FRESH = new Map(
 		frontierSentinel: 'a spare sentinel renamed before it joins a frontier',
 	}),
 );
+
+/**
+ * Individual fresh writes whose safety depends on a runtime invariant outside
+ * the checker's bounded branch/provenance model. Keys include the runtime
+ * module, writer, operation and receiver expression; the exact count prevents
+ * a new identical write from silently borrowing an existing audit. Remove or
+ * re-audit an entry when the checker reports it stale.
+ */
+export const AUDITED_FRESH = new Map(
+	Object.entries({
+		'block.ts:renderReturnedValue:call:removeChild:domParent.removeChild': [
+			1,
+			'frontier is non-null only after domParent was redirected to its detached fragment',
+		],
+		'branches.ts:swapBranchFrontier:call:insertBefore:frag!.insertBefore': [
+			2,
+			'frag is either the new slot frontier or this transaction’s existing slot fragment',
+		],
+		'child-slots.ts:childSlot:write:data:end.data': [
+			1,
+			'end is newly created or the compiler-owned placeholder; freshSlotEnd redirects committed parents',
+		],
+		'child-slots.ts:childSlot:call:insertBefore:p.insertBefore': [
+			2,
+			'the preceding adopting and replacing branches stage every active frontier case',
+		],
+		'child-slots.ts:childSlot:call:insertBefore:parent.insertBefore': [
+			1,
+			'parent is non-null and the preceding frontier branch did not select parent ?? domParent',
+		],
+		'child-slots.ts:childSlot:call:insertBefore:state.start.parentNode!.insertBefore': [
+			1,
+			'the null fragment branch has no applicable frontier; state.start was just placed in that domParent',
+		],
+		'component-slots.ts:clearHmrRange:call:insertBefore:parent.insertBefore': [
+			1,
+			'the staged branch schedules the pair at commit when the block has pending writes',
+		],
+		'component-slots.ts:clearHmrRange:call:replaceChild:parent.replaceChild': [
+			1,
+			'the staged branch schedules the pair at commit when the block has pending writes',
+		],
+		'component-slots.ts:clearChildContent:call:removeChild:host.removeChild': [
+			1,
+			'an active non-aborted, non-rollback transaction with a parent queues deletion and returns',
+		],
+		'component-slots.ts:clearChildContent:call:removeChild:parent.removeChild': [
+			1,
+			'an active non-aborted, non-rollback transaction with a parent queues deletion and returns',
+		],
+		'component-slots.ts:clearChildContent:call:remove:state.text.remove': [
+			1,
+			'an active non-aborted, non-rollback transaction with a parent queues deletion and returns',
+		],
+		'component-slots.ts:clearChildContent:call:removeChild:state.hostNode.parentNode!.removeChild':
+			[
+				1,
+				'an active non-aborted, non-rollback transaction with a parent queues deletion and returns',
+			],
+		'deopt.ts:deoptItemBody:call:replaceChild:host.replaceChild': [
+			1,
+			'host is a distinct, unlanded frontier marked by $$next',
+		],
+		'deopt.ts:deoptItemBody:call:removeChild:host.removeChild': [
+			1,
+			'host is a distinct, unlanded frontier marked by $$next',
+		],
+		'deopt.ts:deoptItemBody:call:insertBefore:parent.insertBefore': [
+			1,
+			'the immediately preceding frontier test for this parent selects the detached branch instead',
+		],
+		'deopt.ts:hostElementBody:call:insertBefore:parent.insertBefore': [
+			1,
+			'the frontier branch handles replacement; an initial host builds in its new block',
+		],
+		'deopt.ts:hostStringTagBody:call:insertBefore:parent.insertBefore': [
+			1,
+			'first mount uses the component slot’s insertion context; committed-parent mounts are redirected to a frontier',
+		],
+		'engine.ts:makeRoot:call:append:frontier.frag!.append': [
+			1,
+			'queueFrontier created the off-document root fragment',
+		],
+		'head.ts:headBlock:call:appendChild:ownerDocument.head.appendChild': [
+			1,
+			'runs from the transaction commit callback',
+		],
+		'head.ts:headBlock:call:appendChild:head.appendChild': [
+			1,
+			'the active, non-aborted transaction branch queues the insertion instead',
+		],
+		'head.ts:headBlock:call:remove:state!.el.remove': [1, 'runs from the scope unmount cleanup'],
+		'hydrate-boundary.ts:createHydrateSlot:call:setAttribute:wrapper.setAttribute': [
+			3,
+			'serverPreserved is false; the client wrapper has not been placed',
+		],
+		'hydrate-boundary.ts:createHydrateSlot:call:append:wrapper.append': [
+			1,
+			'a preserved server wrapper without its range fails hydration before this write',
+		],
+		'lists.ts:forBlock:write:data:end.data': [
+			1,
+			'ownEnd identifies the compiler-owned placeholder; freshSlotEnd redirects a committed parent',
+		],
+	}),
+);
+
+/** Known exact-site debt, distinct from audited-safe writes and the legacy writer-wide list. */
+export const UNRESOLVED_FRESH = new Map([
+	[
+		'deopt.ts:deoptItemBody:call:removeChild:parent.removeChild',
+		[
+			1,
+			'failed same-tag transfer fallback: active-cursor reachability is unproven; deferring removal could make hydration adopt a node queued for deletion',
+		],
+	],
+]);

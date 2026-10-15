@@ -87,8 +87,8 @@ test('a fresh writer that reaches runtime structure must test for a frontier', (
 	]);
 	const { failures, stale } = inspectRenderWrites(
 		`
+	import { usesFrontier } from './runtime/commit.js';
 	interface Block { parentNode: Node; endMarker: Node | null }
-	declare function usesFrontier(block: Block, parent: Node): boolean;
 	function anchor(block: Block) {
 	 const parent = block.parentNode;
 	 parent.insertBefore(document.createComment(''), block.endMarker);
@@ -114,4 +114,113 @@ test('a fresh writer that reaches runtime structure must test for a frontier', (
 		[['anchor', 'call:insertBefore', true]],
 	);
 	assert.deepEqual(stale, ['stillListed']);
+});
+
+test('a guard mention does not protect an unrelated write', () => {
+	const writers = new Map([
+		['commented', 'fresh'],
+		['unrelated', 'fresh'],
+		['wrongBranch', 'fresh'],
+		['unstable', 'fresh'],
+		['shadowed', 'fresh'],
+		['guarded', 'fresh'],
+	]);
+	const { failures } = inspectRenderWrites(
+		`
+	import { usesFrontier } from './runtime/commit.js';
+	interface Block { parentNode: Node; endMarker: Node | null }
+	declare function getParent(): Node;
+	function commented(block: Block) {
+	 // ROOT_RENDER_TRANSACTION is absent here.
+	 block.parentNode.insertBefore(document.createComment(''), block.endMarker);
+	}
+	function unrelated(block: Block) {
+	 if (usesFrontier(block, block.parentNode)) console.log('frontier');
+	 block.parentNode.insertBefore(document.createComment(''), block.endMarker);
+	}
+	function wrongBranch(block: Block) {
+	 const parent = block.parentNode;
+	 if (usesFrontier(block, parent)) parent.appendChild(document.createComment(''));
+	}
+	function unstable(block: Block) {
+	 if (!usesFrontier(block, getParent())) getParent().appendChild(document.createComment(''));
+	}
+	function shadowed(block: Block, usesFrontier: (block: Block, parent: Node) => boolean) {
+	 const parent = block.parentNode;
+	 if (!usesFrontier(block, parent)) parent.appendChild(document.createComment(''));
+	}
+	function guarded(block: Block) {
+	 const parent = block.parentNode;
+	 if (!usesFrontier(block, parent))
+	  parent.insertBefore(document.createComment(''), block.endMarker);
+	}`,
+		undefined,
+		writers,
+		new Map(),
+	);
+	assert.deepEqual(
+		failures.map(({ owner, unguarded }) => [owner, unguarded]),
+		[
+			['commented', true],
+			['unrelated', true],
+			['wrongBranch', true],
+			['unstable', true],
+			['shadowed', true],
+		],
+	);
+});
+
+test('a site audit cannot cover an additional identical write', () => {
+	const { failures, stale } = inspectRenderWrites(
+		`interface Block { parentNode: Node }
+		function audited(block: Block) {
+		 block.parentNode.appendChild(document.createComment('one'));
+		 block.parentNode.appendChild(document.createComment('two'));
+		}`,
+		undefined,
+		new Map([['audited', 'fresh']]),
+		new Map(),
+		new Map([
+			[
+				'../runtime.ts:audited:call:appendChild:block.parentNode.appendChild',
+				[1, 'specific invariant'],
+			],
+		]),
+	);
+	assert.equal(failures.length, 1);
+	assert.equal(failures[0].unguarded, true);
+	assert.deepEqual(stale, []);
+});
+
+test('transaction guards must read the runtime binding at the branch', () => {
+	const { failures } = inspectRenderWrites(
+		`import { ROOT_RENDER_TRANSACTION } from './runtime/render.js';
+		interface Block { parentNode: Node }
+		declare function beginRootRender(): void;
+		function direct(block: Block) {
+		 const parent = block.parentNode;
+		 if (ROOT_RENDER_TRANSACTION === null) parent.appendChild(document.createComment(''));
+		}
+		function shadow(block: Block, ROOT_RENDER_TRANSACTION: null) {
+		 const parent = block.parentNode;
+		 if (ROOT_RENDER_TRANSACTION === null) parent.appendChild(document.createComment(''));
+		}
+		function snapshot(block: Block) {
+		 const parent = block.parentNode;
+		 const transaction = ROOT_RENDER_TRANSACTION;
+		 beginRootRender();
+		 if (transaction === null) parent.appendChild(document.createComment(''));
+		}`,
+		undefined,
+		new Map([
+			['direct', 'fresh'],
+			['shadow', 'fresh'],
+			['snapshot', 'fresh'],
+		]),
+		new Map(),
+	);
+	assert.deepEqual(
+		failures.map(({ owner }) => owner),
+		['shadow', 'snapshot'],
+	);
 });
