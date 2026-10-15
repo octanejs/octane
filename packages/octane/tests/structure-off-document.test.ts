@@ -6,10 +6,25 @@ import { createElement, createRoot, flushSync } from '../src/index.js';
 // New structure over committed DOM builds off-document and lands at commit
 // (#2043): a render that adds it makes no change to the page.
 const SOURCE = `
-import { use } from 'octane';
+import { createElement, use } from 'octane';
 function Probe(props) @{
 	props.probe();
 	<></>
+}
+export function Returns(props) {
+	if (props.mode === 'none') return undefined;
+	if (props.mode === 'list')
+		return [
+			createElement('i', { key: 'a' }, 'a'),
+			createElement(Probe, { key: 'probe', probe: props.probe }),
+		];
+	return <b>{'host'}</b>;
+}
+export function StringTag(props) @{
+	<main>
+		<props.tag id="tagged" class={props.cls} title={props.cls}>{props.cls as string}</props.tag>
+		<Probe probe={props.probe} />
+	</main>
 }
 export function HoleList(props) @{
 	<main>
@@ -117,6 +132,40 @@ describe.each([false, true])('structure over committed DOM (dev=%s)', (dev) => {
 			expect(app.during.length).toBeGreaterThan(0);
 			for (const records of app.during) expect(records).toEqual([]);
 			expect(app.container.querySelector('#list')!.textContent).toBe('ab');
+		} finally {
+			app.done();
+		}
+	});
+
+	it('patches a committed string-tag host’s props at commit', () => {
+		const c = client();
+		const app = mountObserved(c.StringTag, { tag: 'section', cls: 'one' });
+		try {
+			const host = app.container.querySelector('#tagged')!;
+			app.arm();
+			flushSync(() => app.render({ tag: 'section', cls: 'two' }));
+			expect(app.during.length).toBeGreaterThan(0);
+			for (const records of app.during) expect(records).toEqual([]);
+			expect(app.container.querySelector('#tagged')).toBe(host);
+			expect(host.className).toBe('two');
+			expect(host.getAttribute('title')).toBe('two');
+			expect(host.textContent).toBe('two');
+		} finally {
+			app.done();
+		}
+	});
+
+	it('builds a returned value’s new list off-document', () => {
+		const c = client();
+		// Its last row probes once the rows before it are in place.
+		const app = mountObserved(c.Returns, { mode: 'host' });
+		try {
+			flushSync(() => app.render({ mode: 'none' }));
+			app.arm();
+			flushSync(() => app.render({ mode: 'list' }));
+			expect(app.during.length).toBeGreaterThan(0);
+			for (const records of app.during) expect(records).toEqual([]);
+			expect(app.container.textContent).toBe('a');
 		} finally {
 			app.done();
 		}
