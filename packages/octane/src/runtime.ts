@@ -17364,7 +17364,7 @@ function permanentStaticHydrationRangeEnd(
 }
 
 function preservePermanentStaticHydrationRange(scope: Scope): void {
-	const hydration = activeHydration();
+	const hydration = hydrating ? activeHydration() : null;
 	if (hydration === null) return;
 	const marker = hydration.node;
 	if (marker?.nodeType !== 8) return;
@@ -18654,6 +18654,20 @@ type InternalHydrateComponent = ComponentBody<HydrateProps> & {
 	readonly __octanePermanentStatic: ComponentBody<HydrateProps>;
 };
 
+export const __PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags<
+	ComponentBody<HydrateProps>
+>(
+	function PermanentStaticHydrate(_props, scope) {
+		// Match Hydrate's own server useId while leaving all child IDs to the
+		// paired private sidecar. The componentSlot's adopted outer range owns
+		// the untouched server DOM across parent updates and unmount.
+		useId(HYDRATE_ID_SLOT);
+		preservePermanentStaticHydrationRange(scope);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'PermanentStaticHydrate',
+);
+
 function initializeHydrateComponent(
 	boundaryBody: typeof hydrateBoundaryBody,
 ): InternalHydrateComponent {
@@ -18727,18 +18741,8 @@ function initializeHydrateComponent(
 		COMPONENT_FLAG_BOUNDARY,
 		'Hydrate',
 	);
-	const permanentStatic = markComponentFlags<ComponentBody<HydrateProps>>(
-		function PermanentStaticHydrate(_props, scope) {
-			// Match Hydrate's own server useId while leaving all child IDs to the
-			// paired private sidecar. The componentSlot's adopted outer range owns
-			// the untouched server DOM across parent updates and unmount.
-			useId(HYDRATE_ID_SLOT);
-			preservePermanentStaticHydrationRange(scope);
-		},
-		COMPONENT_FLAG_BOUNDARY,
-		'PermanentStaticHydrate',
-	);
-	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: permanentStatic });
+
+	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: __PermanentStaticHydrate });
 	return hydrate as InternalHydrateComponent;
 }
 
@@ -21226,6 +21230,62 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 			root: 0,
 		} satisfies LazyTemplateRecord,
 	} as unknown as Element;
+}
+
+/** Compiler-only cold preparation for scripts explicitly owned by a template mount. */
+/* @__NO_SIDE_EFFECTS__ */
+export function scriptTemplate(html: string, ns: number, frag: number, paths: number[][]): Element {
+	const token = template(html, ns, frag);
+	const lazy = (token as any)[LAZY_TEMPLATE] as LazyTemplateRecord;
+	// Only script tokens install cold cache accessors. Ordinary template records
+	// and their resolver stay unchanged, and parse-free adoption never reads the
+	// parsed cache. Each namespace becomes a plain cached value after preparation.
+	for (let namespace = 0; namespace < 3; namespace++) {
+		Object.defineProperty(lazy.parsed, namespace, {
+			configurable: true,
+			enumerable: true,
+			get() {
+				let root = parseTemplate(html, namespace as 0 | 1 | 2, frag);
+				for (const path of paths) {
+					let node = root;
+					for (const index of path) {
+						node = getFirstChild(node)!;
+						for (let i = 0; i < index; i++) node = getNextSibling(node)!;
+					}
+					const parsed = node as Element;
+					// A parser-created script stays inert when cloned. A never-inserted
+					// script created in the live document instead gives each clone the
+					// browser's normal execution semantics, without executing the cache.
+					// Preserve opaque component destinations rather than creating HTML
+					// scripts inside foreign content.
+					const script = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(
+						parsed.namespaceURI,
+						'script',
+					);
+					const view = STAGED_DOM ? STAGED_DOM.view(script) : script;
+					const parsedView = STAGED_DOM ? STAGED_DOM.view(parsed) : parsed;
+					for (const attr of parsedView.attributes) {
+						const attribute = STAGED_DOM ? STAGED_DOM.view(attr) : attr;
+						view.setAttributeNS(attribute.namespaceURI, attribute.name, attribute.value);
+					}
+					view.textContent = parsedView.textContent;
+					if (node === root) root = script;
+					else {
+						const parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!;
+						(STAGED_DOM ? STAGED_DOM.view(parent) : parent).replaceChild(script, node);
+					}
+				}
+				Object.defineProperty(lazy.parsed, namespace, {
+					value: root,
+					writable: true,
+					configurable: true,
+					enumerable: true,
+				});
+				return root;
+			},
+		});
+	}
+	return token;
 }
 
 /**

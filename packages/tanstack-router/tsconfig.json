@@ -1,4 +1,5 @@
 {
+  "tsrx": { "compiler": "octane/compiler/volar" },
   "compilerOptions": {
     "module": "esnext",
     "lib": ["esnext", "dom", "dom.iterable"],

@@ -1521,6 +1521,73 @@ function rejectDangerouslySetInnerHTMLChildren(tag, node, ctx) {
 	throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.' + at);
 }
 
+// This is a compiler option, not a DOM prop or a runtime execution switch.
+function scriptExecutionOption(
+	node,
+	ctx,
+	attributes = node.attributes || node.openingElement?.attributes || [],
+) {
+	let execute = false;
+	for (const attr of attributes) {
+		const argument = unwrapTsExpr(attr.argument);
+		if (
+			attr._octaneKnownAttributeSpread?.fields.includes('__executeOnMount') ||
+			((attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') &&
+				argument?.type === 'ObjectExpression' &&
+				argument.properties.some(
+					(property) =>
+						property.type === 'Property' &&
+						(!property.computed || property.key.type === 'Literal') &&
+						(property.key.name ?? property.key.value) === '__executeOnMount',
+				))
+		) {
+			throw new Error('__executeOnMount must be a direct attribute, not a spread property.');
+		}
+		if (
+			(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
+			jsxAttrRawName(attr) !== '__executeOnMount'
+		)
+			continue;
+		const value = unwrapTsExpr(
+			attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
+		);
+		const tag = elementTagName(node) || jsxTagName(node);
+		const loc = attr.loc?.start;
+		const at = loc
+			? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${loc.line}:${loc.column})`
+			: '';
+		if (
+			tag !== 'script' ||
+			(value != null &&
+				!(
+					(value.type === 'Literal' || value.type === 'BooleanLiteral') &&
+					typeof value.value === 'boolean'
+				))
+		) {
+			throw new Error(
+				'__executeOnMount requires a static boolean on a native <script> template.' + at,
+			);
+		}
+		execute = value == null || value.value;
+	}
+	return execute;
+}
+
+function withoutScriptExecutionOption(attributes) {
+	const index = attributes.findIndex(
+		(attr) =>
+			(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+			jsxAttrRawName(attr) === '__executeOnMount',
+	);
+	return index < 0
+		? attributes
+		: attributes.filter(
+				(attr) =>
+					(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
+					jsxAttrRawName(attr) !== '__executeOnMount',
+			);
+}
+
 // Compiler-generated code references runtime helpers under a collision-proof
 // `_$` alias — `import { setText as _$setText } from 'octane'` + `_$setText(…)`
 // — because generated statements are interleaved with USER statements inside
@@ -11066,6 +11133,7 @@ function expandKnownAttributeSpreads(attributes) {
 // and the handler, bundle, and lift analyses then see the lowered form they
 // emit. Copy-on-write: an attribute without value JSX keeps its identity.
 function lowerHostAttributeValues(attributes, ctx) {
+	attributes = withoutScriptExecutionOption(attributes);
 	let out = null;
 	for (let i = 0; i < attributes.length; i++) {
 		const attr = attributes[i];
@@ -11142,6 +11210,18 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 	assertNoLegacyContextProviders(ast, source, cleanFilename);
 	options = nativeReadOptions(ast, options);
 	assertNativeReadDiagnostics(ast, source, cleanFilename, options);
+	if (source.includes('__executeOnMount'))
+		mapAst(ast, (node) => {
+			if ((node.type === 'JSXElement' || node.type === 'Element') && !isComponentTag(node)) {
+				if (
+					scriptExecutionOption(node, { mapSourceName: cleanFilename }) &&
+					(options?.renderer?.target ?? 'dom') !== 'dom'
+				) {
+					throw new Error('__executeOnMount requires the DOM template renderer.');
+				}
+			}
+			return null;
+		});
 	return { ast, options };
 }
 
@@ -12895,9 +12975,17 @@ function compileInternal(
 		});
 	const templateNodes = ctx.hoistedTemplates.map((t) => {
 		const args = [b.literal(t.html, JSON.stringify(t.html))];
-		if (t.ns || t.frag) args.push(b.literal(t.ns | 0));
-		if (t.frag) args.push(b.literal(t.frag | 0));
-		return inheritOriginLoc(b.const(t.name, markPure(b.call('_$template', ...args))), moduleOrigin);
+		const scripts = t.scriptPaths !== null;
+		if (t.ns || t.frag || scripts) args.push(b.literal(t.ns | 0));
+		if (t.frag || scripts) args.push(b.literal(t.frag | 0));
+		if (scripts)
+			args.push(
+				b.array(t.scriptPaths.map((path) => b.array(path.map((index) => b.literal(index))))),
+			);
+		return inheritOriginLoc(
+			b.const(t.name, markPure(b.call(scripts ? '_$scriptTemplate' : '_$template', ...args))),
+			moduleOrigin,
+		);
 	});
 	// No tail slots exist on the client today (prop memos are server-only), but
 	// flush before assembly so a future client-side tail site cannot trip the
@@ -14779,6 +14867,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// NB: the ns helpers take the TAG STRING (passing the node silently returns
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
+	if (scriptExecutionOption(node, ctx) && selfNs !== 'html' && selfNs !== 'opaque') {
+		throw new Error('__executeOnMount requires an HTML <script> template.');
+	}
 	const childNs = nsForChildren(tag, selfNs);
 	// The static namespace walk starts each independently compiled component in
 	// an opaque context because a component can be invoked under foreign content.
@@ -25183,7 +25274,13 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
 	}
-	const attrs = node.attributes || node.openingElement?.attributes || [];
+	if (!componentTag && scriptExecutionOption(node, ctx)) {
+		throw new Error(
+			'__executeOnMount requires a native <script> in an owned template, not a JSX value.',
+		);
+	}
+	const authoredAttrs = node.attributes || node.openingElement?.attributes || [];
+	const attrs = componentTag ? authoredAttrs : withoutScriptExecutionOption(authoredAttrs);
 	classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs);
 	const properties = [];
 	for (const attr of attrs) {
@@ -25801,6 +25898,7 @@ function headResourceKind(n) {
 	if (n.type !== 'JSXElement' && n.type !== 'Element') return null;
 	const tag = jsxTagName(n) || elementTagName(n);
 	if (tag !== 'link' && tag !== 'script') return null;
+	if (tag === 'script' && scriptExecutionOption(n, {})) return null;
 	const attrs = n.attributes || n.openingElement?.attributes || [];
 	let hasPrecedence = false;
 	let relStylesheet = false;
@@ -26108,6 +26206,7 @@ function headAttrsExpression(el) {
 		}
 		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
 		const attrName = a.name.name || a.name;
+		if (attrName === '__executeOnMount') continue;
 		// refs/key have no head semantics; `class` is the CSS-scoping stamp
 		// (meaningless on title/meta/link) — drop them. EVENTS pass through: a
 		// hoisted element lives in document.head, outside every delegation root,
@@ -28238,6 +28337,7 @@ function planJsx(
 	const losesPosition = (n, record) =>
 		record !== null && (n.type !== 'Element' || !record.anchorlessAppendSafe);
 	const rootTemplate = createTemplateIr();
+	const scriptPaths = [];
 	let htmlIdx = 0;
 	// Text-adjacency classification of the root nodes (see textAdjacencyKind):
 	// root-level text holes are `<!>` bindings too, so a dynamic hole with a
@@ -28283,6 +28383,7 @@ function planJsx(
 			inlinedSubs,
 			parentNs,
 			cssHash,
+			scriptPaths,
 		);
 		// Flag a root-level text binding whose neighbour is also text — the server
 		// separates the pair with `<!-- -->`, so the walk must be hole-aware. Only
@@ -28348,7 +28449,7 @@ function planJsx(
 	let elementVars;
 	let ensureVar;
 	if (!noTemplate) {
-		ctx.runtimeNeeded.add('template');
+		ctx.runtimeNeeded.add(scriptPaths.length ? 'scriptTemplate' : 'template');
 		ctx.runtimeNeeded.add('clone');
 		// Template namespace strategy:
 		//   - HTML single-root: parse the element directly, no flag.
@@ -28419,7 +28520,13 @@ function planJsx(
 		// adds the wrapper the HTML parser needs. Hydration reads the count without
 		// parsing the template to find where the roots it adopted end.
 		const fragArg = single ? 0 : htmlIdx;
-		const tpl = allocTemplate(ctx, rootTemplate, flag, fragArg);
+		const tpl = allocTemplate(
+			ctx,
+			rootTemplate,
+			flag,
+			fragArg,
+			scriptPaths.length ? scriptPaths : null,
+		);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
@@ -31701,6 +31808,7 @@ function emitNodeHtml(
 	inlinedSubs,
 	parentNs = 'html',
 	cssHash = null,
+	scriptPaths,
 ) {
 	if (node._octaneBindingValue || node._octaneBindingSlot) {
 		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash, parentNs);
@@ -31839,6 +31947,7 @@ function emitNodeHtml(
 			inlinedSubs,
 			parentNs,
 			cssHash,
+			scriptPaths,
 		);
 	if (node.type === 'Literal' && typeof node.value === 'string') {
 		const escaped = escapeHtml(node.value);
@@ -32028,6 +32137,7 @@ function emitElementHtml(
 	inlinedSubs,
 	parentNs = 'html',
 	cssHash = null,
+	scriptPaths,
 ) {
 	// DEV: record this element's source position keyed by its template path, so the binding
 	// mount loop can stamp `<el>.__oct_loc` on bound elements (hydration-mismatch warnings on
@@ -32080,6 +32190,12 @@ function emitElementHtml(
 	// (`<foreignObject>` is SVG-ns but its children are HTML).
 	const hostNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, parentNs);
+	if (scriptExecutionOption(node, ctx)) {
+		if (hostNs !== 'html' && hostNs !== 'opaque') {
+			throw new Error('__executeOnMount requires an HTML <script> template.');
+		}
+		scriptPaths.push(path);
+	}
 	// Collect attributes.
 	const attrs = lowerHostAttributeValues(
 		expandKnownAttributeSpreads(node.attributes || node.openingElement?.attributes || []),
@@ -33495,6 +33611,7 @@ function emitElementHtml(
 						inlinedSubs,
 						childNs,
 						cssHash,
+						scriptPaths,
 					);
 					appendTemplateIr(html, childHtml);
 					childIdx++;
@@ -37416,13 +37533,16 @@ function bodyContainsJsx(node) {
 }
 
 /** @param {TemplateIR} ast */
-function allocTemplate(ctx, ast, ns = 0, frag = 0) {
+function allocTemplate(ctx, ast, ns = 0, frag = 0, scriptPaths = null) {
 	const { html, origins } = serializeTemplateIr(ast);
+	const scripts = scriptPaths === null ? null : JSON.stringify(scriptPaths);
 	const intern = !ctx.hmr && !ctx.dev && !ctx.profile;
 	const bucket = intern ? ctx.internedTemplates.get(html) : undefined;
 	const existing = Array.isArray(bucket)
-		? bucket.find((template) => template.ns === ns && template.frag === frag)
-		: bucket?.ns === ns && bucket.frag === frag
+		? bucket.find(
+				(template) => template.ns === ns && template.frag === frag && template.scripts === scripts,
+			)
+		: bucket?.ns === ns && bucket.frag === frag && bucket.scripts === scripts
 			? bucket
 			: undefined;
 	if (existing !== undefined) {
@@ -37445,7 +37565,7 @@ function allocTemplate(ctx, ast, ns = 0, frag = 0) {
 	}
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	const template = { name, ast, html, ns, frag, origins };
+	const template = { name, ast, html, ns, frag, origins, scriptPaths, scripts };
 	ctx.hoistedTemplates.push(template);
 	if (intern) {
 		if (bucket === undefined) ctx.internedTemplates.set(html, template);

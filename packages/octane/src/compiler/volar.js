@@ -119,6 +119,15 @@ const OCTANE_PLATFORM = {
 	},
 	hooks: {
 		canHoistStaticNode: (node) => !containsComponentJsx(node),
+		transformElementAttributes(attributes, _context, element) {
+			// Router's execution capability is compiler metadata, not a public DOM prop.
+			if (
+				element.openingElement?.name?.name !== 'script' ||
+				!attributes.some((attribute) => attribute.name?.name === '__executeOnMount')
+			)
+				return attributes;
+			return attributes.filter((attribute) => attribute.name?.name !== '__executeOnMount');
+		},
 	},
 };
 

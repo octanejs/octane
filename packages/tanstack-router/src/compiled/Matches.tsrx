@@ -4,7 +4,10 @@ import {
 	useContext,
 	useLayoutEffect,
 	useRef,
+	trustHTML,
+	Hydrate,
 } from 'octane';
+import { never } from 'octane/hydration';
 import type { NotFoundError } from '@tanstack/router-core';
 import { hasKeys, isNotFound, rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
 import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
@@ -257,11 +260,9 @@ function CompiledScrollRestoration() @{
 	const script = getScrollRestorationScriptForRouter(router);
 	const rendersScript = typeof option !== 'function' || option({ location: router.latestLocation });
 	@if ((script !== null || rendersScript) && ((isServer ?? router.isServer) || !hydrated)) {
-		<script
-			nonce={router.options.ssr?.nonce}
-			suppressHydrationWarning
-			dangerouslySetInnerHTML={{ __html: script ?? '' }}
-		/>
+		<Hydrate split={false} when={never()}>
+			<script nonce={router.options.ssr?.nonce} dangerouslySetInnerHTML={trustHTML(script ?? '')} />
+		</Hydrate>
 	}
 }
 

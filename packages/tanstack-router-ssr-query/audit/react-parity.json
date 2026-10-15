@@ -166,7 +166,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/tsconfig.octane.json",
           "role": "support",
-          "sha256": "c0923878814f83561454657a42634a4df2acc571701aa5589b4bc2254e163126"
+          "sha256": "cc147d6c95df35e8add447856f951d92aeba02ef140df6f52a75fb4041e5ba41"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
@@ -204,7 +204,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "aab88b4330137d4e3469590b62299a800c9c552e1fe1c79009fca442b06aaf36"
+          "sha256": "b46177f6a820ea83378a05f4d30c900a50342ff88d884617e96045df75ab912e"
         }
       ]
     }

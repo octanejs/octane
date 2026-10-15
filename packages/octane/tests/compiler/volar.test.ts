@@ -52,6 +52,58 @@ function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
  * the contract.
  */
 describe('compileToVolarMappings', () => {
+	it('type-checks internal script metadata without widening public or component props', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-script-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const sources = {
+				Native:
+					'export function Native() @{ <script __executeOnMount src="/entry.js" nonce="test" /> }',
+				Component:
+					'declare function Child(props: { __executeOnMount: string }): any; export function Component() @{ <Child __executeOnMount={42} /> }',
+				Public: 'export function Public() @{ <script executeOnMount /> }',
+				InvalidNative: 'export function InvalidNative() @{ <script __executeOnMount src={42} /> }',
+			};
+			const files = Object.entries(sources).map(([name, source]) => {
+				const file = join(root, name + '.tsx');
+				writeFileSync(file, compileToVolarMappings(source, name + '.tsrx').code);
+				return file;
+			});
+			const inspection = join(root, 'Inspection.tsx');
+			writeFileSync(inspection, compileTypesInspection(sources.Native, 'Inspection.tsrx').code);
+			files.push(inspection);
+			const program = ts.createProgram(files, {
+				jsx: ts.JsxEmit.Preserve,
+				module: ts.ModuleKind.ESNext,
+				moduleResolution: ts.ModuleResolutionKind.Bundler,
+				noEmit: true,
+				strict: true,
+				skipLibCheck: true,
+				target: ts.ScriptTarget.ESNext,
+				types: [],
+			});
+			const errors = files.map((file) =>
+				program
+					.getSemanticDiagnostics(program.getSourceFile(file)!)
+					.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
+			);
+			expect(errors[0]).toEqual([]);
+			expect(errors[1]).toEqual([
+				expect.stringContaining("Type 'number' is not assignable to type 'string'"),
+			]);
+			expect(errors[2]).toEqual([expect.stringContaining('executeOnMount')]);
+			expect(errors[3]).toEqual([expect.stringContaining("Type 'number' is not assignable")]);
+			expect(errors[4]).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('retains computed method keys when generated brackets have no source mapping', () => {
 		const source = `const key = Symbol.iterator;
 		export const iterable = { [key]() { return [1, 2][Symbol.iterator](); } };`;
