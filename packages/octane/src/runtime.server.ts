@@ -2843,7 +2843,8 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 		if (d.type === Fragment || d.type === Activity) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
-	return false;
+	// A portal renders through its own block on the client (descNeedsBlocks).
+	return d.$$kind === PORTAL_TAG;
 }
 
 // Return one complete script-data string when a host descriptor contains only
