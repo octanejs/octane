@@ -327,10 +327,10 @@ const NATIVE_REFLECT_APPLY = Reflect.apply;
 const NATIVE_ARRAY_SPECIES_GETTER = /* @__PURE__ */ (() =>
 	Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get)();
 
-// The values a compiled `.map()` returns through another receiver's method. The
-// client renders their component items as it renders the native receiver's
-// rows (mappedDeoptItemBody), so they serialize in that row shape too.
-const MAPPED_VALUES = new WeakSet<object>();
+// The compiler passes a custom `.map()` result straight into ssrChild. Hand
+// that site its row shape once: the same value may also appear in an ordinary
+// child slot, where its component items have a different owner on the client.
+let MAPPED_VALUE: object | null = null;
 
 /** Server twin of the compiler's guarded native-array map ABI. */
 export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) => any): any {
@@ -351,8 +351,7 @@ export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) 
 				mapped = packed;
 			}
 		}
-		if (mapped !== null && (typeof mapped === 'object' || typeof mapped === 'function'))
-			MAPPED_VALUES.add(mapped);
+		MAPPED_VALUE = typeof mapped === 'object' ? mapped : null;
 		return mapped;
 	}
 	if (
@@ -2393,11 +2392,13 @@ export function ssrChild(
 	// inside it as the slot's own Block does.
 	returned?: boolean,
 ): string {
+	const mapped = MAPPED_VALUE;
+	if (mapped !== null) MAPPED_VALUE = null;
 	if (isSignalHandle(v)) {
 		v = readSignalBinding(v);
 	}
 	if (probingDangerHtmlChild(v)) return '';
-	return ssrChildValue(v, scope, true, false, returned === true);
+	return ssrChildValue(v, scope, true, false, returned === true, mapped !== null && mapped === v);
 }
 
 function ssrReturnedValue(v: unknown, scope: SSRScope): string {
@@ -2426,6 +2427,7 @@ function ssrChildValue(
 	selfMarkItem: boolean = false,
 	// A component's returned value (see ssrChild).
 	returned: boolean = false,
+	mapped: boolean = false,
 ): string {
 	if (v !== null && typeof v === 'object' && SERVER_HTML in v) {
 		return (v as ServerHtml)[SERVER_HTML];
@@ -2454,7 +2456,6 @@ function ssrChildValue(
 			returned,
 		);
 	}
-	const mapped = typeof v === 'object' && MAPPED_VALUES.has(v as object);
 	const iterable = iterableChildArray(v);
 	if (iterable !== null) v = iterable;
 	// Arrays, iterables, Fragment descriptors, and keyed single descriptors use the client's
@@ -9064,6 +9065,7 @@ interface Ambient {
 	css: StyleCollector | null;
 	nonceAttr: string;
 	markers: boolean;
+	returnInRange: boolean;
 	permanentStaticHydrateDepth: number;
 	head: HeadBuffer | null;
 	fallbackHoistDepth: number;
@@ -9103,6 +9105,7 @@ function saveAmbient(): Ambient {
 		css: CSS,
 		nonceAttr: NONCE_ATTR,
 		markers: MARKERS,
+		returnInRange: RETURN_IN_RANGE,
 		permanentStaticHydrateDepth: PERMANENT_STATIC_HYDRATE_DEPTH,
 		head: HEAD,
 		fallbackHoistDepth: FALLBACK_HOIST_DEPTH,
@@ -9162,6 +9165,7 @@ function restoreAmbient(a: Ambient): void {
 	CSS = a.css;
 	NONCE_ATTR = a.nonceAttr;
 	MARKERS = a.markers;
+	RETURN_IN_RANGE = a.returnInRange;
 	PERMANENT_STATIC_HYDRATE_DEPTH = a.permanentStaticHydrateDepth;
 	HEAD = a.head;
 	FALLBACK_HOIST_DEPTH = a.fallbackHoistDepth;
@@ -9222,6 +9226,7 @@ function runFullFramedPass(
 	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
+	RETURN_IN_RANGE = false;
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
@@ -9385,6 +9390,7 @@ function runDiscoveryRound(
 	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
+	RETURN_IN_RANGE = false;
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;

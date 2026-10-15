@@ -153,6 +153,27 @@ describe('the hydration protocol version', () => {
 		expect(recoverable).toHaveLength(1);
 	});
 
+	it('rejects an incompatible root even when the document version matches', async () => {
+		container.innerHTML = Server.renderToString(server.App, PROPS).html.replace(MARK, '<!--2-->');
+		const main = container.querySelector('main');
+		const recoverable: unknown[] = [];
+		const documentMark = document.createComment('3');
+		document.insertBefore(documentMark, document.documentElement);
+		try {
+			await act(async () => {
+				root = hydrateRoot(container, client.App, PROPS, {
+					onRecoverableError: (error) => recoverable.push(error),
+				});
+			});
+			expect(container.querySelector('main')).not.toBe(main);
+			expect(recoverable).toEqual([
+				expect.objectContaining({ message: expect.stringContaining('hydration protocol') }),
+			]);
+		} finally {
+			documentMark.remove();
+		}
+	});
+
 	it.each([
 		['an older server', ''],
 		['a version 2 server', '<!--2-->'],

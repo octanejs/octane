@@ -925,12 +925,15 @@ export function childSlot(
 		const end = document.createComment('');
 		const host = state.hostNode;
 		const p = host === null ? null : host.parentNode;
-		// A host descriptor of the host's own type adopts it (the pure-host
-		// upgrade below); a lone keyed host keeps the list regime's in-place pair.
+		// An unkeyed host descriptor of the host's own type adopts it (the
+		// pure-host upgrade below). A keyed host enters the list regime and
+		// replaces the outgoing host.
 		const adopts =
+			hydration === null &&
+			preparedList === null &&
 			host !== null &&
 			typeof elementType === 'string' &&
-			(preparedList !== null || adoptsPureHost(host, value as ElementDescriptor, domParent));
+			adoptsPureHost(host, value as ElementDescriptor, domParent);
 		if (p !== null && !adopts && ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, p)) {
 			// Over committed DOM the pair, and whatever this render puts in it, take
 			// the host's place at commit: the rest of this call renders into the
@@ -947,8 +950,6 @@ export function childSlot(
 		} else if (
 			p !== null &&
 			adopts &&
-			preparedList === null &&
-			hydration === null &&
 			ROOT_RENDER_TRANSACTION !== null &&
 			usesFrontier(parentBlock, p)
 		) {

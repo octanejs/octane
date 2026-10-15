@@ -71,12 +71,8 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 					},
 				})
 			: undefined;
+		// Hydrate in the parsed document so the app retains its document-level SSR context.
 		const doc = parsed?.window.document ?? new DOMParser().parseFromString(html, 'text/html');
-		// The document's output names the hydration protocol version before <html>.
-		// The app container moves into this document, so the version does too.
-		const mark = Array.from(doc.childNodes).find((node) => node.nodeType === Node.COMMENT_NODE)!;
-		expect((mark as Comment).data).toBe('3');
-		document.insertBefore(mark, document.documentElement);
 		if (transport) {
 			expect(html).toContain('data-tsr-stream-part');
 			expect(doc.querySelectorAll('script[data-tsr-stream-part]')).toHaveLength(0);
@@ -93,7 +89,6 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 		expect(scrollScript.nonce).toBe('fixture-nonce');
 		input.value = 'typed before hydration';
 		expect(button.textContent?.trim()).toBe('Count: 0');
-		document.body.append(container);
 		const serverScripts = new Set<Node>(container.querySelectorAll('script'));
 		const addedScripts: Node[] = [];
 		const recordScripts = (records: MutationRecord[]) => {
@@ -158,7 +153,6 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 			scrollTo.mockRestore();
 			root.unmount();
 			container.remove();
-			(mark as Comment).remove();
 			vi.unstubAllGlobals();
 			parsed?.window.close();
 		}

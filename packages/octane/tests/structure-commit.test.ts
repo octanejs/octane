@@ -1120,4 +1120,53 @@ describe('de-opt markers change at commit', () => {
 			container.remove();
 		}
 	});
+
+	it('keeps the outgoing root host untouched until its keyed replacement commits', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const observer = new MutationObserver(() => {});
+		let during: MutationRecord[] | null = null;
+		let observedInput: HTMLInputElement | null = null;
+		const App = (props: { child: ReturnType<typeof createElement> }) => props.child;
+		try {
+			flushSync(() =>
+				root.render(App, {
+					child: createElement(
+						'div',
+						{ id: 'host' },
+						createElement('input', { defaultValue: 'initial' }),
+					),
+				}),
+			);
+			const outgoingHost = container.querySelector('#host');
+			const outgoingInput = container.querySelector('input')!;
+			outgoingInput.value = 'typed';
+			observer.observe(container, { childList: true, subtree: true });
+			flushSync(() =>
+				root.render(App, {
+					child: createElement(
+						'div',
+						{ key: 'keyed', id: 'host' },
+						createElement('input', { defaultValue: 'replacement' }),
+						createElement(DeoptProbe, {
+							probe: () => {
+								during = observer.takeRecords();
+								observedInput = container.querySelector('input');
+							},
+						}),
+					),
+				}),
+			);
+			expect(during).toEqual([]);
+			expect(observedInput).toBe(outgoingInput);
+			expect(outgoingInput.value).toBe('typed');
+			expect(container.querySelector('#host')).not.toBe(outgoingHost);
+			expect(container.querySelector('input')!.value).toBe('replacement');
+		} finally {
+			observer.disconnect();
+			root.unmount();
+			container.remove();
+		}
+	});
 });

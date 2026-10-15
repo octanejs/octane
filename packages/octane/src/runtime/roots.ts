@@ -940,12 +940,14 @@ function hydrateRootWithOutputHandler(
 	const served = skipFoldedHeadPrefix(container, getFirstChild(container));
 	let mark = served;
 	let foreignText: Node | null = null;
-	while (mark !== null && !isProtocolMark(mark)) {
+	// A numeric comment names the root's protocol even when this client cannot
+	// read that version. A document-level version cannot override it.
+	while (mark !== null && !(mark.nodeType === 8 && /^\d+$/.test((mark as Comment).data))) {
 		if (mark.nodeType === 3) foreignText ??= mark;
 		mark = getNextSibling(mark);
 	}
-	let protocolSkew = mark === null && served !== null;
-	if (protocolSkew) {
+	let protocolSkew = served !== null && (mark === null || !isProtocolMark(mark));
+	if (protocolSkew && mark === null) {
 		const doc = container.nodeType === 9 ? (container as Document) : container.ownerDocument!;
 		for (const parent of [doc, doc.head])
 			for (let node = parent && getFirstChild(parent); node; node = getNextSibling(node))

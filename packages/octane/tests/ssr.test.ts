@@ -814,6 +814,51 @@ describe('SSR — nested render entry isolation', () => {
 		expect(outer.html).not.toContain('/nested-render.css');
 		expect(outer.html.match(/href="\/outer-render\.css"/g)).toHaveLength(1);
 	});
+
+	it('hydrates independent roots rendered inside and outside a nested render', () => {
+		let nested = '';
+		const outer = RT.renderToString(() =>
+			RT.createElement(() => {
+				nested = RT.renderToString(() => RT.createElement('input', { defaultValue: 'inner' })).html;
+				return RT.createElement('input', { defaultValue: 'outer' });
+			}),
+		).html;
+		const containers = [document.createElement('div'), document.createElement('div')];
+		containers[0]!.innerHTML = nested;
+		containers[1]!.innerHTML = outer;
+		document.body.append(...containers);
+		const served = containers.map((container) => container.querySelector('input')!);
+		served[0]!.value = 'inner edit';
+		served[1]!.value = 'outer edit';
+		served[0]!.focus();
+		const errors: unknown[] = [];
+		const options = { onRecoverableError: (error: unknown) => errors.push(error) };
+		const roots = [
+			hydrateRoot(
+				containers[0]!,
+				() => createClientElement('input', { defaultValue: 'inner' }),
+				{},
+				options,
+			),
+			hydrateRoot(
+				containers[1]!,
+				() => createClientElement(() => createClientElement('input', { defaultValue: 'outer' })),
+				{},
+				options,
+			),
+		];
+		try {
+			flushSync(() => {});
+			expect(containers[0]!.querySelector('input')).toBe(served[0]);
+			expect(containers[1]!.querySelector('input')).toBe(served[1]);
+			expect(served.map((input) => input.value)).toEqual(['inner edit', 'outer edit']);
+			expect(document.activeElement).toBe(served[0]);
+			expect(errors).toEqual([]);
+		} finally {
+			for (const root of roots) root.unmount();
+			for (const container of containers) container.remove();
+		}
+	});
 });
 
 describe('SSR — ssrSpread attribute-name validation', () => {
