@@ -20,7 +20,7 @@ import {
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
 } from '../signals/types.js';
-import type { Scope } from './types.js';
+import type { Block, Scope } from './types.js';
 import { type HydrationDriver, HYDRATION_DRIVER } from './drivers.js';
 import type { TrackedThenable } from './use.js';
 import { HYDRATION_PASS, CURSOR, type HydrationCapability } from './hydration.js';
@@ -532,9 +532,14 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 		const end = block.endMarker;
 		if (hydration !== null && hydration.depth === 0) hydration.insertRoot(root, block);
 		else if (end !== null && end === DETACHED_ROOT) {
-			// A committed list's fresh row: its root stays detached until commit.
-			block.startMarker = root;
-			block.endMarker = root;
+			// A committed list's fresh row: its root stays detached until commit. The
+			// components of a sole-component row hand the row's end down, so each
+			// takes the root up to the row; a lite stand-in has no range of its own.
+			for (let b: Block | null = block; b !== null && b.endMarker === end; b = b.parentBlock) {
+				b.endMarker =
+					(b.startMarker as Node | null | undefined) === undefined ? null : (b.startMarker = root);
+				if (b.forSlot) break;
+			}
 		} else {
 			const parent = block.parentNode;
 			const transaction = ROOT_RENDER_TRANSACTION;
