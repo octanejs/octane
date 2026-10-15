@@ -167,7 +167,8 @@ export function makeCompiledFileRouter(initial = '/files/a') {
 		const lazyParams = lazyFile.useParams() as any;
 		const selected = api.useLoaderData() as any;
 		const navigate = file.useNavigate();
-		<section class="file" data-lazy={lazyParams.id}>
+		const [menuOpen, setMenuOpen] = useState(true);
+		<section class="file" data-lazy={lazyParams.id} data-menu={String(menuOpen)}>
 			<p>{(direct.id + ':' + selected.label) as string}</p>
 			<file.Link class="file-relative" to="." params={{ id: 'b' }} search={{ page: 2 }}>
 				Next file
@@ -175,7 +176,12 @@ export function makeCompiledFileRouter(initial = '/files/a') {
 			<api.Link class="file-api" to="." params={{ id: 'c' }}>
 				API file
 			</api.Link>
-			<Link class="file-timing" to="/files/$id" params={{ id: 'e' }}>
+			<Link
+				class="file-timing"
+				to="/files/$id"
+				params={{ id: 'e' }}
+				onClick={() => setMenuOpen(false)}
+			>
 				{({ isTransitioning }) => String(isTransitioning)}
 			</Link>
 			<Link class="file-missing" to="/files/$id" params={{ id: 'missing' }}>

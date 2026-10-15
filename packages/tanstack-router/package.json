@@ -62,7 +62,7 @@
     "isbot": "^5.1.22"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.13.0"
+    "octane": "workspace:^"
   },
   "devDependencies": {
     "@tanstack/react-router": "catalog:default",

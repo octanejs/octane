@@ -113,6 +113,7 @@ export {
 	useState,
 	useLinkedState,
 	useReducer,
+	__useCommittedState,
 	__useStateWithGetter,
 	__useLinkedStateWithGetter,
 	__useReducerWithGetter,

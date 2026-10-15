@@ -1,4 +1,5 @@
 import {
+	__useCommittedState,
 	ViewTransition,
 	createPortal,
 	use,
@@ -7,6 +8,8 @@ import {
 	useState,
 	type ViewTransitionInstance,
 } from 'octane';
+
+const committedSlot = Symbol('committed-scope');
 
 interface Props {
 	controls: Record<string, (value: string) => void>;
@@ -81,6 +84,41 @@ export function ScopedEffectsApp(props: Props) @{
 				</>
 			</ViewTransition>
 		}
+	</div>
+}
+
+function CommittedScopeContent(props: Props & { afterCommit: () => void }) @{
+	const [value, setValue, commitValue] = __useCommittedState('initial', committedSlot);
+	useLayoutEffect(() => {
+		props.controls.left = setValue;
+	}, []);
+	<button
+		data-value="left"
+		onClick={() => {
+			commitValue('committed');
+			props.afterCommit();
+		}}
+	>
+		{value as string}
+	</button>
+}
+
+export function CommittedScopedApp(props: Props & { afterCommit: () => void }) @{
+	<div>
+		<ViewTransition scope="element" name="left-scope">
+			<section data-scope="left">
+				<ViewTransition name="item">
+					<CommittedScopeContent {...props} />
+				</ViewTransition>
+			</section>
+		</ViewTransition>
+		<ViewTransition scope="element" name="right-scope">
+			<section data-scope="right">
+				<ViewTransition name="item">
+					<Content {...props} id="right" />
+				</ViewTransition>
+			</section>
+		</ViewTransition>
 	</div>
 }
 

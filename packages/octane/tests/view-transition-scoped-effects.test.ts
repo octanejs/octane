@@ -16,6 +16,7 @@ import {
 } from './conformance/_helpers/view-transition-mocks';
 import {
 	ScopedEffectsApp,
+	CommittedScopedApp,
 	ScopeShapeApp,
 	ScopedPortalApp,
 	ScopedImageApp,
@@ -383,6 +384,43 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(right.skipped).toBe(false);
 		await vi.waitFor(() => expect(events).toContain('left:urgent left'));
 		expect(events).not.toContain('right:right changed');
+	});
+
+	it('commits binding state before its callback during an unfinished capture', async () => {
+		let left!: Capture;
+		const observed: unknown[] = [];
+		await act(() =>
+			root.render(CommittedScopedApp, {
+				controls,
+				events,
+				afterCommit: () => observed.push([text('left'), left.skipped]),
+			}),
+		);
+		startTransition(() => controls.left('captured'));
+		left = await nextCapture('left');
+		(container.querySelector('[data-value="left"]') as HTMLButtonElement).click();
+		expect(observed).toEqual([['committed', true]]);
+	});
+
+	it('commits binding state before its callback while skipping only the affected animating scope', async () => {
+		let left!: Capture;
+		let right!: Capture;
+		const observed: unknown[] = [];
+		await act(() =>
+			root.render(CommittedScopedApp, {
+				controls,
+				events,
+				afterCommit: () => observed.push([text('left'), left.skipped, right.skipped]),
+			}),
+		);
+		startTransition(() => controls.left('captured'));
+		left = await nextCapture('left');
+		await updateAndReady(left);
+		startTransition(() => controls.right('captured'));
+		right = await nextCapture('right');
+		await updateAndReady(right);
+		(container.querySelector('[data-value="left"]') as HTMLButtonElement).click();
+		expect(observed).toEqual([['committed', true, false]]);
 	});
 	it('reveals resolved Suspense in a sibling scope while the first scope animates', async () => {
 		let resolve!: (value: string) => void;
