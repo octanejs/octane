@@ -2347,7 +2347,6 @@ export function ssrTextPre(v: unknown): string {
 // separate children source. Scoped children must remain lazy. createElement
 // already mirrors positional children into props, so only legacy descriptors
 // with a distinct non-null children field need a repaired props object.
-// `keyScoped` says the caller's `child-key` membrane already encodes `d.key`.
 /** The props a component descriptor renders its component with, its children among them. */
 function descriptorProps(d: ElementDescriptor): any {
 	// A scoped descriptor's children getter resolves deferred children; reading
@@ -2357,6 +2356,7 @@ function descriptorProps(d: ElementDescriptor): any {
 	return children == null || children === d.props?.children ? d.props : { ...d.props, children };
 }
 
+// `keyScoped` says the caller's `child-key` membrane already encodes `d.key`.
 function ssrComponentDescriptor(
 	d: ElementDescriptor,
 	scope: SSRScope,

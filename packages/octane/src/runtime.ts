@@ -15645,6 +15645,38 @@ export function createCompiledContext<T>(defaultValue: T): Context<T> {
 	return initializeContext(ctx, defaultValue);
 }
 
+/**
+ * Clear a Provider scope whose children went away. Over committed DOM the
+ * outgoing children leave at commit, after their cleanups, as a dialect flip's do.
+ */
+function resetProviderChildren(scope: Scope): void {
+	const block = scope.block;
+	const parent = block.parentNode;
+	const live = ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, parent);
+	resetScopeChildren(scope, !live);
+	if (!live || block.disposed) return;
+	const end = block.endMarker;
+	const first =
+		block.startMarker !== null ? getNextSibling(block.startMarker) : getFirstChild(parent);
+	if (first !== end)
+		queueRootDeletion(null, first, end === null ? parent.lastChild : end.previousSibling);
+}
+
+/** A Provider whose children went away clears them once its render commits. */
+function clearEmptiedProvider(scope: Scope): void {
+	if (!scope.block.disposed && scope.hooks?.get(CHILDREN_DIALECT_SLOT) === 2)
+		resetScopeChildren(scope);
+}
+
+/** Record a Provider's children dialect; a dropped window restores the previous one. */
+function setChildrenDialect(scope: Scope, previous: unknown, dialect: unknown): void {
+	if (previous !== undefined && TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+		// A reset above may have dropped the hooks map, so the undo reopens it.
+		journalUndo(() => ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, previous));
+	}
+	ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+}
+
 /** The children of this provider must be authored between its template tags. */
 export function CompiledContext<T>(
 	props: { context: Context<T>; value: T; children?: unknown },
@@ -15652,21 +15684,29 @@ export function CompiledContext<T>(
 ): void {
 	provideContext(scope, props.context, props.value);
 	const children = props.children;
-	if (children == null) return;
+	if (children == null) {
+		// Children it rendered before still occupy the scope. Record the empty dialect, as the
+		// descriptor Provider does: a rolled-back transition can restore their DOM, which the
+		// next body must then clear rather than mount beside.
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== undefined && previous !== 2) {
+			setChildrenDialect(scope, previous, 2);
+			// The outgoing children leave at commit, so an abandoned render keeps them.
+			atCommit(clearEmptiedProvider, scope);
+		}
+		return;
+	}
 	if (!isChildrenBlock(children)) {
 		throw new TypeError(formatClientError(345));
 	}
 	const dialect = (children as any)[CHILDREN_BODY] ?? children;
 	const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 	if (previous !== dialect) {
-		if (previous !== undefined) {
-			invalidateSharedBodyOutput(scope);
-			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
-				const hooks = scope.hooks!;
-				journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
-			}
-		}
-		ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+		if (previous === 2) {
+			resetProviderChildren(scope);
+			if (scope.block.disposed) return;
+		} else if (previous !== undefined) invalidateSharedBodyOutput(scope);
+		setChildrenDialect(scope, previous, dialect);
 	}
 	const output = renderSharedBody(children as ComponentBody, undefined, scope, undefined);
 	if (output != null) throw new TypeError(formatClientError(345));
@@ -15723,7 +15763,9 @@ export function renderClientContextProvider<T>(
 	// flip instead: the two sides are structurally different code, which is the same
 	// contract React gives an element-type change.
 	const children = props.children;
-	if (children != null) {
+	// Empty children on a Provider that has rendered some still reconcile, as a
+	// descriptor hole, so the previous children are removed rather than kept.
+	if (children != null || scope.hooks?.get(CHILDREN_DIALECT_SLOT) !== undefined) {
 		// Compiled closures carry their stable source-body identity. Their function
 		// identity changes when a parent supplies fresh captures, but their output
 		// still owns the same slots and may retain its auto-memo dependencies.
