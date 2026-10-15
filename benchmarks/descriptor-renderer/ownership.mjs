@@ -48,6 +48,7 @@ for (const name of [
 	'adoptedDeoptChildren',
 	'buildDeoptAdoptQueue',
 	'mountItemsLinear',
+	'renderPreparedChildList',
 ]) {
 	const node = ast.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === name);
 	if (!node) continue;
@@ -81,6 +82,14 @@ for (const name of [
 			['Map', 'Set'].includes(n.expression.getText(ast))
 		)
 			observe(n, n.expression.getText(ast) === 'Map' ? 'adoptionMaps' : 'adoptionSets');
+		if (
+			name === 'renderPreparedChildList' &&
+			ts.isBinaryExpression(n) &&
+			n.left.getText(ast) === 'adoptByKey' &&
+			ts.isNewExpression(n.right) &&
+			n.right.expression.getText(ast) === 'Map'
+		)
+			observe(n.right, 'adoptionMaps');
 		ts.forEachChild(n, scan);
 	}
 	scan(node.body);

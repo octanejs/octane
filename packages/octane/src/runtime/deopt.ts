@@ -99,11 +99,13 @@ import {
 import { childSlot, childTextHole } from './child-slots.js';
 import { detachDeoptTreeRefs } from './activity.js';
 import {
+	type ForSlot,
 	depsEqual,
 	readListKey,
 	mountItemsLinear,
 	reconcileKeyed,
 	batchClearItems,
+	moveBlockBefore,
 	moveFocusedNodeBefore,
 } from './lists.js';
 import {
@@ -2334,6 +2336,32 @@ function buildDeoptAdoptQueue(
 	return queue;
 }
 
+/**
+ * A staged upgrade's list at its commit, over the host's adopted children: the
+ * pairs of adopted rows wrap their nodes, then the list's end, its rows from
+ * the last (each moved only when out of place) and its start. Its new rows
+ * have landed at the host's end (queueFrontier) and move into place here. The
+ * upgraded host's children slot (its slot 0) must still show this list.
+ */
+function placeUpgradedList(args: any[]): void {
+	const [state, owner, host, wraps] = args as [ForSlot, Block, Node, any[] | null];
+	if (owner.disposed || (owner.slots[0] as ChildSlot | undefined)?.forSlot !== state) return;
+	if (wraps !== null)
+		for (let i = 0; i < wraps.length; i += 2) {
+			const node: Node = wraps[i + 1];
+			if (node.parentNode !== host) continue;
+			host.insertBefore(wraps[i].startMarker, node);
+			host.insertBefore(wraps[i].endMarker, getNextSibling(node));
+		}
+	host.insertBefore(state.end, null);
+	let anchor: Node = state.end;
+	for (let block = state.tail; block !== null; block = block.prevSibling) {
+		if (getNextSibling(block.endMarker!) !== anchor) moveBlockBefore(block, anchor);
+		anchor = block.startMarker!;
+	}
+	host.insertBefore(state.start, anchor);
+}
+
 // List-only reconciliation is separate from childSlot's text/function path so
 // its first-use compilation can remain deferred until a list value reaches it.
 // Slot registration and upgrade ownership have already been established.
@@ -2549,11 +2577,21 @@ export function renderPreparedChildList(
 	// flips promote to a minted pair in place (deoptItemBody).
 	// First fill dispatches to the linear pass directly (see mountItemsLinear)
 	// so a de-opt list's hydration adopt skips the full reconciler too.
-	if (state.forSlot.size === 0) {
+	let adoptByKey: Map<any, number> | null = null;
+	const forSlot = state.forSlot;
+	if (forSlot.size === 0) {
+		const adopt = forSlot.adopt;
 		try {
-			mountItemsLinear(
+			if (adopt !== null && items.length !== 0) {
+				adoptByKey = new Map();
+				for (let i = 0; i < adopt.length; i++) {
+					const key = adopt[i].key;
+					if (!adoptByKey.has(key)) adoptByKey.set(key, i);
+				}
+			}
+			const wraps = mountItemsLinear(
 				parentBlock,
-				state.forSlot,
+				forSlot,
 				items,
 				keySource,
 				body,
@@ -2562,8 +2600,16 @@ export function renderPreparedChildList(
 				normalizeKey,
 				passthroughList,
 				// An upgrade's list has no placed markers until its commit.
-				state.forSlot.adopt !== null ? domParent : null,
+				adopt !== null ? domParent : null,
+				adoptByKey,
 			);
+			if (adoptByKey !== null)
+				ROOT_RENDER_TRANSACTION!.ops.push(placeUpgradedList, [
+					forSlot,
+					parentBlock,
+					domParent,
+					wraps,
+				]);
 		} catch (error) {
 			if (passthroughStart !== null) {
 				discardMarker(passthroughStart);
@@ -2599,7 +2645,9 @@ export function renderPreparedChildList(
 	// sweep them now.
 	if (state.forSlot.adopt !== null) {
 		const leftovers = state.forSlot.adopt;
+		const consumed = state.forSlot === forSlot ? adoptByKey : null;
 		for (let i = 0; i < leftovers.length; i++) {
+			if (consumed?.get(leftovers[i].key) === -i - 1) continue;
 			const n = leftovers[i].node;
 			if (n.parentNode !== null) {
 				if (ROOT_RENDER_TRANSACTION !== null) {
