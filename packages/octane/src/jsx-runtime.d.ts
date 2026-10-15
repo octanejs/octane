@@ -255,10 +255,7 @@ declare namespace Octane {
 		hidden?: React.HTMLAttributes<T>['hidden'];
 		tabindex?: NativeAttributeValue<React.SVGAttributes<T>['tabIndex']>;
 	}
-	interface ScriptHTMLAttributes<T> extends Transformed<React.ScriptHTMLAttributes<T>, T> {
-		/** Static template opt-in: execute fresh mounts; hydration adopts without replay. */
-		executeOnMount?: boolean;
-	}
+	interface ScriptHTMLAttributes<T> extends Transformed<React.ScriptHTMLAttributes<T>, T> {}
 	interface SelectHTMLAttributes<T> extends Transformed<React.SelectHTMLAttributes<T>, T> {}
 	interface SlotHTMLAttributes<T> extends Transformed<React.SlotHTMLAttributes<T>, T> {}
 	interface SourceHTMLAttributes<T> extends Transformed<React.SourceHTMLAttributes<T>, T> {}

@@ -1023,7 +1023,7 @@ describe('compile errors — @for headers', () => {
 	});
 });
 
-describe('script executeOnMount authoring contract', () => {
+describe('script __executeOnMount authoring contract', () => {
 	it.each(['client', 'server'] as const)(
 		'rejects unsupported %s script execution options',
 		(mode) => {
@@ -1037,45 +1037,45 @@ describe('script executeOnMount authoring contract', () => {
 			])
 				expect(() =>
 					compile(
-						`export function App({active}) @{ <script executeOnMount={${expression}} /> }`,
+						`export function App({active}) @{ <script __executeOnMount={${expression}} /> }`,
 						'script-option.tsrx',
 						{ mode },
 					),
-				).toThrow(/executeOnMount requires a static boolean on a native <script> template/);
+				).toThrow(/__executeOnMount requires a static boolean on a native <script> template/);
 			for (const source of [
-				'export function App() @{ <script executeOnMount="true" /> }',
-				'export function App() @{ <div executeOnMount /> }',
+				'export function App() @{ <script __executeOnMount="true" /> }',
+				'export function App() @{ <div __executeOnMount /> }',
 			])
 				expect(() => compile(source, 'script-option.tsrx', { mode })).toThrow(
-					/executeOnMount requires a static boolean on a native <script> template/,
+					/__executeOnMount requires a static boolean on a native <script> template/,
 				);
 			for (const tag of ['script', 'div'])
 				expect(() =>
 					compile(
-						`export function App() @{ <${tag} {...{executeOnMount:true}} /> }`,
+						`export function App() @{ <${tag} {...{__executeOnMount:true}} /> }`,
 						'spread-script.tsrx',
 						{ mode },
 					),
-				).toThrow(/executeOnMount must be a direct attribute/);
+				).toThrow(/__executeOnMount must be a direct attribute/);
 			expect(() =>
 				compile(
-					'export function App() @{ <svg><script executeOnMount /></svg> }',
+					'export function App() @{ <svg><script __executeOnMount /></svg> }',
 					'foreign-script.tsrx',
 					{ mode },
 				),
-			).toThrow(/executeOnMount requires an HTML <script> template/);
+			).toThrow(/__executeOnMount requires an HTML <script> template/);
 			expect(() =>
-				compile('export const script = <script executeOnMount />;', 'script-value.tsx', { mode }),
-			).toThrow(/executeOnMount requires a native <script> in an owned template/);
+				compile('export const script = <script __executeOnMount />;', 'script-value.tsx', { mode }),
+			).toThrow(/__executeOnMount requires a native <script> in an owned template/);
 		},
 	);
 
 	it('rejects script execution outside the DOM renderer', () => {
 		expect(() =>
-			compile('export function App() @{ <script executeOnMount /> }', 'script.object.tsrx', {
+			compile('export function App() @{ <script __executeOnMount /> }', 'script.object.tsrx', {
 				renderer: { id: 'object', target: 'universal', module: 'object-renderer' },
 			}),
-		).toThrow(/executeOnMount requires the DOM template renderer/);
+		).toThrow(/__executeOnMount requires the DOM template renderer/);
 	});
 
 	it.each(['client', 'server'] as const)(
@@ -1094,7 +1094,7 @@ describe('script executeOnMount authoring contract', () => {
 			]) {
 				expect(
 					compile(
-						`export function App() @{ <script executeOnMount${option} /> }`,
+						`export function App() @{ <script __executeOnMount${option} /> }`,
 						'script-option.tsrx',
 						{ mode },
 					).diagnostics,
@@ -1102,7 +1102,7 @@ describe('script executeOnMount authoring contract', () => {
 			}
 			expect(
 				compile(
-					'export function App({Child, active}) @{ <Child executeOnMount={active} /> }',
+					'export function App({Child, active}) @{ <Child __executeOnMount={active} /> }',
 					'component-option.tsrx',
 					{ mode },
 				).diagnostics,

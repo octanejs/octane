@@ -21145,8 +21145,6 @@ interface LazyTemplateRecord {
 	 */
 	frag: number;
 	parsed: Array<Node | null>;
-	/** Cold preparation only; normal templates keep this field null. */
-	prepare: ((root: Node) => Node) | null;
 	/**
 	 * Lazily computed adoption-root descriptor for PROD hydration's parse-free
 	 * root check (see HydrationCapability.cloneLazy): 0 = not computed yet, a
@@ -21229,7 +21227,6 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 			ns: ns === 1 ? 1 : ns === 2 ? 2 : ns === 3 ? 3 : 0,
 			frag,
 			parsed: [null, null, null],
-			prepare: null,
 			root: 0,
 		} satisfies LazyTemplateRecord,
 	} as unknown as Element;
@@ -21240,38 +21237,54 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 export function scriptTemplate(html: string, ns: number, frag: number, paths: number[][]): Element {
 	const token = template(html, ns, frag);
 	const lazy = (token as any)[LAZY_TEMPLATE] as LazyTemplateRecord;
-	lazy.prepare = (root) => {
-		for (const path of paths) {
-			let node = root;
-			for (const index of path) {
-				node = getFirstChild(node)!;
-				for (let i = 0; i < index; i++) node = getNextSibling(node)!;
-			}
-			const parsed = node as Element;
-			// A parser-created script stays inert when cloned. A never-inserted
-			// script created in the live document instead gives each clone the
-			// browser's normal execution semantics, without executing the cache.
-			// Preserve opaque component destinations rather than creating HTML
-			// scripts inside foreign content.
-			const script = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(
-				parsed.namespaceURI,
-				'script',
-			);
-			const view = STAGED_DOM ? STAGED_DOM.view(script) : script;
-			const parsedView = STAGED_DOM ? STAGED_DOM.view(parsed) : parsed;
-			for (const attr of parsedView.attributes) {
-				const attribute = STAGED_DOM ? STAGED_DOM.view(attr) : attr;
-				view.setAttributeNS(attr.namespaceURI, attribute.name, attribute.value);
-			}
-			view.textContent = parsedView.textContent;
-			if (node === root) root = script;
-			else {
-				const parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!;
-				(STAGED_DOM ? STAGED_DOM.view(parent) : parent).replaceChild(script, node);
-			}
-		}
-		return root;
-	};
+	// Only script tokens install cold cache accessors. Ordinary template records
+	// and their resolver stay unchanged, and parse-free adoption never reads the
+	// parsed cache. Each namespace becomes a plain cached value after preparation.
+	for (let namespace = 0; namespace < 3; namespace++) {
+		Object.defineProperty(lazy.parsed, namespace, {
+			configurable: true,
+			enumerable: true,
+			get() {
+				let root = parseTemplate(html, namespace as 0 | 1 | 2, frag);
+				for (const path of paths) {
+					let node = root;
+					for (const index of path) {
+						node = getFirstChild(node)!;
+						for (let i = 0; i < index; i++) node = getNextSibling(node)!;
+					}
+					const parsed = node as Element;
+					// A parser-created script stays inert when cloned. A never-inserted
+					// script created in the live document instead gives each clone the
+					// browser's normal execution semantics, without executing the cache.
+					// Preserve opaque component destinations rather than creating HTML
+					// scripts inside foreign content.
+					const script = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElementNS(
+						parsed.namespaceURI,
+						'script',
+					);
+					const view = STAGED_DOM ? STAGED_DOM.view(script) : script;
+					const parsedView = STAGED_DOM ? STAGED_DOM.view(parsed) : parsed;
+					for (const attr of parsedView.attributes) {
+						const attribute = STAGED_DOM ? STAGED_DOM.view(attr) : attr;
+						view.setAttributeNS(attribute.namespaceURI, attribute.name, attribute.value);
+					}
+					view.textContent = parsedView.textContent;
+					if (node === root) root = script;
+					else {
+						const parent = (STAGED_DOM ? STAGED_DOM.view(node) : node).parentNode!;
+						(STAGED_DOM ? STAGED_DOM.view(parent) : parent).replaceChild(script, node);
+					}
+				}
+				Object.defineProperty(lazy.parsed, namespace, {
+					value: root,
+					writable: true,
+					configurable: true,
+					enumerable: true,
+				});
+				return root;
+			},
+		});
+	}
 	return token;
 }
 
@@ -21463,7 +21476,6 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 	let parsed = lazy.parsed[ns];
 	if (parsed === null) {
 		parsed = parseTemplate(lazy.html, ns, lazy.frag);
-		if (lazy.prepare !== null) parsed = lazy.prepare(parsed);
 		lazy.parsed[ns] = parsed;
 	}
 	return parsed;

@@ -547,7 +547,7 @@ describe('owned executable templates', () => {
 		for (const script of scripts) {
 			expect(script.getAttribute('src')).toBe('/execution.js');
 			expect(script.getAttribute('nonce')).toBe('owned-nonce');
-			expect(script.hasAttribute('executeOnMount')).toBe(false);
+			expect(script.hasAttribute('__executeOnMount')).toBe(false);
 		}
 	});
 });
@@ -560,7 +560,7 @@ describe('script option compatibility', () => {
 			expect(mounted.findAll('script')).toHaveLength(0);
 			const scripts = document.head.querySelectorAll('script[src="/ordinary-resource.js"]');
 			expect(scripts).toHaveLength(1);
-			expect(scripts[0].hasAttribute('executeOnMount')).toBe(false);
+			expect(scripts[0].hasAttribute('__executeOnMount')).toBe(false);
 			mounted.unmount();
 			expect(scripts[0].isConnected).toBe(true);
 			expect(warning).not.toHaveBeenCalled();
@@ -568,7 +568,7 @@ describe('script option compatibility', () => {
 			const fragment = parseFragment(html);
 			expect(fragment.querySelectorAll('script')).toHaveLength(1);
 			expect(fragment.querySelectorAll('section > script')).toHaveLength(0);
-			expect(fragment.querySelector('script')!.hasAttribute('executeOnMount')).toBe(false);
+			expect(fragment.querySelector('script')!.hasAttribute('__executeOnMount')).toBe(false);
 		} finally {
 			mounted.unmount();
 			document.head

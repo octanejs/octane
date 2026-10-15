@@ -1531,21 +1531,21 @@ function scriptExecutionOption(
 	for (const attr of attributes) {
 		const argument = unwrapTsExpr(attr.argument);
 		if (
-			attr._octaneKnownAttributeSpread?.fields.includes('executeOnMount') ||
+			attr._octaneKnownAttributeSpread?.fields.includes('__executeOnMount') ||
 			((attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') &&
 				argument?.type === 'ObjectExpression' &&
 				argument.properties.some(
 					(property) =>
 						property.type === 'Property' &&
 						(!property.computed || property.key.type === 'Literal') &&
-						(property.key.name ?? property.key.value) === 'executeOnMount',
+						(property.key.name ?? property.key.value) === '__executeOnMount',
 				))
 		) {
-			throw new Error('executeOnMount must be a direct attribute, not a spread property.');
+			throw new Error('__executeOnMount must be a direct attribute, not a spread property.');
 		}
 		if (
 			(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
-			jsxAttrRawName(attr) !== 'executeOnMount'
+			jsxAttrRawName(attr) !== '__executeOnMount'
 		)
 			continue;
 		const value = unwrapTsExpr(
@@ -1565,7 +1565,7 @@ function scriptExecutionOption(
 				))
 		) {
 			throw new Error(
-				'executeOnMount requires a static boolean on a native <script> template.' + at,
+				'__executeOnMount requires a static boolean on a native <script> template.' + at,
 			);
 		}
 		execute = value == null || value.value;
@@ -1577,14 +1577,14 @@ function withoutScriptExecutionOption(attributes) {
 	const index = attributes.findIndex(
 		(attr) =>
 			(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
-			jsxAttrRawName(attr) === 'executeOnMount',
+			jsxAttrRawName(attr) === '__executeOnMount',
 	);
 	return index < 0
 		? attributes
 		: attributes.filter(
 				(attr) =>
 					(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
-					jsxAttrRawName(attr) !== 'executeOnMount',
+					jsxAttrRawName(attr) !== '__executeOnMount',
 			);
 }
 
@@ -11210,14 +11210,14 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 	assertNoLegacyContextProviders(ast, source, cleanFilename);
 	options = nativeReadOptions(ast, options);
 	assertNativeReadDiagnostics(ast, source, cleanFilename, options);
-	if (source.includes('executeOnMount'))
+	if (source.includes('__executeOnMount'))
 		mapAst(ast, (node) => {
 			if ((node.type === 'JSXElement' || node.type === 'Element') && !isComponentTag(node)) {
 				if (
 					scriptExecutionOption(node, { mapSourceName: cleanFilename }) &&
 					(options?.renderer?.target ?? 'dom') !== 'dom'
 				) {
-					throw new Error('executeOnMount requires the DOM template renderer.');
+					throw new Error('__executeOnMount requires the DOM template renderer.');
 				}
 			}
 			return null;
@@ -14868,7 +14868,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
 	if (scriptExecutionOption(node, ctx) && selfNs !== 'html' && selfNs !== 'opaque') {
-		throw new Error('executeOnMount requires an HTML <script> template.');
+		throw new Error('__executeOnMount requires an HTML <script> template.');
 	}
 	const childNs = nsForChildren(tag, selfNs);
 	// The static namespace walk starts each independently compiled component in
@@ -25276,7 +25276,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	}
 	if (!componentTag && scriptExecutionOption(node, ctx)) {
 		throw new Error(
-			'executeOnMount requires a native <script> in an owned template, not a JSX value.',
+			'__executeOnMount requires a native <script> in an owned template, not a JSX value.',
 		);
 	}
 	const authoredAttrs = node.attributes || node.openingElement?.attributes || [];
@@ -26206,7 +26206,7 @@ function headAttrsExpression(el) {
 		}
 		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
 		const attrName = a.name.name || a.name;
-		if (attrName === 'executeOnMount') continue;
+		if (attrName === '__executeOnMount') continue;
 		// refs/key have no head semantics; `class` is the CSS-scoping stamp
 		// (meaningless on title/meta/link) — drop them. EVENTS pass through: a
 		// hoisted element lives in document.head, outside every delegation root,
@@ -32192,7 +32192,7 @@ function emitElementHtml(
 	const childNs = nsForChildren(tag, parentNs);
 	if (scriptExecutionOption(node, ctx)) {
 		if (hostNs !== 'html' && hostNs !== 'opaque') {
-			throw new Error('executeOnMount requires an HTML <script> template.');
+			throw new Error('__executeOnMount requires an HTML <script> template.');
 		}
 		scriptPaths.push(path);
 	}

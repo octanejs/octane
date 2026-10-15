@@ -109,6 +109,7 @@ export interface MountedScript {
 	id: string;
 	source?: string;
 	src?: string;
+	defer?: boolean;
 }
 
 export function MountedScripts(props: { scripts: MountedScript[]; revision: number }) @{
@@ -116,10 +117,11 @@ export function MountedScripts(props: { scripts: MountedScript[]; revision: numb
 		<input aria-label="Script draft" defaultValue="server" />
 		@for (const script of props.scripts; key script.id) {
 			<script
-				executeOnMount
+				__executeOnMount
 				data-script={script.id}
 				nonce="script-nonce"
 				src={script.src}
+				defer={script.defer}
 				dangerouslySetInnerHTML={{ __html: script.source ?? '' }}
 			/>
 		}
@@ -127,7 +129,7 @@ export function MountedScripts(props: { scripts: MountedScript[]; revision: numb
 }
 
 export function StaticExecutingScript() @{
-	<script executeOnMount>
+	<script __executeOnMount>
 		(window.scriptExecutions ??= []).push('static');
 	</script>
 }
@@ -141,11 +143,11 @@ export function StaticInertScript() @{
 export function NestedExecutingScripts() @{
 	<>
 		<aside>
-			<script executeOnMount nonce="nested-nonce">
+			<script __executeOnMount nonce="nested-nonce">
 				(window.scriptExecutions ??= []).push('nested');
 			</script>
 		</aside>
-		<script executeOnMount>
+		<script __executeOnMount>
 			(window.scriptExecutions ??= []).push('fragment');
 		</script>
 	</>
@@ -159,7 +161,7 @@ function ScriptPendingChild(props: { pending: Promise<void> }) @{
 export function PendingExecutingScript(props: { pending: Promise<void> }) @{
 	@try {
 		<section>
-			<script executeOnMount>
+			<script __executeOnMount>
 				(window.scriptExecutions ??= []).push('pending');
 			</script>
 			<ScriptPendingChild pending={props.pending} />
@@ -171,8 +173,13 @@ export function PendingExecutingScript(props: { pending: Promise<void> }) @{
 
 export function OwnedAsyncScripts() @{
 	<section data-owned-scripts>
-		<script executeOnMount={true as const} async src="/execution.js" nonce="owned-nonce" />
-		<script executeOnMount={true satisfies boolean} async src="/execution.js" nonce="owned-nonce" />
+		<script __executeOnMount={true as const} async src="/execution.js" nonce="owned-nonce" />
+		<script
+			__executeOnMount={true satisfies boolean}
+			async
+			src="/execution.js"
+			nonce="owned-nonce"
+		/>
 	</section>
 }
 
@@ -193,8 +200,8 @@ export function PendingDescriptorScript(props: { pending: Promise<void> }) @{
 
 export function OrdinaryAsyncScripts() @{
 	<section>
-		<script executeOnMount={false as const} async src="/ordinary-resource.js" />
-		<script executeOnMount={false satisfies boolean} async src="/ordinary-resource.js" />
+		<script __executeOnMount={false as const} async src="/ordinary-resource.js" />
+		<script __executeOnMount={false satisfies boolean} async src="/ordinary-resource.js" />
 	</section>
 }
 

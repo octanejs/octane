@@ -1,9 +1,9 @@
 ---
-'octane': minor
+'octane': patch
 '@octanejs/tanstack-router': patch
 ---
 
-Add a static `executeOnMount` opt-in for compiled script elements, preserving ordinary template inertness and adopting server scripts without replaying them during hydration.
+Support Router-owned executable templates through an internal compiler capability, preserving ordinary template inertness and adopting server scripts without replaying them during hydration.
 
 Keep permanent static hydration ranges independent of the deferred activation implementation in client bundles.
 

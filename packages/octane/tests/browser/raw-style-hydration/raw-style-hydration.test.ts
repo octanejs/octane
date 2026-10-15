@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Browser, Page } from 'playwright';
+import type { Browser, Page, Route } from 'playwright';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { octane } from 'octane/compiler/vite';
@@ -141,6 +141,60 @@ describe.sequential('raw <style> real-browser hydration', () => {
 
 describe.sequential('script execution ownership', () => {
 	it.each(['dev', 'prod'] as const)(
+		'%s leaves dynamically inserted external script ordering to load completion',
+		async (mode) => {
+			const { failures, page, server } = await openHydratedPage(mode, true);
+			const requests = new Map<string, Route>();
+			try {
+				await page.route('**/ordered-*.js', (route) => {
+					requests.set(new URL(route.request().url()).pathname, route);
+				});
+				for (const defer of [false, true]) {
+					const first = `/ordered-first-${defer}.js`;
+					const second = `/ordered-second-${defer}.js`;
+					await page.evaluate(
+						({ first, second, defer }) => {
+							window.scriptExecutions = [];
+							window.__scriptExecution.render([
+								{ id: first, src: first, defer },
+								{ id: second, src: second, defer },
+								{ id: `inline-${defer}`, source: 'window.scriptExecutions.push("inline")' },
+							]);
+						},
+						{ first, second, defer },
+					);
+					await expect
+						.poll(() => requests.has(first) && requests.has(second), { timeout: 10_000 })
+						.toBe(true);
+					expect(await page.evaluate(() => window.scriptExecutions)).toEqual(['inline']);
+					await requests.get(second)!.fulfill({
+						contentType: 'text/javascript',
+						body: 'window.scriptExecutions.push("second")',
+					});
+					requests.delete(second);
+					await page.waitForFunction(() => window.scriptExecutions?.includes('second'));
+					expect(await page.evaluate(() => window.scriptExecutions)).toEqual(['inline', 'second']);
+					await requests.get(first)!.fulfill({
+						contentType: 'text/javascript',
+						body: 'window.scriptExecutions.push("first")',
+					});
+					requests.delete(first);
+					await page.waitForFunction(() => window.scriptExecutions?.includes('first'));
+					expect(await page.evaluate(() => window.scriptExecutions)).toEqual([
+						'inline',
+						'second',
+						'first',
+					]);
+				}
+				expect(failures).toEqual([]);
+			} finally {
+				await Promise.allSettled([...requests.values()].map((route) => route.abort()));
+				await Promise.allSettled([page.close(), server.close()]);
+			}
+		},
+	);
+
+	it.each(['dev', 'prod'] as const)(
 		'%s executes fresh opted scripts and retains hydrated or reordered scripts without replay',
 		async (mode) => {
 			const { failures, page, server } = await openHydratedPage(mode, true);
@@ -168,7 +222,7 @@ describe.sequential('script execution ownership', () => {
 					await page.locator('#scripts-root script').evaluateAll((nodes) =>
 						nodes.map((node) => ({
 							nonce: (node as HTMLScriptElement).nonce,
-							hint: node.hasAttribute('executeOnMount'),
+							hint: node.hasAttribute('__executeOnMount'),
 						})),
 					),
 				).toEqual([
