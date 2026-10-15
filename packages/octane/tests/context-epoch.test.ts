@@ -18,30 +18,39 @@ describe('context epoch', () => {
 		expect(secondCopy.contextEpochNow()).toBe(before + 2);
 	});
 
-	it('a context version bumped outside provideContext still refreshes consumers on the next root.render', () => {
-		// The react-hosted mirror contract: publishSnapshots bumps
-		// mirror.$$version directly and the paired epoch bump is discharged by
-		// the root.render commit that follows (renderResolved). Without it the
-		// $$ctxDepsEpoch fast path would skip the dep scans and strand the
-		// consumer — this simulates that external bumper end to end.
-		const Ctx = createContext(0);
-		let reads = 0;
-		const Reader = memo(function Reader() {
-			reads++;
-			return createElement('output', { className: 'v' }, String(use(Ctx)));
-		});
-		const App = (props: { value: number }) =>
-			createElement(Ctx, { value: props.value }, createElement(Reader));
-		const r = mount(App, { value: 1 });
-		expect(reads).toBe(1);
-		// Bare version write — no provideContext, no bumpContextEpoch. The
-		// root.render commit below is the only epoch mover.
-		(Ctx as any).$$version++;
-		r.update(App, { value: 1 });
-		// Equal props AND an Object.is-equal provider value — the memo bail and
-		// the provider's early return both stand; only the renderResolved epoch
-		// bump can explain the consumer re-executing.
-		expect(reads).toBe(2);
-		r.unmount();
-	});
+	it.each([false, true])(
+		'a context version bumped outside provideContext still refreshes consumers on the next root.render (sibling update: %s)',
+		(updateSibling) => {
+			// The react-hosted mirror contract: publishSnapshots bumps
+			// mirror.$$version directly and the paired epoch bump is discharged by
+			// the root.render commit that follows (renderResolved). Without it the
+			// $$ctxDepsEpoch fast path would skip the dep scans and strand the
+			// consumer — this simulates that external bumper end to end.
+			const Ctx = createContext(0);
+			let reads = 0;
+			const Reader = memo(function Reader() {
+				reads++;
+				return createElement('output', { className: 'v' }, String(use(Ctx)));
+			});
+			const App = (props: { value: number; sibling: number }) =>
+				createElement(
+					'main',
+					null,
+					createElement(Ctx, { value: props.sibling }, 'sibling'),
+					createElement(Ctx, { value: props.value }, createElement(Reader)),
+				);
+			const r = mount(App, { value: 1, sibling: 0 });
+			expect(reads).toBe(1);
+			// Bare version write — no provideContext, no bumpContextEpoch. The
+			// root.render commit below is the only epoch mover.
+			(Ctx as any).$$version++;
+			// A subsequent local provider write must not hide the external force.
+			r.update(App, { value: 1, sibling: updateSibling ? 1 : 0 });
+			// Equal props AND an Object.is-equal provider value — the memo bail and
+			// the provider's early return both stand; only the renderResolved epoch
+			// bump can explain the consumer re-executing.
+			expect(reads).toBe(2);
+			r.unmount();
+		},
+	);
 });

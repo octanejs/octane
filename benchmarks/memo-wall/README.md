@@ -106,10 +106,22 @@ production compiler. React Compiler caches the `.map`, imported helper call,
 and their JSX regions by the inferred `items` dependency.
 
 Each wall owns its own item array, an unrelated `tick` state, and a theme
-context provider ABOVE the rows. There is one context object PER WALL: an
-octane context's `$$version` is global to the context object, so a shared
-context would let wall A's provider bumps stale-stamp wall B's memo boundaries
-and contaminate wall B's next op with a spurious 1000-leaf refresh.
+context provider ABOVE the rows. The original harness used one context object
+PER WALL because context-wide version bumps could spuriously refresh all 1000
+consumers in the other wall. That independent-context control remains here;
+the shared-context case has a separate regression gate below.
+
+`node provider-scope.mjs` separately exercises two providers of the **same**
+context through the production DOM runtime. After changing the sibling
+provider, an unrelated root update must leave the retained memo wall's
+consumers untouched. At 128 and 512 consumers, the historical runtime executes
+128 and 512 extra consumer bodies; the provider-value check reduces both to
+zero. A real change to the retained provider still updates every consumer,
+with nearest-provider text and host identity checked in both cases. These
+deterministic counts feed the memo-wall ratio guards. Pass an alternate
+`runtime.ts` and `--measure` to record a historical implementation without the
+zero-work gate. This Node/happy-dom check measures consumer work, not layout,
+paint, or application latency.
 
 ## Render-count probes (the correctness gate)
 
