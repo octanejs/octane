@@ -22323,43 +22323,7 @@ function parseSeedJson(raw: string): unknown[] | null {
 	}
 }
 
-// A mapped-list fallback owns its host through the descriptor reconciler. On
-// the first transition to the compiled item body, let that body's existing
-// clone() mount adopt the same host and initialize its ordinary binding bag.
-// Armed only around that one mapped survivor render; all other clones see null.
-let MAPPED_ITEM_ADOPTION: { node: Node | null } | null = null;
-
 export function clone<T extends Node>(node: T, loc?: string, partialStyles?: string): T {
-	if (MAPPED_ITEM_ADOPTION && MAPPED_ITEM_ADOPTION.node !== null) {
-		const adopted = MAPPED_ITEM_ADOPTION.node;
-		MAPPED_ITEM_ADOPTION.node = null;
-		const lazy =
-			(node as any).nodeType === undefined
-				? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
-				: undefined;
-		const expected = lazy === undefined ? node : resolveLazyTemplate(lazy);
-		if (
-			(adopted as Element).localName === (expected as Element).localName &&
-			(adopted as Element).namespaceURI === (expected as Element).namespaceURI
-		) {
-			for (let child = getFirstChild(adopted); child !== null; child = getNextSibling(child)) {
-				detachDeoptTreeRefs(child, null);
-			}
-			(adopted as Element).replaceChildren();
-			for (let child = getFirstChild(expected); child !== null; child = getNextSibling(child)) {
-				adopted.appendChild(child.cloneNode(true));
-			}
-			return adopted as T;
-		}
-		const replacement = expected.cloneNode(true);
-		const block = CURRENT_SCOPE!.block;
-		detachDeoptTreeRefs(adopted, null);
-		adopted.parentNode!.replaceChild(replacement, adopted);
-		if (block.startMarker === adopted) block.startMarker = replacement;
-		if (block.endMarker === adopted) block.endMarker = replacement;
-		block.deoptNode = null;
-		return replacement as T;
-	}
 	// Compiler templates are inert module-scope tokens. Parse each concrete
 	// namespace on its first real mount, then clone the cached node thereafter.
 	// Non-compiler callers can still hand clone() an ordinary DOM Node directly.
@@ -37221,14 +37185,11 @@ export function mapSlot(
 	if (native === true) {
 		const previous = ((scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined)
 			?.forSlot;
-		if (
-			previous?.mappedNative === false &&
-			previous.head !== null &&
-			(previous.head.slots[0] as CompSlot | undefined)?.__kind === 'componentSlotSlot'
-		) {
-			// A custom receiver may have reordered keyed component survivors. Its
-			// first native successor must still execute the authored map callback in
-			// ascending source order, before the reconciler walks the prior order.
+		if (previous?.mappedNative === false) {
+			// A list a custom receiver rendered keeps rendering the authored map
+			// callback's descriptors for its lifetime, so its rows keep their
+			// elements, as React keeps a same-key, same-type element: the
+			// reconciler patches them, and nothing switches representation.
 			const mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
 			childSlot(
 				scopeOrItems,
@@ -37246,8 +37207,6 @@ export function mapSlot(
 				undefined,
 				true,
 			);
-			const next = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot;
-			if (next.forSlot !== null) next.forSlot.mappedNative = true;
 			return;
 		}
 		childSlot(
@@ -37455,7 +37414,7 @@ function renderPreparedChildList(
 	const keySource = compiledMapKey || keys!;
 	const normalizeKey = !!compiledMapKey;
 	const wasMappedNative = state.forSlot.mappedNative === true;
-	let body =
+	const body =
 		compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
 	if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
 		for (let index = 0; index < items.length; index++) {
@@ -37500,30 +37459,9 @@ function renderPreparedChildList(
 			}
 		}
 	}
-	if (compiledMapBody !== undefined) {
-		if (state.forSlot.mappedNative === false) {
-			body = (item: any, scope: Scope, extra?: any[]): void => {
-				const adopted = scope.slots[0] === undefined ? scope.block.deoptNode : null;
-				if (adopted === null || adopted.nodeType !== 1) {
-					(compiledMapBody as any)(item, scope, extra);
-					return;
-				}
-				const previous = MAPPED_ITEM_ADOPTION;
-				const adoption = { node: adopted };
-				MAPPED_ITEM_ADOPTION = adoption;
-				try {
-					(compiledMapBody as any)(item, scope, extra);
-					if (adoption.node === null) scope.block.deoptNode = null;
-				} finally {
-					MAPPED_ITEM_ADOPTION = previous;
-				}
-			};
-		}
-		state.forSlot.mappedNative = true;
-	}
+	if (compiledMapBody !== undefined) state.forSlot.mappedNative = true;
 	// `body` is `deoptItemBody` exactly when the compiler supplied no map body
-	// and this is not the mapped fallback — both wrapper assignments above are
-	// guarded by those two conditions. Record it on the slot rather than
+	// and this is not the mapped fallback. Record it on the slot rather than
 	// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
 	state.forSlot.plainDeopt = plainDeopt ? updateDeoptComponent : null;
