@@ -8694,6 +8694,9 @@ function drainQueue(): { err: any } | null {
 			} else hiddenActivity = visibilityOwner;
 		}
 		const rootFrame = beginRootRender(block.idState.renderOwner);
+		// The root an error no boundary handled tears down, once its frame closes.
+		let uncaughtRoot: Block | null = null;
+		let uncaught: unknown;
 		try {
 			// A first render scheduled by startTransition runs after makeRoot's
 			// construction window. Its hooks and partial DOM still belong to this
@@ -8791,14 +8794,8 @@ function drainQueue(): { err: any } | null {
 				let root: Block = block;
 				while (root.parentBlock !== null) root = root.parentBlock;
 				if (root.kind === 'root' && !root.disposed) {
-					if (
-						hydrationStarted &&
-						HYDRATION_DRIVER!.isPresentationMiss(unhandled) &&
-						root.idState.renderOwner !== undefined
-					) {
-						root.idState.renderOwner.preservePresentation = true;
-						DOM_ROOT_DISPOSERS.get(root)?.();
-					} else unmountBlock(root);
+					uncaughtRoot = root;
+					uncaught = unhandled;
 				}
 			}
 		} finally {
@@ -8809,6 +8806,18 @@ function drainQueue(): { err: any } | null {
 				TRANSITION_ROOT_DRIVER.drop(transaction);
 			TRANSITION_ORIGIN = null;
 			endRootRender(rootFrame);
+			// The failed attempt writes nothing while its frame is open: the
+			// teardown of its committed tree runs after it closes.
+			if (uncaughtRoot !== null && !uncaughtRoot.disposed) {
+				if (
+					hydrationStarted &&
+					HYDRATION_DRIVER!.isPresentationMiss(uncaught) &&
+					uncaughtRoot.idState.renderOwner !== undefined
+				) {
+					uncaughtRoot.idState.renderOwner.preservePresentation = true;
+					DOM_ROOT_DISPOSERS.get(uncaughtRoot)?.();
+				} else unmountBlock(uncaughtRoot);
+			}
 			// A descendant render can replace an Activity's direct host root. The
 			// Activity itself did not render, so reapply its visual hide after the
 			// complete attempt (including a captured error or Suspense retry).
