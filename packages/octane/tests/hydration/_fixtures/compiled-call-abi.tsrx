@@ -97,6 +97,19 @@ export function ReturnedRows(props: {
 	</section>
 }
 
+function BareGuardRow(props: ReturnRowProps) {
+	if (!props.visible) return;
+	return <ReturnRowEditor id={props.id} visible={props.visible} onInputRef={props.onInputRef} />;
+}
+
+export function BareGuardedReturnedEditor(props: ReturnRowProps) @{
+	<section>
+		<i>before</i>
+		<BareGuardRow id={props.id} visible={props.visible} onInputRef={props.onInputRef} />
+		<strong>after</strong>
+	</section>
+}
+
 export function PlainReturnedEditor(props: ReturnRowProps) {
 	return <ReturnRow id={props.id} visible={props.visible} onInputRef={props.onInputRef} />;
 }

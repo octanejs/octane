@@ -5,6 +5,7 @@ import { act, createRoot, flushSync, hydrateRoot, type Root } from '../../src/in
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import {
+	BareGuardedReturnedEditor,
 	KeyedCall,
 	OnlyChildText,
 	OptionalKeyCall,
@@ -135,6 +136,62 @@ describe('hydrating returned components from independently generated documents',
 });
 
 describe.each(['render', 'hydrate'] as const)('compiled call ABI (%s)', (mode) => {
+	it.each([true, false])(
+		'adopts a returned editor after a bare guard, then removes and remounts it (initially visible: %s)',
+		async (visible) => {
+			const onInputRef = vi.fn();
+			const props = { id: 'draft', visible, onInputRef };
+			const reports: unknown[] = [];
+			let draft: HTMLInputElement | null;
+			if (mode === 'hydrate') {
+				container.innerHTML = ServerRT.renderToString(server.BareGuardedReturnedEditor, props).html;
+				draft = container.querySelector('input');
+				if (draft) {
+					draft.value = 'unfinished draft';
+					draft.focus();
+					draft.setSelectionRange(2, 8);
+				}
+				root = hydrateRoot(container, BareGuardedReturnedEditor as any, props, {
+					onRecoverableError: (error) => reports.push(error),
+				});
+				await act(() => {});
+			} else {
+				await start(mode, 'BareGuardedReturnedEditor', BareGuardedReturnedEditor, props);
+				draft = container.querySelector('input');
+				if (draft) {
+					draft.value = 'unfinished draft';
+					draft.focus();
+					draft.setSelectionRange(2, 8);
+				}
+			}
+			const before = container.querySelector('i')!;
+			const after = container.querySelector('strong')!;
+			expect(container.querySelector('input')).toBe(draft);
+			expect(reports).toEqual([]);
+			if (visible) {
+				expect(onInputRef).toHaveBeenCalledWith('draft', draft);
+				expect(draft!.value).toBe('unfinished draft');
+				expect(document.activeElement).toBe(draft);
+				expect([draft!.selectionStart, draft!.selectionEnd]).toEqual([2, 8]);
+			}
+			flushSync(() => root!.render(BareGuardedReturnedEditor as any, { ...props, visible: true }));
+			const button = container.querySelector('button')!;
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('draft:1');
+			if (visible) expect(container.querySelector('input')).toBe(draft);
+			flushSync(() => root!.render(BareGuardedReturnedEditor as any, { ...props, visible: false }));
+			expect(container.querySelector('input')).toBeNull();
+			expect(container.querySelector('button')).toBeNull();
+			expect(container.querySelector('i')).toBe(before);
+			expect(container.querySelector('strong')).toBe(after);
+			flushSync(() => root!.render(BareGuardedReturnedEditor as any, { ...props, visible: true }));
+			expect(container.querySelector('input')!.value).toBe('draft');
+			expect(container.querySelector('button')!.textContent).toBe('draft:0');
+			expect(container.querySelector('i')).toBe(before);
+			expect(container.querySelector('strong')).toBe(after);
+		},
+	);
+
 	it('remounts a keyed call only when its key changes', async () => {
 		const r = await start(mode, 'KeyedCall', KeyedCall, { version: 1 });
 		const first = container.querySelector('button')!;

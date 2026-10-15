@@ -13945,14 +13945,16 @@ function ssrCompileBodyWithMapTemps(
 	} else {
 		// `node.body` may be a BlockStatement (`function f() { … return <jsx> }`, the
 		// desugared `@{}` form) or, for legacy/synthetic callers, the statement array
-		// itself. rewriteEarlyExits wants the array.
+		// itself. Only synthetic arms lower their exits to template control flow.
 		const bodyStmts =
 			node.body && node.body.type === 'BlockStatement' ? node.body.body || [] : node.body || [];
 		// A statement array is a synthetic arm body (see splitArmExits); a function
 		// body keeps its returns on the generic value ABI.
 		const bodyRewritten = Array.isArray(node.body)
 			? splitArmExits(unwrapOutputCodeBlock(bodyStmts), ctx)
-			: rewriteEarlyExits(unwrapOutputCodeBlock(bodyStmts));
+			: unwrapOutputCodeBlock(bodyStmts).map((statement) =>
+					normalizeOwnRenderableReturns(statement, true),
+				);
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
