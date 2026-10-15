@@ -1697,6 +1697,8 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bindSignalHostPropSources',
 	'canSplitStyleProperties',
 	'styleObjectPrototype',
+	'setRenderStyle',
+	'setRenderStyleProperty',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -28674,9 +28676,14 @@ function planJsx(
 			if (!b.mountOnly) ctx.runtimeNeeded.add(`evt${arity}u`);
 		}
 		if (b.kind === 'styleProperties') {
-			ctx.runtimeNeeded.add('setStyleProperty');
+			if (!b.spread) ctx.runtimeNeeded.add('setStyleProperty');
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
-			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
+			if (b.spread) {
+				ctx.runtimeNeeded.add('styleObjectPrototype');
+				// A spread style diffs during render, which stages its writes (#2043).
+				ctx.runtimeNeeded.add('setRenderStyle');
+				ctx.runtimeNeeded.add('setRenderStyleProperty');
+			}
 		}
 		if (b.kind === 'nativeStyle' || b.kind === 'nativeProjection') {
 			b.slotIndex = ++nativeStyleSlots;
@@ -32035,9 +32042,11 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 					F('_sty'),
 					styleSpreadObject(bind, F('_sty'), previous),
 				);
+				// It diffs during render, so a root render stages its writes (#2043).
+				const renderStyle = () => attrLoweringToken(b.id('_$setRenderStyle'), bind);
 				const full = b.stmt(
 					b.call(
-						callee(),
+						renderStyle(),
 						F('_el'),
 						merged,
 						bind.deferred ? b.conditional(initial, undefinedNode(), previousStyle) : previousStyle,
@@ -32049,7 +32058,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 						b.block([
 							b.stmt(
 								b.call(
-									attrLoweringToken(b.id('_$setStyleProperty'), bind),
+									attrLoweringToken(b.id('_$setRenderStyleProperty'), bind),
 									F('_el'),
 									inheritOriginLoc(b.literal(property.name), property.key),
 									valueOf(property),
@@ -32079,7 +32088,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 								b.stmt(b.assignment('=', F('_sty'), b.conditional(needsFull, merged, spread))),
 							]),
 							b.block([
-								b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))),
+								b.stmt(b.call(renderStyle(), F('_el'), spread, F('_sty'))),
 								...scalar,
 								b.stmt(b.assignment('=', F('_sty'), spread)),
 							]),

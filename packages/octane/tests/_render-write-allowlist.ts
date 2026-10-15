@@ -11,24 +11,11 @@ export interface RenderWriteAllowance {
 	reason: string;
 }
 
-const STYLE = 'Compiled split-style bindings call setStyle/setStyleProperty during render.';
 const FIRST_MOUNT =
 	"A root's first client render over a container that holds other DOM mounts into it in place.";
 const HYDRATING = 'A hydrating render writes the server DOM it adopts.';
 
 export const RENDER_WRITE_ALLOWLIST: readonly RenderWriteAllowance[] = [
-	...['applyStyleValue', 'applyStyleProperty', 'setStyleProperty'].map((writer) => ({
-		file: 'style-object-literals.test.ts',
-		writer,
-		owner: 'structure',
-		reason: STYLE,
-	})),
-	{
-		file: 'style-object-literals.test.ts',
-		writer: 'rollbackTransitionJournal',
-		owner: 'structure',
-		reason: 'A held window restores the style a render wrote in place (JOURNAL_ATTR).',
-	},
 	...[
 		'childSlot',
 		'clearRootContainer',

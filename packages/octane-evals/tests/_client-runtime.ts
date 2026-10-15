@@ -56,6 +56,8 @@ export {
 	hostSourceChildren,
 	canSplitStyleProperties,
 	styleObjectPrototype,
+	setRenderStyle,
+	setRenderStyleProperty,
 	isContext,
 	// `'use dom bindings'` views.
 	bindPresentationView,

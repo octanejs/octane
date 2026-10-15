@@ -1638,7 +1638,8 @@ Other consequences:
   it was. A hand-written body over the compiler ABI follows the same rule:
   writing committed DOM during render, including through `setText` or
   `setAttribute`, is unsupported. Its staged forms are a bag factory's host,
-  `setRenderText` from `octane/internal/client`, and layout effects.
+  `setRenderText` and `setRenderStyle` from `octane/internal/client`, and
+  layout effects.
 - Priority (`urgent` vs `transition`) governs Suspense hold semantics and
   whether a render waits for a later host task (above), not time-slicing.
 - Fallback-visible boundaries whose retries fully stage reveal together,
