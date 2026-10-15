@@ -777,6 +777,10 @@ a provider or boundary that has not rendered. Static JSX, explicit
 `createElement(...)` calls, and event or render-prop callbacks retain ordinary
 JavaScript evaluation semantics.
 
+Strong DOM templates have one explicit render-only form: an inline `@{ ... }`
+block passed directly as a component prop. It produces a compiled body rather
+than an element descriptor; see [Named render bodies](#named-render-bodies).
+
 ### Values that exist only during the building call
 
 Deferral applies to every compiler-authored JSX value, including host-only
@@ -896,6 +900,44 @@ through imports; a standalone compiler caller can mark a local binding explicitl
 For a function-as-child API that also accepts ordinary template children, use
 `typeof children === 'function' && !isChildrenBlock(children)` before invoking a
 render prop. A compiled children body must be rendered through Octane.
+
+### Named render bodies
+
+In Strong-mode DOM templates, a block passed directly to a component prop is
+also a render-only body, on both the client and server:
+
+```tsrx
+"use strong";
+
+function Slot(props) @{
+  <section>{props.content}</section>
+}
+
+function Example(props) @{
+  <Slot content={@{ <span>{props.label as string}</span> }} />
+}
+```
+
+This form needs no authored `() =>` wrapper and constructs no element descriptor
+for the block itself. `isChildrenBlock(content)` identifies it. Render it with
+`{content}`; do not call it as a callback or inspect it with `Children`,
+`isValidElement`, or `cloneElement`. Ordinary JSX such as
+`content={<span />}` retains its descriptor contract.
+
+The block's setup, hooks, and output run when the receiving component renders
+it, under that insertion's context. Each insertion owns independent state and
+cleanup. Updating captures preserves the insertion; switching to a different
+authored body replaces it. Strong's immutable snapshot rules still apply.
+Production memoization can retain a simple body when its captured own data
+properties are unchanged. Dependency probes leave accessors unread and compare
+their receiver instead. Setup, conditional reads, and deeper property paths
+conservatively retain ordinary rendering.
+
+This contract applies to direct block attributes on compiled template component
+calls. Blocks stored in variables or object properties, returned from callbacks,
+passed to portals, or compiled outside Strong mode keep their existing behavior.
+Universal renderers are unchanged. Use an ordinary function for an API that
+invokes a callback itself.
 
 ### Template branch identity
 

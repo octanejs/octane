@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import * as ServerMdx from '@octanejs/mdx/server';
+// @ts-expect-error The shared fixture loader compiles the provider graph for SSR.
+import * as ServerMdx from '../../mdx/tests/_fixtures/provider-server.ts?octane-ssr';
 import { evalModuleCode, stripMarkers } from '../../mdx/tests/_helpers.js';
 import { compileDocusaurusMdxSync, remarkDocusaurusPageData } from '../src/mdx.js';
 import { docusaurusMdx } from '../src/vite.js';
