@@ -695,6 +695,12 @@ jobs:
         id: install_heavy_node_dependencies
         run: pnpm install --prod=false --frozen-lockfile
 
+      # This suite includes a compiler wall-time guard. Run it without competing
+      # Vitest workers so the guard measures the compiler rather than contention.
+      - name: Run compiler Vite options tests
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
+        run: pnpm vitest run --project octane packages/octane/tests/compiler/compiler-vite-options.test.ts --maxWorkers=1
+
       - name: Setup Bun
         id: setup_heavy_node_bun
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
