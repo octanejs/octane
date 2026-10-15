@@ -4,7 +4,7 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 const FIXTURE = `
-import { createElement, Fragment, useState } from 'octane';
+import { createElement, createPortal, Fragment, useState } from 'octane';
 
 export function NativeRows(props) @{
 	<ul id="descriptor-list">
@@ -100,6 +100,20 @@ export function NamespaceDescriptorRows(props) @{
 
 function ProxyInner(props) @{
 	<strong data-proxy-inner="">{props.label as string}</strong>
+}
+
+export function PortalDescriptorRows(props) @{
+	const rows = props.items.map((item) =>
+		createElement(
+			'li',
+			{ key: item.id, 'data-id': item.id },
+			createPortal(
+				createElement('span', { 'data-portaled': item.id }, item.label),
+				props.target,
+			),
+		),
+	);
+	<ul id="portal-descriptor-list">{rows}</ul>
 }
 
 export function ProxyDescriptorRows(props) @{
@@ -280,6 +294,49 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 			flushSync(() => root.render(client.MixedDescriptorRows, { items: reordered }));
 			expect(container.querySelector('[data-id="alpha"]')?.textContent).toBe('Alpha');
 			expect(beta.textContent).toBe('Beta:1');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('adopts host items whose only child is a portal', () => {
+		// A portal child puts its host item on the block path on both sides, so
+		// the server must give that item the range the client expects.
+		const items = [
+			{ id: 'alpha', label: 'Alpha' },
+			{ id: 'beta', label: 'Beta' },
+		];
+		const target = document.createElement('div');
+		target.dataset.descriptorListTest = '';
+		document.body.appendChild(target);
+		const container = document.createElement('div');
+		container.dataset.descriptorListTest = '';
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(server.PortalDescriptorRows, {
+			items,
+			target,
+		}).html;
+		const rows = [...container.querySelectorAll<HTMLLIElement>('li[data-id]')];
+		const recoverable: unknown[] = [];
+
+		const root = hydrateRoot(
+			container,
+			client.PortalDescriptorRows,
+			{ items, target },
+			{ onRecoverableError: (error) => recoverable.push(error) },
+		);
+		try {
+			flushSync(() => {});
+			expect(recoverable).toEqual([]);
+			expect([...container.querySelectorAll('li[data-id]')]).toEqual(rows);
+			expect(
+				[...target.querySelectorAll('[data-portaled]')].map((node) => node.textContent),
+			).toEqual(['Alpha', 'Beta']);
+
+			flushSync(() =>
+				root.render(client.PortalDescriptorRows, { items: [items[1], items[0]], target }),
+			);
+			expect([...container.querySelectorAll('li[data-id]')]).toEqual([rows[1], rows[0]]);
 		} finally {
 			root.unmount();
 		}
