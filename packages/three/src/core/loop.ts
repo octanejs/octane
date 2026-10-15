@@ -1,3 +1,5 @@
+'use strong';
+
 import type { RenderCallback, RootState, RootStore, Subscription } from './store.js';
 
 export type GlobalRenderCallback = (timestamp: number) => void;
