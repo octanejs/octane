@@ -2424,6 +2424,9 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 						scope.dispose();
 					}
 				}
+			});
+
+			it(`does not claim a layout host ${mutation} by its own retirement cleanup (${dev ? 'dev' : 'prod'})`, async () => {
 				for (const knownStylex of [false, true]) {
 					for (const nextComponent of ['same', 'different'] as const) {
 						const layoutScope = createScope({

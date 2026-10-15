@@ -55,7 +55,7 @@ function Keyed() {
 	);
 }
 
-function KeyedWithStaleTail() {
+function KeyedWithDuplicate() {
 	const [items, setItems] = useState(['a', 'b', 'c']);
 	const [on, setOn] = useState(false);
 	return createElement(
@@ -65,11 +65,13 @@ function KeyedWithStaleTail() {
 			'button',
 			{
 				'data-testid': 'replace',
-				onClick: () => (setItems(['a', 'x', 'c']), setOn(true)),
+				onClick: () => (setItems(['c', 'x', 'a']), setOn(true)),
 			},
 			'replace',
 		),
-		items.map((v) => createElement('li', { key: v, 'data-testid': `li-${v}` }, v)),
+		items.map((v) =>
+			createElement('li', { key: v === 'b' ? 'a' : v, 'data-testid': `li-${v}` }, v),
+		),
 		on && createElement(Inner, null),
 	);
 }
@@ -155,8 +157,8 @@ describe('de-opt pure-host → component upgrade', () => {
 		r.unmount();
 	});
 
-	it('keeps keyed survivors after removing an incompatible list node', () => {
-		const r = mount(KeyedWithStaleTail);
+	it('keeps the first duplicate-key row and reorders adopted rows during an upgrade', () => {
+		const r = mount(KeyedWithDuplicate);
 		try {
 			const liA = r.find('[data-testid="li-a"]');
 			const staleB = r.find('[data-testid="li-b"]');
@@ -168,7 +170,7 @@ describe('de-opt pure-host → component upgrade', () => {
 			expect(r.find('[data-testid="li-c"]')).toBe(retainedC);
 			r.click('[data-testid="li-c"]');
 			expect(clicks).toBe(1);
-			expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
+			expect(r.findAll('li').map((li) => li.textContent)).toEqual(['c', 'x', 'a']);
 			expect(staleB.isConnected).toBe(false);
 			expect(retainedC.isConnected).toBe(true);
 		} finally {
