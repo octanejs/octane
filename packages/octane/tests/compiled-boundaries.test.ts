@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createElement, flushSync, hydrateRoot, lazy, useContext } from 'octane';
+import {
+	createElement,
+	flushSync,
+	hydrateRoot,
+	lazy,
+	startTransition,
+	Suspense,
+	useContext,
+} from 'octane';
 import { renderToString } from 'octane/server';
 import { act, mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
@@ -117,6 +125,54 @@ describe('checked compiled boundaries', () => {
 		const props = { children: createElement('b', null, 'descriptor') };
 		expect(() => mount(client.CheckedProvider, props)).toThrow(/CompiledContext/);
 		expect(() => renderToString(server.CheckedProvider, props)).toThrow(/CompiledContext/);
+	});
+
+	it('removes compiled provider children when they become null', () => {
+		const events: string[] = [];
+		const log = (value: string) => events.push(value);
+		const view = mount(client.GatedShell, { show: true, log });
+		try {
+			const button = view.container.querySelector('button')!;
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('screen:gated:1');
+
+			flushSync(() => view.root.render(client.GatedShell, { show: false, log }));
+			expect(view.container.querySelector('article')).toBeNull();
+			expect(view.container.querySelector('footer')!.textContent).toBe('tail');
+			expect(events).toEqual(['mount', 'cleanup']);
+
+			flushSync(() => view.root.render(client.GatedShell, { show: true, log }));
+			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+			expect(events).toEqual(['mount', 'cleanup', 'mount']);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps one copy of compiled provider children when a transition emptying it is abandoned', async () => {
+		const events: string[] = [];
+		const log = (value: string) => events.push(value);
+		const resource = new Promise<never>(() => {});
+		const App = (props: { show: boolean }) =>
+			createElement(
+				Suspense,
+				{ fallback: 'loading' },
+				createElement(client.GatedShell, { show: props.show, log, resource }),
+			);
+		const view = mount(App, { show: true });
+		try {
+			await act(async () => {
+				startTransition(() => view.root.render(App, { show: false }));
+			});
+			flushSync(() => view.root.render(App, { show: true }));
+			expect(view.container.querySelectorAll('article')).toHaveLength(1);
+			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+
+			flushSync(() => view.root.render(App, { show: false }));
+			expect(view.container.querySelector('article')).toBeNull();
+		} finally {
+			view.unmount();
+		}
 	});
 
 	it('reveals a resolved compiled route and cannot remount after its owner unmounts', async () => {

@@ -8,6 +8,7 @@ import {
 	createContext,
 	isValidElement,
 	use,
+	useEffect,
 	useState,
 	type ElementDescriptor,
 	type OctaneNode,
@@ -423,4 +424,36 @@ export function NestedSuspenseApp(props: { promise: Promise<string> }) {
 			</NestedPromiseContext>
 		</Suspense>
 	);
+}
+
+// --- a Provider's only child switching to null / undefined ---
+
+let _setEmptyChild: ((child: 'leaf' | null | undefined) => void) | null = null;
+let _setEmptyLeafCount: ((u: (n: number) => number) => void) | null = null;
+const emptiedLeafEvents: string[] = [];
+
+export function setEmptiedProviderChild(child: 'leaf' | null | undefined) {
+	_setEmptyChild?.(child);
+}
+export function bumpEmptiedProviderLeaf() {
+	_setEmptyLeafCount?.((n) => n + 1);
+}
+export function readEmptiedProviderEvents() {
+	return emptiedLeafEvents.splice(0);
+}
+
+function EmptiedLeaf() {
+	const [n, setN] = useState(0);
+	_setEmptyLeafCount = setN;
+	useEffect(() => {
+		emptiedLeafEvents.push('mount');
+		return () => emptiedLeafEvents.push('cleanup');
+	}, []);
+	return <span className="emptied-leaf">{`${use(Ctx)}:${n}`}</span>;
+}
+
+export function EmptiedProviderApp() {
+	const [child, setChild] = useState<'leaf' | null | undefined>('leaf');
+	_setEmptyChild = setChild;
+	return <Ctx value="provided">{child === 'leaf' ? <EmptiedLeaf /> : child}</Ctx>;
 }

@@ -3,6 +3,7 @@ import {
 	CompiledOutlet,
 	createCompiledContext,
 	createContext,
+	use,
 	useContext,
 	useLayoutEffect,
 	useState,
@@ -83,6 +84,31 @@ export function Shadowed(props: { replacement: () => any }) @{
 
 export function CheckedProvider(props: { children: unknown }) @{
 	<CompiledContext context={Tone} value="provided" children={props.children} />
+}
+
+function GateProvider(props: { show: boolean; children: unknown }) @{
+	<CompiledContext context={Tone} value="gated" children={props.show ? props.children : null} />
+}
+
+function Suspends(props: { resource: Promise<unknown> }) @{
+	use(props.resource);
+	<i />
+}
+
+export function GatedShell(props: {
+	show: boolean;
+	log: (message: string) => void;
+	resource?: Promise<unknown>;
+}) @{
+	<main>
+		<GateProvider show={props.show}>
+			<Screen label="screen" log={props.log} />
+		</GateProvider>
+		@if (!props.show && props.resource) {
+			<Suspends resource={props.resource} />
+		}
+		<footer>tail</footer>
+	</main>
 }
 
 export function PendingShell(props: { component: typeof Other; label: string }) @{
