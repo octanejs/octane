@@ -1,4 +1,4 @@
-// react-router's CatchBoundary + default ErrorComponent, rebuilt on octane's
+// react-router's CatchBoundary, rebuilt on octane's
 // `@try`/`@catch` (octane has no class components, so the upstream
 // CatchBoundaryImpl class becomes a catch branch). Contract preserved from
 // upstream CatchBoundary.tsx:
@@ -13,9 +13,12 @@
 //     getDerivedStateFromProps; here a layout effect calls the catch reset — one
 //     commit later, same observable outcome). Match passes the router's `loadedAt`
 //     so navigation clears route error UI.
-import { useState, useRef, useLayoutEffect } from 'octane';
+import { useRef, useLayoutEffect } from 'octane';
 import type { OctaneNode } from 'octane';
 import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
+import { ErrorComponent } from './ErrorComponent.tsrx';
+
+export { ErrorComponent };
 
 export function CatchBoundary(props: {
 	getResetKey: () => unknown;
@@ -65,37 +68,4 @@ function CatchErrorView(props: {
 	const ErrorComp = props.errorComponent ?? ErrorComponent;
 
 	<ErrorComp error={props.error} reset={props.reset} info={{ componentStack: '' }} />
-}
-
-// The default error UI, markup-identical to react-router's ErrorComponent (string
-// styles serialize to the same inline css React produces, so the differential rig
-// can byte-compare it).
-export function ErrorComponent(props: {
-	error: any;
-	reset?: () => void;
-	info?: { componentStack?: string };
-}) @{
-	const [show, setShow] = useState(process.env.NODE_ENV !== 'production');
-
-	<div style="padding:.5rem;max-width:100%">
-		<div style="display:flex;align-items:center;gap:.5rem">
-			<strong style="font-size:1rem">Something went wrong!</strong>
-			<button
-				style="appearance:none;font-size:.6em;border:1px solid currentColor;padding:.1rem .2rem;font-weight:bold;border-radius:.25rem"
-				onClick={() => setShow((d) => !d)}
-			>
-				{show ? 'Hide Error' : 'Show Error'}
-			</button>
-		</div>
-		<div style="height:.25rem"></div>
-		@if (show) {
-			<div>
-				<pre style="font-size:.7em;border:1px solid red;border-radius:.25rem;padding:.3rem;color:red;overflow:auto">
-					@if (props.error?.message) {
-						<code>{props.error.message as string}</code>
-					}
-				</pre>
-			</div>
-		}
-	</div>
 }

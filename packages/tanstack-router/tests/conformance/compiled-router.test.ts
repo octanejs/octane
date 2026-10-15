@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
 import { mount, nextPaint } from '../_helpers';
 import { makeCompiledRouter, makeCompiledFileRouter } from '../_fixtures/compiled-router.tsrx';
@@ -157,6 +157,34 @@ describe('opt-in compiled router rendering', () => {
 		view.unmount();
 	});
 
+	it('keeps the later destination when it supersedes a pending match', async () => {
+		let release!: () => void;
+		const waiting = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const router = makeCompiledRouter('/', { loader: () => waiting });
+		router.options.defaultPendingMs = 1;
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			const navigation = router.navigate({ to: '/items/a' });
+			await settle();
+			expect(view.findAll('.pending')).toHaveLength(1);
+			await router.navigate({ to: '/' });
+			release();
+			await navigation;
+			await settle();
+			expect(view.findAll('.pending')).toHaveLength(0);
+			expect(view.findAll('.item')).toHaveLength(0);
+			expect(view.find('.go-item').textContent).toBe('Open item');
+			expect(router.state.resolvedLocation?.pathname).toBe('/');
+		} finally {
+			release();
+			view.unmount();
+		}
+	});
+
 	it('shows route errors inside the compiled layout', async () => {
 		const router = makeCompiledRouter('/items/a', { rejected: true });
 		await router.load();
@@ -165,6 +193,94 @@ describe('opt-in compiled router rendering', () => {
 		expect(view.find('.route-error').textContent).toBe('item failed');
 		expect(view.find('header').textContent).toBe('Routes');
 		view.unmount();
+	});
+
+	it('reports a render error once and recovers when its route match changes', async () => {
+		const onCatch = vi.fn();
+		const router = makeCompiledRouter('/items/broken', { renderError: true, onCatch });
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			expect(view.find('.route-error').textContent).toBe('item render failed');
+			expect(onCatch).toHaveBeenCalledTimes(1);
+			expect(onCatch.mock.calls[0][0]).toMatchObject({ message: 'item render failed' });
+			const parent = view.find('.items-layout');
+
+			await router.navigate({ to: '/items/a' });
+			await settle();
+			expect(view.find('.items-layout')).toBe(parent);
+			expect(view.findAll('.route-error')).toHaveLength(0);
+			expect(view.find('.value').textContent).toBe('a:Name a');
+			expect(onCatch).toHaveBeenCalledTimes(1);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('passes an error thrown by a route callback to the parent error boundary', async () => {
+		const onCatch = vi.fn(() => {
+			throw new Error('parent owns this');
+		});
+		const parentOnCatch = vi.fn();
+		const router = makeCompiledRouter('/items/broken', {
+			renderError: true,
+			onCatch,
+			parentOnCatch,
+		});
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			expect(view.find('.route-error').textContent).toBe('parent owns this');
+			expect(view.findAll('.items-layout')).toHaveLength(0);
+			expect(onCatch).toHaveBeenCalledTimes(1);
+			expect(parentOnCatch).toHaveBeenCalledTimes(1);
+			expect(parentOnCatch.mock.calls[0][0]).toMatchObject({ message: 'parent owns this' });
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps the global error details interactive', async () => {
+		const router = makeCompiledRouter('/items/broken', { renderError: true });
+		await router.load();
+		router.routesById['/items/$id'].update({ errorComponent: undefined });
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			expect(view.find('strong').textContent).toBe('Something went wrong!');
+			expect(view.find('code').textContent).toBe('item render failed');
+			view.click('button');
+			await nextPaint();
+			expect(view.find('button').textContent).toBe('Show Error');
+			expect(view.findAll('code')).toHaveLength(0);
+			view.click('button');
+			await nextPaint();
+			expect(view.find('button').textContent).toBe('Hide Error');
+			expect(view.find('code').textContent).toBe('item render failed');
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('reads updated route components when its match changes', async () => {
+		const router = makeCompiledRouter('/items/a', { renderError: true });
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			expect(view.find('.value').textContent).toBe('a:Name a');
+			router.routesById['/items/$id'].update({
+				component: router.routesById['/'].options.component,
+			});
+			await router.navigate({ to: '/items/b' });
+			await settle();
+			expect(view.findAll('.item')).toHaveLength(0);
+			expect(view.find('.items-layout .go-item').textContent).toBe('Open item');
+		} finally {
+			view.unmount();
+		}
 	});
 
 	it('fails explicitly for unsupported provider wrappers', async () => {
