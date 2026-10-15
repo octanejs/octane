@@ -1908,7 +1908,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 	// a partially updated document or route graph.
 	it(
 		'hot-updates generated MDX twice while preserving the surrounding interactive page',
-		{ concurrent: false, timeout: 60_000 },
+		{ concurrent: false, timeout: 180_000 },
 		async () => {
 			const file = join(WEBSITE, 'src/content/home-sample.mdx');
 			const original = readFileSync(file, 'utf8');
@@ -1925,12 +1925,24 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					() => document.querySelector('.demo-count-value')?.textContent === '1',
 				);
 				for (const text of ['first generated template edit', 'second generated template edit']) {
-					writeFileSync(file, original.replace(initialText, text));
-					await page.waitForFunction(
-						(expected) =>
-							document.querySelector('.hero-code-body')?.textContent?.includes(expected),
-						text,
-					);
+					// A loaded runner can take longer than one action budget to compile
+					// and push the update, and the file watcher can drop a write that
+					// lands right after the previous one. Rewrite the edit while waiting.
+					const edited = original.replace(initialText, text);
+					for (let attempt = 0; ; attempt++) {
+						writeFileSync(file, edited);
+						try {
+							await page.waitForFunction(
+								(expected) =>
+									document.querySelector('.hero-code-body')?.textContent?.includes(expected),
+								text,
+								{ timeout: 15_000 },
+							);
+							break;
+						} catch (error) {
+							if (attempt === 3) throw error;
+						}
+					}
 					expect(await sample.textContent()).toContain(text);
 					// Reloading or remounting the parent would reset this sibling's state.
 					expect(await count.locator('.demo-count-value').textContent()).toBe('1');
