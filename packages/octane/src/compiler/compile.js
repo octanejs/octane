@@ -15959,6 +15959,35 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// comp-call root of a `@{}` body — which is exactly this emit.
 	const inherit = ctx._ssrInheritRoot === true && !node._octaneBindingSite;
 	ctx._ssrInheritRoot = false;
+	if (isStrongKeyedFragment(node, ctx)) {
+		const fragment = prepareKeyedFragment(node, ctx, name, inlinedSubs);
+		const sub = ssrCompileSub(
+			fragment.children,
+			ctx,
+			'__skeyed',
+			[fragment.param],
+			cssHash,
+			parentNs,
+			componentNs,
+		);
+		// Component identity participates in SSR async replay keys, so this body
+		// must stay stable when an ancestor suspends and renders again.
+		ctx.hoistedHelpers.push(sub.fn);
+		ctx.runtimeNeeded.add('ssrComponent');
+		return ssrCall(
+			'ssrComponent',
+			[
+				b.id('__s'),
+				b.id(sub.fnName),
+				fragment.propsExpr,
+				b.literal(false),
+				fragment.keyExpr,
+				undefinedNode(),
+				b.literal(invocationSite),
+			],
+			node,
+		);
+	}
 	// Capture before compiling attributes/children: nested subs temporarily mutate
 	// this context flag. Only this component's immediate children sub inherits the
 	// returned-fragment mode; control-flow arm subs intentionally reset it.
@@ -16115,6 +16144,20 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		}
 	}
 	if (descriptorConfig) {
+		if (ctx.strongRenderValues && !activityDescriptor && !isFragmentLongForm(node, ctx)) {
+			ctx.runtimeNeeded.add('ssrComponentFromConfig');
+			return ssrCall(
+				'ssrComponentFromConfig',
+				[
+					b.id('__s'),
+					compExpr,
+					inheritOriginLoc(b.object(propNodes), node),
+					b.literal(invocationSite),
+					componentNs === null ? b.literal(null) : b.literal(componentNs),
+				],
+				node,
+			);
+		}
 		// The direct mode-only Activity was lowered to ActivityStatement. Richer
 		// Activity configs and generic explicit-key + spread sites keep one ordered
 		// element config, matching createElement without changing simple call sites.
@@ -16214,20 +16257,22 @@ function ssrCompileSub(
 	ctx._ssrFoldedExprHoles = baseName === '__sfragment';
 	let fn;
 	try {
-		fn = ssrCompileBody(
-			synth,
-			ctx,
-			fnName,
-			cssHash,
-			[],
-			parentNs || 'html',
-			false,
-			componentNs,
-			returnedFragmentTemplate,
-			returnedFragmentRoot,
-			// Nested helpers touch no themes; the component body already did.
-			[],
-			unboxedHtml,
+		fn = withNestedTemplateScope(synth, ctx, () =>
+			ssrCompileBody(
+				synth,
+				ctx,
+				fnName,
+				cssHash,
+				[],
+				parentNs || 'html',
+				false,
+				componentNs,
+				returnedFragmentTemplate,
+				returnedFragmentRoot,
+				// Nested helpers touch no themes; the component body already did.
+				[],
+				unboxedHtml,
+			),
 		);
 	} finally {
 		ctx._ssrFoldedExprHoles = prevFoldedExprHoles;
@@ -22455,6 +22500,65 @@ function hasJsxSpreadAttribute(node) {
 	);
 }
 
+// A Strong template owns this entire render scope. Ref/spread configs retain
+// Fragment's inspectable descriptor boundary and its ref lifecycle.
+function isStrongKeyedFragment(node, ctx) {
+	if (
+		!ctx?.strongRenderValues ||
+		node.openingElement?.metadata?.descriptorFragment ||
+		ctx._returnedFragmentTemplate ||
+		!isFragmentLongForm(node, ctx)
+	)
+		return false;
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	return attrs.length === 1 && hasJsxAttribute(node, 'key');
+}
+
+// Reuse a component scope, keeping the whole body (including setup and try
+// arms) behind the key. Capture lexical receiver/arguments before hoisting, and
+// evaluate/coerce the key before snapshotting the locals its body reads.
+function prepareKeyedFragment(node, ctx, name, inlinedSubs) {
+	let children = node.children || [];
+	const lexical = captureCallbackLexicalValues(b.arrow([], b.block(children)), ctx);
+	if (lexical) children = lexical.body.body;
+	const captures = (helperCaptures(ctx, children, []) || []).map((name) => ({
+		name,
+		value: b.id(name),
+	}));
+	if (lexical) captures.push(...lexical.captures);
+	const param = b.object_pattern(
+		captures.map(({ name }) => b.prop('init', b.id(name), b.id(name), false, true)),
+	);
+	const props = b.object(captures.map(({ name, value }) => b.prop('init', b.id(name), value)));
+	const value = (node.attributes || node.openingElement.attributes)[0].value;
+	const key =
+		value == null
+			? b.literal(true)
+			: value.type === 'JSXExpressionContainer'
+				? value.expression
+				: value;
+	const keyName = allocCompilerName(ctx, '__fragmentKey');
+	ctx.currentMapTemps.push(keyName);
+	return {
+		children,
+		param,
+		propsExpr: b.sequence([
+			b.assignment('=', b.id(keyName), tsrxExprNode(key, ctx, name, inlinedSubs)),
+			b.assignment(
+				'=',
+				b.id(keyName),
+				b.conditional(
+					b.binary('===', b.id(keyName), undefinedNode()),
+					undefinedNode(),
+					b.binary('+', b.literal(''), b.id(keyName)),
+				),
+			),
+			props,
+		]),
+		keyExpr: b.id(keyName),
+	};
+}
+
 // An explicit key cannot be split from a spread config: whichever occurs last
 // wins, and all getters/expressions must run in source order. Extracted templates
 // retain the proof after the complete config becomes a single spread hole.
@@ -23767,6 +23871,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 	// The emission normalizes from `openingElement.attributes`, so update it too.
 	if (node.openingElement) {
 		out.openingElement = { ...node.openingElement, attributes: newAttrs };
+		if (isStrongKeyedFragment(node, ctx)) {
+			// Returned JSX keeps its inspectable value boundary. Its holes have
+			// already been extracted in the owning component's render scope.
+			out.openingElement.metadata = { ...node.openingElement.metadata, descriptorFragment: true };
+		}
 		if (mergedKeyedSpreadConfig) {
 			out.openingElement.metadata = {
 				...node.openingElement.metadata,
@@ -26523,7 +26632,12 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (ctx && allowImperative && isDescriptorBuiltElement(n, inSvg, ctx)) {
+			if (
+				ctx &&
+				allowImperative &&
+				isDescriptorBuiltElement(n, inSvg, ctx) &&
+				!isStrongKeyedFragment(n, ctx)
+			) {
 				out.push(
 					inheritOriginLoc(
 						{
@@ -29393,6 +29507,26 @@ function planJsx(
 		const slotIndex = cc.slotIndex;
 		const org = cc.origin ?? planOrigin;
 		const hostExpr = () => hostNodeFor(`_compHost$${cc.id}`);
+		if (cc.orderedConfig) {
+			ctx.runtimeNeeded.add('componentSlotFromConfig');
+			pushAfterStmt(
+				cc.id,
+				org,
+				b.stmt(
+					b.call(
+						'_$componentSlotFromConfig',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						cc.compNode,
+						cc.propsExpr,
+						b.literal(cc.invocationSite),
+						anchorNodeFor(cc, 'compAnchor') ?? b.literal(null),
+					),
+				),
+			);
+			continue;
+		}
 		if (cc.hostChildrenBinding != null) {
 			const props = () => {
 				const host = bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
@@ -34561,6 +34695,33 @@ function makeCompCall(
 ) {
 	const id = ctx.nextHelperId++;
 	const invocationSite = componentInvocationSite(ctx, node);
+	if (isStrongKeyedFragment(node, ctx)) {
+		const fragment = prepareKeyedFragment(node, ctx, componentName, inlinedSubs);
+		const helper = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__keyed',
+			fragment.children,
+			[fragment.param],
+			parentNs,
+			cssHash,
+			[],
+			node,
+		);
+		return {
+			id,
+			invocationSite,
+			compNode: b.id(helper),
+			propsExpr: fragment.propsExpr,
+			keyExpr: fragment.keyExpr,
+			voidComponent: true,
+			anchorlessAppendSafe: true,
+			hostPath: null,
+			autoMemoDeps: null,
+			loc: devLoc(ctx, node),
+			origin: node,
+		};
+	}
 	const compName = tagBindingName(node);
 	const directRenderer = isStaticFragmentComponent(node, ctx)
 		? ctx.componentInfo.get(compName).staticFragmentRenderer
@@ -34737,9 +34898,23 @@ function makeCompCall(
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
+		// Dynamic tags can still select a host with function actions or a Fragment.
+		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
+		if (ctx.strongRenderValues && !activityDescriptor && !isFragmentLongForm(node, ctx)) {
+			return {
+				id,
+				invocationSite,
+				compNode,
+				propsExpr,
+				orderedConfig: true,
+				anchorlessAppendSafe: true,
+				hostPath: null,
+				loc: devLoc(ctx, node),
+				origin: node,
+			};
+		}
 		// A keyed spread builds a descriptor whose tag may be a host string or a
 		// Fragment at runtime, so its props select descriptor capabilities too.
-		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
 		ctx.runtimeNeeded.add('createElementFromConfig');
 		return {
 			id,

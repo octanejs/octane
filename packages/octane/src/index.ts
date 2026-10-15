@@ -249,6 +249,7 @@ export {
 	activityBlock,
 	componentSlot,
 	componentSlotVoid,
+	componentSlotFromConfig,
 	componentSlotLite,
 	compilerCacheArray,
 	compilerCacheImmutableArrayFilter,

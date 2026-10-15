@@ -6774,5 +6774,37 @@
     "reference": "transition-one-128",
     "maxRatio": 5,
     "note": "Four times as many controlled options may perform at most five times the deterministic native work. Exact selection, host identity, user draft and native capture count are verified in both unobserved and observed production Chromium runs."
+  },
+  {
+    "suite": "render-values",
+    "op": "compat_client_descriptor_calls",
+    "target": "keyed-render-values",
+    "reference": "render-values-reference",
+    "maxRatio": 0,
+    "note": "Strong keyed Fragment groups, scoped and try bodies, and component spreads in either source order must compile without descriptor construction; live same-key updates preserve input identity and changed keys reset it."
+  },
+  {
+    "suite": "render-values",
+    "op": "compat_server_descriptor_calls",
+    "target": "keyed-render-values",
+    "reference": "render-values-reference",
+    "maxRatio": 0,
+    "note": "Strong keyed Fragment groups, scoped and try bodies, and component spreads in either source order must compile without descriptor construction; live same-key updates preserve input identity and changed keys reset it."
+  },
+  {
+    "suite": "render-values",
+    "op": "native_client_descriptor_calls",
+    "target": "keyed-render-values",
+    "reference": "render-values-reference",
+    "maxRatio": 0,
+    "note": "Strong keyed Fragment groups, scoped and try bodies, and component spreads in either source order must compile without descriptor construction; live same-key updates preserve input identity and changed keys reset it."
+  },
+  {
+    "suite": "render-values",
+    "op": "native_server_descriptor_calls",
+    "target": "keyed-render-values",
+    "reference": "render-values-reference",
+    "maxRatio": 0,
+    "note": "Strong keyed Fragment groups, scoped and try bodies, and component spreads in either source order must compile without descriptor construction; live same-key updates preserve input identity and changed keys reset it."
   }
 ]

@@ -235,6 +235,7 @@ export {
 	ssrElement,
 	ssrComponent,
 	ssrComponentNS,
+	ssrComponentFromConfig,
 	ssrInNamespace,
 	ssrBlock,
 	ssrFragmentMarker,

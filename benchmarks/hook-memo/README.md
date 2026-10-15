@@ -135,6 +135,27 @@ independent caching of every prop expression. Complete consumer bundle and timin
 comparisons remain separate measurements; this scenario does not impose a byte
 threshold.
 
+`keyed-render-values.tsrx` adds five Strong controls: a keyed Fragment, a keyed
+Fragment with local scoped setup, a keyed Fragment enclosing a try/pending/catch
+boundary, and an imported component with its key before or after spread props.
+Each performs 32 changing-label updates under one key and then 32 key changes.
+Same-key updates preserve the input, typed value, focus, and label node; a changed
+key replaces both nodes and restores the default input value. Clean and observed
+bundles must agree, and every root empties on teardown. Pending and catch
+transitions, spread precedence, and effect ownership have separate runtime tests;
+this benchmark exercises the successful update/remount paths.
+
+The client and server production output is parsed in both compatibility and
+native-signal modes to count descriptor-construction calls through their imported
+bindings. Ratio guards require zero calls across these five scenarios. The live
+controls use native-signal compilation. Extended observation records application/runtime object,
+constructor, function, and array creation events by scenario and update phase.
+These are source events, not heap bytes; native allocations and DOM-emulator work
+are outside the observer. The combined clean bundle bytes include all render-value
+scenarios and the runtime; they do not substitute for a complete consumer build.
+`BENCH_RENDER_VALUES_ARTIFACT=/absolute/path.mjs` retains the clean production
+bundle for an independent same-input timing or heap probe.
+
 ## Compiler cache shapes
 
 The `compiler-cache-shapes` target is a separate production fixture. It enables
