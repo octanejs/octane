@@ -85,6 +85,19 @@ export function CheckedProvider(props: { children: unknown }) @{
 	<CompiledContext context={Tone} value="provided" children={props.children} />
 }
 
+function GateProvider(props: { show: boolean; children: unknown }) @{
+	<CompiledContext context={Tone} value="gated" children={props.show ? props.children : null} />
+}
+
+export function GatedShell(props: { show: boolean; log: (message: string) => void }) @{
+	<main>
+		<GateProvider show={props.show}>
+			<Screen label="screen" log={props.log} />
+		</GateProvider>
+		<footer>tail</footer>
+	</main>
+}
+
 export function PendingShell(props: { component: typeof Other; label: string }) @{
 	<CompiledContext context={Tone} value="ready">
 		@try {

@@ -61,6 +61,31 @@ for (const empty of [null, undefined]) {
 	});
 }
 
+it('removes hydrated Provider children when they become null', () => {
+	const server = loadServerFixture('packages/octane/tests/_fixtures/jsx-context-children.tsx');
+	const { html } = ServerRuntime.renderToString(server.EmptiedProviderApp);
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	document.body.appendChild(container);
+	const leaf = container.querySelector('.emptied-leaf');
+	const onRecoverableError = vi.fn();
+
+	const root = hydrateRoot(container, EmptiedProviderApp, { onRecoverableError });
+	flushSync(() => {});
+	flushEffects();
+	expect(container.querySelector('.emptied-leaf')).toBe(leaf);
+	expect(onRecoverableError).not.toHaveBeenCalled();
+	readEmptiedProviderEvents();
+
+	flushSync(() => setEmptiedProviderChild(null));
+	flushEffects();
+	expect(container.querySelectorAll('.emptied-leaf').length).toBe(0);
+	expect(readEmptiedProviderEvents()).toEqual(['cleanup']);
+
+	root.unmount();
+	container.remove();
+});
+
 it('.tsx <Context> renders element-descriptor children and provides context', () => {
 	const r = mount(ProviderApp as any);
 	// The host <div class="wrap"> with component children renders (de-opt host path).
@@ -248,31 +273,6 @@ describe('same-module JSX component children', () => {
 		} finally {
 			Reflect.deleteProperty(component, 'defaultProps');
 		}
-	});
-
-	it('removes hydrated Provider children when they become null', () => {
-		const server = loadServerFixture('packages/octane/tests/_fixtures/jsx-context-children.tsx');
-		const { html } = ServerRuntime.renderToString(server.EmptiedProviderApp);
-		const container = document.createElement('div');
-		container.innerHTML = html;
-		document.body.appendChild(container);
-		const leaf = container.querySelector('.emptied-leaf');
-		const onRecoverableError = vi.fn();
-
-		const root = hydrateRoot(container, EmptiedProviderApp, { onRecoverableError });
-		flushSync(() => {});
-		flushEffects();
-		expect(container.querySelector('.emptied-leaf')).toBe(leaf);
-		expect(onRecoverableError).not.toHaveBeenCalled();
-		readEmptiedProviderEvents();
-
-		flushSync(() => setEmptiedProviderChild(null));
-		flushEffects();
-		expect(container.querySelectorAll('.emptied-leaf').length).toBe(0);
-		expect(readEmptiedProviderEvents()).toEqual(['cleanup']);
-
-		root.unmount();
-		container.remove();
 	});
 
 	it('hydrates static nested components and preserves their original sibling and element nodes', () => {

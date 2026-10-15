@@ -16473,7 +16473,11 @@ export function CompiledContext<T>(
 ): void {
 	provideContext(scope, props.context, props.value);
 	const children = props.children;
-	if (children == null) return;
+	if (children == null) {
+		// Children it rendered before still occupy the scope; the reset also clears the dialect.
+		if (scope.hooks?.get(CHILDREN_DIALECT_SLOT) !== undefined) resetScopeChildren(scope);
+		return;
+	}
 	if (!isChildrenBlock(children)) {
 		throw new TypeError(formatClientError(345));
 	}

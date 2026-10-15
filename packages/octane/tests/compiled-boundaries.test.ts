@@ -119,6 +119,28 @@ describe('checked compiled boundaries', () => {
 		expect(() => renderToString(server.CheckedProvider, props)).toThrow(/CompiledContext/);
 	});
 
+	it('removes compiled provider children when they become null', () => {
+		const events: string[] = [];
+		const log = (value: string) => events.push(value);
+		const view = mount(client.GatedShell, { show: true, log });
+		try {
+			const button = view.container.querySelector('button')!;
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('screen:gated:1');
+
+			flushSync(() => view.root.render(client.GatedShell, { show: false, log }));
+			expect(view.container.querySelector('article')).toBeNull();
+			expect(view.container.querySelector('footer')!.textContent).toBe('tail');
+			expect(events).toEqual(['mount', 'cleanup']);
+
+			flushSync(() => view.root.render(client.GatedShell, { show: true, log }));
+			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+			expect(events).toEqual(['mount', 'cleanup', 'mount']);
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('reveals a resolved compiled route and cannot remount after its owner unmounts', async () => {
 		let resolve!: (component: typeof client.Other) => void;
 		const resource = new Promise<typeof client.Other>((done) => (resolve = done));
