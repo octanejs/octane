@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createElement, flushSync, hydrateRoot, lazy, useContext } from 'octane';
+import {
+	createElement,
+	flushSync,
+	hydrateRoot,
+	lazy,
+	startTransition,
+	Suspense,
+	useContext,
+} from 'octane';
 import { renderToString } from 'octane/server';
 import { act, mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
@@ -136,6 +144,32 @@ describe('checked compiled boundaries', () => {
 			flushSync(() => view.root.render(client.GatedShell, { show: true, log }));
 			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
 			expect(events).toEqual(['mount', 'cleanup', 'mount']);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps one copy of compiled provider children when a transition emptying it is abandoned', async () => {
+		const events: string[] = [];
+		const log = (value: string) => events.push(value);
+		const resource = new Promise<never>(() => {});
+		const App = (props: { show: boolean }) =>
+			createElement(
+				Suspense,
+				{ fallback: 'loading' },
+				createElement(client.GatedShell, { show: props.show, log, resource }),
+			);
+		const view = mount(App, { show: true });
+		try {
+			await act(async () => {
+				startTransition(() => view.root.render(App, { show: false }));
+			});
+			flushSync(() => view.root.render(App, { show: true }));
+			expect(view.container.querySelectorAll('article')).toHaveLength(1);
+			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+
+			flushSync(() => view.root.render(App, { show: false }));
+			expect(view.container.querySelector('article')).toBeNull();
 		} finally {
 			view.unmount();
 		}

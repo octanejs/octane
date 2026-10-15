@@ -16474,8 +16474,15 @@ export function CompiledContext<T>(
 	provideContext(scope, props.context, props.value);
 	const children = props.children;
 	if (children == null) {
-		// Children it rendered before still occupy the scope; the reset also clears the dialect.
-		if (scope.hooks?.get(CHILDREN_DIALECT_SLOT) !== undefined) resetScopeChildren(scope);
+		// Children it rendered before still occupy the scope. Record the empty dialect, as the
+		// descriptor Provider does: a rolled-back transition can restore their DOM, which the
+		// next body must then clear rather than mount beside.
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== undefined && previous !== 2) {
+			resetScopeChildren(scope);
+			if (scope.block.disposed) return;
+			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, 2);
+		}
 		return;
 	}
 	if (!isChildrenBlock(children)) {
@@ -16484,7 +16491,10 @@ export function CompiledContext<T>(
 	const dialect = (children as any)[CHILDREN_BODY] ?? children;
 	const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 	if (previous !== dialect) {
-		if (previous !== undefined) {
+		if (previous === 2) {
+			resetScopeChildren(scope);
+			if (scope.block.disposed) return;
+		} else if (previous !== undefined) {
 			invalidateSharedBodyOutput(scope);
 			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 				const hooks = scope.hooks!;
