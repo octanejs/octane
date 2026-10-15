@@ -2350,10 +2350,11 @@ export function ssrTextPre(v: unknown): string {
 // `keyScoped` says the caller's `child-key` membrane already encodes `d.key`.
 /** The props a component descriptor renders its component with, its children among them. */
 function descriptorProps(d: ElementDescriptor): any {
+	// A scoped descriptor's children getter resolves deferred children; reading
+	// it here would run them in the parent's scope, before the component enters.
+	if (SCOPED_ELEMENT_PROPS.has(d.props)) return d.props;
 	const children = d.children;
-	return SCOPED_ELEMENT_PROPS.has(d.props) || children == null || children === d.props?.children
-		? d.props
-		: { ...d.props, children };
+	return children == null || children === d.props?.children ? d.props : { ...d.props, children };
 }
 
 function ssrComponentDescriptor(
