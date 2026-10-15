@@ -171,7 +171,7 @@ export const WRITERS = new Map(
 		restoreFocusSelection: 'native',
 		restoreFocusedMovements: 'native',
 		vtFinalizeGroup: 'native',
-		promoteHmrBlockRange: 'native',
+		clearHmrRange: 'fresh',
 		'FragmentInstance.blur': 'native',
 		'FragmentInstance.dispatchEvent': 'native',
 		'FragmentInstance.scrollIntoView': 'native',

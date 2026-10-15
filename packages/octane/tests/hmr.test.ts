@@ -488,6 +488,59 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
+	it.each([
+		[
+			'a template with several roots',
+			'<><p id="lede">{TEXT}</p><output>{count as string}</output></>',
+		],
+		['a single root', '<p id="lede">{TEXT}<output>{count as string}</output></p>'],
+	])('keeps the outgoing output until the re-render commits (%s)', async (_name, template) => {
+		const source = (text: string) => `
+				import { useState } from 'octane';
+				export function App(props) @{
+					const [count, setCount] = useState(0);
+					props.expose(setCount);
+					props.probe();
+					${template.replace('{TEXT}', `{'${text}'}`)}
+				}
+			`;
+		const initial = await compileHmrComponent(source('before'));
+		const updated = await compileHmrComponent(source('after'));
+		let setCount!: (value: number) => void;
+		let armed = false;
+		const during: { records: MutationRecord[]; text: string }[] = [];
+		const observer = new MutationObserver(() => {});
+		let container!: HTMLElement;
+		const probe = () => {
+			if (armed) during.push({ records: observer.takeRecords(), text: container.textContent! });
+		};
+		const r = mount(initial, { expose: (setter: typeof setCount) => (setCount = setter), probe });
+		container = r.container;
+		try {
+			flushSync(() => setCount(7));
+			const output = r.find('output');
+			observer.observe(container, {
+				subtree: true,
+				childList: true,
+				characterData: true,
+				attributes: true,
+			});
+			armed = true;
+			flushSync(() => {
+				expect((initial as any)[HMR].update(updated)).toBe(true);
+			});
+			// Its re-render rendered over the outgoing output and wrote none of it.
+			expect(during).toEqual([{ records: [], text: 'before7' }]);
+			expect(container.textContent).toBe('after7');
+			expect(r.find('output')).not.toBe(output);
+			flushSync(() => setCount(8));
+			expect(r.find('output').textContent).toBe('8');
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
 	it('replaces compiled static output while preserving hook state', async () => {
 		const initial = await compileHmrComponent(`
 			import { useState } from 'octane';

@@ -16171,17 +16171,42 @@ function hasResettableHmrRange(block: Block): boolean {
 	return start.parentNode === block.parentNode;
 }
 
-function promoteHmrBlockRange(block: Block): void {
-	const root = block.startMarker;
-	if (root === null || root !== block.endMarker) return;
+/** Hot blocks whose outgoing output their re-render's commit removes (clearHmrRange). */
+const HMR_CLEARS = new WeakSet<Block>();
+
+/**
+ * Remove a hot block's outgoing output as its re-render starts: at that
+ * render's commit, before the incoming output lands, so the edited component
+ * keeps showing until then. An exclusively owned self-marked root gets a
+ * private range around it, which the incoming output fills.
+ */
+function clearHmrRange(block: Block): void {
 	const parent = block.parentNode;
-	const rangeStart = document.createComment('hmr');
-	const rangeEnd = document.createComment('/hmr');
-	parent.insertBefore(rangeStart, root);
-	parent.insertBefore(rangeEnd, getNextSibling(root));
-	block.startMarker = rangeStart;
-	block.endMarker = rangeEnd;
-	block.exclusiveMarkers = false;
+	const start = block.startMarker;
+	const staged = ROOT_RENDER_TRANSACTION !== null && pendingWrites(block) !== null;
+	if (start !== null && start === block.endMarker) {
+		const rangeStart = document.createComment('hmr');
+		const rangeEnd = document.createComment('/hmr');
+		if (staged) {
+			placeAtCommit(parent, rangeStart, start);
+			placeAtCommit(parent, rangeEnd, getNextSibling(start));
+			queueRootDeletion(null, start, start);
+		} else {
+			parent.insertBefore(rangeStart, start);
+			parent.replaceChild(rangeEnd, start);
+		}
+		journalRootProperty(block, 'startMarker', start);
+		journalRootProperty(block, 'endMarker', start);
+		block.startMarker = rangeStart;
+		block.endMarker = rangeEnd;
+		block.exclusiveMarkers = false;
+		return;
+	}
+	const end = block.endMarker;
+	const first = start !== null ? getNextSibling(start) : getFirstChild(parent);
+	if (!staged) removeRange(first, end);
+	else if (first !== end)
+		queueRootDeletion(null, first, end === null ? parent.lastChild : end.previousSibling);
 }
 
 /**
@@ -16232,13 +16257,8 @@ function resetHmrBlock(block: Block): void {
 				}
 			}
 
-			unmountScopeChildrenAndSlotsOnly(block, true);
-			removeRange(
-				block.startMarker !== null
-					? getNextSibling(block.startMarker)
-					: getFirstChild(block.parentNode),
-				block.endMarker,
-			);
+			// The outgoing DOM stays until the re-render's commit (clearHmrRange).
+			unmountScopeChildrenAndSlotsOnly(block, false);
 
 			block.children = null;
 			block.cleanups = preserved;
@@ -39977,8 +39997,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// Rebuild every live block's compiler-owned output, then schedule the new
 			// body. The Block + hook map persist (stable Symbol.for-based keys), while
 			// template/binding/component slots start from their mount path so arbitrary
-			// source edits cannot read the previous compilation's layout. An exclusively
-			// owned self-marked root is promoted to a private range during the reset.
+			// source edits cannot read the previous compilation's layout. The outgoing
+			// output stays on screen until the re-render's commit (clearHmrRange).
 			const it = meta.liveBlocks.values();
 			for (let r = it.next(); !r.done; r = it.next()) {
 				const b = r.value;
@@ -39989,8 +40009,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 				b.body = wrapper as unknown as ComponentBody<any>;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(b, 'hmr');
-				promoteHmrBlockRange(b);
 				resetHmrBlock(b);
+				HMR_CLEARS.add(b);
 				scheduleRender(b);
 			}
 			return true;
@@ -40002,6 +40022,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		// update() if disposed.
 		if (scope === CURRENT_SCOPE && scope !== null) {
 			meta.liveBlocks.add(scope.block);
+			if (HMR_CLEARS.delete(scope.block)) clearHmrRange(scope.block);
 			// Propagate the wrapped body's return — a return-based (folded) component
 			// hands back a renderable descriptor that renderBlock must still mount.
 			return meta.fn(props as any, scope, extra);
