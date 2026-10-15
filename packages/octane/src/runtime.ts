@@ -15646,26 +15646,31 @@ export function createCompiledContext<T>(defaultValue: T): Context<T> {
 }
 
 /**
- * Clear a Provider scope whose children went away. Over committed DOM the
- * outgoing children leave at commit, after their cleanups, as a dialect flip's do.
+ * Clear a Provider scope before new children render into it. Over committed DOM
+ * the outgoing children leave at commit, after their cleanups, and the incoming
+ * ones build in a frontier that lands before the Provider's end, as a dialect
+ * flip's do. Returns the end to restore once the body has rendered.
  */
-function resetProviderChildren(scope: Scope): void {
+function resetProviderChildren(scope: Scope): Node | null | undefined {
 	const block = scope.block;
 	const parent = block.parentNode;
 	const live = ROOT_RENDER_TRANSACTION !== null && usesFrontier(block, parent);
 	resetScopeChildren(scope, !live);
-	if (!live || block.disposed) return;
+	if (!live || block.disposed) return undefined;
 	const end = block.endMarker;
 	const first =
 		block.startMarker !== null ? getNextSibling(block.startMarker) : getFirstChild(parent);
 	if (first !== end)
 		queueRootDeletion(null, first, end === null ? parent.lastChild : end.previousSibling);
+	return openScopeFrontier(scope, block, parent);
 }
 
 /** A Provider whose children went away clears them once its render commits. */
 function clearEmptiedProvider(scope: Scope): void {
-	if (!scope.block.disposed && scope.hooks?.get(CHILDREN_DIALECT_SLOT) === 2)
-		resetScopeChildren(scope);
+	if (scope.block.disposed || scope.hooks?.get(CHILDREN_DIALECT_SLOT) !== 2) return;
+	resetScopeChildren(scope);
+	// The reset drops the hooks map; the scope still renders the empty dialect.
+	ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, 2);
 }
 
 /** Record a Provider's children dialect; a dropped window restores the previous one. */
@@ -15701,14 +15706,20 @@ export function CompiledContext<T>(
 	}
 	const dialect = (children as any)[CHILDREN_BODY] ?? children;
 	const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+	let liveEnd: Node | null | undefined;
 	if (previous !== dialect) {
 		if (previous === 2) {
-			resetProviderChildren(scope);
+			liveEnd = resetProviderChildren(scope);
 			if (scope.block.disposed) return;
 		} else if (previous !== undefined) invalidateSharedBodyOutput(scope);
 		setChildrenDialect(scope, previous, dialect);
 	}
-	const output = renderSharedBody(children as ComponentBody, undefined, scope, undefined);
+	let output: unknown;
+	try {
+		output = renderSharedBody(children as ComponentBody, undefined, scope, undefined);
+	} finally {
+		if (liveEnd !== undefined) scope.block.endMarker = liveEnd;
+	}
 	if (output != null) throw new TypeError(formatClientError(345));
 }
 

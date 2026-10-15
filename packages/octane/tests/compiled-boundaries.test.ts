@@ -149,6 +149,27 @@ describe('checked compiled boundaries', () => {
 		}
 	});
 
+	it('refills an emptied compiled provider in a transition without writing during render', async () => {
+		const events: string[] = [];
+		const log = (value: string) => events.push(value);
+		const view = mount(client.GatedShell, { show: true, log });
+		try {
+			await act(async () => {
+				startTransition(() => view.root.render(client.GatedShell, { show: false, log }));
+			});
+			expect(view.container.querySelector('article')).toBeNull();
+			await act(async () => {
+				startTransition(() => view.root.render(client.GatedShell, { show: true, log }));
+			});
+			expect(view.container.querySelectorAll('article')).toHaveLength(1);
+			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+			expect(view.container.querySelector('footer')!.textContent).toBe('tail');
+			expect(events).toEqual(['mount', 'cleanup', 'mount']);
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('keeps one copy of compiled provider children when a transition emptying it is abandoned', async () => {
 		const events: string[] = [];
 		const log = (value: string) => events.push(value);
