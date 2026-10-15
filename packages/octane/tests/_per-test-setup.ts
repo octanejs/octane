@@ -1,5 +1,6 @@
 import { afterEach } from 'vitest';
 import { drainPassiveEffects } from '../src/index.js';
+import './_render-write-guard.js';
 
 // Per-test isolation for DEFERRED passive work. Unmount passive destroys run
 // in the passive flush, not synchronously (React parity — see unmountScope) —

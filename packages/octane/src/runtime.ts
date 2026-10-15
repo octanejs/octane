@@ -11069,6 +11069,20 @@ function flushPassivePostPaint(): void {
 }
 
 /**
+ * Test-only probe for the strict render-write check (tests/_render-write-guard.ts):
+ * whether a DOM write now happens during a render (#2043), by the innermost
+ * root's phase. A root render frame is open, or a Block is rendering, and no
+ * commit is applying its writes. Unused by applications, so bundlers drop it.
+ */
+export function renderWritesForbidden(): boolean {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	return (
+		COMMITTING_OWNER === null &&
+		(CURRENT_BLOCK !== null || (transaction !== null && transaction.rendering > 0))
+	);
+}
+
+/**
  * Test/test-environment helper — synchronously drain any queued passive
  * (`useEffect`) bodies that would normally fire after paint. Idempotent.
  * While a queued commit settles an exhausted update budget, the bodies stay
