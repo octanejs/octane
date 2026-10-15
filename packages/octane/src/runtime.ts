@@ -2271,7 +2271,7 @@ function componentSourceLoc(body: unknown): string | undefined {
 // client's does not match the client render (HydrationMismatch), while the
 // server's attributes, class, style and raw HTML are kept, never patched: their
 // writers return while hydration adopts their element (HydrationCapability's
-// keepsAttribute, keepsClass, keepsStyle and adoptHTML). Development lists what
+// adopts and adoptHTML). Development lists what
 // differs in one warning per hydration pass (hydration/dev-values.ts), and
 // production compares nothing.
 // `suppressHydrationWarning` on the owning element (React's
@@ -20517,12 +20517,6 @@ class HydrationCapability {
 	 */
 	replayDepth = -1;
 	seedCursor = 0;
-	/**
-	 * What a hydrating update built on the client where its slot had already
-	 * rendered: blocks (renderUpdate), and child slots whose list it built.
-	 * Allocated by the first such update.
-	 */
-	private updates: WeakSet<Block | ChildSlot> | null = null;
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
@@ -20629,11 +20623,8 @@ class HydrationCapability {
 	 * block, and not from a block that a hydrating update built (renderUpdate).
 	 */
 	owns(block: Block): boolean {
-		const updates = this.updates;
-		for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		for (let current: Block | null = block; current !== null; current = current.parentBlock)
 			if (current === this.rootBlock) return true;
-			if (updates !== null && updates.has(current)) return false;
-		}
 		return false;
 	}
 
@@ -20653,21 +20644,12 @@ class HydrationCapability {
 
 	/**
 	 * Render `block`, which an update created in place of content its slot had
-	 * already rendered, as a suspended deferred boundary's retry does after its
-	 * captures changed. The server never rendered it, and the cursor belongs to
+	 * already rendered. The server never rendered it, and the cursor belongs to
 	 * other slots' server nodes, so it builds on the client without moving the
-	 * cursor. So does every later render of it or its descendants under this
-	 * hydration (owns), including a retry that resumes a block that suspended
-	 * inside it. A method, so that the callback stays out of callers' frames.
+	 * cursor. A method, so that the callback stays out of callers' frames.
 	 */
 	renderUpdate(block: Block): void {
-		this.recordUpdate(block);
 		this.suspend(() => renderBlock(block));
-	}
-
-	/** Record that a hydrating update built `owner` on the client (see updates). */
-	recordUpdate(owner: Block | ChildSlot): void {
-		(this.updates ??= new WeakSet()).add(owner);
 	}
 
 	/**
@@ -21191,12 +21173,11 @@ class HydrationCapability {
 
 	/**
 	 * Whether a hydrating update of `slot`, whose list exists, builds that list
-	 * on the client: an earlier hydrating update built it (recordUpdate).
-	 * Otherwise the list adopts the server's items, and when it kept none, as
-	 * after a fill that threw, its first fill starts over from the first of them.
+	 * on the client. It adopts the server's items instead, and when it kept
+	 * none, as after a fill that threw, its first fill starts over from the
+	 * first of them.
 	 */
 	buildsList(slot: ChildSlot): boolean {
-		if (this.updates?.has(slot) === true) return true;
 		const list = slot.forSlot!;
 		if (list.size === 0 && !(this.passthroughRanges && slot.borrowed) && this.isOpen(list.start))
 			this.node = getNextSibling(list.start);
@@ -22118,60 +22099,14 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Whether `el` keeps its server value where a writer sets the client's: an
-	 * element hydration adopted keeps its attributes, class, style and raw HTML,
-	 * which React never patches. An element the client built takes the client's.
+	 * A writer sets the client's value on `el`, an element hydration adopted,
+	 * which keeps its server attributes, class, style and raw HTML, as React
+	 * never patches them; development lists a difference (hydration/dev-values.ts).
+	 * No element is where the compiled walk of an adopted template expected the
+	 * one a binding writes: the server rendered fewer nodes there than the client.
 	 */
-	private adopts(el: Element): boolean {
-		if (el === null) this.missingElement();
-		return true;
-	}
-
-	/**
-	 * Whether an adopted `el` keeps its server attribute `name` where the client
-	 * writes `next`. Production compares nothing; development lists a
-	 * difference (hydration/dev-values.ts).
-	 */
-	keepsAttribute(el: Element, name: string, next: string | null): boolean {
-		if (!this.adopts(el)) return false;
-		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(this, el, name, next);
-		return true;
-	}
-
-	/**
-	 * Whether an adopted `el` keeps its server class where a writer sets `next`
-	 * (`absentIsEmpty`: an absent class attribute reads as '').
-	 */
-	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
-		if (!this.adopts(el)) return false;
-		if (process.env.NODE_ENV !== 'production') unpatchedClass(this, el, next, absentIsEmpty);
-		return true;
-	}
-
-	/**
-	 * Whether an adopted `el` keeps its server style where a writer sets the
-	 * complete style `value`, or the fixed declarations `entries`, after the
-	 * static declarations `staticCss`.
-	 */
-	keepsStyle(
-		el: HTMLElement | SVGElement,
-		value: any,
-		staticCss?: string,
-		entries?: readonly unknown[],
-	): boolean {
-		if (!this.adopts(el)) return false;
-		if (process.env.NODE_ENV !== 'production')
-			unpatchedStyle(this, el, expectedStyle(el, value, staticCss, entries));
-		return true;
-	}
-
-	/**
-	 * A compiled walk of an adopted template found no server node where the
-	 * template has the element that a binding writes: the server rendered
-	 * fewer nodes there than the client.
-	 */
-	private missingElement(): never {
-		this.fail(undefined, () => 'an element', null);
+	adopts(el: Element | null): void {
+		if (el === null) this.fail(undefined, () => 'an element', null);
 	}
 
 	/**
@@ -26182,7 +26117,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
 	// An adopted element keeps its server attribute; development compares it with the final
 	// coerced value.
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	const ns = attrNamespace(name);
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) {
@@ -26298,7 +26237,11 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
 			? null
 			: String(value);
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26322,7 +26265,11 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 			next = null;
 		else next = sanitizeURL(next);
 	}
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26362,7 +26309,11 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 		}
 		next = typeof value === 'string' ? value : String(value);
 	}
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26382,7 +26333,11 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	}
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26405,7 +26360,11 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 		value == null || typeof value === 'function' || typeof value === 'symbol'
 			? null
 			: String(value);
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26604,7 +26563,11 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write). A string needs none.
 	const cls = typeof value === 'string' ? value : normalizeClass(value);
-	if (hydrating && CURSOR?.keepsClass(el, cls, true)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedClass(CURSOR, el, cls, true);
+		return;
+	}
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -26633,7 +26596,11 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 // existed).
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
-	if (hydrating && CURSOR?.keepsClass(el, cls, false)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedClass(CURSOR, el, cls, false);
+		return;
+	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
@@ -26670,7 +26637,11 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	const style = (el as HTMLElement).style;
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
-	if (hydrating && CURSOR?.keepsStyle(el, value)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedStyle(CURSOR, el, expectedStyle(el, value));
+		return;
+	}
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
@@ -26692,7 +26663,12 @@ export function setStyleProperty(
 	previous: any,
 	scope: Scope | null = CURRENT_SCOPE,
 ): void {
-	if (hydrating && CURSOR?.keepsStyle(el, { [name]: value }, staticCss)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production')
+			unpatchedStyle(CURSOR, el, expectedStyle(el, { [name]: value }, staticCss));
+		return;
+	}
 	const remove = value == null || typeof value === 'boolean';
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
@@ -26730,7 +26706,12 @@ export function setStyleProperties(
 	entries: readonly unknown[],
 	staticCss: string,
 ): void {
-	if (hydrating && CURSOR?.keepsStyle(el, null, staticCss, entries)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production')
+			unpatchedStyle(CURSOR, el, expectedStyle(el, null, staticCss, entries));
+		return;
+	}
 	const style = (el as HTMLElement).style;
 	let journaled = false;
 	for (let i = 0; i < entries.length; i += 2) {
@@ -26829,7 +26810,7 @@ function applyStyleProperty(
 
 /**
  * The style a writer renders, on a detached declaration block, for hydration
- * to compare with the server's it keeps (HydrationCapability.keepsStyle): the
+ * to compare with the server's it keeps (setStyle and its siblings): the
  * complete style `value`, or the fixed declarations `entries`, after the
  * static declarations `staticCss`.
  */
@@ -28178,7 +28159,11 @@ function setHeadAttribute(el: Element, name: string, value: unknown): void {
 			return setAttribute(el, name, value);
 	}
 	const next = coerceAttrValue(el, name, value);
-	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
+		return;
+	}
 	if (el.getAttribute(name) === next) return;
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -38360,7 +38345,6 @@ export function childSlot(
 		// A hydrating update builds a list that replaces other content, or one an
 		// earlier hydrating update built, on the client.
 		if (rebuild || (hydratingUpdate && (state.forSlot === null || hydration!.buildsList(state)))) {
-			if (hydratingUpdate) hydration!.recordUpdate(state);
 			// Mount each item rather than look for server items that are not there.
 			const slot = state;
 			hydration!.suspend(() =>
@@ -49007,9 +48991,6 @@ function mountItem<T>(
 				ssrMarkerless,
 			),
 		);
-		// Like a block renderUpdate builds, every later render of the row stays on
-		// the client, including a retry that resumes a block suspended inside it.
-		hydration.recordUpdate(block);
 		return block;
 	}
 	// Any other row of a committed list renders into a run fragment.
