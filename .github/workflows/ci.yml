@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, next]
   pull_request:
-    branches: [main, "jon/update-bindings-*"]
+    branches: [main, next, "jon/update-bindings-*"]
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
 
 concurrency:
