@@ -29,6 +29,7 @@ import {
 	CaughtEffectHost,
 	UncaughtEffectHost,
 	MountThrower,
+	RecordingMountThrower,
 	ClickCounter,
 	CleanupThrower,
 	CleanupHost,
@@ -773,6 +774,34 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		});
 		expect(container.textContent).toBe('n:1');
 		root.unmount();
+	});
+
+	// The client render that replaces a failed hydration writes nothing while it
+	// renders, and the server DOM leaves only once that render has closed: a root
+	// that onUncaughtError renders commits at once.
+	it('discards the server DOM after a failed fallback render closes', () => {
+		container.innerHTML = '<!--3--><main>server</main>';
+		const observer = new MutationObserver(() => {});
+		observer.observe(container, { subtree: true, childList: true, characterData: true });
+		const seen: number[] = [];
+		const record = () => seen.push(observer.takeRecords().length);
+		const other = document.createElement('div');
+		document.body.append(other);
+		const otherRoot = createRoot(other);
+		let rendered: string | null = null;
+		const onUncaughtError = vi.fn(() => {
+			otherRoot.render(ClickCounter, {});
+			rendered = other.textContent;
+		});
+		const root = hydrateRoot(container, RecordingMountThrower, { record }, { onUncaughtError });
+		observer.disconnect();
+		expect(seen).toEqual([0]);
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect(rendered).toBe('n:0');
+		expect(container.innerHTML).toBe('');
+		root.unmount();
+		otherRoot.unmount();
+		other.remove();
 	});
 
 	it('a consumed sync-mount error keeps event delegation on the recovered root', async () => {
