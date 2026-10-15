@@ -21,7 +21,6 @@ import type { ResourceBinding } from './requests.js';
 interface GraphBridge {
 	ScopedNode: typeof import('./graph.js').ScopedNode;
 	graph: SignalGraph;
-	flags: { Dirty: number; Pending: number; Mutable: number; Watching: number };
 	historical(): boolean;
 	assertAlive(owner: GraphOwner): void;
 	link(from: ScopedNode, to: ScopedNode | SignalObserver): void;
