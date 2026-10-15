@@ -40720,6 +40720,31 @@ function clearPassthroughTry(state: TrySlot): void {
 	state.tryBlock = null;
 }
 
+/**
+ * A passthrough boundary's new arm, which renders into the boundary's parent
+ * without markers of its own. Under a committed parent, or as the fallback that
+ * replaces server content (`fresh`), it builds off-document, and its commit
+ * appends it as the arm it replaces leaves.
+ */
+function passthroughArm(state: TrySlot, body: ComponentBody, props: any, fresh = false): Block {
+	const block = createBlock(
+		'control-flow',
+		state.parentBlock,
+		state.domParent,
+		null,
+		null,
+		body,
+		props,
+		state.env,
+	);
+	if (fresh ? ROOT_RENDER_TRANSACTION !== null : usesFrontier(state.parentBlock, state.domParent)) {
+		const frag = queueFrontier(block, state.domParent, null);
+		block.parentNode = frag;
+		noteFrontierMember(frag, block);
+	}
+	return (state.block = block);
+}
+
 function mountPassthroughCatch(
 	state: TrySlot,
 	error: unknown,
@@ -40732,29 +40757,18 @@ function mountPassthroughCatch(
 	setTryBranch(state, 0);
 	state.err = error;
 	if (state.catchBody === null) throw error;
-	const block = createBlock(
-		'control-flow',
-		state.parentBlock,
-		state.domParent,
-		null,
-		null,
+	// A fallback for server content lands after that content has left
+	// (removeOwnedContent).
+	const hydration = freshFallback && hydrating ? activeHydration() : null;
+	const block = passthroughArm(
+		state,
 		state.catchBody,
 		{ err: error, reset: state.reset },
-		state.env,
+		hydration !== null,
 	);
-	state.block = block;
 	try {
-		const hydration = hydrating ? activeHydration() : null;
-		if (freshFallback && hydration !== null) {
-			// The fallback builds off-document and lands at commit, after the server
-			// content it replaces has left (removeOwnedContent).
-			if (ROOT_RENDER_TRANSACTION !== null) {
-				const frag = queueFrontier(block, state.domParent, null);
-				block.parentNode = frag;
-				noteFrontierMember(frag, block);
-			}
-			hydration.suspend(() => renderBlock(block));
-		} else renderBlock(block);
+		if (hydration !== null) hydration.suspend(() => renderBlock(block));
+		else renderBlock(block);
 	} finally {
 		if (reportInline && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
 	}
@@ -40764,20 +40778,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 	clearPassthroughTry(state);
 	setTryBranch(state, 2);
 	state.pendingThenable = thenable;
-	if (state.pendingBody !== null) {
-		const block = createBlock(
-			'control-flow',
-			state.parentBlock,
-			state.domParent,
-			null,
-			null,
-			state.pendingBody,
-			undefined,
-			state.env,
-		);
-		state.block = block;
-		renderBlock(block);
-	}
+	if (state.pendingBody !== null) renderBlock(passthroughArm(state, state.pendingBody, undefined));
 	const retry = () => {
 		if (state.pendingThenable !== thenable || state.parentBlock.disposed) return;
 		state.pendingThenable = null;
@@ -40806,18 +40807,7 @@ function renderPassthroughTry(state: TrySlot): void {
 	let block = state.tryBlock;
 	if (block === null || block.disposed) {
 		if (state.block !== null) unmountBlock(state.block);
-		block = createBlock(
-			'control-flow',
-			state.parentBlock,
-			state.domParent,
-			null,
-			null,
-			state.tryBody,
-			undefined,
-			state.env,
-		);
-		state.tryBlock = block;
-		state.block = block;
+		block = state.tryBlock = passthroughArm(state, state.tryBody, undefined);
 		setTryBranch(state, 1);
 		const rare = blockRare(block);
 		rare.tryHandler = (error: unknown) => {
