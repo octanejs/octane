@@ -2348,39 +2348,24 @@ export function ssrTextPre(v: unknown): string {
 // already mirrors positional children into props, so only legacy descriptors
 // with a distinct non-null children field need a repaired props object.
 // `keyScoped` says the caller's `child-key` membrane already encodes `d.key`.
+/** The props a component descriptor renders its component with, its children among them. */
+function descriptorProps(d: ElementDescriptor): any {
+	const children = d.children;
+	return SCOPED_ELEMENT_PROPS.has(d.props) || children == null || children === d.props?.children
+		? d.props
+		: { ...d.props, children };
+}
+
 function ssrComponentDescriptor(
 	d: ElementDescriptor,
 	scope: SSRScope,
 	keyScoped?: 'key',
 	inherit?: 2,
 ): string {
-	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
-		return ssrComponent(
-			scope,
-			d.type as ServerComponent,
-			d.props,
-			inherit,
-			d.key ?? undefined,
-			keyScoped,
-			d.__octaneInvocationSite,
-		);
-	}
-	const children = d.children;
-	if (children == null || children === d.props?.children) {
-		return ssrComponent(
-			scope,
-			d.type as ServerComponent,
-			d.props,
-			inherit,
-			d.key ?? undefined,
-			keyScoped,
-			d.__octaneInvocationSite,
-		);
-	}
 	return ssrComponent(
 		scope,
 		d.type as ServerComponent,
-		{ ...d.props, children },
+		descriptorProps(d),
 		inherit,
 		d.key ?? undefined,
 		keyScoped,
@@ -8666,6 +8651,25 @@ function renderEntryValue(props: { value: ServerRenderNode }, scope: SSRScope): 
 	return ssrHtml(ssrChild(props.value, scope));
 }
 
+/**
+ * The root component a render entry renders, with its props and options. An
+ * element entry whose type is a component renders as that component's root,
+ * as hydrateRoot renders it: `renderToString(<App {...props} />)` renders as
+ * `renderToString(App, props)`, so both frame the root alike. Any other value
+ * renders as what a root returns (renderEntryValue), and its second argument
+ * is the options.
+ */
+function renderEntry<O>(
+	entry: ServerRenderNode,
+	props: any,
+	options: O | undefined,
+): [ServerComponent, any, O | undefined] {
+	if (typeof entry === 'function') return [entry as ServerComponent, props, options];
+	return isElementDescriptor(entry) && typeof entry.type === 'function'
+		? [entry.type as ServerComponent, descriptorProps(entry), options ?? props]
+		: [renderEntryValue, { value: entry }, options ?? props];
+}
+
 /** Guard against a `use(thenable)` that never resolves wedging the render loop. */
 const MAX_SUSPENSE_PASSES = 50;
 
@@ -10087,12 +10091,8 @@ export async function prerender(
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
-	const component =
-		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
-	if (typeof entryComponent !== 'function') {
-		options ??= props;
-		props = { value: entryComponent };
-	}
+	let component: ServerComponent;
+	[component, props, options] = renderEntry(entryComponent, props, options);
 	const preparedOptions = needsAutomaticSignalInjection(options)
 		? await prepareAutomaticSignalInjection(options as StreamOptions)
 		: options;
@@ -10342,12 +10342,8 @@ export function renderToString(
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
-	const component =
-		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
-	if (typeof entryComponent !== 'function') {
-		options ??= props;
-		props = { value: entryComponent };
-	}
+	let component: ServerComponent;
+	[component, props, options] = renderEntry(entryComponent, props, options);
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap(options ?? null);
@@ -10382,12 +10378,8 @@ export function renderToStaticMarkup(
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
-	const component =
-		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
-	if (typeof entryComponent !== 'function') {
-		options ??= props;
-		props = { value: entryComponent };
-	}
+	let component: ServerComponent;
+	[component, props, options] = renderEntry(entryComponent, props, options);
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap(options ?? null);
@@ -12540,12 +12532,8 @@ export function renderToPipeableStream(
 	pipe: <T extends { write(chunk: string): unknown; end(): unknown }>(destination: T) => T;
 	abort: (reason?: unknown) => void;
 } {
-	const component =
-		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
-	if (typeof entryComponent !== 'function') {
-		options ??= props;
-		props = { value: entryComponent };
-	}
+	let component: ServerComponent;
+	[component, props, options] = renderEntry(entryComponent, props, options);
 	interface Destination {
 		write(chunk: string): unknown;
 		end(): unknown;
@@ -12856,12 +12844,8 @@ export function renderToReadableStream(
 	props?: any,
 	options?: StreamOptions,
 ): Promise<ReadableStream<Uint8Array> & { allReady: Promise<void> }> {
-	const component =
-		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
-	if (typeof entryComponent !== 'function') {
-		options ??= props;
-		props = { value: entryComponent };
-	}
+	let component: ServerComponent;
+	[component, props, options] = renderEntry(entryComponent, props, options);
 	if (needsAutomaticSignalInjection(options)) {
 		return prepareAutomaticSignalInjection(options!).then((prepared) =>
 			renderToReadableStream(component, props, prepared),
