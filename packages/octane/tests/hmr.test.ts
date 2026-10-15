@@ -1,14 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'octane/server';
 import {
+	bagOf,
+	clone,
 	hmr,
 	HMR,
+	template,
 	useState,
 	flushSync,
 	hydrateRoot,
 	type ComponentBody,
 	type Scope,
 } from '../src/index.js';
+import { setRenderText } from '../src/runtime.js';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 
@@ -19,26 +23,26 @@ import { loadCompiledFixtureSource } from './_server-fixture';
  * cases run the emitted handoff and the bundler's current accept callback.
  *
  * The component bodies here use the same `(props, scope, extra)` signature
- * the octane compiler emits. They follow the standard
- * "clear-range-then-insert" pattern that compiled bodies use on re-render.
+ * the octane compiler emits, in its staged form: a render writes no committed
+ * DOM, so the bag factory places the root at commit and an update stages its
+ * text (setRenderText). update() resets each live block's slots, so the next
+ * body mounts from its own template.
  */
 
-function clearBlockRange(scope: Scope): void {
-	const block = scope.block;
-	// Root blocks have null markers and own the whole parentNode; non-root
-	// blocks own just the inclusive range between markers.
-	if (!block.startMarker || !block.endMarker) {
-		while (block.parentNode.firstChild) {
-			block.parentNode.removeChild(block.parentNode.firstChild);
+function leafBody(html: string, text: (scope: Scope) => string): ComponentBody<any> {
+	const source = template(html);
+	return ((_props: any, scope: Scope) => {
+		const value = text(scope);
+		let bag = scope.slots[0];
+		if (bag === undefined) {
+			const root = clone(source);
+			bag = bagOf(scope, root, { text: root.firstChild, value: undefined });
 		}
-		return;
-	}
-	let n: Node | null = block.startMarker.nextSibling;
-	while (n && n !== block.endMarker) {
-		const next: Node | null = n.nextSibling;
-		block.parentNode.removeChild(n);
-		n = next;
-	}
+		if (bag.value !== value) {
+			setRenderText(bag.text, value);
+			bag.value = value;
+		}
+	}) as ComponentBody<any>;
 }
 
 interface TestHotContext {
@@ -394,13 +398,7 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('renders the initial component body', () => {
-		const Foo = hmr(((_props: any, scope: Scope, _extra: any) => {
-			clearBlockRange(scope);
-			const root = document.createElement('span');
-			root.className = 'leaf';
-			root.textContent = 'initial';
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
-		}) as ComponentBody<any>);
+		const Foo = hmr(leafBody('<span class="leaf"> </span>', () => 'initial'));
 		const r = mount(Foo);
 		expect(r.find('.leaf').textContent).toBe('initial');
 		r.unmount();
@@ -470,20 +468,8 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('update() swaps the body of live blocks + re-renders', () => {
-		const v1: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
-			clearBlockRange(scope);
-			const root = document.createElement('span');
-			root.className = 'leaf v1';
-			root.textContent = 'A';
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
-		}) as ComponentBody<any>;
-		const v2: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
-			clearBlockRange(scope);
-			const root = document.createElement('span');
-			root.className = 'leaf v2';
-			root.textContent = 'B';
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
-		}) as ComponentBody<any>;
+		const v1 = leafBody('<span class="leaf v1"> </span>', () => 'A');
+		const v2 = leafBody('<span class="leaf v2"> </span>', () => 'B');
 
 		const Foo = hmr(v1);
 		const r = mount(Foo);
@@ -500,6 +486,59 @@ describe('hmr — runtime wrapper', () => {
 		expect(r.find('.leaf').classList.contains('v2')).toBe(true);
 
 		r.unmount();
+	});
+
+	it.each([
+		[
+			'a template with several roots',
+			'<><p id="lede">{TEXT}</p><output>{count as string}</output></>',
+		],
+		['a single root', '<p id="lede">{TEXT}<output>{count as string}</output></p>'],
+	])('keeps the outgoing output until the re-render commits (%s)', async (_name, template) => {
+		const source = (text: string) => `
+				import { useState } from 'octane';
+				export function App(props) @{
+					const [count, setCount] = useState(0);
+					props.expose(setCount);
+					props.probe();
+					${template.replace('{TEXT}', `{'${text}'}`)}
+				}
+			`;
+		const initial = await compileHmrComponent(source('before'));
+		const updated = await compileHmrComponent(source('after'));
+		let setCount!: (value: number) => void;
+		let armed = false;
+		const during: { records: MutationRecord[]; text: string }[] = [];
+		const observer = new MutationObserver(() => {});
+		let container!: HTMLElement;
+		const probe = () => {
+			if (armed) during.push({ records: observer.takeRecords(), text: container.textContent! });
+		};
+		const r = mount(initial, { expose: (setter: typeof setCount) => (setCount = setter), probe });
+		container = r.container;
+		try {
+			flushSync(() => setCount(7));
+			const output = r.find('output');
+			observer.observe(container, {
+				subtree: true,
+				childList: true,
+				characterData: true,
+				attributes: true,
+			});
+			armed = true;
+			flushSync(() => {
+				expect((initial as any)[HMR].update(updated)).toBe(true);
+			});
+			// Its re-render rendered over the outgoing output and wrote none of it.
+			expect(during).toEqual([{ records: [], text: 'before7' }]);
+			expect(container.textContent).toBe('after7');
+			expect(r.find('output')).not.toBe(output);
+			flushSync(() => setCount(8));
+			expect(r.find('output').textContent).toBe('8');
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
 	});
 
 	it('replaces compiled static output while preserving hook state', async () => {
@@ -544,7 +583,7 @@ describe('hmr — runtime wrapper', () => {
 			}
 		`);
 		const container = document.createElement('div');
-		container.innerHTML = '<main><p id="lede">before</p></main>';
+		container.innerHTML = '<!--3--><main><p id="lede">before</p></main>';
 		document.body.appendChild(container);
 		const adopted = container.firstElementChild;
 		const root = hydrateRoot(container, initial);
@@ -1122,20 +1161,8 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('rejects an update whose compiled output ABI is incompatible', () => {
-		const v1: ComponentBody<any> = ((_props: any, scope: Scope) => {
-			clearBlockRange(scope);
-			const root = document.createElement('span');
-			root.className = 'leaf';
-			root.textContent = 'committed';
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
-		}) as ComponentBody<any>;
-		const v2: ComponentBody<any> = ((_props: any, scope: Scope) => {
-			clearBlockRange(scope);
-			const root = document.createElement('span');
-			root.className = 'leaf';
-			root.textContent = 'incompatible';
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
-		}) as ComponentBody<any>;
+		const v1 = leafBody('<span class="leaf"> </span>', () => 'committed');
+		const v2 = leafBody('<span class="leaf"> </span>', () => 'incompatible');
 		(v2 as any).__octaneReturnedOutput = true;
 
 		const Foo = hmr(v1);
@@ -1154,23 +1181,26 @@ describe('hmr — runtime wrapper', () => {
 		// Both bodies use the SAME hook symbol (simulating the compiler's
 		// `Symbol.for('octane:file.tsrx:Foo.useState#0')`-stable emit).
 		const HOOK_SYM = Symbol.for('octane:hmr.test.ts:Counter.useState#0');
-		const v1: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
+		const v1 = leafBody('<span class="leaf"> </span>', () => {
 			const [n] = useState(0, HOOK_SYM as any);
-			clearBlockRange(scope);
-			const root = document.createElement('span');
-			root.className = 'leaf';
-			root.textContent = 'v1:' + n;
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
-		}) as ComponentBody<any>;
-		const v2: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
+			return 'v1:' + n;
+		});
+		const bump = template('<button class="leaf" id="bump"> </button>');
+		const v2: ComponentBody<any> = ((_props: any, scope: Scope) => {
 			const [n, setN] = useState(0, HOOK_SYM as any);
-			clearBlockRange(scope);
-			const root = document.createElement('button');
-			root.className = 'leaf';
-			root.id = 'bump';
-			root.textContent = 'v2:' + n;
-			root.onclick = () => setN((c: number) => c + 1);
-			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
+			let bag = scope.slots[0];
+			if (bag === undefined) {
+				const root = clone(bump) as HTMLButtonElement;
+				// The click reads the latest setter from the bag.
+				root.onclick = () => bag.setN((c: number) => c + 1);
+				bag = bagOf(scope, root, { text: root.firstChild, value: undefined, setN });
+			}
+			bag.setN = setN;
+			const value = 'v2:' + n;
+			if (bag.value !== value) {
+				setRenderText(bag.text, value);
+				bag.value = value;
+			}
 		}) as ComponentBody<any>;
 
 		const Counter = hmr(v1);

@@ -195,7 +195,6 @@ const CLIENT_ONLY_MODULES = new Set([
 	'signals/native-read-events.ts',
 	'signals/native-read-inspection.ts',
 	'signals/native-read-retry.ts',
-	'signals/transition-candidate.ts',
 ]);
 const SERVER_ONLY_MODULES = new Set(['signals/native-read-server.ts', 'signals/server.ts']);
 

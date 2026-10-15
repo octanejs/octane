@@ -52,6 +52,11 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 			? new JSDOM(html, { runScripts: 'dangerously', url: 'https://fixture.test/' })
 			: undefined;
 		const doc = parsed?.window.document ?? new DOMParser().parseFromString(html, 'text/html');
+		// The document's output names the hydration protocol version before <html>.
+		// The app container moves into this document, so the version does too.
+		const mark = Array.from(doc.childNodes).find((node) => node.nodeType === Node.COMMENT_NODE)!;
+		expect((mark as Comment).data).toBe('3');
+		document.insertBefore(mark, document.documentElement);
 		if (transport) {
 			expect(html).toContain('data-tsr-stream-part');
 			expect(doc.querySelectorAll('script')).toHaveLength(0);
@@ -88,6 +93,7 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 		} finally {
 			root.unmount();
 			container.remove();
+			(mark as Comment).remove();
 			vi.unstubAllGlobals();
 			parsed?.window.close();
 		}

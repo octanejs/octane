@@ -48,7 +48,7 @@ function tail(site: string, actual: string) {
 		new RegExp(
 			'^' +
 				escape(
-					`Octane hydration mismatch at ${site}: the client expected the end of the branch ` +
+					`Octane hydration mismatch at ${site}: the client expected the end of its content ` +
 						`but the server rendered ${actual}.`,
 				),
 		),
@@ -202,9 +202,9 @@ describe.each([
 		},
 	);
 
-	// The client's last component renders what the server's `<s>` is, and the
-	// server's `<u>` after it is the tail.
-	it('client-renders the root for a server tail after a component’s matching node', async () => {
+	// The client's last component renders what the server's `<s>` is, but the
+	// server frames every component call, so that call finds no range of its own.
+	it('client-renders the root for a component the server rendered inline', async () => {
 		const serverNodes = render('UnframedComponent', { server: true });
 
 		const recoverable = await hydrate(client.UnframedComponent);
@@ -212,7 +212,19 @@ describe.each([
 		expect(markup(container.firstElementChild!)).toBe('<b>b</b><s>s</s>');
 		expectRootFellBack(serverNodes, recoverable);
 		expect(warnings()).toEqual(
-			dev ? [tail(siteOf('function UnframedComponent(', '@if'), '<u>')] : [],
+			dev
+				? [
+						expect.stringMatching(
+							new RegExp(
+								'^' +
+									escape(
+										`Octane hydration mismatch at ${siteOf('function UnframedComponent(', '<Strike')}: ` +
+											'the client expected a component range but the server rendered <s>.',
+									),
+							),
+						),
+					]
+				: [],
 		);
 	});
 });

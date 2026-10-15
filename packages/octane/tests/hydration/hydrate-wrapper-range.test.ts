@@ -169,8 +169,8 @@ describe('a Hydrate wrapper without its server range', () => {
 					? [
 							expect.stringMatching(
 								new RegExp(
-									`^Octane hydration mismatch at ${FILE}:\\d+:\\d+: the client expected a ` +
-										`Hydrate boundary range but the server rendered <p>`,
+									`^Octane hydration mismatch at ${FILE}:6:\\d+: the client expected a ` +
+										`component range but the server rendered <div>`,
 								),
 							),
 						]
@@ -178,4 +178,60 @@ describe('a Hydrate wrapper without its server range', () => {
 			);
 		},
 	);
+});
+
+// An island adopts its server range as a component adopts its frame: server
+// content the client renders nothing for, after the island's content in its
+// range or after the range in its wrapper, is a mismatch the island falls back
+// from, reporting it once, while the root's own content stays adopted.
+const ISLAND_SOURCE = `import { Hydrate } from 'octane';
+import { load } from 'octane/hydration';
+
+export function App() @{
+	<main>
+		<h1>{'title'}</h1>
+		<Hydrate split={false} when={load()}><p>{'island'}</p></Hydrate>
+	</main>
+}
+`;
+
+function extraSpan(): Element {
+	const span = document.createElement('span');
+	span.textContent = 'extra';
+	return span;
+}
+
+describe.each([
+	['inside its range', (wrapper: Element) => wrapper.lastChild!.before(extraSpan())],
+	['after its range', (wrapper: Element) => wrapper.append(extraSpan())],
+])('a Hydrate island with server content %s', (_where, addExtra) => {
+	it('falls back to its client content and reports once', async () => {
+		const options = { id: 'hydrate-island-extra.tsrx' };
+		const compiledServer = loadCompiledFixtureSource(ISLAND_SOURCE, {
+			...options,
+			mode: 'server',
+			compileOptions: { mode: 'server' },
+		});
+		const compiledClient = loadCompiledFixtureSource(ISLAND_SOURCE, { ...options, mode: 'client' });
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = Server.renderToString(compiledServer.App, {}).html;
+		const heading = container.querySelector('h1')!;
+		const serverParagraph = container.querySelector('p')!;
+		addExtra(serverParagraph.parentElement!);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const onRecoverableError = vi.fn();
+
+		const root = Client.hydrateRoot(container, compiledClient.App, {}, { onRecoverableError });
+		await Client.act(() => {});
+
+		expect(container.querySelector('main')!.textContent).toBe('titleisland');
+		expect(container.querySelector('span')).toBeNull();
+		expect(serverParagraph.isConnected).toBe(false);
+		expect(container.querySelector('h1')).toBe(heading);
+		expect(onRecoverableError).toHaveBeenCalledOnce();
+		root.unmount();
+		container.remove();
+		vi.restoreAllMocks();
+	});
 });

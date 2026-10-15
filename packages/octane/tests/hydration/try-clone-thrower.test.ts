@@ -7,10 +7,9 @@ import type { PageProps } from './_fixtures/try-clone-thrower.tsrx';
 
 // A hydrating try body that throws to its catch arm.
 //
-// Where the server's body threw the same way, the server rendered the catch
-// arm, and hydration adopts it: nothing differs, so nothing is reported. React
-// has no counterpart, because its server renderer never renders an error
-// boundary's fallback.
+// As in React, whose server renderer never renders an error boundary's
+// fallback, a server body that throws reaches the nearest Suspense boundary,
+// which the client renders afresh, or else fails the server render.
 //
 // Where the server rendered something else, the server HTML does not match, as
 // in React: the nearest fallback owner (a @try/@pending arm, or else the root;
@@ -139,46 +138,43 @@ function expectStructuralReport(recovered: unknown[]) {
 	expectMismatchDiagnostic();
 }
 
-describe('hydrateRoot — a try body throws to the catch arm the server also rendered', () => {
-	it.each<[string, PageName, Props, Props, string?]>([
-		['a template clone', 'Clone', { value: 'x' }, {}],
-		['a host with a class binding', 'Adopted', { value: 'x' }, {}],
-		['a template-less range', 'Plain', { value: 'x' }, {}],
-		['a template clone, in a compiled <ErrorBoundary>', 'Boundary', { value: 'x' }, {}],
+describe('hydrateRoot — a try body that threw on the server', () => {
+	it.each<[string, PageName, Props]>([
+		['a template clone', 'Clone', { value: 'x' }],
+		['a host with a class binding', 'Adopted', { value: 'x' }],
+		['a template-less range', 'Plain', { value: 'x' }],
+		['a template clone, in a compiled <ErrorBoundary>', 'Boundary', { value: 'x' }],
 		[
 			'a template clone, in an <ErrorBoundary> component',
 			'DynamicBoundary',
 			{ value: 'x', fallback: 'x' },
-			{ fallback: 'x' },
-			'<div><h1>before</h1>x<button>after</button></div>',
 		],
-		[
-			'a template clone, in an inner @try that catches it',
-			'Nested',
+		['a template clone, in an inner @try that catches it', 'Nested', { value: 'x' }],
+	])('%s fails the server render, which only catch arms surround', (_, name, props) => {
+		let thrown: unknown;
+		try {
+			ServerRT.renderToString(server[name], { ...props, onAfter: () => {} });
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toBe('x');
+	});
+
+	// The inner Suspense boundary ships its fallback, and its client render
+	// throws to the outer catch arm, as any client error does.
+	it('an outer clone renders the outer catch arm from the client render of its inner Suspense boundary', async () => {
+		const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
+			'Uncaught',
 			{ value: 'x' },
-			{ outer: undefined },
-			'<div><h1>before</h1><section><p class="inner">x</p><i>ok</i></section><button>after</button></div>',
-		],
-		['an outer clone, in the outer @try that catches it', 'Uncaught', { value: 'x' }, {}],
-	])(
-		'%s adopts it without a report',
-		async (_, name, serverProps, clientProps, expected = CATCH_ARM) => {
-			const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
-				name,
-				serverProps,
-				{
-					value: 'x',
-					...clientProps,
-				},
-			);
-			expect(visible()).toBe(expected);
-			expectAdoptedHosts(hosts, onAfter);
-			expect(caught).toEqual(['x']);
-			expect(recovered).toEqual([]);
-			expect(consoleError).not.toHaveBeenCalled();
-			root.unmount();
-		},
-	);
+			{ value: 'x' },
+		);
+		expect(visible()).toBe(CATCH_ARM);
+		expectAdoptedHosts(hosts, onAfter);
+		expect(caught).toEqual(['x']);
+		expect(recovered).toEqual([]);
+		expect(consoleError).not.toHaveBeenCalled();
+		root.unmount();
+	});
 });
 
 describe('hydrateRoot — a try body throws to its catch arm where the server rendered another arm', () => {

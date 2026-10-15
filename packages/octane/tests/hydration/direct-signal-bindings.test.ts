@@ -359,13 +359,15 @@ export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'retu
 							{ signalOwner: owner, onRecoverableError: (error) => recoverable.push(error) },
 						);
 					});
-					// The signal changed before hydration, so the client's text differs from
-					// the server's: as in React, the root renders on the client from the
-					// signal's current value, and its bindings are live.
-					expect(input.isConnected).toBe(false);
-					expect(recoverable).toHaveLength(1);
+					// The signal changed before hydration. As React hydrates a
+					// useSyncExternalStore value from getServerSnapshot, the root hydrates
+					// the server's value from its snapshot and takes the current one as an
+					// update: the focused input stays, and its bindings are live.
+					expect(container.querySelector('input')).toBe(input);
+					expect(document.activeElement).toBe(input);
+					expect(recoverable).toEqual([]);
 					expect(container.querySelector('p')!.textContent).toBe('entered before hydration');
-					expect(container.querySelector('input')!.value).toBe('entered before hydration');
+					expect(input.value).toBe('entered before hydration');
 				} else {
 					root = createRoot(container);
 					root.render(client.App, { value: 'primitive' });
@@ -1015,7 +1017,7 @@ export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`
 			);
 			const container = document.createElement('div');
 			document.body.appendChild(container);
-			container.innerHTML = `<div><p>${serverContent}</p><i class="x">t</i></div>`;
+			container.innerHTML = `<!--3--><div><p>${serverContent}</p><i class="x">t</i></div>`;
 			flushSync(() => {
 				root = hydrateRoot(container, client.App, { value: 'a' }, { onRecoverableError() {} });
 			});
@@ -1062,8 +1064,9 @@ export function App(props) @{ <div><p {...props.attrs}>{props.value}</p><Tag kin
 		enableSignalBindings();
 		const container = document.createElement('div');
 		document.body.appendChild(container);
+		// The root's first commit replaces the container's previous content, as
+		// React's does, so the input the body mounts starts outside it.
 		const input = document.createElement('input');
-		container.appendChild(input);
 		const draft$ = __signalAt('g:draft-candidate', 'server', { key: 'draft-candidate' });
 		let token: unknown;
 		let owner: SignalOwner | null = null;
@@ -1960,4 +1963,118 @@ it('retains adopted text from another document during live updates', async () =>
 		owner.dispose();
 		iframe.remove();
 	}
+});
+
+// A signal-bound control hydrates through the same writers as a plain one, so
+// its first writes to the adopted control land at commit too (#2028, #2043).
+describe.each([false, true])('a hydrating render with signal-bound controls (dev %s)', (dev) => {
+	const source = `function Probe(props) @{
+	props.record();
+	<i>{'probe'}</i>
+}
+export function App(props) @{
+	<main>
+		<input id="plain-text" value={props.plainText} />
+		<input id="signal-text" value={props.text} />
+		<textarea id="plain-note" value={props.plainNote} />
+		<textarea id="signal-note" value={props.note} />
+		<input id="plain-box" type="checkbox" checked={props.plainChecked} />
+		<input id="signal-box" type="checkbox" checked={props.checked} />
+		<Probe record={props.record} />
+	</main>
+}`;
+	const options = {
+		id: `/src/hydrating-signal-controls-${dev}.tsrx`,
+		compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
+	};
+
+	it('writes them at commit, as it writes plain controls', async () => {
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const owner = createScope({ scopeKey: `hydrating-signal-controls-${dev}` });
+		const text = owner.signal$('text', 'server text');
+		const note = owner.signal$('note', 'server note');
+		const checked = owner.signal$('checked', true);
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(
+			server.App,
+			{
+				plainText: 'server text',
+				text,
+				plainNote: 'server note',
+				note,
+				plainChecked: true,
+				checked,
+				record() {},
+			},
+			{ signalOwner: owner },
+		).html;
+		const main = container.querySelector('main')!;
+		const control = (id: string) => main.querySelector<HTMLInputElement>('#' + id)!;
+		const controls = [...main.querySelectorAll('input, textarea')];
+		// The client's values differ from the server's.
+		owner.batch(() => {
+			owner.set(text, 'client text');
+			owner.set(note, 'client note');
+			owner.set(checked, false);
+		});
+		const committed: MutationRecord[] = [];
+		const observer = new MutationObserver((records) => committed.push(...records));
+		observer.observe(main, {
+			subtree: true,
+			attributes: true,
+			characterData: true,
+			childList: true,
+		});
+		let renderWrites = -1;
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: Root | undefined;
+		try {
+			await act(() => {
+				root = hydrateRoot(
+					container,
+					client.App,
+					{
+						plainText: 'client text',
+						text,
+						plainNote: 'client note',
+						note,
+						plainChecked: false,
+						checked,
+						// The hydrating render is the first; a later one sees its commit.
+						record: () => {
+							if (renderWrites === -1) renderWrites = observer.takeRecords().length;
+						},
+					},
+					{ signalOwner: owner },
+				);
+			});
+			committed.push(...observer.takeRecords());
+			expect(renderWrites).toBe(0);
+			const state = (id: string) => {
+				const element = control(id);
+				return [element.value, element.defaultValue, element.checked, element.defaultChecked];
+			};
+			for (const kind of ['text', 'note'])
+				expect(state('signal-' + kind)).toEqual(state('plain-' + kind));
+			expect(control('signal-text').getAttribute('value')).toBe('client text');
+			expect(committed.some((record) => record.target === control('signal-text'))).toBe(true);
+			controls.forEach((element, index) =>
+				expect(main.querySelectorAll('input, textarea')[index]).toBe(element),
+			);
+			await act(() => {
+				owner.set(text, 'later text');
+				owner.set(checked, true);
+			});
+			expect(control('signal-text').value).toBe('later text');
+			expect(control('signal-box').checked).toBe(true);
+		} finally {
+			observer.disconnect();
+			errors.mockRestore();
+			root?.unmount();
+			owner.dispose();
+			container.remove();
+		}
+	});
 });

@@ -147,11 +147,16 @@ describe('automatic hook dependencies — full compiler', () => {
 						dev,
 						inlineHookMemo: false,
 					}).code;
+					// The server never renders, so never compiles, the catch arm.
 					expect(
 						depsOf(code).sort(
 							(a, b) => (Array.isArray(a) ? a.length : 0) - (Array.isArray(b) ? b.length : 0),
 						),
-					).toEqual([['method(props, "log")'], ['method(props, "log")', 'retry']]);
+					).toEqual(
+						mode === 'client'
+							? [['method(props, "log")'], ['method(props, "log")', 'retry']]
+							: [['method(props, "log")']],
+					);
 				}
 			}
 		}

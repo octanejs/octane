@@ -1,4 +1,4 @@
-import { useState, createContext, use, useLayoutEffect } from 'octane';
+import { useState, createContext, use } from 'octane';
 
 export function Label(props) @{
 	<span class="lbl">{props.text as string}</span>
@@ -110,13 +110,6 @@ function SharedStaticIcon() {
 
 function SharedStaticLabel() {
 	return <span class="shared-label">Shared label</span>;
-}
-
-export function useConnectedElementEffect(report: (event: string) => void) {
-	useLayoutEffect(() => {
-		report('connected');
-		return () => report('cleanup');
-	}, []);
 }
 
 function StaticCustomElement() {

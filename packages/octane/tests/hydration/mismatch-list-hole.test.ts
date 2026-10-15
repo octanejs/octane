@@ -361,9 +361,10 @@ describe.each([
 	});
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from what the server rendered. As React reports nothing for an
-	// update that reaches a dehydrated boundary, the arm renders on the client
-	// without a report.
+	// differ from what the server rendered. As React hydrates a dehydrated
+	// boundary before the update that reached it, the boundary adopts the
+	// server's arm with the captures it rendered, then the update patches it,
+	// and nothing reports a mismatch.
 	describe('in a dormant boundary whose captures changed before activation', () => {
 		it.each([
 			{
@@ -376,7 +377,7 @@ describe.each([
 			{ component: 'DormantHole', server: { kind: 'pi', v: 'A' }, client: { kind: 'p', v: 'A' } },
 			{ component: 'DormantRows', server: { rows: ['a'] }, client: { rows: ['a', 'b', 'c'] } },
 			{ component: 'DormantRows', server: { rows: ['a', 'b', 'c'] }, client: { rows: ['a'] } },
-		])('renders $component from $server to $client silently', async (row) => {
+		])('hydrates $component from $server, then updates it to $client silently', async (row) => {
 			const serverProps = { when: condition(false), text: null, later: null, ...row.server };
 			container.innerHTML = ServerRT.renderToString(server[row.component], serverProps).html;
 			const recovered: unknown[] = [];
@@ -386,11 +387,11 @@ describe.each([
 			flushSync(() => {});
 			try {
 				const host = container.firstElementChild!;
-				const serverNodes = armNodes(container);
+				const section = container.querySelector('section')!;
 				const clientProps = { text: null, later: null, ...row.client };
 				await act(() => root.render(client[row.component], { ...clientProps, when: load() }));
 				expect(container.firstElementChild).toBe(host);
-				expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+				expect(container.querySelector('section')).toBe(section);
 				expect(markup(container.querySelector('section')!)).toBe(
 					await clientMarkup(row.component === 'DormantHole' ? 'Hole' : 'FramedRows', clientProps),
 				);

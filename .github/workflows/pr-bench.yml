@@ -16,7 +16,7 @@ name: PR bench
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, next]
     types: [opened, reopened, synchronize, ready_for_review]
     paths-ignore:
       - "**/*.md"

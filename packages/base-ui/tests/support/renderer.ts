@@ -11,6 +11,7 @@ export const randomStringValue = () => crypto.randomUUID();
 export const reactMajor = 19;
 export const flushMicrotasks = () => act(async () => {});
 
+const PROTOCOL_VERSION = '3';
 const serverComponents = new WeakMap<ComponentBody, ComponentBody>();
 export function registerServerComponent(client: ComponentBody, server: ComponentBody) {
 	serverComponents.set(client, server);
@@ -111,8 +112,18 @@ export function createRenderer(
 			const container = document.createElement('div');
 			document.body.appendChild(container);
 			onTestFinished(() => container.remove());
-			container.innerHTML = serverRender(server, serverProps).html;
-			return { container, hydrate: () => render(element, { container, hydrate: true }) };
+			// Octane's output opens with the hydration protocol version, which React's
+			// has no counterpart for: the markup upstream assertions read omits it,
+			// and hydration finds it where the server put it.
+			const html = serverRender(server, serverProps).html;
+			container.innerHTML = html.replace(`<!--${PROTOCOL_VERSION}-->`, '');
+			return {
+				container,
+				hydrate: () => {
+					container.prepend(document.createComment(PROTOCOL_VERSION));
+					return render(element, { container, hydrate: true });
+				},
+			};
 		},
 	};
 }

@@ -35,7 +35,10 @@ import {
 	HYDRATE_MARKER_SELECTOR,
 	HYDRATE_SEED_ATTR,
 	HYDRATE_WHEN_ATTR,
-} from '../src/hydration-markers.js';
+	isRangeClose,
+	isRangeOpen,
+	RANGE_OPEN_SOURCE,
+} from '../src/hydration-protocol.js';
 import { bindingRootMarker, BINDING_OPEN_PREFIX } from '../src/dom-binding-protocol.js';
 import { VIEW_TRANSITION_SCOPE_CSS, VIEW_TRANSITION_SCOPE_STYLE_ID } from '../src/css.js';
 import * as tags from '../src/runtime-tags.js';
@@ -103,13 +106,43 @@ describe('hydration marker payloads', () => {
 		expect(HYDRATION_FOR_ITEMS[HYDRATION_FOR_ARM_INDEX]).toBe('1');
 	});
 
+	// The client runtime, stream-protocol.ts and the inline swap script all
+	// balance ranges with this one grammar. A comment it does not open, such as
+	// an IE conditional comment in raw HTML, must stay an ordinary comment.
+	it.each([
+		['[', true],
+		['[f0', true],
+		['[f1', true],
+		['[f0;b;v1;s2', true],
+		['[b;v1;root', true],
+		['[$:0', true],
+		['[$:12', true],
+		['[$?os1-0', true],
+		['[$!e0', true],
+		[']', false],
+		['[2', false],
+		['[f', false],
+		['[f2', false],
+		['[b', false],
+		['[$', false],
+		['[if IE]><![endif]', false],
+		['[data]', false],
+		['oct-seed:x', false],
+		['', false],
+		[' ', false],
+	])('opens a range on %j: %s, in the runtime and the swap script alike', (data, opens) => {
+		expect(isRangeOpen(data)).toBe(opens);
+		expect(new RegExp(RANGE_OPEN_SOURCE).test(data)).toBe(opens);
+		expect(isRangeClose(data)).toBe(data === ']');
+	});
+
 	it('spells each arm marker in exactly one module', () => {
 		// The payloads stay plain literals: a cross-module template-literal
 		// derivation is not constant-folded by the bundler and measurably grew
 		// every entry bundle. Downstream prefixes still derive from them.
-		expect(spelledIn('[f')).toEqual(['hydration-markers.ts']);
-		expect(spelledIn('[f0')).toEqual(['hydration-markers.ts']);
-		expect(spelledIn('[f1')).toEqual(['hydration-markers.ts']);
+		expect(spelledIn('[f')).toEqual(['hydration-protocol.ts']);
+		expect(spelledIn('[f0')).toEqual(['hydration-protocol.ts']);
+		expect(spelledIn('[f1')).toEqual(['hydration-protocol.ts']);
 		expect(spelledIn('[f0;b;')).toEqual([]);
 		expect(spelledIn('[f1;b;')).toEqual([]);
 	});
@@ -154,11 +187,11 @@ describe('deferred hydration boundary attributes', () => {
 	});
 
 	it('names each attribute in exactly one module', () => {
-		expect(spelledIn('data-octane-hydrate-id')).toEqual(['hydration-markers.ts']);
-		expect(spelledIn('data-octane-hydrate-when')).toEqual(['hydration-markers.ts']);
-		expect(spelledIn('data-octane-hydrate-id-count')).toEqual(['hydration-markers.ts']);
-		expect(spelledIn('data-octane-hydrate-seed')).toEqual(['hydration-markers.ts']);
-		expect(spelledIn('[data-octane-hydrate-id]')).toEqual(['hydration-markers.ts']);
+		expect(spelledIn('data-octane-hydrate-id')).toEqual(['hydration-protocol.ts']);
+		expect(spelledIn('data-octane-hydrate-when')).toEqual(['hydration-protocol.ts']);
+		expect(spelledIn('data-octane-hydrate-id-count')).toEqual(['hydration-protocol.ts']);
+		expect(spelledIn('data-octane-hydrate-seed')).toEqual(['hydration-protocol.ts']);
+		expect(spelledIn('[data-octane-hydrate-id]')).toEqual(['hydration-protocol.ts']);
 	});
 });
 
@@ -173,7 +206,7 @@ describe('useId wire format', () => {
 	});
 
 	it('spells the infix in exactly one module', () => {
-		expect(spelledIn('in-')).toEqual(['hydration-markers.ts']);
+		expect(spelledIn('in-')).toEqual(['hydration-protocol.ts']);
 	});
 });
 

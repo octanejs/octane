@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'octane/server';
 import { flushSync, hydrateRoot } from 'octane';
 import { act, flushEffects, mount } from './_helpers.js';
@@ -50,8 +50,18 @@ describe('module-level arrows returning @try', () => {
 			const compiled = loadCompiledFixtureSource(source, { id: 'arrow-form.tsrx', mode });
 			if (mode === 'server') {
 				expect(renderToString(compiled.Content, { label: 'ready' }).html).toContain('ready');
-				expect(renderToString(compiled.Content, { label: 'offline', fail: true }).html).toContain(
-					'Error: offline',
+				// As in React, the server never renders @catch: it reports the error
+				// and ships @pending for the client to render.
+				const onError = vi.fn();
+				const failed = renderToString(
+					compiled.Content,
+					{ label: 'offline', fail: true },
+					{ onError },
+				).html;
+				expect(failed).toContain('loading');
+				expect(failed).not.toContain('Error: offline');
+				expect(onError).toHaveBeenCalledExactlyOnceWith(
+					expect.objectContaining({ message: 'offline' }),
 				);
 			} else {
 				const view = mount(compiled.Content, { label: 'ready' });
@@ -245,17 +255,43 @@ describe('module-level arrows returning @try', () => {
 		}
 	});
 
-	it.each(runtimeForms)('%s server-renders each boundary arm', (_name, _Component, exportName) => {
-		expect(renderToString(server[exportName], { label: 'server', value: 'ready' }).html).toContain(
-			'server: ready',
-		);
-		expect(
-			renderToString(server[exportName], { label: 'server', promise: new Promise(() => {}) }).html,
-		).toContain('server: loading');
-		expect(renderToString(server[exportName], { label: 'server', fail: true }).html).toContain(
-			'unavailable',
-		);
-	});
+	// As in React, the server never renders @catch: an error ships @pending,
+	// and the client's render of the boundary shows @catch when it throws too.
+	it.each(runtimeForms)(
+		'%s server-renders its content and pending arms and leaves an error to the client',
+		async (_name, Component, exportName) => {
+			expect(
+				renderToString(server[exportName], { label: 'server', value: 'ready' }).html,
+			).toContain('server: ready');
+			expect(
+				renderToString(server[exportName], { label: 'server', promise: new Promise(() => {}) })
+					.html,
+			).toContain('server: loading');
+			const props = { label: 'server', fail: true };
+			const onError = vi.fn();
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(server[exportName], props, { onError }).html;
+			document.body.append(container);
+			expect(onError).toHaveBeenCalledExactlyOnceWith(
+				expect.objectContaining({ message: 'unavailable' }),
+			);
+			expect(container.querySelector('.pending')!.textContent).toBe('server: loading');
+			expect(container.querySelector('.retry')).toBeNull();
+			const caught: unknown[] = [];
+			const root = hydrateRoot(container, Component, props, {
+				onCaughtError: (error) => caught.push(error),
+			});
+			try {
+				await act(async () => {});
+				expect(container.querySelector('.retry')!.textContent).toBe('server: Error: unavailable');
+				expect(container.querySelector('.pending')).toBeNull();
+				expect(caught).toEqual([expect.objectContaining({ message: 'unavailable' })]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
 
 	it.each(runtimeForms)(
 		'%s hydrates existing hosts and keeps events and updates live',

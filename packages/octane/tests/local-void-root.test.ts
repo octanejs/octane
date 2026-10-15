@@ -218,7 +218,7 @@ function attach(host, label) {
 }
 export async function run() {
  const host = document.querySelector('#host'), other = document.body.appendChild(document.createElement('div'));
- ${hydrate ? `host.innerHTML = '<main><button>a:0</button><input value="initial"></main>'; other.innerHTML = '<main><button>b:0</button><input value="initial"></main>';` : ''}
+ ${hydrate ? `host.innerHTML = '<!--3--><main><button>a:0</button><input value="initial"></main>'; other.innerHTML = '<!--3--><main><button>b:0</button><input value="initial"></main>';` : ''}
  const server = host.querySelector('button'), a = attach(host, 'a'), b = attach(other, 'b');
  const button = host.querySelector('button'), input = host.querySelector('input');
  input.value = 'typed'; button.click(); await Promise.resolve();

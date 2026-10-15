@@ -12,8 +12,8 @@ for (const dev of [false, true]) {
 		);
 		assert.equal(
 			result.changed,
-			result.rows,
-			'Only the changed two-capture handler requires a snapshot.',
+			0,
+			'A changed capture is staged for the commit, so its bundle needs no snapshot either.',
 		);
 	});
 }

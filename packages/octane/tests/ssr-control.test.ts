@@ -1,9 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { injectStyle } from '../src/index.js';
-import { TRY_CATCH_COMMENT } from '../src/hydration-markers.js';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from './_server-fixture';
@@ -27,9 +26,6 @@ const m = evalServer(readFileSync(join(FIXTURES, 'ssr-control.tsrx'), 'utf8'), '
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
-/** Leads a caught arm, counting the try body's and catch arm's positional seeds. */
-const CAUGHT = (trySeeds: number, catchSeeds: number) =>
-	`<!--${TRY_CATCH_COMMENT}${trySeeds}:${catchSeeds}-->`;
 const FOR_EMPTY_OPEN = '<!--[f0-->';
 const FOR_ITEMS_OPEN = '<!--[f1-->';
 
@@ -48,10 +44,10 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 
 	it('@for uses direct host roots as item boundaries; @empty still uses the list range', async () => {
 		expect((await RT.renderToString(m.List, { items: ['a', 'b'] })).html).toBe(
-			`<ul>${FOR_ITEMS_OPEN}<li>a</li><li>b</li>${CLOSE}</ul>`,
+			`<!--3--><ul>${FOR_ITEMS_OPEN}<li>a</li><li>b</li>${CLOSE}</ul>`,
 		);
 		expect((await RT.renderToString(m.List, { items: [] })).html).toBe(
-			`<ul>${FOR_EMPTY_OPEN}<li class="empty">none</li>${CLOSE}</ul>`,
+			`<!--3--><ul>${FOR_EMPTY_OPEN}<li class="empty">none</li>${CLOSE}</ul>`,
 		);
 	});
 
@@ -125,7 +121,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		}
 	});
 
-	it('@try renders the resolved success arm (awaiting use), @catch on error', async () => {
+	it('@try renders the resolved success arm (awaiting use), @pending on error', async () => {
 		// Nested ranges: outer = try-slot, inner = the resolved arm. Sync body →
 		// success arm, no suspension, no seed script.
 		expect(
@@ -141,38 +137,46 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		const resolvedDocument = new DOMParser().parseFromString(resolved.html, 'text/html');
 		expect(resolvedDocument.querySelector('div > span.ok')?.textContent).toBe('x');
 		expect(resolvedDocument.querySelector('.pending, .error')).toBeNull();
-		// A thrown error renders the @catch arm with the error.
-		const caught = (
-			await RT.renderToString(m.Boundary, {
+		// As in React, whose server never runs an error boundary, a thrown error
+		// reports through onError and the boundary ships its @pending fallback
+		// for the client to render; the @catch arm renders only on the client.
+		const boom = new Error('boom');
+		const onError = vi.fn();
+		const failed = document.createElement('div');
+		failed.innerHTML = RT.renderToString(
+			m.Boundary,
+			{
 				read: () => {
-					throw new Error('boom');
+					throw boom;
 				},
-			})
+			},
+			{ onError },
 		).html;
-		expect(caught).toBe(
-			`<div>${OPEN}${CAUGHT(0, 0)}${OPEN}<span class="error">boom</span>${CLOSE}${CLOSE}</div>`,
-		);
+		expect(failed.querySelector('div > .loading')?.textContent).toBe('loading');
+		expect(failed.querySelector('.error, .ok')).toBeNull();
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError).toHaveBeenCalledWith(boom);
 	});
 
-	it('@catch exposes a callable server reset function', async () => {
+	it('a catch-only @try passes a server error on, so the render fails', async () => {
 		const boundary = evalServer(
 			`
 				export const Boundary = () => @{
-					@try {
-						throw new Error('boom');
-						<span>{'unreachable'}</span>
-					} @catch (error, reset) {
-						reset();
-						<span data-reset={typeof reset}>{error.message as string}</span>
-					}
+					<main>
+						@try {
+							throw new Error('boom');
+							<span>{'unreachable'}</span>
+						} @catch (error) {
+							<span>{error.message as string}</span>
+						}
+					</main>
 				}
 			`,
-			'ssr-catch-reset.tsrx',
+			'ssr-catch-only.tsrx',
 		);
 
-		expect((await RT.renderToString(boundary.Boundary)).html).toBe(
-			`${OPEN}${CAUGHT(0, 0)}${OPEN}<span data-reset="function">boom</span>${CLOSE}${CLOSE}`,
-		);
+		expect(() => RT.renderToString(boundary.Boundary)).toThrow('boom');
+		await expect(prerender(boundary.Boundary)).rejects.toThrow('boom');
 	});
 });
 
@@ -190,7 +194,7 @@ describe('SSR Phase 3 — component children (context Provider)', () => {
 describe('SSR Phase 3 — portals', () => {
 	it('emits a site marker for a portal and renders sibling content inline', async () => {
 		const body = (await RT.renderToString(m.WithPortal)).html;
-		expect(body).toBe('<div id="host"><!----><span>inline</span></div>');
+		expect(body).toBe('<!--3--><div id="host"><!----><span>inline</span></div>');
 	});
 });
 

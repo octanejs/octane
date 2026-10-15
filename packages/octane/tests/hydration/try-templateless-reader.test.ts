@@ -1,26 +1,21 @@
 import { loadServerFixture } from '../_server-fixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { prerender } from 'octane/static';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import {
 	Branch,
-	NestedRejected,
-	Rejected,
 	RejectedPending,
 	RejectedThenResolved,
 	Resolved,
-	Rethrown,
-	RethrownBoundary,
-	TemplateRejected,
 } from './_fixtures/try-templateless-reader.tsrx';
 
 // A template-less component (no `@{}` body) claims a server component range
-// when it hydrates. Where its use() rejected on the server, the boundary that
-// caught the rejection rendered its @catch arm in that place, plus a rejection
-// seed. The component must read that seed, and the boundary must adopt the
-// server's catch arm, exactly as it does for a template reader. A body that
-// renders where the server rendered something else is a mismatch, which with
-// no Suspense boundary around it renders the root on the client.
+// when it hydrates. As in React, whose server never runs an error boundary, a
+// use() that rejected on the server leaves its Suspense boundary's @pending arm
+// for the client to render from client data, keeping the hosts around it, and
+// with no Suspense boundary the server render fails. A body that renders where
+// the server rendered something else is a mismatch, which with no Suspense
+// boundary around it renders the root on the client.
 // Recoverable errors publish in dev and prod; console diagnostics in dev only.
 
 const server = loadServerFixture(
@@ -65,36 +60,56 @@ function serverNodes() {
 
 describe('hydrateRoot — template-less use() reader rejected on the server', () => {
 	it.each([
-		['is the sole try child', 'Rejected', Rejected],
-		['is a template reader (control)', 'TemplateRejected', TemplateRejected],
-		['sits in a boundary with a @pending arm', 'RejectedPending', RejectedPending],
-		['is rendered by another template-less component', 'NestedRejected', NestedRejected],
-	] as const)('adopts the server catch arm when the reader %s', async (_, name, Client) => {
-		container.innerHTML = (await prerender(server[name], { promise: Promise.reject('x') })).html;
-		const before = serverNodes();
-		expect(before.caught!.textContent).toBe('x');
+		['is the sole try child', 'Rejected'],
+		['is a template reader (control)', 'TemplateRejected'],
+		['is rendered by another template-less component', 'NestedRejected'],
+		['sits under an inner @catch that rethrows', 'Rethrown'],
+		['sits under an inner ErrorBoundary that rethrows', 'RethrownBoundary'],
+	] as const)(
+		'fails the server render where only catch arms surround a reader that %s',
+		async (_, name) => {
+			await expect(prerender(server[name], { promise: Promise.reject('x') })).rejects.toBe('x');
+		},
+	);
 
-		const { root, caught, recovered } = await hydrate(Client, { promise: pending() });
+	it.each([
+		['resolves', () => Promise.resolve('client'), [], ''],
+		['rejects too', () => Promise.reject('y'), ['y'], 'y'],
+	] as const)(
+		'client-renders a Suspense boundary whose reader the client %s, keeping its hosts',
+		async (_, read, expectedCaught, caughtText) => {
+			const promise = read();
+			promise.catch(() => {});
+			container.innerHTML = (
+				await prerender(server.RejectedPending, { promise: Promise.reject('x') })
+			).html;
+			const before = serverNodes();
+			expect(container.querySelector('em')!.textContent).toBe('loading');
+			expect(before.caught).toBeNull();
 
-		expect(container.querySelector('.caught')).toBe(before.caught);
-		expect(container.querySelector('h1')).toBe(before.h1);
-		expect(container.querySelector('button')).toBe(before.button);
-		expect(container.querySelectorAll('.caught')).toHaveLength(1);
-		expect(container.querySelector('em')).toBeNull();
-		expect(caught).toEqual(['x']);
-		expect(recovered).toEqual([]);
-		expect(consoleError).not.toHaveBeenCalled();
-		root.unmount();
-	});
+			const { root, caught, recovered } = await hydrate(RejectedPending, { promise });
+			await vi.waitFor(async () => {
+				await act(async () => {});
+				expect(container.querySelector('em')).toBeNull();
+			});
 
-	it('keeps later positional seeds aligned after the caught boundary', async () => {
+			expect(container.querySelector('h1')).toBe(before.h1);
+			expect(container.querySelector('button')).toBe(before.button);
+			expect(container.querySelector('.caught')?.textContent ?? '').toBe(caughtText);
+			expect(caught).toEqual(expectedCaught);
+			expect(recovered).toHaveLength(1);
+			expect(consoleError).not.toHaveBeenCalled();
+			root.unmount();
+		},
+	);
+
+	it('keeps later positional seeds aligned after a client-rendered boundary', async () => {
 		container.innerHTML = (
 			await prerender(server.RejectedThenResolved, {
 				rejected: Promise.reject('x'),
 				resolved: Promise.resolve('later'),
 			})
 		).html;
-		const serverCatch = container.querySelector('.caught');
 		const value = container.querySelector('.value');
 		expect(value!.textContent).toBe('later');
 
@@ -103,36 +118,15 @@ describe('hydrateRoot — template-less use() reader rejected on the server', ()
 			resolved: pending<string>(),
 		});
 
-		expect(container.querySelector('.caught')).toBe(serverCatch);
-		expect(container.querySelector('b')).toBeNull();
+		expect(container.querySelector('em')!.textContent).toBe('loading');
 		expect(container.querySelector('.value')).toBe(value);
 		expect(value!.textContent).toBe('later');
-		expect(container.querySelector('em')).toBeNull();
-		expect(caught).toEqual(['x']);
-		expect(recovered).toEqual([]);
+		expect(container.querySelector('.caught')).toBeNull();
+		expect(caught).toEqual([]);
+		expect(recovered).toHaveLength(1);
 		expect(consoleError).not.toHaveBeenCalled();
 		root.unmount();
 	});
-
-	it.each([
-		['a @catch arm', 'Rethrown', Rethrown],
-		['an ErrorBoundary', 'RethrownBoundary', RethrownBoundary],
-	] as const)(
-		'gives %s inside the reader the decoded rejection reason',
-		async (_, name, Client) => {
-			container.innerHTML = (await prerender(server[name], { promise: Promise.reject('x') })).html;
-			const { h1, button } = serverNodes();
-			expect(container.querySelector('.caught')!.textContent).toBe('Error: inner:x');
-
-			const { root, caught } = await hydrate(Client, { promise: pending() });
-
-			expect(container.querySelector('.caught')!.textContent).toBe('Error: inner:x');
-			expect(container.querySelector('h1')).toBe(h1);
-			expect(container.querySelector('button')).toBe(button);
-			expect(caught).toEqual([new Error('inner:x')]);
-			root.unmount();
-		},
-	);
 
 	it('still adopts the reader range when the server resolved it', async () => {
 		container.innerHTML = (

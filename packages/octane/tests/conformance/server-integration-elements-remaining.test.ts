@@ -15,7 +15,8 @@ function replaceWithMismatchedMarkup(container: HTMLElement): void {
 	const wrong = document.createElement('aside');
 	wrong.id = 'wrong-server-tree';
 	wrong.textContent = 'wrong';
-	container.replaceChildren(wrong);
+	// The server's protocol version stays: only the tree it rendered differs.
+	container.replaceChildren(document.createComment('3'), wrong);
 }
 
 const structuralMismatch = { mutateServerDom: replaceWithMismatchedMarkup } as const;
@@ -818,7 +819,7 @@ function rejectsAcrossRenderers(
 
 	it(`${title} — client recovery on mismatched server markup`, () => {
 		const container = document.createElement('div');
-		container.innerHTML = '<aside id="wrong-server-tree">wrong</aside>';
+		container.innerHTML = '<!--3--><aside id="wrong-server-tree">wrong</aside>';
 		let root: ReturnType<typeof hydrateRoot> | undefined;
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {

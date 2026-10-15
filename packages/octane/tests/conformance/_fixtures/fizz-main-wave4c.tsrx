@@ -141,8 +141,8 @@ export function ContextErrorRecovery(props) @{
 				<RecoveryContext value="inner">
 					<ThrowContextError error={props.error} />
 				</RecoveryContext>
-			} @catch (error) {
-				<b id="context-error">{error.message as string}</b>
+			} @pending {
+				<b id="context-fallback">{'Loading'}</b>
 			}
 			<ReadRecoveryContext id="context-after-error" />
 		</RecoveryContext>

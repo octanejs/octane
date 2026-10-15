@@ -69,6 +69,12 @@ const fixtures = load_scoped_styles_fixtures() as Fixture[];
  */
 const KNOWN_FAILURES: Record<string, Partial<Record<Mode, string>>> = {};
 
+/**
+ * Elements only a `@catch` arm renders, per fixture. As in React, the server
+ * never renders an error boundary's fallback, so the server compile omits them.
+ */
+const CATCH_ARM_ELEMENTS: Record<string, string[]> = { 'control-flow': ['e9 err'] };
+
 // --- label / hash helpers -----------------------------------------------------
 
 function escapeRegExp(text: string): string {
@@ -564,6 +570,10 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 						const unescaped = compiledCode().replace(/\\"/g, '"');
 						for (const [key, chain] of Object.entries(expected.elements)) {
 							const candidates = classCandidates(key, chain, hashes);
+							if (mode === 'server' && CATCH_ARM_ELEMENTS[name]?.includes(key)) {
+								for (const candidate of candidates) expect(unescaped).not.toContain(candidate);
+								continue;
+							}
 							const hit =
 								candidates.some((candidate) => unescaped.includes(candidate)) ||
 								(chain.length === 0 &&

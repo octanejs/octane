@@ -296,11 +296,16 @@ for (const parserName of ['native', 'javascript']) {
 					'lazy-ref-misuse.ts': lazyRefMisuse.code,
 				});
 				expect(catchDiagnostics).toEqual([
-					{
-						file: 'catch-misuse.ts',
-						code: 2322,
-						message: "Type 'unknown' is not assignable to type 'string'.",
-					},
+					// The server never renders, so never emits, a catch arm.
+					...(mode === 'client'
+						? [
+								{
+									file: 'catch-misuse.ts',
+									code: 2322,
+									message: "Type 'unknown' is not assignable to type 'string'.",
+								},
+							]
+						: []),
 					{
 						file: 'lazy-ref-misuse.ts',
 						code: 2322,

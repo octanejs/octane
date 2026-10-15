@@ -5,7 +5,7 @@ import Markdown from '../src/index';
 
 async function publicHtml(props: Parameters<typeof Markdown>[0]): Promise<string> {
 	return (await prerender(Markdown as ComponentBody<typeof props>, props)).html.replace(
-		/<!--\[-->|<!--\]-->/g,
+		/<!--3-->|<!--\[-->|<!--\]-->/g,
 		'',
 	);
 }

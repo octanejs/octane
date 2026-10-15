@@ -531,7 +531,7 @@ interface ResourceView<T> {
 type Describe<T> = () => QueryRequest<T> | typeof skip;
 
 export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
-	// Members that are not private are also used by an Action frame's producer
+	// Members that are not private are also used by a pending slot's producer
 	// (candidate-producers.ts), which forks this binding and publishes its selection.
 	declare candidate?: true;
 	/** Only a cell that a later render declared again with a new selection has a view. */
@@ -579,7 +579,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 				? this.compute()
 				: pending(() => this.compute());
 		};
-		node.retry = (options) => this.retry(options);
+		node.retryRequest = (options) => this.retry(options);
 	}
 
 	private request(describe = this.describe!): Request<T> | typeof skip {

@@ -71,9 +71,9 @@ describe('checked compiled boundaries', () => {
 		} finally {
 			view.unmount();
 		}
-		const html = renderToString(server.CatchShell, { component }).html;
-		expect(html).toContain('CompiledOutlet');
-		expect(html).not.toContain('<article');
+		// The server runs no error boundary (React's model): with no Suspense
+		// boundary above it, the rejected outlet fails the render.
+		expect(() => renderToString(server.CatchShell, { component })).toThrow(/CompiledOutlet/);
 	});
 
 	it('keeps ordinary dynamic components and context descriptor children', () => {

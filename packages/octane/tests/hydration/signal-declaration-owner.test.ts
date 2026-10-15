@@ -57,6 +57,8 @@ function frames(output: string): Record<string, string> {
 const SHAPES = Object.keys(frames(''));
 // The browser never renders a permanently static boundary's children.
 const CLIENT_SHAPES = SHAPES.filter((shape) => shape !== 'static Hydrate');
+// The server never renders a catch arm: its boundary renders on the client.
+const SERVER_SHAPES = SHAPES.filter((shape) => shape !== 'catch');
 
 // Builds a module whose declaring component is the root or a nested child.
 function source(body: string, nested: boolean, imports = 'derived$, query$'): string {
@@ -121,7 +123,7 @@ function cases(shapes: string[]) {
 	);
 }
 
-const CASES = cases(SHAPES);
+const CASES = cases(SERVER_SHAPES);
 const CLIENT_CASES = cases(CLIENT_SHAPES);
 
 const PROPS = { show: true, items: ['first', 'second'], mode: 'a' };
@@ -221,7 +223,6 @@ async function hydrateServerOutput(
 	options: {
 		dev: boolean;
 		strong: boolean;
-		adoptsOutput: boolean;
 		loads?: number;
 		deferred?: boolean;
 	},
@@ -280,7 +281,7 @@ async function hydrateServerOutput(
 			await client.act(() => root!.render(clientModule.App, { ...props, when: condition(true) }));
 		expect(browserLoad).not.toHaveBeenCalled();
 		const hydrated = [...container.querySelectorAll('output')];
-		if (options.adoptsOutput) expect(hydrated).toEqual(outputs);
+		expect(hydrated).toEqual(outputs);
 		expect(hydrated.map((node) => node.textContent)).toEqual(
 			outputs.map((node) => node.textContent),
 		);
@@ -360,12 +361,9 @@ describe('signal declarations read across their component template', () => {
 	it.each(CASES)(
 		'resumes the server query for setup and $shape $read reads (nested: $nested, $name)',
 		async ({ dev, strong, read, shape, nested }) => {
-			// A synchronous render error is not a server rejection seed, so the
-			// browser rebuilds its catch arm; every other arm adopts server DOM.
 			await hydrateServerOutput(source(capturedRead(read, shape, 'get()'), nested), {
 				dev,
 				strong,
-				adoptsOutput: shape !== 'catch',
 			});
 		},
 	);
@@ -378,7 +376,6 @@ describe('signal declarations read across their component template', () => {
 			await hydrateServerOutput(source(capturedRead(read, shape, null), nested), {
 				dev,
 				strong,
-				adoptsOutput: shape !== 'catch',
 			});
 		},
 	);
@@ -397,7 +394,7 @@ describe('signal declarations read across their component template', () => {
  <Hydrate when={props.when}${split ? '' : ' split={false}'}><output>{record$.get() as string}</output><output>{selected$.get() as string}</output></Hydrate>`,
 					false,
 				),
-				{ dev, strong, adoptsOutput: true, deferred: true },
+				{ dev, strong, deferred: true },
 			);
 		},
 	);
@@ -440,7 +437,7 @@ describe('signal declarations read across their component template', () => {
 	it.each(MODES)(
 		"resumes the server query a row's derived value reads through a render prop ($name)",
 		async ({ dev, strong }) => {
-			await hydrateServerOutput(ROW_RENDER_PROP, { dev, strong, adoptsOutput: true });
+			await hydrateServerOutput(ROW_RENDER_PROP, { dev, strong });
 		},
 	);
 
@@ -717,7 +714,7 @@ export function App(props) @{
  }`,
 				false,
 			),
-			{ dev, strong, adoptsOutput: true, loads: 2 },
+			{ dev, strong, loads: 2 },
 		);
 	});
 
@@ -788,7 +785,7 @@ export function App(props) @{
 	it.each(MODES)(
 		"resumes the server query for a block nested in its block's value JSX ($name)",
 		async ({ dev, strong }) => {
-			await hydrateServerOutput(valueSource('get()'), { dev, strong, adoptsOutput: true });
+			await hydrateServerOutput(valueSource('get()'), { dev, strong });
 		},
 	);
 
@@ -798,7 +795,6 @@ export function App(props) @{
 			await hydrateServerOutput(returnedSource('get()', nested), {
 				dev,
 				strong,
-				adoptsOutput: true,
 			});
 		},
 	);
@@ -975,7 +971,7 @@ export function App(props) @{
 	it.each(MODES)(
 		'resumes the server query a child read through a callback ($name)',
 		async ({ dev, strong }) => {
-			await hydrateServerOutput(GETTER, { dev, strong, adoptsOutput: true });
+			await hydrateServerOutput(GETTER, { dev, strong });
 		},
 	);
 

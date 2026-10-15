@@ -422,7 +422,7 @@ export function Input(props) @{
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		try {
-			container.innerHTML = '<input id="spread-text">';
+			container.innerHTML = '<!--3--><input id="spread-text">';
 			const adopted = container.firstElementChild as HTMLInputElement;
 			adopted.value = 'before-hydration';
 			const root = hydrateRoot(container, SpreadText, {
@@ -435,7 +435,7 @@ export function Input(props) @{
 			root.unmount();
 
 			error.mockClear();
-			container.innerHTML = '<textarea id="stale"></textarea>';
+			container.innerHTML = '<!--3--><textarea id="stale"></textarea>';
 			const stale = container.firstElementChild;
 			const replacementRoot = hydrateRoot(container, SpreadText, {
 				hostProps: { onChange: noop },
@@ -447,7 +447,7 @@ export function Input(props) @{
 			replacementRoot.unmount();
 
 			error.mockClear();
-			container.innerHTML = '<input id="direct-create-element">';
+			container.innerHTML = '<!--3--><input id="direct-create-element">';
 			const directServerNode = container.firstElementChild;
 			const directRoot = hydrateRoot(container, DirectCreateElement, {
 				hostProps: { onChange: noop },

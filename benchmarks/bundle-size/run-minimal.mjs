@@ -52,6 +52,7 @@ const existingScenarios = [
 	['server-hooks', 'ts'],
 	['server-render', 'ts'],
 	['component-owned-effects', 'ts'],
+	['descriptor-children', 'ts'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -279,16 +280,33 @@ const effectControls = {
 		'scheduleRegisteredPassiveFlush',
 	],
 };
+// The generic child slot's optional value regimes are installed by their
+// creators: createPortal, signal bindings and context creation. A descriptor
+// tree that creates none of them must drop each regime, while a scenario that
+// creates one proves the oracle still sees its declaration.
+const childSlotControls = {
+	'descriptor-children': {
+		dropped: ['renderPortalChild', 'bindImplicitSignalChild', 'useContextInternal'],
+		kept: ['childSlot'],
+	},
+	context: { dropped: [], kept: ['useContextInternal'] },
+	'hydrate-frame': { dropped: [], kept: ['renderPortalChild', 'bindImplicitSignalChild'] },
+};
 const effectDeclarations = Object.values(effectControls).flat();
+const childSlotDeclarations = [
+	...new Set(
+		Object.values(childSlotControls).flatMap(({ dropped, kept }) => [...dropped, ...kept]),
+	),
+];
+const mappedScenario = (id) =>
+	Object.hasOwn(effectControls, id) || Object.hasOwn(childSlotControls, id);
 // The split shell uses neither ViewTransition nor Activity, so its runtime chunk
 // must drop their optional drivers as a single bundle does; renderBlockInner is
 // the control that proves the source-map oracle sees the chunk.
 const splitControls = {
 	dropped: [
-		'STAGED_DOM',
 		'VIEW_TRANSITION_DRIVER',
 		'DEFERRED_LAYOUT_DRIVER',
-		'STAGED_COMMIT_CAPTURE',
 		'activityRefState',
 		'renderHiddenActivity',
 		'rehideActivityAfterDescendantRender',
@@ -301,8 +319,8 @@ const runtimeRanges = (names) =>
 		(text, source) => parseAst(text, { lang: 'ts' }, source),
 		names.map((name) => ({ name, source: 'runtime.ts' })),
 	);
-const effectRanges = selectedScenarios.some(({ id }) => Object.hasOwn(effectControls, id))
-	? runtimeRanges(effectDeclarations)
+const effectRanges = selectedScenarios.some(({ id }) => mappedScenario(id))
+	? runtimeRanges([...effectDeclarations, ...childSlotDeclarations])
 	: [];
 const splitRanges = selectedScenarios.some(({ bundler }) => bundler === 'vite-split')
 	? runtimeRanges([...splitControls.dropped, ...splitControls.kept])
@@ -576,7 +594,7 @@ async function buildScenario(scenario, entry) {
 		build: {
 			write: false,
 			minify: 'oxc',
-			sourcemap: Object.hasOwn(effectControls, scenario.id) ? 'hidden' : false,
+			sourcemap: mappedScenario(scenario.id) ? 'hidden' : false,
 			target: 'esnext',
 			lib: {
 				entry,
@@ -645,6 +663,18 @@ try {
 			hookPathExports = [],
 			effects,
 		} = await buildScenario(scenario, entry);
+		if (Object.hasOwn(childSlotControls, id)) {
+			assert.ok(effects, `${name}: missing child-slot reachability map`);
+			const { dropped, kept } = childSlotControls[id];
+			assert.deepEqual(
+				[
+					...dropped.filter((name) => effects.has(name)),
+					...kept.filter((name) => !effects.has(name)),
+				],
+				[],
+				`${name}: child-slot value regimes must follow their creators`,
+			);
+		}
 		if (Object.hasOwn(effectControls, id)) {
 			assert.ok(effects, `${name}: missing effect reachability map`);
 			const required = effectControls[id];

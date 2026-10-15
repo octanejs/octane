@@ -17,6 +17,10 @@ references and replays the same deletion. Both root and nested transition rollba
 interpreters recognize that record. The insertion, pending-state restoration,
 journal order, Set lifetime, and deferred cleanup remain unchanged.
 
+Since #2043 step 2, retirement records no journal entry at all. Deletions queue on
+the root's commit queue, and a dropped window truncates both that queue and the Set
+to their lengths at the window's start (`dropRootOps`).
+
 ## Retained work
 
 - Keep the retirement Set: the scheduler checks ancestor membership before

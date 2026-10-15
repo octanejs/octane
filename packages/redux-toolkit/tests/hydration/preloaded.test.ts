@@ -4,7 +4,7 @@ import { settle } from '../_helpers';
 import { PreloadedApp, createPreloadedStore, preloadedApi } from '../ssr/_fixtures/preloaded.tsrx';
 
 const SERVER_HTML =
-	'<!--[--><!--[--><p id="preloaded-result">result=server-value:fulfilled</p><!--]--><!--]-->';
+	'<!--3--><!--[--><!--[--><p id="preloaded-result">result=server-value:fulfilled</p><!--]--><!--]-->';
 
 function expandCountedMarkers(html: string): string {
 	return html.replace(/<!--([\[\]])([1-9]\d*)-->/g, (whole, marker: string, raw: string) => {

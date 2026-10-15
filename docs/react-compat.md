@@ -159,8 +159,10 @@ must use the server entry explicitly.
 Use Octane's asynchronous or streaming server renderer. Each React island buffers
 its complete React server HTML; an enclosing Octane streaming boundary can send
 its fallback while that island is pending. React's internal progressive reveal
-scripts are not streamed separately. Errors reach the Octane server catch path;
-React error boundaries do not handle server render errors.
+scripts are not streamed separately. Errors take Octane's server error path:
+the nearest Octane Suspense boundary ships its fallback for a client render, as
+React does; neither React error boundaries nor Octane `@catch` arms handle server
+render errors.
 
 React `useId` values receive a per-island prefix derived from Octane `useId`.
 Hydration adopts the existing island DOM through React `hydrateRoot`, preserving

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { flushSync, hydrateRoot, type Root } from 'octane';
+import { flushSync, hydrateRoot, startTransition, type Root } from 'octane';
 import { renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
 import { createResource, createScope, query, type Scope } from 'octane/signals';
@@ -278,4 +278,57 @@ describe('compiled component invocation native reads', () => {
 			container.remove();
 		}
 	});
+});
+
+describe('native style bindings write at commit', () => {
+	const cases = [
+		['structured', { color: 'red' }, { color: 'blue' }],
+		['scalar', 'color: red', 'color: blue'],
+	] as const;
+	for (const priority of ['urgent', 'transition'] as const) {
+		for (const [kind, from, to] of cases) {
+			it(`changes a ${kind} style only when its render commits (${priority})`, async () => {
+				let during: MutationRecord[] | null = null;
+				const app = mount(client.NativeStyleCommit, { style: from, probe: () => {} });
+				const div = app.find('.native-style') as HTMLElement;
+				const records: MutationRecord[] = [];
+				const observer = new MutationObserver((batch) => records.push(...batch));
+				observer.observe(div, { attributes: true });
+				const mutations = () => {
+					records.push(...observer.takeRecords());
+					return records.splice(0);
+				};
+				const render = (gate?: Promise<unknown>) => {
+					mutations();
+					during = null;
+					return act(() => {
+						const next = () =>
+							app.root.render(client.NativeStyleCommit, {
+								style: to,
+								probe: () => {
+									during = mutations();
+								},
+								gate,
+							});
+						if (priority === 'transition') startTransition(next);
+						else next();
+					});
+				};
+				try {
+					// A sibling suspends: the dropped render leaves the style as it was.
+					await render(new Promise(() => {}));
+					expect(during).toEqual([]);
+					expect(mutations()).toEqual([]);
+					expect(div.style.color).toBe('red');
+
+					await render();
+					expect(during).toEqual([]);
+					expect(div.style.color).toBe('blue');
+				} finally {
+					observer.disconnect();
+					app.unmount();
+				}
+			});
+		}
+	}
 });

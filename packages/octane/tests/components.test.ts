@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
+	bagOf,
 	createElement,
 	useState,
 	template,
@@ -8,7 +9,9 @@ import {
 	flushSync,
 	hydrateRoot,
 	isValidElement,
+	type Scope,
 } from 'octane';
+import { setRenderText } from 'octane/internal/client';
 import { renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
 import { mount, act } from './_helpers';
@@ -138,28 +141,21 @@ describe('key-driven remount on standalone component', () => {
 // descriptor-returning path the `@octanejs/*` bindings rely on.
 describe('hand-written descriptor renderer (return-based body, no compiler)', () => {
 	// The compiled imperative renderer for `<button onClick={onInc}>{n}</button>`.
-	const _btn = template('<button></button>');
-	function CountButtonFrag(props: any, __s: any) {
-		const __block = __s.block;
-		let _b = __s.b$0;
-		if (_b === undefined) {
-			_b = {};
+	// As compiled output does, it writes no DOM at render: its bag factory places
+	// the button at commit, and an update stages its text write for commit.
+	const _btn = template('<button> </button>');
+	function CountButtonFrag(props: any, scope: Scope) {
+		let bag = scope.slots[0];
+		if (bag === undefined) {
 			const el = clone(_btn) as HTMLButtonElement;
-			const txt = document.createTextNode(String(props.n));
-			el.appendChild(txt);
-			el.onclick = props.onInc;
-			_b.el = el;
-			_b.txt = txt;
-			_b.n = props.n;
-			__block.parentNode.insertBefore(el, __block.endMarker);
-			__s.b$0 = _b;
-		} else {
-			if (_b.n !== props.n) {
-				_b.txt.data = String(props.n);
-				_b.n = props.n;
-			}
-			_b.el.onclick = props.onInc; // latest closure
+			el.onclick = () => bag.onInc(); // the latest closure, from the bag
+			bag = bagOf(scope, el, { txt: el.firstChild, n: undefined, onInc: null });
 		}
+		if (bag.n !== props.n) {
+			setRenderText(bag.txt, String(props.n));
+			bag.n = props.n;
+		}
+		bag.onInc = props.onInc;
 	}
 
 	// "Just a function" — has a hook (manual stable slot), RETURNS a descriptor.
@@ -200,9 +196,10 @@ describe('returned components inside templates', () => {
 		'.shared-sole svg',
 	];
 
-	it('keeps a connected custom element effect through production parent updates', () => {
-		// Exercise production component reuse under both runtime projects. The hook
-		// itself is an ordinary fixture import with compiler-assigned hook slots.
+	it('keeps a connected custom element through production parent updates', () => {
+		// Exercise production component reuse under both runtime projects. As in
+		// React, a custom element's callbacks run at commit, when its content is
+		// inserted into the document, not inside the render that created it.
 		const client = loadCompiledFixtureSource<typeof fx>(
 			readFileSync('packages/octane/tests/_fixtures/components.tsrx', 'utf8'),
 			{
@@ -212,35 +209,31 @@ describe('returned components inside templates', () => {
 			},
 		);
 		const events: string[] = [];
-		const hookErrors: unknown[] = [];
 		customElements.define(
 			'octane-connected-effect-probe',
 			class extends HTMLElement {
 				connectedCallback() {
-					try {
-						fx.useConnectedElementEffect((event) => events.push(event));
-					} catch (error) {
-						hookErrors.push(error);
-					}
+					events.push('connected');
+				}
+				disconnectedCallback() {
+					events.push('disconnected');
 				}
 			},
 		);
 		const r = mount(client.ConnectedCustomElementParent, { tick: 'zero' });
 		try {
-			expect(hookErrors).toEqual([]);
 			expect(events).toEqual(['connected']);
 			const element = r.find('octane-connected-effect-probe');
 			r.update(client.ConnectedCustomElementParent, { tick: 'one' });
 			expect(r.find('.connected-tick').textContent).toBe('one');
 			expect(r.find('octane-connected-effect-probe')).toBe(element);
 			expect(element.isConnected).toBe(true);
-			expect(hookErrors).toEqual([]);
 			expect(events).toEqual(['connected']);
 		} finally {
 			r.unmount();
 		}
 		expect(r.container.childNodes).toHaveLength(0);
-		expect(events).toEqual(['connected', 'cleanup']);
+		expect(events).toEqual(['connected', 'disconnected']);
 	});
 
 	it('preserves SVG nodes through updates and keyed moves, and retires removed branches', () => {

@@ -456,6 +456,20 @@ describe('ReactLazy public conformance', () => {
 });
 
 describe('lazy server regression coverage', () => {
+	// As in React, whose server never runs an error boundary, a server error
+	// reports through onError and leaves the Suspense fallback for the client.
+	function renderErrored(props: Record<string, unknown>, message: string): void {
+		const errors: unknown[] = [];
+		const { html } = ServerRuntime.renderToString(server.LazyHost, props, {
+			onError: (error) => errors.push(error),
+		});
+		expect(html).toContain('<div class="lazy-fallback">Loading...</div>');
+		expect(html).not.toContain('lazy-error');
+		expect(errors).toEqual([
+			expect.objectContaining({ message: expect.stringContaining(message) }),
+		]);
+	}
+
 	it('renders a synchronously fulfilled lazy module without a fallback pass', () => {
 		const Lazy = ServerRuntime.lazy(() => lazyModule(server.LazyText));
 		const { html } = ServerRuntime.renderToString(server.LazyHost, {
@@ -478,11 +492,7 @@ describe('lazy server regression coverage', () => {
 	it('rejects a nested server lazy wrapper', () => {
 		const Inner = ServerRuntime.lazy(() => lazyModule(server.LazyText));
 		const Outer = ServerRuntime.lazy(() => lazyModule(Inner));
-		const { html } = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Outer,
-			childProps: { text: 'nested' },
-		});
-		expect(html).toContain('Error: lazy: expected');
+		renderErrored({ comp: Outer, childProps: { text: 'nested' } }, 'lazy: expected');
 	});
 
 	// Server mirror of ReactLazy.js:70-180's transactional loader setup.
@@ -493,11 +503,7 @@ describe('lazy server regression coverage', () => {
 			if (attempts === 1) throw new Error('server load exploded');
 			return lazyModule(server.LazyText);
 		});
-		const first = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Lazy,
-			childProps: { text: 'first' },
-		});
-		expect(first.html).toContain('Error: server load exploded');
+		renderErrored({ comp: Lazy, childProps: { text: 'first' } }, 'server load exploded');
 
 		const second = ServerRuntime.renderToString(server.LazyHost, {
 			comp: Lazy,
@@ -521,11 +527,7 @@ describe('lazy server regression coverage', () => {
 			}
 			return lazyModule(server.LazyText);
 		});
-		const first = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Lazy,
-			childProps: { text: 'first' },
-		});
-		expect(first.html).toContain('Error: server subscription exploded');
+		renderErrored({ comp: Lazy, childProps: { text: 'first' } }, 'server subscription exploded');
 
 		const second = ServerRuntime.renderToString(server.LazyHost, {
 			comp: Lazy,
@@ -548,11 +550,7 @@ describe('lazy server regression coverage', () => {
 			}),
 		);
 		const Lazy = ServerRuntime.lazy(load);
-		const first = ServerRuntime.renderToString(server.LazyHost, {
-			comp: Lazy,
-			childProps: { text: 'first' },
-		});
-		expect(first.html).toContain('Error: server default exploded');
+		renderErrored({ comp: Lazy, childProps: { text: 'first' } }, 'server default exploded');
 
 		const second = ServerRuntime.renderToString(server.LazyHost, {
 			comp: Lazy,

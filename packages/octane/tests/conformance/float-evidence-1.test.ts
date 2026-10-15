@@ -110,7 +110,7 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 	// instead of an <html> container).
 	it('hydration adopts hoisted non-resource head elements alongside inserted resources', async () => {
 		const r = await Server.renderToString(srv.MixedHead, {});
-		const bodyStart = r.html.indexOf('<main');
+		const bodyStart = r.html.indexOf('<!--3-->');
 		expect(bodyStart).toBeGreaterThan(-1);
 		document.head.insertAdjacentHTML('beforeend', r.html.slice(0, bodyStart));
 		const c = document.createElement('div');
@@ -178,7 +178,7 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 	// removed from the html inline'
 	it('sibling texts survive SSR resource elision and hydrate without mismatch', async () => {
 		const r = await Server.renderToString(srv.TextResourceSiblings, {});
-		const bodyStart = r.html.indexOf('<div class="text-siblings"');
+		const bodyStart = r.html.indexOf('<!--3-->');
 		expect(bodyStart).toBeGreaterThan(-1);
 		const headHtml = r.html.slice(0, bodyStart);
 		const bodyHtml = r.html.slice(bodyStart);
@@ -303,7 +303,7 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 		await act(() => {
 			mountInto(AttrSheet);
 		});
-		const el = document.head.querySelector('link[href="/attr.css"]')!;
+		const el = document.head.querySelector('link[rel="stylesheet"][href="/attr.css"]')!;
 		expect(el.getAttribute('data-precedence')).toBe('default');
 		expect(el.getAttribute('crossorigin')).toBe('anonymous');
 		expect(el.getAttribute('media')).toBe('all');
@@ -311,6 +311,17 @@ describe('conformance: React Float resource evidence (slice 1)', () => {
 		expect(el.getAttribute('referrerpolicy')).toBe('origin');
 		expect(el.getAttribute('data-foo')).toBe('"quoted"');
 		expect(el.hasAttribute('precedence')).toBe(false);
+		// React's getResource preloads the sheet as it renders, with only the
+		// options a fetch needs (ReactFiberConfigDOM: crossOrigin, integrity,
+		// media, hrefLang, referrerPolicy).
+		const preload = document.head.querySelector('link[rel="preload"][href="/attr.css"]')!;
+		expect(preload.getAttribute('as')).toBe('style');
+		expect(preload.getAttribute('crossorigin')).toBe('anonymous');
+		expect(preload.getAttribute('media')).toBe('all');
+		expect(preload.getAttribute('integrity')).toBe('somehash');
+		expect(preload.getAttribute('referrerpolicy')).toBe('origin');
+		expect(preload.hasAttribute('data-foo')).toBe(false);
+		expect(preload.hasAttribute('data-precedence')).toBe(false);
 	});
 
 	// Per ReactDOMFloat-test.js:2936 — 'does not preload nomodule scripts'

@@ -69,7 +69,7 @@ describe('conformance: Fizz transport, abort, and shell errors', () => {
 		await ended;
 
 		expect(output).toBe(
-			'<header>host prefix</header><div id="transport-payload">hello world</div>',
+			'<header>host prefix</header><!--3--><div id="transport-payload">hello world</div>',
 		);
 	});
 

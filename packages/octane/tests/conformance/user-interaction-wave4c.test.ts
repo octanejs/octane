@@ -51,7 +51,7 @@ describe('conformance: controlled fields use native edit events', () => {
 					container.innerHTML =
 						mode === 'hydrate-match'
 							? renderToString(server[component], props).html
-							: '<div id="bad-server-field">wrong</div>';
+							: '<!--3--><div id="bad-server-field">wrong</div>';
 					serverField = container.firstElementChild;
 					root = hydrateRoot(container, client[component], props);
 				}

@@ -265,7 +265,9 @@ describe('clsx class composition — SSR output', () => {
 			href: '/story',
 			attrs: { className: ['spread', { active: true }], 'data-style-src': 'title-link' },
 		});
-		expect(html).toBe('<a href="/story" class="spread active" data-style-src="title-link">x</a>');
+		expect(html).toBe(
+			'<!--3--><a href="/story" class="spread active" data-style-src="title-link">x</a>',
+		);
 	});
 
 	it('serialises one effective class at its authored position after a spread', async () => {
@@ -273,7 +275,7 @@ describe('clsx class composition — SSR output', () => {
 			attrs: { className: ['spread', { active: true }], 'data-first': 'one' },
 			cls: ['final', { selected: true }],
 		});
-		expect(html).toBe('<div data-first="one" class="final selected">x</div>');
+		expect(html).toBe('<!--3--><div data-first="one" class="final selected">x</div>');
 	});
 
 	it('serialises one final class across multiple spreads', async () => {
@@ -283,7 +285,7 @@ describe('clsx class composition — SSR output', () => {
 			second: { class: ['last', { active: true }], 'data-second': 'two' },
 		});
 		expect(html).toBe(
-			'<div class="last active" data-first="one" data-own="own" data-second="two">x</div>',
+			'<!--3--><div class="last active" data-first="one" data-own="own" data-second="two">x</div>',
 		);
 	});
 

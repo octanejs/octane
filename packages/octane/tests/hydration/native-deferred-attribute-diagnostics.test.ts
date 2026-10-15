@@ -126,11 +126,12 @@ async function consumer(dev: boolean) {
 
 // A dormant island activates with captures or a native value that changed since
 // the server rendered, so its control's attributes differ from the server's.
-// Nothing reports a mismatch, as React reports nothing for an update that
-// reaches a dehydrated boundary. A changed native value is a live binding: the
-// island adopts the server's control and the binding writes the new value. A
-// changed capture makes the server's attributes stale, and hydration never
-// patches an attribute, so the island renders on the client instead.
+// A changed native value is a live binding: the island adopts the server's
+// control and the binding writes the new value. Changed captures hydrate first,
+// as React hydrates a dehydrated boundary before the update that reached it:
+// the island adopts the server's control with the captures it was claimed with,
+// then applies the latest ones as an update. Only claimed captures that already
+// differed from the server's are a mismatch, which development reports.
 async function scenario(dev: boolean, split: boolean, name: string, capturesChange: boolean) {
 	const view = await consumer(dev);
 	let root: any;
@@ -185,25 +186,21 @@ async function scenario(dev: boolean, split: boolean, name: string, capturesChan
 		};
 		await view.api.act(() => root.render(Component, latest));
 		const live = view.host.querySelector('#synthetic-control')! as HTMLButtonElement;
-		if (capturesChange) {
-			expect(live).not.toBe(control);
-			expect(control.isConnected).toBe(false);
-		} else {
-			expect(live).toBe(control);
-		}
+		expect(live).toBe(control);
 		expect(live.getAttribute('data-identity')).toBe(latest.identity);
 		expect(live.hidden).toBe(false);
 		expect(recoverable).toEqual([]);
 		expect(refs.filter(Boolean)).toEqual([live]);
 		expect(refs.filter((node) => node && node.ownerDocument !== view.window.document)).toEqual([]);
 		expect(effects).toEqual(['layout-mount', 'passive-mount']);
-		// Dev and prod render the child only live, inside native read collection:
-		// there is no side render of the dormant boundary's earlier captures.
+		// Dev and prod render the child only live, inside native read collection.
 		expect(renders.length).toBeGreaterThan(0);
 		expect(renders.every((render) => render.guarded && render.observer)).toBe(true);
-		// Every activation here follows changed captures or a changed native value,
-		// so nothing reports a mismatch.
-		expect(view.diagnostics).toEqual([]);
+		expect(view.diagnostics).toEqual(
+			dev && initialMismatch
+				? [{ level: 'error', args: [expect.stringContaining('attribute `data-identity`')] }]
+				: [],
+		);
 		if (model) {
 			await view.api.act(() => model.hidden$.set(true));
 			expect(live.hidden).toBe(true);

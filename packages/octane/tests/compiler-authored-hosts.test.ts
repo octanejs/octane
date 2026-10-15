@@ -327,7 +327,9 @@ describe('authored host JSX', () => {
 		const r = mount(App);
 		try {
 			expect(r.container.innerHTML).toBe('<div><span>kept</span></div>');
-			expect(renderToString(fixture(source, true).App).html).toBe('<div><span>kept</span></div>');
+			expect(renderToString(fixture(source, true).App).html).toBe(
+				'<!--3--><div><span>kept</span></div>',
+			);
 		} finally {
 			r.unmount();
 		}

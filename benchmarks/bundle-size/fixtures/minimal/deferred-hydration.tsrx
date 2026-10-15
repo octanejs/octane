@@ -23,8 +23,11 @@ function DeferredRoot(props: { onActivate: () => void }) @{
 }
 
 export async function run(container: HTMLElement) {
+	// renderToString(DeferredRoot) output. Recapture it when the hydration range
+	// protocol changes: a stale copy mismatches, so the island renders on the
+	// client and drops the captured click.
 	container.innerHTML =
-		'<main><!--[--><div data-octane-hydrate-id=":in-0:" data-octane-hydrate-when="interaction" data-octane-hydrate-id-count="0"><!--[--><!--[--><!--[--><!--[--><button id="minimal-deferred-action">dormant</button><!--]--><!--]--><!--]--><!--]--></div><!--]--></main>';
+		'<!--3--><main><!--[--><div data-octane-hydrate-id=":in-0:" data-octane-hydrate-when="interaction" data-octane-hydrate-id-count="0"><!--[--><!--[--><!--[--><button id="minimal-deferred-action">dormant</button><!--]--><!--]--><!--]--></div><!--]--></main>';
 	let clicks = 0;
 	const button = container.querySelector('#minimal-deferred-action') as HTMLButtonElement;
 	const before = button.textContent;
@@ -40,6 +43,7 @@ export async function run(container: HTMLElement) {
 		requestAnimationFrame(() => setTimeout(resolve, 0));
 	});
 	const after = button.textContent;
+	const adopted = container.querySelector('#minimal-deferred-action') === button;
 	root.unmount();
-	return { before, after, clicks, cleaned: container.childNodes.length === 0 };
+	return { adopted, before, after, clicks, cleaned: container.childNodes.length === 0 };
 }
