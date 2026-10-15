@@ -1,6 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	decodeStreamedRendererFrame,
+	isStreamFrameIdentity,
 	isStreamedRendererFrame,
 	sameStreamFrameIdentity,
 	type StreamedRegionPlacementFrame,
@@ -194,14 +195,7 @@ export function createStreamedResultReceiverState(
 		}, timeoutMs);
 	};
 	const registerSelection = (identity: StreamFrameIdentity, contentRevision = 0): void => {
-		if (
-			!isStreamedRendererFrame({
-				identity,
-				sequence: 0,
-				channel: 'result',
-				kind: 'complete',
-			})
-		) {
+		if (!isStreamFrameIdentity(identity)) {
 			throw new StreamedReceiverError('identity', formatClientError(253));
 		}
 		if (
