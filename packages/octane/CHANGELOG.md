@@ -1,5 +1,15 @@
 # octane
 
+## 0.13.7
+
+### Patch Changes
+
+- 781fd29: Support the website document shell, links, route-bound hooks, and head assets through the compiled Router entry. Add matching compiled Start client/server entries and a `compiled` build-plugin option that coordinates route generation and lazy imports while preserving ordinary Router/Start behavior.
+
+  Make editor/type tooling recognize dynamic style content props as ordinary host elements, matching runtime compilation and preserving scoped CSS blocks.
+- ea438fb: Avoid rerendering memoized context consumers when only a sibling provider changes. Retain updates for real nearest-provider value changes and conservative invalidation for hosted, replayed, and externally invalidated contexts.
+- 2623e7a: Preserve table sections, rows, and cells when mounting multi-root template children through a component.
+
 ## 0.13.6
 
 ### Patch Changes
