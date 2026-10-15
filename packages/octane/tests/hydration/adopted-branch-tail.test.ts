@@ -48,7 +48,7 @@ function tail(site: string, actual: string) {
 		new RegExp(
 			'^' +
 				escape(
-					`Octane hydration mismatch at ${site}: the client expected the end of the branch ` +
+					`Octane hydration mismatch at ${site}: the client expected the end of its content ` +
 						`but the server rendered ${actual}.`,
 				),
 		),

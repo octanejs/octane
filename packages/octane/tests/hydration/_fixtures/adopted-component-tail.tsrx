@@ -116,6 +116,41 @@ function ClientShape(props: { inner?: boolean }) @{
 	}
 }
 
+function LiteOk() @{
+	<i>{'ok'}</i>
+}
+
+function LiteNothing() @{
+	<></>
+}
+
+function ServerCalls() @{
+	<>
+		<LiteOk />
+		<LiteNothing />
+		<s class="foreign">{'f'}</s>
+	</>
+}
+
+function ClientCalls() @{
+	<>
+		<LiteOk />
+		<LiteNothing />
+	</>
+}
+
+// A component whose identity differs on the client, and whose content is its
+// lite calls' ranges: the last call's range ends where the client's content does.
+export function LiteCalls(props: { server?: boolean }) {
+	const Calls = props.server ? ServerCalls : ClientCalls;
+	return (
+		<div>
+			<Calls />
+			<p>{'after'}</p>
+		</div>
+	);
+}
+
 // A component whose identity differs on the client, and whose body is a
 // branch the server rendered no range for: the branch's template adopts the
 // frame's first hosts in place.

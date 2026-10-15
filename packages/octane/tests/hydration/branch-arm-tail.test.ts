@@ -88,10 +88,10 @@ describe.each([
 		'The nearest Suspense or Hydrate boundary, or the root, will be regenerated on the client.';
 
 	const tailReport = (component: string, directive: string, server = 'a control-flow block') =>
-		report(component, directive, 'the end of the branch', server);
+		report(component, directive, 'the end of its content', server);
 
 	const emptyReport = (component: string) =>
-		report(component, '@if', 'an empty branch', 'a control-flow block');
+		report(component, '@if', 'the end of its content', 'a control-flow block');
 
 	async function hydrate(
 		name: string,

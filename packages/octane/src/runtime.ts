@@ -13112,12 +13112,6 @@ export function componentSlotLite<P>(
 		if (host.nodeType === 11) noteFrontierMember(host, scope);
 		if (process.env.NODE_ENV !== 'production') LITE_BODIES!.set(scope, comp as ComponentBody);
 		stampSignalInstance(scope, parentScope, invocationSite);
-		if (adoptedOpen !== null && adoptedClose !== null) {
-			hydration!.liteRanges.set(scope, {
-				start: adoptedOpen,
-				end: adoptedClose as Comment,
-			});
-		}
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
 		(parentScope.children ??= []).push({
@@ -13162,7 +13156,7 @@ export function componentSlotLite<P>(
 	// The first node after the template that adopted the frame's content.
 	let claimed: Node | null | undefined;
 	const outerClaim =
-		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen));
+		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen), scope);
 	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
@@ -13208,9 +13202,9 @@ export function componentSlotLite<P>(
 	} else if (hydration !== null) {
 		// A hydrating replay, such as a suspended activation's resume, re-renders
 		// an adopted range without adopting it again; its new siblings still adopt
-		// from after it.
-		const range = hydration.liteRanges.get(scope);
-		if (range !== undefined) hydration.node = getNextSibling(range.end);
+		// from after it. An adopted call's stand-in ends at the range's close.
+		const end = scope.block.endMarker;
+		if (isBlockClose(end)) hydration.node = getNextSibling(end!);
 	}
 }
 
@@ -17421,7 +17415,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		}
 		// The island's content adopts its server range as a component's does: what
 		// the server left after it is a mismatch, which the island falls back from.
-		const outerClaim = hydration.beginClaim(getNextSibling(state.start));
+		const outerClaim = hydration.beginClaim(getNextSibling(state.start), block);
 		let claimed: Node | null | undefined;
 		try {
 			renderBlock(block);
@@ -20340,17 +20334,6 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 // exactly-adjacent marker pair. The post-hydration ownership walk can only
 // remove comments in that shape, so roots without one skip the pass entirely.
 
-/**
- * Lite component calls deliberately allocate no CompSlot/Block range owner,
- * but hydration still adopts their server frame pair. Keep that pair in an
- * ephemeral map for the one post-hydration compaction pass; the live lite
- * scope only needs its end marker re-pointed if the pair is borrowed.
- */
-interface HydratedLiteRange {
-	start: Comment;
-	end: Comment;
-}
-
 /** A server text whose comparison waits for the pass's render-phase updates (keepsText). */
 interface PendingHydrationText {
 	server: string | null;
@@ -20470,6 +20453,9 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
 	return null;
 }
 
+/** What a range's owner expects after its content, when the server rendered more (settle). */
+const END_OF_CONTENT = 'the end of its content';
+
 /**
  * Root-local hydration state and the dynamic dispatch boundary for hydration-only
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
@@ -20504,7 +20490,6 @@ class HydrationCapability {
 	 */
 	rootClaimed = false;
 	readonly deferredActivities: Array<() => void> = [];
-	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
 	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
 	/**
@@ -20512,6 +20497,8 @@ class HydrationCapability {
 	 * until the template that renders that range's content adopts it.
 	 */
 	private claimFrom: Node | null = null;
+	/** The Scope that owns that range, whose template is the range's content (claimRoots). */
+	private claimOwner: Scope | null = null;
 	/**
 	 * The first node after that template's roots, which the range's content
 	 * does not claim. Undefined until the template adopts claimFrom.
@@ -20719,9 +20706,10 @@ class HydrationCapability {
 	 * slots inside it render, so an enclosing claim is settled by then, or no
 	 * template will settle it, and only its record needs restoring.
 	 */
-	beginClaim(first: Node | null): Node | null | undefined {
+	beginClaim(first: Node | null, owner: Scope): Node | null | undefined {
 		const outer = this.claimEnd;
 		this.claimFrom = first;
+		this.claimOwner = owner;
 		this.claimEnd = undefined;
 		return outer;
 	}
@@ -20746,7 +20734,7 @@ class HydrationCapability {
 	 * anything left after the client's content is a mismatch (settleClaim).
 	 */
 	renderClaimed(block: Block, scope: Scope, slotKey: number): void {
-		const outer = this.beginClaim(getNextSibling(block.startMarker!));
+		const outer = this.beginClaim(getNextSibling(block.startMarker!), block);
 		let from: Node | null | undefined;
 		try {
 			renderBlock(block);
@@ -20775,17 +20763,29 @@ class HydrationCapability {
 		const cursor = this.node;
 		if (cursor === end) return;
 		if (from === undefined) {
-			// The cursor must follow the last slot's own range. After any other
-			// slot, the cursor proves nothing.
+			// The cursor must follow the last slot's own range: an adopted lite
+			// call's stand-in ends at its close. After any other slot, the cursor
+			// proves nothing.
 			const slots = owner.slots;
 			const last = slots[slots.length - 1];
 			const lastEnd: Node | null | undefined =
-				this.liteRanges.get(last)?.end ?? (last?.borrowed || last?.inherited ? null : last?.end);
+				last?.borrowed || last?.inherited ? null : (last?.end ?? last?.block?.endMarker);
 			if (lastEnd == null || getNextSibling(lastEnd) !== cursor) return;
 			from = cursor;
 		}
-		if (from === null || from === end) return;
-		// Leave anything the client built, and a tail outside the range.
+		this.settle(end, scope, slotKey, from);
+	}
+
+	/**
+	 * After the owner of an adopted server range that ends at `end` first
+	 * rendered its content, which ends at `from` (the cursor, by default),
+	 * server content left before `end` is content the client renders nothing
+	 * for: a mismatch. A `from` outside the range, in content the client built
+	 * or a tail past `end`, proves nothing and is left in place. The slot at
+	 * `scope`'s `slotKey` owns the range.
+	 */
+	settle(end: Node, scope: Scope, slotKey = -1, from: Node | null | undefined = this.node): void {
+		if (from == null || from === end) return;
 		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
 			if (node === null) return;
 		}
@@ -20797,7 +20797,7 @@ class HydrationCapability {
 						componentSourceLoc(scope.block.body) ||
 						(end.parentNode as any).__oct_loc
 				: undefined,
-			() => 'the end of the component',
+			() => END_OF_CONTENT,
 			from,
 		);
 	}
@@ -21166,33 +21166,6 @@ class HydrationCapability {
 	}
 
 	/**
-	 * After a list's first fill adopted the client's items, before the list's
-	 * `end`: server content left between the cursor and `end` is items the
-	 * client does not render.
-	 */
-	settleItems(end: Node): void {
-		const from = this.leftover(end);
-		if (from !== null)
-			this.fail(
-				process.env.NODE_ENV !== 'production' ? (end.parentNode as any)?.__oct_loc : undefined,
-				() => 'the end of the list',
-				from,
-			);
-	}
-
-	/**
-	 * Where the server content starts that a range's owner left unclaimed when
-	 * it finished rendering: the cursor, when the range's close `end` follows
-	 * it. Null when the cursor is on `end`, or past it.
-	 */
-	private leftover(end: Node): Node | null {
-		const from = this.node;
-		for (let node = from; node !== null && from !== end; node = getNextSibling(node))
-			if (node === end) return from;
-		return null;
-	}
-
-	/**
 	 * A slot of `parent` claimed the server range that `close` ends. Step the
 	 * cursor past it to the next sibling's server content. A parent that the
 	 * slot's render disposed, as a cleanup error an ancestor boundary caught
@@ -21209,7 +21182,7 @@ class HydrationCapability {
 	 * of its own template (claimRoots), or past the range its last slot claimed.
 	 */
 	renderAdoptedArm(block: Block): void {
-		const outerClaim = this.beginClaim(getNextSibling(block.startMarker!));
+		const outerClaim = this.beginClaim(getNextSibling(block.startMarker!), block);
 		let claimed: Node | null | undefined;
 		try {
 			renderBlock(block);
@@ -21217,23 +21190,6 @@ class HydrationCapability {
 			claimed = this.endClaim(outerClaim);
 		}
 		if (claimed != null) this.node = claimed;
-	}
-
-	/**
-	 * Runs after a branch's first hydrating render, which adopted the server's
-	 * arm range from `first` to `end`, when the cursor did not reach `end`:
-	 * what is left is content the server rendered for another arm, longer than
-	 * this one, or the whole range when the arm rendered nothing.
-	 */
-	settleArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
-		const from = this.leftover(end);
-		if (from !== null)
-			this.failAt(
-				scope,
-				slotKey,
-				from === first ? 'an empty branch' : 'the end of the branch',
-				from,
-			);
 	}
 
 	/**
@@ -21747,7 +21703,7 @@ class HydrationCapability {
 		if (
 			scope === null ||
 			open === null ||
-			(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)
+			(scope !== this.claimOwner && scope.block.startMarker !== open)
 		)
 			return true;
 		this.claimFrom = null;
@@ -37411,7 +37367,7 @@ function renderPreparedChildList(
 			throw error;
 		}
 		// Only first-fill adoption consumes unowned server items, as in forBlock.
-		if (hydration !== null && !passthroughList) hydration.settleItems(state.forSlot.end);
+		if (hydration !== null && !passthroughList) hydration.settle(state.forSlot.end, parentBlock);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -45512,8 +45468,7 @@ function renderBranchSlot(
 					hydration!.renderAdoptedArm(b);
 					// The server may have rendered another arm here, longer than this one
 					// or one this arm renders nothing of.
-					if (hydration!.node !== bEnd)
-						hydration!.settleArmTail(parentScope, slotKey, first!, bEnd);
+					hydration!.settle(bEnd, parentScope, slotKey);
 				} else {
 					renderBlock(b);
 				}
@@ -45521,7 +45476,7 @@ function renderBranchSlot(
 				// An empty client branch, but the server rendered content in this slot
 				// (e.g. an `@else` with content on the server, an empty `@if` on the
 				// client).
-				hydration.failAt(parentScope, slotKey, 'an empty branch', getNextSibling(state.start));
+				hydration.failAt(parentScope, slotKey, END_OF_CONTENT, getNextSibling(state.start));
 			}
 		} else if (body) {
 			// Markerless client mount — pick the boundary by what the branch renders.
@@ -47121,7 +47076,7 @@ export function forBlock<T>(
 		// Only first-fill adoption consumes unowned server items. Survivor
 		// reconciliation can leave the cursor inside an already-owned item, which
 		// is no server item left over when a pending child replays hydration.
-		if (hydration !== null) hydration.settleItems(state.end);
+		if (hydration !== null) hydration.settle(state.end, parentScope, slotKey);
 	} else {
 		reconcileKeyed(
 			parentBlock,
