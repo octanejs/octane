@@ -1,3 +1,4 @@
+import { composeGeneratorPlugins } from '../start-router-plugin/generator-plugins/compose-generator-plugins.js';
 import { routesManifestPlugin } from '../start-router-plugin/generator-plugins/routes-manifest-plugin.js';
 import { prerenderRoutesPlugin } from '../start-router-plugin/generator-plugins/prerender-routes-plugin.js';
 import { buildRouteTreeFileFooterFromConfig } from '../start-router-plugin/route-tree-footer.js';
@@ -35,10 +36,16 @@ function registerRouterPlugins(api, opts) {
 							corePluginOpts: opts.corePluginOpts,
 						});
 					},
-					plugins: [
-						routesManifestPlugin(),
-						...(opts.startPluginOpts.prerender?.enabled === true ? [prerenderRoutesPlugin()] : []),
-					],
+					plugins: composeGeneratorPlugins({
+						frameworkPlugins: opts.corePluginOpts.routerGeneratorPlugins,
+						userPlugins: routerConfig.plugins,
+						builtInPlugins: [
+							routesManifestPlugin(),
+							...(opts.startPluginOpts.prerender?.enabled === true
+								? [prerenderRoutesPlugin()]
+								: []),
+						],
+					}),
 				},
 				routerPluginContext,
 			);

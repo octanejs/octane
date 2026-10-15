@@ -83,6 +83,7 @@ function createRouterCodeSplitterPlugin(options = {}, routerPluginContext) {
 			code,
 			codeSplitGroupings: splitGroupings,
 			targetFramework: userConfig.target,
+			compiled: userConfig.compiled,
 			filename: id,
 			id,
 			deleteNodes: userConfig.codeSplittingOptions?.deleteNodes

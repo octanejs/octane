@@ -755,6 +755,7 @@ ${acc.routeTree.map((child) => `${child.variableName}Route: typeof ${getResolved
 				filename: node.fullPath,
 				ctx: {
 					target: this.config.target,
+					compiled: this.config.compiled,
 					routeId: escapedRoutePath,
 					lazy: node._fsRouteType === 'lazy',
 				},

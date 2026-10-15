@@ -107,10 +107,13 @@
       "import": "./src/server-entry.js",
       "default": "./src/server-entry.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./compiled/client": "./src/compiled/client.ts",
+    "./compiled/server": "./src/compiled/server.ts"
   },
   "sideEffects": [
-    "./src/default-entry/client.js"
+    "./src/default-entry/client.js",
+    "./src/compiled/default-client.js"
   ],
   "scripts": {
     "test": "cd ../.. && vitest run --project tanstack-start --project tanstack-start-rsbuild"

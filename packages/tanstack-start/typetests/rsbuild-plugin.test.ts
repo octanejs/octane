@@ -6,6 +6,7 @@ import {
 } from '@octanejs/tanstack-start/plugin/rsbuild';
 
 const options = {
+	compiled: true,
 	octane: {
 		devtools: true,
 		hmr: false,

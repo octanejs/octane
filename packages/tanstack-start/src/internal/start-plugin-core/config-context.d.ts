@@ -13,6 +13,7 @@ export declare function createStartConfigContext<TInputConfig>(opts: {
 		opts: TInputConfig | undefined,
 		core: {
 			framework: TanStackStartCoreOptions['framework'];
+			compiled?: boolean;
 		},
 		root: string,
 	) => TanStackStartOutputConfig;

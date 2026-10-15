@@ -9,7 +9,7 @@
 // rail of ported-library marks (./library-icons.ts) fills the space to the right
 // of the prose. Each mark links to its binding on GitHub; the rail disappears
 // below the two-column breakpoint.
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@octanejs/tanstack-router/compiled';
 import { ecosystemPackageGuideHref } from '../../../lib/ecosystem-presentation.ts';
 import { LIBRARY_ICONS } from './library-icons.ts';
 

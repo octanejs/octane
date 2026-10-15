@@ -26202,14 +26202,6 @@ function normalizeAuthoredJsxLiterals(ast) {
 			if (typeof raw === 'string' && raw.slice(1, -1) === value) return null;
 			return { ...node, value: { ...node.value, raw: JSON.stringify(value) } };
 		}
-		if (
-			node.type === 'JSXStyleElement' &&
-			(hasJsxAttribute(node, 'dangerouslySetInnerHTML') || hasJsxAttribute(node, 'children'))
-		) {
-			return normalizeAuthoredJsxLiterals(
-				b.jsx_element(node, node.openingElement.attributes || [], []),
-			);
-		}
 		return null;
 	});
 }

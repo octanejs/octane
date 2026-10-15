@@ -107,6 +107,7 @@ export interface NormalizedClientBuild {
 }
 export interface TanStackStartCoreOptions {
 	framework: CompileStartFrameworkOptions;
+	compiled?: boolean;
 	defaultEntryPaths: {
 		client: string;
 		server: string;

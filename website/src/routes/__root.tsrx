@@ -1,7 +1,7 @@
 'use strong';
 
 import { trustHTML } from 'octane';
-import { Body, Head, Html, Scripts, createRootRoute } from '@octanejs/tanstack-router';
+import { Body, Head, Html, Scripts, createRootRoute } from '@octanejs/tanstack-router/compiled';
 import { SiteHeadContent } from '../components/SiteHeadContent.tsrx';
 import { MainLayout } from '../layouts/MainLayout.tsrx';
 import { NotFound } from '../pages/not-found/NotFound.tsrx';

@@ -9,3 +9,9 @@ export const octaneStartDefaultEntryPaths = {
 	server: path.resolve(defaultEntryDirectory, 'server.js'),
 	start: path.resolve(defaultEntryDirectory, 'start.js'),
 };
+
+export const octaneStartCompiledEntryPaths = {
+	client: path.resolve(sourceDirectory, 'compiled/default-client.js'),
+	server: path.resolve(sourceDirectory, 'compiled/default-server.js'),
+	start: octaneStartDefaultEntryPaths.start,
+};

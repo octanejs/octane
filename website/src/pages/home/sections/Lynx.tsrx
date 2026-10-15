@@ -12,7 +12,7 @@
 // reader scrolls near it.
 import { Hydrate } from 'octane';
 import { visible } from 'octane/hydration';
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@octanejs/tanstack-router/compiled';
 import { LynxShowcase } from './LynxShowcase.tsrx';
 
 export function Lynx() @{

@@ -60,7 +60,25 @@ function transform({ ctx, source, parseSource, filename, node }) {
 	const expectedCallee = getExpectedRouteConstructor(ctx.lazy);
 	const expectedRouteId = `${routeIdQuote}${ctx.routeId}${routeIdQuote}`;
 	const currentRouteId = source.slice(routeCall.routeIdArg.start, routeCall.routeIdArg.end);
-	const targetModule = getRouterPackage(ctx.target);
+	const targetModule =
+		getRouterPackage(ctx.target) + (ctx.target === 'octane' && ctx.compiled ? '/compiled' : '');
+	if (ctx.target === 'octane') {
+		const otherModule = getRouterPackage(ctx.target) + (ctx.compiled ? '' : '/compiled');
+		const mixedImport = ast.program.body.some(
+			(statement) =>
+				t.isImportDeclaration(statement) &&
+				statement.source.value === otherModule &&
+				statement.importKind !== 'type' &&
+				statement.specifiers.some((specifier) => specifier.importKind !== 'type'),
+		);
+		if (mixedImport)
+			return {
+				result: 'error',
+				error: new Error(
+					`Route ${filename ?? ctx.routeId} imports ${otherModule}, but this build uses ${targetModule}. Use the matching Router entry throughout the route tree and set tanstackStart({ compiled: ${Boolean(ctx.compiled)} }) consistently.`,
+				),
+			};
+	}
 	const imports = parseTargetImports(ast.program.body, source, targetModule);
 	const s = new MagicString(source);
 	let modified = false;

@@ -36,15 +36,23 @@ export function CompiledRouterProvider(props: RouterProps) @{
 	</CompiledContext>
 }
 
+function CompiledWrap(props: { component?: any; children?: unknown }) @{
+	@if (props.component) {
+		<CompiledComponent component={props.component} props={{ children: props.children }} />
+	} @else {
+		<>{props.children}</>
+	}
+}
+
 function CompiledMatches() @{
 	const router = useRouter();
 	const rootRoute = (router.routesById as any)[rootRouteId];
 	useLayoutEffect(() => {
 		if (router.options.scrollRestoration) setupScrollRestoration(router);
 	}, [router]);
-	useTransitioner(router);
+	const expectedMatches = useTransitioner(router);
 	@try {
-		<CompiledMatchesInner />
+		<CompiledMatchesInner expectedMatches={expectedMatches} />
 	} @pending {
 		<CompiledPending route={rootRoute} />
 	} @catch (error, reset) {
@@ -53,16 +61,20 @@ function CompiledMatches() @{
 	}
 }
 
-function CompiledMatchesInner() @{
+function CompiledMatchesInner(props: { expectedMatches: unknown }) @{
 	const router = useRouter();
 	const acknowledgement: Array<any> = ((router as any)._rendered ??= []);
-	const matches = useStore(router.stores.matches, (m: any) => acknowledgement[0] ?? m);
+	const matches = useStore(router.stores.matches, (m: any) =>
+		acknowledgement[0] === props.expectedMatches ? (props.expectedMatches ?? m) : m,
+	) as any;
 	const rootMatch = matches[0];
 	useLayoutEffect(() => {
 		if (acknowledgement[0] === matches) settleOwner(acknowledgement, true);
 	}, [acknowledgement, matches]);
 	@if (rootMatch) {
-		<CompiledMatch routeId={rootMatch.routeId} />
+		<CompiledContext context={matchContext} value={rootMatch.routeId}>
+			<CompiledMatch routeId={rootMatch.routeId} />
+		</CompiledContext>
 	}
 }
 
@@ -71,31 +83,28 @@ function CompiledMatch(props: { routeId: string }) @{
 	const store = router.stores.getMatchStore(props.routeId);
 	const ssr = useStore(store, (match: any) => match.ssr);
 	const route = (router.routesById as Record<string, any>)[props.routeId];
-	if (route.isRoot && route.options.shellComponent) {
-		throw new Error(
-			'CompiledRouterProvider does not accept shellComponent. Use RouterProvider for renderable document shells.',
-		);
-	}
 	const pending = route.options.pendingComponent ?? router.options.defaultPendingComponent;
 	const errorComponent = route.options.errorComponent ?? router.options.defaultErrorComponent;
 	const noSsr = ssr === false || ssr === 'data-only';
 	const hasSuspense =
 		(!route.isRoot || route.options.wrapInSuspense || noSsr) &&
 		((route.options.wrapInSuspense ?? pending ?? errorComponent?.preload) || noSsr);
-	<CompiledContext context={matchContext} value={props.routeId}>
-		@if (hasSuspense) {
-			@try {
+	<CompiledWrap component={route.isRoot ? route.options.shellComponent : undefined}>
+		<CompiledContext context={matchContext} value={props.routeId}>
+			@if (hasSuspense) {
+				@try {
+					<CompiledMatchContent route={route} routeId={props.routeId} noSsr={noSsr} />
+				} @pending {
+					<CompiledPending route={route} />
+				}
+			} @else {
 				<CompiledMatchContent route={route} routeId={props.routeId} noSsr={noSsr} />
-			} @pending {
-				<CompiledPending route={route} />
 			}
-		} @else {
-			<CompiledMatchContent route={route} routeId={props.routeId} noSsr={noSsr} />
-		}
+		</CompiledContext>
 		@if (route.parentRoute?.id === rootRouteId && router.options.scrollRestoration) {
 			<CompiledScrollRestoration />
 		}
-	</CompiledContext>
+	</CompiledWrap>
 }
 
 // Without a configured Suspense boundary, both lazy imports and loader promises
