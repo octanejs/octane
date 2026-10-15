@@ -754,6 +754,25 @@ describe('CI workflow aggregation', () => {
 		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
 	});
 
+	test('keeps isolated compiler coverage in the required Node integration lane', () => {
+		const project = baseVitestModule.default.test.projects.find(
+			({ test }) => test?.name === 'octane',
+		);
+		const sharded = shardedVitestConfig.test.projects.find(({ test }) => test?.name === 'octane');
+		assert.equal(project.testExecution.group, 'heavy-node');
+		assert.equal(project.testExecution.include.length, 1);
+		const [spec] = project.testExecution.include;
+		assert.ok(existsSync(path.join(REPO, spec)));
+		assert.equal(project.test.exclude.includes(spec), false);
+		assert.equal(sharded.test.exclude.filter((entry) => entry === spec).length, 1);
+		const lane = jobSource('heavy_node_integration');
+		assert.equal(lane.split(spec).length - 1, 1);
+		assert.match(
+			lane,
+			/Run compiler Vite options tests\n\s+if: [^\n]+\n\s+run: .*--project octane .*--maxWorkers=1/,
+		);
+	});
+
 	test('derives sharded projects generically from execution-group ownership', () => {
 		const projects = configureShardedProjects([
 			{ test: { name: 'ordinary', include: ['ordinary/**/*.test.ts'] } },
