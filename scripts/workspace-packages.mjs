@@ -77,6 +77,7 @@ const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
 	'@octanejs/octane-is',
 	'@octanejs/rspack-plugin',
 	'@octanejs/rsbuild-plugin',
+	'@octanejs/tanstack-router',
 	'@octanejs/vite-plugin',
 ]);
 

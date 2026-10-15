@@ -1,3 +1,5 @@
+'use strong';
+
 // Shared useLinkProps behavior — port of react-router's link.tsx
 // (client path; SSR link rendering arrives with the SSR entries). All of Link's
 // behavior lives here so both `<Link>` and custom `createLink` components share
@@ -8,7 +10,7 @@
 // IntersectionObserver, 'render' once on mount), the click handler (navigate
 // with replace/resetScroll/hashScrollIntoView/viewTransition/startTransition/
 // ignoreBlocker forwarded), and data-status/data-transitioning reflection.
-import { useRef, useState, useEffect, useCallback, flushSync } from 'octane';
+import { __useCommittedState, useRef, useEffect, useCallback } from 'octane';
 import {
 	deepEqual,
 	exactPathTest,
@@ -225,7 +227,10 @@ export function createUseLinkProps(useRouter: typeof UseRouter) {
 			resolvedInactiveProps.style,
 		);
 
-		const [isTransitioning, setIsTransitioning] = useState(false, subSlot(slot, 'lp:t'));
+		const [isTransitioning, setIsTransitioning, commitIsTransitioning] = __useCommittedState(
+			false,
+			subSlot(slot, 'lp:t'),
+		);
 		const hasRenderFetched = useRef(false, subSlot(slot, 'lp:rf'));
 		const elRef = useRef<Element | null>(null, subSlot(slot, 'lp:el'));
 
@@ -246,6 +251,7 @@ export function createUseLinkProps(useRouter: typeof UseRouter) {
 			subSlot(slot, 'lp:dp'),
 		);
 
+		// This manually slotted module retains explicit effect dependencies.
 		// preload="viewport": preload when the anchor scrolls into view (100px margin).
 		useEffect(
 			() => {
@@ -292,9 +298,7 @@ export function createUseLinkProps(useRouter: typeof UseRouter) {
 			) {
 				e.preventDefault();
 
-				flushSync(() => {
-					setIsTransitioning(true);
-				});
+				commitIsTransitioning(true);
 				const unsub = router.subscribe('onResolved', () => {
 					unsub();
 					setIsTransitioning(false);

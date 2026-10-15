@@ -20,10 +20,14 @@ describe('opt-in compiled router rendering', () => {
 			const link = view.find('.file-timing') as HTMLAnchorElement;
 			const observations: unknown[] = [];
 			const unsubscribe = router.subscribe('onBeforeNavigate', () => {
-				observations.push([link.getAttribute('data-transitioning'), link.textContent]);
+				observations.push([
+					link.getAttribute('data-transitioning'),
+					link.textContent,
+					view.find('.file').getAttribute('data-menu'),
+				]);
 			});
 			link.click();
-			expect(observations).toEqual([['transitioning', 'true']]);
+			expect(observations).toEqual([['transitioning', 'true', 'false']]);
 			await settle();
 			expect(view.find('.file p').textContent).toBe('e:File e');
 			expect(link.getAttribute('data-transitioning')).toBeNull();

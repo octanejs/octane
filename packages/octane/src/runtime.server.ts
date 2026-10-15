@@ -7823,6 +7823,15 @@ export function useState<T>(
 	) as [T, (next: any) => void, () => T];
 }
 
+/** @internal Server counterpart: no external integration callback runs during SSR. */
+export function __useCommittedState<T>(
+	initial: T | (() => T),
+	slot: ServerHookSlot | undefined,
+): [T, (next: T | ((value: T) => T)) => void, (next: T | ((value: T) => T)) => void] {
+	const [value, setter] = useState(initial, slot);
+	return [value, setter, setter];
+}
+
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),

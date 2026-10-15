@@ -147,6 +147,7 @@ for (const name of [
 	'ink',
 	'lynx',
 	'octane-is',
+	'tanstack-router',
 	'vite-plugin-octane',
 	'rspack-plugin-octane',
 	'rsbuild-plugin-octane',
