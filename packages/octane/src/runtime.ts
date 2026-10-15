@@ -32085,7 +32085,9 @@ export function portal(
 		prev !== undefined &&
 		prev.target === target
 	) {
-		prepareFragmentPortalInterleaving(prev);
+		// It moves committed nodes of the target, so it lands at commit, before
+		// what this render's commit then inserts there.
+		atCommit(prepareFragmentPortalInterleaving, prev);
 	}
 	const state = renderPortalState(
 		prev ?? null,
