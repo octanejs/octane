@@ -1780,13 +1780,11 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 	it.concurrent(
 		'the first router event after hydration does not remount the app',
 		async () => {
-			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
-				waitForNetworkIdle: true,
-			});
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
 			try {
-				// Let hydrateStart's post-networkidle tail (router match commit +
-				// hydrateRoot) finish before firing the event.
-				await page.waitForTimeout(500);
+				// The homepage's effect log only fills after hydration commits. Waiting
+				// for it also ensures the router has subscribed before the first event.
+				await page.getByRole('log').getByText('count is now 0', { exact: true }).waitFor();
 				// A hash replaceState is the smallest router event: it reloads and
 				// commits a new location without changing matches. The hydrated tree
 				// must update in place — a remount would replace every DOM node (and
