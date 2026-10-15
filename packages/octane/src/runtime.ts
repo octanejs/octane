@@ -5672,7 +5672,9 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 			seen.delete(state);
 		});
 		// A hydrating render writes none of the server range it adopts.
-		if (state.adopt !== null) journalRootRange(state.start.parentNode!, state.start, state.end);
+		// A staged upgrade (placeUpgradedList) changes none of it during render.
+		if (state.adopt !== null && state.start.parentNode !== null)
+			journalRootRange(state.start.parentNode, state.start, state.end);
 		// No chain record restores indices here, so rows that already exist keep
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
@@ -36633,6 +36635,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	const tag = d.type as string;
 	let el = block.deoptNode as Element | null;
+	let desc: ElementDescriptor | null = null;
 	const hydration = hydrating ? activeHydration() : null;
 	// Component tags can resolve to host strings under SVG/MathML. Inherit from
 	// the actual destination rather than assuming every dynamic host is HTML.
@@ -36680,12 +36683,17 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		const parent = block.parentNode;
 		parent.insertBefore(el, block.endMarker);
 		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+	} else if (usesFrontier(block, el)) {
+		// A committed element's props change at commit, after its children's
+		// entries, as hostElementBody's do.
+		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// Re-render, same tag — diff props in place against the stamped descriptor.
 		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
-	setDeoptDesc(el, d);
+	if (desc === null) setDeoptDesc(el, d);
 	if (!hasHostPropContent(d)) renderHostTagChildren(d, block, el);
+	if (desc !== null) queueDeoptOrder(el, block, desc, null, null);
 }
 
 // Render a string-tag componentSlot's children into `el`. A FUNCTION child (the
@@ -36869,7 +36877,7 @@ let DEOPT_UPGRADE: { block: Block; children: any } | null = null;
 // Only raw-host upgrades need this walk. The retained array structure supplies
 // positional boundaries, while each raw node supplies its accepted descriptor:
 // a deferred leaf's live key/type may already belong to the next Provider value.
-function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node }): any {
+function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node | null }): any {
 	if (Array.isArray(value)) {
 		// A plain cold-path copy avoids invoking an authored slice/species and
 		// reads indexed accessors only once before preparing the accepted keys.
@@ -36892,24 +36900,24 @@ function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node
 }
 
 // Build the adoption queue for an upgraded element: pair each existing raw
-// child node (strictly between `start` and `end`, in DOM order) with the key
+// child node (from `first` up to `end`, in DOM order) with the key
 // its OLD child value carries under the same keying scheme the incoming items
 // will use. Empty old values (null/false/'' — the raw path rendered nothing
 // for them) occupy a key slot but get no node. Stops pairing at the first
 // node/value mismatch (defensive; unpaired nodes are swept after the render).
 function buildDeoptAdoptQueue(
 	oldChildren: any,
-	start: Comment,
-	end: Comment,
+	first: Node | null,
+	end: Node | null,
 ): Array<{ key: any; node: Node }> {
 	// SAME flatten + keying as the childSlot array path (incl. compound
 	// slot-scoped keys for nested arrays) — the queue's keys must match the
 	// keys the incoming items will get, or nothing adopts.
-	const accepted = adoptedDeoptChildren(oldChildren, { node: getNextSibling(start), end });
+	const accepted = adoptedDeoptChildren(oldChildren, { node: first, end });
 	const prepared = prepareDeoptList(accepted, true)!;
 	const { items, keys } = prepared;
 	const queue: Array<{ key: any; node: Node }> = [];
-	let cursor: Node | null = getNextSibling(start);
+	let cursor: Node | null = first;
 	for (let i = 0; i < items.length; i++) {
 		const v = items[i];
 		if (v == null || v === false || v === true || v === '') continue; // rendered nothing
@@ -37290,6 +37298,10 @@ function renderPreparedChildList(
 		: false;
 	let passthroughStart: Comment | null = null;
 	let passthroughEnd: Comment | null = null;
+	// The raw children of a committed host that upgrades to Blocks stay where
+	// they are while its render adopts them: the list's markers, the moves of
+	// what it adopts and its new rows land at commit (placeUpgradedList).
+	const staged = upgradeArmed && ROOT_RENDER_TRANSACTION !== null && pendingWrites(null) !== null;
 	if (preparedList.items.length === 0 && hydration === null && state.ownerHost !== null) {
 		// An owns-parent slot needs no list anchors while empty. This also lets
 		// an upgraded host retain its element after its last component disappears,
@@ -37346,7 +37358,7 @@ function renderPreparedChildList(
 				placeAtCommit(domParent, state.end, anchor);
 			else if (!passthroughList && !upgradeArmed && usesFrontier(parentBlock, domParent))
 				slotFrontier(state, parentBlock, domParent, null).appendChild(state.end);
-			else domParent.insertBefore(state.end, anchor);
+			else if (!staged) domParent.insertBefore(state.end, anchor);
 			if (passthroughList) passthroughEnd = state.end;
 		}
 		if (state.start === null) {
@@ -37362,7 +37374,16 @@ function renderPreparedChildList(
 					: state.end;
 			if (hydration !== null || (hydrating && domParent.isConnected))
 				placeAtCommit(domParent, state.start, before);
-			else (upgradeArmed ? domParent : state.end.parentNode!).insertBefore(state.start, before);
+			else if (upgradeArmed) {
+				if (!staged) domParent.insertBefore(state.start, before);
+			} else {
+				// A committed slot's end stays put; the list's start lands with its
+				// rows at commit, before that end.
+				const parent = state.end.parentNode!;
+				if (usesFrontier(parentBlock, parent))
+					slotFrontier(state, parentBlock, parent, state.end).appendChild(state.start);
+				else parent.insertBefore(state.start, before);
+			}
 			if (passthroughList) passthroughStart = state.start;
 		}
 		state.forSlot = {
@@ -37387,7 +37408,9 @@ function renderPreparedChildList(
 			next: null,
 		};
 		if (upgradeArmed) {
-			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
+			state.forSlot.adopt = staged
+				? buildDeoptAdoptQueue(upgradeChildren, getFirstChild(domParent), null)
+				: buildDeoptAdoptQueue(upgradeChildren, getNextSibling(state.start), state.end!);
 		}
 	}
 	const { items, keys } = preparedList;
@@ -37501,6 +37524,8 @@ function renderPreparedChildList(
 				ssrMarkerless,
 				normalizeKey,
 				passthroughList,
+				// A staged upgrade's list has no placed markers until its commit.
+				state.forSlot.adopt !== null && state.forSlot.end.parentNode === null ? domParent : null,
 			);
 		} catch (error) {
 			if (passthroughStart !== null) {
@@ -38742,7 +38767,9 @@ export function childSlot(
 			}
 			return;
 		}
-		if (rootShapeChanged && usesFrontier(parentBlock, domParent)) {
+		// An upgraded host's component child that adopted nothing above replaces
+		// the host's raw children the same way.
+		if ((rootShapeChanged || upgradeArmed) && usesFrontier(parentBlock, domParent)) {
 			// The incoming Block renders in the slot's fragment, between a pair of
 			// its own, and lands where the outgoing content stands at commit.
 			const owned = state.ownerHost !== null || (state.borrowed && state.start === null);
@@ -47917,6 +47944,9 @@ function mountItemsLinear<T>(
 	ssrMarkerless: boolean,
 	normalizeKey: boolean = false,
 	passthroughList: boolean = false,
+	// A committed host's upgrade (renderPreparedChildList): its rows render
+	// where they stand or off-document, and placeUpgradedList orders them.
+	upgradeHost: Node | null = null,
 ): void {
 	const newLen = items.length;
 	const observeKey =
@@ -47936,7 +47966,7 @@ function mountItemsLinear<T>(
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
 	// A hydrating list's end may still be to place (placeAtCommit).
-	const parentNode = markerParent(state.end)!;
+	const parentNode = upgradeHost ?? markerParent(state.end)!;
 	// A committed list's rows render off-document and land before its end.
 	const next =
 		ROOT_RENDER_TRANSACTION === null || passthroughList
@@ -47950,6 +47980,10 @@ function mountItemsLinear<T>(
 	const adopt = state.adopt;
 	let adoptByKey: Map<any, { key: any; node: Node }> | null = null;
 	let adoptedNodes: Set<Node> | null = null;
+	// A staged upgrade's new rows, off-document, and its adopted rows whose pair
+	// wraps their node at commit.
+	let run: DocumentFragment | null = null;
+	let wraps: any[] | null = null;
 	if (adopt !== null) {
 		adoptByKey = new Map();
 		for (let index = 0; index < adopt.length; index++) {
@@ -47964,28 +47998,45 @@ function mountItemsLinear<T>(
 			const key = readListKey(keySource, item, i, normalizeKey);
 			if (observeKey !== undefined) observeKey(i, key);
 			let adoptNode: Node | null = null;
-			let anchor: Node = state.end;
+			let anchor: Node | null = state.end;
+			let into = parentNode;
 			if (adoptByKey !== null) {
-				anchor = (prev === null ? getNextSibling(state.start!) : getNextSibling(prev.endMarker!))!;
+				if (upgradeHost === null)
+					anchor = (
+						prev === null ? getNextSibling(state.start!) : getNextSibling(prev.endMarker!)
+					)!;
 				const candidate = adoptByKey.get(key);
 				if (candidate !== undefined) {
 					adoptNode = candidate.node;
 					adoptByKey.delete(key);
 					(adoptedNodes ??= new Set()).add(adoptNode);
-					if (adoptNode !== anchor) {
+					if (upgradeHost === null && adoptNode !== anchor) {
 						if (renderingFocus !== null) {
 							captureFocusedMovement(parentNode, renderingFocus);
-							moveFocusedNodeBefore(parentNode, adoptNode, anchor, renderingFocus);
+							moveFocusedNodeBefore(parentNode, adoptNode, anchor!, renderingFocus);
 						} else parentNode.insertBefore(adoptNode, anchor);
 					}
+				}
+				if (upgradeHost !== null) {
+					anchor = null;
+					if (adoptNode === null) into = run ??= queueFrontier(parentBlock, upgradeHost, null);
 				}
 			}
 			const block: Block =
 				hydrating && passthroughList
-					? mountPassthroughListItem(parentBlock, parentNode, anchor, item, i, key, itemBody, state)
-					: mountItem(
+					? mountPassthroughListItem(
 							parentBlock,
 							parentNode,
+							anchor!,
+							item,
+							i,
+							key,
+							itemBody,
+							state,
+						)
+					: mountItem(
+							parentBlock,
+							into,
 							anchor,
 							item,
 							i,
@@ -47997,7 +48048,10 @@ function mountItemsLinear<T>(
 							adoptNode,
 							false,
 							next,
+							upgradeHost !== null,
 						);
+			if (upgradeHost !== null && adoptNode !== null && block.startMarker !== adoptNode)
+				(wraps ??= []).push(block, adoptNode);
 			oldItems.set(key, block);
 			block.prevSibling = prev;
 			block.nextSibling = null;
@@ -48007,6 +48061,13 @@ function mountItemsLinear<T>(
 		}
 		state.tail = prev;
 		state.size = newLen;
+		if (upgradeHost !== null)
+			ROOT_RENDER_TRANSACTION!.ops.push(placeUpgradedList, [
+				state,
+				parentBlock,
+				upgradeHost,
+				wraps,
+			]);
 	} catch (error) {
 		// Adopted nodes still belong to the committed raw host tree and the cleanup
 		// below deliberately leaves them connected. Keep the full queue so the root
@@ -48943,6 +49004,8 @@ function mountItem<T>(
 	// A committed list's pending structure (listNext): the row renders off the
 	// document and lands before `anchor` at commit.
 	next: SlotNext | null = null,
+	// A committed host's upgrade: an adopted row's pair wraps its node at commit.
+	staged = false,
 ): Block {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_INSERT);
@@ -49134,8 +49197,10 @@ function mountItem<T>(
 		// Adoption: wrap the existing raw node in this item's markers where it
 		// already sits (identity/focus/input state survive) instead of building
 		// at the anchor.
-		parentNode.insertBefore(start, adoptNode);
-		parentNode.insertBefore(end, getNextSibling(adoptNode));
+		if (!staged) {
+			parentNode.insertBefore(start, adoptNode);
+			parentNode.insertBefore(end, getNextSibling(adoptNode));
+		}
 	} else {
 		parentNode.insertBefore(start, anchor);
 		parentNode.insertBefore(end, anchor);
@@ -49164,6 +49229,32 @@ function mountItem<T>(
 		throw error;
 	}
 	return block;
+}
+
+/**
+ * A staged upgrade's list at its commit, over the host's adopted children: the
+ * pairs of adopted rows wrap their nodes, then the list's end, its rows from
+ * the last (each moved only when out of place) and its start. Its new rows
+ * have landed at the host's end (queueFrontier) and move into place here. The
+ * upgraded host's children slot (its slot 0) must still show this list.
+ */
+function placeUpgradedList(args: any[]): void {
+	const [state, owner, host, wraps] = args as [ForSlot, Block, Node, any[] | null];
+	if (owner.disposed || (owner.slots[0] as ChildSlot | undefined)?.forSlot !== state) return;
+	if (wraps !== null)
+		for (let i = 0; i < wraps.length; i += 2) {
+			const node: Node = wraps[i + 1];
+			if (node.parentNode !== host) continue;
+			host.insertBefore(wraps[i].startMarker, node);
+			host.insertBefore(wraps[i].endMarker, getNextSibling(node));
+		}
+	host.insertBefore(state.end, null);
+	let anchor: Node = state.end;
+	for (let block = state.tail; block !== null; block = block.prevSibling) {
+		if (getNextSibling(block.endMarker!) !== anchor) moveBlockBefore(block, anchor);
+		anchor = block.startMarker!;
+	}
+	host.insertBefore(state.start, anchor);
 }
 
 /**

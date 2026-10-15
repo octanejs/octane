@@ -54,6 +54,7 @@ export const WRITERS = new Map(
 		clearRootContainer: 'commit',
 		landItemPair: 'commit',
 		landHostPair: 'commit',
+		placeUpgradedList: 'commit',
 		mappedDeoptItemBody: 'commit',
 		commitStyleResource: 'commit',
 		commitScriptResource: 'commit',
@@ -210,7 +211,6 @@ export const UNGUARDED_FRESH = new Map(
 		prepareFragmentPortalInterleaving: 'a portal into a target that holds other content',
 		evacuateInterleavedPortalRanges: 'a portal into a target that holds other content',
 		renderFragmentRefDescriptor: "a ref'd Fragment's marker pair",
-		hostStringTagBody: 'a string-tag host built into its Block',
 		frontierSentinel: 'a spare sentinel renamed before it joins a frontier',
 	}),
 );
