@@ -57,3 +57,23 @@ export function EditorRows(props: { tag: string; labels: readonly string[] }) @{
 		}
 	</ul>
 }
+
+function NewEditor(props: { tag: string }) {
+	return createElement(
+		props.tag,
+		{ 'data-label': 'ready', defaultValue: 'server draft' },
+		createElement('input', { defaultValue: 'native draft' }),
+	);
+}
+
+export function ConditionalEditor(props: { tag: string; show: boolean }) @{
+	<section>
+		<b>A</b>
+		@if (props.show) {
+			<NewEditor tag={props.tag} />
+		} @else {
+			<span>waiting</span>
+		}
+		<b>B</b>
+	</section>
+}

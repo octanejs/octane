@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import { createElement } from '../src/index.js';
-import { App, EditorRows } from './_fixtures/anchorless-host.tsrx';
+import { App, ConditionalEditor, EditorRows } from './_fixtures/anchorless-host.tsrx';
 
 // A LONE PURE-HOST descriptor at a value position (a pass-through component's
 // return, a host descriptor rendered at a root) mounts ANCHORLESS — no comment
@@ -13,6 +13,24 @@ import { App, EditorRows } from './_fixtures/anchorless-host.tsrx';
 // React-style pass-through: whatever `children` value it's given is what the
 // root renders — this is exactly @octanejs/testing-library's ValueRoot shim.
 const Pass = (props: any) => props.children;
+
+function PlainEditorChild(props: { tag: string }) {
+	return createElement(
+		props.tag,
+		{ 'data-label': 'ready', defaultValue: 'server draft' },
+		createElement('input', { defaultValue: 'native draft' }),
+	);
+}
+
+function PlainDescriptorEditor(props: { tag: string; show: boolean }) {
+	return createElement(
+		'section',
+		null,
+		createElement('b', null, 'A'),
+		props.show ? createElement(PlainEditorChild, { tag: props.tag }) : null,
+		createElement('b', null, 'B'),
+	);
+}
 
 describe('anchorless lone pure-host value', () => {
 	it('mounts with NO comment anchors — container.firstChild IS the element', () => {
@@ -218,6 +236,77 @@ describe('anchorless lone pure-host value', () => {
 			const r = mount(App, { mode, tag });
 			dispose = () => r.unmount();
 			r.update(App, { mode: 'editor', tag });
+			expect(events).toEqual(['attribute']);
+			expect(r.container.childNodes).toHaveLength(0);
+		},
+	);
+
+	it.each([
+		['compiled', ConditionalEditor, 'AwaitingB'],
+		['plain', PlainDescriptorEditor, 'AB'],
+	] as const)(
+		'initializes a newly mounted conditional editor before connection (%s)',
+		(kind, View, before) => {
+			const observations: Array<{
+				label: string | null;
+				defaultValue: string | null;
+				inputDefaultValue: string | undefined;
+			}> = [];
+			const tag = `conditional-${kind}-component-editor`;
+			customElements.define(
+				tag,
+				class extends HTMLElement {
+					connectedCallback() {
+						observations.push({
+							label: this.getAttribute('data-label'),
+							defaultValue: this.getAttribute('defaultValue'),
+							inputDefaultValue: this.querySelector('input')?.defaultValue,
+						});
+					}
+				},
+			);
+			const r = mount(View, { tag, show: false });
+			try {
+				const section = r.find('section');
+				expect(section.textContent).toBe(before);
+				r.update(View, { tag, show: true });
+				expect(r.find('section')).toBe(section);
+				expect(r.find(tag).getAttribute('data-label')).toBe('ready');
+				expect(r.find(tag).getAttribute('defaultValue')).toBe('server draft');
+				expect(observations).toEqual([
+					{ label: 'ready', defaultValue: 'server draft', inputDefaultValue: 'native draft' },
+				]);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each([
+		['compiled', ConditionalEditor],
+		['plain', PlainDescriptorEditor],
+	] as const)(
+		'does not connect a newly mounted conditional editor after its initial attributes unmount the root (%s)',
+		(kind, View) => {
+			const tag = `conditional-${kind}-component-disposer`;
+			const events: string[] = [];
+			let dispose: (() => void) | undefined;
+			customElements.define(
+				tag,
+				class extends HTMLElement {
+					static observedAttributes = ['data-label'];
+					attributeChangedCallback() {
+						events.push('attribute');
+						dispose?.();
+					}
+					connectedCallback() {
+						events.push('connected');
+					}
+				},
+			);
+			const r = mount(View, { tag, show: false });
+			dispose = () => r.unmount();
+			r.update(View, { tag, show: true });
 			expect(events).toEqual(['attribute']);
 			expect(r.container.childNodes).toHaveLength(0);
 		},
