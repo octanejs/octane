@@ -35437,7 +35437,13 @@ function reconcileDeoptNode(
 				elNs !== undefined
 					? document.createElementNS(elNs, value.type)
 					: document.createElement(value.type);
-			setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
+			// Even off-document, custom setters may call back into the application.
+			// Admit those writes with the slot so unmount can revoke the frontier
+			// before its newly created host is connected.
+			if (ROOT_RENDER_TRANSACTION !== null && isHtmlCustomElement(el)) {
+				defer = true;
+				desc = deoptRecord(el, value);
+			} else setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
 		if (desc === null) setDeoptDesc(el, value);
 		const nodes = hasHostPropContent(value)
