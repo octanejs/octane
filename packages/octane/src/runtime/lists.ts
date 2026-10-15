@@ -200,8 +200,9 @@ export function forBlock<T>(
 	// binds no `index` name → a pure reorder that only moves a survivor's
 	// position need not re-render it), bit 4 = the server emitted direct-host
 	// items without per-item pairs, bit 5 = a nested host conditional requires
-	// its owning Block's scope whenever an item body does need to render.
-	// Packed into one numeric literal.
+	// its owning Block's scope whenever an item body does need to render, bit 7 =
+	// a sole component row whose template inserts its one root, bits 8+ = a keyed
+	// selection's dependency index. Packed into one numeric literal.
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? CURSOR : null;
 	let state = parentScope.slots[slotKey] as ForSlot | undefined;
@@ -451,18 +452,13 @@ export function forBlock<T>(
 			state.cachedDeps = deps;
 		}
 	}
+	// A committed list's direct-host row (true) or sole-component row (2) keeps
+	// its root detached until commit (mountItem).
+	const markerless = (f & 16) !== 0 || ((f & 128) !== 0 && 2);
 	if (state.size === 0) {
 		// First fill (hydration adopt / fresh mount / update-path 0 → N): the
 		// linear pass — the full reconciler has no old list to diff against.
-		mountItemsLinear(
-			parentBlock,
-			state,
-			items,
-			getKey,
-			itemBody as any,
-			(f & 2) !== 0,
-			(f & 16) !== 0,
-		);
+		mountItemsLinear(parentBlock, state, items, getKey, itemBody as any, (f & 2) !== 0, markerless);
 		// Only first-fill adoption consumes unowned server items. Survivor
 		// reconciliation can leave the cursor inside an already-owned item, which
 		// is no server item left over when a pending child replays hydration.
@@ -478,7 +474,7 @@ export function forBlock<T>(
 			(f & 2) !== 0,
 			lite,
 			(f & 8) !== 0,
-			(f & 16) !== 0,
+			markerless,
 		);
 		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentBlock);
 	}
@@ -552,7 +548,7 @@ export function keyedForBlock<T>(
 			itemBody,
 			state.cachedDeps,
 			deps,
-			flags >>> 6,
+			flags >>> 8,
 			selectionBody,
 		)
 	) {
@@ -1009,7 +1005,7 @@ export function mountItemsLinear<T>(
 	keySource: ListKeySource<T>,
 	itemBody: (item: T, scope: Scope) => void,
 	singleRoot: boolean | 2,
-	ssrMarkerless: boolean,
+	ssrMarkerless: boolean | 2,
 	normalizeKey: boolean = false,
 	passthroughList: boolean = false,
 	// A host's upgrade (renderPreparedChildList): its rows render where they
@@ -1266,8 +1262,9 @@ export function reconcileKeyed<T>(
 	indexIndependent: boolean = false,
 	// The matching server compiler proved a direct host root and omitted the
 	// item's hydration pair. Kept separate from singleRoot because sole-component
-	// and conditional roots are markerless only on fresh client mounts today.
-	ssrMarkerless: boolean = false,
+	// and conditional roots are markerless only on fresh client mounts today; 2 =
+	// a sole-component row, markerless on the client only (mountItem).
+	ssrMarkerless: boolean | 2 = false,
 	normalizeKey: boolean = false,
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -1950,8 +1947,10 @@ function mountItem<T>(
 	singleRoot: boolean | 2,
 	// A compiled row whose server body the compiler proved a direct host: it has
 	// no range of its own on the wire. A descriptor item (singleRoot 2) decides
-	// by its value instead (selfDelimits).
-	ssrMarkerless: boolean,
+	// by its value instead (selfDelimits). 2 = a sole-component row whose
+	// component's template inserts its one root: it has a range on the wire, and
+	// on the client keeps that root detached until commit too.
+	ssrMarkerless: boolean | 2,
 	// Pure-host → blocks upgrade adoption: an existing raw child node this item
 	// should take over IN PLACE (self-marked directly, or markers minted around
 	// it, seeded as the item block's deoptNode so the body's pure path patches
@@ -1979,7 +1978,7 @@ function mountItem<T>(
 			if (
 				descriptor
 					? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
-					: ssrMarkerless
+					: ssrMarkerless === true
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
 				// direct-host item self-delimits, exactly like the existing client-mount
@@ -2104,9 +2103,9 @@ function mountItem<T>(
 			renderBlock(block);
 			return block;
 		}
-		// A committed list's direct-host row, whose own template inserts its one
-		// root, keeps that root detached until commit (DETACHED_ROOT).
-		const detached = next !== null && singleRoot === true && ssrMarkerless;
+		// A committed list's direct-host or sole-component row, whose template
+		// inserts its one root, keeps that root detached until commit (DETACHED_ROOT).
+		const detached = next !== null && singleRoot === true && ssrMarkerless !== false;
 		const block = createBlock(
 			'control-flow',
 			parentBlock,

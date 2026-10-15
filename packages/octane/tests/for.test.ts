@@ -58,6 +58,8 @@ import {
 	SuspendingRowConditionalList,
 	EarlySuspendingRowHostList,
 	EarlySuspendingRowComponentList,
+	InsertedRowList,
+	InsertedHookRowList,
 	NestedKeyedReorderList,
 	NestedKeyedReorderBoundary,
 	NestedKeyedReorderTransition,
@@ -2938,4 +2940,33 @@ describe.each([
 			r.unmount();
 		}
 	});
+});
+
+describe('keyed component rows that an update inserts', () => {
+	it.each([
+		['a hookless', InsertedRowList, ''],
+		['a hookful', InsertedHookRowList, ':0'],
+	] as const)(
+		'lands %s component row anywhere, then updates, moves and removes it',
+		(_shape, List, suffix) => {
+			const r = mount(List, { rows: ['b', 'd'] });
+			try {
+				const text = () => r.findAll('li').map((li) => li.textContent);
+				const [b, d] = r.findAll('li');
+				r.update(List, { rows: ['a', 'b', 'c', 'd', 'e'] });
+				expect(text()).toEqual(['a', 'b', 'c', 'd', 'e'].map((row) => row + suffix));
+				const rows = r.findAll('li');
+				expect(rows[1]).toBe(b);
+				expect(rows[3]).toBe(d);
+				r.update(List, { rows: ['e', 'c', 'x', 'a'] });
+				expect(text()).toEqual(['e', 'c', 'x', 'a'].map((row) => row + suffix));
+				const moved = r.findAll('li');
+				expect([moved[0], moved[1], moved[3]]).toEqual([rows[4], rows[2], rows[0]]);
+				r.update(List, { rows: [] });
+				expect(r.findAll('li')).toHaveLength(0);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
 });

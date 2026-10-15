@@ -12559,6 +12559,9 @@ function compileInternal(
 		// like a single-root `@for` item. (Output-shape based — independent of which
 		// hooks it calls.)
 		info.singleRoot = !compNode._octaneBindingView && singleHostComponentRoot(compNode);
+		// Its own template inserts that root (no @if arm does), so a committed
+		// list's sole-component row can keep the root detached until commit.
+		info.hostRoot = info.singleRoot;
 		// Transitive @if-arm form of the same proof — resolved by the fixed point
 		// below once every same-module callee an arm depends on is itself proven.
 		info.singleRootIfDeps =
@@ -29213,7 +29216,9 @@ function planJsx(
 		//        that only changes a survivor's position need not re-render it),
 		//        bit 4 = SSR emitted markerless direct-host items; hydrate them by root,
 		//        bit 5 = conditional item bodies require their active scope,
-		//        bits 6+ = the zero-based keyedForBlock selection dependency index.
+		//        bit 6 = dev: a mapped list without keys,
+		//        bit 7 = a sole component row whose template inserts its one root,
+		//        bits 8+ = the zero-based keyedForBlock selection dependency index.
 		// keyedForBlock itself identifies a selection, including dependency zero;
 		// ordinary forBlock reuses bit 5 without an argument or tuple allocation.
 		const flags =
@@ -29224,7 +29229,8 @@ function planJsx(
 			(fc.ssrMarkerless ? 16 : 0) |
 			(fc.requiresScope ? 32 : 0) |
 			(ctx.dev && fc.missingMapKey ? 64 : 0) |
-			(fc.keyedSelectionIndex >= 0 ? fc.keyedSelectionIndex << 6 : 0);
+			(fc.detachRoot ? 128 : 0) |
+			(fc.keyedSelectionIndex >= 0 ? fc.keyedSelectionIndex << 8 : 0);
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
 		// emptyBody?, anchor?, ownEnd?, selectionBody?). The final argument is
 		// emitted only for a certified keyed-selection call.
@@ -36656,6 +36662,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// ranges. An item that can exit early renders no root when it does.
 	let singleRoot = false;
 	let singleRootExpr = null;
+	// A sole component whose own template inserts the row's root (hostRoot).
+	let detachRoot = false;
 	if (!armMayExit(subStmts)) {
 		const jsxChildren = subStmts.filter((s) => isJsxNode(s));
 		if (jsxChildren.length === 1) {
@@ -36689,8 +36697,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 				if (bare && !hasSpread && !hasKeyOrChildren && !hasChildren) {
 					const compName = tagName.name;
 					const local = ctx.componentInfo?.get(compName);
-					if (local?.singleRoot === true) singleRoot = true;
-					else if (isImmutableComponentTag(tagName, ctx)) singleRootExpr = compName;
+					if (local?.singleRoot === true) {
+						singleRoot = true;
+						detachRoot = local.hostRoot === true;
+					} else if (isImmutableComponentTag(tagName, ctx)) singleRootExpr = compName;
 				}
 			}
 		}
@@ -36703,6 +36713,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	if (node._octaneBindingSite) {
 		singleRoot = false;
 		singleRootExpr = null;
+		detachRoot = false;
 	}
 	const ssrMarkerless = isSsrMarkerlessForItem(node, subStmts);
 	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
@@ -36793,6 +36804,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		singleRoot,
 		singleRootExpr,
 		ssrMarkerless,
+		detachRoot,
 		hostMountSafe,
 		// The env union doubles as the deps array: emitted whenever the helpers
 		// capture anything (Phase 2 — the runtime stamps it as block.extra), and
