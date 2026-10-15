@@ -11,8 +11,16 @@ title: Signals
 </div>
 
 Signals are a **stable Octane API**. Import the data engine from `octane/signals`
-or the component hook from `octane/signals/client`. The standard Octane compiler
-handles native reads automatically: **no extra compiler option is needed**.
+or the component hook from `octane/signals/client`.
+
+**Every module that consumes native signal reads needs its own runtime import**
+from `octane/signals`, `octane/signals/client`, or `octane/signals/server`. For
+example, a component that calls `count$.get()` during rendering needs this import
+even if it receives the handle through props or imports it from another file. The
+same rule applies when a component calls a helper that reads signals. If the
+module does not use a named signals API, add `import 'octane/signals';`. A
+type-only import or a `$` name alone does not enable native-read compilation. No
+extra compiler option is needed.
 
 <h2 id="declarations">Declare state and derived values</h2>
 
@@ -74,12 +82,8 @@ require a nonempty key. The first argument of `signal$('draft')` is the stored
 string, not a key. Function initial values are also data; to store a function
 through the updater-style setter, use `handler$.set(() => nextHandler)`.
 
-Each module that consumes native reads needs a **runtime import** from
-`octane/signals`, `octane/signals/client`, or `octane/signals/server`. A
-type-only import or a `$` name alone does not enable native-read compilation.
-Use `import 'octane/signals'` in a component that only receives handles as props.
-
-Rendering a handle directly, as in `{props.label as string}` or
+Direct DOM bindings are distinct from native signal reads. Rendering a handle
+directly, as in `{props.label as string}` or
 `title={props.label}`, binds it to the DOM when the rendering module has **any
 import** from `octane/signals`. A type-only
 `import type { SignalHandle } from 'octane/signals'` is enough and does not enable

@@ -40,9 +40,10 @@ All three integrations also accept `profile: true` for a client profiling
 build. See [Profiling](/docs/profiling) for Chrome tracks, render causes, the
 console API, and the recommended production-style workflow.
 
-[Signals](/docs/signals) work automatically with all three integrations. Import
-from `octane/signals` or `octane/signals/client` and keep the `$` suffix on signal
-capabilities. No `nativeReads` compiler option is required.
+[Signals](/docs/signals) work with all three integrations. Each module that
+consumes native signal reads requires a runtime import from `octane/signals`,
+`octane/signals/client`, or `octane/signals/server`. No `nativeReads` compiler
+option is required.
 
 <h2 id="vite">Vite</h2>
 
