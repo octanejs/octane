@@ -4568,7 +4568,7 @@ function noteFrontierMember(parent: Node, member: object): void {
 // Keep the host writer on the member so ordinary compiled roots don't retain
 // the descriptor renderer. List runs commit only their own members.
 function commitFrontierMembers(next: SlotNext, from: Node | Block): boolean {
-	const writes = next.writes?.get(from);
+	const writes = next.writes!.get(from);
 	if (writes === undefined) return true;
 	for (let i = 0; i < writes.length; i++) {
 		const write = writes[i];
@@ -4649,7 +4649,7 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 	)
 		return;
 	const frag = next.frag;
-	if (frag !== null && !commitFrontierMembers(next, frag)) return;
+	if (frag !== null && next.writes !== undefined && !commitFrontierMembers(next, frag)) return;
 	// A branch arm's detached root lands alone, with no members to rehome.
 	if (frag !== null || next.root !== null) parent.insertBefore(frag ?? next.root!, before);
 	for (let i = 0; i < members.length; i += 2) {
@@ -5030,7 +5030,7 @@ function placeRoots(parent: Node, rows: Block[], anchor: Node, next: SlotNext): 
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		if (!row.disposed) {
-			if (!commitFrontierMembers(next, row)) return;
+			if (next.writes !== undefined && !commitFrontierMembers(next, row)) return;
 			into.insertBefore(row.startMarker!, anchor);
 		}
 	}
@@ -5055,7 +5055,7 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
  */
 function placeRun(parent: Node, frag: DocumentFragment, anchor: Node): void {
 	const next: SlotNext = (frag as any).$$next;
-	if (!commitFrontierMembers(next, frag)) return;
+	if (next.writes !== undefined && !commitFrontierMembers(next, frag)) return;
 	const from = frag;
 	const into = parent;
 	for (let node = from.firstChild; node !== null; node = from.firstChild)
