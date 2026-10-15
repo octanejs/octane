@@ -1592,6 +1592,11 @@ before-mutation ref-detach phase.
 
 Other consequences:
 
+- A render writes no DOM the page shows, so a dropped render leaves the page as
+  it was. A hand-written body over the compiler ABI follows the same rule:
+  writing committed DOM during render, including through `setText` or
+  `setAttribute`, is unsupported; its staged forms are a bag factory's host,
+  `setRenderText`, and commit ops.
 - Priority (`urgent` vs `transition`) governs Suspense hold semantics and
   whether a render waits for a later host task (above), not time-slicing.
 - Fallback-visible boundaries whose retries fully stage reveal together,

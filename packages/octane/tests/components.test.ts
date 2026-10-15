@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
+	bagOf,
 	createElement,
 	useState,
 	template,
@@ -8,7 +9,9 @@ import {
 	flushSync,
 	hydrateRoot,
 	isValidElement,
+	type Scope,
 } from 'octane';
+import { setRenderText } from 'octane/internal/client';
 import { renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
 import { mount, act } from './_helpers';
@@ -138,28 +141,21 @@ describe('key-driven remount on standalone component', () => {
 // descriptor-returning path the `@octanejs/*` bindings rely on.
 describe('hand-written descriptor renderer (return-based body, no compiler)', () => {
 	// The compiled imperative renderer for `<button onClick={onInc}>{n}</button>`.
-	const _btn = template('<button></button>');
-	function CountButtonFrag(props: any, __s: any) {
-		const __block = __s.block;
-		let _b = __s.b$0;
-		if (_b === undefined) {
-			_b = {};
+	// As compiled output does, it writes no DOM at render: its bag factory places
+	// the button at commit, and an update stages its text write for commit.
+	const _btn = template('<button> </button>');
+	function CountButtonFrag(props: any, scope: Scope) {
+		let bag = scope.slots[0];
+		if (bag === undefined) {
 			const el = clone(_btn) as HTMLButtonElement;
-			const txt = document.createTextNode(String(props.n));
-			el.appendChild(txt);
-			el.onclick = props.onInc;
-			_b.el = el;
-			_b.txt = txt;
-			_b.n = props.n;
-			__block.parentNode.insertBefore(el, __block.endMarker);
-			__s.b$0 = _b;
-		} else {
-			if (_b.n !== props.n) {
-				_b.txt.data = String(props.n);
-				_b.n = props.n;
-			}
-			_b.el.onclick = props.onInc; // latest closure
+			el.onclick = () => bag.onInc(); // the latest closure, from the bag
+			bag = bagOf(scope, el, { txt: el.firstChild, n: undefined, onInc: null });
 		}
+		if (bag.n !== props.n) {
+			setRenderText(bag.txt, String(props.n));
+			bag.n = props.n;
+		}
+		bag.onInc = props.onInc;
 	}
 
 	// "Just a function" — has a hook (manual stable slot), RETURNS a descriptor.

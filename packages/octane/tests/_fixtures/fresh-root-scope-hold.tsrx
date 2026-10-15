@@ -1,9 +1,12 @@
-import { setAttribute, setText, use, useState } from 'octane';
+import { use, useLayoutEffect, useState } from 'octane';
 
 function NewRow(props) @{
 	const [clicks, setClicks] = useState(0);
-	setText(props.external.firstChild as Text, 'external:' + props.label);
-	setAttribute(props.external, 'data-state', props.label);
+	// Render writes no DOM it does not own; a node outside the root changes at commit.
+	useLayoutEffect(() => {
+		(props.external.firstChild as Text).data = 'external:' + props.label;
+		props.external.setAttribute('data-state', props.label);
+	});
 	<button id="new-row" title={'row:' + props.label} onClick={() => setClicks(clicks + 1)}>
 		{'row:' + props.label + ':' + clicks}
 	</button>
