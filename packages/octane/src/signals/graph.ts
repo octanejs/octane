@@ -11,12 +11,14 @@ import {
 import { installSignalActions } from '#octane/signal-actions/graph';
 import { installServerReads } from '#octane/signals/server-reads';
 import {
+	assertAlive,
 	ScopeDisposedError,
 	SignalCycleError,
 	SignalFrameError,
 	SignalIdleError,
 	SignalWriteError,
 } from './errors.js';
+export { assertAlive } from './errors.js';
 import {
 	REACTIVE_DIRTY,
 	REACTIVE_MUTABLE,
@@ -932,10 +934,6 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		const state = untrack(() => refreshNode(this));
 		return attachObserver(this, notify, false, state);
 	}
-}
-
-export function assertAlive(owner: GraphOwner): void {
-	if (owner.retired) throw new ScopeDisposedError(owner.scopeKey);
 }
 
 /** Inspect only cached metadata; never refresh a dormant or invalidated node. */
