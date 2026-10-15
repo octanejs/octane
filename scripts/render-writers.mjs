@@ -165,8 +165,7 @@ export const WRITERS = new Map(
 		unmountBlockInner: 'unmount',
 		// native
 		vtInjectScopeStyle: 'native',
-		vtReleaseScopeBoundary: 'native',
-		vtPrepareScopeBoundary: 'native',
+		vtSyncScopeMarker: 'commit',
 		vtApplyStyles: 'native',
 		vtRevertNames: 'native',
 		restoreFocusSelection: 'native',

@@ -6455,10 +6455,15 @@ function vtReleaseScopeBoundary(block: Block): void {
 	saved.owners = saved.owners.filter((owner) => owner !== block);
 	if (saved.owners.length !== 0) return;
 	if (!VT_DRAIN) vtInterruptOwner(host as VTOwner);
-	if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
-	host.removeAttribute('vt-scope');
+	atCommit(vtSyncScopeMarker, host);
 	if (TRANSITION_JOURNAL !== null) journalUndo(() => VT_SCOPE_OWNERS.set(host, saved));
 	VT_SCOPE_OWNERS.delete(host);
+}
+
+/** A scope host's marker, at commit: present while a declaration owns the host. */
+function vtSyncScopeMarker(host: Element): void {
+	if (VT_SCOPE_OWNERS.get(host) === undefined) host.removeAttribute('vt-scope');
+	else if (host.getAttribute('vt-scope') !== 'element') host.setAttribute('vt-scope', 'element');
 }
 
 /** Keep nested scopes isolated while leaving authored inline CSS in control. */
@@ -6494,10 +6499,7 @@ function vtPrepareScopeBoundary(block: Block): void {
 		saved.owners = [...saved.owners, block];
 		state.scopeHost = host;
 	}
-	if (host.getAttribute('vt-scope') !== 'element') {
-		if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
-		host.setAttribute('vt-scope', 'element');
-	}
+	if (host.getAttribute('vt-scope') !== 'element') atCommit(vtSyncScopeMarker, host);
 	// The commit may adopt a fresh host into another document (an iframe's):
 	// its stylesheet owner is the document the host lands in.
 	const transaction = ROOT_RENDER_TRANSACTION;
