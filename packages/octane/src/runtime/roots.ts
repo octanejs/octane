@@ -78,8 +78,8 @@ import type {
 import {
 	withRefDetachSuppression,
 	ROOT_ERROR_HANDLERS,
-	registerRootErrorHandlers,
-	installRootErrorHandlers,
+	registerRootOptions,
+	installRootOptions,
 	reportUncaughtError,
 	installHydrationDriver,
 } from './drivers.js';
@@ -654,7 +654,7 @@ function createRootWithOutputHandler(
 }
 
 export function createRoot(container: RootContainer, options?: RootOptions): Root {
-	installRootErrorHandlers();
+	installRootOptions();
 	return createRootWithOutputHandler(container, options, renderReturnedValue);
 }
 
@@ -665,7 +665,7 @@ export function __createRootDefaultOptions(container: RootContainer): Root {
 
 /** Compiler-only root for a statically proven void `@{}` entry component. */
 export function __createVoidRoot(container: RootContainer, options?: RootOptions): Root {
-	installRootErrorHandlers();
+	installRootOptions();
 	return createRootWithOutputHandler(container, options, null);
 }
 
@@ -805,7 +805,7 @@ function hydrateRootWithOutputHandler(
 	rootOptions: RootOptions | undefined,
 	outputHandler: OutputHandler | null,
 ): Root {
-	installRootErrorHandlers();
+	installRootOptions();
 	assertValidRootContainer(container);
 	// Leases, presentations and streamed arms below outlive the adoption pass.
 	installHydrationDriver();
@@ -925,7 +925,7 @@ function hydrateRootWithOutputHandler(
 		},
 	};
 	rootBlock.idState = idState;
-	registerRootErrorHandlers(rootBlock, rootOptions);
+	registerRootOptions!(rootBlock, rootOptions);
 	// The comment that opens the root's output names the hydration protocol its
 	// server spoke. Without it, or with another version, the root renders on the
 	// client instead of adopting ranges it would misread. Like a range's
@@ -1014,7 +1014,7 @@ function hydrateRootWithOutputHandler(
 				outputHandler,
 			);
 			rootBlock.idState = idState;
-			registerRootErrorHandlers(rootBlock, rootOptions);
+			registerRootOptions!(rootBlock, rootOptions);
 			owner.adopt!(rootBlock);
 		}
 		const frame = beginHydratingRootRender(owner);

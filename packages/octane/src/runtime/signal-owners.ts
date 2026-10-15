@@ -9,6 +9,7 @@ import {
 	NATIVE_READ_DRIVER,
 	SIGNAL_BINDINGS_ENABLED,
 	ensureNativeReadDriver,
+	registerRootOptions,
 } from './drivers.js';
 import { hydrating } from '../hydration-flag.js';
 import { __normalizeBindingStyle } from '../dom-binding-styles.js';
@@ -143,7 +144,9 @@ export function signalRetryBoundary(block: Block): TrySlot | undefined {
 	}
 }
 
-function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
+// A named function expression keeps recursive references inside its own
+// binding, so an unused retry walk can be removed with its callers.
+const signalRetrySlot = function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
 	const children = scope.children;
 	if (children !== null) {
 		for (const child of children) {
@@ -172,9 +175,9 @@ function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
 		}
 	}
 	return null;
-}
+};
 
-function signalRetryPath(scope: Scope, root: Scope): unknown[] | null {
+const signalRetryPath = function signalRetryPath(scope: Scope, root: Scope): unknown[] | null {
 	if (scope === root) return [];
 	const location = SIGNAL_RETRY_LOCATIONS.get(scope);
 	let parent = location?.parent ?? scope.parent ?? scope.block.parentBlock;
@@ -190,7 +193,7 @@ function signalRetryPath(scope: Scope, root: Scope): unknown[] | null {
 	if (segment === null) return null;
 	const path = signalRetryPath(parent, root);
 	return path === null ? null : path.concat(segment);
-}
+};
 
 function signalRetryNode(
 	cache: SignalRetryOwners,
@@ -216,6 +219,9 @@ export function retainSignalRetryScope(
 	holder: { retrySignalOwners?: SignalRetryOwners },
 	subtree = false,
 ): void {
+	// These entry guards must read the live capabilities directly: wrapping
+	// the check hides the signal-free case from production tree shaking.
+	if (!signalDocumentEnabled && !registerRootOptions) return;
 	const owner = scope.signalOwner;
 	if (owner) {
 		const path = signalRetryPath(scope, root);
@@ -285,7 +291,11 @@ export function supersedeSignalRetryOwners(holder: {
 	for (const owner of retired) retireRendererSignalOwner(owner);
 }
 
-function signalRetryListPath(scope: Scope, state: ForSlot, root: Scope): unknown[] | null {
+const signalRetryListPath = function signalRetryListPath(
+	scope: Scope,
+	state: ForSlot,
+	root: Scope,
+): unknown[] | null {
 	// Lists can inherit a lite DOM proxy as parentBlock. Its owning Scope is
 	// already registered below the real ancestor and found by this same walk.
 	while (scope instanceof LiteBlockImpl) scope = scope.parentBlock;
@@ -303,7 +313,7 @@ function signalRetryListPath(scope: Scope, state: ForSlot, root: Scope): unknown
 		}
 	}
 	return null;
-}
+};
 
 function collectRetiredSignalRetryOwners(
 	node: SignalRetryNode,
@@ -376,6 +386,7 @@ export function takeSignalRetryVisit(scope: Scope): SignalRetryVisit | null {
 // completed render that created no slot at an index renders nothing there; a
 // suspended one may not have reached it yet.
 export function pruneSignalRetryVisit(visit: SignalRetryVisit, suspended: boolean): void {
+	if (!signalDocumentEnabled && !registerRootOptions) return;
 	const { scope, cache, path } = visit;
 	const retired: SignalRendererOwnerIdentity[] = [];
 	const tail = path.length - 4;
@@ -422,6 +433,7 @@ export function trackSignalRetryListKeys<T>(
 	length: number,
 	source: ListKeySource<T>,
 ): ((index: number, key: unknown) => void) | undefined {
+	if (!signalDocumentEnabled && !registerRootOptions) return;
 	const boundary = signalRetryBoundary(parent);
 	const owner = parent.idState.renderOwner;
 	const cache = boundary?.retrySignalOwners ?? owner?.retrySignalOwners;
@@ -525,6 +537,7 @@ export function rootSignalInstanceKey(ids: RootIdState): string {
 }
 
 function resolveSignalInstanceKey(scope: Scope): string | undefined {
+	if (!signalDocumentEnabled && !registerRootOptions) return;
 	const resolved = scope.signalInstanceResolved;
 	if (resolved !== undefined) return resolved;
 	const parent = scope.signalInstanceParent;
@@ -628,6 +641,7 @@ export function stampSignalInstance(
 }
 
 export function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
+	if (!signalDocumentEnabled && !registerRootOptions) return;
 	if (scope === null) return;
 	const root = scope.block.idState.renderOwner;
 	let documentOwner = root?.signalOwner;

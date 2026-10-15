@@ -116,7 +116,7 @@ import {
 	installManualFormPending,
 	SIGNAL_COMMIT_RETRY,
 	HYDRATION_DRIVER,
-	registerRootErrorHandlers,
+	registerRootOptions,
 	reportCaughtError,
 	reportUncaughtError,
 	publishInlineCaughtErrorReports,
@@ -5154,7 +5154,7 @@ export function makeRoot(
 			rootBlock.idState = idState;
 			renderOwner.current = rootBlock;
 			createdInRootRender(rootBlock);
-			registerRootErrorHandlers(rootBlock, errorOptions);
+			if (registerRootOptions) registerRootOptions(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 				__devtoolsSetNameResolver(inspectDevtoolsName);
