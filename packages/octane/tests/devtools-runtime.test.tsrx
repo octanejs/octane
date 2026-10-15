@@ -1,10 +1,10 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { createRoot, useState } from 'octane';
+import { createContext, createRoot, use, useState } from 'octane';
 import { act, mount } from './_helpers';
-import type { OctaneDevtoolsHook } from '../src/devtools-hook';
+import type { DevtoolsTreeNode, OctaneDevtoolsHook } from '../src/devtools-hook';
 
-function Leaf(props) @{
-	<span>{props.count as string}</span>
+function Leaf(props: { count: number }) @{
+	<span>{String(props.count)}</span>
 }
 
 function CounterApp() @{
@@ -13,6 +13,28 @@ function CounterApp() @{
 		<button onClick={() => setCount(count + 1)}>inc</button>
 		<Leaf count={count} />
 	</div>
+}
+
+const InspectContext = createContext({ owner: 'default', version: 0, value: 'default' });
+
+function InspectedContextValue() @{
+	const provided = use(InspectContext);
+	<span>{provided.value as string}</span>
+}
+
+function InspectedContextApp(props: { count: number }) @{
+	<InspectContext value={{ owner: 'app', version: props.count, value: 'value-' + props.count }}>
+		<InspectedContextValue />
+	</InspectContext>
+}
+
+function inspectedContext(nodes: DevtoolsTreeNode[]): unknown[] {
+	return nodes.flatMap((node) => [
+		...hook()
+			.inspect(node.id)!
+			.context.map((entry) => entry.value),
+		...inspectedContext(node.children),
+	]);
 }
 
 function hook(): OctaneDevtoolsHook {
@@ -27,7 +49,7 @@ describe('runtime devtools instrumentation (profile build)', () => {
 	});
 
 	it('registers a mounted root and exposes it as a named tree', () => {
-		const { unmount } = mount(<CounterApp />);
+		const { unmount } = mount(CounterApp);
 		const roots = hook().getTree();
 		const app = roots.find((r) => r.name === 'CounterApp');
 		expect(app).toBeDefined();
@@ -40,12 +62,31 @@ describe('runtime devtools instrumentation (profile build)', () => {
 		).toBe(false);
 	});
 
+	it('inspects actual provider values through updates, including values shaped like runtime records', () => {
+		const rendered = mount(InspectedContextApp, { count: 1 });
+		try {
+			expect(rendered.find('span').textContent).toBe('value-1');
+			expect(inspectedContext(hook().getTree())).toContainEqual({
+				owner: 'app',
+				version: 1,
+				value: 'value-1',
+			});
+			rendered.update(InspectedContextApp, { count: 2 });
+			expect(rendered.find('span').textContent).toBe('value-2');
+			const contexts = inspectedContext(hook().getTree());
+			expect(contexts).toContainEqual({ owner: 'app', version: 2, value: 'value-2' });
+			expect(contexts).not.toContainEqual({ owner: 'app', version: 1, value: 'value-1' });
+		} finally {
+			rendered.unmount();
+		}
+	});
+
 	it('fires flush subscribers once per scheduler flush', () => {
 		let flushes = 0;
 		const off = hook().subscribe(() => {
 			flushes++;
 		});
-		const { container, unmount } = mount(<CounterApp />);
+		const { container, unmount } = mount(CounterApp);
 		const before = flushes;
 		act(() => {
 			(container.querySelector('button') as HTMLButtonElement).click();
@@ -85,7 +126,7 @@ describe('runtime devtools instrumentation (profile build)', () => {
 	});
 
 	it('notifies subscribers when a script-dispatched click reaches its microtask commit', async () => {
-		const rendered = mount(<CounterApp />);
+		const rendered = mount(CounterApp);
 		let off = () => {};
 		try {
 			await Promise.resolve();

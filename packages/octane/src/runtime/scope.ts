@@ -89,7 +89,7 @@ export class BlockImpl {
 	declare signalInstanceResolved: string | undefined;
 	declare signalTokenEscaped: boolean;
 	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
-	declare $$ctxValues: Map<Context<any>, any> | null;
+	declare $$ctxValues: Scope['$$ctxValues'];
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
 	// changed version here means "a consumer somewhere at/below me needs the new
@@ -240,7 +240,7 @@ export class ScopeImpl {
 	declare children: ChildScope[] | null;
 	declare _slots: any[] | null;
 	declare refFields: string[] | null;
-	declare $$ctxValues: Map<Context<any>, any> | null;
+	declare $$ctxValues: Scope['$$ctxValues'];
 	declare $$ctxReads: Map<Context<any>, any> | null;
 	declare $$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
 	declare $$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
@@ -317,7 +317,7 @@ export class LiteBlockImpl {
 	declare endMarker: Node | null;
 	declare parentBlock: Block;
 	declare memoInChain: boolean;
-	declare $$ctxValues: Map<Context<any>, any> | null;
+	declare $$ctxValues: Scope['$$ctxValues'];
 	declare idState: RootIdState;
 	// Signal-instance fields exist on every Block stand-in: signal key walks
 	// read them polymorphically through scope.block and parentBlock chains.

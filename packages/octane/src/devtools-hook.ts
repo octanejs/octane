@@ -244,7 +244,7 @@ const hook: OctaneDevtoolsHook = {
 			for (const [ctx, value] of scope.$$ctxValues) {
 				context.push({
 					name: (ctx && (ctx.displayName || ctx.name)) || 'Context',
-					value: safePreview(value),
+					value: safePreview(value.value),
 				});
 			}
 		}
