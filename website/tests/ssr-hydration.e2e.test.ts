@@ -365,9 +365,6 @@ async function waitForLocatorText(
 // clipboard capture observes the public browser API without OS permissions.
 async function assertHomepageIntegrationSamples(baseUrl: string) {
 	const { page, errors } = await loadRoute(baseUrl, '/', {
-		// The sample is already visible in SSR HTML. Let the hydration entry's
-		// dynamic imports settle before the first single-shot interaction.
-		waitForNetworkIdle: true,
 		beforeNavigation: async (page) => {
 			await page.addInitScript(() => {
 				const writes: string[] = [];

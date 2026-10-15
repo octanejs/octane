@@ -3,7 +3,7 @@
 // boundaries; detailed copy and visual behavior belong to focused tests.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router/compiled';
 import bundleSizeBaseline from '../../benchmarks/baselines/local/bundle-size.json';
 import threeRendererBaseline from '../../benchmarks/baselines/local/three-renderer.json';
 import weatherAppLighthouseBaseline from '../../benchmarks/baselines/local/weather-app-lighthouse.json';

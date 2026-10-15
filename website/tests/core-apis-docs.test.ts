@@ -5,7 +5,7 @@
 // without serializing that build and this test.
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router/compiled';
 import { getRouter } from '../src/router.ts';
 import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs } from '../src/content/docs.ts';

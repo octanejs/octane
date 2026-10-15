@@ -4,7 +4,7 @@
 // which hangs a copy button off it, and there is nothing here to paste.
 import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, render, waitFor } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router/compiled';
 import { getRouter } from '../src/router.ts';
 import { FileTree } from '../src/components/FileTree.tsrx';
 import manifest from '../../packages/cli/data/scaffold-manifest.json';
