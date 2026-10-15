@@ -148,25 +148,13 @@ const PREBUNDLED = [
 	// @octanejs/three's raw store source, reached through the same deferred
 	// chunk.
 	'@octanejs/three > zustand/vanilla',
-	// TanStack DevTools panel-host island. The whole island is reached only
-	// through @octanejs/tanstack-devtools's raw .tsrx source and the host's
-	// internal dynamic import, so Vite's scanner sees none of it. Pre-declare
-	// the ENTIRE island so it optimizes in ONE startup pass: that keeps the
-	// host's lazy mount chunk on a hash consistent with its entry (no
-	// mid-mount re-optimize → no "504 Outdated Optimize Dep") and bundles the
-	// CJS dep dayjs with a synthesized `default` export. solid-js is pinned to
-	// 1.9.14 for this island via the pnpm override (Solid 2 dropped
-	// solid-js/web); remove this block once @tanstack/devtools ships Solid 2.
-	'@tanstack/devtools',
-	'@tanstack/devtools-ui',
-	'@tanstack/devtools-client',
-	'@tanstack/devtools-event-bus',
-	'@tanstack/devtools-event-client',
-	'dayjs',
-	'goober',
-	'@solid-primitives/event-listener',
-	'@solid-primitives/keyboard',
-	'@solid-primitives/resize-observer',
+	// The panel host and native event client are reached through raw workspace
+	// source, beyond Vite's scanner. Resolve each through its owning package:
+	// bare transitive entries are filtered out by isDeclarable under pnpm.
+	// Bundling both roots also follows the host's lazy mount/panel imports,
+	// avoiding a second optimize pass while the devtools island is mounting.
+	'@octanejs/tanstack-devtools > @tanstack/devtools',
+	'@octanejs/devtools > @tanstack/devtools-event-client',
 ];
 
 export default defineConfig({

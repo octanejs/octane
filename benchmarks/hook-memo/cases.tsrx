@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'octane';
 import { useManualPair } from './manual-hooks';
 import { usePlainBox, usePlainCallback, usePlainExplicitPair } from './plain-hooks';
+import { useStrongManualPair } from './strong-manual-hooks';
 
 type Box = { value: number; tick: number };
 type Callback = () => number;
@@ -112,6 +113,14 @@ export function PlainExplicitSlot({ dep, tick, observe }: Props) @{
 export function ManualSlotHook({ dep, tick, observe }: Props) @{
 	const first = useManualPair(dep, tick);
 	const second = useManualPair(dep + 1, tick);
+	observe(first.box, first.callback);
+	observe(second.box, second.callback);
+	<output>{tick + ':' + first.box.value + ',' + second.box.value}</output>
+}
+
+export function StrongManualSlotHook({ dep, tick, observe }: Props) @{
+	const first = useStrongManualPair(dep, tick);
+	const second = useStrongManualPair(dep + 1, tick);
 	observe(first.box, first.callback);
 	observe(second.box, second.callback);
 	<output>{tick + ':' + first.box.value + ',' + second.box.value}</output>

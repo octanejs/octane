@@ -312,6 +312,7 @@ describe('@octanejs/tanstack-router — document asset ownership', () => {
 interface TestAtom<T> {
 	get(): T;
 	publish(value: T): void;
+	hasSubscribers(): boolean;
 	subscribe(listener: () => void): { unsubscribe(): void };
 }
 
@@ -328,6 +329,7 @@ function createTestAtom<T>(initial: T): TestAtom<T> {
 				listener();
 			}
 		},
+		hasSubscribers: () => listeners.size > 0,
 		subscribe: function subscribe(listener: () => void) {
 			listeners.add(listener);
 			return {
@@ -401,12 +403,30 @@ describe('@octanejs/tanstack-router — store selection', () => {
 		try {
 			flushEffects();
 			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('first');
+			expect(first.hasSubscribers()).toBe(true);
+			expect(second.hasSubscribers()).toBe(false);
+
+			result.update(SelectedAtomValue, { atom: first });
+			flushEffects();
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('first');
+			expect(first.hasSubscribers()).toBe(true);
 
 			result.update(SelectedAtomValue, { atom: second });
+			flushEffects();
 			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('second');
+			expect(first.hasSubscribers()).toBe(false);
+			expect(second.hasSubscribers()).toBe(true);
+
+			flushSync(() => first.publish('stale'));
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('second');
+			flushSync(() => second.publish('current'));
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('current');
 		} finally {
 			result.unmount();
 		}
+		flushEffects();
+		expect(first.hasSubscribers()).toBe(false);
+		expect(second.hasSubscribers()).toBe(false);
 	});
 
 	it('keeps an allocating selector stable across parent rerenders when equality holds', () => {

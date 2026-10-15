@@ -1,3 +1,5 @@
+'use strong';
+
 // The read hooks — ports of react-router's useMatch.tsx / useParams / useSearch /
 // useLoaderData / useLoaderDeps / useRouteContext / useNavigate / useCanGoBack /
 // Matches.tsx (useMatches / useParentMatches / useChildMatches). Everything match-

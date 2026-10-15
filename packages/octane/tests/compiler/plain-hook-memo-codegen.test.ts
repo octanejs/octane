@@ -365,7 +365,7 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 		expect(memoCalls(ordinary)).toBe(0);
 	});
 
-	it('keeps authored manual hook calls when memo optimization is disabled and honors the hard opt-out', () => {
+	it.each([false, true])('preserves manual slots and opt-outs (strong=%s)', (strong) => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-manual-memo-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -380,12 +380,15 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 					octane: { hookSlots: { manual: ['src'] } },
 				}),
 			);
-			const source = `import { useMemo, useState } from 'octane';
+			const source = `${strong ? '"use strong";' : ''}
+				import { useCallback, useMemo, useState } from 'octane';
 				const stateSlot = Symbol('state');
 				const memoSlot = Symbol('memo');
+				const callbackSlot = Symbol('callback');
 				export function useValue(value) {
 					const [state] = useState(value, stateSlot);
-					return useMemo(() => state, [state], memoSlot);
+					const memo = useMemo(() => state, [state], memoSlot);
+					return useCallback(() => memo, [memo], callbackSlot);
 				}`;
 			const id = join(sourceRoot, 'use-value.ts');
 			const compiler = createOctaneCompiler({ root });
@@ -397,6 +400,7 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 				{ inlineHookMemo: false },
 				{ dev: true },
 				{ hmr: true },
+				{ profile: true },
 				{ environment: 'server' as const },
 			]) {
 				const output = compiler.transform(source, id, mode);
@@ -407,7 +411,7 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 					if (
 						ts.isCallExpression(node) &&
 						ts.isIdentifier(node.expression) &&
-						(node.expression.text === 'useState' || node.expression.text === 'useMemo')
+						['useState', 'useMemo', 'useCallback'].includes(node.expression.text)
 					) {
 						calls.push([
 							node.expression.text,
@@ -421,6 +425,7 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 				expect(calls).toEqual([
 					['useState', 2, 'stateSlot'],
 					['useMemo', 3, 'memoSlot'],
+					['useCallback', 3, 'callbackSlot'],
 				]);
 			}
 		} finally {

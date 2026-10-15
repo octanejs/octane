@@ -1333,7 +1333,9 @@ export function slotHooks(source, id, options) {
 	}
 	const getterCalls = importInfo.importsHook ? collectStateGetterCalls(ast) : new WeakSet();
 	if (
-		!strongAnalysis?.enabled &&
+		// Manual Strong modules already reject generated declaration caches above,
+		// so their authored memo calls can keep the existing production lowering.
+		(!strongAnalysis?.enabled || options?.manualSlots === true) &&
 		// The whole-AST memo path does not apply declaration identity edits.
 		!signalLowering.usesSignals &&
 		canPrint &&

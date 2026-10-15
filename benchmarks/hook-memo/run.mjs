@@ -59,6 +59,12 @@ const CASES = [
 		hitArraysPerRender: 2,
 	},
 	{ name: 'manual_slot_hook', component: 'ManualSlotHook', pairs: 2, hitArraysPerRender: 2 },
+	{
+		name: 'strong_manual_slot_hook',
+		component: 'StrongManualSlotHook',
+		pairs: 2,
+		hitArraysPerRender: 2,
+	},
 	{ name: 'null_deps', component: 'NullDeps', alwaysFresh: true },
 	{ name: 'conditional', component: 'Conditional', conditional: true },
 ];
@@ -67,6 +73,7 @@ const APP_FILES = [
 	path.join(ROOT, 'plain-hooks.ts'),
 	path.join(ROOT, 'returned-jsx.tsx'),
 	path.join(ROOT, 'manual-hooks.ts'),
+	path.join(ROOT, 'strong-manual-hooks.ts'),
 ];
 const SHAPE_FILE = path.join(ROOT, 'cache-shapes.tsrx');
 const SHAPE_ENTRY = path.join(ROOT, 'cache-shapes-entry.mjs');
@@ -124,6 +131,7 @@ function compileApplication(inlineHookMemo) {
 	for (const [filename, manualSlots] of [
 		[APP_FILES[1], false],
 		[APP_FILES[3], true],
+		[APP_FILES[4], true],
 	]) {
 		const plainSource = fs.readFileSync(filename, 'utf8');
 		const slotted = slotHooks(plainSource, filename, {
@@ -266,10 +274,11 @@ function summarizedCounters(counters) {
 // own work (root transaction and retry bookkeeping) is unrelated to memo hooks.
 // Subtracting the hook-free driver's same-phase counts leaves only the work a
 // scenario's hooks add. The driver keeps its own ops and guards, and raw
-// per-phase counts stay in the JSON metadata.
+// per-phase counts stay in the JSON metadata. Teardown has no shared render
+// overhead: each component's cleanup is reported in full.
 function memoCounters(measurements, fixture, phase) {
 	const counters = measurements[`${fixture.name}_${phase}`].counters;
-	if (fixture.control) return counters;
+	if (fixture.control || phase === 'unmount') return counters;
 	const driver = measurements[`${DRIVER.name}_${phase}`].counters;
 	return Object.fromEntries(
 		Object.entries(counters).map(([kind, count]) => {
