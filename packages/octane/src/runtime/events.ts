@@ -564,7 +564,7 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 // one native capture callback for their capture and emulated bubble queues.
 export const _delegatedCapture = new Map<string, DelegatedEventType>();
 // Capture registration installs this target before publishing its capture flag.
-let CAPTURE_FINISH: typeof finishCaptureDispatch;
+let CAPTURE_FINISH: typeof finishCaptureDispatch | null = null;
 
 const ACTIVE_TOUCH_BUBBLE: AddEventListenerOptions = { passive: false };
 const ACTIVE_TOUCH_CAPTURE: AddEventListenerOptions = { capture: true, passive: false };
@@ -1397,6 +1397,9 @@ function dispatchDelegatedCapture(
 ): boolean {
 	path ??= prepareDelegatedEvent(event, this);
 	if (type === undefined || (type.flags & EVENT_CAPTURE) === 0) return false;
+	// Root observation above is mandatory; this standalone guard lets bundles
+	// without authored capture discard the logical phase below.
+	if (!CAPTURE_FINISH) return false;
 	path ??= event.composedPath();
 	if ((!event.bubbles || (type.flags & EVENT_BUBBLE) === 0) && CONTROLLED_RESTORE_DRIVER)
 		CONTROLLED_RESTORE_DRIVER.enqueue(event, type);

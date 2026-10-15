@@ -46,7 +46,7 @@ const ROOT_ERROR_DECLARATIONS = [
 	'registeredEnqueueInlineCaughtError',
 	'registeredPublishInlineCaughtErrorReports',
 ];
-const CAPTURE_DECLARATIONS = ['finishCaptureDispatch'];
+const CAPTURE_DECLARATIONS = ['CAPTURE_FINISH', 'finishCaptureDispatch'];
 const TRANSITION_HOOK_DECLARATIONS = [
 	'foldTransitionUpdate',
 	'queueTransitionUpdate',
