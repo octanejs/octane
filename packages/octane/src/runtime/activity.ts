@@ -660,39 +660,30 @@ export function detachRegisteredSubtreeRefs(
 		if (bag != null) {
 			for (let j = 0, n = rm.length; j < n; j += 3) {
 				const kind = rm[j];
+				let el;
+				let ref;
 				if (kind === 'r') {
 					// Element ref binding: field holds the ref, partner holds the element.
-					const el = bag[rm[j + 2]];
-					const ref = bag[rm[j + 1]] ?? activityRefs?.get(el)?.connected;
-					if (ref == null) continue;
-					out.push({ ref, el, scope });
-					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
-						attachRef(ref, null, el);
-					}
+					el = bag[rm[j + 2]];
+					ref = bag[rm[j + 1]];
 				} else if (kind === 's') {
 					// Spread binding: the committed spread object may carry a ref.
-					const el = bag[rm[j + 2]];
+					el = bag[rm[j + 2]];
 					if (el == null) continue;
 					const spread = bag[rm[j + 1]];
-					const ref =
-						(spread?.[SIGNAL_HOST_PROP_SOURCES] === true ? spread.resolved : spread)?.ref ??
-						activityRefs?.get(el)?.connected;
-					if (ref == null) continue;
-					out.push({ ref, el, scope });
-					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
-						attachRef(ref, null, el);
-					}
+					ref = (spread?.[SIGNAL_HOST_PROP_SOURCES] === true ? spread.resolved : spread)?.ref;
 				} else {
 					// 'f' — <Fragment ref>: detach the FragmentInstance's current ref;
 					// reveal re-attaches the same instance.
-					const fi = bag[rm[j + 1]];
-					if (fi == null) continue;
-					const ref = fi._currentRef ?? activityRefs?.get(fi)?.connected;
-					if (ref == null) continue;
-					out.push({ ref, el: fi, scope });
-					if (shouldDetach && !refAttachWasDiscarded(uncommitted, fi, ref)) {
-						attachRef(ref, null, fi);
-					}
+					el = bag[rm[j + 1]];
+					if (el == null) continue;
+					ref = el._currentRef;
+				}
+				ref ??= activityRefs?.get(el)?.connected;
+				if (ref == null) continue;
+				out.push({ ref, el, scope });
+				if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
+					attachRef(ref, null, el);
 				}
 			}
 		}

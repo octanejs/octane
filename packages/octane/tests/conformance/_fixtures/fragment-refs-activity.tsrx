@@ -13,6 +13,23 @@ const Activity = ActivitySentinel as unknown as (props: {
 	children?: OctaneNode;
 }) => null;
 
+export function ActivityMixedRefs(props: {
+	mode: ActivityMode;
+	elementRef: { current: HTMLButtonElement | null };
+	spread: { ref: { current: HTMLButtonElement | null } };
+	fragmentRef: FragmentReference;
+}) @{
+	<Activity mode={props.mode}>
+		<section>
+			<button ref={props.elementRef}>{'direct'}</button>
+			<button {...props.spread}>{'spread'}</button>
+			<Fragment ref={props.fragmentRef}>
+				<span>{'fragment'}</span>
+			</Fragment>
+		</section>
+	</Activity>
+}
+
 export function ActivityFragmentGroup(props: {
 	mode: ActivityMode;
 	fragmentRef: FragmentReference;
