@@ -35,20 +35,18 @@ Trust the source over any summary, this file included:
 - `docs/differences-from-react.md`: the divergence contract.
 - `docs/packages.md`: the generated package inventory, checked by CI.
 
-Fix defects in the package that owns the behavior and add the regression there.
-Do not hide framework defects behind app workarounds, weak tests, generated
-output, or test-only behavior; retain the integration scenario as end-to-end
-evidence.
-
 ## The workflows live in skills, so load the skill first
 
-Branch, PR, issue, bug, and audit procedures live in skills. Load one when its
-trigger first arises, even if it is a later step you chose:
+Load the matching skill when its trigger first arises, including later steps:
 
 - `create-a-pr`: before any branch, commit, changeset, or PR.
 - `handle-issue`: a GitHub issue number or link.
 - `bug-hunter`: a failing test, a regression, or behavior that differs from
   expectation.
+- `resolve-octane-defect`: a defect in Octane or an Octane library. Open a fix PR
+  in the owning package with regression coverage, or file an issue. Retain any
+  integration scenario as end-to-end evidence. Never mask the defect with a
+  workaround, weak tests, generated output, or test-only behavior.
 - `octane-core-extend`: before editing `packages/octane/src`.
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
