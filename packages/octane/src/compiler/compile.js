@@ -25005,24 +25005,23 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 // component Element node. Recurses into prop values so nested JSX values lower too.
 // What a value-position JSX tag can be at runtime: a host string, a Fragment, a
 // module function component, or anything (a local, a member, a dynamic
-// expression, or an import from another module). A tag counts as the octane
-// Fragment or as a component only when it provably resolves to that module
-// binding (an octane `Fragment` import, or an immutable module function): a
-// shadowing parameter or local can hold a host string.
+// expression, or an import from another module). Only a proven module binding
+// counts as a Fragment or component: a shadowing local can hold a host string.
 function descriptorTagKind(ctx, nameNode, componentTag) {
 	if (!componentTag) return 'host';
 	if (nameNode?.type !== 'Identifier' && nameNode?.type !== 'JSXIdentifier') return 'dynamic';
-	if (ctx.activityModuleAst == null || ctx.authoredModuleAst == null) return 'dynamic';
+	if (ctx.activityModuleAst == null) return 'dynamic';
 	const name = nameNode.name;
-	let kind;
-	if (ctx.octaneImportLocals?.get(name) === 'Fragment') kind = 'fragment';
-	else {
-		const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
-			ctx.authoredModuleAst.body,
-		));
-		if (!functions.has(name)) return 'dynamic';
-		kind = 'component';
-	}
+	const imported = ctx.octaneImportLocals?.get(name);
+	const kind =
+		imported === 'Fragment'
+			? 'fragment'
+			: BUILTIN_BOUNDARY_TAGS.has(imported) ||
+				  (ctx.moduleTopLevelBindings?.mutable.has(name) === false &&
+						autoMemoModuleFunctions(ctx).has(name))
+				? 'component'
+				: 'dynamic';
+	if (kind === 'dynamic') return kind;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
 	const scope = lexical.nodeScopes.get(nameNode);
 	if (scope === undefined) return 'dynamic';

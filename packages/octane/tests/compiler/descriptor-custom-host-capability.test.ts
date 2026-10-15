@@ -52,6 +52,27 @@ const tagCases = [
 		capabilities: [],
 	},
 	{
+		name: 'immutable arrow-function component',
+		source: 'const Editor = () => null; export const view = <Editor />;',
+		capabilities: [],
+	},
+	{
+		name: 'mutable function binding can become a custom tag',
+		source: 'let Editor = () => null; Editor = "my-editor"; export const view = <Editor />;',
+		capabilities: [custom],
+	},
+	{
+		name: 'Octane boundary imported under an alias',
+		source: "import { Suspense as Boundary } from 'octane'; export const view = <Boundary />;",
+		capabilities: [],
+	},
+	{
+		name: 'shadowed Octane boundary may be a custom tag',
+		source:
+			"import { Suspense as Boundary } from 'octane'; export function view(Boundary) { return <Boundary />; }",
+		capabilities: [custom],
+	},
+	{
 		name: 'imported component or host tag',
 		source: "import Editor from './editor'; export const view = <Editor />;",
 		capabilities: [custom],

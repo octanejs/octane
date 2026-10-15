@@ -19,7 +19,7 @@ import type {
 	ElementDescriptor,
 	ChildSlot,
 } from './types.js';
-import { queueRefAttach } from './drivers.js';
+import { descriptorCustomHosts, queueRefAttach } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { queueRefDetach, type FragmentInstance, mountFragmentRef } from './refs.js';
 import {
@@ -134,14 +134,6 @@ import {
 	DEFAULT_CHECKED_INITIALIZED,
 	isControlledHostProp,
 } from './forms.js';
-
-// Public element factories and descriptor JSX whose tag may be custom enable
-// this path. Native-only compiled descriptor bundles can omit its host writer.
-export let descriptorCustomHosts:
-	((ownerBlock: Block, placement: Node, order: DeoptOrder) => void) | undefined;
-export function enableDescriptorCustomHosts(): void {
-	descriptorCustomHosts = prepareFrontierHost;
-}
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -1370,7 +1362,7 @@ function queueDeoptOrder(
 	return order;
 }
 
-function prepareFrontierHost(ownerBlock: Block, placement: Node, order: DeoptOrder): void {
+export function prepareFrontierHost(ownerBlock: Block, placement: Node, order: DeoptOrder): void {
 	// Child descriptors are not attached yet, so use the outer slot's actual
 	// destination even when a retained Block kept its parent in live DOM.
 	const root = placement.getRootNode() as any;

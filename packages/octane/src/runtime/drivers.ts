@@ -124,6 +124,7 @@ import {
 	detachRegisteredSubtreeRefs,
 } from './activity.js';
 import { withRegisteredRefDetachSuppression } from './commit.js';
+import { prepareFrontierHost } from './deopt.js';
 import { publishRegisteredManualFormPending } from './actions.js';
 import { delegateEvents } from './events.js';
 import {
@@ -161,6 +162,12 @@ export let withRefDetachSuppression: typeof withRegisteredRefDetachSuppression =
 export let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
 export let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 export let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
+// Public element factories and descriptor JSX whose tag may be custom enable
+// this path. Native-only compiled descriptor bundles can omit its host writer.
+export let descriptorCustomHosts: typeof prepareFrontierHost | undefined;
+export function enableDescriptorCustomHosts(): void {
+	descriptorCustomHosts = prepareFrontierHost;
+}
 // Record actual committed ref identities only when an Activity is in use. A
 // hidden render may already have replaced its manifest's ref before cleanup;
 // the committed identity is the one that must be disconnected exactly once.

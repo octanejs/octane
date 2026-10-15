@@ -135,6 +135,8 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		survivor: true,
 		cleaned: true,
 	},
+	'descriptor-native-jsx': { text: 'native', cleaned: true },
+	'descriptor-custom-jsx': { connectedLabel: 'ready', present: true, cleaned: true },
 	'binding-vanilla': {
 		before: 0,
 		after: 1,

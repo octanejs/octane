@@ -59,6 +59,8 @@ const existingScenarios = [
 	['server-render', 'ts'],
 	['component-owned-effects', 'ts'],
 	['descriptor-children', 'ts'],
+	['descriptor-native-jsx', 'tsx'],
+	['descriptor-custom-jsx', 'tsx'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -296,11 +298,18 @@ const effectControls = {
 // creators: createPortal, signal bindings and context creation. A descriptor
 // tree that creates none of them must drop each regime, while a scenario that
 // creates one proves the oracle still sees its declaration.
+// The same source-map oracle tracks the custom-host receipt even if it is
+// inlined or renamed in the production bundle. Its custom-element control
+// verifies that a real custom host keeps the writer and sees its initial prop.
+const customHostReceipt = 'queueFrontierHost';
 const childSlotControls = {
+	'root-static-specialized': { dropped: [customHostReceipt], kept: [] },
 	'descriptor-children': {
 		dropped: ['renderPortalChild', 'bindImplicitSignalChild', 'useContextInternal'],
 		kept: ['childSlot'],
 	},
+	'descriptor-native-jsx': { dropped: [customHostReceipt], kept: [] },
+	'descriptor-custom-jsx': { dropped: [], kept: [customHostReceipt] },
 	context: { dropped: [], kept: ['useContextInternal'] },
 	'hydrate-frame': { dropped: [], kept: ['renderPortalChild', 'bindImplicitSignalChild'] },
 };

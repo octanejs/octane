@@ -97,6 +97,7 @@ export type {
 } from './runtime/types.js';
 export {
 	enableSignalBindings,
+	enableDescriptorCustomHosts,
 	queueRefAttach,
 	invokeManualHook,
 	withSlot,
@@ -371,7 +372,6 @@ export { ownSlotAnchor, ifBlock, switchBlock } from './runtime/branches.js';
 export {
 	positionalChildren,
 	hostComponent,
-	enableDescriptorCustomHosts,
 	enableDescriptorFragmentRefs,
 } from './runtime/deopt.js';
 export { activityBlock } from './runtime/activity.js';

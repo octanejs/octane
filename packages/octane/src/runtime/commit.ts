@@ -9,7 +9,14 @@ export {} from './head.js';
 import { hydrating, hydrationStarted } from '../hydration-flag.js';
 import { __profileCount, ProfileCounter, __profileJournalRolledBack } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
-import type { Scope, Block, RootRenderTransaction, SlotNext, SuspenseRefEntry } from './types.js';
+import type {
+	Scope,
+	Block,
+	RootRenderOwner,
+	RootRenderTransaction,
+	SlotNext,
+	SuspenseRefEntry,
+} from './types.js';
 import type { RefDetachSuppression, FragmentInstance } from './refs.js';
 import {
 	QUEUE,
@@ -425,7 +432,7 @@ export function applySlotNext(slot: { next: SlotNext | null }): void {
 		const first: Node | null = out[out.length - 2];
 		if (first !== null && first.parentNode === parent) before = getNextSibling(out[out.length - 1]);
 	}
-	if (!applyOutgoing(out, parent, next)) return;
+	if (!applyOutgoing(out, parent, next.tx.owner)) return;
 	const members = next.members;
 	// A deletion cleanup can unmount the slot's owner before its content lands.
 	if (members === null || next.owner!.disposed) return;
@@ -605,12 +612,11 @@ export function queueRootDeletion(owner: unknown, first: Node | null, last: Node
  * order, so each lands against the DOM the render saw: a survivor moves before
  * its anchor, and a run's fragment goes into `parent` before its anchor.
  */
-export function applyOutgoing(out: any[], parent?: Node, next?: SlotNext): boolean {
+export function applyOutgoing(out: any[], parent?: Node, owner?: RootRenderOwner): boolean {
 	for (let i = 0; ; i += 3) {
-		// A new host's callbacks can replace this root midway through a list's
-		// outgoing work. Also check after the final deletion, before its frontier
-		// lands. Other commit entries may not carry a slot.
-		if (next !== undefined && next.tx.owner.generation !== COMMITTING_GENERATION) return false;
+		// A cleanup or host callback can replace the committing root. Check after
+		// the final deletion too, before the slot's frontier connects.
+		if (owner !== undefined && owner.generation !== COMMITTING_GENERATION) return false;
 		if (i >= out.length) return true;
 		const kind = out[i];
 		if (kind === placeRoots || kind === moveBlockBefore || kind === placeRun) {

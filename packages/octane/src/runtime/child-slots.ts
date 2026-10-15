@@ -33,6 +33,7 @@ import {
 	type HydrationDriver,
 	HYDRATION_DRIVER,
 	SIGNAL_BINDINGS_ENABLED,
+	descriptorCustomHosts,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -90,7 +91,6 @@ import {
 	prepareDeoptList,
 	iterableChildArray,
 	reconcileDeoptNode,
-	descriptorCustomHosts,
 	itemRange,
 	descNeedsBlocks,
 	hostElementBody,

@@ -4,7 +4,7 @@
 // Children, and the Fragment and Activity sentinels.
 
 import { enableDescriptorFormActions } from './host-props.js';
-import { enableDescriptorCustomHosts } from './deopt.js';
+import { enableDescriptorCustomHosts } from './drivers.js';
 import { hasOwnProp } from '../has-own.js';
 import {
 	applyElementDefaultProps,

@@ -3,6 +3,7 @@ import { builders as b, parseModule } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import ts from 'typescript';
+import * as InternalClientRuntime from 'octane/internal/client';
 import { compile } from '../src/compiler/compile.js';
 import { lowerUniversalRendererRegionAst } from '../src/compiler/compile-universal.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
@@ -3333,7 +3334,7 @@ export default function Default() @{ <scene version={1} /> }`);
 					? undefined
 					: {
 							octane: domRuntime,
-							'octane/internal/client': domRuntime,
+							'octane/internal/client': InternalClientRuntime,
 							'octane/universal': UniversalRuntime,
 							[bridge]: { Canvas: UniversalRuntime.createUniversalHostBoundary('object') },
 						};
@@ -3541,7 +3542,7 @@ export default (function Counter({ depth }) @{
 			});
 			const modules = {
 				octane: domRuntime,
-				'octane/internal/client': domRuntime,
+				'octane/internal/client': InternalClientRuntime,
 				'octane/universal': {
 					...UniversalRuntime,
 					registerThreadFunction(
