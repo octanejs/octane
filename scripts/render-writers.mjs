@@ -101,6 +101,7 @@ export const WRITERS = new Map(
 		renderReturnedValue: 'fresh',
 		fragmentTemplate: 'fresh',
 		parseTemplate: 'fresh',
+		prepareOwnedTemplateScript: 'fresh',
 		drainFrag: 'fresh',
 		htext: 'fresh',
 		htextSwap: 'fresh',

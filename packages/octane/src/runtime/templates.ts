@@ -241,6 +241,21 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 	} as unknown as Element;
 }
 
+// Both arguments belong to the freshly parsed, detached template cache. A
+// parser-created script stays inert when cloned, while a never-inserted script
+// created in the live document gives each clone normal execution semantics.
+function prepareOwnedTemplateScript(parsed: Element, parent: Node | null): Element {
+	// Preserve opaque component destinations rather than creating HTML scripts
+	// inside foreign content.
+	const script = document.createElementNS(parsed.namespaceURI, 'script');
+	for (const attr of parsed.attributes) {
+		script.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+	}
+	script.textContent = parsed.textContent;
+	if (parent !== null) parent.replaceChild(script, parsed);
+	return script;
+}
+
 /** Compiler-only cold preparation for scripts explicitly owned by a template mount. */
 /* @__NO_SIDE_EFFECTS__ */
 export function scriptTemplate(html: string, ns: number, frag: number, paths: number[][]): Element {
@@ -261,19 +276,11 @@ export function scriptTemplate(html: string, ns: number, frag: number, paths: nu
 						node = getFirstChild(node)!;
 						for (let i = 0; i < index; i++) node = getNextSibling(node)!;
 					}
-					const parsed = node as Element;
-					// A parser-created script stays inert when cloned. A never-inserted
-					// script created in the live document instead gives each clone the
-					// browser's normal execution semantics, without executing the cache.
-					// Preserve opaque component destinations rather than creating HTML
-					// scripts inside foreign content.
-					const script = document.createElementNS(parsed.namespaceURI, 'script');
-					for (const attr of parsed.attributes) {
-						script.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
-					}
-					script.textContent = parsed.textContent;
+					const script = prepareOwnedTemplateScript(
+						node as Element,
+						node === root ? null : node.parentNode!,
+					);
 					if (node === root) root = script;
-					else node.parentNode!.replaceChild(script, node);
 				}
 				Object.defineProperty(lazy.parsed, namespace, {
 					value: root,
