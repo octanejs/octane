@@ -67,7 +67,12 @@ export function serializeScopeRead(
 	const scope = root.owner as ScopeImpl;
 	if (!scope.seedable) return [];
 	const rootEntry = scopeSeedEntry(scope, root, read);
-	if (!rootEntry) return undefined;
+	// A snapshot renders a pending or failed state as it is, without suspending.
+	// The client resolves that state itself, or takes the stream's delivery, so
+	// the read carries no seed rather than an invented ready one. Any other
+	// unready read completed by mistake.
+	if (!rootEntry)
+		return read === 'snapshot' && root.state?.snapshot.status !== 'ready' ? [] : undefined;
 	const owners = new Map<ScopeImpl, SignalSeedEntry[]>();
 	const keys = new Map<string, ScopeImpl>();
 	const seen = new Set<ScopedNode>();
