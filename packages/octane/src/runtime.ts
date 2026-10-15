@@ -5043,8 +5043,9 @@ function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNext | nu
 	const tx = ROOT_RENDER_TRANSACTION;
 	if (tx === null) return null;
 	if (state.next !== null && state.next.tx === tx) return slotNext(state);
-	// A hydrating list's end may still be to place (placeAtCommit).
-	const parent = markerParent(state.end)!;
+	// A hydrating list's end may still be to place (placeAtCommit): only then
+	// is it parentless, so an ordinary list update makes no extra call.
+	const parent = state.end.parentNode ?? markerParent(state.end)!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
 	let owner = parentBlock;
 	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
