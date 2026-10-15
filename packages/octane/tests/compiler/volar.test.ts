@@ -1255,7 +1255,8 @@ declare const dynamicStyle$: SignalHandle<'height'>;
 declare const payload$: SignalHandle<{ selected: typeof styles.root }>;
 declare function Custom(props: { sx: SignalHandle<number | null> }): null;
 `;
-			const valid = `${imports}
+			const valid = `import 'octane/signals';
+${imports}
 export function Panel() @{
   <div sx={styles.height(height$)}>
     <span sx={appearance$} />

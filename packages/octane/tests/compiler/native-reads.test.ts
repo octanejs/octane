@@ -8,6 +8,7 @@ import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
 const NAMING = 'OCTANE_NATIVE_SIGNAL_NAME';
 const MEMO_READ = 'OCTANE_NATIVE_MEMO_READ';
+const SIGNAL_IMPORT = 'OCTANE_NATIVE_SIGNAL_IMPORT';
 const FILENAME = '/src/native-reads.tsrx';
 const ORDINARY_DOLLAR = readFileSync(
 	resolve(import.meta.dirname, '../_fixtures/native-reads-ordinary-dollar.tsrx'),
@@ -32,6 +33,512 @@ const modes = [
 	{ dev: false, hmr: false, strong: true },
 	{ mode: 'server' },
 ] as const;
+
+describe('native signal import diagnostics', () => {
+	const typeImport = `import type { SignalHandle } from 'octane/signals';`;
+	const read = 'props.count$.get()';
+	const source = `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{
+  <output>{String(${read})}</output>
+}`;
+
+	it.each([{ dev: true }, { dev: false, hmr: false }, { mode: 'server' }] as const)(
+		'requires a runtime signals import for a proven render read in %j',
+		(options) => {
+			expect(() => compile(source, FILENAME, options)).toThrow(SIGNAL_IMPORT);
+		},
+	);
+
+	it.each(['client', 'server'])(
+		'requires a runtime import with a type-only signals/%s import',
+		(entry) => {
+			expect(() =>
+				compile(source.replace('octane/signals', `octane/signals/${entry}`), FILENAME, {
+					dev: true,
+				}),
+			).toThrow(SIGNAL_IMPORT);
+		},
+	);
+
+	it.each([
+		{
+			label: 'a reachable nullish fallback',
+			source: source.replace(read, `null ?? ${read}`),
+		},
+		{
+			label: 'an aliased named type and destructured prop',
+			source: `import { type SignalHandle as Handle } from 'octane/signals';
+export function Counter({ count$: value$ }: { count$: Handle<number> }) @{
+  const count$ = value$;
+  <output>{String(count$.latest())}</output>
+}`,
+		},
+		{
+			label: 'a namespace type import',
+			source: `import type * as Signals from 'octane/signals';
+export function Counter(props: { count$: Signals.SignalHandle<number> }) @{
+  <output>{String(props.count$.snapshot().status)}</output>
+}`,
+		},
+		{
+			label: 'an inline type import',
+			source: `export function Counter(props: { count$: import('octane/signals').SignalHandle<number> }) @{
+  <output>{String(props.count$.get())}</output>
+}`,
+		},
+		{
+			label: 'a Unicode-escaped get identifier',
+			source: String.raw`${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(props.count$.\u0067et())}</output> }`,
+		},
+		{
+			label: 'an escaped slash in an inline signal type import',
+			source: String.raw`export function Counter(props: { count$: import('octane\u002fsignals').SignalHandle<number> }) @{ <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'a scope read',
+			source: `import type { Scope, SignalHandle } from 'octane/signals';
+export function Counter(props: { scope: Scope; count$: SignalHandle<number> }) @{
+  <output>{String(props.scope.get(props.count$))}</output>
+}`,
+		},
+		{
+			label: 'a synchronously called local helper',
+			source: `${typeImport}
+function readCount$(count$: SignalHandle<number>) { return count$.get(); }
+export function Counter(props: { count$: SignalHandle<number> }) @{
+  <output>{String(readCount$(props.count$))}</output>
+}`,
+		},
+		{
+			label: 'an outer signal captured by a nested local helper',
+			source: `${typeImport}
+function outer$(count$: SignalHandle<number>) { function inner$() { return count$.get(); } return inner$(); }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(outer$(props.count$))}</output> }`,
+		},
+		{
+			label: 'a synchronous useMemo callback',
+			source: `import { useMemo } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{
+  const label = useMemo(() => String(props.count$.get()));
+  <output>{label as string}</output>
+}`,
+		},
+		{
+			label: 'a useState lazy initializer',
+			source: `import { useState } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const [value] = useState(() => props.count$.get()); <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a useReducer initializer receiving a typed signal',
+			source: `import { useReducer } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const [value] = useReducer((state: number) => state, props.count$, count$ => count$.get()); <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a useLinkedState reconcile callback receiving a typed source',
+			source: `import { useLinkedState } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const [value] = useLinkedState(props.count$, count$ => count$.get()); <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a useSyncExternalStore snapshot callback',
+			source: `import { useSyncExternalStore } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const value = useSyncExternalStore(() => () => {}, () => props.count$.get()); <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a plain function used as a local JSX component',
+			source: `${typeImport}
+function Counter(props: { count$: SignalHandle<number> }) {
+  return <output>{String(props.count$.get())}</output>;
+}
+export function App(props: { count$: SignalHandle<number> }) @{ <Counter count$={props.count$} /> }`,
+		},
+		{
+			label: 'a typed signal prop passed to an untyped local JSX child',
+			source: `${typeImport}
+function Child(props) @{ <output>{String(props.count$.get())}</output> }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <Child count$={props.count$} /> }`,
+		},
+		{
+			label: 'a createElement component passed to root.render',
+			source: `import { createElement, createRoot } from 'octane';
+${typeImport}
+declare const count$: SignalHandle<number>;
+function Counter() { return createElement('output', null, String(count$.get())); }
+createRoot(document.body).render(Counter);`,
+		},
+		{
+			label: 'a typed signal prop passed through root.render',
+			source: `import { createRoot } from 'octane';
+${typeImport}
+declare const typedHandle$: SignalHandle<number>;
+function Child(props) @{ <output>{String(props.count$.get())}</output> }
+createRoot(document.body).render(Child, { count$: typedHandle$ });`,
+		},
+		{
+			label: 'a typed signal prop passed through an exported bootstrap',
+			source: `import { createRoot } from 'octane';
+${typeImport}
+function Counter(props) @{ <output>{String(props.count$.get())}</output> }
+export function bootstrap(host: Element, count$: SignalHandle<number>) { createRoot(host).render(Counter, { count$ }); }`,
+		},
+		{
+			label: 'an exported function returning JSX',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) { return <output>{String(props.count$.get())}</output>; }`,
+		},
+		{
+			label: 'an exported arrow returning JSX',
+			source: `${typeImport}
+export const Counter = (props: { count$: SignalHandle<number> }) => <output>{String(props.count$.get())}</output>;`,
+		},
+		{
+			label: 'an exported memo-wrapped component',
+			source: `import { memo } from 'octane';
+${typeImport}
+export const Counter = memo((props: { count$: SignalHandle<number> }) => <output>{String(props.count$.get())}</output>);`,
+		},
+		{
+			label: 'a separately exported component',
+			source: `${typeImport}
+function Counter(props: { count$: SignalHandle<number> }) { return <output>{String(props.count$.get())}</output>; }
+export { Counter };`,
+		},
+		{
+			label: 'a local props interface',
+			source: `${typeImport}
+interface Props { count$: SignalHandle<number> }
+export function Counter(props: Props) @{ <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'an inherited props interface',
+			source: `${typeImport}
+interface BaseProps { count$: SignalHandle<number> }
+interface Props extends BaseProps {}
+export function Counter(props: Props) @{ <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'a signal handle type assertion',
+			source: `${typeImport}
+export function Counter(props: { count: unknown }) @{ <output>{String((props.count as SignalHandle<number>).get())}</output> }`,
+		},
+		{
+			label: 'a nullable handle through optional chaining',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> | null }) @{ <output>{String(props.count$?.get())}</output> }`,
+		},
+		{
+			label: 'a guarded nullable handle',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> | null }) @{ let value = 0; if (props.count$ !== null) value = props.count$.get(); <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a read after a conditional await with a synchronous path',
+			source: `${typeImport}
+async function readCount$(count$: SignalHandle<number>, defer: boolean) { if (defer) await Promise.resolve(); return count$.get(); }
+export function Counter(props: { count$: SignalHandle<number>; defer: boolean }) @{ void readCount$(props.count$, props.defer); <output /> }`,
+		},
+		{
+			label: 'a catch reached by an explicit throw',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ let value = 0; try { throw 0; } catch { value = props.count$.get(); } <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a read after an explicit throw was caught',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ try { throw 0; } catch {} <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'a finally block reached after return',
+			source: `${typeImport}
+function readCount$(count$: SignalHandle<number>) { try { return 0; } finally { count$.get(); } }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(readCount$(props.count$))}</output> }`,
+		},
+		{
+			label: 'a read after a for-of loop breaks',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ for (const item of [1]) { break; } <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'a read after switch cases break',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number>; mode: string }) @{ switch (props.mode) { case 'one': break; default: break; } <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'a read in a later switch case after an earlier case returns',
+			source: `${typeImport}
+function readCount$(count$: SignalHandle<number>, mode: string) { switch (mode) { case 'skip': return 0; case 'read': return count$.get(); default: return 0; } }
+export function Counter(props: { count$: SignalHandle<number>; mode: string }) @{ <output>{String(readCount$(props.count$, props.mode))}</output> }`,
+		},
+		{
+			label: 'a read after a labeled block breaks',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ exit: { break exit; } <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'a read in an immediately accessed object literal getter',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(({ get value() { return props.count$.get(); } }).value)}</output> }`,
+		},
+		{
+			label: 'an instantiated base-class field initializer',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ class Base { value = props.count$.get(); } class Derived extends Base {} <output>{String(new Derived().value)}</output> }`,
+		},
+		{
+			label: 'a derived field initialized after an explicit super call',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ class Base {} class Derived extends Base { value = props.count$.get(); constructor() { super(); } } <output>{String(new Derived().value)}</output> }`,
+		},
+		{
+			label: 'a detached read passed to useMemo',
+			source: `import { useMemo } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(useMemo(props.count$.get))}</output> }`,
+		},
+		{
+			label: 'an untyped helper called with a typed handle',
+			source: `${typeImport}
+function readCount$(count$) { return count$.get(); }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(readCount$(props.count$))}</output> }`,
+		},
+		{
+			label: 'a generic constrained to a signal handle',
+			source: `${typeImport}
+export function Counter<T extends SignalHandle<number>>(props: { count$: T }) @{ <output>{String(props.count$.get())}</output> }`,
+		},
+		{
+			label: 'an indexed typed handle array',
+			source: `${typeImport}
+export function Counter(props: { counts$: SignalHandle<number>[] }) @{ <output>{String(props.counts$[0].get())}</output> }`,
+		},
+		{
+			label: 'a dynamically indexed handle array',
+			source: `${typeImport}
+export function Counter(props: { counts$: SignalHandle<number>[]; index: number }) @{ <output>{String(props.counts$[props.index].get())}</output> }`,
+		},
+		{
+			label: 'a generic Array of handles',
+			source: `${typeImport}
+export function Counter(props: { counts$: Array<SignalHandle<number>> }) @{ <output>{String(props.counts$[0].get())}</output> }`,
+		},
+		{
+			label: 'a handle read while iterating a typed array prop',
+			source: `${typeImport}
+export function Counter(props: { counts$: SignalHandle<number>[] }) @{ let total = 0; for (const count$ of props.counts$) { total += count$.get(); } <output>{String(total)}</output> }`,
+		},
+		{
+			label: 'a handle read in a keyed template loop',
+			source: `${typeImport}
+export function Counter(props: { counts$: SignalHandle<number>[] }) @{ <ul>@for (const item of props.counts$; key item.key) { <li>{String(item.get())}</li> }</ul> }`,
+		},
+		{
+			label: 'a read in a live template else arm',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <section>@if (false) { <output /> } @else { <output>{String(props.count$.get())}</output> }</section> }`,
+		},
+		{
+			label: 'a callback on a fresh nonempty handle array',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String([props.count$].map(count$ => count$.get()))}</output> }`,
+		},
+		{
+			label: 'a reachable read in a cyclic local call graph',
+			source: `${typeImport}
+function first$(count$: SignalHandle<number>, depth: number): number { return depth ? second$(count$, depth - 1) : count$.get(); }
+function second$(count$: SignalHandle<number>, depth: number): number { return depth ? first$(count$, depth - 1) : 0; }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(first$(props.count$, 2))}</output> }`,
+		},
+	])('requires a runtime signals import for $label', ({ source: missingImport }) => {
+		expect(() => compile(missingImport, FILENAME, { dev: true })).toThrow(SIGNAL_IMPORT);
+	});
+
+	it('requires a runtime signals import in a plain TypeScript custom hook', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		const hook = `import { useMemo } from 'octane';
+${typeImport}
+export function useCount(signal: SignalHandle<number>) { return useMemo(() => signal.get()); }`;
+		expect(() => compiler.transform(hook, '/project/src/use-count.ts', { dev: true })).toThrow(
+			SIGNAL_IMPORT,
+		);
+	});
+
+	it('points the editor to the read and explains how to enable it', () => {
+		const diagnostic = compileToVolarMappings(source, FILENAME, {}).diagnostics.find(
+			(entry) => entry.code === SIGNAL_IMPORT,
+		);
+		expect(diagnostic).toMatchObject({
+			severity: 'error',
+			filename: FILENAME,
+			message: expect.stringMatching(/import.*octane\/signals/i),
+		});
+		const readStart = source.indexOf(read);
+		expect(diagnostic!.start.offset).toBeGreaterThanOrEqual(readStart);
+		expect(diagnostic!.end.offset).toBeGreaterThan(diagnostic!.start.offset);
+		expect(diagnostic!.end.offset).toBeLessThanOrEqual(readStart + read.length);
+	});
+
+	it.each([
+		{
+			label: 'a runtime import',
+			source: `import 'octane/signals';\n${source}`,
+		},
+		{
+			label: 'an ordinary getter beside a direct signal binding',
+			source: `${typeImport}
+export function Counter(props: { cache$: Map<string, number>; count$: SignalHandle<number> }) @{
+  <section><output>{String(props.cache$.get('count'))}</output><input value={props.count$} /></section>
+}`,
+		},
+		{
+			label: 'reads deferred to an event or effect',
+			source: `import { useEffect } from 'octane';
+${typeImport}
+declare function record(value: number): void;
+function readCount$(count$: SignalHandle<number>) { return count$.get(); }
+export function Counter(props: { count$: SignalHandle<number> }) @{
+  useEffect(() => record(readCount$(props.count$)), []);
+  <button onClick={() => record(readCount$(props.count$))}>Read</button>
+}`,
+		},
+		{
+			label: 'a deferred useLayoutSnapshot measure callback',
+			source: `import { useLayoutSnapshot } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const value = useLayoutSnapshot(() => props.count$.get(), { initial: 0 }); <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a local template helper called only from an event',
+			source: `${typeImport}
+function readCount$(count$: SignalHandle<number>) @{ <output>{String(count$.get())}</output> }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <button onClick={() => readCount$(props.count$)}>Read</button> }`,
+		},
+		{
+			label: 'an imperative module read',
+			source: `${typeImport}
+declare const count$: SignalHandle<number>;
+const initialCount = count$.get();
+export function Counter() @{ <output>{String(initialCount)}</output> }`,
+		},
+		{
+			label: 'a read in a statically false branch',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ if (false) props.count$.get(); <output /> }`,
+		},
+		{
+			label: 'a read in a statically false template if arm',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <section>@if (false) { <output>{String(props.count$.get())}</output> }</section> }`,
+		},
+		{
+			label: 'a component reachable only through an unreachable root render',
+			source: `import { createElement, createRoot } from 'octane';
+${typeImport}
+declare const count$: SignalHandle<number>;
+function Counter() { return createElement('output', null, String(count$.get())); }
+if (false) createRoot(document.body).render(Counter);`,
+		},
+		{
+			label: 'a read in a statically false while loop',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ while (false) { props.count$.get(); } <output /> }`,
+		},
+		{
+			label: 'a read in a for-of loop over an empty array',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ for (const item of []) { props.count$.get(); } <output /> }`,
+		},
+		{
+			label: 'a read after an unconditional return',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) { return <output />; props.count$.get(); }`,
+		},
+		{
+			label: 'a catch that cannot be reached from an empty try',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ try {} catch { props.count$.get(); } <output /> }`,
+		},
+		{
+			label: 'a catch after reading an own literal data property',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ try { ({ value: 1 }).value; } catch { props.count$.get(); } <output /> }`,
+		},
+		{
+			label: 'an unreachable nullish fallback',
+			source: source.replace(read, `1 ?? ${read}`),
+		},
+		{
+			label: 'an ambiguous receiver',
+			source: `${typeImport}
+export function Counter(props: { value$: SignalHandle<number> | { get(): number } }) @{
+  <output>{String(props.value$.get())}</output>
+}`,
+		},
+		{
+			label: 'a similarly named type from another module',
+			source: `import type { SignalHandle } from './foreign';
+export function Counter(props: { count$: SignalHandle<number> }) @{
+  <output>{String(props.count$.get())}</output>
+}`,
+		},
+		{
+			label: 'a reassigned ordinary receiver',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number>; fallback: { get(): number } }) @{
+  let reader: SignalHandle<number> | { get(): number } = props.count$;
+  reader = props.fallback;
+  <output>{String(reader.get())}</output>
+}`,
+		},
+		{
+			label: 'a pending check with no signal read',
+			source: `import type { Scope } from 'octane/signals';
+export function Counter(props: { scope: Scope }) @{ <output>{String(props.scope.isPending(() => 123))}</output> }`,
+		},
+		{
+			label: 'a called generator with an unconsumed read',
+			source: `${typeImport}
+function* readCount$(count$: SignalHandle<number>) { yield count$.get(); }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(Boolean(readCount$(props.count$)))}</output> }`,
+		},
+		{
+			label: 'an asynchronous read after await',
+			source: `${typeImport}
+async function readCount$(count$: SignalHandle<number>) { await Promise.resolve(); return count$.get(); }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <output>{String(Boolean(readCount$(props.count$)))}</output> }`,
+		},
+		{
+			label: 'an uninstantiated instance field',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ class Deferred { value = props.count$.get(); } <output /> }`,
+		},
+		{
+			label: 'a derived field unreachable after a throwing base constructor',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ class Base { constructor() { throw new Error('stop'); } } class Derived extends Base { value = props.count$.get(); } try { new Derived(); } catch {} <output /> }`,
+		},
+		{
+			label: 'a callback on a proven empty handle array',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const counts: SignalHandle<number>[] = []; <output>{String(counts.map(() => props.count$.get()))}</output> }`,
+		},
+		{
+			label: 'an array map override that does not invoke its callback',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{
+  const counts: SignalHandle<number>[] = [props.count$];
+  counts.map = () => [];
+  <output>{String(counts.map(() => props.count$.get()))}</output>
+}`,
+		},
+	])('accepts $label', ({ source: accepted }) => {
+		expect(() => compile(accepted, FILENAME, { dev: true })).not.toThrow();
+	});
+});
 
 describe('automatic native signal compilation', () => {
 	it.each(modes)('accepts CSS keys in logical native style expressions in %j', (options) => {

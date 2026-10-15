@@ -22,6 +22,12 @@ module does not use a named signals API, add `import 'octane/signals';`. A
 type-only import or a `$` name alone does not enable native-read compilation. No
 extra compiler option is needed.
 
+If the compiler can identify a render-time native signal read from the module's
+source, it reports `OCTANE_NATIVE_SIGNAL_IMPORT` when the runtime import is
+missing. For example, it can recognize a prop typed with a locally imported
+`SignalHandle<T>`. It cannot identify every read through opaque cross-module or
+untyped values, so a successful compilation does not make the import optional.
+
 <h2 id="declarations">Declare state and derived values</h2>
 
 Use `signal$(initial)` for writable state and `derived$(compute)` for a read-only
