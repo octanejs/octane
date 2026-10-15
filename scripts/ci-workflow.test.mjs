@@ -4,6 +4,7 @@ import { existsSync, globSync, readFileSync, readdirSync, statSync } from 'node:
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
+import { projectSelects } from './react-parity/vitest-contract.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
@@ -758,18 +759,24 @@ describe('CI workflow aggregation', () => {
 		const project = baseVitestModule.default.test.projects.find(
 			({ test }) => test?.name === 'octane',
 		);
-		const sharded = shardedVitestConfig.test.projects.find(({ test }) => test?.name === 'octane');
 		assert.equal(project.testExecution.group, 'heavy-node');
 		assert.equal(project.testExecution.include.length, 1);
 		const [spec] = project.testExecution.include;
 		assert.ok(existsSync(path.join(REPO, spec)));
-		assert.equal(project.test.exclude.includes(spec), false);
-		assert.equal(sharded.test.exclude.filter((entry) => entry === spec).length, 1);
+		const owners = (projects) =>
+			projects.filter((entry) => projectSelects(entry, spec, REPO)).map(({ test }) => test.name);
+		assert.deepEqual(owners(baseVitestModule.default.test.projects), ['octane']);
+		assert.deepEqual(owners(shardedVitestConfig.test.projects), []);
 		const lane = jobSource('heavy_node_integration');
 		assert.equal(lane.split(spec).length - 1, 1);
-		assert.match(
-			lane,
-			/Run compiler Vite options tests\n\s+if: [^\n]+\n\s+run: .*--project octane .*--maxWorkers=1/,
+		assert.ok(
+			lane.includes(
+				[
+					'      - name: Run compiler Vite options tests',
+					"        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}",
+					`        run: pnpm vitest run --project octane ${spec} --maxWorkers=1`,
+				].join('\n'),
+			),
 		);
 	});
 
