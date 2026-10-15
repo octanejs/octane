@@ -18,6 +18,15 @@ const RUNTIME = path.join(ROOT, 'packages/octane/src/runtime.ts');
 const hasModifier = (node, kind) => node.modifiers?.some((m) => m.kind === kind) ?? false;
 
 export function readClientRuntime(file = RUNTIME, ref) {
+	return joinClientRuntime(file, ref).text;
+}
+
+/**
+ * The joined text, and for a split runtime its modules in the order the text
+ * holds them, each with the range of its statements, and the evaluation chain
+ * its order links form (module names, first to last).
+ */
+export function joinClientRuntime(file = RUNTIME, ref) {
 	const git = (...args) =>
 		execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28, stdio: 'pipe' });
 	const relative = (f) => path.relative(ROOT, f).split(path.sep).join('/');
@@ -38,7 +47,8 @@ export function readClientRuntime(file = RUNTIME, ref) {
 	const sourceDir = path.dirname(facadeFile);
 	const dir = path.join(sourceDir, 'runtime');
 	const names = list(dir).filter((name) => name.endsWith('.ts'));
-	if (path.basename(facadeFile) !== 'runtime.ts' || !names.length) return read(facadeFile);
+	if (path.basename(facadeFile) !== 'runtime.ts' || !names.length)
+		return { text: read(facadeFile), modules: null, chain: null };
 	const facade = parse(facadeFile);
 	const modules = new Map(
 		names.sort().map((name) => [path.join(dir, name), parse(path.join(dir, name))]),
@@ -92,8 +102,10 @@ export function readClientRuntime(file = RUNTIME, ref) {
 	}
 	const body = [];
 	const ambient = new Set();
+	const ranges = [];
 	for (const file of order) {
 		const sf = modules.get(file);
+		ranges.push({ name: path.basename(file, '.ts'), from: body.length });
 		const text = sf.getFullText();
 		for (const st of sf.statements) {
 			if (isOrderLink(st)) continue;
@@ -156,7 +168,22 @@ export function readClientRuntime(file = RUNTIME, ref) {
 			return `import ${all ? 'type ' : ''}{ ${list} } from '${spec}';`;
 		})
 		.filter(Boolean);
-	return `${[...importText, ...facadeKept].join('\n')}\n${body.join('')}\n`;
+	let offset = [...importText, ...facadeKept].join('\n').length + 1;
+	const starts = body.map((text) => {
+		const start = offset;
+		offset += text.length;
+		return start;
+	});
+	const name = (f) => path.basename(f, '.ts');
+	return {
+		text: `${[...importText, ...facadeKept].join('\n')}\n${body.join('')}\n`,
+		modules: ranges.map((r, i) => ({
+			name: r.name,
+			start: starts[r.from] ?? offset,
+			end: i + 1 < ranges.length ? (starts[ranges[i + 1].from] ?? offset) : offset,
+		})),
+		chain: chain.map(name),
+	};
 }
 
 /**
