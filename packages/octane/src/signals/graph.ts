@@ -9,6 +9,7 @@ import {
 	type PendingSlotLike,
 } from './transition-state.js';
 import { installSignalActions } from '#octane/signal-actions/graph';
+import { installServerReads } from '#octane/signals/server-reads';
 import {
 	ScopeDisposedError,
 	SignalCycleError,
@@ -1856,3 +1857,5 @@ registerGraphBridge({
 // loaded after an Action awaited. An islands build moves this registration into
 // the renderer (see action-capability.ts).
 installSignalActions();
+// A server render collects its signal reads whenever signals exist.
+installServerReads();

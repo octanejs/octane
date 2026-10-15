@@ -1,6 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
 import type { ScopedNode, SignalReadMode } from './graph.js';
+import type { createNativeServerReadDriver } from './native-read-server.js';
 
 /** Explicit async reads own an observer edge instead of a synchronous graph edge. */
 export const SIGNAL_DEPENDENT_NODE: unique symbol = Symbol('octane.signalDependent');
@@ -181,6 +182,17 @@ export function supplyNativeReadSerializer(
 	serializer: NonNullable<typeof nativeReadSerializer>,
 ): void {
 	nativeReadSerializer = serializer;
+}
+
+/**
+ * The server read driver's factory. The graph supplies it outside the browser
+ * (server-reads.ts), so a server render collects its reads whenever signals
+ * exist, and a server bundle with no signals keeps no collector.
+ */
+export let nativeServerReads: typeof createNativeServerReadDriver | null = null;
+
+export function supplyNativeServerReads(factory: typeof createNativeServerReadDriver): void {
+	nativeServerReads = factory;
 }
 
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;

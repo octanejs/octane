@@ -1,9 +1,9 @@
 // An early binding program (dom-bindings.ts, dom-binding-program.ts) writes the
 // DOM it owns as its source publishes, with no renderer loaded. Render never
 // writes the document (#2043), so a publication made while an Octane render
-// slice is open defers the program's drain until the runtime closes the slice,
-// whether its root then commits the render or drops it. The source really
-// changed, so the write lands either way, before the next paint.
+// slice is open defers the program's drain until that render's commit has run,
+// whether the root committed the render or dropped it. The source really
+// changed, so the write lands either way, on the same task, before any paint.
 //
 // This module imports nothing, so an early program carries it without the
 // runtime. Only an early program creates the slice record, so the runtime's
@@ -14,7 +14,7 @@
 export interface RenderSlice {
 	/** An Octane render slice is open. */
 	open: boolean;
-	/** The open slice's deferred drains. A program stays busy until its own runs, so it queues once. */
+	/** Drains a slice deferred, until its commit. A program stays busy until its own runs, so it queues once. */
 	drains: Array<() => void>;
 }
 

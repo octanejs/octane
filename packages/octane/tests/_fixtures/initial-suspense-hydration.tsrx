@@ -52,6 +52,44 @@ function AdoptionContent(props: AdoptionProps) {
 	);
 }
 
+// The same content returned as a fragment with a trailing host: its hosts
+// render through runtime descriptors rather than a template.
+function FragmentAdoptionContent(props: AdoptionProps) {
+	if (!props.gateInChild) waitForGate(props.gate);
+	const id = useId();
+	const data = use(props.data);
+	const [count, setCount] = useState(0);
+	useLayoutEffect(() => {
+		props.onLifecycle('mount:' + props.label);
+		return () => props.onLifecycle('cleanup:' + props.label);
+	}, []);
+	return (
+		<>
+			<section>
+				<label htmlFor={id}>{'Draft'}</label>
+				<input id={id} defaultValue="server draft" ref={props.onRef} />
+				<output>{data}</output>
+				<button onClick={() => setCount(count + 1)}>{count as number}</button>
+				<GatedText gate={props.gate} secondGate={props.secondGate} label={props.label} />
+			</section>
+			<p data-adoption-status>{props.label as string}</p>
+		</>
+	);
+}
+
+function SectionRelay(props: AdoptionProps) {
+	return <AdoptionContent {...props} />;
+}
+function SectionRelayChain(props: AdoptionProps) {
+	return <SectionRelay {...props} />;
+}
+function FragmentRelay(props: AdoptionProps) {
+	return <FragmentAdoptionContent {...props} />;
+}
+function FragmentRelayChain(props: AdoptionProps) {
+	return <FragmentRelay {...props} />;
+}
+
 function AdoptionSibling(props: Pick<AdoptionProps, 'siblingData' | 'onSiblingClick'>) {
 	const id = useId();
 	const data = use(props.siblingData);
@@ -68,9 +106,74 @@ function AdoptionSibling(props: Pick<AdoptionProps, 'siblingData' | 'onSiblingCl
 export function InitialAdoptionScreen(props: AdoptionProps) {
 	return (
 		<main>
-			<ErrorBoundary fallback={(error) => <p role="alert">{(error as Error).message}</p>}>
+			<ErrorBoundary fallback={(error: unknown) => <p role="alert">{(error as Error).message}</p>}>
 				<Suspense fallback={<p>Loading</p>}>
 					<AdoptionContent {...props} />
+				</Suspense>
+			</ErrorBoundary>
+			<AdoptionSibling siblingData={props.siblingData} onSiblingClick={props.onSiblingClick} />
+		</main>
+	);
+}
+
+export function InitialFragmentScreen(props: AdoptionProps) {
+	return (
+		<main>
+			<ErrorBoundary fallback={(error: unknown) => <p role="alert">{(error as Error).message}</p>}>
+				<Suspense fallback={<p>Loading</p>}>
+					<FragmentAdoptionContent {...props} />
+				</Suspense>
+			</ErrorBoundary>
+			<AdoptionSibling siblingData={props.siblingData} onSiblingClick={props.onSiblingClick} />
+		</main>
+	);
+}
+
+export function InitialSectionRelayScreen(props: AdoptionProps) {
+	return (
+		<main>
+			<ErrorBoundary fallback={(error: unknown) => <p role="alert">{(error as Error).message}</p>}>
+				<Suspense fallback={<p>Loading</p>}>
+					<SectionRelay {...props} />
+				</Suspense>
+			</ErrorBoundary>
+			<AdoptionSibling siblingData={props.siblingData} onSiblingClick={props.onSiblingClick} />
+		</main>
+	);
+}
+
+export function InitialSectionRelayChainScreen(props: AdoptionProps) {
+	return (
+		<main>
+			<ErrorBoundary fallback={(error: unknown) => <p role="alert">{(error as Error).message}</p>}>
+				<Suspense fallback={<p>Loading</p>}>
+					<SectionRelayChain {...props} />
+				</Suspense>
+			</ErrorBoundary>
+			<AdoptionSibling siblingData={props.siblingData} onSiblingClick={props.onSiblingClick} />
+		</main>
+	);
+}
+
+export function InitialFragmentRelayScreen(props: AdoptionProps) {
+	return (
+		<main>
+			<ErrorBoundary fallback={(error: unknown) => <p role="alert">{(error as Error).message}</p>}>
+				<Suspense fallback={<p>Loading</p>}>
+					<FragmentRelay {...props} />
+				</Suspense>
+			</ErrorBoundary>
+			<AdoptionSibling siblingData={props.siblingData} onSiblingClick={props.onSiblingClick} />
+		</main>
+	);
+}
+
+export function InitialFragmentRelayChainScreen(props: AdoptionProps) {
+	return (
+		<main>
+			<ErrorBoundary fallback={(error: unknown) => <p role="alert">{(error as Error).message}</p>}>
+				<Suspense fallback={<p>Loading</p>}>
+					<FragmentRelayChain {...props} />
 				</Suspense>
 			</ErrorBoundary>
 			<AdoptionSibling siblingData={props.siblingData} onSiblingClick={props.onSiblingClick} />
