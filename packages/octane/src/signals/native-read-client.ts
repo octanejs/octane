@@ -56,9 +56,7 @@ interface Candidate extends NativeReadWitness {
 interface RenderFrame {
 	block: Block | null;
 	collectorToken: number;
-	// Most invocations read in just one scope. Captures still own their
-	// separate per-consumer set after the invocation completes.
-	candidates: Candidate | Map<Scope, Candidate> | null;
+	candidates: Map<Scope, Candidate> | null;
 	/** Renderer data scoped to this one invocation, such as a declaration stage. */
 	invocationData: unknown;
 	/** This invocation's declaration number; nested invocations have larger ones. */
@@ -215,26 +213,13 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	}
 
 	function getCandidate(frame: RenderFrame, scope: Scope): Candidate {
-		const candidates = frame.candidates;
-		let candidate =
-			candidates === null
-				? undefined
-				: candidates instanceof Map
-					? candidates.get(scope)
-					: candidates.consumer.scope === scope
-						? candidates
-						: undefined;
+		const candidates = (frame.candidates ??= new Map());
+		let candidate = candidates.get(scope);
 		if (candidate === undefined) {
 			const consumer = getConsumer(scope, frame.block!);
 			candidate = { consumer, reads: new Map(), mixed: false, active: true };
 			consumer.pending.add(candidate);
-			if (candidates === null) frame.candidates = candidate;
-			else if (candidates instanceof Map) candidates.set(scope, candidate);
-			else
-				frame.candidates = new Map([
-					[candidates.consumer.scope, candidates],
-					[scope, candidate],
-				]);
+			candidates.set(scope, candidate);
 		}
 		return candidate;
 	}
@@ -414,28 +399,18 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				// restores whatever abandoned frames entered. Only their reads remain.
 				for (let above = depth - 1; above > index; above--) {
 					const candidates = frames[above].candidates;
-					if (candidates instanceof Map)
-						for (const candidate of candidates.values()) release(candidate);
-					else if (candidates !== null) release(candidates);
+					if (candidates !== null) for (const candidate of candidates.values()) release(candidate);
 				}
-				const candidates = frame.candidates;
-				if (candidates !== null) {
+				if (frame.candidates !== null) {
 					if (completed) {
 						const capture = host.capture();
 						if (capture === null) throw new Error(formatClientError(167));
 						const destination = target(capture);
-						if (candidates instanceof Map)
-							for (const candidate of candidates.values()) put(destination, candidate);
-						else put(destination, candidates);
+						for (const candidate of frame.candidates.values()) put(destination, candidate);
 					} else {
-						if (candidates instanceof Map) {
-							for (const candidate of candidates.values()) {
-								if (suspended && candidate.active) host.suspended(block, candidate);
-								release(candidate);
-							}
-						} else {
-							if (suspended && candidates.active) host.suspended(block, candidates);
-							release(candidates);
+						for (const candidate of frame.candidates.values()) {
+							if (suspended && candidate.active) host.suspended(block, candidate);
+							release(candidate);
 						}
 					}
 				}
