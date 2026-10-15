@@ -646,6 +646,7 @@ export function teardownHydrateBoundary(state: HydrateSlot): void {
 	state.initialCaptures = null;
 	cleanupHydrateInstallers(state);
 	cleanupHydrateStreamWait(state);
+	// load() can start procedural prefetch before passive setup, so settle it here.
 	state.prefetchAbort?.abort();
 	resolveHydrateWaiters(state, 'abort');
 	unregisterHydrationIntentBoundary(state.wrapper, state.intentBoundary);
