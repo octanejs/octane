@@ -11998,7 +11998,6 @@ async function runStream(
 			);
 		});
 
-	const emittedCss = new Set<string>();
 	/** Float sheet hrefs already on the wire (shell head fold or a wave carrier). */
 	const flushedSheets = new Set<string>();
 	let resourceChunkSeq = 0;
@@ -12145,18 +12144,8 @@ async function runStream(
 	// (or onHeadReady under the separate head channel) — record it so wave
 	// diffs never re-ship one.
 	if (pass.sheets !== null) for (const key of pass.sheets.keys()) flushedSheets.add(key);
-	let leadingStyles = '';
-	for (const [hash, sheet] of pass.cssEntries) {
-		emittedCss.add(hash);
-		leadingStyles +=
-			'<style data-octane="' +
-			hash +
-			'"' +
-			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
-			'>' +
-			escapeEntireInlineStyleContent(sheet.css) +
-			'</style>';
-	}
+	const emittedCss = new Set(pass.cssEntries.keys());
+	const leadingStyles = pass.css;
 	// Streaming DOCUMENT renders always lead with `<!DOCTYPE html>` — React
 	// Fizz parity, injection or not (buffered renderers stay doctype-free,
 	// also per React; see isDocumentRoot).
