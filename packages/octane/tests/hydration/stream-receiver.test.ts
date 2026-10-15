@@ -46,6 +46,21 @@ function placement(
 }
 
 describe('streamed region receiver', () => {
+	it('rejects a malformed selection identity before registration', () => {
+		const receiver = createStreamedResultReceiver({
+			buildId: 'build-1',
+			documentId: 'document-1',
+			ownerKey: 'account-1',
+		});
+		try {
+			expect(() => receiver.registerSelection(identity({ attempt: -1 }))).toThrow(
+				StreamedReceiverError,
+			);
+		} finally {
+			receiver.dispose();
+		}
+	});
+
 	it('retains a transport failure until the result module attaches', async () => {
 		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
 			const receiver = createReceiver({
