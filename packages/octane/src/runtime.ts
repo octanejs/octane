@@ -44852,32 +44852,40 @@ function moveToFrontier(
 
 /** What still anchors on an arm frontier's sentinel inserts where the arm lands. */
 function settleArmFrontier(scope: Scope, frag: Node, end: Node, after: Node | null): void {
-	retargetArmPending(scope, end, after);
 	if (scope.block.endMarker === end) scope.block.endMarker = after;
-	frag.removeChild(end);
-	SPARE_SENTINEL = end as Comment;
+	releaseFrontierSentinel(scope, frag as DocumentFragment, end as Comment, after);
 }
 
-/** Point what moveArmPending moved onto sentinel `from`, nested arms included, at `to`. */
-function retargetArmPending(scope: Scope, from: Node, to: Node | null): void {
+/**
+ * Point what anchors on sentinel `from` under `scope` at `to`: its slots, and
+ * the arms and children still pending on it, nested ones included. One with a
+ * bound of its own holds its content's anchors inside that bound.
+ */
+function retargetPending(scope: Scope, from: Node, to: Node | null): void {
 	const slots = scope._slots;
 	if (slots !== null)
 		for (let i = 0; i < slots.length; i++) {
 			const slot = slots[i];
-			if (slot.anchor === from) slot.anchor = to;
+			if (slot.anchor === from) {
+				journalRootProperty(slot, 'anchor', from);
+				slot.anchor = to;
+			}
 			const arm = slot.block ?? slot.lite;
-			if (arm == null) continue;
-			retargetArmPending(arm, from, to);
-			if (arm.block.endMarker === from) arm.block.endMarker = to;
+			if (arm != null && arm.block.endMarker === from) retargetPendingBlock(arm, from, to);
 		}
 	const children = scope.children;
 	if (children !== null)
 		for (let i = 0; i < children.length; i++) {
 			const child = children[i].scope;
-			if (child.block === scope.block) continue;
-			retargetArmPending(child, from, to);
-			if (child.block.endMarker === from) child.block.endMarker = to;
+			if (child.block !== scope.block && child.block.endMarker === from)
+				retargetPendingBlock(child, from, to);
 		}
+}
+
+function retargetPendingBlock(scope: Scope, from: Node, to: Node | null): void {
+	retargetPending(scope, from, to);
+	journalRootProperty(scope.block, 'endMarker', from);
+	scope.block.endMarker = to;
 }
 
 /** Bound a markerless arm's content, from `first` up to `after`, with a marker pair. */
@@ -45294,8 +45302,9 @@ function frontierSentinel(frag: DocumentFragment, data: string): Comment {
 }
 
 /**
- * Retire a frontier sentinel once `scope` rendered before it: the root slots
- * anchored on it insert before `before` instead, where the content lands.
+ * Retire a frontier sentinel once `scope` rendered before it: what still
+ * anchors on it, at any depth, inserts before `before` instead, where the
+ * content lands.
  */
 function releaseFrontierSentinel(
 	scope: Scope,
@@ -45303,7 +45312,7 @@ function releaseFrontierSentinel(
 	end: Comment,
 	before: Node | null,
 ): void {
-	markerlessBranchRoots(scope, frag, end, before);
+	retargetPending(scope, end, before);
 	frag.removeChild(end);
 	SPARE_SENTINEL = end;
 }
