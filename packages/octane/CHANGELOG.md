@@ -1,5 +1,26 @@
 # octane
 
+## 0.13.8
+
+### Patch Changes
+
+- 19033e4: A server render that reads a pending or failed query through `snapshot()` no
+  longer throws "A completed native server read has no serializable ready value"
+  once the server has loaded a module that reads signals. The snapshot renders
+  the state as it is and adds nothing to the hydration snapshot, rather than an
+  invented ready value: the client resolves that state itself, or takes the
+  result a stream delivers, as it does when no module reads signals. A completed
+  `get()` of a value that is not ready still throws.
+- a9dfdf7: Remove a Provider's previous children when they become `null` or `undefined`, for both a `.tsx` `<Context value>` and `CompiledContext`. They used to stay mounted, with their effects and state, until the Provider rendered children again.
+- c6cb71a: `renderToString(<App />)` and the other server entry points render a component
+  element as its component's root, so `hydrateRoot` with either entry form adopts
+  it.
+- 340beda: Compile key-only Fragments and keyed component spreads in Strong DOM templates without element descriptors, preserving keyed scope cleanup, prop evaluation order, and server rendering and hydration behavior.
+- c54cfdd: Enable Strong mode for Router's hook and store adapters while preserving their
+  authored hook slots and production memo optimization. Allow manually slotted Strong
+  modules to use the existing memo lowering when no generated declaration cache is
+  required.
+
 ## 0.13.7
 
 ### Patch Changes
