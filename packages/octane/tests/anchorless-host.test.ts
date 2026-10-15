@@ -169,6 +169,60 @@ describe('anchorless lone pure-host value', () => {
 		}
 	});
 
+	it.each([
+		['text', 'AplainB'],
+		['comp', 'AsoloB'],
+	])('initializes a custom editor when it replaces %s inside an existing section', (mode, text) => {
+		const seen: (string | null)[] = [];
+		const tag = `replacement-${mode}-editor`;
+		customElements.define(
+			tag,
+			class extends HTMLElement {
+				connectedCallback() {
+					seen.push(this.getAttribute('data-label'));
+				}
+			},
+		);
+		const r = mount(App, { mode, tag });
+		try {
+			const section = r.find('section');
+			expect(section.textContent).toBe(text);
+			r.update(App, { mode: 'editor', tag });
+			expect(r.find('section')).toBe(section);
+			expect(section.textContent).toBe('AeditorB');
+			expect(seen).toEqual(['ready']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each(['text', 'comp'])(
+		'does not connect a custom editor replacing %s when its initial attribute unmounts the root',
+		(mode) => {
+			let dispose: (() => void) | undefined;
+			const events: string[] = [];
+			const tag = `disposer-${mode}-editor`;
+			customElements.define(
+				tag,
+				class extends HTMLElement {
+					static observedAttributes = ['data-label'];
+					attributeChangedCallback() {
+						events.push('attribute');
+						dispose?.();
+					}
+					connectedCallback() {
+						events.push('connected');
+					}
+				},
+			);
+			const r = mount(App, { mode, tag });
+			dispose = () => r.unmount();
+			r.update(App, { mode: 'editor', tag });
+			expect(events).toEqual(['attribute']);
+			expect(r.container.childNodes).toHaveLength(0);
+		},
+	);
+
 	it('attaches the ref on mount and detaches it when the value flips away', () => {
 		const ref: { current: Element | null } = { current: null };
 		const r = mount(Pass, { children: createElement('div', { ref }) });

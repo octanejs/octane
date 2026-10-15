@@ -35459,6 +35459,7 @@ function reconcileDeoptNode(
 	prev: Node | null,
 	value: any,
 	ownerBlock: Block,
+	placement: Node,
 	ns?: string,
 ): Node | null {
 	if (value == null || value === false || value === true || value === '') return null;
@@ -35520,7 +35521,7 @@ function reconcileDeoptNode(
 			// is text, is client DOM: it builds with adoption suspended.
 			const hydration = hydrating ? CURSOR : null;
 			if (hydration !== null)
-				return hydration.suspend(() => reconcileDeoptNode(null, value, ownerBlock, ns));
+				return hydration.suspend(() => reconcileDeoptNode(null, value, ownerBlock, placement, ns));
 			el =
 				elNs !== undefined
 					? document.createElementNS(elNs, value.type)
@@ -35545,27 +35546,36 @@ function reconcileDeoptNode(
 					ownerBlock,
 					defer,
 					pending,
+					placement,
 				);
 		if (desc !== null || nodes !== null) {
 			const order = queueDeoptOrder(el, owner, desc, nodes, null);
 			if (freshCustom) {
-				// A fresh nested host may not have been attached to its parent's DOM
-				// yet. Its rendering Block (or a fresh ancestor) still names the
-				// frontier which will connect it. A later slot frontier needs no
-				// early commit: this order already precedes that slot's entry.
-				for (let block: Block | null = ownerBlock; block !== null; block = block.parentBlock) {
-					const root = block.parentNode.getRootNode() as any;
-					if (root.$$next?.tx === order.tx) {
-						queueFrontierHost(root.$$next, root, order);
-						break;
-					}
-					if (block.createdStamp !== order.tx.createdStamp) break;
-					const next = block.forSlot?.next;
-					if (next?.tx === order.tx) {
-						// A compiled single-host row has no fragment. Its own root
-						// lands during the list's outgoing work, after earlier removals.
-						queueFrontierHost(next, block, order);
-						break;
+				// A retained Block may open a frontier without moving its own parent.
+				// Child descriptors are not attached yet, so use the outer slot's
+				// actual placement destination, even through fresh native wrappers.
+				const root = placement.getRootNode() as any;
+				if (root.$$next?.tx === order.tx) {
+					queueFrontierHost(root.$$next, root, order);
+				} else {
+					// A fresh nested host may not have been attached to its parent's DOM
+					// yet. Its rendering Block (or a fresh ancestor) still names the
+					// frontier which will connect it. A later slot frontier needs no
+					// early commit: this order already precedes that slot's entry.
+					for (let block: Block | null = ownerBlock; block !== null; block = block.parentBlock) {
+						const root = block.parentNode.getRootNode() as any;
+						if (root.$$next?.tx === order.tx) {
+							queueFrontierHost(root.$$next, root, order);
+							break;
+						}
+						if (block.createdStamp !== order.tx.createdStamp) break;
+						const next = block.forSlot?.next;
+						if (next?.tx === order.tx) {
+							// A compiled single-host row has no fragment. Its own root
+							// lands during the list's outgoing work, after earlier removals.
+							queueFrontierHost(next, block, order);
+							break;
+						}
 					}
 				}
 			}
@@ -35596,6 +35606,7 @@ function reconcileDeoptChildren(
 	ownerBlock: Block,
 	defer: boolean,
 	pendingOrder: DeoptOrder | null,
+	placement: Node,
 ): Node[] | null {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.BLOCK_DEOPT);
@@ -35653,7 +35664,7 @@ function reconcileDeoptChildren(
 		if (next.length !== 0 && hydrating) HYDRATION_PASS!.deoptMismatch(el, next[0]);
 		const built: Node[] = [];
 		for (let i = 0; i < next.length; i++) {
-			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
+			const node = reconcileDeoptNode(null, next[i], ownerBlock, placement, childNs);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				if (defer) built.push(node);
@@ -35769,7 +35780,7 @@ function reconcileDeoptChildren(
 			else if (hydrating && hydrationOwnsUnstamped === true && !singleton)
 				HYDRATION_PASS!.deoptMismatch(el, child);
 		}
-		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
+		const node = reconcileDeoptNode(prev, child, ownerBlock, placement, childNs);
 		if (node !== null) {
 			(node as any).$$deoptKey = key;
 			result.push(node);
@@ -36203,7 +36214,13 @@ function deoptItemBody(item: any, scope: Scope): void {
 		prev = startM != null ? getNextSibling(startM) : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
+	const node = reconcileDeoptNode(
+		prev,
+		item,
+		block,
+		prev?.parentNode ?? block.parentNode,
+		deoptChildNamespace(block.parentNode),
+	);
 	if (node !== prev) {
 		journalRootProperty(block, 'deoptNode', block.deoptNode);
 		const parent = block.parentNode;
@@ -38495,6 +38512,17 @@ export function childSlot(
 			// state survives a re-render. Switching in from a component/text first
 			// tears that down (also nulls a stale hostNode).
 			if (state.block !== null || state.text !== null) clearChildContent(state);
+			// A clear can have queued this slot's commit before its incoming host
+			// is built, without opening the fragment yet. That fresh host must use
+			// this very frontier for its initial custom-element writes. Keep the
+			// live domParent for namespaces and marker placement below.
+			const placement =
+				ROOT_RENDER_TRANSACTION !== null &&
+				state.next?.tx === ROOT_RENDER_TRANSACTION &&
+				state.hostNode === null &&
+				usesFrontier(parentBlock, domParent)
+					? slotFrontier(state, parentBlock, domParent, state.end ?? anchor ?? null)
+					: domParent;
 			if (state.end === null) {
 				// ANCHORLESS: no markers — the element self-delimits, so reconcile
 				// straight against the tracked node. A same-tag value patches it in
@@ -38503,7 +38531,13 @@ export function childSlot(
 				// always yields a node for a host descriptor; the null checks are
 				// shape-parity with the marked path below.
 				const prev = state.hostNode;
-				const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
+				const node = reconcileDeoptNode(
+					prev,
+					value,
+					parentBlock,
+					placement,
+					deoptChildNamespace(domParent),
+				);
 				if (node !== prev) {
 					const parent = prev === null ? null : prev.parentNode;
 					if (ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, parent ?? domParent)) {
@@ -38544,7 +38578,13 @@ export function childSlot(
 				prev = getNextSibling(state.start!);
 				if (prev === state.end) prev = null;
 			}
-			const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
+			const node = reconcileDeoptNode(
+				prev,
+				value,
+				parentBlock,
+				placement,
+				deoptChildNamespace(domParent),
+			);
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
 					if (ROOT_RENDER_TRANSACTION !== null) {

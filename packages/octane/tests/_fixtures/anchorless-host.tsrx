@@ -13,7 +13,7 @@ function Solo(props: { label: string }) @{
 // different content kind (text / null / de-opt array / singleRoot component /
 // host-with-component-children / portal), which must promote the slot to
 // markers in place without losing its position between the <b> siblings.
-function Flipper(props: { mode: string; target?: HTMLElement; hostRef?: any }) {
+function Flipper(props: { mode: string; target?: HTMLElement; hostRef?: any; tag?: string }) {
 	const mode = props.mode;
 	if (mode === 'host') {
 		return createElement('div', { id: 'host', ref: props.hostRef }, 'host');
@@ -30,6 +30,9 @@ function Flipper(props: { mode: string; target?: HTMLElement; hostRef?: any }) {
 	if (mode === 'comp') {
 		return <Solo label="solo" />;
 	}
+	if (mode === 'editor') {
+		return createElement(props.tag!, { 'data-label': 'ready' }, 'editor');
+	}
 	if (mode === 'hostcomp') {
 		return createElement('div', { id: 'hc' }, createElement(Solo, { label: 'deep' }));
 	}
@@ -39,10 +42,10 @@ function Flipper(props: { mode: string; target?: HTMLElement; hostRef?: any }) {
 	return null;
 }
 
-export function App(props: { mode: string; target?: HTMLElement; hostRef?: any }) @{
+export function App(props: { mode: string; target?: HTMLElement; hostRef?: any; tag?: string }) @{
 	<section class="root">
 		<b>{'A'}</b>
-		<Flipper mode={props.mode} target={props.target} hostRef={props.hostRef} />
+		<Flipper mode={props.mode} target={props.target} hostRef={props.hostRef} tag={props.tag} />
 		<b>{'B'}</b>
 	</section>
 }
