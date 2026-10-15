@@ -188,13 +188,13 @@ must select the same entry for a tree. Start applications select this entry with
 split-module imports.
 
 Compiled selection removes descriptor creation from route selection, bound
-links and document composition, but does not make the entire binding Strong or
+links and document shells, but does not make the entire binding Strong or
 remove the generic renderer. Link retains synchronous `flushSync` so its
-transition cue is already visible in `onBeforeNavigate` callbacks. Route scripts
-use the native host path so newly inserted inline and external scripts execute;
-cloned template scripts would be inert. They retain their managed nodes through
-hydration and are replaced with route ownership. Router-core's initial hydration
-data scripts instead remove themselves before adoption. The scroll-restoration
+transition cue is already visible in `onBeforeNavigate` callbacks. Both entries
+share a non-Strong script component that renders host descriptors: new inline and
+external scripts execute, and self-removing hydration data scripts leave no
+template row frames behind. Route scripts retain their managed nodes through
+hydration and are replaced with route ownership. The scroll-restoration
 script remains through adoption and is dropped afterward. Error propagation,
 scroll-script hydration compatibility, and lifecycle dependencies retain their
 existing contracts.

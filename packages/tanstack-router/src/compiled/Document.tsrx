@@ -1,18 +1,12 @@
 'use strong';
 
-import {
-	useEffect,
-	useId,
-	trustHTML,
-	HYDRATION_RANGE_BOUNDARY,
-	createPortal,
-	useState,
-} from 'octane';
+import { useEffect, useId, HYDRATION_RANGE_BOUNDARY, createPortal, useState } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';
 import { createAsset } from '../assetComponent.tsrx';
 import { createUseTags } from '../headContentBinding';
 import { createUseScripts } from '../scriptContentBinding';
+import { createScripts } from '../scriptComponent.tsrx';
 import { getAssetKeys } from '../assetKeys';
 import { useHydrated } from '../ClientOnly.tsrx';
 import { useRouter } from './bindings';
@@ -82,9 +76,7 @@ export function Body(props: BodyProps) @{
 export const Asset = createAsset(useRouter);
 export const useTags = createUseTags(useRouter);
 const useScripts = createUseScripts(useRouter);
-// Route scripts must be created as live DOM nodes on client navigation.
-// A script cloned from a static template is inert, even after insertion.
-const Script = 'script';
+export const Scripts = createScripts(useScripts);
 
 export function HeadContent(props: { assetCrossOrigin?: AssetCrossOriginConfig }) @{
 	const owner = useId();
@@ -104,22 +96,6 @@ export function HeadContent(props: { assetCrossOrigin?: AssetCrossOriginConfig }
 	<>
 		@for (const asset of assets; key asset.assetKey) {
 			<Asset {...asset} target="head" />
-		}
-	</>
-}
-
-export function Scripts() @{
-	const owner = useId();
-	const scripts = useScripts();
-	const keys = getAssetKeys('body', owner, scripts);
-	const assets = scripts.map((script, index) => ({ ...script, ...keys[index]! }));
-	<>
-		@for (const asset of assets; key asset.assetKey) {
-			<Script
-				{...asset.attrs}
-				data-tsr-managed-key={asset.managedKey}
-				dangerouslySetInnerHTML={trustHTML(asset.children ?? '')}
-			/>
 		}
 	</>
 }

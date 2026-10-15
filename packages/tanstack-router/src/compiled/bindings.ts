@@ -1,3 +1,5 @@
+'use strong';
+
 import { createCompiledContext, useContext } from 'octane';
 import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
 import { createRouterHooks } from '../hookBindings';

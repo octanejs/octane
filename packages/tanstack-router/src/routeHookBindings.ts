@@ -1,3 +1,5 @@
+'use strong';
+
 import type * as Hooks from './hooks';
 import type { useRouter as UseRouter } from './context';
 import { splitSlot, subSlot } from './internal';

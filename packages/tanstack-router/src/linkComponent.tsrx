@@ -1,3 +1,5 @@
+'use strong';
+
 // A navigating anchor — a thin shell over `useLinkProps` (link.ts), which
 // carries ALL of react-router Link's behavior: href building (mask-aware),
 // external-URL + dangerous-protocol handling, active-state detection,
