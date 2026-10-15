@@ -21259,19 +21259,15 @@ class HydrationCapability {
 	 * finds for a host descriptor.
 	 */
 	settleTextRange(scope: Scope, slotKey: number, state: ChildSlot, str: string): void {
-		const end = state.end!;
 		const first = getNextSibling(state.start!)!;
-		const kept = str !== '' && first.nodeType === 3;
-		const stale = kept ? getNextSibling(first)! : first;
-		if (stale === end) return;
-		this.fail(
-			process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) : undefined,
-			() => {
-				const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
-				return kept ? `the end of ${client}` : client;
-			},
-			stale,
-		);
+		if (str !== '' && first.nodeType === 3)
+			this.settle(state.end!, scope, slotKey, getNextSibling(first));
+		else if (first !== state.end)
+			this.fail(
+				process.env.NODE_ENV !== 'production' ? siteLoc(scope, slotKey) : undefined,
+				() => (str === '' ? 'nothing' : `text ${JSON.stringify(str)}`),
+				first,
+			);
 	}
 
 	parseSeeds(raw: string): unknown[] | null {
@@ -21329,22 +21325,25 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Hydrating, the server rendered no node where `el`'s de-opt children render
-	 * `child`: as React does for a missing node, the nearest fallback owner
-	 * renders on the client. An element the client built holds client children
-	 * only, and the parser keeps a `<noscript>`'s server content as text, which
-	 * React never hydrates. A method, so that bundles which never hydrate do not
-	 * retain it.
+	 * Hydrating, `el`'s server children differ from its de-opt children: the
+	 * server rendered no node where they render `child`, or `extra`, a server
+	 * child none of them adopted, is content the client renders nothing for.
+	 * As React does, the nearest fallback owner renders on the client. An
+	 * element the client built holds client children only, and the parser
+	 * keeps a `<noscript>`'s server content as text, which React never
+	 * hydrates. A method, so that bundles which never hydrate do not retain it.
 	 */
-	missingDeoptChild(el: Element, child: unknown): void {
+	deoptMismatch(el: Element, child: unknown, extra: Node | null = null): void {
 		if (this.depth !== 0 || el.localName === 'noscript') return;
 		this.fail(
 			process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 			() =>
-				isHostDescriptor(child)
-					? `<${String((child as ElementDescriptor).type)}>`
-					: `text ${JSON.stringify(String(child))}`,
-			null,
+				extra !== null
+					? `the end of <${el.localName}>`
+					: isHostDescriptor(child)
+						? `<${String((child as ElementDescriptor).type)}>`
+						: `text ${JSON.stringify(String(child))}`,
+			extra,
 		);
 	}
 
@@ -21788,11 +21787,7 @@ class HydrationCapability {
 		this.fail(
 			loc || (el as any).__oct_loc,
 			() =>
-				text === null
-					? 'the end of the text element'
-					: text === ''
-						? 'nothing'
-						: `text ${JSON.stringify(text)}`,
+				text === null ? END_OF_CONTENT : text === '' ? 'nothing' : `text ${JSON.stringify(text)}`,
 			// Name a server range by the content it frames: its first element.
 			isBlockOpen(from) ? this.framedContent(from) : from,
 		);
@@ -35479,7 +35474,7 @@ function reconcileDeoptChildren(
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (pending === null && firstChild === null) {
 		// Hydrating, an adopted host with no server children cannot hold these.
-		if (next.length !== 0 && hydrating) HYDRATION_PASS!.missingDeoptChild(el, next[0]);
+		if (next.length !== 0 && hydrating) HYDRATION_PASS!.deoptMismatch(el, next[0]);
 		const built: Node[] = [];
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
@@ -35596,7 +35591,7 @@ function reconcileDeoptChildren(
 			if (up < unstamped.length) prev = unstamped[up++];
 			// The server rendered fewer children than the client.
 			else if (hydrating && hydrationOwnsUnstamped === true && !singleton)
-				HYDRATION_PASS!.missingDeoptChild(el, child);
+				HYDRATION_PASS!.deoptMismatch(el, child);
 		}
 		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
 		if (node !== null) {
@@ -35612,14 +35607,9 @@ function reconcileDeoptChildren(
 			const hydration = hydrating ? CURSOR : null;
 			if (singleton && (n as any).$$deoptKey === undefined) continue;
 			// A server node that no client child adopted is content the client
-			// renders nothing for. With scripting enabled, the parser keeps a
-			// `<noscript>`'s server content as text, which React never hydrates.
-			if (hydration !== null && (n as any).$$deoptKey === undefined && el.localName !== 'noscript')
-				hydration.fail(
-					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
-					() => `the end of <${el.localName}>`,
-					n,
-				);
+			// renders nothing for.
+			if (hydration !== null && (n as any).$$deoptKey === undefined)
+				hydration.deoptMismatch(el, null, n);
 			if (defer || journal) {
 				queueRootDeletion(() => detachDeoptTreeRefs(n, null), n, n);
 			} else {

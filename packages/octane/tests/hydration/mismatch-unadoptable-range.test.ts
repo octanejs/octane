@@ -204,6 +204,50 @@ describe.each([
 		},
 	);
 
+	// The value adopts the range's first node, an element or text, and the
+	// server rendered more after it.
+	it.each([
+		{
+			component: 'Hole',
+			value: 'an element',
+			server: 'p-tail',
+			kind: 'keyed',
+			html: '<p class="x">A</p>',
+		},
+		{ component: 'Hole', value: 'text', server: 'text-tail', kind: 'text', html: 'A' },
+		{
+			component: 'ReturnHole',
+			value: 'an element',
+			server: 'p-tail',
+			kind: 'keyed',
+			html: '<p class="x">A</p>',
+		},
+		{ component: 'ReturnHole', value: 'text', server: 'text-tail', kind: 'text', html: 'A' },
+	])(
+		'renders the root on the client for $value in a $component where the server rendered more',
+		async ({ component, server: serverKind, kind, html }) => {
+			container.innerHTML = ServerRT.renderToString(server[component], {
+				kind: serverKind,
+				v: 'A',
+				text: null,
+			}).html;
+			const serverNodes = subtree(container.querySelector('section')!);
+			const recovered: unknown[] = [];
+			const root = hydrate(client[component], { kind, v: 'A', text: null }, recovered);
+			try {
+				expectDiscarded(serverNodes);
+				expect(markup(container.querySelector('section')!)).toBe(`${html}<b>A</b>`);
+				await expectReported(recovered);
+				if (dev)
+					expect(warns()[0]).toContain(
+						'the client expected the end of its content but the server rendered <s>.',
+					);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	describe('when the value suspends', () => {
 		it.each([
 			{

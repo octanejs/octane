@@ -163,7 +163,7 @@ describe.each([
 			expect(p().innerHTML).toBe('a');
 			expect(serverP.isConnected).toBe(false);
 			expect(tag.isConnected).toBe(false);
-			await expectReported(recovered, line, '<b>', 'the end of the text element');
+			await expectReported(recovered, line, '<b>', 'the end of its content');
 			expectUpdatesClientText(name);
 		});
 
