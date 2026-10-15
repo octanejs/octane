@@ -2420,7 +2420,7 @@ function hydrationNodeMatches(server: Node, template: Node): boolean {
 /**
  * Does the server node at the cursor match a nested fragment's FIRST logical
  * root? A leading template comment is a dynamic hole whose server form (text,
- * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
+ * a marker range, or nothing) cannot decide a mismatch, as in fragmentRoots.
  * The first static element root after the leading `<!>` holes decides instead,
  * compared with the server node that the compiled walk reaches from the cursor
  * (HydrationCapability.sibling steps over each hole's server form). Otherwise
@@ -17366,30 +17366,22 @@ function createHydrateSlot(
 }
 
 /**
- * After a Hydrate island's content adopted its server range, a server
- * sibling left after the island's complete client shape is content the
- * client renders nothing for: a mismatch, which the island falls back from.
- * Cursor-based adoption may stop on an owned range marker, and the client
- * may have built nodes there, so look past both, and past renderer style
- * sidecars. A root keeps the unmatched siblings in its container, as React
- * does, so only an island settles its remainder.
+ * After a Hydrate island's content adopted its server range, a server node
+ * left after that range in the island's wrapper is content the client renders
+ * nothing for: a mismatch, which the island falls back from. Renderer style
+ * and seed sidecars are not content.
  */
-function finishRoot(hydration: HydrationCapability): void {
-	let remainder = hydration.rootRemainder === undefined ? hydration.node : hydration.rootRemainder;
-	while (
-		remainder !== null &&
-		(remainder === hydration.rootCleanupBoundary ||
-			isRendererHydrationStyle(remainder) ||
-			isHydrateSeedSidecar(remainder))
-	)
-		remainder = getNextSibling(remainder);
-	if (remainder === null) return;
+function settleHydrateTail(hydration: HydrationCapability, end: Node): void {
+	let node = getNextSibling(end);
+	while (node !== null && (isRendererHydrationStyle(node) || isHydrateSeedSidecar(node)))
+		node = getNextSibling(node);
+	if (node === null) return;
 	hydration.fail(
 		process.env.NODE_ENV !== 'production'
 			? componentSourceLoc(hydration.rootBlock.body)
 			: undefined,
 		() => 'the end of the root',
-		remainder,
+		node,
 	);
 }
 
@@ -17412,7 +17404,6 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (serverProps !== null) state.props = serverProps;
 	if (serverContexts !== null) block.$$ctxValues = serverContexts;
 	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
-	hydration.protectRootAnchor(state.end);
 	hydration.defers = true;
 	hydration.idStart = block.idState.next;
 	const previousHydration = HYDRATION_PASS;
@@ -17442,19 +17433,21 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			});
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
-		renderBlock(block);
+		// The island's content adopts its server range as a component's does: what
+		// the server left after it is a mismatch, which the island falls back from.
+		const outerClaim = hydration.beginClaim(getNextSibling(state.start));
+		let claimed: Node | null | undefined;
+		try {
+			renderBlock(block);
+		} finally {
+			claimed = hydration.endClaim(outerClaim);
+		}
 		if (hydration.deferred !== null) hydration.claimDeferred();
 		drainHydrationRenderPhaseUpdates(block, true);
 		if (state.hydrated) {
-			// A descriptor-only child need not clone a compiled root template. Claim
-			// the internal try slot's remainder only once adoption completes: a later
-			// template clone must get the first claim.
-			const adoptedSlot = block.slots[0] as TrySlot | undefined;
-			if (adoptedSlot?.__kind === 'trySlotSlot') {
-				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
-			}
 			hydration.settleTexts();
-			finishRoot(hydration);
+			hydration.settleClaim(block, state.end, claimed, block, -1);
+			settleHydrateTail(hydration, state.end);
 			completed = true;
 		}
 	} catch (thrown) {
@@ -17584,7 +17577,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 
 /**
  * An island that falls back discards the server nodes after its range in its
- * wrapper too, the unmatched content that failed its hydration (finishRoot),
+ * wrapper too, the unmatched content that failed its hydration (settleHydrateTail),
  * as React deletes a dehydrated boundary's whole content. A renderer's
  * hydration style is not content.
  */
@@ -20519,9 +20512,11 @@ class HydrationCapability {
 	seedCursor = 0;
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
-	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
-	rootRemainder: Node | null | undefined;
-	rootCleanupBoundary: Node | null = null;
+	/**
+	 * The root's first top-level template has been adopted, or something else
+	 * owns the root's content, so no later clone compares the root's roots.
+	 */
+	rootClaimed = false;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
@@ -21425,14 +21420,6 @@ class HydrationCapability {
 	}
 
 	/**
-	 * `node` anchors the root rather than being its content, so finishRoot does
-	 * not count it as a server sibling left over after the root's content.
-	 */
-	protectRootAnchor(node: Node): void {
-		this.rootCleanupBoundary = node;
-	}
-
-	/**
 	 * Whether a root's return slot finds no server range at `anchor` or the
 	 * cursor: a root that renders text, nothing, or a third-party component's
 	 * markup there (wrapUnframedRoot).
@@ -21450,64 +21437,32 @@ class HydrationCapability {
 		const end = document.createComment('');
 		parent.insertBefore(start, cursor);
 		parent.insertBefore(end, remainder);
-		this.protectRootAnchor(end);
-		this.claimRootRemainder(remainder);
+		this.rootClaimed = true;
 		return [start, end];
 	}
 
-	/** Record the first node outside a root-owned range exactly once. */
-	claimRootRemainder(node: Node | null): void {
-		if (this.rootRemainder !== undefined) return;
-		this.rootRemainder = node;
-	}
-
-	private fragmentRemainder(
+	/** Whether the server's nodes from `cursor` on fit a root fragment `template`'s roots. */
+	private fragmentRoots(
 		template: Node,
 		cursor: Node | null,
 		loc: string | undefined,
 		partialStyles: string | undefined,
-	): Node | null | undefined {
+	): boolean {
 		let expected = getFirstChild(template);
 		let actual = cursor;
 		for (let index = 0; expected !== null; index++) {
-			if (actual === null) return undefined;
+			if (actual === null) return false;
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
 			if (expected.nodeType !== 8) {
-				if (!hydrationNodeMatches(actual, expected)) return undefined;
+				if (!hydrationNodeMatches(actual, expected)) return false;
 				if (process.env.NODE_ENV !== 'production')
 					unpatchedStatics(this, actual, expected, loc, partialStyles, String(index));
 			}
 			actual = this.sibling(actual, 1);
 			expected = getNextSibling(expected);
 		}
-		return actual;
-	}
-
-	/**
-	 * If a top-level cursor sits inside a server marker frame, return the first
-	 * sibling after that OUTERMOST frame. A clone can execute in a lite/provider
-	 * descendant while its DOM is still a direct child of the root container;
-	 * `cursor.nextSibling` would then be only the descendant's close marker.
-	 */
-	private framedRootRemainder(cursor: Node): Node | null | undefined {
-		const rootParent = this.rootBlock.parentNode;
-		let outerOpen: Node | null = null;
-		let depth = 0;
-		for (
-			let node = getFirstChild(rootParent);
-			node !== null && node !== cursor;
-			node = getNextSibling(node)
-		) {
-			if (isBlockOpen(node)) {
-				if (depth === 0) outerOpen = node;
-				depth++;
-			} else if (this.isClose(node) && depth > 0) {
-				depth--;
-				if (depth === 0) outerOpen = null;
-			}
-		}
-		return outerOpen === null ? undefined : getNextSibling(this.close(outerOpen));
+		return true;
 	}
 
 	clone<T extends Node>(template: T, loc?: string, partialStyles?: string): T {
@@ -21672,16 +21627,14 @@ class HydrationCapability {
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
 		// Lite/no-template wrappers can render the logical root while sharing the
 		// public root Block, and return-based wrappers render it in a child Block.
-		// Identify the first top-level cursor by DOM ownership, then claim its
-		// remainder ONCE so later lite descendant clones cannot overwrite it.
+		// Identify the first top-level cursor by DOM ownership, and claim the root
+		// ONCE, so later lite descendant clones do not compare its roots again.
 		const claimsRoot =
-			this.rootRemainder === undefined &&
+			!this.rootClaimed &&
 			(cursor !== null
 				? cursor.parentNode === this.rootBlock.parentNode
 				: CURRENT_BLOCK === this.rootBlock);
-		const framedRemainder =
-			claimsRoot && cursor !== null ? this.framedRootRemainder(cursor) : undefined;
-		let unframedRemainder = claimsRoot && cursor !== null ? getNextSibling(cursor) : undefined;
+		if (claimsRoot) this.rootClaimed = true;
 		// A closing marker bounds an empty server range; it cannot be the first
 		// child of a newly populated fragment. Build fresh descendants without
 		// consuming that boundary, so its owner can advance the outer cursor.
@@ -21694,8 +21647,7 @@ class HydrationCapability {
 		// (Root claims happen once per hydrateRoot, so parsing here is cold.)
 		if (isFragment && claimsRoot) {
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			const remainder = this.fragmentRemainder(template, cursor, loc, partialStyles);
-			if (remainder === undefined) {
+			if (!this.fragmentRoots(template, cursor, loc, partialStyles)) {
 				const fragment = template;
 				this.fail(
 					process.env.NODE_ENV !== 'production'
@@ -21705,7 +21657,6 @@ class HydrationCapability {
 					cursor,
 				);
 			}
-			this.claimRootRemainder(framedRemainder === undefined ? remainder : framedRemainder);
 		}
 		if (cursor === null) {
 			this.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
@@ -21720,7 +21671,6 @@ class HydrationCapability {
 			if (match === null)
 				this.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), cursor);
 			this.node = cursor = match;
-			if (unframedRemainder !== undefined) unframedRemainder = getNextSibling(match);
 		}
 		// The compiled walk descends into the root's children: where it would find
 		// no element, the server rendered fewer nodes than the template has.
@@ -21756,10 +21706,6 @@ class HydrationCapability {
 		}
 		if (process.env.NODE_ENV !== 'production' && template !== null)
 			unpatchedStatics(this, cursor, template, loc, partialStyles, '');
-		if (claimsRoot)
-			this.claimRootRemainder(
-				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
-			);
 		if (cursor === this.claimFrom) this.claimRoots(cursor, null);
 		return cursor;
 	}
@@ -33762,7 +33708,7 @@ function componentSlotImpl(
 			// Its comments become our markers, and the cursor moves to its content.
 			start = open;
 			end = hydration!.close(start);
-			if (parentBlock === hydration!.rootBlock) hydration!.claimRootRemainder(getNextSibling(end));
+			if (parentBlock === hydration!.rootBlock) hydration!.rootClaimed = true;
 			hydration!.node = getNextSibling(start);
 			// A passthrough root's owner adopts whatever range the server rendered
 			// first in the container, so its own output need not fill that range.
@@ -38150,7 +38096,7 @@ export function childSlot(
 			// and point the cursor at the first content node for the Block's clone()
 			// / the text adopt below.
 			end = hydration.close(start);
-			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
+			if (parentBlock === hydration.rootBlock) hydration.rootClaimed = true;
 			hydration.node = getNextSibling(start);
 			adoptedRange = true;
 		} else if (hydration !== null && isBlockOpen(hydration.node)) {
@@ -38160,10 +38106,7 @@ export function childSlot(
 			// component whose only body root is `{children}` hydrate as single-root.
 			start = hydration.node as Comment;
 			end = hydration.close(hydration.node as Node);
-			if (parentBlock === hydration.rootBlock) {
-				hydration.protectRootAnchor(end);
-				hydration.claimRootRemainder(getNextSibling(end));
-			}
+			if (parentBlock === hydration.rootBlock) hydration.rootClaimed = true;
 			hydration.node = getNextSibling(start);
 			adoptedRange = true;
 		} else if (bindingMarker !== undefined) {
@@ -38218,7 +38161,6 @@ export function childSlot(
 			// Hydration places the slot's marker in the server DOM it adopts at commit.
 			if (hydration !== null) {
 				placeAtCommit(domParent, end, anchor ?? null);
-				if (parentBlock === hydration.rootBlock) hydration.protectRootAnchor(end);
 			} else domParent.insertBefore(end, anchor ?? null);
 		}
 		state = {
@@ -41754,8 +41696,7 @@ function renderInitialSuspenseHydration(
 	hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
-	hydration.claimRootRemainder(initial.end);
-	hydration.protectRootAnchor(initial.end);
+	hydration.rootClaimed = true;
 	const previousHydration = HYDRATION_PASS;
 	if (previousHydration?.retryPresentation !== undefined)
 		hydration.retryPresentation = previousHydration.retryPresentation;
@@ -50846,7 +50787,7 @@ function hydrateRootWithOutputHandler(
 				rootBlock.endMarker = hydration.close(firstNode);
 				// The entry's own pair bounds the root's content, so no clone inside
 				// it claims the root.
-				hydration.claimRootRemainder(getNextSibling(rootBlock.endMarker));
+				hydration.rootClaimed = true;
 				hydration.node = getNextSibling(firstNode);
 			}
 			renderBlock(rootBlock);
