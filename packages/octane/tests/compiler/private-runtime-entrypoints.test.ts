@@ -185,6 +185,6 @@ describe('private compiler-runtime package entries', () => {
 		const inputs = Object.keys(result.metafile.inputs).map((input) => input.split(sep).join('/'));
 
 		expect(value).toBe('&lt;span title="x"&gt;');
-		expect(inputs.some((input) => input.endsWith('/src/runtime.ts'))).toBe(false);
+		expect(inputs.some((input) => /\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/.test(input))).toBe(false);
 	});
 });

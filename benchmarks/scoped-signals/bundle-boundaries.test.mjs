@@ -381,7 +381,7 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 	]);
 	assert.ok(
 		ordinary.inputs.some(
-			(input) => input.path.endsWith('/src/runtime.ts') && input.bytesInOutput > 0,
+			(input) => /\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/.test(input.path) && input.bytesInOutput > 0,
 		),
 		'The public createRoot control must retain its actual renderer.',
 	);
@@ -879,7 +879,8 @@ export function Reader({ value = count$.get() }) @{ <b>{value as number}</b> }`,
 			resolved: Object.keys(result.metafile.inputs),
 		};
 	};
-	const renderer = /packages\/octane\/src\/(?:runtime\.ts|internal\/client\.ts)$/;
+	const renderer =
+		/packages\/octane\/src\/(?:runtime\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
 	const window = new Window();
 	const globals = new Map();
 	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
@@ -1141,7 +1142,7 @@ test('compiled structural adoption costs only its selected implementation', asyn
 		if (mode === 'client') {
 			assert.ok(
 				!Object.keys(result.metafile.inputs).some((name) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						name,
 					),
 				),
@@ -1262,7 +1263,8 @@ export function Island() { 'use dom bindings';
 }`,
 	};
 	const options = { dev: false, hmr: false };
-	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const renderer =
+		/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
 	const bundle = async (entry, mode = 'client') => {
 		const result = await build({
 			stdin: {
@@ -1417,7 +1419,8 @@ export let activations = 0;
 export function mounted() { activations++; }
 export function increment() { count$.set((n) => n + 1); }`;
 	const options = { dev: false, hmr: false };
-	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const renderer =
+		/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
 	const bundle = async (entry, bindings, mode = 'client') => {
 		const sources = {
 			'island-app.tsrx': app,
@@ -1631,7 +1634,7 @@ export function mount(root, source, options) { return view.mount(root, view, sou
 		if (mode === 'client')
 			assert.ok(
 				!Object.keys(result.metafile.inputs).some((name) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						name,
 					),
 				),
@@ -1880,7 +1883,7 @@ export default {...current, hostOperations: undefined, adopt: __adoptSelectedBin
 		if (mode === 'client')
 			assert.ok(
 				!Object.keys(result.metafile.inputs).some((id) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						id,
 					),
 				),
@@ -2201,7 +2204,7 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 			for (const client of [selected, legacy])
 				assert.ok(
 					!client.resolved.some((id) =>
-						/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+						/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 							id,
 						),
 					),
@@ -2547,7 +2550,7 @@ test('early whole-style bindings exclude later renderer attribute tables', async
 	assert.ok([...baseline.earlyInputs].some((id) => id.endsWith('/dom-tables.js')));
 	assert.ok(
 		![...selected.earlyInputs].some((id) =>
-			/(?:\/dom-tables\.js|\/runtime(?:\.server)?\.ts|\/signals\/(?:engine|graph|facade)\.ts)$/.test(
+			/(?:\/dom-tables\.js|\/runtime(?:\.server)?\.ts|\/runtime\/[^/]+\.ts|\/signals\/(?:engine|graph|facade)\.ts)$/.test(
 				id,
 			),
 		),
@@ -2704,7 +2707,7 @@ export function mount(parent, source) { return mountBindings({parent}, SharedRec
 		if (names.includes('early'))
 			assert.ok(
 				![...earlyInputs].some((name) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						name,
 					),
 				),

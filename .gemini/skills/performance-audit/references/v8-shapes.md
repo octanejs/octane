@@ -5,14 +5,14 @@ or per server request. Module initialization and once-per-root setup are cold.
 A development-only branch (`process.env.NODE_ENV !== 'production'`) does not run
 in production, but it must not change a production shape either: `Scope.locs`
 is declared optional and never allocated in production for that reason
-(`packages/octane/src/runtime.ts`, `interface Scope`).
+(`packages/octane/src/runtime/types.ts`, `interface Scope`).
 
-Cite symbols, not line numbers: `runtime.ts` moves daily.
+Cite symbols, not line numbers: the runtime moves daily.
 
 ## Stable hidden classes
 
 - **One allocation site, every field, fixed order.** `BlockImpl`, `ScopeImpl`,
-  and `LiteBlockImpl` in `runtime.ts` list type-only `declare` fields and assign
+  and `LiteBlockImpl` in `runtime/block.ts` list type-only `declare` fields and assign
   every one unconditionally in the constructor. Feature-only fields (`vt`,
   `__trySlot`, `__activitySlot`, `__warmCache`, list-item `prevSibling`,
   `nextSibling`, `key`) start as `null`, `undefined`, or `0`, so Suspense,
@@ -33,7 +33,7 @@ Cite symbols, not line numbers: `runtime.ts` moves daily.
 - **Build records with their final shape and real values.** The binding-bag
   arity factories `bag0` to `bag16` build `{ a: v0, b: v1, … }` as one literal,
   so every bag of arity N shares one hot allocation site
-  (`runtime.ts`, "Binding-bag arity factories"; `compile.js` `makeBag`). Two
+  (`runtime/templates.ts`, "Binding-bag arity factories"; `compile.js` `makeBag`). Two
   literal sites that must share a class declare identical keys in identical
   order: both `ForSlot` literals declare `plainDeopt`, and `template()` declares
   `LazyTemplateRecord.root` in its literal.
@@ -63,7 +63,7 @@ Cite symbols, not line numbers: `runtime.ts` moves daily.
   DOM node call cached native accessors (`getFirstChild`, `getNextSibling` via
   `firstChildGetter.call(node)`), so one site does not see every Element, Text,
   and Comment map. Compiled per-template walks keep raw `firstChild` because each
-  template owns its own sites (`runtime.ts`, "DOM operations bootstrap").
+  template owns its own sites (`runtime/templates.ts`, "DOM operations bootstrap").
 - Where a site is polymorphic by design, read the discriminant once into a local
   and branch on it. `unmountSlot` reads `val.__kind` once across six slot shapes.
 - Keep a hot parameter's type stable. Give each arity or kind its own entry point
@@ -101,7 +101,7 @@ Cite symbols, not line numbers: `runtime.ts` moves daily.
 - A rest parameter allocates on every call, even under Maglev. `arguments` is
   elided by Maglev and TurboFan only when it is read on a cold branch; Ignition
   and Sparkplug materialize it on entry. The HMR component `wrapper` in
-  `runtime.ts` reads `arguments` only on its direct-call branch and forwards with
+  `runtime/component-slots.ts` reads `arguments` only on its direct-call branch and forwards with
   `Reflect.apply(meta.fn, this, arguments)`.
 - Measure allocation with `--min-semi-space-size=256 --max-semi-space-size=256`.
   Setting only the maximum lets a scavenge run mid-loop and fakes about 0 B/call.

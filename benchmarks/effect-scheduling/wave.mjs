@@ -1,9 +1,9 @@
 // Isolate the actual scheduler sort with deterministic work and semantic controls.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { performance } from 'node:perf_hooks';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import path from 'node:path';
 
@@ -99,15 +99,8 @@ function workload(shape, counted) {
 		},
 	};
 }
-const sources = [['candidate', readFileSync(file, 'utf8')]];
-if (baselineRef)
-	sources.unshift([
-		'baseline',
-		execFileSync('git', ['show', `${baselineRef}:${file}`], {
-			encoding: 'utf8',
-			maxBuffer: 8 * 1024 * 1024,
-		}),
-	]);
+const sources = [['candidate', readClientRuntime(path.resolve(file))]];
+if (baselineRef) sources.unshift(['baseline', readClientRuntime(path.resolve(file), baselineRef)]);
 const targets = [];
 for (const [target, source] of sources) {
 	const metrics = {};

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Hydration-only top-level declarations of the client engine. A client that only
 // calls createRoot never hydrates, so no code from any of them may reach its
@@ -167,32 +169,105 @@ function lineAt(lineStarts, offset) {
 	return low;
 }
 
+const OCTANE_SOURCE = path.resolve(import.meta.dirname, '../../packages/octane/src');
+const RUNTIME_MODULE = /\/packages\/octane\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/;
+
+/** Whether a bundler module id is the client runtime: runtime.ts or one of its modules. */
+export function isRuntimeModule(id) {
+	return RUNTIME_MODULE.test(String(id).replace(/\\/g, '/'));
+}
+
+/** The names an ESTree Program exports. */
+export function exportedNames(program) {
+	const names = new Set();
+	for (const statement of program.body) {
+		if (statement.type !== 'ExportNamedDeclaration') continue;
+		for (const specifier of statement.specifiers ?? []) names.add(specifier.exported.name);
+		const declaration = statement.declaration;
+		if (!declaration) continue;
+		if (declaration.id) names.add(declaration.id.name);
+		for (const declarator of declaration.declarations ?? []) {
+			const found = [];
+			bindingNames(declarator.id, found);
+			for (const name of found) names.add(name);
+		}
+	}
+	return names;
+}
+
+/**
+ * The runtime exports a Rolldown chunk renders. Rolldown reports each export on
+ * the module that declares it, so a split runtime's come from all of its
+ * modules; `surface` (runtime.ts's own exports) leaves out the names its
+ * modules export only to one another.
+ */
+export function renderedRuntimeExports(modules, surface) {
+	const names = [];
+	for (const [id, module] of Object.entries(modules))
+		if (isRuntimeModule(id))
+			for (const name of module.renderedExports ?? []) if (surface.has(name)) names.push(name);
+	return names;
+}
+
+/**
+ * The client runtime's files below packages/octane/src: runtime.ts and, once
+ * scripts/split-runtime.mjs has split it, its concept modules in runtime/.
+ */
+export function runtimeSourceFiles(sourceDir = OCTANE_SOURCE) {
+	const dir = path.join(sourceDir, 'runtime');
+	const modules = fs.existsSync(dir)
+		? fs
+				.readdirSync(dir)
+				.filter((name) => name.endsWith('.ts'))
+				.sort()
+				.map((name) => `runtime/${name}`)
+		: [];
+	return ['runtime.ts', ...modules];
+}
+
 /**
  * Resolve every deny-listed declaration to its 0-based range in its source
  * file, from [startLine, startColumn] up to [endLine, endColumn] (exclusive).
  * A variable's range is its declarator, without the statement's keyword.
  * `parse(text, source)` returns an ESTree Program whose offsets index `text`.
- * A name that is no longer a top-level declaration of its file fails with the
- * reason, so a rename cannot silently pass.
+ * A `runtime.ts` source names the client runtime: the entry resolves to the
+ * runtime module that declares it. A name that is no longer a top-level
+ * declaration of its file fails with the reason, so a rename cannot silently
+ * pass.
  */
-export function resolveDeclarationRanges(readSource, parse, denied = HYDRATION_ONLY_DECLARATIONS) {
+export function resolveDeclarationRanges(
+	readSource,
+	parse,
+	denied = HYDRATION_ONLY_DECLARATIONS,
+	runtimeFiles = runtimeSourceFiles(),
+) {
 	const files = new Map();
 	const ranges = [];
 	const missing = [];
-	for (const entry of denied) {
-		if (!files.has(entry.source)) {
-			const text = readSource(entry.source);
+	const fileOf = (source) => {
+		if (!files.has(source)) {
+			const text = readSource(source);
 			const lineStarts = [0];
 			for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) {
 				lineStarts.push(index + 1);
 			}
-			files.set(entry.source, {
+			files.set(source, {
 				text,
 				lineStarts,
-				declarations: topLevelDeclarations(parse(text, entry.source)),
+				declarations: topLevelDeclarations(parse(text, source)),
 			});
 		}
-		const file = files.get(entry.source);
+		return files.get(source);
+	};
+	for (const named of denied) {
+		let entry = named;
+		if (entry.source === 'runtime.ts' && !fileOf('runtime.ts').declarations.has(entry.name)) {
+			const source = runtimeFiles.find((candidate) =>
+				fileOf(candidate).declarations.has(entry.name),
+			);
+			if (source !== undefined) entry = { ...entry, source };
+		}
+		const file = fileOf(entry.source);
 		const span = file.declarations.get(entry.name);
 		if (span === undefined) {
 			missing.push(entry);
