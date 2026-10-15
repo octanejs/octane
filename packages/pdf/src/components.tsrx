@@ -201,7 +201,7 @@ export function Document(props: DocumentProps = {}) {
 		setPdfError(null);
 		if (!source) return;
 
-		void import('pdfjs-dist')
+		void import('pdfjs-dist/legacy/build/pdf.mjs')
 			.then((pdfjs) => {
 				if (!active) return;
 				loadingTask = pdfjs.getDocument({ ...source, ...options } as never);
@@ -499,7 +499,7 @@ export function Page(props: PageProps = {}) {
 		canvas.style.width = `${Math.floor(viewport.width)}px`;
 		canvas.style.height = `${Math.floor(viewport.height)}px`;
 		canvas.style.visibility = 'hidden';
-		void import('pdfjs-dist')
+		void import('pdfjs-dist/legacy/build/pdf.mjs')
 			.then((pdfjs) => {
 				if (!active) return;
 				renderTask = page.render({
@@ -545,7 +545,7 @@ export function Page(props: PageProps = {}) {
 				if (!active) return;
 				contentLoaded = true;
 				onGetTextSuccess?.(content);
-				const pdfjs = await import('pdfjs-dist');
+				const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 				if (!active) return;
 				textLayer = new pdfjs.TextLayer({
 					container: element,
@@ -608,7 +608,7 @@ export function Page(props: PageProps = {}) {
 				const annotations = filterAnnotations
 					? filterAnnotations({ annotations: loadedAnnotations })
 					: loadedAnnotations;
-				const pdfjs = await import('pdfjs-dist');
+				const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 				if (!active) return;
 				const annotationViewport = viewport.clone({ dontFlip: true });
 				const parameters = {

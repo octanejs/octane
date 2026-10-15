@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>Octane PDF browser compatibility</title>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module">
+			import { pdfjs } from '@octanejs/pdf';
+			import { createRoot } from 'octane';
+			import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
+			import { PdfHydrationFixture } from './hydration.tsrx';
+
+			pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+			createRoot(document.getElementById('root')).render(PdfHydrationFixture);
+		</script>
+	</body>
+</html>

@@ -1,4 +1,4 @@
-import * as pdfjs from 'pdfjs-dist';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 // OCTANE DIVERGENCE[pdf-octane-node-ref-event-types][differential:react-pdf-document-shells]
 // OCTANE DIVERGENCE[pdf-star-export-surface][types:pdf-adapted]
