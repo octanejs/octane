@@ -17224,7 +17224,7 @@ function createHydrateSlot(
 	// seed sidecars, regardless of which root hydrates first.
 	if (props.__independent !== undefined) {
 		// No parent-owned content range.
-	} else if (serverPreserved && hydration!.isOpen(getFirstChild(wrapper))) {
+	} else if (serverPreserved && isBlockOpen(getFirstChild(wrapper))) {
 		start = getFirstChild(wrapper) as Comment;
 		end = hydration!.close(start);
 		// The commit removes the sidecars, which an attempt that replaces a
@@ -20455,11 +20455,6 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
 const END_OF_CONTENT = 'the end of its content';
 
 /**
- * Root-local hydration state and the dynamic dispatch boundary for hydration-only
- * code. The class is constructed only by hydrateRoot, so client-only bundles can
- * discard its methods together with the marker/mismatch/seed helper graph.
- */
-/**
  * Development only: report where hydration probes the server DOM for a range
  * instead of knowing its shape (#2028), or falls back to adopting server nodes
  * outside a range of their own. `kind` names the probe or the fallback, and
@@ -20472,6 +20467,11 @@ function auditHydrationProbe(kind: string, hit: boolean): void {
 	if (report) report(kind, hit);
 }
 
+/**
+ * Root-local hydration state and the dynamic dispatch boundary for hydration-only
+ * code. The class is constructed only by hydrateRoot, so client-only bundles can
+ * discard its methods together with the marker/mismatch/seed helper graph.
+ */
 class HydrationCapability {
 	depth = 0;
 	/**
@@ -21359,25 +21359,31 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Whether a root's return slot finds no server range at `anchor` or the
-	 * cursor: a root that renders text, nothing, or a third-party component's
-	 * markup there (wrapUnframedRoot).
+	 * Before a first render of `value` in a slot of the root, whose server
+	 * content is the root container's. The server renders a root's value in a
+	 * range of its own, at `anchor` or the cursor, which the slot adopts, but
+	 * for the root's two unframed forms (serverComponentOutput): nothing,
+	 * which claims nothing, as React leaves the root container's children that
+	 * do not match in place, and a string's bare text. Any other markup does
+	 * not match the client render, such as a component's markup that no range
+	 * bounds, which only a server other than Octane's renders.
 	 */
-	unframedRoot(anchor: Node | null): boolean {
-		return !isBlockOpen(anchor) && !this.isOpen(this.node);
-	}
-
-	/** Bound an unframed third-party component root so its returned value can adopt it. */
-	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
-		if (process.env.NODE_ENV !== 'production') auditHydrationProbe('unframedRoot', false);
-		const parent = cursor.parentNode!;
-		const remainder = getNextSibling(cursor);
-		const start = document.createComment('');
-		const end = document.createComment('');
-		parent.insertBefore(start, cursor);
-		parent.insertBefore(end, remainder);
-		this.rootClaimed = true;
-		return [start, end];
+	rootSlot(anchor: Node | null, value: unknown, list: boolean): void {
+		const cursor = this.node;
+		if (
+			isBlockOpen(anchor) ||
+			isBlockOpen(cursor) ||
+			value == null ||
+			value === '' ||
+			typeof value === 'boolean' ||
+			(typeof value === 'string' && cursor?.nodeType === 3)
+		)
+			return;
+		this.fail(
+			process.env.NODE_ENV !== 'production' ? componentSourceLoc(this.rootBlock.body) : undefined,
+			() => (list ? 'a renderable list range' : 'a renderable root'),
+			cursor,
+		);
 	}
 
 	/** Whether the server's nodes from `cursor` on fit a root fragment `template`'s roots. */
@@ -37967,43 +37973,13 @@ export function childSlot(
 			rootShapeChanged = true;
 		}
 	}
-	// A root's return slot with no server range at its anchor or the cursor.
-	const unframedComponentRoot =
-		state === undefined &&
-		hydration !== null &&
-		parentBlock === hydration.rootBlock &&
-		hydration.node !== null &&
-		hydration.node.parentNode === domParent &&
-		preparedList === null &&
-		typeof elementType === 'function' &&
-		hydration.unframedRoot(anchor ?? null);
 	if (
 		state === undefined &&
 		hydration !== null &&
 		!hydrationTransparent &&
-		parentBlock === hydration.rootBlock &&
-		hydration.unframedRoot(anchor ?? null)
-	) {
-		// Generic root returns normally serialize as one hydratable range. Plain
-		// strings/null are the two unframed root forms; accept their matching DOM.
-		// A root that renders nothing claims nothing: as React skips the root
-		// container's children that do not match, it leaves them in place.
-		// Arbitrary other markup does not match the client render.
-		const cursor = hydration.node;
-		const unframedMatch =
-			value == null ||
-			value === '' ||
-			typeof value === 'boolean' ||
-			(typeof value === 'string' && cursor?.nodeType === 3) ||
-			unframedComponentRoot;
-		if (!unframedMatch) {
-			hydration.fail(
-				process.env.NODE_ENV !== 'production' ? componentSourceLoc(parentBlock.body) : undefined,
-				() => (preparedList === null ? 'a renderable root' : 'a renderable list range'),
-				cursor,
-			);
-		}
-	}
+		parentBlock === hydration.rootBlock
+	)
+		hydration.rootSlot(anchor ?? null, value, preparedList !== null);
 	// This call adopted the server's `<!--[-->…<!--]-->` pair as the slot's range,
 	// or is the first render of a slot lent its list item's or returning
 	// component's range.
@@ -38050,8 +38026,6 @@ export function childSlot(
 			start = parentBlock.startMarker as Comment;
 			end = parentBlock.endMarker as Comment;
 			adoptedRange = hydration !== null;
-		} else if (unframedComponentRoot) {
-			[start, end] = hydration!.wrapUnframedRoot(hydration!.node!);
 		} else if (hydration !== null && isBlockOpen(anchor ?? null)) {
 			start = anchor as Comment;
 			// Hydration (nested hole): the anchor resolved via child/sibling to the

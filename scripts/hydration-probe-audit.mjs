@@ -41,25 +41,17 @@ const FAMILIES = {
 	// Strong, lite and void component calls (commit 5).
 	components: ['componentSlotImpl', 'componentSlotLite'],
 	// Compiled template roots, renderable and text holes, lists and branches (commit 6).
-	templates: ['claimRoots', 'framesSlotContent', 'framedRootRemainder'],
-	holes: [
-		'childSlot',
-		'holeOpen',
-		'textFrameEnd',
-		'hydrateOnlyChild',
-		'unclaimedText',
-		'adoptBindingText',
-	],
+	templates: ['claimRoots'],
+	holes: ['childSlot', 'hydrateOnlyChild', 'unclaimedText', 'adoptBindingText'],
 	lists: ['mountItem', 'forBlock'],
-	branches: ['branchOpen', 'settleArmTail', 'renderBranchSlot', 'activityBlock'],
+	branches: ['branchOpen', 'renderBranchSlot', 'activityBlock'],
 	// Root entry and `<Hydrate>` islands (commit 10a).
 	roots: [
 		// A passthrough root's lists (range-boundary.test.ts) go with its root.
 		'mountPassthroughListItem',
 		'hydrateRootWithOutputHandler',
 		'createHydrateSlot',
-		'wrapUnframedRoot',
-		'unframedRoot',
+		'rootSlot',
 		'adopt',
 		'retry',
 	],
@@ -74,9 +66,9 @@ const BUDGET = {
 	holes: 0,
 	lists: 0,
 	branches: 0,
-	// Commit 6 left an unframed root return (unframedRoot) and a passthrough
-	// root's lists to commit 10a.
-	roots: 125,
+	// A passthrough root and its lists, which own no server range above their
+	// owner (HYDRATION_RANGE_BOUNDARY), place their items by the cursor.
+	roots: 104,
 };
 
 const OWNER = new Map();
