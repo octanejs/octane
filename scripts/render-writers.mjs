@@ -138,7 +138,6 @@ export const WRITERS = new Map(
 		renderBranchSlot: 'fresh',
 		activityBlock: 'fresh',
 		forBlock: 'fresh',
-		mountItemsLinear: 'fresh',
 		mountItem: 'fresh',
 		makeRoot: 'fresh',
 		createHydrateSlot: 'fresh',
