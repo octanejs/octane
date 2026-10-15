@@ -1011,13 +1011,16 @@ export function mountItemsLinear<T>(
 	// A host's upgrade (renderPreparedChildList): its rows render where they
 	// stand or off-document, and placeUpgradedList orders them at commit.
 	upgradeHost: Node | null = null,
-): void {
+	// The caller owns this index. An accepted queue position i becomes -i - 1:
+	// its node cannot be adopted twice, and the original queue survives a retry.
+	adoptByKey: Map<any, number> | null = null,
+): any[] | null {
 	const newLen = items.length;
 	const observeKey =
 		parentBlock.idState.renderOwner?.signalOwner !== undefined
 			? trackSignalRetryListKeys(parentBlock, state, newLen, keySource)
 			: undefined;
-	if (newLen === 0) return;
+	if (newLen === 0) return null;
 	if (process.env.NODE_ENV !== 'production') {
 		keySource = checkedListKey(keySource, normalizeKey);
 		normalizeKey = false;
@@ -1036,25 +1039,11 @@ export function mountItemsLinear<T>(
 		ROOT_RENDER_TRANSACTION === null || passthroughList
 			? null
 			: listNext(state, parentBlock, ROOT_RENDER_TRANSACTION.ops.length);
-	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
-	// element's existing raw children, keyed like the incoming items. This cold
-	// map preserves later survivors after a removed/changed key, and reorders
-	// adopted nodes without remounting their DOM state. Ordinary fills allocate
-	// no adoption map. Keep the original queue intact until every item succeeds.
 	const adopt = state.adopt;
-	let adoptByKey: Map<any, { key: any; node: Node }> | null = null;
-	let adoptedNodes: Set<Node> | null = null;
 	// A staged upgrade's new rows, off-document, and its adopted rows whose pair
 	// wraps their node at commit.
 	let run: DocumentFragment | null = null;
 	let wraps: any[] | null = null;
-	if (adopt !== null) {
-		adoptByKey = new Map();
-		for (let index = 0; index < adopt.length; index++) {
-			const entry = adopt[index];
-			if (!adoptByKey.has(entry.key)) adoptByKey.set(entry.key, entry);
-		}
-	}
 	let prev: Block | null = null;
 	try {
 		for (let i = 0; i < newLen; i++) {
@@ -1067,10 +1056,9 @@ export function mountItemsLinear<T>(
 			if (adoptByKey !== null) {
 				const candidate = adoptByKey.get(key);
 				anchor = null;
-				if (candidate !== undefined) {
-					adoptNode = candidate.node;
-					adoptByKey.delete(key);
-					(adoptedNodes ??= new Set()).add(adoptNode);
+				if (candidate !== undefined && candidate >= 0) {
+					adoptNode = adopt![candidate].node;
+					adoptByKey.set(key, -candidate - 1);
 				} else into = run ??= queueFrontier(parentBlock, parentNode, null);
 			}
 			const block: Block =
@@ -1111,8 +1099,6 @@ export function mountItemsLinear<T>(
 		}
 		state.tail = prev;
 		state.size = newLen;
-		if (adoptByKey !== null)
-			ROOT_RENDER_TRANSACTION!.ops.push(placeUpgradedList, [state, parentBlock, parentNode, wraps]);
 	} catch (error) {
 		// Adopted nodes still belong to the committed raw host tree and the cleanup
 		// below deliberately leaves them connected. Keep the full queue so the root
@@ -1146,14 +1132,7 @@ export function mountItemsLinear<T>(
 		state.size = 0;
 		throw error;
 	}
-	if (adoptByKey !== null) {
-		let remaining = 0;
-		for (let index = 0; index < adopt!.length; index++) {
-			const entry = adopt![index];
-			if (!adoptedNodes?.has(entry.node)) adopt![remaining++] = entry;
-		}
-		adopt!.length = remaining;
-	}
+	return wraps;
 }
 
 // A list above a selected hydration owner has no server list frames in the
@@ -2175,32 +2154,6 @@ function mountItem<T>(
 		throw error;
 	}
 	return block;
-}
-
-/**
- * A staged upgrade's list at its commit, over the host's adopted children: the
- * pairs of adopted rows wrap their nodes, then the list's end, its rows from
- * the last (each moved only when out of place) and its start. Its new rows
- * have landed at the host's end (queueFrontier) and move into place here. The
- * upgraded host's children slot (its slot 0) must still show this list.
- */
-function placeUpgradedList(args: any[]): void {
-	const [state, owner, host, wraps] = args as [ForSlot, Block, Node, any[] | null];
-	if (owner.disposed || (owner.slots[0] as ChildSlot | undefined)?.forSlot !== state) return;
-	if (wraps !== null)
-		for (let i = 0; i < wraps.length; i += 2) {
-			const node: Node = wraps[i + 1];
-			if (node.parentNode !== host) continue;
-			host.insertBefore(wraps[i].startMarker, node);
-			host.insertBefore(wraps[i].endMarker, getNextSibling(node));
-		}
-	host.insertBefore(state.end, null);
-	let anchor: Node = state.end;
-	for (let block = state.tail; block !== null; block = block.prevSibling) {
-		if (getNextSibling(block.endMarker!) !== anchor) moveBlockBefore(block, anchor);
-		anchor = block.startMarker!;
-	}
-	host.insertBefore(state.start, anchor);
 }
 
 /**
