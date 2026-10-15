@@ -497,6 +497,10 @@ class AdoptionFrameImpl implements AdoptionFrame {
 	read(node: ScopedNode, read: SignalReadMode): NodeState | undefined {
 		this.assertActive();
 		const seed = presentedSeed(this.data.entries, node.key, read);
+		// A node the server's snapshot of this scope lacks never reached its HTML.
+		// Hydration reads it live, suspending while it is pending, as it does with
+		// no snapshot at all, and adoption reconciles the server output.
+		if (seed === undefined && getNativeAdoptionResolver()) return undefined;
 		// A resource seed holds the request the server resolved. When the client
 		// selects another one (its props or state differ from the server's), that
 		// history cannot present it. Hydration then reads the node live, exactly

@@ -62,10 +62,10 @@ describe('independent hydration bootstrap', () => {
 	// A draft typed before activation reaches the island's signal when its
 	// control hands off, after the island adopted the server DOM, so nothing
 	// differs from the server HTML and the captured command replays once the
-	// controlled primary commits. A signal written before activation instead
-	// makes the island's text differ from the server's: the island renders on
-	// the client, and the command captured on the server DOM it discarded is
-	// dropped, as React drops replays for a client-rendered boundary.
+	// controlled primary commits. A signal written before activation does the
+	// same: the island hydrates the value the server rendered, from its
+	// snapshot, and takes the newer one as an update, as React hydrates a
+	// useSyncExternalStore value from getServerSnapshot.
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['handoff', 'live'] as const).flatMap((write) =>
@@ -187,23 +187,6 @@ function Content() @{
 					expect(errors).toEqual([]);
 					return;
 				}
-			}
-			if (write === 'live') {
-				await vi.waitFor(() => expect(host.querySelector('textarea')).not.toBe(input));
-				await settle();
-				expect(input.isConnected).toBe(false);
-				expect(committed).toBe(true);
-				expect(sent).toEqual([]);
-				const live = host.querySelector('textarea')!;
-				expect(live.value).toBe('entered before activation');
-				expect(host.querySelector('output')!.textContent).toBe('entered before activation');
-				expect(errors).toEqual([]);
-				host.querySelector('button')!.click();
-				expect(sent).toEqual(['entered before activation']);
-				await settle();
-				expect(live.value).toBe('');
-				expect(host.querySelector('output')!.textContent).toBe('');
-				return;
 			}
 			await vi.waitFor(() => expect(sent).toEqual(['entered before activation']));
 			expect(sentTimeStamps).toEqual([12.5]);
