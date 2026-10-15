@@ -16543,7 +16543,9 @@ export function renderClientContextProvider<T>(
 	// flip instead: the two sides are structurally different code, which is the same
 	// contract React gives an element-type change.
 	const children = props.children;
-	if (children != null) {
+	// Empty children on a Provider that has rendered some still reconcile, as a
+	// descriptor hole, so the previous children are removed rather than kept.
+	if (children != null || scope.hooks?.get(CHILDREN_DIALECT_SLOT) !== undefined) {
 		// Compiled closures carry their stable source-body identity. Their function
 		// identity changes when a parent supplies fresh captures, but their output
 		// still owns the same slots and may retain its auto-memo dependencies.

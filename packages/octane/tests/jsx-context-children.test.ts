@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { flushSync, hydrateRoot, isValidElement } from '../src/index.js';
-import { act, mount } from './_helpers';
+import { act, flushEffects, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
 	DefaultPropsNestedApp,
 	DescriptorEscapedApp,
 	DirectNestedApp,
+	EmptiedProviderApp,
 	EscapedNestedApp,
 	MixedNestedApp,
 	NestedErrorApp,
@@ -19,19 +20,46 @@ import {
 	PrivateNestedApp,
 	StaticNestedApp,
 	bumpCount,
+	bumpEmptiedProviderLeaf,
 	directNestedMiddleReturnValue,
 	directNestedReturnValue,
 	escapedNestedDescriptor,
+	readEmptiedProviderEvents,
 	readNestedDefaultEvents,
 	reRenderParent,
 	reRenderField,
 	reRenderList,
 	resetNestedDefaultEvents,
+	setEmptiedProviderChild,
 } from './_fixtures/jsx-context-children.tsx';
 
 // JSX context support: a `.tsx` `<Ctx value>` with element
 // children, and host elements with component children produced via `createElement`
 // from control-flow returns (the de-opt path), must render and reconcile.
+
+for (const empty of [null, undefined]) {
+	it(`.tsx <Context> removes its children when they become ${String(empty)}`, () => {
+		const r = mount(EmptiedProviderApp as any);
+		flushEffects();
+		expect(readEmptiedProviderEvents()).toEqual(['mount']);
+		flushSync(() => bumpEmptiedProviderLeaf());
+		expect(r.find('.emptied-leaf').textContent).toBe('provided:1');
+
+		flushSync(() => setEmptiedProviderChild(empty));
+		flushEffects();
+		expect(r.findAll('.emptied-leaf').length).toBe(0);
+		expect(readEmptiedProviderEvents()).toEqual(['cleanup']);
+
+		// Shown again, the child is a new mount: fresh state, context still provided.
+		flushSync(() => setEmptiedProviderChild('leaf'));
+		flushEffects();
+		expect(r.find('.emptied-leaf').textContent).toBe('provided:0');
+		expect(readEmptiedProviderEvents()).toEqual(['mount']);
+		r.unmount();
+		flushEffects();
+		expect(readEmptiedProviderEvents()).toEqual(['cleanup']);
+	});
+}
 
 it('.tsx <Context> renders element-descriptor children and provides context', () => {
 	const r = mount(ProviderApp as any);
@@ -220,6 +248,31 @@ describe('same-module JSX component children', () => {
 		} finally {
 			Reflect.deleteProperty(component, 'defaultProps');
 		}
+	});
+
+	it('removes hydrated Provider children when they become null', () => {
+		const server = loadServerFixture('packages/octane/tests/_fixtures/jsx-context-children.tsx');
+		const { html } = ServerRuntime.renderToString(server.EmptiedProviderApp);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const leaf = container.querySelector('.emptied-leaf');
+		const onRecoverableError = vi.fn();
+
+		const root = hydrateRoot(container, EmptiedProviderApp, { onRecoverableError });
+		flushSync(() => {});
+		flushEffects();
+		expect(container.querySelector('.emptied-leaf')).toBe(leaf);
+		expect(onRecoverableError).not.toHaveBeenCalled();
+		readEmptiedProviderEvents();
+
+		flushSync(() => setEmptiedProviderChild(null));
+		flushEffects();
+		expect(container.querySelectorAll('.emptied-leaf').length).toBe(0);
+		expect(readEmptiedProviderEvents()).toEqual(['cleanup']);
+
+		root.unmount();
+		container.remove();
 	});
 
 	it('hydrates static nested components and preserves their original sibling and element nodes', () => {
