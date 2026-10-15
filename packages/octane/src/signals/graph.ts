@@ -8,6 +8,7 @@ import {
 import { installSignalActions } from '#octane/signal-actions/graph';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
+	assertAlive,
 	ScopeDisposedError,
 	SignalCycleError,
 	SignalFrameError,
@@ -78,6 +79,7 @@ export interface CandidateProducerReceipt {
 }
 
 export { CandidateUnsupportedError } from './transition-state.js';
+export { assertAlive } from './errors.js';
 export type { SignalCandidateFrame, CandidatePreparation } from './transition-candidate.js';
 
 export type SignalReadMode = 'value' | 'latest' | 'snapshot';
@@ -941,10 +943,6 @@ export class WritableScopedNode<T = any> extends ScopedNode<T> {
 		}
 		return super.get();
 	}
-}
-
-export function assertAlive(owner: GraphOwner): void {
-	if (owner.retired) throw new ScopeDisposedError(owner.scopeKey);
 }
 
 /** Inspect only cached metadata; never refresh a dormant or invalidated node. */

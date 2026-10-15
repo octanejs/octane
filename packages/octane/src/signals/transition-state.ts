@@ -9,7 +9,7 @@ import type {
 	SignalGraph,
 } from './graph.js';
 import type { ResourceBinding } from './requests.js';
-import type { SignalActionFrame } from './transition-action.js';
+import type { SignalActionFrame, SignalActionNode } from './transition-action.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { SignalTransitionCoordinatorFactory } from './transition-coordinator.js';
 import { setNativeCandidateResolver, type NativeReadSource } from './read-protocol.js';
@@ -44,6 +44,18 @@ interface CandidateGraph {
 export let candidateGraph: CandidateGraph;
 export function registerCandidateGraph(graph: CandidateGraph): void {
 	candidateGraph = graph;
+}
+
+interface NativeSignalActionExtension {
+	source(entry: SignalActionNode, read: SignalReadMode, source: NativeReadSource): NativeReadSource;
+	accept(prepared: readonly { entry: SignalActionNode; revision: number }[]): void;
+	release(entry: SignalActionNode): void;
+}
+
+/** Installed by optional native presentation, without retaining an Action frame. */
+export let nativeSignalActionExtension: NativeSignalActionExtension | undefined;
+export function registerNativeSignalActionExtension(extension: NativeSignalActionExtension): void {
+	nativeSignalActionExtension = extension;
 }
 
 /**

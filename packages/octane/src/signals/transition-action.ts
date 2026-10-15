@@ -23,6 +23,7 @@ import {
 	candidateGraph as bridge,
 	candidateHooks,
 	CandidateUnsupportedError,
+	nativeSignalActionExtension as nativeExtension,
 	swapActiveSignalCandidate,
 	withoutSignalCandidate,
 } from './transition-state.js';
@@ -37,19 +38,6 @@ export interface NativeCandidateSource {
 	readonly source: NativeReadSource;
 	accept(canonical: NativeReadSource, observedVersion: number): boolean;
 	discard(): void;
-}
-
-interface NativeSignalActionExtension {
-	source(entry: SignalActionNode, read: SignalReadMode, source: NativeReadSource): NativeReadSource;
-	accept(prepared: readonly { entry: SignalActionNode; revision: number }[]): void;
-	release(entry: SignalActionNode): void;
-}
-
-let nativeExtension: NativeSignalActionExtension | undefined;
-
-/** Installed by an optional native presentation entry, never the graph engine. */
-export function registerNativeSignalActionExtension(extension: NativeSignalActionExtension): void {
-	nativeExtension = extension;
 }
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {

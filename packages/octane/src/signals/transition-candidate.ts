@@ -1,10 +1,10 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { NativeReadSource } from './read-protocol.js';
-import { candidateGraph as bridge } from './transition-state.js';
 import {
+	candidateGraph as bridge,
 	registerNativeSignalActionExtension,
-	type SignalActionFrame,
-} from './transition-action.js';
+} from './transition-state.js';
+import type { SignalActionFrame } from './transition-action.js';
 
 export type { CandidatePreparation } from './transition-action.js';
 export type SignalCandidateFrame = SignalActionFrame;
