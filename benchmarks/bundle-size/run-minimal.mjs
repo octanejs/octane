@@ -292,29 +292,35 @@ const effectControls = {
 		'scheduleRegisteredPassiveFlush',
 	],
 };
-// The generic child slot's optional value regimes are installed by their
-// creators: createPortal, signal bindings and context creation. A descriptor
-// tree that creates none of them must drop each regime, while a scenario that
-// creates one proves the oracle still sees its declaration.
-const childSlotControls = {
+// Optional runtime implementations follow the features that create them. A
+// control that uses each feature proves the source-map oracle still sees it.
+const signalOwnerDeclarations = [
+	'scopeSignalOwner',
+	'resolveSignalInstanceKey',
+	'retainSignalRetryScope',
+	'pruneSignalRetryVisit',
+	'trackSignalRetryListKeys',
+];
+const featureControls = {
 	'descriptor-children': {
 		dropped: ['renderPortalChild', 'bindImplicitSignalChild', 'useContextInternal'],
 		kept: ['childSlot'],
 	},
-	context: { dropped: [], kept: ['useContextInternal'] },
-	'hydrate-frame': { dropped: [], kept: ['renderPortalChild', 'bindImplicitSignalChild'] },
+	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
+	'hydrate-frame': {
+		dropped: [],
+		kept: ['renderPortalChild', 'bindImplicitSignalChild', ...signalOwnerDeclarations],
+	},
 };
 const effectDeclarations = Object.values(effectControls).flat();
-const childSlotDeclarations = [
-	...new Set(
-		Object.values(childSlotControls).flatMap(({ dropped, kept }) => [...dropped, ...kept]),
-	),
+const featureDeclarations = [
+	...new Set(Object.values(featureControls).flatMap(({ dropped, kept }) => [...dropped, ...kept])),
 ];
 // `node scripts/split-runtime.mjs order` scores runtime module orders against
 // each Rolldown scenario's chunk and source map, which it reads from here.
 const MAP_DIR = process.env.BUNDLE_SIZE_MAP_DIR;
 const mappedScenario = (id) =>
-	Boolean(MAP_DIR) || Object.hasOwn(effectControls, id) || Object.hasOwn(childSlotControls, id);
+	Boolean(MAP_DIR) || Object.hasOwn(effectControls, id) || Object.hasOwn(featureControls, id);
 // The split shell uses neither ViewTransition nor Activity, so its runtime chunk
 // must drop their optional drivers as a single bundle does; renderBlockInner is
 // the control that proves the source-map oracle sees the chunk.
@@ -335,7 +341,7 @@ const runtimeRanges = (names) =>
 		names.map((name) => ({ name, source: 'runtime.ts' })),
 	);
 const effectRanges = selectedScenarios.some(({ id }) => mappedScenario(id))
-	? runtimeRanges([...effectDeclarations, ...childSlotDeclarations])
+	? runtimeRanges([...effectDeclarations, ...featureDeclarations])
 	: [];
 const splitRanges = selectedScenarios.some(({ bundler }) => bundler === 'vite-split')
 	? runtimeRanges([...splitControls.dropped, ...splitControls.kept])
@@ -681,16 +687,16 @@ try {
 			hookPathExports = [],
 			effects,
 		} = await buildScenario(scenario, entry);
-		if (Object.hasOwn(childSlotControls, id)) {
-			assert.ok(effects, `${name}: missing child-slot reachability map`);
-			const { dropped, kept } = childSlotControls[id];
+		if (Object.hasOwn(featureControls, id)) {
+			assert.ok(effects, `${name}: missing feature reachability map`);
+			const { dropped, kept } = featureControls[id];
 			assert.deepEqual(
 				[
 					...dropped.filter((name) => effects.has(name)),
 					...kept.filter((name) => !effects.has(name)),
 				],
 				[],
-				`${name}: child-slot value regimes must follow their creators`,
+				`${name}: optional runtime implementations must follow their features`,
 			);
 		}
 		if (Object.hasOwn(effectControls, id)) {

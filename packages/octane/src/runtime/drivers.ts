@@ -245,12 +245,13 @@ export interface HydrationDriver {
 }
 export let HYDRATION_DRIVER: HydrationDriver | null = null;
 
-// Root callback reporting is installed only by roots whose ABI permits options.
-// Keep every consumer callable: some calls pass the recovery itself as an argument.
+// Only root entry points whose ABI permits options install this. Besides
+// registering callbacks, its presence means a root may have an explicit signal
+// owner; default-options-only applications cannot have one.
 export let ROOT_ERROR_HANDLERS: WeakMap<Block, RootErrorHandlers> | null = null;
-export let registerRootErrorHandlers: typeof registerEnabledRootErrorHandlers = noop;
-export function installRootErrorHandlers(): void {
-	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
+export let registerRootOptions: typeof registerEnabledRootErrorHandlers | null = null;
+export function installRootOptions(): void {
+	registerRootOptions = registerEnabledRootErrorHandlers;
 }
 export let reportCaughtError: typeof registeredReportCaughtError = noop;
 export let reportUncaughtError: typeof registeredReportUncaughtError = () => false;
