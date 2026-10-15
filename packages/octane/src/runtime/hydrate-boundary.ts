@@ -364,7 +364,7 @@ function permanentStaticHydrationRangeEnd(
 }
 
 function preservePermanentStaticHydrationRange(scope: Scope): void {
-	const hydration = CURSOR;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration === null) return;
 	const marker = hydration.node;
 	if (marker?.nodeType !== 8) return;
@@ -426,13 +426,13 @@ function renderCompiledHydrateChild(state: HydrateSlot, scope: Scope, extra: unk
 
 const EMPTY_HYDRATE_PENDING: ComponentBody = () => undefined;
 
-export function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 	return createHydrateBoundaryBody(state, renderHydrateChild, (_props, scope) => {
 		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
 	});
 }
 
-export function compiledHydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+function compiledHydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 	// Keep a real empty pending arm: null would propagate suspension and change
 	// the try block's ownership, transition swap and scheduled visibility policy.
 	return createHydrateBoundaryBody(state, renderCompiledHydrateChild, EMPTY_HYDRATE_PENDING);
@@ -1335,7 +1335,21 @@ type InternalHydrateComponent = ComponentBody<HydrateProps> & {
 	readonly __octanePermanentStatic: ComponentBody<HydrateProps>;
 };
 
-export function initializeHydrateComponent(
+export const __PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags<
+	ComponentBody<HydrateProps>
+>(
+	function PermanentStaticHydrate(_props, scope) {
+		// Match Hydrate's own server useId while leaving all child IDs to the
+		// paired private sidecar. The componentSlot's adopted outer range owns
+		// the untouched server DOM across parent updates and unmount.
+		useId(HYDRATE_ID_SLOT);
+		preservePermanentStaticHydrationRange(scope);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'PermanentStaticHydrate',
+);
+
+function initializeHydrateComponent(
 	boundaryBody: typeof hydrateBoundaryBody,
 ): InternalHydrateComponent {
 	const hydrate = markComponentFlags<ComponentBody<HydrateProps>>(
@@ -1408,17 +1422,13 @@ export function initializeHydrateComponent(
 		COMPONENT_FLAG_BOUNDARY,
 		'Hydrate',
 	);
-	const permanentStatic = markComponentFlags<ComponentBody<HydrateProps>>(
-		function PermanentStaticHydrate(_props, scope) {
-			// Match Hydrate's own server useId while leaving all child IDs to the
-			// paired private sidecar. The componentSlot's adopted outer range owns
-			// the untouched server DOM across parent updates and unmount.
-			useId(HYDRATE_ID_SLOT);
-			preservePermanentStaticHydrationRange(scope);
-		},
-		COMPONENT_FLAG_BOUNDARY,
-		'PermanentStaticHydrate',
-	);
-	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: permanentStatic });
+	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: __PermanentStaticHydrate });
 	return hydrate as InternalHydrateComponent;
 }
+
+export const Hydrate: ComponentBody<HydrateProps> =
+	/* @__PURE__ */ initializeHydrateComponent(hydrateBoundaryBody);
+
+/** Compiler-owned template children with no authored fallback; never a descriptor entry point. */
+export const __HydrateCompiled: ComponentBody<HydrateProps> =
+	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody);

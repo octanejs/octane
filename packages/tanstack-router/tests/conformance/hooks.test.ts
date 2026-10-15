@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
 import { createElement, flushSync, Suspense, use } from 'octane';
 import { flushEffects, mount, nextPaint } from '../_helpers';
-import { Asset, RouterProvider, routerContext } from '@octanejs/tanstack-router';
+import { Asset, RouterProvider, Scripts, routerContext } from '@octanejs/tanstack-router';
 import { usePrevious } from '../../src/utils';
 import { useStore } from '../../src/useStore';
 import { makeHeadAssetRouter, makeHooksRouter, navigateIdentities } from '../_fixtures/hooks.tsrx';
@@ -21,6 +21,31 @@ async function flush() {
 // useRouteContext, Matches.tsx (useParentMatches/useChildMatches), useNavigate
 // (stable identity), useCanGoBack.
 describe('@octanejs/tanstack-router — hooks', () => {
+	it('does not expose compiler metadata supplied through route script attributes', async () => {
+		const router = makeSsrRouter();
+		router.isServer = false;
+		const attrs = Object.freeze({
+			id: 'runtime-script-attributes',
+			__executeOnMount: 'caller-value',
+			'data-owner': 'route',
+		});
+		router.routeTree.options.scripts = () => [attrs];
+		await router.load();
+		function ScriptOwner() {
+			return createElement(routerContext, { value: router, children: createElement(Scripts) });
+		}
+		const result = mount(ScriptOwner);
+		try {
+			const script = result.find('#runtime-script-attributes');
+			expect(script.getAttribute('data-owner')).toBe('route');
+			expect(script.getAttribute('nonce')).toBe('octane-csp');
+			expect(script.hasAttribute('__executeOnMount')).toBe(false);
+			expect(attrs.__executeOnMount).toBe('caller-value');
+		} finally {
+			result.unmount();
+		}
+	});
+
 	it('a LAYOUT with no `from` resolves the NEAREST match, not the leaf', async () => {
 		const router = makeHooksRouter('/items/i7?tab=specs');
 		await router.load();
@@ -312,6 +337,7 @@ describe('@octanejs/tanstack-router — document asset ownership', () => {
 interface TestAtom<T> {
 	get(): T;
 	publish(value: T): void;
+	hasSubscribers(): boolean;
 	subscribe(listener: () => void): { unsubscribe(): void };
 }
 
@@ -328,6 +354,7 @@ function createTestAtom<T>(initial: T): TestAtom<T> {
 				listener();
 			}
 		},
+		hasSubscribers: () => listeners.size > 0,
 		subscribe: function subscribe(listener: () => void) {
 			listeners.add(listener);
 			return {
@@ -401,12 +428,30 @@ describe('@octanejs/tanstack-router — store selection', () => {
 		try {
 			flushEffects();
 			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('first');
+			expect(first.hasSubscribers()).toBe(true);
+			expect(second.hasSubscribers()).toBe(false);
+
+			result.update(SelectedAtomValue, { atom: first });
+			flushEffects();
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('first');
+			expect(first.hasSubscribers()).toBe(true);
 
 			result.update(SelectedAtomValue, { atom: second });
+			flushEffects();
 			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('second');
+			expect(first.hasSubscribers()).toBe(false);
+			expect(second.hasSubscribers()).toBe(true);
+
+			flushSync(() => first.publish('stale'));
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('second');
+			flushSync(() => second.publish('current'));
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('current');
 		} finally {
 			result.unmount();
 		}
+		flushEffects();
+		expect(first.hasSubscribers()).toBe(false);
+		expect(second.hasSubscribers()).toBe(false);
 	});
 
 	it('keeps an allocating selector stable across parent rerenders when equality holds', () => {

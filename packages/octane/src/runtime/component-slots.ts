@@ -651,8 +651,8 @@ export interface CompSlot {
 	// Last-render `key` value. Sentinel `NO_KEY` when the slot was created
 	// without a key arg, or when the prior render didn't supply one — so a
 	// first render with `key=undefined` followed by a subsequent render with
-	// `key=undefined` doesn't spuriously remount. Compared with Object.is so
-	// NaN keys are stable and 0 / -0 are distinguished.
+	// `key=undefined` doesn't spuriously remount. Other keys use JSX's string
+	// coercion, so numeric and equivalent string keys share one identity.
 	prevKey: any;
 	/** The call site supplied `key=`, even when its current value is undefined. */
 	keyed: boolean;
@@ -812,7 +812,7 @@ export function CompiledOutlet<P>(
  * (so hooks/effects are scoped properly). If the component identity changes
  * across renders (dynamic-component / element-type swap), the old Block is
  * torn down and a fresh one mounted in its place. When a `key` arg is
- * supplied and changes between renders (Object.is compare), the slot also
+ * supplied and its canonical string value changes between renders, the slot also
  * tears down + remounts — matches React's key-driven identity reset: useState
  * resets, useEffect cleanups fire, refs null out, the subtree gets a fresh
  * Block with a fresh hook bag.
@@ -1036,7 +1036,7 @@ export function componentSlotImpl(
 		registerSlot(parentScope, state);
 	}
 	const nextKey = key === undefined ? NO_KEY : '' + key;
-	const keyChanged = key !== undefined && state.prevKey !== NO_KEY && nextKey !== state.prevKey;
+	const keyChanged = nextKey !== state.prevKey;
 	const replacing = identity !== state.currentComp || keyChanged;
 	const journaledSlot = ROOT_RENDER_TRANSACTION !== null && state.block !== null && replacing;
 	const frontier = journaledSlot && usesFrontier(parentBlock, domParent);
@@ -1049,8 +1049,8 @@ export function componentSlotImpl(
 	// changed since last render, force `comp !== state.currentComp` semantics
 	// even if the component identity is unchanged. Null out currentComp so the
 	// existing tear-down branch below fires; prevKey is updated after so we
-	// don't loop on the same key. `key === undefined` means "no key this
-	// render" and is a no-op so React-style optional-key callers don't pay.
+	// don't loop on the same key. Adding or removing an optional key replaces
+	// the subtree too; repeated keyless renders retain the NO_KEY identity.
 	if (keyChanged) {
 		state.currentComp = null;
 	}

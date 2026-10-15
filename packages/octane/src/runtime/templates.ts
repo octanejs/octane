@@ -241,6 +241,53 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 	} as unknown as Element;
 }
 
+/** Compiler-only cold preparation for scripts explicitly owned by a template mount. */
+/* @__NO_SIDE_EFFECTS__ */
+export function scriptTemplate(html: string, ns: number, frag: number, paths: number[][]): Element {
+	const token = template(html, ns, frag);
+	const lazy = (token as any)[LAZY_TEMPLATE] as LazyTemplateRecord;
+	// Only script tokens install cold cache accessors. Ordinary template records
+	// and their resolver stay unchanged, and parse-free adoption never reads the
+	// parsed cache. Each namespace becomes a plain cached value after preparation.
+	for (let namespace = 0; namespace < 3; namespace++) {
+		Object.defineProperty(lazy.parsed, namespace, {
+			configurable: true,
+			enumerable: true,
+			get() {
+				let root = parseTemplate(html, namespace as 0 | 1 | 2, frag);
+				for (const path of paths) {
+					let node = root;
+					for (const index of path) {
+						node = getFirstChild(node)!;
+						for (let i = 0; i < index; i++) node = getNextSibling(node)!;
+					}
+					const parsed = node as Element;
+					// A parser-created script stays inert when cloned. A never-inserted
+					// script created in the live document instead gives each clone the
+					// browser's normal execution semantics, without executing the cache.
+					// Preserve opaque component destinations rather than creating HTML
+					// scripts inside foreign content.
+					const script = document.createElementNS(parsed.namespaceURI, 'script');
+					for (const attr of parsed.attributes) {
+						script.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+					}
+					script.textContent = parsed.textContent;
+					if (node === root) root = script;
+					else node.parentNode!.replaceChild(script, node);
+				}
+				Object.defineProperty(lazy.parsed, namespace, {
+					value: root,
+					writable: true,
+					configurable: true,
+					enumerable: true,
+				});
+				return root;
+			},
+		});
+	}
+	return token;
+}
+
 /**
  * Cheap root scan of a template's HTML source — the HTML parser is never
  * involved. Returns the root element's tag name exactly as written (the

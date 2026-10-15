@@ -229,6 +229,9 @@ export type { PortalDescriptor } from './runtime/portals.js';
 export {
 	Hydrate,
 	__HydrateCompiled,
+	__PermanentStaticHydrate,
+} from './runtime/hydrate-boundary.js';
+export {
 	Suspense,
 	ViewTransition,
 	ErrorBoundary,
@@ -328,6 +331,7 @@ export {
 	createHostElement,
 	createElementAt,
 	createElementFromConfig,
+	componentSlotFromConfig,
 	isValidElement,
 	cloneElement,
 	Children,
@@ -403,6 +407,7 @@ export {
 export { bagRecord, bagDone } from './runtime/commit.js';
 export {
 	template,
+	scriptTemplate,
 	clone,
 	drainFrag,
 	bag0,

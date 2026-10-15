@@ -1521,6 +1521,73 @@ function rejectDangerouslySetInnerHTMLChildren(tag, node, ctx) {
 	throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.' + at);
 }
 
+// This is a compiler option, not a DOM prop or a runtime execution switch.
+function scriptExecutionOption(
+	node,
+	ctx,
+	attributes = node.attributes || node.openingElement?.attributes || [],
+) {
+	let execute = false;
+	for (const attr of attributes) {
+		const argument = unwrapTsExpr(attr.argument);
+		if (
+			attr._octaneKnownAttributeSpread?.fields.includes('__executeOnMount') ||
+			((attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') &&
+				argument?.type === 'ObjectExpression' &&
+				argument.properties.some(
+					(property) =>
+						property.type === 'Property' &&
+						(!property.computed || property.key.type === 'Literal') &&
+						(property.key.name ?? property.key.value) === '__executeOnMount',
+				))
+		) {
+			throw new Error('__executeOnMount must be a direct attribute, not a spread property.');
+		}
+		if (
+			(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
+			jsxAttrRawName(attr) !== '__executeOnMount'
+		)
+			continue;
+		const value = unwrapTsExpr(
+			attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
+		);
+		const tag = elementTagName(node) || jsxTagName(node);
+		const loc = attr.loc?.start;
+		const at = loc
+			? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${loc.line}:${loc.column})`
+			: '';
+		if (
+			tag !== 'script' ||
+			(value != null &&
+				!(
+					(value.type === 'Literal' || value.type === 'BooleanLiteral') &&
+					typeof value.value === 'boolean'
+				))
+		) {
+			throw new Error(
+				'__executeOnMount requires a static boolean on a native <script> template.' + at,
+			);
+		}
+		execute = value == null || value.value;
+	}
+	return execute;
+}
+
+function withoutScriptExecutionOption(attributes) {
+	const index = attributes.findIndex(
+		(attr) =>
+			(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+			jsxAttrRawName(attr) === '__executeOnMount',
+	);
+	return index < 0
+		? attributes
+		: attributes.filter(
+				(attr) =>
+					(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
+					jsxAttrRawName(attr) !== '__executeOnMount',
+			);
+}
+
 // Compiler-generated code references runtime helpers under a collision-proof
 // `_$` alias — `import { setText as _$setText } from 'octane'` + `_$setText(…)`
 // — because generated statements are interleaved with USER statements inside
@@ -11027,6 +11094,7 @@ function expandKnownAttributeSpreads(attributes) {
 // and the handler, bundle, and lift analyses then see the lowered form they
 // emit. Copy-on-write: an attribute without value JSX keeps its identity.
 function lowerHostAttributeValues(attributes, ctx) {
+	attributes = withoutScriptExecutionOption(attributes);
 	let out = null;
 	for (let i = 0; i < attributes.length; i++) {
 		const attr = attributes[i];
@@ -11103,6 +11171,18 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 	assertNoLegacyContextProviders(ast, source, cleanFilename);
 	options = nativeReadOptions(ast, options);
 	assertNativeReadDiagnostics(ast, source, cleanFilename, options);
+	if (source.includes('__executeOnMount'))
+		mapAst(ast, (node) => {
+			if ((node.type === 'JSXElement' || node.type === 'Element') && !isComponentTag(node)) {
+				if (
+					scriptExecutionOption(node, { mapSourceName: cleanFilename }) &&
+					(options?.renderer?.target ?? 'dom') !== 'dom'
+				) {
+					throw new Error('__executeOnMount requires the DOM template renderer.');
+				}
+			}
+			return null;
+		});
 	return { ast, options };
 }
 
@@ -12859,9 +12939,17 @@ function compileInternal(
 		});
 	const templateNodes = ctx.hoistedTemplates.map((t) => {
 		const args = [b.literal(t.html, JSON.stringify(t.html))];
-		if (t.ns || t.frag) args.push(b.literal(t.ns | 0));
-		if (t.frag) args.push(b.literal(t.frag | 0));
-		return inheritOriginLoc(b.const(t.name, markPure(b.call('_$template', ...args))), moduleOrigin);
+		const scripts = t.scriptPaths !== null;
+		if (t.ns || t.frag || scripts) args.push(b.literal(t.ns | 0));
+		if (t.frag || scripts) args.push(b.literal(t.frag | 0));
+		if (scripts)
+			args.push(
+				b.array(t.scriptPaths.map((path) => b.array(path.map((index) => b.literal(index))))),
+			);
+		return inheritOriginLoc(
+			b.const(t.name, markPure(b.call(scripts ? '_$scriptTemplate' : '_$template', ...args))),
+			moduleOrigin,
+		);
 	});
 	// No tail slots exist on the client today (prop memos are server-only), but
 	// flush before assembly so a future client-side tail site cannot trip the
@@ -14748,6 +14836,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// NB: the ns helpers take the TAG STRING (passing the node silently returns
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
+	if (scriptExecutionOption(node, ctx) && selfNs !== 'html' && selfNs !== 'opaque') {
+		throw new Error('__executeOnMount requires an HTML <script> template.');
+	}
 	const childNs = nsForChildren(tag, selfNs);
 	// The static namespace walk starts each independently compiled component in
 	// an opaque context because a component can be invoked under foreign content.
@@ -15937,6 +16028,35 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	const inherit =
 		ctx._ssrInheritRoot === 2 ? 2 : ctx._ssrInheritRoot === true && !node._octaneBindingSite;
 	ctx._ssrInheritRoot = false;
+	if (isStrongKeyedFragment(node, ctx)) {
+		const fragment = prepareKeyedFragment(node, ctx, name, inlinedSubs);
+		const sub = ssrCompileSub(
+			fragment.children,
+			ctx,
+			'__skeyed',
+			[fragment.param],
+			cssHash,
+			parentNs,
+			componentNs,
+		);
+		// Component identity participates in SSR async replay keys, so this body
+		// must stay stable when an ancestor suspends and renders again.
+		ctx.hoistedHelpers.push(sub.fn);
+		ctx.runtimeNeeded.add('ssrComponent');
+		return ssrCall(
+			'ssrComponent',
+			[
+				b.id('__s'),
+				b.id(sub.fnName),
+				fragment.propsExpr,
+				b.literal(false),
+				fragment.keyExpr,
+				undefinedNode(),
+				b.literal(invocationSite),
+			],
+			node,
+		);
+	}
 	// Capture before compiling attributes/children: nested subs temporarily mutate
 	// this context flag. Only this component's immediate children sub inherits the
 	// returned-fragment mode; control-flow arm subs intentionally reset it.
@@ -16095,6 +16215,20 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		}
 	}
 	if (descriptorConfig) {
+		if (ctx.strongRenderValues && !activityDescriptor && !isFragmentLongForm(node, ctx)) {
+			ctx.runtimeNeeded.add('ssrComponentFromConfig');
+			return ssrCall(
+				'ssrComponentFromConfig',
+				[
+					b.id('__s'),
+					compExpr,
+					inheritOriginLoc(b.object(propNodes), node),
+					b.literal(invocationSite),
+					componentNs === null ? b.literal(null) : b.literal(componentNs),
+				],
+				node,
+			);
+		}
 		// The direct mode-only Activity was lowered to ActivityStatement. Richer
 		// Activity configs and generic explicit-key + spread sites keep one ordered
 		// element config, matching createElement without changing simple call sites.
@@ -16194,20 +16328,22 @@ function ssrCompileSub(
 	ctx._ssrFoldedExprHoles = baseName === '__sfragment';
 	let fn;
 	try {
-		fn = ssrCompileBody(
-			synth,
-			ctx,
-			fnName,
-			cssHash,
-			[],
-			parentNs || 'html',
-			false,
-			componentNs,
-			returnedFragmentTemplate,
-			returnedFragmentRoot,
-			// Nested helpers touch no themes; the component body already did.
-			[],
-			unboxedHtml,
+		fn = withNestedTemplateScope(synth, ctx, () =>
+			ssrCompileBody(
+				synth,
+				ctx,
+				fnName,
+				cssHash,
+				[],
+				parentNs || 'html',
+				false,
+				componentNs,
+				returnedFragmentTemplate,
+				returnedFragmentRoot,
+				// Nested helpers touch no themes; the component body already did.
+				[],
+				unboxedHtml,
+			),
 		);
 	} finally {
 		ctx._ssrFoldedExprHoles = prevFoldedExprHoles;
@@ -22463,6 +22599,65 @@ function hasJsxSpreadAttribute(node) {
 	);
 }
 
+// A Strong template owns this entire render scope. Ref/spread configs retain
+// Fragment's inspectable descriptor boundary and its ref lifecycle.
+function isStrongKeyedFragment(node, ctx) {
+	if (
+		!ctx?.strongRenderValues ||
+		node.openingElement?.metadata?.descriptorFragment ||
+		ctx._returnedFragmentTemplate ||
+		!isFragmentLongForm(node, ctx)
+	)
+		return false;
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	return attrs.length === 1 && hasJsxAttribute(node, 'key');
+}
+
+// Reuse a component scope, keeping the whole body (including setup and try
+// arms) behind the key. Capture lexical receiver/arguments before hoisting, and
+// evaluate/coerce the key before snapshotting the locals its body reads.
+function prepareKeyedFragment(node, ctx, name, inlinedSubs) {
+	let children = node.children || [];
+	const lexical = captureCallbackLexicalValues(b.arrow([], b.block(children)), ctx);
+	if (lexical) children = lexical.body.body;
+	const captures = (helperCaptures(ctx, children, []) || []).map((name) => ({
+		name,
+		value: b.id(name),
+	}));
+	if (lexical) captures.push(...lexical.captures);
+	const param = b.object_pattern(
+		captures.map(({ name }) => b.prop('init', b.id(name), b.id(name), false, true)),
+	);
+	const props = b.object(captures.map(({ name, value }) => b.prop('init', b.id(name), value)));
+	const value = (node.attributes || node.openingElement.attributes)[0].value;
+	const key =
+		value == null
+			? b.literal(true)
+			: value.type === 'JSXExpressionContainer'
+				? value.expression
+				: value;
+	const keyName = allocCompilerName(ctx, '__fragmentKey');
+	ctx.currentMapTemps.push(keyName);
+	return {
+		children,
+		param,
+		propsExpr: b.sequence([
+			b.assignment('=', b.id(keyName), tsrxExprNode(key, ctx, name, inlinedSubs)),
+			b.assignment(
+				'=',
+				b.id(keyName),
+				b.conditional(
+					b.binary('===', b.id(keyName), undefinedNode()),
+					undefinedNode(),
+					b.binary('+', b.literal(''), b.id(keyName)),
+				),
+			),
+			props,
+		]),
+		keyExpr: b.id(keyName),
+	};
+}
+
 // An explicit key cannot be split from a spread config: whichever occurs last
 // wins, and all getters/expressions must run in source order. Extracted templates
 // retain the proof after the complete config becomes a single spread hole.
@@ -23775,6 +23970,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 	// The emission normalizes from `openingElement.attributes`, so update it too.
 	if (node.openingElement) {
 		out.openingElement = { ...node.openingElement, attributes: newAttrs };
+		if (isStrongKeyedFragment(node, ctx)) {
+			// Returned JSX keeps its inspectable value boundary. Its holes have
+			// already been extracted in the owning component's render scope.
+			out.openingElement.metadata = { ...node.openingElement.metadata, descriptorFragment: true };
+		}
 		if (mergedKeyedSpreadConfig) {
 			out.openingElement.metadata = {
 				...node.openingElement.metadata,
@@ -25082,7 +25282,13 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
 	}
-	const attrs = node.attributes || node.openingElement?.attributes || [];
+	if (!componentTag && scriptExecutionOption(node, ctx)) {
+		throw new Error(
+			'__executeOnMount requires a native <script> in an owned template, not a JSX value.',
+		);
+	}
+	const authoredAttrs = node.attributes || node.openingElement?.attributes || [];
+	const attrs = componentTag ? authoredAttrs : withoutScriptExecutionOption(authoredAttrs);
 	classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs);
 	const properties = [];
 	for (const attr of attrs) {
@@ -25700,6 +25906,7 @@ function headResourceKind(n) {
 	if (n.type !== 'JSXElement' && n.type !== 'Element') return null;
 	const tag = jsxTagName(n) || elementTagName(n);
 	if (tag !== 'link' && tag !== 'script') return null;
+	if (tag === 'script' && scriptExecutionOption(n, {})) return null;
 	const attrs = n.attributes || n.openingElement?.attributes || [];
 	let hasPrecedence = false;
 	let relStylesheet = false;
@@ -26007,6 +26214,7 @@ function headAttrsExpression(el) {
 		}
 		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
 		const attrName = a.name.name || a.name;
+		if (attrName === '__executeOnMount') continue;
 		// refs/key have no head semantics; `class` is the CSS-scoping stamp
 		// (meaningless on title/meta/link) — drop them. EVENTS pass through: a
 		// hoisted element lives in document.head, outside every delegation root,
@@ -26531,7 +26739,12 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (ctx && allowImperative && isDescriptorBuiltElement(n, inSvg, ctx)) {
+			if (
+				ctx &&
+				allowImperative &&
+				isDescriptorBuiltElement(n, inSvg, ctx) &&
+				!isStrongKeyedFragment(n, ctx)
+			) {
 				out.push(
 					inheritOriginLoc(
 						{
@@ -28132,6 +28345,7 @@ function planJsx(
 	const losesPosition = (n, record) =>
 		record !== null && (n.type !== 'Element' || !record.anchorlessAppendSafe);
 	const rootTemplate = createTemplateIr();
+	const scriptPaths = [];
 	let htmlIdx = 0;
 	// Text-adjacency classification of the root nodes (see textAdjacencyKind):
 	// root-level text holes are `<!>` bindings too, so a dynamic hole with a
@@ -28177,6 +28391,7 @@ function planJsx(
 			inlinedSubs,
 			parentNs,
 			cssHash,
+			scriptPaths,
 		);
 		// Flag a root-level text binding whose neighbour is also text — the server
 		// separates the pair with `<!-- -->`, so the walk must be hole-aware. Only
@@ -28246,7 +28461,7 @@ function planJsx(
 	let elementVars;
 	let ensureVar;
 	if (!noTemplate) {
-		ctx.runtimeNeeded.add('template');
+		ctx.runtimeNeeded.add(scriptPaths.length ? 'scriptTemplate' : 'template');
 		ctx.runtimeNeeded.add('clone');
 		// Template namespace strategy:
 		//   - HTML single-root: parse the element directly, no flag.
@@ -28317,7 +28532,13 @@ function planJsx(
 		// adds the wrapper the HTML parser needs. Hydration reads the count without
 		// parsing the template to find where the roots it adopted end.
 		const fragArg = single ? 0 : htmlIdx;
-		const tpl = allocTemplate(ctx, rootTemplate, flag, fragArg);
+		const tpl = allocTemplate(
+			ctx,
+			rootTemplate,
+			flag,
+			fragArg,
+			scriptPaths.length ? scriptPaths : null,
+		);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
@@ -29497,6 +29718,26 @@ function planJsx(
 		const slotIndex = cc.slotIndex;
 		const org = cc.origin ?? planOrigin;
 		const hostExpr = () => hostNodeFor(`_compHost$${cc.id}`);
+		if (cc.orderedConfig) {
+			ctx.runtimeNeeded.add('componentSlotFromConfig');
+			pushAfterStmt(
+				cc.id,
+				org,
+				b.stmt(
+					b.call(
+						'_$componentSlotFromConfig',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						cc.compNode,
+						cc.propsExpr,
+						b.literal(cc.invocationSite),
+						anchorNodeFor(cc, 'compAnchor') ?? b.literal(null),
+					),
+				),
+			);
+			continue;
+		}
 		if (cc.hostChildrenBinding != null) {
 			const props = () => {
 				const host = bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
@@ -32339,6 +32580,7 @@ function emitNodeHtml(
 	inlinedSubs,
 	parentNs = 'html',
 	cssHash = null,
+	scriptPaths,
 ) {
 	if (node._octaneBindingValue || node._octaneBindingSlot) {
 		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash, parentNs);
@@ -32477,6 +32719,7 @@ function emitNodeHtml(
 			inlinedSubs,
 			parentNs,
 			cssHash,
+			scriptPaths,
 		);
 	if (node.type === 'Literal' && typeof node.value === 'string') {
 		const escaped = escapeHtml(node.value);
@@ -32666,6 +32909,7 @@ function emitElementHtml(
 	inlinedSubs,
 	parentNs = 'html',
 	cssHash = null,
+	scriptPaths,
 ) {
 	// DEV: record this element's source position keyed by its template path, so the binding
 	// mount loop can stamp `<el>.__oct_loc` on bound elements (hydration-mismatch warnings on
@@ -32718,6 +32962,12 @@ function emitElementHtml(
 	// (`<foreignObject>` is SVG-ns but its children are HTML).
 	const hostNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, parentNs);
+	if (scriptExecutionOption(node, ctx)) {
+		if (hostNs !== 'html' && hostNs !== 'opaque') {
+			throw new Error('__executeOnMount requires an HTML <script> template.');
+		}
+		scriptPaths.push(path);
+	}
 	// Collect attributes.
 	const attrs = lowerHostAttributeValues(
 		expandKnownAttributeSpreads(node.attributes || node.openingElement?.attributes || []),
@@ -34074,6 +34324,7 @@ function emitElementHtml(
 						inlinedSubs,
 						childNs,
 						cssHash,
+						scriptPaths,
 					);
 					appendTemplateIr(html, childHtml);
 					childIdx++;
@@ -35289,6 +35540,33 @@ function makeCompCall(
 ) {
 	const id = ctx.nextHelperId++;
 	const invocationSite = componentInvocationSite(ctx, node);
+	if (isStrongKeyedFragment(node, ctx)) {
+		const fragment = prepareKeyedFragment(node, ctx, componentName, inlinedSubs);
+		const helper = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__keyed',
+			fragment.children,
+			[fragment.param],
+			parentNs,
+			cssHash,
+			[],
+			node,
+		);
+		return {
+			id,
+			invocationSite,
+			compNode: b.id(helper),
+			propsExpr: fragment.propsExpr,
+			keyExpr: fragment.keyExpr,
+			voidComponent: true,
+			anchorlessAppendSafe: true,
+			hostPath: null,
+			autoMemoDeps: null,
+			loc: devLoc(ctx, node),
+			origin: node,
+		};
+	}
 	const compName = tagBindingName(node);
 	const directRenderer = isStaticFragmentComponent(node, ctx)
 		? ctx.componentInfo.get(compName).staticFragmentRenderer
@@ -35465,9 +35743,23 @@ function makeCompCall(
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
+		// Dynamic tags can still select a host with function actions or a Fragment.
+		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
+		if (ctx.strongRenderValues && !activityDescriptor && !isFragmentLongForm(node, ctx)) {
+			return {
+				id,
+				invocationSite,
+				compNode,
+				propsExpr,
+				orderedConfig: true,
+				anchorlessAppendSafe: true,
+				hostPath: null,
+				loc: devLoc(ctx, node),
+				origin: node,
+			};
+		}
 		// A keyed spread builds a descriptor whose tag may be a host string or a
 		// Fragment at runtime, so its props select descriptor capabilities too.
-		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
 		ctx.runtimeNeeded.add('createElementFromConfig');
 		return {
 			id,
@@ -37981,13 +38273,16 @@ function bodyContainsJsx(node) {
 }
 
 /** @param {TemplateIR} ast */
-function allocTemplate(ctx, ast, ns = 0, frag = 0) {
+function allocTemplate(ctx, ast, ns = 0, frag = 0, scriptPaths = null) {
 	const { html, origins } = serializeTemplateIr(ast);
+	const scripts = scriptPaths === null ? null : JSON.stringify(scriptPaths);
 	const intern = !ctx.hmr && !ctx.dev && !ctx.profile;
 	const bucket = intern ? ctx.internedTemplates.get(html) : undefined;
 	const existing = Array.isArray(bucket)
-		? bucket.find((template) => template.ns === ns && template.frag === frag)
-		: bucket?.ns === ns && bucket.frag === frag
+		? bucket.find(
+				(template) => template.ns === ns && template.frag === frag && template.scripts === scripts,
+			)
+		: bucket?.ns === ns && bucket.frag === frag && bucket.scripts === scripts
 			? bucket
 			: undefined;
 	if (existing !== undefined) {
@@ -38010,7 +38305,7 @@ function allocTemplate(ctx, ast, ns = 0, frag = 0) {
 	}
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	const template = { name, ast, html, ns, frag, origins };
+	const template = { name, ast, html, ns, frag, origins, scriptPaths, scripts };
 	ctx.hoistedTemplates.push(template);
 	if (intern) {
 		if (bucket === undefined) ctx.internedTemplates.set(html, template);

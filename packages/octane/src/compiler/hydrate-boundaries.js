@@ -1809,18 +1809,20 @@ function hydrateBoundaryElement(
 			children,
 			openingElement: {
 				...opening,
-				name: permanentStaticName(opening.name, opening.name),
-				attributes: [
-					...(opening.attributes ?? []),
-					jsxExpressionAttribute('children', b.literal(null, 'null'), opening),
-				],
+				name: inheritGeneratedOrigin(b.jsx_id(boundary.staticComponentName), opening.name),
+				// The exact split/never inputs are compiler-owned and unused by the
+				// static body. Keeping them would retain the strategy module.
+				attributes: [],
 			},
 			closingElement:
 				node.closingElement === null
 					? null
 					: {
 							...node.closingElement,
-							name: permanentStaticName(node.closingElement.name, node.closingElement.name),
+							name: inheritGeneratedOrigin(
+								b.jsx_id(boundary.staticComponentName),
+								node.closingElement.name,
+							),
 						},
 		};
 	}
@@ -2375,10 +2377,12 @@ export function prepareHydrateBoundaries(
 			`boundary ${JSON.stringify(boundaryPath)} does not exist`,
 		);
 	}
+	const staticComponentName = uniqueGeneratedName(source, '__OctanePermanentStaticHydrate');
 	for (const boundary of analysis.boundaries) {
 		boundary.filename = filename;
 		boundary.hookNames = analysis.imports.hookNames;
 		boundary.ast = analysis.ast;
+		boundary.staticComponentName = staticComponentName;
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
@@ -2452,6 +2456,23 @@ export function prepareHydrateBoundaries(
 			moduleMovePlan.bindingsByPath,
 			moduleMovePlan.declarationsByPath,
 			captureBindings,
+		);
+	}
+	if (analysis.boundaries.some((boundary) => boundary.permanentStatic)) {
+		// Import the static body directly: reaching it through Hydrate's property
+		// also retains the deferred activation implementation in client bundles.
+		ast = pruneUnusedImportsAst(
+			{
+				...ast,
+				body: [
+					b.import_declaration(
+						[b.import_specifier('__PermanentStaticHydrate', staticComponentName)],
+						'octane',
+					),
+					...ast.body,
+				],
+			},
+			true,
 		);
 	}
 	if (captureBindings.size > 0) {

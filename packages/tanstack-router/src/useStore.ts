@@ -1,3 +1,5 @@
+'use strong';
+
 // The keystone adapter. Everything reactive in the router funnels through
 // `@tanstack/react-store`'s `useStore(atom, selector)`, which is
 // `useSyncExternalStoreWithSelector(atom.subscribe→unsubscribe, atom.get, …,

@@ -654,8 +654,11 @@ function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor<Elem
 	};
 }
 
-/** Cold component body used only by `createElement(Fragment, { ref }, ...)`. */
-function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope): void {
+/** Cold component body for a ref-bearing Fragment. */
+export function renderFragmentRefDescriptor(
+	descriptor: Pick<ElementDescriptor, 'ref' | 'children'>,
+	scope: Scope,
+): void {
 	const block = scope.block;
 	let instance = block.slots[1] as FragmentInstance | undefined;
 	if (instance === undefined) {

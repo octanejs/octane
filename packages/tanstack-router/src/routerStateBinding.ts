@@ -1,3 +1,5 @@
+'use strong';
+
 // The reactive base every router hook reads through: subscribe to the router's
 // canonical snapshot store (`router.stores.__store`) and select a slice.
 import { useStore } from './useStore';

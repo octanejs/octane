@@ -3,13 +3,7 @@
 // Try and error slots, catching render and effect errors, suspending, hiding
 // and revealing content, retries, resuming, and initial Suspense hydration.
 
-import {
-	HYDRATE_STREAM_ERROR_ATTR,
-	reserveHydrationIds,
-	hydrateBoundaryBody,
-	compiledHydrateBoundaryBody,
-	initializeHydrateComponent,
-} from './hydrate-boundary.js';
+import { HYDRATE_STREAM_ERROR_ATTR, reserveHydrationIds } from './hydrate-boundary.js';
 import { hydrationStarted, hydrating } from '../hydration-flag.js';
 import {
 	STREAM_BOUNDARY_ATTR,
@@ -24,7 +18,6 @@ import {
 	__profileSchedule,
 } from '../profiling.js';
 import { __devtoolsClearBoundary, __devtoolsSetBoundaryState } from '../devtools-hook.js';
-import type { HydrateProps } from '../hydration/types.js';
 import { markComponentFlags, COMPONENT_FLAG_BOUNDARY } from '../component-flags.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
@@ -186,13 +179,6 @@ export let deferringStagedRevealEffects = false;
 // Ordinary roots also capture commit work. Keep their generic publication path
 // independent of Suspense until a boundary actually records a visibility change.
 export let PUBLISH_SUSPENSE_COMMIT: ((state: TrySlot) => void) | null = null;
-
-export const Hydrate: ComponentBody<HydrateProps> =
-	/* @__PURE__ */ initializeHydrateComponent(hydrateBoundaryBody);
-
-/** Compiler-owned template children with no authored fallback; never a descriptor entry point. */
-export const __HydrateCompiled: ComponentBody<HydrateProps> =
-	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody);
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of

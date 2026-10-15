@@ -14,7 +14,7 @@ import {
 import { formatClientError } from '../error-codes.client.generated.js';
 import { FRAGMENT_TAG, ACTIVITY_TAG, ELEMENT_TAG, PORTAL_TAG } from '../runtime-tags.js';
 import { isRendererContext, registerClientRendererBridge } from '../renderer-bridge.js';
-import type { ComponentBody, ElementDescriptor } from './types.js';
+import type { ComponentBody, ElementDescriptor, Scope } from './types.js';
 import { flushSync } from './engine.js';
 import { type TrackedThenable, useThenable, trackThenable } from './use.js';
 import {
@@ -23,7 +23,12 @@ import {
 	createNativeScopedResolver,
 } from './context.js';
 import { CURRENT_SCOPE, CURRENT_BLOCK } from './render.js';
-import { POSITIONAL_CHILDREN, enableDescriptorFragmentRefs } from './deopt.js';
+import {
+	POSITIONAL_CHILDREN,
+	enableDescriptorFragmentRefs,
+	renderFragmentRefDescriptor,
+} from './deopt.js';
+import { componentSlot } from './component-slots.js';
 import { type FragmentProps, renderActivityDescriptor } from './activity.js';
 import { EMPTY_ARGS } from './events.js';
 
@@ -488,6 +493,47 @@ export function createElementAt<P>(
 ): ElementDescriptor<P> {
 	enableDescriptorCapabilities();
 	return createElementFromConfig(invocationSite, type, props, children);
+}
+
+/** Compiler-owned ordered JSX config, without an intermediate element record. */
+export function componentSlotFromConfig(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	comp: ComponentBody | string | typeof Fragment,
+	config: any,
+	invocationSite?: string,
+	anchor?: Node | null,
+): void {
+	if (typeof comp === 'function' && isRendererContext(comp)) {
+		registerClientRendererBridge(renderClientContextProvider, flushSync);
+	}
+	const key = hasElementConfigKey(config) ? '' + config.key : undefined;
+	const props = copyElementConfig(config);
+	applyElementDefaultProps(comp, props);
+	const body =
+		comp === Fragment
+			? props.ref != null || hasOwnProp.call(props, 'ref')
+				? renderFragmentRefDescriptor
+				: renderFragmentConfig
+			: comp;
+	componentSlot(
+		parentScope,
+		slotKey,
+		domParent,
+		body,
+		props,
+		invocationSite,
+		anchor,
+		false,
+		false,
+		key,
+		true,
+	);
+}
+
+function renderFragmentConfig(props: { children?: unknown }): unknown {
+	return props.children;
 }
 
 /**

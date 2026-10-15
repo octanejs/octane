@@ -1022,3 +1022,91 @@ describe('compile errors — @for headers', () => {
 		}
 	});
 });
+
+describe('script __executeOnMount authoring contract', () => {
+	it.each(['client', 'server'] as const)(
+		'rejects unsupported %s script execution options',
+		(mode) => {
+			for (const expression of [
+				'active',
+				'(active)',
+				'active as boolean',
+				'(active as boolean)',
+				'active satisfies boolean',
+				'active!',
+			])
+				expect(() =>
+					compile(
+						`export function App({active}) @{ <script __executeOnMount={${expression}} /> }`,
+						'script-option.tsrx',
+						{ mode },
+					),
+				).toThrow(/__executeOnMount requires a static boolean on a native <script> template/);
+			for (const source of [
+				'export function App() @{ <script __executeOnMount="true" /> }',
+				'export function App() @{ <div __executeOnMount /> }',
+			])
+				expect(() => compile(source, 'script-option.tsrx', { mode })).toThrow(
+					/__executeOnMount requires a static boolean on a native <script> template/,
+				);
+			for (const tag of ['script', 'div'])
+				expect(() =>
+					compile(
+						`export function App() @{ <${tag} {...{__executeOnMount:true}} /> }`,
+						'spread-script.tsrx',
+						{ mode },
+					),
+				).toThrow(/__executeOnMount must be a direct attribute/);
+			expect(() =>
+				compile(
+					'export function App() @{ <svg><script __executeOnMount /></svg> }',
+					'foreign-script.tsrx',
+					{ mode },
+				),
+			).toThrow(/__executeOnMount requires an HTML <script> template/);
+			expect(() =>
+				compile('export const script = <script __executeOnMount />;', 'script-value.tsx', { mode }),
+			).toThrow(/__executeOnMount requires a native <script> in an owned template/);
+		},
+	);
+
+	it('rejects script execution outside the DOM renderer', () => {
+		expect(() =>
+			compile('export function App() @{ <script __executeOnMount /> }', 'script.object.tsrx', {
+				renderer: { id: 'object', target: 'universal', module: 'object-renderer' },
+			}),
+		).toThrow(/__executeOnMount requires the DOM template renderer/);
+	});
+
+	it.each(['client', 'server'] as const)(
+		'accepts literal true and false without changing component props in %s output',
+		(mode) => {
+			for (const option of [
+				'',
+				...['true', 'false'].flatMap((value) => [
+					`={${value}}`,
+					`={(${value})}`,
+					`={${value} as const}`,
+					`={(${value} as const)}`,
+					`={${value} satisfies boolean}`,
+					`={${value}!}`,
+				]),
+			]) {
+				expect(
+					compile(
+						`export function App() @{ <script __executeOnMount${option} /> }`,
+						'script-option.tsrx',
+						{ mode },
+					).diagnostics,
+				).toEqual([]);
+			}
+			expect(
+				compile(
+					'export function App({Child, active}) @{ <Child __executeOnMount={active} /> }',
+					'component-option.tsrx',
+					{ mode },
+				).diagnostics,
+			).toEqual([]);
+		},
+	);
+});
