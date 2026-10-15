@@ -69,6 +69,12 @@ function Item() @{
 	</article>
 }
 
+function RecoverableItem() @{
+	const params = useParams({ from: '/items/$id' }) as { id: string };
+	if (params.id === 'broken') throw new Error('item render failed');
+	<Item />
+}
+
 function ErrorView(props: ErrorComponentProps) @{
 	<p class="route-error">
 		{(props.error instanceof Error ? props.error.message : String(props.error)) as string}
@@ -90,6 +96,9 @@ export function makeCompiledRouter(
 		shell?: boolean;
 		isServer?: boolean;
 		loader?: () => Promise<unknown>;
+		renderError?: boolean;
+		onCatch?: (error: Error) => void;
+		parentOnCatch?: (error: Error) => void;
 	} = {},
 ) {
 	const root = new BaseRootRoute({
@@ -104,6 +113,8 @@ export function makeCompiledRouter(
 		path: 'items',
 		component: Items,
 		notFoundComponent: NotFoundView,
+		errorComponent: opts.parentOnCatch ? ErrorView : undefined,
+		onCatch: opts.parentOnCatch,
 	});
 	const item = new BaseRoute({
 		getParentRoute: () => items,
@@ -116,9 +127,12 @@ export function makeCompiledRouter(
 		},
 		component: opts.invalid
 			? ((() => 'plain returned text') as any)
-			: lazyCompiledRouteComponent(async () => ({ Item }), 'Item'),
+			: opts.renderError
+				? RecoverableItem
+				: lazyCompiledRouteComponent(async () => ({ Item }), 'Item'),
 		pendingComponent: Pending,
 		errorComponent: ErrorView,
+		onCatch: opts.onCatch,
 		remountDeps: ({ params }: any) => [params.id],
 	});
 	items.addChildren([item]);

@@ -1,44 +1,17 @@
-import {
-	CompiledOutlet as CompiledComponent,
-	CompiledContext,
-	useContext,
-	useLayoutEffect,
-	useRef,
-	trustHTML,
-	Hydrate,
-} from 'octane';
-import { never } from 'octane/hydration';
+'use strong';
+
+import { CompiledOutlet as CompiledComponent, CompiledContext, useContext } from 'octane';
 import type { NotFoundError } from '@tanstack/router-core';
-import { hasKeys, isNotFound, rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
-import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
+import { rootRouteId } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
-import { routerContext, matchContext, useRouter } from './bindings';
+import { matchContext, useRouter } from './bindings';
 import { useStore } from '../useStore';
-import { useTransitioner, settleOwner } from '../Transitioner.tsrx';
 import { useHydrated } from '../ClientOnly.tsrx';
-import { ErrorComponent } from '../CatchBoundary.tsrx';
-import { createLazyRouteLoader } from '../lazyRouteLoader';
-import type { RouterProps } from '../RouterProvider.tsrx';
+import { ErrorComponent } from '../ErrorComponent.tsrx';
+import { CompiledFailure, CompiledPending, CompiledScrollRestoration } from './MatchLifecycle.tsrx';
 
-export function CompiledRouterProvider(props: RouterProps) @{
-	const { router, ...rest } = props;
-	if (hasKeys(rest)) {
-		router.update({
-			...router.options,
-			...rest,
-			context: { ...router.options.context, ...rest.context },
-		});
-	}
-	if (router.options.Wrap || router.options.InnerWrap) {
-		throw new Error(
-			'CompiledRouterProvider does not accept Wrap or InnerWrap. Use RouterProvider for renderable wrappers.',
-		);
-	}
-	<CompiledContext context={routerContext} value={router}>
-		<CompiledMatches />
-	</CompiledContext>
-}
-
+// Route IDs enter this tree from published match snapshots. Router-core has
+// already created their stable presentation stores before notifying readers.
 function CompiledWrap(props: { component?: any; children?: unknown }) @{
 	@if (props.component) {
 		<CompiledComponent component={props.component} props={{ children: props.children }} />
@@ -47,41 +20,7 @@ function CompiledWrap(props: { component?: any; children?: unknown }) @{
 	}
 }
 
-function CompiledMatches() @{
-	const router = useRouter();
-	const rootRoute = (router.routesById as any)[rootRouteId];
-	useLayoutEffect(() => {
-		if (router.options.scrollRestoration) setupScrollRestoration(router);
-	}, [router]);
-	const expectedMatches = useTransitioner(router);
-	@try {
-		<CompiledMatchesInner expectedMatches={expectedMatches} />
-	} @pending {
-		<CompiledPending route={rootRoute} />
-	} @catch (error, reset) {
-		if (router.options.disableGlobalCatchBoundary) throw error;
-		<CompiledFailure error={error} reset={reset} route={rootRoute} global={true} />
-	}
-}
-
-function CompiledMatchesInner(props: { expectedMatches: unknown }) @{
-	const router = useRouter();
-	const acknowledgement: Array<any> = ((router as any)._rendered ??= []);
-	const matches = useStore(router.stores.matches, (m: any) =>
-		acknowledgement[0] === props.expectedMatches ? (props.expectedMatches ?? m) : m,
-	) as any;
-	const rootMatch = matches[0];
-	useLayoutEffect(() => {
-		if (acknowledgement[0] === matches) settleOwner(acknowledgement, true);
-	}, [acknowledgement, matches]);
-	@if (rootMatch) {
-		<CompiledContext context={matchContext} value={rootMatch.routeId}>
-			<CompiledMatch routeId={rootMatch.routeId} />
-		</CompiledContext>
-	}
-}
-
-function CompiledMatch(props: { routeId: string }) @{
+export function CompiledMatch(props: { routeId: string }) @{
 	const router = useRouter();
 	const store = router.stores.getMatchStore(props.routeId);
 	const ssr = useStore(store, (match: any) => match.ssr);
@@ -134,11 +73,8 @@ function CompiledMatchInner(props: { routeId: string; noSsr: boolean }) @{
 		search: match._strictSearch,
 	});
 	const key = remountDeps ? JSON.stringify(remountDeps) : undefined;
-	if (match.status === 'pending' && !props.noSsr && (router as any)._tx) {
-		throw (router as any)._tx[5];
-	}
 	@if ((props.noSsr && !hydrated) || match.status === 'pending') {
-		<CompiledPending route={route} />
+		<CompiledPending route={route} waitForTransition={match.status === 'pending' && !props.noSsr} />
 	} @else if (match.status === 'notFound') {
 		<CompiledNotFound route={route} error={match.error} />
 	} @else if (match.status === 'error') {
@@ -190,14 +126,6 @@ export function CompiledOutlet() @{
 	}
 }
 
-function CompiledPending(props: { route?: any }) @{
-	const router = useRouter();
-	const Pending = props.route?.options.pendingComponent ?? router.options.defaultPendingComponent;
-	@if (Pending) {
-		<CompiledComponent component={Pending} props={{}} />
-	}
-}
-
 function CompiledNotFound(props: { route: any; error?: NotFoundError }) @{
 	const router = useRouter();
 	const NotFound = props.route.options.notFoundComponent ?? router.options.defaultNotFoundComponent;
@@ -206,71 +134,4 @@ function CompiledNotFound(props: { route: any; error?: NotFoundError }) @{
 	} @else {
 		<p>Not Found</p>
 	}
-}
-
-function CompiledFailure(props: { error: any; reset: () => void; route: any; global?: boolean }) @{
-	const router = useRouter();
-	const errorComponent = props.global
-		? ErrorComponent
-		: (props.route.options.errorComponent ?? router.options.defaultErrorComponent);
-	const notFoundComponent = props.route.isRoot
-		? (props.route.options.notFoundComponent ?? router.options.notFoundRoute?.options.component)
-		: props.route.options.notFoundComponent;
-	const isMissing = isNotFound(props.error);
-	if (isMissing) {
-		const missing = props.error as NotFoundError;
-		missing.routeId ??= props.route.id;
-		if (!notFoundComponent || missing.routeId !== props.route.id) throw missing;
-	} else if (!errorComponent) {
-		throw props.error;
-	}
-
-	// Report an error only at the boundary that owns it and retry after its
-	// TanStack match identity changes, just like the normal binding.
-	const reported = useRef<unknown>(null);
-	if (!isMissing && !props.global && reported.current !== props.error) {
-		reported.current = props.error;
-		const onCatch = props.route.options.onCatch ?? router.options.defaultOnCatch;
-		onCatch?.(props.error, { componentStack: '' });
-	}
-	const store = router.stores.getMatchStore(props.route.id);
-	const match = useStore(store, (m: any) => m);
-	const firstMatch = useRef(match);
-	useLayoutEffect(() => {
-		if (firstMatch.current !== match) {
-			firstMatch.current = match;
-			props.reset();
-		}
-	}, [match]);
-
-	@if (isMissing) {
-		<CompiledComponent component={notFoundComponent} props={props.error} />
-	} @else {
-		<CompiledComponent
-			component={errorComponent}
-			props={{ error: props.error, reset: props.reset, info: { componentStack: '' } }}
-		/>
-	}
-}
-
-function CompiledScrollRestoration() @{
-	const router = useRouter();
-	const hydrated = useHydrated();
-	const option = router.options.scrollRestoration;
-	const script = getScrollRestorationScriptForRouter(router);
-	const rendersScript = typeof option !== 'function' || option({ location: router.latestLocation });
-	@if ((script !== null || rendersScript) && ((isServer ?? router.isServer) || !hydrated)) {
-		<Hydrate split={false} when={never()}>
-			<script nonce={router.options.ssr?.nonce} dangerouslySetInnerHTML={trustHTML(script ?? '')} />
-		</Hydrate>
-	}
-}
-
-export function lazyCompiledRouteComponent(importer: () => Promise<any>, exportName?: string) {
-	const loader = createLazyRouteLoader(importer, exportName);
-	function Lazy(props: any) @{
-		<CompiledComponent component={loader.read()} props={props} />
-	}
-	Lazy.preload = loader.preload;
-	return Lazy;
 }
