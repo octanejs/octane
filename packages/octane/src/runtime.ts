@@ -50045,7 +50045,7 @@ function makeRoot(
 			if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 			if (unmounted) return;
 		}
-		const frame = beginRootRender(renderOwner);
+		let frame = beginRootRender(renderOwner);
 		renderOwner.transaction!.rootRequest = true;
 		const previousRoot = rootBlock;
 		const previousBody = currentBody;
@@ -50117,10 +50117,6 @@ function makeRoot(
 			rootBlock.idState = idState;
 			renderOwner.current = rootBlock;
 			createdInRootRender(rootBlock);
-			// A fallback rendering in place shares its container with the server's
-			// nodes until it commits: a rollback must not clear the container.
-			if (renderOwner.hydrationFallback !== undefined && frontier === null)
-				preserveRootCreatedDom(rootBlock);
 			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
@@ -50158,9 +50154,12 @@ function makeRoot(
 					validateRootHtmlNesting(container, body, frontier?.frag ?? container);
 				}
 			} catch (error) {
+				let failed = false;
 				try {
 					handleRenderError(mountedRoot, error);
 				} catch (unhandled) {
+					failed = true;
+					error = unhandled;
 					const transaction = renderOwner.transaction;
 					if (transaction !== null) rollbackRootRender(transaction);
 					// Match the scheduled-render failure path: discard the failed tree
@@ -50172,11 +50171,17 @@ function makeRoot(
 					// render, so the option must not behave differently from a scheduled
 					// render's unhandled error.
 					if (rootBlock !== null && !rootBlock.disposed) unmountBlock(rootBlock);
-					renderOwner.hydrationFallback?.(true);
-					if (!reportUncaughtError(mountedRoot, unhandled)) throw unhandled;
+				}
+				// The render closes before the root releases the DOM it leaves:
+				// rendering writes none.
+				endRootRender(frame);
+				frame = null;
+				if (!failed) {
+					if (renderOwner.wakeable === null) root.unmount();
 					return;
 				}
-				if (renderOwner.wakeable === null) root.unmount();
+				renderOwner.hydrationFallback?.(true);
+				if (!reportUncaughtError(mountedRoot, error)) throw error;
 				return;
 			}
 			if (staged) {
