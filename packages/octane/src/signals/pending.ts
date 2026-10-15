@@ -9,6 +9,12 @@ import type {
 	SignalObserver,
 } from './graph.js';
 import {
+	REACTIVE_DIRTY,
+	REACTIVE_MUTABLE,
+	REACTIVE_PENDING,
+	REACTIVE_WATCHING,
+} from './graph-flags.js';
+import {
 	NATIVE_TRANSITION_CONSUMER,
 	SIGNAL_DEPENDENT_NODE,
 	type NativeReadSource,
@@ -385,7 +391,7 @@ function installable(slot: PendingSlot): Install | undefined {
 	// A computation installs only a complete result its batch read and that no
 	// input has changed since. Anything else recomputes from committed state.
 	if (
-		shadow.flags & (graph.flags.Dirty | graph.flags.Pending) ||
+		shadow.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ||
 		state.snapshot.status === 'pending' ||
 		state.snapshot.status === 'idle'
 	)
@@ -439,10 +445,9 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 		release(slot, false);
 		if (read && !slot.node.owner.retired) graph.invalidateNode(slot.node);
 	}
-	const { Dirty, Mutable, Watching } = graph.flags;
 	// Guard installed nodes from propagation through their old and new edges.
 	// Alien still owns frontier traversal; every changed node propagates once.
-	for (const { slot } of installs) slot.node.flags |= Dirty;
+	for (const { slot } of installs) slot.node.flags |= REACTIVE_DIRTY;
 	const changed: ScopedNode[] = [];
 	const releases: (() => void)[] = [];
 	for (const { slot, state, receipt } of installs) {
@@ -483,7 +488,7 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 	} finally {
 		candidateHooks.defer = deferred;
 	}
-	for (const { slot } of installs) slot.node.flags = Mutable | Watching;
+	for (const { slot } of installs) slot.node.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING;
 	try {
 		for (const { receipt } of installs) receipt?.accept?.();
 	} finally {

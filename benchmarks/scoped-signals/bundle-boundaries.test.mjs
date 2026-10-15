@@ -531,11 +531,12 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 		'An islands build must carry signal Actions and their candidate producers with the renderer.',
 	);
 
-	// Both placements stay complete. The renderer is loaded first, and its Action
-	// imports signals only after it awaited. No component reads them natively. A
-	// declared derived cell and a query resource stage through their own producers.
-	const lateSignals = `import { startTransition } from 'octane';
-export function lateSignalAction() {
+	// Both placements and module load orders stay complete. When the renderer
+	// loads first, its Action imports signals only after it awaited. No component
+	// reads them natively; the derived cell and resource use their own producers.
+	const lateSignals = `export async function lateSignalAction(graphFirst) {
+ if (graphFirst) await import('octane/signals');
+ const { startTransition } = await import('octane');
  let release;
  const released = new Promise((resolve) => { release = resolve; });
  let ready;
@@ -569,37 +570,48 @@ export function lateSignalAction() {
  return { state, release: () => { release(); return action; } };
 }`;
 	for (const conditions of [undefined, ['octane-islands']]) {
-		const label = conditions ? 'renderer placement' : 'graph placement';
 		const { code } = await bundle(lateSignals, conditions);
-		const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
-		const pending = api.lateSignalAction();
-		const state = await pending.state;
-		try {
-			assert.deepEqual(state.staged, [2, 4, 6], `${label}: the transition scope reads its writes.`);
-			assert.deepEqual(
-				[state.count.get(), state.tripled(), state.looked.get()],
-				[0, 0, 0],
-				`${label}: the write published before the Action settled.`,
+		for (const graphFirst of [false, true]) {
+			const label = `${conditions ? 'renderer' : 'graph'} placement, ${graphFirst ? 'graph' : 'renderer'} first`;
+			const api = await import(
+				'data:text/javascript;base64,' + Buffer.from(code).toString('base64') + '#' + graphFirst
 			);
-			assert.deepEqual(state.notifications, [], label);
-			await pending.release();
-			const deadline = performance.now() + 2_000;
-			while (
-				(state.notifications.length === 0 || state.looked.latest() !== 20) &&
-				performance.now() < deadline
-			)
-				await new Promise((resolve) => setTimeout(resolve, 1));
-			assert.deepEqual(
-				[state.count.get(), state.tripled(), state.looked.latest()],
-				[2, 6, 20],
-				label,
-			);
-			assert.deepEqual(state.notifications, [2], label);
-		} finally {
-			state.stop();
-			state.scope.dispose();
+			const pending = await api.lateSignalAction(graphFirst);
+			const state = await pending.state;
+			try {
+				assert.deepEqual(
+					state.staged,
+					[2, 4, 6],
+					`${label}: the transition scope reads its writes.`,
+				);
+				assert.deepEqual(
+					[state.count.get(), state.tripled(), state.looked.get()],
+					[0, 0, 0],
+					`${label}: the write published before the Action settled.`,
+				);
+				assert.deepEqual(state.notifications, [], label);
+				await pending.release();
+				const deadline = performance.now() + 2_000;
+				while (
+					(state.notifications.length === 0 || state.looked.latest() !== 20) &&
+					performance.now() < deadline
+				)
+					await new Promise((resolve) => setTimeout(resolve, 1));
+				assert.deepEqual(
+					[state.count.get(), state.tripled(), state.looked.latest()],
+					[2, 6, 20],
+					label,
+				);
+				assert.deepEqual(state.notifications, [2], label);
+				state.count.set(3);
+				assert.deepEqual([state.count.get(), state.tripled()], [3, 9], label);
+				assert.deepEqual(state.notifications, [2, 3], label);
+			} finally {
+				state.stop();
+				state.scope.dispose();
+			}
+			t.diagnostic(`${label}: signals staged and published once`);
 		}
-		t.diagnostic(`${label}: late signals staged and published once`);
 	}
 });
 

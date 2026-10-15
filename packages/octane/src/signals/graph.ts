@@ -18,6 +18,15 @@ import {
 	SignalWriteError,
 } from './errors.js';
 import {
+	REACTIVE_DIRTY,
+	REACTIVE_MUTABLE,
+	REACTIVE_NONE,
+	REACTIVE_PENDING,
+	REACTIVE_RECURSED,
+	REACTIVE_RECURSED_CHECK,
+	REACTIVE_WATCHING,
+} from './graph-flags.js';
+import {
 	NATIVE_DOM_VALUE,
 	forwardNativeTransitionConsumer,
 	getNativeReadObserver,
@@ -111,13 +120,6 @@ interface Stack<T> {
 	prev: Stack<T> | undefined;
 }
 
-const REACTIVE_NONE = 0;
-const REACTIVE_MUTABLE = 1;
-const REACTIVE_WATCHING = 2;
-const REACTIVE_RECURSED_CHECK = 4;
-const REACTIVE_RECURSED = 8;
-const REACTIVE_DIRTY = 16;
-const REACTIVE_PENDING = 32;
 type ReactiveFlags = number;
 
 export interface NodeState<T = unknown> {
@@ -1820,12 +1822,6 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 registerGraphBridge({
 	ScopedNode,
 	graph: { unlink, propagate, shallowPropagate },
-	flags: {
-		Mutable: REACTIVE_MUTABLE,
-		Watching: REACTIVE_WATCHING,
-		Dirty: REACTIVE_DIRTY,
-		Pending: REACTIVE_PENDING,
-	},
 	historical: () => historicalReader !== undefined,
 	assertAlive,
 	link: (from, to) => {
