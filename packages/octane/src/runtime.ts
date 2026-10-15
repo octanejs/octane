@@ -13382,7 +13382,8 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 	// the parentBlock chain) whenever a descriptor carrying a ref is stamped
 	// anywhere in this block's subtree, so a ref-free region skips the
 	// whole-DOM descriptor scan.
-	if (block.deoptNode !== null && block.deoptRefs) detachDeoptTreeRefs(block.deoptNode, null);
+	if (block.deoptNode !== null && block.deoptRefs)
+		detachDeoptTreeRefs(block.deoptNode, null, true, block);
 	// When THIS call removes the block's entire DOM range below, descendants must
 	// not detach their own ranges first: every non-portal descendant's DOM lies
 	// inside this range (portals always self-detach — unmountScopeChildrenAndSlotsOnly
@@ -35501,6 +35502,7 @@ function reconcileDeoptNode(
 		let defer = false;
 		let pending: DeoptOrder | null = null;
 		let desc: ElementDescriptor | null = null;
+		let owner: Block | null = ownerBlock;
 		if (
 			prev !== null &&
 			prev.nodeType === 1 &&
@@ -35517,9 +35519,14 @@ function reconcileDeoptNode(
 			} else {
 				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
 				// Hydration orders an adopted host's children at commit, after what
-				// its reconcile removes.
-				if (hydrating && activeHydration() !== null && ROOT_RENDER_TRANSACTION !== null)
+				// its reconcile removes, and stamps its record there: an attempt that
+				// never commits leaves the server node without one, so the next
+				// attempt applies its props, ref included, as the first did.
+				if (hydrating && activeHydration() !== null && ROOT_RENDER_TRANSACTION !== null) {
 					defer = true;
+					desc = deoptRecord(el, value);
+					owner = null;
+				}
 			}
 		} else {
 			// What hydration builds here, as in a `<noscript>` whose server content
@@ -35545,7 +35552,7 @@ function reconcileDeoptNode(
 					defer,
 					pending,
 				);
-		if (desc !== null || nodes !== null) queueDeoptOrder(el, ownerBlock, desc, nodes, null);
+		if (desc !== null || nodes !== null) queueDeoptOrder(el, owner, desc, nodes, null);
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -35805,7 +35812,8 @@ function reconcileDeoptChildren(
  * A committed de-opt node's change in an open root render, written by its
  * commit entry (applyDeoptOrder) after the deletions its reconcile queued: a
  * host's descriptor (`desc`: its props and DEOPT_DESC record, applied in the
- * Scope `owner`) and its children's order (`nodes`), or a Text's `text`. Null
+ * Scope `owner`, or only the record without one, for a host hydration adopted)
+ * and its children's order (`nodes`), or a Text's `text`. Null
  * fields are unchanged. A later pass of the same render queues a new record,
  * which supersedes it; a window that drops forgets its records with its entries.
  */
@@ -35885,7 +35893,11 @@ function applyDeoptOrder(order: DeoptOrder): void {
 		updateTextValue(node, order.text);
 		return;
 	}
-	if (order.desc !== null) commitInScope(order.owner!, commitDeoptHost, node, order.desc);
+	// A hydrated host applied its props in render and commits only its record.
+	if (order.desc !== null) {
+		if (order.owner === null) stampDeoptDesc(node, order.desc);
+		else commitInScope(order.owner, commitDeoptHost, node, order.desc);
+	}
 	// Foreign ranges among the children stay where they are.
 	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false);
 }
@@ -36490,6 +36502,17 @@ function runtimeHostSiteLoc(block: Block): string {
 	return '';
 }
 
+// The bodies of Blocks for one runtime host element, whose children its child
+// slots render, recorded as they first render. A teardown that names them would
+// keep the host renderers in every bundle that unmounts anything.
+let HOST_ELEMENT_BODY: unknown;
+let HOST_TAG_BODY: unknown;
+
+function isHostBlock(block: Block): boolean {
+	const body = block.body as unknown;
+	return body === HOST_ELEMENT_BODY || body === HOST_TAG_BODY;
+}
+
 // Stable render body for a HOST element produced via `createElement` (the de-opt
 // path) whose subtree contains COMPONENT descriptors — e.g. a `.tsx` component that
 // returns `<div className="n"><Node/><Node/></div>` from inside control flow (so the
@@ -36504,6 +36527,7 @@ function runtimeHostSiteLoc(block: Block): string {
 // Element identity is preserved across re-renders, and nested host-with-components
 // children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
+	HOST_ELEMENT_BODY = hostElementBody;
 	let el = block.deoptNode as Element | null;
 	let desc: ElementDescriptor | null = null;
 	const hydration = hydrating ? activeHydration() : null;
@@ -36631,6 +36655,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 // (ssrDescriptorContent's function branch) — each position's client/server
 // pair stays aligned.
 function hostStringTagBody(d: ElementDescriptor, block: Block): void {
+	HOST_TAG_BODY = hostStringTagBody;
 	const tag = d.type as string;
 	let el = block.deoptNode as Element | null;
 	const hydration = hydrating ? activeHydration() : null;
@@ -41488,7 +41513,11 @@ let initialStreamedPayloads: WeakMap<
 > | null = null;
 
 // Initialized by the hydration capability so client-only Suspense cannot make
-// the hydrator and its seed parser reachable in the shipped bundle.
+// the hydrator and its seed parser reachable in the shipped bundle. Keep this
+// indirection: calling renderInitialSuspenseHydration from tryBlock directly
+// made its hydration swaps reachable and stopped the hydration flag folding,
+// +14 kB gzip on a client-only Suspense app (2026-10), and routing those swaps
+// through the capability instead still cost +3.5 kB gzip.
 let initialSuspenseHydrationRenderer: typeof renderInitialSuspenseHydration | null = null;
 
 /**
@@ -46627,6 +46656,8 @@ function collectVisibleSubtreeRefs(
 // reconcileDeoptNode builds gets setDeoptDesc), so recurse through children —
 // EXCEPT foreign `<!--portal-->…<!--/portal-->` ranges: a portal targeting one of
 // these elements owns its content's refs (its slot detaches them on ITS teardown).
+// A host Block renders its element's children through its child slots, whose
+// Blocks and hosts hold their own refs: its walk takes only its element's.
 function detachDeoptTreeRefs(
 	node: Node,
 	out: SuspenseRefEntry[] | null,
@@ -46661,7 +46692,10 @@ function detachDeoptTreeRefs(
 			queueRefDetach(ref, node as Element);
 		}
 	}
-	let c: Node | null = getFirstChild(node);
+	let c: Node | null =
+		node === (ownerScope as Block | undefined)?.deoptNode && isHostBlock(ownerScope as Block)
+			? null
+			: getFirstChild(node);
 	while (c !== null) {
 		const rangeEnd = (c as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
