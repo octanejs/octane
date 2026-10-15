@@ -1,3 +1,5 @@
+'use strong';
+
 /**
  * Canvas-scoped hooks and graph helpers for the Octane Three renderer.
  *

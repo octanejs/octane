@@ -5,6 +5,8 @@
  * owns only renderer construction, R3F-shaped root state, the Three host
  * container, and the configuration barrier before a scene may render.
  */
+'use strong';
+
 import * as THREE from 'three';
 import {
 	defineUniversalComponent,

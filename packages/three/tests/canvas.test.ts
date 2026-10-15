@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, flushSync } from 'octane';
 import { TorusKnotGeometry } from 'three';
-import { events as createPointerEvents } from '../src/index.js';
+import { events as createPointerEvents } from '@octanejs/three';
 import { createThreeObject } from '../src/core/catalogue.js';
 import type { EventManager, Renderer, RootState } from '../src/core/index.js';
 import { mount, type MountResult } from '../../octane/tests/_helpers.js';
@@ -196,6 +196,10 @@ describe('Canvas', () => {
 		const factory = vi.fn(() => pending);
 		const objectRef = { current: null as { name: string } | null };
 		const onCreated = vi.fn<(state: RootState) => void>();
+		const readyCreated = vi.fn<(state: RootState) => void>();
+		const updatedCreated = vi.fn<(state: RootState) => void>();
+		const initialMissed = vi.fn();
+		const updatedMissed = vi.fn();
 		const raycaster = { near: 1 };
 		const props = {
 			gl: factory,
@@ -214,24 +218,43 @@ describe('Canvas', () => {
 		expect(onCreated).not.toHaveBeenCalled();
 		expect(objectRef.current).toBeNull();
 
-		mounted.update(CanvasApp, { ...props, name: 'latest-before-ready' });
+		mounted.update(CanvasApp, {
+			...props,
+			name: 'latest-before-ready',
+			onCreated: readyCreated,
+			onPointerMissed: initialMissed,
+		});
 		expect(objectRef.current).toBeNull();
 
 		settle(renderer);
 		await flushCanvasWork();
-		expect(onCreated).toHaveBeenCalledTimes(1);
+		expect(onCreated).not.toHaveBeenCalled();
+		expect(readyCreated).toHaveBeenCalledTimes(1);
 		expect(objectRef.current?.name).toBe('latest-before-ready');
 
-		const state = onCreated.mock.calls[0][0];
+		const state = readyCreated.mock.calls[0][0];
 		const sceneObject = objectRef.current;
 		state.raycaster.near = 42;
 
-		mounted.update(CanvasApp, { ...props, name: 'latest-after-ready' });
+		const missedEvent = new MouseEvent('click');
+		state.onPointerMissed?.(missedEvent);
+		expect(initialMissed).toHaveBeenCalledWith(missedEvent);
+		mounted.update(CanvasApp, {
+			...props,
+			name: 'latest-after-ready',
+			onCreated: updatedCreated,
+			onPointerMissed: updatedMissed,
+		});
 		expect(objectRef.current).toBe(sceneObject);
 		expect(objectRef.current?.name).toBe('latest-after-ready');
 
 		await flushCanvasWork();
 		expect(state.raycaster.near).toBe(42);
+		expect(updatedCreated).not.toHaveBeenCalled();
+		initialMissed.mockClear();
+		state.get().onPointerMissed?.(missedEvent);
+		expect(initialMissed).not.toHaveBeenCalled();
+		expect(updatedMissed).toHaveBeenCalledWith(missedEvent);
 	});
 
 	it('activates an empty Canvas and calls onCreated with an empty scene', async () => {
@@ -381,6 +404,7 @@ describe('Canvas', () => {
 		await flushCanvasWork();
 		expect(state.get().events.compute).toBe(userCompute);
 
+		const connect = vi.spyOn(state.get().events, 'connect');
 		mounted.update(CanvasApp, {
 			...props,
 			eventSource: sourceRef,
@@ -388,6 +412,7 @@ describe('Canvas', () => {
 		});
 		await flushCanvasWork();
 		expect(state.get().events.connected).toBe(nextSource);
+		expect(connect.mock.calls).toEqual([[nextSource]]);
 
 		const wrapper = mounted.find('.canvas-shell') as HTMLDivElement;
 		sourceRef.current = finalSource;
