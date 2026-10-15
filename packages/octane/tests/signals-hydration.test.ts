@@ -190,16 +190,26 @@ describe('native signal server output and adoption', () => {
 		expect(container.textContent).toBe('ready');
 	});
 
-	it('rejects a completed nonready snapshot instead of inventing a ready seed', () => {
+	it('renders a pending snapshot without inventing a ready seed, and the client resolves it', async () => {
 		const model = state$('native-hydration-pending-snapshot');
-		const load = query(
-			'native-hydration-pending-snapshot-query',
-			() => new Promise<string>(() => {}),
-		);
+		const pending = deferred<string>();
+		const load = query('native-hydration-pending-snapshot-query', () => pending.promise);
 		const resource$ = createResource(model.scope, 'resource', () => load(undefined));
-		expect(() => renderToString(server.SnapshotHydration, { resource$ })).toThrow(
-			'no serializable ready value',
-		);
+		const html = renderToString(server.SnapshotHydration, { resource$ }).html;
+		// The pending state renders as it is, and the hydration snapshot carries
+		// nothing for it, ready or otherwise.
+		expect(html).toContain('<output>pending</output>');
+		expect(html).not.toContain('data-octane-native-signals');
+		container.innerHTML = html;
+		const output = container.querySelector('output')!;
+		await act(() => {
+			root = hydrateRoot(container, client.SnapshotHydration, { resource$ });
+		});
+		expect(container.querySelector('output')).toBe(output);
+		expect(output.textContent).toBe('pending');
+		await act(() => pending.resolve('ready'));
+		expect(container.querySelector('output')).toBe(output);
+		expect(output.textContent).toBe('ready');
 	});
 
 	it('freshly mounts a pending native arm without replacing its adopted sibling', async () => {
