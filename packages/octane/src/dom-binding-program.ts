@@ -1384,7 +1384,7 @@ function insertBody(
 	transaction: Transaction,
 ): void {
 	if (armRange) {
-		instance.range.start.data = '[';
+		writeMarker(instance.range.start, '[');
 		moveRange(instance.range, range.end.parentNode!, range.end, transaction);
 	} else {
 		let node = instance.range.start.nextSibling;
@@ -1484,9 +1484,14 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 			);
 	}
 	if (definition.kind === 'if')
-		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};${plan.arm}`;
+		writeMarker(region.range.start, `${BINDING_OPEN_PREFIX}${id};${region.site};${plan.arm}`);
 	else if (definition.kind === 'try')
-		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};y${plan.arm}`;
+		writeMarker(region.range.start, `${BINDING_OPEN_PREFIX}${id};${region.site};y${plan.arm}`);
+}
+
+/** A marker that already names its arm, as adopted server markup does, takes no write. */
+function writeMarker(marker: Comment, data: string): void {
+	if (marker.data !== data) marker.data = data;
 }
 
 function writeText(region: RegionInstance, value: string): void {
@@ -2259,13 +2264,13 @@ function commitList(plan: RegionPlan, id: string, transaction: Transaction): voi
 		}
 		let anchor: Node = region.range.end;
 		for (const [key, item] of [...plan.items].reverse()) {
-			item.instance.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};k;${key}`;
+			writeMarker(item.instance.range.start, `${BINDING_OPEN_PREFIX}${id};${region.site};k;${key}`);
 			moveRange(item.instance.range, region.range.end.parentNode!, anchor, transaction);
 			if (transaction.disposed) return;
 			anchor = item.instance.range.start;
 		}
 	}
-	region.range.start.data = `${HYDRATION_FOR_PREFIX}${plan.arm};b;${id};${region.site}`;
+	writeMarker(region.range.start, `${HYDRATION_FOR_PREFIX}${plan.arm};b;${id};${region.site}`);
 	return;
 }
 

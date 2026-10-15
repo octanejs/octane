@@ -4298,13 +4298,20 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	TRANSITION_JOURNAL_DEPTH = frame.depth;
 	OPS_CHECKPOINT = frame.opsCheckpoint;
 	WIP_CAPTURE = frame.capture;
-	if (renderSlice && frame.previous === null) closeRenderSlice(renderSlice);
+	if (renderSlice && frame.previous === null) {
+		renderSlice.open = false;
+		// The drains the slice deferred land after the commit that follows it
+		// (commitRootRenders), or now, when no render is waiting to commit.
+		if (ROOT_RENDER_TRANSACTIONS.length === 0) landRenderSliceWrites(renderSlice);
+	}
 }
 
-/** Run the early binding drains a closing render slice deferred (render-slice.ts). */
-function closeRenderSlice(slice: RenderSlice): void {
-	slice.open = false;
-	if (slice.drains.length === 0) return;
+/**
+ * Run the early binding drains a closed render slice deferred (render-slice.ts),
+ * once no render frame is open: after the commit, still before any paint.
+ */
+function landRenderSliceWrites(slice: RenderSlice): void {
+	if (slice.open || slice.drains.length === 0) return;
 	for (const drain of slice.drains.splice(0)) {
 		try {
 			drain();
@@ -5298,7 +5305,10 @@ function releaseRootLeases(owner: RootRenderOwner, root: Block | null): void {
  * root ends that commit, as its remaining entries name dead DOM.
  */
 function commitRootRenders(): void {
-	if (HOLDING_ROOT_COMMITS) return;
+	if (HOLDING_ROOT_COMMITS) {
+		if (renderSlice) landRenderSliceWrites(renderSlice);
+		return;
+	}
 	// Finished transitions' signals promote before this commit accepts the
 	// renders that read them; committed readers hear of it once it ends.
 	const promoting = PENDING_SIGNAL_PROMOTIONS !== null;
@@ -5440,6 +5450,7 @@ function commitRootRenders(): void {
 	} finally {
 		if (promoting) endNativeBatch(signals);
 	}
+	if (renderSlice) landRenderSliceWrites(renderSlice);
 }
 
 function suspendRootRender(block: Block, wakeable: PromiseLike<unknown>): boolean {
@@ -8805,6 +8816,7 @@ function drainQueue(): { err: any } | null {
 		// The held commit re-scans these once it lands (commitHeldRootRenders).
 		if (activitiesToRehide !== null)
 			for (const activity of activitiesToRehide) (HELD_REHIDES ??= new Set()).add(activity);
+		if (renderSlice) landRenderSliceWrites(renderSlice);
 	} else {
 		commitRootRenders();
 		// Several sibling setters can share one hidden range. Re-scan it once after
