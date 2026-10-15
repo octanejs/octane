@@ -317,14 +317,14 @@ test('the split layout keeps the load rule and its order links', (t) => {
 	}
 	const facade = path.join(root, 'runtime.ts');
 	const extras = path.join(root, 'runtime/extras.ts');
-	assert.deepEqual(checkSplit(facade, []).violations, []);
+	assert.deepEqual(checkSplit(facade, [], new Set()).violations, []);
 	const clean = fs.readFileSync(extras, 'utf8');
 	// A module-scope initializer that reads another module's binding.
 	fs.writeFileSync(
 		extras,
 		`${clean}\nimport { SENTINEL } from './core.js';\nexport const COPY = SENTINEL.label;\n`,
 	);
-	assert.deepEqual(checkSplit(facade, []).violations, [
+	assert.deepEqual(checkSplit(facade, [], new Set()).violations, [
 		'load: COPY (extras) reads SENTINEL (core) at load',
 	]);
 	// Without extras' order link, the chain runtime.ts names ends at extras and
@@ -333,9 +333,42 @@ test('the split layout keeps the load rule and its order links', (t) => {
 	assert.notEqual(unlinked, clean);
 	fs.writeFileSync(extras, unlinked);
 	assert.match(
-		checkSplit(facade, []).violations.join('\n'),
+		checkSplit(facade, [], new Set()).violations.join('\n'),
 		/^link: core is not on the evaluation chain/,
 	);
+});
+
+test('the split layout reports a driver moved below a reader that folds it', (t) => {
+	const m = model();
+	const map = mapOf({
+		core: ['DRIVER', 'COUNT', 'LABEL', 'core', 'install', 'feature', 'SENTINEL', 'createSentinel'],
+		types: ['Exported', 'Local'],
+		extras: ['typed', 'lazy'],
+	});
+	const { moduleOf } = place(m, map);
+	const { chain } = validate(m, map, moduleOf);
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'split-runtime-order-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	for (const [file, text] of emit(m, map, moduleOf, chain)) {
+		const out = path.join(root, path.relative(path.dirname(FILE), file));
+		fs.mkdirSync(path.dirname(out), { recursive: true });
+		fs.writeFileSync(out, text);
+	}
+	const facade = path.join(root, 'runtime.ts');
+	const core = path.join(root, 'runtime/core.ts');
+	assert.deepEqual(checkSplit(facade, [], new Set()).violations, []);
+	// Relocate the driver's `let` below core(), which reads and folds it.
+	const text = fs.readFileSync(core, 'utf8');
+	const declaration = text.match(/^let DRIVER[^\n]*\n/m)[0];
+	fs.writeFileSync(core, `${text.replace(declaration, '')}\n${declaration}`);
+	assert.deepEqual(checkSplit(facade, [], new Set()).violations, [
+		'order: core (core) reads DRIVER (core), which evaluates after it (fold)',
+	]);
+	// A baseline entry for a read now in order is stale.
+	fs.writeFileSync(core, text);
+	assert.deepEqual(checkSplit(facade, [], new Set(['core > DRIVER'])).violations, [
+		'order: core > DRIVER is in order now; remove it from ORDER_BASELINE',
+	]);
 });
 
 test('the committed runtime modules keep the split layout rules', () => {

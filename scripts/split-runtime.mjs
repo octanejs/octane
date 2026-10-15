@@ -544,6 +544,35 @@ export const ROOT_ENTRIES = [
 ];
 // Modules that load only where profile-guarded code imports them.
 const OFF_CHAIN = ['profile-probes'];
+// Reads that already came before their binding in the single-file runtime, so
+// they never folded or inlined. A new pair evaluating out of order fails the
+// split check; an entry that is in order again must be removed.
+const ORDER_BASELINE = new Set([
+	'act > DEFERRED_SWAPS',
+	'bindRendererRegionOwner > HYDRATION_PASS',
+	'createdInRootRender > CURSOR',
+	'createdInRootRender > PRESENTATION_HYDRATION',
+	'ensureViewTransitionDriver > CURSOR',
+	'finishCaptureDispatch > pendingRestores',
+	'inRootHydrationAttempt > PRESENTATION_HYDRATION',
+	'logHydrationMismatch > HYDRATION_PASS',
+	'nativePresentationBinding > SLOT_FLAG_TEARDOWN',
+	'preparePresentationSignalValue > HTML_NS',
+	'presentationWrite > DANGER_HTML_ACTIVE',
+	'queueRefAttach > activityRefCreated',
+	'renderBlock > CURSOR',
+	'seedOrCreate > HYDRATION_PASS',
+	'setHostProps > DESCRIPTOR_FORM_ACTION',
+	'teardownTrySlot > initialSuspenseHydrations',
+	'unmountSlot > UNMOUNT_LITE_ARM',
+	'useBatch > HYDRATION_PASS',
+	'useSyncExternalStore > CURSOR',
+	'useThenable > HYDRATION_PASS',
+	'vtHostVisible > hiddenDisplayNodes',
+	'vtWouldWrap > CURSOR',
+	'writeDirectSignalAttribute > HTML_NS',
+	'writeScalarNativeStyle > SLOT_FLAG_TEARDOWN',
+]);
 
 export function readMap(file = MAP) {
 	return { rootEntries: ROOT_ENTRIES, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
@@ -664,9 +693,11 @@ function reachIndex(model) {
  * Pairs whose order the chain must keep. `fold`: a `let` above a later read,
  * unless keeping the reader keeps a writer, so the binding is written in every
  * bundle with the read and never folds. `inline`: a primitive `const` above a
- * later read, unless Rolldown inlines it anywhere.
+ * later read, unless Rolldown inlines it anywhere. With `anyOrder`, a read
+ * counts wherever the text puts it, so a split whose chain moved a binding
+ * below its reader still yields the pair.
  */
-export function orderConstraints(model, map) {
+export function orderConstraints(model, map, { anyOrder = false } = {}) {
 	const writers = writerIndex(model);
 	const reach = reachIndex(model);
 	// What every rendering bundle keeps: the intersection of what each root
@@ -684,7 +715,7 @@ export function orderConstraints(model, map) {
 		for (const [name, r] of reader.refs) {
 			if (!r.read) continue;
 			const binding = model.unitByName.get(name);
-			if (binding.order > reader.order) continue;
+			if (binding === reader || (!anyOrder && binding.order > reader.order)) continue;
 			if (isMutable(binding)) {
 				const kept = reach(reader);
 				const written = (writers.get(binding.id) ?? []).some(
@@ -806,7 +837,8 @@ export function validate(model, map, moduleOf) {
  * (a driver or uninlined constant above the reads that fold or inline it)
  * satisfied by that chain.
  */
-export function checkSplit(src = RUNTIME, rootEntries = ROOT_ENTRIES) {
+export function checkSplit(src = RUNTIME, rootEntries = ROOT_ENTRIES, baseline = ORDER_BASELINE) {
+	const inverted = new Set();
 	const { text, modules, chain } = joinClientRuntime(src);
 	const model = analyze(src, text);
 	const moduleAt = (pos) => modules.find((m) => pos >= m.start && pos < m.end)?.name;
@@ -825,14 +857,22 @@ export function checkSplit(src = RUNTIME, rootEntries = ROOT_ENTRIES) {
 			offChain.add(m);
 		}
 	}
-	for (const c of orderConstraints(model, { rootEntries })) {
+	for (const c of orderConstraints(model, { rootEntries }, { anyOrder: true })) {
 		const [a, b] = [moduleOf.get(c.before.id), moduleOf.get(c.after.id)];
-		if (a === b || !position.has(a) || !position.has(b)) continue;
-		if (position.get(a) > position.get(b))
+		if (!position.has(a) || !position.has(b)) continue;
+		// The joined text holds the chain's modules in order, so a unit's order in
+		// it is its evaluation order.
+		const key = `${c.after.id} > ${c.name}`;
+		if (c.before.order < c.after.order) continue;
+		if (baseline.has(key)) inverted.add(key);
+		else
 			violations.push(
 				`order: ${c.after.id} (${b}) reads ${c.name} (${a}), which evaluates after it (${c.rule})`,
 			);
 	}
+	for (const key of baseline)
+		if (!inverted.has(key))
+			violations.push(`order: ${key} is in order now; remove it from ORDER_BASELINE`);
 	return { model, violations, chain };
 }
 
