@@ -11,6 +11,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { gzipSync } from 'node:zlib';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 const SOURCE_REPO = path.resolve(process.argv[2] ?? process.env.PASSIVE_SOURCE_ROOT ?? REPO);
@@ -51,7 +52,7 @@ async function bundleRuntime(observed) {
 						name: 'observe-passive-schedules',
 						setup(plugin) {
 							plugin.onLoad({ filter: /\/runtime\.ts$/ }, ({ path: sourceFile }) => ({
-								contents: observeSchedules(fs.readFileSync(sourceFile, 'utf8')),
+								contents: observeSchedules(readClientRuntime(sourceFile)),
 								loader: 'ts',
 							}));
 						},
@@ -180,7 +181,7 @@ try {
 					cycles: CYCLES,
 					source: SOURCE_REPO,
 					runtimeSha256: createHash('sha256')
-						.update(fs.readFileSync(path.join(SOURCE, 'runtime.ts')))
+						.update(readClientRuntime(path.join(SOURCE, 'runtime.ts')))
 						.digest('hex'),
 					bundleSha256: createHash('sha256').update(cleanBytes).digest('hex'),
 					bytes: cleanBytes.length,

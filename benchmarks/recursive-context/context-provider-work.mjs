@@ -1,18 +1,13 @@
 // Audit the retained provider lookup against a get-first proposal. Untimed.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import path from 'node:path';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 const file = 'packages/octane/src/runtime.ts';
 const baselineRef = process.argv[2] ?? '6284156ce';
-const source = execFileSync('git', ['show', `${baselineRef}:${file}`], {
-	cwd: repo,
-	encoding: 'utf8',
-	maxBuffer: 8 * 1024 * 1024,
-});
+const source = readClientRuntime(path.join(repo, file), baselineRef);
 function helpers(source) {
 	const start = source.indexOf('function cacheContextOwner(');
 	const end = source.indexOf('/** @internal Live context reader', start);
@@ -88,7 +83,7 @@ const results = {};
 for (const [name, code] of [
 	['baseline', original],
 	['getFirstProposal', getFirst],
-	['candidate', helpers(readFileSync(path.join(repo, file), 'utf8'))],
+	['candidate', helpers(readClientRuntime(path.join(repo, file)))],
 ]) {
 	const read = instantiate(code);
 	results[name] = Object.fromEntries(

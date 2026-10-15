@@ -3,11 +3,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import ts from 'typescript';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const fixture = new URL('./octane-tsrx/', import.meta.url);
 const sha256 = (source) => createHash('sha256').update(source).digest('hex');
@@ -170,9 +171,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 			suite: 'warm-adoption',
 			node: process.version,
 			browser: browser.version(),
-			runtimeHash: sha256(
-				readFileSync(new URL('../../packages/octane/src/runtime.ts', import.meta.url)),
-			),
+			runtimeHash: sha256(readClientRuntime()),
 			results,
 		};
 		console.log(JSON.stringify(payload, null, 2));

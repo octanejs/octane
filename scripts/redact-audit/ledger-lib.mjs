@@ -301,6 +301,25 @@ function hasExecutableTest(contents, file, testName, repoRoot) {
 	);
 }
 
+// A reference to the client runtime's runtime.ts names its concept modules too,
+// where scripts/split-runtime.mjs moves its declarations.
+function referenceContents(absolute) {
+	const contents = readFileSync(absolute, 'utf8');
+	const modules = path.join(path.dirname(absolute), 'runtime');
+	if (
+		!absolute.endsWith(`${path.sep}octane${path.sep}src${path.sep}runtime.ts`) ||
+		!existsSync(modules)
+	)
+		return contents;
+	return [
+		contents,
+		...readdirSync(modules)
+			.filter((name) => name.endsWith('.ts'))
+			.sort()
+			.map((name) => readFileSync(path.join(modules, name), 'utf8')),
+	].join('\n');
+}
+
 function validateOctaneReference(referenceValue, label, errors, repoRoot) {
 	const reference = expectRecord(referenceValue, label, errors);
 	if (!reference) return;
@@ -316,7 +335,7 @@ function validateOctaneReference(referenceValue, label, errors, repoRoot) {
 
 	const absolute = resolveRepositoryFile(repoRoot, reference.file, `${label}.file`, errors);
 	if (!absolute) return;
-	const contents = readFileSync(absolute, 'utf8');
+	const contents = referenceContents(absolute);
 	if (reference.symbol && !contents.includes(reference.symbol))
 		errors.push(`${label}.symbol was not found in ${reference.file}: ${reference.symbol}.`);
 	if (

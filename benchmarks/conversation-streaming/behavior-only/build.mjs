@@ -15,7 +15,7 @@ const REPO = path.resolve(HERE, '../../..');
 const require = createRequire(path.join(REPO, 'packages/octane/package.json'));
 const hash = (contents) => createHash('sha256').update(contents).digest('hex');
 const forbidden =
-	/\/packages\/octane\/src\/(?:runtime(?:\.server)?\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/;
+	/\/packages\/octane\/src\/(?:runtime(?:\.server)?\.[jt]s$|runtime\/[^/]+\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/;
 function sizes(bytes) {
 	return {
 		raw: bytes.length,

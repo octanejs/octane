@@ -2,10 +2,10 @@
 // The counted Array subclass observes native sort calls; callback order is
 // checked independently of the measurement.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import path from 'node:path';
+import { readClientRuntime, runtimeDeclarations } from '../lib/client-runtime.mjs';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 
 process.chdir(path.resolve(import.meta.dirname, '../..'));
@@ -17,15 +17,14 @@ function instantiate(source) {
 	const refName = source.includes('function drainQueuedRefAttaches():')
 		? 'drainQueuedRefAttaches'
 		: 'drainRefAttaches';
-	const refStart = source.indexOf(`function ${refName}():`);
-	const refEnd = source.indexOf('// Callback replacement', refStart);
-	const comparisonStart = source.indexOf('function blockIsAncestorOf(');
-	const comparisonEnd = source.indexOf('function finishEffectCommit()', comparisonStart);
-	assert.ok(
-		refStart >= 0 && refEnd > refStart && comparisonStart >= 0 && comparisonEnd > comparisonStart,
-	);
 	const code = stripTypeScriptTypes(
-		source.slice(comparisonStart, comparisonEnd) + '\n' + source.slice(refStart, refEnd),
+		runtimeDeclarations(source, [
+			'blockIsAncestorOf',
+			'comparePostOrder',
+			'compareEffectPostOrder',
+			'compareRefPostOrder',
+			refName,
+		]),
 	);
 	return Function(`"use strict";
 		const counts = { sorts: 0 };
@@ -109,15 +108,8 @@ function observe(source, shape) {
 	return { entries: queued.length, sorts: runtime.counts.sorts };
 }
 
-const sources = [['candidate', readFileSync(file, 'utf8')]];
-if (baselineRef)
-	sources.unshift([
-		'baseline',
-		execFileSync('git', ['show', `${baselineRef}:${file}`], {
-			encoding: 'utf8',
-			maxBuffer: 8 * 1024 * 1024,
-		}),
-	]);
+const sources = [['candidate', readClientRuntime(path.resolve(file))]];
+if (baselineRef) sources.unshift(['baseline', readClientRuntime(path.resolve(file), baselineRef)]);
 const targets = [];
 for (const [label, source] of sources) {
 	for (const shape of [

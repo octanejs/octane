@@ -8,8 +8,17 @@ import { COMPOSED_SLOT_HELPER, WORK_METRICS } from './work-metrics.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ts = createRequire(path.join(ROOT, 'packages/octane/package.json'))('typescript');
-const RUNTIME_SOURCES = ['runtime.ts', 'hook-slot-cache.ts'].map((file) => {
-	const filename = path.join(ROOT, 'packages/octane/src', file);
+// The client runtime is runtime.ts and, once split, its concept modules.
+const SOURCE = path.join(ROOT, 'packages/octane/src');
+const RUNTIME_MODULES = fs.existsSync(path.join(SOURCE, 'runtime'))
+	? fs
+			.readdirSync(path.join(SOURCE, 'runtime'))
+			.filter((file) => file.endsWith('.ts'))
+			.sort()
+			.map((file) => `runtime/${file}`)
+	: [];
+const RUNTIME_SOURCES = ['runtime.ts', ...RUNTIME_MODULES, 'hook-slot-cache.ts'].map((file) => {
+	const filename = path.join(SOURCE, file);
 	return ts.createSourceFile(
 		filename,
 		fs.readFileSync(filename, 'utf8'),

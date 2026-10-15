@@ -1,6 +1,6 @@
 # Scheduling: microtasks, tasks, and megatasks
 
-Cite symbols, not line numbers: `runtime.ts` moves daily. Issue
+Cite symbols, not line numbers: the runtime moves daily. Issue
 [#1864](https://github.com/octanejs/octane/issues/1864) owns changes to the
 scheduling contract; read its latest decisions before touching any of this.
 

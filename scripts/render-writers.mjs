@@ -1,5 +1,6 @@
 /**
- * Every function in packages/octane/src/runtime.ts that writes native DOM, and
+ * Every function in the client runtime (packages/octane/src/runtime.ts and
+ * runtime/*.ts) that writes native DOM, and
  * why that write is not a render writing committed DOM (#2043). A root render
  * computes; its commit writes. scripts/check-render-writes.mjs fails on a DOM
  * write in any function missing here, and on an entry that no longer writes.

@@ -9,11 +9,12 @@ import { build } from 'esbuild';
 import ts from 'typescript';
 import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 const repo = path.resolve(import.meta.dirname, '../..');
 process.env.NODE_ENV = 'production';
 const runtimePath = path.join(repo, 'packages/octane/src/runtime.ts');
 const runtimeFile = path.resolve(process.argv[2] ?? runtimePath);
-const source = fs.readFileSync(runtimeFile, 'utf8');
+const source = readClientRuntime(runtimeFile);
 const ast = ts.createSourceFile(runtimePath, source, ts.ScriptTarget.Latest, true);
 const fn = ast.statements.find(
 	(n) => ts.isFunctionDeclaration(n) && n.name?.text === 'setDeoptDesc',

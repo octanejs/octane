@@ -14,6 +14,7 @@
  * test for a frontier first (GUARD); UNGUARDED_FRESH lists the writers still
  * to fix.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importNativeTypeScript } from './octane-tsc/native.mjs';
@@ -25,6 +26,18 @@ const { API, ModuleKind, ModuleResolutionKind, TypeFlags } =
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const runtimeFile = path.join(ROOT, 'packages/octane/src/runtime.ts');
+// The client runtime is runtime.ts and, once split, its concept modules.
+const runtimeDir = path.join(ROOT, 'packages/octane/src/runtime');
+export function runtimeFiles() {
+	const modules = fs.existsSync(runtimeDir)
+		? fs
+				.readdirSync(runtimeDir)
+				.filter((name) => name.endsWith('.ts'))
+				.sort()
+				.map((name) => path.join(runtimeDir, name))
+		: [];
+	return [runtimeFile, ...modules];
+}
 
 // Native methods that change a node, its attributes, its text, its style or
 // its class list. Everything else a native receiver offers is a read.
@@ -85,6 +98,7 @@ export function inspectRenderWrites(
 	writers = WRITERS,
 	unguarded = UNGUARDED_FRESH,
 ) {
+	const files = text === undefined ? runtimeFiles() : [file];
 	// TypeScript 7 runs in its own process: `text` reaches it through the API's
 	// file system callbacks.
 	const api = new API({
@@ -99,7 +113,7 @@ export function inspectRenderWrites(
 	});
 	try {
 		return inspectProgram(
-			api.createProgram([file], {
+			api.createProgram(files, {
 				target: ScriptTarget.ESNext,
 				module: ModuleKind.ESNext,
 				moduleResolution: ModuleResolutionKind.Bundler,
@@ -108,7 +122,7 @@ export function inspectRenderWrites(
 				// Every visible @types package, as TypeScript 5.9 included by default.
 				types: ['*'],
 			}),
-			file,
+			files,
 			writers,
 			unguarded,
 		);
@@ -117,10 +131,8 @@ export function inspectRenderWrites(
 	}
 }
 
-function inspectProgram(program, file, writers, unguarded) {
+function inspectProgram(program, files, writers, unguarded) {
 	const { checker } = program.getProject();
-	const source = program.getSourceFile(file);
-	if (!source) throw new Error(`Cannot read ${file}`);
 	const writes = [];
 	// Declarations are handles that name their file without resolving the node.
 	const fromDOM = (symbol) =>
@@ -222,6 +234,7 @@ function inspectProgram(program, file, writers, unguarded) {
 				if (kind === 'write' || (kind === 'call' && MUTATORS.has(key))) {
 					const position = source.getLineAndCharacterOfPosition(node.getStart(source));
 					writes.push({
+						file: source.fileName,
 						line: position.line + 1,
 						column: position.character + 1,
 						owner: owner(node),
@@ -235,7 +248,12 @@ function inspectProgram(program, file, writers, unguarded) {
 		}
 		node.forEachChild(visit);
 	}
-	visit(source);
+	let source;
+	for (const file of files) {
+		source = program.getSourceFile(file);
+		if (!source) throw new Error(`Cannot read ${file}`);
+		visit(source);
+	}
 	const reaching = writes.filter(
 		(write) =>
 			writers.get(write.owner) === 'fresh' && write.receiver === 'derived' && !write.guarded,
@@ -266,7 +284,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	} else {
 		for (const finding of failures)
 			console.error(
-				`${path.relative(ROOT, runtimeFile)}:${finding.line}:${finding.column} ${finding.owner}: ${finding.unguarded ? 'fresh writer reaches runtime structure without a frontier test:' : 'unclassified'} DOM ${finding.operation} (${finding.expression})`,
+				`${path.relative(ROOT, finding.file)}:${finding.line}:${finding.column} ${finding.owner}: ${finding.unguarded ? 'fresh writer reaches runtime structure without a frontier test:' : 'unclassified'} DOM ${finding.operation} (${finding.expression})`,
 			);
 		for (const name of stale)
 			console.error(
@@ -275,7 +293,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 		if (failures.length !== 0 || stale.length !== 0) process.exitCode = 1;
 		else
 			console.log(
-				`Every native DOM write in runtime.ts is in a classified writer (${WRITERS.size}).`,
+				`Every native DOM write in the client runtime is in a classified writer (${WRITERS.size}).`,
 			);
 	}
 }
