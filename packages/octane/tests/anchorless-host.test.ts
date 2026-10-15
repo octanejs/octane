@@ -138,6 +138,37 @@ describe('anchorless lone pure-host value', () => {
 		}
 	});
 
+	it('stops later compiled rows when a new custom host replaces the root during commit', () => {
+		const connected: (string | null)[] = [];
+		let replace: (() => void) | undefined;
+		const tag = 'compiled-row-replacing-editor';
+		customElements.define(
+			tag,
+			class extends HTMLElement {
+				static observedAttributes = ['data-label'];
+				attributeChangedCallback(_name: string, _old: string | null, value: string) {
+					if (value === 'second') replace?.();
+				}
+				connectedCallback() {
+					connected.push(this.getAttribute('data-label'));
+				}
+			},
+		);
+		function Replacement() {
+			return createElement('p', { id: 'replacement' }, 'Replacement');
+		}
+		const r = mount(EditorRows, { tag, labels: ['first'] });
+		try {
+			replace = () => r.update(Replacement, { tag, labels: [] });
+			r.update(EditorRows, { tag, labels: ['first', 'second', 'third'] });
+			expect(connected).toEqual(['first']);
+			expect(r.container.textContent).toBe('Replacement');
+			expect(r.container.querySelectorAll(tag)).toHaveLength(0);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('attaches the ref on mount and detaches it when the value flips away', () => {
 		const ref: { current: Element | null } = { current: null };
 		const r = mount(Pass, { children: createElement('div', { ref }) });

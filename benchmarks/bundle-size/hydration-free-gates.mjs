@@ -24,7 +24,8 @@ import assert from 'node:assert/strict';
 // never-written module flag (Rolldown with Vite's default minifier) can drop it;
 // esbuild never folds that flag, so esbuild bundles are checked for every other
 // entry: the hydration bodies, which must live where client code cannot reach
-// them (HydrationCapability methods, or an installed driver).
+// them (HydrationCapability methods, the functions only its methods and the
+// passes it runs call, or an installed driver).
 //
 // Each entry is hydration-only by construction, not by its name alone:
 // drainHydrationRenderPhaseUpdates (the first mount drains render-phase
@@ -37,6 +38,27 @@ export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	// The root-local hydration capability. Only hydration entry points construct
 	// it; it is the dispatch boundary for adoption code.
 	{ name: 'HydrationCapability', source: 'runtime.ts' },
+	{ name: 'passSeeds', source: 'runtime.ts' },
+	{ name: 'discardSeeds', source: 'runtime.ts' },
+	{ name: 'holdDiagnostics', source: 'runtime.ts' },
+	{ name: 'releaseDiagnostics', source: 'runtime.ts' },
+	{ name: 'cursorIn', source: 'runtime.ts' },
+	{ name: 'rendersAgain', source: 'runtime.ts' },
+	{ name: 'fragmentRoots', source: 'runtime.ts' },
+	{ name: 'adoptOrDefer', source: 'runtime.ts' },
+	{ name: 'defer', source: 'runtime.ts' },
+	{ name: 'claimDeferred', source: 'runtime.ts' },
+	{ name: 'takeDeferred', source: 'runtime.ts' },
+	{ name: 'hydrationFailure', source: 'runtime.ts' },
+	{ name: 'thrownWhileAdopting', source: 'runtime.ts' },
+	{ name: 'adopt', source: 'runtime.ts' },
+	{ name: 'skipForeign', source: 'runtime.ts' },
+	{ name: 'claimRoots', source: 'runtime.ts' },
+	{ name: 'unclaimedText', source: 'runtime.ts' },
+	{ name: 'framedContent', source: 'runtime.ts' },
+	{ name: 'renderBeforeMismatch', source: 'runtime.ts' },
+	{ name: 'adoptText', source: 'runtime.ts' },
+	{ name: 'settleTexts', source: 'runtime.ts' },
 	// The current hydration pass and its adopting cursor. Only hydration entry
 	// points and the pass assign them, so a client-only bundle can only read
 	// them as null.
