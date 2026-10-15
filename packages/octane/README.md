@@ -29,7 +29,9 @@ Applications that use only the Octane runtime do not need this peer.
 [Signals](https://octanejs.dev/docs/signals) are stable. Import `createScope` and
 `query` from `octane/signals`, or `useSignal$` from `octane/signals/client`, for
 scoped state, derived values, async resources, and native component reads.
-The standard compiler handles signals automatically; no extra option is needed.
+Each module that consumes native signal reads needs its own runtime import from
+`octane/signals`, `octane/signals/client`, or `octane/signals/server`. No extra
+compiler option is needed.
 
 ## Dynamically selected compiled views
 
