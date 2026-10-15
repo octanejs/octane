@@ -26046,16 +26046,20 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			break;
 		case 8:
 			if ((name === 'multiple' || name === 'selected') && !isHtmlCustomElement(el)) {
-				if (name === 'selected') {
-					const hydration = hydrating ? CURSOR : null;
-					// Adopt the user's pre-hydration selection. An armed select
-					// value still reasserts through its controlled commit queue.
-					if (hydration !== null) return;
-				}
+				const next = value && typeof value !== 'function' && typeof value !== 'symbol';
+				// Hydration adopts the user's pre-hydration selection, and an adopted
+				// select keeps its server `multiple` like any server attribute. An
+				// armed select value still reasserts through its controlled commit queue.
+				if (
+					hydrating &&
+					CURSOR !== null &&
+					(name === 'selected' || CURSOR.keepsAttribute(el, name, next ? '' : null))
+				)
+					return;
 				// mustUseProperty like `muted`. `multiple` reflects back to the
 				// attribute; `selected` is live option state (the controlled
 				// <select> projection owns it when a select value is armed).
-				(el as any)[name] = value && typeof value !== 'function' && typeof value !== 'symbol';
+				(el as any)[name] = next;
 				return;
 			}
 			break;

@@ -23,6 +23,8 @@ const HINT_WRITERS = new Set(
 const SOURCE = '/packages/octane/src/';
 const GUARD = '_render-write-guard';
 const TESTS = '/packages/octane/tests/';
+/** The DOM implementation's own frames, such as jsdom's Proxy around a `<select>`. */
+const DOM_INTERNALS = /\/node_modules\/|^node:|^<anonymous>$/;
 
 let violations: string[] = [];
 let checking = false;
@@ -45,7 +47,7 @@ function frames(): Frame[] {
 		const match = /^\s*at (?:(.*?) \()?(.*?)(?::\d+){0,2}\)?$/.exec(line);
 		if (match === null) continue;
 		const file = match[2];
-		if (file.includes(GUARD)) continue;
+		if (file.includes(GUARD) || DOM_INTERNALS.test(file)) continue;
 		// `BlockImpl.hostElementBody [as body]` names `hostElementBody`.
 		const fn = (match[1] ?? '').replace(/ \[as [^\]]+\]$/, '').replace(/^.*\./, '');
 		out.push({ fn, file });
