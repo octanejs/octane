@@ -5,6 +5,8 @@
  * built on Octane's universal hooks so it is safe inside `*.three.tsrx`
  * components. Zustand remains the framework-neutral storage primitive.
  */
+'use strong';
+
 import * as THREE from 'three';
 import { useContext, useRef, useSyncExternalStore, withSlot } from 'octane/universal';
 import { createContext } from 'octane/universal/native';
