@@ -29,7 +29,13 @@ import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { selectMinimalScenarios } from './minimal-gates.mjs';
-import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
+import {
+	exportedNames,
+	isRuntimeModule,
+	renderedRuntimeExports,
+	resolveDeclarationRanges,
+	retainedDeclarations,
+} from './hydration-free-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -188,6 +194,12 @@ const productionDefines = {
 	'process.env.NODE_ENV': JSON.stringify('production'),
 };
 const compiler = createOctaneCompiler({ root: directory });
+// runtime.ts's exports: the names scenarios assert a build renders or drops.
+const runtimeSurface = exportedNames(
+	parseAst(fs.readFileSync(path.join(repository, 'packages/octane/src/runtime.ts'), 'utf8'), {
+		lang: 'ts',
+	}),
+);
 const stat = (value) => ({ median: value, min: value, samples: 1 });
 const forbidden = [
 	['React', /\/node_modules\/react(?:-dom)?\//],
@@ -298,8 +310,11 @@ const childSlotDeclarations = [
 		Object.values(childSlotControls).flatMap(({ dropped, kept }) => [...dropped, ...kept]),
 	),
 ];
+// `node scripts/split-runtime.mjs order` scores runtime module orders against
+// each Rolldown scenario's chunk and source map, which it reads from here.
+const MAP_DIR = process.env.BUNDLE_SIZE_MAP_DIR;
 const mappedScenario = (id) =>
-	Object.hasOwn(effectControls, id) || Object.hasOwn(childSlotControls, id);
+	Boolean(MAP_DIR) || Object.hasOwn(effectControls, id) || Object.hasOwn(childSlotControls, id);
 // The split shell uses neither ViewTransition nor Activity, so its runtime chunk
 // must drop their optional drivers as a single bundle does; renderBlockInner is
 // the control that proves the source-map oracle sees the chunk.
@@ -495,9 +510,6 @@ async function buildSplitScenario(scenario, entry) {
 	);
 	const entryChunk = chunks.find((chunk) => chunk.isEntry);
 	const modules = chunks.flatMap((chunk) => Object.keys(chunk.modules));
-	const runtimeModule = Object.keys(runtime.modules).find((id) =>
-		id.endsWith('/packages/octane/src/runtime.ts'),
-	);
 	const files = chunks.map((chunk) => chunk.code);
 	return {
 		code: files.join('\n'),
@@ -516,7 +528,7 @@ async function buildSplitScenario(scenario, entry) {
 			},
 		],
 		modules,
-		runtimeExports: runtime.modules[runtimeModule].renderedExports,
+		runtimeExports: renderedRuntimeExports(runtime.modules, runtimeSurface),
 	};
 }
 
@@ -624,7 +636,6 @@ async function buildScenario(scenario, entry) {
 	const emittedModules = Object.entries(chunk.modules)
 		.filter(([, module]) => module.renderedLength > 0)
 		.map(([id]) => id);
-	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
 	const serverRuntimeModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/runtime.server.ts'),
 	);
@@ -632,11 +643,18 @@ async function buildScenario(scenario, entry) {
 	const hookPathModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
 	);
+	if (MAP_DIR) {
+		fs.writeFileSync(path.join(MAP_DIR, `${scenario.id}.js`), chunk.code);
+		fs.writeFileSync(path.join(MAP_DIR, `${scenario.id}.js.map`), chunk.map.toString());
+	}
 	return {
 		code: chunk.code,
 		modules,
 		emittedModules,
-		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
+		runtimeExports: renderedRuntimeExports(
+			Object.fromEntries(modules.map((id) => [id, chunk.modules[id]])),
+			runtimeSurface,
+		),
 		serverRuntimeExports: serverRuntimeModule
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
@@ -740,7 +758,7 @@ try {
 				`${name}: a client that never hydrates retained the binding-marker validator`,
 			);
 		}
-		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
+		const hasRuntime = modules.some(isRuntimeModule);
 		const hasServerRuntime = modules.some((module) =>
 			module.endsWith('/packages/octane/src/runtime.server.ts'),
 		);

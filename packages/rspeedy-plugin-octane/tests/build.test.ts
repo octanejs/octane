@@ -17,7 +17,7 @@ const FIXTURE = resolve(import.meta.dirname, '_fixtures/background');
 const APPLICATION_FIXTURE = resolve(import.meta.dirname, '_fixtures/application');
 const BACKGROUND_ONLY_MARKER = 'octane-milestone-six-background-only-callback';
 const FORBIDDEN_MODULE =
-	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
+	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|octane[\\/](?:src|dist)[\\/]runtime[\\/]|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
 
 const BUILD_CASES = [
 	{

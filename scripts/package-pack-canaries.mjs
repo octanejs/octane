@@ -3,7 +3,7 @@ import path from 'node:path';
 import semver from 'semver';
 
 export const NATIVE_GRAPH_FORBIDDEN_MODULE =
-	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
+	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|octane[\\/](?:src|dist)[\\/]runtime[\\/]|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
 
 export function isForbiddenNativeGraphModule(identifier) {
 	return NATIVE_GRAPH_FORBIDDEN_MODULE.test(identifier);

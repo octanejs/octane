@@ -131,7 +131,8 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 			for (const imported of graph.chunks.get(file)?.imports ?? []) visit(imported);
 		};
 		visit(islandsEntry![0]);
-		const renderer = /packages\/octane\/src\/(?:index|runtime|internal\/client)\.ts$/;
+		const renderer =
+			/packages\/octane\/src\/(?:index|runtime|runtime\/[^/]+|internal\/client)\.ts$/;
 		const staticModules = [...reached].flatMap((file) => graph.chunks.get(file)!.modules);
 		expect(staticModules.filter((id) => renderer.test(id))).toEqual([]);
 		// This page's island uses interaction(), so the idle(), visible() and media()
@@ -204,7 +205,7 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 			};
 			return {
 				withSignals: loads(/packages\/octane\/src\/signals\/graph\.ts$/),
-				withRenderer: loads(/packages\/octane\/src\/runtime\.ts$/),
+				withRenderer: loads(/packages\/octane\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/),
 			};
 		};
 		// Give the placement oracle an actual signal Action consumer in both builds.
