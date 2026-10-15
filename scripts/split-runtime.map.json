@@ -1,22 +1,12 @@
 {
   "$comment": [
-    "The module of every top-level declaration in packages/octane/src/runtime.ts, read by scripts/split-runtime.mjs.",
+    "Migration-only: the module of every top-level declaration in the single-file packages/octane/src/runtime.ts, read by scripts/split-runtime.mjs split, order and check --suggest. Once the split lands, the concept modules are the source of truth.",
     "modules: listed in evaluation order, the permitted order `node scripts/split-runtime.mjs order` found gzip compresses best; `units` names declarations, `after:<name>` the statement after <name>.",
-    "rootEntries: the root factories. A binding that every one of them reaches a writer of is written in every rendering bundle, so the order check does not hold its reads.",
     "unpinned: dependencies the facade does not import for order. The dev server's profile fold removes every import of them once it folds the profiling guards, and production bundles keep none of their code, so an order link would only load them in vite dev.",
     "sectionComments: declarations whose detached leading comment, a section header, moves to the named module."
   ],
   "directory": "runtime",
-  "facade": "This module is the runtime's facade. The runtime itself lives in ./runtime/, one module per concept; scripts/split-runtime.map.json names the module of every declaration. The exports below are the runtime's surface, unchanged.\n\nThe links before them pin evaluation order. First come this runtime's dependencies, in the order the single-file runtime imported them, then the last module of the chain. Each runtime module first names the module that evaluates before it, back to the first. A link that imports nothing is an empty re-export: esbuild warns about a bare import of a side-effect-free module, a named import would be unused, and an ESTree printer rewrites `import {} from` as a bare import. verbatimModuleSyntax keeps these links through every transpile. Rolldown emits modules in evaluation order, so the chain keeps every optional driver and module-scope constant above the reads oxc folds or inlines. A module-scope initializer reads only its own module, so no bundler's order can reach a binding before its declaration.",
-  "rootEntries": [
-    "createRoot",
-    "__createRootDefaultOptions",
-    "__createVoidRoot",
-    "__createVoidRootDefaultOptions",
-    "hydrateRoot",
-    "__hydrateVoidRoot",
-    "createIndependentHydrateActivator"
-  ],
+  "facade": "This module is the runtime's facade. The runtime lives in ./runtime/, one module per concept, and those modules are the source to edit. The exports below are the runtime's surface. `node scripts/split-runtime.mjs check` enforces the rules below on the split layout; the tool's map and its other commands were for the one-time split.\n\nThe links before them pin evaluation order. First come this runtime's dependencies, in the order the single-file runtime imported them, then the last module of the chain. Each runtime module first names the module that evaluates before it, back to the first. A link that imports nothing is an empty re-export: esbuild warns about a bare import of a side-effect-free module, a named import would be unused, and an ESTree printer rewrites `import {} from` as a bare import. verbatimModuleSyntax keeps these links through every transpile. Rolldown emits modules in evaluation order, so the chain keeps every optional driver and module-scope constant above the reads oxc folds or inlines. A module-scope initializer reads only its own module, so no bundler's order can reach a binding before its declaration.",
   "unpinned": ["./profiling.js", "./devtools-hook.js"],
   "sectionComments": {
     "TRANSITION_DEPTH": "transitions",

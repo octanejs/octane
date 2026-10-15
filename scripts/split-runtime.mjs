@@ -1,11 +1,20 @@
 /**
  * Splits packages/octane/src/runtime.ts into concept modules under
  * packages/octane/src/runtime/, leaving runtime.ts as a facade with the same
- * exports. scripts/split-runtime.map.json names the module of every top-level
- * declaration; this tool owns everything else, so a re-run on a newer
- * runtime.ts reproduces the split from the map alone.
+ * exports, and checks the split layout afterwards.
  *
- *   node scripts/split-runtime.mjs check          analyze and validate the map
+ * On the split layout, the concept modules are the source of truth and only
+ * `check` applies: it enforces the load rule, the order rule against the chain
+ * the modules' order links form, and that every module with code keeps its
+ * link (scripts/split-runtime.test.mjs runs it in ci:workflow:test).
+ *
+ * Everything else is migration-only and runs on a single-file runtime.ts:
+ * scripts/split-runtime.map.json names the module of every top-level
+ * declaration, and this tool owns the rest, so a run reproduces the split from
+ * the map alone.
+ *
+ *   node scripts/split-runtime.mjs check          the split layout's rules, or,
+ *                                                 on a single file, the map's
  *   node scripts/split-runtime.mjs split          write the facade and modules
  *   node scripts/split-runtime.mjs sorted <file>  write the single-file runtime
  *                                                 reordered into module order
@@ -55,6 +64,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prettier from 'prettier';
 import ts from 'typescript';
+import { joinClientRuntime } from '../benchmarks/lib/client-runtime.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const RUNTIME = path.join(ROOT, 'packages/octane/src/runtime.ts');
@@ -521,8 +531,22 @@ export function analyze(file = RUNTIME, text = fs.readFileSync(file, 'utf8')) {
 const isMutable = (u) => u.kind === 'let' || u.kind === 'var';
 const isTypeOnly = (u) => u.kind === 'type' || u.kind === 'ambient' || u.kind === 'declare';
 
+// The root factories. A binding that every one of them reaches a writer of is
+// written in every rendering bundle, so the order rule does not hold its reads.
+export const ROOT_ENTRIES = [
+	'createRoot',
+	'__createRootDefaultOptions',
+	'__createVoidRoot',
+	'__createVoidRootDefaultOptions',
+	'hydrateRoot',
+	'__hydrateVoidRoot',
+	'createIndependentHydrateActivator',
+];
+// Modules that load only where profile-guarded code imports them.
+const OFF_CHAIN = ['profile-probes'];
+
 export function readMap(file = MAP) {
-	return JSON.parse(fs.readFileSync(file, 'utf8'));
+	return { rootEntries: ROOT_ENTRIES, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 
 /**
@@ -678,12 +702,9 @@ export function orderConstraints(model, map) {
  * Validates a placement and orders its modules: the map's order where the
  * constraints allow it. Returns the evaluation chain and every violation.
  */
-export function validate(model, map, moduleOf) {
+/** The write, pure and load rules for a placement of every unit in a module. */
+function moduleRules(model, moduleOf) {
 	const violations = [];
-	const byName = new Map(map.modules.map((m, i) => [m.name, { ...m, index: i }]));
-	for (const name of new Set(moduleOf.values()))
-		if (!byName.has(name)) violations.push(`unknown module "${name}"`);
-
 	for (const [id, writers] of writerIndex(model)) {
 		const home = moduleOf.get(id);
 		for (const w of writers)
@@ -712,6 +733,15 @@ export function validate(model, map, moduleOf) {
 						`(${moduleOf.get(binding.id)}) at load${via.length ? ` via ${via.join(' > ')}` : ''}`,
 				);
 	}
+	return violations;
+}
+
+export function validate(model, map, moduleOf) {
+	const violations = [];
+	const byName = new Map(map.modules.map((m, i) => [m.name, { ...m, index: i }]));
+	for (const name of new Set(moduleOf.values()))
+		if (!byName.has(name)) violations.push(`unknown module "${name}"`);
+	violations.push(...moduleRules(model, moduleOf));
 
 	// Modules with code evaluate in a chain; type-only modules never load.
 	// A module with `chain: false` loads only where profile-guarded code imports
@@ -767,6 +797,43 @@ export function validate(model, map, moduleOf) {
 	}
 	const mapOrder = map.modules.map((m) => m.name).filter((m) => runtimeModules.has(m));
 	return { violations, chain, edges, reordered: chain.join() !== mapOrder.join() };
+}
+
+/**
+ * The rules the concept modules keep once runtime.ts is split, read from the
+ * modules themselves: the load, write and pure rules; every module with code
+ * on the evaluation chain its order links form; and every order constraint
+ * (a driver or uninlined constant above the reads that fold or inline it)
+ * satisfied by that chain.
+ */
+export function checkSplit(src = RUNTIME, rootEntries = ROOT_ENTRIES) {
+	const { text, modules, chain } = joinClientRuntime(src);
+	const model = analyze(src, text);
+	const moduleAt = (pos) => modules.find((m) => pos >= m.start && pos < m.end)?.name;
+	const moduleOf = new Map(
+		model.units.map((u) => [u.id, moduleAt(model.sf.statements[u.statements[0]].getStart())]),
+	);
+	const violations = moduleRules(model, moduleOf);
+	const position = new Map(chain.map((m, i) => [m, i]));
+	const offChain = new Set(OFF_CHAIN);
+	for (const unit of model.units) {
+		const m = moduleOf.get(unit.id);
+		if (!isTypeOnly(unit) && unit.kind !== 'ambient' && !position.has(m) && !offChain.has(m)) {
+			violations.push(
+				`link: ${m} is not on the evaluation chain; its first statement must name the module before it`,
+			);
+			offChain.add(m);
+		}
+	}
+	for (const c of orderConstraints(model, { rootEntries })) {
+		const [a, b] = [moduleOf.get(c.before.id), moduleOf.get(c.after.id)];
+		if (a === b || !position.has(a) || !position.has(b)) continue;
+		if (position.get(a) > position.get(b))
+			violations.push(
+				`order: ${c.after.id} (${b}) reads ${c.name} (${a}), which evaluates after it (${c.rule})`,
+			);
+	}
+	return { model, violations, chain };
 }
 
 // ---------------------------------------------------------------------------
@@ -1243,15 +1310,24 @@ async function main() {
 	const src = path.resolve(options.src ?? RUNTIME);
 	const mapFile = path.resolve(options.map ?? MAP);
 	const model = analyze(src);
-	const map = readMap(mapFile);
-	if (!map.rootEntries.some((name) => model.unitByName.has(name))) {
-		console.error(
-			`${path.relative(process.cwd(), src)} declares none of the map's root entries, so it is ` +
-				'already split. Run the tool on an unsplit runtime.ts with --src <file>.',
-		);
-		process.exitCode = 1;
+	if (!ROOT_ENTRIES.some((name) => model.unitByName.has(name))) {
+		// runtime.ts is the facade: the concept modules are the source of truth,
+		// and only `check` applies to them.
+		if (command !== 'check') {
+			console.error(
+				`${path.relative(process.cwd(), src)} is already split; \`${command}\` is migration-only ` +
+					'and runs on an unsplit runtime.ts (--src <file>).',
+			);
+			process.exitCode = 1;
+			return;
+		}
+		const { violations, chain } = checkSplit(src);
+		for (const v of violations) console.error(v);
+		console.error(`${chain.length} modules in the chain, ${violations.length} violations`);
+		process.exitCode = violations.length ? 1 : 0;
 		return;
 	}
+	const map = readMap(mapFile);
 	const { moduleOf, unmapped, stale } = place(model, map);
 	const { violations, chain, reordered } = validate(model, map, moduleOf);
 
