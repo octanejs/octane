@@ -37,11 +37,11 @@ export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	// The root-local hydration capability. Only hydration entry points construct
 	// it; it is the dispatch boundary for adoption code.
 	{ name: 'HydrationCapability', source: 'runtime.ts' },
-	// The current hydration pass and its readers. Only hydration entry points
-	// assign it, so a client-only bundle can only read it as null.
-	{ name: 'currentHydration', source: 'runtime.ts', foldOnly: true },
-	{ name: 'activeHydration', source: 'runtime.ts', foldOnly: true },
-	{ name: 'seedHydration', source: 'runtime.ts', foldOnly: true },
+	// The current hydration pass and its adopting cursor. Only hydration entry
+	// points and the pass assign them, so a client-only bundle can only read
+	// them as null.
+	{ name: 'HYDRATION_PASS', source: 'runtime.ts', foldOnly: true },
+	{ name: 'CURSOR', source: 'runtime.ts', foldOnly: true },
 	// Early-presentation adoption. Binding and control leases exist only on
 	// hydrateRoot roots: createRoot rejects both options (client error 76).
 	{ name: 'PRESENTATION_HYDRATION', source: 'runtime.ts', foldOnly: true },

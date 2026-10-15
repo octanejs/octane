@@ -22,8 +22,8 @@
 
 /**
  * Whether a hydration pass is on the stack. It is `true` exactly while
- * runtime.ts's `currentHydration` is set, so `hydrating ? activeHydration() :
- * null` is `activeHydration()` itself.
+ * runtime.ts's `HYDRATION_PASS` is set, so `hydrating ? CURSOR : null` is
+ * `CURSOR` itself.
  */
 export let hydrating = false;
 

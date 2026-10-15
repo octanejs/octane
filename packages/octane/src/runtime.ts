@@ -1047,7 +1047,7 @@ function discardSignalRetryItem(block: Block, error: unknown): void {
 	try {
 		unmountBlock(
 			block,
-			(!hydrating || activeHydration() === null) &&
+			(!hydrating || CURSOR === null) &&
 				!ROOT_RENDER_TRANSACTION?.hydrating &&
 				!ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block),
 		);
@@ -2346,8 +2346,8 @@ function clearHydrationThrow(): void {
  * retried, and the retry repeats the warning.
  */
 function logHydrationMismatch(message: string): void {
-	if (currentHydration?.holds(() => logHydrationMismatch(message)) === true) return;
-	if (currentHydration?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
+	if (HYDRATION_PASS?.holds(() => logHydrationMismatch(message)) === true) return;
+	if (HYDRATION_PASS?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
 }
 
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
@@ -4575,7 +4575,7 @@ function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 		transaction === null ||
 		transaction.aborted ||
 		ROOT_RENDER_ROLLBACK ||
-		(hydrating && activeHydration() !== null)
+		(hydrating && CURSOR !== null)
 	)
 		return false;
 	// A Block this render created writes fresh DOM, unless it adopted live DOM.
@@ -5061,7 +5061,7 @@ function createdInRootRender(block: Block): void {
 	// for the next attempt, as a root's hydrating attempt does (undoCreatedInRootRender).
 	if (
 		(hydrationStarted && PRESENTATION_HYDRATION?.revision !== undefined) ||
-		(block.kind !== 'portal' && !transaction.hydrating && hydrating && activeHydration() !== null)
+		(block.kind !== 'portal' && !transaction.hydrating && hydrating && CURSOR !== null)
 	)
 		preserveRootCreatedDom(block);
 	(transaction.created ??= []).push(block);
@@ -5574,7 +5574,7 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	if (
 		ROOT_RENDER_TRANSACTION !== null &&
-		((ROOT_RENDER_TRANSACTION.hydrating === true && hydrating && activeHydration() !== null) ||
+		((ROOT_RENDER_TRANSACTION.hydrating === true && hydrating && CURSOR !== null) ||
 			state.adopt !== null)
 	) {
 		// The initial chain is empty even though its DOM is already owned: server
@@ -7233,8 +7233,7 @@ function vtNativeAvailable(owners: Set<VTOwner> | null): boolean {
 
 /** Whether act's synchronous loop can start a capture without waiting for native work. */
 function vtWouldWrap(): boolean {
-	if (VT_CAPTURE !== null || (hydrating && activeHydration() !== null) || !queueAllTransition())
-		return false;
+	if (VT_CAPTURE !== null || (hydrating && CURSOR !== null) || !queueAllTransition()) return false;
 	if (!vtHasActiveHandles() && vtNativeAvailable(null)) return true;
 	const owners = vtQueuedOwners();
 	return vtNativeAvailable(owners) && vtActiveHandles(owners).size === 0;
@@ -7320,12 +7319,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		},
 		wouldWrap: vtWouldWrap,
 		wrapResume(work, getBlocks) {
-			if (
-				inFlush ||
-				VT_DRAIN ||
-				(hydrating && activeHydration() !== null) ||
-				typeof document === 'undefined'
-			)
+			if (inFlush || VT_DRAIN || (hydrating && CURSOR !== null) || typeof document === 'undefined')
 				return false;
 			// A resume commits pending render work in its layout drain too. Flush
 			// the previous commit's passives before choosing either owners or waits,
@@ -12200,7 +12194,7 @@ function restoreRenderPhaseUpdate(cell: QueuedCell, snapshot: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	// A Block that a hydrating update built renders on the client, though its
 	// parent adopts server siblings (HydrationCapability.owns).
 	const rebuild = hydration !== null && !hydration.owns(block);
@@ -12688,7 +12682,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 		// bounds the block's output (bordersOutput), as the server rendered it. A
 		// renderer is the returning component's own JSX, which the server renders
 		// inline, so at a root, whose output has no range, it renders in place.
-		const returnHydration = hydrating ? activeHydration() : null;
+		const returnHydration = hydrating ? CURSOR : null;
 		const borrows =
 			returnHydration !== null &&
 			existingRet === undefined &&
@@ -12710,7 +12704,7 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 			isComponentDescriptor &&
 			((out as any).type.$$singleRoot === true ||
 				(borrows && block.startMarker === null) ||
-				(hydrating ? activeHydration()?.passthroughRanges === true : false) ||
+				(hydrating ? CURSOR?.passthroughRanges === true : false) ||
 				// STICKY regime: a return slot mounted through the componentSlot route
 				// (most importantly by the passthrough-hydration branch above, whose
 				// condition is false again once hydration ends) keeps that route while
@@ -13095,7 +13089,7 @@ export function componentSlotLite<P>(
 			return;
 		}
 	}
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
 	// render only) — consumed by the post-body cursor advance below.
@@ -15454,7 +15448,7 @@ export function useSyncExternalStore<T>(
 	// forces an update if the client value differs (React's hydrate-then-sync).
 	// The capability branch is inert, and its implementation is dropped, in client-only builds.
 	const readSnapshot =
-		hydrating && activeHydration() !== null && getServerSnapshot !== undefined
+		hydrating && CURSOR !== null && getServerSnapshot !== undefined
 			? getServerSnapshot
 			: getSnapshot;
 	const value = readSnapshot();
@@ -16539,7 +16533,7 @@ function permanentStaticHydrationRangeEnd(
 }
 
 function preservePermanentStaticHydrationRange(scope: Scope): void {
-	const hydration = activeHydration();
+	const hydration = CURSOR;
 	if (hydration === null) return;
 	const marker = hydration.node;
 	if (marker?.nodeType !== 8) return;
@@ -17192,7 +17186,7 @@ function createHydrateSlot(
 ): HydrateSlot {
 	const parentBlock = scope.block;
 	const parentNode = parentBlock.parentNode;
-	const hydration = activeHydration();
+	const hydration = CURSOR;
 	// The client render replacing a failed root hydration adopts an independent
 	// island's server wrapper as hydration would have: the island's own root
 	// still owns it, whether or not it has activated.
@@ -17421,7 +17415,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	hydration.protectRootAnchor(state.end);
 	hydration.defers = true;
 	hydration.idStart = block.idState.next;
-	const previousHydration = currentHydration;
+	const previousHydration = HYDRATION_PASS;
 	const previousCapture = WIP_CAPTURE;
 	const capture = createOffscreenCapture();
 	if (block.idState.renderOwner?.bindingLeases?.size) {
@@ -17540,7 +17534,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			renderOwner: state.idState.renderOwner,
 		};
 		const recoveryCapture = createOffscreenCapture();
-		const recoveryHydration = currentHydration;
+		const recoveryHydration = HYDRATION_PASS;
 		const recoveryNative = setNativeAdoptionResolver(null);
 		swapHydration(null);
 		WIP_CAPTURE = recoveryCapture;
@@ -18144,7 +18138,7 @@ export function bindRendererRegionOwner(props: unknown): void {
 	// lookup; every other caller must already have a live root.
 	if (
 		DOM_ROOT_DISPOSERS.get(root) === undefined &&
-		(!hydrating || currentHydration!.rootBlock !== root)
+		(!hydrating || HYDRATION_PASS!.rootBlock !== root)
 	) {
 		throw new Error(formatClientError(22));
 	}
@@ -18575,7 +18569,7 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 
 /** Compiler-owned direct use() creations consult their server-proven site outcome first. */
 export function seedOrCreate<T>(site: string, factory: () => T): T {
-	const hydration = hydrating ? seedHydration() : null;
+	const hydration = hydrating && HYDRATION_PASS!.consumesSeeds() ? HYDRATION_PASS : null;
 	const sites =
 		hydration === null || hydration.seeds === null
 			? undefined
@@ -18597,7 +18591,7 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	// the same render order the server produced them in) and mark the thenable
 	// fulfilled, so this render and every later one return synchronously — no
 	// re-suspend, no client re-fetch. Folds out for client-only builds.
-	const hydration = hydrating ? seedHydration() : null;
+	const hydration = hydrating && HYDRATION_PASS!.consumesSeeds() ? HYDRATION_PASS : null;
 	if (
 		hydration !== null &&
 		hydration.seeds !== null &&
@@ -18781,7 +18775,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 	}
 	// Hydrating: every use() adopts a server seed synchronously — nothing to
 	// batch, and warming would duplicate fetches the server already resolved.
-	const hydration = hydrating ? seedHydration() : null;
+	const hydration = hydrating && HYDRATION_PASS!.consumesSeeds() ? HYDRATION_PASS : null;
 	if (hydration !== null && hydration.seeds !== null) return;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.USE_STRATUM);
@@ -20391,10 +20385,13 @@ function commitTextValue([node, text]: [Text, string]): void {
 	node.nodeValue = text;
 }
 
-// Client-reachable code reads this only behind the `hydrating` flag
-// (hydration-flag.ts), which is true exactly while it is set: write it only
-// through swapHydration.
-let currentHydration: HydrationCapability | null = null;
+// Client-reachable code reads these only behind the `hydrating` flag
+// (hydration-flag.ts), which is true exactly while HYDRATION_PASS is set. Only
+// swapHydration and the pass's own depth changes (suspend, defer) write them.
+/** The current hydration pass, also while a render suspends its adoption. */
+let HYDRATION_PASS: HydrationCapability | null = null;
+/** The current pass while it adopts server DOM: null while a render suspends it. */
+let CURSOR: HydrationCapability | null = null;
 
 /**
  * Make `next` the current hydration pass, keeping the `hydrating` flag in step,
@@ -20404,8 +20401,9 @@ let currentHydration: HydrationCapability | null = null;
  */
 function swapHydration(next: HydrationCapability | null): HydrationCapability | null {
 	if (next !== null) installHydrationDriver();
-	const previous = currentHydration;
-	currentHydration = next;
+	const previous = HYDRATION_PASS;
+	HYDRATION_PASS = next;
+	CURSOR = next !== null && next.depth === 0 ? next : null;
 	setHydrating(next !== null);
 	return previous;
 }
@@ -20432,17 +20430,6 @@ function installHydrationDriver(): void {
 		presentationMiss,
 		presentationRange,
 	};
-}
-
-function activeHydration(): HydrationCapability | null {
-	const hydration = currentHydration;
-	return hydration !== null && hydration.isActive() ? hydration : null;
-}
-
-/** The hydration whose positional `use()` seeds the current render consumes. */
-function seedHydration(): HydrationCapability | null {
-	const hydration = currentHydration;
-	return hydration !== null && hydration.consumesSeeds() ? hydration : null;
 }
 
 /** Direct-child scoped CSS resources are renderer-owned hydration sidecars. */
@@ -20633,10 +20620,6 @@ class HydrationCapability {
 		for (let i = seeded.length - 1; i >= 0; i--) seeded[i]();
 	}
 
-	isActive(): boolean {
-		return this.depth === 0;
-	}
-
 	consumesSeeds(): boolean {
 		return this.depth === 0 || this.depth === this.replayDepth;
 	}
@@ -20656,12 +20639,15 @@ class HydrationCapability {
 
 	suspend<T>(fn: () => T): T {
 		this.depth++;
+		const cursor = CURSOR;
+		if (cursor === this) CURSOR = null;
 		const previousNative = setNativeAdoptionResolver(null);
 		try {
 			return fn();
 		} finally {
 			setNativeAdoptionResolver(previousNative);
 			this.depth--;
+			CURSOR = cursor;
 		}
 	}
 
@@ -21435,7 +21421,7 @@ class HydrationCapability {
 	 * retain it.
 	 */
 	missingDeoptChild(el: Element, child: unknown): void {
-		if (!this.isActive() || el.localName === 'noscript') return;
+		if (this.depth !== 0 || el.localName === 'noscript') return;
 		this.fail(
 			process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 			() =>
@@ -21630,6 +21616,7 @@ class HydrationCapability {
 		this.deferred = error;
 		this.deferredHost = host;
 		this.replayDepth = ++this.depth;
+		if (CURSOR === this) CURSOR = null;
 	}
 
 	/**
@@ -22310,7 +22297,7 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 			? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 			: undefined;
 	if (lazy !== undefined) {
-		const hydration = hydrating ? activeHydration() : null;
+		const hydration = hydrating ? CURSOR : null;
 		// PROD hydration validates adoption roots by nodeType + localName only
 		// (hydrationNodeMatches' prod narrowing), answered straight off the
 		// template SOURCE: the happy path adopts the server DOM without ever
@@ -22322,12 +22309,12 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 		const parsed = resolveLazyTemplate(lazy);
 		if (hydration !== null) return hydration.clone(parsed, loc, partialStyles) as T;
 		// A template the client render after a deferred mismatch clones (adoptOrDefer).
-		if (hydrating && currentHydration!.deferred != null) currentHydration!.claimBefore(parsed);
+		if (hydrating && HYDRATION_PASS!.deferred != null) HYDRATION_PASS!.claimBefore(parsed);
 		return parsed.cloneNode(true) as T;
 	}
-	const hydration = hydrating ? currentHydration : null;
+	const hydration = hydrating ? HYDRATION_PASS : null;
 	if (hydration !== null) {
-		if (hydration.isActive()) return hydration.clone(node, loc, partialStyles);
+		if (hydration.depth === 0) return hydration.clone(node, loc, partialStyles);
 		if (hydration.deferred !== null) hydration.claimBefore(node);
 	}
 	return node.cloneNode(true) as T;
@@ -22346,7 +22333,7 @@ function startsWithHost(template: Node): boolean {
  * in place — nothing to move.
  */
 export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
-	if (hydrating && activeHydration() !== null && (root as any).__oct_vfrag === true) return;
+	if (hydrating && CURSOR !== null && (root as any).__oct_vfrag === true) return;
 	if (hydrationStarted && PRESENTATION_HYDRATION?.revision !== undefined)
 		HYDRATION_DRIVER!.presentationMiss(false);
 	// A committed Block's first mount (a resumed body's) lands at commit, as
@@ -22391,13 +22378,13 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
  * functions").
  */
 function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
-	const hydration = hydrating ? currentHydration : null;
+	const hydration = hydrating ? HYDRATION_PASS : null;
 	// The body's holes ran after a deferred hydration mismatch (adoptOrDefer).
 	if (hydration !== null && hydration.deferred !== null) hydration.claimAfterHoles();
 	if (root !== null) {
 		const block = scope.block;
 		const end = block.endMarker;
-		if (hydration !== null && hydration.isActive()) hydration.insertRoot(root, block);
+		if (hydration !== null && hydration.depth === 0) hydration.insertRoot(root, block);
 		else if (end !== null && end === DETACHED_ROOT) {
 			// A committed list's fresh row: its root stays detached until commit.
 			block.startMarker = root;
@@ -22481,7 +22468,7 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
 	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
 	// the coercion in costs nothing on the hot update path. A string needs none.
 	const text = typeof value === 'string' ? value : coerceText(value);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) return hydration.htext(el, text);
 	if (seeded === 1) {
 		const first = firstChildGetter === undefined ? el.firstChild : firstChildGetter.call(el);
@@ -22511,7 +22498,7 @@ export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefine
 export function htextSwap(posNode: Node | null, value: unknown): Text {
 	// Coerce here (see htext) so the call site stays a bare `htextSwap(pos, _v)`.
 	const text = typeof value === 'string' ? value : coerceText(value);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) return hydration.htextSwap(posNode, text);
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
 	const t = document.createTextNode(text);
@@ -22578,7 +22565,7 @@ export function textareaText(parts: unknown[], textHoles?: string): unknown {
 /** @internal Text holes in authored binding views retain an addressable range, including when empty. */
 export function bindingText(posNode: Node | null, value: unknown, marker: string): Text {
 	const text = coerceText(value);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
 	if (frame?.revision !== undefined) {
 		// Client signal bindings reach this text hole too: only the driver names
@@ -22768,7 +22755,7 @@ function matchesClosedPresentationKeys(value: unknown, keys: readonly string[]):
 
 function hasClosedPresentationView(lease: BindingHandoff, scope: Scope, id: string): boolean {
 	try {
-		const root = scope.block.startMarker ?? (hydrating ? activeHydration()?.node : undefined);
+		const root = scope.block.startMarker ?? (hydrating ? CURSOR?.node : undefined);
 		const proof = root == null ? undefined : lease.view?.(root);
 		return proof?.id === id && matchesClosedPresentationKeys(scope.block.props, proof.closedProps);
 	} catch {
@@ -22903,7 +22890,7 @@ export function beginPresentationHydration(
 		return null;
 	}
 	if (owner?.bindingLeases === undefined || WIP_CAPTURE === null) return null;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const lease = [...owner.bindingLeases].find(
 		(candidate) =>
 			candidate.id === id &&
@@ -23635,7 +23622,7 @@ function presentationRange(
 		range?.kind !== kind ||
 		range.end.parentNode !== start.parentNode ||
 		!hydrating ||
-		activeHydration()?.close(start) !== range.end
+		CURSOR?.close(start) !== range.end
 	)
 		presentationMiss();
 	return range;
@@ -23650,7 +23637,7 @@ export function presentationStructure(
 ): void {
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
 	if (frame?.revision === undefined) return writer(...args);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration === null) presentationMiss(false);
 	// ifBlock and the component writers (componentSlot/Void/Lite) all carry their
 	// anchor at argument 6; compiled calls may omit it as a trailing undefined.
@@ -23842,7 +23829,7 @@ export function child<T extends Node>(node: T): Node | null {
  * range), so an element/hole after a block resolves to the right server node.
  */
 export function sibling(node: Node, n: number = 1): Node | null {
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) return hydration.sibling(node, n);
 	let c: Node | null = node;
 	for (let i = 0; i < n; i++) {
@@ -23889,7 +23876,7 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// even for an empty value; preserve that calling convention on intact DOM.
 	const target = node ?? (host!.firstChild as Text);
 	// A hydrating render writes no adopted DOM (HydrationCapability.writeText).
-	if (hydrating && currentHydration?.writeText(target, coerceText(value)) === true) return;
+	if (hydrating && HYDRATION_PASS?.writeText(target, coerceText(value)) === true) return;
 	//
 	// View-transition dirty tracking and the bag snapshot remain at this write
 	// boundary. The optional driver marks the innermost boundary only during a
@@ -23975,7 +23962,7 @@ export function hydrateClaimedBindingCaches(
 	scope: Scope,
 	fields: readonly (string | number)[],
 ): void {
-	if (!hydrating || activeHydration() === null) return;
+	if (!hydrating || CURSOR === null) return;
 	const bag = scope.slots[0] as Record<string, any>;
 	for (let i = 0; i < fields.length; i += 3) {
 		const field = fields[i]!;
@@ -24131,7 +24118,7 @@ function directSignalControlValue(
 
 function validateDirectSignalControl(element: Element, site: string): void {
 	const actual = element.getAttribute(HYDRATE_INPUT_ATTR);
-	if (actual === null && (!hydrating || activeHydration() === null)) {
+	if (actual === null && (!hydrating || CURSOR === null)) {
 		element.setAttribute(HYDRATE_INPUT_ATTR, site);
 		return;
 	}
@@ -24462,7 +24449,7 @@ function createDirectSignalBinding(
 	const controlSnapshot = policy.control?.snapshot(target, site) ?? null;
 	const initial = handle === null ? value : readSignalBinding(handle);
 	binding.pendingControl = hydrating
-		? activeHydration() !== null &&
+		? CURSOR !== null &&
 			isWritableSignal(handle) &&
 			controlSnapshot !== null &&
 			// Only control policies snapshot, so text/attribute bindings never retain
@@ -24509,7 +24496,7 @@ function bindDirectSignal(
 	if (handle === null && prior === null) {
 		if (kind === 'attribute' && previous === value) {
 			// An undefined cache slot has not yet compared an adopted server attribute.
-			const hydration = value === undefined && hydrating ? activeHydration() : null;
+			const hydration = value === undefined && hydrating ? CURSOR : null;
 			if (hydration === null) return previous;
 		}
 		if (TRANSITION_JOURNAL !== null) journalBag();
@@ -24614,7 +24601,7 @@ export function bindSignalText(
 		return previous;
 	}
 	if (previous === undefined && bindingMarker !== undefined) {
-		const existing = hydrating && activeHydration() !== null ? getNextSibling(position) : null;
+		const existing = hydrating && CURSOR !== null ? getNextSibling(position) : null;
 		previous = bindingText(
 			position,
 			existing?.nodeType === 3 ? existing.nodeValue : '',
@@ -24623,12 +24610,7 @@ export function bindSignalText(
 	}
 	// Only the compiler's fresh native template placeholder is already owned.
 	// Hydration still goes through htext to adopt and advance the server cursor.
-	if (
-		previous === undefined &&
-		onlyChild &&
-		seededText === 1 &&
-		(!hydrating || activeHydration() === null)
-	) {
+	if (previous === undefined && onlyChild && seededText === 1 && (!hydrating || CURSOR === null)) {
 		const text = getFirstChild(position);
 		if (text instanceof Text) previous = text;
 	}
@@ -24772,7 +24754,7 @@ function readSignalInScope(scope: Scope, handle: SignalHandle<unknown>): unknown
 function attributeUnchanged(previous: unknown, value: unknown): boolean {
 	if (previous !== value) return false;
 	if (value !== undefined) return true;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	return hydration === null;
 }
 
@@ -24900,7 +24882,7 @@ export function setScriptText(el: Element, value: any): void {
  */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
 		hydration.adoptHTML(el, next);
 		return;
@@ -26081,7 +26063,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		case 8:
 			if ((name === 'multiple' || name === 'selected') && !isHtmlCustomElement(el)) {
 				if (name === 'selected') {
-					const hydration = hydrating ? activeHydration() : null;
+					const hydration = hydrating ? CURSOR : null;
 					// Adopt the user's pre-hydration selection. An armed select
 					// value still reasserts through its controlled commit queue.
 					if (hydration !== null) return;
@@ -26200,7 +26182,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
 	// An adopted element keeps its server attribute; development compares it with the final
 	// coerced value.
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) {
@@ -26316,7 +26298,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
 			? null
 			: String(value);
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26340,7 +26322,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 			next = null;
 		else next = sanitizeURL(next);
 	}
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26380,7 +26362,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 		}
 		next = typeof value === 'string' ? value : String(value);
 	}
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26400,7 +26382,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	}
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26423,7 +26405,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 		value == null || typeof value === 'function' || typeof value === 'symbol'
 			? null
 			: String(value);
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -26622,7 +26604,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write). A string needs none.
 	const cls = typeof value === 'string' ? value : normalizeClass(value);
-	if (hydrating && activeHydration()?.keepsClass(el, cls, true)) return;
+	if (hydrating && CURSOR?.keepsClass(el, cls, true)) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -26651,7 +26633,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 // existed).
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
-	if (hydrating && activeHydration()?.keepsClass(el, cls, false)) return;
+	if (hydrating && CURSOR?.keepsClass(el, cls, false)) return;
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
@@ -26668,7 +26650,7 @@ const IMPORTANT_SUFFIX = '!important';
 
 /** Whether a grouped style must compare its complete value during hydration. @internal */
 export function isHydratingStyle(): boolean {
-	return hydrating ? activeHydration() !== null : false;
+	return hydrating ? CURSOR !== null : false;
 }
 
 /** Intrinsic prototype used to guard completion of fresh style spread snapshots. @internal */
@@ -26676,7 +26658,7 @@ export const styleObjectPrototype = Object.prototype;
 
 /** Whether a spread prefix and its fixed trailing declarations can be diffed separately. @internal */
 export function canSplitStyleProperties(): boolean {
-	if (hydrating && activeHydration() !== null) return false;
+	if (hydrating && CURSOR !== null) return false;
 	// A native object spread copies own values, but the object style writer also
 	// visits enumerable Object.prototype properties. Those must see the complete
 	// object as their receiver and follow all of its own declarations.
@@ -26688,7 +26670,7 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	const style = (el as HTMLElement).style;
 	// An adopted element keeps its server style; development compares it with the
 	// complete authored style.
-	if (hydrating && activeHydration()?.keepsStyle(el, value)) return;
+	if (hydrating && CURSOR?.keepsStyle(el, value)) return;
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
@@ -26710,7 +26692,7 @@ export function setStyleProperty(
 	previous: any,
 	scope: Scope | null = CURRENT_SCOPE,
 ): void {
-	if (hydrating && activeHydration()?.keepsStyle(el, { [name]: value }, staticCss)) return;
+	if (hydrating && CURSOR?.keepsStyle(el, { [name]: value }, staticCss)) return;
 	const remove = value == null || typeof value === 'boolean';
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
@@ -26748,7 +26730,7 @@ export function setStyleProperties(
 	entries: readonly unknown[],
 	staticCss: string,
 ): void {
-	if (hydrating && activeHydration()?.keepsStyle(el, null, staticCss, entries)) return;
+	if (hydrating && CURSOR?.keepsStyle(el, null, staticCss, entries)) return;
 	const style = (el as HTMLElement).style;
 	let journaled = false;
 	for (let i = 0; i < entries.length; i += 2) {
@@ -27684,7 +27666,7 @@ export function bindSignalHostPropSources(
 	if (controlSnapshot !== null) {
 		validateDirectSignalControl(element, site);
 		binding.pendingControl ||= hydrating
-			? activeHydration() !== null &&
+			? CURSOR !== null &&
 				(controlSnapshot.editRevision > 0 ||
 					(isWritableSignal(valueControl) &&
 						isRestoredHydrationTextarea(element, readSignalBinding(valueControl))))
@@ -27970,7 +27952,7 @@ function setHostProps(
 		return;
 	}
 	// A fresh props cache is not a snapshot of attributes already present in SSR.
-	const hydration = prev === undefined && hydrating ? activeHydration() : null;
+	const hydration = prev === undefined && hydrating ? CURSOR : null;
 	const initialHydration = hydration !== null;
 	for (const k in value) {
 		if (k === 'key' || k === 'children' || (!descriptor && !isOwnEnumerable(value, k))) continue;
@@ -28196,7 +28178,7 @@ function setHeadAttribute(el: Element, name: string, value: unknown): void {
 			return setAttribute(el, name, value);
 	}
 	const next = coerceAttrValue(el, name, value);
-	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
+	if (hydrating && CURSOR?.keepsAttribute(el, name, next)) return;
 	if (el.getAttribute(name) === next) return;
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
@@ -28244,7 +28226,7 @@ export function headBlock(
 		// server's and sets the client's props on it (setInitialProperties), which
 		// keeps the attributes only the server rendered. Outside hydration, the
 		// client's attributes replace the server's.
-		const hydration = adopted && hydrating ? activeHydration() : null;
+		const hydration = adopted && hydrating ? CURSOR : null;
 		state = {
 			el,
 			attrNames: adopted && hydration === null ? el.getAttributeNames() : undefined,
@@ -28258,7 +28240,7 @@ export function headBlock(
 			removeHeadEventListeners(state!, null);
 			// A hydration attempt that is discarded leaves the server's element in
 			// place, for the next attempt to claim.
-			if (!adopted || !hydrating || activeHydration() === null) state!.el.remove();
+			if (!adopted || !hydrating || CURSOR === null) state!.el.remove();
 			scope.slots[slot] = undefined;
 		});
 		// The claimed element takes the client's props once hydration ends: at
@@ -30211,8 +30193,7 @@ export function setFormAction(
 		}
 		// A function action implies a non-native submit; drop any stale attribute,
 		// an adopted server element's at commit.
-		if (el.hasAttribute(name))
-			atCommitIf(hydrating && activeHydration() !== null, dropAttribute, [el, name]);
+		if (el.hasAttribute(name)) atCommitIf(hydrating && CURSOR !== null, dropAttribute, [el, name]);
 		return;
 	}
 	setFormActionAttribute(el, name, value);
@@ -30531,7 +30512,7 @@ export function setAutoFocus(el: Element, value: unknown): void {
 		default:
 			return;
 	}
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) return;
 	queueControlledCommit(AUTOFOCUS_QUEUE, el);
 }
@@ -30853,7 +30834,7 @@ export function setValue(el: Element, value: unknown): void {
 	// pre-hydration user input until the element's first real commit or
 	// discrete event. A fresh structural replacement is client-built and needs
 	// normal projection.
-	const adopted = hydrating && first ? activeHydration() !== null : false;
+	const adopted = hydrating && first ? CURSOR !== null : false;
 	if (TRANSITION_JOURNAL !== null) {
 		journalObjectOnce(ctrl);
 		journalBag();
@@ -30909,7 +30890,7 @@ export function setValue(el: Element, value: unknown): void {
 			!(ctrl.composing && Object.is(prev, value)),
 		];
 		// A hydrating render-phase update writes its adopted control at commit.
-		if (hydrating && activeHydration() !== null) atCommit(writeControlledValue, update);
+		if (hydrating && CURSOR !== null) atCommit(writeControlledValue, update);
 		else writeControlledValue(update);
 		return;
 	}
@@ -31006,7 +30987,7 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		// React's initInput does, which separates it from the server default,
 		// including for a later controlled → default flip: at commit.
 		ctrl.sawDC = true;
-		if (hydrating && activeHydration() !== null) {
+		if (hydrating && CURSOR !== null) {
 			atCommit(adoptCheckedness, [input, true, b]);
 			return;
 		}
@@ -31127,7 +31108,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	// enqueue the commit sync either (the post-hydration microtask commit
 	// would clobber a pre-hydration user selection). A fresh replacement has no
 	// user state to preserve and follows the ordinary client-mount path.
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) return;
 	// A root render leaves the projection to its commit.
 	const now = ROOT_RENDER_TRANSACTION === null;
@@ -31180,7 +31161,7 @@ function projectSelectValue(
  */
 export function setDefaultValue(el: Element, value: unknown, initial?: boolean): void {
 	const ctrl = armControlled(el);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (el.localName === 'select') {
 		const first = ctrl.dvv === UNCONTROLLED;
 		const multiple = (el as HTMLSelectElement).multiple;
@@ -31238,7 +31219,7 @@ const DEFAULT_VALUE_BASELINE = Symbol('octane.defaultValue');
 const DEFAULT_CHECKED_INITIALIZED = Symbol('octane.defaultCheckedInitialized');
 
 export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const previous = (input as any)[DEFAULT_VALUE_BASELINE] as string | null | undefined;
 	const s = value == null ? null : toControlledString(value);
@@ -31264,7 +31245,7 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 export function setDefaultChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
 	const input = el as HTMLInputElement;
-	const adopted = hydrating ? activeHydration() !== null : false;
+	const adopted = hydrating ? CURSOR !== null : false;
 	const first = !ctrl.sawDC;
 	if (TRANSITION_JOURNAL !== null) {
 		journalObjectOnce(ctrl);
@@ -32274,7 +32255,7 @@ function renderPortalState(
 	env?: any[],
 	key: string | null = null,
 ): PortalSlot {
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
 		return hydration.suspend(() =>
 			renderPortalState(prev, parentBlock, target, rawBody, rawProps, host, env, key),
@@ -33700,7 +33681,7 @@ function componentSlotImpl(
 			return;
 		}
 	}
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	// This call adopted the server's range for the component's frame.
 	let adoptedFrame = false;
@@ -34683,7 +34664,7 @@ function ownListKey(item: any, warnMissing: boolean): any {
 		warnMissing &&
 		kind === ELEMENT_TAG &&
 		(key == null || ELEMENTS_MISSING_LIST_KEY.has(item)) &&
-		(!hydrating || activeHydration() === null)
+		(!hydrating || CURSOR === null)
 	) {
 		warnMissingListKey(CURRENT_BLOCK);
 	}
@@ -34895,7 +34876,7 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 	const el = state.el;
 	const prev = state.props;
 	const compareLive =
-		prev !== undefined && (!hydrating || activeHydration() === null) && !isHtmlCustomElement(el);
+		prev !== undefined && (!hydrating || CURSOR === null) && !isHtmlCustomElement(el);
 	let needsCheckedInitialization = prev === undefined && el.localName === 'input';
 	if (ROOT_RENDER_TRANSACTION !== null && prev !== props) journalObjectOnce(state);
 	// REMOVE props/events present last render but gone now, via the shared removeHostProp
@@ -35145,7 +35126,7 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 	const block = scope.block;
 	let instance = block.slots[1] as FragmentInstance | undefined;
 	if (instance === undefined) {
-		const hydration = hydrating ? activeHydration() : null;
+		const hydration = hydrating ? CURSOR : null;
 		let start: Comment;
 		let end: Comment;
 		const opening = hydration?.node;
@@ -35181,7 +35162,7 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 	}
 
 	childSlot(scope, 2, block.parentNode, descriptor.children, instance._endMarker);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) hydration.node = getNextSibling(instance._endMarker);
 }
 
@@ -35441,7 +35422,7 @@ function reconcileDeoptNode(
 	if (t === 'string' || t === 'number' || t === 'bigint') {
 		const s = String(value);
 		if (prev !== null && prev.nodeType === 3 /* Text */) {
-			const hydration = hydrating ? activeHydration() : null;
+			const hydration = hydrating ? CURSOR : null;
 			if (hydration !== null) {
 				return hydration.htextSwap(prev, s);
 			}
@@ -35483,7 +35464,7 @@ function reconcileDeoptNode(
 				// its reconcile removes, and stamps its record there: an attempt that
 				// never commits leaves the server node without one, so the next
 				// attempt applies its props, ref included, as the first did.
-				if (hydrating && activeHydration() !== null && ROOT_RENDER_TRANSACTION !== null) {
+				if (hydrating && CURSOR !== null && ROOT_RENDER_TRANSACTION !== null) {
 					defer = true;
 					desc = deoptRecord(el, value);
 					owner = null;
@@ -35492,7 +35473,7 @@ function reconcileDeoptNode(
 		} else {
 			// What hydration builds here, as in a `<noscript>` whose server content
 			// is text, is client DOM: it builds with adoption suspended.
-			const hydration = hydrating ? activeHydration() : null;
+			const hydration = hydrating ? CURSOR : null;
 			if (hydration !== null)
 				return hydration.suspend(() => reconcileDeoptNode(null, value, ownerBlock, ns));
 			el =
@@ -35557,7 +35538,7 @@ function reconcileDeoptChildren(
 			(firstChild as any).$$deoptKey === 0 &&
 			(firstChild as any).$$portalEnd == null
 		) {
-			const hydration = hydrating ? activeHydration() : null;
+			const hydration = hydrating ? CURSOR : null;
 			if (hydration !== null) {
 				hydration.htextSwap(firstChild, String(children));
 			} else if (defer) {
@@ -35594,7 +35575,7 @@ function reconcileDeoptChildren(
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (pending === null && firstChild === null) {
 		// Hydrating, an adopted host with no server children cannot hold these.
-		if (next.length !== 0 && hydrating) currentHydration!.missingDeoptChild(el, next[0]);
+		if (next.length !== 0 && hydrating) HYDRATION_PASS!.missingDeoptChild(el, next[0]);
 		const built: Node[] = [];
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
@@ -35613,7 +35594,7 @@ function reconcileDeoptChildren(
 	// adopting, so a client descriptor that renders none must still clear them.
 	if (
 		next.length === 0 &&
-		(!hydrating || activeHydration() === null) &&
+		(!hydrating || CURSOR === null) &&
 		(pending === null ? !hasDeoptOwnedChild(el) : pending.length === 0)
 	) {
 		return null;
@@ -35654,8 +35635,7 @@ function reconcileDeoptChildren(
 		if (
 			stampedKey === undefined &&
 			descriptor === undefined &&
-			(!(hydrationOwnsUnstamped ??= hydrating ? activeHydration() !== null : false) ||
-				isTextSeparator(scan))
+			(!(hydrationOwnsUnstamped ??= hydrating ? CURSOR !== null : false) || isTextSeparator(scan))
 		) {
 			hasForeign = true;
 			scan = getNextSibling(scan);
@@ -35702,7 +35682,7 @@ function reconcileDeoptChildren(
 				at++;
 			if (at < unstamped.length && unstamped[at].nodeType === 1) up = at;
 			else if (up < unstamped.length)
-				activeHydration()!.fail(
+				CURSOR!.fail(
 					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
 					() => `<${child.type as string}>`,
 					unstamped[up],
@@ -35712,7 +35692,7 @@ function reconcileDeoptChildren(
 			if (up < unstamped.length) prev = unstamped[up++];
 			// The server rendered fewer children than the client.
 			else if (hydrating && hydrationOwnsUnstamped === true && !singleton)
-				currentHydration!.missingDeoptChild(el, child);
+				HYDRATION_PASS!.missingDeoptChild(el, child);
 		}
 		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
 		if (node !== null) {
@@ -35725,7 +35705,7 @@ function reconcileDeoptChildren(
 	for (let i = owned.length - 1; i >= 0; i--) {
 		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
-			const hydration = hydrating ? activeHydration() : null;
+			const hydration = hydrating ? CURSOR : null;
 			if (singleton && (n as any).$$deoptKey === undefined) continue;
 			// A server node that no client child adopted is content the client
 			// renders nothing for. With scripting enabled, the parser keeps a
@@ -36011,7 +35991,7 @@ function landItemPair(pair: any[]): void {
 // childSlot so their subtrees get real, reconcilable Blocks.
 function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
 	// Each field read of a scoped JSX value resolves its record again. A component
 	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
@@ -36237,7 +36217,7 @@ function updateDeoptComponent(block: Block, item: any, index: number): boolean {
 		(WIP_CAPTURE !== null && WIP_CAPTURE.rootTransaction !== true) ||
 		signalDocumentEnabled ||
 		block.idState.renderOwner?.signalOwner !== undefined ||
-		(hydrating && activeHydration() !== null)
+		(hydrating && CURSOR !== null)
 	)
 		return false;
 	// The ordinary render below writes the same index if this returns false.
@@ -36317,7 +36297,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 					item.__octaneInvocationSite,
 					itemRange(block)[1],
 					true,
-					hydrating ? activeHydration() === null : true,
+					hydrating ? CURSOR === null : true,
 				);
 			} finally {
 				// Until its commit swaps the bound, the item's range is its node.
@@ -36490,7 +36470,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	HOST_ELEMENT_BODY = hostElementBody;
 	let el = block.deoptNode as Element | null;
 	let desc: ElementDescriptor | null = null;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	// Component/value boundaries are namespace-transparent. Derive the inherited
 	// namespace from the block's actual DOM parent; explicit <svg>/<math> roots
 	// still override it through inferTagNs.
@@ -36619,7 +36599,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	const tag = d.type as string;
 	let el = block.deoptNode as Element | null;
 	let desc: ElementDescriptor | null = null;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	// Component tags can resolve to host strings under SVG/MathML. Inherit from
 	// the actual destination rather than assuming every dynamic host is HTML.
 	const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
@@ -37836,8 +37816,7 @@ export function bindingChildSlot(
 		// Signal children reach this slot too (bindSignalChild): only the driver
 		// names the range validator, so that client-only bundles drop it.
 		const driver: HydrationDriver = HYDRATION_DRIVER!;
-		const start =
-			(hydrating ? activeHydration()?.resolveOpen(anchor ?? null, domParent) : null) ?? null;
+		const start = (hydrating ? CURSOR?.resolveOpen(anchor ?? null, domParent) : null) ?? null;
 		const range = driver.presentationRange(frame, start, marker, 'slot');
 		if (
 			value == null
@@ -37996,7 +37975,7 @@ export function childSlot(
 	}
 	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return;
 	const parentBlock = parentScope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	// React 19 treats Contexts and thenables as renderable Usable nodes. Resolve
 	// them before choosing a child regime; repeated unwrapping supports shapes
 	// such as Promise<Context<T>> while preserving the normal Suspense route for
@@ -39269,7 +39248,7 @@ export function childTextHole(
 					: String(value);
 		if (str === '') {
 			if (cachedNode === null) {
-				const hydration = hydrating ? activeHydration() : null;
+				const hydration = hydrating ? CURSOR : null;
 				if (hydration === null) {
 					if (KEPT_TEXT_CONTENT !== null)
 						clearKeptText(KEPT_TEXT_CONTENT, parentScope.block, domParent);
@@ -39287,7 +39266,7 @@ export function childTextHole(
 			renderText(parentScope.block, cachedNode, str);
 			return cachedNode;
 		}
-		const hydration = hydrating ? activeHydration() : null;
+		const hydration = hydrating ? CURSOR : null;
 		if (hydration === null) {
 			if (KEPT_TEXT_CONTENT !== null)
 				clearKeptText(KEPT_TEXT_CONTENT, parentScope.block, domParent);
@@ -39319,7 +39298,7 @@ export function childTextHole(
 	// the server rendered text or nothing there.
 	if (state === undefined && cachedNode !== null)
 		removeOnlyChildText(parentScope.block, domParent, cachedNode);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null && state === undefined)
 		hydration.hydrateOnlyChild(parentScope, slotKey, domParent, value, (parent) =>
 			childSlot(parentScope, slotKey, parent, value, null, false, parent as Element),
@@ -40679,7 +40658,7 @@ function mountPassthroughCatch(
 	if (state.catchBody === null) throw error;
 	// A fallback for server content lands after that content has left
 	// (removeOwnedContent).
-	const hydration = freshFallback && hydrating ? activeHydration() : null;
+	const hydration = freshFallback && hydrating ? CURSOR : null;
 	const block = passthroughArm(
 		state,
 		state.catchBody,
@@ -40748,7 +40727,7 @@ function renderPassthroughTry(state: TrySlot): void {
 		block.body = state.tryBody;
 		block.extra = state.env;
 	}
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const beforeOwner = hydration?.passthroughRanges === true;
 	try {
 		if (hydration !== null) hydration.renderTryBody(block, state.catchBody !== null);
@@ -40782,7 +40761,7 @@ export function errorBlock(
 	// Wait for a queued parent self-update's replay, as tryBlock does.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return noop;
 	const parentBlock = parentScope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	let state = parentScope.slots[slotKey] as ErrorSlot | undefined;
 	// A boundary new under committed DOM builds in a frontier, as tryBlock's does.
 	if (
@@ -40931,19 +40910,15 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		return state.block;
 	};
 	state.block = body;
-	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
-	if (freshBoundary) hydration!.depth++;
 	try {
-		if (hydration !== null) hydration.renderTryBody(body, true);
+		if (freshBoundary) hydration!.suspend(() => hydration!.renderTryBody(body, true));
+		else if (hydration !== null) hydration.renderTryBody(body, true);
 		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
 		if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
 			throw error;
 		switchErrorToCatch(state, error, true);
-	} finally {
-		if (freshBoundary) hydration!.depth--;
-		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 	}
 }
 
@@ -40961,7 +40936,7 @@ function switchErrorToCatch(state: ErrorSlot, error: any, reportInline = false):
 }
 
 function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boolean): void {
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const previous = state.block;
 	if (previous !== null) {
 		state.block = null;
@@ -41052,7 +41027,7 @@ export function tryBlock(
 		ensureScheduledVisibilityDriver();
 	}
 	const parentBlock = parentScope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydrationStarted && TRY_OPS === null)
 		TRY_OPS = {
 			createBody: createTryBody,
@@ -41297,7 +41272,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	let renderError: unknown;
 	// Render-phase updates drained during hydration re-render a try body that
 	// is still hydrating.
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	const opsFrom = transaction === null ? 0 : transaction.ops.length;
 	const retiredFrom = transaction?.retired?.size ?? 0;
@@ -41625,7 +41600,7 @@ function waitForStreamedArm(
 	if (taken === null) {
 		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		markArmDiscard(state);
-		if (!clientRenderDehydratedTry(state, currentHydration))
+		if (!clientRenderDehydratedTry(state, HYDRATION_PASS))
 			noteRecoverableHydrationError(() => new Error(formatClientError(347)), state.parentBlock);
 		return null;
 	}
@@ -41779,7 +41754,7 @@ function renderInitialSuspenseHydration(
 			claimStreamedIds(state, initial.waits.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		}
 		markArmDiscard(state);
-		clientRenderDehydratedTry(state, currentHydration);
+		clientRenderDehydratedTry(state, HYDRATION_PASS);
 		return;
 	}
 	if (initial.waits !== undefined) {
@@ -41797,7 +41772,7 @@ function renderInitialSuspenseHydration(
 	// This capability owns one exact arm, never the surrounding root siblings.
 	hydration.claimRootRemainder(initial.end);
 	hydration.protectRootAnchor(initial.end);
-	const previousHydration = currentHydration;
+	const previousHydration = HYDRATION_PASS;
 	if (previousHydration?.retryPresentation !== undefined)
 		hydration.retryPresentation = previousHydration.retryPresentation;
 	const previousCapture = WIP_CAPTURE;
@@ -41952,7 +41927,7 @@ function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const wasPending = state.branch === 2;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	// Only a boundary's first render adopts the server's range.
 	const adopting = hydration !== null && state.branch === -1;
 	discardOffscreenCapture(state.stagedCapture);
@@ -42381,7 +42356,7 @@ function hideTryContentAndMountPendingInner(
 	resumeThenable?: TrackedThenable<any>,
 ): boolean {
 	const wasPending = state.branch === 2;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null && !state.hasResolved && state.tryBlock !== null) {
 		// A suspension during the first hydration attempt has no committed client
 		// subtree to preserve. The try block currently owns the adopted server arm;
@@ -44417,7 +44392,7 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
 	state.stagedEffectDeps = null;
@@ -44698,7 +44673,7 @@ interface BranchSlot {
 export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node | null {
 	const anchor = block.endMarker;
 	const parent = block.parentNode;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (
 		scope.slots[slotKey] !== undefined ||
 		hydration !== null ||
@@ -45438,7 +45413,7 @@ function renderBranchSlot(
 	lone?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (next !== state.branch) {
 		if (
 			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
@@ -45748,7 +45723,7 @@ export function ifBlock(
 		}
 	}
 	if (state === undefined) {
-		const hydration = hydrating ? activeHydration() : null;
+		const hydration = hydrating ? CURSOR : null;
 		let start: Comment | null = null;
 		let end: Node | null = null;
 		const passthrough = hydration?.passthroughRanges === true;
@@ -46260,7 +46235,7 @@ export function activityBlock(
 	}
 	if (mode === 'hidden') ensureActivityVisibilityDriver();
 	const parentBlock = parentScope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	const wantHidden = mode === 'hidden';
 	let state = parentScope.slots[slotKey] as ActivitySlot | undefined;
 	if (
@@ -46767,7 +46742,7 @@ export function switchBlock(
 		}
 	}
 	if (state === undefined) {
-		const hydration = hydrating ? activeHydration() : null;
+		const hydration = hydrating ? CURSOR : null;
 		let start: Comment | null = null;
 		let end: Node | null = null;
 		const passthrough = hydration?.passthroughRanges === true;
@@ -46945,7 +46920,7 @@ export function forBlock<T>(
 	// its owning Block's scope whenever an item body does need to render.
 	// Packed into one numeric literal.
 	const parentBlock = parentScope.block;
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	let state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (
 		state === undefined &&
@@ -47286,7 +47261,7 @@ export function keyedForBlock<T>(
 		flags &= ~4;
 	} else if (
 		state !== undefined &&
-		(!hydrating || activeHydration() === null) &&
+		(!hydrating || CURSOR === null) &&
 		state.cachedDeps !== null &&
 		tryUpdateKeyedSelection(
 			state,
@@ -47342,7 +47317,7 @@ function fastHostListParent(
 		((flags || 0) & 2) === 0 ||
 		!Array.isArray(items) ||
 		items.length < FAST_HOST_LIST_MIN_ITEMS ||
-		(hydrating && activeHydration() !== null) ||
+		(hydrating && CURSOR !== null) ||
 		state.end.parentNode === null ||
 		state.start.parentNode !== state.end.parentNode
 	) {
@@ -48052,7 +48027,7 @@ function mountPassthroughListItem<T>(
 	body: (item: T, scope: Scope) => void,
 	forSlot: ForSlot,
 ): Block {
-	const hydration = activeHydration()!;
+	const hydration = CURSOR!;
 	// The list's own end may still be to place (placeAtCommit): a cursor that
 	// reached where it lands stands at it.
 	const end$ = markerPosition(anchor);
@@ -48935,7 +48910,7 @@ function mountItem<T>(
 ): Block {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_INSERT);
-	const hydration = hydrating ? activeHydration() : null;
+	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
 		// A row that a list update inserts beside rows that already adopted the
 		// server's, as in a suspended deferred boundary's retry after its captures
@@ -49616,11 +49591,11 @@ function registeredReportUncaughtError(block: Block | null, err: unknown): boole
 function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
 	if (ROOT_ERROR_HANDLERS === null) return;
 	const from = block ?? CURRENT_BLOCK;
-	if (currentHydration?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
+	if (HYDRATION_PASS?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
 	if (h === undefined) return;
 	const report = () => queueMicrotask(() => invokeRootErrorHandler(h, makeError()));
-	if (currentHydration?.awaitsCommit(report) !== true) report();
+	if (HYDRATION_PASS?.awaitsCommit(report) !== true) report();
 }
 
 // One live public root owns a container at a time. React still returns a second
@@ -50859,7 +50834,7 @@ function hydrateRootWithOutputHandler(
 			] === 'passthrough';
 		if (process.env.NODE_ENV !== 'production' && hydration.passthroughRoot)
 			auditHydrationProbe('passthroughRoot', false);
-		const previousHydration = currentHydration;
+		const previousHydration = HYDRATION_PASS;
 		swapHydration(hydration);
 		const previousNative = setNativeAdoptionResolver(null);
 		let completed = false;
