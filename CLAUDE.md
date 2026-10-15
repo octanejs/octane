@@ -24,9 +24,9 @@ Load the matching skill when its trigger first arises, including later steps:
 - `bug-hunter`: a failing test, a regression, or behavior that differs from
   expectation.
 - `resolve-octane-defect`: a defect in Octane or an Octane library. Open a fix PR
-  in the owning package with regression coverage and end-to-end integration
-  evidence, or file an issue. Never mask it with a workaround, weak tests,
-  generated output, or test-only behavior.
+  in the owning package with regression coverage, or file an issue. Retain any
+  integration scenario as end-to-end evidence. Never mask the defect with a
+  workaround, weak tests, generated output, or test-only behavior.
 - `octane-core-extend`: before editing `packages/octane/src`.
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
