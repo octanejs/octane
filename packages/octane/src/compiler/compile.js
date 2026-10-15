@@ -31220,7 +31220,7 @@ function makeCommitPlan() {
 		owners: false,
 		/** Register a binding's commit statement once (keyed selection re-emits it). */
 		write: (cell, make) => {
-			if (!writes.some((entry) => entry[0] === cell)) writes.push([cell, make]);
+			writes[cell] ??= make;
 		},
 		writes: () => writes,
 		/** A deferrable binding's direct mount write, by cell. */
@@ -31284,7 +31284,8 @@ function emitCommitFunction(ctx, commit, origin) {
 	const writes = commit.writes();
 	if (writes.length === 0 && commit.name === null) return null;
 	const name = commitFunctionName(ctx, commit);
-	const cells = writes.sort((x, y) => x[0] - y[0]).map(([, make]) => make(commit.size()));
+	const cells = [];
+	for (const make of writes) if (make !== undefined) cells.push(make(commit.size()));
 	const body = [
 		b.const('_n', b.member(b.id('_b'), 'next')),
 		b.declaration('let', [b.declarator('_v')]),
