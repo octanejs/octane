@@ -1,5 +1,21 @@
 [
   {
+    "suite": "memo-wall",
+    "op": "consumer_renders",
+    "target": "provider-scope-unaffected-128",
+    "reference": "provider-scope-changed-128",
+    "maxRatio": 0,
+    "note": "A sibling provider of the same Context must not refresh a retained 128-consumer wall on its next unchanged pass. The changed-provider control still updates every value and preserves all hosts. Deterministic production render counts, not wall time."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "consumer_renders",
+    "target": "provider-scope-unaffected-512",
+    "reference": "provider-scope-changed-512",
+    "maxRatio": 0,
+    "note": "The same sibling-provider isolation guard at 512 consumers. Both targets verify nearest-provider output and retained host identity; real provider changes remain live."
+  },
+  {
     "suite": "universal-leaf-update",
     "op": "leaf_update_ms",
     "target": "siblings-4000",

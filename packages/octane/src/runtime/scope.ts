@@ -99,7 +99,7 @@ export class BlockImpl {
 	// lite descendant that shares this block). The DIRECT signal: a changed
 	// version here means THIS block must re-run; if only $$ctxReads changed, the
 	// block can bail its body and refresh just its consuming child blocks.
-	declare $$ctxDirect: Map<Context<any>, any> | null;
+	declare $$ctxDirect: Block['$$ctxDirect'];
 	// Epoch stamp for the two dep maps — see Block.$$ctxDepsEpoch. Number so the
 	// "unverified" poison (-1) stays inside the same monomorphic field type.
 	declare $$ctxDepsEpoch: number;
