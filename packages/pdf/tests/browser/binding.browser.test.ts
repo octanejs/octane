@@ -44,7 +44,8 @@ beforeAll(async () => {
 		plugins: [
 			{
 				name: 'octane-pdf-browser-hydration-shell',
-				transformIndexHtml(source) {
+				transformIndexHtml(source, context) {
+					if (context.filename !== resolve(harnessRoot, 'index.html')) return source;
 					const marker = '<!--octane-pdf-hydration-shell-->';
 					if (!source.includes(marker)) {
 						throw new Error(`Missing ${marker} in the PDF browser harness`);
@@ -66,7 +67,16 @@ beforeAll(async () => {
 				},
 			],
 		},
-		build: { outDir: outputRoot, emptyOutDir: true },
+		build: {
+			outDir: outputRoot,
+			emptyOutDir: true,
+			rollupOptions: {
+				input: {
+					parity: resolve(harnessRoot, 'index.html'),
+					compatibility: resolve(harnessRoot, 'compatibility.html'),
+				},
+			},
+		},
 	});
 	server = await preview({
 		configFile: false,
@@ -215,4 +225,37 @@ async function runBindingCase() {
 describe('@octanejs/pdf browser contract', () => {
 	// @parity-case browser:react-pdf-selected
 	it(`renders the binding in ${browserName}`, () => runBindingCase(), 90_000);
+
+	it('renders a PDF when the page and worker lack Promise.withResolvers', async () => {
+		const browser = await launchBrowser({ headless: true });
+		const context = await browser.newContext();
+		try {
+			await context.addInitScript(() => Reflect.deleteProperty(Promise, 'withResolvers'));
+			let workerRequests = 0;
+			// Workers have their own globals; page init scripts do not run there.
+			await context.route('**/pdf.worker*.mjs', async (route) => {
+				workerRequests += 1;
+				const response = await route.fetch();
+				await route.fulfill({
+					response,
+					body: `delete Promise.withResolvers;\n${await response.text()}`,
+				});
+			});
+			const page = await context.newPage();
+			const workers: string[] = [];
+			const warnings: string[] = [];
+			page.on('worker', (worker) => workers.push(worker.url()));
+			page.on('console', (message) => warnings.push(message.text()));
+			await page.goto(`${origin}/compatibility.html`, { waitUntil: 'domcontentloaded' });
+			await page
+				.locator('#root canvas[width="120"]')
+				.waitFor({ state: 'visible', timeout: 15_000 });
+			expect(workerRequests).toBeGreaterThan(0);
+			expect(workers.some((url) => /pdf\.worker.*\.mjs/.test(url))).toBe(true);
+			expect(warnings).not.toContainEqual(expect.stringContaining('Setting up fake worker'));
+		} finally {
+			await context.close();
+			await browser.close();
+		}
+	}, 30_000);
 });

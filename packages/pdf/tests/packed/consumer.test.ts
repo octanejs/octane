@@ -66,7 +66,7 @@ describe('@octanejs/pdf packed consumer', () => {
 			`import '@octanejs/pdf/dist/Page/AnnotationLayer.css';
 import '@octanejs/pdf/dist/Page/TextLayer.css';
 import { Document, Page, pdfjs } from '@octanejs/pdf';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 export const view = <Document file="document.pdf"><Page pageNumber={1} /></Document>;
 `,
