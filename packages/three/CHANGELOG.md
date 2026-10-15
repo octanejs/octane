@@ -1,5 +1,11 @@
 # @octanejs/three
 
+## 0.1.59
+
+### Patch Changes
+
+- 8318702: Render the Canvas DOM boundary as a Strong template and publish committed callback updates through effect events. Preserve asynchronous renderer setup, retained scene ownership, and discrete event timing.
+
 ## 0.1.58
 
 ### Patch Changes
