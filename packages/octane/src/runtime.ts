@@ -4431,7 +4431,7 @@ interface SlotNext {
 	root: Node | null;
 	parent: Node | null;
 	before: Node | null;
-	/** Blocks, lite stand-ins and try slots created directly in `frag`. */
+	/** Blocks, lite stand-ins, slots and fresh host commits belonging to their frontier. */
 	members: any[] | null;
 	/** The Block whose slot this is: a deletion cleanup can dispose it first. */
 	owner: Block | null;
@@ -4562,6 +4562,22 @@ function noteFrontierMember(parent: Node, member: object): void {
 	if (next !== undefined) next.members!.push(member, parent);
 }
 
+// A fresh host's user callbacks must see its props before its frontier connects.
+// Keep the host writer on the member so ordinary compiled roots don't retain
+// the descriptor renderer. List runs commit only their own members.
+function commitFrontierMembers(next: SlotNext, from: Node | Block): boolean {
+	const members = next.members!;
+	for (let i = 0; i < members.length; i += 2) {
+		const member = members[i];
+		if (members[i + 1] === from && member.commit !== undefined) {
+			member.commit(member);
+			if (next.owner!.disposed || COMMITTING_OWNER!.generation !== COMMITTING_GENERATION)
+				return false;
+		}
+	}
+	return true;
+}
+
 /**
  * Whether a slot of `parentBlock` that changes structure in the open root
  * render writes through a frontier: its owner's DOM is live. Hydration that is
@@ -4623,15 +4639,17 @@ function applySlotNext(slot: { next: SlotNext | null }): void {
 		const first: Node | null = out[out.length - 2];
 		if (first !== null && first.parentNode === parent) before = getNextSibling(out[out.length - 1]);
 	}
-	applyOutgoing(out, parent);
+	applyOutgoing(out, parent, next);
 	const members = next.members;
 	// A deletion cleanup can unmount the slot's owner before its content lands.
 	if (members === null || next.owner!.disposed) return;
 	const frag = next.frag;
+	if (frag !== null && !commitFrontierMembers(next, frag)) return;
 	// A branch arm's detached root lands alone, with no members to rehome.
 	if (frag !== null || next.root !== null) parent.insertBefore(frag ?? next.root!, before);
 	for (let i = 0; i < members.length; i += 2) {
 		const member = members[i];
+		if (member.commit !== undefined) continue;
 		const from = members[i + 1];
 		if (member.__kind !== undefined) {
 			rehomeSlot(member, from, parent);
@@ -4680,6 +4698,7 @@ function rehomeSlot(member: any, frag: DocumentFragment, parent: Node): void {
 
 /** Development check: nothing below a committed frontier still names its fragment. */
 function assertRehomed(scope: any, frag: DocumentFragment): void {
+	if (scope.commit !== undefined) return;
 	if (
 		scope.__kind === 'trySlotSlot' ||
 		scope.__kind === 'errorSlotSlot' ||
@@ -4802,14 +4821,14 @@ function queueRootDeletion(owner: unknown, first: Node | null, last: Node | null
  * order, so each lands against the DOM the render saw: a survivor moves before
  * its anchor, and a run's fragment goes into `parent` before its anchor.
  */
-function applyOutgoing(out: any[], parent?: Node): void {
+function applyOutgoing(out: any[], parent?: Node, next?: SlotNext): void {
 	for (let i = 0; i < out.length; i += 3) {
 		const kind = out[i];
 		if (kind === placeRoots || kind === moveBlockBefore || kind === placeRun) {
 			// A deletion cleanup can unmount the list before the rest of its log.
 			const anchor: Node = out[i + 2];
 			if (anchor.parentNode === parent) {
-				if (kind === placeRoots) placeRoots(parent!, out[i + 1], anchor);
+				if (kind === placeRoots) placeRoots(parent!, out[i + 1], anchor, next!);
 				else if (kind === placeRun) placeRun(parent!, out[i + 1], anchor);
 				else if (!out[i + 1].disposed) moveBlockBefore(out[i + 1], anchor);
 			}
@@ -5000,11 +5019,14 @@ function listRoots(next: SlotNext, anchor: Node): Block[] {
 	return rows;
 }
 
-function placeRoots(parent: Node, rows: Block[], anchor: Node): void {
+function placeRoots(parent: Node, rows: Block[], anchor: Node, next: SlotNext): void {
 	const into = parent;
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
-		if (!row.disposed) into.insertBefore(row.startMarker!, anchor);
+		if (!row.disposed) {
+			if (next.members !== null && !commitFrontierMembers(next, row)) return;
+			into.insertBefore(row.startMarker!, anchor);
+		}
 	}
 }
 
@@ -5026,6 +5048,8 @@ function listRun(next: SlotNext, anchor: Node): DocumentFragment {
  * row connects before the next row arrives.
  */
 function placeRun(parent: Node, frag: DocumentFragment, anchor: Node): void {
+	const next: SlotNext = (frag as any).$$next;
+	if (!commitFrontierMembers(next, frag)) return;
 	const from = frag;
 	const into = parent;
 	for (let node = from.firstChild; node !== null; node = from.firstChild)
@@ -35399,6 +35423,7 @@ function reconcileDeoptNode(
 		const elNs = inferTagNs(value.type, ns);
 		let el: Element;
 		let defer = false;
+		let freshCustom = false;
 		let pending: DeoptOrder | null = null;
 		let desc: ElementDescriptor | null = null;
 		let owner: Block | null = ownerBlock;
@@ -35442,6 +35467,7 @@ function reconcileDeoptNode(
 			// before its newly created host is connected.
 			if (ROOT_RENDER_TRANSACTION !== null && isHtmlCustomElement(el)) {
 				defer = true;
+				freshCustom = true;
 				desc = deoptRecord(el, value);
 			} else setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
@@ -35457,7 +35483,32 @@ function reconcileDeoptNode(
 					defer,
 					pending,
 				);
-		if (desc !== null || nodes !== null) queueDeoptOrder(el, owner, desc, nodes, null);
+		if (desc !== null || nodes !== null) {
+			const order = queueDeoptOrder(el, owner, desc, nodes, null);
+			if (freshCustom) {
+				// A fresh nested host may not have been attached to its parent's DOM
+				// yet. Its rendering Block (or a fresh ancestor) still names the
+				// frontier which will connect it. A later slot frontier needs no
+				// early commit: this order already precedes that slot's entry.
+				for (let block: Block | null = ownerBlock; block !== null; block = block.parentBlock) {
+					const root = block.parentNode.getRootNode() as any;
+					if (root.$$next?.tx === order.tx) {
+						order.commit = applyDeoptOrder;
+						noteFrontierMember(root, order);
+						break;
+					}
+					if (block.createdStamp !== order.tx.createdStamp) break;
+					const next = block.forSlot?.next;
+					if (next?.tx === order.tx) {
+						// A compiled single-host row has no fragment. Its own root
+						// lands during the list's outgoing work, after earlier removals.
+						order.commit = applyDeoptOrder;
+						(next.members ??= []).push(order, block);
+						break;
+					}
+				}
+			}
+		}
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -35723,6 +35774,7 @@ interface DeoptOrder {
 	desc: ElementDescriptor | null;
 	text: string | null;
 	owner: Block | null;
+	commit?: (order: DeoptOrder) => void;
 }
 
 /** The record an earlier pass of this root render left on `node`, if any. */
@@ -35768,12 +35820,13 @@ function queueDeoptOrder(
 	desc: ElementDescriptor | null,
 	nodes: Node[] | null,
 	text: string | null,
-): void {
+): DeoptOrder {
 	const tx = ROOT_RENDER_TRANSACTION!;
 	const order: DeoptOrder = { tx, el: node, nodes, desc, text, owner };
 	journalRootProperty(node, '$$deoptOrder', (node as any).$$deoptOrder);
 	(node as any).$$deoptOrder = order;
 	tx.ops.push(applyDeoptOrder, order);
+	return order;
 }
 
 /** A committed Text's data, written at commit unless it already shows `data`. */

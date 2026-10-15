@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import { createElement } from '../src/index.js';
-import { App } from './_fixtures/anchorless-host.tsrx';
+import { App, EditorRows } from './_fixtures/anchorless-host.tsrx';
 
 // A LONE PURE-HOST descriptor at a value position (a pass-through component's
 // return, a host descriptor rendered at a root) mounts ANCHORLESS — no comment
@@ -43,11 +43,15 @@ describe('anchorless lone pure-host value', () => {
 		(nested) => {
 			let dispose: (() => void) | undefined;
 			let calls = 0;
+			let connections = 0;
 			class DisposingElement extends HTMLElement {
 				static observedAttributes = ['data-dispose'];
 				attributeChangedCallback() {
 					calls++;
 					dispose?.();
+				}
+				connectedCallback() {
+					connections++;
 				}
 			}
 			const tag = nested ? 'anchorless-nested-disposer' : 'anchorless-root-disposer';
@@ -57,9 +61,82 @@ describe('anchorless lone pure-host value', () => {
 			const next = createElement(tag, { 'data-dispose': 'true' }, 'obsolete');
 			r.update(Pass, { children: nested ? createElement('div', undefined, next) : next });
 			expect(calls).toBe(1);
+			expect(connections).toBe(0);
 			expect(r.container.childNodes).toHaveLength(0);
 		},
 	);
+
+	it.each([false, true])(
+		'connects a new custom host with its initial attributes (nested: %s)',
+		(nested) => {
+			const seen: (string | null)[] = [];
+			const tag = nested ? 'nested-initial-editor' : 'root-initial-editor';
+			customElements.define(
+				tag,
+				class extends HTMLElement {
+					connectedCallback() {
+						seen.push(this.getAttribute('data-label'));
+					}
+				},
+			);
+			const host = createElement(tag, { 'data-label': 'ready' });
+			const r = mount(Pass, { children: nested ? createElement('section', null, host) : host });
+			try {
+				expect(seen).toEqual(['ready']);
+				expect(r.find(tag).getAttribute('data-label')).toBe('ready');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('initializes custom editors before each new keyed run connects', () => {
+		const seen: (string | null)[] = [];
+		const tag = 'keyed-initial-editor';
+		customElements.define(
+			tag,
+			class extends HTMLElement {
+				connectedCallback() {
+					seen.push(this.getAttribute('data-label'));
+				}
+			},
+		);
+		const children = (labels: string[]) =>
+			labels.map((label) => createElement(tag, { key: label, 'data-label': label }));
+		const r = mount(Pass, { children: children(['first']) });
+		try {
+			const survivor = r.find(tag);
+			expect(seen).toEqual(['first']);
+			r.update(Pass, { children: children(['first', 'second', 'third']) });
+			expect(seen).toEqual(['first', 'second', 'third']);
+			expect(r.find(tag)).toBe(survivor);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('initializes a custom editor in a compiled single-host keyed row before it connects', () => {
+		const seen: (string | null)[] = [];
+		const tag = 'compiled-row-initial-editor';
+		customElements.define(
+			tag,
+			class extends HTMLElement {
+				connectedCallback() {
+					seen.push(this.getAttribute('data-label'));
+				}
+			},
+		);
+		const r = mount(EditorRows, { tag, labels: ['first'] });
+		try {
+			const survivor = r.find('li');
+			expect(seen).toEqual(['first']);
+			r.update(EditorRows, { tag, labels: ['first', 'second', 'third'] });
+			expect(seen).toEqual(['first', 'second', 'third']);
+			expect(r.find('li')).toBe(survivor);
+		} finally {
+			r.unmount();
+		}
+	});
 
 	it('attaches the ref on mount and detaches it when the value flips away', () => {
 		const ref: { current: Element | null } = { current: null };

@@ -46,3 +46,11 @@ export function App(props) @{
 		<b>{'B'}</b>
 	</section>
 }
+
+export function EditorRows(props: { tag: string; labels: readonly string[] }) @{
+	<ul>
+		@for (const label of props.labels; key label) {
+			<li>{createElement(props.tag, { 'data-label': label })}</li>
+		}
+	</ul>
+}
