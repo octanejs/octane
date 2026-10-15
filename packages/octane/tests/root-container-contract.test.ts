@@ -177,6 +177,31 @@ describe('public root containers and test environment', () => {
 		expect(container.doctype).toBe(doctype);
 		root.unmount();
 	});
+	it('replaces a server Document whose hydration fails with its own head', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const html = renderToString(server.HoistedTitleDocument, { label: 'server' }).html;
+		const container = new DOMParser().parseFromString('<!DOCTYPE html>' + html, 'text/html');
+		const doctype = container.doctype;
+		const serverHtml = container.documentElement;
+		// A body that no longer matches fails the attempt, which claimed the head's title.
+		container.querySelector('p')!.replaceWith(container.createElement('div'));
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(
+			container,
+			HoistedTitleDocument,
+			{ label: 'client' },
+			{ onRecoverableError },
+		);
+		flushSync(() => {});
+		expect(serverHtml.isConnected).toBe(false);
+		expect(container.querySelectorAll('title')).toHaveLength(1);
+		expect(container.title).toBe('client');
+		expect(container.body.textContent).toBe('client');
+		expect(container.doctype).toBe(doctype);
+		await Promise.resolve();
+		expect(onRecoverableError).toHaveBeenCalledOnce();
+		root.unmount();
+	});
 	it('renders and hydrates detached DocumentFragment containers', () => {
 		const mounted = document.createDocumentFragment();
 		const root = createRoot(mounted);

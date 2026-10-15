@@ -13126,15 +13126,8 @@ export function componentSlotLite<P>(
 		scope.slots[0] === undefined &&
 		ROOT_RENDER_TRANSACTION !== null &&
 		usesFrontier(parentScope.block, host)
-	) {
-		const block = scope.block;
-		liveEnd = block.endMarker;
-		const frag = queueFrontier(parentScope.block, host, liveEnd);
-		journalRootProperty(block, 'parentNode', host);
-		block.parentNode = frag;
-		block.endMarker = null;
-		noteFrontierMember(frag, scope);
-	}
+	)
+		liveEnd = openScopeFrontier(scope, parentScope.block, host);
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	// A Strong hookful body keeps its effects on this Scope. Count the call sites
@@ -15750,20 +15743,12 @@ export function renderClientContextProvider<T>(
 				// other mid-render teardown site does after `unmountBlock`.
 				if (block.disposed) return;
 				if (live) {
-					liveEnd = block.endMarker;
+					const end = block.endMarker;
 					const first =
 						block.startMarker !== null ? getNextSibling(block.startMarker) : getFirstChild(parent);
-					if (first !== liveEnd)
-						queueRootDeletion(
-							null,
-							first,
-							liveEnd === null ? parent.lastChild : liveEnd.previousSibling,
-						);
-					const frag = queueFrontier(block, parent, liveEnd);
-					journalRootProperty(block, 'parentNode', parent);
-					block.parentNode = frag;
-					block.endMarker = null;
-					noteFrontierMember(frag, scope);
+					if (first !== end)
+						queueRootDeletion(null, first, end === null ? parent.lastChild : end.previousSibling);
+					liveEnd = openScopeFrontier(scope, block, parent);
 				}
 			} else if (previous !== undefined) {
 				// A different body reused the same DOM/control slots. Its predecessor's
@@ -15777,15 +15762,28 @@ export function renderClientContextProvider<T>(
 			}
 			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
 		}
-		if (liveEnd === undefined)
+		try {
 			renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
-		else
-			try {
-				renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
-			} finally {
-				scope.block.endMarker = liveEnd;
-			}
+		} finally {
+			if (liveEnd !== undefined) scope.block.endMarker = liveEnd;
+		}
 	}
+}
+
+/**
+ * Point `scope`'s Block, whose content in `parent` is new this render, at a
+ * frontier its commit inserts before the Block's end. Returns that end, which
+ * the caller puts back once the render returns.
+ */
+function openScopeFrontier(scope: Scope, owner: Block, parent: Node): Node | null {
+	const block = scope.block;
+	const end = block.endMarker;
+	const frag = queueFrontier(owner, parent, end);
+	journalRootProperty(block, 'parentNode', parent);
+	block.parentNode = frag;
+	block.endMarker = null;
+	noteFrontierMember(frag, scope);
+	return end;
 }
 
 // Only the directly shared Scope needs stronger component ownership. Ordinary
@@ -25885,16 +25883,22 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			break;
 		case 8:
 			if ((name === 'multiple' || name === 'selected') && !isHtmlCustomElement(el)) {
-				if (name === 'selected') {
-					const hydration = hydrating ? CURSOR : null;
-					// Adopt the user's pre-hydration selection. An armed select
-					// value still reasserts through its controlled commit queue.
-					if (hydration !== null) return;
+				const next = value && typeof value !== 'function' && typeof value !== 'symbol';
+				// Hydration adopts the user's pre-hydration selection, and an adopted
+				// select keeps its server `multiple` like any server attribute. An
+				// armed select value still reasserts through its controlled commit queue.
+				if (hydrating && CURSOR !== null) {
+					if (name === 'multiple') {
+						CURSOR.adopts(el);
+						if (process.env.NODE_ENV !== 'production')
+							unpatchedAttribute(CURSOR, el, name, next ? '' : null);
+					}
+					return;
 				}
 				// mustUseProperty like `muted`. `multiple` reflects back to the
 				// attribute; `selected` is live option state (the controlled
 				// <select> projection owns it when a select value is armed).
-				(el as any)[name] = value && typeof value !== 'function' && typeof value !== 'symbol';
+				(el as any)[name] = next;
 				return;
 			}
 			break;
