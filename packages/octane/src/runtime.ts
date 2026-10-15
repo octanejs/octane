@@ -282,6 +282,8 @@ import {
 	ADOPTION_CONTROL,
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
+	beginNativeBatch,
+	endNativeBatch,
 	nativeProducerPublication,
 	nativeSignalHydration as NATIVE_SIGNAL_HYDRATION,
 	startEarlySignalHydration,
@@ -1823,7 +1825,11 @@ function scheduleNativeRead(target: Block): void {
 			target,
 			inFlush,
 			false,
-			nativeProducerPublication && !inFlush && !inCommitCallback() && _dispatchDepth === 0,
+			nativeProducerPublication &&
+				!inFlush &&
+				!inCommitCallback() &&
+				_dispatchDepth === 0 &&
+				RENDERER_DISCRETE_EVENT_DEPTH === 0,
 		);
 	} finally {
 		if (retainPriority) TRANSITION_DEPTH--;
@@ -2951,6 +2957,8 @@ let TRANSITION_DEPTH = 0;
  * AsyncContext, which isn't available in the browser target.
  */
 let ASYNC_TRANSITION_COUNT = 0;
+/** Renderer listeners own update priority, not delegated DOM propagation. */
+let RENDERER_DISCRETE_EVENT_DEPTH = 0;
 
 /**
  * Optional off-screen swap capability. Generic component/child/control-flow
@@ -3287,7 +3295,14 @@ function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 	// (including continuous events), flushSync and commit callbacks opt out of
 	// that fallback. This only selects the batch: continuous events still flush
 	// in a microtask, and an explicit transition inside a handler wins above.
-	if (syncFlush || _dispatchDepth > 0 || inCommitCallback()) return null;
+	if (
+		IN_FLIGHT_TRANSITION_ACTION_BATCH === null ||
+		syncFlush ||
+		_dispatchDepth > 0 ||
+		RENDERER_DISCRETE_EVENT_DEPTH > 0 ||
+		inCommitCallback()
+	)
+		return null;
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
 }
 
@@ -3657,7 +3672,11 @@ function urgentTransitionCellUpdate(block: Block): boolean {
 	return (
 		TRANSITION_DEPTH === 0 &&
 		!(CURRENT_BLOCK === block && block.currentRenderMode === 'transition') &&
-		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0 || inCommitCallback())
+		(syncFlush ||
+			_dispatchDepth > 0 ||
+			ASYNC_TRANSITION_COUNT === 0 ||
+			RENDERER_DISCRETE_EVENT_DEPTH > 0 ||
+			inCommitCallback())
 	);
 }
 
@@ -8096,7 +8115,11 @@ function scheduleRender(
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0 && !inCommitCallback())
+		(!syncFlush &&
+			_dispatchDepth === 0 &&
+			ASYNC_TRANSITION_COUNT > 0 &&
+			RENDERER_DISCRETE_EVENT_DEPTH === 0 &&
+			!inCommitCallback())
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -31583,6 +31606,28 @@ function reportListenerError(err: unknown): void {
 	console.error(err);
 }
 
+/**
+ * @internal Adapt a renderer-owned discrete native listener to the DOM scheduler.
+ * Its ordinary updates remain urgent during an async Action and commit before
+ * the listener returns; task-held transitions keep their own scheduling.
+ */
+export function __createDiscreteEventListener(listener: EventListener): EventListener {
+	return (event) => {
+		const batch = beginNativeBatch();
+		RENDERER_DISCRETE_EVENT_DEPTH++;
+		try {
+			listener(event);
+		} finally {
+			try {
+				endNativeBatch(batch);
+			} finally {
+				RENDERER_DISCRETE_EVENT_DEPTH--;
+			}
+		}
+		if (!inFlush) flush();
+	};
+}
+
 // Only the OUTERMOST discrete dispatch is a commit boundary: nested programmatic
 // dispatches inherit the outer window. Like React's batchedUpdates, the boundary
 // commits synchronously only when a controlled form control armed a state
@@ -51742,8 +51787,16 @@ function makeRoot(
 			// e.g. a Suspense fallback appearing under a <ViewTransition>).
 			if (mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0)) {
 				rootBlock.pending = true;
-				rootBlock.pendingMode = 'transition';
-				if (TRANSITION_TASK_DRIVER && TRANSITION_TASK_DRIVER.queue(rootBlock)) return;
+				// A renderer event commits its implicit Action-window mount at the
+				// listener boundary; an explicit transition still owns its task.
+				rootBlock.pendingMode =
+					TRANSITION_DEPTH === 0 && RENDERER_DISCRETE_EVENT_DEPTH > 0 ? 'urgent' : 'transition';
+				if (
+					TRANSITION_TASK_DRIVER &&
+					rootBlock.pendingMode === 'transition' &&
+					TRANSITION_TASK_DRIVER.queue(rootBlock)
+				)
+					return;
 				QUEUE.push(rootBlock);
 				if (!syncFlush && !scheduled) {
 					scheduled = true;

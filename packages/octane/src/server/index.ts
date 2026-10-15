@@ -146,6 +146,7 @@ export {
 	invokeManualHook,
 	startTransition,
 	flushSync,
+	__createDiscreteEventListener,
 	isChildrenBlock,
 	isValidElement,
 	cloneElement,
