@@ -157,8 +157,6 @@ export const WRITERS = new Map(
 		finishInitialSuspenseHydration: 'hydration',
 		hydrateRootWithOutputHandler: 'hydration',
 		// rollback
-		restoreRootRange: 'rollback',
-		restoreRootNodes: 'rollback',
 		rollbackTransitionJournal: 'rollback',
 		// unmount
 		disposeReturnSlot: 'unmount',

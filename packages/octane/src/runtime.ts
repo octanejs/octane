@@ -3883,7 +3883,6 @@ function discardHeldRoot(owner: RootRenderOwner): void {
 // snapshotted, so a resumed render projects again.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const JOURNAL_TEXT = 0;
 const JOURNAL_ATTR = 1;
 const JOURNAL_BAG = 2;
 const JOURNAL_PROP = 3;
@@ -4124,7 +4123,6 @@ interface RootRenderTransaction {
 	retainedCreated: Set<Block> | null;
 	/** Blocks this render deleted, still connected until commit. Truncated on drop. */
 	retired: Set<Block> | null;
-	structures: Map<object, number> | null;
 	/**
 	 * The commit queue: `(fn, target)` pairs that commitRootRenders runs in render
 	 * order, before refs and layout effects. A template queues `(C, bag)`
@@ -4236,7 +4234,6 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			bagWindow: ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW,
 			retainedCreated: null,
 			retired: null,
-			structures: null,
 			ops: owner.spareOps ?? [],
 			rendering: 0,
 			cells: null,
@@ -4344,86 +4341,6 @@ function journalRootSlot(state: object): void {
 	journalObjectOnce(state);
 }
 
-/** `parent`'s children after `before` (or from its first) up to, not including, `after`. */
-function collectRootRange(parent: Node, before: Node | null, after: Node | null): Node[] {
-	const nodes: Node[] = [];
-	for (
-		let node = before === null ? getFirstChild(parent) : getNextSibling(before);
-		node !== null && node !== after;
-		node = getNextSibling(node)
-	)
-		nodes.push(node);
-	return nodes;
-}
-
-/** Make the range collectRootRange read hold exactly `nodes` again, in order. */
-function restoreRootRange(
-	parent: Node,
-	before: Node | null,
-	after: Node | null,
-	nodes: Node[],
-): void {
-	// A newer undo can already have removed a speculative slot, including its
-	// markers. That bounded snapshot no longer owns a range in this parent;
-	// walking to a bound that is gone would erase unrelated committed siblings.
-	if (
-		(before !== null && before.parentNode !== parent) ||
-		(after !== null && after.parentNode !== parent)
-	)
-		return;
-	const retained = new Set(nodes);
-	let node = before === null ? getFirstChild(parent) : getNextSibling(before);
-	while (node !== null && node !== after) {
-		const next = getNextSibling(node);
-		if (!retained.has(node)) parent.removeChild(node);
-		node = next;
-	}
-	restoreRootNodes(parent, nodes, after);
-}
-
-function journalRootRange(parent: Node, before: Node | null, after: Node | null): void {
-	const leases = ROOT_RENDER_TRANSACTION?.owner.bindingLeases;
-	const nodes = collectRootRange(parent, before, after);
-	journalUndo(() => {
-		let restore = nodes;
-		// An early owner can publish while renderer preparation is suspended.
-		// Never replay an older snapshot over its still-live interval.
-		for (const lease of leases ?? []) {
-			if (lease.end === undefined || !lease.active()) continue;
-			let ancestor: Node | null = parent;
-			while (ancestor !== null && ancestor.parentNode !== lease.root.parentNode)
-				ancestor = ancestor.parentNode;
-			for (let current: Node | null = lease.root; current !== null; current = current.nextSibling) {
-				if (current === ancestor) return;
-				if (current === lease.end) break;
-			}
-			const start = restore.indexOf(lease.root);
-			const end = restore.indexOf(lease.end);
-			if (start < 0 || end < start || lease.root.parentNode !== parent) continue;
-			const current: Node[] = [];
-			for (let node: Node | null = lease.root; node !== null; node = node.nextSibling) {
-				current.push(node);
-				if (node === lease.end) break;
-			}
-			restore = [...restore.slice(0, start), ...current, ...restore.slice(end + 1)];
-		}
-		restoreRootRange(parent, before, after, restore);
-	});
-}
-
-/** A de-opt parent is captured only when its child membership/order changes. */
-function journalRootChildren(parent: Node): void {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || ROOT_RENDER_ROLLBACK) return;
-	const structures = (transaction.structures ??= new Map());
-	if ((structures.get(parent) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) return;
-	structures.set(parent, TRANSITION_JOURNAL!.length);
-	journalUndo(() => {
-		structures.delete(parent);
-	});
-	journalRootRange(parent, null, null);
-}
-
 /**
  * Whether hydration runs in a root's hydrating attempt. An attempt that
  * suspends rolls back and retries over the server DOM, so what it changes
@@ -4440,21 +4357,6 @@ function inRootHydrationAttempt(): boolean {
 		!ROOT_RENDER_ROLLBACK &&
 		PRESENTATION_HYDRATION?.revision === undefined
 	);
-}
-
-/** Do not detach an unchanged focused host merely to restore its own position. */
-function restoreRootNodes(parent: Node, nodes: Node[], anchor: Node | null): void {
-	for (let i = nodes.length - 1; i >= 0; i--) {
-		const node = nodes[i];
-		if (node.parentNode !== parent || getNextSibling(node) !== anchor) {
-			if (renderingFocus === null) parent.insertBefore(node, anchor);
-			else {
-				captureFocusedMovement(parent, renderingFocus);
-				moveFocusedNodeBefore(parent, node, anchor, renderingFocus);
-			}
-		}
-		anchor = node;
-	}
 }
 
 /** A queued deletion is already absent from this root's logical render tree. */
@@ -5135,12 +5037,10 @@ function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block)
 	return block.createdStamp === transaction.createdStamp;
 }
 
-function undoCreatedInRootRender(block: Block, transaction: RootRenderTransaction): void {
+/** A rolled-back attempt's Block: its scope goes; its DOM never reached the page. */
+function undoCreatedInRootRender(block: Block): void {
 	const refCheckpoint = refDetachQueue.length;
-	unmountBlock(
-		block,
-		(!transaction.hydrating || block.kind === 'portal') && !transaction.retainedCreated?.has(block),
-	);
+	unmountBlock(block, false);
 	refDetachQueue.length = refCheckpoint;
 }
 
@@ -5179,7 +5079,7 @@ function createdInRootRender(block: Block): void {
 	let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
 	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
 	if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
-		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, transaction, null);
+		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, null, null);
 }
 
 /** An upgraded runtime descriptor can give a fresh Block existing host DOM. */
@@ -5214,7 +5114,7 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 			for (let i = transaction.log.length - 4; i >= 0; i -= 4) {
 				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
 				else if (transaction.log[i] === JOURNAL_CREATED)
-					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
+					undoCreatedInRootRender(transaction.log[i + 1]);
 				else if (transaction.log[i] === JOURNAL_EVENT_OWNER)
 					transaction.log[i + 1].$$signalOwner = transaction.log[i + 2];
 			}
@@ -5227,7 +5127,7 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 		const created = transaction.created;
 		if (created !== null)
 			for (let i = created.length - 1; i >= 0; i--)
-				if (!created[i].disposed) undoCreatedInRootRender(created[i], transaction);
+				if (!created[i].disposed) undoCreatedInRootRender(created[i]);
 		discardOffscreenCapture(transaction.capture);
 	} finally {
 		ROOT_RENDER_ROLLBACK = previousRollback;
@@ -5683,10 +5583,6 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 		journalUndo(() => {
 			seen.delete(state);
 		});
-		// A hydrating render writes none of the server range it adopts.
-		// A staged upgrade (placeUpgradedList) changes none of it during render.
-		if (state.adopt !== null && state.start.parentNode !== null)
-			journalRootRange(state.start.parentNode, state.start, state.end);
 		// No chain record restores indices here, so rows that already exist keep
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
@@ -5875,14 +5771,13 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	}
 }
 
-function journalText(node: Text, previous: string | null): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, previous, null);
-	journalBag();
-}
-
-/** A namespaced attribute (`xlink:href`) journals its name as `[namespace, name]`. */
-function journalAttr(el: Element, name: string, ns?: string | null): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, ns ? [ns, name] : name, el.getAttribute(name));
+/**
+ * A style attribute a render still writes in place (setStyle and its property
+ * writers), which a held window restores. Every other attribute a render writes
+ * is fresh or lands at commit (#2043), so only the bag that chose it is kept.
+ */
+function journalAttr(el: Element, name: string): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));
 	journalBag();
 }
 
@@ -5959,19 +5854,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 			const a = log[i + 2];
 			const b = log[i + 3];
 			switch (log[i]) {
-				case JOURNAL_TEXT:
-					(target as Text).nodeValue = a;
+				case JOURNAL_ATTR:
+					if (b === null) (target as Element).removeAttribute(a);
+					else (target as Element).setAttribute(a, b);
 					break;
-				case JOURNAL_ATTR: {
-					const el = target as Element;
-					// Removal by qualified name also finds a namespaced attribute, but
-					// restoring one (`xlink:href`) must recreate it in its namespace.
-					const name = typeof a === 'string' ? a : a[1];
-					if (b === null) el.removeAttribute(name);
-					else if (name === a) el.setAttribute(name, b);
-					else el.setAttributeNS(a[0], name, b);
-					break;
-				}
 				case JOURNAL_PROP:
 					target[a] = b;
 					break;
@@ -5980,7 +5866,7 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 					(target as Block).props = a;
 					break;
 				case JOURNAL_CREATED:
-					undoCreatedInRootRender(target as Block, a as RootRenderTransaction);
+					undoCreatedInRootRender(target as Block);
 					break;
 				case JOURNAL_OPS:
 					dropRootOps(target as RootRenderTransaction, a, b);
@@ -23970,10 +23856,9 @@ function updateTextValue(node: Text, value: string): void {
 	if (hiddenTextWriter !== null && hiddenTextWriter(node, value)) return;
 	const previous = node.nodeValue;
 	if (previous !== value) {
-		// Descriptor text updates participate in the same held-transition undo
-		// window as compiled text bindings. Reuse the live value just compared;
-		// an authored-value cache cannot restore a later external DOM edit.
-		if (TRANSITION_JOURNAL !== null) journalText(node, previous);
+		// A held window restores the bag that chose this write, not the DOM: a
+		// render writes committed text only through its commit (#2043).
+		if (TRANSITION_JOURNAL !== null) journalBag();
 		node.nodeValue = value;
 	}
 }
@@ -23992,10 +23877,11 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// A hydrating render writes no adopted DOM (HydrationCapability.writeText).
 	if (hydrating && currentHydration?.writeText(target, coerceText(value)) === true) return;
 	//
-	// View-transition dirty tracking and journaling remain at this write boundary.
-	// The optional driver marks the innermost boundary only during a wrapped drain.
+	// View-transition dirty tracking and the bag snapshot remain at this write
+	// boundary. The optional driver marks the innermost boundary only during a
+	// wrapped drain.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	if (TRANSITION_JOURNAL !== null) journalText(target, target.nodeValue);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -24037,7 +23923,7 @@ function commitText(write: [Text, string]): void {
  * setText from a render (#2043): a root render that may be dropped queues the
  * write for its commit. The caller's raw-value cache chose the write, so render
  * compares nothing, and a bag the caller publishes next is snapshotted first,
- * as journalText does. Commit functions call setText itself.
+ * as setText does. Commit functions call setText itself.
  */
 export function setRenderText(node: Text, value: any): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
@@ -26302,7 +26188,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// coerced value.
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name, ns);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
@@ -26417,7 +26303,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 			? null
 			: String(value);
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -26441,7 +26327,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 		else next = sanitizeURL(next);
 	}
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -26481,7 +26367,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 		next = typeof value === 'string' ? value : String(value);
 	}
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -26501,7 +26387,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -26524,7 +26410,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 			? null
 			: String(value);
 	if (hydrating && activeHydration()?.keepsAttribute(el, name, next)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -26738,7 +26624,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 			TRANSITION_JOURNAL_DEPTH !== 1 ||
 			CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
 	)
-		journalAttr(el, 'class');
+		journalBag();
 	if (value == null || value === false) el.removeAttribute('class');
 	else (el as any).className = cls;
 }
@@ -26752,7 +26638,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
 	if (hydrating && activeHydration()?.keepsClass(el, cls, false)) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
 }
@@ -27069,7 +26955,7 @@ function eventSlot(name: string, el?: Element): ParsedEventSlot | null {
 // `state.ref`) — see the call sites.
 function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	if (name === 'class' || name === 'className') {
-		if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
+		if (TRANSITION_JOURNAL !== null) journalBag();
 		el.removeAttribute('class');
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
@@ -36396,7 +36282,6 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 					// the component renders into before that node is retired.
 					promoteSelfMarkedItem(block);
 					if (attached && ROOT_RENDER_TRANSACTION !== null) {
-						journalRootRange(parent, stale.previousSibling, getNextSibling(stale));
 						queueRootDeletion(() => detachDeoptTreeRefs(stale, null), stale, stale);
 					} else {
 						detachDeoptTreeRefs(stale, null);
@@ -38420,9 +38305,6 @@ export function childSlot(
 		DEOPT_UPGRADE.block === parentScope.block &&
 		ownsHost !== undefined
 	) {
-		// These children predate their new logical Blocks. Capture them before
-		// list markers or a single-child replacement alter their ownership.
-		if (ROOT_RENDER_TRANSACTION !== null) journalRootChildren(domParent);
 		upgradeChildren = DEOPT_UPGRADE.children;
 		upgradeArmed = true;
 		DEOPT_UPGRADE = null;
