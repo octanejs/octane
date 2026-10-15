@@ -44,6 +44,7 @@ export const REPO_SKILLS = {
 	// Stable entry point routes maintenance and React implementation ports.
 	'react-library-port': '.rulesync/skills/react-library-port/SKILL.md',
 	'octane-react-library-port': '.rulesync/skills/octane-react-library-port/SKILL.md',
+	'resolve-octane-defect': '.rulesync/skills/resolve-octane-defect/SKILL.md',
 	triage: '.rulesync/skills/triage/SKILL.md',
 	'update-bindings': '.rulesync/skills/update-bindings/SKILL.md',
 };
