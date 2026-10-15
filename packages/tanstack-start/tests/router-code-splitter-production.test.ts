@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { compileCodeSplitReferenceRoute } from '../src/internal/router-plugin/core/code-splitter/compilers.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRouterCodeSplitterPlugin } from '../src/internal/router-plugin/core/router-code-splitter-plugin.js';
 import { createRouterPluginContext } from '../src/internal/router-plugin/core/router-plugin-context.js';
@@ -123,3 +124,26 @@ describe('router code-splitter production mode', () => {
 		},
 	);
 });
+
+// Import identity is part of the emitted module contract: mixing contexts would
+// defer a failure until the lazy component first reads a router hook.
+it.each([false, true])(
+	'splits Octane lazy routes through the matching compiled=%s entry',
+	(compiled) => {
+		const routerPackage = '@octanejs/tanstack-router' + (compiled ? '/compiled' : '');
+		const code = routeCode.replace('@tanstack/react-router', routerPackage);
+		const result = compileCodeSplitReferenceRoute({
+			code,
+			codeSplitGroupings: [['component']],
+			targetFramework: 'octane',
+			compiled,
+			filename: '/src/routes/route.tsx',
+			id: '/src/routes/route.tsx',
+			addHmr: false,
+		});
+		expect(result).not.toBeNull();
+		const imports = [...result!.code.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => match[1]);
+		expect(new Set(imports)).toEqual(new Set([routerPackage]));
+		expect(result!.code).toContain('tsr-split=component');
+	},
+);

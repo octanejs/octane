@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Plugin, PluginOption } from 'vite';
 import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
@@ -19,6 +22,56 @@ describe('TanStack Start Vite integration', () => {
 
 		expect(() => tanstackStart(options)).toThrow(/octane\.ssr.*not supported/i);
 	});
+
+	it.each([false, true])(
+		'selects matching default entries for compiled=%s and honors custom entries',
+		async (compiled) => {
+			const root = mkdtempSync(join(tmpdir(), 'octane-start-entries-'));
+			const src = join(root, 'src');
+			mkdirSync(src);
+			writeFileSync(join(src, 'router.ts'), 'export function getRouter() {}');
+			try {
+				async function aliases(custom: boolean) {
+					const plugins = flattenPlugins(
+						tanstackStart({
+							compiled,
+							...(custom
+								? { client: { entry: './custom-client' }, server: { entry: './custom-server' } }
+								: {}),
+						}),
+					);
+					const config = plugins.find(
+						(plugin) => plugin.name === 'tanstack-start-core:config',
+					)!.config;
+					const hook = typeof config === 'function' ? config : config!.handler;
+					const result = await hook.call(
+						{} as never,
+						{ root },
+						{ command: 'build', mode: 'production' },
+					);
+					return result!.resolve!.alias as Record<string, string>;
+				}
+				const defaults = await aliases(false);
+				expect(defaults['virtual:tanstack-start-client-entry']).toMatch(
+					compiled ? /compiled\/default-client\.js$/ : /default-entry\/client\.js$/,
+				);
+				expect(defaults['virtual:tanstack-start-server-entry']).toMatch(
+					compiled ? /compiled\/default-server\.js$/ : /default-entry\/server\.js$/,
+				);
+				writeFileSync(join(src, 'custom-client.ts'), 'export {};');
+				writeFileSync(join(src, 'custom-server.ts'), 'export {};');
+				const custom = await aliases(true);
+				expect(custom['virtual:tanstack-start-client-entry']).toBe(
+					realpathSync(join(src, 'custom-client.ts')),
+				);
+				expect(custom['virtual:tanstack-start-server-entry']).toBe(
+					realpathSync(join(src, 'custom-server.ts')),
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	it('installs Octane compilation before route generation', () => {
 		const plugins = flattenPlugins(tanstackStart({ octane: { hmr: false } }));

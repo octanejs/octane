@@ -31,7 +31,7 @@ export function settleOwner(owner: Array<any>, rendered: boolean) {
 
 export function useTransitioner(routerInstance: AnyRouter) {
 	const router = routerInstance as any;
-	const [, forceRender] = useState<object>();
+	const [expectedMatches, setExpectedMatches] = useState<unknown>();
 
 	const acknowledgement: Array<any> = (router._rendered ??= []);
 
@@ -40,9 +40,9 @@ export function useTransitioner(routerInstance: AnyRouter) {
 			// A newer transition supersedes an unrendered older one.
 			settleOwner(acknowledgement, false);
 			acknowledgement.push(expected, resolve);
-			// Force `MatchesInner` to re-read: it renders `acknowledgement[0]` and
-			// settles this promise from a layout effect once that commit lands.
-			forceRender({});
+			// Publish the matches this transaction needs. MatchesInner consumes this
+			// snapshot and acknowledges it only after that exact tree commits.
+			setExpectedMatches(expected);
 			startTransition(fn);
 		});
 
@@ -93,4 +93,5 @@ export function useTransitioner(routerInstance: AnyRouter) {
 		}
 		return unsub;
 	}, [router, router.history]);
+	return expectedMatches;
 }

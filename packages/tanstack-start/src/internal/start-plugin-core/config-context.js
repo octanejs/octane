@@ -33,7 +33,7 @@ function createStartConfigContext(opts) {
 		if (!startConfig)
 			startConfig = opts.parseConfig(
 				opts.startPluginOpts,
-				{ framework: opts.corePluginOpts.framework },
+				{ framework: opts.corePluginOpts.framework, compiled: opts.corePluginOpts.compiled },
 				requireRoot(),
 			);
 		return startConfig;

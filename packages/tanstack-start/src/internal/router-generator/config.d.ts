@@ -25,6 +25,7 @@ export type TokenMatcher = z.infer<typeof tokenMatcherSchema>;
 export declare const routerFrameworks: readonly ['react', 'solid', 'vue', 'octane'];
 export declare const baseConfigSchema: z.ZodObject<
 	{
+		compiled: z.ZodOptional<z.ZodBoolean>;
 		target: z.ZodDefault<
 			z.ZodOptional<
 				z.ZodEnum<{
@@ -119,6 +120,7 @@ export declare const baseConfigSchema: z.ZodObject<
 export type BaseConfig = z.infer<typeof baseConfigSchema>;
 export declare const configSchema: z.ZodObject<
 	{
+		compiled: z.ZodOptional<z.ZodBoolean>;
 		target: z.ZodDefault<
 			z.ZodOptional<
 				z.ZodEnum<{

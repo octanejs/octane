@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
 import { mount, nextPaint } from '../_helpers';
-import { makeCompiledRouter } from '../_fixtures/compiled-router.tsrx';
+import { makeCompiledRouter, makeCompiledFileRouter } from '../_fixtures/compiled-router.tsrx';
 
 async function settle() {
 	for (let i = 0; i < 6; i++) {
@@ -11,6 +11,75 @@ async function settle() {
 }
 
 describe('opt-in compiled router rendering', () => {
+	it('commits the Link transition cue before synchronous router callbacks', async () => {
+		const router = makeCompiledFileRouter();
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			const link = view.find('.file-timing') as HTMLAnchorElement;
+			const observations: unknown[] = [];
+			const unsubscribe = router.subscribe('onBeforeNavigate', () => {
+				observations.push([link.getAttribute('data-transitioning'), link.textContent]);
+			});
+			link.click();
+			expect(observations).toEqual([['transitioning', 'true']]);
+			await settle();
+			expect(view.find('.file p').textContent).toBe('e:File e');
+			expect(link.getAttribute('data-transitioning')).toBeNull();
+			unsubscribe();
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('binds generated and lazy file-route accessors and links to the compiled context', async () => {
+		const router = makeCompiledFileRouter();
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			expect(view.find('.file p').textContent).toBe('a:File a');
+			expect(view.find('.file').getAttribute('data-lazy')).toBe('a');
+			view.click('.file-relative');
+			await settle();
+			expect(view.find('.file p').textContent).toBe('b:File b');
+			expect(router.state.location.search).toEqual({ page: 2 });
+			view.click('.file-api');
+			await settle();
+			expect(view.find('.file p').textContent).toBe('c:File c');
+			view.click('.file button');
+			await settle();
+			expect(view.find('.file p').textContent).toBe('d:File d');
+			view.click('.file-missing');
+			await settle();
+			expect(view.find('.not-found').textContent).toBe('route api missing');
+			await router.navigate({ to: '/files/$id', params: { id: 'a' } } as any);
+			await settle();
+			expect(view.find('.file p').textContent).toBe('a:File a');
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps the root shell and exposes its nearest match while navigating', async () => {
+		const router = makeCompiledRouter('/', { shell: true });
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			const shell = view.find('.document-shell');
+			expect(shell.getAttribute('data-route')).toBe('__root__');
+			expect(shell.getAttribute('data-context')).toBe('root context');
+			await router.navigate({ to: '/items/a' });
+			await settle();
+			expect(view.find('.document-shell')).toBe(shell);
+			expect(view.find('.value').textContent).toBe('a:Name a');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('renders lazy nested outlets, keeps parent identity and owns hooks and history', async () => {
 		const router = makeCompiledRouter();
 		await router.load();

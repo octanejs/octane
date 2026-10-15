@@ -185,6 +185,7 @@ export default defineConfig({
 		// the pass (explicit subSlot tags compose with it), unlike router/mdx.
 		octaneMdx(websiteMdxOptions),
 		tanstackStart({
+			compiled: true,
 			// Scene modules stay client-only during Start SSR, matching the website's
 			// existing Octane renderer contract while still shipping through Vite.
 			// devtools: true enables profiling instrumentation in dev (compiled out

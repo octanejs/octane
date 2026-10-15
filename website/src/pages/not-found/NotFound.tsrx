@@ -1,4 +1,4 @@
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@octanejs/tanstack-router/compiled';
 import { useTitle } from '../../hooks/use-title.ts';
 
 export function NotFound() @{

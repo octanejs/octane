@@ -163,9 +163,12 @@ function getTargetTemplate(config) {
 					},
 				},
 			};
-		case 'octane':
+		case 'octane': {
+			const routerPackage = config.compiled
+				? `${OCTANE_ROUTER_PACKAGE}/compiled`
+				: OCTANE_ROUTER_PACKAGE;
 			return {
-				fullPkg: OCTANE_ROUTER_PACKAGE,
+				fullPkg: routerPackage,
 				subPkg: 'octane-router',
 				rootRoute: {
 					template: () =>
@@ -176,7 +179,7 @@ function getTargetTemplate(config) {
 							'function RootComponent() @{\n <div>Hello "%%tsrPath%%"!<Outlet /></div>\n}\n',
 						].join(''),
 					imports: {
-						tsrImports: () => `import { Outlet, createRootRoute } from '${OCTANE_ROUTER_PACKAGE}';`,
+						tsrImports: () => `import { Outlet, createRootRoute } from '${routerPackage}';`,
 						tsrExportStart: () => 'export const Route = createRootRoute(',
 						tsrExportEnd: () => ');',
 					},
@@ -190,7 +193,7 @@ function getTargetTemplate(config) {
 							'function RouteComponent() @{\n <div>Hello "%%tsrPath%%"!</div>\n}\n',
 						].join(''),
 					imports: {
-						tsrImports: () => `import { createFileRoute } from '${OCTANE_ROUTER_PACKAGE}';`,
+						tsrImports: () => `import { createFileRoute } from '${routerPackage}';`,
 						tsrExportStart: (routePath) =>
 							`export const Route = createFileRoute(${serializeRoutePath(routePath)})(`,
 						tsrExportEnd: () => ');',
@@ -205,13 +208,14 @@ function getTargetTemplate(config) {
 							'function RouteComponent() @{\n <div>Hello "%%tsrPath%%"!</div>\n}\n',
 						].join(''),
 					imports: {
-						tsrImports: () => `import { createLazyFileRoute } from '${OCTANE_ROUTER_PACKAGE}';`,
+						tsrImports: () => `import { createLazyFileRoute } from '${routerPackage}';`,
 						tsrExportStart: (routePath) =>
 							`export const Route = createLazyFileRoute(${serializeRoutePath(routePath)})(`,
 						tsrExportEnd: () => ');',
 					},
 				},
 			};
+		}
 		default:
 			throw new Error(`router-generator: Unknown target type: ${target}`);
 	}

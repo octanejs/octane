@@ -1,7 +1,7 @@
 // One searchable surface for first-party app integrations and library bindings.
 // Its state lives in the route search params so SSR, shared URLs, and header
 // search land on the same deterministic result set.
-import { useNavigate, useSearch } from '@octanejs/tanstack-router';
+import { useNavigate, useSearch } from '@octanejs/tanstack-router/compiled';
 import { BINDING_CATEGORIES } from '../content/bindings.ts';
 import ecosystemIndex from '../content/ecosystem-index.json';
 import {

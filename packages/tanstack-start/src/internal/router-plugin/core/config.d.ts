@@ -55,6 +55,7 @@ type FileRouteKeys = keyof (Parameters<CreateFileRoute<any, any, any, any, any>>
 export type DeletableNodes = FileRouteKeys | (string & {});
 export declare const configSchema: z.ZodObject<
 	{
+		compiled: z.ZodOptional<z.ZodBoolean>;
 		target: z.ZodDefault<
 			z.ZodOptional<
 				z.ZodEnum<{

@@ -5,7 +5,10 @@ import {
 } from '#tanstack-start/plugin-core/rsbuild';
 import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 import { octaneRouteGeneratorPlugin } from '@octanejs/tanstack-router/generator-plugin';
-import { octaneStartDefaultEntryPaths } from './default-entry-paths.js';
+import {
+	octaneStartDefaultEntryPaths,
+	octaneStartCompiledEntryPaths,
+} from './default-entry-paths.js';
 import { validateOctaneCompilerOptions } from './validate-options.js';
 
 const clientOnlyStripLoaderPath = fileURLToPath(
@@ -13,13 +16,14 @@ const clientOnlyStripLoaderPath = fileURLToPath(
 );
 
 export function tanstackStart(options) {
-	const { octane: octaneOptions, ...startOptions } = options ?? {};
+	const { octane: octaneOptions, compiled = false, ...startOptions } = options ?? {};
 	validateOctaneCompilerOptions(octaneOptions);
 
 	const corePlugin = tanStackStartRsbuild(
 		{
 			framework: 'octane',
-			defaultEntryPaths: octaneStartDefaultEntryPaths,
+			compiled,
+			defaultEntryPaths: compiled ? octaneStartCompiledEntryPaths : octaneStartDefaultEntryPaths,
 			providerEnvironmentName: RSBUILD_ENVIRONMENT_NAMES.server,
 			ssrIsProvider: true,
 			routerGeneratorPlugins: [octaneRouteGeneratorPlugin()],

@@ -1,6 +1,6 @@
 /** @import { Program } from 'estree' */
 
-import { isLayoutWhitespace } from '@tsrx/core';
+import { builders as b, isLayoutWhitespace } from '@tsrx/core';
 
 // `@tsrx/core` 0.5 gives template markup TSX's exact tree: the indentation
 // between children is a `JSXText` of its own, and an `@case`/`@default` arm is
@@ -61,6 +61,18 @@ function adopt(value, editor) {
 			if (out !== null && adopted !== null) out.push(adopted);
 		}
 		return out ?? value;
+	}
+	// Explicit content props make <style> an ordinary host, not scoped CSS.
+	// Normalize before both runtime and editor analysis, retaining authored locations.
+	if (
+		value.type === 'JSXStyleElement' &&
+		value.openingElement.attributes.some(
+			(attr) =>
+				attr.type === 'JSXAttribute' &&
+				(attr.name.name === 'children' || attr.name.name === 'dangerouslySetInnerHTML'),
+		)
+	) {
+		return adopt(b.jsx_element(value, value.openingElement.attributes, []), editor);
 	}
 	/** @type {any} */
 	let out = null;

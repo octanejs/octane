@@ -50,11 +50,31 @@ import { createServerFn } from '@octanejs/tanstack-start';
 import { createFileRoute } from '@octanejs/tanstack-router';
 ```
 
+## Compiled Router integration
+
+Use `tanstackStart({ compiled: true })` in either build plugin for routes authored
+as compiled Octane template bodies. This selects matching default Start entries,
+route scaffolds, generated route-tree imports, and lazy route imports. Existing
+custom `client.entry` and `server.entry` options retain precedence.
+
+Import routing APIs from `@octanejs/tanstack-router/compiled` throughout that
+route tree. A custom client entry uses `StartClient` and `hydrateStart` from
+`@octanejs/tanstack-start/compiled/client`; a custom server uses `StartServer`,
+`defaultStreamHandler`, or `defaultRenderHandler` from
+`@octanejs/tanstack-start/compiled/server`. The package-root server-function APIs
+remain unchanged. Do not mix the ordinary and compiled Router contexts.
+
+The compiled Start components retain the existing document hydration owner and
+ready acknowledgement. The option selects the compiled rendering boundary; it
+does not declare the entire Router or Start package Strong-compliant.
+
 ## Public entries
 
 - `@octanejs/tanstack-start`
 - `@octanejs/tanstack-start/client`
 - `@octanejs/tanstack-start/server`
+- `@octanejs/tanstack-start/compiled/client`
+- `@octanejs/tanstack-start/compiled/server`
 - `@octanejs/tanstack-start/plugin/vite`
 - `@octanejs/tanstack-start/plugin/rsbuild`
 - RPC and environment-marker entries used by the Start compiler

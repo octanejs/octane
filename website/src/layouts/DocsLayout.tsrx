@@ -1,6 +1,6 @@
 // Docs section shell: sidebar of documents (from the registry) + the routed
 // document via <Outlet/>.
-import { Link, Outlet, useParams } from '@octanejs/tanstack-router';
+import { Link, Outlet, useParams } from '@octanejs/tanstack-router/compiled';
 import { OnThisPage } from '../components/OnThisPage.tsrx';
 import { docGroups, defaultDoc, findDoc } from '../content/docs.ts';
 import { useAnimatedMobileNavigation } from '../hooks/use-animated-mobile-navigation.ts';

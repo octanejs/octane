@@ -3,7 +3,7 @@
 // Site search keeps the established header entry point and docs snippets, then
 // adds typed ecosystem results from the generated browser index.
 import { createPortal, useEffect, useRef, useState } from 'octane';
-import { useNavigate } from '@octanejs/tanstack-router';
+import { useNavigate } from '@octanejs/tanstack-router/compiled';
 import {
 	loadSiteSearchIndex,
 	searchSite,

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@octanejs/tanstack-router';
+import { createFileRoute } from '@octanejs/tanstack-router/compiled';
 import { Home } from '../pages/home/Home.tsrx';
 
 export const Route = createFileRoute('/')({

@@ -1720,6 +1720,7 @@ export declare function parseStartConfig(
 	opts: z.input<typeof tanstackStartViteOptionsSchema>,
 	corePluginOpts: {
 		framework: CompileStartFrameworkOptions;
+		compiled?: boolean;
 	},
 	root: string,
 ): {

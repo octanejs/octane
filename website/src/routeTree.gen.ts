@@ -152,7 +152,7 @@ export interface RootRouteChildren {
   PlaygroundRoute: typeof PlaygroundRoute
 }
 
-declare module '@octanejs/tanstack-router' {
+declare module '@octanejs/tanstack-router/compiled' {
   interface FileRoutesByPath {
     '/': {
       id: '/'

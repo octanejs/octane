@@ -17,6 +17,8 @@ export type TanStackOctaneStartRsbuildInputConfig = Omit<
 	TanStackStartRsbuildInputConfig,
 	'octane'
 > & {
+	/** Use compiled route bodies and the compiled Router document boundary. */
+	compiled?: boolean;
 	octane?: OctaneCompilerOptions;
 };
 

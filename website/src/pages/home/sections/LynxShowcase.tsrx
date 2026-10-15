@@ -9,7 +9,7 @@
 // Each card fetches only `example-metadata.json`, not the highlighted sources
 // the docs' <Go> panel also pulls: there is no code on this page.
 import { useEffect, useState } from 'octane';
-import { Link, useLocation } from '@octanejs/tanstack-router';
+import { Link, useLocation } from '@octanejs/tanstack-router/compiled';
 import { LynxPreview } from '../../../components/go/LynxPreview.tsrx';
 import {
 	loadExampleMetadata,

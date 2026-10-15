@@ -36,6 +36,7 @@ import type {
 	UseNavigateResult,
 } from '@tanstack/router-core';
 import { createElement } from 'octane';
+import { createRouteHookBindings } from './routeHookBindings';
 import type { ComponentBody } from 'octane';
 import {
 	useMatch,
@@ -107,59 +108,13 @@ declare module '@tanstack/router-core' {
 // Attach the hook accessors to a route-shaped instance (Route / RootRoute /
 // RouteApi). `strictLoaderHooks: false` is RouteApi's mode — its loader hooks
 // pass `strict: false` upstream (the api may be read from ancestor layouts).
-function attachRouteHooks(self: any, strictLoaderHooks: boolean): void {
-	self.useMatch = (...args: any[]) => {
-		const [user, slot] = splitSlot(args);
-		const opts = user[0] ?? {};
-		return useMatch(
-			{ select: opts.select, structuralSharing: opts.structuralSharing, from: self.id },
-			subSlot(slot, 'r:m'),
-		);
-	};
-	self.useRouteContext = (...args: any[]) => {
-		const [user, slot] = splitSlot(args);
-		const opts = user[0] ?? {};
-		return useRouteContext({ ...opts, from: self.id }, subSlot(slot, 'r:ctx'));
-	};
-	self.useSearch = (...args: any[]) => {
-		const [user, slot] = splitSlot(args);
-		const opts = user[0] ?? {};
-		return useSearch(
-			{ select: opts.select, structuralSharing: opts.structuralSharing, from: self.id },
-			subSlot(slot, 'r:s'),
-		);
-	};
-	self.useParams = (...args: any[]) => {
-		const [user, slot] = splitSlot(args);
-		const opts = user[0] ?? {};
-		return useParams(
-			{ select: opts.select, structuralSharing: opts.structuralSharing, from: self.id },
-			subSlot(slot, 'r:p'),
-		);
-	};
-	self.useLoaderDeps = (...args: any[]) => {
-		const [user, slot] = splitSlot(args);
-		const opts = user[0] ?? {};
-		return useLoaderDeps(
-			strictLoaderHooks ? { ...opts, from: self.id } : { ...opts, from: self.id, strict: false },
-			subSlot(slot, 'r:d'),
-		);
-	};
-	self.useLoaderData = (...args: any[]) => {
-		const [user, slot] = splitSlot(args);
-		const opts = user[0] ?? {};
-		return useLoaderData(
-			strictLoaderHooks ? { ...opts, from: self.id } : { ...opts, from: self.id, strict: false },
-			subSlot(slot, 'r:l'),
-		);
-	};
-}
+const { attachRouteHooks, attachRouteNavigation: attachNavigation } = createRouteHookBindings(
+	{ useMatch, useParams, useSearch, useLoaderData, useLoaderDeps, useRouteContext, useNavigate },
+	useRouter,
+);
 
 function attachRouteNavigation(self: any): void {
-	self.useNavigate = (...args: any[]) => {
-		const [, slot] = splitSlot(args);
-		return useNavigate({ from: self.fullPath }, subSlot(slot, 'r:n'));
-	};
+	attachNavigation(self);
 	self.Link = (props: Record<string, unknown>) =>
 		createElement(Link as any, { from: self.fullPath, ...props });
 }

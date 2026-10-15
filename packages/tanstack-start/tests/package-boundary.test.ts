@@ -16,35 +16,37 @@ function collectFiles(entryPath: string): Array<string> {
 }
 
 describe('@octanejs/tanstack-start package boundary', () => {
-	it('preserves hydration when a production consumer imports the default client entry for its effects', async () => {
-		const clientEntry = resolve(packageDirectory, 'src/default-entry/client.js');
-		const result = await build({
-			stdin: {
-				contents: `import ${JSON.stringify(clientEntry)};`,
-				resolveDir: repositoryRoot,
-				sourcefile: 'start-consumer-bootstrap.js',
-			},
-			bundle: true,
-			format: 'iife',
-			logLevel: 'silent',
-			minify: true,
-			platform: 'browser',
-			treeShaking: true,
-			write: false,
-			plugins: [
-				{
-					name: 'start-consumer-bootstrap-dependencies',
-					setup(builder) {
-						builder.onResolve({ filter: /^octane$/ }, () => ({
-							path: 'octane',
-							namespace: 'start-consumer-bootstrap',
-						}));
-						builder.onResolve({ filter: /^\.\.\/client\.js$/ }, () => ({
-							path: 'start-client',
-							namespace: 'start-consumer-bootstrap',
-						}));
-						builder.onLoad({ filter: /^octane$/, namespace: 'start-consumer-bootstrap' }, () => ({
-							contents: `
+	it.each(['default-entry/client.js', 'compiled/default-client.js'])(
+		'preserves hydration when a production consumer imports %s for its effects',
+		async (entry) => {
+			const clientEntry = resolve(packageDirectory, 'src', entry);
+			const result = await build({
+				stdin: {
+					contents: `import ${JSON.stringify(clientEntry)};`,
+					resolveDir: repositoryRoot,
+					sourcefile: 'start-consumer-bootstrap.js',
+				},
+				bundle: true,
+				format: 'iife',
+				logLevel: 'silent',
+				minify: true,
+				platform: 'browser',
+				treeShaking: true,
+				write: false,
+				plugins: [
+					{
+						name: 'start-consumer-bootstrap-dependencies',
+						setup(builder) {
+							builder.onResolve({ filter: /^octane$/ }, () => ({
+								path: 'octane',
+								namespace: 'start-consumer-bootstrap',
+							}));
+							builder.onResolve({ filter: /^(?:\.\.\/client\.js|\.\/client\.ts)$/ }, () => ({
+								path: 'start-client',
+								namespace: 'start-consumer-bootstrap',
+							}));
+							builder.onLoad({ filter: /^octane$/, namespace: 'start-consumer-bootstrap' }, () => ({
+								contents: `
 export function initializeHydrationEventCapture() {
 	globalThis.bootstrap.capture();
 }
@@ -52,60 +54,61 @@ export function hydrateRoot(container, component, options) {
 	globalThis.bootstrap.hydrate(container, component, options);
 }
 `,
-							loader: 'js',
-						}));
-						builder.onLoad(
-							{ filter: /^start-client$/, namespace: 'start-consumer-bootstrap' },
-							() => ({
-								contents: `
+								loader: 'js',
+							}));
+							builder.onLoad(
+								{ filter: /^start-client$/, namespace: 'start-consumer-bootstrap' },
+								() => ({
+									contents: `
 export const StartClient = globalThis.bootstrap.component;
 export function hydrateStart() {
 	return globalThis.bootstrap.start();
 }
 `,
-								loader: 'js',
-							}),
-						);
+									loader: 'js',
+								}),
+							);
+						},
+					},
+				],
+			});
+			const container = { id: '__app' };
+			const router = { id: 'hydrated-router' };
+			const component = () => undefined;
+			const calls: {
+				capture: number;
+				start: number;
+				hydrations: Array<{ container: unknown; component: unknown; router: unknown }>;
+			} = { capture: 0, start: 0, hydrations: [] };
+			const context = {
+				document: {
+					getElementById: (id: string) => (id === '__app' ? container : null),
+				},
+				bootstrap: {
+					component,
+					capture() {
+						calls.capture++;
+					},
+					start() {
+						calls.start++;
+						return Promise.resolve(router);
+					},
+					hydrate(root: unknown, client: unknown, options: { router: unknown }) {
+						calls.hydrations.push({ container: root, component: client, router: options.router });
 					},
 				},
-			],
-		});
-		const container = { id: '__app' };
-		const router = { id: 'hydrated-router' };
-		const component = () => undefined;
-		const calls: {
-			capture: number;
-			start: number;
-			hydrations: Array<{ container: unknown; component: unknown; router: unknown }>;
-		} = { capture: 0, start: 0, hydrations: [] };
-		const context = {
-			document: {
-				getElementById: (id: string) => (id === '__app' ? container : null),
-			},
-			bootstrap: {
-				component,
-				capture() {
-					calls.capture++;
-				},
-				start() {
-					calls.start++;
-					return Promise.resolve(router);
-				},
-				hydrate(root: unknown, client: unknown, options: { router: unknown }) {
-					calls.hydrations.push({ container: root, component: client, router: options.router });
-				},
-			},
-		};
+			};
 
-		runInNewContext(result.outputFiles[0].text, context);
+			runInNewContext(result.outputFiles[0].text, context);
 
-		expect(calls.capture).toBe(1);
-		expect(calls.start).toBe(1);
+			expect(calls.capture).toBe(1);
+			expect(calls.start).toBe(1);
 
-		await Promise.resolve();
+			await Promise.resolve();
 
-		expect(calls.hydrations).toEqual([{ container, component, router }]);
-	});
+			expect(calls.hydrations).toEqual([{ container, component, router }]);
+		},
+	);
 
 	it('continues tree-shaking an unused package-root import from production consumer bundles', async () => {
 		const packageEntry = resolve(packageDirectory, 'src/index.js');

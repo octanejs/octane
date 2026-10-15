@@ -8,7 +8,7 @@
 // playground-examples.test.ts).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router/compiled';
 import { getRouter } from '../src/router.ts';
 import {
 	compileRuntime,

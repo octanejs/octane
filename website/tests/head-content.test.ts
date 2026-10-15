@@ -7,7 +7,7 @@ import {
 	createRoute,
 	createRouter,
 	type NavigateOptions,
-} from '@octanejs/tanstack-router';
+} from '@octanejs/tanstack-router/compiled';
 import { attachRouterServerSsrUtils } from '@octanejs/tanstack-router/ssr/server';
 import { SiteHeadContent } from '../src/components/SiteHeadContent.tsrx';
 

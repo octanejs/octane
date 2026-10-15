@@ -1284,14 +1284,14 @@
       "version": "0.2.8",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router", "version": "1.170.41" },
-      "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
+      "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries. The opt-in compiled entry also owns typed code/file-route factories, links, root document shells, and document asset APIs for compiled route trees.",
       "divergences": [
         "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
         "Link callbacks receive native DOM events rather than React synthetic events.",
         "Router devtools are distributed separately."
       ],
       "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by Octane-only framework-contract tests in ordinary shards (not a React SSR oracle).",
-      "verified": "2026-08-02"
+      "verified": "2026-10-15"
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",

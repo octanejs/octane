@@ -877,6 +877,35 @@ export function Unchecked(props: { label: (value: number) => string }) @{
 		}
 	});
 
+	it.each([false, true])('maps dynamic style content as host props (Strong: %s)', (strong) => {
+		const source = readFileSync(
+			new URL('../_fixtures/dynamic-style-content.tsrx', import.meta.url),
+			'utf8',
+		);
+		const result = compileToVolarMappings(source, 'dynamic-style-content.tsrx', { strong });
+		expect(result.errors).toEqual([]);
+		expect(result.diagnostics).toEqual([]);
+		// Only the authored CSS block is an embedded stylesheet. Both dynamic
+		// expressions remain mapped TSX so the language service checks their types.
+		expect(result.cssMappings).toHaveLength(1);
+		for (const match of source.matchAll(/props\.css/g)) {
+			const offset = match.index + 'props.'.length;
+			const mapped = result.mappings.flatMap((mapping) =>
+				mapping.sourceOffsets.map((start, index) => {
+					if (offset < start || offset >= start + mapping.lengths[index]) return '';
+					const generated = mapping.generatedOffsets[index] + offset - start;
+					return result.code.slice(generated, generated + 3);
+				}),
+			);
+			expect(mapped).toContain('css');
+		}
+		expect(result.code).toContain('children=');
+		expect(result.code).toContain('dangerouslySetInnerHTML=');
+		const inspection = compileTypesInspection(source, 'dynamic-style-content.tsrx');
+		expect(inspection.code).toContain('children=');
+		expect(inspection.code).toContain('dangerouslySetInnerHTML=');
+	});
+
 	it('accepts a parenthesized style block as an apply target', () => {
 		// The formatter wraps a multi-line assigned block in parentheses, which the
 		// editor parse keeps.

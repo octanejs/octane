@@ -1,6 +1,11 @@
 import {
 	BaseRootRoute,
 	BaseRoute,
+	createRootRoute,
+	createFileRoute,
+	createLazyFileRoute,
+	getRouteApi,
+	Link,
 	createRouter,
 	createMemoryHistory,
 	CompiledOutlet,
@@ -11,12 +16,22 @@ import {
 	useLocation,
 	useCanGoBack,
 	useMatches,
+	useMatch,
+	useRouteContext,
 	notFound,
 	type ErrorComponentProps,
 	type NotFoundRouteProps,
 } from '@octanejs/tanstack-router/compiled';
 import { useState } from 'octane';
 export { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
+
+function Shell(props: { children?: unknown }) @{
+	const match = useMatch({ strict: false });
+	const context = useRouteContext({ strict: false }) as { shell: string };
+	<div class="document-shell" data-route={match.routeId} data-context={context.shell}>
+		{props.children}
+	</div>
+}
 
 function Layout() @{
 	const selected = useMatches({ select: (matches) => matches.at(-1)?.routeId });
@@ -79,8 +94,9 @@ export function makeCompiledRouter(
 ) {
 	const root = new BaseRootRoute({
 		component: Layout,
+		beforeLoad: () => ({ shell: 'root context' }),
 		notFoundComponent: NotFoundView,
-		...(opts.shell ? { shellComponent: Layout } : {}),
+		...(opts.shell ? { shellComponent: Shell } : {}),
 	});
 	const home = new BaseRoute({ getParentRoute: () => root, path: '/', component: Home });
 	const items = new BaseRoute({
@@ -113,5 +129,49 @@ export function makeCompiledRouter(
 		defaultPendingMs: 0,
 		defaultPendingMinMs: 0,
 		...(opts.wrap ? { Wrap: Layout } : {}),
+	});
+}
+
+export function makeCompiledFileRouter(initial = '/files/a') {
+	const api = getRouteApi('/files/$id' as any);
+	const root = createRootRoute({ component: Layout });
+	const file = createFileRoute('/files/$id' as never)({
+		loader: ({ params }: any) => {
+			if (params.id === 'missing') throw api.notFound({ data: 'route api missing' });
+			return { label: 'File ' + params.id };
+		},
+		notFoundComponent: NotFoundView,
+	} as any).update({
+		id: '/files/$id',
+		path: '/files/$id',
+		getParentRoute: () => root,
+	} as any);
+	const lazyFile = createLazyFileRoute('/files/$id' as never)({ component: File });
+	file.lazy(async () => lazyFile as any);
+	function File() @{
+		const direct = file.useParams() as any;
+		const lazyParams = lazyFile.useParams() as any;
+		const selected = api.useLoaderData() as any;
+		const navigate = file.useNavigate();
+		<section class="file" data-lazy={lazyParams.id}>
+			<p>{(direct.id + ':' + selected.label) as string}</p>
+			<file.Link class="file-relative" to="." params={{ id: 'b' }} search={{ page: 2 }}>
+				Next file
+			</file.Link>
+			<api.Link class="file-api" to="." params={{ id: 'c' }}>
+				API file
+			</api.Link>
+			<Link class="file-timing" to="/files/$id" params={{ id: 'e' }}>
+				{({ isTransitioning }) => String(isTransitioning)}
+			</Link>
+			<Link class="file-missing" to="/files/$id" params={{ id: 'missing' }}>
+				Missing
+			</Link>
+			<button onClick={() => navigate({ to: '.', params: { id: 'd' } } as any)}>Navigate</button>
+		</section>
+	}
+	return createRouter({
+		routeTree: root.addChildren([file]),
+		history: createMemoryHistory({ initialEntries: [initial] }),
 	});
 }

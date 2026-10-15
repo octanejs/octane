@@ -23,6 +23,8 @@ export type OctaneCompilerOptions = Omit<OctaneVitePluginOptions, 'ssr'> & {
 };
 
 export type TanStackOctaneStartViteInputConfig = TanStackStartViteInputConfig & {
+	/** Use compiled route bodies and the compiled Router document boundary. */
+	compiled?: boolean;
 	octane?: OctaneCompilerOptions;
 };
 

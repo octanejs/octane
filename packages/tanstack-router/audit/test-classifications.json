@@ -14,7 +14,7 @@
     {
       "path": "packages/tanstack-router/tests/conformance/compiled-router.test.ts",
       "disposition": "octane-only-framework-contract",
-      "reason": "Checks the Octane compiled provider, outlet, route hooks, pending/error/not-found boundaries, and rejected renderables; it has no React oracle."
+      "reason": "Checks the Octane compiled provider, outlet, shell context, code and file-route hooks, Link callback timing, pending/error/not-found boundaries, and rejected renderables; it has no React oracle."
     },
     {
       "path": "packages/tanstack-router/tests/conformance/concurrent-navigation.test.ts",
@@ -87,14 +87,14 @@
       "reason": "Checks the broader Octane Router contract; it is not same-scenario React execution."
     },
     {
-      "path": "packages/tanstack-router/tests/conformance/scroll-restoration-hydration.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Checks hydrateRoot adoption and removal of the server scroll restoration script against router-core's browser build; React's script removes itself before hydration, so there is no same-scenario React execution."
-    },
-    {
       "path": "packages/tanstack-router/tests/conformance/same-route-search.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane same-route search updates; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/scroll-restoration-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks hydrateRoot adoption and removal of the server scroll restoration script against router-core's browser build; React's script removes itself before hydration, so there is no same-scenario React execution."
     },
     {
       "path": "packages/tanstack-router/tests/differential/parity.test.ts",
@@ -110,6 +110,11 @@
       "path": "packages/tanstack-router/tests/ssr/ssr.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the retained Octane adapter SSR behavior cited to TanStack Router PR #7847; it is not a React SSR oracle."
+    },
+    {
+      "path": "packages/tanstack-router/typetests/compiled-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks compiled entry route factories, file-route identities, route-bound accessors, and Link inference against the public binding types; it is not a React type oracle."
     },
     {
       "path": "packages/tanstack-router/typetests/public-api.test-d.ts",

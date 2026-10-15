@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from '@octanejs/tanstack-router';
+import { createFileRoute, notFound } from '@octanejs/tanstack-router/compiled';
 import { ErrorCodeDecoder } from '../pages/error-codes/ErrorCodes.tsrx';
 
 export const Route = createFileRoute('/errors/$code')({

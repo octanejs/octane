@@ -10,6 +10,7 @@ var tokenJsonRegexSchema = z.object({
 var tokenMatcherSchema = z.union([z.string(), z.instanceof(RegExp), tokenJsonRegexSchema]);
 var baseConfigSchema = z.object({
 	target: z.enum(['react', 'solid', 'vue', 'octane']).optional().default('react'),
+	compiled: z.boolean().optional(),
 	virtualRouteConfig: virtualRootRouteSchema.or(z.string()).optional(),
 	routeFilePrefix: z.string().optional(),
 	routeFileIgnorePrefix: z.string().optional().default('-'),

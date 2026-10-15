@@ -253,7 +253,10 @@ function compileCodeSplitReferenceRoute(opts) {
 		return opts.codeSplitGroupings.findIndex((group) => group.includes(str));
 	}
 	const frameworkOptions = getFrameworkOptions(opts.targetFramework);
-	const PACKAGE = frameworkOptions.package;
+	const PACKAGE =
+		opts.targetFramework === 'octane' && opts.compiled
+			? `${frameworkOptions.package}/compiled`
+			: frameworkOptions.package;
 	const LAZY_ROUTE_COMPONENT_IDENT = frameworkOptions.idents.lazyRouteComponent;
 	const LAZY_FN_IDENT = frameworkOptions.idents.lazyFn;
 	const stableRouteOptionKeys = [

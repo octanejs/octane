@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router/compiled';
 import { decodeErrorMessage, errorCodes } from '../src/content/error-codes.ts';
 import { getRouter, parseWebsiteSearch, stringifyWebsiteSearch } from '../src/router.ts';
 

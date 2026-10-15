@@ -68,6 +68,7 @@ function parseStartConfig(opts, corePluginOpts, root) {
 				{
 					...options.router,
 					target: corePluginOpts.framework,
+					compiled: corePluginOpts.compiled,
 					routesDirectory,
 					generatedRouteTree,
 				},

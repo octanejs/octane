@@ -1,3 +1,5 @@
+'use strong';
+
 // Slot mechanics shared by the binding's plain-`.ts` hooks (copied from
 // @octanejs/tanstack-query). The octane compiler injects a per-call-site Symbol slot into
 // every hook call in `.tsrx`/`.tsx`, but these binding files are NOT compiled — so
