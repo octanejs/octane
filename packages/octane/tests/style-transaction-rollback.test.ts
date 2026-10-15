@@ -31,6 +31,19 @@ export function Siblings(props) @{
 		<div id="second" style={{ color: props.color, width: props.last }} />
 	</main>
 }
+// A spread style diffs during render and writes through setRenderStyle.
+export function Spread(props) @{
+	<main><div id="target" style={{ ...props.prefix, color: props.color }} /><Reader read={props.read} /></main>
+}
+export function CaughtSpread(props) @{
+	<main>
+		@try {
+			<div id="target" style={{ ...props.prefix, color: props.color }} />
+		} @catch (error) {
+			<p id="caught">{error.message as string}</p>
+		}
+	</main>
+}
 function Forward(props) @{
 	props.record?.();
 	<div id="target" title={props.title} style={props.style}><input /></div>
@@ -336,6 +349,61 @@ describe.each([
 			ready = true;
 			pending.resolve();
 			root.unmount();
+		}
+	});
+
+	it('writes a spread style only when a waiting root render commits', async () => {
+		const client = fixture(dev, native);
+		const pending = deferred();
+		let ready = true;
+		const read = () => {
+			if (!ready) throw pending.promise;
+			return 'ready';
+		};
+		const root = mount(client.Spread, { prefix: { width: 10 }, color: 'red', read });
+		const element = root.find('#target') as HTMLElement;
+		const writes = new MutationObserver(() => {});
+		try {
+			const original = element.style.cssText;
+			ready = false;
+			writes.observe(element, { attributes: true });
+			root.update(client.Spread, { prefix: { width: 20, opacity: 0.5 }, color: 'blue', read });
+			// The waiting render queues the style for its commit: it neither writes
+			// the host nor restores it.
+			expect(writes.takeRecords()).toEqual([]);
+			expect(element.style.cssText).toBe(original);
+			ready = true;
+			await act(() => pending.resolve());
+			expect(root.find('#target')).toBe(element);
+			expect([element.style.width, element.style.opacity, element.style.color]).toEqual([
+				'20px',
+				'0.5',
+				'blue',
+			]);
+		} finally {
+			writes.disconnect();
+			ready = true;
+			pending.resolve();
+			root.unmount();
+		}
+	});
+
+	it('reports a spread style value that throws at commit to the nearest boundary', async () => {
+		const client = fixture(dev, native);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(client.CaughtSpread, { prefix: { width: 10 }, color: 'red' });
+		try {
+			const color = {
+				toString() {
+					throw new Error('CSS coercion failed');
+				},
+			};
+			await act(() => root.root.render(client.CaughtSpread, { prefix: { width: 20 }, color }));
+			expect(root.find('#caught')!.textContent).toBe('CSS coercion failed');
+			expect(root.findAll('#target')).toEqual([]);
+		} finally {
+			root.unmount();
+			error.mockRestore();
 		}
 	});
 

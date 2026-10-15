@@ -3883,7 +3883,6 @@ function discardHeldRoot(owner: RootRenderOwner): void {
 // snapshotted, so a resumed render projects again.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const JOURNAL_ATTR = 1;
 const JOURNAL_BAG = 2;
 const JOURNAL_PROP = 3;
 const JOURNAL_CREATED = 4;
@@ -4539,13 +4538,12 @@ function openFrontier(
 	parent: Node,
 	before: Node | null,
 ): DocumentFragment {
-	// A container in another document, such as one a client render replacing a
-	// document's failed hydration owns, builds in a fragment of that document.
-	const doc = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument;
+	// A container in another document, such as a document root's, builds in a
+	// fragment of that document.
+	const doc = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
+	const spare = SPARE_FRONTIERS.pop();
 	const frag =
-		doc === null || doc === document
-			? SPARE_FRONTIERS.pop() || document.createDocumentFragment()
-			: doc.createDocumentFragment();
+		spare !== undefined && spare.ownerDocument === doc ? spare : doc.createDocumentFragment();
 	(frag as any).$$next = next;
 	next.frag = frag;
 	next.members = [];
@@ -4914,6 +4912,8 @@ function queueRootUnmount(scope: Scope, exclusive: boolean, out?: any[]): void {
 	} else if (block.kind === 'root') {
 		const parent = block.parentNode;
 		first = getFirstChild(parent);
+		// A document keeps its doctype (clearRootContainer).
+		if (first !== null && first.nodeType === 10) first = getNextSibling(first);
 		last = parent.lastChild;
 	}
 	// A teardown inside an aborted mount keeps that mount's ref suppression.
@@ -5772,16 +5772,6 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 }
 
 /**
- * A style attribute a render still writes in place (setStyle and its property
- * writers), which a held window restores. Every other attribute a render writes
- * is fresh or lands at commit (#2043), so only the bag that chose it is kept.
- */
-function journalAttr(el: Element, name: string): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));
-	journalBag();
-}
-
-/**
  * Open a journal window for a visible try body that is about to re-render, and
  * return the checkpoint to roll back to. `-1` means "not journaling": either the
  * boundary cannot hold (nothing committed to keep) or no transition is in play,
@@ -5854,10 +5844,6 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 			const a = log[i + 2];
 			const b = log[i + 3];
 			switch (log[i]) {
-				case JOURNAL_ATTR:
-					if (b === null) (target as Element).removeAttribute(a);
-					else (target as Element).setAttribute(a, b);
-					break;
 				case JOURNAL_PROP:
 					target[a] = b;
 					break;
@@ -26589,9 +26575,9 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 		return;
 	}
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
-	// The whole style attribute, not the individual declarations applyStyleValue
-	// is about to touch: restoring the attribute text restores every one of them.
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+	// A render writes only fresh DOM here (setRenderStyle stages the rest), so a
+	// held window restores the bag that chose the write.
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	applyStyleValue(el, style, value, prev);
 }
 
@@ -26621,25 +26607,56 @@ export function setStyleProperty(
 	// A commit function passes the rendering scope it recorded.
 	if (remove && previous === scope) return;
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
-	if (TRANSITION_JOURNAL !== null) {
-		const log = TRANSITION_JOURNAL;
-		let tail = log.length - 4;
-		// A declaration snapshots its binding bag immediately after the style.
-		// Only that metadata record is transparent; other writes and savepoints
-		// still require their own live-browser snapshot.
-		if (log[tail] === JOURNAL_BAG && log[tail + 1] === CURRENT_SCOPE?.slots[0]) tail -= 4;
-		if (
-			tail < TRANSITION_JOURNAL_CHECKPOINT ||
-			log[tail] !== JOURNAL_ATTR ||
-			log[tail + 1] !== el ||
-			log[tail + 2] !== 'style'
-		)
-			journalAttr(el, 'style');
-		else journalBag();
-	}
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
+}
+
+/**
+ * setStyle and setStyleProperty from a render (#2043): a spread style binding
+ * diffs during render, and a root render that may be dropped queues each write
+ * for its commit, as setRenderText does. The caller's caches chose the write.
+ * A mount (no previous style) styles the host it has just built, at once.
+ * @internal
+ */
+export function setRenderStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
+	const transaction =
+		prev === undefined || ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
+	if (transaction === null) return setStyle(el, value, prev);
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	transaction.ops.push(commitStyle, [el, value, prev, CURRENT_SCOPE!]);
+}
+
+/** @internal */
+export function setRenderStyleProperty(
+	el: HTMLElement | SVGElement,
+	name: string,
+	value: any,
+	staticCss: string,
+	previous: any,
+): void {
+	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
+	if (transaction === null) return setStyleProperty(el, name, value, staticCss, previous);
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	transaction.ops.push(commitStyle, [el, value, previous, CURRENT_SCOPE!, name, staticCss]);
+}
+
+/** A queued style write's error reaches its scope's boundary, as a commit function's does. */
+function commitStyle([el, value, previous, scope, name, staticCss]: [
+	HTMLElement | SVGElement,
+	any,
+	any,
+	Scope,
+	string?,
+	string?,
+]): void {
+	try {
+		if (name === undefined) setStyle(el, value, previous);
+		else setStyleProperty(el, name, value, staticCss!, previous, scope);
+	} catch (error) {
+		reportEffectError(scope.block, error);
+	}
 }
 
 /**
@@ -26659,7 +26676,7 @@ export function setStyleProperties(
 		return;
 	}
 	const style = (el as HTMLElement).style;
-	let journaled = false;
+	if (TRANSITION_JOURNAL !== null) journalBag();
 	for (let i = 0; i < entries.length; i += 2) {
 		const value = entries[i + 1];
 		// No dynamic declaration exists yet. Removing a null or boolean value
@@ -26667,10 +26684,6 @@ export function setStyleProperties(
 		if (value == null || typeof value === 'boolean') continue;
 		const name = entries[i] as string;
 		if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, undefined, name)) continue;
-		if (!journaled && TRANSITION_JOURNAL !== null) {
-			journalAttr(el, 'style');
-			journaled = true;
-		}
 		applyStyleProperty(el, style, name, value);
 	}
 }
@@ -40152,7 +40165,7 @@ function writeHiddenStyle(
 		if (TRANSITION_JOURNAL !== null) journalBag();
 		transaction.ops.push(commitHiddenStyle, [el, value, previous, property, CURRENT_SCOPE]);
 	} else {
-		if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+		if (TRANSITION_JOURNAL !== null) journalBag();
 		commitHiddenStyle([el, value, previous, property, null]);
 	}
 	return true;
@@ -49625,7 +49638,7 @@ function removeNodes(nodes: readonly Node[]): void {
  */
 function frontierRootMount(block: Block): void {
 	const container = block.parentNode;
-	if (hydrating || container.nodeType === 9 || (container as any).$$next !== undefined) return;
+	if (hydrating || (container as any).$$next !== undefined) return;
 	journalRootProperty(block, 'parentNode', container);
 	const next = (queueFrontier(block, container, null) as any).$$next as SlotNext;
 	next.out.push(() => clearRootContainer(container as RootContainer), null, null);
@@ -49987,14 +50000,14 @@ function makeRoot(
 				frontier.frag!.append(start, end);
 			} else if (renderOwner.hydrationFallback !== undefined) {
 				frontier = renderOwner.hydrationFallback(false);
-			} else if (container.nodeType !== 9) {
-				// A client root renders on the client even while another root hydrates
-				// around it (its Blocks render with that adoption suspended).
-				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
-				// The container's previous content leaves as the mount lands.
-				frontier.out.push(() => clearRootContainer(container), null, null);
 			} else {
-				clearRootContainer(container);
+				// A client root builds off-document, a document container included,
+				// even while another root hydrates around it (its Blocks render with
+				// that adoption suspended).
+				frontier = (queueFrontier(null, container, null) as any).$$next as SlotNext;
+				// The container's previous content leaves as the mount lands, all but
+				// a document's doctype (clearRootContainer).
+				frontier.out.push(() => clearRootContainer(container), null, null);
 			}
 			rootBlock = createBlock(
 				'root',
