@@ -13,6 +13,8 @@ import {
 } from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
 
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
 interface NativeReadHost {
 	capture(): object | null;
 	cleanup(scope: Scope, dispose: () => void): void;
@@ -302,14 +304,17 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	return {
 		/** Selected-node inspection reads this Scope's existing records only. */
 		inspectScope(scope: Scope) {
-			const consumer = consumers.get(scope);
-			if (consumer === undefined || consumer.disposed) return null;
-			return {
-				block: consumer.block,
-				committed:
-					consumer.committed === null ? null : inspectNativeReadWitness(consumer.committed),
-				pending: Array.from(consumer.pending, inspectNativeReadWitness),
-			};
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				const consumer = consumers.get(scope);
+				if (consumer !== undefined && !consumer.disposed)
+					return {
+						block: consumer.block,
+						committed:
+							consumer.committed === null ? null : inspectNativeReadWitness(consumer.committed),
+						pending: Array.from(consumer.pending, inspectNativeReadWitness),
+					};
+			}
+			return null;
 		},
 		/** Receipt stamps exist only for a capture that actually read native data. */
 		stampPublication(owner: PublicationOwner, queues: readonly (readonly object[])[]): void {

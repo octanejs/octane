@@ -2,6 +2,8 @@ import type { NativeReadWitness } from './native-read-collector.js';
 import type { NativeReadSource } from './read-protocol.js';
 import { inspectNativeReadSource } from './native-read-inspection.js';
 
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
 /**
  * A failed first mount may be disposed before an abort-ignoring promise settles.
  * Its existing root or boundary retry episode retains only these source leases,
@@ -13,7 +15,9 @@ export function createNativeReadRetry(notify: () => void) {
 	return {
 		/** Retry leases have no accepted read revision and expose no values. */
 		inspect() {
-			return Array.from(sources.keys(), (source) => inspectNativeReadSource(source, null));
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				return Array.from(sources.keys(), (source) => inspectNativeReadSource(source, null));
+			return [];
 		},
 		get generation(): number {
 			return generation;
