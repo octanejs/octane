@@ -4879,6 +4879,97 @@ export function TreeHydration(props) @{
 		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures.
 	}, 15_000);
 
+	// A publication inside an Octane render defers the early program's drain.
+	// The drain runs once that render has committed, on the same synchronous
+	// path, so the root's commit precedes the early program's writes.
+	// Adopting server markup reads each region's marker; one that already names
+	// the presented arm takes no write.
+	it('adopts a program region without writing its marker', () => {
+		const fixture = authoredPresentation(
+			'AdoptedToggle',
+			{ on: true },
+			false,
+			`export function AdoptedToggle(props) @{ 'use dom bindings';
+ <section>
+  @if (props.on) {
+   <b>on</b>
+  } @else {
+   <i>off</i>
+  }
+ </section>
+}`,
+		);
+		container.innerHTML = fixture.html;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((list) => records.push(...list));
+		observer.observe(container, {
+			subtree: true,
+			childList: true,
+			characterData: true,
+			attributes: true,
+		});
+		const binding = fixture.attach(
+			{ start: container.firstChild!.nextSibling as Comment, end: container.lastChild as Comment },
+			fixture.state,
+		);
+		try {
+			records.push(...observer.takeRecords());
+			expect(records).toEqual([]);
+			fixture.publish({ on: false });
+			expect(container.querySelector('i')?.textContent).toBe('off');
+		} finally {
+			observer.disconnect();
+			binding.dispose();
+		}
+	});
+
+	it('drains an early program after the commit of the render that deferred it', () => {
+		const fixture = authoredPresentation(
+			'DeferredLabel',
+			{ label: 'Early' },
+			false,
+			`export function DeferredLabel(props) @{ 'use dom bindings';
+ <p>{props.label as string}</p>
+}`,
+		);
+		container.innerHTML = fixture.html;
+		const paragraph = container.querySelector('p')!;
+		const { Publisher } = loadCompiledFixtureSource(
+			`export function Publisher(props) @{ props.publish(); <b>publisher</b> }`,
+			{ id: '/src/deferred-drain-publisher.tsrx', mode: 'client' },
+		);
+		const host = document.createElement('section');
+		document.body.append(host);
+		let rendering = false;
+		let atDrain: string | null | undefined;
+		const binding = fixture.attach(paragraph, {
+			getSnapshot() {
+				const snapshot = fixture.state.getSnapshot();
+				if (!rendering && snapshot.label === 'Current' && atDrain === undefined)
+					atDrain = host.textContent;
+				return snapshot;
+			},
+			subscribe: fixture.state.subscribe,
+		});
+		const root = createRoot(host);
+		try {
+			root.render(Publisher, {
+				publish() {
+					rendering = true;
+					fixture.publish({ label: 'Current' });
+					rendering = false;
+				},
+			});
+			// The root's commit had placed its content when the drain read its source.
+			expect(atDrain).toBe('publisher');
+			expect(paragraph.textContent).toBe('Current');
+		} finally {
+			root.unmount();
+			host.remove();
+			binding.dispose();
+		}
+	});
+
 	describe('structural text ownership', () => {
 		const source = `export function Notice(props) @{ 'use dom bindings';
   <section>
