@@ -1584,19 +1584,19 @@ drain. Finite layout-effect cascades complete before DOM mutation observers run,
 including commits started by the scheduler. `flushSync` drains them before returning.
 
 Commit phases retain Octane's ordering: insertion effects mount with connected
-DOM, refs attach before layout bodies, and layout cleanups can observe DOM
-already changed by the render walk. A changed ref detaches after its owner's
-layout cleanup; deletion cleanups interleave insertion and layout work. This
-does not provide React's per-component ref/layout interleaving or a global
-before-mutation ref-detach phase.
+DOM, refs attach before layout bodies, and layout cleanups observe the DOM the
+commit's mutation phase has already changed, as in React. A changed ref
+detaches after its owner's layout cleanup; deletion cleanups interleave
+insertion and layout work. This does not provide React's per-component
+ref/layout interleaving or a global before-mutation ref-detach phase.
 
 Other consequences:
 
 - A render writes no DOM the page shows, so a dropped render leaves the page as
   it was. A hand-written body over the compiler ABI follows the same rule:
   writing committed DOM during render, including through `setText` or
-  `setAttribute`, is unsupported; its staged forms are a bag factory's host,
-  `setRenderText`, and commit ops.
+  `setAttribute`, is unsupported. Its staged forms are a bag factory's host,
+  `setRenderText` from `octane/internal/client`, and layout effects.
 - Priority (`urgent` vs `transition`) governs Suspense hold semantics and
   whether a render waits for a later host task (above), not time-slicing.
 - Fallback-visible boundaries whose retries fully stage reveal together,
