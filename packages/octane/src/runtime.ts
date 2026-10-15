@@ -13176,6 +13176,7 @@ export function componentSlotLite<P>(
 	// render only) — consumed by the post-body cursor advance below.
 	let adoptedOpen: Comment | null = null;
 	let adoptedClose: Node | null = null;
+	let liveEnd: Node | null | undefined;
 	if (scope === undefined) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.BLOCK_LITE_MOUNT);
@@ -13219,6 +13220,21 @@ export function componentSlotLite<P>(
 			scope,
 			at: parentScope._slots === null ? 0 : parentScope._slots.length,
 		});
+	} else if (
+		// A call whose first render suspended mounts on its retry over committed
+		// DOM off-document: in a frontier its commit inserts before the call's end.
+		!scope.mounted &&
+		scope.slots[0] === undefined &&
+		ROOT_RENDER_TRANSACTION !== null &&
+		usesFrontier(parentScope.block, host)
+	) {
+		const block = scope.block;
+		liveEnd = block.endMarker;
+		const frag = queueFrontier(parentScope.block, host, liveEnd);
+		journalRootProperty(block, 'parentNode', host);
+		block.parentNode = frag;
+		block.endMarker = null;
+		noteFrontierMember(frag, scope);
 	}
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
@@ -13272,6 +13288,7 @@ export function componentSlotLite<P>(
 			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_EFFECT_REACHED = effectReached;
 		CURRENT_SCOPE = prevScope;
+		if (liveEnd !== undefined) scope.block.endMarker = liveEnd;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
 	// next SIBLING slot adopts from its own `<!--[-->`. The body leaves the
