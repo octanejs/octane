@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRT from 'octane/server';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
 import { htext, setText } from '../src/runtime.js';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
@@ -9,6 +9,7 @@ import {
 	ForeignSvg,
 	FragmentTextRows,
 	RootTextPair,
+	TableSections,
 } from './_fixtures/dom-template-text.tsrx';
 
 const rows = [
@@ -32,6 +33,41 @@ const nodeTriples = (container: HTMLElement) => {
 };
 
 describe('compiled fragment and text children', () => {
+	it.each(['mount', 'hydrate'])('preserves table sections forwarded as children on %s', (mode) => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const props = { label: 'server' };
+		if (mode === 'hydrate') {
+			const server = loadServerFixture('packages/octane/tests/_fixtures/dom-template-text.tsrx');
+			container.innerHTML = ServerRT.renderToString(server.TableSections, props).html;
+		}
+		const serverInput = container.querySelector('input');
+		const root =
+			mode === 'hydrate' ? hydrateRoot(container, TableSections, props) : createRoot(container);
+		try {
+			if (mode === 'mount') root.render(TableSections, props);
+			flushSync(() => {});
+			expect([...container.querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual([
+				'Label',
+				'Value',
+			]);
+			expect(container.querySelector('tbody td')?.textContent).toBe('server');
+			const input = container.querySelector('input')!;
+			if (mode === 'hydrate') expect(input).toBe(serverInput);
+			input.value = 'typed';
+			input.focus();
+			flushSync(() => root.render(TableSections, { label: 'updated' }));
+			expect(container.querySelector('tbody td')?.textContent).toBe('updated');
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('typed');
+			expect(document.activeElement).toBe(input);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+		expect(container.childNodes).toHaveLength(0);
+	});
+
 	it.each(['', 'server'])(
 		'updates an existing %j text child through a host-only compiled call',
 		(initial) => {

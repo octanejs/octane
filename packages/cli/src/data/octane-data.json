@@ -649,9 +649,10 @@
       "version": "0.1.64",
       "category": "Content",
       "upstream": { "package": "@mdx-js/mdx", "version": "3.1.1" },
-      "surface": "The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context with Strong client/server provider templates. Generated MDX document elements retain value-position rendering. The octane website runs on it.",
+      "surface": "The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context with Strong client/server provider templates. Both generated MDX document functions compile as templates. Optional Strong checks apply the application policy; overridableTags specializes generated hosts while retaining full override support by default. The octane website runs on it.",
       "divergences": [
-        "`useMDXComponents` drops upstream's `useMemo` referential-stability wrapper so the call is valid in both server and client runtimes (same observable mapping)."
+        "`useMDXComponents` drops upstream's `useMemo` referential-stability wrapper so the call is valid in both server and client runtimes (same observable mapping).",
+        "Generated document children follow Octane template semantics: render nested children rather than inspecting or cloning element descriptors; a single literal text child remains a string."
       ],
       "ssr": "SSR + hydration coverage includes nested/function component mappings, parent-context opt-out, DOM adoption, and interactive child state across provider updates (`ssr.test.ts`, `hydration.test.ts`).",
       "verified": "2026-10-14"

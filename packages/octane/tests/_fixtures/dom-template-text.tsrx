@@ -1,3 +1,5 @@
+import type { OctaneNode } from 'octane';
+
 type Row = {
 	readonly id: number;
 	readonly label: string;
@@ -56,4 +58,26 @@ export function ForeignMath({ label }: { readonly label: string }) @{
 	<math id="formula">
 		<MathPair label={label} />
 	</math>
+}
+function Table({ children }: { readonly children?: OctaneNode }) @{
+	<table>{children}</table>
+}
+
+export function TableSections({ label }: { readonly label: string }) @{
+	<Table>
+		<thead>
+			<tr>
+				<th>Label</th>
+				<th>Value</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>{label as string}</td>
+				<td>
+					<input defaultValue="initial" />
+				</td>
+			</tr>
+		</tbody>
+	</Table>
 }

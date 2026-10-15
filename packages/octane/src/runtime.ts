@@ -20091,15 +20091,18 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	initDomOperations();
 	const t = document.createElement('template');
 	if (ns === 0) {
-		// Multi-root templates carry raw markup: an opaque one because its eventual
-		// namespace is unknown until clone time. Add the wrapper the HTML parser
-		// needs here. Markup that arrives already wrapped parses the same way.
-		t.innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
+		// Parse roots in template context first: a synthetic HTML parent would
+		// discard table sections, rows, and cells before they reach their host.
+		t.innerHTML = html;
+		if (frag) {
+			// Stay in the template's inert document so custom elements upgrade in
+			// authored insertion order, rather than while assembling the cache.
+			const wrapper = t.content.ownerDocument.createElement('octane-frag');
+			wrapper.appendChild(t.content);
+			return fragmentTemplate(wrapper);
+		}
 		const root = getFirstChild(t.content) as Element;
-		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
-		// wrapper never exists in the server DOM (the roots render bare), so stamp it
-		// for clone() to SKIP the structural hydration check — there is no 1:1 server
-		// node to compare the wrapper against.
+		// Keep accepting older compiled markup with an explicit fragment wrapper.
 		if (root.nodeType === 1 && root.localName === 'octane-frag') {
 			return fragmentTemplate(root);
 		}
