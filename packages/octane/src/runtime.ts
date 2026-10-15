@@ -44783,11 +44783,13 @@ function renderMarkerlessArm(
 	} catch (error) {
 		if ((before ? getNextSibling(before) : getFirstChild(parent)) !== end)
 			finalizeMarkerlessBranch(state, parent, scope, marker, before, end, false);
-		if (parent !== domParent) settleArmFrontier(scope, parent, end!, after);
+		if (parent !== domParent)
+			releaseFrontierSentinel(scope, parent as DocumentFragment, end as Comment, after);
 		throw error;
 	}
 	finalizeMarkerlessBranch(state, parent, scope, marker, before, end, true);
-	if (parent !== domParent) settleArmFrontier(scope, parent, end!, after);
+	if (parent !== domParent)
+		releaseFrontierSentinel(scope, parent as DocumentFragment, end as Comment, after);
 }
 
 /**
@@ -44850,42 +44852,30 @@ function moveToFrontier(
 	noteFrontierMember(frag, scope);
 }
 
-/** What still anchors on an arm frontier's sentinel inserts where the arm lands. */
-function settleArmFrontier(scope: Scope, frag: Node, end: Node, after: Node | null): void {
-	if (scope.block.endMarker === end) scope.block.endMarker = after;
-	releaseFrontierSentinel(scope, frag as DocumentFragment, end as Comment, after);
-}
-
 /**
- * Point what anchors on sentinel `from` under `scope` at `to`: its slots, and
- * the arms and children still pending on it, nested ones included. One with a
- * bound of its own holds its content's anchors inside that bound.
+ * Point what anchors on sentinel `from` in `scope` at `to`: its Block's end, its
+ * slots, and the arms and children still pending on it, nested ones included.
+ * One with a bound of its own holds its content's anchors inside that bound.
+ * Nothing here needs a journal entry: what anchors on a sentinel is new in this
+ * render, or moveArmPending journaled it.
  */
 function retargetPending(scope: Scope, from: Node, to: Node | null): void {
+	const block = scope.block;
 	const slots = scope._slots;
 	if (slots !== null)
 		for (let i = 0; i < slots.length; i++) {
 			const slot = slots[i];
-			if (slot.anchor === from) {
-				journalRootProperty(slot, 'anchor', from);
-				slot.anchor = to;
-			}
+			if (slot.anchor === from) slot.anchor = to;
 			const arm = slot.block ?? slot.lite;
-			if (arm != null && arm.block.endMarker === from) retargetPendingBlock(arm, from, to);
+			if (arm != null && arm.block.endMarker === from) retargetPending(arm, from, to);
 		}
 	const children = scope.children;
 	if (children !== null)
 		for (let i = 0; i < children.length; i++) {
 			const child = children[i].scope;
-			if (child.block !== scope.block && child.block.endMarker === from)
-				retargetPendingBlock(child, from, to);
+			if (child.block !== block && child.block.endMarker === from) retargetPending(child, from, to);
 		}
-}
-
-function retargetPendingBlock(scope: Scope, from: Node, to: Node | null): void {
-	retargetPending(scope, from, to);
-	journalRootProperty(scope.block, 'endMarker', from);
-	scope.block.endMarker = to;
+	if (block.endMarker === from) block.endMarker = to;
 }
 
 /** Bound a markerless arm's content, from `first` up to `after`, with a marker pair. */
@@ -45214,7 +45204,6 @@ function swapBranchFrontier(
 		) {
 			// A pending arm owns nothing yet; its anchor is where it will land.
 			releaseFrontierSentinel(arm, frag!, end as Comment, before);
-			arm.endMarker = before;
 			pending = true;
 		} else if (
 			suspended === null &&
