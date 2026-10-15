@@ -272,6 +272,12 @@ renders its `@pending` fallback; synchronously-resolved `use()` still seeds. Use
 `hydrateRoot` renders a boundary the server left pending on the client, keeping
 the server DOM around it, and reports it once through `onRecoverableError`.
 
+As in React, every server renderer also takes an element in place of the
+component and its props: `renderToString(<App {...props} />)` renders exactly as
+`renderToString(App, props)`, so the HTML of either form hydrates through
+`hydrateRoot(container, App, props)` and `hydrateRoot(container, <App {...props} />)`
+alike.
+
 ### `renderToStaticMarkup(component, props?, options?) => RenderResult` — `octane/server`
 
 Like `renderToString` but produces clean, **non-hydratable** HTML: no
