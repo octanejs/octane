@@ -101,7 +101,6 @@ export const WRITERS = new Map(
 		renderReturnedValue: 'fresh',
 		fragmentTemplate: 'fresh',
 		parseTemplate: 'fresh',
-		clone: 'fresh',
 		drainFrag: 'fresh',
 		htext: 'fresh',
 		htextSwap: 'fresh',
@@ -204,7 +203,6 @@ export const WRITERS = new Map(
  */
 export const UNGUARDED_FRESH = new Map(
 	Object.entries({
-		clone: 'a template clone, and a hole that replaces its adopted node',
 		htext: 'an only-child text hole seeded into its host',
 		htextSwap: 'a text hole that replaces its placeholder',
 		bindingText: 'a text binding that mints its range',
