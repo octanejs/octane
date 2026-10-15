@@ -73,6 +73,35 @@ describe('components mapping', () => {
 		expect(container.querySelector('i')?.textContent).toBe('emphasis');
 	});
 
+	it('updates inherited mappings without remounting stable children', () => {
+		const children = createElement(MDXProvider, {
+			components: { wrapper: Layout },
+			children: createElement(ComponentsDoc),
+		});
+		const { container, rerender } = render(MDXProvider, {
+			props: { components: { h1: 'h2' }, children },
+		});
+		const layout = screen.getByTestId('layout');
+		const button = screen.getByTestId('counter');
+		expect(container.querySelector('h2')?.textContent).toBe('Interactive');
+		fireEvent.click(button);
+		expect(button.textContent).toBe('count: 3');
+
+		rerender(MDXProvider, { props: { components: { h1: 'h3' }, children } });
+		expect(container.querySelector('h3')?.textContent).toBe('Interactive');
+		expect(container.querySelector('h2')).toBeNull();
+		expect(screen.getByTestId('layout')).toBe(layout);
+		expect(screen.getByTestId('counter')).toBe(button);
+		expect(button.textContent).toBe('count: 3');
+
+		rerender(MDXProvider, { props: { components: null, children } });
+		expect(container.querySelector('h1')?.textContent).toBe('Interactive');
+		expect(container.querySelector('h3')).toBeNull();
+		expect(screen.getByTestId('counter')).toBe(button);
+		fireEvent.click(button);
+		expect(button.textContent).toBe('count: 4');
+	});
+
 	// Per @mdx-js/react lib/index.js: disableParentContext ignores the inherited mapping.
 	it('disableParentContext ignores the parent mapping', () => {
 		const inner = createElement(MDXProvider, {

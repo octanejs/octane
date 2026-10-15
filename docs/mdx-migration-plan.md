@@ -72,9 +72,9 @@ What each MDX construct becomes under octane's `.tsx` handling:
   (`enforce: 'pre'`), produces FINAL JS, per-module SSR auto-detection copied
   from `octane/compiler/vite` — composes with the octane plugin with no
   ordering hazard (disjoint extensions).
-- `packages/mdx/src/index.ts` — the @mdx-js/react port: `MDXProvider`,
+- `packages/mdx/src/index.tsrx` — the @mdx-js/react port: `MDXProvider`,
   `useMDXComponents`, `MDXComponents` types (client runtime context).
-- `packages/mdx/src/server.ts` — the same provider layer mirrored onto
+- `packages/mdx/src/server.tsrx` — the same provider layer mirrored onto
   `octane/server` context for SSR passes (keep merge semantics in lockstep
   with index.ts).
 
