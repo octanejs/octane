@@ -13,7 +13,7 @@ pnpm add @octanejs/pdf
 import { Document, Page, pdfjs } from '@octanejs/pdf';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
+  'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString();
 
@@ -23,6 +23,12 @@ export function Preview({ file }: { file: string }) {
   </Document>;
 }
 ```
+
+Use the legacy worker path shown above, including when upgrading an existing
+integration. The worker runs in a separate browser context, so the modern worker
+can still fail on browsers without newer APIs such as `Promise.withResolvers`.
+The PDF.js legacy build supplies compatibility polyfills, which may modify global
+objects when those APIs are missing.
 
 The binding preserves `Document`, `Page`, `Thumbnail`, `Outline`, the three
 context hooks, `PasswordResponses`, `pdfjs`, and the published root types. It
@@ -46,8 +52,8 @@ modules.
 
 ## Server rendering
 
-The package resolves PDF.js's legacy build on the server and its modern build
-in browsers. Server rendering emits deterministic loading, no-data, and error
+The package resolves PDF.js's legacy build on the server and in browsers.
+Server rendering emits deterministic loading, no-data, and error
 shells without starting a worker or touching canvas. Hydration adopts those
 shells before client-side PDF loading begins.
 

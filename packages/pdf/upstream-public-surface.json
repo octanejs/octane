@@ -43,8 +43,8 @@
     },
     {
       "upstream": "pdfjs-dist/build/pdf.worker.min.mjs",
-      "octane": "pdfjs-dist/build/pdf.worker.min.mjs",
-      "classification": "unchanged-framework-neutral-dependency"
+      "octane": "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+      "classification": "adapted-framework-neutral-dependency"
     }
   ],
   "wildcardPolicy": {
