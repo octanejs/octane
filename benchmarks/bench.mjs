@@ -664,6 +664,7 @@ const SUITES = [
 			{ script: 'run.mjs', args: (n) => [String(n)] },
 			{ label: 'bail-compare', script: 'bail-compare.mjs', args: () => [] },
 			{ label: 'survivor-work', script: 'survivor-work.mjs', args: () => [] },
+			{ label: 'provider-scope', script: 'provider-scope.mjs', args: () => [] },
 		],
 	},
 	{
