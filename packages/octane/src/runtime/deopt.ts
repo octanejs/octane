@@ -1425,6 +1425,8 @@ function applyDeoptOrder(order: DeoptOrder): void {
 	// A later pass of this render superseded it.
 	if (node.$$deoptOrder !== order) return;
 	node.$$deoptOrder = undefined;
+	// A caught render can discard this host while its enclosing frontier survives.
+	if (order.owner?.disposed) return;
 	if (order.text !== null) {
 		updateTextValue(node, order.text);
 		return;

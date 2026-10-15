@@ -4,6 +4,7 @@ import { createElement } from '../src/index.js';
 import {
 	App,
 	ConditionalEditor,
+	CaughtEditorMount,
 	EditorRows,
 	SingleEditorRetryRows,
 	MultipleEditorRetryRows,
@@ -39,6 +40,31 @@ function PlainDescriptorEditor(props: { tag: string; show: boolean }) {
 }
 
 describe('anchorless lone pure-host value', () => {
+	it('does not initialize a custom host discarded by a caught render', () => {
+		const events: string[] = [];
+		const tag = 'caught-render-editor';
+		customElements.define(
+			tag,
+			class extends HTMLElement {
+				static observedAttributes = ['data-label'];
+				attributeChangedCallback() {
+					events.push(`attribute:${this.getAttribute('data-label')}`);
+				}
+				connectedCallback() {
+					events.push(`connect:${this.getAttribute('data-label')}`);
+				}
+			},
+		);
+		const root = mount(CaughtEditorMount, { tag });
+		try {
+			expect(root.find('span').textContent).toBe('editor failed');
+			expect(root.findAll(tag)).toHaveLength(1);
+			expect(events).toEqual(['attribute:kept', 'connect:kept']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('mounts with NO comment anchors — container.firstChild IS the element', () => {
 		const r = mount(Pass, { children: createElement('div', { id: 'a' }, 'hello') });
 		expect(r.container.innerHTML).toBe('<div id="a">hello</div>');

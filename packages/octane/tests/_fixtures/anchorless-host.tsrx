@@ -112,3 +112,21 @@ export function ConditionalEditor(props: { tag: string; show: boolean }) @{
 		<b>B</b>
 	</section>
 }
+
+function FailingEditorSibling() {
+	throw new Error('editor failed');
+}
+
+export function CaughtEditorMount(props: { tag: string }) @{
+	<section>
+		{createElement(props.tag, { 'data-label': 'kept' })}
+		@try {
+			<div>
+				{createElement(props.tag, { 'data-label': 'abandoned' })}
+				<FailingEditorSibling />
+			</div>
+		} @catch (error) {
+			<span>{(error as Error).message as string}</span>
+		}
+	</section>
+}
