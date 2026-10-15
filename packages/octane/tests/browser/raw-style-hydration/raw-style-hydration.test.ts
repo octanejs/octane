@@ -26,7 +26,10 @@ afterAll(async () => {
 	await browser?.close();
 });
 
-async function openHydratedPage(mode: 'dev' | 'prod'): Promise<{
+async function openHydratedPage(
+	mode: 'dev' | 'prod',
+	scripts = false,
+): Promise<{
 	failures: string[];
 	page: Page;
 	server: ViteDevServer;
@@ -39,10 +42,27 @@ async function openHydratedPage(mode: 'dev' | 'prod'): Promise<{
 		tag: 'style',
 		source: RAW_STYLE_SOURCE,
 	});
+	const scriptHtml = scripts
+		? renderToString(serverModule.MountedScripts, {
+				scripts: [{ id: 'server', source: '(window.scriptExecutions ??= []).push("server")' }],
+				revision: 0,
+			}).html
+		: '';
 	const shellPlugin: Plugin = {
 		name: 'raw-style-hydration-shell',
 		transformIndexHtml(source) {
-			return source.replace('<!--octane-ssr-->', () => html);
+			return source
+				.replace('<!--octane-ssr-->', () => html)
+				.replace(
+					'</body>',
+					() => `${scripts ? `<div id="scripts-root">${scriptHtml}</div>` : ''}</body>`,
+				);
+		},
+		configureServer(server) {
+			server.middlewares.use('/execution.js', (_request, response) => {
+				response.setHeader('content-type', 'text/javascript');
+				response.end('(window.scriptExecutions ??= []).push("external")');
+			});
 		},
 	};
 	const server = await createServer({
@@ -114,6 +134,132 @@ describe.sequential('raw <style> real-browser hydration', () => {
 				} finally {
 					await Promise.allSettled([page.close(), server.close()]);
 				}
+			}
+		},
+	);
+});
+
+describe.sequential('script execution ownership', () => {
+	it.each(['dev', 'prod'] as const)(
+		'%s executes fresh opted scripts and retains hydrated or reordered scripts without replay',
+		async (mode) => {
+			const { failures, page, server } = await openHydratedPage(mode, true);
+			try {
+				await page.waitForFunction(() => Boolean(window.__scriptExecution));
+				expect(await page.evaluate(() => window.__scriptExecution.adopted)).toEqual({
+					input: true,
+					script: true,
+				});
+				expect(await page.evaluate(() => window.scriptExecutions)).toEqual(['server']);
+				await page.getByLabel('Script draft', { exact: true }).fill('retained');
+				await page.evaluate(() =>
+					window.__scriptExecution.render([
+						{ id: 'inline', source: '(window.scriptExecutions ??= []).push("inline")' },
+						{ id: 'external', src: '/execution.js' },
+					]),
+				);
+				await page.waitForFunction(() => window.scriptExecutions?.includes('external'));
+				expect(await page.evaluate(() => window.scriptExecutions)).toEqual([
+					'server',
+					'inline',
+					'external',
+				]);
+				expect(
+					await page.locator('#scripts-root script').evaluateAll((nodes) =>
+						nodes.map((node) => ({
+							nonce: (node as HTMLScriptElement).nonce,
+							hint: node.hasAttribute('executeOnMount'),
+						})),
+					),
+				).toEqual([
+					{ nonce: 'script-nonce', hint: false },
+					{ nonce: 'script-nonce', hint: false },
+				]);
+				const unchanged = await page.evaluate(() => {
+					const before = Array.from(document.querySelectorAll('#scripts-root script'));
+					window.__scriptExecution.render(
+						[
+							{ id: 'external', src: '/execution.js' },
+							{ id: 'inline', source: '(window.scriptExecutions ??= []).push("inline")' },
+						],
+						1,
+					);
+					return (
+						before[0] === document.querySelectorAll('#scripts-root script')[1] &&
+						before[1] === document.querySelectorAll('#scripts-root script')[0]
+					);
+				});
+				expect(unchanged).toBe(true);
+				expect(await page.evaluate(() => window.scriptExecutions)).toEqual([
+					'server',
+					'inline',
+					'external',
+				]);
+				expect(await page.getByLabel('Script draft', { exact: true }).inputValue()).toBe(
+					'retained',
+				);
+				await page.evaluate(() => {
+					window.__scriptExecution.render([]);
+					window.__scriptExecution.render([
+						{ id: 'inline', source: '(window.scriptExecutions ??= []).push("inline")' },
+					]);
+					window.__scriptExecution.mountStatic();
+				});
+				expect(await page.evaluate(() => window.scriptExecutions)).toEqual([
+					'server',
+					'inline',
+					'external',
+					'inline',
+					'static',
+					'static',
+					'nested',
+					'fragment',
+					'nested',
+					'fragment',
+				]);
+				// Both owners can mount a hidden primary before a later child suspends.
+				// Preserve that existing insertion behavior, and do not replay on cancellation.
+				for (const descriptor of [true, false]) {
+					const pending = await page.evaluateHandle(
+						(value) => window.__scriptExecution.mountPending(value),
+						descriptor,
+					);
+					await expect(page.locator('#pending-script p').textContent()).resolves.toBe(
+						'script waiting',
+					);
+					const event = descriptor ? 'descriptor-pending' : 'pending';
+					expect(
+						await page.evaluate(
+							(name) => window.scriptExecutions?.filter((value) => value === name).length,
+							event,
+						),
+					).toBe(1);
+					await pending.evaluate((value) => {
+						value.unmount();
+						value.resolve();
+					});
+					await page.evaluate(
+						() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+					);
+					expect(
+						await page.evaluate(
+							(name) => window.scriptExecutions?.filter((value) => value === name).length,
+							event,
+						),
+					).toBe(1);
+				}
+				const asyncScripts = await page.evaluateHandle(() => window.__scriptExecution.mountAsync());
+				expect(await page.locator('#async-scripts section > script').count()).toBe(2);
+				await page.waitForFunction(
+					() => window.scriptExecutions?.filter((value) => value === 'external').length === 3,
+				);
+				expect(await page.locator('head script[src="/execution.js"]').count()).toBe(0);
+				await asyncScripts.evaluate((value) => value.unmount());
+				expect(await page.locator('script[src="/execution.js"]').count()).toBe(0);
+				expect(await page.evaluate(() => window.__scriptExecution.failures)).toEqual([]);
+				expect(failures).toEqual([]);
+			} finally {
+				await Promise.allSettled([page.close(), server.close()]);
 			}
 		},
 	);

@@ -71,6 +71,13 @@ const clients = [
 		entry: path.join(probes, 'create-root-signals.tsrx'),
 		compile: true,
 	},
+	...['vite', 'esbuild'].map((bundler) => ({
+		name: `permanent-static-${bundler}`,
+		bundler,
+		entry: path.join(probes, 'permanent-static.tsrx'),
+		compile: true,
+		staticOnly: true,
+	})),
 	...[
 		['root-static', 'tsrx'],
 		['root-static-local', 'tsrx'],
@@ -220,6 +227,16 @@ const ranges = resolveDeclarationRanges(
 	(source) => fs.readFileSync(path.join(octaneSource, source), 'utf8'),
 	(text, source) => parseAst(text, { lang: 'ts' }, source),
 );
+// A permanent server-owned range must not retain deferred activation or strategy
+// machinery. Ordinary deferred hydration below proves these source ranges are visible.
+const staticHydrateRanges = resolveDeclarationRanges(
+	(source) => fs.readFileSync(path.join(octaneSource, source), 'utf8'),
+	(text, source) => parseAst(text, { lang: 'ts' }, source),
+	['createHydrateSlot', 'installHydrateBoundary', 'activateHydrateBoundary'].map((name) => ({
+		name,
+		source: 'runtime.ts',
+	})),
+);
 // Non-vacuity: a client bundle must retain its public or compiler-specialized root.
 const rootRanges = resolveDeclarationRanges(
 	(source) => fs.readFileSync(path.join(octaneSource, source), 'utf8'),
@@ -242,11 +259,11 @@ const failures = [];
 const controlRetained = new Map();
 for (const scenario of controls) {
 	const { maps } = await buildScenario(scenario);
-	controlRetained.set(scenario.name, retainedBy(maps, ranges));
+	controlRetained.set(scenario.name, retainedBy(maps, [...ranges, ...staticHydrateRanges]));
 	console.log(`${scenario.name.padEnd(34)} control`);
 }
 try {
-	verifyControlCoverage(controlRetained, ranges);
+	verifyControlCoverage(controlRetained, [...ranges, ...staticHydrateRanges]);
 } catch (error) {
 	failures.push(error);
 }
@@ -261,7 +278,10 @@ for (const scenario of selectedClients) {
 			`${scenario.name}: the public root export was lost`,
 		);
 	assert.notEqual(roots.size, 0, `${scenario.name}: the client bundle lost its root factory`);
-	const denied = deniedRangesFor(scenario.bundler === 'esbuild' ? 'esbuild' : 'rolldown', ranges);
+	const denied = [
+		...deniedRangesFor(scenario.bundler === 'esbuild' ? 'esbuild' : 'rolldown', ranges),
+		...(scenario.staticOnly ? staticHydrateRanges : []),
+	];
 	const retained = retainedBy(maps, denied);
 	let clean = true;
 	try {

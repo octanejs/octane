@@ -142,6 +142,8 @@ export {
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
 	__vtSeen,
 	template,
+	scriptTemplate,
+	__PermanentStaticHydrate,
 	clone,
 	drainFrag,
 	// Binding-bag arity factories — one-shot allocate+insert+commit for the

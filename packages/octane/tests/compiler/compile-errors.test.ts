@@ -1022,3 +1022,67 @@ describe('compile errors — @for headers', () => {
 		}
 	});
 });
+
+describe('script executeOnMount authoring contract', () => {
+	it.each(['client', 'server'] as const)(
+		'rejects unsupported %s script execution options',
+		(mode) => {
+			for (const source of [
+				'export function App({active}) @{ <script executeOnMount={active} /> }',
+				'export function App() @{ <script executeOnMount="true" /> }',
+				'export function App() @{ <div executeOnMount /> }',
+			])
+				expect(() => compile(source, 'script-option.tsrx', { mode })).toThrow(
+					/executeOnMount requires a static boolean on a native <script> template/,
+				);
+			for (const tag of ['script', 'div'])
+				expect(() =>
+					compile(
+						`export function App() @{ <${tag} {...{executeOnMount:true}} /> }`,
+						'spread-script.tsrx',
+						{ mode },
+					),
+				).toThrow(/executeOnMount must be a direct attribute/);
+			expect(() =>
+				compile(
+					'export function App() @{ <svg><script executeOnMount /></svg> }',
+					'foreign-script.tsrx',
+					{ mode },
+				),
+			).toThrow(/executeOnMount requires an HTML <script> template/);
+			expect(() =>
+				compile('export const script = <script executeOnMount />;', 'script-value.tsx', { mode }),
+			).toThrow(/executeOnMount requires a native <script> in an owned template/);
+		},
+	);
+
+	it('rejects script execution outside the DOM renderer', () => {
+		expect(() =>
+			compile('export function App() @{ <script executeOnMount /> }', 'script.object.tsrx', {
+				renderer: { id: 'object', target: 'universal', module: 'object-renderer' },
+			}),
+		).toThrow(/executeOnMount requires the DOM template renderer/);
+	});
+
+	it.each(['client', 'server'] as const)(
+		'accepts literal true and false without changing component props in %s output',
+		(mode) => {
+			for (const option of ['', '={true}', '={false}']) {
+				expect(
+					compile(
+						`export function App() @{ <script executeOnMount${option} /> }`,
+						'script-option.tsrx',
+						{ mode },
+					).diagnostics,
+				).toEqual([]);
+			}
+			expect(
+				compile(
+					'export function App({Child, active}) @{ <Child executeOnMount={active} /> }',
+					'component-option.tsrx',
+					{ mode },
+				).diagnostics,
+			).toEqual([]);
+		},
+	);
+});

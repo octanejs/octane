@@ -719,7 +719,7 @@ export function App() @{
 		expect(hasStaticImport(client.code, './StaticNavigation.tsrx')).toBe(false);
 		expect(dynamicImports(client.code)).toEqual(new Set());
 		expect(client.code).not.toContain('data-server-only');
-		expect(client.code).toContain('__octanePermanentStatic');
+		expect(client.code).toContain('__PermanentStaticHydrate');
 
 		const server = compiler().transform(exact, FILE, { environment: 'server' })!;
 		expect(hasStaticImport(server.code, './StaticNavigation.tsrx')).toBe(true);
@@ -739,7 +739,7 @@ export function App() @{
 		const ordinary = compiler().transform(configured, FILE, { environment: 'client' })!;
 		expect(hasStaticImport(ordinary.code, './StaticNavigation.tsrx')).toBe(true);
 		expect(ordinary.code).toContain('data-server-only');
-		expect(ordinary.code).not.toContain('__octanePermanentStatic');
+		expect(ordinary.code).not.toMatch(/__octanePermanentStatic|__PermanentStaticHydrate/);
 
 		const empty = compiler().transform(
 			`import { Hydrate } from 'octane'; import { never } from 'octane/hydration'; export function App() @{ <Hydrate split={false} when={never()} /> }`,
@@ -747,7 +747,7 @@ export function App() @{
 			{ environment: 'client' },
 		)!;
 		expect(dynamicImports(empty.code)).toEqual(new Set());
-		expect(empty.code).toContain('__octanePermanentStatic');
+		expect(empty.code).toContain('__PermanentStaticHydrate');
 
 		for (const inexact of [
 			`import { Hydrate } from 'octane'; import { never } from 'octane/hydration'; import { StaticNavigation } from './StaticNavigation.tsrx'; export function App(options) @{ <Hydrate split={false} when={never()} {...options}><StaticNavigation data-server-only="yes" /></Hydrate> }`,
@@ -757,7 +757,7 @@ export function App() @{
 			const retained = compiler().transform(inexact, FILE, { environment: 'client' })!;
 			expect(hasStaticImport(retained.code, './StaticNavigation.tsrx')).toBe(true);
 			expect(retained.code).toContain('data-server-only');
-			expect(retained.code).not.toContain('__octanePermanentStatic');
+			expect(retained.code).not.toMatch(/__octanePermanentStatic|__PermanentStaticHydrate/);
 		}
 	});
 
@@ -858,7 +858,7 @@ function App() {
 `;
 		const client = compiler().transform(source, FILE, { environment: 'client' })!;
 		expect(client.code).toContain('function StaticShell');
-		expect(client.code).toContain('__octanePermanentStatic');
+		expect(client.code).toContain('__PermanentStaticHydrate');
 	});
 
 	it('erases an inner permanent-static graph from an ordinary split child', () => {

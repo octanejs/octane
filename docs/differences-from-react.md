@@ -962,6 +962,22 @@ Use a prop for dynamic content:
 <style dangerouslySetInnerHTML={{ __html: css }} />
 ```
 
+Ordinary template-cloned scripts are inert on fresh client mounts. Existing
+resource classification is unchanged: eligible `<script async src>` elements
+still hoist, deduplicate and execute as resources, including with a literal
+`executeOnMount={false}`. A native
+HTML `<script executeOnMount>` opts into the browser's execution behavior when a
+fresh node is inserted. Use a direct bare attribute or a literal boolean; a
+spread cannot enable or disable it, and a statically visible spread attempt is
+rejected. This is a DOM-template compiler option, stripped from the element and server HTML.
+Hydration adopts an existing server script without executing it again. Updating
+or moving that node does not replay it; removing it and mounting a new node can
+execute again. Script type, CSP, nonce, loading and async ordering still follow
+the browser's rules. Opting in bypasses resource hoisting and keeps the script
+owned by its mount, including when `async` and `src` are present.
+It is unsupported in JSX values and known SVG/MathML templates. For dynamic
+executable source, use `dangerouslySetInnerHTML` with explicitly trusted source.
+
 A style element with explicit content props is an ordinary host element. A
 literal CSS body retains Octane's scoped-style compilation. These forms also
 work through `createElement` for runtime-created content.

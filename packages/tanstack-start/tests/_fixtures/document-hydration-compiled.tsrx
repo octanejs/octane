@@ -31,6 +31,7 @@ function RootDocument({ children }: { children?: OctaneNode }) @{
 function Counter() @{
 	const [count, setCount] = useState(0);
 	<main>
+		<input id="draft" aria-label="Draft" defaultValue="server" />
 		<button id="counter" onClick={() => setCount((value) => value + 1)}>
 			{'Count: ' + count}
 		</button>
@@ -39,11 +40,19 @@ function Counter() @{
 
 export function makeDocumentRouter(isServer: boolean) {
 	const root = createRootRoute({ component: Outlet, shellComponent: RootDocument });
-	const index = createRoute({ getParentRoute: () => root, path: '/', component: Counter });
+	const index = createRoute({
+		getParentRoute: () => root,
+		path: '/',
+		component: Counter,
+		scripts: () => [
+			{ id: 'route-data', type: 'application/json', children: '{"value":"retained"}' },
+		],
+	});
 	return createRouter({
 		routeTree: root.addChildren([index]),
 		history: createMemoryHistory({ initialEntries: ['/'] }),
 		isServer,
-		scrollRestoration: false,
+		scrollRestoration: true,
+		ssr: { nonce: 'fixture-nonce' },
 	});
 }
