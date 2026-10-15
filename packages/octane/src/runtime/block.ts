@@ -1330,12 +1330,6 @@ export function unmountSlot(val: any, detachDom: boolean): void {
 		for (let b: Block | null = val.head; b !== null; b = b.nextSibling) unmountBlock(b, detachDom);
 		// An @empty branch (if any) hangs off the same slot.
 		if (val.emptyBlock) unmountBlock(val.emptyBlock, detachDom);
-	} else if (k === 'hydrateBlockSlot') {
-		// A load() strategy can begin procedural prefetch during the initial
-		// hydration render, before this slot's passive installer ever runs.
-		// Its capability teardown above aborts that work and resolves pending
-		// waitFor subscribers without rooting Hydrate in this generic walk.
-		if (val.block) unmountBlock(val.block, detachDom);
 	} else if (k === 'childSlot') {
 		// A `{expr}` value slot holds EITHER a component Block (a component /
 		// host-with-components value) OR a `forSlot` keyed list (an array value,
