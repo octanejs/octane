@@ -18,6 +18,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["./src/**/*.d.ts", "./src/**/*.tsrx"],
+  "include": ["./src/**/*.ts", "./src/**/*.tsrx"],
   "exclude": ["node_modules", "dist", "tests"]
 }

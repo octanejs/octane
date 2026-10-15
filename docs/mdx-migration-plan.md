@@ -11,6 +11,14 @@ never silently paper over it.
 
 ## Progress (reverse-chronological)
 
+Generated document functions now use template bodies on client and server.
+`overridableTags` specializes generated hosts for sites with a fixed override
+set, while its default preserves full provider/prop overrides. The website
+lists `table` and `pre` and forwards its shared Strong setting. The adapter
+uses MDX's existing printer handlers and source-map generator; no additional
+parser or runtime is introduced. Authored expressions retain ordinary Octane
+semantics, and whole-module Strong checking remains opt-in for other callers.
+
 > **Phase 1 — all six open questions resolved (2026-07-06): hydration
 > (byte-adoption tests, on top of the two octane gap fixes below), SSR provider
 > context (`@octanejs/mdx/server`), Shiki recipe + integration tests, `.mdx`
@@ -28,39 +36,29 @@ never silently paper over it.
 
 ## Architecture — compile, don't interpret
 
-@mdx-js/mdx with **`jsx: true`** emits the compiled document as classic JSX
-*source* (no `_jsx` runtime calls), and with **`providerImportSource`** it
-imports `useMDXComponents` from a configurable module. That emitted program is
-exactly the React-style `.tsx` dialect octane's compiler already handles, so:
+@mdx-js/mdx with **`jsx: true`** emits JSX source and wires
+`useMDXComponents` from the configured provider module. The adapter converts
+both generated functions using MDX's existing printer extension:
 
 ```
 .mdx / .md
-  → @mdx-js/mdx compile({ jsx: true, SourceMapGenerator, providerImportSource, … })  (JSX/ESM source)
-  → recmaOctaneAdapter                                                               (1 small ESTree fixup, below)
-  → octane/compiler compile(source, id, { mode: 'client' | 'server' })               (real octane codegen)
+  → @mdx-js/mdx (remark/rehype/recma, provider mapping)
+  → template printer (generated document body and layout dispatcher)
+  → octane/compiler (client templates or server HTML strings)
 ```
 
-(`providerImportSource` defaults per mode: `@octanejs/mdx` client,
-`@octanejs/mdx/server` server — each runtime's own context store.)
-
-What each MDX construct becomes under octane's `.tsx` handling:
-
-- `_createMdxContent(props)` (the document body, `return <>…</>`) — a
-  return-JSX function: octane compiles it to the `(props, __s, __extra)` ABI;
-  the fragment return value-lowers to an array of `createElement` descriptors
-  (client) / `ssrChild([...])` over the same descriptor array (server) — one
-  slot range + one block per item, the shape hydration adopts.
-- `<_components.h1>` member tags (markdown elements via the mapping, value
-  `"h1"` unless overridden) — component-tagged elements whose runtime value may
-  be a host tag STRING; the client de-opt renderer and the server's
-  `ssrComponent`/`ssrChild` both render string comps in the same block shape.
-- `MDXContent` (the default export, `return MDXLayout ? <MDXLayout…> : …`) — a
-  passthrough function; its value-position JSX lowers to descriptors, and
-  `renderBlock`/`renderComponentFramed` mount/normalize the returned
-  descriptor on client/server.
-- Embedded octane components (`import Counter from './counter.tsrx'` +
-  `<Counter/>`) — ordinary imports; the octane vite plugin compiles them with
-  their full template fast path.
+- `_createMdxContent` owns the document template. Generated host mappings
+  remain dynamic unless excluded by `overridableTags`.
+- `MDXContent` owns the optional-layout template and mounts the document body
+  through the normal component ABI in either branch.
+- Explicit layouts, custom components, authored JSX, and provider/prop
+  precedence keep MDX's behavior.
+- The provider defaults remain `@octanejs/mdx` on the client and
+  `@octanejs/mdx/server` on the server.
+- `strong` forwards the application's policy to the Octane compiler. It is
+  optional and applies to the whole document module.
+- Existing source-map composition and template HMR preserve the document's
+  authored source identity, live updates, and named-export invalidation.
 
 ### Packages
 
@@ -76,16 +74,16 @@ What each MDX construct becomes under octane's `.tsx` handling:
   `useMDXComponents`, `MDXComponents` types (client runtime context).
 - `packages/mdx/src/server.tsrx` — the same provider layer mirrored onto
   `octane/server` context for SSR passes (keep merge semantics in lockstep
-  with index.ts).
+  with index.tsrx).
 
 ## recmaOctaneAdapter — the two-compiler adaptations
 
-Down to ONE small ESTree fixup over MDX's emitted program (an ABI difference,
-not a gap): **rewrite the bare `_createMdxContent(props)` call to
-`<_createMdxContent {...props}/>`.** The direct call bypasses the
-`(props, __s, __extra)` ABI (the server body would run on `__s === undefined`
-scope recovery); as JSX both layout branches mount through the component
-machinery on client and server.
+The adapter preserves the upstream component-map construction, converts the two
+generated render bodies into templates, and routes the no-layout branch through
+`<_createMdxContent {...props}/>` instead of a direct function call. Optional
+host specialization affects only generated host mappings. The printer delegates
+ordinary setup and JSX back to the existing handlers, retaining source positions
+for the existing two-stage map.
 
 Former adaptations, dropped as their octane gaps were fixed:
 

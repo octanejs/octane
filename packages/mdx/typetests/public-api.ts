@@ -26,6 +26,8 @@ useServerComponents(null);
 void documentProps;
 
 const compileOptions: CompileMdxOptions = {
+	strong: true,
+	overridableTags: ['table', 'pre'] as const,
 	remarkPlugins: [],
 	rehypePlugins: [],
 	mdxOptions: { development: true, baseUrl: 'https://example.com/docs/' },
@@ -36,6 +38,10 @@ octaneMdx(compileOptions);
 
 // @ts-expect-error Compiler options retain their upstream types.
 compileMdxSync('', 'example.mdx', { mdxOptions: { development: 'yes' } });
+// @ts-expect-error Override specialization accepts host names, not component values.
+octaneMdx({ overridableTags: { h1: 'h2' } });
+// @ts-expect-error Strong configuration remains boolean.
+compileMdxSync('', 'example.mdx', { strong: 'yes' });
 // @ts-expect-error Public MDX imports must not introduce a global JSX namespace.
 export type NoGlobalJSX = JSX.Element;
 

@@ -32,16 +32,16 @@ export function Matches() @{
 	useLayoutEffect(() => {
 		if (router.options.scrollRestoration) setupScrollRestoration(router);
 	}, [router]);
-	useTransitioner(router);
+	const expectedMatches = useTransitioner(router);
 
 	<InnerWrap>
 		<Suspense fallback={pendingElement}>
-			<MatchesInner />
+			<MatchesInner expectedMatches={expectedMatches} />
 		</Suspense>
 	</InnerWrap>
 }
 
-function MatchesInner() @{
+function MatchesInner(props: { expectedMatches: unknown }) @{
 	const router = useRouter();
 	// router-core 1.171.34 dropped the `firstId`/`loadedAt` stores: the root match
 	// is `matches[0]` and the global error boundary resets on its identity. While a
@@ -49,7 +49,9 @@ function MatchesInner() @{
 	// (`acknowledgement[0]`) so the committed tree equals what it awaits, then
 	// settle that render acknowledgement from a layout effect once it lands.
 	const acknowledgement: Array<any> = ((router as any)._rendered ??= []);
-	const matches = useStore(router.stores.matches, (m: any) => acknowledgement[0] ?? m);
+	const matches = useStore(router.stores.matches, (m: any) =>
+		acknowledgement[0] === props.expectedMatches ? (props.expectedMatches ?? m) : m,
+	) as any;
 	const rootMatch = matches[0];
 	const routeId = rootMatch?.routeId as string | undefined;
 	const CatchWrap = router.options.disableGlobalCatchBoundary ? SafeFragment : CatchBoundary;

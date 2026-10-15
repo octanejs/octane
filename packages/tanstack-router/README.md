@@ -135,26 +135,26 @@ package's `status.json`).
   synthetic events.
 - Router devtools are distributed separately and are not part of this binding.
 
-## Compiled code routes
+## Compiled route trees
 
-Use `@octanejs/tanstack-router/compiled` for a tree whose selected route, pending,
-error and not-found components are compiled Octane `@{ ... }` bodies. Its
-`CompiledRouterProvider`, `CompiledOutlet`, and `lazyCompiledRouteComponent`
-avoid retaining the descriptor renderer merely to select a route at runtime.
-TanStack still owns the matching, loading, navigation, history and render
-acknowledgements.
+Use `@octanejs/tanstack-router/compiled` for a tree whose selected route, shell,
+pending, error and not-found components are compiled Octane `@{ ... }` bodies.
+The entry exports `RouterProvider`, `Outlet`, and `lazyRouteComponent`; the
+existing `CompiledRouterProvider`, `CompiledOutlet`, and
+`lazyCompiledRouteComponent` names remain aliases. TanStack owns matching,
+loading, navigation, history and render acknowledgements.
 
 ```tsx
 import {
-  BaseRootRoute, BaseRoute, createRouter, createBrowserHistory,
-  CompiledRouterProvider, CompiledOutlet, lazyCompiledRouteComponent, useParams,
+  createRootRoute, createRoute, createRouter, createBrowserHistory,
+  RouterProvider, Outlet, lazyRouteComponent,
 } from '@octanejs/tanstack-router/compiled';
 
-const root = new BaseRootRoute({ component: Layout });
-const item = new BaseRoute({
+const root = createRootRoute({ component: Layout });
+const item = createRoute({
   getParentRoute: () => root,
   path: 'items/$id',
-  component: lazyCompiledRouteComponent(() => import('./Item')),
+  component: lazyRouteComponent(() => import('./Item')),
 });
 const router = createRouter({
   routeTree: root.addChildren([item]),
@@ -162,10 +162,10 @@ const router = createRouter({
 });
 
 function Layout() @{
-  <main><CompiledOutlet /></main>
+  <main><Outlet /></main>
 }
 function App() @{
-  <CompiledRouterProvider router={router} />
+  <RouterProvider router={router} />
 }
 ```
 
@@ -173,12 +173,32 @@ Import read/navigation hooks (`useMatch`, `useParams`, `useSearch`,
 `useLoaderData`, `useLoaderDeps`, `useRouteContext`, `useLocation`,
 `useMatches`, `useParentMatches`, `useChildMatches`, `useNavigate`,
 `useCanGoBack`, `useRouter`, and `useRouterState`) from the same `/compiled`
-entry. It owns a separate pair of non-callable contexts. Base route factories
-come directly from router-core: use the free hooks in the route components,
-rather than route-bound hooks or `Route.Link` from the normal Octane entry.
+entry. It owns separate non-callable contexts. Its `createRoute`,
+`createRootRoute`, `createRootRouteWithContext`, `getRouteApi`, `createFileRoute`,
+`createLazyRoute`, and `createLazyFileRoute` attach accessors to those contexts.
+Route-bound hooks and `Route.Link` work alongside the exported `Link`,
+`useLinkProps`, and `createLink`. Factories construct router-core base instances;
+they do not promise `instanceof Route` from the ordinary entry.
 
-The first compiled contract excludes `Wrap`, `InnerWrap`, and
-`shellComponent`; the provider reports a diagnostic if they are configured.
+The compiled entry also exports `Html`, `Head`, `Body`, `HeadContent`, `Scripts`,
+`Asset`, `useTags`, `getAssetKeys`, `ClientOnly`, and `useHydrated` for document
+shells. Root shells can read their root match and context. SSR and client builds
+must select the same entry for a tree. Start applications select this entry with
+`compiled: true` in their Start plugin options, including generated route and
+split-module imports.
+
+Compiled selection removes descriptor creation from route selection, bound
+links and document shells, but does not make the entire binding Strong or
+remove the generic renderer. Link retains synchronous `flushSync` so its
+transition cue is already visible in `onBeforeNavigate` callbacks. Both entries
+share a non-Strong script component that renders host descriptors: new inline and
+external scripts execute, and self-removing hydration data scripts leave no
+template row frames behind. Route scripts retain their managed nodes through
+hydration and are replaced with route ownership. The scroll-restoration
+script remains through adoption and is dropped afterward. Error propagation,
+scroll-script hydration compatibility, and lifecycle dependencies retain their
+existing contracts.
+
+`Wrap` and `InnerWrap` remain unsupported and produce an explicit diagnostic.
 For returned JSX, host strings, renderable wrappers or mixed route trees, retain
-`RouterProvider`, `Outlet` and `lazyRouteComponent` from the ordinary entry.
-SSR and client builds must select the same entry for a tree.
+the ordinary entry. Its public APIs and contexts remain available unchanged.

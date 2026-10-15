@@ -1741,6 +1741,7 @@ export declare function parseStartConfig(
 	opts: z.input<typeof tanstackStartRsbuildOptionsSchema>,
 	corePluginOpts: {
 		framework: CompileStartFrameworkOptions;
+		compiled?: boolean;
 	},
 	root: string,
 ): {

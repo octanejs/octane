@@ -52,7 +52,8 @@ function listFiles(root: string, current = root): string[] {
 	});
 }
 
-describe('TanStack Start Rsbuild integration', () => {
+describe.each([false, true])('TanStack Start Rsbuild integration compiled=%s', (compiled) => {
+	const routerPackage = '@octanejs/tanstack-router' + (compiled ? '/compiled' : '');
 	let root: string;
 
 	beforeEach(() => {
@@ -87,7 +88,7 @@ describe('TanStack Start Rsbuild integration', () => {
 		write(
 			root,
 			'src/router.ts',
-			`import { createRouter } from '@octanejs/tanstack-router';
+			`import { createRouter } from '${routerPackage}';
 import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
@@ -97,7 +98,7 @@ export function getRouter() {
 		);
 		write(
 			root,
-			'src/routes/__root.tsx',
+			'src/routes/__root.tsrx',
 			`/** @jsxImportSource octane */
 import {
 	Body,
@@ -107,25 +108,21 @@ import {
 	Outlet,
 	Scripts,
 	createRootRoute,
-} from '@octanejs/tanstack-router';
+} from '${routerPackage}';
 
 export const Route = createRootRoute({
 	shellComponent: RootDocument,
 	component: RootLayout,
 });
 
-function RootDocument(props: { children?: unknown }) {
-	return (
-		<Html lang="en">
-			<Head><HeadContent /></Head>
-			<Body>{props.children}<Scripts /></Body>
-		</Html>
-	);
+function RootDocument(props: { children?: unknown }) @{
+	<Html lang="en">
+		<Head><HeadContent /></Head>
+		<Body>{props.children}<Scripts /></Body>
+	</Html>
 }
 
-function RootLayout() {
-	return <Outlet />;
-}
+function RootLayout() @{ <Outlet /> }
 `,
 		);
 		write(
@@ -153,7 +150,7 @@ export function BrowserOnlyProof() @{
 		write(
 			root,
 			'src/routes/index.tsrx',
-			`import { ClientOnly, createFileRoute } from '@octanejs/tanstack-router';
+			`import { ClientOnly, createFileRoute } from '${routerPackage}';
 import { BrowserOnlyProof } from '../BrowserOnlyProof.client.tsrx';
 import { loadMessage } from '../loadMessage';
 
@@ -162,16 +159,14 @@ export const Route = createFileRoute('/')({
 	component: Home,
 });
 
-function Home() {
+function Home() @{
 	const message = Route.useLoaderData();
-	return (
-		<main data-rsbuild-start="ready">
-			<span>{message as string}</span>
-			<ClientOnly fallback={<span data-client-only-fallback="ready">server fallback</span>}>
-				<BrowserOnlyProof />
-			</ClientOnly>
-		</main>
-	);
+	<main data-rsbuild-start="ready">
+		<span>{message as string}</span>
+		<ClientOnly fallback={<span data-client-only-fallback="ready">server fallback</span>}>
+			<BrowserOnlyProof />
+		</ClientOnly>
+	</main>
 }
 `,
 		);
@@ -186,7 +181,7 @@ function Home() {
 			cwd: root,
 			rsbuildConfig: {
 				root,
-				plugins: [tanstackStart({ octane: { parallel: false } })],
+				plugins: [tanstackStart({ compiled, octane: { parallel: false } })],
 				dev: { lazyCompilation: false },
 				server: { host: '127.0.0.1' },
 			},
@@ -213,7 +208,7 @@ function Home() {
 			cwd: root,
 			rsbuildConfig: {
 				root,
-				plugins: [tanstackStart({ octane: { hmr: false, parallel: false } })],
+				plugins: [tanstackStart({ compiled, octane: { hmr: false, parallel: false } })],
 				output: { minify: false },
 			},
 		});

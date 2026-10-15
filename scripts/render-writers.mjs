@@ -150,7 +150,6 @@ export const WRITERS = new Map(
 		skipFoldedHeadPrefix: 'hydration',
 		'HydrationCapability.adoptBindingText': 'hydration',
 		'HydrationCapability.newText': 'hydration',
-		'HydrationCapability.wrapUnframedRoot': 'hydration',
 		'HydrationCapability.insertRoot': 'hydration',
 		finishInitialSuspenseHydration: 'hydration',
 		hydrateRootWithOutputHandler: 'hydration',

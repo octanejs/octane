@@ -1,5 +1,5 @@
 import { useState } from 'octane';
-import { Link, Outlet, useParams, useSearch } from '@octanejs/tanstack-router';
+import { Link, Outlet, useParams, useSearch } from '@octanejs/tanstack-router/compiled';
 import {
 	decodeErrorMessage,
 	errorArguments,

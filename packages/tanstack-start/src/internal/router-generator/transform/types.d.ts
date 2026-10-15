@@ -29,6 +29,7 @@ export type TransformResult =
 	  };
 export interface TransformContext {
 	target: Config['target'];
+	compiled?: boolean;
 	routeId: string;
 	lazy: boolean;
 }

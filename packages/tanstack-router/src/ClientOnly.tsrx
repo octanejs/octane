@@ -1,3 +1,5 @@
+'use strong';
+
 // ClientOnly / useHydrated — port of react-router's ClientOnly.tsx. Renders
 // children only once the client has hydrated: `useHydrated` reads a constant
 // external store whose server snapshot is `false` and client snapshot is

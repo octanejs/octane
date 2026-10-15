@@ -7,8 +7,8 @@ import {
 	getAssetKeys,
 	useHydrated,
 	useTags,
-} from '@octanejs/tanstack-router';
-import type { RouterManagedTag } from '@octanejs/tanstack-router';
+} from '@octanejs/tanstack-router/compiled';
+import type { RouterManagedTag } from '@octanejs/tanstack-router/compiled';
 
 // The router's <HeadContent />, minus the manifest's `modulepreload` hints.
 //

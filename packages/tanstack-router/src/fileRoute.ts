@@ -10,7 +10,12 @@ import {
 	useSearch,
 } from './hooks';
 import { useRouter } from './context';
-import { splitSlot, subSlot } from './internal';
+import { createRouteHookBindings } from './routeHookBindings';
+
+const { attachLazyRouteHooks } = createRouteHookBindings(
+	{ useMatch, useParams, useSearch, useLoaderData, useLoaderDeps, useRouteContext, useNavigate },
+	useRouter,
+);
 import type {
 	AnyContext,
 	AnyRoute,
@@ -198,63 +203,7 @@ export class LazyRoute<TRoute extends AnyRoute> {
 
 	constructor(opts: { id: string } & LazyRouteOptions) {
 		this.options = opts;
-		const id = this.options.id;
-		this.useMatch = ((...args: Array<any>) => {
-			const [user, slot] = splitSlot(args);
-			const options = user[0] ?? {};
-			return useMatch(
-				{
-					select: options.select,
-					from: id,
-					structuralSharing: options.structuralSharing,
-				},
-				subSlot(slot, 'lr:m'),
-			);
-		}) as typeof this.useMatch;
-		this.useRouteContext = ((...args: Array<any>) => {
-			const [user, slot] = splitSlot(args);
-			return useRouteContext({ ...(user[0] ?? {}), from: id }, subSlot(slot, 'lr:c'));
-		}) as typeof this.useRouteContext;
-		this.useSearch = ((...args: Array<any>) => {
-			const [user, slot] = splitSlot(args);
-			const options = user[0] ?? {};
-			return useSearch(
-				{
-					select: options.select,
-					from: id,
-					structuralSharing: options.structuralSharing,
-				},
-				subSlot(slot, 'lr:s'),
-			);
-		}) as typeof this.useSearch;
-		this.useParams = ((...args: Array<any>) => {
-			const [user, slot] = splitSlot(args);
-			const options = user[0] ?? {};
-			return useParams(
-				{
-					select: options.select,
-					from: id,
-					structuralSharing: options.structuralSharing,
-				},
-				subSlot(slot, 'lr:p'),
-			);
-		}) as typeof this.useParams;
-		this.useLoaderDeps = ((...args: Array<any>) => {
-			const [user, slot] = splitSlot(args);
-			return useLoaderDeps({ ...(user[0] ?? {}), from: id }, subSlot(slot, 'lr:d'));
-		}) as typeof this.useLoaderDeps;
-		this.useLoaderData = ((...args: Array<any>) => {
-			const [user, slot] = splitSlot(args);
-			return useLoaderData({ ...(user[0] ?? {}), from: id }, subSlot(slot, 'lr:l'));
-		}) as typeof this.useLoaderData;
-		this.useNavigate = ((...args: Array<any>) => {
-			const [, slot] = splitSlot(args);
-			const router = useRouter();
-			return useNavigate(
-				{ from: (router.routesById as Record<string, any>)[id].fullPath },
-				subSlot(slot, 'lr:n'),
-			);
-		}) as typeof this.useNavigate;
+		attachLazyRouteHooks(this);
 	}
 }
 

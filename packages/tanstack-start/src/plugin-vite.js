@@ -2,7 +2,10 @@ import { START_ENVIRONMENT_NAMES, tanStackStartVite } from '#tanstack-start/plug
 import { octaneRouteGeneratorPlugin } from '@octanejs/tanstack-router/generator-plugin';
 import { octane } from 'octane/compiler/vite';
 import { octaneClientOnlyServerStrip } from './client-only-server-strip.js';
-import { octaneStartDefaultEntryPaths } from './default-entry-paths.js';
+import {
+	octaneStartDefaultEntryPaths,
+	octaneStartCompiledEntryPaths,
+} from './default-entry-paths.js';
 import { validateOctaneCompilerOptions } from './validate-options.js';
 
 // The Start runtime chain must be source-served. Its compiler removes
@@ -28,7 +31,7 @@ const WORKSPACE_SOURCE_INCLUDES = [
 ];
 
 export function tanstackStart(options) {
-	const { octane: octaneOptions, ...startOptions } = options ?? {};
+	const { octane: octaneOptions, compiled = false, ...startOptions } = options ?? {};
 	validateOctaneCompilerOptions(octaneOptions);
 
 	// `devtools: true` is Start's shorthand for the compiler's command-aware
@@ -47,7 +50,8 @@ export function tanstackStart(options) {
 
 	const corePluginOptions = {
 		framework: 'octane',
-		defaultEntryPaths: octaneStartDefaultEntryPaths,
+		compiled,
+		defaultEntryPaths: compiled ? octaneStartCompiledEntryPaths : octaneStartDefaultEntryPaths,
 		providerEnvironmentName: START_ENVIRONMENT_NAMES.server,
 		ssrIsProvider: true,
 		ssrResolverStrategy: { type: 'default' },

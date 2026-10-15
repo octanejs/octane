@@ -7,6 +7,7 @@ export type CompileCodeSplitReferenceRouteOptions = {
 	codeSplitGroupings: CodeSplitGroupings;
 	deleteNodes?: Set<DeletableNodes>;
 	targetFramework: Config['target'];
+	compiled?: boolean;
 	filename: string;
 	id: string;
 	addHmr?: boolean;

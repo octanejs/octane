@@ -1,7 +1,7 @@
 // One documentation page: render compiled MDX in a readable article and add
 // the previous/next navigation supplied by the registry. The owning DocsLayout
 // renders this document's section navigation inside the shared left sidebar.
-import { Link, useParams } from '@octanejs/tanstack-router';
+import { Link, useParams } from '@octanejs/tanstack-router/compiled';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
 import { useTitle } from '../../hooks/use-title.ts';

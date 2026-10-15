@@ -41,7 +41,7 @@ import {
 	useLinkedState,
 } from 'octane';
 import type { CompileDiagnostic } from 'octane/compiler';
-import { useNavigate } from '@octanejs/tanstack-router';
+import { useNavigate } from '@octanejs/tanstack-router/compiled';
 import type {
 	PlaygroundLang,
 	PlaygroundOutputTarget,

@@ -2,7 +2,7 @@
 // as the docs. The selected panel owns its copy state so changing examples
 // cannot leave a stale "Copied" message on the new sample.
 import { useRef, useState } from 'octane';
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@octanejs/tanstack-router/compiled';
 import OctaneSample from '../../../content/home-octanecompat-sample.mdx';
 import ReactSample from '../../../content/home-reactcompat-sample.mdx';
 import { useCopyToClipboard } from '../../../hooks/use-copy.ts';

@@ -3,3 +3,5 @@ export declare const octaneStartDefaultEntryPaths: {
 	server: string;
 	start: string;
 };
+
+export declare const octaneStartCompiledEntryPaths: typeof octaneStartDefaultEntryPaths;

@@ -1,18 +1,22 @@
 {
-  "upstream": { "package": "@tanstack/react-router", "version": "1.170.41" },
-  "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
+  "upstream": {
+    "package": "@tanstack/react-router",
+    "version": "1.170.41"
+  },
+  "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries. The opt-in compiled entry also owns typed code/file-route factories, links, root document shells, and document asset APIs for compiled route trees.",
   "divergences": [
-    "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
+    "Refs are props \u2014 `createLink`'s `forwardRef` becomes a `ref` prop.",
     "Link callbacks receive native DOM events rather than React synthetic events.",
     "Router devtools are distributed separately."
   ],
   "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by Octane-only framework-contract tests in ordinary shards (not a React SSR oracle).",
-  "verified": "2026-08-02",
+  "verified": "2026-10-15",
   "notes": [
     "The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.",
     "Same-route search navigations now render store updates urgently: a route that suspends on the new search input can show its pending fallback. To retain stale content, use `useDeferredValue` on the search input consumed by the suspending content; the previous automatic same-route hold no longer applies.",
     "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator.",
-    "React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately."
+    "React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately.",
+    "2026-10-15 scoped compiled-entry maintenance: shared route/Link/asset behavior retains ordinary entry contracts; compiled Link keeps synchronous flushSync, a shared non-Strong script descriptor owner preserves live creation and self-removing hydration transport, and scroll/error lifecycle compatibility remains explicit. This is not whole-package Strong compliance or removal of the generic renderer; Wrap and InnerWrap remain unsupported in the compiled entry."
   ],
   "docs": ["docs/tanstack-parity-audit.md"]
 }
