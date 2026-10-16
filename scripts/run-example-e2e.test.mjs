@@ -18,11 +18,11 @@ describe('example E2E shard planning', () => {
 		assert.equal(new Set(scheduledIds).size, apps.length);
 		assert.deepEqual(
 			plan.shards.map((shard) => shard.estimatedWeight).sort((left, right) => left - right),
-			[39, 40, 40],
+			[41, 41, 41],
 		);
 		assert.deepEqual(
 			plan.shards.map((shard) => shard.apps.length).sort((left, right) => left - right),
-			[6, 6, 7],
+			[6, 7, 7],
 		);
 	});
 
@@ -31,7 +31,7 @@ describe('example E2E shard planning', () => {
 		const byId = new Map(apps.map((app) => [app.id, app]));
 
 		assert.deepEqual(
-			['cartlane', 'hacker-news', 'pagecraft'].map((id) => ({
+			['cartlane', 'hacker-news', 'pagecraft', 'storybook'].map((id) => ({
 				id,
 				executionModes: byId.get(id).executionModes,
 				weight: byId.get(id).weight,
@@ -40,6 +40,7 @@ describe('example E2E shard planning', () => {
 				{ id: 'cartlane', executionModes: 2, weight: 10 },
 				{ id: 'hacker-news', executionModes: 2, weight: 8 },
 				{ id: 'pagecraft', executionModes: 2, weight: 10 },
+				{ id: 'storybook', executionModes: 2, weight: 4 },
 			],
 		);
 	});

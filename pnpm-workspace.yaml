@@ -265,6 +265,7 @@ catalogs:
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.1
+    '@storybook/react-vite': 10.6.1
     '@portabletext/react': 8.0.1
     '@portabletext/toolkit': 6.0.0
     '@portabletext/types': 4.0.2
@@ -482,6 +483,7 @@ catalogs:
     rulesync: ^8.32.0
     solid-js: '2.0.0-rc.14'
     sonner: 2.0.7
+    storybook: 10.6.1
     thinking-orbs: 0.2.0
     styled-components: 6.4.3
     stylis: ^4.4.0
