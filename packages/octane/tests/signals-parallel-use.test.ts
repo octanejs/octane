@@ -825,9 +825,8 @@ describe('native reads in use() creations', () => {
 		expect(conditionalStarts).toEqual([]);
 		expect(conditional.html).toContain('hidden');
 		for (const View of [server.ParallelErrors, server.ParallelJsxErrors]) {
-			// The source-order first rejection wins even when a later one settles
-			// first. As in React, the server reports it rather than rendering the
-			// catch arm, and ships the pending fallback for a client render.
+			// The source-order first rejection reaches the authored catch arm even
+			// when a later one settles first.
 			const firstError = deferred<string>();
 			const secondError = deferred<string>();
 			let completed = false;
@@ -845,12 +844,11 @@ describe('native reads in use() creations', () => {
 			await drain();
 			expect(completed).toBe(false);
 			firstError.reject(new Error('first error'));
-			const html = (await errors).html;
-			expect(html).toContain('class="pending"');
-			expect(html).not.toContain('first error');
-			expect(html).not.toContain('later error');
-			expect(onError).toHaveBeenCalledTimes(1);
-			expect(onError.mock.calls[0][0]).toMatchObject({ message: 'first error' });
+			const markup = document.createElement('div');
+			markup.innerHTML = (await errors).html;
+			expect(markup.querySelector('.error')?.textContent).toBe('first error');
+			expect(markup.querySelector('.pending')).toBeNull();
+			expect(onError).not.toHaveBeenCalled();
 			const failedStarts: string[] = [];
 			const failedOnError = vi.fn();
 			const failed = await prerender(
@@ -864,10 +862,10 @@ describe('native reads in use() creations', () => {
 				{ onError: failedOnError },
 			);
 			expect(failedStarts).toEqual(['first']);
-			expect(failed.html).toContain('class="pending"');
-			expect(failed.html).not.toContain('synchronous first error');
-			expect(failedOnError).toHaveBeenCalledTimes(1);
-			expect(failedOnError.mock.calls[0][0]).toMatchObject({ message: 'synchronous first error' });
+			markup.innerHTML = failed.html;
+			expect(markup.querySelector('.error')?.textContent).toBe('synchronous first error');
+			expect(markup.querySelector('.pending')).toBeNull();
+			expect(failedOnError).not.toHaveBeenCalled();
 		}
 	});
 

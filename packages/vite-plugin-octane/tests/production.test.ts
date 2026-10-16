@@ -699,12 +699,10 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		const response = await handler(new Request('http://localhost/pages/error'));
 		expect(response.status).toBe(200);
 		const prodHtml = await response.text();
-		// As in React, the server never renders an error boundary: the root's
-		// pending arm ships with an instruction to render the boundary on the
-		// client, where the catch arm catches the repeated error.
-		expect(prodHtml).toContain('Loading fixture…');
-		expect(prodHtml).toContain('$OCTRX(');
-		expect(prodHtml).not.toContain('Fixture failed');
+		const catchText = 'Fixture failed: Error: fixture root boundary';
+		const prodBody = bodyRegionOf(prodHtml);
+		expect(prodBody).toContain(catchText);
+		expect(prodBody).not.toContain('Loading fixture…');
 		const stylesheet = findBuiltAsset(path.join(distDir, 'client'), '.css', '.root-catch');
 		expect(stylesheet).toBeTruthy();
 		expect(prodHtml).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
@@ -713,9 +711,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		expect(devResponse.status).toBe(200);
 		// Each response names its stream boundaries with ids of its own.
 		const boundaryIds = (html: string) => html.replace(/\bos[0-9a-f]{32}-\d+-\d+/g, 'os-id');
-		expect(boundaryIds(bodyRegionOf(await devResponse.text()))).toBe(
-			boundaryIds(bodyRegionOf(prodHtml)),
-		);
+		expect(boundaryIds(bodyRegionOf(await devResponse.text()))).toBe(boundaryIds(prodBody));
 
 		let browser: import('playwright').Browser | undefined;
 		try {
@@ -736,10 +732,8 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		});
 		page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
 		try {
-			await page.goto(devOrigin + '/pages/error', { waitUntil: 'load' });
-			expect(await page.locator('.root-catch').textContent()).toBe(
-				'Fixture failed: Error: fixture root boundary',
-			);
+			await page.goto(productionOrigin + '/pages/error', { waitUntil: 'load' });
+			expect(await page.locator('.root-catch').textContent()).toBe(catchText);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
