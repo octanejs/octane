@@ -89,18 +89,16 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Counter } from './Counter.tsrx';
 import { asReact } from './asReact.tsx';
 
-const CounterStory = asReact(Counter);
-
 const meta = {
 	title: 'Octane/Counter',
-	component: CounterStory,
+	component: asReact(Counter),
 	args: { label: 'Increment', step: 1, disabled: false },
 	argTypes: {
 		label: { control: 'text' },
 		step: { control: 'number' },
 		disabled: { control: 'boolean' },
 	},
-} satisfies Meta<typeof CounterStory>;
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
