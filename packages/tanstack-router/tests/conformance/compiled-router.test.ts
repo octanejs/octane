@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoot } from 'octane';
+import { createRoot, startTransition } from 'octane';
 import {
 	CompiledRouterProvider,
 	PreconfiguredRouterProvider,
 } from '@octanejs/tanstack-router/compiled';
 import { mount, nextPaint } from '../_helpers';
 import { makeCompiledRouter, makeCompiledFileRouter } from '../_fixtures/compiled-router.tsrx';
+import { createDeferred } from '../_fixtures/concurrent-navigation.tsrx';
 
 async function settle() {
 	for (let i = 0; i < 6; i++) {
@@ -15,6 +16,77 @@ async function settle() {
 }
 
 describe('opt-in compiled router rendering', () => {
+	it.each([false, true])(
+		'keeps the visible route during an urgent provider update while navigation suspends (async action: %s)',
+		async (asyncAction) => {
+			const deferred = createDeferred<string>();
+			const router = makeCompiledRouter('/', { componentPromise: deferred.promise });
+			await router.load();
+			const view = mount(CompiledRouterProvider as any, { router });
+			await settle();
+			const home = view.find('.go-item');
+			const visible: boolean[] = [];
+			const observer = new MutationObserver(() => visible.push(home.isConnected));
+			try {
+				observer.observe(view.container, { childList: true, subtree: true });
+				if (asyncAction)
+					startTransition(async () => {
+						await router.navigate({ to: '/items/a' });
+					});
+				else void router.navigate({ to: '/items/a' });
+				await settle();
+				expect(view.find('.go-item')).toBe(home);
+				view.update(CompiledRouterProvider as any, { router, defaultPreload: 'intent' });
+				await settle();
+				observer.disconnect();
+				expect(visible).not.toContain(false);
+				expect(view.find('.go-item')).toBe(home);
+				expect(view.findAll('.suspended-item')).toHaveLength(0);
+				deferred.resolve('Slow page');
+				await settle();
+				expect(view.find('.suspended-item').textContent).toBe('Slow page');
+			} finally {
+				observer.disconnect();
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(['invalidate', 'navigate', 'same-route', 'load'] as const)(
+		'settles an async action awaiting router.%s',
+		async (operation) => {
+			const router = makeCompiledRouter('/');
+			await router.load();
+			const view = mount(CompiledRouterProvider as any, { router });
+			await settle();
+			let settled = false;
+			let failure: unknown;
+			try {
+				startTransition(async () => {
+					try {
+						if (operation === 'invalidate') await router.invalidate({ sync: true });
+						else if (operation === 'same-route') {
+							for (let i = 0; i < 3; i++) await router.navigate({ to: '/' });
+						} else if (operation === 'load') {
+							for (let i = 0; i < 3; i++) await router.load({ sync: true });
+						} else await router.navigate({ to: '/items/a' });
+						settled = true;
+					} catch (error) {
+						failure = error;
+					}
+				});
+				await settle();
+				expect(failure).toBeUndefined();
+				expect(settled).toBe(true);
+				expect(view.find(operation === 'navigate' ? '.value' : '.go-item').textContent).toBe(
+					operation === 'navigate' ? 'a:Name a' : 'Open item',
+				);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
 	it('navigates from a route layout effect when its provider mounts', async () => {
 		const router = makeCompiledRouter('/items/a', { navigateOnMount: true });
 		await router.load();

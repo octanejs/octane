@@ -22,7 +22,7 @@ import {
 	type ErrorComponentProps,
 	type NotFoundRouteProps,
 } from '@octanejs/tanstack-router/compiled';
-import { useLayoutEffect, useState } from 'octane';
+import { use, useLayoutEffect, useState } from 'octane';
 export {
 	CompiledRouterProvider,
 	PreconfiguredRouterProvider,
@@ -86,6 +86,12 @@ function RecoverableItem() @{
 	<Item />
 }
 
+function SuspendedItem() @{
+	const data = useLoaderData({ strict: false }) as { componentPromise: Promise<string> };
+	const value = use(data.componentPromise);
+	<p class="suspended-item">{value as string}</p>
+}
+
 function ErrorView(props: ErrorComponentProps) @{
 	<p class="route-error">
 		{(props.error instanceof Error ? props.error.message : String(props.error)) as string}
@@ -111,6 +117,7 @@ export function makeCompiledRouter(
 		onCatch?: (error: Error) => void;
 		parentOnCatch?: (error: Error) => void;
 		navigateOnMount?: boolean;
+		componentPromise?: Promise<string>;
 	} = {},
 ) {
 	const root = new BaseRootRoute({
@@ -135,14 +142,16 @@ export function makeCompiledRouter(
 			if (opts.loader) await opts.loader();
 			if (params.id === 'missing') throw notFound({ data: 'no item' });
 			if (opts.rejected) throw new Error('item failed');
-			return { name: 'Name ' + params.id };
+			return { name: 'Name ' + params.id, componentPromise: opts.componentPromise };
 		},
-		component: opts.invalid
-			? ((() => 'plain returned text') as any)
-			: opts.renderError
-				? RecoverableItem
-				: lazyCompiledRouteComponent(async () => ({ Item }), 'Item'),
-		pendingComponent: Pending,
+		component: opts.componentPromise
+			? SuspendedItem
+			: opts.invalid
+				? ((() => 'plain returned text') as any)
+				: opts.renderError
+					? RecoverableItem
+					: lazyCompiledRouteComponent(async () => ({ Item }), 'Item'),
+		pendingComponent: opts.componentPromise ? undefined : Pending,
 		errorComponent: ErrorView,
 		onCatch: opts.onCatch,
 		remountDeps: ({ params }: any) => [params.id],

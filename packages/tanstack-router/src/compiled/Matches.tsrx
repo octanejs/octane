@@ -6,7 +6,7 @@ import {
 	useContext,
 	useLayoutEffect,
 } from 'octane';
-import type { AnyRouteMatch, AnyRouter, NotFoundError } from '@tanstack/router-core';
+import type { AnyRouter, NotFoundError } from '@tanstack/router-core';
 import { rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
 import { routerContext, matchContext, useRouter } from './bindings';
@@ -36,9 +36,9 @@ function CompiledMatches() @{
 	const router = useRouter();
 	const rootRoute = (router.routesById as any)[rootRouteId];
 	useLayoutEffect(() => setupRouterScrollRestoration(router));
-	const expectedMatches = useTransitioner(router);
+	useTransitioner(router);
 	@try {
-		<CompiledMatchesInner expectedMatches={expectedMatches} />
+		<CompiledMatchesInner />
 	} @pending {
 		<CompiledPending route={rootRoute} />
 	} @catch (error, reset) {
@@ -47,9 +47,9 @@ function CompiledMatches() @{
 	}
 }
 
-function CompiledMatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> | undefined }) @{
+function CompiledMatchesInner() @{
 	const router = useRouter();
-	const matches = usePresentedMatches(router, props.expectedMatches);
+	const matches = usePresentedMatches(router);
 	const rootMatch = matches[0];
 	@if (rootMatch) {
 		<CompiledContext context={matchContext} value={rootMatch.routeId}>

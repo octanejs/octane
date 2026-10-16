@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { act } from 'octane';
+import { act, startTransition } from 'octane';
 import { mount, nextPaint } from '../_helpers';
 import { RouterProvider } from '@octanejs/tanstack-router';
 import { makeConcurrentRouter, createDeferred } from '../_fixtures/concurrent-navigation.tsrx';
@@ -15,6 +15,80 @@ async function flush() {
 }
 
 describe('@octanejs/tanstack-router — concurrent navigation (startTransition)', () => {
+	it.each([false, true])(
+		'keeps the visible route during an urgent provider update while navigation suspends (async action: %s)',
+		async (asyncAction) => {
+			const deferred = createDeferred<string>();
+			const router = makeConcurrentRouter('/', deferred);
+			await router.load();
+			const view = mount(RouterProvider as any, { router });
+			await flush();
+			const home = view.find('.home');
+			const visible: boolean[] = [];
+			const observer = new MutationObserver(() => visible.push(home.isConnected));
+			try {
+				observer.observe(view.container, { childList: true, subtree: true });
+				if (asyncAction)
+					startTransition(async () => {
+						await router.navigate({ to: '/slow-bare' });
+					});
+				else void router.navigate({ to: '/slow-bare' });
+				await flush();
+				expect(view.find('.home')).toBe(home);
+				view.update(RouterProvider as any, { router, defaultPreload: 'intent' });
+				await flush();
+				observer.disconnect();
+				expect(visible).not.toContain(false);
+				expect(view.find('.home')).toBe(home);
+				expect(view.findAll('.slow')).toHaveLength(0);
+				deferred.resolve('Slow page');
+				await flush();
+				expect(view.find('.slow').textContent).toBe('Slow page');
+				expect(router.state.resolvedLocation?.pathname).toBe('/slow-bare');
+			} finally {
+				observer.disconnect();
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(['invalidate', 'navigate', 'same-route', 'load'] as const)(
+		'settles an async action awaiting router.%s',
+		async (operation) => {
+			const deferred = createDeferred<string>();
+			deferred.resolve('Slow page');
+			const router = makeConcurrentRouter('/', deferred);
+			await router.load();
+			const r = mount(RouterProvider as any, { router });
+			await flush();
+			let settled = false;
+			let failure: unknown;
+			try {
+				startTransition(async () => {
+					try {
+						if (operation === 'invalidate') await router.invalidate({ sync: true });
+						else if (operation === 'same-route') {
+							for (let i = 0; i < 3; i++) await router.navigate({ to: '/' });
+						} else if (operation === 'load') {
+							for (let i = 0; i < 3; i++) await router.load({ sync: true });
+						} else await router.navigate({ to: '/slow' });
+						settled = true;
+					} catch (error) {
+						failure = error;
+					}
+				});
+				await flush();
+				expect(failure).toBeUndefined();
+				expect(settled).toBe(true);
+				expect(r.find(operation === 'navigate' ? '.slow' : '.home').textContent).toBe(
+					operation === 'navigate' ? 'Slow page' : 'Home',
+				);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
 	// The router drives navigation state commits through octane's startTransition
 	// (Transitioner.tsrx), so React's transition/Suspense contract applies:
 	//
