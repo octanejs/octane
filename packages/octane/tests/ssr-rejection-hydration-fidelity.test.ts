@@ -11,10 +11,8 @@ import {
 	SeedCollision,
 } from './_fixtures/ssr-suspense.tsrx';
 
-// As in React, a use() that rejected on the server leaves the nearest Suspense
-// boundary's fallback for a client render and ships nothing of its reason. The
-// client renders that boundary from client data, and its own rejection reaches
-// a client @catch arm with the reason exactly as the client's promise rejected.
+// Authored catch arms render server failures into HTML. Hydration retries the
+// boundary from client data, so a client catch receives the client's own reason.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspense.tsrx');
 
@@ -61,13 +59,13 @@ async function settle(check: () => void): Promise<void> {
 }
 
 describe('SSR rejection hydration', () => {
-	it('ships no part of a primitive reason, and the client catch receives its own', async () => {
+	it('renders a primitive server rejection and gives the client catch its own reason', async () => {
 		const { html } = await prerender(server.ReasonBoundary, {
 			promise: Promise.reject('plain-reason'),
 		});
-		expect(html).not.toContain('plain-reason');
 		container.innerHTML = html;
-		expect(container.querySelector('.reason-loading')).not.toBeNull();
+		expect(container.querySelector('.reason-error')?.textContent).toBe('plain-reason:');
+		expect(container.querySelector('.reason-loading')).toBeNull();
 
 		const clientRejection = Promise.reject('client-reason');
 		clientRejection.catch(() => {});
@@ -85,21 +83,21 @@ describe('SSR rejection hydration', () => {
 			expect(error.textContent).toBe('client-reason:');
 			expect(error.getAttribute('data-kind')).toBe('string');
 			expect(caught).toBe('client-reason');
-			expect(recovered).toHaveLength(1);
+			expect(recovered).toEqual([]);
 		} finally {
 			errorSpy.mockRestore();
 			root.unmount();
 		}
 	});
 
-	it('client-renders only the innermost Suspense boundary of nested boundaries', async () => {
+	it('routes an inner rejection to the outer catch and retries that boundary on hydration', async () => {
 		const { html } = await prerender(server.NestedRejectionBoundary, {
 			promise: Promise.reject('nested-no'),
 		});
 		container.innerHTML = html;
 		const box = container.querySelector('#nested-rejection');
-		expect(container.querySelector('.nested-inner-loading')!.textContent).toBe('inner');
-		expect(container.querySelector('.nested-outer-loading, .nested-error')).toBeNull();
+		expect(container.querySelector('.nested-error')?.textContent).toBe('nested-no');
+		expect(container.querySelector('.nested-inner-loading, .nested-outer-loading')).toBeNull();
 
 		const recovered: unknown[] = [];
 		const root = await hydrate(
@@ -113,18 +111,27 @@ describe('SSR rejection hydration', () => {
 			);
 			expect(container.querySelector('#nested-rejection')).toBe(box);
 			expect(container.querySelector('.nested-inner-loading, .nested-error')).toBeNull();
-			expect(recovered).toHaveLength(1);
+			expect(recovered).toEqual([]);
 		} finally {
 			root.unmount();
 		}
 	});
 
 	it('lets an inner client catch rethrow the client reason to an outer catch', async () => {
+		const serverReason = {
+			message: 'server-no',
+			code: 'E_SERVER',
+			privateDetail: 'server-only-private-detail',
+		};
 		const { html } = await prerender(server.RethrowingNestedRejectionBoundary, {
-			promise: Promise.reject({ message: 'server-no', code: 'E_SERVER' }),
+			promise: Promise.reject(serverReason),
 		});
-		expect(html).not.toContain('server-no');
+		expect(html).not.toContain(serverReason.privateDetail);
 		container.innerHTML = html;
+		expect(container.querySelector('.nested-rethrow-error')?.textContent).toBe('server-no');
+		expect(container.querySelector('.nested-rethrow-error')?.getAttribute('data-code')).toBe(
+			'E_SERVER',
+		);
 
 		const reason = { message: 'rethrow-no', code: 'E_RETHROW' };
 		const clientRejection = Promise.reject(reason);

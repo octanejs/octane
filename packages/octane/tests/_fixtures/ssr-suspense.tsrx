@@ -307,8 +307,7 @@ export function SeedCollision(props) @{
 	</div>
 }
 
-// The inner boundary has no catch arm, but it is the Suspense boundary nearest
-// a rejection, so only it renders on the client.
+// The pending-only inner boundary lets a rejection reach the outer catch.
 export function NestedRejectionBoundary(props) @{
 	<div id="nested-rejection">
 		@try {
