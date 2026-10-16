@@ -3817,6 +3817,7 @@ export default defineConfig({
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					exclude: [
+						'packages/tanstack-router/tests/browser/**/*.test.ts',
 						'packages/tanstack-router/tests/differential/**/*.test.ts',
 						'packages/tanstack-router/tests/ssr/**/*.test.ts',
 					],
@@ -3835,6 +3836,16 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'tanstack-router-browser',
+					include: ['packages/tanstack-router/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 			},
 			{

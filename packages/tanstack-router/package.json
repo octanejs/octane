@@ -36,6 +36,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./core": "./src/core.ts",
     "./history": "./src/history.ts",
     "./compiled": "./src/compiled.ts",
     "./ssr/server": {

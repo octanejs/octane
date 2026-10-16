@@ -1,10 +1,18 @@
-// `@tanstack/history` is a separate framework-agnostic dependency (the browser/
-// hash/memory history abstractions). react-router re-exports it from `./history`;
-// we mirror that so `@octanejs/tanstack-router/history` and the bare entry both resolve it.
-export {
-	createHistory,
-	createBrowserHistory,
-	createHashHistory,
-	createMemoryHistory,
+import {
+	createBrowserHistory as createTanStackBrowserHistory,
+	createHashHistory as createTanStackHashHistory,
 } from '@tanstack/history';
+import { prepareInitialHistoryState } from './historyState';
+
+export { createHistory, createMemoryHistory } from '@tanstack/history';
 export type * from '@tanstack/history';
+
+export const createBrowserHistory: typeof createTanStackBrowserHistory = (options) => {
+	prepareInitialHistoryState(options?.window);
+	return createTanStackBrowserHistory(options);
+};
+
+export const createHashHistory: typeof createTanStackHashHistory = (options) => {
+	prepareInitialHistoryState(options?.window);
+	return createTanStackHashHistory(options);
+};
