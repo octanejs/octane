@@ -14,7 +14,6 @@ import { useLayoutEffect, createElement, Suspense } from 'octane';
 import { setupScrollRestoration, rootRouteId } from '@tanstack/router-core';
 import { useRouter, matchContext as MatchContext } from './context';
 import { useTransitioner, usePresentedMatches } from './Transitioner.tsrx';
-import type { AnyRouteMatch } from '@tanstack/router-core';
 import { Match } from './Match.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
@@ -32,18 +31,18 @@ export function Matches() @{
 	useLayoutEffect(() => {
 		if (router.options.scrollRestoration) setupScrollRestoration(router);
 	}, [router]);
-	const expectedMatches = useTransitioner(router);
+	useTransitioner(router);
 
 	<InnerWrap>
 		<Suspense fallback={pendingElement}>
-			<MatchesInner expectedMatches={expectedMatches} />
+			<MatchesInner />
 		</Suspense>
 	</InnerWrap>
 }
 
-function MatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> | undefined }) @{
+function MatchesInner() @{
 	const router = useRouter();
-	const matches = usePresentedMatches(router, props.expectedMatches);
+	const matches = usePresentedMatches(router);
 	const rootMatch = matches[0];
 	const routeId = rootMatch?.routeId as string | undefined;
 	const CatchWrap = router.options.disableGlobalCatchBoundary ? SafeFragment : CatchBoundary;

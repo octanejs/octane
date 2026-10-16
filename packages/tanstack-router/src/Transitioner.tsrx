@@ -19,7 +19,7 @@
 //      and kick off the initial load — or, when hydrating an already-resolved SSR
 //      location, acknowledge the first render so `onRendered` consumers (scroll
 //      restoration, devtools) fire.
-import { useInsertionEffect, useLayoutEffect, useState, startTransition } from 'octane';
+import { useInsertionEffect, useLayoutEffect, startTransition } from 'octane';
 import { getLocationChangeInfo, trimPathRight } from '@tanstack/router-core';
 import type { AnyRouteMatch, AnyRouter } from '@tanstack/router-core';
 import { useStore } from './useStore';
@@ -32,7 +32,7 @@ function settleOwner(owner: NonNullable<AnyRouter['_rendered']>, rendered: boole
 	settle?.(rendered);
 }
 
-function installTransitioner(router: AnyRouter, present: (matches: Array<AnyRouteMatch>) => void) {
+function installTransitioner(router: AnyRouter) {
 	const acknowledgement = (router._rendered ??= []);
 	const previous = router.startTransition;
 	const owned: AnyRouter['startTransition'] = (fn, expected) =>
@@ -40,7 +40,6 @@ function installTransitioner(router: AnyRouter, present: (matches: Array<AnyRout
 			settleOwner(acknowledgement, false);
 			acknowledgement[0] = expected;
 			acknowledgement[1] = resolve;
-			present(expected);
 			startTransition(fn);
 		});
 	router.startTransition = owned;
@@ -92,13 +91,11 @@ function subscribeToHistory(router: AnyRouter, history: AnyRouter['history']) {
 }
 
 export function useTransitioner(router: AnyRouter) {
-	const [expectedMatches, setExpectedMatches] = useState<Array<AnyRouteMatch>>();
 	const history = router.history;
 	// Install before descendant layout effects can navigate, without mutating the
 	// router during render or placing a sibling before a document-level route.
-	useInsertionEffect(() => installTransitioner(router, setExpectedMatches));
+	useInsertionEffect(() => installTransitioner(router));
 	useLayoutEffect(() => subscribeToHistory(router, history));
-	return expectedMatches;
 }
 
 function acknowledgeRenderedMatches(router: AnyRouter, matches: Array<AnyRouteMatch>) {
@@ -109,10 +106,10 @@ function acknowledgeRenderedMatches(router: AnyRouter, matches: Array<AnyRouteMa
 // The store may reconstruct its match array, so a navigation must present the
 // exact snapshot offered by router-core until that tree commits. The live owner
 // is observed only by the store snapshot and by the commit acknowledgement.
-export function usePresentedMatches(router: AnyRouter, expectedMatches?: Array<AnyRouteMatch>) {
-	const matches = useStore(router.stores.matches, (current) =>
-		expectedMatches && router._rendered?.[0] === expectedMatches ? expectedMatches : current,
-	);
+// Mirroring it in component state would entangle that update with an async action
+// awaiting navigation, leaving both the action and its render acknowledgement pending.
+export function usePresentedMatches(router: AnyRouter) {
+	const matches = useStore(router.stores.matches, (current) => router._rendered?.[0] ?? current);
 	useLayoutEffect(() => acknowledgeRenderedMatches(router, matches));
 	return matches;
 }
