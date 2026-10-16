@@ -1146,6 +1146,36 @@
       ]
     },
     {
+      "directory": "examples/storybook",
+      "id": "storybook",
+      "title": "Storybook",
+      "summary": "A React-owned Storybook workbench hosting native Octane counters through OctaneCompat with live Controls and story lifecycle coverage.",
+      "status": "active",
+      "host": "react",
+      "renderModes": ["client"],
+      "dialects": ["tsrx", "tsx"],
+      "bindings": [],
+      "octaneFeatures": ["native-events", "octane-compat", "react-host", "scoped-styles", "state"],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "live-controls",
+          "title": "Update native label, step, and disabled props through Controls without resetting state",
+          "kind": "golden",
+          "spec": "e2e/storybook.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "story-lifecycle",
+          "title": "Switch story variants, remove the previous subtree, and return to fresh counter state",
+          "kind": "golden",
+          "spec": "e2e/storybook.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": []
+    },
+    {
       "directory": "examples/streambox",
       "id": "streambox",
       "title": "Streambox",

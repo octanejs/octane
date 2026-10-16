@@ -1,0 +1,30 @@
+{
+  "name": "storybook-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "React-owned Storybook stories hosting native Octane components through OctaneCompat.",
+  "scripts": {
+    "dev": "storybook dev --no-open",
+    "build": "storybook build --output-dir dist",
+    "typecheck": "octane-tsc -p tsconfig.json",
+    "test:e2e": "pnpm build && playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
+  },
+  "dependencies": {
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@storybook/react-vite": "catalog:default",
+    "@types/node": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vitejs/plugin-react": "catalog:default",
+    "storybook": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

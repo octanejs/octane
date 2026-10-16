@@ -36,6 +36,15 @@ Octane components inside React 19. See the
 for choosing a boundary and setting up a mixed application. Both boundaries
 have server implementations in `octane/react/server`.
 
+## Storybook with Octane components
+
+The [Storybook example](../examples/storybook/README.md) uses `OctaneCompat` in
+the opposite direction: Storybook's React renderer owns ordinary `.stories.tsx`
+wrappers, while Octane owns the native `.tsrx` component subtree. Its local React
+wrapper passes typed props through `OctaneCompat`; explicit args and argTypes
+provide Controls. The example README covers installation, compiler setup,
+development, static builds, and browser verification.
+
 ## Compiler ownership
 
 Keep React component modules under React's JSX transform. In a mixed Vite app,
