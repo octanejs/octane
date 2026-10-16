@@ -40,10 +40,11 @@ have server implementations in `octane/react/server`.
 
 The [Storybook example](../examples/storybook/README.md) uses `OctaneCompat` in
 the opposite direction: Storybook's React renderer owns ordinary `.stories.tsx`
-wrappers, while Octane owns the native `.tsrx` component subtree. Its local React
-wrapper passes typed props through `OctaneCompat`; explicit args and argTypes
-provide Controls. The example README covers installation, compiler setup,
-development, static builds, and browser verification.
+wrappers, while Octane owns the native `.tsrx` component subtree. Its local
+`asReact` helper creates a stable React wrapper with inferred native props and
+passes them through `OctaneCompat`; explicit args and argTypes provide Controls.
+The example README covers installation, compiler setup, development, static builds,
+and browser verification.
 
 ## Compiler ownership
 

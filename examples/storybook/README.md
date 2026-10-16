@@ -78,18 +78,18 @@ first preview can load without a late dependency optimization reload.
 
 ## Typed stories and Controls
 
-[`Counter.stories.tsx`](src/Counter.stories.tsx) defines a stable named React
-wrapper around the native [`Counter.tsrx`](src/Counter.tsrx) component:
+[`asReact`](src/asReact.tsx) creates a React wrapper around a native Octane
+component. [`Counter.stories.tsx`](src/Counter.stories.tsx) calls it once at module
+scope for [`Counter.tsrx`](src/Counter.tsrx), keeping the React component identity
+stable across Controls updates:
 
 ```tsx
 /** @jsxImportSource react */
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { OctaneCompat } from 'octane/react';
-import { Counter, type CounterProps } from './Counter.tsrx';
+import { Counter } from './Counter.tsrx';
+import { asReact } from './asReact.tsx';
 
-function CounterStory(props: CounterProps) {
-	return <OctaneCompat component={Counter} props={props} />;
-}
+const CounterStory = asReact(Counter);
 
 const meta = {
 	title: 'Octane/Counter',
@@ -110,10 +110,18 @@ export const Default: Story = {};
 
 Set Storybook's `component` to the React wrapper. Passing the raw Octane function
 would let React invoke a component that belongs to Octane's renderer. The
-`component`/`props` bridge form preserves the native prop types, and the
-`typecheck` script uses `octane-tsc` without ambient `.tsrx` shims or casts.
+shared helper infers the native prop types through `OctaneHostedComponent<P>`
+and passes them through the `component`/`props` bridge form. No repeated props
+annotation is needed. The `typecheck` script uses `octane-tsc` without ambient
+`.tsrx` shims or casts.
 Explicit `args` and `argTypes` supply Controls; React docgen is disabled, and
 automatic native-component prop documentation is outside this recipe.
+
+This helper adapts Octane components to React. `.tsrx` is a language extension;
+the selected compiler determines the runtime. Solid- or Vue-target TSRX requires
+its own compiler and compatible Storybook renderer or a separate bridge into
+React. The helper checks prop types, not runtime ownership; these other targets
+are not supported by this example.
 
 The example is client-only. `OctaneCompat` adds a `div` host, so place it where
 ordinary HTML permits a div, rather than directly in a table row, select, or SVG
