@@ -49935,10 +49935,11 @@ function reconcileKeyed<T>(
 			if (prev) prev.nextSibling = block;
 			else state.head = block;
 			prev = block;
+			// A later row can suspend, so each completed insertion must be retryable.
+			if (afterMiddle) afterMiddle.prevSibling = block;
+			else state.tail = block;
+			state.size++;
 		}
-		if (afterMiddle) afterMiddle.prevSibling = prev;
-		else state.tail = prev;
-		state.size += newEnd - prefixLen + 1;
 		return;
 	}
 
@@ -50049,9 +50050,9 @@ function reconcileKeyed<T>(
 				if (prev) prev.nextSibling = block;
 				else state.head = block;
 				prev = block;
+				state.tail = block;
+				state.size = i + 1;
 			}
-			state.tail = prev;
-			state.size = newLen;
 			return;
 		}
 	}
@@ -50091,6 +50092,13 @@ function reconcileKeyed<T>(
 					__profileCount(ProfileCounter.LIST_REMOVE);
 				oldItems.delete(cur!.key);
 				state.size--;
+				// A later survivor or insertion can suspend. The live chain must
+				// already omit this row if the boundary retains the partial render.
+				const previous = cur!.prevSibling;
+				if (previous) previous.nextSibling = next;
+				else state.head = next;
+				if (next) next.prevSibling = previous;
+				else state.tail = previous;
 			} else {
 				sources[newRelIdx] = oldIdx;
 				if (newRelIdx < lastIdx) moved = true;
@@ -50116,40 +50124,8 @@ function reconcileKeyed<T>(
 			oldIdx++;
 		}
 
-		// Fast bail: all survivors AND no moves AND no mounts → old middle is the
-		// same shape & order as new middle.
-		if (!moved && patched === newMidLen) {
-			// If the survivor walk did NOT unmount anything (oldRemain ===
-			// patched), the linked-list pointers are still correct end-to-end
-			// and we can return without touching them. But if blocks were
-			// unmounted BETWEEN survivors, the survivors' .prevSibling /
-			// .nextSibling pointers still reference now-disposed blocks AND
-			// state.head / state.tail may also point at disposed blocks. The
-			// next reconcile would then walk those stale pointers, decrement
-			// state.size for blocks that no longer exist, and ultimately
-			// crash with a null-pointer access in the prefix/suffix walk.
-			//
-			// Relink the entire middle chain so its prev/next pointers — and
-			// the boundary into beforeMiddle / afterMiddle / state.head /
-			// state.tail — accurately reflect the post-unmount topology.
-			// O(newMidLen); only fires when survivors and removes are mixed.
-			// Surfaced by fuzz-keyed-list seed=-2060211668 action 9 (a
-			// replace-all 13 → 2 where both survivors are in original order).
-			if (oldRemain !== patched) {
-				let prev: Block | null = beforeMiddle;
-				for (let i = 0; i < newMidLen; i++) {
-					const block = oldItems.get(newKeys[i])!;
-					block.prevSibling = prev;
-					if (prev) prev.nextSibling = block;
-					else state.head = block;
-					prev = block;
-				}
-				prev!.nextSibling = afterMiddle;
-				if (afterMiddle) afterMiddle.prevSibling = prev;
-				else state.tail = prev;
-			}
-			return;
-		}
+		// All surviving rows are already linked in the requested order.
+		if (!moved && patched === newMidLen) return;
 
 		// The remaining middle needs a move or an insertion. Pure survivor
 		// updates above may have completed first, but have not changed the chain.
@@ -50224,23 +50200,8 @@ function reconcileKeyed<T>(
 					if (next) next.prevSibling = block;
 					else state.tail = block;
 				}
-				// Boundary patch: the first and last block of the NEW middle may be
-				// identity-mapped (not in _disp), in which case the displacement
-				// loop never touched them — they still carry their pre-reconcile
-				// neighbour pointers, which can be stale (e.g. pointing at a block
-				// that the survivor walk just unmounted, or at a prior-reconcile
-				// neighbour that has since shifted). Always re-pin the boundary
-				// pointers so state.head / state.tail / beforeMiddle.next /
-				// afterMiddle.prev are correct for the next reconcile.
-				//
-				// Repro for why this matters: surfaced by fuzz-keyed-list seed
-				// -1491785866 — a `replace-all` that shrinks the list (e.g. 6 → 3)
-				// where the last survivor is identity-mapped. Without the patch,
-				// state.tail keeps pointing at the prior-tail block (now deleted)
-				// and the surviving last block's .nextSibling still points at the
-				// removed sibling. The next reconcile then stops its old-middle
-				// walk early (at the stale nextSibling) and re-mounts the
-				// last survivor as a NEW block, producing a duplicate row.
+				// Re-pin the new middle's endpoints, including identity-mapped
+				// endpoints that the displacement loop did not visit.
 				const newMidFirst = oldItems.get(newKeys[0])!;
 				const newMidLast = oldItems.get(newKeys[newMidLen - 1])!;
 				newMidFirst.prevSibling = beforeMiddle;
@@ -50281,14 +50242,21 @@ function reconcileKeyed<T>(
 		if (moved) {
 			const seq = lis(sources, newMidLen);
 			let seqIdx = seq.length - 1;
-			let anchor = middleEndAnchor;
+			let nextBlock = afterMiddle;
 			for (let i = newMidLen - 1; i >= 0; i--) {
 				if (sources[i] === -1) continue;
 				const block = oldItems.get(newKeys[i])!;
-				if (seqIdx < 0 || i !== seq[seqIdx]) moveBlockBefore(block, anchor);
+				if (seqIdx < 0 || i !== seq[seqIdx])
+					moveBlockBefore(block, nextBlock ? nextBlock.startMarker! : middleEndAnchor);
 				else seqIdx--;
-				anchor = block.startMarker!;
+				block.nextSibling = nextBlock;
+				if (nextBlock) nextBlock.prevSibling = block;
+				else state.tail = block;
+				nextBlock = block;
 			}
+			nextBlock!.prevSibling = beforeMiddle;
+			if (beforeMiddle) beforeMiddle.nextSibling = nextBlock;
+			else state.head = nextBlock;
 		}
 		let previous = beforeMiddle;
 		let nextSurvivor = 0;
@@ -50300,10 +50268,9 @@ function reconcileKeyed<T>(
 					nextSurvivor = i + 1;
 					while (nextSurvivor < newMidLen && sources[nextSurvivor] === -1) nextSurvivor++;
 				}
-				const anchor =
-					nextSurvivor < newMidLen
-						? oldItems.get(newKeys[nextSurvivor])!.startMarker!
-						: middleEndAnchor;
+				const nextBlock =
+					nextSurvivor < newMidLen ? oldItems.get(newKeys[nextSurvivor])! : afterMiddle;
+				const anchor = nextBlock ? nextBlock.startMarker! : middleEndAnchor;
 				const targetIdx = i + prefixLen;
 				block = mountItem(
 					parentBlock,
@@ -50321,15 +50288,15 @@ function reconcileKeyed<T>(
 				);
 				oldItems.set(key, block);
 				state.size++;
+				block.prevSibling = previous;
+				block.nextSibling = nextBlock;
+				if (previous) previous.nextSibling = block;
+				else state.head = block;
+				if (nextBlock) nextBlock.prevSibling = block;
+				else state.tail = block;
 			} else block = oldItems.get(key)!;
-			block.prevSibling = previous;
-			if (previous) previous.nextSibling = block;
-			else state.head = block;
 			previous = block;
 		}
-		previous!.nextSibling = afterMiddle;
-		if (afterMiddle) afterMiddle.prevSibling = previous;
-		else state.tail = previous;
 	} finally {
 		if (
 			sources.length <= MAX_KEYED_REORDER_SCRATCH &&
