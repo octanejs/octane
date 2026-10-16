@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
-import { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
+import {
+	CompiledRouterProvider,
+	PreconfiguredRouterProvider,
+} from '@octanejs/tanstack-router/compiled';
 import { nextPaint } from '../_helpers';
 import { makeCompiledRouter } from '../_fixtures/compiled-router.tsrx';
 // @ts-expect-error the shared fixture plugin compiles the router graph for the server
@@ -14,11 +17,22 @@ async function settle() {
 	}
 }
 
-describe('compiled routes across SSR and hydration', () => {
+describe.each([
+	{
+		label: 'option-capable',
+		client: CompiledRouterProvider,
+		server: server.CompiledRouterProvider,
+	},
+	{
+		label: 'preconfigured',
+		client: PreconfiguredRouterProvider,
+		server: server.PreconfiguredRouterProvider,
+	},
+])('compiled routes across SSR and hydration ($label)', ({ client, server: provider }) => {
 	it('adopts the loaded lazy route and navigates with live hooks after hydration', async () => {
 		const serverRouter = server.makeCompiledRouter('/items/a', { isServer: true });
 		await serverRouter.load();
-		const { html } = renderToString(server.CompiledRouterProvider, { router: serverRouter });
+		const { html } = renderToString(provider, { router: serverRouter });
 
 		const container = document.createElement('div');
 		container.innerHTML = html;
@@ -34,7 +48,7 @@ describe('compiled routes across SSR and hydration', () => {
 		const errors: unknown[] = [];
 		const root = hydrateRoot(
 			container,
-			CompiledRouterProvider as any,
+			client as any,
 			{ router },
 			{ onRecoverableError: (error) => errors.push(error) },
 		);

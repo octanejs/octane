@@ -9,6 +9,7 @@ import {
 	createMemoryHistory,
 	getRouteApi,
 	Link,
+	PreconfiguredRouterProvider,
 } from '@octanejs/tanstack-router/compiled';
 
 const root = createRootRoute();
@@ -19,6 +20,9 @@ const item = createRoute({
 });
 const tree = root.addChildren([item]);
 const router = createRouter({ routeTree: tree, history: createMemoryHistory() });
+PreconfiguredRouterProvider({ router });
+// @ts-expect-error preconfigured providers do not accept router option props
+PreconfiguredRouterProvider({ router, defaultPendingMs: 50 });
 expectTypeOf(item.useParams<typeof router>()).toEqualTypeOf<{ id: string }>();
 expectTypeOf(item.useLoaderData<typeof router>()).toEqualTypeOf<{ title: string }>();
 expectTypeOf(item.addChildren([]).Link).toEqualTypeOf(item.Link);

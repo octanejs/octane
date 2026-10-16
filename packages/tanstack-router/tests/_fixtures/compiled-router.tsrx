@@ -22,8 +22,11 @@ import {
 	type ErrorComponentProps,
 	type NotFoundRouteProps,
 } from '@octanejs/tanstack-router/compiled';
-import { useState } from 'octane';
-export { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
+import { useLayoutEffect, useState } from 'octane';
+export {
+	CompiledRouterProvider,
+	PreconfiguredRouterProvider,
+} from '@octanejs/tanstack-router/compiled';
 
 function Shell(props: { children?: unknown }) @{
 	const match = useMatch({ strict: false });
@@ -46,6 +49,14 @@ function Home() @{
 	<button class="go-item" onClick={() => navigate({ to: '/items/a' } as any)}>
 		Open item
 	</button>
+}
+
+function NavigateOnMount() @{
+	const navigate = useNavigate();
+	useLayoutEffect(() => {
+		void navigate({ to: '/' } as any);
+	});
+	<p>Redirecting</p>
 }
 
 function Items() @{
@@ -99,6 +110,7 @@ export function makeCompiledRouter(
 		renderError?: boolean;
 		onCatch?: (error: Error) => void;
 		parentOnCatch?: (error: Error) => void;
+		navigateOnMount?: boolean;
 	} = {},
 ) {
 	const root = new BaseRootRoute({
@@ -135,6 +147,7 @@ export function makeCompiledRouter(
 		onCatch: opts.onCatch,
 		remountDeps: ({ params }: any) => [params.id],
 	});
+	if (opts.navigateOnMount) item.update({ component: NavigateOnMount });
 	items.addChildren([item]);
 	return createRouter({
 		routeTree: root.addChildren([home, items]),
