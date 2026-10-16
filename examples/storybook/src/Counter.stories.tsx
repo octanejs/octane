@@ -1,11 +1,9 @@
 /** @jsxImportSource react */
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { OctaneCompat } from 'octane/react';
-import { Counter, type CounterProps } from './Counter.tsrx';
+import { Counter } from './Counter.tsrx';
+import { asReact } from './asReact.tsx';
 
-function CounterStory(props: CounterProps) {
-	return <OctaneCompat component={Counter} props={props} />;
-}
+const CounterStory = asReact(Counter);
 
 const meta = {
 	title: 'Octane/Counter',
