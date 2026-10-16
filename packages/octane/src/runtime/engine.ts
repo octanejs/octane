@@ -365,6 +365,8 @@ declare const process: { env: { NODE_ENV?: string } };
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
 export let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
+/** Renderer listeners own update priority, not delegated DOM propagation. */
+export let RENDERER_DISCRETE_EVENT_DEPTH = 0;
 export let DEFERRED_LAYOUT_DRIVER: DeferredLayoutDriver | null = null;
 // A ViewTransition's drain renders without committing: its root transactions
 // commit inside the native update callback (vtFlush).
@@ -637,8 +639,6 @@ export let TRANSITION_DEPTH = 0;
  * AsyncContext, which isn't available in the browser target.
  */
 export let ASYNC_TRANSITION_COUNT = 0;
-/** Renderer listeners own update priority, not delegated DOM propagation. */
-export let RENDERER_DISCRETE_EVENT_DEPTH = 0;
 
 /**
  * @internal Adapt a renderer-owned discrete native listener to the DOM scheduler.
