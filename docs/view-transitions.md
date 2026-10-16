@@ -28,11 +28,8 @@ startTransition(() => setOpen(true));
 A boundary only activates on **transition-lane** commits — updates inside
 `startTransition`, `useDeferredValue` re-renders, and Suspense reveals
 (fallback → content). Urgent updates and `flushSync` never animate. As in React,
-an urgent update or `flushSync` skips a transition only while it is still
-preparing (before `ready`): an urgent update skips the preparing transitions it
-touches, `flushSync` every preparing scope. Once an animation runs, the urgent
-commit first runs the animating commit's passive effects, then changes the live
-DOM under the animation.
+they skip a transition only while it is still preparing (before `ready`). Once
+the animation runs, they commit under it without skipping it.
 Event handlers can opt updates into animation with `startTransition`. Octane uses the native options overload (`document.startViewTransition({ update, types })`)
 and detects older callback-only implementations once per native function. Those
 implementations animate without native transition types. Without the native API,
@@ -190,7 +187,8 @@ already pending before mutations. Resource failures or the timeout allow the
 commit to continue. Lazy and offscreen images do not hold the capture. As in
 React, an image with an `onLoad` handler opts out of the client resource wait.
 
-Urgent work finishes pending layout work and skips the animation. Unchanged or
+Urgent work during that wait finishes the pending layout work and skips the
+animation. Unchanged or
 `none` boundaries do not receive separate new captures, except an unchanged
 boundary inside an animating ancestor: it keeps its name on both sides, so its
 old snapshot never plays alone over the ancestor's new one. The default root overlay
