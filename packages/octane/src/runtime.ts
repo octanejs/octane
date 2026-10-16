@@ -6257,6 +6257,10 @@ interface VTSession {
 	owner: VTOwner;
 	handle: VTHandle;
 	interrupt: (() => void) | undefined;
+	/** Releases the commit's held passive effects without skipping the animation. */
+	release: (() => void) | undefined;
+	/** `ready` resolved: the update committed and only the animation is still running. */
+	committed: boolean;
 }
 
 interface VtMeasurement {
@@ -7242,8 +7246,13 @@ function vtBeginCapture(interrupt: () => void, stagedCommit: StagedCommitCapture
 	return capture;
 }
 
-function vtRegisterHandle(owner: VTOwner, handle: VTHandle, interrupt?: () => void): VTSession {
-	const session: VTSession = { owner, handle, interrupt };
+function vtRegisterHandle(
+	owner: VTOwner,
+	handle: VTHandle,
+	interrupt?: () => void,
+	release?: () => void,
+): VTSession {
+	const session: VTSession = { owner, handle, interrupt, release, committed: false };
 	VT_SESSIONS.set(owner, session);
 	const doc = vtOwnerDocument(owner);
 	if (owner.nodeType === 9) doc.__octaneViewTransition = handle;
@@ -7376,6 +7385,30 @@ function vtInterruptOwners(owners: Set<VTOwner> | null): void {
 	for (const handle of handles) handle.skipTransition();
 }
 
+/**
+ * React's rule (`flushPendingEffects`): urgent work skips only a transition still preparing, which
+ * React clears once `ready` resolves. After that, the urgent commit changes the live DOM under the
+ * running animation. An external handle has no receipt, so it still counts as preparing.
+ */
+function vtInterruptPreparing(owners: Set<VTOwner> | null): void {
+	VT_CAPTURE?.interrupt();
+	const committed = new Set<VTHandle>();
+	for (const session of VT_SESSIONS.values()) if (session.committed) committed.add(session.handle);
+	const handles = vtActiveHandles(owners);
+	let released = false;
+	for (const session of VT_SESSIONS.values()) {
+		if (!handles.has(session.handle)) continue;
+		if (!session.committed) session.interrupt?.();
+		else if (session.release !== undefined) {
+			session.release();
+			released = true;
+		}
+	}
+	for (const handle of handles) if (!committed.has(handle)) handle.skipTransition();
+	// React's `flushPendingEffects` runs the animating commit's passives before urgent work.
+	if (released) vtDrainPassivesBeforeCapture();
+}
+
 function vtInterruptOwner(owner: VTOwner): void {
 	vtInterruptOwners(new Set([owner]));
 }
@@ -7504,7 +7537,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			const handles = vtActiveHandles(owners);
 			if (handles.size > 0) {
 				if (queueAllTransition()) return vtWaitForHandles(handles, owners);
-				vtInterruptOwners(owners);
+				vtInterruptPreparing(owners);
 				return false;
 			}
 			if (!vtWouldWrap()) return false;
@@ -7529,7 +7562,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		clearTypes() {
 			VT_PENDING_TYPES = [];
 		},
-		interrupt: vtInterrupt,
+		interrupt: () => vtInterruptPreparing(null),
 		refreshPendingOwner(owner) {
 			const receipt = VT_CAPTURE?.stagedCommit.owners.get(owner);
 			if (receipt !== undefined && receipt.current === owner.current)
@@ -7558,7 +7591,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			if (!passivesSettled || (QUEUE.length > 0 && !queueAllTransition())) {
 				// An urgent sibling keeps its priority. A still-open passive cascade
 				// can touch further owners, so only that fallback interrupts all scopes.
-				if (passivesSettled) vtInterruptOwners(owners);
+				if (passivesSettled) vtInterruptPreparing(owners);
 				else vtInterrupt();
 				adoptTransitionQueue(true);
 				work();
@@ -10138,17 +10171,23 @@ function vtFlush(
 			return;
 		}
 		group.handle = handle;
-		group.session = vtRegisterHandle(group.owner, handle, () => {
-			group.interrupted = true;
-			group.skipRequested = true;
-			releasePassives();
-		});
+		group.session = vtRegisterHandle(
+			group.owner,
+			handle,
+			() => {
+				group.interrupted = true;
+				group.skipRequested = true;
+				releasePassives();
+			},
+			releasePassives,
+		);
 		if (group.skipRequested || interrupted) handle.skipTransition();
 		handle.ready
 			.then(
 				() => {
 					restore(group);
 					if (group.interrupted || group.settled) return;
+					if (group.session !== null) group.session.committed = true;
 					for (const activation of group.acts) {
 						if (group.interrupted || group.settled) break;
 						const cleanup = vtFireCallback(activation.kind, activation.rec, types);
@@ -10234,9 +10273,9 @@ export function flushSync<T>(fn: () => T): T {
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
 	if (inFlush) return runNativeBatch(fn);
-	// flushSync mid-view-transition skips the animation (React's rule): the
-	// sync drain below applies everything now; the pending update callback
-	// later drains an empty queue.
+	// flushSync while a view transition is still preparing skips it (React's
+	// rule): the sync drain below applies everything now; the pending update
+	// callback later drains an empty queue. A running animation keeps going.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
 	syncFlush = true;

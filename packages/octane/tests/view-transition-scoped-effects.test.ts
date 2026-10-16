@@ -371,7 +371,8 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(events).not.toContain('left:left changed');
 	});
 
-	it('skips only the scope affected by an urgent update after both captures complete', async () => {
+	// React's rule: urgent work skips only a transition still preparing, never one already animating.
+	it('commits an urgent update under committed scopes without skipping their animations', async () => {
 		startTransition(() => controls.left('left changed'));
 		const left = await nextCapture('left');
 		await updateAndReady(left);
@@ -380,7 +381,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		await updateAndReady(right);
 		controls.left('urgent left');
 		await vi.waitFor(() => expect(text('left')).toBe('urgent left'));
-		expect(left.skipped).toBe(true);
+		expect(left.skipped).toBe(false);
 		expect(right.skipped).toBe(false);
 		await vi.waitFor(() => expect(events).toContain('left:urgent left'));
 		expect(events).not.toContain('right:right changed');
@@ -402,7 +403,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(observed).toEqual([['committed', true]]);
 	});
 
-	it('commits binding state before its callback while skipping only the affected animating scope', async () => {
+	it('commits binding state before its callback without skipping an animating scope', async () => {
 		let left!: Capture;
 		let right!: Capture;
 		const observed: unknown[] = [];
@@ -420,7 +421,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		right = await nextCapture('right');
 		await updateAndReady(right);
 		(container.querySelector('[data-value="left"]') as HTMLButtonElement).click();
-		expect(observed).toEqual([['committed', true, false]]);
+		expect(observed).toEqual([['committed', false, false]]);
 	});
 	it('reveals resolved Suspense in a sibling scope while the first scope animates', async () => {
 		let resolve!: (value: string) => void;

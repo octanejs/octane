@@ -329,7 +329,7 @@ describe.sequential.each(['dev', 'prod'] as const)(
 			}
 		});
 
-		it('keeps a sibling animation active when another scope starts and is interrupted again', async () => {
+		it('keeps both scopes animating when an urgent update lands in one already committed', async () => {
 			const fixture = await openPage(mode, 'siblings');
 			try {
 				const { page, errors } = fixture;
@@ -339,9 +339,10 @@ describe.sequential.each(['dev', 'prod'] as const)(
 				expect(second.result.active.sort()).toEqual(['left', 'right']);
 				expect(second.result.calls[first.mark.call]!.finished).toBe('pending');
 				const third = await updateLocal(page, 'right', 'right-second', [], true);
-				expect(third.result.active).toEqual(['left']);
+				expect(third.result.active.sort()).toEqual(['left', 'right']);
 				expect(third.result.calls[first.mark.call]!.finished).toBe('pending');
-				expect(third.result.cleanups.filter((id) => id === 'left')).toEqual([]);
+				expect(third.result.calls[second.mark.call]!.finished).toBe('pending');
+				expect(third.result.cleanups).toEqual([]);
 				expect(await page.locator('[data-content="right"]').textContent()).toBe('right-second');
 				const finished = await page.evaluate(() => window.__viewTransitionScopes.finish());
 				expect(finished.cleanups.filter((id) => id === 'left')).toEqual(['left']);

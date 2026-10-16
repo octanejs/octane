@@ -802,7 +802,7 @@ describe.sequential.each(['dev', 'prod'] as const)('native View Transition parit
 		}
 	});
 
-	it('keeps outside controls interactive during animation and cleans up an urgent interruption', async () => {
+	it('keeps outside controls interactive and the animation running through an urgent update', async () => {
 		const fixture = await openPage(mode);
 		try {
 			const { page, errors } = fixture;
@@ -825,7 +825,16 @@ describe.sequential.each(['dev', 'prod'] as const)('native View Transition parit
 			expect(
 				await page.evaluate(() => window.__viewTransitionParity.snapshot().outsideClicks),
 			).toBe(1);
+			// React skips only a transition still preparing: the urgent commit lands under the running animation.
 			await start(page, { text: 'urgent' }, [], true);
+			expect(await page.locator('#panel span').textContent()).toBe('urgent');
+			expect(await page.evaluate(() => window.__viewTransitionParity.snapshot().cleanups)).toEqual(
+				[],
+			);
+			await page.evaluate(() => {
+				for (const animation of document.documentElement.getAnimations({ subtree: true }))
+					animation.play();
+			});
 			const result = await page.evaluate(
 				(mark) => window.__viewTransitionParity.settle(mark),
 				mark,
