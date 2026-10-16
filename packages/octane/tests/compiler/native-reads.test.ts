@@ -44,6 +44,8 @@ export function Counter(props: { count$: SignalHandle<number> }) @{
 	const throwingChild = `function ThrowingChild() { throw new Error('render failed'); }`;
 	const signalValue = `${typeImport}
 function SignalValue(props) @{ <output>{String(props.count$.get())}</output> }`;
+	const typedSignalValue = `import type { OctaneNode } from 'octane';
+${signalValue}`;
 	const signalDescriptor = `${signalValue}
 function descriptor(count$: SignalHandle<number>) { return <SignalValue count$={count$} />; }`;
 	const recursiveUnion = (alternateSignal: string) => `${typeImport}
@@ -314,6 +316,18 @@ ${typeImport}
 export function Counter(props: { count$: SignalHandle<number>; promise: Promise<string> }) @{ @try { <span>{use(props.promise) as string}</span> } @pending { <output>{String(props.count$.get())}</output> } }`,
 		},
 		{
+			label: 'a pending arm reached by a suspending accessor',
+			source: `import { use } from 'octane';
+${typeImport}
+export function Counter({ count$, promise }: { count$: SignalHandle<number>; promise: Promise<string> }) @{ const model = { get label() { return use(promise); }, set label(value) {} }; @try { <span>{model.label as string}</span> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
+			label: 'a pending arm after an object escapes',
+			source: `import { use } from 'octane';
+${typeImport}
+export function Counter({ count$, promise }: { count$: SignalHandle<number>; promise: Promise<string> }) @{ const model = { label: 'ready' }; Object.defineProperty(model, 'label', { get() { return use(promise); } }); @try { <span>{model.label as string}</span> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
 			label: 'a template catch around an opaque child component',
 			source: `import Child from './child';
 ${typeImport}
@@ -340,9 +354,51 @@ export function Counter(props: { count$: SignalHandle<number> }) @{ const child 
 		},
 		{
 			label: 'a union-typed signal descriptor rendered in a hole',
-			source: `import type { OctaneNode } from 'octane';
-${signalValue}
+			source: `${typedSignalValue}
 export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const child: OctaneNode | string = <SignalValue count$={count$} />; <div>{child}</div> }`,
+		},
+		{
+			label: 'a signal child in a typed local array',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: OctaneNode[] = [<SignalValue count$={count$} />]; void children.length; <div>{children}</div> }`,
+		},
+		{
+			label: 'a signal child inserted into a typed array',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: OctaneNode[] = [null, null]; children[0] = <span />; children[1] = <SignalValue count$={count$} />; const size = children.length; <div>{children}{children}</div> }`,
+		},
+		{
+			label: 'an inserted signal child before a throwing child',
+			source: `${typedSignalValue}
+${throwingChild}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: OctaneNode[] = []; children[1] = <ThrowingChild />; children[0] = <SignalValue count$={count$} />; <div>{children}</div> }`,
+		},
+		{
+			label: 'a signal child in a typed tuple',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: [OctaneNode] = [<SignalValue count$={count$} />]; <div>{children}</div> }`,
+		},
+		{
+			label: 'a signal child in a readonly array',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: readonly OctaneNode[] = [<SignalValue count$={count$} />]; <div>{children}</div> }`,
+		},
+		{
+			label: 'a signal child in a typed children array',
+			source: `${typedSignalValue}
+function Frame({ children }: { children: OctaneNode[] }) @{ <div>{children}</div> }
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ <Frame children={[<SignalValue count$={count$} />]} /> }`,
+		},
+		{
+			label: 'a signal child in a nested typed array',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const rows: OctaneNode[][] = [[<SignalValue count$={count$} />]]; <div>{rows}</div> }`,
+		},
+		{
+			label: 'a signal child in a JSX children array',
+			source: `${typedSignalValue}
+function Frame({ children }: { children: OctaneNode[] }) @{ <div>{children}</div> }
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ <Frame><span /><SignalValue count$={count$} /></Frame> }`,
 		},
 		{
 			label: 'a helper-returned descriptor returned directly by a component',
@@ -608,6 +664,11 @@ export function Counter(props: { count$: SignalHandle<number> }) @{ @try { throw
 export function Counter({ count$, label }: { count$: SignalHandle<number>; label: string }) @{ @try { <span>{label as string}</span> } @pending { <output>{String(count$.get())}</output> } }`,
 		},
 		{
+			label: 'a pending arm around an inert member read',
+			source: `${typeImport}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const model = { label: 'ready' }; void model.label; @try { <span>{model.label as string}</span> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
 			label: 'a catch around an ignored JSX prop',
 			source: `${typeImport}
 ${throwingChild}
@@ -681,6 +742,32 @@ export function Counter(props: { count$: SignalHandle<number> }) @{ try { ({ val
 export function Counter(props: { value$: SignalHandle<number> | { get(): number } }) @{
   <output>{String(props.value$.get())}</output>
 }`,
+		},
+		{
+			label: 'an ambiguous receiver in a typed child array',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> | { get(): number } }) @{ const children: OctaneNode[] = [<SignalValue count$={count$} />]; <div>{children}</div> }`,
+		},
+		{
+			label: 'an ambiguous array element contract',
+			source: `${typeImport}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const values: Array<SignalHandle<number> | { get(): number }> = [count$]; <output>{String(values[0].get())}</output> }`,
+		},
+		{
+			label: 'a cleared typed child array',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: OctaneNode[] = [<SignalValue count$={count$} />]; children.length = 0; <div>{children}</div> }`,
+		},
+		{
+			label: 'a replaced typed array child',
+			source: `${typedSignalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: OctaneNode[] = [<SignalValue count$={count$} />]; children[0] = null; const size = children.length; <div>{children}</div> }`,
+		},
+		{
+			label: 'an inserted signal child after a throwing child',
+			source: `${typedSignalValue}
+${throwingChild}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const children: OctaneNode[] = []; children[1] = <SignalValue count$={count$} />; children[0] = <ThrowingChild />; <div>{children}</div> }`,
 		},
 		{
 			label: 'an ordinary getter reached through a recursive type',

@@ -1,4 +1,8 @@
-import { createLexicalAnalysis } from './compile-universal.js';
+import {
+	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
+} from './compile-universal.js';
 import { analyzeRendererBoundaries } from './renderer-boundaries.js';
 import { isDomBindingDirective } from './dom-binding-directive.js';
 import { HOOK_NAMES } from './hook-names.js';
@@ -52,6 +56,7 @@ const RENDER_NODES = new Set([
 	'JSXSwitchExpression',
 	'JSXTryExpression',
 ]);
+const STATEMENT_LIST_TYPES = new Set(['BlockStatement', 'JSXCodeBlock', 'Program']);
 const WRAPPERS = new Set([
 	'ParenthesizedExpression',
 	'TSAsExpression',
@@ -353,6 +358,10 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			for (const param of node.params ?? []) declare(param, null);
 		} else if (node.type === 'AssignmentExpression' && node.operator === '=') {
 			declare(node.left, node.right);
+			if (missingImport && node.left?.type === 'MemberExpression') {
+				const record = recordFor(unwrap(node.left.object));
+				if (record) record.hasMemberAssignment = true;
+			}
 		} else if (node.type === 'TSTypeAliasDeclaration') {
 			declareTypeName(node.id.name);
 			typeAliases.set(node.id.name, node.typeAnnotation);
@@ -483,6 +492,13 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 					: mergeValues(values);
 		} else if (missingImport && annotation.type === 'TSArrayType') {
 			return { kind: 'array', element: typeValue(annotation.elementType, state) };
+		} else if (
+			missingImport &&
+			annotation.type === 'TSTypeOperator' &&
+			annotation.operator === 'readonly'
+		) {
+			const value = typeValue(annotation.typeAnnotation, state);
+			return value.kind === 'array' ? value : UNKNOWN;
 		} else if (missingImport && annotation.type === 'TSNumberKeyword') {
 			return NUMBER;
 		} else if (
@@ -498,12 +514,12 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		) {
 			return NULLISH;
 		} else if (annotation.type === 'TSTupleType') {
-			return {
-				kind: 'object',
-				properties: new Map(
-					annotation.elementTypes.map((entry, index) => [String(index), typeValue(entry, state)]),
-				),
-			};
+			const properties = new Map(
+				annotation.elementTypes.map((entry, index) => [String(index), typeValue(entry, state)]),
+			);
+			return missingImport
+				? { kind: 'array', properties, element: UNKNOWN }
+				: { kind: 'object', properties };
 		}
 		return UNKNOWN;
 	}
@@ -631,6 +647,127 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			return { kind: 'builtin', name, read: true };
 		return UNKNOWN;
 	}
+	let literalReferences;
+	let opaqueReferences;
+	function closedReferences(record) {
+		if (!literalReferences) {
+			literalReferences = new Map();
+			opaqueReferences = new Set();
+			function index(candidate, parent, key) {
+				if (!candidate || typeof candidate !== 'object') return;
+				// Direct eval can reference a lexical binding without an AST reference.
+				if (
+					candidate.type === 'WithStatement' ||
+					(candidate.type === 'CallExpression' && unwrap(candidate.callee)?.name === 'eval')
+				) {
+					opaqueReferences = null;
+					return;
+				}
+				if (
+					(candidate.type === 'Identifier' || candidate.type === 'JSXIdentifier') &&
+					isIdentifierReference(candidate, parent, key, lexical)
+				) {
+					if (!lexical.nodeScopes.has(candidate)) opaqueReferences.add(candidate.name);
+					else {
+						const binding = recordFor(candidate);
+						if (binding) {
+							let references = literalReferences.get(binding);
+							if (!references) literalReferences.set(binding, (references = { all: [] }));
+							references.all.push(candidate);
+						}
+					}
+				}
+				forEachRuntimeAstChild(candidate, (child, childKey) => {
+					if (opaqueReferences) index(child, candidate, childKey);
+				});
+			}
+			index(ast, null, null);
+		}
+		return opaqueReferences && !opaqueReferences.has(record.name)
+			? literalReferences.get(record)
+			: null;
+	}
+	function localLiteral(record, type) {
+		const declarator = parents.get(record?.declarations[0]);
+		const declaration = parents.get(declarator);
+		const literal = unwrap(declarator?.init);
+		return record?.declarations.length === 1 &&
+			declarator?.type === 'VariableDeclarator' &&
+			declaration?.kind === 'const' &&
+			parents.get(declaration)?.type !== 'ExportNamedDeclaration' &&
+			literal?.type === type
+			? literal
+			: null;
+	}
+	function discardedMember(reference) {
+		const member = parents.get(reference);
+		const use = parents.get(member);
+		return member?.type === 'MemberExpression' &&
+			member.object === reference &&
+			(use?.type === 'ExpressionStatement' ||
+				(use?.type === 'UnaryExpression' && use.operator === 'void'))
+			? member
+			: null;
+	}
+	function arrayLengthRead(reference) {
+		const member = parents.get(reference);
+		if (
+			member?.type !== 'MemberExpression' ||
+			member.object !== reference ||
+			propertyName(member.property, member.computed) !== 'length'
+		)
+			return false;
+		let current = member;
+		let parent = parents.get(current);
+		while (WRAPPERS.has(parent?.type)) {
+			current = parent;
+			parent = parents.get(current);
+		}
+		return !(
+			((parent?.type === 'AssignmentExpression' || parent?.type === 'AssignmentPattern') &&
+				parent.left === current) ||
+			parent?.type === 'UpdateExpression' ||
+			(parent?.type === 'UnaryExpression' && parent.operator === 'delete') ||
+			((parent?.type === 'ForInStatement' || parent?.type === 'ForOfStatement') &&
+				parent.left === current) ||
+			parent?.type === 'ArrayPattern' ||
+			parent?.type === 'RestElement' ||
+			(parent?.type === 'Property' && parents.get(parent)?.type === 'ObjectPattern')
+		);
+	}
+	function ownLiteralProperty(object, member) {
+		const name = propertyName(member.property, member.computed);
+		if (name === null) return null;
+		let setter = null;
+		for (let index = object.properties.length - 1; index >= 0; index--) {
+			const property = object.properties[index];
+			if (property.type === 'SpreadElement') return null;
+			const key = propertyName(property.key, property.computed);
+			if (key === null) return null;
+			if (key !== name) continue;
+			// This syntax sets the prototype instead of defining an own property.
+			if (
+				key === '__proto__' &&
+				!property.computed &&
+				!property.method &&
+				!property.shorthand &&
+				property.kind === 'init'
+			)
+				continue;
+			if (property.kind === 'set') setter ??= property;
+			else return property.kind === 'get' ? property : (setter ?? property);
+		}
+		return setter;
+	}
+	function activeReferences(record, literal) {
+		const references = closedReferences(record);
+		if (!references) return null;
+		return (references.active ??= references.all.filter((reference) => {
+			if (literal.type === 'ArrayExpression') return !arrayLengthRead(reference);
+			const member = discardedMember(reference);
+			return !member || ownLiteralProperty(literal, member)?.kind !== 'init';
+		}));
+	}
 	function recordValue(record) {
 		if (record === null) return UNKNOWN;
 		if (parameterValues?.has(record)) return parameterValues.get(record);
@@ -685,6 +822,22 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				supplied === NULLISH)
 		)
 			return supplied;
+		if (contract.kind === 'array' && supplied?.kind === 'array' && supplied.properties) {
+			seen ??= new WeakMap();
+			if (seenPair(seen, contract, supplied)) return contract;
+			const element = contract.element ?? UNKNOWN;
+			const properties = new Map();
+			for (const [index, value] of supplied.properties)
+				properties.set(
+					index,
+					refineRenderValue(
+						resolveTypeMember(contract.properties?.get(index) ?? element),
+						resolveTypeMember(value),
+						seen,
+					),
+				);
+			return { kind: 'array', properties, element };
+		}
 		if (contract.kind !== 'object' || supplied?.kind !== 'object') return contract;
 		seen ??= new WeakMap();
 		if (seenPair(seen, contract, supplied)) return contract;
@@ -776,8 +929,13 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		if (missingImport && node.type === 'Literal' && typeof node.value === 'boolean')
 			return PRIMITIVE;
 		if (missingImport && isKnownTextChildExpression(input, null)) return PRIMITIVE;
-		if (node.type === 'Identifier' || node.type === 'JSXIdentifier')
-			return recordValue(recordFor(node));
+		if (node.type === 'Identifier' || node.type === 'JSXIdentifier') {
+			const record = recordFor(node);
+			const value = recordValue(record);
+			return missingImport && record?.hasMemberAssignment
+				? arrayValueAt(record, node, value)
+				: value;
+		}
 		if (FUNCTION_TYPES.has(node.type)) return functionValue(node);
 		if (
 			node.type === 'MemberExpression' ||
@@ -842,6 +1000,98 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		if (node.type === 'SequenceExpression') return valueOf(node.expressions.at(-1));
 		if (node.type === 'AssignmentExpression') return valueOf(node.right);
 		return UNKNOWN;
+	}
+	function arrayValueAt(record, reference, value) {
+		if (
+			value.kind !== 'array' ||
+			!value.properties ||
+			record.annotations?.length !== 1 ||
+			record.annotations[0].path.length !== 0
+		)
+			return value;
+		const contract = typeValue(record.annotations[0].annotation);
+		if (contract.kind !== 'array') return value;
+		const literal = localLiteral(record, 'ArrayExpression');
+		if (
+			!literal ||
+			literal.elements.some((element) => !element || element.type === 'SpreadElement')
+		)
+			return value;
+		const lifetime = arrayLifetime(record, literal);
+		if (!lifetime?.uses.has(reference)) return value;
+		const { block, writes } = lifetime;
+		let current = reference;
+		while (current && parents.get(current) !== block) {
+			current = parents.get(current);
+			if (FUNCTION_TYPES.has(current?.type)) return value;
+		}
+		const end = block.render === current ? block.body.length : block.body.indexOf(current);
+		let properties = null;
+		for (let index = 0; index < end; index++) {
+			const write = writes.get(block.body[index]);
+			if (!write) continue;
+			// Every write in this statement list dominates the use; other
+			// references only observe length or consume the array in DOM slots.
+			if (write.name === 'length') properties = new Map();
+			else {
+				properties ??= new Map(value.properties);
+				properties.set(
+					write.name,
+					refineRenderValue(
+						resolveTypeMember(contract.properties?.get(write.name) ?? contract.element ?? UNKNOWN),
+						valueOf(write.assignment.right),
+					),
+				);
+			}
+		}
+		// Assignment order does not change array iteration order. Dispatch must
+		// see lower indices first, including indices filled after higher ones.
+		if (properties?.size > 1)
+			properties = new Map([...properties].sort(([left], [right]) => Number(left) - Number(right)));
+		return properties ? { ...value, properties } : value;
+	}
+	function arrayLifetime(record, literal) {
+		const indexed = closedReferences(record);
+		if (!indexed) return null;
+		if ('array' in indexed) return indexed.array;
+		let block = null;
+		const writes = new Map();
+		const uses = new Set();
+		for (const reference of activeReferences(record, literal)) {
+			const member = parents.get(reference);
+			const assignment = parents.get(member);
+			const statement = parents.get(assignment);
+			const container = parents.get(statement);
+			const name =
+				member?.type === 'MemberExpression' ? propertyName(member.property, member.computed) : null;
+			if (
+				member?.object === reference &&
+				assignment?.type === 'AssignmentExpression' &&
+				assignment.operator === '=' &&
+				assignment.left === member &&
+				statement?.type === 'ExpressionStatement' &&
+				STATEMENT_LIST_TYPES.has(container?.type) &&
+				(name === 'length'
+					? unwrap(assignment.right)?.value === 0
+					: name !== null && /^(0|[1-9]\d*)$/.test(name) && Number(name) < 2 ** 32 - 1)
+			) {
+				if (block && block !== container) return (indexed.array = null);
+				block = container;
+				writes.set(statement, { assignment, name });
+			} else uses.add(reference);
+		}
+		if (!block || (uses.size > 1 && [...uses].some((reference) => !domArrayChild(reference))))
+			return (indexed.array = null);
+		return (indexed.array = { block, writes, uses });
+	}
+	function domArrayChild(reference) {
+		const container = parents.get(reference);
+		const parent = parents.get(container);
+		return (
+			container?.type === 'JSXExpressionContainer' &&
+			container.expression === reference &&
+			(parent?.type === 'JSXFragment' || (parent?.type === 'JSXElement' && !isComponentTag(parent)))
+		);
 	}
 	function forcePattern(pattern, value) {
 		pattern = unwrap(pattern);
@@ -1046,17 +1296,22 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			return { kind: 'object', properties };
 		}
 		function literalProperty(member) {
-			const object = unwrap(member.object);
-			const name = propertyName(member.property, member.computed);
-			if (object?.type !== 'ObjectExpression' || name === null) return null;
-			for (let index = object.properties.length - 1; index >= 0; index--) {
-				const property = object.properties[index];
-				if (property.type === 'SpreadElement') return null;
-				const key = propertyName(property.key, property.computed);
-				if (key === null) return null;
-				if (key === name) return property;
+			let object = unwrap(member.object);
+			if (object?.type === 'Identifier') {
+				const record = recordFor(object);
+				const literal = localLiteral(record, 'ObjectExpression');
+				const references = literal && activeReferences(record, literal);
+				if (
+					!references ||
+					references.length > 1 ||
+					(references.length === 1 && references[0] !== object)
+				)
+					return null;
+				// Every other reference discards an own data property. The object
+				// cannot have escaped or had this property replaced by an accessor.
+				object = literal;
 			}
-			return null;
+			return object?.type === 'ObjectExpression' ? ownLiteralProperty(object, member) : null;
 		}
 		function reportRead(node) {
 			if (!rendering || visitedReads.has(node)) return;
