@@ -371,7 +371,12 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(events).not.toContain('left:left changed');
 	});
 
-	it('skips only the scope affected by an urgent update after both captures complete', async () => {
+	// React's rule: urgent work skips only a transition still preparing, never one already animating.
+	it('commits an urgent update under committed scopes without skipping their animations', async () => {
+		let observedBeforeUrgentCommit: string | null = null;
+		onEffect = (id, value) => {
+			if (id === 'left' && value === 'left changed') observedBeforeUrgentCommit = text('left');
+		};
 		startTransition(() => controls.left('left changed'));
 		const left = await nextCapture('left');
 		await updateAndReady(left);
@@ -380,10 +385,53 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		await updateAndReady(right);
 		controls.left('urgent left');
 		await vi.waitFor(() => expect(text('left')).toBe('urgent left'));
-		expect(left.skipped).toBe(true);
+		expect(left.skipped).toBe(false);
 		expect(right.skipped).toBe(false);
+		expect(observedBeforeUrgentCommit).toBe('left changed');
 		await vi.waitFor(() => expect(events).toContain('left:urgent left'));
 		expect(events).not.toContain('right:right changed');
+	});
+
+	it('releases held effects in commit order before a synchronous update across animating scopes', async () => {
+		startTransition(() => controls.left('left changed'));
+		const left = await nextCapture('left');
+		await updateAndReady(left);
+		startTransition(() => controls.right('right changed'));
+		const right = await nextCapture('right');
+		await updateAndReady(right);
+		flushSync(() => {
+			events.push('urgent');
+			controls.outside('urgent outside');
+		});
+		expect(events.filter((event) => !event.startsWith('cleanup:'))).toEqual([
+			'left:left changed',
+			'right:right changed',
+			'urgent',
+		]);
+		expect(left.skipped).toBe(false);
+		expect(right.skipped).toBe(false);
+	});
+
+	it('keeps a ready scope animating when urgent work interrupts a preparing sibling', async () => {
+		startTransition(() => {
+			controls.left('left changed');
+			controls.right('right changed');
+		});
+		const left = await nextCapture('left');
+		const right = await nextCapture('right');
+		await Promise.all([left.update(), right.update()]);
+		left.ready.resolve();
+		await Promise.resolve();
+		const rightHost = owner('right') as HTMLElement;
+		flushSync(() => {
+			rightHost.style.setProperty('view-transition-name', 'urgent-name');
+			controls.outside('urgent outside');
+		});
+		expect(text('outside')).toBe('urgent outside');
+		expect(left.skipped).toBe(false);
+		expect(right.skipped).toBe(true);
+		await right.ready.promise;
+		expect(rightHost.style.getPropertyValue('view-transition-name')).toBe('urgent-name');
 	});
 
 	it('commits binding state before its callback during an unfinished capture', async () => {
@@ -402,7 +450,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(observed).toEqual([['committed', true]]);
 	});
 
-	it('commits binding state before its callback while skipping only the affected animating scope', async () => {
+	it('commits binding state before its callback without skipping an animating scope', async () => {
 		let left!: Capture;
 		let right!: Capture;
 		const observed: unknown[] = [];
@@ -420,7 +468,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		right = await nextCapture('right');
 		await updateAndReady(right);
 		(container.querySelector('[data-value="left"]') as HTMLButtonElement).click();
-		expect(observed).toEqual([['committed', true, false]]);
+		expect(observed).toEqual([['committed', false, false]]);
 	});
 	it('reveals resolved Suspense in a sibling scope while the first scope animates', async () => {
 		let resolve!: (value: string) => void;
@@ -667,7 +715,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		},
 	);
 	it.each([false, true])(
-		'waits for a newly discovered busy portal destination and permits urgent interruption (urgent=%s)',
+		'waits for a busy portal destination while allowing urgent work underneath its animation (urgent=%s)',
 		async (urgent) => {
 			const source = document.createElement('div');
 			document.body.append(source);
@@ -703,7 +751,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 					await vi.waitFor(() => expect(text('outside')).toBe('urgent'));
 					expect(owner('left').textContent).not.toContain('before');
 					expect(owner('right').textContent).toContain('after');
-					expect(busy.skipped).toBe(true);
+					expect(busy.skipped).toBe(false);
 					await Promise.resolve();
 					expect(captures.slice(previous)).toEqual([]);
 				} else {

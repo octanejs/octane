@@ -183,11 +183,14 @@ interface VTCapture {
 	ready: Promise<void>;
 	release: () => void;
 	completed: boolean;
+	committed: boolean;
 }
 interface VTSession {
 	owner: VTOwner;
 	handle: VTHandle;
 	interrupt: (() => void) | undefined;
+	/** Undefined while preparing; a release callback once ready; null after release. */
+	release: (() => void) | null | undefined;
 }
 
 interface VtMeasurement {
@@ -1125,6 +1128,7 @@ export function vtBeginCapture(interrupt: () => void): VTCapture {
 		}),
 		release: () => release(),
 		completed: false,
+		committed: false,
 	};
 	VT_CAPTURE = capture;
 	return capture;
@@ -1135,7 +1139,7 @@ export function vtRegisterHandle(
 	handle: VTHandle,
 	interrupt?: () => void,
 ): VTSession {
-	const session: VTSession = { owner, handle, interrupt };
+	const session: VTSession = { owner, handle, interrupt, release: undefined };
 	VT_SESSIONS.set(owner, session);
 	const doc = vtOwnerDocument(owner);
 	if (owner.nodeType === 9) doc.__octaneViewTransition = handle;
@@ -1259,13 +1263,39 @@ export function vtWaitForHandles(handles: Set<VTHandle>, owners: Set<VTOwner> | 
 	return handles.size > 0;
 }
 
-export function vtInterruptOwners(owners: Set<VTOwner> | null): void {
-	// A pending capture owns one indivisible mutation/layout transaction.
-	VT_CAPTURE?.interrupt();
+function vtInterruptOwners(owners: Set<VTOwner> | null, preparingOnly = false): void {
+	// Before any participant is ready, the capture owns an indivisible commit.
+	// Once one is ready, the commit landed even if sibling captures still prepare.
+	const capture = VT_CAPTURE;
+	if (capture !== null && !(preparingOnly && capture.committed)) capture.interrupt();
 	const handles = vtActiveHandles(owners);
-	for (const session of VT_SESSIONS.values())
-		if (handles.has(session.handle)) session.interrupt?.();
+	let ready: VTSession[] | undefined;
+	for (const session of VT_SESSIONS.values()) {
+		if (!handles.has(session.handle)) continue;
+		if (preparingOnly && session.release !== undefined) (ready ??= []).push(session);
+		else session.interrupt?.();
+	}
+	let released = false;
+	if (ready !== undefined) {
+		// Restoring a receipt prepends its effects, so release later captures first.
+		for (let i = ready.length - 1; i >= 0; i--) {
+			const session = ready[i];
+			handles.delete(session.handle);
+			const release = session.release;
+			if (release != null) {
+				session.release = null;
+				release();
+				released = true;
+			}
+		}
+	}
 	for (const handle of handles) handle.skipTransition();
+	if (released) vtDrainPassivesBeforeCapture();
+}
+
+/** Urgent work skips preparing captures but commits underneath running animations. */
+export function vtInterruptPreparing(owners: Set<VTOwner> | null = null): void {
+	vtInterruptOwners(owners, true);
 }
 
 function vtInterruptOwner(owner: VTOwner): void {

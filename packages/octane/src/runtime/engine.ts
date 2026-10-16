@@ -191,7 +191,7 @@ import {
 	vtQueuedOwners,
 	vtActiveHandles,
 	vtWaitForHandles,
-	vtInterruptOwners,
+	vtInterruptPreparing,
 	vtInterrupt,
 	queueAllTransition,
 	queuedTransitionCue,
@@ -1445,7 +1445,7 @@ export function ensureViewTransitionDriver(): ViewTransitionDriver {
 					queueAllTransition()
 				)
 					return true;
-				if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) vtInterrupt();
+				if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) vtInterruptPreparing();
 				return false;
 			}
 			if (!vtHasActiveHandles()) {
@@ -1459,7 +1459,7 @@ export function ensureViewTransitionDriver(): ViewTransitionDriver {
 			const handles = vtActiveHandles(owners);
 			if (handles.size > 0) {
 				if (queueAllTransition()) return vtWaitForHandles(handles, owners);
-				vtInterruptOwners(owners);
+				vtInterruptPreparing(owners);
 				return false;
 			}
 			if (!vtWouldWrap()) return false;
@@ -1484,7 +1484,7 @@ export function ensureViewTransitionDriver(): ViewTransitionDriver {
 		clearTypes() {
 			VT_PENDING_TYPES = [];
 		},
-		interrupt: vtInterrupt,
+		interrupt: vtInterruptPreparing,
 		refreshPendingOwner(owner) {
 			const transaction = owner.transaction;
 			if (transaction !== null && transaction.heldGeneration !== undefined)
@@ -1508,7 +1508,7 @@ export function ensureViewTransitionDriver(): ViewTransitionDriver {
 			if (!passivesSettled || (QUEUE.length > 0 && !queueAllTransition())) {
 				// An urgent sibling keeps its priority. A still-open passive cascade
 				// can touch further owners, so only that fallback interrupts all scopes.
-				if (passivesSettled) vtInterruptOwners(owners);
+				if (passivesSettled) vtInterruptPreparing(owners);
 				else vtInterrupt();
 				adoptTransitionQueue(true);
 				work();
@@ -3040,6 +3040,7 @@ function vtFlush(
 		}
 	};
 	const releasePassives = (): void => {
+		if (passivesReleased) return;
 		passivesReleased = true;
 		if (layoutCapture !== null) releaseDeferredPassives(layoutCapture);
 	};
@@ -3225,17 +3226,20 @@ function vtFlush(
 			return;
 		}
 		group.handle = handle;
-		group.session = vtRegisterHandle(group.owner, handle, () => {
+		const session = (group.session = vtRegisterHandle(group.owner, handle, () => {
 			group.interrupted = true;
 			group.skipRequested = true;
+			restore(group);
 			releasePassives();
-		});
+		}));
 		if (group.skipRequested || interrupted) handle.skipTransition();
 		handle.ready
 			.then(
 				() => {
 					restore(group);
 					if (group.interrupted || group.settled) return;
+					capture.committed = true;
+					session.release = releasePassives;
 					for (const activation of group.acts) {
 						if (group.interrupted || group.settled) break;
 						const cleanup = vtFireCallback(activation.kind, activation.rec, types);
@@ -3321,9 +3325,8 @@ export function flushSync<T>(fn: () => T): T {
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
 	if (inFlush) return runNativeBatch(fn);
-	// flushSync mid-view-transition skips the animation (React's rule): the
-	// sync drain below applies everything now; the pending update callback
-	// later drains an empty queue.
+	// A preparing view transition is skipped so the sync drain can commit now.
+	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
 	syncFlush = true;
