@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "tests": [
     {
+      "path": "packages/tanstack-router/tests/browser/history-state.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks browser-entry state preservation when initializing Octane router history; it has no React runtime oracle."
+    },
+    {
       "path": "packages/tanstack-router/tests/conformance/blocker.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane navigation-blocker integration; it is not same-scenario React execution."
@@ -105,6 +110,11 @@
       "path": "packages/tanstack-router/tests/harness/setup.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/tanstack-router/tests/headless-entry.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane headless router entry through a consumer build and route load; it has no React runtime oracle."
     },
     {
       "path": "packages/tanstack-router/tests/ssr/ssr.test.ts",
