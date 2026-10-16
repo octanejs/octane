@@ -1446,6 +1446,10 @@ export class HydrationCapability {
 	hempty(el: Node, text: boolean, loc?: string): Text | null {
 		const first = getFirstChild(el);
 		if (first === null || (el as Element).localName === 'textarea') return null;
+		if (first.nodeType === 8 && (first as Comment).data === HYDRATION_START) {
+			const end = getNextSibling(first);
+			if (isBlockClose(end) && getNextSibling(end) === null) return null;
+		}
 		if (first.nodeType === 3 && getNextSibling(first) === null) {
 			// With no host, keepsText applies no suppressHydrationWarning, and the
 			// hole already ruled out a host it would write the client's text into.
