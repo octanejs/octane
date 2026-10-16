@@ -1759,6 +1759,34 @@ describe.each([
 		);
 	}
 
+	it('adopts an only-child hole after its server content removes itself', async () => {
+		container.innerHTML = ServerRT.renderToString(server.Hole, {
+			kind: 'p',
+			v: 'A',
+			tail: 't',
+		}).html;
+		const host = container.querySelector('section > div')!;
+		const tail = container.querySelector('i');
+		host.querySelector('p')!.remove();
+		const recovered: unknown[] = [];
+		const props = { kind: 'undefined', v: 'A', tail: 't' };
+		const root = hydrateRoot(container, client.Hole, props, {
+			onRecoverableError: (error) => recovered.push(error),
+		});
+		try {
+			await act(() => {});
+			expect(container.querySelector('section > div')).toBe(host);
+			expect(container.querySelector('i')).toBe(tail);
+			expect(recovered).toEqual([]);
+			flushSync(() => root.render(client.Hole, { ...props, kind: 'text', v: 'B' }));
+			expect(host.textContent).toBe('B');
+			flushSync(() => root.render(client.Hole, { ...props, kind: 'p', v: 'C' }));
+			expect(markup(host)).toBe('<p class="x">C</p>');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	// OCTANE DIVERGENCE: where the hole is its host's only child and the client
 	// value is text, React compares only the host's whole textContent, so a
 	// server `<div><p>A</p></div>` passes for a client `<div>A</div>` and keeps
