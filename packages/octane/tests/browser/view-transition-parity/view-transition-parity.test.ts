@@ -848,4 +848,53 @@ describe.sequential.each(['dev', 'prod'] as const)('native View Transition parit
 			await fixture.close();
 		}
 	});
+
+	// A held passive left parked until `finished` ran after the urgent commit's own effects.
+	it('runs a running animation’s held passive effects before an urgent update', async () => {
+		const fixture = await openPage(mode);
+		try {
+			const { page, errors } = fixture;
+			const mark = await start(page, { text: 'animated' });
+			await page.waitForFunction(() => window.__viewTransitionParity.snapshot().events.length > 0);
+			const paused = await page.evaluate(() => {
+				const animations = document.documentElement.getAnimations({ subtree: true });
+				for (const animation of animations) animation.pause();
+				return animations.length > 0;
+			});
+			expect(paused).toBe(true);
+			const held = await page.evaluate(() => window.__viewTransitionParity.snapshot().passives);
+			expect(held.some((effect) => effect.generation === mark.generation)).toBe(false);
+			const urgent = await start(page, { text: 'urgent' }, [], true);
+			await page.waitForFunction(
+				(generation) =>
+					window.__viewTransitionParity
+						.snapshot()
+						.passives.some((effect) => effect.generation === generation && effect.kind === 'mount'),
+				urgent.generation,
+			);
+			const passives = (
+				await page.evaluate(() => window.__viewTransitionParity.snapshot().passives)
+			).filter((effect) => effect.generation >= mark.generation);
+			expect(passives).toEqual([
+				{ generation: mark.generation, kind: 'mount' },
+				{ generation: mark.generation, kind: 'cleanup' },
+				{ generation: urgent.generation, kind: 'mount' },
+			]);
+			expect(await page.evaluate(() => window.__viewTransitionParity.snapshot().cleanups)).toEqual(
+				[],
+			);
+			await page.evaluate(() => {
+				for (const animation of document.documentElement.getAnimations({ subtree: true }))
+					animation.play();
+			});
+			const result = await page.evaluate(
+				(mark) => window.__viewTransitionParity.settle(mark),
+				mark,
+			);
+			expect(result.cleanups).toEqual(['update']);
+			expect(errors).toEqual([]);
+		} finally {
+			await fixture.close();
+		}
+	});
 });
