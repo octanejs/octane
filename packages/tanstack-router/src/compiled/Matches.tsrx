@@ -1,14 +1,62 @@
 'use strong';
 
-import { CompiledOutlet as CompiledComponent, CompiledContext, useContext } from 'octane';
-import type { NotFoundError } from '@tanstack/router-core';
-import { rootRouteId } from '@tanstack/router-core';
+import {
+	CompiledOutlet as CompiledComponent,
+	CompiledContext,
+	useContext,
+	useLayoutEffect,
+} from 'octane';
+import type { AnyRouteMatch, AnyRouter, NotFoundError } from '@tanstack/router-core';
+import { rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
-import { matchContext, useRouter } from './bindings';
+import { routerContext, matchContext, useRouter } from './bindings';
 import { useStore } from '../useStore';
+import { useTransitioner, usePresentedMatches } from '../Transitioner.tsrx';
 import { useHydrated } from '../ClientOnly.tsrx';
 import { ErrorComponent } from '../ErrorComponent.tsrx';
 import { CompiledFailure, CompiledPending, CompiledScrollRestoration } from './MatchLifecycle.tsrx';
+
+export function PreconfiguredRouterProvider(props: { router: AnyRouter }) @{
+	const router = props.router;
+	if (router.options.Wrap || router.options.InnerWrap) {
+		throw new Error(
+			'Compiled providers do not accept Wrap or InnerWrap. Use RouterProvider from @octanejs/tanstack-router for renderable wrappers.',
+		);
+	}
+	<CompiledContext context={routerContext} value={router}>
+		<CompiledMatches />
+	</CompiledContext>
+}
+
+function setupRouterScrollRestoration(router: AnyRouter) {
+	if (router.options.scrollRestoration) setupScrollRestoration(router);
+}
+
+function CompiledMatches() @{
+	const router = useRouter();
+	const rootRoute = (router.routesById as any)[rootRouteId];
+	useLayoutEffect(() => setupRouterScrollRestoration(router));
+	const expectedMatches = useTransitioner(router);
+	@try {
+		<CompiledMatchesInner expectedMatches={expectedMatches} />
+	} @pending {
+		<CompiledPending route={rootRoute} />
+	} @catch (error, reset) {
+		if (router.options.disableGlobalCatchBoundary) throw error;
+		<CompiledFailure error={error} reset={reset} route={rootRoute} global={true} />
+	}
+}
+
+function CompiledMatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> }) @{
+	const router = useRouter();
+	const matches = usePresentedMatches(router, props.expectedMatches);
+	const rootMatch = matches[0];
+	@if (rootMatch) {
+		<CompiledContext context={matchContext} value={rootMatch.routeId}>
+			<CompiledMatch routeId={rootMatch.routeId} />
+		</CompiledContext>
+	}
+}
 
 // Route IDs enter this tree from published match snapshots. Router-core has
 // already created their stable presentation stores before notifying readers.

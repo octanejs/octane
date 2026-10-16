@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
+import { createRoot } from 'octane';
+import {
+	CompiledRouterProvider,
+	PreconfiguredRouterProvider,
+} from '@octanejs/tanstack-router/compiled';
 import { mount, nextPaint } from '../_helpers';
 import { makeCompiledRouter, makeCompiledFileRouter } from '../_fixtures/compiled-router.tsrx';
 
@@ -11,6 +15,72 @@ async function settle() {
 }
 
 describe('opt-in compiled router rendering', () => {
+	it('navigates from a route layout effect when its provider mounts', async () => {
+		const router = makeCompiledRouter('/items/a', { navigateOnMount: true });
+		await router.load();
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		const resolvedContent: Array<string | null> = [];
+		const unsubscribe = router.subscribe('onResolved', () => {
+			resolvedContent.push(container.querySelector('.go-item')?.textContent ?? null);
+		});
+		try {
+			root.render(PreconfiguredRouterProvider as any, { router });
+			await settle();
+			expect(resolvedContent).toContain('Open item');
+			expect(container.querySelector('.go-item')?.textContent).toBe('Open item');
+			expect(router.state.resolvedLocation?.pathname).toBe('/');
+		} finally {
+			unsubscribe();
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('follows history only while its router is active in the provider', async () => {
+		const previous = makeCompiledRouter('/');
+		await previous.load();
+		const view = mount(PreconfiguredRouterProvider as any, { router: previous });
+		const replacement = makeCompiledRouter('/items/b');
+		try {
+			await settle();
+			view.update(PreconfiguredRouterProvider as any, { router: replacement });
+			await settle();
+			expect(view.find('.value').textContent).toBe('b:Name b');
+			previous.history.push('/items/a');
+			await settle();
+			expect(previous.state.location.pathname).toBe('/');
+			expect(view.find('.value').textContent).toBe('b:Name b');
+		} finally {
+			view.unmount();
+		}
+		replacement.history.push('/items/c');
+		await settle();
+		expect(replacement.state.location.pathname).toBe('/items/b');
+	});
+
+	it('preserves route state when provider options change', async () => {
+		const router = makeCompiledRouter('/items/a');
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			const item = view.find('.item');
+			view.click('.count');
+			expect(view.find('.count').textContent).toBe('1');
+			view.update(CompiledRouterProvider as any, { router, defaultPendingMs: 50 });
+			expect(router.options.defaultPendingMs).toBe(50);
+			expect(view.find('.item')).toBe(item);
+			expect(view.find('.count').textContent).toBe('1');
+			view.update(CompiledRouterProvider as any, { router });
+			expect(view.find('.item')).toBe(item);
+			expect(view.find('.count').textContent).toBe('1');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('commits the Link transition cue before synchronous router callbacks', async () => {
 		const router = makeCompiledFileRouter();
 		await router.load();
@@ -84,16 +154,22 @@ describe('opt-in compiled router rendering', () => {
 		}
 	});
 
-	it('renders lazy nested outlets, keeps parent identity and owns hooks and history', async () => {
+	it('renders lazy nested outlets, preserves parent identity and acknowledges committed navigation', async () => {
 		const router = makeCompiledRouter();
 		await router.load();
-		const view = mount(CompiledRouterProvider as any, { router });
+		const view = mount(PreconfiguredRouterProvider as any, { router });
 		await settle();
 		const header = view.find('header');
 		expect(header.getAttribute('data-selected')).toBe('/');
-		const events: string[] = [];
-		const unsubs = ['onLoad', 'onResolved', 'onRendered'].map((event) =>
-			router.subscribe(event as any, () => events.push(event)),
+		const events: Array<{ type: string; pathname: string; content: string | null }> = [];
+		const unsubs = (['onLoad', 'onResolved', 'onRendered'] as const).map((type) =>
+			router.subscribe(type, (event) =>
+				events.push({
+					type,
+					pathname: event.toLocation.pathname,
+					content: view.findAll('.value')[0]?.textContent ?? null,
+				}),
+			),
 		);
 
 		(view.find('.go-item') as HTMLButtonElement).click();
@@ -113,9 +189,15 @@ describe('opt-in compiled router rendering', () => {
 		expect(view.find('.items-layout')).toBe(itemsLayout);
 		expect(view.find('.value').textContent).toBe('b:Name b');
 		expect(view.find('.count').textContent).toBe('0');
-		expect(events).toContain('onLoad');
-		expect(events).toContain('onResolved');
-		expect(events).toContain('onRendered');
+		expect(events).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ type: 'onLoad' }),
+				{ type: 'onResolved', pathname: '/items/a', content: 'a:Name a' },
+				{ type: 'onRendered', pathname: '/items/a', content: 'a:Name a' },
+				{ type: 'onResolved', pathname: '/items/b', content: 'b:Name b' },
+				{ type: 'onRendered', pathname: '/items/b', content: 'b:Name b' },
+			]),
+		);
 
 		router.history.back();
 		await settle();

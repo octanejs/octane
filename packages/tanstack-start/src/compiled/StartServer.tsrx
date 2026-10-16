@@ -1,6 +1,6 @@
 'use strong';
 
-import { RouterProvider } from '@octanejs/tanstack-router/compiled';
+import { PreconfiguredRouterProvider } from '@octanejs/tanstack-router/compiled';
 import type { AnyRouter } from '@tanstack/router-core';
 
 export interface StartServerProps {
@@ -8,5 +8,5 @@ export interface StartServerProps {
 }
 
 export function StartServer({ router }: StartServerProps) @{
-	<RouterProvider router={router} />
+	<PreconfiguredRouterProvider router={router} />
 }

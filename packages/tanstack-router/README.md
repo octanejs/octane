@@ -144,6 +144,11 @@ existing `CompiledRouterProvider`, `CompiledOutlet`, and
 `lazyCompiledRouteComponent` names remain aliases. TanStack owns matching,
 loading, navigation, history and render acknowledgements.
 
+`PreconfiguredRouterProvider` accepts only `{ router }` and owns the provider and
+match projection in Strong mode; route lifecycle boundaries may still require
+compatibility mode. Configure the router before rendering it. Use `RouterProvider`
+when provider option props need to reconfigure the router synchronously.
+
 ```tsx
 import {
   createRootRoute, createRoute, createRouter, createBrowserHistory,

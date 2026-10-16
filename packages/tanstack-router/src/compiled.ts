@@ -36,7 +36,11 @@ export {
 	useCanGoBack,
 } from './compiled/bindings';
 export type { UseRouterStateOptions, UseRouterStateResult } from './routerStateBinding';
-export { CompiledOutlet, CompiledOutlet as Outlet } from './compiled/Matches.tsrx';
+export {
+	CompiledOutlet,
+	CompiledOutlet as Outlet,
+	PreconfiguredRouterProvider,
+} from './compiled/Matches.tsrx';
 export {
 	CompiledRouterProvider,
 	CompiledRouterProvider as RouterProvider,

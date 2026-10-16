@@ -1,3 +1,5 @@
+'use strong';
+
 // The navigation engine — port of react-router's Transitioner. It runs as a hook
 // because a rendered sibling would place an SSR marker before a root route's
 // document-level <html> node and outside the #__app hydration range.
@@ -17,81 +19,99 @@
 //      and kick off the initial load — or, when hydrating an already-resolved SSR
 //      location, acknowledge the first render so `onRendered` consumers (scroll
 //      restoration, devtools) fire.
-import { useLayoutEffect, useState, startTransition } from 'octane';
+import { useInsertionEffect, useLayoutEffect, useState, startTransition } from 'octane';
 import { getLocationChangeInfo, trimPathRight } from '@tanstack/router-core';
-import type { AnyRouter } from '@tanstack/router-core';
+import type { AnyRouteMatch, AnyRouter } from '@tanstack/router-core';
+import { useStore } from './useStore';
 
 // Resolve the pending render acknowledgement with whether the expected matches
 // rendered, then clear the slot. `owner` is `router._rendered`: `[expected, resolve]`.
-export function settleOwner(owner: Array<any>, rendered: boolean) {
-	const settle = owner[1] as ((rendered: boolean) => void) | undefined;
+function settleOwner(owner: NonNullable<AnyRouter['_rendered']>, rendered: boolean) {
+	const settle = owner[1];
 	owner.length = 0;
 	settle?.(rendered);
 }
 
-export function useTransitioner(routerInstance: AnyRouter) {
-	const router = routerInstance as any;
-	const [expectedMatches, setExpectedMatches] = useState<unknown>();
-
-	const acknowledgement: Array<any> = (router._rendered ??= []);
-
-	router.startTransition = (fn: () => void, expected: unknown) =>
+function installTransitioner(router: AnyRouter, present: (matches: Array<AnyRouteMatch>) => void) {
+	const acknowledgement = (router._rendered ??= []);
+	const previous = router.startTransition;
+	const owned: AnyRouter['startTransition'] = (fn, expected) =>
 		new Promise<boolean>((resolve) => {
-			// A newer transition supersedes an unrendered older one.
 			settleOwner(acknowledgement, false);
-			acknowledgement.push(expected, resolve);
-			// Publish the matches this transaction needs. MatchesInner consumes this
-			// snapshot and acknowledges it only after that exact tree commits.
-			setExpectedMatches(expected);
+			acknowledgement[0] = expected;
+			acknowledgement[1] = resolve;
+			present(expected);
 			startTransition(fn);
 		});
-
-	useLayoutEffect(() => {
-		const unsub = router.history.subscribe(() => router.load());
-
-		// octane has no StrictMode double-invoke, so this layout effect runs once per
-		// mounted router and re-runs only when the router (or its history) is swapped
-		// on a live provider — exactly when the new router needs its initial load.
-		// Upstream guards this block with a dev-only `mounted` ref purely to absorb
-		// React's StrictMode double-invoke; keeping that ref here would instead skip
-		// the swapped-in router's load.
-		router.updateLatestLocation?.();
-		const location = router.latestLocation;
-		const nextLocation = router.buildLocation({
-			to: location.pathname,
-			search: true,
-			params: true,
-			hash: true,
-			state: true,
-			_includeValidateSearch: true,
-		} as any);
-		if (trimPathRight(location.publicHref) !== trimPathRight(nextLocation.publicHref)) {
-			router.commitLocation({ ...nextLocation, replace: true, ignoreBlocker: true });
-			return unsub;
+	router.startTransition = owned;
+	return () => {
+		if (router.startTransition === owned) {
+			router.startTransition = previous;
+			settleOwner(acknowledgement, false);
 		}
+	};
+}
 
-		const resolvedLocation = router.stores.resolvedLocation.get();
-		if (
-			resolvedLocation?.href === location.href &&
-			resolvedLocation.state.__TSR_key === location.state.__TSR_key
-		) {
-			// Already resolved (SSR hydration): emit `onRendered` for scroll
-			// restoration and devtools. The match tree has already committed by the
-			// time this layout effect runs (child effects fire before the parent's),
-			// so emit directly rather than through the acknowledgement/settle path:
-			// hydration acknowledges the matches already on screen, which — unlike a
-			// navigation that commits the *next* matches — triggers no re-render for
-			// `MatchesInner`'s settle effect to run on.
-			router.emit({
-				type: 'onRendered',
-				...getLocationChangeInfo(resolvedLocation, resolvedLocation),
-			});
-		} else if (!router._tx) {
-			router.load({ sync: true }).catch((err: unknown) => {
-				console.error(err);
-			});
-		}
+function subscribeToHistory(router: AnyRouter, history: AnyRouter['history']) {
+	const unsub = history.subscribe(() => router.load());
+
+	// Re-run for a replacement router or history so the new instance loads.
+	router.updateLatestLocation?.();
+	const location = router.latestLocation;
+	const nextLocation = router.buildLocation({
+		to: location.pathname,
+		search: true,
+		params: true,
+		hash: true,
+		state: true,
+		_includeValidateSearch: true,
+	} as any);
+	if (trimPathRight(location.publicHref) !== trimPathRight(nextLocation.publicHref)) {
+		router.commitLocation({ ...nextLocation, replace: true, ignoreBlocker: true });
 		return unsub;
-	}, [router, router.history]);
+	}
+
+	const resolvedLocation = router.stores.resolvedLocation.get();
+	if (
+		resolvedLocation?.href === location.href &&
+		resolvedLocation.state.__TSR_key === location.state.__TSR_key
+	) {
+		// Hydration acknowledges the already-committed tree, which does not trigger
+		// another render for the navigation acknowledgement effect to observe.
+		router.emit({
+			type: 'onRendered',
+			...getLocationChangeInfo(resolvedLocation, resolvedLocation),
+		});
+	} else if (!router._tx) {
+		router.load({ sync: true }).catch((err: unknown) => {
+			console.error(err);
+		});
+	}
+	return unsub;
+}
+
+export function useTransitioner(router: AnyRouter) {
+	const [expectedMatches, setExpectedMatches] = useState<Array<AnyRouteMatch>>();
+	const history = router.history;
+	// Install before descendant layout effects can navigate, without mutating the
+	// router during render or placing a sibling before a document-level route.
+	useInsertionEffect(() => installTransitioner(router, setExpectedMatches));
+	useLayoutEffect(() => subscribeToHistory(router, history));
 	return expectedMatches;
+}
+
+function acknowledgeRenderedMatches(router: AnyRouter, matches: Array<AnyRouteMatch>) {
+	const owner = router._rendered;
+	if (owner && owner[0] === matches) settleOwner(owner, true);
+}
+
+// The store may reconstruct its match array, so a navigation must present the
+// exact snapshot offered by router-core until that tree commits. The live owner
+// is observed only by the store snapshot and by the commit acknowledgement.
+export function usePresentedMatches(router: AnyRouter, expectedMatches?: Array<AnyRouteMatch>) {
+	const matches = useStore(router.stores.matches, (current) =>
+		expectedMatches && router._rendered?.[0] === expectedMatches ? expectedMatches : current,
+	);
+	useLayoutEffect(() => acknowledgeRenderedMatches(router, matches));
+	return matches;
 }
