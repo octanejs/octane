@@ -287,6 +287,8 @@ Nonconvergent size feedback still needs a bounded layout algorithm. Observers ow
 
 Signals are a stable API and work with the standard Octane compiler and its Vite, Rspack, and Rsbuild integrations. Every module consuming native signal reads needs its own runtime import from `octane/signals`, `octane/signals/client`, or `octane/signals/server`; a type-only import or `$` name alone is insufficient. No `nativeReads` option is required. Import `signal$`, `derived$`, `query$`, `skip`, `optimistic$`, and `action$` from `octane/signals`; import `useSignal$` from `octane/signals/client` for component-local state. Server compilation selects `octane/signals/server` for the local hook automatically.
 
+`OCTANE_NATIVE_SIGNAL_IMPORT` reports a missing runtime import when the compiler can identify a native signal read during rendering from locally available signal types. Opaque cross-module or untyped values may escape the diagnostic; the import is still required for reactive reads. Use `import 'octane/signals';` when no named signals API is needed.
+
 ### Declarations, async derivations, and queries
 
 `signal$(initial)` is writable; `derived$(compute)` is read-only and accepts an immediate value, Promise, async iterable, or Promise of an async iterable. Synchronous calculations remain immediate. Module declarations resolve to request-local cells on the server and document-local cells in the browser. Stable compiler-identified feature instances own their instance declarations. Browser modules need no renderer root; server reads/writes require a request owner. Unmounting one root does not dispose document-global state.

@@ -8,7 +8,7 @@ const KEY_MESSAGE =
 
 // Array methods that invoke their callback before returning. A callback passed to
 // one of these runs in the caller's phase, so render rules apply inside it.
-const SYNCHRONOUS_ARRAY_CALLBACKS = new Set([
+export const SYNCHRONOUS_ARRAY_CALLBACKS = new Set([
 	'every',
 	'filter',
 	'find',

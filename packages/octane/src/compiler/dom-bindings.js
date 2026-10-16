@@ -20,6 +20,10 @@ import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import { fixedBindingProps } from './dom-binding-fixed-props.js';
 import { isLayoutText, needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
 import {
+	DOM_BINDING_DIRECTIVE as DIRECTIVE,
+	isDomBindingDirective as isDirective,
+} from './dom-binding-directive.js';
+import {
 	parseDomBindingRequest,
 	formatDomBindingRequest,
 	DOM_BINDINGS_QUERY,
@@ -29,7 +33,6 @@ import {
 
 export { DOM_BINDINGS_QUERY, DOM_BINDINGS_MOUNT_QUERY } from './dom-binding-request.js';
 export const DOM_BINDING_COMPILER_ABI_VERSION = 1;
-const DIRECTIVE = 'use dom bindings';
 const MARKER = 'data-octane-bindings';
 const NODE_MARKER = 'data-octane-binding-node';
 const SKIP = new Set([
@@ -218,10 +221,6 @@ function unwrap(node) {
 
 function statements(fn) {
 	return Array.isArray(fn.body?.body) ? fn.body.body : [];
-}
-
-function isDirective(node) {
-	return node?.type === 'ExpressionStatement' && node.expression?.value === DIRECTIVE;
 }
 
 function attrName(attr) {
