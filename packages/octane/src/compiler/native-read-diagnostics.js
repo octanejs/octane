@@ -2,6 +2,7 @@ import { createLexicalAnalysis } from './compile-universal.js';
 import { analyzeRendererBoundaries } from './renderer-boundaries.js';
 import { isDomBindingDirective } from './dom-binding-directive.js';
 import { HOOK_NAMES } from './hook-names.js';
+import { isComponentTag, isKnownTextChildExpression } from './render-classification.js';
 import { SYNCHRONOUS_ARRAY_CALLBACKS } from './strong-render-policy.js';
 import { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ, nativeReadDiagnostic } from './native-read-facts.js';
 export { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ } from './native-read-facts.js';
@@ -16,6 +17,16 @@ const SIGNAL_METHODS = new Set(['signal$', 'derived$']);
 const READ_METHODS = ['get', 'latest', 'snapshot'];
 const SIGNAL_FACTORIES = new Set(['signal$', 'derived$', 'query$', 'createResource']);
 const LOCAL_HOOKS = new Set(['useSignal$']);
+const ERROR_CONSTRUCTORS = new Set([
+	'Error',
+	'EvalError',
+	'RangeError',
+	'ReferenceError',
+	'SyntaxError',
+	'TypeError',
+	'URIError',
+	'AggregateError',
+]);
 // Runtime callbacks that can execute while the hook is rendering. Effect and
 // layout callbacks are deliberately absent; their reads are imperative.
 const RENDER_CALLBACKS = new Map([
@@ -31,6 +42,15 @@ const FUNCTION_TYPES = new Set([
 	'ArrowFunctionExpression',
 	'FunctionDeclaration',
 	'FunctionExpression',
+]);
+const RENDER_NODES = new Set([
+	'JSXElement',
+	'JSXFragment',
+	'JSXCodeBlock',
+	'JSXIfExpression',
+	'JSXForExpression',
+	'JSXSwitchExpression',
+	'JSXTryExpression',
 ]);
 const WRAPPERS = new Set([
 	'ParenthesizedExpression',
@@ -57,26 +77,12 @@ const UNKNOWN = Object.freeze({ kind: 'unknown' });
 const HANDLE = Object.freeze({ kind: 'handle' });
 const SCOPE = Object.freeze({ kind: 'scope' });
 const NULLISH = Object.freeze({ kind: 'nullish' });
-const RENDER_OUTPUT = Object.freeze({ kind: 'renderOutput' });
 const NUMBER = Object.freeze({ kind: 'number' });
+const PRIMITIVE = Object.freeze({ kind: 'primitive' });
 const ROOT = Object.freeze({ kind: 'root' });
 
-function sameProof(left, right) {
-	if (left === right) return true;
-	if (!left || !right || left.kind !== right.kind) return false;
-	if (left.kind === 'function') return left.fn === right.fn;
-	if (left.kind === 'class') return left.node === right.node;
-	if (left.kind === 'builtin') return left.name === right.name && left.read === right.read;
-	if (left.kind === 'namespace') return left.module === right.module;
-	if (left.kind === 'nullable') return sameProof(left.value, right.value);
-	if (left.kind !== 'object' && left.kind !== 'array') return false;
-	if (left.kind === 'array' && !sameProof(left.element, right.element)) return false;
-	if (left.properties === right.properties) return true;
-	if (!left.properties || !right.properties || left.properties.size !== right.properties.size)
-		return false;
-	for (const [name, value] of left.properties)
-		if (!sameProof(value, right.properties.get(name))) return false;
-	return true;
+function isRenderValue(value) {
+	return value?.kind === 'renderOutput' || value?.kind === 'renderChoice';
 }
 
 function unwrap(node) {
@@ -166,6 +172,18 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		// Every locally identifiable read spells a read method somewhere in the
 		// module. Escaped property names retain a backslash, so still analyze them.
 		if (!escaped && !READ_METHODS.some((name) => source.includes(name))) return [];
+		// Source text can mention the module in comments or strings. Only an
+		// actual import can establish the signal provenance this pass recognizes.
+		if (!importsSignalModule(ast)) {
+			let found = false;
+			function findInlineImport(node) {
+				if (!node || found) return;
+				if (node.type === 'TSImportType' && SIGNAL_MODULES.has(node.source?.value)) found = true;
+				else children(node, findInlineImport);
+			}
+			findInlineImport(ast);
+			if (!found) return [];
+		}
 	}
 	if (
 		!missingImport &&
@@ -194,7 +212,6 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				),
 			];
 	}
-	const lexical = createLexicalAnalysis(ast);
 	const nodes = [];
 	const parents = new WeakMap();
 	const seen = new WeakSet();
@@ -207,6 +224,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		children(node, (child) => collect(child, node));
 	}
 	collect(ast, null);
+	const lexical = createLexicalAnalysis(ast);
 	const records = new Map();
 	const allRecords = [];
 	const nativeTypes = new Map();
@@ -357,12 +375,26 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 	let recordCache;
 	let functionCache;
 	let parameterValues;
+	let evaluatedValues;
+	let returnedValues;
+	let renderOutput;
 	const activeRecords = new Set();
 	const activeFunctions = new Set();
-	function typeValue(annotation, active = new Set()) {
+	const typeCache = new WeakMap();
+	function typeValue(annotation, state) {
 		if (!annotation) return UNKNOWN;
+		state ??= { active: new Set(), cycles: 0 };
+		if (missingImport && typeCache.has(annotation)) return typeCache.get(annotation);
+		const cycles = state.cycles;
+		const value = resolveTypeValue(annotation, state);
+		// A result cut short by an ancestor cycle depends on that path. Cache
+		// completed proofs only, including shared acyclic interface heritage.
+		if (missingImport && state.cycles === cycles) typeCache.set(annotation, value);
+		return value;
+	}
+	function resolveTypeValue(annotation, state) {
 		if (annotation.type === 'TSTypeAnnotation' || annotation.type === 'TSParenthesizedType')
-			return typeValue(annotation.typeAnnotation, active);
+			return typeValue(annotation.typeAnnotation, state);
 		if (
 			annotation.type === 'TSTypeReference' ||
 			(missingImport && annotation.type === 'TSInterfaceHeritage')
@@ -378,12 +410,16 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				)
 					return {
 						kind: 'array',
-						element: typeValue(annotation.typeArguments?.params?.[0], active),
+						element: typeValue(annotation.typeArguments?.params?.[0], state),
 					};
-				if (!active.has(name.name) && typeAliases.has(name.name)) {
-					active.add(name.name);
-					const value = typeValue(typeAliases.get(name.name), active);
-					active.delete(name.name);
+				if (typeAliases.has(name.name)) {
+					if (state.active.has(name.name)) {
+						state.cycles++;
+						return UNKNOWN;
+					}
+					state.active.add(name.name);
+					const value = typeValue(typeAliases.get(name.name), state);
+					state.active.delete(name.name);
 					return value;
 				}
 			} else if (
@@ -403,15 +439,19 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			if (DEFINITE_HANDLE_TYPES.has(annotation.qualifier?.name)) return HANDLE;
 			if (annotation.qualifier?.name === 'Scope') return SCOPE;
 		} else if (missingImport && annotation.type === 'TSInterfaceDeclaration') {
-			const own = typeValue(annotation.body, active);
+			const own = typeValue(annotation.body, state);
+			let properties = own.properties;
 			for (const base of annotation.extends ?? []) {
-				const inherited = typeValue(base, active);
+				const inherited = typeValue(base, state);
 				if (inherited === HANDLE || inherited === SCOPE) return inherited;
 				if (inherited.kind === 'object')
 					for (const [name, value] of inherited.properties)
-						if (!own.properties.has(name)) own.properties.set(name, value);
+						if (!properties.has(name)) {
+							if (properties === own.properties) properties = new Map(properties);
+							properties.set(name, value);
+						}
 			}
-			return own;
+			return properties === own.properties ? own : { kind: 'object', properties };
 		} else if (
 			annotation.type === 'TSTypeLiteral' ||
 			(missingImport && annotation.type === 'TSInterfaceBody')
@@ -419,22 +459,39 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			const properties = new Map();
 			for (const member of annotation.members ?? annotation.body ?? []) {
 				const name = propertyName(member.key, member.computed);
-				if (name !== null) properties.set(name, typeValue(member.typeAnnotation, active));
+				// Resolve only the property a read follows. Eager expansion both
+				// loses recursive paths and can explode on branching type graphs.
+				if (name !== null)
+					properties.set(
+						name,
+						missingImport
+							? { kind: 'typeMember', annotation: member.typeAnnotation }
+							: typeValue(member.typeAnnotation, state),
+					);
 			}
 			return { kind: 'object', properties };
 		} else if (annotation.type === 'TSUnionType' || annotation.type === 'TSIntersectionType') {
-			const values = annotation.types.map((entry) => typeValue(entry, active));
+			const values = annotation.types.map((entry) => typeValue(entry, state));
 			if (missingImport && annotation.type === 'TSUnionType' && values.includes(NULLISH)) {
-				const value = mergeValues(values.filter((entry) => entry !== NULLISH));
+				const value = joinTypeValues(values.filter((entry) => entry !== NULLISH));
 				return value !== UNKNOWN ? { kind: 'nullable', value } : UNKNOWN;
 			}
 			return annotation.type === 'TSIntersectionType'
 				? mergePossibleValues(values)
-				: mergeValues(values);
+				: missingImport
+					? joinTypeValues(values)
+					: mergeValues(values);
 		} else if (missingImport && annotation.type === 'TSArrayType') {
-			return { kind: 'array', element: typeValue(annotation.elementType, active) };
+			return { kind: 'array', element: typeValue(annotation.elementType, state) };
 		} else if (missingImport && annotation.type === 'TSNumberKeyword') {
 			return NUMBER;
+		} else if (
+			missingImport &&
+			(annotation.type === 'TSStringKeyword' ||
+				annotation.type === 'TSBooleanKeyword' ||
+				annotation.type === 'TSBigIntKeyword')
+		) {
+			return PRIMITIVE;
 		} else if (
 			missingImport &&
 			(annotation.type === 'TSNullKeyword' || annotation.type === 'TSUndefinedKeyword')
@@ -444,23 +501,118 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			return {
 				kind: 'object',
 				properties: new Map(
-					annotation.elementTypes.map((entry, index) => [String(index), typeValue(entry, active)]),
+					annotation.elementTypes.map((entry, index) => [String(index), typeValue(entry, state)]),
 				),
 			};
 		}
 		return UNKNOWN;
 	}
+	function resolveTypeMember(value) {
+		return value?.kind === 'typeMember' ? typeValue(value.annotation) : value;
+	}
+	function seenPair(seen, left, right) {
+		let matches = seen.get(left);
+		if (matches?.has(right)) return true;
+		if (!matches) seen.set(left, (matches = new WeakSet()));
+		matches.add(right);
+		return false;
+	}
+	function sameProof(left, right, seen) {
+		if (left === right) return true;
+		left = resolveTypeMember(left);
+		right = resolveTypeMember(right);
+		if (left === right) return true;
+		if (!left || !right || left.kind !== right.kind) return false;
+		if (left.kind === 'function') return left.fn === right.fn;
+		if (left.kind === 'class') return left.node === right.node;
+		if (left.kind === 'typeUnion') {
+			seen ??= new WeakMap();
+			if (seenPair(seen, left, right)) return true;
+			return (
+				left.values.length === right.values.length &&
+				left.values.every((value, index) => sameProof(value, right.values[index], seen))
+			);
+		}
+		if (left.kind === 'renderChoice')
+			return (
+				left.values.length === right.values.length &&
+				left.values.every((value, index) => sameProof(value, right.values[index], seen))
+			);
+		if (left.kind === 'renderOutput')
+			return (
+				left.node === right.node &&
+				sameProof(left.target, right.target, seen) &&
+				sameProof(left.props, right.props, seen) &&
+				left.children.length === right.children.length &&
+				left.children.every((value, index) => sameProof(value, right.children[index], seen)) &&
+				sameBindings(left.bindings, right.bindings, seen)
+			);
+		if (left.kind === 'builtin') return left.name === right.name && left.read === right.read;
+		if (left.kind === 'namespace') return left.module === right.module;
+		if (left.kind === 'nullable') return sameProof(left.value, right.value, seen);
+		if (left.kind !== 'object' && left.kind !== 'array') return false;
+		seen ??= new WeakMap();
+		if (seenPair(seen, left, right)) return true;
+		if (left.kind === 'array' && !sameProof(left.element, right.element, seen)) return false;
+		if (left.properties === right.properties) return true;
+		if (!left.properties || !right.properties || left.properties.size !== right.properties.size)
+			return false;
+		for (const [name, value] of left.properties)
+			if (!sameProof(value, right.properties.get(name), seen)) return false;
+		return true;
+	}
+	function sameBindings(left, right, seen) {
+		return (
+			left === right ||
+			(left != null &&
+				right != null &&
+				left.size === right.size &&
+				[...left].every(([record, value]) => sameProof(value, right.get(record), seen)))
+		);
+	}
 	function mergePossibleValues(values) {
 		for (const value of values) if (value.kind === 'handle') return HANDLE;
 		return values.find((value) => value.kind !== 'unknown') ?? UNKNOWN;
 	}
+	function joinTypeValues(values) {
+		const alternatives = [];
+		for (const value of values)
+			for (const entry of value.kind === 'typeUnion' ? value.values : [value])
+				if (
+					!alternatives.some(
+						(existing) =>
+							existing === entry || (entry.kind === 'builtin' && sameProof(existing, entry)),
+					)
+				)
+					alternatives.push(entry);
+		return alternatives.length === 1
+			? alternatives[0]
+			: alternatives.length
+				? { kind: 'typeUnion', values: alternatives }
+				: UNKNOWN;
+	}
 	function mergeValues(values) {
 		if (!missingImport) return mergePossibleValues(values);
 		const first = values[0];
-		return first && values.every((value) => sameProof(value, first)) ? first : UNKNOWN;
+		if (first && values.every((value) => sameProof(value, first))) return first;
+		// Preserve independently reachable render results without treating an
+		// ambiguous value as a definite signal receiver.
+		if (values.some(isRenderValue)) {
+			const alternatives = [];
+			for (const value of values)
+				for (const entry of value.kind === 'renderChoice' ? value.values : [value])
+					if (!alternatives.some((existing) => sameProof(existing, entry)))
+						alternatives.push(entry);
+			return { kind: 'renderChoice', values: alternatives };
+		}
+		return UNKNOWN;
 	}
 	function memberValue(value, name, index = false) {
-		if (value.kind === 'object') return value.properties.get(name) ?? UNKNOWN;
+		// Project before joining: unrelated fields and recursive links do not
+		// change whether every union branch proves the accessed member.
+		if (value.kind === 'typeUnion')
+			return joinTypeValues(value.values.map((entry) => memberValue(entry, name, index)));
+		if (value.kind === 'object') return resolveTypeMember(value.properties.get(name)) ?? UNKNOWN;
 		if (value.kind === 'root' && name === 'render')
 			return { kind: 'builtin', name, renderComponent: true };
 		if (value.kind === 'array') {
@@ -497,7 +649,18 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			}
 			// The authored type is the available contract for a typed binding;
 			// an ambiguous contract cannot prove a signal even if its initializer can.
-			const result = mergeValues(values);
+			let result = mergeValues(values);
+			if (record.expressions.length)
+				result = refineRenderValue(
+					result,
+					mergeValues(
+						record.expressions.map(({ expression, path }) => {
+							let value = valueOf(expression);
+							for (const name of path) value = memberValue(value, name);
+							return value;
+						}),
+					),
+				);
 			activeRecords.delete(record);
 			recordCache.set(record, result);
 			return result;
@@ -511,6 +674,32 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		activeRecords.delete(record);
 		recordCache.set(record, result);
 		return result;
+	}
+	function refineRenderValue(contract, supplied, seen) {
+		if (contract === supplied) return contract;
+		if (
+			(contract === UNKNOWN || contract.kind === 'typeUnion') &&
+			(isRenderValue(supplied) ||
+				supplied === PRIMITIVE ||
+				supplied === NUMBER ||
+				supplied === NULLISH)
+		)
+			return supplied;
+		if (contract.kind !== 'object' || supplied?.kind !== 'object') return contract;
+		seen ??= new WeakMap();
+		if (seenPair(seen, contract, supplied)) return contract;
+		let properties = null;
+		for (const [name, value] of contract.properties) {
+			if (!supplied.properties.has(name)) continue;
+			const original = resolveTypeMember(value);
+			const refined = refineRenderValue(
+				original,
+				resolveTypeMember(supplied.properties.get(name)),
+				seen,
+			);
+			if (refined !== original) (properties ??= new Map(contract.properties)).set(name, refined);
+		}
+		return properties ? { kind: 'object', properties } : contract;
 	}
 	function functionValue(fn) {
 		if (functionCache.has(fn)) return functionCache.get(fn);
@@ -528,7 +717,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				return producesRender(node.consequent) || producesRender(node.alternate);
 			if (node?.type === 'LogicalExpression')
 				return producesRender(node.left) || producesRender(node.right);
-			return valueOf(expression) === RENDER_OUTPUT;
+			return isRenderValue(valueOf(expression));
 		}
 		function addReturn(expression) {
 			const node = unwrap(expression);
@@ -575,18 +764,26 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 	}
 	function valueOf(input) {
 		if (missingImport && (input?.type === 'TSAsExpression' || input?.type === 'TSTypeAssertion'))
-			return typeValue(input.typeAnnotation);
+			return refineRenderValue(typeValue(input.typeAnnotation), valueOf(input.expression));
 		const node = unwrap(input);
 		if (!node) return UNKNOWN;
-		if (missingImport && (node.type === 'JSXElement' || node.type === 'JSXFragment'))
-			return RENDER_OUTPUT;
+		if (missingImport && evaluatedValues?.has(node)) return evaluatedValues.get(node);
+		if (missingImport && RENDER_NODES.has(node.type)) return renderOutput(node);
 		if (missingImport && (node.type === 'ClassDeclaration' || node.type === 'ClassExpression'))
 			return { kind: 'class', node };
 		if (missingImport && node.type === 'Literal' && typeof node.value === 'number') return NUMBER;
+		if (missingImport && node.type === 'Literal' && node.value === null) return NULLISH;
+		if (missingImport && node.type === 'Literal' && typeof node.value === 'boolean')
+			return PRIMITIVE;
+		if (missingImport && isKnownTextChildExpression(input, null)) return PRIMITIVE;
 		if (node.type === 'Identifier' || node.type === 'JSXIdentifier')
 			return recordValue(recordFor(node));
 		if (FUNCTION_TYPES.has(node.type)) return functionValue(node);
-		if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+		if (
+			node.type === 'MemberExpression' ||
+			node.type === 'OptionalMemberExpression' ||
+			node.type === 'JSXMemberExpression'
+		) {
 			let receiver = valueOf(node.object);
 			// The nullish branch cannot invoke any member, regardless of whether
 			// narrowing was written as a guard or as optional chaining.
@@ -603,7 +800,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			if (callee.kind === 'builtin') {
 				if (missingImport && callee.name === 'memo') return valueOf(node.arguments[0]);
 				if (missingImport && callee.name === 'createRoot') return ROOT;
-				if (missingImport && callee.name === 'createElement') return RENDER_OUTPUT;
+				if (missingImport && callee.name === 'createElement') return renderOutput(node);
 				if (callee.name === 'createScope') return SCOPE;
 				if (
 					SIGNAL_METHODS.has(callee.name) ||
@@ -677,6 +874,9 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		recordCache = new Map();
 		functionCache = new WeakMap();
 		parameterValues = new Map();
+		evaluatedValues = new WeakMap();
+		returnedValues = null;
+		renderOutput = describeRenderOutput;
 		const diagnostics = [];
 		const activeRenderFunctions = new Set();
 		const visitedContexts = new WeakMap();
@@ -684,14 +884,18 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		// The visitor carries every possible synchronous completion through a
 		// statement. Only NORMAL paths continue into the next statement; finally
 		// and catch can resume an abrupt completion, while await leaves render.
+		// Renderer suspension is a thrown control value, distinct from await.
 		const NORMAL = 1;
 		const RETURN = 2;
 		const THROW = 4;
 		const SUSPEND = 8;
 		const BREAK = 16;
 		const CONTINUE = 32;
+		const RENDER_SUSPEND = 64;
+		const EXCEPTION = THROW | RENDER_SUSPEND;
 		let constructionContext = null;
 		let rendering = false;
+		let dispatchReturns = false;
 		function complete(state, exits) {
 			state.exits = (state.exits & ~NORMAL) | exits;
 		}
@@ -699,8 +903,11 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			if (!pattern || !value || value === UNKNOWN) return;
 			if (pattern.type === 'Identifier') {
 				const record = recordFor(pattern);
-				if (record && !record.annotations?.length && record.expressions.length === 0)
-					parameterValues.set(record, value);
+				if (record && record.expressions.length === 0) {
+					const contract = record.annotations?.length ? recordValue(record) : null;
+					const refined = contract ? refineRenderValue(contract, value) : value;
+					if (refined !== contract) parameterValues.set(record, refined);
+				}
 			} else if (pattern.type === 'AssignmentPattern') bindParameter(pattern.left, value);
 			else if (pattern.type === 'ObjectPattern') {
 				for (const property of pattern.properties ?? [])
@@ -713,24 +920,39 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 					bindParameter(pattern.elements[index], memberValue(value, String(index)));
 			}
 		}
-		function visitFunction(fn, arguments_ = [], construction = null) {
-			// A presentation view has its own renderer-free publication semantics;
-			// sampled signal values there are intentionally not subscriptions.
-			if (fn.generator || isDomBindingDirective(fn.body?.body?.[0])) return NORMAL;
-			if (activeRenderFunctions.has(fn)) return NORMAL | THROW;
-			activeRenderFunctions.add(fn);
-			const previous = [recordCache, functionCache, parameterValues, constructionContext];
-			recordCache = new Map();
-			functionCache = new WeakMap();
-			constructionContext = construction;
-			// Dynamic callers are not lexical parents. Keep only proofs the callee
-			// can capture; retaining the call stack multiplies equivalent paths.
-			const outerScope = lexical.nodeScopes.get(fn);
-			parameterValues = new Map(
+		function lexicalBindings(node) {
+			const scope = lexical.nodeScopes.get(node);
+			return new Map(
 				[...parameterValues].filter(
-					([record]) => lexical.resolveBinding(outerScope, record.name)?.scope === record.scope,
+					([record]) => lexical.resolveBinding(scope, record.name)?.scope === record.scope,
 				),
 			);
+		}
+		function visitFunction(fn, arguments_ = [], construction = null, dispatchResult = false) {
+			// A presentation view has its own renderer-free publication semantics;
+			// sampled signal values there are intentionally not subscriptions.
+			if (fn.generator || isDomBindingDirective(fn.body?.body?.[0]))
+				return { exits: NORMAL, value: UNKNOWN };
+			if (activeRenderFunctions.has(fn)) return { exits: NORMAL | EXCEPTION, value: UNKNOWN };
+			activeRenderFunctions.add(fn);
+			const previous = [
+				recordCache,
+				functionCache,
+				parameterValues,
+				evaluatedValues,
+				returnedValues,
+				constructionContext,
+				dispatchReturns,
+			];
+			recordCache = new Map();
+			functionCache = new WeakMap();
+			evaluatedValues = new WeakMap();
+			returnedValues = [];
+			constructionContext = construction;
+			dispatchReturns = dispatchResult;
+			// Dynamic callers are not lexical parents. Keep only proofs the callee
+			// can capture; retaining the call stack multiplies equivalent paths.
+			parameterValues = lexicalBindings(fn);
 			for (let index = 0; index < arguments_.length; index++)
 				bindParameter(fn.params[index], arguments_[index]);
 			let contexts = visitedContexts.get(fn);
@@ -738,42 +960,60 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			const visited = contexts.find(
 				(context) =>
 					context.rendering === rendering &&
+					context.dispatchResult === dispatchResult &&
 					context.construction === construction?.node &&
-					context.parameters.size === parameterValues.size &&
-					[...context.parameters].every(([record, value]) =>
-						sameProof(value, parameterValues.get(record)),
-					),
+					sameBindings(context.parameters, parameterValues),
 			);
-			let exits = visited?.exits;
+			let result = visited?.result;
 			if (!visited) {
 				const state = { exits: NORMAL };
 				for (const param of fn.params ?? []) visitRender(param, state);
-				visitRender(fn.body, state);
-				exits = fn.async
-					? NORMAL
-					: (state.exits & (NORMAL | RETURN) ? NORMAL : 0) | (state.exits & THROW);
+				if (fn.body?.type === 'JSXCodeBlock') visitCodeBlock(fn.body, state, dispatchResult);
+				else if (dispatchResult && fn.body?.type !== 'BlockStatement') visitOutput(fn.body, state);
+				else visitRender(fn.body, state);
+				if (state.exits & NORMAL)
+					returnedValues.push(fn.body?.type === 'BlockStatement' ? NULLISH : valueOf(fn.body));
+				result = {
+					exits: fn.async
+						? NORMAL
+						: (state.exits & (NORMAL | RETURN) ? NORMAL : 0) | (state.exits & EXCEPTION),
+					value: fn.async ? UNKNOWN : mergeValues(returnedValues),
+				};
 				contexts.push({
 					parameters: parameterValues,
 					construction: construction?.node,
 					rendering,
-					exits,
+					dispatchResult,
+					result,
 				});
 			}
-			[recordCache, functionCache, parameterValues, constructionContext] = previous;
+			[
+				recordCache,
+				functionCache,
+				parameterValues,
+				evaluatedValues,
+				returnedValues,
+				constructionContext,
+				dispatchReturns,
+			] = previous;
 			activeRenderFunctions.delete(fn);
-			return exits;
+			return result;
 		}
 		function visitComponent(expression, arguments_ = []) {
 			const node = unwrap(expression);
 			if (node?.type === 'CallExpression' && valueOf(node.callee).name === 'createElement')
 				return visitComponent(node.arguments[0], [valueOf(node.arguments[1])]);
-			const value = valueOf(expression);
+			return visitComponentValue(valueOf(expression), arguments_);
+		}
+		function visitComponentValue(value, arguments_) {
 			if (value.kind === 'function') {
 				const previous = rendering;
 				rendering = true;
-				visitFunction(value.fn, arguments_);
+				const { exits } = visitFunction(value.fn, arguments_, null, true);
 				rendering = previous;
+				return exits;
 			}
+			return NORMAL | EXCEPTION;
 		}
 		function visitExport(expression) {
 			const value = valueOf(expression);
@@ -782,7 +1022,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				visitComponent(expression);
 			else visitFunction(value.fn);
 		}
-		function jsxProps(opening) {
+		function jsxProps(opening, children_ = []) {
 			const properties = new Map();
 			for (const attribute of opening?.attributes ?? []) {
 				if (attribute.type === 'JSXSpreadAttribute') {
@@ -796,6 +1036,13 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 						properties.set(name, valueOf(attribute.value?.expression ?? attribute.value));
 				}
 			}
+			const children = children_.filter((child) => child.type !== 'JSXText' || child.value.trim());
+			if (children.length === 1) properties.set('children', childValue(children[0]));
+			else if (children.length > 1)
+				properties.set('children', {
+					kind: 'array',
+					properties: new Map(children.map((child, index) => [String(index), childValue(child)])),
+				});
 			return { kind: 'object', properties };
 		}
 		function literalProperty(member) {
@@ -889,6 +1136,126 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			}
 			return null;
 		}
+		function intrinsicErrorConstruction(node) {
+			return (
+				node?.type === 'NewExpression' &&
+				node.callee?.type === 'Identifier' &&
+				ERROR_CONSTRUCTORS.has(node.callee.name) &&
+				recordFor(node.callee) === null
+			);
+		}
+		function primitiveConstant(expression) {
+			const constant = constantValue(expression);
+			return constant !== null && (constant.value === null || typeof constant.value !== 'object');
+		}
+		function thrownExits(expression) {
+			return primitiveConstant(expression) || intrinsicErrorConstruction(unwrap(expression))
+				? THROW
+				: EXCEPTION;
+		}
+		function childValue(node) {
+			if (node?.type === 'JSXText' || node?.expression?.type === 'JSXEmptyExpression')
+				return PRIMITIVE;
+			return valueOf(node?.type === 'JSXExpressionContainer' ? node.expression : node);
+		}
+		function describeRenderOutput(node) {
+			let target = null;
+			let props = null;
+			let children = [];
+			let bindings = null;
+			if (node.type === 'JSXElement' && isComponentTag(node)) {
+				const opening = node.openingElement;
+				target = valueOf(opening.name.expression ?? opening.name);
+				props = jsxProps(opening, node.children);
+			} else if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
+				children = (node.children ?? []).map(childValue);
+			} else if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+				const tag = unwrap(node.arguments[0]);
+				target = tag?.type === 'Literal' && typeof tag.value === 'string' ? null : valueOf(tag);
+				props = valueOf(node.arguments[1]);
+				children = node.arguments.slice(2).map(valueOf);
+				if (children.length) {
+					const properties = new Map(props.kind === 'object' ? props.properties : []);
+					properties.set(
+						'children',
+						children.length === 1
+							? children[0]
+							: {
+									kind: 'array',
+									properties: new Map(children.map((child, index) => [String(index), child])),
+								},
+					);
+					props = { kind: 'object', properties };
+				} else if (props.kind === 'object' && props.properties.has('children'))
+					children = [props.properties.get('children')];
+			} else bindings = lexicalBindings(node);
+			return { kind: 'renderOutput', node, target, props, children, bindings };
+		}
+		function dispatchValue(value, state) {
+			if (!(state.exits & NORMAL)) return;
+			value = resolveTypeMember(value);
+			if (value.kind === 'nullable') value = value.value;
+			if (value === PRIMITIVE || value === NUMBER || value === NULLISH || value === HANDLE) return;
+			if (value.kind === 'renderChoice' || value.kind === 'typeUnion') {
+				let exits = 0;
+				for (const alternative of value.values) {
+					const branch = { exits: NORMAL };
+					dispatchValue(alternative, branch);
+					exits |= branch.exits;
+				}
+				complete(state, exits);
+				return;
+			}
+			if (value.kind === 'array' && value.properties) {
+				for (const child of value.properties.values()) dispatchValue(child, state);
+				return;
+			}
+			if (value.kind !== 'renderOutput') {
+				state.exits |= EXCEPTION;
+				return;
+			}
+			if (value.target) complete(state, visitComponentValue(value.target, [value.props]));
+			else if (value.bindings) {
+				const previous = [recordCache, functionCache, parameterValues, evaluatedValues];
+				recordCache = new Map();
+				functionCache = new WeakMap();
+				parameterValues = value.bindings;
+				evaluatedValues = new WeakMap();
+				visitRender(value.node, state, true);
+				[recordCache, functionCache, parameterValues, evaluatedValues] = previous;
+			} else for (const child of value.children) dispatchValue(child, state);
+		}
+		function visitOutput(node, state) {
+			if (!node) return;
+			visitRender(node, state);
+			dispatchValue(childValue(node), state);
+		}
+		function visitCodeBlock(node, state, dispatch) {
+			for (const statement of node.body ?? []) visitRender(statement, state);
+			if (dispatch) visitOutput(node.render, state);
+			else visitRender(node.render, state);
+		}
+		function visitArm(node, state) {
+			if (!node) return;
+			const previous = [dispatchReturns, returnedValues];
+			dispatchReturns = false;
+			returnedValues = null;
+			if (node.type === 'CatchClause') {
+				visitRender(node.param, state);
+				visitRender(node.resetParam, state);
+				node = node.body;
+			}
+			const statements = Array.isArray(node) ? node : node.body;
+			if (!Array.isArray(statements)) visitOutput(node, state);
+			else
+				for (let index = 0; index < statements.length; index++) {
+					if (index === statements.length - 1) visitOutput(statements[index], state);
+					else visitRender(statements[index], state);
+				}
+			if (state.exits & (RETURN | CONTINUE))
+				state.exits = (state.exits & ~(RETURN | CONTINUE)) | NORMAL;
+			[dispatchReturns, returnedValues] = previous;
+		}
 		function initializeInstance(node, state) {
 			for (const member of node.body?.body ?? [])
 				if (member.type === 'PropertyDefinition' && !member.static)
@@ -902,17 +1269,17 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				(member) => member.type === 'MethodDefinition' && member.kind === 'constructor',
 			);
 			if (node.superClass && constructor) {
-				complete(state, visitFunction(constructor.value, arguments_, { node, active }));
+				complete(state, visitFunction(constructor.value, arguments_, { node, active }).exits);
 				return;
 			}
 			if (node.superClass) {
 				const base = valueOf(node.superClass);
 				if (base.kind === 'class') instantiateClass(base.node, state, arguments_, active);
-				else state.exits |= THROW;
+				else state.exits |= EXCEPTION;
 			}
 			initializeInstance(node, state);
 			if (constructor && state.exits & NORMAL)
-				complete(state, visitFunction(constructor.value, arguments_));
+				complete(state, visitFunction(constructor.value, arguments_).exits);
 		}
 		function visitLoop(node, state) {
 			const doWhile = node.type === 'DoWhileStatement';
@@ -930,7 +1297,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				body.exits & BREAK ||
 				(test === null && !doWhile) ||
 				((test === null || !test.value) && body.exits & NORMAL);
-			complete(state, (body.exits & (RETURN | THROW | SUSPEND)) | (canExit ? NORMAL : 0));
+			complete(state, (body.exits & (RETURN | EXCEPTION | SUSPEND)) | (canExit ? NORMAL : 0));
 		}
 		function visitIterableLoop(node, state) {
 			visitRender(node.right, state);
@@ -938,8 +1305,9 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			if (node.await) return complete(state, SUSPEND);
 			const iterable = unwrap(node.right);
 			const forOf = node.type !== 'ForInStatement';
+			const visitBody = node.type === 'JSXForExpression' ? visitArm : visitRender;
 			if (forOf && iterable?.type === 'ArrayExpression' && !iterable.elements.length)
-				return visitRender(node.empty, state);
+				return visitBody(node.empty, state);
 			const previous = [recordCache, functionCache, parameterValues];
 			const value = valueOf(node.right);
 			recordCache = new Map();
@@ -953,21 +1321,26 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			const body = { exits: NORMAL };
 			visitRender(node.left, body);
 			visitRender(node.key, body);
-			visitRender(node.body, body);
+			visitBody(node.body, body);
 			[recordCache, functionCache, parameterValues] = previous;
 			const nonempty =
 				forOf && iterable?.type === 'ArrayExpression' && iterable.elements.length > 0;
 			const empty = { exits: nonempty ? 0 : NORMAL };
-			visitRender(node.empty, empty);
+			visitBody(node.empty, empty);
 			const canExit = body.exits & (NORMAL | BREAK | CONTINUE);
 			complete(
 				state,
-				(body.exits & (RETURN | THROW | SUSPEND)) | (canExit ? NORMAL : 0) | empty.exits,
+				(body.exits & (RETURN | EXCEPTION | SUSPEND)) | (canExit ? NORMAL : 0) | empty.exits,
 			);
 		}
 		function visitSwitch(node, state) {
 			visitRender(node.discriminant, state);
 			if (!(state.exits & NORMAL)) return;
+			const template = node.type === 'JSXSwitchExpression';
+			function visitCase(entry, result) {
+				if (template) visitArm(entry.consequent, result);
+				else for (const statement of entry.consequent) visitRender(statement, result);
+			}
 			const discriminant = constantValue(node.discriminant);
 			const values = node.cases.map((entry) => entry.test && constantValue(entry.test));
 			if (
@@ -988,9 +1361,10 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 					}
 				}
 				if (selected < 0) selected = fallback;
-				if (selected >= 0)
-					for (const entry of node.cases.slice(selected))
-						for (const statement of entry.consequent) visitRender(statement, state);
+				if (selected >= 0) {
+					if (template) visitCase(node.cases[selected], state);
+					else for (const entry of node.cases.slice(selected)) visitCase(entry, state);
+				}
 			} else {
 				const unmatched = { exits: NORMAL };
 				const matched = { exits: 0 };
@@ -998,8 +1372,14 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				for (const entry of node.cases) {
 					if (entry.test) visitRender(entry.test, unmatched);
 					else hasDefault = true;
-					matched.exits |= unmatched.exits & NORMAL;
-					for (const statement of entry.consequent) visitRender(statement, matched);
+					if (template) {
+						const branch = { exits: unmatched.exits & NORMAL };
+						visitCase(entry, branch);
+						matched.exits |= branch.exits;
+					} else {
+						matched.exits |= unmatched.exits & NORMAL;
+						visitCase(entry, matched);
+					}
 				}
 				complete(state, matched.exits | (hasDefault ? unmatched.exits & ~NORMAL : unmatched.exits));
 			}
@@ -1009,10 +1389,10 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			const block = { exits: NORMAL };
 			visitRender(node.block, block);
 			let exits = block.exits;
-			if (node.handler && exits & THROW) {
+			if (node.handler && exits & EXCEPTION) {
 				const caught = { exits: NORMAL };
 				visitRender(node.handler, caught);
-				exits = (exits & ~THROW) | caught.exits;
+				exits = (exits & ~EXCEPTION) | caught.exits;
 			}
 			if (node.finalizer && exits & ~SUSPEND) {
 				const finalized = { exits: NORMAL };
@@ -1024,7 +1404,26 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			}
 			complete(state, exits);
 		}
-		function visitRender(node, state) {
+		function visitTemplateTry(node, state) {
+			// Each arm is a separate render helper. Its return/continue ends the
+			// arm, not the surrounding component or either fallback.
+			function arm(node) {
+				const result = { exits: NORMAL };
+				visitArm(node, result);
+				return result.exits;
+			}
+			const primary = arm(node.block);
+			let exits = primary & ~EXCEPTION;
+			if (primary & THROW) exits |= node.handler ? arm(node.handler) : THROW;
+			if (primary & RENDER_SUSPEND)
+				exits |= node.pending
+					? arm(node.pending)
+					: options.mode === 'server'
+						? NORMAL
+						: RENDER_SUSPEND;
+			complete(state, exits);
+		}
+		function visitRender(node, state, dispatchTemplate = false) {
 			if (
 				!node ||
 				typeof node !== 'object' ||
@@ -1032,6 +1431,16 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				FUNCTION_TYPES.has(node.type)
 			)
 				return;
+			// Template values are inert until a render slot consumes them. JSX
+			// descriptor construction still evaluates its authored props/children.
+			if (
+				RENDER_NODES.has(node.type) &&
+				node.type !== 'JSXElement' &&
+				node.type !== 'JSXFragment'
+			) {
+				if (!dispatchTemplate) return;
+				if (node.type === 'JSXCodeBlock') return visitCodeBlock(node, state, true);
+			}
 			// Instance field initializers run when the class is instantiated, not
 			// when its declaration is evaluated. A computed field name still runs now.
 			if (node.type === 'PropertyDefinition' && !node.static) {
@@ -1043,15 +1452,26 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				node.type === 'ConditionalExpression' ||
 				node.type === 'JSXIfExpression'
 			) {
+				const visitBranch = node.type === 'JSXIfExpression' ? visitArm : visitRender;
 				visitRender(node.test, state);
 				if (!(state.exits & NORMAL)) return;
 				const branch = constantValue(node.test);
-				if (branch !== null) visitRender(branch.value ? node.consequent : node.alternate, state);
-				else {
+				if (branch !== null) {
+					const selected = branch.value ? node.consequent : node.alternate;
+					visitBranch(selected, state);
+					if (node.type === 'ConditionalExpression' && state.exits & NORMAL)
+						evaluatedValues.set(node, valueOf(selected));
+				} else {
 					const consequent = { exits: NORMAL };
 					const alternate = { exits: NORMAL };
-					visitRender(node.consequent, consequent);
-					visitRender(node.alternate, alternate);
+					visitBranch(node.consequent, consequent);
+					visitBranch(node.alternate, alternate);
+					if (node.type === 'ConditionalExpression') {
+						const values = [];
+						if (consequent.exits & NORMAL) values.push(valueOf(node.consequent));
+						if (alternate.exits & NORMAL) values.push(valueOf(node.alternate));
+						evaluatedValues.set(node, mergeValues(values));
+					}
 					complete(state, consequent.exits | alternate.exits);
 				}
 				return;
@@ -1065,14 +1485,20 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 					((node.operator === '&&' && !left.value) ||
 						(node.operator === '||' && left.value) ||
 						(node.operator === '??' && left.value != null))
-				)
+				) {
+					evaluatedValues.set(node, valueOf(node.left));
 					return;
+				}
 				const right = { exits: NORMAL };
 				visitRender(node.right, right);
+				const values = left === null ? [valueOf(node.left)] : [];
+				if (right.exits & NORMAL) values.push(valueOf(node.right));
+				evaluatedValues.set(node, mergeValues(values));
 				complete(state, right.exits | (left === null ? NORMAL : 0));
 				return;
 			}
 			if (node.type === 'TryStatement') return visitTry(node, state);
+			if (node.type === 'JSXTryExpression') return visitTemplateTry(node, state);
 			if (node.type === 'SwitchStatement' || node.type === 'JSXSwitchExpression')
 				return visitSwitch(node, state);
 			if (
@@ -1094,29 +1520,30 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				return visitLoop(node, state);
 			children(node, (child) => visitRender(child, state));
 			if (!(state.exits & NORMAL)) return;
+			if (node.type === 'JSXElement' || node.type === 'JSXFragment')
+				evaluatedValues.set(node, describeRenderOutput(node));
 			if (node.type === 'AwaitExpression') return complete(state, SUSPEND);
-			if (node.type === 'ReturnStatement') return complete(state, RETURN);
-			if (node.type === 'ThrowStatement') return complete(state, THROW);
+			if (node.type === 'ReturnStatement') {
+				const value = node.argument ? valueOf(node.argument) : NULLISH;
+				returnedValues?.push(value);
+				if (dispatchReturns && node.argument) dispatchValue(value, state);
+				if (state.exits & NORMAL) complete(state, RETURN);
+				return;
+			}
+			if (node.type === 'ThrowStatement') return complete(state, thrownExits(node.argument));
 			if (node.type === 'BreakStatement') return complete(state, BREAK);
 			if (node.type === 'ContinueStatement') return complete(state, CONTINUE);
 			if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
 				const property = literalProperty(node);
-				if (property?.kind === 'get') complete(state, visitFunction(property.value));
-				else if (!property) state.exits |= THROW;
+				if (property?.kind === 'get') complete(state, visitFunction(property.value).exits);
+				else if (!property) state.exits |= EXCEPTION;
 			}
 			if (node.type === 'NewExpression') {
 				const target = valueOf(node.callee);
 				if (target.kind === 'class')
 					instantiateClass(target.node, state, node.arguments.map(valueOf));
-				else state.exits |= THROW;
+				else state.exits |= intrinsicErrorConstruction(node) ? THROW : EXCEPTION;
 			}
-			if (
-				rendering &&
-				node.type === 'JSXOpeningElement' &&
-				node.name?.type === 'JSXIdentifier' &&
-				/^[A-Z]/.test(node.name.name)
-			)
-				visitComponent(node.name, [jsxProps(node)]);
 			if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
 			if (node.callee?.type === 'Super' && constructionContext) {
 				const base = valueOf(constructionContext.node.superClass);
@@ -1127,7 +1554,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 						node.arguments.map(valueOf),
 						constructionContext.active,
 					);
-				else state.exits |= THROW;
+				else state.exits |= EXCEPTION;
 				initializeInstance(constructionContext.node, state);
 				return;
 			}
@@ -1140,7 +1567,9 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			}
 			if (callee.read === true) reportRead(node);
 			else if (callee.kind === 'function') {
-				complete(state, visitFunction(callee.fn, node.arguments.map(valueOf)));
+				const result = visitFunction(callee.fn, node.arguments.map(valueOf));
+				evaluatedValues.set(node, result.value);
+				complete(state, result.exits);
 				return;
 			} else {
 				const indices = callee.kind === 'builtin' ? RENDER_CALLBACKS.get(callee.name) : null;
@@ -1156,12 +1585,13 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 					for (const index of indices ?? [0]) {
 						const callback = valueOf(node.arguments[index]);
 						if (callback.read === true) reportRead(node.arguments[index]);
-						exits |= callback.kind === 'function' ? visitFunction(callback.fn, arguments_) : NORMAL;
+						exits |=
+							callback.kind === 'function' ? visitFunction(callback.fn, arguments_).exits : NORMAL;
 					}
 					complete(state, exits);
 				}
 			}
-			state.exits |= THROW;
+			state.exits |= EXCEPTION;
 		}
 		for (const statement of ast.body) {
 			if (statement.type === 'ExportDefaultDeclaration') visitExport(statement.declaration);

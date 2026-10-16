@@ -41,6 +41,14 @@ describe('native signal import diagnostics', () => {
 export function Counter(props: { count$: SignalHandle<number> }) @{
   <output>{String(${read})}</output>
 }`;
+	const throwingChild = `function ThrowingChild() { throw new Error('render failed'); }`;
+	const signalValue = `${typeImport}
+function SignalValue(props) @{ <output>{String(props.count$.get())}</output> }`;
+	const signalDescriptor = `${signalValue}
+function descriptor(count$: SignalHandle<number>) { return <SignalValue count$={count$} />; }`;
+	const recursiveUnion = (alternateSignal: string) => `${typeImport}
+type Branch = { signal: SignalHandle<number>; next: Branch; left: string } | { signal: ${alternateSignal}; next: Branch; right: number };
+export function Counter(props: { node: Branch }) @{ <output>{String(props.node.next.signal.get())}</output> }`;
 
 	it.each([{ dev: true }, { dev: false, hmr: false }, { mode: 'server' }] as const)(
 		'requires a runtime signals import for a proven render read in %j',
@@ -57,6 +65,24 @@ export function Counter(props: { count$: SignalHandle<number> }) @{
 					dev: true,
 				}),
 			).toThrow(SIGNAL_IMPORT);
+		},
+	);
+
+	it.each(['@catch (_error)', '@pending'])(
+		'accepts a read in an unreachable %s arm',
+		(fallback) => {
+			const input = `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { <span /> } ${fallback} { <output>{String(${read})}</output> } }`;
+			expect(() => compile(input, FILENAME, { dev: true })).not.toThrow();
+		},
+	);
+
+	it.each(['@catch (_error)', '@pending'])(
+		'diagnoses a later render read when an unreachable %s arm throws',
+		(fallback) => {
+			const input = `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <section>@try { <span /> } ${fallback} { throw 0; <span /> } <output>{String(${read})}</output></section> }`;
+			expect(() => compile(input, FILENAME, { dev: true })).toThrow(SIGNAL_IMPORT);
 		},
 	);
 
@@ -222,6 +248,35 @@ interface Props extends BaseProps {}
 export function Counter(props: Props) @{ <output>{String(props.count$.get())}</output> }`,
 		},
 		{
+			label: 'a signal reached through a recursive type alias',
+			source: `${typeImport}
+type Branch = { next: Branch; count$: SignalHandle<number> };
+export function Counter(props: { branch: Branch }) @{ <output>{String(props.branch.next.next.count$.get())}</output> }`,
+		},
+		{
+			label: 'a signal reached through a recursive interface',
+			source: `${typeImport}
+interface Branch { next: Branch; count$: SignalHandle<number> }
+export function Counter(props: { branch: Branch }) @{ <output>{String(props.branch.next.count$.get())}</output> }`,
+		},
+		{
+			label: 'a signal reached through mutually recursive aliases',
+			source: `${typeImport}
+type Branch = { next: Leaf };
+type Leaf = { parent: Branch; count$: SignalHandle<number> };
+export function Counter(props: { branch: Branch }) @{ <output>{String(props.branch.next.parent.next.count$.get())}</output> }`,
+		},
+		{
+			label: 'a signal shared by recursive union branches',
+			source: recursiveUnion('SignalHandle<number>'),
+		},
+		{
+			label: 'a signal shared by otherwise distinct union branches',
+			source: `${typeImport}
+type Entry = { signal: SignalHandle<number>; left: string } | { signal: SignalHandle<number>; right: number };
+export function Counter(props: { entry: Entry }) @{ <output>{String(props.entry.signal.get())}</output> }`,
+		},
+		{
 			label: 'a signal handle type assertion',
 			source: `${typeImport}
 export function Counter(props: { count: unknown }) @{ <output>{String((props.count as SignalHandle<number>).get())}</output> }`,
@@ -246,6 +301,86 @@ export function Counter(props: { count$: SignalHandle<number>; defer: boolean })
 			label: 'a catch reached by an explicit throw',
 			source: `${typeImport}
 export function Counter(props: { count$: SignalHandle<number> }) @{ let value = 0; try { throw 0; } catch { value = props.count$.get(); } <output>{String(value)}</output> }`,
+		},
+		{
+			label: 'a template catch reached by an explicit throw',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { throw 0; <span /> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a template pending arm reached by a suspended read',
+			source: `import { use } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number>; promise: Promise<string> }) @{ @try { <span>{use(props.promise) as string}</span> } @pending { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a template catch around an opaque child component',
+			source: `import Child from './child';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { <Child /> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a template catch around a rendered local descriptor',
+			source: `${typeImport}
+${throwingChild}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { const child = <ThrowingChild />; <div>{child}</div> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a template catch around a forwarded descriptor',
+			source: `import type { OctaneNode } from 'octane';
+${typeImport}
+${throwingChild}
+function Forward({ child }: { child: OctaneNode }) @{ <div>{child}</div> }
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { <Forward child={<ThrowingChild />} /> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a helper-returned descriptor assigned and rendered',
+			source: `${signalDescriptor}
+export function Counter(props: { count$: SignalHandle<number> }) @{ const child = descriptor(props.count$); <div>{child}</div> }`,
+		},
+		{
+			label: 'a union-typed signal descriptor rendered in a hole',
+			source: `import type { OctaneNode } from 'octane';
+${signalValue}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const child: OctaneNode | string = <SignalValue count$={count$} />; <div>{child}</div> }`,
+		},
+		{
+			label: 'a helper-returned descriptor returned directly by a component',
+			source: `${signalDescriptor}
+function Forward(props: { count$: SignalHandle<number> }) { return descriptor(props.count$); }
+export function Counter(props: { count$: SignalHandle<number> }) @{ <Forward count$={props.count$} /> }`,
+		},
+		{
+			label: 'a conditional descriptor returned directly by a component',
+			source: `${signalValue}
+export function Counter(props: { count$: SignalHandle<number>; show: boolean }) { return props.show ? <SignalValue count$={props.count$} /> : <span />; }`,
+		},
+		{
+			label: 'a logical descriptor rendered in a child hole',
+			source: `${signalValue}
+export function Counter(props: { count$: SignalHandle<number>; show: boolean }) @{ <div>{props.show && <SignalValue count$={props.count$} />}</div> }`,
+		},
+		{
+			label: 'a conditional descriptor returned from a local helper',
+			source: `${signalValue}
+function choose(count$: SignalHandle<number>, show: boolean) { return show ? <SignalValue count$={count$} /> : <span />; }
+export function Counter(props: { count$: SignalHandle<number>; show: boolean }) @{ <div>{choose(props.count$, props.show)}</div> }`,
+		},
+		{
+			label: 'a template pending arm around a renderable child',
+			source: `import type { OctaneNode } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number>; child: OctaneNode }) @{ @try { <span>{props.child}</span> } @pending { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a render read after a nested template arm returns',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <section>@try { <div>@if (true) { return; <span /> }</div> } @catch (_error) { <span /> } <output>{String(props.count$.get())}</output></section> }`,
+		},
+		{
+			label: 'a render read after a template loop row continues',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ <section>@try { <ul>@for (const item of [1]; key item) { continue; <li /> }</ul> } @catch (_error) { <span /> } <output>{String(props.count$.get())}</output></section> }`,
 		},
 		{
 			label: 'a read after an explicit throw was caught',
@@ -463,6 +598,75 @@ export function Counter(props: { count$: SignalHandle<number> }) { return <outpu
 export function Counter(props: { count$: SignalHandle<number> }) @{ try {} catch { props.count$.get(); } <output /> }`,
 		},
 		{
+			label: 'a pending arm after an ordinary Error is caught',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { throw new Error('failed'); <span /> } @pending { <output>{String(props.count$.get())}</output> } @catch (_error) { <span /> } }`,
+		},
+		{
+			label: 'a pending arm around a typed text child',
+			source: `${typeImport}
+export function Counter({ count$, label }: { count$: SignalHandle<number>; label: string }) @{ @try { <span>{label as string}</span> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
+			label: 'a catch around an ignored JSX prop',
+			source: `${typeImport}
+${throwingChild}
+function Ignore(_props: { child: unknown }) @{ <span /> }
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { <Ignore child={<ThrowingChild />} /> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a catch around ignored component children',
+			source: `${typeImport}
+${throwingChild}
+function Ignore(_props: { children: unknown }) @{ <span /> }
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { <Ignore><ThrowingChild /></Ignore> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a catch around an unused local descriptor',
+			source: `${typeImport}
+${throwingChild}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { const unused = <ThrowingChild />; <span /> } @catch (_error) { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a pending arm around an inert local host descriptor',
+			source: `${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { const child = <span />; <div>{child}</div> } @pending { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a pending arm around an inert number-typed child',
+			source: `${typeImport}
+export function Counter({ count$, value }: { count$: SignalHandle<number>; value: number }) @{ @try { <div>{value}</div> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
+			label: 'a pending arm around an inert typed local descriptor',
+			source: `import type { OctaneNode } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number> }) @{ @try { const child: OctaneNode = <span />; <div>{child}</div> } @pending { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
+			label: 'a union-typed inert descriptor in a template boundary',
+			source: `import type { OctaneNode } from 'octane';
+${typeImport}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const child: OctaneNode | string = <span />; @try { <div>{child}</div> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
+			label: 'an inert createElement host in a template boundary',
+			source: `import { createElement } from 'octane';
+${typeImport}
+export function Counter({ count$ }: { count$: SignalHandle<number> }) @{ const props: { children: string } = { children: 'safe' }; const child = createElement('span', props); @try { <div>{child}</div> } @pending { <output>{String(count$.get())}</output> } }`,
+		},
+		{
+			label: 'a statically dead conditional descriptor alternative',
+			source: `${signalValue}
+export function Counter(props: { count$: SignalHandle<number> }) { return false ? <SignalValue count$={props.count$} /> : <span />; }`,
+		},
+		{
+			label: 'a pending arm after JavaScript catch intercepts suspension',
+			source: `import { use } from 'octane';
+${typeImport}
+export function Counter(props: { count$: SignalHandle<number>; promise: Promise<string> }) @{ @try { try { use(props.promise); } catch {} <span /> } @pending { <output>{String(props.count$.get())}</output> } }`,
+		},
+		{
 			label: 'a catch after reading an own literal data property',
 			source: `${typeImport}
 export function Counter(props: { count$: SignalHandle<number> }) @{ try { ({ value: 1 }).value; } catch { props.count$.get(); } <output /> }`,
@@ -477,6 +681,16 @@ export function Counter(props: { count$: SignalHandle<number> }) @{ try { ({ val
 export function Counter(props: { value$: SignalHandle<number> | { get(): number } }) @{
   <output>{String(props.value$.get())}</output>
 }`,
+		},
+		{
+			label: 'an ordinary getter reached through a recursive type',
+			source: `${typeImport}
+type Branch = { next: Branch; count$: SignalHandle<number>; cache: { get(): number } };
+export function Counter(props: { branch: Branch }) @{ <output>{String(props.branch.next.cache.get())}</output> }`,
+		},
+		{
+			label: 'an ambiguous getter in a recursive union',
+			source: recursiveUnion('{ get(): number }'),
 		},
 		{
 			label: 'a similarly named type from another module',
