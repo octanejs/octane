@@ -6257,6 +6257,8 @@ interface VTSession {
 	owner: VTOwner;
 	handle: VTHandle;
 	interrupt: (() => void) | undefined;
+	/** The update callback committed its DOM; only the animation is still running. */
+	committed: boolean;
 }
 
 interface VtMeasurement {
@@ -7243,7 +7245,7 @@ function vtBeginCapture(interrupt: () => void, stagedCommit: StagedCommitCapture
 }
 
 function vtRegisterHandle(owner: VTOwner, handle: VTHandle, interrupt?: () => void): VTSession {
-	const session: VTSession = { owner, handle, interrupt };
+	const session: VTSession = { owner, handle, interrupt, committed: false };
 	VT_SESSIONS.set(owner, session);
 	const doc = vtOwnerDocument(owner);
 	if (owner.nodeType === 9) doc.__octaneViewTransition = handle;
@@ -7376,6 +7378,21 @@ function vtInterruptOwners(owners: Set<VTOwner> | null): void {
 	for (const handle of handles) handle.skipTransition();
 }
 
+/**
+ * React's rule (`flushPendingEffects`): urgent work skips only a transition still preparing. Once
+ * an Octane update callback committed, the urgent commit changes the live DOM under the running
+ * animation. An external handle has no receipt, so it still counts as preparing.
+ */
+function vtInterruptPreparing(owners: Set<VTOwner> | null): void {
+	VT_CAPTURE?.interrupt();
+	const committed = new Set<VTHandle>();
+	for (const session of VT_SESSIONS.values()) if (session.committed) committed.add(session.handle);
+	const handles = vtActiveHandles(owners);
+	for (const session of VT_SESSIONS.values())
+		if (handles.has(session.handle) && !session.committed) session.interrupt?.();
+	for (const handle of handles) if (!committed.has(handle)) handle.skipTransition();
+}
+
 function vtInterruptOwner(owner: VTOwner): void {
 	vtInterruptOwners(new Set([owner]));
 }
@@ -7504,7 +7521,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			const handles = vtActiveHandles(owners);
 			if (handles.size > 0) {
 				if (queueAllTransition()) return vtWaitForHandles(handles, owners);
-				vtInterruptOwners(owners);
+				vtInterruptPreparing(owners);
 				return false;
 			}
 			if (!vtWouldWrap()) return false;
@@ -7529,7 +7546,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		clearTypes() {
 			VT_PENDING_TYPES = [];
 		},
-		interrupt: vtInterrupt,
+		interrupt: () => vtInterruptPreparing(null),
 		refreshPendingOwner(owner) {
 			const receipt = VT_CAPTURE?.stagedCommit.owners.get(owner);
 			if (receipt !== undefined && receipt.current === owner.current)
@@ -9990,6 +10007,7 @@ function vtFlush(
 			if (!interrupted)
 				for (const group of participants) {
 					if (!group.interrupted && !group.settled) vtFinalizeGroup(group, types);
+					if (group.session !== null) group.session.committed = true;
 				}
 			if (drainError !== null) throw drainError.error;
 		};
