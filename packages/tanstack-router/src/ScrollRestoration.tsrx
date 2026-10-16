@@ -5,7 +5,7 @@
 // Matches); use one or the other.
 import { useLayoutEffect } from 'octane';
 import { setupScrollRestoration } from '@tanstack/router-core';
-import { useRouter } from './context.ts';
+import { useRouter } from './context';
 
 export function ScrollRestoration() @{
 	const router = useRouter();

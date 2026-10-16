@@ -80,36 +80,36 @@ export function isIndependentHydrateManifest(value: unknown): value is Independe
 	]);
 	if (!Object.keys(value).every((name) => allowed.has(name))) return false;
 	if (
-		value.version !== 1 ||
-		!key(value.buildId) ||
-		!key(value.boundaryId) ||
-		!key(value.moduleId) ||
-		!key(value.exportName) ||
-		!Number.isSafeInteger(value.hookSeed) ||
-		(value.hookSeed as number) < 0 ||
-		!Number.isSafeInteger(value.idSeed) ||
-		(value.idSeed as number) < 0 ||
-		value.parentDependencies !== false ||
-		!uniqueKeys(value.signalSites) ||
-		!uniqueKeys(value.styles) ||
-		!Array.isArray(value.captureSchema)
+		value['version'] !== 1 ||
+		!key(value['buildId']) ||
+		!key(value['boundaryId']) ||
+		!key(value['moduleId']) ||
+		!key(value['exportName']) ||
+		!Number.isSafeInteger(value['hookSeed']) ||
+		(value['hookSeed'] as number) < 0 ||
+		!Number.isSafeInteger(value['idSeed']) ||
+		(value['idSeed'] as number) < 0 ||
+		value['parentDependencies'] !== false ||
+		!uniqueKeys(value['signalSites']) ||
+		!uniqueKeys(value['styles']) ||
+		!Array.isArray(value['captureSchema'])
 	) {
 		return false;
 	}
 	const names = new Set<string>();
-	for (const capture of value.captureSchema) {
+	for (const capture of value['captureSchema']) {
 		if (
 			!plainRecord(capture) ||
 			Object.keys(capture).length !== 2 ||
-			!key(capture.name) ||
-			capture.type !== 'json' ||
-			names.has(capture.name)
+			!key(capture['name']) ||
+			capture['type'] !== 'json' ||
+			names.has(capture['name'])
 		) {
 			return false;
 		}
-		names.add(capture.name);
+		names.add(capture['name']);
 	}
-	return captures(value.captures, value.captureSchema.length);
+	return captures(value['captures'], value['captureSchema'].length);
 }
 
 export function createIndependentHydrateManifest(

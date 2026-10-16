@@ -207,15 +207,15 @@ export interface DirectSignalBinding {
 	readonly policy: DirectSignalBindingPolicy;
 	readonly target: Node;
 	readonly site: string;
-	readonly name?: string;
-	readonly attributeKind?: DirectSignalAttributeKind;
+	readonly name?: string | undefined;
+	readonly attributeKind?: DirectSignalAttributeKind | undefined;
 	readonly handle: SignalHandle<unknown> | null;
-	text?: Text;
+	text?: Text | undefined;
 	value: unknown;
-	unsubscribe?: () => void;
-	input?: EventListener;
-	controlWriterCleanup?: () => void;
-	pendingControl?: boolean;
+	unsubscribe?: (() => void) | undefined;
+	input?: EventListener | undefined;
+	controlWriterCleanup?: (() => void) | undefined;
+	pendingControl?: boolean | undefined;
 	disposed: boolean;
 }
 
@@ -908,8 +908,8 @@ interface SignalHostPropSourcesBinding {
 	resolved: Record<string, unknown> | undefined;
 	subscriptions: Map<SignalHandle<unknown>, () => void>;
 	controlWriters: Map<'value' | 'checked', () => void>;
-	input?: EventListener;
-	pendingControl?: boolean;
+	input?: EventListener | undefined;
+	pendingControl?: boolean | undefined;
 	disposed: boolean;
 }
 
@@ -1403,7 +1403,7 @@ export function bindSignalHostPropSources(
 	syncSignalHostControl(binding);
 	if (!binding.pendingControl && controlSnapshot !== null)
 		consumeHydrationControl(element, controlSnapshot.revision);
-	if (binding.pendingControl) queueSignalHostControlAdoption(binding, binding.resolved?.value);
+	if (binding.pendingControl) queueSignalHostControlAdoption(binding, binding.resolved?.['value']);
 	return binding;
 }
 

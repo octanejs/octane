@@ -20,9 +20,9 @@
 import { createElement, Suspense } from 'octane';
 import { isNotFound, rootRouteId } from '@tanstack/router-core';
 import type { NotFoundError, RootRouteOptions } from '@tanstack/router-core';
-import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
-import { useStore } from './useStore.ts';
-import { useRouter, matchContext as MatchContext } from './context.ts';
+import type { ErrorInfo, ErrorRouteComponent } from './route';
+import { useStore } from './useStore';
+import { useRouter, matchContext as MatchContext } from './context';
 import { Outlet } from './Outlet.tsrx';
 import { RouteNotFound } from './RouteNotFound.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';

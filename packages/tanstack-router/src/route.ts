@@ -637,7 +637,8 @@ export class RouteApi<TId, TRouter extends AnyRouter = RegisteredRouter> extends
 		}) as unknown as typeof this.Link;
 	}
 
-	notFound = (opts?: NotFoundError) => notFound({ routeId: this.id, ...opts } as NotFoundError);
+	override notFound = (opts?: NotFoundError) =>
+		notFound({ routeId: this.id, ...opts } as NotFoundError);
 }
 
 export function getRouteApi<const TId, TRouter extends AnyRouter = RegisteredRouter>(

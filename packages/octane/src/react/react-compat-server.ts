@@ -65,7 +65,7 @@ function bufferReactIsland(
 		try {
 			const stream = await renderToReadableStream(tree, {
 				identifierPrefix,
-				nonce: owner.nonce,
+				...(owner.nonce === undefined ? undefined : { nonce: owner.nonce }),
 				signal: controller.signal,
 				onError(reason) {
 					// React's server error boundaries cannot catch render failures.

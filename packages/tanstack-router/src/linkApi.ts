@@ -1,13 +1,11 @@
 import { createElement } from 'octane';
 import type { ComponentBody } from 'octane';
 import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
-import { useRouter } from './context';
 import { Link } from './Link.tsrx';
-import { createUseLinkProps } from './linkBinding';
 import type { LinkComponent } from './linkTypes';
 import type { ValidateLinkOptions, ValidateLinkOptionsArray } from './typePrimitives';
 
-export const useLinkProps = createUseLinkProps(useRouter);
+export { useLinkProps } from './Link.tsrx';
 
 // Wrap a design-system component so it navigates like <Link> — the component
 // receives the fully-built link props (href, handlers, data-status, …).

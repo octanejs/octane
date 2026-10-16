@@ -53,7 +53,7 @@ export interface EarlyFormSubmissionRecord {
 export interface EarlyFormSubmissionMailbox {
 	readonly version: 1;
 	readonly q: EarlyFormSubmissionRecord[];
-	receive?: (record: EarlyFormSubmissionRecord) => boolean;
+	receive?: ((record: EarlyFormSubmissionRecord) => boolean) | undefined;
 	activate?: (record: EarlyFormSubmissionRecord) => void;
 	overflow?: boolean;
 	captures(form: HTMLFormElement): boolean;

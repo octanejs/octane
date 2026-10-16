@@ -312,7 +312,7 @@ interface SuspenseRetryBatch {
 	queued: boolean;
 	flushing: boolean;
 	/** Cold observers recheck readiness after a commit or a superseding render. */
-	afterCommit?: Array<() => void>;
+	afterCommit?: Array<() => void> | undefined;
 }
 const SUSPENSE_RETRIES = new Map<Block, SuspenseRetryBatch>();
 let flushingSuspenseRetries = false;
@@ -1716,7 +1716,7 @@ export function waitForStreamedArm(
 	initial: InitialSuspenseHydration,
 ): InitialSuspenseHydration | null {
 	const sentinel = initial.waits!;
-	const open = state.start as Comment & { [STREAM_RETRY_PROP]?: () => void };
+	const open = state.start as Comment & { [STREAM_RETRY_PROP]?: (() => void) | undefined };
 	if (sentinel.parentNode === null || sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
 		open[STREAM_RETRY_PROP] = undefined;
 	else {

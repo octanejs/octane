@@ -255,9 +255,10 @@ export interface RootIdState {
 	prefix: string;
 	next: number;
 	/** Shared deterministic namespace for lazily used module-signal instances. */
-	signalState?: { prefix: string; next: number; opaqueKeys?: Map<string, OpaqueSignalKeys> };
+	signalState?:
+		{ prefix: string; next: number; opaqueKeys?: Map<string, OpaqueSignalKeys> } | undefined;
 	/** Shared render ownership; descendants already carry this root-local record. */
-	renderOwner?: RootRenderOwner;
+	renderOwner?: RootRenderOwner | undefined;
 	/** Exclusive end of an SSR-reserved deferred-boundary range. */
 	limit?: number;
 	/** Root allocator used if a hydration mismatch consumes beyond that range. */
@@ -532,15 +533,15 @@ export interface TransitionActionBatch {
 	 * Signal nodes pending in this batch (signals/pending.ts), promoted once it
 	 * and every batch entangled into it finish; null once they have been.
 	 */
-	signals?: PendingSlotLike[] | null;
+	signals?: PendingSlotLike[] | null | undefined;
 }
 
 export interface RootRenderOwner {
 	current: Block | null;
 	/** Shared document/account data owner; distinct from this root's presentation owner. */
-	signalOwner?: SignalOwner;
+	signalOwner?: SignalOwner | undefined;
 	/** Immutable initial-response history, borrowed by deferred and streamed adoptions. */
-	initialDocumentSignals?: ScopeSeed;
+	initialDocumentSignals?: ScopeSeed | undefined;
 	bindingLeases?: Set<BindingHandoff>;
 	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
@@ -550,9 +551,9 @@ export interface RootRenderOwner {
 	 * clear the container, for the frontier it renders in, so the server DOM
 	 * stays until it commits, and with `failed` when it ends in an uncaught error.
 	 */
-	hydrationFallback?: (failed: boolean) => SlotNext | null;
+	hydrationFallback?: ((failed: boolean) => SlotNext | null) | undefined;
 	bindingContainer?: Node;
-	adopt?: (block: Block) => void;
+	adopt?: ((block: Block) => void) | undefined;
 	retry: () => void;
 	request: ((mode: 'urgent' | 'transition') => void) | null;
 	generation: number;
@@ -560,7 +561,7 @@ export interface RootRenderOwner {
 	/** Lazily allocated only by adapters carrying metadata across fresh retry scopes. */
 	retryKey: object | null;
 	/** Actual first-mount signal state retained only for the current retry episode. */
-	retrySignalOwners?: SignalRetryOwners;
+	retrySignalOwners?: SignalRetryOwners | undefined;
 	/** Only native suspended readers allocate a retry lease outside their discarded Scopes. */
 	nativeRetry?: NativeReadRetry;
 	transaction: RootRenderTransaction | null;
@@ -819,7 +820,7 @@ export interface HydrateSlot {
 	serverPreserved: boolean;
 	seedRaw: string | null;
 	/** Ready native values are scoped to this independently activated island. */
-	nativeSeedRaw?: string;
+	nativeSeedRaw?: string | undefined;
 	idState: RootIdState;
 	/** One-shot result of the client-only function form of `when`. */
 	dynamicStrategy: HydrationStrategy | null;
@@ -857,7 +858,7 @@ export type HostPropSource = readonly [
 	isSpread: boolean,
 	sourceOrName: unknown,
 	value?: unknown,
-	merge?: boolean,
+	merge?: boolean | undefined,
 ];
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
@@ -971,7 +972,7 @@ export interface ChildSlot {
 
 export interface TrySlot {
 	/** Only an initial hydrated primary discarded by suspension needs transfer. */
-	retrySignalOwners?: SignalRetryOwners;
+	retrySignalOwners?: SignalRetryOwners | undefined;
 	__kind: 'trySlotSlot';
 	__flags: typeof SLOT_FLAG_TEARDOWN;
 	__teardown: typeof teardownTrySlot;

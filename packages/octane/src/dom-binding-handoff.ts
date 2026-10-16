@@ -9,7 +9,7 @@ export interface BindingHandoffRange {
 	readonly end: Node;
 	readonly arm?: number;
 	readonly view?: string;
-	readonly slot?: string;
+	readonly slot?: string | undefined;
 }
 
 /** A closed caller shape proven for this actual child range, never for its module globally. */
@@ -44,7 +44,7 @@ export interface BindingHandoff {
 	afterPublication?(callback: () => void): () => void;
 	active(): boolean;
 	retire(publish?: () => void): void;
-	owner?: object;
+	owner?: object | undefined;
 }
 
 export interface BindingHandoffCapability {

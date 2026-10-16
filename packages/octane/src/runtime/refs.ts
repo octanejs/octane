@@ -390,7 +390,7 @@ export class FragmentInstance {
 		type: string;
 		listener: EventListenerOrEventListenerObject;
 		/** Snapshot taken at registration, as EventTarget does; `capture` is a boolean. */
-		options: AddEventListenerOptions;
+		options: FragmentListenerOptions;
 		/** Drops this entry when `options.signal` aborts; detached on removal and teardown. */
 		abort: () => void;
 	}> | null;
@@ -476,7 +476,11 @@ export class FragmentInstance {
 	_attachChild(child: Element | Text): void {
 		if (this._listeners !== null) {
 			for (const entry of this._listeners) {
-				child.addEventListener(entry.type, entry.listener, entry.options);
+				child.addEventListener(
+					entry.type,
+					entry.listener,
+					entry.options as AddEventListenerOptions,
+				);
 			}
 		}
 		if (child.nodeType === 1 && this._observers !== null) {
@@ -582,7 +586,7 @@ export class FragmentInstance {
 		if (this._destroyed) return;
 		// A boolean or omitted argument has no members, so these reads are undefined.
 		const given = options as AddEventListenerOptions | undefined;
-		const snapshot: AddEventListenerOptions = {
+		const snapshot: FragmentListenerOptions = {
 			capture: listenerCapturePhase(options),
 			signal: given?.signal,
 			once: given?.once,
@@ -614,7 +618,7 @@ export class FragmentInstance {
 		listeners.push(entry);
 		snapshot.signal?.addEventListener('abort', entry.abort, { once: true });
 		for (const child of fragmentDirectNodes(this)) {
-			child.addEventListener(type, listener, snapshot);
+			child.addEventListener(type, listener, snapshot as AddEventListenerOptions);
 		}
 	}
 
@@ -830,7 +834,11 @@ export class FragmentInstance {
 		const target = (parent.ownerDocument || document).createTextNode('');
 		if (listeners !== null) {
 			for (const entry of listeners) {
-				target.addEventListener(entry.type, entry.listener, entry.options);
+				target.addEventListener(
+					entry.type,
+					entry.listener,
+					entry.options as AddEventListenerOptions,
+				);
 			}
 		}
 		parent.appendChild(target);
@@ -890,6 +898,15 @@ export class FragmentInstance {
 		}
 	}
 }
+
+// Internal records keep one shape. Web IDL treats undefined dictionary members
+// as absent; narrow only at the native listener boundary, without forcing defaults.
+type FragmentListenerOptions = {
+	capture: boolean;
+	signal: AbortSignal | undefined;
+	once: boolean | undefined;
+	passive: boolean | undefined;
+};
 
 /**
  * EventTarget.removeEventListener compares on (type, listener, capture-flag).

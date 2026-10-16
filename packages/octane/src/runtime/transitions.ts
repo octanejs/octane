@@ -44,6 +44,7 @@ import {
 	TRANSITION_TASK_ACTIVE,
 	queuePendingSignalPromotion,
 	ACTIVE_TRANSITION_ACTION_BATCH,
+	RENDERER_DISCRETE_EVENT_DEPTH,
 	IN_FLIGHT_TRANSITION_ACTION_BATCH,
 	flushTransitionActionBatch,
 	TRANSITION_HOLDERS,
@@ -249,7 +250,14 @@ export function transitionActionBatchForUpdate(block?: Block): TransitionActionB
 	// (including continuous events), flushSync and commit callbacks opt out of
 	// that fallback. This only selects the batch: continuous events still flush
 	// in a microtask, and an explicit transition inside a handler wins above.
-	if (syncFlush || _dispatchDepth > 0 || inCommitCallback()) return null;
+	if (
+		IN_FLIGHT_TRANSITION_ACTION_BATCH === null ||
+		syncFlush ||
+		_dispatchDepth > 0 ||
+		RENDERER_DISCRETE_EVENT_DEPTH > 0 ||
+		inCommitCallback()
+	)
+		return null;
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
 }
 
@@ -908,7 +916,7 @@ export interface TransitionHookSlot {
 	tentative: boolean;
 	/** Profile-build-only hook source; the assignment is erased in normal bundles. */
 	profileSlot?: HookSlot;
-	error?: { value: unknown };
+	error?: { value: unknown } | undefined;
 	start: (fn: () => void | Promise<unknown>) => void;
 	publish: (pending: boolean) => void;
 }

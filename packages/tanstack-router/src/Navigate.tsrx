@@ -1,7 +1,7 @@
 // Imperative navigation as a component: navigates once on mount, renders nothing.
 import { useLayoutEffect, useRef } from 'octane';
 import type { NavigateOptions } from '@tanstack/router-core';
-import { useNavigate } from './hooks.ts';
+import { useNavigate } from './hooks';
 
 export function Navigate(props: NavigateOptions) @{
 	const navigate = useNavigate();

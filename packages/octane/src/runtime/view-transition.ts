@@ -659,7 +659,7 @@ function vtClassByType(
 		if (match === 'none') return 'none';
 		result = result === undefined ? match : result + ' ' + match;
 	}
-	return result ?? value.default;
+	return result ?? value['default'];
 }
 
 function vtResolveClass(
@@ -1091,19 +1091,19 @@ export function vtPruneStaticDimensions(effect: KeyframeEffect, owner: Document)
 	if (typeof effect.getKeyframes !== 'function') return;
 	const frames = effect.getKeyframes();
 	if (frames.length < 2) return;
-	const width = frames[0].width;
-	const height = frames[0].height;
+	const width = frames[0]['width'];
+	const height = frames[0]['height'];
 	if (
 		width === undefined ||
 		height === undefined ||
-		!frames.every((frame) => frame.width === width && frame.height === height)
+		!frames.every((frame) => frame['width'] === width && frame['height'] === height)
 	)
 		return;
 	const simplified = frames.map((frame) => {
 		const copy = { ...frame };
-		delete copy.width;
-		delete copy.height;
-		if (copy.transform === 'none') delete copy.transform;
+		delete copy['width'];
+		delete copy['height'];
+		if (copy['transform'] === 'none') delete copy['transform'];
 		return copy;
 	});
 	effect.setKeyframes(simplified);

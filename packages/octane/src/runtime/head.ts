@@ -58,7 +58,7 @@ interface HeadSlot {
 	/** Direct listeners keyed by prop name so capture and bubble phases stay independent. */
 	handlers?: Map<string, EventListener>;
 	/** Authored attribute keys only; never retain the props' values past a render. */
-	attrNames?: string[];
+	attrNames?: string[] | undefined;
 	/** A root render's attributes and text for this committed element, until its commit. */
 	next: { tx: RootRenderTransaction; attrs: Record<string, any> | null; text: unknown } | null;
 }
@@ -388,7 +388,7 @@ export function namespaceHeadElement(
 	// A key from an explicit attribute wins; otherwise preserve a key copied by
 	// an already-evaluated spread. The raw attrs object is built once by generated
 	// code, so getters/spreads never run twice merely to discover the key.
-	const key = authoredKey !== undefined ? authoredKey : attrs?.key;
+	const key = authoredKey !== undefined ? authoredKey : attrs?.['key'];
 	const config: any = { headKey, tag, attrs, text };
 	if (key !== undefined) config.key = key;
 	return createElement(namespaceHead, config);
@@ -586,10 +586,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	if (as === 'script' && resourceState().scripts.has(rawHref)) return;
 	// Image preloads with a srcset are keyed by the srcset+sizes pair, not the
 	// fallback href — two responsive preloads for one href stay distinct.
-	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
+	const imageSrcSet = as === 'image' ? options['imageSrcSet'] : undefined;
 	const key =
 		typeof imageSrcSet === 'string' && imageSrcSet !== ''
-			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
+			? 'preload:image:' + imageSrcSet + '::' + String(options['imageSizes'] ?? '')
 			: 'preload:' + as + ':' + rawHref;
 	const safeHref = sanitizeURL(rawHref);
 	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
@@ -693,7 +693,7 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
-	else if ('as' in options && typeof options.as !== 'string') {
+	else if ('as' in options && typeof options['as'] !== 'string') {
 		options = { ...options, as: undefined };
 	}
 	// A module that preinitModule or a Float script already executes needs no preload.
@@ -920,11 +920,11 @@ function preloadStylesheetResource(href: string, attrs: Record<string, unknown>)
 		l.href = safeHref;
 		l.setAttribute('as', 'style');
 		applyResourceAttrs(l, {
-			crossOrigin: attrs.crossOrigin,
-			integrity: attrs.integrity,
-			media: attrs.media,
-			hrefLang: attrs.hrefLang,
-			referrerPolicy: attrs.referrerPolicy,
+			crossOrigin: attrs['crossOrigin'],
+			integrity: attrs['integrity'],
+			media: attrs['media'],
+			hrefLang: attrs['hrefLang'],
+			referrerPolicy: attrs['referrerPolicy'],
 		});
 		return l;
 	});
@@ -957,19 +957,19 @@ export function stylesheetResource(
 		return;
 	}
 	if (typeof document === 'undefined' || attrs == null) return;
-	const href = attrs.href;
+	const href = attrs['href'];
 	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
 	preloadStylesheetResource(href, attrs);
 	requestResourceElement(commitStylesheetResource, attrs);
 }
 
 function commitStylesheetResource(attrs: Record<string, unknown>): void {
-	const href = attrs.href as string;
+	const href = attrs['href'] as string;
 	const state = resourceState();
 	// First instance wins, including its non-key props — matching React's
 	// resource identity (later differing props do not retarget a live sheet).
 	if (state.sheets.has(href)) return;
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const precedence = attrs['precedence'] == null ? '' : String(attrs['precedence']);
 	insertPrecedenced(state, stylesheetLink(href, precedence, attrs), precedence);
 	state.sheets.add(href);
 }
@@ -986,7 +986,7 @@ export function styleResource(
 	development?: boolean,
 ): void {
 	if (typeof document === 'undefined' || attrs == null) return;
-	const href = attrs.href;
+	const href = attrs['href'];
 	if (typeof href !== 'string' || href === '' || resourceState().sheets.has(href)) return;
 	requestResourceElement(commitStyleResource, [attrs, css, development]);
 }
@@ -996,7 +996,7 @@ function commitStyleResource([attrs, css, development]: [
 	string,
 	boolean | undefined,
 ]): void {
-	const href = attrs.href as string;
+	const href = attrs['href'] as string;
 	const state = resourceState();
 	if (state.sheets.has(href)) return;
 	if (
@@ -1011,7 +1011,7 @@ function commitStyleResource([attrs, css, development]: [
 				'Inline styles cannot consume a stylesheet preload; remove the preload or use a stylesheet link.',
 		);
 	}
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const precedence = attrs['precedence'] == null ? '' : String(attrs['precedence']);
 	// textContent makes any CSS safe to insert client-side, but the SSR twin
 	// must fail closed on "</style" (raw-text serialization) — surface the same
 	// authoring diagnostic here so SPA-only development still sees it.
@@ -1044,13 +1044,13 @@ export function resetFloatResourceState(): void {
 /** Compiler target for `<script async src>` resources (React Float). */
 export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof document === 'undefined' || attrs == null) return;
-	const src = attrs.src;
+	const src = attrs['src'];
 	if (typeof src !== 'string' || src === '' || resourceState().scripts.has(src)) return;
 	requestResourceElement(commitScriptResource, attrs);
 }
 
 function commitScriptResource(attrs: Record<string, unknown>): void {
-	const src = attrs.src as string;
+	const src = attrs['src'] as string;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;
 	document.head.appendChild(asyncScript(src, attrs));

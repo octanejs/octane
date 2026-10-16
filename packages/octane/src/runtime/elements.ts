@@ -365,15 +365,15 @@ function scopedValueDescriptor<P>(resolve: () => ElementDescriptor<P>): ElementD
 	Object.defineProperty(descriptor, SCOPED_VALUE_RECORD, { value: resolve });
 	// Different renderer copies can share the initial { $$kind } V8 map. Seed
 	// this module's symbol before accessor transitions to keep their maps apart.
-	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES.type);
-	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES.props);
-	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
-	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
-	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
+	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES['type']);
+	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES['props']);
+	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES['key']);
+	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES['ref']);
+	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES['children']);
 	Object.defineProperty(
 		descriptor,
 		'__octaneInvocationSite',
-		SCOPED_VALUE_PROPERTIES.__octaneInvocationSite,
+		SCOPED_VALUE_PROPERTIES['__octaneInvocationSite'],
 	);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
@@ -658,7 +658,8 @@ export function cloneElement<P>(
 			// A complete scoped value can wrap a scoped element. Its shared getter
 			// reads a resolver from its receiver, so bind that one to the source.
 			// A user-replaced getter still receives the clone as before.
-			copiedGetter = get === SCOPED_VALUE_PROPERTIES.children.get ? () => get!.call(element) : get;
+			copiedGetter =
+				get === SCOPED_VALUE_PROPERTIES['children'].get ? () => get!.call(element) : get;
 		}
 		props = {};
 		for (const name in element.props) {
@@ -741,7 +742,7 @@ export function cloneElement<P>(
 			Object.defineProperty(descriptor, 'children', {
 				configurable: true,
 				enumerable: true,
-				get: copiedGetter,
+				get: copiedGetter!,
 			});
 		}
 	}
@@ -777,7 +778,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 			);
 		} else {
 			const copiedGetter =
-				get === SCOPED_VALUE_PROPERTIES.children.get ? () => get!.call(element) : get;
+				get === SCOPED_VALUE_PROPERTIES['children'].get ? () => get!.call(element) : get;
 			descriptor = {
 				$$kind: ELEMENT_TAG,
 				type: element.type,
@@ -791,7 +792,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 			Object.defineProperty(descriptor, 'children', {
 				configurable: true,
 				enumerable: true,
-				get: copiedGetter,
+				get: copiedGetter!,
 			});
 		}
 	} else {

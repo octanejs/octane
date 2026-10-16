@@ -1,3 +1,5 @@
+declare const process: { env: { NODE_ENV?: string } };
+
 export { trustHTML, type TrustedHTML } from './trusted-html.js';
 export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
 /**
@@ -392,7 +394,7 @@ interface SsrElementContext {
 	parent: SsrElementContext | null;
 	namespace: ParserNamespace;
 	childrenNamespace: ParserNamespace;
-	location?: string;
+	location?: string | undefined;
 }
 
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
@@ -731,11 +733,11 @@ interface Frame {
 	namespace: 'html' | 'svg' | 'mathml' | undefined;
 	// Potential bindings retain identity on the existing invocation frame, not
 	// an owner or serialized ancestor path. Discovery jobs retain this same node.
-	signalParentKey?: ServerSignalInstanceKey;
-	signalInvocationSite?: string;
-	signalListKeys?: ServerSignalListKeys | null;
+	signalParentKey?: ServerSignalInstanceKey | undefined;
+	signalInvocationSite?: string | undefined;
+	signalListKeys?: ServerSignalListKeys | null | undefined;
 	signalKey?: unknown;
-	signalInstanceKey?: string;
+	signalInstanceKey?: string | undefined;
 }
 interface Job {
 	comp: ServerComponent;
@@ -1456,15 +1458,15 @@ function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescrip
 	// resolver before the public accessor transitions so their distinct getters
 	// do not compete for the same initial V8 map.
 	Object.defineProperty(descriptor, SCOPED_VALUE_RESOLVER, { value: resolve });
-	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES.type);
-	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES.props);
-	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
-	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
-	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
+	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES['type']);
+	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES['props']);
+	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES['key']);
+	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES['ref']);
+	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES['children']);
 	Object.defineProperty(
 		descriptor,
 		'__octaneInvocationSite',
-		SCOPED_VALUE_PROPERTIES.__octaneInvocationSite,
+		SCOPED_VALUE_PROPERTIES['__octaneInvocationSite'],
 	);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
@@ -1861,7 +1863,7 @@ export function cloneElement(
 		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
 		if (scopedChildren === getScopedChildren) {
 			scopedResolver = (element as ElementDescriptor & DeferredChildren)[SCOPED_CHILDREN_RESOLVER];
-		} else if (scopedChildren === SCOPED_VALUE_PROPERTIES.children.get) {
+		} else if (scopedChildren === SCOPED_VALUE_PROPERTIES['children'].get) {
 			// A scoped value wrapping a scoped element reads its own resolver.
 			const get = scopedChildren;
 			scopedChildren = () => get!.call(element);
@@ -1901,7 +1903,7 @@ export function cloneElement(
 			props,
 			'children',
 			scopedResolver === undefined
-				? { configurable: true, enumerable: true, get: scopedChildren }
+				? { configurable: true, enumerable: true, get: scopedChildren! }
 				: SCOPED_CHILDREN_PROPERTY,
 		);
 		if (scopedResolver !== undefined) setScopedChildrenResolver(props, scopedResolver);
@@ -1926,7 +1928,7 @@ export function cloneElement(
 			descriptor,
 			'children',
 			scopedResolver === undefined
-				? { configurable: true, enumerable: true, get: scopedChildren }
+				? { configurable: true, enumerable: true, get: scopedChildren! }
 				: SCOPED_CHILDREN_PROPERTY,
 		);
 		if (scopedResolver !== undefined) setScopedChildrenResolver(descriptor, scopedResolver);
@@ -1952,7 +1954,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 	if (scopedChildren) {
 		const get = Object.getOwnPropertyDescriptor(element, 'children')!.get;
 		const copiedGetter =
-			get === SCOPED_VALUE_PROPERTIES.children.get ? () => get!.call(element) : get;
+			get === SCOPED_VALUE_PROPERTIES['children'].get ? () => get!.call(element) : get;
 		descriptor = {
 			$$kind: ELEMENT_TAG,
 			type: element.type,
@@ -1965,7 +1967,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 			'children',
 			get === getScopedChildren
 				? SCOPED_CHILDREN_PROPERTY
-				: { configurable: true, enumerable: true, get: copiedGetter },
+				: { configurable: true, enumerable: true, get: copiedGetter! },
 		);
 		if (get === getScopedChildren) {
 			setScopedChildrenResolver(
@@ -3970,7 +3972,7 @@ export function ssrAttrs(
 			const formProps: Record<string, unknown> = Object.create(null);
 			for (const { name, value } of ordered) formProps[name] = value;
 			const action =
-				tag === 'form' ? formProps.action : (formProps.formAction ?? formProps.formaction);
+				tag === 'form' ? formProps['action'] : (formProps['formAction'] ?? formProps['formaction']);
 			if (typeof action === 'function') devValidateSsrFormProps(tag, formProps);
 		}
 	}
@@ -4233,8 +4235,8 @@ export function ssrSpreadContent(
 	scope: SSRScope,
 ): string {
 	if (snapshot === null) return '';
-	const html = snapshot.dangerouslySetInnerHTML;
-	const child = snapshot.children;
+	const html = snapshot['dangerouslySetInnerHTML'];
+	const child = snapshot['children'];
 	if (html != null) {
 		if (typeof html !== 'object' || !('__html' in html)) {
 			throw new Error(formatServerError(6));
@@ -4304,7 +4306,8 @@ export function ssrFormAuthoringDiagnostics(
 		devValidateSsrFormProps(tag, props);
 		if (
 			SHELL_WITNESS !== null &&
-			typeof (tag === 'form' ? props.action : (props.formAction ?? props.formaction)) === 'function'
+			typeof (tag === 'form' ? props['action'] : (props['formAction'] ?? props['formaction'])) ===
+				'function'
 		)
 			witnessShellHost('event', tag === 'form' ? 'action' : 'formAction', tag);
 	}
@@ -4561,7 +4564,7 @@ export function ssrOptionValueSources(sources: readonly SsrAttributeSource[]): u
 			continue;
 		}
 		if (Object.prototype.propertyIsEnumerable.call(Object(source), 'value')) {
-			value = (source as Record<string, unknown>).value;
+			value = (source as Record<string, unknown>)['value'];
 		}
 	}
 	return value;
@@ -5096,7 +5099,7 @@ function replayUpdatedComponentBody(
 	return out;
 }
 
-type ServerSignalIdentityToken = string | { value: object | symbol; position?: number };
+type ServerSignalIdentityToken = string | { value: object | symbol; position?: number | undefined };
 
 interface ServerOpaqueSignalKeys {
 	ids: Map<string, number>;
@@ -5274,7 +5277,7 @@ function serverSignalOwner(
 			documentOwner: SignalOwner;
 			instanceOwner: object;
 			instanceKey: string;
-			enclosingOwner?: SignalRendererOwnerIdentity;
+			enclosingOwner?: SignalRendererOwnerIdentity | undefined;
 		} = {
 			scopeKey: resolved.signalOwner.scopeKey,
 			documentOwner: resolved.signalOwner,
@@ -6233,10 +6236,10 @@ function vtSsrResolve(
 	kind: 'enter' | 'exit' | 'update' | 'share' | 'parentEnter' | 'parentExit',
 ): string {
 	const value = props[kind];
-	const resolved = typeof value === 'string' ? value : value?.default;
+	const resolved = typeof value === 'string' ? value : value?.['default'];
 	if (resolved != null) return resolved;
 	const fallback = props.default;
-	return (typeof fallback === 'string' ? fallback : fallback?.default) ?? 'auto';
+	return (typeof fallback === 'string' ? fallback : fallback?.['default']) ?? 'auto';
 }
 
 /** Find an opening tag's actual terminator without allocating scan state. */
@@ -7081,14 +7084,14 @@ interface ServerPuCreation {
 	value: unknown;
 	site: ServerHookSlot | undefined;
 	frame: Frame | null;
-	nativeWitness?: NativeReadWitness | null;
+	nativeWitness?: NativeReadWitness | null | undefined;
 }
 
 interface ServerWarmEntry {
 	deps: unknown[];
 	value: unknown;
 	available: boolean;
-	nativeWitness?: NativeReadWitness | null;
+	nativeWitness?: NativeReadWitness | null | undefined;
 }
 
 type ServerMemoEvidence = ServerPuCreation | ServerWarmEntry;
@@ -7657,6 +7660,15 @@ export function useState<T>(
 		() => (typeof initial === 'function' ? (initial as () => T)() : (initial as T)),
 		slot,
 	) as [T, (next: any) => void, () => T];
+}
+
+/** @internal Server counterpart: no external integration callback runs during SSR. */
+export function __useCommittedState<T>(
+	initial: T | (() => T),
+	slot: ServerHookSlot | undefined,
+): [T, (next: T | ((value: T) => T)) => void, (next: T | ((value: T) => T)) => void] {
+	const [value, setter] = useState(initial, slot);
+	return [value, setter, setter];
 }
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
@@ -8276,6 +8288,11 @@ export function flushSync<T>(fn: () => T): T {
 	return fn();
 }
 
+/** @internal The server has no DOM event scheduler. */
+export function __createDiscreteEventListener(listener: EventListener): EventListener {
+	return listener;
+}
+
 // Children-block tagging — same contract as the client runtime (runtime.ts):
 // the compiler tags element/text children lowered to a render function so
 // `isChildrenBlock` can tell them from a user render-prop child. Both runtimes
@@ -8498,11 +8515,11 @@ export function ssrHeadEl(
 	// HeadBuffer). Ownership markers travel with the element, so hydration
 	// adoption is position-independent.
 	if (tag === 'meta' && attrs !== null) {
-		if (attrs.charSet !== undefined || attrs.charset !== undefined) {
+		if (attrs['charSet'] !== undefined || attrs['charset'] !== undefined) {
 			HEAD.charset += s;
 			return '';
 		}
-		if (attrs.name === 'viewport') {
+		if (attrs['name'] === 'viewport') {
 			HEAD.viewport += s;
 			return '';
 		}
@@ -8635,7 +8652,7 @@ export interface RenderOptions {
 	 * CSP nonce stamped on every inline tag the renderer emits: the deduped
 	 * `<style data-octane>` tags and the suspense seed `<script>`.
 	 */
-	nonce?: string;
+	nonce?: string | undefined;
 	/**
 	 * Per-render override of the global suspense settle deadline
 	 * (setSsrSuspenseTimeout). 0 disables the deadline for this render. Async
@@ -8657,7 +8674,7 @@ export interface RenderOptions {
 	 * into the body, where a `<title>` loses to the template's and a canonical or
 	 * description is ignored outright.
 	 */
-	headChannel?: 'fold' | 'separate';
+	headChannel?: 'fold' | 'separate' | undefined;
 }
 
 // Fold into a rendered document or a fragment that leads with an authored
@@ -8836,18 +8853,18 @@ type SuspenseOutcome = SuspenseResult & {
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Pending streaming subscriptions shared across this request's settle waves. */
-	streamSettlements?: StreamSettlements;
+	streamSettlements?: StreamSettlements | undefined;
 	/** Recoverable buffered-boundary errors are reported once across async retries. */
 	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
 	/** Resource-thrown thenables a buffered settle has seen settle (see isStalledWave). */
 	settledThrows?: Set<PromiseLike<unknown>>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
-	resourceOptions?: RenderOptions | null;
+	resourceOptions?: RenderOptions | null | undefined;
 	/** Optional renderer resources; allocated only by a participating adapter. */
-	resources?: ServerRenderResources;
+	resources?: ServerRenderResources | undefined;
 	/** One request/account owner shared by every pass and streamed region. */
 	signalOwner?: SignalOwner;
-	initialDocumentSignals?: ScopeSeed;
+	initialDocumentSignals?: ScopeSeed | undefined;
 	ownedSignalOwner?: boolean;
 	signalInstances?: Map<string, SignalRendererOwnerIdentity>;
 	signalIdentityKeys?: Map<string, ServerOpaqueSignalKeys>;
@@ -8881,7 +8898,7 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		 *  (it CONSUMES the previous wave's outcomes) from ancestor recreation
 		 *  (the settled instances are never referenced again). Undefined —
 		 *  the common case — costs one undefined-check per identity hit. */
-		touched?: Set<PromiseLike<unknown>>;
+		touched?: Set<PromiseLike<unknown>> | undefined;
 	};
 };
 
@@ -10514,9 +10531,9 @@ interface StreamBoundary {
 	/** Recoverable render error retained for the public streaming onError callback. */
 	error?: unknown;
 	/** Whether this boundary's recoverable error has reached onError. */
-	errorReported?: boolean;
+	errorReported?: boolean | undefined;
 	/** Whether its client-render recovery instruction was accepted by the transport. */
-	errorFlushed?: boolean;
+	errorFlushed?: boolean | undefined;
 	/** The client graph is erased, so failure retains the authored server fallback. */
 	serverOwnedStatic: boolean;
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
@@ -10526,7 +10543,7 @@ interface StreamBoundary {
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
 	/** Ready native values captured with this exact accepted segment. */
-	signals?: NativeSignalManifest;
+	signals?: NativeSignalManifest | undefined;
 	/** Number of boundary-local useIds consumed before the shell suspended. */
 	pendingIdOffset: number;
 	/** Namespace inherited by this boundary's content arm. */
@@ -11539,7 +11556,7 @@ export interface StreamInjectionSource {
 	/** @internal Pending query authority must precede shell-time module execution. */
 	takeInitialSelections?(): string;
 	/** This source emits validated renderer frames and needs the pre-module mailbox. */
-	readonly streamedRenderer?: true;
+	readonly streamedRenderer?: true | undefined;
 	/** @internal Automatic query-attempt sink installed by streamedSignals. */
 	readonly observeSignalAttempt?: (
 		attempt: ServerSignalQueryAttempt,
@@ -13217,10 +13234,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 			}
 		}
 	}
-	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
+	const imageSrcSet = as === 'image' ? options['imageSrcSet'] : undefined;
 	const key =
 		typeof imageSrcSet === 'string' && imageSrcSet !== ''
-			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
+			? 'preload:image:' + imageSrcSet + '::' + String(options['imageSizes'] ?? '')
 			: 'preload:' + as + ':' + value;
 	const safeHref = sanitizeURL(value);
 	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
@@ -13370,13 +13387,13 @@ export function ssrStylesheetResource(
 		return '';
 	}
 	if (HEAD === null || attrs == null) return '';
-	const href = attrs.href;
+	const href = attrs['href'];
 	if (typeof href !== 'string' || href === '') return '';
 	const key = 'sheet:' + href;
 	if (HEAD.hints.has(key)) return '';
 	HEAD.replay = null;
 	HEAD.hints.add(key);
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const precedence = attrs['precedence'] == null ? '' : String(attrs['precedence']);
 	const tag =
 		'<link rel="stylesheet" href="' +
 		escapeAttr(sanitizeURL(href)) +
@@ -13406,7 +13423,7 @@ export function ssrStyleResource(
 	development?: boolean,
 ): string {
 	if (HEAD === null || attrs == null) return '';
-	const href = attrs.href;
+	const href = attrs['href'];
 	if (typeof href !== 'string' || href === '') return '';
 	if (process.env.NODE_ENV !== 'production' && development === true && /\s/.test(href)) {
 		console.error(
@@ -13440,7 +13457,7 @@ export function ssrStyleResource(
 	}
 	HEAD.replay = null;
 	HEAD.hints.add(key);
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const precedence = attrs['precedence'] == null ? '' : String(attrs['precedence']);
 	const tag =
 		'<style data-precedence="' +
 		escapeAttr(precedence) +
@@ -13462,7 +13479,7 @@ export function ssrStyleResource(
 /** Compiler target for `<script async src>` resources (React Float). */
 export function ssrScriptResource(attrs: Record<string, unknown> | null): string {
 	if (HEAD === null || attrs == null) return '';
-	const src = attrs.src;
+	const src = attrs['src'];
 	if (typeof src !== 'string' || src === '') return '';
 	const key = 'script:' + src;
 	// One executable per src per pass, across the classic and module forms.
@@ -13487,7 +13504,7 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 	const value = coerceHintHref(href);
 	if (value === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
-	else if ('as' in options && typeof options.as !== 'string') {
+	else if ('as' in options && typeof options['as'] !== 'string') {
 		options = { ...options, as: undefined };
 	}
 	// A module that preinitModule OR a classic Float script already executes in

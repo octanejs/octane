@@ -222,7 +222,7 @@ export interface StateSlot<T> extends QueuedCell {
 	getter: (() => T) | undefined;
 }
 
-type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
+export type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [T, StateSetter<T>, () => T];
 
 type HookReducer = ((state: any, action: any) => any) | null;
@@ -246,7 +246,7 @@ function applyHookUpdate(state: unknown, action: unknown, reducer: HookReducer):
  * published at commit (commitHookCells), so a dropped render leaves the queue
  * as it was.
  */
-function foldHookQueue(cell: QueuedCell, reducer: HookReducer): any {
+export function foldHookQueue(cell: QueuedCell, reducer: HookReducer): any {
 	const transaction = ROOT_RENDER_TRANSACTION;
 	const transition = CURRENT_BLOCK!.currentRenderMode === 'transition';
 	let value = cell.base;
@@ -412,7 +412,7 @@ export interface LinkedStatePrevious<Source, Value> {
 /** Equality customizations for a source-linked local state cell. */
 export interface LinkedStateOptions<Source, Value> {
 	sourceEqual?: (previous: Source, next: Source) => boolean;
-	valueEqual?: (previous: Value, next: Value) => boolean;
+	valueEqual?: ((previous: Value, next: Value) => boolean) | undefined;
 }
 
 interface LinkedStateSlot<Source, Value> extends QueuedCell {
@@ -420,12 +420,12 @@ interface LinkedStateSlot<Source, Value> extends QueuedCell {
 	value: Value;
 	setter: StateSetter<Value>;
 	getter?: () => Value;
-	valueEqual?: (previous: Value, next: Value) => boolean;
+	valueEqual?: ((previous: Value, next: Value) => boolean) | undefined;
 	/** A source draft is visible to its rendering owner, never to committed readers. */
 	renderPending?: boolean;
-	renderSource?: Source;
+	renderSource?: Source | undefined;
 	renderValue?: Value;
-	renderValueEqual?: (previous: Value, next: Value) => boolean;
+	renderValueEqual?: ((previous: Value, next: Value) => boolean) | undefined;
 	renderSourceChanged?: boolean;
 	/** Preserve only drafts explicitly edited by their rendering owner. */
 	renderUpdated?: boolean;
@@ -433,7 +433,7 @@ interface LinkedStateSlot<Source, Value> extends QueuedCell {
 	renderParked?: boolean;
 	/** Refresh the revealed owner after an outside update changed its parked draft. */
 	renderNeedsRefresh?: boolean;
-	renderPublish?: () => void;
+	renderPublish?: (() => void) | undefined;
 	renderVersion?: number;
 }
 

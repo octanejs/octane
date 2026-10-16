@@ -11,6 +11,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
+import { __createDiscreteEventListener } from '../src/index.js';
 import { act, mount } from './_helpers';
 import {
 	Counter,
@@ -136,6 +137,28 @@ describe('discrete dispatch commit timing (React batchedUpdates parity)', () => 
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		expect(input.value).toBe('fixed');
 		r.unmount();
+	});
+
+	it('restores a controlled edit before a nested DOM event returns to a renderer listener', () => {
+		const r = mount(RejectedInput);
+		try {
+			const input = r.find('#rejected') as HTMLInputElement;
+			const surface = document.createElement('button');
+			let observed: string | undefined;
+			surface.addEventListener(
+				'pointerdown',
+				__createDiscreteEventListener(() => {
+					setNativeValue(input, 'fixed!');
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+					observed = input.value;
+				}),
+			);
+			surface.dispatchEvent(new Event('pointerdown'));
+			expect(observed).toBe('fixed');
+			expect(input.value).toBe('fixed');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('restores a nested controlled edit when the outer click stops before its bubble handler', async () => {

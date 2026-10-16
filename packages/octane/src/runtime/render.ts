@@ -1847,8 +1847,9 @@ export function renderInitialSuspenseHydration(
 		// arm renders on the client from client data, reporting nothing, and its
 		// obsolete wakeable is ignored.
 		if (initial.waits !== undefined) {
-			(state.start as Comment & { [STREAM_RETRY_PROP]?: () => void })[STREAM_RETRY_PROP] =
-				undefined;
+			(state.start as Comment & { [STREAM_RETRY_PROP]?: (() => void) | undefined })[
+				STREAM_RETRY_PROP
+			] = undefined;
 			claimStreamedIds(state, initial.waits.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		}
 		markArmDiscard(state);

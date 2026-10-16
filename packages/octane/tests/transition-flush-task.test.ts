@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, addTransitionType, createRoot, flushSync, startTransition } from '../src/index.js';
+import {
+	__createDiscreteEventListener,
+	act,
+	addTransitionType,
+	createRoot,
+	flushSync,
+	startTransition,
+} from '../src/index.js';
 import {
 	ActionProbe,
 	ActionShell,
@@ -239,6 +246,61 @@ describe('startTransition from async code', () => {
 
 		expect(probe.log).toEqual(['0', '2', 'task']);
 		expect(probe.container.textContent).toBe('2');
+	});
+
+	it('commits a renderer event during an async Action without admitting an unrelated transition', async () => {
+		// The shared fixture module installs the ViewTransition driver.
+		const vt = installViewTransitionMocks();
+		const probe = mountStateProbe();
+		const deferredContainer = document.createElement('div');
+		const deferredRoot = createRoot(deferredContainer);
+		const mountedContainer = document.createElement('div');
+		let mountedRoot: ReturnType<typeof createRoot> | undefined;
+		let mountedDuringListener: string | null | undefined;
+		let mountedAfterListener: string | null | undefined;
+		let setDeferred!: (value: number) => void;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		try {
+			deferredRoot.render(StateProbe, {
+				expose: (setter: (value: number) => void) => (setDeferred = setter),
+				onCommit: () => {},
+			});
+			await Promise.resolve();
+			startTransition(() => setDeferred(1));
+			startTransition(() => gate);
+			probe.container.addEventListener(
+				'pointerdown',
+				__createDiscreteEventListener(() => {
+					mountedRoot = createRoot(mountedContainer);
+					mountedRoot.render(StateProbe, { expose: () => {}, onCommit: () => {} });
+					mountedDuringListener = mountedContainer.textContent;
+				}),
+			);
+			probe.container.addEventListener(
+				'pointerdown',
+				__createDiscreteEventListener(() => {
+					mountedAfterListener = mountedContainer.textContent;
+					probe.set(2);
+				}),
+			);
+			probe.container.dispatchEvent(new Event('pointerdown'));
+			expect(probe.container.textContent).toBe('2');
+			expect(probe.log.at(-1)).toBe('2');
+			expect(mountedDuringListener).toBe('');
+			expect(mountedAfterListener).toBe('0');
+			expect(mountedContainer.textContent).toBe('0');
+			expect(deferredContainer.textContent).toBe('0');
+			expect(vt.calls).toHaveLength(0);
+			release();
+			await untilTasks(() => deferredContainer.textContent === '1');
+			expect(deferredContainer.textContent).toBe('1');
+		} finally {
+			release();
+			mountedRoot?.unmount();
+			deferredRoot.unmount();
+			vt.restore();
+		}
 	});
 
 	it('is drained by flushSync with the urgent work', async () => {

@@ -1,6 +1,7 @@
 import { Document, Outline, Page, Thumbnail, pdfjs } from '@octanejs/pdf';
 import { createRoot, delegateEvents, hydrateRoot, useMemo, useState } from 'octane';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import legacyWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {
 	createElement as createReactElement,
 	useMemo as useReactMemo,
@@ -12,7 +13,7 @@ import { Document as ReactDocument, Page as ReactPage, pdfjs as reactPdfjs } fro
 import { createProbePdf } from '../../feasibility/fixture';
 import { PdfHydrationFixture } from './hydration.tsrx';
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+pdfjs.GlobalWorkerOptions.workerSrc = legacyWorkerUrl;
 reactPdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const NativeWorker = window.Worker;

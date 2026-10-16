@@ -5,8 +5,8 @@
 // false | matched params. The component renders its children when matched — a
 // render-prop child ALWAYS renders, receiving the params (false when unmatched).
 import { useCallback, isChildrenBlock } from 'octane';
-import { useRouter } from './context.ts';
-import { useStore } from './useStore.ts';
+import { useRouter } from './context';
+import { useStore } from './useStore';
 
 export function useMatchRoute() {
 	const router = useRouter();
@@ -29,10 +29,10 @@ export function MatchRoute(props: Record<string, any>) @{
 	const matchRoute = useMatchRoute();
 	const params = matchRoute(props);
 	const out =
-		typeof props.children === 'function' && !isChildrenBlock(props.children)
-			? props.children(params)
+		typeof props['children'] === 'function' && !isChildrenBlock(props['children'])
+			? props['children'](params)
 			: params
-				? props.children
+				? props['children']
 				: null;
 	<>{out}</>
 }

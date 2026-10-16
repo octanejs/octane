@@ -70,11 +70,13 @@ interface RetainedRequestIdentity {
 interface RequestOwner extends GraphOwner {
 	requests: Map<string, RequestEntry> | undefined;
 	queryDefinitions: Map<string, QueryDefinition> | undefined;
-	readonly streams?: {
-		readonly selections: Map<string, StreamFrameIdentity>;
-		selectionReady(binding: ResourceBinding): void;
-		discardCompleted(identity: StreamFrameIdentity): void;
-	};
+	readonly streams?:
+		| {
+				readonly selections: Map<string, StreamFrameIdentity>;
+				selectionReady(binding: ResourceBinding): void;
+				discardCompleted(identity: StreamFrameIdentity): void;
+		  }
+		| undefined;
 }
 
 class Request<T> implements QueryRequest<T> {
@@ -535,9 +537,10 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 	// (candidate-producers.ts), which forks this binding and publishes its selection.
 	declare candidate?: true;
 	/** Only a cell that a later render declared again with a new selection has a view. */
-	declare private view?: ResourceView<T>;
+	declare private view?: ResourceView<T> | undefined;
 	/** A render's description that selected the committed request, and what it read. */
-	declare private probed?: { readonly describe: Describe<T>; readonly reads: ScopedNode[] };
+	declare private probed?:
+		{ readonly describe: Describe<T>; readonly reads: ScopedNode[] } | undefined;
 	/** The query definition this binding last selected, exempt from the conflict check. */
 	queryDefinition: QueryDefinition | undefined = undefined;
 	selected: RequestEntry | undefined;

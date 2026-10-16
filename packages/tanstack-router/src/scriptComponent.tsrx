@@ -2,7 +2,7 @@
 
 import { trustHTML, useId } from 'octane';
 import type { RouterManagedTag } from '@tanstack/router-core';
-import { getAssetKeys } from './assetKeys.ts';
+import { getAssetKeys } from './assetKeys';
 
 function scriptAttributes(attrs: RouterManagedTag['attrs']) {
 	if (!attrs || !Object.prototype.hasOwnProperty.call(attrs, '__executeOnMount')) return attrs;

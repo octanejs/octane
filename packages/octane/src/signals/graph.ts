@@ -100,10 +100,10 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 // Upstream: stackblitz/alien-signals@8734d386d925025d0e99419bd9161c17b112c5ee, src/system.ts.
 // The package LICENSE includes the upstream copyright and permission notice.
 interface ReactiveNode {
-	deps?: Link;
-	depsTail?: Link;
-	subs?: Link;
-	subsTail?: Link;
+	deps?: Link | undefined;
+	depsTail?: Link | undefined;
+	subs?: Link | undefined;
+	subsTail?: Link | undefined;
 	flags: ReactiveFlags;
 }
 
@@ -126,7 +126,7 @@ type ReactiveFlags = number;
 
 export interface NodeState<T = unknown> {
 	readonly snapshot: SignalSnapshot<T>;
-	readonly waiting?: PromiseLike<unknown>;
+	readonly waiting?: PromiseLike<unknown> | undefined;
 	readonly resolveWaiting?: () => void;
 	/** Foreign lifetimes sampled by this result, independent of its current dependencies. */
 	readonly owners?: ReadonlySet<GraphOwner>;
@@ -139,7 +139,7 @@ interface Wakeup {
 	/** The thenable the latest evaluation threw, if one did. */
 	thrown?: object;
 	/** The node waiting on that thenable, held only until the wait ends. */
-	node?: ScopedNode;
+	node?: ScopedNode | undefined;
 }
 
 type Work = ScopedNode | SignalObserver | (() => void);
@@ -536,10 +536,10 @@ export function presentDuringFlush(): void {
 export function readyState<T>(
 	value: T,
 	activity: {
-		refreshing?: boolean;
-		connection?: ConnectionState;
+		refreshing?: boolean | undefined;
+		connection?: ConnectionState | undefined;
 		complete?: boolean;
-		requestKey?: string;
+		requestKey?: string | undefined;
 	} = noActivity,
 ): NodeState<T> {
 	const refreshing = activity.refreshing ?? false;

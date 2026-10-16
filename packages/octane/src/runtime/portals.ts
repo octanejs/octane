@@ -84,8 +84,8 @@ export interface PortalSlot {
 	end: Comment | null;
 	/** Its target delegates its events: from creation, or from the commit that inserts it. */
 	registered: boolean;
-	fragmentOwners?: FragmentInstance | readonly FragmentInstance[];
-	fragmentAnchor?: Node;
+	fragmentOwners?: FragmentInstance | readonly FragmentInstance[] | undefined;
+	fragmentAnchor?: Node | undefined;
 	sourceAnchor?: Node;
 	interleavedFragment?: FragmentInstance;
 }

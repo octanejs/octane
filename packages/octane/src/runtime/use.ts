@@ -62,8 +62,8 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 // ---------------------------------------------------------------------------
 
 export interface TrackedThenable<T = any> extends PromiseLike<T> {
-	status?: 'pending' | 'fulfilled' | 'rejected';
-	value?: T;
+	status?: 'pending' | 'fulfilled' | 'rejected' | undefined;
+	value?: T | undefined;
 	reason?: any;
 }
 
@@ -428,7 +428,7 @@ export interface WarmEntry {
 	deps: any[];
 	value: any;
 	/** Real memo cell represented by an unavailable entry, when applicable. */
-	source?: MemoHookEntry;
+	source?: MemoHookEntry | undefined;
 	/** A warmed value may be adopted once; the retained tombstone still prevents
 	 * a later dependency stratum from speculatively creating it again. */
 	available: boolean;

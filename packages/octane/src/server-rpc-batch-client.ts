@@ -15,7 +15,7 @@ export type { ServerCallBatchOptions } from './server-rpc-protocol.js';
 interface Member {
 	hash: string;
 	body: string;
-	signal?: AbortSignal;
+	signal?: AbortSignal | undefined;
 	resolve(value: unknown): void;
 	reject(error: unknown): void;
 	dispose(): void;

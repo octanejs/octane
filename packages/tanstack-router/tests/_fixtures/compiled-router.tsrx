@@ -22,8 +22,11 @@ import {
 	type ErrorComponentProps,
 	type NotFoundRouteProps,
 } from '@octanejs/tanstack-router/compiled';
-import { useState } from 'octane';
-export { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
+import { useLayoutEffect, useState } from 'octane';
+export {
+	CompiledRouterProvider,
+	PreconfiguredRouterProvider,
+} from '@octanejs/tanstack-router/compiled';
 
 function Shell(props: { children?: unknown }) @{
 	const match = useMatch({ strict: false });
@@ -48,6 +51,14 @@ function Home() @{
 	</button>
 }
 
+function NavigateOnMount() @{
+	const navigate = useNavigate();
+	useLayoutEffect(() => {
+		void navigate({ to: '/' } as any);
+	});
+	<p>Redirecting</p>
+}
+
 function Items() @{
 	<section class="items-layout">
 		<h1>Items</h1>
@@ -67,6 +78,12 @@ function Item() @{
 			{String(count)}
 		</button>
 	</article>
+}
+
+function RecoverableItem() @{
+	const params = useParams({ from: '/items/$id' }) as { id: string };
+	if (params.id === 'broken') throw new Error('item render failed');
+	<Item />
 }
 
 function ErrorView(props: ErrorComponentProps) @{
@@ -90,6 +107,10 @@ export function makeCompiledRouter(
 		shell?: boolean;
 		isServer?: boolean;
 		loader?: () => Promise<unknown>;
+		renderError?: boolean;
+		onCatch?: (error: Error) => void;
+		parentOnCatch?: (error: Error) => void;
+		navigateOnMount?: boolean;
 	} = {},
 ) {
 	const root = new BaseRootRoute({
@@ -104,6 +125,8 @@ export function makeCompiledRouter(
 		path: 'items',
 		component: Items,
 		notFoundComponent: NotFoundView,
+		errorComponent: opts.parentOnCatch ? ErrorView : undefined,
+		onCatch: opts.parentOnCatch,
 	});
 	const item = new BaseRoute({
 		getParentRoute: () => items,
@@ -116,11 +139,15 @@ export function makeCompiledRouter(
 		},
 		component: opts.invalid
 			? ((() => 'plain returned text') as any)
-			: lazyCompiledRouteComponent(async () => ({ Item }), 'Item'),
+			: opts.renderError
+				? RecoverableItem
+				: lazyCompiledRouteComponent(async () => ({ Item }), 'Item'),
 		pendingComponent: Pending,
 		errorComponent: ErrorView,
+		onCatch: opts.onCatch,
 		remountDeps: ({ params }: any) => [params.id],
 	});
+	if (opts.navigateOnMount) item.update({ component: NavigateOnMount });
 	items.addChildren([item]);
 	return createRouter({
 		routeTree: root.addChildren([home, items]),
@@ -153,7 +180,8 @@ export function makeCompiledFileRouter(initial = '/files/a') {
 		const lazyParams = lazyFile.useParams() as any;
 		const selected = api.useLoaderData() as any;
 		const navigate = file.useNavigate();
-		<section class="file" data-lazy={lazyParams.id}>
+		const [menuOpen, setMenuOpen] = useState(true);
+		<section class="file" data-lazy={lazyParams.id} data-menu={String(menuOpen)}>
 			<p>{(direct.id + ':' + selected.label) as string}</p>
 			<file.Link class="file-relative" to="." params={{ id: 'b' }} search={{ page: 2 }}>
 				Next file
@@ -161,7 +189,12 @@ export function makeCompiledFileRouter(initial = '/files/a') {
 			<api.Link class="file-api" to="." params={{ id: 'c' }}>
 				API file
 			</api.Link>
-			<Link class="file-timing" to="/files/$id" params={{ id: 'e' }}>
+			<Link
+				class="file-timing"
+				to="/files/$id"
+				params={{ id: 'e' }}
+				onClick={() => setMenuOpen(false)}
+			>
 				{({ isTransitioning }) => String(isTransitioning)}
 			</Link>
 			<Link class="file-missing" to="/files/$id" params={{ id: 'missing' }}>

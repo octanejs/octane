@@ -977,8 +977,8 @@ type DelegatedNode = Node & {
 };
 
 export type PortalEventBoundary = Node & {
-	$$portalEventRange?: PortalSlot;
-	$$portalEventStart?: PortalEventBoundary;
+	$$portalEventRange?: PortalSlot | undefined;
+	$$portalEventStart?: PortalEventBoundary | undefined;
 };
 
 function resolvePortalEventOwner(node: DelegatedNode): void {

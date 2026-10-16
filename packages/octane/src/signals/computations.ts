@@ -148,11 +148,13 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 	/** The latest evaluation produced asynchronous work rather than a value. */
 	private asynchronous = false;
 	/** A later render's computation, evaluated privately until that render is accepted. */
-	declare private view?: { readonly node: ScopedNode<T>; readonly binding: DerivedBinding<T> };
+	declare private view?:
+		{ readonly node: ScopedNode<T>; readonly binding: DerivedBinding<T> } | undefined;
 	/** A render's computation that produced the committed value, and what it read. */
-	declare private probed?: { readonly compute: DerivedCompute<T>; readonly reads: ScopedNode[] };
+	declare private probed?:
+		{ readonly compute: DerivedCompute<T>; readonly reads: ScopedNode[] } | undefined;
 	/** A view's first result, already produced by the render's probe. */
-	declare private seeded?: { readonly result: unknown };
+	declare private seeded?: { readonly result: unknown } | undefined;
 
 	constructor(
 		readonly owner: Scope & GraphOwner,
@@ -261,7 +263,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		});
 	}
 
-	protected discardDefinition(): void {
+	protected override discardDefinition(): void {
 		if (this.view?.binding.asynchronous) this.releaseView();
 	}
 

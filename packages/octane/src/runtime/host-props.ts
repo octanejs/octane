@@ -417,7 +417,7 @@ export function setDangerouslySetInnerHTMLSources(
 		isSpread: boolean,
 		sourceOrName: unknown,
 		value?: unknown,
-		merge?: boolean,
+		merge?: boolean | undefined,
 	])[],
 	ignoreSourceChildren = false,
 ): void {
@@ -839,8 +839,8 @@ function devValidateAriaProps(el: Element, props: Record<string, unknown>): void
 
 function devValidateHostProps(el: Element, props: Record<string, unknown>): void {
 	if ((el as any).__oct_loc === undefined || isHtmlCustomElement(el)) return;
-	const customized = typeof props.is === 'string';
-	(el as any).__oct_custom_is = customized ? props.is : undefined;
+	const customized = typeof props['is'] === 'string';
+	(el as any).__oct_custom_is = customized ? props['is'] : undefined;
 	if (customized) return;
 	let invalid: string[] | undefined;
 	for (const name of Object.keys(props)) {
@@ -1712,7 +1712,8 @@ export function resolveHostPropSources(
 		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
 		: values.values();
 	for (const { name, value } of ordered) resolved[name] = value;
-	if (readStyle !== undefined && 'style' in resolved) resolved.style = readStyle(resolved.style);
+	if (readStyle !== undefined && 'style' in resolved)
+		resolved['style'] = readStyle(resolved['style']);
 	return resolved;
 }
 
@@ -1778,7 +1779,7 @@ export function bagRecordHost(
 					found = true;
 				}
 			} else if (source[1] != null && isOwnEnumerable(source[1] as object, 'style')) {
-				style = (source[1] as Record<string, unknown>).style;
+				style = (source[1] as Record<string, unknown>)['style'];
 				found = true;
 			}
 		}
@@ -1799,7 +1800,7 @@ export function hostSourceChildren(
 ): unknown {
 	const sources = next === null ? null : next[cell];
 	if (!Array.isArray(sources))
-		return isOwnEnumerable(committed, 'children') ? committed.children : undefined;
+		return isOwnEnumerable(committed, 'children') ? committed['children'] : undefined;
 	let children: unknown;
 	for (const source of sources as HostPropSource[]) {
 		const value = source[1] as any;

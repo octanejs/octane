@@ -505,7 +505,7 @@ export function queueFormAuthoringDiagnostic(
 	else if (kind === 'option-children') state.authoringChildren = 'option';
 	else if (kind === 'option-selected') {
 		if (typeof selected === 'function') state.authoringSelected = selected;
-		else (state.authoringProps ??= Object.create(null)).selected = selected ?? true;
+		else (state.authoringProps ??= Object.create(null))['selected'] = selected ?? true;
 	}
 	queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
 }
@@ -1047,15 +1047,16 @@ export function setFormControlSources(
 		const spread = source[1];
 		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
 		const object = Object(spread) as Record<string, unknown>;
-		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) value = object.value;
+		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) value = object['value'];
 		if (Object.prototype.propertyIsEnumerable.call(object, 'defaultValue'))
-			defaultValue = object.defaultValue;
+			defaultValue = object['defaultValue'];
 		if (tag === 'input') {
-			if (Object.prototype.propertyIsEnumerable.call(object, 'checked')) checked = object.checked;
+			if (Object.prototype.propertyIsEnumerable.call(object, 'checked'))
+				checked = object['checked'];
 			if (Object.prototype.propertyIsEnumerable.call(object, 'defaultChecked'))
-				defaultChecked = object.defaultChecked;
+				defaultChecked = object['defaultChecked'];
 		} else if (tag === 'select' && Object.prototype.propertyIsEnumerable.call(object, 'multiple')) {
-			multiple = object.multiple;
+			multiple = object['multiple'];
 		}
 	}
 	applyFormControlValues(el, tag, value, defaultValue, checked, defaultChecked, multiple);

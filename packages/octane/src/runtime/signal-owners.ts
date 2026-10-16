@@ -129,7 +129,7 @@ export const TEMPLATE_INVOCATION_SITE = 't:';
 // WeakMap entry.
 export interface SignalRetryNode {
 	children?: Map<unknown, SignalRetryNode>;
-	owner?: SignalRendererOwnerIdentity;
+	owner?: SignalRendererOwnerIdentity | undefined;
 }
 // A replacement renders before the live slot may publish it. Only signal-owned
 // WIPs need this prospective location; the weak metadata never owns their life.
@@ -216,7 +216,7 @@ function signalRetryNode(
 export function retainSignalRetryScope(
 	scope: Scope,
 	root: Scope,
-	holder: { retrySignalOwners?: SignalRetryOwners },
+	holder: { retrySignalOwners?: SignalRetryOwners | undefined },
 	subtree = false,
 ): void {
 	// These entry guards must read the live capabilities directly: wrapping
@@ -270,7 +270,9 @@ export function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySl
 	});
 }
 
-export function clearSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwners }): void {
+export function clearSignalRetryOwners(holder: {
+	retrySignalOwners?: SignalRetryOwners | undefined;
+}): void {
 	const cache = holder.retrySignalOwners;
 	if (cache === undefined) return;
 	holder.retrySignalOwners = undefined;
@@ -282,7 +284,7 @@ export function clearSignalRetryOwners(holder: { retrySignalOwners?: SignalRetry
 // request when its selection is unchanged. Retire only owners whose cells
 // cannot follow those inputs.
 export function supersedeSignalRetryOwners(holder: {
-	retrySignalOwners?: SignalRetryOwners;
+	retrySignalOwners?: SignalRetryOwners | undefined;
 }): void {
 	const cache = holder.retrySignalOwners;
 	if (cache === undefined) return;
@@ -477,7 +479,7 @@ export function trackSignalRetryListKeys<T>(
 	};
 }
 
-type SignalIdentityToken = string | { value: object | symbol; position?: number };
+type SignalIdentityToken = string | { value: object | symbol; position?: number | undefined };
 
 export interface OpaqueSignalKeys {
 	objects: WeakMap<object, number>;

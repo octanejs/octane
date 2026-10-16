@@ -37,13 +37,16 @@ export {
 } from './compiled/bindings';
 export type { UseRouterStateOptions, UseRouterStateResult } from './routerStateBinding';
 export {
-	CompiledRouterProvider,
-	CompiledRouterProvider as RouterProvider,
 	CompiledOutlet,
 	CompiledOutlet as Outlet,
+	PreconfiguredRouterProvider,
+} from './compiled/Matches.tsrx';
+export {
+	CompiledRouterProvider,
+	CompiledRouterProvider as RouterProvider,
 	lazyCompiledRouteComponent,
 	lazyCompiledRouteComponent as lazyRouteComponent,
-} from './compiled/Matches.tsrx';
+} from './compiled/RouterProvider.tsrx';
 export {
 	createRoute,
 	createRootRoute,

@@ -129,6 +129,8 @@ export {
 	isInActScope,
 	setIsOctaneActEnvironment,
 	flushSync,
+	__useCommittedState,
+	__createDiscreteEventListener,
 	act,
 	useSyncExternalStore,
 	useTransition,

@@ -122,8 +122,8 @@ export type {
 } from './routeHookTypes';
 export { useAwaited } from './useAwaited';
 export type { AwaitOptions } from './useAwaited';
-export { useLinkProps, createLink, linkOptions } from './link';
-export type { LinkOptionsFn, LinkOptionsFnOptions } from './link';
+export { useLinkProps, createLink, linkOptions } from './linkApi';
+export type { LinkOptionsFn, LinkOptionsFnOptions } from './linkApi';
 export type {
 	ActiveLinkOptionProps,
 	ActiveLinkOptions,
@@ -166,8 +166,8 @@ export { Scripts } from './Scripts.tsrx';
 export { ScriptOnce } from './ScriptOnce.tsrx';
 export { Asset } from './Asset.tsrx';
 export type { AssetProps } from './Asset.tsrx';
-export { getAssetKeys } from './assetKeys.ts';
-export type { AssetKeys } from './assetKeys.ts';
+export { getAssetKeys } from './assetKeys';
+export type { AssetKeys } from './assetKeys';
 export { useTags } from './headContentUtils';
 export { Html } from './Html';
 export type { HtmlProps } from './Html';

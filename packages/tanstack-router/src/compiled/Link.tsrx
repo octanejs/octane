@@ -3,10 +3,8 @@
 import { createUseLinkProps } from '../linkBinding';
 import { createLinkComponent } from '../linkComponent.tsrx';
 import { useRouter } from './bindings';
-import type { createLink as StandardCreateLink } from '../link';
+import type { createLink as StandardCreateLink } from '../linkApi';
 
-// The shared hook intentionally retains flushSync's synchronous navigation cue.
-// The compiled entry does not relax its observable event timing.
 export const useLinkProps = createUseLinkProps(useRouter);
 export const Link = createLinkComponent(useLinkProps);
 

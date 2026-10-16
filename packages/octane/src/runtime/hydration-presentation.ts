@@ -128,7 +128,7 @@ export interface PresentationHydrationFrame {
 			valid: (retired?: boolean) => boolean;
 			binding: DirectSignalBinding;
 			lease: ControlHandoff | undefined;
-			stop?: () => void;
+			stop?: (() => void) | undefined;
 		}
 	>;
 	completed: boolean;

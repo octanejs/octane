@@ -9,7 +9,7 @@
 import { useState, useEffect, isChildrenBlock } from 'octane';
 import type { OctaneNode } from 'octane';
 import type { BlockerFnArgs, HistoryAction, HistoryLocation } from '@tanstack/history';
-import { useRouter } from './context.ts';
+import { useRouter } from './context';
 
 // Blocker types, ported from react-router's useBlocker.tsx. Upstream derives the
 // location shapes from the registered route tree's generics; the octane binding's

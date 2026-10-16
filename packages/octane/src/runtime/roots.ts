@@ -236,7 +236,7 @@ export interface RootOptions {
 	 * after their fallback's refs and layout effects commit. Retained hidden
 	 * reports wait for reveal; abandoning their catch cancels them.
 	 */
-	onCaughtError?: (error: unknown) => void;
+	onCaughtError?: ((error: unknown) => void) | undefined;
 	/**
 	 * React 19 parity: called for an error no boundary claims. When provided it
 	 * REPLACES the default report for this root (render errors stop rethrowing
@@ -244,14 +244,14 @@ export interface RootOptions {
 	 * Recovery semantics are unchanged either way — an uncaught render error
 	 * still unmounts the failed root's entire tree.
 	 */
-	onUncaughtError?: (error: unknown) => void;
+	onUncaughtError?: ((error: unknown) => void) | undefined;
 	/**
 	 * React 19 parity, hydration only: called (dev AND prod) once for each
 	 * boundary, a Suspense arm, a Hydrate island or the root, whose server HTML
 	 * does not match the client render and which therefore renders on the
 	 * client. Attributes never fall back, so they never report.
 	 */
-	onRecoverableError?: (error: unknown) => void;
+	onRecoverableError?: ((error: unknown) => void) | undefined;
 }
 
 /**

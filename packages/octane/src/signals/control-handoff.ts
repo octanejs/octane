@@ -23,7 +23,7 @@ export interface ControlHandoff {
 	matches(handle: SignalHandle<unknown>): boolean;
 	composing(): boolean;
 	retire(): void;
-	owner?: object;
+	owner?: object | undefined;
 }
 
 /** Callable cleanup which can also be offered explicitly to hydrateRoot's controlLeases. */

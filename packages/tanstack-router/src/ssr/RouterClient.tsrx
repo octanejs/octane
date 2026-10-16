@@ -2,7 +2,7 @@ import { use } from 'octane';
 import { hydrate } from '@tanstack/router-core/ssr/client';
 import type { AnyRouter } from '@tanstack/router-core';
 import { RouterProvider } from '../RouterProvider.tsrx';
-import { toExternalHydrationThenable } from '../externalHydration.ts';
+import { toExternalHydrationThenable } from '../externalHydration';
 
 const hydrationPromises = new WeakMap<AnyRouter, PromiseLike<void>>();
 const ready = {

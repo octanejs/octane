@@ -8,7 +8,7 @@
 // when the match resolved with `status === 'notFound'` (a loader threw
 // `notFound()`). Upstream spreads the NotFoundError onto the component, so a
 // `notFound({ data })` payload arrives as the `data` prop.
-import { useRouter } from './context.ts';
+import { useRouter } from './context';
 
 export function RouteNotFound(props: { routeId: string; error?: any }) @{
 	const router = useRouter();

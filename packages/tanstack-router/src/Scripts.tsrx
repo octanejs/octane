@@ -1,5 +1,5 @@
 import { createScripts } from './scriptComponent.tsrx';
-import { useScripts } from './scriptContentUtils.ts';
+import { useScripts } from './scriptContentUtils';
 
 // router-core 1.171.34 owns the hydration-script lifecycle: the server appends
 // the initial hydration tags (and the streaming boundary) through

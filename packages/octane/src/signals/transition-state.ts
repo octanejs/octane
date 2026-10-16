@@ -157,11 +157,13 @@ export const candidateHooks: {
 	/** Promotion runs its graph's producer invalidation after the graph settles. */
 	defer: boolean;
 	/** Forks a resource (requests.ts) into a private candidate. */
-	resource?: (this: ResourceBinding, target: ScopedNode) => CandidateProducer;
+	resource?: ((this: ResourceBinding, target: ScopedNode) => CandidateProducer) | undefined;
 	/** Forks a general derived binding (computations.ts) into a private candidate. */
-	derived?: (
-		this: DerivedBinding<any>,
-		target: ScopedNode,
-		context: CandidateContext,
-	) => CandidateProducer;
+	derived?:
+		| ((
+				this: DerivedBinding<any>,
+				target: ScopedNode,
+				context: CandidateContext,
+		  ) => CandidateProducer)
+		| undefined;
 } = { defer: false, resource: undefined, derived: undefined };

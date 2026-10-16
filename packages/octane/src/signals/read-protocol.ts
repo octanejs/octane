@@ -126,7 +126,7 @@ export interface NativeReadSource {
 	 * On-demand DevTools metadata for a currently referenced source, with no
 	 * global graph registry. Present only in profiling builds.
 	 */
-	inspect?(): NativeReadInspection;
+	inspect?: (() => NativeReadInspection) | undefined;
 }
 
 export type NativeReadObserver = (source: NativeReadSource, version: number) => void;
@@ -154,7 +154,7 @@ export function readNativeDomStyle(value: any): any {
 }
 
 export function readNativeDomProps(props: Record<string, unknown>): Record<string, unknown> {
-	return 'style' in props ? { ...props, style: readNativeDomStyle(props.style) } : props;
+	return 'style' in props ? { ...props, style: readNativeDomStyle(props['style']) } : props;
 }
 
 /** A renderer supplies historical data only for a data scope actually read. */

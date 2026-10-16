@@ -15,7 +15,7 @@ export function formAuthoringDiagnostics(
 ): FormAuthoringDiagnostic[] {
 	const diagnostics: FormAuthoringDiagnostic[] = [];
 	if (tag === 'input' || tag === 'textarea' || tag === 'select') {
-		if (props.value !== undefined && props.defaultValue !== undefined) {
+		if (props['value'] !== undefined && props['defaultValue'] !== undefined) {
 			diagnostics.push({
 				kind: 'value-default',
 				message:
@@ -23,7 +23,11 @@ export function formAuthoringDiagnostics(
 					`A form field must be either controlled or uncontrolled; remove one of these props.`,
 			});
 		}
-		if (tag === 'input' && props.checked !== undefined && props.defaultChecked !== undefined) {
+		if (
+			tag === 'input' &&
+			props['checked'] !== undefined &&
+			props['defaultChecked'] !== undefined
+		) {
 			diagnostics.push({
 				kind: 'checked-default',
 				message:
@@ -33,7 +37,7 @@ export function formAuthoringDiagnostics(
 		}
 	}
 
-	if (tag === 'textarea' && children != null && props.value == null) {
+	if (tag === 'textarea' && children != null && props['value'] == null) {
 		diagnostics.push({
 			kind: 'textarea-children',
 			message: 'Use `defaultValue` or `value` instead of children on <textarea>.',
@@ -41,14 +45,14 @@ export function formAuthoringDiagnostics(
 	}
 
 	if (tag === 'option') {
-		if (props.selected != null) {
+		if (props['selected'] != null) {
 			diagnostics.push({
 				kind: 'option-selected',
 				message: 'Use `value` or `defaultValue` on <select> instead of `selected` on <option>.',
 			});
 		}
 		if (
-			props.value == null &&
+			props['value'] == null &&
 			children !== undefined &&
 			typeof children === 'object' &&
 			children !== null
@@ -62,10 +66,10 @@ export function formAuthoringDiagnostics(
 		}
 	}
 
-	const action = tag === 'form' ? props.action : (props.formAction ?? props.formaction);
+	const action = tag === 'form' ? props['action'] : (props['formAction'] ?? props['formaction']);
 	if (action == null) return diagnostics;
 	if (tag === 'input') {
-		if (props.type !== 'submit' && props.type !== 'image') {
+		if (props['type'] !== 'submit' && props['type'] !== 'image') {
 			diagnostics.push({
 				kind: 'action-type',
 				message: 'A <input> can only specify `formAction` with type="submit" or type="image".',
@@ -73,7 +77,7 @@ export function formAuthoringDiagnostics(
 			return diagnostics;
 		}
 	} else if (tag === 'button') {
-		if (props.type != null && props.type !== 'submit') {
+		if (props['type'] != null && props['type'] !== 'submit') {
 			diagnostics.push({
 				kind: 'action-type',
 				message: 'A <button> can only specify `formAction` with type="submit" or no type.',
@@ -86,7 +90,7 @@ export function formAuthoringDiagnostics(
 	if (typeof action !== 'function') return diagnostics;
 
 	if (tag === 'form') {
-		if (props.method != null || props.encType != null || props.enctype != null) {
+		if (props['method'] != null || props['encType'] != null || props['enctype'] != null) {
 			diagnostics.push({
 				kind: 'action-method',
 				message:
@@ -94,7 +98,7 @@ export function formAuthoringDiagnostics(
 					'Octane controls the submission transport.',
 			});
 		}
-		if (props.target != null) {
+		if (props['target'] != null) {
 			diagnostics.push({
 				kind: 'action-target',
 				message:
@@ -105,7 +109,7 @@ export function formAuthoringDiagnostics(
 		return diagnostics;
 	}
 
-	if (props.name != null) {
+	if (props['name'] != null) {
 		diagnostics.push({
 			kind: 'action-name',
 			message:
@@ -114,10 +118,10 @@ export function formAuthoringDiagnostics(
 		});
 	}
 	if (
-		props.formMethod != null ||
-		props.formmethod != null ||
-		props.formEncType != null ||
-		props.formenctype != null
+		props['formMethod'] != null ||
+		props['formmethod'] != null ||
+		props['formEncType'] != null ||
+		props['formenctype'] != null
 	) {
 		diagnostics.push({
 			kind: 'action-method',
@@ -126,7 +130,7 @@ export function formAuthoringDiagnostics(
 				'Octane controls the submission transport.',
 		});
 	}
-	if (props.formTarget != null || props.formtarget != null) {
+	if (props['formTarget'] != null || props['formtarget'] != null) {
 		diagnostics.push({
 			kind: 'action-target',
 			message:

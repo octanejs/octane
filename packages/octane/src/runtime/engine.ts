@@ -211,7 +211,9 @@ import {
 	missingSlot,
 	slotStack,
 	type StateSlot,
+	type StateSetter,
 	commitHookCells,
+	foldHookQueue,
 	queueHookUpdate,
 	markRootUpdated,
 	inInactiveSubtree,
@@ -407,7 +409,11 @@ export function scheduleNativeRead(target: Block): void {
 			target,
 			inFlush,
 			false,
-			nativeProducerPublication && !inFlush && !inCommitCallback() && _dispatchDepth === 0,
+			nativeProducerPublication &&
+				!inFlush &&
+				!inCommitCallback() &&
+				_dispatchDepth === 0 &&
+				RENDERER_DISCRETE_EVENT_DEPTH === 0,
 		);
 	} finally {
 		if (retainPriority) TRANSITION_DEPTH--;
@@ -495,7 +501,7 @@ let EFFECT_COMMIT_DEPTH = 0;
 let COMMIT_PHASE_ERRORS: Array<{
 	block: Block | null;
 	error: unknown;
-	handler?: TryHandler | null;
+	handler?: TryHandler | null | undefined;
 }> | null = null;
 // Callback refs are commit-phase callbacks too. Track them separately from
 // effect callbacks so an attach that repeatedly schedules its owner participates
@@ -631,6 +637,30 @@ export let TRANSITION_DEPTH = 0;
  * AsyncContext, which isn't available in the browser target.
  */
 export let ASYNC_TRANSITION_COUNT = 0;
+/** Renderer listeners own update priority, not delegated DOM propagation. */
+export let RENDERER_DISCRETE_EVENT_DEPTH = 0;
+
+/**
+ * @internal Adapt a renderer-owned discrete native listener to the DOM scheduler.
+ * Its ordinary updates remain urgent during an async Action and commit before
+ * the listener returns; task-held transitions keep their own scheduling.
+ */
+export function __createDiscreteEventListener(listener: EventListener): EventListener {
+	return (event) => {
+		const batch = beginNativeBatch();
+		RENDERER_DISCRETE_EVENT_DEPTH++;
+		try {
+			listener(event);
+		} finally {
+			try {
+				endNativeBatch(batch);
+			} finally {
+				RENDERER_DISCRETE_EVENT_DEPTH--;
+			}
+		}
+		if (!inFlush) flush();
+	};
+}
 
 /** Slots whose batches finished, promoted by the next commit (promotePendingSignals). */
 export let PENDING_SIGNAL_PROMOTIONS: PendingSlotLike[] | null = null;
@@ -1871,7 +1901,11 @@ export function scheduleRender(
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0 && !inCommitCallback())
+		(!syncFlush &&
+			_dispatchDepth === 0 &&
+			ASYNC_TRANSITION_COUNT > 0 &&
+			RENDERER_DISCRETE_EVENT_DEPTH === 0 &&
+			!inCommitCallback())
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -4153,6 +4187,62 @@ export function drainRegisteredPassivePhase(): void {
 	}
 }
 
+// Only bindings opting into committed state allocate this companion setter.
+// Keeping it outside the ordinary state cell preserves every useState record's shape.
+const COMMITTED_STATE_SETTERS = /* @__PURE__ */ new WeakMap<StateSetter<any>, StateSetter<any>>();
+
+/**
+ * @internal Binding state whose third setter accepts a state value/updater and
+ * commits the ordinary scheduled batch before an external integration callback.
+ * The batch can include eligible work in other roots and previously queued
+ * effects, even if the state update is a no-op. Unrelated transitions waiting
+ * for their host task are not adopted. Normal ViewTransition routing decides
+ * which active owners an urgent update affects. An ambient render or commit
+ * owns updates made during it.
+ */
+export function __useCommittedState<T>(
+	initial: T | (() => T),
+	slot: HookSlot | undefined,
+): [T, StateSetter<T>, StateSetter<T>] {
+	const state = readStateHook(initial, slot, false);
+	const setter = state.setter;
+	let committed = COMMITTED_STATE_SETTERS.get(setter);
+	if (committed === undefined) {
+		const block = CURRENT_BLOCK!;
+		committed = (next: T | ((previous: T) => T)) => {
+			if (block.disposed) return;
+			// A nested commit can invalidate the active DOM walk. Its ambient
+			// render/commit already owns this update, just as it owns flushSync's.
+			if (CURRENT_BLOCK !== null || inFlush) {
+				setter(next);
+				return;
+			}
+			const previousSync = syncFlush;
+			const previousTransition = TRANSITION_DEPTH;
+			const previousAction = ACTIVE_TRANSITION_ACTION_BATCH;
+			syncFlush = true;
+			TRANSITION_DEPTH = 0;
+			ACTIVE_TRANSITION_ACTION_BATCH = null;
+			try {
+				setter(next);
+				syncFlush = false;
+				// The setter suppressed scheduling while it forced urgent priority.
+				// If this owner was already waiting for a transition task, perform the
+				// same per-owner upgrade an ordinary urgent setter would have made.
+				if (block.pending && block.pendingMode === 'urgent' && TRANSITION_QUEUE.length !== 0)
+					TRANSITION_TASK_DRIVER!.upgrade(block, 'urgent');
+				flush();
+			} finally {
+				syncFlush = previousSync;
+				TRANSITION_DEPTH = previousTransition;
+				ACTIVE_TRANSITION_ACTION_BATCH = previousAction;
+			}
+		};
+		COMMITTED_STATE_SETTERS.set(setter, committed);
+	}
+	return [state.queue === null ? state.value : foldHookQueue(state, null), setter, committed];
+}
+
 /** Both tuple forms consume the same resolved cell without a second hook lookup. */
 export function readStateHook<T>(
 	initial: T | (() => T) | undefined,
@@ -5171,8 +5261,16 @@ export function makeRoot(
 			// e.g. a Suspense fallback appearing under a <ViewTransition>).
 			if (mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0)) {
 				rootBlock.pending = true;
-				rootBlock.pendingMode = 'transition';
-				if (TRANSITION_TASK_DRIVER && TRANSITION_TASK_DRIVER.queue(rootBlock)) return;
+				// A renderer event commits its implicit Action-window mount at the
+				// listener boundary; an explicit transition still owns its task.
+				rootBlock.pendingMode =
+					TRANSITION_DEPTH === 0 && RENDERER_DISCRETE_EVENT_DEPTH > 0 ? 'urgent' : 'transition';
+				if (
+					TRANSITION_TASK_DRIVER &&
+					rootBlock.pendingMode === 'transition' &&
+					TRANSITION_TASK_DRIVER.queue(rootBlock)
+				)
+					return;
 				QUEUE.push(rootBlock);
 				if (!syncFlush && !scheduled) {
 					scheduled = true;
