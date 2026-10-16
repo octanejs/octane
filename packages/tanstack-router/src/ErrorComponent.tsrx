@@ -1,5 +1,7 @@
 'use strong';
 
+declare const process: { env: { NODE_ENV?: string } };
+
 import { useState } from 'octane';
 
 // The default error UI, markup-identical to react-router's ErrorComponent (string

@@ -61,7 +61,7 @@ export async function __serverRpc(
 					...(stream ? { Accept: SERVER_RESULT_CONTENT_TYPE } : {}),
 				},
 				body: payload,
-				signal,
+				signal: signal ?? null,
 			});
 		} catch (cause) {
 			throw new ServerCallUncertainError(

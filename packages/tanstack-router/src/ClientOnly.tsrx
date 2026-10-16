@@ -9,7 +9,7 @@
 // call sites).
 import { useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
-import { splitSlot, subSlot } from './internal.ts';
+import { splitSlot, subSlot } from './internal';
 
 const subscribe = () => () => {};
 

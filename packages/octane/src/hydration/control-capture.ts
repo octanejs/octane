@@ -26,8 +26,8 @@ export type EarlyHydrationIntent = readonly [
 	string,
 	string | null,
 	string | null,
-	Element?,
-	string?,
+	(Element | undefined)?,
+	(string | undefined)?,
 	boolean?,
 	number?,
 ];

@@ -11,9 +11,9 @@
 // no forwardRef); `disabled` renders without an href + role="link" (upstream
 // drops the anchor's disabled attribute; the aria props carry the state).
 import { isChildrenBlock } from 'octane';
-import type { useLinkProps as UseLinkProps } from './link.ts';
+import type { useLinkProps as UseLinkProps } from './linkApi';
 import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
-import type { LinkComponentProps, OctaneAnchorProps, UseLinkPropsOptions } from './linkTypes.ts';
+import type { LinkComponentProps, OctaneAnchorProps, UseLinkPropsOptions } from './linkTypes';
 
 // Keep the generic implementation signature visible to `.tsrx` consumers so
 // route-aware `to`/`params`/`search` inference and native anchor event types are

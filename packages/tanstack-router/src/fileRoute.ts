@@ -70,7 +70,7 @@ export class FileRoute<
 	TPath extends RouteConstraints['TPath'] = FileRoutesByPath[TFilePath]['path'],
 	TFullPath extends RouteConstraints['TFullPath'] = FileRoutesByPath[TFilePath]['fullPath'],
 > {
-	silent?: boolean;
+	silent?: boolean | undefined;
 
 	constructor(
 		public path?: TFilePath,

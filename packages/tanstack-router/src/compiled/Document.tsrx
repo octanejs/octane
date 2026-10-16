@@ -1,5 +1,7 @@
 'use strong';
 
+declare const process: { env: { NODE_ENV?: string } };
+
 import { useEffect, useId, HYDRATION_RANGE_BOUNDARY, createPortal, useState } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';

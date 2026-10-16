@@ -8,7 +8,7 @@ import {
 /** A single-consumer result; iterator.return() cancels only this invocation. */
 export async function readServerResult(
 	response: Response,
-	options: ServerResultLimits & { signal?: AbortSignal } = {},
+	options: ServerResultLimits & { signal?: AbortSignal | undefined } = {},
 ): Promise<unknown> {
 	if (response.body === null)
 		throw new ServerCallUncertainError(new Error('Server function returned an empty response'));

@@ -7,7 +7,7 @@
 import { hasKeys } from '@tanstack/router-core';
 import type { AnyRouter } from '@tanstack/router-core';
 import type { OctaneNode } from 'octane';
-import { routerContext as RouterContext } from './context.ts';
+import { routerContext as RouterContext } from './context';
 import { Matches } from './Matches.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
 

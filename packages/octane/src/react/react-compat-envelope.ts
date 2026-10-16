@@ -18,14 +18,14 @@ class IslandErrorBoundary extends React.Component<
 	{ observer: ReactCompatObserver | null; children?: React.ReactNode },
 	{ failed: boolean }
 > {
-	state = { failed: false };
+	override state = { failed: false };
 	static getDerivedStateFromError() {
 		return { failed: true };
 	}
-	componentDidCatch(error: unknown) {
+	override componentDidCatch(error: unknown) {
 		this.props.observer?.error(error);
 	}
-	render() {
+	override render() {
 		return this.state.failed ? null : this.props.children;
 	}
 }

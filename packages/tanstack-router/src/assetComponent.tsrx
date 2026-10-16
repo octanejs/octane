@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, trustHTML } from 'octane';
 import { isServer } from '@tanstack/router-core/isServer';
 import type { RouterManagedTag } from '@tanstack/router-core';
-import type { useRouter as UseRouter } from './context.ts';
+import type { useRouter as UseRouter } from './context';
 import { useHydrated } from './ClientOnly.tsrx';
 
 export type AssetProps = RouterManagedTag & {

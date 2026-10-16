@@ -27,7 +27,7 @@ export function resourceHintWarning(
 		if (invalidOptions) {
 			encountered += ' The `options` argument was ' + describeHintValue(options) + '.';
 		} else {
-			const destination = (options as Record<string, unknown>).as;
+			const destination = (options as Record<string, unknown>)['as'];
 			if (typeof destination !== 'string' || destination === '') {
 				encountered += ' The `as` option was ' + describeHintValue(destination) + '.';
 			}
@@ -44,7 +44,7 @@ export function resourceHintWarning(
 		if (options != null && invalidOptions) {
 			encountered += ' The `options` argument was ' + describeHintValue(options) + '.';
 		} else if (options !== null && typeof options === 'object' && 'as' in options) {
-			const destination = (options as Record<string, unknown>).as;
+			const destination = (options as Record<string, unknown>)['as'];
 			if (
 				(name === 'preloadModule' && typeof destination !== 'string') ||
 				(name === 'preinitModule' && destination !== 'script')
@@ -76,7 +76,7 @@ export function resourceHintWarning(
 				'.'
 			);
 		}
-		const destination = (options as Record<string, unknown>).as;
+		const destination = (options as Record<string, unknown>)['as'];
 		return destination === 'style' || destination === 'script'
 			? null
 			: 'preinit(): The `as` option must be "style" or "script"; received ' +
@@ -93,7 +93,7 @@ export function resourceHintWarning(
 			);
 		}
 		if (options !== null && typeof options === 'object') {
-			const crossOrigin = (options as Record<string, unknown>).crossOrigin;
+			const crossOrigin = (options as Record<string, unknown>)['crossOrigin'];
 			if (typeof crossOrigin !== 'string') {
 				return (
 					'preconnect(): The `crossOrigin` option must be a string; received ' +

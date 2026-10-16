@@ -181,7 +181,7 @@ export function readNativeDomStyle(value: any): any {
 }
 
 export function readNativeDomProps(props: Record<string, unknown>): Record<string, unknown> {
-	return 'style' in props ? { ...props, style: readNativeDomStyle(props.style) } : props;
+	return 'style' in props ? { ...props, style: readNativeDomStyle(props['style']) } : props;
 }
 
 /** A renderer supplies historical data only for a data scope actually read. */

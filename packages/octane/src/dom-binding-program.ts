@@ -128,8 +128,8 @@ export function __activateBindingAdapters(
 		definition: Extract<BindingAdapter, { kind: 'ref' }>;
 		node: Element;
 		value: unknown;
-		dependencies?: readonly unknown[];
-		cleanup?: () => void;
+		dependencies?: readonly unknown[] | undefined;
+		cleanup?: (() => void) | undefined;
 	}> = [];
 	let disposed = false;
 	let cleaned = false;
@@ -412,12 +412,12 @@ interface RegionInstance {
 	items: Map<string, FragmentInstance> | null;
 	text: Text | null;
 	signal?: BindingSignalConnection;
-	signalPlan?: RegionPlan;
+	signalPlan?: RegionPlan | undefined;
 	signalFrame?: number;
 	unresolvedSlot?: boolean;
-	slot?: string;
+	slot?: string | undefined;
 	/** A `@try` region keeps showing `@catch` until its `reset` runs. */
-	caught?: { readonly error: unknown };
+	caught?: { readonly error: unknown } | undefined;
 	reset?: () => void;
 	/**
 	 * A `@try` region still shows the server's resolved body, which no client
@@ -439,15 +439,15 @@ interface FragmentInstance {
 	signals?: Map<number, BindingSignalConnection>;
 	projections?: Map<number, BindingProjectionConnection>;
 	controls?: Map<number, BindingControlLease>;
-	signalPlan?: FragmentPlan;
+	signalPlan?: FragmentPlan | undefined;
 	signalFrame?: number;
 	environment: readonly unknown[];
 	fresh: boolean;
 	disposed: boolean;
 	activated: boolean;
 	controller?: AbortController;
-	cleanup?: BindingActivationCleanup;
-	updateAdapters?: () => void;
+	cleanup?: BindingActivationCleanup | undefined;
+	updateAdapters?: (() => void) | undefined;
 	/** Cleanups returned by mount-only effects; `null` once they have run. */
 	effects?: Array<() => void> | null;
 }
@@ -459,8 +459,8 @@ interface FragmentPlan {
 	initial: Array<string | boolean | readonly string[] | null> | null;
 	regions: RegionPlan[];
 	groups: Map<number, { commit(): void }>;
-	controls?: Map<number, BindingControlPrepared>;
-	adapters?: () => void;
+	controls?: Map<number, BindingControlPrepared> | undefined;
+	adapters?: (() => void) | undefined;
 }
 
 interface RegionPlan {
@@ -483,24 +483,24 @@ interface Transaction {
 	contentEditable: boolean;
 	restoreStyles: boolean;
 	preservePresentation?: boolean;
-	signals?: ReturnType<typeof __createBindingSignals>;
-	styles?: ReturnType<typeof __createBindingStyles>;
-	projections?: ReturnType<typeof __createBindingProjections>;
-	controls?: ReturnType<typeof __createBindingControls>;
-	hostOperations?: BindingProgramHostOperations;
-	initialOperations?: BindingProgramInitializers;
-	list?: BindingListCapability;
-	tryRegions?: BindingTryCapability;
-	effects?: BindingEffectsCapability;
+	signals?: ReturnType<typeof __createBindingSignals> | undefined;
+	styles?: ReturnType<typeof __createBindingStyles> | undefined;
+	projections?: ReturnType<typeof __createBindingProjections> | undefined;
+	controls?: ReturnType<typeof __createBindingControls> | undefined;
+	hostOperations?: BindingProgramHostOperations | undefined;
+	initialOperations?: BindingProgramInitializers | undefined;
+	list?: BindingListCapability | undefined;
+	tryRegions?: BindingTryCapability | undefined;
+	effects?: BindingEffectsCapability | undefined;
 	notifySignal?(prepare: () => () => void): void;
-	reads?: BindingReadTracker;
+	reads?: BindingReadTracker | undefined;
 	refresh?: () => void;
 	run?: <T>(callback: () => T) => T;
 	waits?: WeakSet<object>;
 	preparing?: boolean;
 	frame: number;
-	published?: () => void;
-	preview?: BindingPreview;
+	published?: (() => void) | undefined;
+	preview?: BindingPreview | undefined;
 	consumer?: NativeTransitionNotify;
 }
 

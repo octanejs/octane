@@ -3,7 +3,7 @@
 import { createUseLinkProps } from '../linkBinding';
 import { createLinkComponent } from '../linkComponent.tsrx';
 import { useRouter } from './bindings';
-import type { createLink as StandardCreateLink } from '../link';
+import type { createLink as StandardCreateLink } from '../linkApi';
 
 export const useLinkProps = createUseLinkProps(useRouter);
 export const Link = createLinkComponent(useLinkProps);

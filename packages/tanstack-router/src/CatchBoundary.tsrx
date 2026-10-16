@@ -15,7 +15,7 @@
 //     so navigation clears route error UI.
 import { useRef, useLayoutEffect } from 'octane';
 import type { OctaneNode } from 'octane';
-import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
+import type { ErrorInfo, ErrorRouteComponent } from './route';
 import { ErrorComponent } from './ErrorComponent.tsrx';
 
 export { ErrorComponent };
@@ -23,8 +23,8 @@ export { ErrorComponent };
 export function CatchBoundary(props: {
 	getResetKey: () => unknown;
 	children: OctaneNode;
-	errorComponent?: ErrorRouteComponent;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	errorComponent?: ErrorRouteComponent | undefined;
+	onCatch?: ((error: Error, errorInfo: ErrorInfo) => void) | undefined;
 }) @{
 	@try {
 		<>{props.children}</>
@@ -42,9 +42,9 @@ export function CatchBoundary(props: {
 function CatchErrorView(props: {
 	error: any;
 	reset: () => void;
-	getResetKey?: () => unknown;
-	errorComponent?: ErrorRouteComponent;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	getResetKey: () => unknown;
+	errorComponent?: ErrorRouteComponent | undefined;
+	onCatch?: ((error: Error, errorInfo: ErrorInfo) => void) | undefined;
 }) @{
 	// componentDidCatch parity — once per distinct caught error, during render so a
 	// rethrow (the notFound-forwarding path) escapes to the parent boundary.

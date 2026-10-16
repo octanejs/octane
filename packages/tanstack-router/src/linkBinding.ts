@@ -218,13 +218,13 @@ export function createUseLinkProps(useRouter: typeof UseRouter) {
 		// Class composes clsx-style (octane normalizeClass folds arrays + falsy).
 		const resolvedClass = [
 			klass ?? className,
-			resolvedActiveProps.class ?? resolvedActiveProps.className,
-			resolvedInactiveProps.class ?? resolvedInactiveProps.className,
+			resolvedActiveProps['class'] ?? resolvedActiveProps['className'],
+			resolvedInactiveProps['class'] ?? resolvedInactiveProps['className'],
 		].filter(Boolean);
 		const resolvedStyle = mergeStyles(
 			style,
-			resolvedActiveProps.style,
-			resolvedInactiveProps.style,
+			resolvedActiveProps['style'],
+			resolvedInactiveProps['style'],
 		);
 
 		const [isTransitioning, setIsTransitioning, commitIsTransitioning] = __useCommittedState(
@@ -235,7 +235,7 @@ export function createUseLinkProps(useRouter: typeof UseRouter) {
 		const elRef = useRef<Element | null>(null, subSlot(slot, 'lp:el'));
 
 		const preload =
-			options.reloadDocument || externalLink
+			options['reloadDocument'] || externalLink
 				? false
 				: (userPreload ?? router.options.defaultPreload);
 		const preloadDelay = userPreloadDelay ?? router.options.defaultPreloadDelay ?? 0;

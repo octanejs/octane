@@ -12,7 +12,7 @@
 // ErrorComponent for errors no route boundary caught, reset by `loadedAt`.
 import { useLayoutEffect, createElement, Suspense } from 'octane';
 import { setupScrollRestoration, rootRouteId } from '@tanstack/router-core';
-import { useRouter, matchContext as MatchContext } from './context.ts';
+import { useRouter, matchContext as MatchContext } from './context';
 import { useTransitioner, usePresentedMatches } from './Transitioner.tsrx';
 import type { AnyRouteMatch } from '@tanstack/router-core';
 import { Match } from './Match.tsrx';
@@ -41,7 +41,7 @@ export function Matches() @{
 	</InnerWrap>
 }
 
-function MatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> }) @{
+function MatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> | undefined }) @{
 	const router = useRouter();
 	const matches = usePresentedMatches(router, props.expectedMatches);
 	const rootMatch = matches[0];

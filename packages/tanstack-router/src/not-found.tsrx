@@ -6,14 +6,14 @@
 import { isNotFound } from '@tanstack/router-core';
 import type { ErrorComponentProps, NotFoundError } from '@tanstack/router-core';
 import type { OctaneNode } from 'octane';
-import type { ErrorInfo } from './route.ts';
-import { useRouter } from './context.ts';
-import { useStore } from './useStore.ts';
+import type { ErrorInfo } from './route';
+import { useRouter } from './context';
+import { useStore } from './useStore';
 import { CatchBoundary } from './CatchBoundary.tsrx';
 
 function NotFoundFallback(props: {
 	error: unknown;
-	render?: (error: NotFoundError) => OctaneNode;
+	render?: ((error: NotFoundError) => OctaneNode) | undefined;
 }) {
 	if (isNotFound(props.error)) {
 		return props.render ? props.render(props.error) : null;

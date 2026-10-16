@@ -11,7 +11,7 @@ export type Readiness = {
 export type DocumentRegistry = {
 	roots: Map<Element, RootRecord>;
 	ranges: Map<Element, RangeRecord>;
-	capture?: BehaviorCaptureHooks;
+	capture?: BehaviorCaptureHooks | undefined;
 };
 
 export type BehaviorDOM = Pick<

@@ -6,7 +6,7 @@
 import { isServer } from '@tanstack/router-core/isServer';
 import { Hydrate, trustHTML } from 'octane';
 import { never } from 'octane/hydration';
-import { useRouter } from './context.ts';
+import { useRouter } from './context';
 import { useHydrated } from './ClientOnly.tsrx';
 
 export function ScriptOnce(props: { children: string }) @{

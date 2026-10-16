@@ -11,8 +11,8 @@
 // match — so the 404 lands inside the layout chrome.
 import { useContext, createElement, Suspense } from 'octane';
 import { rootRouteId } from '@tanstack/router-core';
-import { useStore } from './useStore.ts';
-import { useRouter, matchContext } from './context.ts';
+import { useStore } from './useStore';
+import { useRouter, matchContext } from './context';
 import { Match } from './Match.tsrx';
 import { RouteNotFound } from './RouteNotFound.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';

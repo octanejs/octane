@@ -111,10 +111,11 @@ function buildTagsFromMatches(
 		}
 
 		if (manifest.inlineStyle) {
+			const children = manifest.inlineStyle.children;
 			manifestTags.push({
 				tag: 'style',
 				attrs: { ...manifest.inlineStyle.attrs, nonce },
-				children: manifest.inlineStyle.children,
+				...(children === undefined ? undefined : { children }),
 				inlineCss: true,
 			});
 		}
@@ -123,25 +124,19 @@ function buildTagsFromMatches(
 	const styles = matches
 		.flatMap((match) => match.styles ?? [])
 		.filter((style) => style !== undefined)
-		.map(
-			({ children, ...attrs }) =>
-				({
-					tag: 'style',
-					attrs: { ...attrs, nonce },
-					children: children,
-				}) satisfies RouterManagedTag,
+		.map(({ children, ...attrs }): RouterManagedTag =>
+			children === undefined
+				? { tag: 'style', attrs: { ...attrs, nonce } }
+				: { tag: 'style', attrs: { ...attrs, nonce }, children },
 		);
 
 	const headScripts = matches
 		.flatMap((match) => match.headScripts ?? [])
 		.filter((script) => script !== undefined)
-		.map(
-			({ children, ...attrs }) =>
-				({
-					tag: 'script',
-					attrs: { ...attrs, nonce },
-					children: children,
-				}) satisfies RouterManagedTag,
+		.map(({ children, ...attrs }): RouterManagedTag =>
+			children === undefined
+				? { tag: 'script', attrs: { ...attrs, nonce } }
+				: { tag: 'script', attrs: { ...attrs, nonce }, children },
 		);
 
 	const tags: Array<RouterManagedTag> = [];

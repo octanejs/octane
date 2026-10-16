@@ -29,11 +29,11 @@ interface StagedDeclaration<D> {
 export abstract class RedeclarableBinding<D> {
 	/** Declaration order of the committed definition. Older closures never rebind it. */
 	protected sequence = 0;
-	declare private staged?: StagedDeclaration<D>;
+	declare private staged?: StagedDeclaration<D> | undefined;
 	/** Kept by an attempt that restarted before any render declaring it was accepted. */
 	declare private provisional?: boolean;
 	/** The render values the committed definition captured, when compiled code listed them. */
-	declare private captures?: readonly unknown[];
+	declare private captures?: readonly unknown[] | undefined;
 	/** The last render invocation whose first declaration presented the committed cell. */
 	declare private presented?: number;
 	abstract readonly node: ScopedNode;

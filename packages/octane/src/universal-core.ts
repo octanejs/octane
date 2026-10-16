@@ -1067,7 +1067,7 @@ interface CommittedCollapsedTemplate {
 	readonly owner: UniversalOwnerRecord;
 	readonly firstId?: number;
 	readonly prepared?: PreparedCollapsedTemplateProgram;
-	readonly values?: readonly UniversalHostTemplateProgramValue[];
+	readonly values?: readonly UniversalHostTemplateProgramValue[] | undefined;
 }
 
 interface CommittedEvent extends BlueprintEvent {
@@ -1712,15 +1712,15 @@ function assignUniversalPropSpread(
 		Object.defineProperty(props, 'className', {
 			configurable: true,
 			set(next) {
-				props.class = next;
+				props['class'] = next;
 			},
 		});
 	}
 	try {
 		Object.assign(props, source);
 	} finally {
-		if (needsProtoGuard && !protoAssigned) delete props.__proto__;
-		if (hasOwnClassName) delete props.className;
+		if (needsProtoGuard && !protoAssigned) delete props['__proto__'];
+		if (hasOwnClassName) delete props['className'];
 	}
 }
 
@@ -1784,7 +1784,7 @@ export function universalProps(
 			}
 		}
 	}
-	if (children !== NO_CHILDREN) props.children = children;
+	if (children !== NO_CHILDREN) props['children'] = children;
 	return {
 		$$kind: UNIVERSAL_PROPS,
 		props: Object.freeze(props),
@@ -2007,7 +2007,7 @@ function rendererRegionOwnerBridge(value: unknown): UniversalRendererRegionOwner
 export function defineUniversalComponent<P>(
 	renderer: string,
 	render: (props: P, context: UniversalRenderContext) => UniversalRenderable,
-	metadata?: { module?: string },
+	metadata?: { module?: string | undefined },
 ): UniversalComponent<P> {
 	assertRendererId(renderer, 'defineUniversalComponent renderer');
 	if (typeof render !== 'function')
@@ -2717,8 +2717,8 @@ function materializeComponentValue(
 		const normalized = normalizePropsValue(value.props);
 		const provider = universalContext(
 			value.component as unknown as UniversalContext<unknown>,
-			normalized.props.value,
-			normalized.props.children as UniversalRenderable | (() => UniversalRenderable),
+			normalized.props['value'],
+			normalized.props['children'] as UniversalRenderable | (() => UniversalRenderable),
 		);
 		const key = value.hasKey ? normalizeUniversalKey(value.key) : null;
 		return materializeValue(
@@ -3912,21 +3912,22 @@ function materializeNode(
 		Object.assign(sourceProps, propsValue.props);
 	}
 	if (
-		isUniversalHostBinding(sourceProps.ref) ||
-		isUniversalHostBinding(sourceProps.key) ||
-		isUniversalHostBinding(sourceProps.children)
+		isUniversalHostBinding(sourceProps['ref']) ||
+		isUniversalHostBinding(sourceProps['key']) ||
+		isUniversalHostBinding(sourceProps['children'])
 	) {
 		throw new Error('Experimental host bindings require an ordinary host property.');
 	}
 	const hasKey =
 		staticProps === null && (propsValue?.hasKey || hasOwnProp.call(sourceProps, 'key'));
 	const hostKey = normalizeUniversalKey(
-		propsValue?.hasKey ? propsValue.key : hasKey ? sourceProps.key : null,
+		propsValue?.hasKey ? propsValue.key : hasKey ? sourceProps['key'] : null,
 	);
-	const ref = staticProps === null && hasOwnProp.call(sourceProps, 'ref') ? sourceProps.ref : null;
+	const ref =
+		staticProps === null && hasOwnProp.call(sourceProps, 'ref') ? sourceProps['ref'] : null;
 	const dynamicChildren =
 		staticProps === null && hasOwnProp.call(sourceProps, 'children')
-			? sourceProps.children
+			? sourceProps['children']
 			: undefined;
 	let props = sourceProps;
 	let events: Map<string, BlueprintEvent> | null = null;

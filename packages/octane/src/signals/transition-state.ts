@@ -99,13 +99,15 @@ export const candidateHooks: {
 	/** Accepting a frame runs its graph's producer invalidation after the graph settles. */
 	defer: boolean;
 	/** Present while a frame holds a write: revokes or records it for an urgent write. */
-	urgentWrite?: (node: ScopedNode, value: unknown) => (() => void)[] | undefined;
+	urgentWrite?: ((node: ScopedNode, value: unknown) => (() => void)[] | undefined) | undefined;
 	/** Forks a resource (requests.ts) into a private candidate. */
-	resource?: (this: ResourceBinding, target: ScopedNode) => CandidateProducer;
+	resource?: ((this: ResourceBinding, target: ScopedNode) => CandidateProducer) | undefined;
 	/** Forks a general derived binding (computations.ts) into a private candidate. */
-	derived?: (
-		this: DerivedBinding<any>,
-		target: ScopedNode,
-		frame: SignalCandidateFrame,
-	) => CandidateProducer;
+	derived?:
+		| ((
+				this: DerivedBinding<any>,
+				target: ScopedNode,
+				frame: SignalCandidateFrame,
+		  ) => CandidateProducer)
+		| undefined;
 } = { defer: false, urgentWrite: undefined, resource: undefined, derived: undefined };

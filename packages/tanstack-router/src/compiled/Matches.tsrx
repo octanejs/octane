@@ -47,7 +47,7 @@ function CompiledMatches() @{
 	}
 }
 
-function CompiledMatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> }) @{
+function CompiledMatchesInner(props: { expectedMatches?: Array<AnyRouteMatch> | undefined }) @{
 	const router = useRouter();
 	const matches = usePresentedMatches(router, props.expectedMatches);
 	const rootMatch = matches[0];

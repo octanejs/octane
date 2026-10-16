@@ -66,17 +66,17 @@ export interface SignalActionNode {
 	revision: number;
 	readonly epoch: number;
 	readonly stop: () => void;
-	producer?: CandidateProducer;
+	producer?: CandidateProducer | undefined;
 	written?: boolean;
 	withdrawn?: boolean;
-	urgentOperations?: Array<(previous: unknown) => unknown>;
+	urgentOperations?: Array<(previous: unknown) => unknown> | undefined;
 	sources?: Partial<Record<SignalReadMode, NativeCandidateSource>>;
 }
 
 interface PreparationWake {
-	notify?: (event: { kind: 'retry' | 'invalid'; token: object }) => void;
-	validate?: () => boolean;
-	token?: object;
+	notify?: ((event: { kind: 'retry' | 'invalid'; token: object }) => void) | undefined;
+	validate?: (() => boolean) | undefined;
+	token?: object | undefined;
 	queued: boolean;
 	invalid: boolean;
 }

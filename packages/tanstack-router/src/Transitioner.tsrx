@@ -81,6 +81,7 @@ function subscribeToHistory(router: AnyRouter, history: AnyRouter['history']) {
 		router.emit({
 			type: 'onRendered',
 			...getLocationChangeInfo(resolvedLocation, resolvedLocation),
+			fromLocation: resolvedLocation,
 		});
 	} else if (!router._tx) {
 		router.load({ sync: true }).catch((err: unknown) => {

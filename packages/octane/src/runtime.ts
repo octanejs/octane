@@ -824,7 +824,7 @@ const TEMPLATE_INVOCATION_SITE = 't:';
 // WeakMap entry.
 interface SignalRetryNode {
 	children?: Map<unknown, SignalRetryNode>;
-	owner?: SignalRendererOwnerIdentity;
+	owner?: SignalRendererOwnerIdentity | undefined;
 }
 interface SignalRetryOwners {
 	paths: SignalRetryNode;
@@ -988,7 +988,9 @@ function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): vo
 	});
 }
 
-function clearSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwners }): void {
+function clearSignalRetryOwners(holder: {
+	retrySignalOwners?: SignalRetryOwners | undefined;
+}): void {
 	const cache = holder.retrySignalOwners;
 	if (cache === undefined) return;
 	holder.retrySignalOwners = undefined;
@@ -1218,7 +1220,7 @@ export function enableSignalBindings(abi = 1, potentialOnly = false): void {
 	if (!potentialOnly) enableSignalDocument(abi);
 }
 
-type SignalIdentityToken = string | { value: object | symbol; position?: number };
+type SignalIdentityToken = string | { value: object | symbol; position?: number | undefined };
 
 interface OpaqueSignalKeys {
 	objects: WeakMap<object, number>;
@@ -2537,9 +2539,10 @@ interface RootIdState {
 	prefix: string;
 	next: number;
 	/** Shared deterministic namespace for lazily used module-signal instances. */
-	signalState?: { prefix: string; next: number; opaqueKeys?: Map<string, OpaqueSignalKeys> };
+	signalState?:
+		{ prefix: string; next: number; opaqueKeys?: Map<string, OpaqueSignalKeys> } | undefined;
 	/** Shared render ownership; descendants already carry this root-local record. */
-	renderOwner?: RootRenderOwner;
+	renderOwner?: RootRenderOwner | undefined;
 	/** Exclusive end of an SSR-reserved deferred-boundary range. */
 	limit?: number;
 	/** Root allocator used if a hydration mismatch consumes beyond that range. */
@@ -2816,7 +2819,7 @@ let EFFECT_COMMIT_DEPTH = 0;
 let COMMIT_PHASE_ERRORS: Array<{
 	block: Block | null;
 	error: unknown;
-	handler?: TryHandler | null;
+	handler?: TryHandler | null | undefined;
 }> | null = null;
 // Callback refs are commit-phase callbacks too. Track them separately from
 // effect callbacks so an attach that repeatedly schedules its owner participates
@@ -3063,22 +3066,22 @@ function ensureTransitionSwapDriver(): void {
 
 interface TransitionActionSlot<T> {
 	value: T;
-	renderTransition?: { value: T };
-	pendingActionBatch?: TransitionActionBatch;
-	pendingActionValue?: T;
+	renderTransition?: { value: T } | undefined;
+	pendingActionBatch?: TransitionActionBatch | undefined;
+	pendingActionValue?: T | undefined;
 }
 
 interface TransitionActionUpdate<T = unknown> {
 	/** An urgent replacement can cancel a held value even when its base is equal. */
 	superseded?: boolean;
 	/** Retained after its block rendered it (queueTransitionBlock); its value is committed. */
-	rendered?: boolean;
+	rendered?: boolean | undefined;
 	state?: StateSlot<T>;
 	/** Already queued work precedes this batch; later urgent work stays on the cell. */
 	previous?: TransitionActionUpdate<T>;
 	next?: TransitionActionUpdate<T>;
-	stateUpdates?: Array<T | ((previous: T) => T)>;
-	reducerActions?: any[];
+	stateUpdates?: Array<T | ((previous: T) => T)> | undefined;
+	reducerActions?: any[] | undefined;
 	replayBaseValue?: T;
 	urgentOperations?: number[];
 	batch?: TransitionActionBatch;
@@ -3114,7 +3117,7 @@ interface TransitionActionBatch {
 	pendingHolds?: number;
 	workComplete?: boolean;
 	/** Allocated only by a native write inside this Action. */
-	native?: SignalActionFrame;
+	native?: SignalActionFrame | undefined;
 	nativeWake?: () => void;
 	nativeBlocks?: Set<Block>;
 	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
@@ -4367,9 +4370,9 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 interface RootRenderOwner {
 	current: Block | null;
 	/** Shared document/account data owner; distinct from this root's presentation owner. */
-	signalOwner?: SignalOwner;
+	signalOwner?: SignalOwner | undefined;
 	/** Immutable initial-response history, borrowed by deferred and streamed adoptions. */
-	initialDocumentSignals?: ScopeSeed;
+	initialDocumentSignals?: ScopeSeed | undefined;
 	bindingLeases?: Set<BindingHandoff>;
 	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
@@ -4379,9 +4382,9 @@ interface RootRenderOwner {
 	 * where it would clear the container, so the server DOM stays until it
 	 * commits, and with `true` when it ends in an uncaught error.
 	 */
-	hydrationFallback?: (failed: boolean) => void;
+	hydrationFallback?: ((failed: boolean) => void) | undefined;
 	bindingContainer?: Node;
-	adopt?: (block: Block) => void;
+	adopt?: ((block: Block) => void) | undefined;
 	retry: () => void;
 	request: ((mode: 'urgent' | 'transition') => void) | null;
 	generation: number;
@@ -4396,7 +4399,7 @@ interface RootRenderOwner {
 	nativeTransitions?: Set<TransitionActionBatch>;
 	transaction: RootRenderTransaction | null;
 	/** Installed only when a single-origin transition suspends at this root. */
-	transition?: RootTransitionHold;
+	transition?: RootTransitionHold | undefined;
 	disposed: boolean;
 }
 
@@ -6741,7 +6744,7 @@ function vtClassByType(
 		if (match === 'none') return 'none';
 		result = result === undefined ? match : result + ' ' + match;
 	}
-	return result ?? value.default;
+	return result ?? value['default'];
 }
 
 function vtResolveClass(
@@ -7192,19 +7195,19 @@ function vtPruneStaticDimensions(effect: KeyframeEffect, owner: Document): void 
 	if (typeof effect.getKeyframes !== 'function') return;
 	const frames = effect.getKeyframes();
 	if (frames.length < 2) return;
-	const width = frames[0].width;
-	const height = frames[0].height;
+	const width = frames[0]['width'];
+	const height = frames[0]['height'];
 	if (
 		width === undefined ||
 		height === undefined ||
-		!frames.every((frame) => frame.width === width && frame.height === height)
+		!frames.every((frame) => frame['width'] === width && frame['height'] === height)
 	)
 		return;
 	const simplified = frames.map((frame) => {
 		const copy = { ...frame };
-		delete copy.width;
-		delete copy.height;
-		if (copy.transform === 'none') delete copy.transform;
+		delete copy['width'];
+		delete copy['height'];
+		if (copy['transform'] === 'none') delete copy['transform'];
 		return copy;
 	});
 	effect.setKeyframes(simplified);
@@ -7824,7 +7827,7 @@ let EFFECT_EVENT_ACTION_TARGET = effectEventCommitActions;
 // A subtree rendered off-screen by `renderOffscreen` (its DOM sits between owned
 // `start`/`end` markers, outside the committed slot range, with its effects captured).
 interface OffscreenWip {
-	retrySignalOwners?: SignalRetryOwners;
+	retrySignalOwners?: SignalRetryOwners | undefined;
 	block: Block;
 	start: Comment;
 	end: Comment;
@@ -12610,8 +12613,8 @@ function createBlock(
 
 type RenderPhaseCell = {
 	value: unknown;
-	updates?: unknown[];
-	renderPhaseActions?: unknown[];
+	updates?: unknown[] | undefined;
+	renderPhaseActions?: unknown[] | undefined;
 };
 type RenderPhaseSnapshot = {
 	value: unknown;
@@ -14849,14 +14852,14 @@ interface LinkedStateSlot<Source, Value> {
 	value: Value;
 	setter: StateSetter<Value>;
 	getter?: () => Value;
-	valueEqual?: (previous: Value, next: Value) => boolean;
-	pendingActionBatch?: TransitionActionBatch;
-	pendingActionValue?: Value;
+	valueEqual?: ((previous: Value, next: Value) => boolean) | undefined;
+	pendingActionBatch?: TransitionActionBatch | undefined;
+	pendingActionValue?: Value | undefined;
 	/** A source draft is visible to its rendering owner, never to committed readers. */
 	renderPending?: boolean;
-	renderSource?: Source;
+	renderSource?: Source | undefined;
 	renderValue?: Value;
-	renderValueEqual?: (previous: Value, next: Value) => boolean;
+	renderValueEqual?: ((previous: Value, next: Value) => boolean) | undefined;
 	renderSourceChanged?: boolean;
 	/** Preserve only drafts explicitly edited by their rendering owner. */
 	renderUpdated?: boolean;
@@ -14864,7 +14867,7 @@ interface LinkedStateSlot<Source, Value> {
 	renderParked?: boolean;
 	/** Refresh the revealed owner after an outside update changed its parked draft. */
 	renderNeedsRefresh?: boolean;
-	renderPublish?: () => void;
+	renderPublish?: (() => void) | undefined;
 	renderVersion?: number;
 }
 
@@ -17138,7 +17141,7 @@ interface HydrateSlot {
 	serverPreserved: boolean;
 	seedRaw: string | null;
 	/** Ready native values are scoped to this independently activated island. */
-	nativeSeedRaw?: string;
+	nativeSeedRaw?: string | undefined;
 	idState: RootIdState;
 	/** One-shot result of the client-only function form of `when`. */
 	dynamicStrategy: HydrationStrategy | null;
@@ -19541,8 +19544,8 @@ function useContextInternal<T>(context: Context<T>): T {
 // ---------------------------------------------------------------------------
 
 interface TrackedThenable<T = any> extends PromiseLike<T> {
-	status?: 'pending' | 'fulfilled' | 'rejected';
-	value?: T;
+	status?: 'pending' | 'fulfilled' | 'rejected' | undefined;
+	value?: T | undefined;
 	reason?: any;
 }
 
@@ -20025,7 +20028,7 @@ interface WarmEntry {
 	deps: any[];
 	value: any;
 	/** Real memo cell represented by an unavailable entry, when applicable. */
-	source?: MemoHookEntry;
+	source?: MemoHookEntry | undefined;
 	/** A warmed value may be adopted once; the retained tombstone still prevents
 	 * a later dependency stratum from speculatively creating it again. */
 	available: boolean;
@@ -24745,7 +24748,7 @@ interface PresentationHydrationFrame {
 			valid: (retired?: boolean) => boolean;
 			binding: DirectSignalBinding;
 			lease: ControlHandoff | undefined;
-			stop?: () => void;
+			stop?: (() => void) | undefined;
 		}
 	>;
 	completed: boolean;
@@ -26129,15 +26132,15 @@ interface DirectSignalBinding {
 	readonly policy: DirectSignalBindingPolicy;
 	readonly target: Node;
 	readonly site: string;
-	readonly name?: string;
-	readonly attributeKind?: DirectSignalAttributeKind;
+	readonly name?: string | undefined;
+	readonly attributeKind?: DirectSignalAttributeKind | undefined;
 	readonly handle: SignalHandle<unknown> | null;
-	text?: Text;
+	text?: Text | undefined;
 	value: unknown;
-	unsubscribe?: () => void;
-	input?: EventListener;
-	controlWriterCleanup?: () => void;
-	pendingControl?: boolean;
+	unsubscribe?: (() => void) | undefined;
+	input?: EventListener | undefined;
+	controlWriterCleanup?: (() => void) | undefined;
+	pendingControl?: boolean | undefined;
 	disposed: boolean;
 }
 
@@ -27004,7 +27007,7 @@ export function setDangerouslySetInnerHTMLSources(
 		isSpread: boolean,
 		sourceOrName: unknown,
 		value?: unknown,
-		merge?: boolean,
+		merge?: boolean | undefined,
 	])[],
 	ignoreSourceChildren = false,
 ): void {
@@ -27320,7 +27323,7 @@ export class FragmentInstance {
 		type: string;
 		listener: EventListenerOrEventListenerObject;
 		/** Snapshot taken at registration, as EventTarget does; `capture` is a boolean. */
-		options: AddEventListenerOptions;
+		options: FragmentListenerOptions;
 		/** Drops this entry when `options.signal` aborts; detached on removal and teardown. */
 		abort: () => void;
 	}> | null;
@@ -27409,7 +27412,7 @@ export class FragmentInstance {
 				(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(
 					entry.type,
 					entry.listener,
-					entry.options,
+					entry.options as AddEventListenerOptions,
 				);
 			}
 		}
@@ -27524,7 +27527,7 @@ export class FragmentInstance {
 		if (this._destroyed) return;
 		// A boolean or omitted argument has no members, so these reads are undefined.
 		const given = options as AddEventListenerOptions | undefined;
-		const snapshot: AddEventListenerOptions = {
+		const snapshot: FragmentListenerOptions = {
 			capture: listenerCapturePhase(options),
 			signal: given?.signal,
 			once: given?.once,
@@ -27556,7 +27559,11 @@ export class FragmentInstance {
 		listeners.push(entry);
 		snapshot.signal?.addEventListener('abort', entry.abort, { once: true });
 		for (const child of fragmentDirectNodes(this)) {
-			(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(type, listener, snapshot);
+			(STAGED_DOM ? STAGED_DOM.view(child) : child).addEventListener(
+				type,
+				listener,
+				snapshot as AddEventListenerOptions,
+			);
 		}
 	}
 
@@ -27797,7 +27804,7 @@ export class FragmentInstance {
 				(STAGED_DOM ? STAGED_DOM.view(target) : target).addEventListener(
 					entry.type,
 					entry.listener,
-					entry.options,
+					entry.options as AddEventListenerOptions,
 				);
 			}
 		}
@@ -27863,6 +27870,15 @@ export class FragmentInstance {
 		}
 	}
 }
+
+// Internal records keep one shape. Web IDL treats undefined dictionary members
+// as absent; narrow only at the native listener boundary, without forcing defaults.
+type FragmentListenerOptions = {
+	capture: boolean;
+	signal: AbortSignal | undefined;
+	once: boolean | undefined;
+	passive: boolean | undefined;
+};
 
 /**
  * EventTarget.removeEventListener compares on (type, listener, capture-flag).
@@ -28353,8 +28369,8 @@ function devValidateAriaProps(el: Element, props: Record<string, unknown>): void
 
 function devValidateHostProps(el: Element, props: Record<string, unknown>): void {
 	if ((el as any).__oct_loc === undefined || isHtmlCustomElement(el)) return;
-	const customized = typeof props.is === 'string';
-	(el as any).__oct_custom_is = customized ? props.is : undefined;
+	const customized = typeof props['is'] === 'string';
+	(el as any).__oct_custom_is = customized ? props['is'] : undefined;
 	if (customized) return;
 	let invalid: string[] | undefined;
 	for (const name of Object.keys(props)) {
@@ -29102,7 +29118,7 @@ type HostPropSource = readonly [
 	isSpread: boolean,
 	sourceOrName: unknown,
 	value?: unknown,
-	merge?: boolean,
+	merge?: boolean | undefined,
 ];
 
 interface HostPropWriter {
@@ -29248,7 +29264,8 @@ function resolveHostPropSources(
 		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
 		: values.values();
 	for (const { name, value } of ordered) resolved[name] = value;
-	if (readStyle !== undefined && 'style' in resolved) resolved.style = readStyle(resolved.style);
+	if (readStyle !== undefined && 'style' in resolved)
+		resolved['style'] = readStyle(resolved['style']);
 	return resolved;
 }
 
@@ -29297,8 +29314,8 @@ interface SignalHostPropSourcesBinding {
 	resolved: Record<string, unknown> | undefined;
 	subscriptions: Map<SignalHandle<unknown>, () => void>;
 	controlWriters: Map<'value' | 'checked', () => void>;
-	input?: EventListener;
-	pendingControl?: boolean;
+	input?: EventListener | undefined;
+	pendingControl?: boolean | undefined;
 	disposed: boolean;
 }
 
@@ -29829,7 +29846,8 @@ export function bindSignalHostPropSources(
 		if (!binding.pendingControl && controlSnapshot !== null)
 			consumeHydrationControl(element, controlSnapshot.revision);
 	}
-	if (binding.pendingControl) queueSignalHostControlAdoption(committed, binding.resolved?.value);
+	if (binding.pendingControl)
+		queueSignalHostControlAdoption(committed, binding.resolved?.['value']);
 	return committed;
 }
 
@@ -30059,7 +30077,7 @@ interface HeadSlot {
 	/** Direct listeners keyed by prop name so capture and bubble phases stay independent. */
 	handlers?: Map<string, EventListener>;
 	/** Authored attribute keys only; never retain the props' values past a render. */
-	attrNames?: string[];
+	attrNames?: string[] | undefined;
 }
 
 // A shallow HeadSlot snapshot cannot undo mutations to its listener Map or the
@@ -30360,7 +30378,7 @@ export function namespaceHeadElement(
 	// A key from an explicit attribute wins; otherwise preserve a key copied by
 	// an already-evaluated spread. The raw attrs object is built once by generated
 	// code, so getters/spreads never run twice merely to discover the key.
-	const key = authoredKey !== undefined ? authoredKey : attrs?.key;
+	const key = authoredKey !== undefined ? authoredKey : attrs?.['key'];
 	const config: any = { headKey, tag, attrs, text };
 	if (key !== undefined) config.key = key;
 	return createElement(namespaceHead, config);
@@ -31285,8 +31303,8 @@ type DelegatedNode = Node & {
 };
 
 type PortalEventBoundary = Node & {
-	$$portalEventRange?: PortalSlot;
-	$$portalEventStart?: PortalEventBoundary;
+	$$portalEventRange?: PortalSlot | undefined;
+	$$portalEventStart?: PortalEventBoundary | undefined;
 };
 
 function resolvePortalEventOwner(node: DelegatedNode): void {
@@ -32715,7 +32733,7 @@ export function queueFormAuthoringDiagnostic(
 	else if (kind === 'option-children') state.authoringChildren = 'option';
 	else if (kind === 'option-selected') {
 		if (typeof selected === 'function') state.authoringSelected = selected;
-		else (state.authoringProps ??= Object.create(null)).selected = selected ?? true;
+		else (state.authoringProps ??= Object.create(null))['selected'] = selected ?? true;
 	}
 	queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
 }
@@ -33254,15 +33272,16 @@ export function setFormControlSources(
 		const spread = source[1];
 		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
 		const object = Object(spread) as Record<string, unknown>;
-		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) value = object.value;
+		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) value = object['value'];
 		if (Object.prototype.propertyIsEnumerable.call(object, 'defaultValue'))
-			defaultValue = object.defaultValue;
+			defaultValue = object['defaultValue'];
 		if (tag === 'input') {
-			if (Object.prototype.propertyIsEnumerable.call(object, 'checked')) checked = object.checked;
+			if (Object.prototype.propertyIsEnumerable.call(object, 'checked'))
+				checked = object['checked'];
 			if (Object.prototype.propertyIsEnumerable.call(object, 'defaultChecked'))
-				defaultChecked = object.defaultChecked;
+				defaultChecked = object['defaultChecked'];
 		} else if (tag === 'select' && Object.prototype.propertyIsEnumerable.call(object, 'multiple')) {
-			multiple = object.multiple;
+			multiple = object['multiple'];
 		}
 	}
 	applyFormControlValues(el, tag, value, defaultValue, checked, defaultChecked, multiple);
@@ -33886,8 +33905,8 @@ interface PortalSlot {
 	host: Node;
 	start: Comment | null;
 	end: Comment | null;
-	fragmentOwners?: FragmentInstance | readonly FragmentInstance[];
-	fragmentAnchor?: Node;
+	fragmentOwners?: FragmentInstance | readonly FragmentInstance[] | undefined;
+	fragmentAnchor?: Node | undefined;
 	sourceAnchor?: Node;
 	interleavedFragment?: FragmentInstance;
 }
@@ -34775,15 +34794,15 @@ function scopedValueDescriptor<P>(resolve: () => ElementDescriptor<P>): ElementD
 	Object.defineProperty(descriptor, SCOPED_VALUE_RECORD, { value: resolve });
 	// Different renderer copies can share the initial { $$kind } V8 map. Seed
 	// this module's symbol before accessor transitions to keep their maps apart.
-	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES.type);
-	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES.props);
-	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
-	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
-	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
+	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES['type']);
+	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES['props']);
+	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES['key']);
+	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES['ref']);
+	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES['children']);
 	Object.defineProperty(
 		descriptor,
 		'__octaneInvocationSite',
-		SCOPED_VALUE_PROPERTIES.__octaneInvocationSite,
+		SCOPED_VALUE_PROPERTIES['__octaneInvocationSite'],
 	);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
@@ -35027,7 +35046,8 @@ export function cloneElement<P>(
 			// A complete scoped value can wrap a scoped element. Its shared getter
 			// reads a resolver from its receiver, so bind that one to the source.
 			// A user-replaced getter still receives the clone as before.
-			copiedGetter = get === SCOPED_VALUE_PROPERTIES.children.get ? () => get!.call(element) : get;
+			copiedGetter =
+				get === SCOPED_VALUE_PROPERTIES['children'].get ? () => get!.call(element) : get;
 		}
 		props = {};
 		for (const name in element.props) {
@@ -35110,7 +35130,7 @@ export function cloneElement<P>(
 			Object.defineProperty(descriptor, 'children', {
 				configurable: true,
 				enumerable: true,
-				get: copiedGetter,
+				get: copiedGetter!,
 			});
 		}
 	}
@@ -35146,7 +35166,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 			);
 		} else {
 			const copiedGetter =
-				get === SCOPED_VALUE_PROPERTIES.children.get ? () => get!.call(element) : get;
+				get === SCOPED_VALUE_PROPERTIES['children'].get ? () => get!.call(element) : get;
 			descriptor = {
 				$$kind: ELEMENT_TAG,
 				type: element.type,
@@ -35160,7 +35180,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 			Object.defineProperty(descriptor, 'children', {
 				configurable: true,
 				enumerable: true,
-				get: copiedGetter,
+				get: copiedGetter!,
 			});
 		}
 	} else {
@@ -41884,7 +41904,7 @@ interface SuspenseRetryBatch {
 	queued: boolean;
 	flushing: boolean;
 	/** Cold observers recheck readiness after a commit or a superseding render. */
-	afterCommit?: Array<() => void>;
+	afterCommit?: Array<() => void> | undefined;
 }
 const SUSPENSE_RETRIES = new Map<Block, SuspenseRetryBatch>();
 let flushingSuspenseRetries = false;
@@ -45498,7 +45518,7 @@ interface TransitionHookSlot {
 	tentative: boolean;
 	/** Profile-build-only hook source; the assignment is erased in normal bundles. */
 	profileSlot?: HookSlot;
-	error?: { value: unknown };
+	error?: { value: unknown } | undefined;
 	start: (fn: () => void | Promise<unknown>) => void;
 	publish: (pending: boolean) => void;
 }
@@ -51072,7 +51092,7 @@ export interface RootOptions {
 	 * after their fallback's refs and layout effects commit. Retained hidden
 	 * reports wait for reveal; abandoning their catch cancels them.
 	 */
-	onCaughtError?: (error: unknown) => void;
+	onCaughtError?: ((error: unknown) => void) | undefined;
 	/**
 	 * React 19 parity: called for an error no boundary claims. When provided it
 	 * REPLACES the default report for this root (render errors stop rethrowing
@@ -51080,14 +51100,14 @@ export interface RootOptions {
 	 * Recovery semantics are unchanged either way — an uncaught render error
 	 * still unmounts the failed root's entire tree.
 	 */
-	onUncaughtError?: (error: unknown) => void;
+	onUncaughtError?: ((error: unknown) => void) | undefined;
 	/**
 	 * React 19 parity, hydration only: called (dev AND prod) once for each
 	 * boundary, a Suspense arm, a Hydrate island or the root, whose server HTML
 	 * does not match the client render and which therefore renders on the
 	 * client. Attributes never fall back, so they never report.
 	 */
-	onRecoverableError?: (error: unknown) => void;
+	onRecoverableError?: ((error: unknown) => void) | undefined;
 }
 
 /**
@@ -52858,10 +52878,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	if (as === 'script' && resourceState().scripts.has(rawHref)) return;
 	// Image preloads with a srcset are keyed by the srcset+sizes pair, not the
 	// fallback href — two responsive preloads for one href stay distinct.
-	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
+	const imageSrcSet = as === 'image' ? options['imageSrcSet'] : undefined;
 	const key =
 		typeof imageSrcSet === 'string' && imageSrcSet !== ''
-			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
+			? 'preload:image:' + imageSrcSet + '::' + String(options['imageSizes'] ?? '')
 			: 'preload:' + as + ':' + rawHref;
 	const safeHref = sanitizeURL(rawHref);
 	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
@@ -52963,7 +52983,7 @@ export function preloadModule(href: string, options?: Record<string, unknown>): 
 	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	if (options === null || typeof options !== 'object') options = undefined;
-	else if ('as' in options && typeof options.as !== 'string') {
+	else if ('as' in options && typeof options['as'] !== 'string') {
 		options = { ...options, as: undefined };
 	}
 	// A module that preinitModule or a Float script already executes needs no preload.
@@ -53165,13 +53185,13 @@ export function stylesheetResource(
 		return;
 	}
 	if (typeof document === 'undefined' || attrs == null) return;
-	const href = attrs.href;
+	const href = attrs['href'];
 	if (typeof href !== 'string' || href === '') return;
 	const state = resourceState();
 	// First instance wins, including its non-key props — matching React's
 	// resource identity (later differing props do not retarget a live sheet).
 	if (state.sheets.has(href)) return;
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const precedence = attrs['precedence'] == null ? '' : String(attrs['precedence']);
 	const l = (STAGED_DOM ? STAGED_DOM.view(document) : document).createElement('link');
 	(STAGED_DOM ? STAGED_DOM.view(l) : l).rel = 'stylesheet';
 	(STAGED_DOM ? STAGED_DOM.view(l) : l).href = sanitizeURL(href);
@@ -53193,7 +53213,7 @@ export function styleResource(
 	development?: boolean,
 ): void {
 	if (typeof document === 'undefined' || attrs == null) return;
-	const href = attrs.href;
+	const href = attrs['href'];
 	if (typeof href !== 'string' || href === '') return;
 	const state = resourceState();
 	if (state.sheets.has(href)) return;
@@ -53209,7 +53229,7 @@ export function styleResource(
 				'Inline styles cannot consume a stylesheet preload; remove the preload or use a stylesheet link.',
 		);
 	}
-	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const precedence = attrs['precedence'] == null ? '' : String(attrs['precedence']);
 	// textContent makes any CSS safe to insert client-side, but the SSR twin
 	// must fail closed on "</style" (raw-text serialization) — surface the same
 	// authoring diagnostic here so SPA-only development still sees it.
@@ -53242,7 +53262,7 @@ export function resetFloatResourceState(): void {
 /** Compiler target for `<script async src>` resources (React Float). */
 export function scriptResource(attrs: Record<string, unknown> | null): void {
 	if (typeof document === 'undefined' || attrs == null) return;
-	const src = attrs.src;
+	const src = attrs['src'];
 	if (typeof src !== 'string' || src === '') return;
 	const state = resourceState();
 	if (state.scripts.has(src)) return;

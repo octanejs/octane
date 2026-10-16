@@ -133,7 +133,7 @@ function safePreview(value: unknown, depth = 0): unknown {
 		if (typeof Node !== 'undefined' && value instanceof Node) return '[Node]';
 		const fields = Object.getOwnPropertyDescriptors(value);
 		if (Array.isArray(value)) {
-			const length = Math.min(Number(fields.length?.value) || 0, 20);
+			const length = Math.min(Number(fields['length']?.value) || 0, 20);
 			return Array.from({ length }, (_, index) => previewField(fields[index], depth));
 		}
 		const out: Record<string, unknown> = {};
@@ -171,14 +171,14 @@ function classifyCell(cell: any): DevtoolsHookCell | null {
 	}
 	// Effect slots are reported separately as `effectCount`; skip them here so
 	// they don't also surface as untyped `other` rows in the hook list.
-	if (fields.effect?.value === true) return null;
-	if ('setter' in fields) return { kind: 'state', value: previewField(fields.value, -1) };
+	if (fields['effect']?.value === true) return null;
+	if ('setter' in fields) return { kind: 'state', value: previewField(fields['value'], -1) };
 	if ('dispatch' in fields && 'reducer' in fields)
-		return { kind: 'reducer', value: previewField(fields.value, -1) };
+		return { kind: 'reducer', value: previewField(fields['value'], -1) };
 	if ('current' in fields && !('deps' in fields))
-		return { kind: 'ref', value: previewField(fields.current, -1) };
+		return { kind: 'ref', value: previewField(fields['current'], -1) };
 	if ('deps' in fields && 'value' in fields)
-		return { kind: 'memo-or-callback', value: previewField(fields.value, -1) };
+		return { kind: 'memo-or-callback', value: previewField(fields['value'], -1) };
 	return { kind: 'other', value: safePreview(cell) };
 }
 

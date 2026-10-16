@@ -23,7 +23,7 @@ export interface StreamedRendererLimits {
 export interface StreamedSignalResultOptions extends StreamedRendererLimits {
 	readonly signal?: AbortSignal;
 	/** Re-enter the captured server request owner for lazy iterator pulls. */
-	readonly run?: <T>(callback: () => T) => T;
+	readonly run?: (<T>(callback: () => T) => T) | undefined;
 	/** @internal Initial-document authority announcement before result frames. */
 	readonly announceSelection?: boolean;
 }
@@ -32,7 +32,7 @@ export interface AutomaticStreamedSignalOptions extends StreamedRendererLimits {
 	readonly buildId: string;
 	readonly documentId: string;
 	readonly selectionGeneration?: number;
-	readonly nonce?: string;
+	readonly nonce?: string | undefined;
 }
 
 export interface AutomaticStreamedSignalInjection extends StreamInjectionSource {
@@ -340,7 +340,7 @@ export function createStreamedSignalInjection(
 function createSignalInjection(
 	identity: StreamFrameIdentity,
 	result: unknown,
-	options: StreamedSignalResultOptions & { nonce?: string },
+	options: StreamedSignalResultOptions & { nonce?: string | undefined },
 	timeoutMessage: string,
 ): StreamInjectionSource & { readonly queuedBytes: number } {
 	const budget = limits(options);

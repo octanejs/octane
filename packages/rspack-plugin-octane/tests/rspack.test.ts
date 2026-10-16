@@ -16,7 +16,7 @@ import rspack from '@rspack/core';
 import { JSDOM } from 'jsdom';
 import { compile as compileOctane } from 'octane/compiler';
 import { renderToString } from 'octane/server';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { evaluateCompiledFixtureCode } from '../../octane/tests/_server-fixture.js';
 import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
 
@@ -358,6 +358,69 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 		const file = join(outputPath, 'bundle.cjs');
 		return { code: readFileSync(file, 'utf8'), file };
 	}
+
+	it('renders and navigates public router links in a browser bundle', async () => {
+		installRealProfileFixture(false);
+		mkdirSync(join(root, 'node_modules/@octanejs'), { recursive: true });
+		symlinkSync(
+			join(repositoryRoot, 'packages/tanstack-router'),
+			join(root, 'node_modules/@octanejs/tanstack-router'),
+			'dir',
+		);
+		write(
+			root,
+			'src/index.js',
+			`
+import { createElement, createRoot, flushSync } from 'octane';
+import { Link, createLink, createRootRoute, createRoute, createRouter, createMemoryHistory, RouterProvider } from '@octanejs/tanstack-router';
+const CustomLink = createLink((props) => createElement('a', props, props.children));
+const routeTree = createRootRoute({component: () => createElement('nav', null,
+  createElement(Link, {to:'/about'}, 'About'),
+  createElement(CustomLink, {to:'/'}, 'Home'))});
+routeTree.addChildren([createRoute({getParentRoute:()=>routeTree,path:'/about'})]);
+const router = createRouter({routeTree,history:createMemoryHistory({initialEntries:['/']}),isServer:false});
+globalThis.bundledLink = (async () => {
+  await router.load();
+  const root = createRoot(document.getElementById('root'));
+  flushSync(() => root.render(createElement(RouterProvider, {router})));
+  return {router,root};
+})();`,
+		);
+		const output = join(root, 'dist-router-link');
+		await compile({
+			context: root,
+			mode: 'development',
+			target: 'web',
+			entry: './src/index.js',
+			resolve: { extensionAlias: { '.js': ['.ts', '.js'] } },
+			optimization: { minimize: false },
+			output: { path: output, filename: 'bundle.js' },
+			plugins: [new OctaneRspackPlugin({ parallel: false })],
+		});
+		const browser = new JSDOM('<div id="root"></div>', {
+			url: 'https://router.test/',
+			runScripts: 'outside-only',
+		});
+		try {
+			browser.window.eval(readFileSync(join(output, 'bundle.js'), 'utf8'));
+			const mounted = await (browser.window as any).bundledLink;
+			try {
+				const links = browser.window.document.querySelectorAll('a');
+				expect([...links].map((link) => [link.getAttribute('href'), link.textContent])).toEqual([
+					['/about', 'About'],
+					['/', 'Home'],
+				]);
+				links[0]!.dispatchEvent(
+					new browser.window.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+				);
+				await vi.waitFor(() => expect(mounted.router.state.location.pathname).toBe('/about'));
+			} finally {
+				mounted.root.unmount();
+			}
+		} finally {
+			browser.window.close();
+		}
+	});
 
 	it('builds client and server graphs with maps, raw dependencies, and one target runtime', async () => {
 		for (const [environment, target, runtimeMarker, absentMarker] of [

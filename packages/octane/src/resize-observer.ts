@@ -92,7 +92,7 @@ export function createResizeObserver(
 			nativeOptions = {
 				get box() {
 					const value = options.box;
-					if (value === undefined) return undefined;
+					if (value === undefined) return box;
 					box = `${value}` as ResizeObserverBoxOptions;
 					return box;
 				},

@@ -84,15 +84,15 @@ const IDENTITY_KEYS = new Set([
 export function isStreamFrameIdentity(value: unknown): value is StreamFrameIdentity {
 	if (!isRecord(value) || !hasOnly(value, IDENTITY_KEYS)) return false;
 	return (
-		value.protocol === 1 &&
-		isKey(value.buildId) &&
-		isKey(value.documentId) &&
-		isKey(value.ownerKey) &&
-		isKey(value.instanceKey) &&
-		isKey(value.nodeKey) &&
-		isKey(value.selectionKey) &&
-		isCounter(value.selectionGeneration) &&
-		isCounter(value.attempt)
+		value['protocol'] === 1 &&
+		isKey(value['buildId']) &&
+		isKey(value['documentId']) &&
+		isKey(value['ownerKey']) &&
+		isKey(value['instanceKey']) &&
+		isKey(value['nodeKey']) &&
+		isKey(value['selectionKey']) &&
+		isCounter(value['selectionGeneration']) &&
+		isCounter(value['attempt'])
 	);
 }
 
@@ -133,7 +133,10 @@ function isEncodedSignalValue(value: unknown, depth = 0): value is EncodedSignal
 
 function isHistoricalFrame(value: unknown): value is ScopeSeed {
 	return (
-		isRecord(value) && value.version === 1 && isKey(value.scopeKey) && Array.isArray(value.entries)
+		isRecord(value) &&
+		value['version'] === 1 &&
+		isKey(value['scopeKey']) &&
+		Array.isArray(value['entries'])
 	);
 }
 
@@ -141,27 +144,32 @@ const RESULT_BASE_KEYS = new Set(['identity', 'sequence', 'channel', 'kind']);
 
 /** Strictly validate an untrusted decoded frame before any mailbox or DOM mutation. */
 export function isStreamedRendererFrame(value: unknown): value is StreamedRendererFrame {
-	if (!isRecord(value) || !isStreamFrameIdentity(value.identity) || !isCounter(value.sequence)) {
+	if (
+		!isRecord(value) ||
+		!isStreamFrameIdentity(value['identity']) ||
+		!isCounter(value['sequence'])
+	) {
 		return false;
 	}
-	if (value.channel === 'result') {
-		if (value.kind === 'open') {
+	if (value['channel'] === 'result') {
+		if (value['kind'] === 'open') {
 			return (
 				hasOnly(value, new Set([...RESULT_BASE_KEYS, 'resource'])) &&
-				(value.resource === 'promise' || value.resource === 'stream')
+				(value['resource'] === 'promise' || value['resource'] === 'stream')
 			);
 		}
-		if (value.kind === 'value') {
+		if (value['kind'] === 'value') {
 			return (
-				hasOnly(value, new Set([...RESULT_BASE_KEYS, 'value'])) && isEncodedSignalValue(value.value)
+				hasOnly(value, new Set([...RESULT_BASE_KEYS, 'value'])) &&
+				isEncodedSignalValue(value['value'])
 			);
 		}
-		if (value.kind === 'error') {
-			return hasOnly(value, new Set([...RESULT_BASE_KEYS, 'code'])) && isKey(value.code);
+		if (value['kind'] === 'error') {
+			return hasOnly(value, new Set([...RESULT_BASE_KEYS, 'code'])) && isKey(value['code']);
 		}
-		return value.kind === 'complete' && hasOnly(value, RESULT_BASE_KEYS);
+		return value['kind'] === 'complete' && hasOnly(value, RESULT_BASE_KEYS);
 	}
-	if (value.channel !== 'placement' || value.kind !== 'html') return false;
+	if (value['channel'] !== 'placement' || value['kind'] !== 'html') return false;
 	const allowed = new Set([
 		'identity',
 		'sequence',
@@ -176,18 +184,18 @@ export function isStreamedRendererFrame(value: unknown): value is StreamedRender
 	]);
 	if (
 		!hasOnly(value, allowed) ||
-		!isCounter(value.contentRevision) ||
-		(value.mode !== 'full' && value.mode !== 'delta') ||
-		typeof value.html !== 'string' ||
-		!isHistoricalFrame(value.historicalFrame) ||
-		!Array.isArray(value.styles) ||
-		!value.styles.every(isKey) ||
-		new Set(value.styles).size !== value.styles.length
+		!isCounter(value['contentRevision']) ||
+		(value['mode'] !== 'full' && value['mode'] !== 'delta') ||
+		typeof value['html'] !== 'string' ||
+		!isHistoricalFrame(value['historicalFrame']) ||
+		!Array.isArray(value['styles']) ||
+		!value['styles'].every(isKey) ||
+		new Set(value['styles']).size !== value['styles'].length
 	) {
 		return false;
 	}
-	if (value.mode === 'delta') return isCounter(value.baseRevision);
-	return value.baseRevision === undefined || isCounter(value.baseRevision);
+	if (value['mode'] === 'delta') return isCounter(value['baseRevision']);
+	return value['baseRevision'] === undefined || isCounter(value['baseRevision']);
 }
 
 export function decodeStreamedRendererFrame(json: string): StreamedRendererFrame {

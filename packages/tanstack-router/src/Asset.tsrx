@@ -1,4 +1,4 @@
-import { useRouter } from './context.ts';
+import { useRouter } from './context';
 import { createAsset } from './assetComponent.tsrx';
 
 export const Asset = createAsset(useRouter);

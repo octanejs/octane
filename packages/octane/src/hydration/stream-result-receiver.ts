@@ -59,7 +59,7 @@ interface ResultState {
 	frames: StreamedSignalResultFrame[];
 	frameSizes: number[];
 	bytes: number;
-	consumer?: StreamedResultConsumer;
+	consumer?: StreamedResultConsumer | undefined;
 	timer?: ReturnType<typeof setTimeout>;
 	failure?: StreamedReceiverError;
 }
@@ -69,9 +69,9 @@ export interface StreamedSelectionState {
 	result: ResultState;
 	placementSequence: number;
 	contentRevision: number;
-	region?: StreamedRegionRegistration;
+	region?: StreamedRegionRegistration | undefined;
 	historical?: HistoricalFrameLease;
-	pendingPlacement?: { cancel(): void };
+	pendingPlacement?: { cancel(): void } | undefined;
 	failure?: StreamedReceiverError;
 }
 

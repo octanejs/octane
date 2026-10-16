@@ -1,3 +1,5 @@
+declare const process: { env: { NODE_ENV?: string } };
+
 /**
  * Host-agnostic pieces shared by the `octane/react` client controller and the
  * `octane/react/server` hosted renderer: the public prop/facade types and the
