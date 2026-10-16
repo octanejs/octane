@@ -57,8 +57,6 @@ function frames(output: string): Record<string, string> {
 const SHAPES = Object.keys(frames(''));
 // The browser never renders a permanently static boundary's children.
 const CLIENT_SHAPES = SHAPES.filter((shape) => shape !== 'static Hydrate');
-// The server never renders a catch arm: its boundary renders on the client.
-const SERVER_SHAPES = SHAPES.filter((shape) => shape !== 'catch');
 
 // Builds a module whose declaring component is the root or a nested child.
 function source(body: string, nested: boolean, imports = 'derived$, query$'): string {
@@ -123,7 +121,7 @@ function cases(shapes: string[]) {
 	);
 }
 
-const CASES = cases(SERVER_SHAPES);
+const CASES = cases(SHAPES);
 const CLIENT_CASES = cases(CLIENT_SHAPES);
 
 const PROPS = { show: true, items: ['first', 'second'], mode: 'a' };

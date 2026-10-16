@@ -1,7 +1,6 @@
 // A @try body whose only child is a template-less component that reads a
-// promise with use(). Where the server rejected the promise, a Suspense
-// boundary leaves its fallback for the client to render, keeping the hosts
-// around the boundary; catch arms alone do not catch on the server.
+// promise with use(). A server rejection renders the nearest catch arm while
+// keeping the hosts around the boundary.
 import { ErrorBoundary, use } from 'octane';
 
 function Reader(props: { promise: Promise<unknown> }) {

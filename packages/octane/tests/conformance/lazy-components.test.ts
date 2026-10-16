@@ -456,18 +456,17 @@ describe('ReactLazy public conformance', () => {
 });
 
 describe('lazy server regression coverage', () => {
-	// As in React, whose server never runs an error boundary, a server error
-	// reports through onError and leaves the Suspense fallback for the client.
+	// OCTANE DIVERGENCE: an authored error arm handles server render errors.
 	function renderErrored(props: Record<string, unknown>, message: string): void {
 		const errors: unknown[] = [];
 		const { html } = ServerRuntime.renderToString(server.LazyHost, props, {
 			onError: (error) => errors.push(error),
 		});
-		expect(html).toContain('<div class="lazy-fallback">Loading...</div>');
-		expect(html).not.toContain('lazy-error');
-		expect(errors).toEqual([
-			expect.objectContaining({ message: expect.stringContaining(message) }),
-		]);
+		const markup = document.createElement('div');
+		markup.innerHTML = html;
+		expect(markup.querySelector('.lazy-error')?.textContent).toContain(message);
+		expect(markup.querySelector('.lazy-fallback')).toBeNull();
+		expect(errors).toEqual([]);
 	}
 
 	it('renders a synchronously fulfilled lazy module without a fallback pass', () => {

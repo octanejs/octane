@@ -478,9 +478,8 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 	});
 
 	// Per ReactDOMFizzServer-test.js:703/:1070.
-	// Per ReactDOMFizzServer-test.js "should client render a boundary if a lazy
-	// component rejects": the server never runs the catch arm.
-	it('keeps a streamed lazy fallback for a client render on rejection', async () => {
+	// OCTANE DIVERGENCE: a rejected lazy component reveals the authored error arm.
+	it('reveals a streamed lazy error fallback on rejection', async () => {
 		const module = deferred<{ default: () => unknown }>();
 		server.setRejectingLazyModule(module.promise);
 		const collector = createPipeableCollector();
@@ -494,9 +493,9 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 		module.reject(error);
 		const container = activate(await collector.ended);
 		try {
-			expect(onError).toHaveBeenCalledWith(error);
-			expect(container.querySelector('#lazy-rejection-fallback')?.textContent).toBe('loading');
-			expect(container.querySelector('#lazy-rejection-error')).toBeNull();
+			expect(onError).not.toHaveBeenCalled();
+			expect(container.querySelector('#lazy-rejection-fallback')).toBeNull();
+			expect(container.querySelector('#lazy-rejection-error')?.textContent).toBe('lazy failed');
 		} finally {
 			container.remove();
 		}

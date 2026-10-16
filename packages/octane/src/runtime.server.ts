@@ -40,6 +40,8 @@ import type {
 import { bindingRootMarker, encodeBindingKey, type BindingKey } from './dom-binding-protocol.js';
 import {
 	BOUNDARY_CLIENT,
+	BOUNDARY_CLIENT_CAUGHT,
+	BOUNDARY_CATCH_GUARD,
 	BOUNDARY_CLIENT_ERROR,
 	BOUNDARY_CLIENT_NATIVE,
 	BOUNDARY_CLIENT_SUSPENDED,
@@ -51,6 +53,7 @@ import {
 	isRangeOpen,
 	RANGE_OPEN_SOURCE,
 	selfDelimits,
+	STREAM_CATCH_COMMENT,
 } from './hydration-protocol.js';
 import {
 	ACTIVITY_TAG,
@@ -422,6 +425,32 @@ export type ServerRenderNode =
 	| undefined;
 
 let CURRENT_SCOPE: SSRScope | null = null;
+// A JSX Suspense boundary only performs React-style server recovery when no
+// enclosing Octane error handler can take the error. The scope identity keeps
+// an independent nested render from inheriting its caller's boundary.
+let ACTIVE_SSR_CATCH_SCOPE: SSRScope | null = null;
+
+function renderWithSsrCatchScope(
+	scope: SSRScope,
+	tryFn: (arg: unknown, scope: SSRScope) => string,
+): string {
+	const previous = ACTIVE_SSR_CATCH_SCOPE;
+	ACTIVE_SSR_CATCH_SCOPE = scope;
+	try {
+		return tryFn(undefined, scope);
+	} finally {
+		ACTIVE_SSR_CATCH_SCOPE = previous;
+	}
+}
+
+function hasEnclosingSsrCatch(scope: SSRScope): boolean {
+	const owner = ACTIVE_SSR_CATCH_SCOPE;
+	if (owner === null) return false;
+	for (let current: SSRScope | null = scope; current !== null; current = current.parent) {
+		if (current === owner) return true;
+	}
+	return false;
+}
 // Server helpers use the same synchronous read/witness ABI without importing
 // the client renderer or attaching a subscription to any shared producer.
 let NATIVE_READ_COLLECTOR: ReturnType<typeof createNativeServerReadDriver> | null = null;
@@ -6001,6 +6030,7 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 					'jsx-static-hydrate',
 					(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
 					null,
+					SSR_RECOVER_ERRORS,
 					undefined,
 					false,
 				),
@@ -6063,6 +6093,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 										'jsx-hydrate',
 										(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
 										null,
+										SSR_RECOVER_ERRORS,
 										'html',
 										false,
 									),
@@ -6163,6 +6194,7 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 				'jsx-suspense',
 				(_arg, s) => ssrChildrenHtml(props.children, s),
 				(_arg, s) => ssrChild(props.fallback, s),
+				SSR_RECOVER_ERRORS,
 			),
 		);
 	},
@@ -6693,12 +6725,9 @@ export function addTransitionType(_type: string): void {}
 
 /**
  * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX built-in mirror of
- * `@try { … } @catch (e) { fallback }`. As in React, whose server never runs an
- * error boundary, `fallback` renders only on the client: a render error passes
- * to the nearest `<Suspense>`/`@pending`, which ships its own fallback for a
- * client render, and a suspension rethrows to it too (matching the client
- * ErrorBoundary's explicit suspension propagation). Routed through ssrTry, like
- * the compiled catch-only boundary, for the same range shape.
+ * `@try { … } @catch (e) { fallback }`. Render errors use the fallback;
+ * suspension belongs to an enclosing Suspense boundary. The server reset is
+ * inert because a server render has no persistent boundary to retry.
  */
 export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 	function ErrorBoundary(
@@ -6706,7 +6735,19 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 		scope: SSRScope,
 	): string {
 		return ssrHtml(
-			ssrTry(scope, 'jsx-error-boundary', (_arg, s) => ssrChildrenHtml(props.children, s), null),
+			ssrTry(
+				scope,
+				'jsx-error-boundary',
+				(_arg, s) => ssrChildrenHtml(props.children, s),
+				null,
+				(error, s, reset) =>
+					ssrChild(
+						typeof props.fallback === 'function'
+							? (props.fallback as (error: unknown, reset: () => void) => unknown)(error, reset)
+							: props.fallback,
+						s,
+					),
+			),
 		);
 	},
 	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
@@ -10527,7 +10568,15 @@ interface StreamBoundary {
 	id: string;
 	/** Discovery order, used as the stable tiebreaker among reachable siblings. */
 	order: number;
-	state: 'pending' | 'done' | 'errored';
+	state: 'pending' | 'guard' | 'done' | 'errored';
+	/** Root-local IDs represented by an enclosing catch owner's shell content. */
+	catchGuardIdCount?: number;
+	/** Positional seeds represented by that content. */
+	catchGuardSeedCount?: number;
+	/** The sentinel is retained in the accepted shell or an immutable parent segment. */
+	catchGuardCaptured?: boolean;
+	/** Pending descendants to wake if the client claimed the guard before its reveal. */
+	abandoned?: string[] | undefined;
 	/** Recoverable render error retained for the public streaming onError callback. */
 	error?: unknown;
 	/** Whether this boundary's recoverable error has reached onError. */
@@ -10558,6 +10607,8 @@ interface StreamState {
 	boundaries: Map<string, StreamBoundary>;
 	/** Conservative index of registered boundary owners; stale entries only cost a scan. */
 	boundaryOwnerKeys: Set<string>;
+	/** Gates guard capture work; stale true values only cost one scan. */
+	hasUncapturedCatchGuards: boolean;
 	nextId: number;
 	token: string;
 	/** Boundary positions reached by the active full-tree pass, when tracked. */
@@ -10614,6 +10665,9 @@ function rewindStreamBoundaryReplay(stream: StreamState, checkpoint: number): vo
 			boundary.error = value.error;
 			boundary.errorReported = value.errorReported;
 			boundary.errorFlushed = value.errorFlushed;
+			boundary.abandoned = value.abandoned;
+			if (value.state === 'guard' && !value.catchGuardCaptured)
+				stream.hasUncapturedCatchGuards = true;
 			if (!stream.boundaries.has(saved.key)) restoredDeletion = true;
 			stream.boundaries.set(saved.key, boundary);
 		}
@@ -10670,6 +10724,7 @@ function pruneUnrepresentedStreamDescendants(
 	stream: StreamState,
 	ownerKey: string,
 	ownerHtml: string,
+	abandoned?: string[],
 ): void {
 	// Independent siblings are the common case. Without this guard every
 	// completed sibling scans every other registered sibling in the wave.
@@ -10689,6 +10744,8 @@ function pruneUnrepresentedStreamDescendants(
 			}
 			if (nearestOwner !== ownerKey) continue;
 			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			if (abandoned !== undefined && child.state === 'pending' && !child.serverOwnedStatic)
+				abandoned.push(child.id);
 			recordStreamBoundaryMutation(stream, childKey);
 			stream.boundaries.delete(childKey);
 			removed = true;
@@ -10709,6 +10766,36 @@ function pruneStreamBoundariesAbsentFromShell(
 	}
 }
 
+// A root suspension or enclosing pending boundary can discard a pass after it
+// discovered a guard. Freeze its ID/seed spans when the sentinel enters the
+// accepted shell or an immutable parent segment, even if that segment must wait
+// behind another boundary. Scan each retained body once, only while guards await
+// capture, and record mutations so a render-phase replay can undo the capture.
+function captureCatchGuards(stream: StreamState, html: string): void {
+	const guards = new Map<string, string>();
+	for (const [key, boundary] of stream.boundaries) {
+		if (boundary.state === 'guard' && !boundary.catchGuardCaptured) guards.set(boundary.id, key);
+	}
+	const prefix = STREAM_BOUNDARY_ATTR + '="';
+	let offset = 0;
+	while (guards.size !== 0) {
+		const start = html.indexOf(prefix, offset);
+		if (start < 0) break;
+		const idStart = start + prefix.length;
+		const end = html.indexOf('"', idStart);
+		if (end < 0) break;
+		const id = html.slice(idStart, end);
+		const key = guards.get(id);
+		if (key !== undefined) {
+			recordStreamBoundaryMutation(stream, key);
+			stream.boundaries.get(key)!.catchGuardCaptured = true;
+			guards.delete(id);
+		}
+		offset = end + 1;
+	}
+	stream.hasUncapturedCatchGuards = guards.size !== 0;
+}
+
 // A boundary is one range whose opening comment, `open`, carries its state
 // (hydration-protocol.ts). A presentation-binding view labels the range with
 // the arm it rendered (0 content, 1 pending) instead, and its arm keeps a range
@@ -10717,7 +10804,7 @@ function pruneStreamBoundariesAbsentFromShell(
 function ssrTryArm(
 	content: string,
 	open: string,
-	arm: 0 | 1,
+	arm: 0 | 1 | 2,
 	bindingMarker: string | undefined,
 ): string {
 	return MARKERS
@@ -10734,6 +10821,10 @@ function ssrTryBody(content: string, bindingMarker: string | undefined): string 
 	return bindingMarker === undefined ? String(content) : ssrBlock(content);
 }
 
+// Internal JSX Suspense and hydration wrappers recover otherwise-unhandled
+// server errors in their pending arm. Authored @try passes null or a catch.
+const SSR_RECOVER_ERRORS = false;
+
 /**
  * Compiled `@try` / JSX `<Suspense>` boundary. `siteKey` is the compiler's
  * source-position hash; combined with the frame path + per-frame occurrence it
@@ -10743,28 +10834,27 @@ function ssrTryBody(content: string, bindingMarker: string | undefined): string 
  *   success, no arm    → `[` tryHtml
  *   suspend, streaming → `[$?id` the sentinel, pendingHtml
  *   suspend, buffered  → `[$!sN` pendingHtml, for a client render
- *   error, @pending    → the suspend form, `[$!eN` when buffered
- *   error, no @pending → rethrow
- * React's server never runs an error boundary, so a `@catch` arm renders only
- * on the client. A Suspense boundary reports the error (onError) and ships its
- * fallback for the client to render; any other boundary passes the error on,
- * so with no Suspense boundary above it the render fails. A boundary without a
- * fallback passes suspension on too, as the client's tryBlock does, unless the
- * caller owns it explicitly (a `<Hydrate>` wrapper, a presentation-binding
- * view). In streaming mode a suspended boundary additionally carries the
- * `<template data-oct-b>` sentinel, and a REGISTERED boundary keeps returning
- * its pending form (content ships via its segment, an error via its
- * client-render instruction).
+ *   error, @catch      → catch content, retried on the client without shipping the error
+ *   error, no @catch   → rethrow, except a JSX Suspense recovery boundary
+ * A boundary without a pending arm passes suspension on, as the client's
+ * tryBlock does, unless the caller owns it explicitly (a `<Hydrate>` wrapper,
+ * a presentation-binding view). A registered streaming boundary keeps returning
+ * its pending form while the completed content or catch arm ships via its segment.
  */
 export function ssrTry(
 	scope: SSRScope,
 	siteKey: string,
 	tryFn: (arg: unknown, scope: SSRScope) => string,
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
+	catchOrRecover:
+		| ((error: unknown, scope: SSRScope, reset: () => void) => string)
+		| null
+		| typeof SSR_RECOVER_ERRORS = null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
 	propagateSuspense = pendFn === null,
 	bindingMarker?: string,
 ): string {
+	const catchFn = catchOrRecover || null;
 	if (inDiscardedPass()) return '';
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
@@ -10810,7 +10900,7 @@ export function ssrTry(
 			entry.owners = ownerKeys;
 		}
 	}
-	const withArmScope = <T>(arm: 'content' | 'pending', fn: () => T): T => {
+	const withArmScope = <T>(arm: 'content' | 'pending' | 'catch', fn: () => T): T => {
 		const prev = ASYNC_SCOPE;
 		ASYNC_SCOPE = armScope + arm;
 		try {
@@ -10819,8 +10909,8 @@ export function ssrTry(
 			ASYNC_SCOPE = prev;
 		}
 	};
-	const withContentArm = <T>(fn: () => T): T =>
-		withArmScope('content', () => {
+	const withContentArm = <T>(fn: () => T, arm: 'content' | 'catch' = 'content'): T =>
+		withArmScope(arm, () => {
 			if (stream === null) return fn();
 			stream.activeTryKeys.push(key);
 			stream.activeOwnerKeys.push(key);
@@ -10865,7 +10955,7 @@ export function ssrTry(
 		ID_COUNTER = outerIdCounter;
 		boundaryIds = false;
 	};
-	if (entry !== undefined) enterBoundaryIds(0);
+	if (entry !== undefined && entry.catchGuardIdCount === undefined) enterBoundaryIds(0);
 	let nativeFresh = false;
 	// Why the client renders an arm the server could not finish: it read values
 	// that cannot be sent, which the client does not report, or it suspended or
@@ -11022,13 +11112,58 @@ export function ssrTry(
 			try {
 				inner = vtSsrClaimArm(
 					ssrTryBody(
-						withContentArm(() => tryFn(undefined, scope)),
+						withContentArm(() =>
+							catchFn === null ? tryFn(undefined, scope) : renderWithSsrCatchScope(scope, tryFn),
+						),
 						bindingMarker,
 					),
 					'enter',
 				);
 			} finally {
 				nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+			}
+			if (
+				stream !== null &&
+				catchFn !== null &&
+				(entry?.catchGuardIdCount !== undefined ||
+					(entry === undefined && stream.boundaryOwnerKeys.has(key)))
+			) {
+				// A child may fail after this content has reached the shell. Keep an
+				// address for the enclosing catch without delaying the child's reveal.
+				if (entry === undefined) {
+					const order = stream.nextId++;
+					entry = {
+						id: stream.token + '-' + order.toString(36),
+						order,
+						state: 'guard',
+						catchGuardIdCount: 0,
+						catchGuardSeedCount: 0,
+						catchGuardCaptured: false,
+						serverOwnedStatic: PERMANENT_STATIC_HYDRATE_DEPTH !== 0,
+						html: '',
+						rawHtml: false,
+						seeds: [],
+						pendingIdOffset: 0,
+						namespace,
+						ancestors: ancestorKeys,
+						owners: ownerKeys,
+					};
+					recordStreamBoundaryMutation(stream, key);
+					stream.boundaries.set(key, entry);
+					stream.hasUncapturedCatchGuards = true;
+					if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
+				}
+				if (!entry.catchGuardCaptured) {
+					entry.catchGuardIdCount = Math.max(0, ID_COUNTER - outerIdCounter);
+					entry.catchGuardSeedCount = (SERIAL?.length ?? serialStart) - serialStart;
+				}
+				appendNativeSeedReads(nativeReads);
+				return ssrTryArm(
+					'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + inner,
+					BOUNDARY_CATCH_GUARD + entry.id,
+					0,
+					bindingMarker,
+				);
 			}
 			if (entry !== undefined) {
 				// Registered (was pending in an earlier pass): capture the content +
@@ -11053,6 +11188,7 @@ export function ssrTry(
 					const seeds = isolateSerial(serialStart);
 					if (!entry.serverOwnedStatic) entry.seeds = seeds;
 					pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
+					if (stream!.hasUncapturedCatchGuards) captureCatchGuards(stream!, entry.html);
 				} else {
 					// Later passes re-render from cache; the segment already has these.
 					isolateSerial(serialStart);
@@ -11134,9 +11270,81 @@ export function ssrTry(
 				}
 				return pendingForm();
 			}
+			if (catchFn !== null) {
+				// The failed body's positional values cannot seed a sibling, and the
+				// client retries this boundary with its own data and error. Never send
+				// the server error or catch-arm values as hydration seeds.
+				rewindSerial(serialStart);
+				if (entry?.catchGuardIdCount !== undefined) {
+					if (entry.catchGuardCaptured) {
+						restoreOuterIds();
+						enterBoundaryIds(0);
+					} else {
+						// No retained output contains this guard: render the catch inline
+						// instead of sending a replacement for an absent sentinel.
+						pruneUnrepresentedStreamDescendants(stream!, key, '');
+						recordStreamBoundaryMutation(stream!, key);
+						stream!.boundaries.delete(key);
+						entry = undefined;
+					}
+				}
+				const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+				const previousNativeReads = NATIVE_SERVER_READS;
+				if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+				let caught: string;
+				try {
+					caught = ssrTryBody(
+						withContentArm(() => catchFn(e, scope, NOOP), 'catch'),
+						bindingMarker,
+					);
+				} finally {
+					finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+					rewindSerial(serialStart);
+				}
+				if (entry !== undefined) {
+					if (entry.state === 'pending' || entry.state === 'guard') {
+						entry.state = 'done';
+						entry.rawHtml = VT_SSR_HAS_RAW_HTML;
+						entry.html =
+							(entry.serverOwnedStatic
+								? ''
+								: '<!--' +
+									STREAM_CATCH_COMMENT +
+									(entry.catchGuardIdCount === undefined
+										? ''
+										: ':' + entry.catchGuardIdCount + ':' + entry.catchGuardSeedCount) +
+									'-->') + caught;
+						const abandoned = entry.catchGuardIdCount === undefined ? undefined : [];
+						pruneUnrepresentedStreamDescendants(stream!, key, entry.html, abandoned);
+						if (abandoned?.length) entry.abandoned = abandoned;
+						if (stream!.hasUncapturedCatchGuards) captureCatchGuards(stream!, entry.html);
+					}
+					if (entry.catchGuardIdCount !== undefined) {
+						restoreOuterIds();
+						ID_COUNTER += entry.catchGuardIdCount;
+						return ssrTryArm('', BOUNDARY_CATCH_GUARD + entry.id, 0, bindingMarker);
+					}
+					ID_COUNTER = entry.pendingIdOffset;
+					return pendingForm();
+				}
+				const idCount = Math.max(0, ID_COUNTER - outerIdCounter);
+				return bindingMarker === undefined
+					? ssrTryArm(caught, BOUNDARY_CLIENT + BOUNDARY_CLIENT_CAUGHT + idCount, 2, bindingMarker)
+					: ssrTryArm(
+							'<!--' + STREAM_CATCH_COMMENT + ':' + idCount + '-->' + caught,
+							HYDRATION_START,
+							2,
+							bindingMarker,
+						);
+			}
 			// Only a Suspense boundary, or one that owns its suspension and already
 			// registered it, recovers.
-			if (pendFn === null && entry === undefined) throw e;
+			if (
+				catchOrRecover !== SSR_RECOVER_ERRORS ||
+				hasEnclosingSsrCatch(scope) ||
+				(pendFn === null && entry === undefined)
+			)
+				throw e;
 			if (stream !== null) {
 				// Fizz keeps a Suspense shell valid when its primary content throws:
 				// publish the fallback, report the error, and mark this boundary for a
@@ -11215,6 +11423,10 @@ export function ssrTry(
 // truthy second argument removes only a server-owned permanent-static sentinel,
 // retaining its already-flushed fallback because no client graph can recover it.
 let STREAM_RUNTIME_JS: string | undefined;
+// A claimed catch guard cannot replace client-owned DOM. Its abandoned pending
+// descendants still need their normal retry notification; their opaque IDs use
+// only the stream token's alphanumeric, underscore, and hyphen alphabet.
+const STREAM_ABANDON_ATTR = 'data-oct-abandon';
 function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
 		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
@@ -11237,7 +11449,9 @@ function streamRuntimeJs(): string {
 		"var s=d.querySelector('[" +
 		STREAM_SEGMENT_ATTR +
 		"=\"'+id+'\"]');" +
-		'if(!s)return;if(!t){s.remove();return;}' +
+		'if(!s)return;if(!t){var a=s.getAttribute("' +
+		STREAM_ABANDON_ATTR +
+		'");s.remove();if(a){a=a.split(",");for(var i=0;i<a.length;i++)X(a[i],0,1);}return;}' +
 		'var c=P(s);if(!c)return;' +
 		'var sd=c.querySelector("script[' +
 		STREAM_SEED_ATTR +
@@ -11267,15 +11481,15 @@ function streamRuntimeJs(): string {
 		STREAM_RETRY_PROP +
 		'();if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
 		'window.$OCTRC.marker=M;window.$OCTRC.parse=P;window.$OCTRC.content=C;' +
-		'var X=window.$OCTRX=function(id,so){' +
+		'var X=window.$OCTRX=function(id,so,visibleOnly){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
 		"=\"'+id+'\"]');" +
-		'if(t){if(so)t.remove();else{t.setAttribute("data-oct-err","");var o=t.previousSibling;if(o.' +
+		'if(t){if(so)t.remove();else{t.setAttribute("data-oct-err",visibleOnly?"c":"");var o=t.previousSibling;if(o.' +
 		STREAM_RETRY_PROP +
 		')o.' +
 		STREAM_RETRY_PROP +
-		'()}}else(E||(E=[])).push([id,so]);};' +
+		'()}}else if(!visibleOnly)(E||(E=[])).push([id,so]);};' +
 		// $OCTRH(id): hoist a wave carrier's Float sheet tags into document.head.
 		// With a live client runtime (window.$OCTFR, installed once client Float
 		// resource state exists) each tag is handed over so ONE authority keeps
@@ -11803,7 +12017,11 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 		STREAM_SEGMENT_ATTR +
 		'="' +
 		escapeAttr(b.id) +
-		'"><script type="application/json" ' +
+		'"' +
+		(b.abandoned === undefined
+			? ''
+			: ' ' + STREAM_ABANDON_ATTR + '="' + b.abandoned.join(',') + '"') +
+		'><script type="application/json" ' +
 		STREAM_SCRIPT_ATTR +
 		nonceAttr +
 		'>' +
@@ -11887,6 +12105,7 @@ async function runStream(
 	const stream: StreamState = {
 		boundaries: new Map(),
 		boundaryOwnerKeys: new Set(),
+		hasUncapturedCatchGuards: false,
 		nextId: 0,
 		token: createStreamToken(),
 		activePassBoundaryKeys: null,
@@ -12067,7 +12286,7 @@ async function runStream(
 				let visible = true;
 				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
 					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-					if (ancestor !== undefined) {
+					if (ancestor !== undefined && ancestor.state !== 'guard') {
 						visible = reachable.has(ancestor.id);
 						break;
 					}
@@ -12096,7 +12315,7 @@ async function runStream(
 			let visible = true;
 			for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
 				const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-				if (ancestor !== undefined) {
+				if (ancestor !== undefined && ancestor.state !== 'guard') {
 					visible = flushedSegments.has(ancestor.id);
 					break;
 				}
@@ -12295,6 +12514,7 @@ async function runStream(
 		}
 		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell, pass.rawHtml) : shell);
 		if (shellWrite !== undefined) await shellWrite;
+		if (stream.hasUncapturedCatchGuards) captureCatchGuards(stream, pass.body);
 	} catch (err) {
 		try {
 			completeInjection();
@@ -12486,7 +12706,8 @@ async function runStream(
 			}
 		}
 		for (const b of stream.boundaries.values()) {
-			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
+			if (b.state !== 'guard' && !flushedSegments.has(b.id) && !b.errorFlushed)
+				tail += boundaryErrorChunk(b, nonceAttr);
 		}
 		// Best-effort well-formedness under injection: the held document tail
 		// still closes <body>/<html> after the degraded-boundary markers.

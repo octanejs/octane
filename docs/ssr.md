@@ -69,8 +69,9 @@ Use `query$` from `octane/signals` for data that the page needs. Read it with
 sends the pending content. When its first value arrives, the server sends the
 ready HTML for that boundary. Separate boundaries let a fast section appear
 without waiting for a slower one. If a query fails on the server, the boundary
-keeps its pending content and the browser renders it, showing `@catch` if the
-browser's attempt fails too (see [Render errors](#render-errors)).
+renders its `@catch` content. If the pending content has already streamed, the
+server sends the catch content as the boundary's replacement (see
+[Render errors](#render-errors)).
 
 ```tsrx
 import 'octane/signals';
@@ -284,31 +285,33 @@ alike.
 
 #### Render errors
 
-As in React, the server never runs an error boundary: a `@catch` arm or an
-`<ErrorBoundary>` fallback renders only in the browser. Every server renderer
-handles a render error, or a rejected `use()`, the same way:
+Octane handles render errors in authored error boundaries on the server as
+well as in the browser. A `@catch` arm or `<ErrorBoundary>` fallback handles
+render errors and rejected `use()` calls from its content, without reaching the
+renderer's `onError`. If a streaming boundary has already sent its `@pending`
+content, the server replaces it with the catch content when the rejection is
+observed. An error thrown by the catch content continues to an enclosing
+boundary.
 
-- Inside a Suspense boundary (a `@try` with `@pending`, or `<Suspense>`), the
-  error reaches `onError`, and the nearest such boundary ships its fallback,
-  marked for the client to render. A boundary that already streamed its
-  fallback is marked by a later instruction instead. No part of the error,
-  and no seed for the failed content, reaches the page.
-- Outside every Suspense boundary, it fails the render: `renderToString`
-  throws, `prerender` rejects, and a stream fails its shell (`onShellError`, or
-  a rejected `renderToReadableStream`). A `@try` with only `@catch` does not
-  stop it.
+`@pending` handles suspension, not errors. A `@try` with only `@pending`
+passes a render error to an enclosing error boundary; a `@try` with only
+`@catch`, like `<ErrorBoundary>`, passes suspension to an enclosing pending
+boundary. Without a pending boundary, a synchronous render cannot complete and
+an asynchronous shell waits. An error that reaches the root fails the render:
+`renderToString` throws, `prerender` rejects, and a stream that has not sent its
+shell fails through `onShellError` or a rejected `renderToReadableStream`.
 
-Nor does it hold a suspension. A `@try` with only `@catch`, like
-`<ErrorBoundary>`, is not a Suspense boundary, on the server as on the client:
-while something inside it waits, the nearest Suspense boundary shows its
-fallback, and with none above it the shell waits.
+JSX `<Suspense>` retains React-compatible server recovery when no authored error
+boundary handles the failure: it reports the error through `onError`, ships its
+fallback, and marks the boundary for a client render. If the fallback has
+already streamed, a later instruction marks it. Hydration reports this recovery
+through `onRecoverableError`; a client render error follows normal client error
+boundary routing.
 
-`hydrateRoot` renders a marked boundary afresh from client data, running its
-`use()` calls and requests again, and reports it once through
-`onRecoverableError`, as React reports a boundary its server could not finish.
-If that client render throws, the boundary's own `@catch` arm or the nearest
-client error boundary takes the error, as in any client render; a catch arm
-that takes it in that first render is reported alone, through `onCaughtError`.
+Running authored error boundaries during SSR is an intentional divergence from
+React. It keeps pending and error states distinct and makes the same error UI
+available on both sides of the render, without requiring an application to add
+a loading fallback to contain a server error.
 
 ### `renderToStaticMarkup(component, props?, options?) => RenderResult` — `octane/server`
 
@@ -583,8 +586,8 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
   subtree re-runs, not D+1 full passes). The emitted HTML always comes from a
   full pass, so hydration byte-format is identical either way. Resolved values
   are serialized into the seed script so hydration does not re-fetch or
-  re-suspend. A rejection is a render error, so its boundary ships no seeds
-  and renders on the client. Compiler-owned request factories consult their
+  re-suspend. A rejection follows [render-error routing](#render-errors).
+  Compiler-owned request factories consult their
   matching server-provided seed before running, while existing promises,
   contexts, and externally owned hydration promises retain their original
   ownership. Request-site metadata lives outside fulfilled values, and the
@@ -761,10 +764,9 @@ export default defineConfig({
 
 The catch component receives `{ error, reset }`; the pending component receives
 no props. When both are configured, the catch boundary is closest to the route
-and the pending boundary wraps it. Suspensions select the pending UI. A route
-error on the server ships the pending UI for the browser to render the route,
-where a repeated error reaches the catch UI ([Render errors](#render-errors));
-without a pending component, it fails the response. Paths must be Vite-root paths. `index.html` must contain exactly one
+and the pending boundary wraps it. Suspensions select the pending UI; route
+render errors select the catch UI on the server and client (see
+[Render errors](#render-errors)). Paths must be Vite-root paths. `index.html` must contain exactly one
 `<!--ssr-head-->` marker, one `<!--ssr-body-->` marker, and one closing `</body>`
 tag; builds now fail with an actionable error when that hydration contract is
 malformed.

@@ -232,13 +232,16 @@ describe('hydrateRoot — JSX error boundaries', () => {
 		root.unmount();
 	});
 
-	it('fails the server render when a rejection reaches only an ErrorBoundary', async () => {
-		// React's server never runs an error boundary: with no Suspense boundary
-		// to client-render, the original reason fails the render.
-		await expect(
-			prerender(server.JsxRejectedBoundaryPage, {
+	it('renders an ErrorBoundary fallback when a server resource rejects', async () => {
+		container.innerHTML = (
+			await prerender(server.JsxRejectedBoundaryPage, {
 				promise: Promise.reject('server rejected'),
-			}),
-		).rejects.toBe('server rejected');
+			})
+		).html;
+		expect(container.querySelector('#jsx-rejected-error')?.textContent).toBe('server rejected');
+		expect(container.querySelector('#jsx-rejected-error')?.getAttribute('data-kind')).toBe(
+			'string',
+		);
+		expect(container.querySelector('#jsx-rejected-after')?.textContent).toBe('after');
 	});
 });

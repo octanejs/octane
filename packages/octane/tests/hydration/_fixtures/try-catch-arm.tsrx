@@ -1,9 +1,6 @@
 import { ErrorBoundary, Suspense, use } from 'octane';
 
-// React's server never runs an error boundary. A server error reaches the
-// nearest Suspense boundary, which ships its fallback for the client to render,
-// where a catch arm takes a repeated throw. With no Suspense boundary above it,
-// the error fails the server render.
+// Server and client render failures exercise authored and JSX error boundaries.
 
 interface State {
 	failed: boolean;

@@ -121,7 +121,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		}
 	});
 
-	it('@try renders the resolved success arm (awaiting use), @pending on error', async () => {
+	it('@try renders success after awaiting use and @catch on error', async () => {
 		// Nested ranges: outer = try-slot, inner = the resolved arm. Sync body →
 		// success arm, no suspension, no seed script.
 		expect(
@@ -137,9 +137,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		const resolvedDocument = new DOMParser().parseFromString(resolved.html, 'text/html');
 		expect(resolvedDocument.querySelector('div > span.ok')?.textContent).toBe('x');
 		expect(resolvedDocument.querySelector('.pending, .error')).toBeNull();
-		// As in React, whose server never runs an error boundary, a thrown error
-		// reports through onError and the boundary ships its @pending fallback
-		// for the client to render; the @catch arm renders only on the client.
+		// OCTANE DIVERGENCE: an authored error arm handles server render errors.
 		const boom = new Error('boom');
 		const onError = vi.fn();
 		const failed = document.createElement('div');
@@ -152,13 +150,12 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 			},
 			{ onError },
 		).html;
-		expect(failed.querySelector('div > .loading')?.textContent).toBe('loading');
-		expect(failed.querySelector('.error, .ok')).toBeNull();
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError).toHaveBeenCalledWith(boom);
+		expect(failed.querySelector('div > .error')?.textContent).toBe('boom');
+		expect(failed.querySelector('.loading, .ok')).toBeNull();
+		expect(onError).not.toHaveBeenCalled();
 	});
 
-	it('a catch-only @try passes a server error on, so the render fails', async () => {
+	it('a catch-only @try renders its fallback on the server', async () => {
 		const boundary = evalServer(
 			`
 				export const Boundary = () => @{
@@ -166,8 +163,9 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 						@try {
 							throw new Error('boom');
 							<span>{'unreachable'}</span>
-						} @catch (error) {
-							<span>{error.message as string}</span>
+						} @catch (error, reset) {
+							reset();
+							<span data-reset={typeof reset}>{error.message as string}</span>
 						}
 					</main>
 				}
@@ -175,8 +173,45 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 			'ssr-catch-only.tsrx',
 		);
 
-		expect(() => RT.renderToString(boundary.Boundary)).toThrow('boom');
-		await expect(prerender(boundary.Boundary)).rejects.toThrow('boom');
+		for (const { html } of [
+			RT.renderToString(boundary.Boundary),
+			await prerender(boundary.Boundary),
+		]) {
+			const rendered = new DOMParser().parseFromString(html, 'text/html');
+			expect(rendered.querySelector('main > span[data-reset="function"]')?.textContent).toBe(
+				'boom',
+			);
+		}
+	});
+
+	it('a pending-only @try passes server errors to an outer catch or the root', () => {
+		const { Caught, Uncaught } = loadCompiledFixtureSource(
+			`
+				function PendingOnly() @{
+					@try {
+						throw new Error('boom');
+						<span>unreachable</span>
+					} @pending {
+						<span>loading</span>
+					}
+				}
+				export function Caught() @{
+					@try { <PendingOnly /> } @catch (error) {
+						<strong>{error.message as string}</strong>
+					}
+				}
+				export function Uncaught() @{ <PendingOnly /> }
+			`,
+			{ id: 'ssr-pending-only-error.tsrx', mode: 'server' },
+		);
+		const onError = vi.fn();
+		const rendered = new DOMParser().parseFromString(
+			RT.renderToString(Caught, {}, { onError }).html,
+			'text/html',
+		);
+		expect(rendered.body.textContent).toBe('boom');
+		expect(onError).not.toHaveBeenCalled();
+		expect(() => RT.renderToString(Uncaught)).toThrow('boom');
 	});
 });
 

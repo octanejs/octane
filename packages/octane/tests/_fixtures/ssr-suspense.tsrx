@@ -364,9 +364,7 @@ export function FactoryRejectionBoundary(props: { scenario: string }) @{
 	</section>
 }
 
-// A @try without @pending is not a Suspense boundary: on the server, as on the
-// client, it passes both suspension and errors on to the nearest one. Its
-// @catch arm renders only on the client.
+// A @try without @pending passes suspension to an ancestor while handling errors.
 function CatchOnlyValue(props: { promise: Promise<string>; error?: Error }) @{
 	if (props.error !== undefined) throw props.error;
 	const value = use(props.promise);

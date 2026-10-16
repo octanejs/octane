@@ -23,10 +23,8 @@ import {
 // SSR Phase 4 — Suspense + data serialization. render() is async: a
 // use(thenable) that hasn't resolved suspends the pass (the @try shows
 // @pending), render() awaits it and re-renders, so the @try ends up showing its
-// resolved success arm (or, on rejection, its @pending fallback for the client
-// to render, as React's server never runs an error boundary). Each resolved
-// value is appended
-// to `body` as an inline data <script> for the client to seed on hydration.
+// resolved success arm or, on rejection, its @catch fallback. Each resolved
+// value is appended to `body` as an inline data <script> for hydration.
 
 const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
@@ -231,7 +229,7 @@ describe('SSR — resource-thrown thenables', () => {
 		expect((await work).html).toContain('<span class="resource-value">first/second:seed</span>');
 	});
 
-	it('reports the original resource rejection and leaves its fallback for the client', async () => {
+	it('renders the error fallback for a rejected resource', async () => {
 		const pending = deferred<string>();
 		const onError = vi.fn();
 		const work = prerender(
@@ -245,10 +243,9 @@ describe('SSR — resource-thrown thenables', () => {
 		const reason = new Error('resource failed');
 		pending.reject(reason);
 		const out = await work;
-		expect(out.html).toContain('<span class="resource-loading">loading resource</span>');
-		expect(out.html).not.toContain('resource-error');
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError).toHaveBeenCalledWith(reason);
+		expect(out.html).toContain('<span class="resource-error">Error: resource failed</span>');
+		expect(out.html).not.toContain('resource-loading');
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('aborts a request waiting on a resource-thrown thenable', async () => {
@@ -329,7 +326,7 @@ describe('SSR — resource-thrown thenables', () => {
 		}
 	});
 
-	it('marks the outer boundary errored when a streamed resource fallback rejects', async () => {
+	it('reveals the outer catch when a streamed resource fallback rejects', async () => {
 		const { fallback, collector, errors, stream, shell } = streamResourceFallback();
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -339,11 +336,11 @@ describe('SSR — resource-thrown thenables', () => {
 			fallback.reject(reason);
 			container.innerHTML = await collector.ended;
 			activateStreamedMarkup(container);
-			expect(container.querySelector('.resource-outer-loading')?.textContent).toBe(
-				'loading outer resource',
+			expect(container.querySelector('.resource-outer-error')?.textContent).toBe(
+				'Error: fallback failed',
 			);
-			expect(container.querySelector('.resource-outer-error, .resource-inner-error')).toBeNull();
-			expect(errors).toEqual([reason]);
+			expect(container.querySelector('.resource-outer-loading, .resource-inner-error')).toBeNull();
+			expect(errors).toEqual([]);
 		} finally {
 			stream.abort();
 			container.remove();
@@ -1064,25 +1061,21 @@ export function App(props) @{
 		},
 	);
 
-	it('reports plain async component rejection without an unhandled replay rejection', async () => {
+	it('catches plain async component rejection without an unhandled replay rejection', async () => {
 		const reason = new Error('async-component-nope');
 		const caught: unknown[] = [];
 		const unhandled: unknown[] = [];
 		const onUnhandledRejection = (error: unknown) => unhandled.push(error);
 		process.on('unhandledRejection', onUnhandledRejection);
 		try {
-			const out = await prerender(
-				m.AsyncComponentBoundary,
-				{
-					component: async () => {
-						throw reason;
-					},
+			const out = await prerender(m.AsyncComponentBoundary, {
+				component: async () => {
+					throw reason;
 				},
-				{ onError: (error: unknown) => caught.push(error) },
-			);
+				onCatch: (error: unknown) => caught.push(error),
+			});
 
-			expect(out.html).toContain('<span class="async-component-loading">loading</span>');
-			expect(out.html).not.toContain('async-component-nope');
+			expect(out.html).toContain('<span class="async-component-error">async-component-nope</span>');
 			expect(caught).toEqual([reason]);
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 			expect(unhandled).toEqual([]);
@@ -1156,20 +1149,17 @@ export function App(props) @{
 					component: async () =>
 						RT.createElement('span', { className: 'mixed-ok' }, 'mixed-fulfilled'),
 				}),
-				prerender(
-					m.AsyncComponentBoundary,
-					{
-						component: async () => {
-							throw rejectedReason;
-						},
+				prerender(m.AsyncComponentBoundary, {
+					component: async () => {
+						throw rejectedReason;
 					},
-					{ onError: (error: unknown) => caught.push(error) },
-				),
+					onCatch: (error: unknown) => caught.push(error),
+				}),
 			]);
 
 			expect(fulfilled.html).toContain('<span class="mixed-ok">mixed-fulfilled</span>');
 			expect(fulfilled.html).not.toContain('async-component-loading');
-			expect(rejected.html).toContain('<span class="async-component-loading">loading</span>');
+			expect(rejected.html).toContain('<span class="async-component-error">mixed-rejected</span>');
 			expect(rejected.html).not.toContain('mixed-fulfilled');
 			expect(caught).toEqual([rejectedReason]);
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -1189,28 +1179,22 @@ export function App(props) @{
 		process.on('unhandledRejection', onUnhandledRejection);
 		try {
 			const [left, right] = await Promise.all([
-				prerender(
-					m.AsyncComponentBoundary,
-					{
-						component: async () => {
-							throw leftReason;
-						},
+				prerender(m.AsyncComponentBoundary, {
+					component: async () => {
+						throw leftReason;
 					},
-					{ onError: (error: unknown) => leftCaught.push(error) },
-				),
-				prerender(
-					m.AsyncComponentBoundary,
-					{
-						component: async () => {
-							throw rightReason;
-						},
+					onCatch: (error: unknown) => leftCaught.push(error),
+				}),
+				prerender(m.AsyncComponentBoundary, {
+					component: async () => {
+						throw rightReason;
 					},
-					{ onError: (error: unknown) => rightCaught.push(error) },
-				),
+					onCatch: (error: unknown) => rightCaught.push(error),
+				}),
 			]);
 
-			expect(left.html).toContain('<span class="async-component-loading">loading</span>');
-			expect(right.html).toContain('<span class="async-component-loading">loading</span>');
+			expect(left.html).toContain('<span class="async-component-error">left-rejected</span>');
+			expect(right.html).toContain('<span class="async-component-error">right-rejected</span>');
 			expect(leftCaught).toEqual([leftReason]);
 			expect(rightCaught).toEqual([rightReason]);
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -1251,16 +1235,13 @@ export function App(props) @{
 					replayThenable((resolve) => resolve('fresh-value')),
 				),
 			});
-			const rejected = await prerender(
-				m.AsyncComponentBoundary,
-				{
-					component: replaying(
-						Promise.reject(originalReason),
-						replayThenable((_resolve, reject) => reject(new Error('fresh-rejection'))),
-					),
-				},
-				{ onError: (error: unknown) => caught.push(error) },
-			);
+			const rejected = await prerender(m.AsyncComponentBoundary, {
+				component: replaying(
+					Promise.reject(originalReason),
+					replayThenable((_resolve, reject) => reject(new Error('fresh-rejection'))),
+				),
+				onCatch: (error: unknown) => caught.push(error),
+			});
 			const throwsAfterContinuation = await prerender(m.AsyncComponentBoundary, {
 				component: replaying(
 					Promise.resolve(
@@ -1275,7 +1256,9 @@ export function App(props) @{
 
 			expect(fulfilled.html).toContain('<span class="cached-ok">cached-value</span>');
 			expect(fulfilled.html).not.toContain('fresh-value');
-			expect(rejected.html).toContain('<span class="async-component-loading">loading</span>');
+			expect(rejected.html).toContain(
+				'<span class="async-component-error">cached-rejection</span>',
+			);
 			expect(caught).toEqual([originalReason]);
 			expect(throwsAfterContinuation.html).toContain(
 				'<span class="cached-after-throw">cached-after-throw</span>',
@@ -1304,17 +1287,16 @@ export function App(props) @{
 		expect(out.html).toBe('<!--3--><div id="leaf">hello</div>' + seed('["hello"]'));
 	});
 
-	it('leaves a boundary whose use(promise) rejected for the client to render', async () => {
+	it('renders the error arm when use(promise) rejects', async () => {
 		const reason = new Error('nope');
 		const onError = vi.fn();
 		const out = await prerender(m.Boundary, { promise: Promise.reject(reason) }, { onError });
-		// The fallback ships with no seed, so nothing of the reason reaches the page.
-		expect(out.html).toContain('<span class="loading">loading</span>');
-		expect(out.html).not.toContain('nope');
+		expect(out.html).toContain('<span class="err">nope</span>');
+		expect(out.html).not.toContain('class="loading"');
 		expect(out.html).not.toContain('data-octane-suspense');
-		expect(onError).toHaveBeenCalledWith(reason);
+		expect(onError).not.toHaveBeenCalled();
 
-		// The client renders the boundary afresh from its own data and reports it.
+		// Client data may succeed even if the server's data rejected.
 		const container = document.createElement('div');
 		document.body.append(container);
 		container.innerHTML = out.html;
@@ -1331,7 +1313,7 @@ export function App(props) @{
 		try {
 			expect(container.querySelector('.ok')?.textContent).toBe('client');
 			expect(container.querySelector('.loading, .err')).toBeNull();
-			expect(onRecoverableError).toHaveBeenCalledTimes(1);
+			expect(onRecoverableError).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();
 			container.remove();

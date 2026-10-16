@@ -11,7 +11,7 @@ import { loadCompiledFixtureSource } from '../_server-fixture.js';
 // server's arm) waits for the commit of the attempt that completes.
 
 const SOURCE = `
-import { use } from 'octane';
+import { Suspense, use } from 'octane';
 
 function ServerThrows(props) @{
 	if (props.server) throw new Error('server only');
@@ -28,11 +28,9 @@ function Content(props) @{
 		<p>{props.text as string}</p>
 		<span>{props.empty as string}</span>
 		<div>{props.a as string}{props.b as string}</div>
-		@try {
+		<Suspense fallback={<i>{'pending'}</i>}>
 			<ServerThrows server={props.server} />
-		} @pending {
-			<i>{'pending'}</i>
-		}
+		</Suspense>
 		<Gate gate={props.gate} />
 	</>
 }

@@ -1306,7 +1306,7 @@ export function takeNativeFreshArm(
 	ids: RootIdState,
 ): RootIdState | null {
 	if (hydration === null) return null;
-	const value = hydration.bindingTryState(state.start) ?? (state.start as Comment).data;
+	const value = hydration.clientTryState(state.start);
 	const count = value.startsWith(BOUNDARY_CLIENT) ? boundaryIdCount(value) : -1;
 	if (count < 0) return null;
 	reserveHydrationIds(ids, count);

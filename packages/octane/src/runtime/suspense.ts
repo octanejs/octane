@@ -25,6 +25,7 @@ import {
 	BOUNDARY_CONTENT,
 	boundaryIdCount,
 	BOUNDARY_CLIENT,
+	BOUNDARY_CLIENT_CAUGHT,
 	BOUNDARY_CLIENT_ERROR,
 	BOUNDARY_CLIENT_SUSPENDED,
 } from '../hydration-protocol.js';
@@ -1125,8 +1126,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 			freshBoundary = true;
 		}
 		if (adopting && !freshBoundary) {
-			[start, end] = hydration!.armRange(state.start, getNextSibling(state.start), state.end);
-			hydration!.node = getNextSibling(start);
+			[start, end] = hydration!.beginTryArm(state.start, state.end);
 		} else {
 			start = document.createComment('try-b');
 			end = document.createComment('/try-b');
@@ -1709,7 +1709,8 @@ export function claimStreamedIds(state: TrySlot, id: string): void {
  * the stream swaps its content in or marks it errored, whose call to the retry
  * left on its open (STREAM_RETRY_PROP) retries it. Otherwise the boundary
  * takes its content's record, or, errored, renders on the client and reports
- * once, as React does. Returns the record to hydrate, or null.
+ * once, as React does. A server-rendered catch also retries on the client, but
+ * is not a hydration failure. Returns the record to hydrate, or null.
  */
 export function waitForStreamedArm(
 	state: TrySlot,
@@ -1717,7 +1718,8 @@ export function waitForStreamedArm(
 ): InitialSuspenseHydration | null {
 	const sentinel = initial.waits!;
 	const open = state.start as Comment & { [STREAM_RETRY_PROP]?: (() => void) | undefined };
-	if (sentinel.parentNode === null || sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
+	const revealed = sentinel.parentNode === null;
+	if (revealed || sentinel.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
 		open[STREAM_RETRY_PROP] = undefined;
 	else {
 		const wait = new Promise<void>((resolve) => (open[STREAM_RETRY_PROP] = resolve));
@@ -1733,11 +1735,14 @@ export function waitForStreamedArm(
 		return null;
 	}
 	initialSuspenseHydrations!.delete(state);
-	const taken = sentinel.parentNode === null ? TRY_OPS!.take(state, initial.reader!) : null;
+	const caught = revealed
+		? initial.reader!.streamedArmMarker(open)?.nodeType === 8
+		: sentinel.getAttribute(HYDRATE_STREAM_ERROR_ATTR) === BOUNDARY_CLIENT_CAUGHT;
+	const taken = revealed && !caught ? TRY_OPS!.take(state, initial.reader!) : null;
 	if (taken === null) {
 		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		markArmDiscard(state);
-		if (!clientRenderDehydratedTry(state, HYDRATION_PASS))
+		if (!clientRenderDehydratedTry(state, HYDRATION_PASS) && !caught)
 			noteRecoverableHydrationError(() => new Error(formatClientError(347)), state.parentBlock);
 		return null;
 	}
@@ -1795,9 +1800,9 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
 /**
  * Render `state` on the client, as a dehydrated boundary is, when the
  * server left it to the client. Its `[$!rN` open (hydration-protocol.ts)
- * says the server's render threw, suspended, or read values it cannot send;
- * a streamed `[$?id` boundary whose template sentinel still leads it shows a
- * fallback whose content has not arrived. Octane cannot hydrate either, so
+ * says the server's render threw, suspended, read values it cannot send, or
+ * rendered an authored catch. A streamed `[$?id` boundary can likewise show
+ * an errored fallback or a revealed catch. Octane cannot adopt these arms, so
  * the boundary claims its own id namespace (the N ids the server's render
  * reserved, or the stream's), and its commit replaces the server's content.
  * Leaving a sentinel would let a later stream swap overwrite client-owned
@@ -1809,7 +1814,7 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
  * which swaps the hydration flags, stays on the capability (clientRender).
  */
 function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean {
-	const open = hydration.bindingTryState(state.start) ?? (state.start as Comment).data;
+	const open = hydration.clientTryState(state.start);
 	// Whether the server's render threw rather than suspended; null reports nothing.
 	let errored: boolean | null = null;
 	if (open.startsWith(BOUNDARY_CLIENT)) {
@@ -1826,10 +1831,14 @@ function claimClientArm(hydration: HydrationCapability, state: TrySlot): boolean
 			errored = reason === BOUNDARY_CLIENT_ERROR;
 	} else if (open.startsWith(BOUNDARY_STREAMED)) {
 		// A pending boundary waits for its content instead (waitForStreamedArm).
-		if (!hydration.streamSentinel(state.start)?.hasAttribute(HYDRATE_STREAM_ERROR_ATTR))
-			return false;
+		const marker = hydration.streamedArmMarker(state.start);
+		if (marker === null) return false;
+		if (marker.nodeType === 1) {
+			const reason = (marker as Element).getAttribute(HYDRATE_STREAM_ERROR_ATTR);
+			if (reason === null) return false;
+			if (reason !== BOUNDARY_CLIENT_CAUGHT) errored = true;
+		}
 		claimStreamedIds(state, open.slice(BOUNDARY_STREAMED.length));
-		errored = true;
 	} else return false;
 	hydration.clientRender(state, errored);
 	return true;
@@ -1935,8 +1944,7 @@ export function mountTry(state: TrySlot, claimsRetryOwners = false): void {
 	if (adopting) {
 		// ADOPT the server's content, which the seeded use() values let the try
 		// body render its success arm over.
-		[bStart, bEnd] = hydration!.armRange(state.start, getNextSibling(state.start), state.end);
-		hydration!.node = getNextSibling(bStart);
+		[bStart, bEnd] = hydration!.beginTryArm(state.start, state.end);
 	} else {
 		bStart = document.createComment('try-b');
 		bEnd = document.createComment('/try-b');

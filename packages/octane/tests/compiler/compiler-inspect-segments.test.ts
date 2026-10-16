@@ -256,9 +256,7 @@ describe.each([
 				.filter((segment) => segment.exact === true && segment.srcEnd !== null)
 				.map((segment) => FOLDED.slice(segment.srcStart, segment.srcEnd!)),
 		);
-		// The server never renders, so never compiles, a catch arm.
-		const keywords = ['@if', '@else', '@for', '@empty', '@try', '@pending'];
-		if (!server) keywords.push('@catch');
+		const keywords = ['@if', '@else', '@for', '@empty', '@try', '@pending', '@catch'];
 		for (const keyword of keywords) {
 			expect(claimed.has(keyword), `${keyword} is unreachable on the fold path`).toBe(true);
 		}
@@ -353,8 +351,7 @@ describe.each([
 		'@default',
 		'@try',
 		'@pending',
-		// The server never renders, so never compiles, a catch arm.
-		...(options.mode === 'server' ? [] : ['@catch']),
+		'@catch',
 	];
 
 	const result = compile(SOURCE, 'App.tsrx', { ...options, inspect: true }) as ReturnType<

@@ -12,11 +12,9 @@ import {
 	resetStreamRuntimeGlobals,
 } from '../_server-stream.js';
 
-// React's server never runs an error boundary. A render error, or a rejected
-// use(), reports through onError and leaves the nearest Suspense boundary's
-// fallback for the client, which renders that boundary afresh from client data
-// and reports it through onRecoverableError. A throw there reaches the client's
-// catch arm. With no Suspense boundary above it, the error fails the render.
+// OCTANE DIVERGENCE: server render errors reach the nearest authored error
+// boundary. On activation the client retries the primary content in that
+// boundary, without replacing the surrounding page or reporting a mismatch.
 
 const SOURCE = readFileSync(
 	join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/try-catch-arm.tsrx'),
@@ -25,7 +23,7 @@ const SOURCE = readFileSync(
 
 type Mode = 'renderToString' | 'prerender' | 'stream';
 const MODES: Mode[] = ['renderToString', 'prerender', 'stream'];
-const SUSPENSE_CASES = MODES.flatMap((mode) =>
+const BOUNDARY_CASES = MODES.flatMap((mode) =>
 	['Recovering', 'CatchInsidePending', 'JsxBoundaries'].map((name) => [name, mode] as const),
 );
 
@@ -99,17 +97,13 @@ describe.each([true, false])('server render errors (dev=%s)', (dev) => {
 		});
 	}
 
-	function expectServerError(errors: unknown[], message: string): void {
-		expect(errors).toEqual([expect.objectContaining({ message })]);
-	}
-
-	it.each(SUSPENSE_CASES)(
-		'%s (%s) ships its fallback, and the client render recovers',
+	it.each(BOUNDARY_CASES)(
+		'%s (%s) renders the catch arm and retries successfully on activation',
 		async (name, mode) => {
 			const errors = await serverRender(name, { state: { failed: true } }, mode);
-			expectServerError(errors, 'failed');
-			expect(container.querySelector('i')!.textContent).toBe('loading');
-			expect(container.querySelector('button, p')).toBeNull();
+			expect(errors).toEqual([]);
+			expect(container.querySelector('button')?.textContent).toBe('failed');
+			expect(container.querySelector('i, p')).toBeNull();
 			const main = container.querySelector('main')!;
 			const footer = container.querySelector('footer')!;
 
@@ -119,18 +113,16 @@ describe.each([true, false])('server render errors (dev=%s)', (dev) => {
 			expect(container.querySelector('main')).toBe(main);
 			expect(container.querySelector('footer')).toBe(footer);
 			expect(caught).toEqual([]);
-			expect(recoverable).toEqual([
-				expect.objectContaining({ message: expect.stringContaining('server rendering') }),
-			]);
+			expect(recoverable).toEqual([]);
 			root.unmount();
 		},
 	);
 
-	it.each(SUSPENSE_CASES)(
-		'%s (%s) shows the client catch arm when the client throws too',
+	it.each(BOUNDARY_CASES)(
+		'%s (%s) activates a live catch arm when the client throws too',
 		async (name, mode) => {
 			await serverRender(name, { state: { failed: true } }, mode);
-			expect(container.querySelector('i')!.textContent).toBe('loading');
+			expect(container.querySelector('button')?.textContent).toBe('failed');
 			const main = container.querySelector('main')!;
 
 			const state = { failed: true };
@@ -139,7 +131,6 @@ describe.each([true, false])('server render errors (dev=%s)', (dev) => {
 			expect(button.textContent).toBe('failed');
 			expect(container.querySelector('i, p')).toBeNull();
 			expect(container.querySelector('main')).toBe(main);
-			// As in React, a catch arm that caught in that render reports alone.
 			expect(caught).toEqual(['failed']);
 			expect(recoverable).toEqual([]);
 
@@ -150,44 +141,38 @@ describe.each([true, false])('server render errors (dev=%s)', (dev) => {
 		},
 	);
 
-	it.each(['CatchOnly', 'JsxCatchOnly'])(
-		'%s fails the render: a catch arm is not a server boundary',
-		async (name) => {
-			const props = { state: { failed: true } };
-			expect(() => ServerRT.renderToString(server[name], props)).toThrow('failed');
-			await expect(prerender(server[name], props)).rejects.toThrow('failed');
-			const onShellError = vi.fn();
-			await expect(
-				ServerRT.renderToReadableStream(server[name], props, { onShellError }),
-			).rejects.toThrow('failed');
-			expect(onShellError).toHaveBeenCalledWith(expect.objectContaining({ message: 'failed' }));
-		},
-	);
+	it.each(
+		MODES.flatMap((mode) => ['CatchOnly', 'JsxCatchOnly'].map((name) => [name, mode] as const)),
+	)('%s (%s) renders its catch arm without a pending boundary', async (name, mode) => {
+		const errors = await serverRender(name, { state: { failed: true } }, mode);
+		expect(container.querySelector('button')?.textContent).toBe('failed');
+		expect(errors).toEqual([]);
+	});
 
-	it('marks a boundary that throws after the shell for a client render', async () => {
+	it('streams the catch arm when a retry throws after the shell', async () => {
 		const server$ = deferred<string>();
 		const streamed = collectReadableStream(server.Streamed, { promise: server$.promise });
 		await Promise.resolve();
 		server$.resolve('bad');
 		const result = await streamed;
-		expectServerError(result.errors, 'bad value');
+		expect(result.errors).toEqual([]);
 		container.innerHTML = result.html;
 		activateStreamedMarkup(container);
-		expect(container.querySelector('i')!.textContent).toBe('loading');
-		expect(container.querySelector('button, p')).toBeNull();
+		expect(container.querySelector('button')?.textContent).toBe('bad value');
+		expect(container.querySelector('i, p')).toBeNull();
 		const footer = container.querySelector('footer')!;
 
 		const client$ = deferred<string>();
 		const { root, recoverable, caught } = await hydrate('Streamed', { promise: client$.promise });
 		expect(container.querySelector('i')!.textContent).toBe('loading');
-		expect(recoverable).toHaveLength(1);
+		expect(recoverable).toEqual([]);
 
 		await act(async () => client$.resolve('good'));
 		await settle(() => expect(container.querySelector('p')?.textContent).toBe('good'));
 		expect(container.querySelector('i, button')).toBeNull();
 		expect(container.querySelector('footer')).toBe(footer);
 		expect(caught).toEqual([]);
-		expect(recoverable).toHaveLength(1);
+		expect(recoverable).toEqual([]);
 		root.unmount();
 	});
 
@@ -197,10 +182,10 @@ describe.each([true, false])('server render errors (dev=%s)', (dev) => {
 		await Promise.resolve();
 		server$.reject(new Error('server rejected'));
 		const result = await streamed;
-		expectServerError(result.errors, 'server rejected');
-		expect(result.html).not.toContain('server rejected');
+		expect(result.errors).toEqual([]);
 		container.innerHTML = result.html;
 		activateStreamedMarkup(container);
+		expect(container.querySelector('button')?.textContent).toBe('server rejected');
 
 		const { root, caught } = await hydrate('Streamed', { promise: Promise.resolve('bad') });
 		await settle(() => expect(container.querySelector('button')?.textContent).toBe('bad value'));

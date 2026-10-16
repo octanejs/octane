@@ -9940,16 +9940,13 @@ export function Answer() @{
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
 
-				// As in React, the server never renders @catch: a failed read ships the
-				// @pending fallback, and the client rebuilds the arm, whose read fails
-				// too and shows @catch until reset retries.
+				// A failed server read renders @catch, which activation retries from client state.
 				generation$.set(6);
 				request(6).reject(new Error('server failure'));
 				await settle();
 				const failed = fixture();
 				container.innerHTML = failed.html;
-				expect(container.querySelector('[data-pending]')!.textContent).toBe('waiting');
-				expect(container.querySelector('button')).toBeNull();
+				expect(container.querySelector('button')?.textContent).toBe('Error: server failure');
 				const failedSection = container.querySelector('section')!;
 				const failedHandle = failed.attach(failedSection, failed.state);
 				expect(container.querySelector('section')).toBe(failedSection);
@@ -10013,10 +10010,8 @@ export function Answer() @{
 			}
 		});
 
-		// A binding view stays an ordinary component: hydrateRoot adopts the same
-		// server @try output, whichever settled arm the server rendered. As in
-		// React, the server never renders @catch: a failed read ships @pending,
-		// and the client renders the boundary, where the read fails again.
+		// A binding view stays an ordinary component: hydrateRoot adopts successful
+		// content and retries a server-caught error from client state.
 		it(`hydrates a binding view's settled @try arms with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
 			const source = `import { answer$ } from './island-state';
 export function Answer() @{
@@ -10050,15 +10045,13 @@ export function Answer() @{
 					container.innerHTML = fixture.html;
 					const section = container.querySelector('section')!;
 					const server = section.querySelector('p')!;
-					expect(server.textContent).toBe(outcome === 'error' ? 'waiting' : 'ready');
-					const caught: unknown[] = [];
+					expect(server.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
 					const recoverable: unknown[] = [];
 					hydratedRoot = hydrateRoot(
 						container,
 						fixture.loadClient().Answer,
 						{},
 						{
-							onCaughtError: (value) => caught.push(value),
 							onRecoverableError: (value) => recoverable.push(value),
 						},
 					);
@@ -10069,11 +10062,9 @@ export function Answer() @{
 					if (outcome === 'ready') {
 						expect(section.querySelector('p')).toBe(server);
 						expect(server.textContent).toBe('ready');
-						expect(caught).toEqual([]);
 					} else {
 						expect(section.querySelector('p[data-error]')!.textContent).toBe('Error: failed');
 						expect(section.querySelector('[data-pending]')).toBeNull();
-						expect(caught).toEqual([expect.objectContaining({ message: 'failed' })]);
 					}
 					expect(recoverable).toEqual([]);
 					expect(error).not.toHaveBeenCalled();

@@ -16,16 +16,20 @@ import {
 } from '../constants.js';
 import { unpatchedStatics, unpatchedHTML, takeUnpatchedValues } from '../hydration/dev-values.js';
 import { formatClientError } from '../error-codes.client.generated.js';
-import { BINDING_OPEN_PREFIX } from '../dom-binding-protocol.js';
+import { BINDING_OPEN_PREFIX, parseBindingMarker } from '../dom-binding-protocol.js';
 import {
 	HYDRATION_PROTOCOL_VERSION,
 	BOUNDARY_STREAMED,
 	SUSPENSE_RESOLVED_COMMENT,
 	BOUNDARY_CONTENT,
 	STREAM_SEED_COMMENT,
+	STREAM_CATCH_COMMENT,
 	NATIVE_SIGNAL_FRESH_COMMENT,
 	BOUNDARY_CLIENT,
+	BOUNDARY_CLIENT_CAUGHT,
 	BOUNDARY_CLIENT_NATIVE,
+	BOUNDARY_CATCH_GUARD,
+	boundaryIdCount,
 	parserNormalizedMatch,
 	isRangeOpen,
 } from '../hydration-protocol.js';
@@ -72,7 +76,7 @@ import { isAdoptionControl } from './hydration-presentation.js';
 import { isHostElementOfType } from './host-props.js';
 import { isElementDescriptor, isHostDescriptor } from './elements.js';
 import { siteLoc, componentSourceLoc } from './diagnostics.js';
-import { nodeAfter, atCommit, placeHydratedText, applyOutgoing } from './commit.js';
+import { nodeAfter, atCommit, discardMarker, placeHydratedText, applyOutgoing } from './commit.js';
 import {
 	getFirstChild,
 	getNextSibling,
@@ -431,6 +435,23 @@ export function auditHydrationProbe(kind: string, hit: boolean): void {
 	if (report) report(kind, hit);
 }
 
+/** A catch guard is either its own boundary or a binding view's primary arm. */
+function isCatchGuardOpen(open: Node): boolean {
+	const data = (open as Comment).data;
+	if (data.startsWith(BOUNDARY_CATCH_GUARD)) return true;
+	if (!data.startsWith(BINDING_OPEN_PREFIX)) return false;
+	const binding = parseBindingMarker(data);
+	return binding?.kind === 'try' && binding.arm === 0;
+}
+
+/** A caught guard records the primary's original IDs and positional seeds. */
+function caughtGuardState(node: Node | null): string | null {
+	const data = node?.nodeType === 8 ? (node as Comment).data : '';
+	return data.startsWith(STREAM_CATCH_COMMENT + ':')
+		? BOUNDARY_CLIENT + BOUNDARY_CLIENT_CAUGHT + data.slice(STREAM_CATCH_COMMENT.length + 1)
+		: null;
+}
+
 /**
  * Root-local hydration state and the dynamic dispatch boundary for hydration-only
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
@@ -731,14 +752,19 @@ export class HydrationCapability {
 	}
 
 	/**
-	 * The template sentinel that still leads the streamed boundary `open` opens
-	 * while its segment has not swapped in, or null. A method so that
-	 * client-only bundles drop the stream-protocol validator with this class.
+	 * The renderer-owned marker leading a streamed boundary: its pending template
+	 * sentinel, a revealed catch comment, or null for ordinary revealed content.
+	 * A method so client-only bundles drop the stream-protocol validator.
 	 */
-	streamSentinel(open: Node): Element | null {
-		const sentinel = getNextSibling(open);
-		return sentinel?.nodeType === 1 && isRendererStreamBoundaryTemplate(sentinel as Element)
-			? (sentinel as Element)
+	streamedArmMarker(open: Node): Element | Comment | null {
+		let marker = getNextSibling(open);
+		if (marker?.nodeType === 1)
+			return isRendererStreamBoundaryTemplate(marker as Element) ? (marker as Element) : null;
+		// A binding view keeps the stream's seed-scope comment before its content.
+		if (marker?.nodeType === 8 && (marker as Comment).data.startsWith(STREAM_SEED_COMMENT))
+			marker = getNextSibling(marker);
+		return marker?.nodeType === 8 && (marker as Comment).data === STREAM_CATCH_COMMENT
+			? (marker as Comment)
 			: null;
 	}
 
@@ -771,6 +797,24 @@ export class HydrationCapability {
 			: [open, end];
 	}
 
+	/** Adopt a primary arm, claiming any guard on its pending descendants at commit. */
+	beginTryArm(open: Node, end: Node): readonly [Node, Node] {
+		let first = getNextSibling(open);
+		if (
+			first?.nodeType === 1 &&
+			isCatchGuardOpen(open) &&
+			isRendererStreamBoundaryTemplate(first as Element)
+		) {
+			const sentinel = first;
+			first = getNextSibling(sentinel);
+			// A discarded attempt leaves the server's ability to replace this arm.
+			atCommit(discardMarker, sentinel);
+		}
+		const range = this.armRange(open, first, end);
+		this.node = range[0] === open ? first : getNextSibling(range[0]);
+		return range;
+	}
+
 	/**
 	 * What a presentation-binding view's `@try` range holds, spelled as a
 	 * boundary's open (hydration-protocol.ts), or null for any other range.
@@ -783,20 +827,53 @@ export class HydrationCapability {
 		const lead = getNextSibling(open);
 		if (lead?.nodeType === 1) {
 			const sentinel = lead as Element;
-			return isRendererStreamBoundaryTemplate(sentinel)
+			return isRendererStreamBoundaryTemplate(sentinel) && !isCatchGuardOpen(open)
 				? BOUNDARY_STREAMED + sentinel.getAttribute(STREAM_BOUNDARY_ATTR)
 				: HYDRATION_START;
 		}
 		const data = lead?.nodeType === 8 ? (lead as Comment).data : '';
-		return data.startsWith(SUSPENSE_RESOLVED_COMMENT)
-			? BOUNDARY_CONTENT + data.slice(SUSPENSE_RESOLVED_COMMENT.length)
-			: data.startsWith(STREAM_SEED_COMMENT)
-				? BOUNDARY_STREAMED + data.slice(STREAM_SEED_COMMENT.length)
-				: data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)
-					? BOUNDARY_CLIENT +
-						BOUNDARY_CLIENT_NATIVE +
-						data.slice(NATIVE_SIGNAL_FRESH_COMMENT.length)
-					: HYDRATION_START;
+		if (data.startsWith(SUSPENSE_RESOLVED_COMMENT))
+			return BOUNDARY_CONTENT + data.slice(SUSPENSE_RESOLVED_COMMENT.length);
+		if (data.startsWith(STREAM_SEED_COMMENT))
+			return (
+				caughtGuardState(getNextSibling(lead!)) ??
+				BOUNDARY_STREAMED + data.slice(STREAM_SEED_COMMENT.length)
+			);
+		const caught = caughtGuardState(lead);
+		if (caught !== null) return caught;
+		if (data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT))
+			return (
+				BOUNDARY_CLIENT + BOUNDARY_CLIENT_NATIVE + data.slice(NATIVE_SIGNAL_FRESH_COMMENT.length)
+			);
+		return HYDRATION_START;
+	}
+
+	/** Claim a boundary's first-render state, including a replaced guard's seed span. */
+	clientTryState(open: Node): string {
+		const binding = this.bindingTryState(open);
+		const data = (open as Comment).data;
+		const state =
+			binding ??
+			(data.startsWith(BOUNDARY_CATCH_GUARD)
+				? (caughtGuardState(getNextSibling(open)) ?? data)
+				: data);
+		if (
+			state.startsWith(BOUNDARY_CLIENT) &&
+			state.charAt(BOUNDARY_CLIENT.length) === BOUNDARY_CLIENT_CAUGHT
+		) {
+			const separator = state.indexOf(':', BOUNDARY_CLIENT.length + 1);
+			if (separator !== -1) {
+				const ids = state.slice(0, separator);
+				const seeds = boundaryIdCount(BOUNDARY_CONTENT + state.slice(separator + 1));
+				if (boundaryIdCount(ids) >= 0 && seeds >= 0) {
+					// The replaced primary's positional seeds still precede the next
+					// sibling's in this hydration scope, but no client will consume them.
+					this.seedCursor += seeds;
+					return ids;
+				}
+			}
+		}
+		return state;
 	}
 
 	/**

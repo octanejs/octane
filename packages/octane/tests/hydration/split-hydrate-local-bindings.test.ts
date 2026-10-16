@@ -14,8 +14,7 @@ import type * as Fixture from './_fixtures/split-hydrate-local-bindings.tsrx';
 // Directive-local bindings inside and around split `<Hydrate>` boundaries. The
 // server renders every boundary inline. The client parent and each split child
 // are compiled from the same source, bundled together, and hydrated over the
-// server HTML in development and production. As React's server never runs an
-// error boundary, a @catch arm renders only on the client: its cases render
+// server HTML in development and production. The @catch cases render
 // successfully on the server and throw while the client hydrates.
 
 type Props = Fixture.Props;

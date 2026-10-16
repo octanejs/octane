@@ -50,19 +50,15 @@ describe('module-level arrows returning @try', () => {
 			const compiled = loadCompiledFixtureSource(source, { id: 'arrow-form.tsrx', mode });
 			if (mode === 'server') {
 				expect(renderToString(compiled.Content, { label: 'ready' }).html).toContain('ready');
-				// As in React, the server never renders @catch: it reports the error
-				// and ships @pending for the client to render.
 				const onError = vi.fn();
 				const failed = renderToString(
 					compiled.Content,
 					{ label: 'offline', fail: true },
 					{ onError },
 				).html;
-				expect(failed).toContain('loading');
-				expect(failed).not.toContain('Error: offline');
-				expect(onError).toHaveBeenCalledExactlyOnceWith(
-					expect.objectContaining({ message: 'offline' }),
-				);
+				expect(failed).toContain('Error: offline');
+				expect(failed).not.toContain('loading');
+				expect(onError).not.toHaveBeenCalled();
 			} else {
 				const view = mount(compiled.Content, { label: 'ready' });
 				try {
@@ -255,10 +251,8 @@ describe('module-level arrows returning @try', () => {
 		}
 	});
 
-	// As in React, the server never renders @catch: an error ships @pending,
-	// and the client's render of the boundary shows @catch when it throws too.
 	it.each(runtimeForms)(
-		'%s server-renders its content and pending arms and leaves an error to the client',
+		'%s server-renders content, pending, and error arms and retries the error on hydration',
 		async (_name, Component, exportName) => {
 			expect(
 				renderToString(server[exportName], { label: 'server', value: 'ready' }).html,
@@ -272,20 +266,13 @@ describe('module-level arrows returning @try', () => {
 			const container = document.createElement('div');
 			container.innerHTML = renderToString(server[exportName], props, { onError }).html;
 			document.body.append(container);
-			expect(onError).toHaveBeenCalledExactlyOnceWith(
-				expect.objectContaining({ message: 'unavailable' }),
-			);
-			expect(container.querySelector('.pending')!.textContent).toBe('server: loading');
-			expect(container.querySelector('.retry')).toBeNull();
-			const caught: unknown[] = [];
-			const root = hydrateRoot(container, Component, props, {
-				onCaughtError: (error) => caught.push(error),
-			});
+			expect(onError).not.toHaveBeenCalled();
+			expect(container.querySelector('.retry')?.textContent).toBe('server: Error: unavailable');
+			const root = hydrateRoot(container, Component, props);
 			try {
 				await act(async () => {});
-				expect(container.querySelector('.retry')!.textContent).toBe('server: Error: unavailable');
+				expect(container.querySelector('.retry')?.textContent).toBe('server: Error: unavailable');
 				expect(container.querySelector('.pending')).toBeNull();
-				expect(caught).toEqual([expect.objectContaining({ message: 'unavailable' })]);
 			} finally {
 				root.unmount();
 				container.remove();

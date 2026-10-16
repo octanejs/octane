@@ -5,10 +5,8 @@ import { loadServerFixture } from '../_server-fixture.js';
 import * as Client from './_fixtures/try-hole-reader.tsrx';
 
 // A template reader that calls use() in a text hole clones its root before the
-// hole reads its value. As in React, whose server never runs an error boundary,
-// a read that rejected on the server leaves its Suspense boundary's @pending
-// arm for the client to render from client data, as it does for a reader that
-// calls use() in setup. With no Suspense boundary, the server render fails.
+// hole reads its value. A rejected server read renders its error arm, as it
+// does for a reader that calls use() in setup.
 
 const server = loadServerFixture('packages/octane/tests/hydration/_fixtures/try-hole-reader.tsrx');
 
@@ -37,7 +35,7 @@ async function hydrateRejected(name: PageName, clientValue: Promise<string>) {
 		await prerender(server[name], { label: 'server', value: Promise.reject('x') })
 	).html;
 	const div = container.querySelector('div')!;
-	expect(visible()).toBe('<div><p>pending</p></div>');
+	expect(visible()).toBe('<div><em title="server">server</em></div>');
 	const caught: unknown[] = [];
 	const recovered: unknown[] = [];
 	let root!: ReturnType<typeof hydrateRoot>;
@@ -73,7 +71,7 @@ describe('hydrateRoot — use() in a template hole rejected on the server', () =
 			expect(visible()).toBe(`<div>${content}</div>`);
 			expect(container.querySelector('div')).toBe(div);
 			expect(caught).toEqual([]);
-			expect(recovered).toHaveLength(1);
+			expect(recovered).toEqual([]);
 			expect(consoleError).not.toHaveBeenCalled();
 			root.unmount();
 		},
@@ -91,9 +89,7 @@ describe('hydrateRoot — use() in a template hole rejected on the server', () =
 			});
 			expect(container.querySelector('div')).toBe(div);
 			expect(caught).toEqual(['y']);
-			// The client render suspended before it rejected, so the boundary
-			// committed its fallback, and reported the server's error, first.
-			expect(recovered).toHaveLength(1);
+			expect(recovered).toEqual([]);
 			root.unmount();
 		},
 	);
@@ -101,9 +97,10 @@ describe('hydrateRoot — use() in a template hole rejected on the server', () =
 	it.each([
 		['in a @try', 'CatchOnly'],
 		['in an <ErrorBoundary>', 'Boundary'],
-	] as const)('fails the server render for a reader %s', async (_, name) => {
-		await expect(
-			prerender(server[name], { label: 'server', value: Promise.reject('x') }),
-		).rejects.toBe('x');
+	] as const)('renders the error arm for a reader %s', async (_, name) => {
+		container.innerHTML = (
+			await prerender(server[name], { label: 'server', value: Promise.reject('x') })
+		).html;
+		expect(visible()).toBe('<div><em title="server">server</em></div>');
 	});
 });

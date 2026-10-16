@@ -36,7 +36,13 @@
 //           `window.$OCTS[id]`.
 // - `[$!rN` the client renders the boundary. r says why the server could not:
 //           `e` it threw, `s` it suspended in a synchronous render, `n` it read
-//           a value that cannot be sent to the client. N is as above.
+//           a value that cannot be sent to the client, `c` an authored catch
+//           handled the error. N is as above. A catch is retried with client
+//           data; the server's error is never serialized to the client.
+// - `[$!gid` a catch boundary whose primary contains a pending descendant. Its
+//           leading stream sentinel lets the server replace the whole boundary
+//           if that descendant later throws. Client activation claims it. The
+//           opaque id is not a valid count, so older readers reject this state.
 // A boundary without a fallback whose content rendered is an ordinary `[`
 // range. A presentation-binding view keeps its own boundary shape (see
 // SUSPENSE_RESOLVED_COMMENT below).
@@ -96,10 +102,13 @@ export const BOUNDARY_CONTENT = '[$:';
 export const BOUNDARY_STREAMED = '[$?';
 /** Boundary open: the client renders the boundary (`[$!rN`). */
 export const BOUNDARY_CLIENT = '[$!';
-/** `[$!` reasons: the server's render threw, suspended, or read untransportable values. */
+/** Catch boundary guarding pending descendants (`[$!gid`). */
+export const BOUNDARY_CATCH_GUARD = '[$!g';
+/** `[$!` reasons: the server's render threw, suspended, read untransportable values, or caught an error. */
 export const BOUNDARY_CLIENT_ERROR = 'e';
 export const BOUNDARY_CLIENT_SUSPENDED = 's';
 export const BOUNDARY_CLIENT_NATIVE = 'n';
+export const BOUNDARY_CLIENT_CAUGHT = 'c';
 
 /** Whether a comment's data opens a range. */
 export function isRangeOpen(data: string): boolean {
@@ -166,6 +175,8 @@ export function boundaryIdCount(data: string): number {
 export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
 /** Left by the swap script where a streamed binding-view boundary's sentinel was. */
 export const STREAM_SEED_COMMENT = 'oct-seed:';
+/** Leads a streamed server catch. `:<ids>` marks a buffered binding catch; `:<ids>:<seeds>` marks a revealed guard whose replaced primary reserved those IDs and positional seeds. */
+export const STREAM_CATCH_COMMENT = 'oct-catch';
 /** A binding-view arm with untransportable demand is mounted fresh within its own range. */
 export const NATIVE_SIGNAL_FRESH_COMMENT = 'oct-native-fresh:';
 

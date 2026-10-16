@@ -1924,6 +1924,13 @@ error-boundary lifecycles. Catch fallbacks mount fresh nodes (like React's
 `forceUnmountCurrentAndReconcile`); deletion-phase and ref-detach errors route
 to the enclosing boundary.
 
+Octane also runs authored error boundaries during server rendering. A render
+error or rejected `use()` selects `@catch` or `<ErrorBoundary>`; `@pending`
+handles suspension. React does not run error boundaries on the server. Octane
+deliberately diverges so the same boundary handles errors on the server and
+client and an application does not have to represent failure as loading. See
+[Render errors](./ssr.md#render-errors) for streaming and unhandled errors.
+
 Directives are also renderable values. A module-level arrow can return a
 boundary directly, with or without parentheses or an explicit `return`:
 
@@ -2063,11 +2070,8 @@ normalizer accepts, in addition to ordinary objects.
 Server `useSyncExternalStore` falls back to `getSnapshot` when
 `getServerSnapshot` is absent. Transition starters and optimistic setters from
 server hooks are no-ops; a server hook's transition starter does not invoke its
-callback. Portals emit an empty placeholder. As in React, error boundaries are
-client-only: a server render error renders the nearest Suspense boundary's
-fallback for a client render and notifies `onError`; a pending promise with no
-boundary makes a synchronous buffered render throw instead of returning partial
-HTML.
+callback. Portals emit an empty placeholder. A pending promise with no boundary
+makes a synchronous buffered render throw instead of returning partial HTML.
 
 ### Streaming
 
@@ -2217,13 +2221,10 @@ hydration walk, two static branches that share a root tag are not told apart:
 <span class="expanded">...</span>
 ```
 
-Server render errors follow React. The server never runs an error boundary: an
-error, or a rejected `use()`, reaches `onError` and leaves the nearest Suspense
-boundary's fallback, which hydration renders afresh from client data and
-reports through `onRecoverableError`. There a `@catch` arm takes a repeated
-throw. With no Suspense boundary above it, the error fails the server render,
-even under a catch-only `@try` or `ErrorBoundary`, which do not hold a
-suspension either. See [Render errors](./ssr.md#render-errors).
+An authored error boundary can render its fallback on the server; see
+[Errors](#errors-try--catch-not-class-boundaries) for this divergence from
+React. JSX `<Suspense>` retains React-compatible client recovery for an
+otherwise unhandled server error; see [Render errors](./ssr.md#render-errors).
 
 A `<Hydrate>` boundary replays captured interaction events as constructed,
 untrusted copies that keep the captured event's `timeStamp`, including through

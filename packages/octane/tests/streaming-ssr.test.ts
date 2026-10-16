@@ -482,9 +482,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		}
 	});
 
-	it('fails the shell when only a catch-only @try holds a synchronous permanent-static error', async () => {
-		// React's server never runs an error boundary, so with no Suspense
-		// boundary above it the error is a shell error.
+	it('renders a catch-only fallback for a synchronous permanent-static error', async () => {
 		const c = collector();
 		const error = new Error('static shell boom');
 		const onShellError = vi.fn();
@@ -495,8 +493,11 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		).pipe(c.dest);
 
 		await c.ended;
-		expect(onShellError).toHaveBeenCalledWith(error);
-		expect(c.chunks.join('')).not.toContain('permanent-static-sync-catch');
+		expect(onShellError).not.toHaveBeenCalled();
+		container.innerHTML = c.chunks.join('');
+		expect(container.querySelector('#permanent-static-sync-catch')?.textContent).toBe(
+			'static shell boom',
+		);
 	});
 
 	it('retains a permanent-static fallback when its pending stream rejects', async () => {
@@ -531,9 +532,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(onAllReady).toHaveBeenCalledOnce();
 	});
 
-	it('retains a permanent-static fallback when an authored @try stream rejects', async () => {
-		// The @catch arm renders only on the client, which never renders a
-		// permanent-static range, so its fallback stays.
+	it('reveals an authored error fallback when a permanent-static stream rejects', async () => {
 		const value = deferred<string>();
 		const c = collector();
 		const onError = vi.fn();
@@ -546,19 +545,21 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		container.innerHTML = c.chunks.join('');
 		activate(container);
 		const shellChunkCount = c.chunks.length;
-		const [id] = protocolIds(c.chunks.join(''));
-		const fallback = container.querySelector('#permanent-static-caught-fallback');
+		expect(container.querySelector('#permanent-static-caught-fallback')?.textContent).toBe(
+			'Caught fallback',
+		);
 		const error = new Error('caught static stream boom');
 		value.reject(error);
 		await c.ended;
 		const tail = c.chunks.slice(shellChunkCount).join('');
-		expect(tail).toContain(staticErrorCall(id));
 		container.insertAdjacentHTML('beforeend', tail);
 		activate(container);
 
-		expect(container.querySelector('#permanent-static-caught-fallback')).toBe(fallback);
-		expect(container.querySelector('#permanent-static-caught-error')).toBeNull();
-		expect(onError).toHaveBeenCalledWith(error);
+		expect(container.querySelector('#permanent-static-caught-fallback')).toBeNull();
+		expect(container.querySelector('#permanent-static-caught-error')?.textContent).toBe(
+			'caught static stream boom',
+		);
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('retains a permanent-static fallback when the stream aborts', async () => {
@@ -1323,9 +1324,9 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					'middle-ready',
 					'last-ready',
 				]);
-				expect(container.querySelector('.err')).toBeNull();
-				expect(container.querySelectorAll('.loading')).toHaveLength(1);
-				expect(errors).toEqual([rejection]);
+				expect(container.querySelector('.err')?.textContent).toBe('last-rejected');
+				expect(container.querySelector('.loading')).toBeNull();
+				expect(errors).toEqual([]);
 			} finally {
 				stop();
 				await ended.catch(() => {});
@@ -1569,7 +1570,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(container.querySelector('.outer-value')?.textContent).toBe('outside');
 	});
 
-	it('keeps the fallback and marks the boundary errored when the promise rejects', async () => {
+	it('reveals the error arm when the promise rejects', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const onError = vi.fn();
@@ -1579,17 +1580,16 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			{ onError },
 		);
 		pipe(c.dest);
-		const [id] = protocolIds(c.chunks[0]);
+		container.innerHTML = c.chunks.join('');
+		expect(container.querySelector('.loading')?.textContent).toBe('loading');
 		const error = new Error('nope');
 		d.reject(error);
 		await c.ended;
-		expect(c.chunks.slice(1).join('')).toContain(errorCall(id));
-		expect(c.chunks.join('')).not.toContain('nope');
 		container.innerHTML = c.chunks.join('');
 		activate(container);
-		expect(container.querySelector('.loading')?.textContent).toBe('loading');
-		expect(container.querySelector('.err')).toBeNull();
-		expect(onError).toHaveBeenCalledWith(error);
+		expect(container.querySelector('.loading')).toBeNull();
+		expect(container.querySelector('.err')?.textContent).toBe('nope');
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('abort landing during a wave coalesce cancels the pass and completes once', async () => {
@@ -2264,16 +2264,15 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			scenario: 'weather-failure',
 		});
 		const result = await rendered;
-		expect(result.errors).toEqual([
-			expect.objectContaining({ message: 'The Kyoto forecast desk did not answer.' }),
-		]);
+		expect(result.errors).toEqual([]);
 		container.innerHTML = result.html;
 		activate(container);
-		expect(container.querySelector('.factory-pending')).not.toBeNull();
-		expect(container.querySelector('.factory-error')).toBeNull();
+		expect(container.querySelector('.factory-pending')).toBeNull();
+		expect(container.querySelector('.factory-error h2')?.textContent).toBe(
+			'The local weather desk did not answer.',
+		);
 
-		// The client renders the boundary afresh, reports that, and refetches. Its
-		// own rejection reaches the client @catch arm after that render suspended.
+		// The client retries from its own data; its rejection reaches the client catch.
 		const onRecoverableError = vi.fn();
 		const onCaughtError = vi.fn();
 		let root!: ReturnType<typeof hydrateRoot>;
@@ -2292,7 +2291,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			});
 			expect(container.querySelector('.factory-pending')).toBeNull();
 			expect(onCaughtError).toHaveBeenCalledTimes(1);
-			expect(onRecoverableError).toHaveBeenCalledTimes(1);
+			expect(onRecoverableError).not.toHaveBeenCalled();
 
 			await act(async () => {
 				(container.querySelector('.factory-error button') as HTMLButtonElement).click();
@@ -2309,7 +2308,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
-	it('client-renders a streamed boundary whose use() rejected, and reports it', async () => {
+	it('retries a streamed server-caught error from client data', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const { pipe } = ServerRT.renderToPipeableStream(
@@ -2324,10 +2323,8 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		container.innerHTML = c.chunks.join('');
 		activate(container);
 		const rootBox = container.querySelector('#id-box');
-		expect(container.querySelector('.id-loading')).not.toBeNull();
-		expect(container.querySelector('.id-error')).toBeNull();
-		// No part of the server's reason reaches the page.
-		expect(container.innerHTML).not.toContain('server-no');
+		expect(container.querySelector('.id-loading')).toBeNull();
+		expect(container.querySelector('.id-error')?.textContent).toBe('server-no');
 
 		const seen: Array<[string, string]> = [];
 		const onRecoverableError = vi.fn();
@@ -2348,7 +2345,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			expect(container.querySelector('#id-box')).toBe(rootBox);
 			expect(seen).toContainEqual(['root', ':page-in-0:']);
 			expect(container.querySelectorAll('.id-loading')).toHaveLength(1);
-			expect(onRecoverableError).toHaveBeenCalledTimes(1);
+			expect(onRecoverableError).not.toHaveBeenCalled();
 
 			await act(async () => client.resolve('client-ready'));
 			await vi.waitFor(async () => {
@@ -2356,7 +2353,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 				expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
 			});
 			expect(container.querySelector('.id-loading, .id-error')).toBeNull();
-			expect(onRecoverableError).toHaveBeenCalledTimes(1);
+			expect(onRecoverableError).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();
 		}
@@ -2543,11 +2540,8 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 	});
 });
 
-// A `@try` without `@pending` is not a Suspense boundary. As on React's server,
-// where an error boundary does not run, and as on Octane's client, it passes
-// both a suspension and an error on to the nearest Suspense boundary, in every
-// renderer and timing. With none above it, they reach the root.
-describe('a @try without @pending passes suspension and server errors on', () => {
+// A catch-only boundary handles errors but leaves suspension to its ancestor.
+describe('server error boundaries distinguish errors from suspension', () => {
 	// The lowered JSX ErrorBoundary is the same kind of boundary.
 	const BOUNDARIES = [
 		['@try with @catch', 'CatchOnlyInSuspense', CatchOnlyInSuspense],
@@ -2597,14 +2591,13 @@ describe('a @try without @pending passes suspension and server errors on', () =>
 				return (await result).html;
 			},
 		],
-	])('%s ships the Suspense fallback for an error', async (_renderer, render) => {
+	])('%s renders the inner error fallback', async (_renderer, render) => {
 		const error = new Error('catch-only boom');
 		const onError = vi.fn();
 		container.innerHTML = await render(error, onError);
-		expect(container.querySelector('.catch-only-loading')).not.toBeNull();
-		expect(container.querySelector('.catch-only-section, .catch-only-error')).toBeNull();
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError).toHaveBeenCalledWith(error);
+		expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+		expect(container.querySelector('.catch-only-loading')).toBeNull();
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it.each(BOUNDARIES)(
@@ -2622,19 +2615,17 @@ describe('a @try without @pending passes suspension and server errors on', () =>
 		},
 	);
 
-	it('streams the Suspense fallback for an error thrown before anything suspends', async () => {
+	it('streams the error fallback for an error thrown before anything suspends', async () => {
 		const error = new Error('catch-only boom');
 		const result = await collectPipeableStream(server.CatchOnlyInSuspense, {
 			promise: new Promise<string>(() => {}),
 			error,
 		});
-		expect(result.errors).toEqual([error]);
-		const [id] = protocolIds(result.html);
-		expect(result.html).toContain(errorCall(id));
+		expect(result.errors).toEqual([]);
 		container.innerHTML = result.html;
 		activate(container);
-		expect(container.querySelector('.catch-only-loading')).not.toBeNull();
-		expect(container.querySelector('.catch-only-section, .catch-only-error')).toBeNull();
+		expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+		expect(container.querySelector('.catch-only-loading')).toBeNull();
 	});
 
 	it.each(BOUNDARIES)(
@@ -2679,62 +2670,53 @@ describe('a @try without @pending passes suspension and server errors on', () =>
 	);
 
 	it.each(BOUNDARIES)(
-		'keeps the Suspense fallback and marks it errored when the read %s suspended on rejects',
+		'reveals the error fallback when the read %s suspended on rejects',
 		async (_kind, fixture) => {
 			const error = new Error('catch-only boom');
 			const { html, onError, onAllReady } = await streamCatchOnly(fixture, (read) =>
 				read.reject(error),
 			);
-			expect(onError).toHaveBeenCalledTimes(1);
-			expect(onError).toHaveBeenCalledWith(error);
+			expect(onError).not.toHaveBeenCalled();
 			expect(onAllReady).toHaveBeenCalledOnce();
 			expect(html).not.toContain('catch-only boom');
 			container.innerHTML = html;
 			activate(container);
-			expect(container.querySelector('.catch-only-loading')).not.toBeNull();
-			expect(container.querySelector('.catch-only-section')).toBeNull();
-			// The Suspense boundary's sentinel is the only one on the page.
-			const sentinels = container.querySelectorAll('template[data-oct-b]');
-			expect(sentinels).toHaveLength(1);
-			expect(html).toContain(errorCall(sentinels[0].getAttribute('data-oct-b')!));
+			expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+			expect(container.querySelector('.catch-only-loading')).toBeNull();
 		},
 	);
 
 	it.each(BOUNDARIES)(
-		'hydration renders the Suspense boundary on the client, where %s takes a repeated error',
+		'hydration preserves the surrounding content when %s takes a repeated error',
 		async (_kind, fixture, Component) => {
 			const { html } = await streamCatchOnly(fixture, (read) =>
 				read.reject(new Error('catch-only boom')),
 			);
 			container.innerHTML = html;
 			activate(container);
-			const serverFallback = container.querySelector('.catch-only-loading');
-			expect(serverFallback).not.toBeNull();
-			const client = deferred<string>();
+			const serverFallback = container.querySelector('.catch-only-error');
+			expect(serverFallback?.textContent).toBe('caught');
+			const section = container.querySelector('.catch-only-section');
+			const client = Promise.reject(new Error('client boom'));
+			client.catch(() => {});
 			const onRecoverableError = vi.fn();
-			const onCaughtError = vi.fn();
 			let root!: ReturnType<typeof hydrateRoot>;
 			await act(async () => {
 				root = hydrateRoot(
 					container,
 					Component as any,
-					{ promise: client.promise },
-					{ onRecoverableError, onCaughtError },
+					{ promise: client },
+					{ onRecoverableError },
 				);
 			});
 			try {
-				// The client renders the boundary afresh: its own fallback replaces the
-				// server's while the client data loads.
-				expect(serverFallback!.isConnected).toBe(false);
-				expect(container.querySelector('.catch-only-loading')).not.toBeNull();
-				await act(async () => client.reject(new Error('client boom')));
 				await vi.waitFor(async () => {
 					await act(async () => {});
 					expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
 				});
+				expect(container.querySelector('.catch-only-section')).toBe(section);
 				expect(container.querySelector('.catch-only-loading')).toBeNull();
-				expect(onRecoverableError).toHaveBeenCalledTimes(1);
-				expect(onCaughtError).toHaveBeenCalledTimes(1);
+				expect(onRecoverableError).not.toHaveBeenCalled();
 			} finally {
 				root.unmount();
 			}
@@ -2758,7 +2740,7 @@ describe('a @try without @pending passes suspension and server errors on', () =>
 		expect(text).not.toContain('data-oct-b');
 	});
 
-	it('fails the shell when its suspended read rejects with no Suspense boundary above it', async () => {
+	it('renders the error fallback when a shell-blocking read rejects', async () => {
 		const value = deferred<string>();
 		const onError = vi.fn();
 		const onShellError = vi.fn();
@@ -2769,9 +2751,9 @@ describe('a @try without @pending passes suspension and server errors on', () =>
 		);
 		const error = new Error('catch-only boom');
 		value.reject(error);
-		await expect(rendered).rejects.toBe(error);
-		expect(onShellError).toHaveBeenCalledWith(error);
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError).toHaveBeenCalledWith(error);
+		container.innerHTML = await new Response(await rendered).text();
+		expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+		expect(onShellError).not.toHaveBeenCalled();
+		expect(onError).not.toHaveBeenCalled();
 	});
 });

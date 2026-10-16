@@ -25,6 +25,7 @@ import {
 	HYDRATION_FOR_PREFIX,
 	HYDRATION_START,
 	NATIVE_SIGNAL_FRESH_COMMENT,
+	STREAM_CATCH_COMMENT,
 	STREAM_SEED_COMMENT,
 	SUSPENSE_RESOLVED_COMMENT,
 } from './hydration-protocol.js';
@@ -414,9 +415,10 @@ interface RegionInstance {
 	reset?: () => void;
 	/**
 	 * A `@try` region still shows the server's resolved body, which no client
-	 * preparation has committed. It stays while the client's own read is pending.
+	 * preparation has committed. It stays while the client's own read is pending;
+	 * an Element retains the server-owned catch guard until commit.
 	 */
-	adopted?: boolean;
+	adopted?: boolean | Element;
 }
 
 interface FragmentInstance {
@@ -947,13 +949,19 @@ function adoptTry(
 	const range = region.range;
 	let arm = region.arm;
 	let node = range.start.nextSibling;
+	let guard: Element | undefined;
 	while (node !== range.end && node !== null) {
 		if (node.nodeType === 1 && (node as Element).localName === 'template') {
 			const next = node.nextSibling;
 			if (!(node as Element).hasAttribute(STREAM_BOUNDARY_ATTR)) mismatch();
-			// An errored boundary has no adoptable arm; otherwise its fallback is.
-			arm = (node as Element).hasAttribute('data-oct-err') ? -2 : 1;
-			node.parentNode!.removeChild(node);
+			const errored = (node as Element).hasAttribute('data-oct-err');
+			// A primary's guard still belongs to the server until this view commits.
+			if (arm === 0 && !errored) guard = node as Element;
+			else {
+				// An errored boundary has no adoptable arm; otherwise its fallback is.
+				arm = errored ? -2 : 1;
+				node.parentNode!.removeChild(node);
+			}
 			node = next;
 			continue;
 		}
@@ -963,7 +971,12 @@ function adoptTry(
 		}
 		if (node.nodeType !== 8) mismatch();
 		const data = (node as Comment).data;
-		if (data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)) arm = -2;
+		if (
+			data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT) ||
+			data === STREAM_CATCH_COMMENT ||
+			data.startsWith(STREAM_CATCH_COMMENT + ':')
+		)
+			arm = -2;
 		else if (data.startsWith(STREAM_SEED_COMMENT)) arm = 0;
 		else if (!data.startsWith(SUSPENSE_RESOLVED_COMMENT)) break;
 		node = node.nextSibling;
@@ -975,7 +988,7 @@ function adoptTry(
 	const fragment = definition.arms[arm];
 	if (fragment) {
 		region.child = resolveFragment(fragment, id, body, false, transaction);
-		region.adopted = arm === 0;
+		region.adopted = guard ?? arm === 0;
 	} else if (body.start.nextSibling !== body.end) mismatch();
 }
 
@@ -1464,6 +1477,8 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 	region.arm = plan.arm;
 	if (definition.kind === 'slot') region.slot = plan.slot;
 	else if (definition.kind === 'try') {
+		const adopted = region.adopted;
+		if (adopted && adopted !== true) adopted.remove();
 		region.caught = plan.caught;
 		region.adopted = false;
 	}

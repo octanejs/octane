@@ -1171,12 +1171,11 @@ for (const fixture of fixtures) {
 				result.unmount();
 			});
 
-			// As in React, the server never runs an error boundary, so with no
-			// Suspense boundary above it the error fails the server render.
-			it(`${exportName} fails the server render without a Suspense boundary`, () => {
-				expect(() => ServerRuntime.renderToString(fixture.server[exportName])).toThrow(
-					/^scoped (?:getter )?failure$/,
-				);
+			it(`${exportName} assigns a server error to its nearest boundary`, () => {
+				const markup = document.createElement('div');
+				markup.innerHTML = ServerRuntime.renderToString(fixture.server[exportName]).html;
+				expect(markup.querySelector('[data-fallback="inner"]')?.textContent).toBe('inner');
+				expect(markup.querySelector('[data-fallback="outer"]')).toBeNull();
 			});
 		}
 

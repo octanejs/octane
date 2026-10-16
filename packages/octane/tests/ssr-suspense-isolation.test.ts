@@ -160,11 +160,7 @@ describe('SSR suspense — resolved values and concurrent render isolation', () 
 		expect(out.html).toContain('ctxval:DATA');
 	});
 
-	// An error thrown after data resolves belongs to the application's ancestor
-	// Suspense boundary and must not reject the whole prerender operation. As in
-	// React, the server reports it and ships that boundary's fallback for a
-	// client render; the catch arm renders only on the client.
-	it('reports a post-resolve error and leaves its boundary for a client render, not out of render()', async () => {
+	it('renders the error arm when a component throws after its data resolves', async () => {
 		const mod = evalServer(
 			`import { use } from 'octane';
 			 export function Boom(p) @{
@@ -190,10 +186,9 @@ describe('SSR suspense — resolved values and concurrent render isolation', () 
 		const p = prerender(mod.App, { promise: d.promise }, { onError });
 		d.resolve('boom');
 		const { html } = await p;
-		expect(html).toContain('class="pending"');
-		expect(html).not.toContain('class="caught"');
+		expect(html).toContain('<p class="caught">exploded: boom</p>');
+		expect(html).not.toContain('class="pending"');
 		expect(html).not.toContain('class="ok"');
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError.mock.calls[0][0]).toMatchObject({ message: 'exploded: boom' });
+		expect(onError).not.toHaveBeenCalled();
 	});
 });

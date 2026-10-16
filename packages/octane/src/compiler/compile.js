@@ -16829,15 +16829,39 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		registerClauseOrigin(ctx, node.pendingKeyword, [pendSub.fnName]);
 		pendFn = inheritOriginLoc(b.id(pendSub.fnName), node.pendingKeyword ?? node.pending);
 	}
+	let catchFn = null;
+	if (node.handler) {
+		const params = [];
+		if (node.handler.param) params.push(node.handler.param);
+		if (node.handler.resetParam) params.push(node.handler.resetParam);
+		const catchSub = ssrCompileSub(
+			node.handler.body.body,
+			ctx,
+			'__scatch',
+			params,
+			cssHash,
+			parentNs,
+			componentNs,
+		);
+		inlinedSubs.push(catchSub.fn);
+		registerClauseOrigin(ctx, node.handlerKeyword, [catchSub.fnName]);
+		const catchOrigin = node.handlerKeyword ?? node.handler;
+		// Compiled helpers place the scope after authored parameters; ssrTry
+		// always passes it second, so adapt only a two-parameter catch.
+		catchFn = node.handler.resetParam
+			? inheritOriginLoc(
+					b.arrow(
+						[b.id('__error'), b.id('__scope'), b.id('__reset')],
+						b.call(catchSub.fnName, b.id('__error'), b.id('__reset'), b.id('__scope')),
+					),
+					catchOrigin,
+				)
+			: inheritOriginLoc(b.id(catchSub.fnName), catchOrigin);
+	}
 	registerDirectiveOrigin(ctx, node, ['_$ssrTry', trySub.fnName]);
 	ctx.runtimeNeeded.add('ssrTry');
-	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
-	// suspension renders the @pending fallback (plus, in STREAMING renders, the
-	// boundary registration + `<template data-oct-b>` sentinel). As React's server
-	// never runs an error boundary, the @catch arm is client-only: any other
-	// thrown error marks a @pending boundary for a client render, or rethrows.
-	// Output is byte-identical to the old inline try/catch emit for buffered
-	// renders (hydration compatibility).
+	// The server owns the same authored arms as the client: pending handles
+	// suspension, catch handles errors, and a missing arm propagates outward.
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
 	const trailing = [];
@@ -16857,6 +16881,9 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	}
 	if (bindingSite !== null) {
 		trailing.push(inheritOriginLoc(b.literal(node.propagateSuspense === true), node), bindingSite);
+	}
+	if (catchFn !== null || trailing.length !== 0) {
+		trailing.unshift(catchFn ?? inheritOriginLoc(b.literal(null), node));
 	}
 	return ssrCall(
 		'ssrTry',

@@ -242,13 +242,10 @@ describe('SSR parallel use() — the server mirror', () => {
 			},
 			{ onError },
 		);
-		// As in React, the server never renders the catch arm: it reports the
-		// rejection and ships the pending fallback for the client to render.
-		expect(out.html).toContain('<i>w</i>');
-		expect(out.html).not.toContain('caught:');
+		expect(out.html).toContain('caught: boom-b');
+		expect(out.html).not.toContain('<i>w</i>');
 		expect(out.html).not.toContain('class="ok"');
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError.mock.calls[0][0]).toMatchObject({ message: 'boom-b' });
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('renderToString (single pass, no await) still shows @pending for a batched suspend', () => {

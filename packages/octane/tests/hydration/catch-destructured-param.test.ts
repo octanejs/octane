@@ -7,9 +7,7 @@ import * as Fixture from './_fixtures/catch-destructured-param.tsrx';
 
 // A `@catch` parameter may be a destructuring pattern, annotated or not, whose
 // defaults read component locals. Its bindings belong to the error arm and
-// shadow same-named component locals. As in React, whose server never runs an
-// error boundary, only the client renders the error arm: on the server the
-// error fails a render that has no Suspense boundary around it.
+// shadow same-named component locals, on both the server and client.
 
 type Props = Fixture.Props;
 
@@ -131,16 +129,17 @@ describe('@catch destructuring parameters', () => {
 		page.unmount();
 	});
 
-	it.each(['UnannotatedPattern', 'AnnotatedPattern', 'DefaultFromParent', 'ArrayPattern'] as const)(
-		'%s: the server never renders the error arm',
-		(view) => {
-			expect(() =>
-				renderToString(server[view], {
-					state: { failed: true },
-					label: 'server',
-					thrown: view === 'ArrayPattern' ? ['first'] : undefined,
-				}),
-			).toThrow();
-		},
-	);
+	it.each([
+		['UnannotatedPattern', undefined, 'server failed'],
+		['AnnotatedPattern', undefined, 'server failed'],
+		['DefaultFromParent', { code: 'E1' }, 'server fallback:E1'],
+		['ArrayPattern', ['first'], 'first+server'],
+	] as const)('%s: the server renders the destructured error arm', (view, thrown, expected) => {
+		container.innerHTML = renderToString(server[view], {
+			state: { failed: true },
+			label: 'server',
+			thrown,
+		}).html;
+		expect(text('.retry, .caught')).toEqual([expected]);
+	});
 });

@@ -1,5 +1,5 @@
 // `@catch` parameters written as destructuring patterns. Each boundary renders
-// its error arm, on the client, from the bindings the pattern declares. A
+// its error arm from the bindings the pattern declares. A
 // caught value is `unknown`, so, as with a TypeScript `catch` clause, a pattern
 // is annotated `any`.
 

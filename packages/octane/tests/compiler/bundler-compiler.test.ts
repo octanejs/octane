@@ -1995,8 +1995,7 @@ export function App(p) @{
 			dev: false,
 		});
 		expect(server?.code).toContain('_$ssrTry(');
-		// The server never renders the fallback, so it compiles none.
-		expect(server?.code).not.toContain('button');
+		expect(server?.code).toContain('button');
 		expect(server?.code).not.toContain('ErrorBoundary');
 
 		const dynamic = compiler.transform(

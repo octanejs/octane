@@ -1,7 +1,7 @@
 // A template reader whose use() runs in a text hole, inside a @try body. The
 // template clones its root before the hole reads its value. When the server's
-// read rejected, the client renders the boundary from client data, exactly as
-// it does for a reader whose use() runs in setup, before the template.
+// read rejected, its catch arm renders; activation retries from client data,
+// as it does for a reader whose use() runs in setup, before the template.
 import { ErrorBoundary, use } from 'octane';
 
 function Reader(props: { value: Promise<string> }) @{

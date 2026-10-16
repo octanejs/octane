@@ -602,22 +602,16 @@ describe('lazy — SSR', () => {
 		}
 	});
 
-	// As in React, the server never renders @catch: it reports a rejected load
-	// and ships @pending, and the client renders the boundary, whose own load
-	// rejects into @catch.
-	it('prerender reports a rejected load and the client routes it to @catch', async () => {
+	it('prerender renders @catch for a rejected load and hydration retries it', async () => {
 		const onError = vi.fn();
 		const L = Server.lazy(() => Promise.reject(new Error('chunk failed')));
 		const r = await prerender(m.LazyHost, { comp: L }, { onError });
-		expect(onError).toHaveBeenCalledExactlyOnceWith(
-			expect.objectContaining({ message: 'chunk failed' }),
-		);
-		expect(r.html).not.toContain('caught:');
+		expect(onError).not.toHaveBeenCalled();
 
 		const container = document.createElement('div');
 		container.innerHTML = r.html;
 		document.body.appendChild(container);
-		expect(container.querySelector('.fallback')!.textContent).toBe('loading');
+		expect(container.querySelector('.error')?.textContent).toBe('caught: chunk failed');
 		const load = deferred<{ default: any }>();
 		const recoverable: unknown[] = [];
 		const root = hydrateRoot(
@@ -628,12 +622,9 @@ describe('lazy — SSR', () => {
 		);
 		try {
 			await act(() => load.reject(new Error('chunk failed')));
-			expect(container.querySelector('.error')!.textContent).toBe('caught: chunk failed');
+			expect(container.querySelector('.error')?.textContent).toBe('caught: chunk failed');
 			expect(container.querySelector('.fallback')).toBeNull();
-			// The boundary the server could not finish is reported once.
-			expect(recoverable).toEqual([
-				expect.objectContaining({ message: expect.stringContaining('server rendering') }),
-			]);
+			expect(recoverable).toEqual([]);
 		} finally {
 			root.unmount();
 			container.remove();

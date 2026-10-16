@@ -636,13 +636,7 @@ export function App() @{
 `;
 					const { code } = compile(source, 'App.tsrx', { mode });
 					expect(code).toContain('armA');
-					// As in React, the server never renders @catch, so it compiles no catch arm.
-					if (directive.name === '@try' && mode === 'server') {
-						expect(code).toContain('armP');
-						expect(code).not.toContain('armB');
-					} else {
-						expect(code).toContain('armB');
-					}
+					expect(code).toContain('armB');
 					const evaluable = code
 						.replace(/^import[\s\S]*?from '[^']+';$/gm, '')
 						.replace(/^export /gm, '');

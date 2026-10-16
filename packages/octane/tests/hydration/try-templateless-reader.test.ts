@@ -10,12 +10,10 @@ import {
 } from './_fixtures/try-templateless-reader.tsrx';
 
 // A template-less component (no `@{}` body) claims a server component range
-// when it hydrates. As in React, whose server never runs an error boundary, a
-// use() that rejected on the server leaves its Suspense boundary's @pending arm
-// for the client to render from client data, keeping the hosts around it, and
-// with no Suspense boundary the server render fails. A body that renders where
-// the server rendered something else is a mismatch, which with no Suspense
-// boundary around it renders the root on the client.
+// when it hydrates. A use() that rejected on the server renders the nearest
+// catch arm. A body that renders where the server rendered something else is a
+// mismatch, which with no Suspense boundary around it renders the root on the
+// client.
 // Recoverable errors publish in dev and prod; console diagnostics in dev only.
 
 const server = loadServerFixture(
@@ -60,23 +58,23 @@ function serverNodes() {
 
 describe('hydrateRoot — template-less use() reader rejected on the server', () => {
 	it.each([
-		['is the sole try child', 'Rejected'],
-		['is a template reader (control)', 'TemplateRejected'],
-		['is rendered by another template-less component', 'NestedRejected'],
-		['sits under an inner @catch that rethrows', 'Rethrown'],
-		['sits under an inner ErrorBoundary that rethrows', 'RethrownBoundary'],
-	] as const)(
-		'fails the server render where only catch arms surround a reader that %s',
-		async (_, name) => {
-			await expect(prerender(server[name], { promise: Promise.reject('x') })).rejects.toBe('x');
-		},
-	);
+		['is the sole try child', 'Rejected', 'x'],
+		['is a template reader (control)', 'TemplateRejected', 'x'],
+		['is rendered by another template-less component', 'NestedRejected', 'x'],
+		['sits under an inner @catch that rethrows', 'Rethrown', 'Error: inner:x'],
+		['sits under an inner ErrorBoundary that rethrows', 'RethrownBoundary', 'Error: inner:x'],
+	] as const)('renders the nearest catch arm for a reader that %s', async (_, name, expected) => {
+		container.innerHTML = (await prerender(server[name], { promise: Promise.reject('x') })).html;
+		expect(container.querySelector('.caught')?.textContent).toBe(expected);
+		expect(container.querySelector('h1')?.textContent).toBe('before');
+		expect(container.querySelector('button')?.textContent).toBe('after');
+	});
 
 	it.each([
 		['resolves', () => Promise.resolve('client'), [], ''],
 		['rejects too', () => Promise.reject('y'), ['y'], 'y'],
 	] as const)(
-		'client-renders a Suspense boundary whose reader the client %s, keeping its hosts',
+		'retries a caught boundary whose reader the client %s, keeping its hosts',
 		async (_, read, expectedCaught, caughtText) => {
 			const promise = read();
 			promise.catch(() => {});
@@ -84,8 +82,8 @@ describe('hydrateRoot — template-less use() reader rejected on the server', ()
 				await prerender(server.RejectedPending, { promise: Promise.reject('x') })
 			).html;
 			const before = serverNodes();
-			expect(container.querySelector('em')!.textContent).toBe('loading');
-			expect(before.caught).toBeNull();
+			expect(before.caught?.textContent).toBe('x');
+			expect(container.querySelector('em')).toBeNull();
 
 			const { root, caught, recovered } = await hydrate(RejectedPending, { promise });
 			await vi.waitFor(async () => {
@@ -97,7 +95,7 @@ describe('hydrateRoot — template-less use() reader rejected on the server', ()
 			expect(container.querySelector('button')).toBe(before.button);
 			expect(container.querySelector('.caught')?.textContent ?? '').toBe(caughtText);
 			expect(caught).toEqual(expectedCaught);
-			expect(recovered).toHaveLength(1);
+			expect(recovered).toEqual([]);
 			expect(consoleError).not.toHaveBeenCalled();
 			root.unmount();
 		},
@@ -123,7 +121,7 @@ describe('hydrateRoot — template-less use() reader rejected on the server', ()
 		expect(value!.textContent).toBe('later');
 		expect(container.querySelector('.caught')).toBeNull();
 		expect(caught).toEqual([]);
-		expect(recovered).toHaveLength(1);
+		expect(recovered).toEqual([]);
 		expect(consoleError).not.toHaveBeenCalled();
 		root.unmount();
 	});

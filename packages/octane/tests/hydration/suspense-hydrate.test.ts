@@ -588,14 +588,14 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		root.unmount();
 	});
 
-	it('client-renders a resource the server rejected, starting the client request', async () => {
+	it('retries a resource caught on the server, starting the client request', async () => {
 		const { html } = await prerender(factoryServer.SeededResource, {
 			id: 'rejected',
 			load: () => Promise.reject(new Error('server-rejection')),
 		});
 		container.innerHTML = html;
-		expect(container.querySelector('#seeded-pending')).not.toBeNull();
-		expect(container.querySelector('#seeded-error')).toBeNull();
+		expect(container.querySelector('#seeded-pending')).toBeNull();
+		expect(container.querySelector('#seeded-error')?.textContent).toBe('server-rejection');
 		const clientLoad = vi.fn(() => Promise.resolve('client-success'));
 		const onRecoverableError = vi.fn();
 
@@ -614,7 +614,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		});
 		expect(container.querySelector('#seeded-pending, #seeded-error')).toBeNull();
 		expect(clientLoad).toHaveBeenCalledWith('rejected');
-		expect(onRecoverableError).toHaveBeenCalledTimes(1);
+		expect(onRecoverableError).not.toHaveBeenCalled();
 		root.unmount();
 	});
 
@@ -912,7 +912,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 // boundary hydrates without disturbing the server DOM around it, and the
 // `useId` values the server reserved inside it keep later ids in step.
 const STATES_SOURCE = `
-	import { use, useId } from 'octane';
+	import { Suspense, use, useId } from 'octane';
 
 	function Tail() @{
 		const id = useId();
@@ -933,6 +933,22 @@ const STATES_SOURCE = `
 		</main>
 	}
 
+	function SuspenseContent(props) @{
+		const id = useId();
+		const value = use(props.value);
+		<p id="states-content" data-id={id}>{value as string}</p>
+	}
+
+	export function JsxBoundaryStates(props) @{
+		<main>
+			<header id="states-before">{'before' as string}</header>
+			<Suspense fallback={<i id="states-fallback">{'loading' as string}</i>}>
+				<SuspenseContent value={props.value} />
+			</Suspense>
+			<Tail />
+		</main>
+	}
+
 	export function CatchingStates(props) @{
 		<main>
 			<header id="states-before">{'before' as string}</header>
@@ -946,6 +962,124 @@ const STATES_SOURCE = `
 				<b id="states-error">{(error as Error).message as string}</b>
 			}
 			<Tail />
+		</main>
+	}
+
+	export function NestedCatchingStates(props) @{
+		<main>
+			<header id="states-before">{'before' as string}</header>
+			@try {
+				const id = useId();
+				<section data-id={id}>
+					@try {
+						const value = use(props.value);
+						if (value === 'boom') throw new Error('boom');
+						<p id="states-content">{value as string}</p>
+					} @pending {
+						<i id="states-fallback">{'loading' as string}</i>
+					}
+				</section>
+			} @catch (error) {
+				<b id="states-error">{(error as Error).message as string}</b>
+			}
+			<Tail />
+		</main>
+	}
+
+	function SeededTail(props) @{
+		const value = use(props.value);
+		<footer id="states-after">{value as string}</footer>
+	}
+
+	export function SeededNestedCatchingStates(props) @{
+		<main>
+			@try {
+				const primary = use(props.primary);
+				<section data-primary={primary}>
+					@try {
+						const value = use(props.value);
+						if (value === 'boom') throw new Error('boom');
+						<p id="states-content">{value as string}</p>
+					} @pending {
+						<i id="states-fallback">{'loading' as string}</i>
+					}
+				</section>
+			} @catch (error) {
+				<b id="states-error">{(error as Error).message as string}</b>
+			}
+			<SeededTail value={props.sibling} />
+		</main>
+	}
+
+	function LifecycleTail(props) @{
+		props.beforeRead?.();
+		const id = useId();
+		const value = use(props.value);
+		<footer id="states-after" data-id={id}>{value as string}</footer>
+	}
+
+	function ShellGate(props) @{
+		props.beforeRead?.();
+		const value = use(props.value);
+		<aside>{value as string}</aside>
+	}
+
+	export function LifecycleNestedCatchingStates(props) @{
+		<main>
+			@try {
+				<section>
+					@if (props.phase.ready) {
+						const primary = use(props.primary);
+						const id = useId();
+						<output data-id={id}>{primary as string}</output>
+					}
+					@try {
+						const value = use(props.value);
+						<p id="states-content">{value as string}</p>
+					} @pending {
+						<i id="states-fallback">{'loading' as string}</i>
+					}
+				</section>
+			} @catch (error) {
+				<b id="states-error">{(error as Error).message as string}</b>
+			}
+			<LifecycleTail value={props.sibling} />
+			<ShellGate value={props.shell} beforeRead={props.beforeShellRead} />
+		</main>
+	}
+
+	export function WithheldCatchingStates(props) @{
+		<main>
+			@try {
+				<section>
+					@try {
+						const inner = use(props.inner);
+						<div data-inner={inner}>
+							@try {
+								const primary = use(props.primary);
+								const id = useId();
+								<article data-id={id} data-primary={primary}>
+									@try {
+										const value = use(props.value);
+										<p id="states-content">{value as string}</p>
+									} @pending {
+										<i id="states-fallback">{'loading' as string}</i>
+									}
+								</article>
+							} @catch (error) {
+								props.onCatch?.();
+								<b id="states-error">{(error as Error).message as string}</b>
+							}
+							<LifecycleTail value={props.sibling} beforeRead={props.afterGuard} />
+						</div>
+					} @pending {
+						<i id="states-inner-fallback">{'inner loading' as string}</i>
+					}
+					<ShellGate value={props.outer} />
+				</section>
+			} @pending {
+				<i id="states-outer-fallback">{'outer loading' as string}</i>
+			}
 		</main>
 	}
 `;
@@ -963,14 +1097,14 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 	});
 	afterEach(() => resetStreamRuntimeGlobals());
 
-	async function hydrateStates(value: Promise<string>) {
+	async function hydrateStates(value: Promise<string>, name = 'BoundaryStates') {
 		const before = container.querySelector('#states-before')!;
 		const after = container.querySelector('#states-after')!;
 		const afterId = after.textContent;
 		const recoverable: string[] = [];
 		const root = hydrateRoot(
 			container,
-			statesClient.BoundaryStates,
+			statesClient[name],
 			{ value },
 			{ onRecoverableError: (error) => recoverable.push((error as Error).message) },
 		);
@@ -1124,12 +1258,12 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 	});
 
 	/** Stream the boundary's shell into the container, leaving its content pending. */
-	function streamShell() {
+	function streamShell(name = 'BoundaryStates', props: Record<string, unknown> = {}) {
 		const server = deferred<string>();
 		const collector = createPipeableCollector();
 		ServerRT.renderToPipeableStream(
-			statesServer.BoundaryStates,
-			{ value: server.promise },
+			statesServer[name],
+			{ ...props, value: server.promise },
 			{ onError: () => {} },
 		).pipe(collector.destination);
 		container.innerHTML = collector.chunks[0]!;
@@ -1144,15 +1278,45 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		return { server, deliver };
 	}
 
-	function hydratePending(value: Promise<string>) {
+	function lifecycleStream() {
+		const phase = { ready: false };
+		const shell = deferred<string>();
+		const descendant = deferred<string>();
+		const reachedGate = deferred<void>();
+		const shellReady = deferred<void>();
+		const collector = createPipeableCollector();
+		ServerRT.renderToPipeableStream(
+			statesServer.LifecycleNestedCatchingStates,
+			{
+				phase,
+				primary: fulfilled('primary-server'),
+				value: descendant.promise,
+				sibling: fulfilled('sibling-server'),
+				shell: shell.promise,
+				beforeShellRead: () => reachedGate.resolve(undefined),
+			},
+			{ onShellReady: () => shellReady.resolve(undefined) },
+		).pipe(collector.destination);
+		return { phase, shell, descendant, reachedGate, shellReady, collector };
+	}
+
+	function hydratePending(
+		value: Promise<string>,
+		name = 'BoundaryStates',
+		props: Record<string, unknown> = {},
+	) {
 		const recoverable: string[] = [];
+		const caught: unknown[] = [];
 		const root = hydrateRoot(
 			container,
-			statesClient.BoundaryStates,
-			{ value },
-			{ onRecoverableError: (error) => recoverable.push((error as Error).message) },
+			statesClient[name],
+			{ ...props, value },
+			{
+				onRecoverableError: (error) => recoverable.push((error as Error).message),
+				onCaughtError: (error) => caught.push(error),
+			},
 		);
-		return { root, recoverable };
+		return { root, recoverable, caught };
 	}
 
 	/** A thenable use() reads synchronously. */
@@ -1195,9 +1359,9 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		root.unmount();
 	});
 
-	it('renders a waiting streamed boundary on the client and reports it when its stream errors', async () => {
-		const { server, deliver } = streamShell();
-		const { root, recoverable } = hydratePending(Promise.resolve('client'));
+	it('renders a waiting JSX Suspense boundary on the client and reports it when its stream errors', async () => {
+		const { server, deliver } = streamShell('JsxBoundaryStates');
+		const { root, recoverable } = hydratePending(Promise.resolve('client'), 'JsxBoundaryStates');
 		await act(async () => {});
 		expect(container.querySelector('#states-fallback')).not.toBeNull();
 
@@ -1209,6 +1373,217 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		expect(recoverable).toEqual([
 			expect.stringContaining('likely due to an error during server rendering'),
 		]);
+		root.unmount();
+	});
+
+	it('activates before a streamed catch arm arrives without disturbing surrounding content', async () => {
+		const { server, deliver } = streamShell('CatchingStates');
+		const before = container.querySelector('#states-before');
+		const after = container.querySelector('#states-after');
+		const { root, recoverable, caught } = hydratePending(Promise.resolve('boom'), 'CatchingStates');
+		await act(async () => {});
+		expect(container.querySelector('#states-fallback')?.textContent).toBe('loading');
+
+		server.resolve('boom');
+		await deliver();
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			expect(container.querySelector('#states-error')?.textContent).toBe('boom');
+		});
+		expect(container.querySelector('#states-fallback')).toBeNull();
+		expect(container.querySelector('#states-before')).toBe(before);
+		expect(container.querySelector('#states-after')).toBe(after);
+		expect(recoverable).toEqual([]);
+		expect(caught).toEqual([expect.objectContaining({ message: 'boom' })]);
+		root.unmount();
+	});
+
+	it('settles a waiting descendant when its enclosing server catch arrives after activation', async () => {
+		const { server, deliver } = streamShell('NestedCatchingStates');
+		const before = container.querySelector('#states-before');
+		const after = container.querySelector('#states-after')!;
+		const afterId = after.textContent;
+		expect(before?.textContent).toBe('before');
+		const { root, recoverable, caught } = hydratePending(
+			Promise.resolve('client'),
+			'NestedCatchingStates',
+		);
+		await act(async () => {});
+		expect(container.querySelector('#states-fallback')?.textContent).toBe('loading');
+
+		server.resolve('boom');
+		await deliver();
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			expect(container.querySelector('#states-content')?.textContent).toBe('client');
+		});
+		expect(container.querySelector('#states-fallback, #states-error')).toBeNull();
+		expect(container.querySelector('#states-before')).toBe(before);
+		expect(container.querySelector('#states-after')).toBe(after);
+		expect(after.textContent).toBe(afterId);
+		expect(recoverable).toEqual([]);
+		expect(caught).toEqual([]);
+		root.unmount();
+	});
+
+	it('retries an enclosing catch delivered before activation and preserves later ids', async () => {
+		const { server, deliver } = streamShell('NestedCatchingStates');
+		const after = container.querySelector('#states-after')!;
+		const afterId = after.textContent;
+		server.resolve('boom');
+		await deliver();
+		expect(container.querySelector('#states-error')?.textContent).toBe('boom');
+
+		const { root, recoverable, caught } = hydratePending(
+			Promise.resolve('client'),
+			'NestedCatchingStates',
+		);
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			expect(container.querySelector('#states-content')?.textContent).toBe('client');
+		});
+		expect(container.querySelector('#states-after')).toBe(after);
+		expect(after.textContent).toBe(afterId);
+		expect(recoverable).toEqual([]);
+		expect(caught).toEqual([]);
+		root.unmount();
+	});
+
+	it('keeps a later resource seed aligned after a streamed enclosing catch replaces its primary', async () => {
+		const { server, deliver } = streamShell('SeededNestedCatchingStates', {
+			primary: fulfilled('primary-server'),
+			sibling: fulfilled('sibling-server'),
+		});
+		const sibling = container.querySelector('#states-after')!;
+		expect(sibling.textContent).toBe('sibling-server');
+		server.resolve('boom');
+		await deliver();
+		expect(container.querySelector('#states-error')?.textContent).toBe('boom');
+
+		const { root, recoverable, caught } = hydratePending(
+			fulfilled('client'),
+			'SeededNestedCatchingStates',
+			{ primary: fulfilled('primary-client'), sibling: new Promise<string>(() => {}) },
+		);
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			expect(container.querySelector('#states-content')?.textContent).toBe('client');
+		});
+		expect(container.querySelector('#states-after')).toBe(sibling);
+		expect(sibling.textContent).toBe('sibling-server');
+		expect(container.querySelector('section')?.getAttribute('data-primary')).toBe('primary-client');
+		expect(recoverable).toEqual([]);
+		expect(caught).toEqual([]);
+		root.unmount();
+	});
+
+	it('preserves sibling resources and ids when the accepted shell changes before a late catch', async () => {
+		const { phase, shell, descendant, reachedGate, shellReady, collector } = lifecycleStream();
+		await reachedGate.promise;
+		expect(collector.chunks).toEqual([]);
+		phase.ready = true;
+		shell.resolve('shell');
+		await shellReady.promise;
+		expect(collector.chunks.join('')).toContain('primary-server');
+
+		descendant.reject(new Error('late failure'));
+		container.innerHTML = await collector.ended;
+		activateStreamedMarkup(container);
+		expect(container.querySelector('#states-error')?.textContent).toBe('late failure');
+		const sibling = container.querySelector('#states-after')!;
+		const siblingId = sibling.getAttribute('data-id');
+		expect(sibling.textContent).toBe('sibling-server');
+		expect(siblingId).toBeTruthy();
+
+		const { root, recoverable, caught } = hydratePending(
+			fulfilled('client'),
+			'LifecycleNestedCatchingStates',
+			{
+				phase,
+				primary: fulfilled('primary-client'),
+				sibling: fulfilled('sibling-client'),
+				shell: fulfilled('shell'),
+			},
+		);
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			expect(container.querySelector('#states-content')?.textContent).toBe('client');
+		});
+		expect(container.querySelector('#states-after')).toBe(sibling);
+		expect(sibling.textContent).toBe('sibling-server');
+		expect(sibling.getAttribute('data-id')).toBe(siblingId);
+		expect(recoverable).toEqual([]);
+		expect(caught).toEqual([]);
+		root.unmount();
+	});
+
+	it('includes an enclosing catch in the shell when its descendant rejects before the shell', async () => {
+		const { shell, descendant, reachedGate, collector } = lifecycleStream();
+		await reachedGate.promise;
+		expect(collector.chunks).toEqual([]);
+		descendant.reject(new Error('pre-shell failure'));
+		shell.resolve('shell');
+		await collector.ended;
+		container.innerHTML = collector.chunks[0]!;
+		expect(container.querySelector('#states-error')?.textContent).toBe('pre-shell failure');
+		expect(container.querySelector('#states-fallback')).toBeNull();
+		expect(container.querySelector('#states-after')?.textContent).toBe('sibling-server');
+	});
+
+	it('reveals an authored catch when its nested segment fails before an outer segment is ready', async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const descendant = deferred<string>();
+		const reachedSibling = deferred<void>();
+		const reachedCatch = deferred<void>();
+		const collector = createPipeableCollector();
+		ServerRT.renderToPipeableStream(statesServer.WithheldCatchingStates, {
+			outer: outer.promise,
+			inner: inner.promise,
+			value: descendant.promise,
+			primary: fulfilled('primary-server'),
+			sibling: fulfilled('sibling-server'),
+			afterGuard: () => reachedSibling.resolve(undefined),
+			onCatch: () => reachedCatch.resolve(undefined),
+		}).pipe(collector.destination);
+		container.innerHTML = collector.chunks[0]!;
+		expect(container.querySelector('#states-outer-fallback')?.textContent).toBe('outer loading');
+
+		inner.resolve('inner-server');
+		await reachedSibling.promise;
+		descendant.reject(new Error('withheld failure'));
+		await reachedCatch.promise;
+		outer.resolve('outer-server');
+		container.innerHTML = await collector.ended;
+		activateStreamedMarkup(container);
+		expect(container.querySelector('#states-error')?.textContent).toBe('withheld failure');
+		expect(
+			container.querySelector('#states-fallback, #states-inner-fallback, #states-outer-fallback'),
+		).toBeNull();
+		const sibling = container.querySelector('#states-after')!;
+		const siblingId = sibling.getAttribute('data-id');
+		expect(sibling.textContent).toBe('sibling-server');
+		expect(siblingId).toBeTruthy();
+
+		const { root, recoverable, caught } = hydratePending(
+			fulfilled('client'),
+			'WithheldCatchingStates',
+			{
+				outer: fulfilled('outer-client'),
+				inner: fulfilled('inner-client'),
+				primary: fulfilled('primary-client'),
+				sibling: fulfilled('sibling-client'),
+			},
+		);
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			expect(container.querySelector('#states-content')?.textContent).toBe('client');
+		});
+		expect(container.querySelector('#states-after')).toBe(sibling);
+		expect(sibling.textContent).toBe('sibling-server');
+		expect(sibling.getAttribute('data-id')).toBe(siblingId);
+		expect(recoverable).toEqual([]);
+		expect(caught).toEqual([]);
 		root.unmount();
 	});
 
@@ -1233,11 +1608,11 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		root.unmount();
 	});
 
-	it('renders a boundary whose server render threw on the client, and reports it', async () => {
+	it('renders a JSX Suspense boundary whose server render threw on the client, and reports it', async () => {
 		const errors: unknown[] = [];
 		container.innerHTML = (
 			await prerender(
-				statesServer.BoundaryStates,
+				statesServer.JsxBoundaryStates,
 				{ value: Promise.reject(new Error('server failed')) },
 				{ onError: (error) => errors.push(error) },
 			)
@@ -1245,7 +1620,10 @@ describe.each([true, false])('a Suspense boundary in each server state (dev=%s)'
 		expect(errors).toEqual([expect.objectContaining({ message: 'server failed' })]);
 		expect(container.querySelector('#states-content')).toBeNull();
 
-		const { root, recoverable } = await hydrateStates(Promise.resolve('client'));
+		const { root, recoverable } = await hydrateStates(
+			Promise.resolve('client'),
+			'JsxBoundaryStates',
+		);
 		expect(container.querySelector('#states-content')!.textContent).toBe('client');
 		expect(recoverable).toEqual([
 			expect.stringContaining('could not finish this Suspense boundary'),

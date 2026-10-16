@@ -343,7 +343,7 @@ function Thrower(): never {
 }
 
 // The sibling after the server's element is a boundary whose client render
-// throws to its catch arm. (The server never renders a catch arm.)
+// throws to its catch arm.
 export function CaughtBranch(props: { server?: boolean }) @{
 	<div>
 		<section>

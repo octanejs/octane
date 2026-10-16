@@ -274,7 +274,7 @@ describe('ReactCompat buffered server rendering', () => {
 		expect(completion).toContain('<strong>React ready</strong>');
 	});
 
-	it('passes a React server error through the Octane error boundary to its Suspense boundary', async () => {
+	it('handles a React server error in the enclosing Octane error boundary', async () => {
 		const error = new Error('React server failed');
 		const captured: unknown[] = [];
 		function Broken() {
@@ -289,11 +289,9 @@ describe('ReactCompat buffered server rendering', () => {
 				children: reactIsland(Broken),
 			});
 		}
-		// As in React, the server never runs an error boundary. With no Suspense
-		// boundary above it, the island's error fails the render.
-		await expect(prerender(Boundary)).rejects.toBe(error);
-		// Inside a Suspense boundary, the server reports the error and ships the
-		// fallback for a client render.
+		expect(textFrom((await prerender(Boundary)).html)).toBe('Octane caught the error');
+		expect(captured).toEqual([error]);
+		captured.length = 0;
 		function Page() {
 			return Server.createElement(Server.Suspense, {
 				fallback: Server.createElement('p', null, 'Octane pending'),
@@ -302,10 +300,9 @@ describe('ReactCompat buffered server rendering', () => {
 		}
 		const onError = vi.fn();
 		const { html } = await prerender(Page, undefined, { onError });
-		expect(textFrom(html)).toBe('Octane pending');
-		expect(captured).toEqual([]);
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError.mock.calls[0][0]).toBe(error);
+		expect(textFrom(html)).toBe('Octane caught the error');
+		expect(captured).toEqual([error]);
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('awaits a local React Suspense boundary without shipping reveal scripts', async () => {
