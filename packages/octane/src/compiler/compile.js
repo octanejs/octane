@@ -10801,6 +10801,7 @@ function markKnownAttributeSpreads(ast, contracts) {
 						(member) => typeof member !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(member),
 					))) ||
 			(contract.imported === '*' && !contract.members?.length) ||
+			(contract.nonNull !== undefined && typeof contract.nonNull !== 'boolean') ||
 			(contract.style !== undefined &&
 				(contract.style !== 'object' || !contract.fields.includes('style')))
 		)
@@ -10952,6 +10953,7 @@ function markKnownAttributeSpreads(ast, contracts) {
 				_octaneKnownAttributeSpread: {
 					fields: [...shorthand.fields],
 					style: shorthand.style,
+					...(shorthand.nonNull === true ? { nonNull: true } : {}),
 					...(lifted.reactive ? { projection: true } : {}),
 				},
 			};
@@ -10997,6 +10999,7 @@ function markKnownAttributeSpreads(ast, contracts) {
 					_octaneKnownAttributeSpread: {
 						fields: [...contract.fields],
 						style: contract.style,
+						...(contract.nonNull === true ? { nonNull: true } : {}),
 						...(external ? { unbound: true } : {}),
 					},
 				}
@@ -11064,6 +11067,7 @@ function expandKnownAttributeSpreads(attributes) {
 			expression: null,
 			projection: attr._octaneKnownAttributeSpread.projection === true,
 			fields: attr._octaneKnownAttributeSpread.fields,
+			...(attr._octaneKnownAttributeSpread.nonNull === true ? { nonNull: true } : {}),
 		};
 		const argument = attr.argument ?? attr.value.expression;
 		return [
@@ -11079,7 +11083,10 @@ function expandKnownAttributeSpreads(attributes) {
 					),
 					argument,
 				);
-				expression.metadata = { octaneKnownAttributeRead: true };
+				expression.metadata = {
+					octaneKnownAttributeRead: true,
+					...(source.nonNull ? { octaneKnownNonNullSource: source } : {}),
+				};
 				const attribute = inheritOriginLoc(
 					b.jsx_attribute(
 						inheritOriginLoc(b.jsx_id(field), attr),
@@ -11131,6 +11138,10 @@ function lowerHostAttributeValues(attributes, ctx) {
 
 function resolveKnownAttributeSource(expression, valueOf) {
 	if (!expression?.metadata?.octaneKnownAttributeRead) return expression;
+	// Strip only the compiler-created guard after the receiver is proven to be
+	// a render-local. The provider call, field read and writer remain in place.
+	if (expression.metadata.octaneKnownNonNullSource?.binding?.knownSpreadNonNull === true)
+		expression = expression.alternate;
 	return mapAst(expression, (node) => {
 		const source = node.type === 'Identifier' && node.metadata?.octaneKnownAttributeSource;
 		return source ? inheritOriginLoc(valueOf(source), node) : null;
@@ -11845,13 +11856,18 @@ function compileInternal(
 	// module-level helper imports from a sibling function, so the whole module
 	// retains the runtime form in that rare case. Escaped identifiers also pass
 	// the cheap source gate before the exact AST check.
-	const inlineHookMemoEnabled =
+	const inlineHookMemoEligible =
 		options?.inlineHookMemo !== false &&
 		!hmrEnabled &&
 		!devEnabled &&
 		!profileEnabled &&
-		options?.__universal == null &&
-		!((source.includes('eval') || source.includes('\\u')) && hasInlineMemoDirectEval(ast));
+		options?.__universal == null;
+	// Direct eval can observe generated render-body bindings, including their
+	// TDZ before the declaration. Share the module check across both optimizations.
+	const moduleHasDirectEval =
+		(inlineHookMemoEligible || options?.knownAttributeSpreads?.length > 0) &&
+		(source.includes('eval') || source.includes('\\u')) &&
+		hasInlineMemoDirectEval(ast);
 	// Same production-only gate as the tiers above, and for the same reason: a
 	// lifted callback has left the component, which dev tooling, HMR boundaries,
 	// and profile attribution all reason about. Runs AFTER dependency inference
@@ -11892,6 +11908,7 @@ function compileInternal(
 		autoMemo: autoMemoEnabled,
 		strongRenderValues: strongModeEnabled && options?.__universal == null,
 		strongMemo: strongMemoEnabled,
+		knownSpreadRenderLocals: !moduleHasDirectEval,
 		// Ref and effect lifetimes must not churn on an unrelated dev/HMR render.
 		// Only proven literal props use these caches; region/call caching stays prod-only.
 		strongLiteralMemo:
@@ -11968,7 +11985,7 @@ function compileInternal(
 		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
 		currentAutoCalculatedRenderableRefs: null, // proven non-escaping calculation holes, inherited by lexical child bodies
 		nextAutoMemoCacheId: 0, // per-body offset within the module's reserved memo range
-		inlineHookMemo: inlineHookMemoEnabled, // de-callbacked useMemo/useCallback + pu creations
+		inlineHookMemo: inlineHookMemoEligible && !moduleHasDirectEval, // de-callbacked useMemo/useCallback + pu creations
 		hasSlotMemoCandidates: false, // skip the final AST pass when no path-aware site survived
 		_puInlineLowering: false, // true only while a body pipeline ends in inlineHookMemoPass
 		currentHookMemoOffset: 0, // flat hook-memo cell offset for the body being emitted
@@ -18566,7 +18583,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	if (plan?.hasBag) {
 		bodyStatements.push(
 			inheritOriginLoc(
-				b.let('_b', b.member(b.member(b.id('__s'), 'slots'), b.literal(0), true)),
+				b.declaration('let', [
+					b.declarator('_b', b.member(b.member(b.id('__s'), 'slots'), b.literal(0), true)),
+					...(plan.renderLocals ?? []).map((name) => b.declarator(name)),
+				]),
 				node,
 			),
 		);
@@ -28331,6 +28351,9 @@ function planJsx(
 	// re-enters the mount branch instead of updating a half-populated bag.
 	// Control-flow-only bodies carry no bag, so all of it is skipped.
 	const bag = makeBag();
+	// A known spread's result is consumed during this render, including deferred
+	// field writers after the mount/update branch. It needs no persistent bag field.
+	let renderLocals;
 	// #2043: the template's hoisted commit function (see makeCommitPlan). A
 	// presentation view keeps its direct writers for hydration to prepare;
 	// renderWrite holds them for a later render's commit (wrapRenderWriters).
@@ -28687,6 +28710,7 @@ function planJsx(
 	let nativeStyleSlots = 0;
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
+		if (b.knownSpreadLocal !== undefined) (renderLocals ??= []).push(b.knownSpreadLocal);
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
 		// (the `<!>` placeholder / server text node) via the full path INCLUDING the
 		// childIndex — so the hole-aware child/sibling walk adopts the correct server
@@ -29669,6 +29693,15 @@ function planJsx(
 				ctx.signalBindingsUsed = true;
 				if (isDirectSignalHandleExpression(cc.valueExpr)) ctx.signalBindingsEager = true;
 				ctx.runtimeNeeded.add('bindSignalChild');
+				const bindChildAlias = rtAlias('bindSignalChild');
+				// The canonical runtime identifies child holes by scope and slot; its site
+				// argument is unused. Keep the site for runtimes that receive routed calls.
+				const childSite =
+					runtimeAliasForContext(ctx, 'bindSignalChild') === bindChildAlias &&
+					runtimeImportModuleFor(ctx, 'octane', 'bindSignalChild', bindChildAlias) ===
+						'octane/internal/client'
+						? ''
+						: cc.signalSite;
 				const tokenKey = `_sigch$${cc.id}`;
 				bag.constField(tokenKey, b.literal(null));
 				const bindChild = (value) =>
@@ -29677,13 +29710,13 @@ function planJsx(
 							'=',
 							bagFieldNode(bag, tokenKey),
 							b.call(
-								'_$bindSignalChild',
+								bindChildAlias,
 								b.id('__s'),
 								bagFieldNode(bag, tokenKey),
 								b.literal(slotIndex),
 								hostExpr(),
 								value,
-								b.literal(cc.signalSite),
+								b.literal(childSite),
 								childAnchor ?? b.literal(null),
 								...optionalCallArgs(
 									cc.anchorVar ? b.literal(true) : null,
@@ -30322,6 +30355,7 @@ function planJsx(
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
+		renderLocals,
 		mount: mountLines,
 		update: updateLines,
 		everyRender:
@@ -30772,7 +30806,9 @@ function directSignalAttributeWriter(bind) {
 
 function emitBindingMount(bind, elVar, bag) {
 	const knownExpression = resolveKnownAttributeSource(bind.expr, (source) =>
-		b.id(bag.local(`_prev$${source.binding.id}`)),
+		source.binding.knownSpreadLocal === undefined
+			? b.id(bag.local(`_prev$${source.binding.id}`))
+			: b.id(source.binding.knownSpreadLocal),
 	);
 	if (knownExpression !== bind.expr) bind = { ...bind, expr: knownExpression };
 	if (bind.deferred) return emitDeferredMount(bind, elVar, bag);
@@ -30933,7 +30969,11 @@ function emitBindingMount(bind, elVar, bag) {
 			);
 		}
 		case 'hostValue': {
-			return st(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), bind.expr)));
+			const target =
+				bind.knownSpreadLocal === undefined
+					? local(`_prev$${bind.id}`)
+					: b.id(bind.knownSpreadLocal);
+			return st(b.stmt(b.assignment('=', target, bind.expr)));
 		}
 		case 'hostSpread': {
 			// `expr` is the spread's INNER argument; the `_$snapshotSpread(…)`
@@ -31846,7 +31886,9 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 
 function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null, inline = false) {
 	const knownExpression = resolveKnownAttributeSource(bind.expr, (source) =>
-		bagFieldNode(bag, `_prev$${source.binding.id}`),
+		source.binding.knownSpreadLocal === undefined
+			? bagFieldNode(bag, `_prev$${source.binding.id}`)
+			: b.id(source.binding.knownSpreadLocal),
 	);
 	if (knownExpression !== bind.expr) bind = { ...bind, expr: knownExpression };
 	if (bind.mountOnly) return null;
@@ -31983,6 +32025,8 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 			);
 		}
 		case 'hostValue': {
+			if (bind.knownSpreadLocal !== undefined)
+				return st(b.stmt(b.assignment('=', b.id(bind.knownSpreadLocal), bind.expr)));
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
@@ -32986,6 +33030,14 @@ function emitElementHtml(
 			const binding = {
 				id: bindings.length,
 				kind: attr.knownSource.projection ? 'nativeProjection' : 'hostValue',
+				...(ctx.knownSpreadRenderLocals && !attr.knownSource.projection
+					? {
+							knownSpreadLocal: allocCompilerName(ctx, '_a'),
+							...(attr.knownSource.nonNull && ctx.output !== 'ts'
+								? { knownSpreadNonNull: true }
+								: {}),
+						}
+					: {}),
 				expr: tsrxExprNode(attr.argument, ctx, componentName, inlinedSubs),
 				fields: attr.knownSource.fields,
 				path,

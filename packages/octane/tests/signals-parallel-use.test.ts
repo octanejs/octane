@@ -35,6 +35,36 @@ function deferred<T>() {
 const drain = () => new Promise<void>((done) => setTimeout(done, 0));
 
 describe('native reads in use() creations', () => {
+	it('keeps the pending view reactive after a speculative child prop throws', async () => {
+		const scope = createScope({ scopeKey: 'native-warm-throw' });
+		const speculative$ = scope.signal$('speculative', 'unused');
+		const fallback$ = scope.signal$('fallback', 'loading');
+		const parent = deferred<string>();
+		let reached = false;
+		const rendered = mount(client.NativeWarmGetterBoundary, {
+			child: {
+				get make$(): () => Promise<string> {
+					reached = true;
+					speculative$.get();
+					throw new Error('speculative prop');
+				},
+			},
+			gate: () => parent.promise,
+			read$: () => fallback$.get(),
+		});
+		try {
+			expect(reached).toBe(true);
+			expect(rendered.find('output').textContent).toBe('loading');
+			expect(scope.inspect().nodes.find((node) => node.key === 'speculative')?.subscribers).toBe(0);
+			await act(() => fallback$.set('updated'));
+			expect(rendered.find('output').textContent).toBe('updated');
+		} finally {
+			rendered.unmount();
+			parent.resolve('parent');
+			scope.dispose();
+		}
+	});
+
 	it.each([
 		['root', client.NativeWarmParent],
 		['boundary', client.NativeWarmBoundary],

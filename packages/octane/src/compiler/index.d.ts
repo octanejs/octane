@@ -68,6 +68,8 @@ export interface KnownAttributeSpread {
 	members?: readonly string[];
 	/** Exact stable own native presentation data fields; never accessors. */
 	fields: readonly string[];
+	/** Every successful return must make `result == null` false; throwing is unchanged. */
+	nonNull?: boolean;
 	/** Use signal-aware style-object bindings; fields must include style. Omitted retains CSS text. */
 	style?: 'object';
 	/** Opt-in native JSX expression shorthand, passed as one argument to this factory. */
