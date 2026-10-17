@@ -1,5 +1,67 @@
 # @octanejs/tanstack-router-ssr-query
 
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [59e83ac]
+- Updated dependencies [f665de9]
+- Updated dependencies [175b85d]
+- Updated dependencies [f79cfa9]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [da83e7a]
+- Updated dependencies [12e2417]
+- Updated dependencies [175b85d]
+- Updated dependencies [996a44e]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [1924a92]
+- Updated dependencies [3203b52]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [4a33765]
+- Updated dependencies [bb2f650]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [3203b52]
+- Updated dependencies [91dae8d]
+- Updated dependencies [a3a2b9b]
+- Updated dependencies [9c79968]
+- Updated dependencies [600442e]
+- Updated dependencies [5dc82f5]
+- Updated dependencies [ed24d6b]
+- Updated dependencies [9bceb81]
+- Updated dependencies [175b85d]
+- Updated dependencies [c144725]
+  - octane@0.14.0
+  - @octanejs/tanstack-router@0.3.0
+  - @octanejs/tanstack-query@0.1.66
+
 ## 0.1.10
 
 ### Patch Changes
