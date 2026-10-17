@@ -525,6 +525,22 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'storybook',
+		title: 'Storybook',
+		description:
+			'Render native Octane components in React + Vite Storybook with OctaneCompat and typed CSF3 stories.',
+		group: 'Explore',
+		searchTerms: ['Storybook', 'CSF3', 'Controls', 'asReact', 'OctaneCompat', '.stories.tsx'],
+		sections: [
+			{ id: 'run-the-example', title: 'Run the example' },
+			{ id: 'configure-vite', title: 'Configure Vite' },
+			{ id: 'share-the-bridge', title: 'Share the bridge' },
+			{ id: 'write-typed-stories', title: 'Write typed stories' },
+			{ id: 'check-and-build', title: 'Check and build' },
+			{ id: 'limits', title: 'Limits' },
+		],
+	},
+	{
 		slug: 'profiling',
 		title: 'Profiling',
 		description:
