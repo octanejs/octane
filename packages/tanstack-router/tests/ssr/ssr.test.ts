@@ -333,4 +333,15 @@ describe('@octanejs/tanstack-router SSR', () => {
 		expect(html).toContain('caf☕');
 		expect(html).not.toContain('�'); // no replacement character from a dropped byte
 	});
+
+	it('moves leading styles into the head and keeps the protocol version before <html>', async () => {
+		const source = new Response(
+			'<!--3--><style data-octane="a">.a{}</style><html><head><title>t</title></head><body></body></html>',
+		).body!;
+		const html = await new Response(finalizeDocumentShell(source)).text();
+		// hydrateRoot reads the hydration protocol version where it led the output.
+		expect(html).toBe(
+			'<!DOCTYPE html><!--3--><html><head><title>t</title><style data-octane="a">.a{}</style></head><body></body></html>',
+		);
+	});
 });

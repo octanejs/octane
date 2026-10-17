@@ -9,11 +9,12 @@ import { build } from 'esbuild';
 import ts from 'typescript';
 import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 const repo = path.resolve(import.meta.dirname, '../..');
 process.env.NODE_ENV = 'production';
 const runtimePath = path.join(repo, 'packages/octane/src/runtime.ts');
 const runtimeFile = path.resolve(process.argv[2] ?? runtimePath);
-const source = fs.readFileSync(runtimeFile, 'utf8');
+const source = readClientRuntime(runtimeFile);
 const ast = ts.createSourceFile(runtimePath, source, ts.ScriptTarget.Latest, true);
 const fn = ast.statements.find(
 	(n) => ts.isFunctionDeclaration(n) && n.name?.text === 'setDeoptDesc',
@@ -47,6 +48,7 @@ for (const name of [
 	'adoptedDeoptChildren',
 	'buildDeoptAdoptQueue',
 	'mountItemsLinear',
+	'renderPreparedChildList',
 ]) {
 	const node = ast.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === name);
 	if (!node) continue;
@@ -80,6 +82,14 @@ for (const name of [
 			['Map', 'Set'].includes(n.expression.getText(ast))
 		)
 			observe(n, n.expression.getText(ast) === 'Map' ? 'adoptionMaps' : 'adoptionSets');
+		if (
+			name === 'renderPreparedChildList' &&
+			ts.isBinaryExpression(n) &&
+			n.left.getText(ast) === 'adoptByKey' &&
+			ts.isNewExpression(n.right) &&
+			n.right.expression.getText(ast) === 'Map'
+		)
+			observe(n.right, 'adoptionMaps');
 		ts.forEachChild(n, scan);
 	}
 	scan(node.body);

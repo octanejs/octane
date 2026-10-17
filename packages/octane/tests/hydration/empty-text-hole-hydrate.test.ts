@@ -199,15 +199,17 @@ describe('hydrateRoot — empty `<!>`-position text holes', () => {
 });
 
 describe('hydrateRoot — misaligned text hole recovery', () => {
-	// Markup from a server without the empty-hole stand-in: the client walk runs
-	// past the component range. Recovery may rebuild the component, but it must
-	// never delete the enclosing host or anything outside it.
+	// Markup from a server without the empty-hole stand-in, as React's empty
+	// text renders none: the component adopts the range the text's position
+	// resolved to, and the empty Text lands before it at commit. Nothing
+	// deletes the enclosing host or anything outside it.
 	it('keeps the host and its siblings when a component claim runs off the end', async () => {
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		containers.push(container);
 		container.innerHTML =
-			'<div><p><!--[--><button class="after">after</button><!--]--></p><i>sib</i></div>';
+			'<!--3--><div><p><!--[--><button class="after">after</button><!--]--></p><i>sib</i></div>';
+		const button = container.querySelector('button');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const recoverable: unknown[] = [];
 		const root = hydrateRoot(
@@ -219,7 +221,8 @@ describe('hydrateRoot — misaligned text hole recovery', () => {
 			},
 		);
 		await act(() => {});
-		expect(recoverable.length).toBeGreaterThan(0);
+		expect(recoverable).toEqual([]);
+		expect(container.querySelector('button')).toBe(button);
 		expect(container.querySelectorAll('p')).toHaveLength(1);
 		expect(container.querySelector('i')?.textContent).toBe('sib');
 		expect(container.querySelector('p')!.textContent).toContain('after');

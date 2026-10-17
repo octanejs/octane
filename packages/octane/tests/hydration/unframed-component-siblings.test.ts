@@ -6,13 +6,12 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 import { hydrationMarkerSummary } from './_marker-summary.js';
 
-// The server rendered plain elements where the client calls a component. As
-// in React, which compares only the DOM, the calls adopt those elements in
-// place, and it is a mismatch unless they render exactly the server's
-// elements: nothing is repaired in place, the root renders on the client and
-// reports once, each component's effects run once, and the hydration markers
-// stay balanced. A call that renders nothing leaves the server's element to
-// the next call, whose own content then differs from it.
+// The server rendered plain elements where the client calls a component.
+// Octane's server frames every component call, so the first call finds no range
+// of its own there: nothing is repaired in place, the root renders on the
+// client and reports once, each component's effects run once, and the
+// hydration markers stay balanced. React, which compares only the DOM, adopts
+// the elements where the calls render exactly them.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -56,33 +55,11 @@ function mismatchAt(loc: string, expected: string): string {
 const missingRange = (name: string, call: string) => () =>
 	mismatchAt(site(name, call), 'a component range');
 
-/** `FILE:line:0` of the declaration `function name(`. */
-function definitionOf(name: string): string {
-	const index = LINES.findIndex((line) => line.startsWith(`function ${name}(`));
-	if (index < 0) throw new Error(`fixture has no function ${name}`);
-	return `${FILE}:${index + 1}:0`;
-}
-
-/** `FILE:line:column` of `text` in the template of `function name(`. */
-function templateSite(name: string, text: string): string {
-	const from = LINES.findIndex((line) => line.startsWith(`function ${name}(`));
-	const index = LINES.findIndex((line, at) => at > from && line.includes(text));
-	if (from < 0 || index < 0) throw new Error(`fixture function ${name} has no ${text}`);
-	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
-}
-
-/** The next call's text differs from the server's element it adopted in place. */
-const nextCallText = () =>
-	`Octane hydration mismatch at ${templateSite('Leaf', 'props.v')}: the client expected ` +
-	'text "z" but the server rendered text "x". The nearest Suspense or Hydrate boundary, or ' +
-	'the root, will be regenerated on the client.';
-
 const LATER_RANGE = [
 	{
 		built: 'a component that renders nothing',
 		name: 'EmptyThenRange',
-		// The call renders nothing, so the next one adopts the server's element.
-		report: nextCallText,
+		report: missingRange('EmptyThenRange', '<Empty log={props.log} />'),
 		mounted: ['Empty'],
 		html: '<em>z</em>',
 		serverHtml: '<em>x</em><em>z</em>',
@@ -90,8 +67,7 @@ const LATER_RANGE = [
 	{
 		built: 'a component with two roots',
 		name: 'PairThenRange',
-		// The call adopts in place, so its own fragment reports.
-		report: () => mismatchAt(definitionOf('Pair'), 'a fragment starting with <i>'),
+		report: missingRange('PairThenRange', '<Pair log={props.log} />'),
 		mounted: ['Pair'],
 		html: '<i>a</i><i>b</i><em>z</em>',
 		serverHtml: '<em>x</em><b>y</b><em>z</em>',
@@ -99,7 +75,7 @@ const LATER_RANGE = [
 	{
 		built: 'the first component call in an element',
 		name: 'HostEmptyFirst',
-		report: nextCallText,
+		report: missingRange('HostEmptyFirst', '<Empty log={props.log} />'),
 		mounted: ['Empty'],
 		html: '<section><em>z</em></section>',
 		serverHtml: '<section><em>x</em><em>z</em></section>',
@@ -181,9 +157,10 @@ describe.each([
 		},
 	);
 
-	// React compares DOM only: a call that renders nothing, then the calls that
-	// render exactly the server's elements, adopt every one of them.
-	it('adopts the server elements when the calls render exactly them', async () => {
+	// OCTANE DIVERGENCE: React compares DOM only, so a call that renders
+	// nothing, then calls that render exactly the server's elements, adopt
+	// every one of them. Octane's first call finds no range of its own.
+	it('client-renders the root when the calls render exactly the server elements', async () => {
 		container.innerHTML = ServerRT.renderToString(server.EmptyFirst, {
 			on: false,
 			log: [],
@@ -193,13 +170,13 @@ describe.each([
 		const { div, recoverable } = await hydrate('EmptyFirst', log, false);
 
 		expect(markup(div)).toBe('<em>x</em><em>z</em>');
-		const nodes = [...container.querySelectorAll('*')];
-		expect(nodes).toHaveLength(serverNodes.length);
-		nodes.forEach((node, i) => expect(node).toBe(serverNodes[i]));
+		expect(serverNodes.some((node) => node.isConnected)).toBe(false);
 		expect(() => hydrationMarkerSummary(container)).not.toThrow();
 		expect(log).toEqual(['Empty']);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toEqual(
+			dev ? [missingRange('EmptyFirst', '<Empty log={props.log} />')()] : [],
+		);
 	});
 
 	it.each([{ name: 'EmptyFirst', serverHtml: '<em>x</em><em>z</em>' }, ...LATER_RANGE])(

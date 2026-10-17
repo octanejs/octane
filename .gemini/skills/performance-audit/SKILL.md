@@ -13,7 +13,7 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 ## Read first
 
 - Benchmark README in the affected `benchmarks/*` directory
-- `packages/octane/src/runtime.ts` comments for runtime-level changes
+- The owning `packages/octane/src/runtime/` module's comments for runtime-level changes
 - Existing benchmark scripts in `benchmarks/*/package.json` and `run.mjs`
 - The discipline reference for each dimension the change touches:
   [V8 shapes and allocation](references/v8-shapes.md),

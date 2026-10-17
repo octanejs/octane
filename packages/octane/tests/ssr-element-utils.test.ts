@@ -410,7 +410,6 @@ describe('octane/server element utilities', () => {
 						return '<strong>ready</strong>';
 					},
 					() => '<em>loading</em>',
-					null,
 				),
 			);
 		const { html } = renderToStaticMarkup(App, { promise });

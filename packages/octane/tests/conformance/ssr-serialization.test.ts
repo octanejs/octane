@@ -168,7 +168,16 @@ const client = loadCompiledFixtureSource(SRC, {
 	compileOptions: { dev: true },
 });
 
-const ssr = (name: string, props?: any) => ServerRT.renderToString(server[name], props).html;
+// Every hydratable root's output opens with the hydration protocol version
+// (hydration-protocol.ts), which React's serialization has no counterpart for:
+// `ssr` compares the rest, and hydration adopts the whole output.
+const PROTOCOL_MARK = '<!--3-->';
+const serverHtml = (name: string, props?: any) => {
+	const { html } = ServerRT.renderToString(server[name], props);
+	expect(html.startsWith(PROTOCOL_MARK)).toBe(true);
+	return html;
+};
+const ssr = (name: string, props?: any) => serverHtml(name, props).slice(PROTOCOL_MARK.length);
 
 // React's serverRender path: parse the server markup with the DOM parser.
 function parse(html: string): HTMLElement {
@@ -199,30 +208,21 @@ const warns = () =>
 
 // Server-render, adopt via hydrateRoot, return before/after for the no-rebuild check.
 function hydrate(name: string, props?: any) {
-	const html = ssr(name, props);
-	container.innerHTML = html;
+	const output = serverHtml(name, props);
+	const html = output.slice(PROTOCOL_MARK.length);
+	container.innerHTML = output;
 	const before = container.innerHTML;
 	hydrateRoot(container, client[name], props);
 	flushSync(() => {});
 	return { html, before, after: container.innerHTML };
 }
 
-// Expand counted post-hydration markers back to their logically equivalent
-// legacy wire representation. This preserves the old byte-stability assertion
-// without requiring redundant physical Comment nodes to survive adoption.
-const expandCountedHydrationMarkers = (html: string) =>
-	html.replace(/<!--([\[\]])([1-9]\d*)-->/g, (whole, marker: string, raw: string) => {
-		const multiplicity = Number(raw);
-		if (!Number.isSafeInteger(multiplicity) || multiplicity < 2) return whole;
-		return `<!--${marker}-->`.repeat(multiplicity);
-	});
-
-// Assert the case hydrates as a pure adoption: logically byte-stable DOM and no
-// mismatch warnings. Counted marker pairs expand to the exact server protocol.
+// Assert the case hydrates as a pure adoption: byte-stable DOM and no mismatch
+// warnings.
 function expectCleanHydrate(name: string, props?: any) {
 	const r = hydrate(name, props);
 	expect(warns()).toEqual([]);
-	expect(expandCountedHydrationMarkers(r.after)).toBe(r.before);
+	expect(r.after).toBe(r.before);
 	return r;
 }
 
@@ -540,12 +540,11 @@ describe('conformance: SSR serialization — component hierarchies (Elements)', 
 	// component block), the client childSlot/componentSlot/componentSlotLite each
 	// adopt their own range, and every slot advances the hydration cursor past
 	// its adopted close marker so SIBLING slots (MultiHier) adopt the right range.
-	// Exactly-coextensive pairs may then share a counted physical pair.
-	it('hydrates component hierarchies with logical protocol stability (Per :657/:677)', () => {
+	it('hydrates component hierarchies with protocol stability (Per :657/:677)', () => {
 		const one = hydrate('SingleHier');
-		expect(expandCountedHydrationMarkers(one.after)).toBe(one.before);
+		expect(one.after).toBe(one.before);
 		const multi = hydrate('MultiHier');
-		expect(expandCountedHydrationMarkers(multi.after)).toBe(multi.before);
+		expect(multi.after).toBe(multi.before);
 	});
 
 	it('renders multi-child hierarchies of components (Per :677)', () => {

@@ -13,10 +13,11 @@ import {
 	isScannedFile,
 	parseDiff,
 	run,
+	runtimeSources,
 	scanFiles,
 } from './perf-review-scan.mjs';
 
-const RUNTIME_SOURCE = new URL('../packages/octane/src/runtime.ts', import.meta.url);
+const RUNTIME_SOURCES = runtimeSources(fileURLToPath(new URL('..', import.meta.url)));
 
 /** Build a one-hunk diff for `file`; lines starting with '+' are added, others are context. */
 function diff(file, lines, start = 10) {
@@ -33,7 +34,10 @@ function scan(lines, file = 'packages/octane/src/runtime.ts', only = []) {
 }
 
 test('the current client runtime keeps every hot class shape fixed in its constructor', () => {
-	assert.deepEqual(checkHotClasses(readFileSync(RUNTIME_SOURCE, 'utf8')), []);
+	const declaring = RUNTIME_SOURCES.filter(({ text }) => text.includes('class BlockImpl {'));
+	assert.equal(declaring.length, 1);
+	for (const { path: file, text } of RUNTIME_SOURCES)
+		assert.deepEqual(checkHotClasses(text, undefined, file), []);
 });
 
 test('reports declared-but-unassigned, undeclared, and conditional hot-class fields', () => {
@@ -273,17 +277,16 @@ test('flags writes of undeclared fields through Block and Scope receivers', () =
 });
 
 test('every Block and Scope field write in the current runtime targets a declared field', () => {
-	const source = readFileSync(RUNTIME_SOURCE, 'utf8');
-	const hotFields = hotClassFields(source);
+	const hotFields = new Set(RUNTIME_SOURCES.flatMap(({ text }) => [...hotClassFields(text)]));
 	assert.ok(hotFields.has('pending') && hotFields.has('slots') && hotFields.has('rare'));
-	const lines = source.split('\n').map((line) => '+' + line);
-	const findings = scanFiles(parseDiff(diff('packages/octane/src/runtime.ts', lines, 1)), {
-		hotFields,
-	});
-	assert.deepEqual(
-		findings.filter((f) => f.rule === 'hot-field-write'),
-		[],
-	);
+	for (const { path: file, text } of RUNTIME_SOURCES) {
+		const lines = text.split('\n').map((line) => '+' + line);
+		const findings = scanFiles(parseDiff(diff(file, lines, 1)), { hotFields });
+		assert.deepEqual(
+			findings.filter((f) => f.rule === 'hot-field-write'),
+			[],
+		);
+	}
 });
 
 test('a pasted PR diff may declare hot fields the local checkout does not have yet', () => {

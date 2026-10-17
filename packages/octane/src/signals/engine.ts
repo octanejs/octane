@@ -10,8 +10,10 @@ import {
 	derivedState,
 	endSignalBatch,
 	historicalBindingRead,
+	initializeValue,
 	inspectNativeNode,
 	isThenable,
+	presentDuringFlush,
 	readNode,
 	readyState,
 	refreshNode,
@@ -27,7 +29,7 @@ import {
 	type NodeState,
 	type SignalObserver,
 	type SignalReadMode,
-	type SignalCandidateFrame,
+	type CandidateContext,
 } from './graph.js';
 import {
 	beginNativeWriteGuard,
@@ -69,6 +71,8 @@ import type {
 	WritableSignal,
 } from './types.js';
 
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
 interface DecodedSeedEntry {
 	readonly entry: SignalSeedEntry;
 	readonly value: unknown;
@@ -79,7 +83,7 @@ export interface DerivedBindingLifecycle {
 	suspend(): boolean;
 	resume(): void;
 	dispose(): void;
-	forkCandidate?(target: ScopedNode, frame: SignalCandidateFrame): CandidateProducer | undefined;
+	forkCandidate?(target: ScopedNode, context: CandidateContext): CandidateProducer | undefined;
 	declared(sequence: number, captures?: readonly unknown[], declaring?: number): void;
 	/** A later render's declaration of this cell, with a computation that may capture new values. */
 	redeclare(
@@ -106,7 +110,11 @@ interface FrameData {
 
 let activeFrames: Map<ScopeImpl, AdoptionFrameImpl> | undefined;
 
-registerNativeBatchHooks({ startBatch: startSignalBatch, endBatch: endSignalBatch });
+registerNativeBatchHooks({
+	startBatch: startSignalBatch,
+	endBatch: endSignalBatch,
+	present: presentDuringFlush,
+});
 registerNativeSignalHydration();
 
 function requireKey(key: string, label: string): void {
@@ -261,10 +269,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	signal$<T>(key: string, initial: T): WritableSignal<T> {
 		const node = createScopeNode<T>(this, key, 'signal');
 		const seed = initialScopeSeed(this, key) ?? retainedScopeSeed(this, key);
-		node.state = readyState(seed ? (seed.value as T) : initial);
-		node.lastState = node.state;
-		node.last = (node.state.snapshot as { value: T }).value;
-		node.hasLast = true;
+		initializeValue(node, seed ? (seed.value as T) : initial);
 		consumeScopeSeed(this, key);
 		return node as WritableSignal<T>;
 	}
@@ -492,6 +497,10 @@ class AdoptionFrameImpl implements AdoptionFrame {
 	read(node: ScopedNode, read: SignalReadMode): NodeState | undefined {
 		this.assertActive();
 		const seed = presentedSeed(this.data.entries, node.key, read);
+		// A node the server's snapshot of this scope lacks never reached its HTML.
+		// Hydration reads it live, suspending while it is pending, as it does with
+		// no snapshot at all, and adoption reconciles the server output.
+		if (seed === undefined && getNativeAdoptionResolver()) return undefined;
 		// A resource seed holds the request the server resolved. When the client
 		// selects another one (its props or state differ from the server's), that
 		// history cannot present it. Hydration then reads the node live, exactly
@@ -524,28 +533,32 @@ class AdoptionFrameImpl implements AdoptionFrame {
 					subscribers.add(notify);
 					return () => subscribers.delete(notify);
 				},
-				inspect: () => {
-					// Look up metadata on demand instead of capturing the seed payload
-					// in a source that a renderer may still hold after lease release.
-					const presented = this.ended
-						? undefined
-						: presentedSeed(this.data.entries, node.key, read);
-					return {
-						...inspectNativeNode(node, read),
-						status: presented
-							? presented.entry.available === false
-								? 'pending'
-								: 'ready'
-							: 'unevaluated',
-						revision: this.ended ? 1 : 0,
-						historical: true,
-						retained: !!presented && presented.entry.available !== false,
-						refreshing: presented?.entry.refreshing ?? false,
-						connection: presented?.entry.connection ?? 'none',
-						complete: presented?.entry.complete ?? false,
-						dependencies: [],
-					};
-				},
+				retired: () => node.owner.retired,
+				inspect:
+					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
+						? () => {
+								// Look up metadata on demand instead of capturing the seed payload
+								// in a source that a renderer may still hold after lease release.
+								const presented = this.ended
+									? undefined
+									: presentedSeed(this.data.entries, node.key, read);
+								return {
+									...inspectNativeNode(node, read),
+									status: presented
+										? presented.entry.available === false
+											? 'pending'
+											: 'ready'
+										: 'unevaluated',
+									revision: this.ended ? 1 : 0,
+									historical: true,
+									retained: !!presented && presented.entry.available !== false,
+									refreshing: presented?.entry.refreshing ?? false,
+									connection: presented?.entry.connection ?? 'none',
+									complete: presented?.entry.complete ?? false,
+									dependencies: [],
+								};
+							}
+						: undefined,
 			};
 			this.sources.set(channel, source);
 		} else if (source.node !== node) source.node = null;
@@ -798,10 +811,7 @@ export function createDeclaredSignalCell<T>(
 	const [node, created] = declaredScopeNode<T>(owner, key, 'signal');
 	if (!created) return node as WritableSignal<T>;
 	const seed = initialScopeSeed(owner, key) ?? retainedScopeSeed(owner, key);
-	node.state = readyState(seed && !preferInitial ? (seed.value as T) : initial);
-	node.lastState = node.state;
-	node.last = (node.state.snapshot as { value: T }).value;
-	node.hasLast = true;
+	initializeValue(node, seed && !preferInitial ? (seed.value as T) : initial);
 	consumeScopeSeed(owner, key);
 	return node as WritableSignal<T>;
 }

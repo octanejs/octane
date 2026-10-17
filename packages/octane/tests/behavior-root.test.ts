@@ -1811,12 +1811,19 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 						return stop;
 					});
 				try {
-					hydratedRoot = hydrateRoot(container, client.NativeControlHydration, application, {
-						signalOwner: scope,
-						bindingLeases: [layoutBinding, binding],
-						controlLeases: [control],
-						onUncaughtError,
-					});
+					// The island hydrates with the captures it is claimed with, so those
+					// suspend its activation.
+					hydratedRoot = hydrateRoot(
+						container,
+						client.NativeControlHydration,
+						{ ...application, suspend: true },
+						{
+							signalOwner: scope,
+							bindingLeases: [layoutBinding, binding],
+							controlLeases: [control],
+							onUncaughtError,
+						},
+					);
 					await act(() =>
 						hydratedRoot!.render(client.NativeControlHydration, {
 							...application,
@@ -2417,6 +2424,9 @@ export function NativeRetryApp(props: NativeRetryProps) @{
 						scope.dispose();
 					}
 				}
+			});
+
+			it(`does not claim a layout host ${mutation} by its own retirement cleanup (${dev ? 'dev' : 'prod'})`, async () => {
 				for (const knownStylex of [false, true]) {
 					for (const nextComponent of ['same', 'different'] as const) {
 						const layoutScope = createScope({
@@ -4212,14 +4222,16 @@ export function ScalarTextHydration(props) @{
 						expect(paragraph.textContent).toBe('early owner survives refusal');
 						continue;
 					}
+					const suspended =
+						outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
+					// The island hydrates with the captures it is claimed with, so those
+					// decide whether its activation suspends.
 					hydratedRoot = hydrateRoot(
 						article,
 						client.ScalarTextHydration,
-						{ ...application, value },
+						{ ...application, value, suspend: suspended },
 						{ signalOwner: scope, bindingLeases: [binding] },
 					);
-					const suspended =
-						outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
 					await act(() =>
 						hydratedRoot!.render(client.ScalarTextHydration, {
 							...application,
@@ -4297,76 +4309,130 @@ export function ScalarTextHydration(props) @{
 					scope.dispose();
 				}
 			}
-			const duringPreparation = authoredPresentation(
-				'RefreshDuringPreparation',
-				{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },
-				dev,
-				`function PreparationButton(props) @{
+			// A publication inside the hydration render reaches the early program,
+			// which writes nothing until the render slice closes. The accepted
+			// render then fails acceptance against the new early DOM and retries;
+			// the dropped one suspends first. Either way the write lands as the
+			// render returns, and the retry takes over the same nodes.
+			for (const dropped of [false, true]) {
+				const pending = deferred<void>();
+				const duringPreparation = authoredPresentation(
+					'RefreshDuringPreparation',
+					{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },
+					dev,
+					`import { use } from 'octane';
+function PreparationButton(props) @{
  <button title={props.title} onClick={props.onAction} ref={props.onReady}><b>{props.label as string}</b></button>
 }
 export function RefreshDuringPreparation(props) @{ 'use dom bindings';
  <PreparationButton title={props.title} label={props.label} onAction={props.onAction} onReady={props.onReady}/>
+}
+function Wait(props) @{ if (props.suspend) use(props.promise); <i/> }
+export function DroppedPreparation(props) @{
+ <section>
+  <RefreshDuringPreparation title={props.title} label={props.label} onAction={props.onAction} onReady={props.onReady}/>
+  <Wait suspend={props.suspend} promise={props.promise}/>
+ </section>
 }`,
-			);
-			article.innerHTML = duringPreparation.html;
-			const preparationButton = article.querySelector('button')!;
-			const preparationLabel = preparationButton.querySelector('b')!;
-			const preparationRange = {
-				start: article.firstChild as Comment,
-				end: article.lastChild as Comment,
-			};
-			const preparationBinding = duringPreparation.attach(
-				preparationRange,
-				duringPreparation.state,
-			);
-			let refreshedDuringPreparation = false;
-			try {
-				preparationButton.focus();
-				hydratedRoot = hydrateRoot(
-					article,
-					duringPreparation.loadClient().RefreshDuringPreparation,
-					{
-						...duringPreparation.state.getSnapshot(),
-						title: {
-							toString() {
-								if (!refreshedDuringPreparation) {
-									refreshedDuringPreparation = true;
-									duringPreparation.publish({ title: 'Current early', label: 'Current early' });
-								}
-								return 'Accepted';
-							},
-						},
-					},
-					{ bindingLeases: [preparationBinding] },
 				);
-				expect(article.querySelector('button')).toBe(preparationButton);
-				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild).toBe(preparationRange.start);
-				expect(article.lastChild).toBe(preparationRange.end);
-				expect(preparationButton.title).toBe('Current early');
-				expect(duringPreparation.cleanup).not.toHaveBeenCalled();
-				expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
-					[preparationButton],
-				]);
-				preparationButton.click();
-				expect(duringPreparation.state.getSnapshot().onAction).toHaveBeenCalledOnce();
-				await act(() => {});
-				expect(article.querySelector('button')).toBe(preparationButton);
-				expect(preparationButton.querySelector('b')).toBe(preparationLabel);
-				expect(article.firstChild).toBe(preparationRange.start);
-				expect(article.lastChild).toBe(preparationRange.end);
-				expect(document.activeElement).toBe(preparationButton);
-				expect(preparationButton.title).toBe('Accepted');
-				expect(duringPreparation.cleanup).toHaveBeenCalledOnce();
-				expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
-					[preparationButton],
-					[null],
-					[preparationButton],
-				]);
-			} finally {
-				hydratedRoot?.unmount();
-				hydratedRoot = undefined;
-				preparationBinding.dispose();
+				const wait = { suspend: false, promise: pending.promise };
+				article.innerHTML = dropped
+					? renderToString(duringPreparation.server.DroppedPreparation, {
+							...duringPreparation.state.getSnapshot(),
+							...wait,
+						}).html
+					: duringPreparation.html;
+				const preparationButton = article.querySelector('button')!;
+				const preparationLabel = preparationButton.querySelector('b')!;
+				const rangeParent = dropped ? article.querySelector('section')! : article;
+				const locateRange = () => ({
+					start: (dropped
+						? rangeParent.firstChild
+						: rangeParent.firstChild!.nextSibling) as Comment,
+					end: (dropped
+						? preparationButton.nextSibling!.nextSibling
+						: rangeParent.lastChild) as Comment,
+				});
+				const preparationRange = locateRange();
+				const preparationBinding = duringPreparation.attach(
+					preparationRange,
+					duringPreparation.state,
+				);
+				const writes = new MutationObserver(() => {});
+				writes.observe(preparationButton, {
+					attributes: true,
+					characterData: true,
+					childList: true,
+					subtree: true,
+				});
+				let duringRender: { title: string; label: string; writes: number } | undefined;
+				try {
+					preparationButton.focus();
+					const client = duringPreparation.loadClient();
+					hydratedRoot = hydrateRoot(
+						article,
+						dropped ? client.DroppedPreparation : client.RefreshDuringPreparation,
+						{
+							...duringPreparation.state.getSnapshot(),
+							title: {
+								toString() {
+									if (duringRender === undefined) {
+										duringPreparation.publish({
+											title: 'Current early',
+											label: 'Current early',
+										});
+										duringRender = {
+											title: preparationButton.title,
+											label: preparationLabel.textContent!,
+											writes: writes.takeRecords().length,
+										};
+									}
+									return 'Accepted';
+								},
+							},
+							...wait,
+							suspend: dropped,
+						},
+						{ bindingLeases: [preparationBinding] },
+					);
+					expect(duringRender).toEqual({ title: 'Early', label: 'Initial', writes: 0 });
+					expect(article.querySelector('button')).toBe(preparationButton);
+					expect(preparationButton.querySelector('b')).toBe(preparationLabel);
+					expect(locateRange().start).toBe(preparationRange.start);
+					expect(locateRange().end).toBe(preparationRange.end);
+					expect(preparationButton.title).toBe('Current early');
+					expect(preparationLabel.textContent).toBe('Current early');
+					expect(duringPreparation.cleanup).not.toHaveBeenCalled();
+					expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
+						[preparationButton],
+					]);
+					preparationButton.click();
+					expect(duringPreparation.state.getSnapshot().onAction).toHaveBeenCalledOnce();
+					if (dropped) {
+						await act(() => {});
+						expect(preparationButton.title).toBe('Current early');
+						expect(duringPreparation.cleanup).not.toHaveBeenCalled();
+						pending.resolve();
+					}
+					await act(() => {});
+					expect(article.querySelector('button')).toBe(preparationButton);
+					expect(preparationButton.querySelector('b')).toBe(preparationLabel);
+					expect(locateRange().start).toBe(preparationRange.start);
+					expect(locateRange().end).toBe(preparationRange.end);
+					expect(document.activeElement).toBe(preparationButton);
+					expect(preparationButton.title).toBe('Accepted');
+					expect(duringPreparation.cleanup).toHaveBeenCalledOnce();
+					expect(duringPreparation.state.getSnapshot().onReady.mock.calls).toEqual([
+						[preparationButton],
+						[null],
+						[preparationButton],
+					]);
+				} finally {
+					writes.disconnect();
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					preparationBinding.dispose();
+				}
 			}
 			const busyScope = createScope({ scopeKey: `host-publication-retry-${dev}` });
 			const busyHost = authoredPresentation('NativeControlHost', { className: 'early' }, dev);
@@ -4816,6 +4882,97 @@ export function TreeHydration(props) @{
 		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures.
 	}, 15_000);
 
+	// A publication inside an Octane render defers the early program's drain.
+	// The drain runs once that render has committed, on the same synchronous
+	// path, so the root's commit precedes the early program's writes.
+	// Adopting server markup reads each region's marker; one that already names
+	// the presented arm takes no write.
+	it('adopts a program region without writing its marker', () => {
+		const fixture = authoredPresentation(
+			'AdoptedToggle',
+			{ on: true },
+			false,
+			`export function AdoptedToggle(props) @{ 'use dom bindings';
+ <section>
+  @if (props.on) {
+   <b>on</b>
+  } @else {
+   <i>off</i>
+  }
+ </section>
+}`,
+		);
+		container.innerHTML = fixture.html;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((list) => records.push(...list));
+		observer.observe(container, {
+			subtree: true,
+			childList: true,
+			characterData: true,
+			attributes: true,
+		});
+		const binding = fixture.attach(
+			{ start: container.firstChild!.nextSibling as Comment, end: container.lastChild as Comment },
+			fixture.state,
+		);
+		try {
+			records.push(...observer.takeRecords());
+			expect(records).toEqual([]);
+			fixture.publish({ on: false });
+			expect(container.querySelector('i')?.textContent).toBe('off');
+		} finally {
+			observer.disconnect();
+			binding.dispose();
+		}
+	});
+
+	it('drains an early program after the commit of the render that deferred it', () => {
+		const fixture = authoredPresentation(
+			'DeferredLabel',
+			{ label: 'Early' },
+			false,
+			`export function DeferredLabel(props) @{ 'use dom bindings';
+ <p>{props.label as string}</p>
+}`,
+		);
+		container.innerHTML = fixture.html;
+		const paragraph = container.querySelector('p')!;
+		const { Publisher } = loadCompiledFixtureSource(
+			`export function Publisher(props) @{ props.publish(); <b>publisher</b> }`,
+			{ id: '/src/deferred-drain-publisher.tsrx', mode: 'client' },
+		);
+		const host = document.createElement('section');
+		document.body.append(host);
+		let rendering = false;
+		let atDrain: string | null | undefined;
+		const binding = fixture.attach(paragraph, {
+			getSnapshot() {
+				const snapshot = fixture.state.getSnapshot();
+				if (!rendering && snapshot.label === 'Current' && atDrain === undefined)
+					atDrain = host.textContent;
+				return snapshot;
+			},
+			subscribe: fixture.state.subscribe,
+		});
+		const root = createRoot(host);
+		try {
+			root.render(Publisher, {
+				publish() {
+					rendering = true;
+					fixture.publish({ label: 'Current' });
+					rendering = false;
+				},
+			});
+			// The root's commit had placed its content when the drain read its source.
+			expect(atDrain).toBe('publisher');
+			expect(paragraph.textContent).toBe('Current');
+		} finally {
+			root.unmount();
+			host.remove();
+			binding.dispose();
+		}
+	});
+
 	describe('structural text ownership', () => {
 		const source = `export function Notice(props) @{ 'use dom bindings';
   <section>
@@ -5236,7 +5393,10 @@ export function TreeHydration(props) @{
 			inputs[1]!.focus();
 			inputs[1]!.setSelectionRange(2, 7, 'backward');
 			fixture.publish({ items: [items[1]!, items[0]!, items[2]!] });
-			const range = { start: container.firstChild as Comment, end: container.lastChild as Comment };
+			const range = {
+				start: container.firstChild!.nextSibling as Comment,
+				end: container.lastChild as Comment,
+			};
 			const binding = fixture.attach(range, fixture.state);
 			try {
 				expect([...container.querySelectorAll('figure')]).toEqual([
@@ -5282,7 +5442,8 @@ export function TreeHydration(props) @{
 			expect(container.querySelector('input')!.value).toBe('First');
 			expect(container.querySelector('figcaption')!.textContent).toBe('First');
 			replacement.dispose({ preserveDOM: false });
-			expect(container.childNodes).toHaveLength(0);
+			// Only the root's protocol version, outside the range, remains.
+			expect(container.innerHTML).toBe('<!--3-->');
 		}
 	});
 
@@ -6211,7 +6372,10 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 			const host = document.createElement('section');
 			container.append(host);
 			host.innerHTML = fixture.html;
-			const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+			const range = {
+				start: host.firstChild!.nextSibling as Comment,
+				end: host.lastChild as Comment,
+			};
 			const handle = fixture.attach(range, fixture.state);
 			const before = host.innerHTML;
 			const inputs = [...host.querySelectorAll('input')];
@@ -6242,7 +6406,7 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 			handle.dispose();
 			fixture.publish({ items, locked: false, onInput: undefined }, false);
 			fixture.attach(range, fixture.state).dispose({ preserveDOM: false });
-			expect(host.childNodes).toHaveLength(0);
+			expect(host.innerHTML).toBe('<!--3-->');
 		}
 		for (const dev of [false, true]) {
 			for (const invalid of [{ unexpected: true }, Symbol('invalid-text'), () => 'invalid']) {
@@ -6519,7 +6683,10 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 		const host = document.createElement('section');
 		container.append(host);
 		host.innerHTML = fixture.html;
-		const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+		const range = {
+			start: host.firstChild!.nextSibling as Comment,
+			end: host.lastChild as Comment,
+		};
 		const rows = [...host.querySelectorAll('figure')];
 		const handle = fixture.attach(range, fixture.state);
 		expect(() => handle.dispose()).toThrow(cleanupFailure);
@@ -6699,7 +6866,10 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 		const host = document.createElement('section');
 		container.append(host);
 		host.innerHTML = fixture.html;
-		const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+		const range = {
+			start: host.firstChild!.nextSibling as Comment,
+			end: host.lastChild as Comment,
+		};
 		const handle = fixture.attach(range, fixture.state, { signal: canceledProjection.signal });
 		const before = host.innerHTML;
 		const abortingText = {
@@ -7383,10 +7553,13 @@ export function NestedParent(props) @{ 'use dom bindings';
 						host.innerHTML = nested.html;
 						const button = host.querySelector('button')!;
 						const child = button.firstElementChild;
-						const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+						const range = {
+							start: host.firstChild!.nextSibling as Comment,
+							end: host.lastChild as Comment,
+						};
 						if (mode === 'missing-close') range.end.remove();
 						else if (mode === 'duplicate') {
-							host.prepend(range.start.cloneNode());
+							range.start.before(range.start.cloneNode());
 							host.append(range.end.cloneNode());
 						} else if (mode === 'sibling-before')
 							range.start.after(document.createTextNode('outside'));
@@ -9767,19 +9940,22 @@ export function Answer() @{
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
 
-				// A server @catch arm is adopted in place when the client read fails too.
+				// A failed server read renders @catch, which activation retries from client state.
 				generation$.set(6);
 				request(6).reject(new Error('server failure'));
 				await settle();
 				const failed = fixture();
 				container.innerHTML = failed.html;
-				const serverRetry = container.querySelector('button')!;
-				expect(serverRetry.textContent).toBe('Error: server failure');
-				const failedHandle = failed.attach(container.querySelector('section')!, failed.state);
-				expect(container.querySelector('button')).toBe(serverRetry);
+				expect(container.querySelector('button')?.textContent).toBe('Error: server failure');
+				const failedSection = container.querySelector('section')!;
+				const failedHandle = failed.attach(failedSection, failed.state);
+				expect(container.querySelector('section')).toBe(failedSection);
+				const clientRetry = container.querySelector('button')!;
+				expect(clientRetry.textContent).toBe('Error: server failure');
+				expect(container.querySelector('[data-pending]')).toBeNull();
 				generation$.set(7);
 				request(7).resolve('seventh');
-				serverRetry.click();
+				clientRetry.click();
 				await settle();
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('seventh');
 				failedHandle.dispose();
@@ -9834,8 +10010,8 @@ export function Answer() @{
 			}
 		});
 
-		// A binding view stays an ordinary component: hydrateRoot adopts the same
-		// server @try output, whichever settled arm the server rendered.
+		// A binding view stays an ordinary component: hydrateRoot adopts successful
+		// content and retries a server-caught error from client state.
 		it(`hydrates a binding view's settled @try arms with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
 			const source = `import { answer$ } from './island-state';
 export function Answer() @{
@@ -9867,18 +10043,156 @@ export function Answer() @{
 				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 				try {
 					container.innerHTML = fixture.html;
-					const server = container.querySelector('section p')!;
-					hydratedRoot = hydrateRoot(container, fixture.loadClient().Answer, {});
+					const section = container.querySelector('section')!;
+					const server = section.querySelector('p')!;
+					expect(server.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
+					const recoverable: unknown[] = [];
+					hydratedRoot = hydrateRoot(
+						container,
+						fixture.loadClient().Answer,
+						{},
+						{
+							onRecoverableError: (value) => recoverable.push(value),
+						},
+					);
 					await act(async () => {
 						for (let index = 0; index < 4; index++) await Promise.resolve();
 					});
-					expect(container.querySelector('section p')).toBe(server);
-					expect(server.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
+					expect(container.querySelector('section')).toBe(section);
+					if (outcome === 'ready') {
+						expect(section.querySelector('p')).toBe(server);
+						expect(server.textContent).toBe('ready');
+					} else {
+						expect(section.querySelector('p[data-error]')!.textContent).toBe('Error: failed');
+						expect(section.querySelector('[data-pending]')).toBeNull();
+					}
+					expect(recoverable).toEqual([]);
 					expect(error).not.toHaveBeenCalled();
 				} finally {
 					error.mockRestore();
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
+					scope.dispose();
+				}
+			}
+		});
+
+		// A boundary without @pending keeps its content in the arm's own range too.
+		it(`hydrates a binding view's @try without a fallback with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { label$ } from './island-state';
+export function Label() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <p>{label$.get() as string}</p>
+    } @catch (error) {
+      <p data-error>{String(error) as string}</p>
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-hydrate-catch-only-${dev}` });
+			const label$ = scope.signal$('label', 'server');
+			const fixture = authoredPresentation('Label', {}, dev, source, {
+				'./island-state': { label$ },
+			});
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				container.innerHTML = fixture.html;
+				const paragraph = container.querySelector('section p')!;
+				const recoverable: unknown[] = [];
+				hydratedRoot = hydrateRoot(
+					container,
+					fixture.loadClient().Label,
+					{},
+					{ onRecoverableError: (value) => recoverable.push(value) },
+				);
+				await act(async () => {});
+				expect(container.querySelector('section p')).toBe(paragraph);
+				await act(() => label$.set('client'));
+				expect(paragraph.textContent).toBe('client');
+				expect(recoverable).toEqual([]);
+				expect(error).not.toHaveBeenCalled();
+			} finally {
+				error.mockRestore();
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				scope.dispose();
+			}
+		});
+
+		// So does a streamed boundary: hydrateRoot adopts content whose segment
+		// swapped in first, and claims a boundary whose segment has not arrived, so
+		// the late segment cannot replace the client's arm.
+		it(`hydrates a binding view's streamed @try with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$ } from './island-state';
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <p data-answer>{answer$.get() as string}</p>
+    } @pending {
+      <p data-pending>waiting</p>
+    }
+  </section>
+}`;
+			for (const swapped of [true, false]) {
+				const scope = createScope({ scopeKey: `island-hydrate-stream-${swapped}-${dev}` });
+				const answer = deferred<string>();
+				const loadAnswer = query(
+					`island-hydrate-stream-${swapped}`,
+					(_argument: undefined) => answer.promise,
+				);
+				const answer$ = createResource(scope, 'answer', () => loadAnswer(undefined));
+				const fixture = authoredPresentation('Answer', {}, dev, source, {
+					'./island-state': { answer$ },
+				});
+				const collector = createPipeableCollector();
+				renderToPipeableStream(fixture.server.Answer, {}).pipe(collector.destination);
+				for (let index = 0; index < 20 && collector.chunks.length === 0; index++)
+					await new Promise((resolve) => setTimeout(resolve, 0));
+				const shell = collector.chunks.join('');
+				expect(shell).toContain('data-pending');
+				const appendRest = async () => {
+					const tail = document.createElement('div');
+					tail.innerHTML = (await collector.ended).slice(shell.length);
+					container.append(...tail.childNodes);
+					activateStreamedMarkup(container);
+				};
+				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+				try {
+					container.innerHTML = shell;
+					activateStreamedMarkup(container);
+					if (swapped) {
+						answer.resolve('streamed');
+						await appendRest();
+					}
+					const section = container.querySelector('section')!;
+					const server = section.querySelector('p')!;
+					expect(server.textContent).toBe(swapped ? 'streamed' : 'waiting');
+					const recoverable: unknown[] = [];
+					hydratedRoot = hydrateRoot(
+						container,
+						fixture.loadClient().Answer,
+						{},
+						{ onRecoverableError: (value) => recoverable.push(value) },
+					);
+					await act(async () => {});
+					if (!swapped) {
+						answer.resolve('streamed');
+						await act(async () => {});
+						await appendRest();
+					}
+					expect(container.querySelector('section')).toBe(section);
+					expect(section.querySelectorAll('p')).toHaveLength(1);
+					expect(section.querySelector('[data-answer]')!.textContent).toBe('streamed');
+					if (swapped) expect(section.querySelector('p')).toBe(server);
+					expect(recoverable).toEqual([]);
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					error.mockRestore();
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					resetStreamRuntimeGlobals();
 					scope.dispose();
 				}
 			}
@@ -10126,7 +10440,10 @@ export function Answer() @{
 			const host = document.createElement('section');
 			container.append(host);
 			host.innerHTML = fixture.html;
-			const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+			const range = {
+				start: host.firstChild!.nextSibling as Comment,
+				end: host.lastChild as Comment,
+			};
 			const input = host.querySelector('input')!;
 			input.value = 'Native edit';
 			const handle = fixture.attach(range, fixture.state);
@@ -10182,7 +10499,7 @@ export function Answer() @{
 			container.append(failedHost);
 			failedHost.innerHTML = failing.html;
 			const failedRange = {
-				start: failedHost.firstChild as Comment,
+				start: failedHost.firstChild!.nextSibling as Comment,
 				end: failedHost.lastChild as Comment,
 			};
 			const failedInput = failedHost.querySelector('input');
@@ -10935,7 +11252,10 @@ export function LatestSnapshot() @{ 'use dom bindings'; <p>{count$.latest('fallb
 			const rowHost = document.createElement('section');
 			container.append(rowHost);
 			rowHost.innerHTML = rowFixture.html;
-			const rowRange = { start: rowHost.firstChild as Comment, end: rowHost.lastChild as Comment };
+			const rowRange = {
+				start: rowHost.firstChild!.nextSibling as Comment,
+				end: rowHost.lastChild as Comment,
+			};
 			const row = rowHost.querySelector('figure')!;
 			const rowInput = row.querySelector('input')!;
 			rowInput.value = 'native edit';

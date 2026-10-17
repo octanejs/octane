@@ -184,18 +184,20 @@ describe.each([
 		},
 	);
 
-	// React compares DOM only, and the call renders exactly the server's node.
-	it('adopts the server node at a hole in a host element when it matches the call', async () => {
+	// OCTANE DIVERGENCE: React compares DOM only, and adopts the server's node
+	// where the call renders exactly it. Octane's server frames every component
+	// call, so the call without its range falls back.
+	it('client-renders the root at a hole in a host element whose node matches the call', async () => {
 		const s = await hydrate('InHostAdopt', { server: true, tail: 't' }, { tail: 't' });
 
-		expect(markup(s.host)).toBe('<p><u>z</u><i>t</i></p>');
-		expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
-		expect(s.recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		const live = container.firstElementChild!;
+		expect(live).not.toBe(s.host);
+		expect(markup(live)).toBe('<p><u>z</u><i>t</i></p>');
+		for (const node of s.nodes) expect(node.isConnected).toBe(false);
+		expect(s.recoverable).toEqual([expect.stringMatching(report)]);
 
 		s.render({ tail: 'w' });
-		expect(markup(s.host)).toBe('<p><u>z</u><i>w</i></p>');
-		expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
+		expect(markup(live)).toBe('<p><u>z</u><i>w</i></p>');
 	});
 
 	it.each([...SHAPES.map(({ name }) => name), 'InHostAdopt'])(

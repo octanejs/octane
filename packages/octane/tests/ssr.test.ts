@@ -224,9 +224,11 @@ describe.each([
 
 	it('renders spread children as escaped text or ordinary child elements', () => {
 		expect(RT.renderToString(mod.Spread, { attrs: { children: '<safe>' } }).html).toBe(
-			'<div>&lt;safe&gt;</div>',
+			'<!--3--><div>&lt;safe&gt;</div>',
 		);
-		expect(RT.renderToString(mod.Spread, { attrs: { children: 0 } }).html).toBe('<div>0</div>');
+		expect(RT.renderToString(mod.Spread, { attrs: { children: 0 } }).html).toBe(
+			'<!--3--><div>0</div>',
+		);
 		const element = RT.createElement('strong', { id: 'spread-child' }, 'rich');
 		const html = RT.renderToString(mod.Spread, { attrs: { children: element } }).html;
 		const container = document.createElement('div');
@@ -251,17 +253,17 @@ describe.each([
 			RT.renderToString(mod.Spread, {
 				attrs: { children: undefined, dangerouslySetInnerHTML: { __html: '<b>raw</b>' } },
 			}).html,
-		).toBe('<div><b>raw</b></div>');
+		).toBe('<!--3--><div><b>raw</b></div>');
 		expect(
 			RT.renderToString(mod.Spread, {
 				attrs: { children: 'fallback', dangerouslySetInnerHTML: undefined },
 			}).html,
-		).toBe('<div>fallback</div>');
+		).toBe('<!--3--><div>fallback</div>');
 		expect(
 			RT.renderToString(mod.Spread, {
 				attrs: { dangerouslySetInnerHTML: { __html: null } },
 			}).html,
-		).toBe('<div></div>');
+		).toBe('<!--3--><div></div>');
 		expect(() =>
 			RT.renderToString(mod.Spread, {
 				attrs: { children: '', dangerouslySetInnerHTML: { __html: '<b>raw</b>' } },
@@ -279,8 +281,10 @@ describe.each([
 		}) as Record<string, unknown>;
 		Object.defineProperty(attrs, 'children', { value: 'hidden', enumerable: false });
 		Object.defineProperty(attrs, 'title', { value: 'visible', enumerable: true });
-		expect(RT.renderToString(mod.Spread, { attrs }).html).toBe('<div title="visible"></div>');
-		expect(RT.renderToString(mod.Spread, { attrs: null }).html).toBe('<div></div>');
+		expect(RT.renderToString(mod.Spread, { attrs }).html).toBe(
+			'<!--3--><div title="visible"></div>',
+		);
+		expect(RT.renderToString(mod.Spread, { attrs: null }).html).toBe('<!--3--><div></div>');
 	});
 
 	it('snapshots string and symbol getters exactly once in authored prop order', () => {
@@ -320,7 +324,7 @@ describe.each([
 			'direct:after',
 		]);
 		expect(html).toBe(
-			'<section data-before="before" title="spread title" data-after="after">&lt;escaped child&gt;</section>',
+			'<!--3--><section data-before="before" title="spread title" data-after="after">&lt;escaped child&gt;</section>',
 		);
 	});
 
@@ -368,7 +372,7 @@ describe.each([
 			'read:html',
 		]);
 		expect(html).toBe(
-			'<section data-before="before" title="visible title" data-after="after"><strong>raw content</strong></section>',
+			'<!--3--><section data-before="before" title="visible title" data-after="after"><strong>raw content</strong></section>',
 		);
 	});
 });
@@ -407,7 +411,7 @@ describe('SSR Phase 1 — semantics', () => {
 					observed.push([left, right]);
 				},
 			}).html,
-		).toBe('<output>ready</output>');
+		).toBe('<!--3--><output>ready</output>');
 		expect(observed.at(-1)).toEqual([first, second]);
 		for (const callback of [first, second, nextFirst, nextSecond]) {
 			expect(callback).not.toHaveBeenCalled();
@@ -438,7 +442,7 @@ describe('SSR Phase 1 — semantics', () => {
 					return Object.is(value, -0) ? 'negative zero' : 'positive zero';
 				},
 			}).html,
-		).toBe('<output>positive zero</output>');
+		).toBe('<!--3--><output>positive zero</output>');
 		expect(signedZeroValues.map((value) => Object.is(value, -0))).toEqual([true, false]);
 
 		const nanValues: number[] = [];
@@ -451,7 +455,7 @@ describe('SSR Phase 1 — semantics', () => {
 					return `stable ${nanValues.length}`;
 				},
 			}).html,
-		).toBe('<output>stable 1</output>');
+		).toBe('<!--3--><output>stable 1</output>');
 		expect(nanValues).toHaveLength(1);
 	});
 
@@ -496,7 +500,7 @@ describe('SSR Phase 1 — semantics', () => {
 		],
 	])('escapes %s identically in buffered and static markup', (_label, value, expected) => {
 		const expectedMarkup = `<span>${expected}</span>`;
-		expect(RT.renderToString(basic.Counter, { n: value }).html).toBe(expectedMarkup);
+		expect(RT.renderToString(basic.Counter, { n: value }).html).toBe('<!--3-->' + expectedMarkup);
 		expect(RT.renderToStaticMarkup(basic.Counter, { n: value }).html).toBe(expectedMarkup);
 	});
 
@@ -506,14 +510,14 @@ describe('SSR Phase 1 — semantics', () => {
 			[Symbol.toPrimitive](hint: string) {
 				coercions.push(hint);
 				expect(RT.renderToString(basic.Counter, { n: '<nested>&' }).html).toBe(
-					'<span>&lt;nested&gt;&amp;</span>',
+					'<!--3--><span>&lt;nested&gt;&amp;</span>',
 				);
 				return '&<outer>';
 			},
 		};
 
 		expect(RT.renderToString(basic.Counter, { n: value }).html).toBe(
-			'<span>&amp;&lt;outer&gt;</span>',
+			'<!--3--><span>&amp;&lt;outer&gt;</span>',
 		);
 		expect(coercions).toEqual(['string']);
 	});
@@ -535,7 +539,7 @@ describe('SSR Phase 1 — semantics', () => {
 		const stream = await RT.renderToReadableStream(basic.Counter, { n: value });
 		const html = await new Response(stream).text();
 
-		expect(html).toBe('<span>&amp;&lt;script&gt;alert("x")&lt;/script&gt;&amp;amp;</span>');
+		expect(html).toBe('<!--3--><span>&amp;&lt;script&gt;alert("x")&lt;/script&gt;&amp;amp;</span>');
 		expect(html).not.toContain('<script>');
 	});
 
@@ -809,6 +813,51 @@ describe('SSR — nested render entry isolation', () => {
 		expect(outer.html).not.toContain('<!--]-->');
 		expect(outer.html).not.toContain('/nested-render.css');
 		expect(outer.html.match(/href="\/outer-render\.css"/g)).toHaveLength(1);
+	});
+
+	it('hydrates independent roots rendered inside and outside a nested render', () => {
+		let nested = '';
+		const outer = RT.renderToString(() =>
+			RT.createElement(() => {
+				nested = RT.renderToString(() => RT.createElement('input', { defaultValue: 'inner' })).html;
+				return RT.createElement('input', { defaultValue: 'outer' });
+			}),
+		).html;
+		const containers = [document.createElement('div'), document.createElement('div')];
+		containers[0]!.innerHTML = nested;
+		containers[1]!.innerHTML = outer;
+		document.body.append(...containers);
+		const served = containers.map((container) => container.querySelector('input')!);
+		served[0]!.value = 'inner edit';
+		served[1]!.value = 'outer edit';
+		served[0]!.focus();
+		const errors: unknown[] = [];
+		const options = { onRecoverableError: (error: unknown) => errors.push(error) };
+		const roots = [
+			hydrateRoot(
+				containers[0]!,
+				() => createClientElement('input', { defaultValue: 'inner' }),
+				{},
+				options,
+			),
+			hydrateRoot(
+				containers[1]!,
+				() => createClientElement(() => createClientElement('input', { defaultValue: 'outer' })),
+				{},
+				options,
+			),
+		];
+		try {
+			flushSync(() => {});
+			expect(containers[0]!.querySelector('input')).toBe(served[0]);
+			expect(containers[1]!.querySelector('input')).toBe(served[1]);
+			expect(served.map((input) => input.value)).toEqual(['inner edit', 'outer edit']);
+			expect(document.activeElement).toBe(served[0]);
+			expect(errors).toEqual([]);
+		} finally {
+			for (const root of roots) root.unmount();
+			for (const container of containers) container.remove();
+		}
 	});
 });
 

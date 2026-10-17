@@ -131,7 +131,8 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 			for (const imported of graph.chunks.get(file)?.imports ?? []) visit(imported);
 		};
 		visit(islandsEntry![0]);
-		const renderer = /packages\/octane\/src\/(?:index|runtime|internal\/client)\.ts$/;
+		const renderer =
+			/packages\/octane\/src\/(?:index|runtime|runtime\/[^/]+|internal\/client)\.ts$/;
 		const staticModules = [...reached].flatMap((file) => graph.chunks.get(file)!.modules);
 		expect(staticModules.filter((id) => renderer.test(id))).toEqual([]);
 		// This page's island uses interaction(), so the idle(), visible() and media()
@@ -182,12 +183,12 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 		expect(islands).toContain('data-octane-hydrate-independent');
 	});
 
-	// Only the renderer consumes the signal Action frame and transition coordinator.
+	// Only the renderer consumes a transition's pending signal state (pending.ts).
 	// An islands-only app's pages load signals without it, so its client build moves
-	// them from the signal graph into the renderer. A mixed app keeps them with the
+	// it from the signal graph into the renderer. A mixed app keeps it with the
 	// graph, so its renderer pages without signals carry nothing.
 	it('moves signal Actions into the renderer only when every route is islands', async () => {
-		const frame = /packages\/octane\/src\/signals\/transition-(?:action|coordinator)\.ts$/;
+		const frame = /packages\/octane\/src\/signals\/pending\.ts$/;
 		const placement = (graph: BuiltGraph) => {
 			const loads = (module: RegExp) => {
 				const reached = new Set<string>();
@@ -204,7 +205,7 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 			};
 			return {
 				withSignals: loads(/packages\/octane\/src\/signals\/graph\.ts$/),
-				withRenderer: loads(/packages\/octane\/src\/runtime\.ts$/),
+				withRenderer: loads(/packages\/octane\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/),
 			};
 		};
 		// Give the placement oracle an actual signal Action consumer in both builds.

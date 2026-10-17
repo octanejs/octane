@@ -3,6 +3,7 @@
 import {
 	createContext,
 	isChildrenBlock,
+	startTransition,
 	useContext,
 	useEffect,
 	useState,
@@ -338,4 +339,86 @@ export function PureDeepRenderValue(props: {
 			<span>{props.detail!.label}</span>
 		}}
 	/>
+}
+
+function Waiter(props: { read: () => string }) @{
+	<i>{props.read() as string}</i>
+}
+
+export function DroppedCaptureValue(props: {
+	label: string;
+	wait: boolean;
+	host: boolean;
+	read: () => string;
+}) @{
+	<div>
+		@if (props.host) {
+			<DynamicHost
+				tag="div"
+				content={@{
+					const [count, setCount] = useState(0);
+					<button onClick={() => setCount(count + 1)}>{`${props.label}:${count}`}</button>
+				}}
+			/>
+		} @else {
+			<PureSlot
+				visible={true}
+				content={@{
+					const [count, setCount] = useState(0);
+					<button onClick={() => setCount(count + 1)}>{`${props.label}:${count}`}</button>
+				}}
+			/>
+		}
+		@if (props.wait) {
+			<Waiter read={props.read} />
+		}
+	</div>
+}
+
+function SwapOwner(props: {
+	step: number;
+	bump: () => void;
+	read: () => string;
+	forward: (value: OctaneNode) => OctaneNode;
+}) @{
+	const [local, setLocal] = useState(0);
+	<div>
+		<button
+			onClick={() => {
+				props.bump();
+				startTransition(() => setLocal(1));
+			}}
+		>
+			move
+		</button>
+		<SelectedSlot
+			useSecond={(props.step + local) % 2 === 1}
+			forward={props.forward}
+			first={@{
+				<article>{'first'}</article>
+			}}
+			second={@{
+				<aside>{'second'}</aside>
+			}}
+		/>
+		@if (local === 1) {
+			<Waiter read={props.read} />
+		}
+	</div>
+}
+
+// One click swaps the forwarded body twice in one drain: the parent's urgent
+// update, then the owner's transition inside a held boundary's window.
+export function NestedReplacement(props: {
+	read: () => string;
+	forward: (value: OctaneNode) => OctaneNode;
+}) @{
+	const [step, setStep] = useState(0);
+	<main>
+		@try {
+			<SwapOwner step={step} bump={() => setStep(1)} read={props.read} forward={props.forward} />
+		} @pending {
+			<p role="status">waiting</p>
+		}
+	</main>
 }

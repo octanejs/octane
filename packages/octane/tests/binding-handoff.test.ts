@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot } from 'octane';
+import { createRoot, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import * as DomBindings from '../src/dom-bindings.js';
 import * as DomBindingSignals from '../src/dom-binding-signals.js';
@@ -7,6 +7,7 @@ import * as DomBindingStyles from '../src/dom-binding-styles.js';
 import * as Signals from '../src/signals/index.js';
 import * as SignalReads from '../src/signals/read-protocol.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { act } from './_helpers.js';
 
 // A style channel needs the general fixed-layout adopter. Without it, every
 // channel is a fixed scalar and the compiler selects the scalar adopter
@@ -696,3 +697,137 @@ describe.each([false, true].flatMap((dev) => [false, true].map((native) => ({ de
 		});
 	},
 );
+
+// A binding view renders like any component once it is the application's. Render
+// computes and commit writes: a render that waits, here on a sibling, leaves the
+// committed host untouched until it commits.
+const WAITING_VIEWS = `import { unbound } from 'octane/behavior';
+export function Status(props) @{
+	'use dom bindings';
+	<form action={unbound(props.action)}>
+		<button type={props.type} disabled={props.disabled} aria-label={props.label} class={props.classes} style={{ opacity: props.opacity }}>{props.message as string}</button>
+		<input type="checkbox" checked={unbound(props.checked)} onInput={unbound(props.onInput)} />
+	</form>
+}
+export function Host(props) @{
+	'use dom bindings';
+	<section class={props.classes} style={{ opacity: props.opacity }} data-state={props.state}>{unbound(props.children)}</section>
+}
+function Gate(props) @{
+	<i>{props.read() as string}</i>
+}
+export function App(props) @{
+	<main>
+		<Status {...props} />
+		<Host classes={props.classes} opacity={props.opacity} state={props.state}><b>child</b></Host>
+		<Gate read={props.read} />
+	</main>
+}`;
+
+describe.each([false, true])('binding views in a render that waits (dev=%s)', (dev) => {
+	it('write attributes, classes, styles, form state and signal values only at its commit', async () => {
+		const client = loadCompiledFixtureSource(WAITING_VIEWS, {
+			id: `/src/waiting-binding-views-${dev}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+			runtimeModules: {
+				'octane/behavior': DomBindings,
+				'octane/dom-bindings': DomBindings,
+				'octane/dom-binding-signals': DomBindingSignals,
+			},
+		});
+		const scope = Signals.createScope({ scopeKey: `waiting-binding-views-${dev}` });
+		const label$ = scope.signal$('label', 'Send');
+		let release!: () => void;
+		const pending = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		let ready = true;
+		const read = () => {
+			if (!ready) throw pending;
+			return 'ready';
+		};
+		const props = (step: 'first' | 'second') => ({
+			action: `/${step}`,
+			type: step === 'first' ? 'submit' : 'button',
+			disabled: step === 'second',
+			label: label$,
+			classes: step === 'first' ? 'idle' : ['busy', { active: true }],
+			opacity: step === 'first' ? 1 : 0.5,
+			message: step,
+			checked: step === 'second',
+			onInput: () => {},
+			state: step,
+			read,
+		});
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		const writes: MutationRecord[] = [];
+		const observer = new MutationObserver((records) => writes.push(...records));
+		const checked = vi.spyOn(HTMLInputElement.prototype, 'checked', 'set');
+		try {
+			flushSync(() => root.render(client.App, props('first')));
+			const button = container.querySelector('button')!;
+			const input = container.querySelector('input')!;
+			const section = container.querySelector('section')!;
+			expect([button.getAttribute('aria-label'), section.dataset.state]).toEqual(['Send', 'first']);
+			observer.observe(container, {
+				attributes: true,
+				characterData: true,
+				childList: true,
+				subtree: true,
+			});
+			checked.mockClear();
+			ready = false;
+			startTransition(() => {
+				label$.set('Stop');
+				root.render(client.App, props('second'));
+			});
+			await act(() => {});
+			writes.push(...observer.takeRecords());
+			expect(writes).toEqual([]);
+			expect(checked).not.toHaveBeenCalled();
+			expect([button.type, button.className, button.getAttribute('aria-label')]).toEqual([
+				'submit',
+				'idle',
+				'Send',
+			]);
+			ready = true;
+			await act(() => release());
+			writes.push(...observer.takeRecords());
+			expect(container.querySelector('button')).toBe(button);
+			expect([
+				button.type,
+				button.disabled,
+				button.getAttribute('aria-label'),
+				button.className,
+				button.style.opacity,
+				button.textContent,
+				input.checked,
+				container.querySelector('form')!.getAttribute('action'),
+				section.className,
+				section.style.opacity,
+				section.dataset.state,
+			]).toEqual([
+				'button',
+				true,
+				'Stop',
+				'busy active',
+				'0.5',
+				'second',
+				true,
+				'/second',
+				'busy active',
+				'0.5',
+				'second',
+			]);
+			expect(writes.length).toBeGreaterThan(0);
+		} finally {
+			observer.disconnect();
+			root.unmount();
+			container.remove();
+			scope.dispose();
+		}
+	});
+});

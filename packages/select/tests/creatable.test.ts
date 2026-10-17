@@ -51,7 +51,7 @@ function renderPair(overrides: Partial<CreatableResult> = {}) {
 describe('useCreatable parity', () => {
 	it.each(['first', 'last'] as const)('matches React new-option placement: %s', (position) => {
 		const pair = renderPair({ createOptionPosition: position });
-		expect(pair.octaneHTML).toBe(pair.reactHTML);
+		expect(pair.octaneHTML).toBe('<!--3-->' + pair.reactHTML);
 		expect(pair.octane.options).toEqual(pair.react.options);
 		expect(pair.octane.options?.find((option) => (option as CreatableOption).__isNew__)).toEqual({
 			label: 'Create "New choice"',
@@ -64,7 +64,7 @@ describe('useCreatable parity', () => {
 		'matches React suppression for %#',
 		(overrides) => {
 			const pair = renderPair(overrides);
-			expect(pair.octaneHTML).toBe(pair.reactHTML);
+			expect(pair.octaneHTML).toBe('<!--3-->' + pair.reactHTML);
 			expect(pair.octane.options).toEqual(pair.react.options);
 		},
 	);

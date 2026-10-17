@@ -62,7 +62,13 @@ import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
+import {
+	exportedNames,
+	isRuntimeModule,
+	renderedRuntimeExports,
+	resolveDeclarationRanges,
+	retainedDeclarations,
+} from './hydration-free-gates.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
@@ -72,6 +78,13 @@ const WEATHER_APP = path.resolve(__dirname, '../weather-app');
 const BINDINGS_APP = path.join(__dirname, 'apps/bindings');
 const APP_SHELL = path.join(__dirname, 'apps/app-shell');
 const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: dist)
+// runtime.ts's exports: the names a void-root verdict reads from a build.
+const runtimeSurface = exportedNames(
+	parseAst(
+		fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src/runtime.ts'), 'utf8'),
+		{ lang: 'ts' },
+	),
+);
 // Vite 8's default client minifier; see the fairness note above.
 const VITE_MINIFY = 'oxc';
 
@@ -295,17 +308,15 @@ for (const set of SETS)
 		// non-specialized verdict means the proof chain broke upstream; a
 		// missing runtime module reports as its own verdict, not a crash.
 		if (name.startsWith('octane-')) {
-			let runtimeExports;
+			let runtimeExports = [];
 			let runtimeSeen = false;
 			for (const bundle of Array.isArray(result) ? result : result ? [result] : []) {
 				for (const chunk of bundle.output ?? []) {
 					if (chunk.type !== 'chunk') continue;
-					for (const [id, mod] of Object.entries(chunk.modules ?? {})) {
-						if (id.endsWith('/packages/octane/src/runtime.ts')) {
-							runtimeSeen = true;
-							runtimeExports = mod.renderedExports ?? [];
-						}
-					}
+					const modules = chunk.modules ?? {};
+					if (!Object.keys(modules).some(isRuntimeModule)) continue;
+					runtimeSeen = true;
+					runtimeExports = renderedRuntimeExports(modules, runtimeSurface);
 				}
 			}
 			const verdict = !runtimeSeen

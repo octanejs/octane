@@ -3,8 +3,7 @@ import type { ComponentBody, OctaneNode } from 'octane';
 
 // A template (`@{}`) component clones its root element before its holes run, so
 // one that throws from a hole has already adopted that clone against whatever
-// the server rendered in its place. When the server's render threw the same
-// way, that is the boundary's @catch arm.
+// the server rendered in its place.
 
 function read(value: unknown): string {
 	if (value !== undefined) throw value;

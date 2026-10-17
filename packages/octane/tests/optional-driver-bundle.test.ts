@@ -27,11 +27,9 @@ import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 const SOURCE = resolve(import.meta.dirname, '../src');
 const PACKAGE_ROOT = resolve(import.meta.dirname, '..');
 const OPTIONAL_DECLARATIONS = [
-	// ViewTransition's staged DOM and the drivers that prepare a staged commit.
-	'STAGED_DOM',
+	// ViewTransition and the layout phase its native update defers.
 	'VIEW_TRANSITION_DRIVER',
 	'DEFERRED_LAYOUT_DRIVER',
-	'STAGED_COMMIT_CAPTURE',
 	// Suspense and Activity visibility, and effect reconnection on reveal.
 	'SCHEDULED_VISIBILITY_DRIVER',
 	'activityRefState',
@@ -48,14 +46,14 @@ const ROOT_ERROR_DECLARATIONS = [
 	'registeredEnqueueInlineCaughtError',
 	'registeredPublishInlineCaughtErrorReports',
 ];
-const CAPTURE_DECLARATIONS = ['finishCaptureDispatch'];
+const CAPTURE_DECLARATIONS = ['CAPTURE_FINISH', 'finishCaptureDispatch'];
 const TRANSITION_HOOK_DECLARATIONS = [
-	'stagedTransitionValue',
-	'stageTransitionValue',
-	'readQueuedTransition',
-	'captureTransitionHookQueue',
-	'recordUrgentActionUpdate',
-	'finishQueuedTransition',
+	'foldTransitionUpdate',
+	'queueTransitionUpdate',
+	'transitionMemoCells',
+	'dropTransitionRender',
+	'retryTransitionHolder',
+	'keepTransitionWork',
 ];
 const COMMIT_DECLARATIONS = ['drainQueuedEffectEventUpdates', 'drainQueuedStoreSyncs'];
 const FORM_COMMIT_DECLARATIONS = [

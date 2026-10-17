@@ -12,7 +12,7 @@
  * around every dynamic site, and the client `hydrateRoot` cursor scans for them
  * to align with the server output. This module is the public home both import;
  * the marker payloads and boundary attribute names themselves are declared in
- * `hydration-markers.js`, which stays off the `dom-tables.js` graph so the
+ * `hydration-protocol.js`, which stays off the `dom-tables.js` graph so the
  * pre-root capture bundle can share them, and are re-exported here unchanged.
  */
 
@@ -21,7 +21,7 @@ import {
 	HYDRATION_END,
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
-} from './hydration-markers.js';
+} from './hydration-protocol.js';
 
 export { HYDRATION_START, HYDRATION_END, HYDRATION_FOR_EMPTY, HYDRATION_FOR_ITEMS };
 
@@ -63,7 +63,7 @@ export const TEXT_SEPARATOR = `<!--${HYDRATION_TEXT_SEP}-->`;
  */
 export { SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 // A resolved server arm can hydrate independently if client data suspends.
-export { SUSPENSE_RESOLVED_COMMENT } from './hydration-markers.js';
+export { SUSPENSE_RESOLVED_COMMENT } from './hydration-protocol.js';
 export const SUSPENSE_RESOLVED_SEED_ATTR = 'data-octane-suspense-seeds';
 export const SUSPENSE_RESOLVED_NATIVE_ATTR = 'data-octane-suspense-signals';
 
@@ -81,9 +81,10 @@ export const UNDEFINED_SENTINEL_KEY = '__octane_new_undefined__';
 export const SUSPENSE_SEED_WIRE_PREFIX = '\0octane:ssr-seed:';
 
 /**
- * Top-level envelope key used only when a server hydration-seed stream contains
- * rejected `use(thenable)` entries. Keeping rejection metadata outside the
- * fulfilled value array prevents user data from colliding with the protocol.
+ * Top-level envelope key used only when a server hydration-seed stream records
+ * which compiler-owned request sites it seeded. Keeping that metadata outside
+ * the fulfilled value array prevents user data from colliding with the
+ * protocol. (The key's name predates the envelope's current use.)
  */
 export const REJECTION_SENTINEL_KEY = '__octane_new_rejection__';
 
@@ -129,7 +130,7 @@ export {
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
 	HYDRATE_SEED_ATTR,
-} from './hydration-markers.js';
+} from './hydration-protocol.js';
 
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
 // A boundary that is still PENDING when the shell flushes emits its fallback
@@ -138,8 +139,8 @@ export {
 // holding the real content (+ that boundary's use() seed JSON in a
 // `data-oct-seed` script) and an inline `$OCTRC("N")` call that swaps the
 // content into the boundary's range, stashes the seeds on `window.$OCTS`, and
-// replaces the template with a `<!--oct-seed:N-->` comment the client's
-// hydration uses to scope that boundary's seeds.
+// removes the template. The boundary's `[$?N` open then scopes its seeds for
+// hydration (hydration-protocol.ts).
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export { STREAM_BOUNDARY_ATTR } from './stream-protocol.js';
 /** Hidden segment container attribute carrying a completed boundary's content. */
@@ -152,7 +153,7 @@ export { STREAM_SCRIPT_ATTR } from './stream-protocol.js';
  *  inline `$OCTRH` call hoists its tags into document.head. */
 export const STREAM_RESOURCE_ATTR = 'data-oct-fr';
 /** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
-export { STREAM_SEED_COMMENT } from './hydration-markers.js';
+export { STREAM_SEED_COMMENT } from './hydration-protocol.js';
 
 // ---------------------------------------------------------------------------
 // Attribute value-type tables — React parity where the FUNCTIONAL outcome

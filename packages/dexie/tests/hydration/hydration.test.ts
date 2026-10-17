@@ -25,7 +25,7 @@ describe('@octanejs/dexie — hydration', () => {
 		await db.table('items').add({ id: 1, name: 'client' });
 
 		const container = document.createElement('div');
-		container.innerHTML = '<div id="hydration-items">server</div>';
+		container.innerHTML = '<!--3--><div id="hydration-items">server</div>';
 		document.body.appendChild(container);
 		const existingHost = container.firstElementChild;
 		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});

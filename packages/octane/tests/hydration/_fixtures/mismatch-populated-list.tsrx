@@ -74,3 +74,32 @@ export function DormantEmptyArm(props: { items: string[]; when: HydrationStrateg
 		</Hydrate>
 	</div>
 }
+
+// The server rendered more items than the client renders.
+export function FewerItems(props: { items: string[] }) @{
+	<div>
+		<i>
+			@for (const x of props.items; key x) {
+				<s>{x as string}</s>
+			}
+			{label() as string}
+		</i>
+	</div>
+}
+
+function Item(props: { x: string }) @{
+	<s>{props.x as string}</s>
+}
+
+// The same, from an array of keyed elements.
+export function FewerChildren(props: { items: string[] }) {
+	const children = props.items.map((x) => <Item key={x} x={x} />);
+	return (
+		<div>
+			<i>
+				{children}
+				{label() as string}
+			</i>
+		</div>
+	);
+}

@@ -3,7 +3,7 @@ import { createDerivedCellWith, type DerivedBindingLifecycle, type ScopeImpl } f
 import {
 	CandidateUnsupportedError,
 	createDeclarationView,
-	derivedValueState,
+	derivedResult,
 	errorState,
 	invalidateNode,
 	isThenable,
@@ -70,7 +70,7 @@ class ScalarBinding<T>
 				return errorState(error);
 			}
 			// sync:true retains its existing thenable-as-value assertion semantics.
-			return derivedValueState(target, result);
+			return derivedResult(target, result);
 		};
 	}
 

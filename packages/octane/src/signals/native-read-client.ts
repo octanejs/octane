@@ -8,18 +8,18 @@ import {
 import {
 	NATIVE_TRANSITION_CONSUMER,
 	setSignalDeclarationInvocation,
+	type NativeTransitionNotify,
 	type NativeReadRelease,
 	type NativeReadSource,
 } from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
 
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
 interface NativeReadHost {
 	capture(): object | null;
 	cleanup(scope: Scope, dispose: () => void): void;
 	schedule(block: Block): void;
-	/** Candidate admission renders this exact subscribed owner without notifying it. */
-	prepare?(block: Block): void;
-	retire?(block: Block): void;
 	/** Reuse current ref manifests after a superseding root commits. */
 	replayRefs(capture: object, owner: PublicationOwner): boolean;
 	refDisposed(entry: object): boolean;
@@ -44,7 +44,7 @@ interface Consumer {
 
 /** Lets a release find the consumer behind a subscription (rebaseNativeRead). */
 const CONSUMER: unique symbol = Symbol();
-type ConsumerNotify = (() => void) & { [CONSUMER]?: Consumer };
+type ConsumerNotify = NativeTransitionNotify & { [CONSUMER]?: Consumer };
 
 interface Candidate extends NativeReadWitness {
 	consumer: Consumer;
@@ -68,6 +68,8 @@ interface RenderFrame {
 }
 
 type CandidateSet = Map<Consumer, Candidate>;
+
+function noop(): void {}
 
 /**
  * Hydration registers this as the NativeReadRebase. A consumer whose committed
@@ -161,8 +163,10 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		for (const source of candidate.reads.keys()) {
 			const subscription = consumer.subscriptions.get(source);
 			if (subscription !== undefined && --subscription.leases === 0) {
-				consumer.subscriptions.delete(source);
+				// Forget it only once stopped: an exhausted native stack can interrupt
+				// the stop, and disposeConsumer then finishes it.
 				subscription.dispose();
+				consumer.subscriptions.delete(source);
 			}
 		}
 		candidate.reads.clear();
@@ -171,11 +175,13 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	function disposeConsumer(consumer: Consumer): void {
 		if (consumer.disposed) return;
 		consumer.disposed = true;
-		host.retire?.(consumer.block);
 		if (consumer.committed !== null) release(consumer.committed);
 		consumer.committed = null;
 		for (const candidate of consumer.pending) release(candidate);
 		consumer.pending.clear();
+		// Only a release the native stack interrupted leaves one behind.
+		for (const subscription of consumer.subscriptions.values()) subscription.dispose();
+		consumer.subscriptions.clear();
 		// The WeakMap entry does not keep the Scope alive. Deleting it also makes
 		// an accidental later read unable to recover a retired consumer.
 		consumers.delete(consumer.scope);
@@ -197,15 +203,10 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			};
 			consumers.set(scope, consumer);
 			const owned = consumer;
-			(owned.notify as ConsumerNotify)[CONSUMER] = owned;
-			if (host.prepare !== undefined) {
-				Object.assign(owned.notify, {
-					[NATIVE_TRANSITION_CONSUMER]: {
-						active: () => !owned.disposed && !owned.block.disposed,
-						prepare: () => host.prepare!(owned.block),
-					},
-				});
-			}
+			const notify = owned.notify as ConsumerNotify;
+			notify[CONSUMER] = owned;
+			// A transition that writes what this consumer reads renders its Block.
+			notify[NATIVE_TRANSITION_CONSUMER] = block;
 			host.cleanup(scope, () => disposeConsumer(owned));
 		}
 		return consumer;
@@ -236,12 +237,14 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		}
 		candidate.reads.set(source, version);
 		const consumer = candidate.consumer;
-		let subscription = consumer.subscriptions.get(source);
+		const subscription = consumer.subscriptions.get(source);
 		if (subscription === undefined) {
-			subscription = { leases: 0, dispose: source.subscribe(consumer.notify) };
-			consumer.subscriptions.set(source, subscription);
-		}
-		subscription.leases++;
+			// Record the lease before subscribing, so a release always finds what
+			// an exhausted native stack left, never an observer it cannot stop.
+			const leased = { leases: 1, dispose: noop };
+			consumer.subscriptions.set(source, leased);
+			leased.dispose = source.subscribe(consumer.notify);
+		} else subscription.leases++;
 	});
 
 	function put(target: CandidateSet, candidate: Candidate): void {
@@ -285,17 +288,20 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	}
 
 	return {
-		/** Selected-node inspection reads this Scope's existing records only. */
-		inspectScope(scope: Scope) {
-			const consumer = consumers.get(scope);
-			if (consumer === undefined || consumer.disposed) return null;
-			return {
-				block: consumer.block,
-				committed:
-					consumer.committed === null ? null : inspectNativeReadWitness(consumer.committed),
-				pending: Array.from(consumer.pending, inspectNativeReadWitness),
-			};
-		},
+		/** DevTools only: selected-node inspection reads this Scope's existing records only. */
+		inspectScope:
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
+				? (scope: Scope) => {
+						const consumer = consumers.get(scope);
+						if (consumer === undefined || consumer.disposed) return null;
+						return {
+							block: consumer.block,
+							committed:
+								consumer.committed === null ? null : inspectNativeReadWitness(consumer.committed),
+							pending: Array.from(consumer.pending, inspectNativeReadWitness),
+						};
+					}
+				: undefined,
 		/** Receipt stamps exist only for a capture that actually read native data. */
 		stampPublication(owner: PublicationOwner, queues: readonly (readonly object[])[]): void {
 			const publication: Publication = { owner, generation: owner.generation };

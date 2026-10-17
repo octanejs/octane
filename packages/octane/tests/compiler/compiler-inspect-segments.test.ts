@@ -256,7 +256,8 @@ describe.each([
 				.filter((segment) => segment.exact === true && segment.srcEnd !== null)
 				.map((segment) => FOLDED.slice(segment.srcStart, segment.srcEnd!)),
 		);
-		for (const keyword of ['@if', '@else', '@for', '@empty', '@try', '@pending', '@catch']) {
+		const keywords = ['@if', '@else', '@for', '@empty', '@try', '@pending', '@catch'];
+		for (const keyword of keywords) {
 			expect(claimed.has(keyword), `${keyword} is unreachable on the fold path`).toBe(true);
 		}
 	});

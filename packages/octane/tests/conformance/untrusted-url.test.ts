@@ -171,8 +171,8 @@ async function assertBadMarkupHydration(entry: MatrixCase): Promise<void> {
 	const container = document.createElement(entry.containerTag ?? 'div');
 	container.innerHTML =
 		entry.containerTag === 'frameset'
-			? '<frameset id="badIdWhichWillCauseMismatch"></frameset>'
-			: '<p id="badIdWhichWillCauseMismatch"></p>';
+			? '<!--3--><frameset id="badIdWhichWillCauseMismatch"></frameset>'
+			: '<!--3--><p id="badIdWhichWillCauseMismatch"></p>';
 	const bad = container.firstElementChild!;
 	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 	const recoverable: unknown[] = [];

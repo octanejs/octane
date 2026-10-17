@@ -6,7 +6,10 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
 import type { SupersededArmProps } from './_fixtures/suspense-superseded-arm.tsrx';
 import {
 	ConditionalArmRootSuspensionApp,
+	DelayedBoundaryApp,
 	DescriptorRootSuspensionAfterSiblingApp,
+	ResumedTemplateApp,
+	SoleRootResumeApp,
 	HiddenPrimaryRefCatchApp,
 	HiddenInsertionCleanupApp,
 	IndependentRefApp,
@@ -42,6 +45,84 @@ function deferred<T>() {
 function fulfilled<T>(value: T): PromiseLike<T> {
 	return { then() {}, status: 'fulfilled', value } as any;
 }
+
+it.each([
+	['a single-root and a two-root child', ResumedTemplateApp, ['#resumed-leaf', '#resumed-first']],
+	['a sole component root', SoleRootResumeApp, ['#sole-leaf']],
+] as const)(
+	'mounts a resumed child at commit, never into the hidden primary (%s)',
+	async (_name, App, ids) => {
+		const gate = deferred<string>();
+		const mutations: MutationRecord[][] = [];
+		const observer = new MutationObserver(() => {});
+		const root = mount(App, {
+			value: gate.promise,
+			probe() {
+				mutations.push(observer.takeRecords());
+			},
+		});
+		observer.observe(root.container, {
+			subtree: true,
+			childList: true,
+			characterData: true,
+			attributes: true,
+		});
+		try {
+			await act(() => gate.resolve('Ready'));
+			// The retry renders both children before the probe: none of it reached the page.
+			expect(mutations.length).toBeGreaterThan(0);
+			for (const atRender of mutations) expect(atRender).toEqual([]);
+			for (const id of ids) expect(root.find(id).textContent).toBe('Ready');
+			expect(root.container.querySelector('#late-waiting')).toBeNull();
+		} finally {
+			observer.disconnect();
+			root.unmount();
+		}
+	},
+);
+
+it('keeps the pending UI untouched while a resumed child builds its error boundary', async () => {
+	const gate = deferred<string>();
+	const seen: { pending: Element | null; loaded: Element | null; mutations: MutationRecord[] }[] =
+		[];
+	let container!: HTMLElement;
+	const observer = new MutationObserver(() => {});
+	const root = mount(DelayedBoundaryApp, {
+		value: gate.promise,
+		probe() {
+			seen.push({
+				pending: container.querySelector('#late-waiting'),
+				loaded: container.querySelector('#late-loaded'),
+				mutations: observer.takeRecords(),
+			});
+		},
+	});
+	container = root.container;
+	const pending = root.find('#late-waiting');
+	const input = pending.querySelector('input')!;
+	input.value = 'keep this note until ready';
+	observer.observe(container, {
+		subtree: true,
+		childList: true,
+		characterData: true,
+		attributes: true,
+	});
+	try {
+		await act(() => gate.resolve('Ready'));
+		// The resumed render builds off-document: nothing it does reaches the page.
+		expect(seen.length).toBeGreaterThan(0);
+		for (const atRender of seen) {
+			expect(atRender.pending).toBe(pending);
+			expect(atRender.loaded).toBeNull();
+			expect(atRender.mutations).toEqual([]);
+		}
+		expect(root.find('#late-loaded').textContent).toBe('Ready');
+		expect(container.querySelector('#late-waiting')).toBeNull();
+	} finally {
+		observer.disconnect();
+		root.unmount();
+	}
+});
 
 function makeStore() {
 	let value = 0;

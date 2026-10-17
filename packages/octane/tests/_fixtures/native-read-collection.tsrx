@@ -1,4 +1,4 @@
-import { createElement, useLayoutEffect, useRef, useState } from 'octane';
+import { createElement, use, useLayoutEffect, useRef, useState } from 'octane';
 import type { Resource, SignalHandle } from 'octane/signals';
 import 'octane/signals';
 
@@ -142,6 +142,32 @@ export function HelperReader(props: { count$: SignalHandle<number>; items: numbe
 		}
 		@for (const item of props.items; key item) {
 			<u>{doubled$(props.count$) + ':' + item}</u>
+		}
+	</section>
+}
+
+function StyleProbe(props: { probe: () => void }) @{
+	props.probe();
+	<u>{'probe'}</u>
+}
+
+function StyleGate(props: { gate: Promise<unknown> }) @{
+	use(props.gate);
+	<i>{'gate'}</i>
+}
+
+// A native style binding over a structured or a scalar value, then a probe
+// that observes the DOM while the render is still running.
+export function NativeStyleCommit(props: {
+	style: string | { color: string };
+	probe: () => void;
+	gate?: Promise<unknown>;
+}) @{
+	<section>
+		<div class="native-style" style={props.style} />
+		<StyleProbe probe={props.probe} />
+		@if (props.gate) {
+			<StyleGate gate={props.gate} />
 		}
 	</section>
 }

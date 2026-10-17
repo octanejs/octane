@@ -769,6 +769,10 @@ function styleScopeStraddlesBoundary(list, own, inside) {
 }
 
 function assertHydrateStyleScopes(boundary, filename) {
+	const styleValidation =
+		boundary.ast === boundary.styleValidation?.root ? boundary.styleValidation : null;
+	if (styleValidation?.absent) return;
+	let hasStyle = false;
 	const inside = new WeakSet();
 	collectSubtreeNodes(boundary.node.children, inside);
 	const seenLists = new WeakSet();
@@ -781,6 +785,7 @@ function assertHydrateStyleScopes(boundary, filename) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+		if (node.type === 'JSXStyleElement') hasStyle = true;
 		if (TRANSPARENT_TS_EXPRESSIONS.has(node.type)) {
 			visit(node.expression, inFunction);
 			return;
@@ -816,6 +821,8 @@ function assertHydrateStyleScopes(boundary, filename) {
 		}
 	};
 	visit(boundary.ast ?? boundary.node, false);
+	// Every boundary visits the same module nodes, even when a function is unrelated to that boundary.
+	if (styleValidation && !hasStyle) styleValidation.absent = true;
 }
 
 function validateBoundary(boundary, filename, hookNames) {
@@ -907,6 +914,7 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', pars
 
 	const boundaries = [];
 	const roots = [];
+	const styleValidation = { root: ast, absent: false };
 	const relevantBindings = new Set([...imports.importBindings, ...topLevelBindingNames(ast)]);
 	const seen = new WeakSet();
 	const walk = (node, shadowed, parentBoundary) => {
@@ -946,6 +954,7 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', pars
 					parent: parentBoundary,
 					path,
 					shadowedImports: new Set(shadowed),
+					styleValidation,
 				};
 				siblings.push(boundary);
 				boundaries.push(boundary);
@@ -2710,6 +2719,8 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 				// Extraction always compiles an independent widget as a template body.
 				// Keep its server children on that same path even in return-JSX parents,
 				// whose descriptor children would add a range the widget cannot adopt.
+				// A hydrate boundary module never inherits its body's range for a sole
+				// component root, so the server frames that call too.
 				attributes.push(
 					jsxExpressionAttribute(
 						'children',
@@ -2718,6 +2729,7 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 							body: [],
 							render: b.jsx_fragment(node.children ?? []),
 							metadata: { path: [] },
+							_octaneHydrateBoundary: true,
 						}),
 						node,
 					),

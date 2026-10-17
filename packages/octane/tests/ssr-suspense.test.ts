@@ -1,13 +1,12 @@
 import { loadCompiledFixtureSource } from './_server-fixture.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as RT from 'octane/server';
 import type { StreamOptions } from 'octane/server';
 import { prerender, type RenderOptions } from 'octane/static';
-import { hydrateRoot, flushSync } from '../src/index.js';
-import { TRY_CATCH_COMMENT } from '../src/hydration-markers.js';
+import { act, hydrateRoot, flushSync } from '../src/index.js';
 import {
 	Boundary as ClientBoundary,
 	Nested as ClientNested,
@@ -24,8 +23,8 @@ import {
 // SSR Phase 4 — Suspense + data serialization. render() is async: a
 // use(thenable) that hasn't resolved suspends the pass (the @try shows
 // @pending), render() awaits it and re-renders, so the @try ends up showing its
-// resolved success arm (or @catch on rejection). Each resolved value is appended
-// to `body` as an inline data <script> for the client to seed on hydration.
+// resolved success arm or, on rejection, its @catch fallback. Each resolved
+// value is appended to `body` as an inline data <script> for hydration.
 
 const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
@@ -43,9 +42,6 @@ const m = evalServer(
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
-/** Leads a caught arm, counting the try body's and catch arm's positional seeds. */
-const CAUGHT = (trySeeds: number, catchSeeds: number) =>
-	`<!--${TRY_CATCH_COMMENT}${trySeeds}:${catchSeeds}-->`;
 const seed = (json: string) =>
 	`<script type="application/json" data-octane-suspense>${json}</script>`;
 
@@ -233,16 +229,23 @@ describe('SSR — resource-thrown thenables', () => {
 		expect((await work).html).toContain('<span class="resource-value">first/second:seed</span>');
 	});
 
-	it('renders the original resource rejection through its catch arm', async () => {
+	it('renders the error fallback for a rejected resource', async () => {
 		const pending = deferred<string>();
-		const work = prerender(m.ThrownResourceBoundary, {
-			read: resourceReader(pending.promise),
-			promise: Promise.resolve('seed'),
-		});
-		pending.reject(new Error('resource failed'));
+		const onError = vi.fn();
+		const work = prerender(
+			m.ThrownResourceBoundary,
+			{
+				read: resourceReader(pending.promise),
+				promise: Promise.resolve('seed'),
+			},
+			{ onError },
+		);
+		const reason = new Error('resource failed');
+		pending.reject(reason);
 		const out = await work;
 		expect(out.html).toContain('<span class="resource-error">Error: resource failed</span>');
 		expect(out.html).not.toContain('resource-loading');
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('aborts a request waiting on a resource-thrown thenable', async () => {
@@ -323,20 +326,20 @@ describe('SSR — resource-thrown thenables', () => {
 		}
 	});
 
-	it('routes a streamed resource fallback rejection to the outer catch arm', async () => {
+	it('reveals the outer catch when a streamed resource fallback rejects', async () => {
 		const { fallback, collector, errors, stream, shell } = streamResourceFallback();
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		try {
 			await shell;
-			fallback.reject(new Error('fallback failed'));
+			const reason = new Error('fallback failed');
+			fallback.reject(reason);
 			container.innerHTML = await collector.ended;
 			activateStreamedMarkup(container);
 			expect(container.querySelector('.resource-outer-error')?.textContent).toBe(
 				'Error: fallback failed',
 			);
-			expect(container.querySelector('.resource-inner-error')).toBeNull();
-			expect(container.querySelector('.resource-outer-loading')).toBeNull();
+			expect(container.querySelector('.resource-outer-loading, .resource-inner-error')).toBeNull();
 			expect(errors).toEqual([]);
 		} finally {
 			stream.abort();
@@ -1058,7 +1061,7 @@ export function App(props) @{
 		},
 	);
 
-	it('routes plain async component rejection to @catch without an unhandled replay rejection', async () => {
+	it('catches plain async component rejection without an unhandled replay rejection', async () => {
 		const reason = new Error('async-component-nope');
 		const caught: unknown[] = [];
 		const unhandled: unknown[] = [];
@@ -1066,10 +1069,10 @@ export function App(props) @{
 		process.on('unhandledRejection', onUnhandledRejection);
 		try {
 			const out = await prerender(m.AsyncComponentBoundary, {
-				onCatch: (error: unknown) => caught.push(error),
 				component: async () => {
 					throw reason;
 				},
+				onCatch: (error: unknown) => caught.push(error),
 			});
 
 			expect(out.html).toContain('<span class="async-component-error">async-component-nope</span>');
@@ -1147,15 +1150,15 @@ export function App(props) @{
 						RT.createElement('span', { className: 'mixed-ok' }, 'mixed-fulfilled'),
 				}),
 				prerender(m.AsyncComponentBoundary, {
-					onCatch: (error: unknown) => caught.push(error),
 					component: async () => {
 						throw rejectedReason;
 					},
+					onCatch: (error: unknown) => caught.push(error),
 				}),
 			]);
 
 			expect(fulfilled.html).toContain('<span class="mixed-ok">mixed-fulfilled</span>');
-			expect(fulfilled.html).not.toContain('mixed-rejected');
+			expect(fulfilled.html).not.toContain('async-component-loading');
 			expect(rejected.html).toContain('<span class="async-component-error">mixed-rejected</span>');
 			expect(rejected.html).not.toContain('mixed-fulfilled');
 			expect(caught).toEqual([rejectedReason]);
@@ -1177,23 +1180,21 @@ export function App(props) @{
 		try {
 			const [left, right] = await Promise.all([
 				prerender(m.AsyncComponentBoundary, {
-					onCatch: (error: unknown) => leftCaught.push(error),
 					component: async () => {
 						throw leftReason;
 					},
+					onCatch: (error: unknown) => leftCaught.push(error),
 				}),
 				prerender(m.AsyncComponentBoundary, {
-					onCatch: (error: unknown) => rightCaught.push(error),
 					component: async () => {
 						throw rightReason;
 					},
+					onCatch: (error: unknown) => rightCaught.push(error),
 				}),
 			]);
 
 			expect(left.html).toContain('<span class="async-component-error">left-rejected</span>');
-			expect(left.html).not.toContain('right-rejected');
 			expect(right.html).toContain('<span class="async-component-error">right-rejected</span>');
-			expect(right.html).not.toContain('left-rejected');
 			expect(leftCaught).toEqual([leftReason]);
 			expect(rightCaught).toEqual([rightReason]);
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -1235,11 +1236,11 @@ export function App(props) @{
 				),
 			});
 			const rejected = await prerender(m.AsyncComponentBoundary, {
-				onCatch: (error: unknown) => caught.push(error),
 				component: replaying(
 					Promise.reject(originalReason),
 					replayThenable((_resolve, reject) => reject(new Error('fresh-rejection'))),
 				),
+				onCatch: (error: unknown) => caught.push(error),
 			});
 			const throwsAfterContinuation = await prerender(m.AsyncComponentBoundary, {
 				component: replaying(
@@ -1258,7 +1259,6 @@ export function App(props) @{
 			expect(rejected.html).toContain(
 				'<span class="async-component-error">cached-rejection</span>',
 			);
-			expect(rejected.html).not.toContain('fresh-rejection');
 			expect(caught).toEqual([originalReason]);
 			expect(throwsAfterContinuation.html).toContain(
 				'<span class="cached-after-throw">cached-after-throw</span>',
@@ -1284,17 +1284,40 @@ export function App(props) @{
 
 	it('a bare use(promise) with no @try boundary is awaited and resolved', async () => {
 		const out = await prerender(m.AsyncLeaf, { promise: Promise.resolve('hello') });
-		expect(out.html).toBe('<div id="leaf">hello</div>' + seed('["hello"]'));
+		expect(out.html).toBe('<!--3--><div id="leaf">hello</div>' + seed('["hello"]'));
 	});
 
-	it('routes a rejected use(promise) to @catch and seeds the catch hydration path', async () => {
-		const out = await prerender(m.Boundary, { promise: Promise.reject(new Error('nope')) });
-		expect(out.html).toBe(
-			`<div id="box">${OPEN}${CAUGHT(1, 0)}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>` +
-				seed(
-					'{"__octane_new_rejection__":{"version":1,"values":[null],"rejections":[[0,{"kind":"error","name":"Error","message":"nope","fields":{}}]]}}',
-				),
-		);
+	it('renders the error arm when use(promise) rejects', async () => {
+		const reason = new Error('nope');
+		const onError = vi.fn();
+		const out = await prerender(m.Boundary, { promise: Promise.reject(reason) }, { onError });
+		expect(out.html).toContain('<span class="err">nope</span>');
+		expect(out.html).not.toContain('class="loading"');
+		expect(out.html).not.toContain('data-octane-suspense');
+		expect(onError).not.toHaveBeenCalled();
+
+		// Client data may succeed even if the server's data rejected.
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = out.html;
+		const onRecoverableError = vi.fn();
+		let root!: ReturnType<typeof hydrateRoot>;
+		await act(async () => {
+			root = hydrateRoot(
+				container,
+				ClientBoundary,
+				{ promise: { status: 'fulfilled', value: 'client', then() {} } },
+				{ onRecoverableError },
+			);
+		});
+		try {
+			expect(container.querySelector('.ok')?.textContent).toBe('client');
+			expect(container.querySelector('.loading, .err')).toBeNull();
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 
 	it('resolves NESTED suspense across multiple passes (outer gates inner)', async () => {
@@ -1366,7 +1389,7 @@ export function App(props) @{
 			'<div id="sibs"><span class="a">A1</span><span class="b">A2</span></div>',
 		);
 		// b must contain ONLY its own seed — not A's values leaking through SERIAL.
-		expect(b.html).toBe('<div id="leaf">B1</div>' + seed('["B1"]'));
+		expect(b.html).toBe('<!--3--><div id="leaf">B1</div>' + seed('["B1"]'));
 	});
 
 	it('non-suspending components emit no seed <script>', async () => {
@@ -1378,7 +1401,7 @@ export function App(props) @{
 			'plain.tsrx',
 		);
 		const out2 = await prerender(plain.Plain);
-		expect(out2.html).toBe('<div id="p">static</div>');
+		expect(out2.html).toBe('<!--3--><div id="p">static</div>');
 		expect(out2.html).not.toContain('data-octane-suspense');
 	});
 

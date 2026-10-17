@@ -180,3 +180,32 @@ export function BundleOwnerCapture({
 		<button onClickCapture={() => bubble()}>replace</button>
 	</main>
 }
+
+// Lists of inert rows whose handlers carry the row's authority: one owns its
+// parent, so a clear can take the owned-parent path; one shares it.
+interface OwnerRowsProps {
+	rows: number[];
+	remove: () => void;
+	bubble: () => void;
+}
+
+export function OwnerRows(props: OwnerRowsProps) @{
+	<ul>
+		@for (const row of props.rows; key row) {
+			<li onClick={props.bubble}>
+				<button onClick={props.remove}>{String(row) as string}</button>
+			</li>
+		}
+	</ul>
+}
+
+export function SharedOwnerRows(props: OwnerRowsProps) @{
+	<ul>
+		<i>{'shared'}</i>
+		@for (const row of props.rows; key row) {
+			<li onClick={props.bubble}>
+				<button onClick={props.remove}>{String(row) as string}</button>
+			</li>
+		}
+	</ul>
+}

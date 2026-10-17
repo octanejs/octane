@@ -204,6 +204,50 @@ describe.each([
 		},
 	);
 
+	// The value adopts the range's first node, an element or text, and the
+	// server rendered more after it.
+	it.each([
+		{
+			component: 'Hole',
+			value: 'an element',
+			server: 'p-tail',
+			kind: 'keyed',
+			html: '<p class="x">A</p>',
+		},
+		{ component: 'Hole', value: 'text', server: 'text-tail', kind: 'text', html: 'A' },
+		{
+			component: 'ReturnHole',
+			value: 'an element',
+			server: 'p-tail',
+			kind: 'keyed',
+			html: '<p class="x">A</p>',
+		},
+		{ component: 'ReturnHole', value: 'text', server: 'text-tail', kind: 'text', html: 'A' },
+	])(
+		'renders the root on the client for $value in a $component where the server rendered more',
+		async ({ component, server: serverKind, kind, html }) => {
+			container.innerHTML = ServerRT.renderToString(server[component], {
+				kind: serverKind,
+				v: 'A',
+				text: null,
+			}).html;
+			const serverNodes = subtree(container.querySelector('section')!);
+			const recovered: unknown[] = [];
+			const root = hydrate(client[component], { kind, v: 'A', text: null }, recovered);
+			try {
+				expectDiscarded(serverNodes);
+				expect(markup(container.querySelector('section')!)).toBe(`${html}<b>A</b>`);
+				await expectReported(recovered);
+				if (dev)
+					expect(warns()[0]).toContain(
+						'the client expected the end of its content but the server rendered <s>.',
+					);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	describe('when the value suspends', () => {
 		it.each([
 			{
@@ -275,10 +319,11 @@ describe.each([
 		});
 
 		// Captures that changed before a dormant boundary activated legitimately
-		// differ from what the server rendered. As React reports nothing for an
-		// update that reaches a dehydrated boundary, the arm renders on the client
-		// without a report, also when its first attempt suspends.
-		it('renders the arm of a dormant boundary whose value became a list before activation without reporting', async () => {
+		// differ from what the server rendered. As React hydrates a dehydrated
+		// boundary before the update that reached it, the boundary adopts the
+		// server's arm with the captures it rendered, then the update renders the
+		// newer value into it without a report, also when that value suspends.
+		it('hydrates a dormant boundary, then updates its value to a list without reporting', async () => {
 			const serverProps = { when: condition(false), kind: 'empty', v: 'A', text: null };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
 			const recovered: unknown[] = [];
@@ -288,7 +333,6 @@ describe.each([
 			try {
 				const main = container.querySelector('main')!;
 				const section = container.querySelector('section')!;
-				const serverNodes = subtree(section);
 				expect(markup(section)).toBe('<b>A</b>');
 				await act(() =>
 					root.render(client.DormantHole, { when: load(), kind: 'wait-list', v: 'A', text }),
@@ -298,10 +342,8 @@ describe.each([
 					await text;
 				});
 				expect(container.querySelector('main')).toBe(main);
-				expectDiscarded(serverNodes);
-				expect(markup(container.querySelector('section')!)).toBe(
-					'<p class="x">A</p><em class="waits">R</em><b>A</b>',
-				);
+				expect(container.querySelector('section')).toBe(section);
+				expect(markup(section)).toBe('<p class="x">A</p><em class="waits">R</em><b>A</b>');
 				await Promise.resolve();
 				expect(recovered).toEqual([]);
 				expect(warns()).toEqual([]);

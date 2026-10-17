@@ -1936,7 +1936,7 @@
     "23": {
       "message": "Server-rendered use() rejected",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "24": {
       "message": "Element type is invalid: expected a string (for a built-in element) or a function (for a component), but got: %s.",
@@ -2038,7 +2038,7 @@
     "45": {
       "message": "Server-rendered use() rejected (function)",
       "runtime": ["server"],
-      "status": "active"
+      "status": "retired"
     },
     "46": {
       "message": "Expected %s listener to be a function, instead got a value of `%s` type.",
@@ -2208,7 +2208,7 @@
     "79": {
       "message": "Unsupported native signal transition.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "80": {
       "message": "Independent Hydrate cannot activate a `%s` strategy because its lexical parent never runs on the client. Use load(), idle(), visible(), media(), interaction(), or never(), or remove `independent`.",
@@ -2839,37 +2839,37 @@
     "206": {
       "message": "Nested signal candidates are not supported.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "207": {
       "message": "Only live candidate-capable owners are supported.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "208": {
       "message": "Rebase the signal candidate before writing.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "209": {
       "message": "Native signal presentation is not installed.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "210": {
       "message": "The candidate owner changed lifetime.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "211": {
       "message": "Candidate dependency escaped its frame.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "212": {
       "message": "The native read candidate has retired.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "213": {
       "message": "A signal document lifecycle requires a live document and build identity.",
@@ -3539,6 +3539,21 @@
     "346": {
       "message": "CompiledOutlet requires a compiled component function with no returned renderable.",
       "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "347": {
+      "message": "The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "348": {
+      "message": "Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "349": {
+      "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
+      "runtime": ["client"],
       "status": "active"
     }
   },

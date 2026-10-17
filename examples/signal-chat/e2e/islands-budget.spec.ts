@@ -35,9 +35,9 @@ test('activates every island without the renderer within the islands-only JavaSc
 		description: `${files.length} scripts, ${gzip} bytes gzip-9`,
 	});
 	// #1514 targets 70 KiB. Every route of this app is islands-only, so its client
-	// build places the signal Action frame, its transition coordinator and its
-	// resource and derived candidate producers with the renderer (the
-	// `octane-islands` condition) rather than the signal modules, about 5 KB that
-	// these pages load but never run. The route measures 66,829 B since.
+	// build places pending transition signal state and its resource and derived
+	// candidate producers with the renderer (the `octane-islands` condition)
+	// rather than the signal modules, code these pages would load but never run.
+	// The route measured 66,829 B.
 	expect(gzip).toBeLessThanOrEqual(67 * 1024);
 });

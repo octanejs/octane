@@ -212,10 +212,8 @@ describe.each([false, true])('a child @{} block as a directive arm output (dev: 
 	}
 
 	// The @catch and @pending arms render only when their @try body fails or
-	// suspends, so they get a body that always does. Hydration re-renders a
-	// thrown or still-pending body on the client instead of adopting the
-	// server's arm, whatever the arm renders, so these arms are checked on the
-	// server and on mount and update.
+	// suspends, so they get a body that always does. Check their setup blocks on
+	// the server and across a client mount and update.
 	const boundaries = () =>
 		load(
 			`import { use, useState } from 'octane';

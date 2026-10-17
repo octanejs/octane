@@ -4,7 +4,7 @@ import {
 	HYDRATE_INPUT_ATTR,
 	HYDRATE_MARKER_SELECTOR,
 	HYDRATE_WHEN_ATTR,
-} from '../hydration-markers.js';
+} from '../hydration-protocol.js';
 import {
 	EARLY_HYDRATION_INTENTS_KEY,
 	HYDRATE_INTERACTION_EVENTS_ATTR,

@@ -31319,19 +31319,19 @@
     },
     {
       "caseId": "react-case-v1:66b790106a842abbdb9a",
-      "status": "covered",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should client render a boundary if a lazy component rejects",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Octane adapts React's lazy-rejection client recovery to its supported public @try/@catch boundary: rejection replaces the streamed lazy fallback with the catch outcome.",
+      "rationale": "When an authored @catch surrounds a lazy component, Octane intentionally reveals that error arm after a server rejection instead of retaining the pending fallback for client rendering. This distinguishes an error from pending work; plain JSX Suspense retains React-style recovery.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
-          "testName": "replaces a streamed lazy fallback with the public catch outcome on rejection",
+          "testName": "reveals a streamed lazy error fallback on rejection",
           "modes": ["server-stream", "production-compile"]
         }
       ]
@@ -33106,19 +33106,19 @@
     },
     {
       "caseId": "react-case-v1:6c97b10901765559427f",
-      "status": "covered",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "Errors in boundaries should be sent to the client and reported on client render - Error after flushing",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "A rejection after the fallback has streamed publishes the supported catch arm and hydration adopts that streamed error result without replacing its DOM.",
+      "rationale": "An authored @catch handles a rejection after the shell flushes: Octane reveals the error arm, then retries from client data during hydration without reporting the handled server error as recoverable. React instead retains the Suspense fallback and reports the client-render recovery.",
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "hydrates a streamed catch arm in place and consumes the superseded client rejection",
+          "testName": "retries a streamed server-caught error from client data",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
       ]
@@ -44209,19 +44209,19 @@
     },
     {
       "caseId": "react-case-v1:91d1b844f01d32de2285",
-      "status": "covered",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "using a rejected promise will throw",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Replacing the upstream class boundary with Octane's supported @catch surface, a rejected Promise Usable selects the catch arm and streams the rejection message.",
+      "rationale": "A rejected promise still throws, but Octane intentionally handles it in an authored @catch on the server and reveals the error arm instead of retaining the pending fallback for a client render.",
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "streams the @catch arm when the promise rejects",
+          "testName": "reveals the error arm when the promise rejects",
           "modes": ["server-stream", "production-compile"]
         }
       ]

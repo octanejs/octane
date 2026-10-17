@@ -37,3 +37,30 @@ export function RefPostorderBatch({ log, label }: Props) @{
 		<SecondBranch log={log} label={label} />
 	</main>
 }
+
+// A fresh host with a ref, then a committed host whose ref changes identity,
+// as a form library's `register(name)` returns a new ref every render.
+export interface SiblingProps {
+	show: boolean;
+	first: (el: Element | null) => void;
+	bind: Record<string, unknown>;
+}
+
+function MaybeInput(props: { show: boolean; first: (el: Element | null) => void }) @{
+	<p>
+		@if (props.show) {
+			<input ref={props.first} />
+		}
+	</p>
+}
+
+function RegisteredInput(props: { bind: Record<string, unknown> }) @{
+	<input type="checkbox" {...props.bind} />
+}
+
+export function CompiledSiblings(props: SiblingProps) @{
+	<form>
+		<MaybeInput show={props.show} first={props.first} />
+		<RegisteredInput bind={props.bind} />
+	</form>
+}

@@ -1,4 +1,4 @@
-import { use } from 'octane';
+import { Suspense, use } from 'octane';
 
 function ThrowError(props) {
 	throw props.error;
@@ -43,11 +43,9 @@ export function FatalFallback(props) @{
 
 export function ErrorInsideBoundary(props) @{
 	<section id="error-inside-boundary">
-		@try {
+		<Suspense fallback={<i class="error-boundary-fallback">{'loading'}</i>}>
 			<ThrowError error={props.error} />
-		} @pending {
-			<i class="error-boundary-fallback">{'loading'}</i>
-		}
+		</Suspense>
 	</section>
 }
 

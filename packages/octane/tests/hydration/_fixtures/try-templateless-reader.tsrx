@@ -1,8 +1,6 @@
 // A @try body whose only child is a template-less component that reads a
-// promise with use(). The server rejected the promise, so it rendered the
-// @catch arm (plus a rejection seed) where the client's componentSlot claim
-// expects the reader's own range. Hydration must read the seed, adopt the
-// server catch arm, and keep the hosts around the boundary.
+// promise with use(). A server rejection renders the nearest catch arm while
+// keeping the hosts around the boundary.
 import { ErrorBoundary, use } from 'octane';
 
 function Reader(props: { promise: Promise<unknown> }) {
@@ -44,8 +42,9 @@ export function TemplateRejected(props: { promise: Promise<unknown> }) @{
 	</div>
 }
 
-// The reader is followed by a host in the same try body, and a later boundary
-// reads its own seed: positional seeds after the caught boundary stay aligned.
+// The reader is followed by a host in the same try body, and a later reader
+// takes the root's next seed: positional seeds after the client-rendered
+// boundary stay aligned.
 export function RejectedThenResolved(props: {
 	rejected: Promise<unknown>;
 	resolved: Promise<string>;
@@ -56,14 +55,12 @@ export function RejectedThenResolved(props: {
 				<Reader promise={props.rejected} />
 				<b>{'body'}</b>
 			</>
+		} @pending {
+			<em>{'loading'}</em>
 		} @catch (error: unknown) {
 			<p class="caught">{String(error) as string}</p>
 		}
-		@try {
-			<Value promise={props.resolved} />
-		} @pending {
-			<em>{'loading'}</em>
-		}
+		<Value promise={props.resolved} />
 	</div>
 }
 

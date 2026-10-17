@@ -274,7 +274,7 @@
         {
           "path": "packages/base-ui/tests/support/renderer.ts",
           "role": "support",
-          "sha256": "6e740c4d30574e9a935e304ff783c67d9bf46d3e6fd34a661cf89291571ebf88"
+          "sha256": "4d8abde6fbd737a8042303c240130a4135cbc458b86aa58a6c37831967c875cb"
         },
         {
           "path": "packages/base-ui/tests/support/test-utils.ts",
@@ -464,7 +464,7 @@
         {
           "path": "packages/base-ui/tests/support/renderer.ts",
           "role": "support",
-          "sha256": "6e740c4d30574e9a935e304ff783c67d9bf46d3e6fd34a661cf89291571ebf88"
+          "sha256": "4d8abde6fbd737a8042303c240130a4135cbc458b86aa58a6c37831967c875cb"
         },
         {
           "path": "packages/base-ui/tests/support/test-utils.ts",

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot, startTransition } from 'octane';
+import { createRoot, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers';
@@ -29,6 +29,19 @@ export function Siblings(props) @{
 	<main>
 		<div id="first" style={{ color: props.color, width: props.width }} />
 		<div id="second" style={{ color: props.color, width: props.last }} />
+	</main>
+}
+// A spread style diffs during render and writes through setRenderStyle.
+export function Spread(props) @{
+	<main><div id="target" style={{ ...props.prefix, color: props.color }} /><Reader read={props.read} /></main>
+}
+export function CaughtSpread(props) @{
+	<main>
+		@try {
+			<div id="target" style={{ ...props.prefix, color: props.color }} />
+		} @catch (error) {
+			<p id="caught">{error.message as string}</p>
+		}
 	</main>
 }
 function Forward(props) @{
@@ -135,16 +148,20 @@ describe.each([
 		}
 	});
 
-	it('restores each host when a later CSS value throws after earlier declarations changed', () => {
+	it('reports a later CSS value that throws at commit, after earlier hosts were written', () => {
 		const client = fixture(dev, native);
-		const root = mount(client.Siblings, { color: 'red', width: 10, last: 10 });
-		const first = root.find('#first') as HTMLElement;
-		const second = root.find('#second') as HTMLElement;
-		const originals = [first.style.cssText, second.style.cssText];
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const errors: string[] = [];
+		const root = createRoot(container, {
+			onUncaughtError: (error) => errors.push((error as Error).message),
+		});
 		const seen: string[] = [];
 		try {
-			expect(() =>
-				root.update(client.Siblings, {
+			flushSync(() => root.render(client.Siblings, { color: 'red', width: 10, last: 10 }));
+			const second = container.querySelector('#second') as HTMLElement;
+			flushSync(() =>
+				root.render(client.Siblings, {
 					color: 'blue',
 					width: 20,
 					last: {
@@ -154,11 +171,16 @@ describe.each([
 						},
 					},
 				}),
-			).toThrow('CSS coercion failed');
+			);
+			// As in React, the declarations are coerced while the commit writes them:
+			// the second host's earlier declaration is already written, and with no
+			// boundary the root unmounts and reports the error.
 			expect(seen).toEqual(['blue']);
-			expect([first.style.cssText, second.style.cssText]).toEqual(originals);
+			expect(errors).toEqual(['CSS coercion failed']);
+			expect(container.querySelector('#second')).toBe(null);
 		} finally {
 			root.unmount();
+			container.remove();
 		}
 	});
 
@@ -266,7 +288,7 @@ describe.each([
 	// Components often forward an optional style prop that is unset or a string.
 	// Native and ordinary bindings write those the same way, and a root render
 	// that waits must restore both the attribute and the value later writes diff against.
-	it('writes forwarded unset and string styles in place and restores them while a root render waits', async () => {
+	it('writes forwarded unset and string styles only when a waiting root render commits', async () => {
 		const client = fixture(dev, native);
 		const pending = deferred();
 		let ready = true;
@@ -278,6 +300,10 @@ describe.each([
 		const element = root.find('#target') as HTMLElement;
 		const input = element.querySelector('input')!;
 		input.value = 'retained draft';
+		const written: string[] = [];
+		const writes = new MutationObserver((records) => {
+			for (const record of records) written.push(record.attributeName!);
+		});
 		try {
 			expect(element.hasAttribute('style')).toBe(false);
 			root.update(client.Forwarded, { style: 'color: red; width: 10px;', title: 'string', read });
@@ -285,12 +311,18 @@ describe.each([
 			element.style.borderColor = 'green';
 			const original = element.style.cssText;
 			ready = false;
+			writes.observe(element, { attributes: true });
 			root.update(client.Forwarded, { style: undefined, title: 'waiting', read });
+			// The waiting render records its writes for its commit. It neither
+			// writes the host's style or title nor restores them.
+			expect(writes.takeRecords()).toEqual([]);
 			expect(root.find('#target')).toBe(element);
 			expect(element.style.cssText).toBe(original);
 			expect(element.title).toBe('string');
 			ready = true;
 			await act(() => pending.resolve());
+			for (const record of writes.takeRecords()) written.push(record.attributeName!);
+			expect(written).toEqual(expect.arrayContaining(['style', 'title']));
 			// Unsetting a string style clears the attribute's declarations, as it
 			// would have without the wait, including the edit made outside Octane.
 			expect(element.style.cssText).toBe('');
@@ -313,9 +345,65 @@ describe.each([
 			expect(element.querySelector('input')).toBe(input);
 			expect(input.value).toBe('retained draft');
 		} finally {
+			writes.disconnect();
 			ready = true;
 			pending.resolve();
 			root.unmount();
+		}
+	});
+
+	it('writes a spread style only when a waiting root render commits', async () => {
+		const client = fixture(dev, native);
+		const pending = deferred();
+		let ready = true;
+		const read = () => {
+			if (!ready) throw pending.promise;
+			return 'ready';
+		};
+		const root = mount(client.Spread, { prefix: { width: 10 }, color: 'red', read });
+		const element = root.find('#target') as HTMLElement;
+		const writes = new MutationObserver(() => {});
+		try {
+			const original = element.style.cssText;
+			ready = false;
+			writes.observe(element, { attributes: true });
+			root.update(client.Spread, { prefix: { width: 20, opacity: 0.5 }, color: 'blue', read });
+			// The waiting render queues the style for its commit: it neither writes
+			// the host nor restores it.
+			expect(writes.takeRecords()).toEqual([]);
+			expect(element.style.cssText).toBe(original);
+			ready = true;
+			await act(() => pending.resolve());
+			expect(root.find('#target')).toBe(element);
+			expect([element.style.width, element.style.opacity, element.style.color]).toEqual([
+				'20px',
+				'0.5',
+				'blue',
+			]);
+		} finally {
+			writes.disconnect();
+			ready = true;
+			pending.resolve();
+			root.unmount();
+		}
+	});
+
+	it('reports a spread style value that throws at commit to the nearest boundary', async () => {
+		const client = fixture(dev, native);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(client.CaughtSpread, { prefix: { width: 10 }, color: 'red' });
+		try {
+			const color = {
+				toString() {
+					throw new Error('CSS coercion failed');
+				},
+			};
+			await act(() => root.root.render(client.CaughtSpread, { prefix: { width: 20 }, color }));
+			expect(root.find('#caught')!.textContent).toBe('CSS coercion failed');
+			expect(root.findAll('#target')).toEqual([]);
+		} finally {
+			root.unmount();
+			error.mockRestore();
 		}
 	});
 

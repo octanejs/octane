@@ -15,7 +15,8 @@ import { createOctaneCompiler } from '../../src/compiler/bundler.js';
 
 const packageRoot = resolve(import.meta.dirname, '../..');
 const fixtures = resolve(import.meta.dirname, '../_fixtures/pure-factories');
-const runtimeModule = /(?:^|\/)src\/runtime(?:\.server)?\.ts$/;
+// The client runtime (runtime.ts and its concept modules) or the server runtime.
+const runtimeModule = /(?:^|\/)src\/runtime(?:\.server\.ts|\.ts|\/[^/]+\.ts)$/;
 
 async function bundle(entry: string, environment: 'client' | 'server') {
 	const compiler = createOctaneCompiler({ root: packageRoot });

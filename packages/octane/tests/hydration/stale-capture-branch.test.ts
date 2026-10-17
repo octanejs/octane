@@ -6,12 +6,15 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // A Hydrate island is a hydration fallback boundary. When its captures change
-// before it activates, the server HTML predates the client's state: a @switch
-// whose case changed renders the island on the client, as React client-renders
-// a dehydrated boundary it cannot hydrate with the props it now has, without a
-// hydration warning or onRecoverableError. With unchanged captures, a case the
-// server did not render is a mismatch: the island renders on the client and
-// reports it once. Either way the server nodes outside the island stay.
+// before it activates, the server HTML predates the client's state. As React
+// hydrates a dehydrated boundary before the update that reached it, the island
+// first hydrates with the case the server rendered, then the update switches
+// the case on the adopted nodes, without a hydration warning or
+// onRecoverableError. An update that reaches an island still waiting on its
+// data leaves the server HTML in place until the island retries
+// (docs/differences-from-react.md). With unchanged captures, a case the server
+// did not render is a mismatch: the island renders on the client and reports
+// it once. Either way the server nodes outside the island stay.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -87,7 +90,7 @@ describe.each([
 		{ k: 'b', html: '<em>e</em>' },
 		{ k: 'c', html: '<b>c</b><em>e</em>' },
 	])(
-		'renders the island on the client with case $k once the pending island resumes',
+		'hydrates the island, then switches to case $k once the pending island resumes',
 		async ({ k, html }) => {
 			container.innerHTML = ServerRT.renderToString(server.Ranged, {
 				server: true,
@@ -101,15 +104,18 @@ describe.each([
 			await hydrate('Ranged', { k: 'a', leaf: leaf.promise });
 			expect(markup(serverSection)).toBe('<u>z</u><em>e</em>');
 
-			// While the island is pending, the server HTML stays.
+			// While the island is pending, the server HTML stays: the update does not
+			// render the island on the client before it retries, as React would.
 			flushSync(() => root!.render(client.Ranged, { k, leaf: leaf.promise }));
 			expect(section()).toBe(serverSection);
 			expect(markup(serverSection)).toBe('<u>z</u><em>e</em>');
-			await act(async () => leaf.resolve('x'));
+			// The leaf resolves to the server's text, so the retry adopts case 'a'
+			// before the update switches it.
+			await act(async () => leaf.resolve('z'));
 
 			expect(container.firstElementChild).toBe(outer);
-			expect(serverSection.isConnected).toBe(false);
-			expect(em.isConnected).toBe(false);
+			expect(section()).toBe(serverSection);
+			expect(container.querySelector('em')).toBe(em);
 			expect(markup(section())).toBe(html);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
@@ -119,23 +125,25 @@ describe.each([
 			const liveEm = container.querySelector('em');
 			flushSync(() => root!.render(client.Ranged, { k: 'a', leaf: leaf.promise }));
 			expect(section()).toBe(live);
-			expect(markup(live)).toBe('<u>x</u><em>e</em>');
+			expect(markup(live)).toBe('<u>z</u><em>e</em>');
 			expect(container.querySelector('em')).toBe(liveEm);
 		},
 	);
 
-	it('renders a dormant island on the client with the changed case when it activates', async () => {
+	it('hydrates a dormant island, then switches to the changed case when it activates', async () => {
 		container.innerHTML = ServerRT.renderToString(server.Dormant, { k: 'a' }).html;
 		const outer = container.firstElementChild!;
 		const serverSection = section();
 		await hydrate('Dormant', { k: 'a' });
 		expect(markup(serverSection)).toBe('<u>z</u><em>e</em>');
 
+		const em = container.querySelector('em')!;
 		flushSync(() => root!.render(client.Dormant, { k: 'c' }));
 		await act(async () => {});
 
 		expect(container.firstElementChild).toBe(outer);
-		expect(serverSection.isConnected).toBe(false);
+		expect(section()).toBe(serverSection);
+		expect(container.querySelector('em')).toBe(em);
 		expect(markup(section())).toBe('<b>c</b><em>e</em>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
