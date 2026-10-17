@@ -965,6 +965,9 @@ export class LiteBlockImpl {
 	declare parentNode: Node;
 	declare endMarker: Node | null;
 	declare parentBlock: Block;
+	// Parent chains never change. Cache their nearest real Block so recursive
+	// lite bodies do not repeat an ancestor walk at every structural slot.
+	declare ownerBlock: Block;
 	declare memoInChain: boolean;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	declare idState: RootIdState;
@@ -991,6 +994,7 @@ export class LiteBlockImpl {
 		this.parentNode = parentNode;
 		this.endMarker = endMarker;
 		this.parentBlock = parentBlock;
+		this.ownerBlock = parentBlock instanceof LiteBlockImpl ? parentBlock.ownerBlock : parentBlock;
 		this.memoInChain = parentBlock.memoInChain;
 		this.$$ctxValues = null;
 		this.idState = parentBlock.idState;

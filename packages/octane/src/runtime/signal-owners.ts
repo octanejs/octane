@@ -183,8 +183,8 @@ const signalRetryPath = function signalRetryPath(scope: Scope, root: Scope): unk
 	let parent = location?.parent ?? scope.parent ?? scope.block.parentBlock;
 	// A lite body's DOM context is not a Scope. Start at its real ancestor;
 	// signalRetrySlot descends the registered children and retains each lite
-	// call-site segment on the way to this target, without widening the proxy.
-	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
+	// call-site segment on the way to this target.
+	if (parent instanceof LiteBlockImpl) parent = parent.ownerBlock;
 	if (parent === null) return null;
 	const segment =
 		location === undefined
@@ -300,7 +300,7 @@ const signalRetryListPath = function signalRetryListPath(
 ): unknown[] | null {
 	// Lists can inherit a lite DOM proxy as parentBlock. Its owning Scope is
 	// already registered below the real ancestor and found by this same walk.
-	while (scope instanceof LiteBlockImpl) scope = scope.parentBlock;
+	if (scope instanceof LiteBlockImpl) scope = scope.ownerBlock;
 	for (let index = 0; index < scope.slots.length; index++) {
 		const slot = scope.slots[index];
 		if (slot === state || slot?.forSlot === state) {
