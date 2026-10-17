@@ -1,20 +1,10 @@
 // These exceptional paths own live router state and synchronous error reporting.
 // They remain compatibility components so the match projection can stay pure.
-import {
-	CompiledOutlet as CompiledComponent,
-	useLayoutEffect,
-	useRef,
-	trustHTML,
-	Hydrate,
-} from 'octane';
-import { never } from 'octane/hydration';
+import { CompiledOutlet as CompiledComponent, useLayoutEffect, useRef } from 'octane';
 import type { NotFoundError } from '@tanstack/router-core';
 import { isNotFound } from '@tanstack/router-core';
-import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
-import { isServer } from '@tanstack/router-core/isServer';
 import { useRouter } from './bindings';
 import { useStore } from '../useStore';
-import { useHydrated } from '../ClientOnly.tsrx';
 import { ErrorComponent } from '../ErrorComponent.tsrx';
 
 export function CompiledPending(props: { route?: any; waitForTransition?: boolean }) @{
@@ -78,18 +68,5 @@ export function CompiledFailure(props: {
 			component={errorComponent}
 			props={{ error: props.error, reset: props.reset, info: { componentStack: '' } }}
 		/>
-	}
-}
-
-export function CompiledScrollRestoration() @{
-	const router = useRouter();
-	const hydrated = useHydrated();
-	const option = router.options.scrollRestoration;
-	const script = getScrollRestorationScriptForRouter(router);
-	const rendersScript = typeof option !== 'function' || option({ location: router.latestLocation });
-	@if ((script !== null || rendersScript) && ((isServer ?? router.isServer) || !hydrated)) {
-		<Hydrate split={false} when={never()}>
-			<script nonce={router.options.ssr?.nonce} dangerouslySetInnerHTML={trustHTML(script ?? '')} />
-		</Hydrate>
 	}
 }
