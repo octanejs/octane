@@ -18,7 +18,7 @@ import { useStore } from '../useStore';
 import { useTransitioner, usePresentedMatches } from '../Transitioner.tsrx';
 import { useHydrated } from '../ClientOnly.tsrx';
 import { ErrorComponent } from '../ErrorComponent.tsrx';
-import { CompiledFailure, CompiledPending } from './MatchLifecycle.tsrx';
+import { CompiledFailure } from './MatchLifecycle.tsrx';
 
 export function PreconfiguredRouterProvider(props: { router: AnyRouter }) @{
 	const router = props.router;
@@ -59,6 +59,20 @@ function CompiledMatchesInner() @{
 		<CompiledContext context={matchContext} value={rootMatch.routeId}>
 			<CompiledMatch routeId={rootMatch.routeId} />
 		</CompiledContext>
+	}
+}
+
+function CompiledPending(props: { route?: any; waitForTransition?: boolean }) @{
+	const router = useRouter();
+	if (props.waitForTransition) {
+		// Observe the transaction with the pending match it owns, not through the
+		// stable router identity during Strong render.
+		const transition = useStore(router.stores.getMatchStore(props.route.id), () => router._tx?.[5]);
+		if (transition) throw transition;
+	}
+	const Pending = props.route?.options.pendingComponent ?? router.options.defaultPendingComponent;
+	@if (Pending) {
+		<CompiledComponent component={Pending} props={{}} />
 	}
 }
 

@@ -1,25 +1,10 @@
-// These exceptional paths own live router state and synchronous error reporting.
-// They remain compatibility components so the match projection can stay pure.
+// Synchronous error reporting remains compatibility-owned.
 import { CompiledOutlet as CompiledComponent, useLayoutEffect, useRef } from 'octane';
 import type { NotFoundError } from '@tanstack/router-core';
 import { isNotFound } from '@tanstack/router-core';
 import { useRouter } from './bindings';
 import { useStore } from '../useStore';
 import { ErrorComponent } from '../ErrorComponent.tsrx';
-
-export function CompiledPending(props: { route?: any; waitForTransition?: boolean }) @{
-	const router = useRouter();
-	// The pending match must suspend on the live navigation transaction before
-	// showing its fallback. The Strong match projection cannot read that owner.
-	if (props.waitForTransition) {
-		const transaction = (router as any)._tx;
-		if (transaction) throw transaction[5];
-	}
-	const Pending = props.route?.options.pendingComponent ?? router.options.defaultPendingComponent;
-	@if (Pending) {
-		<CompiledComponent component={Pending} props={{}} />
-	}
-}
 
 export function CompiledFailure(props: {
 	error: any;

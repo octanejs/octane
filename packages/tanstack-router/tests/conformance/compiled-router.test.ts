@@ -343,6 +343,39 @@ describe('opt-in compiled router rendering', () => {
 		}
 	});
 
+	it('keeps the later destination pending when an obsolete loader finishes', async () => {
+		const first = createDeferred<void>();
+		const second = createDeferred<void>();
+		let loaderPromise = first.promise;
+		const router = makeCompiledRouter('/', { loader: () => loaderPromise });
+		router.options.defaultPendingMs = 1;
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			const firstNavigation = router.navigate({ to: '/items/a' });
+			await settle();
+			expect(view.find('.pending').textContent).toBe('Loading');
+			loaderPromise = second.promise;
+			const secondNavigation = router.navigate({ to: '/items/b' });
+			await settle();
+			expect(router.state.location.pathname).toBe('/items/b');
+			first.resolve();
+			await settle();
+			expect(view.find('.pending').textContent).toBe('Loading');
+			expect(view.findAll('.item')).toHaveLength(0);
+			second.resolve();
+			await Promise.all([firstNavigation, secondNavigation]);
+			await settle();
+			expect(view.find('.value').textContent).toBe('b:Name b');
+			expect(router.state.resolvedLocation?.pathname).toBe('/items/b');
+		} finally {
+			first.resolve();
+			second.resolve();
+			view.unmount();
+		}
+	});
+
 	it('shows route errors inside the compiled layout', async () => {
 		const router = makeCompiledRouter('/items/a', { rejected: true });
 		await router.load();
