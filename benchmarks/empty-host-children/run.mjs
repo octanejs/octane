@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 import { build, transformSync } from 'esbuild';
 import { chromium } from 'playwright';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 const require = createRequire(path.join(repo, 'packages/octane/package.json'));
@@ -14,9 +15,8 @@ const { parseModule, builders: b } = require('@tsrx/core');
 const { print } = require('esrap');
 const language = require('esrap/languages/tsx').default;
 const runtime = path.join(repo, 'packages/octane/src/runtime.ts');
-const runtimeSource = fs.readFileSync(
+const runtimeSource = readClientRuntime(
 	process.env.EMPTY_HOST_RUNTIME || process.argv[2] || runtime,
-	'utf8',
 );
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const val = (score) => ({ score, median: score, min: score, samples: 1 });

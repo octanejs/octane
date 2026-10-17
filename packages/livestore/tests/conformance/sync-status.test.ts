@@ -84,7 +84,7 @@ describe('sync status', () => {
 			},
 		} as unknown as Store<any>;
 		const container = document.createElement('div');
-		container.innerHTML = `<div id="sync">${JSON.stringify(status)}</div>`;
+		container.innerHTML = `<!--3--><div id="sync">${JSON.stringify(status)}</div>`;
 		document.body.appendChild(container);
 		const serverHost = container.querySelector('#sync');
 

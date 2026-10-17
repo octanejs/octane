@@ -79,9 +79,10 @@ describe('checked compiled boundaries', () => {
 		} finally {
 			view.unmount();
 		}
-		const html = renderToString(server.CatchShell, { component }).html;
-		expect(html).toContain('CompiledOutlet');
-		expect(html).not.toContain('<article');
+		const markup = document.createElement('div');
+		markup.innerHTML = renderToString(server.CatchShell, { component }).html;
+		expect(markup.querySelector('[role=alert]')?.textContent).toMatch(/CompiledOutlet/);
+		expect(markup.querySelector('article')).toBeNull();
 	});
 
 	it('keeps ordinary dynamic components and context descriptor children', () => {
@@ -143,6 +144,27 @@ describe('checked compiled boundaries', () => {
 
 			flushSync(() => view.root.render(client.GatedShell, { show: true, log }));
 			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+			expect(events).toEqual(['mount', 'cleanup', 'mount']);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('refills an emptied compiled provider in a transition without writing during render', async () => {
+		const events: string[] = [];
+		const log = (value: string) => events.push(value);
+		const view = mount(client.GatedShell, { show: true, log });
+		try {
+			await act(async () => {
+				startTransition(() => view.root.render(client.GatedShell, { show: false, log }));
+			});
+			expect(view.container.querySelector('article')).toBeNull();
+			await act(async () => {
+				startTransition(() => view.root.render(client.GatedShell, { show: true, log }));
+			});
+			expect(view.container.querySelectorAll('article')).toHaveLength(1);
+			expect(view.container.querySelector('button')!.textContent).toBe('screen:gated:0');
+			expect(view.container.querySelector('footer')!.textContent).toBe('tail');
 			expect(events).toEqual(['mount', 'cleanup', 'mount']);
 		} finally {
 			view.unmount();

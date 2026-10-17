@@ -830,7 +830,7 @@ describe('Form actions example — attributes with no baked HTML', () => {
 			'disabled',
 			'disabled={status.pending}',
 			{
-				client: ['_$setBooleanAttributeIfChanged', "'disabled'"],
+				client: ['_$setBooleanAttribute', "'disabled'"],
 				server: ['_$ssrAttr', '"disabled"'],
 			},
 		],

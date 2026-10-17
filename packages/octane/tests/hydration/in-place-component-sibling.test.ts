@@ -6,16 +6,12 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // The server rendered another @if/@switch arm whose elements match the client
-// arm's. As in React, which hydrates elements regardless of which branch
-// produced them, the client arm adopts them silently. Its component call has
-// no server range of its own, so it renders its template against the server
-// element at the cursor and adopts that element in place. Hydration must then
-// continue after that element, wherever the component's own holes left the
-// cursor: the next component adopts its own server range instead of the same
-// element. Where the server's elements do differ, the root renders on the
-// client and reports it once. The development compile renders these calls
-// through the lite component slot; the production compile through the
-// single-root component slot.
+// arm's. React hydrates elements regardless of which branch produced them, so
+// it adopts them silently. Octane's server frames every component call, so the
+// client arm's first call finds the other arm's element without its range: the
+// root renders on the client and reports it once, as it does where the server's
+// elements differ. The development compile renders these calls through the lite
+// component slot; the production compile through the single-root component slot.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -103,7 +99,7 @@ async function hydrate(
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — a component after one adopted without a range ($name)', ({ dev }) => {
+])('hydrateRoot — components in another arm’s matching markup ($name)', ({ dev }) => {
 	const client = dev ? clients.development : clients.production;
 
 	it.each([
@@ -114,7 +110,8 @@ describe.each([
 			name: 'NestedArm',
 			first: '<em><b>x</b></em>',
 		},
-	])('the next component adopts its own server range in $block', async ({ name, first }) => {
+	])('renders the root on the client for $block', async ({ name, first }) => {
+		// OCTANE DIVERGENCE: React adopts the matching server elements.
 		const { host, serverNodes, recoverable } = await hydrate(
 			client,
 			name,
@@ -122,21 +119,21 @@ describe.each([
 			{ on: true, z: 'z' },
 		);
 
-		expect(container.firstElementChild).toBe(host);
-		expect(markup(host)).toBe(`${first}<em>z</em>`);
-		expect(host.children).toHaveLength(2);
-		expect(host.children[0]).toBe(serverNodes[0]);
-		expect(host.children[1]).toBe(serverNodes[1]);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		const live = container.firstElementChild!;
+		expect(markup(live)).toBe(`${first}<em>z</em>`);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 
-		// Each component updates the element it adopted.
+		// Each component updates the element it rendered.
+		const second = live.children[1];
 		flushSync(() => root!.render(client[name], { on: true, z: 'w' }));
-		expect(markup(host)).toBe(`${first}<em>w</em>`);
-		expect(host.children[1]).toBe(serverNodes[1]);
+		expect(markup(live)).toBe(`${first}<em>w</em>`);
+		expect(live.children[1]).toBe(second);
 	});
 
-	it('renders the root on the client when the server element after the adopted one differs', async () => {
+	it('renders the root on the client when the server element after the matching one differs', async () => {
 		const { host, serverNodes, recoverable } = await hydrate(
 			client,
 			'ShortArm',
@@ -151,9 +148,9 @@ describe.each([
 		expect(warnings()).toEqual(
 			dev
 				? [
-						`Octane hydration mismatch at ${FILE}:${lineOf('function Leaf(') + 1}:1: the ` +
-							'client expected <em> but the server rendered <s>. The nearest Suspense or ' +
-							'Hydrate boundary, or the root, will be regenerated on the client.',
+						`Octane hydration mismatch at ${FILE}:${lineOf('function ShortArm(') + 4}:4: the client ` +
+							'expected a component range but the server rendered <em>. The nearest Suspense ' +
+							'or Hydrate boundary, or the root, will be regenerated on the client.',
 					]
 				: [],
 		);
@@ -190,11 +187,12 @@ describe.each([
 	});
 });
 
-// The development compile renders these hookless calls through the lite slot.
-// The production compile gives Empty a full component slot, which rebuilds a
-// call without a server range rather than rendering it against the cursor.
-describe('hydrateRoot — a lite component that renders nothing before one adopted in place', () => {
-	it('leaves the element to the next component', async () => {
+// OCTANE DIVERGENCE: a hookless component that renders nothing, where the
+// server's arm rendered no range for it. React adopts the server's elements for
+// the components after it; Octane's first call finds no range of its own, and
+// the root renders on the client and reports once.
+describe('hydrateRoot — a lite component that renders nothing in another arm’s markup', () => {
+	it('renders the root on the client', async () => {
 		const { host, serverNodes, recoverable } = await hydrate(
 			clients.development,
 			'EmptyFirstArm',
@@ -202,12 +200,10 @@ describe('hydrateRoot — a lite component that renders nothing before one adopt
 			{ on: true, z: 'z' },
 		);
 
-		expect(container.firstElementChild).toBe(host);
-		expect(markup(host)).toBe('<em>x</em><em>z</em>');
-		expect(host.children).toHaveLength(2);
-		expect(host.children[0]).toBe(serverNodes[0]);
-		expect(host.children[1]).toBe(serverNodes[1]);
-		expect(recoverable).toEqual([]);
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container.firstElementChild!)).toBe('<em>x</em><em>z</em>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 	});
 });
 

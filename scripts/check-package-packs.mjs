@@ -481,7 +481,7 @@ import 'octane/internal/client';
 import { renderToString } from 'octane/server';
 
 assert.equal(typeof createElement, 'function');
-assert.deepEqual(renderToString(() => 'runtime-only'), { html: 'runtime-only', css: '' });
+assert.deepEqual(renderToString(() => 'runtime-only'), { html: '<!--3-->runtime-only', css: '' });
 `,
 	);
 	execFileSync(

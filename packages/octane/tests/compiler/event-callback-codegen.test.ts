@@ -183,7 +183,10 @@ describe('compiler-owned native event callbacks', () => {
 		// (mount + update), whichever lowering carries it — closure assignment,
 		// the bundle's `evtNu` helper, or a spread's source resolver.
 		const emitCount = (code: string) => (code.match(/setLog\(|setN\(|ev\(\)/g) || []).length;
-		const rewritesOnUpdate = (code: string) => /_\$evt\d+u\(/.test(code) || emitCount(code) > 1;
+		// An update records the handler for its commit (or, outside commit
+		// functions, rewrites it through the bundle update helper).
+		const rewritesOnUpdate = (code: string) =>
+			/_\$(?:evt\d+u|bagRecord)\(/.test(code) || emitCount(code) > 1;
 
 		const installedOnce = (body: string) => !rewritesOnUpdate(compileBody(body));
 
@@ -292,8 +295,8 @@ describe('compiler-owned native event callbacks', () => {
 		const rowBody = code.slice(code.indexOf('function __item'));
 		expect(rowBody).toContain('function __item');
 		// `item.label` is a member path, so the row takes the bundle lowering;
-		// the update helper is the proof its slot still follows the item.
-		expect(rowBody).toMatch(/_\$evt\d+u\(/);
+		// the update record is the proof its slot still follows the item.
+		expect(rowBody).toMatch(/_\$bagRecord\(/);
 	});
 
 	it('retains an Effect Event mount wrapper only for an unshared native event slot', () => {

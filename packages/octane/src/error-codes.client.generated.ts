@@ -34,7 +34,6 @@ type ClientErrorArguments = {
 	20: [];
 	21: [];
 	22: [];
-	23: [];
 	24: [unknown];
 	25: [];
 	26: [unknown];
@@ -54,7 +53,6 @@ type ClientErrorArguments = {
 	76: [];
 	77: [];
 	78: [];
-	79: [];
 	81: [];
 	82: [unknown];
 	83: [];
@@ -180,13 +178,6 @@ type ClientErrorArguments = {
 	203: [];
 	204: [];
 	205: [];
-	206: [];
-	207: [];
-	208: [];
-	209: [];
-	210: [];
-	211: [];
-	212: [];
 	213: [];
 	214: [];
 	215: [];
@@ -317,6 +308,9 @@ type ClientErrorArguments = {
 	344: [];
 	345: [];
 	346: [];
+	347: [];
+	348: [];
+	349: [unknown];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -426,8 +420,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 22:
 				return formatDevErrorMessage('A renderer-owned DOM region requires a live DOM root.', args);
-			case 23:
-				return formatDevErrorMessage('Server-rendered use() rejected', args);
 			case 24:
 				return formatDevErrorMessage(
 					'Element type is invalid: expected a string (for a built-in element) or a function (for a component), but got: %s.',
@@ -502,8 +494,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 78:
 				return formatDevErrorMessage('A hydration binding lease can be claimed only once.', args);
-			case 79:
-				return formatDevErrorMessage('Unsupported native signal transition.', args);
 			case 81:
 				return formatDevErrorMessage('An optimistic source needs a live Octane scope.', args);
 			case 82:
@@ -889,20 +879,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				return formatDevErrorMessage('The request description is still pending.', args);
 			case 205:
 				return formatDevErrorMessage('Frozen scalar candidates are not supported.', args);
-			case 206:
-				return formatDevErrorMessage('Nested signal candidates are not supported.', args);
-			case 207:
-				return formatDevErrorMessage('Only live candidate-capable owners are supported.', args);
-			case 208:
-				return formatDevErrorMessage('Rebase the signal candidate before writing.', args);
-			case 209:
-				return formatDevErrorMessage('Native signal presentation is not installed.', args);
-			case 210:
-				return formatDevErrorMessage('The candidate owner changed lifetime.', args);
-			case 211:
-				return formatDevErrorMessage('Candidate dependency escaped its frame.', args);
-			case 212:
-				return formatDevErrorMessage('The native read candidate has retired.', args);
 			case 213:
 				return formatDevErrorMessage(
 					'A signal document lifecycle requires a live document and build identity.',
@@ -1383,6 +1359,21 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 346:
 				return formatDevErrorMessage(
 					'CompiledOutlet requires a compiled component function with no returned renderable.',
+					args,
+				);
+			case 347:
+				return formatDevErrorMessage(
+					'The server could not finish this Suspense boundary, likely due to an error during server rendering. Switched to client rendering.',
+					args,
+				);
+			case 348:
+				return formatDevErrorMessage(
+					"Hydration failed because the server rendered this root for a different version of Octane's hydration protocol, so the root rendered on the client instead. Deploy the server and the client from the same Octane version.",
+					args,
+				);
+			case 349:
+				return formatDevErrorMessage(
+					'A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.',
 					args,
 				);
 			default:

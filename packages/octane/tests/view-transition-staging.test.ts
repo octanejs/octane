@@ -29,6 +29,7 @@ import {
 } from './_fixtures/view-transition-signal-controls.tsrx';
 import { condition } from 'octane/hydration';
 import { SelectStateApp } from './_fixtures/view-transition-host-state.tsrx';
+import { Item, TransitionHoles } from './_fixtures/text-hole-commit.tsrx';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 
@@ -131,6 +132,12 @@ describe('ViewTransition staged commits', () => {
 			expect(select.options).toHaveLength(options.length);
 			options.forEach((option, index) => expect(select.options[index]).toBe(option));
 			expect(input.value).toBe('user draft');
+			// A user edit while the transition is held restores the committed
+			// selection, not the one the held render asked for.
+			options[1]!.selected = true;
+			select.dispatchEvent(new Event('change', { bubbles: true }));
+			await act(async () => {});
+			expectSelection([options[0]!]);
 			if (cancel) {
 				flushSync(() =>
 					root.render(SelectStateApp, {
@@ -212,6 +219,50 @@ describe('ViewTransition staged commits', () => {
 		expect(container.textContent).toBe('after');
 		expect(events.filter((event) => event === 'layout:after')).toEqual(['layout:after']);
 		expect(recoverable).toEqual([error]);
+	});
+
+	it('keeps every renderable hole’s content until the native update', async () => {
+		const holes = '#sibling, #only, #rows li, #pairs li, #root-hole, #returned';
+		const expected = (t: string) => [
+			'before ' + t + ' after',
+			t,
+			t,
+			t,
+			t,
+			'one' + t,
+			t,
+			'two' + t,
+			t,
+			t,
+		];
+		await act(() => root.render(TransitionHoles, { value: 'first' }));
+		const nodes = [...container.querySelectorAll(holes)];
+		const shown = () => nodes.map((node) => node.textContent);
+		expect(shown()).toEqual(expected('first'));
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, { childList: true, subtree: true, characterData: true });
+		try {
+			let previous = 'first';
+			for (const [index, value] of ['second', createElement(Item, { label: 'item' })].entries()) {
+				startTransition(() => root.render(TransitionHoles, { value }));
+				await vi.waitFor(() => expect(handles).toHaveLength(index + 1));
+				records.push(...observer.takeRecords());
+				expect(records).toEqual([]);
+				expect(shown()).toEqual(expected(previous));
+				await handles[index].update();
+				previous = typeof value === 'string' ? value : 'item';
+				expect(shown()).toEqual(expected(previous));
+				expect([...container.querySelectorAll(holes)]).toEqual(nodes);
+				handles[index].ready.resolve();
+				handles[index].finished.resolve();
+				await act(() => {});
+				records.length = 0;
+				observer.takeRecords();
+			}
+		} finally {
+			observer.disconnect();
+		}
 	});
 
 	it('keeps DOM, event handlers and commit callbacks unchanged until the native update', async () => {
@@ -341,9 +392,10 @@ describe('ViewTransition staged commits', () => {
 		}
 	});
 
-	// An update that reaches a dormant island with changed captures renders
-	// the island on the client (docs/deferred-hydration.md), as React does for
-	// an update that reaches a dehydrated boundary it cannot hydrate first.
+	// An update that reaches a dormant island with changed captures hydrates
+	// the island with the captures it was claimed with, then applies the newer
+	// ones as an update (docs/deferred-hydration.md), as React hydrates a
+	// dehydrated boundary before the update that reached it.
 	// Use the canonical component with split={false}: a compiler-split import
 	// completes as legitimate urgent work and interrupts a held transition.
 	// With no such interruption, activation must preserve visible SSR until
@@ -384,8 +436,10 @@ describe('ViewTransition staged commits', () => {
 		expect(preservedText.textContent).toBe('before text');
 		expect(preserved.querySelector('[data-binding-arm]')!.localName).toBe('i');
 		await handles[hydrationCapture].update();
-		expect(preserved.isConnected).toBe(false);
+		// The update patches the adopted server nodes.
 		const presentation = container.querySelector('[data-presentation]')!;
+		expect(presentation).toBe(preserved);
+		expect(presentation.querySelector('[data-binding-text]')).toBe(preservedText);
 		expect(presentation.querySelector('[data-binding-text]')!.textContent).toBe('after text');
 		expect(presentation.querySelector('[data-binding-value]')!.textContent).toBe('after');
 		expect(presentation.querySelector('[data-binding-arm]')!.localName).toBe('b');

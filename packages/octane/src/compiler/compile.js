@@ -1745,6 +1745,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'beginPresentationHydration',
 	'endPresentationHydration',
 	'presentationWrite',
+	'renderWrite',
 	'presentationHostWrite',
 	'presentationStructure',
 	'presentationFailure',
@@ -1770,6 +1771,8 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bindSignalHostPropSources',
 	'canSplitStyleProperties',
 	'styleObjectPrototype',
+	'setRenderStyle',
+	'setRenderStyleProperty',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -1786,6 +1789,19 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'updateFreshClassAttr',
 	'textHoleUpdate',
 	'childTextHoleUpdate',
+	'bagHole',
+	'bagChildHole',
+	'commitHole',
+	'setRenderText',
+	'bagRecord',
+	'bagRecordSignal',
+	'bagRecordHost',
+	'signalOwnerUse',
+	'bagDone',
+	'setEventSlot',
+	'commitEventBundle',
+	'commitHostSources',
+	'hostSourceChildren',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
@@ -8972,61 +8988,6 @@ function isSsrMarkerlessForItem(node, itemBody) {
 	return jsxChildren.length === 1 && isSingleTemplateHost(jsxChildren[0]);
 }
 
-/**
- * A same-module, single-host component already supplies a complete SSR range.
- *
- * The keyed item can adopt that existing component pair instead of wrapping it
- * again. Its component call then adopts the host through the established
- * singleRoot path. Explicit keys, spread/children overrides, imported or
- * dynamic callees, and additional item statements cannot use that proof.
- * `body` is forItemTemplateBody's output, which the client's single-root proof
- * also reads, so a removed row-key attribute leaves both sides in agreement.
- */
-function canShareSsrComponentItemRange(body, ctx) {
-	if (body.length !== 1) return false;
-	const component = body[0];
-	if (
-		(component?.type !== 'Element' && component?.type !== 'JSXElement') ||
-		!isComponentTag(component)
-	) {
-		return false;
-	}
-
-	const tag = component.openingElement?.name || component.id || component.name;
-	if (
-		(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
-		!ctx.ssrSingleRootComponents?.has(tag.name) ||
-		(component.children || []).length !== 0
-	) {
-		return false;
-	}
-
-	const attributes = component.attributes || component.openingElement?.attributes || [];
-	if (
-		attributes.some((attribute) => {
-			if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
-				return true;
-			}
-			const name = attribute.name?.name || attribute.name;
-			return name === 'key' || name === 'children';
-		})
-	)
-		return false;
-
-	// Split queries keep only stable module-function capture proofs. A shadow
-	// or writable module binding needs its separate component frame on the wire.
-	const binding = ctx.ssrSingleRootComponents.get(tag.name);
-	const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
-		ctx.authoredModuleAst.body,
-	));
-	if (functions.get(tag.name)?.id !== binding) return false;
-	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
-	return (
-		lexical.bindingNodes.has(binding) &&
-		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === lexical.rootScope
-	);
-}
-
 // Direct host-row mounting skips component-render bookkeeping. Keep the proof
 // narrower than markerless item rendering so opaque host lifecycles fail closed.
 const HOST_MOUNT_SAFE_TAGS = new Set([
@@ -12685,6 +12646,9 @@ function compileInternal(
 		// like a single-root `@for` item. (Output-shape based — independent of which
 		// hooks it calls.)
 		info.singleRoot = !compNode._octaneBindingView && singleHostComponentRoot(compNode);
+		// Its own template inserts that root (no @if arm does), so a committed
+		// list's sole-component row can keep the root detached until commit.
+		info.hostRoot = info.singleRoot;
 		// Transitive @if-arm form of the same proof — resolved by the fixed point
 		// below once every same-module callee an arm depends on is itself proven.
 		info.singleRootIfDeps =
@@ -13529,7 +13493,6 @@ function compileServer(
 			ast,
 			options?.isDescriptorChildrenImport,
 		),
-		ssrSingleRootComponents: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		output: options?.output,
@@ -13584,23 +13547,6 @@ function compileServer(
 		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
-	// Share an item's component frame only for the authored immutable identity
-	// that split queries can retain. Keep the direct-host shape proof separate
-	// from the client's richer componentInfo records and register forward refs.
-	for (const node of ast.body) {
-		const component =
-			node.type === 'ExportDefaultDeclaration' || node.type === 'ExportNamedDeclaration'
-				? node.declaration
-				: node;
-		if (
-			component?.id &&
-			(isComponentFunction(component) || isReturnJsxFunction(component)) &&
-			singleHostComponentRoot(component)
-		) {
-			ctx.ssrSingleRootComponents.set(component.id.name, component.id);
-		}
-	}
-
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
 	for (const node of ast.body) {
 		const firstStatement = bodyNodes.length;
@@ -13935,6 +13881,19 @@ function compileServerComponent(node, ctx) {
 	return nodes;
 }
 
+// The sole root of a `return <jsx>` body is the component's returned value
+// (hydration protocol 3): the client renders it in the return slot, which
+// borrows the component's range, so the server renders a returned component or
+// renderable value directly in the component's frame.
+function returnedValueRoot(bodyNodes) {
+	if (bodyNodes.length !== 1) return false;
+	const root = bodyNodes[0];
+	if (root._octaneBindingSite !== undefined) return false;
+	return root.type === 'TSRXExpression'
+		? root.returnedJsxValue === true
+		: root.type === 'Element' && isComponentTag(root);
+}
+
 function ssrReturnedJsxNode(argument, ctx) {
 	const returnedHostRoot =
 		(argument.type === 'Element' || argument.type === 'JSXElement') && !isComponentTag(argument);
@@ -14148,11 +14107,21 @@ function ssrCompileBodyWithMapTemps(
 	// wrap (the parent's own pair already bounds it). Synthetic sub-bodies
 	// (statement arrays) never qualify. Consumed by ssrEmitComponent at the
 	// root emit, before it recurses into props/children.
+	// A returned value's sole root is `2` instead (returnedValueRoot), consumed
+	// by ssrEmitComponent or ssrEmitTsrxExpression.
 	const prevInheritRoot = ctx._ssrInheritRoot;
 	ctx._ssrInheritRoot =
-		((!!(node.body && node.body.type === 'JSXCodeBlock') && !returnedOutput) ||
+		((!!(node.body && node.body.type === 'JSXCodeBlock') &&
+			!returnedOutput &&
+			node.body._octaneHydrateBoundary !== true) ||
 			returnedFragmentRoot) &&
-		inheritSoleCompRoot(bodyNodes, ctx);
+		inheritSoleCompRoot(bodyNodes, ctx)
+			? true
+			: (returnedOutput || node.body?.type === 'BlockStatement') &&
+				  !node._octaneBindingView &&
+				  returnedValueRoot(bodyNodes)
+				? 2
+				: false;
 	// Body/sub ROOTS (including fragment-root children) are not host-element
 	// children: the client routes rich holes there through the de-opt value
 	// path (a portal has no host to stamp — see the emitNodeHtml root branch),
@@ -15785,8 +15754,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// (emitted via `ssrText`). A spread or raw-HTML writer does not change the
 	// client's shape, so it must not change this one: inside RCDATA (<textarea>)
 	// a frame around a primitive would parse as literal text.
+	// A ternary with a JSX arm is a value hole too wherever the client folds it
+	// into one (a returned `.tsx` tree), not an @if.
 	const onlyChild0 =
-		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
+		normChildren.length === 1 &&
+		(normChildren[0].type === 'Text' ||
+			(normChildren[0].type === 'TSRXExpression' &&
+				(ctx._tsxValuePos === true || ctx._ssrFoldedExprHoles === true) &&
+				isConditionalJsx(normChildren[0].expression)))
+			? normChildren[0]
+			: null;
 	const textareaParts = textareaTextParts(tag, selfNs, normChildren, ctx);
 	let childrenExpr;
 	if (authoredStaticScriptContent !== undefined) {
@@ -16055,7 +16032,8 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
 	// comp-call root of a `@{}` body — which is exactly this emit.
-	const inherit = ctx._ssrInheritRoot === true && !node._octaneBindingSite;
+	const inherit =
+		ctx._ssrInheritRoot === 2 ? 2 : ctx._ssrInheritRoot === true && !node._octaneBindingSite;
 	ctx._ssrInheritRoot = false;
 	if (isStrongKeyedFragment(node, ctx)) {
 		const fragment = prepareKeyedFragment(node, ctx, name, inlinedSubs);
@@ -16172,9 +16150,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const opaqueChildren = !activityDescriptor && !isFragmentLongForm(node, ctx);
+		// Activity is template syntax even in a `.tsx` return: the client compiles
+		// its children to a children block there, so they stay one here.
 		const descriptorChildren =
 			isDescriptorChildrenTag(node, ctx) ||
-			ctx._tsxValuePos ||
+			(ctx._tsxValuePos && !activityDescriptor) ||
 			(returnedFragmentTemplate && !requiresTemplateNormalization(node, parentNs, true, ctx));
 		if (descriptorChildren) {
 			// VALUE position (a React-style `.tsx` `return <jsx>` body), or an ordinary
@@ -16266,7 +16246,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			[b.literal(invocationSite), compExpr, inheritOriginLoc(b.object(propNodes), node)],
 			node,
 		);
-		const child = ssrCall('ssrChild', [descriptor, b.id('__s')], node);
+		const child = ssrCall(
+			'ssrChild',
+			inherit === 2 ? [descriptor, b.id('__s'), b.literal(true)] : [descriptor, b.id('__s')],
+			node,
+		);
 		if (componentNs === null) return child;
 		ctx.runtimeNeeded.add('ssrInNamespace');
 		return ssrCall(
@@ -16279,20 +16263,16 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
 	ctx.runtimeNeeded.add(helper);
 	const args = [b.id('__s'), compExpr, inheritOriginLoc(b.object(propNodes), node)];
+	const inheritArg = b.literal(inherit, inherit === 2 ? '2' : inherit ? 'true' : 'false');
 	if (explicitNamespace) {
 		args.push(
 			b.literal(componentNs, JSON.stringify(componentNs)),
-			b.literal(inherit, inherit ? 'true' : 'false'),
+			inheritArg,
 			keyExpr ?? undefinedNode(),
 			b.literal(invocationSite),
 		);
 	} else {
-		args.push(
-			b.literal(inherit, inherit ? 'true' : 'false'),
-			keyExpr ?? undefinedNode(),
-			undefinedNode(),
-			b.literal(invocationSite),
-		);
+		args.push(inheritArg, keyExpr ?? undefinedNode(), undefinedNode(), b.literal(invocationSite));
 	}
 	if (node._octaneBindingSite) {
 		args.push(b.literal(bindingMarker(node._octaneBindingSite, 'v')));
@@ -16421,10 +16401,12 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 		thenSub ? thenSub.fnName : null,
 		elseFnName,
 	]);
-	// A guaranteed direct host in every arm can borrow the outer slot range;
-	// otherwise retain the inner branch range required by opaque/multi-node arms.
+	// An arm renders directly inside the slot's one range (hydration-protocol.ts).
+	// A presentation-binding view keeps a range of its own around an arm that is
+	// not a guaranteed direct host.
 	const borrowBranchRange =
-		canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts);
+		!node._octaneBindingSite ||
+		(canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts));
 	const thenCall = thenSub
 		? ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)
 		: null;
@@ -16638,8 +16620,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
 		node,
 	);
-	const sharedItemRange =
-		!bindingSite && (markerlessItem || canShareSsrComponentItemRange(itemBody, ctx));
+	const sharedItemRange = !bindingSite && markerlessItem;
 	const itemHtml =
 		sharedItemRange || bindingSite ? itemCall : ssrCall('ssrBlock', [itemCall], node);
 	let renderItem = itemNeedsIdentity
@@ -16770,9 +16751,6 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
 	const cases = node.cases || [];
-	const borrowBranchRange =
-		cases.some((arm) => arm.test == null) &&
-		cases.every((arm) => canBorrowSsrHostBranchRange(arm.consequent));
 	const arms = [];
 	let defaultCall = ssrHtmlTemplate([], node, ctx);
 	let caseIndex = 0;
@@ -16791,17 +16769,11 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 		// itself starts before it, so anchor the arm on the keyword when known.
 		const armOrigin = c.keyword ?? c;
 		registerClauseOrigin(ctx, c.keyword, [sub.fnName]);
-		// Direct-host cases can borrow the outer slot range, just like @if arms.
+		// A case renders directly inside the slot's one range, like an @if arm.
 		const armCall = ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin);
 		const renderedArm = ssrCall(
 			'ssrArm',
-			[
-				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
-				ssrThunk(
-					borrowBranchRange ? armCall : ssrCall('ssrBlock', [armCall], armOrigin),
-					armOrigin,
-				),
-			],
+			[b.literal(c.test == null ? 'default' : `case:${caseIndex}`), ssrThunk(armCall, armOrigin)],
 			armOrigin,
 		);
 		if (c.test == null) defaultCall = renderedArm;
@@ -16840,9 +16812,8 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(trySub.fn);
-	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
-	// client adopts it as the boundary's branch range during hydration without
-	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
+	// ssrTry renders the boundary as one range whose open records which arm the
+	// server rendered (hydration-protocol.ts).
 	let pendFn = inheritOriginLoc(b.literal(null), node); // no @pending → empty slot
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(
@@ -16858,7 +16829,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		registerClauseOrigin(ctx, node.pendingKeyword, [pendSub.fnName]);
 		pendFn = inheritOriginLoc(b.id(pendSub.fnName), node.pendingKeyword ?? node.pending);
 	}
-	let catchFn = inheritOriginLoc(b.literal(null), node); // no @catch → rethrow
+	let catchFn = null;
 	if (node.handler) {
 		const params = [];
 		if (node.handler.param) params.push(node.handler.param);
@@ -16873,11 +16844,10 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			componentNs,
 		);
 		inlinedSubs.push(catchSub.fn);
-		// A no-param @catch simply ignores the error argument ssrTry passes.
-		// ssrTry keeps the SSR scope second; adapt the authored reset parameter
-		// around that ABI instead of shifting existing one-parameter helpers.
 		registerClauseOrigin(ctx, node.handlerKeyword, [catchSub.fnName]);
 		const catchOrigin = node.handlerKeyword ?? node.handler;
+		// Compiled helpers place the scope after authored parameters; ssrTry
+		// always passes it second, so adapt only a two-parameter catch.
 		catchFn = node.handler.resetParam
 			? inheritOriginLoc(
 					b.arrow(
@@ -16890,11 +16860,8 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	}
 	registerDirectiveOrigin(ctx, node, ['_$ssrTry', trySub.fnName]);
 	ctx.runtimeNeeded.add('ssrTry');
-	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
-	// suspension renders the @pending fallback (plus, in STREAMING renders, the
-	// boundary registration + `<template data-oct-b>` sentinel); any other thrown
-	// error renders @catch (or rethrows). Output is byte-identical to the old
-	// inline try/catch emit for buffered renders (hydration compatibility).
+	// The server owns the same authored arms as the client: pending handles
+	// suspension, catch handles errors, and a missing arm propagates outward.
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
 	const trailing = [];
@@ -16903,22 +16870,24 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const bindingSite = node._octaneBindingSite
 		? inheritOriginLoc(b.literal(bindingMarker(node._octaneBindingSite, 'y')), node)
 		: null;
-	if (componentNs !== null || node.propagateSuspense === true || bindingSite !== null) {
+	// Without @pending the runtime passes suspension on, as the client's tryBlock
+	// does. A presentation-binding view's catch-only region owns it instead.
+	if (componentNs !== null || bindingSite !== null) {
 		trailing.push(
 			componentNs === null
 				? inheritOriginLoc(b.id('undefined'), node)
 				: inheritOriginLoc(b.literal(componentNs, JSON.stringify(componentNs)), node),
 		);
 	}
-	if (node.propagateSuspense === true || bindingSite !== null) {
-		trailing.push(inheritOriginLoc(b.literal(node.propagateSuspense === true), node));
-	}
 	if (bindingSite !== null) {
-		trailing.push(inheritOriginLoc(b.literal(false), node), bindingSite);
+		trailing.push(inheritOriginLoc(b.literal(node.propagateSuspense === true), node), bindingSite);
+	}
+	if (catchFn !== null || trailing.length !== 0) {
+		trailing.unshift(catchFn ?? inheritOriginLoc(b.literal(null), node));
 	}
 	return ssrCall(
 		'ssrTry',
-		[b.id('__s'), b.literal(ssrTryKey(node)), b.id(trySub.fnName), pendFn, catchFn, ...trailing],
+		[b.id('__s'), b.literal(ssrTryKey(node)), b.id(trySub.fnName), pendFn, ...trailing],
 		node,
 	);
 }
@@ -16951,6 +16920,9 @@ function ssrControlKey(kind, node) {
 // renderer component so its template scopes and hydration range both survive.
 function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const expr = node.expression;
+	// A returned value's sole root renders in its component's frame (returnedValueRoot).
+	const returnedRoot = ctx._ssrInheritRoot === 2 && node.returnedJsxValue === true;
+	if (returnedRoot) ctx._ssrInheritRoot = false;
 	if (node._octaneBindingOpaque || node._octaneBindingValue || node._octaneBindingSlot) {
 		ctx.runtimeNeeded.add('ssrBindingChild');
 		const child = ssrCall(
@@ -17011,7 +16983,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 				b.id('__s'),
 				b.id(sub.fnName),
 				b.object([]),
-				b.literal(false),
+				returnedRoot ? b.literal(2) : b.literal(false),
 				undefinedNode(),
 				undefinedNode(),
 				// Like the client's lowerHostFragment renderer, this one keeps the
@@ -17077,7 +17049,9 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		// the setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
 		lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
 	}
-	const childExpr = ssrCall('ssrChild', [resolveStyleExpr(lowered, cssHash), b.id('__s')], node);
+	const childArgs = [resolveStyleExpr(lowered, cssHash), b.id('__s')];
+	if (returnedRoot) childArgs.push(b.literal(true));
+	const childExpr = ssrCall('ssrChild', childArgs, node);
 	if (componentNs === null) return childExpr;
 	ctx.runtimeNeeded.add('ssrInNamespace');
 	return ssrCall(
@@ -17741,6 +17715,7 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	]);
 	if (proof.structural) {
 		writers.add('setText');
+		writers.add('setRenderText');
 		writers.add('bindSignalText');
 		writers.add('markDangerouslySetInnerHTMLChildren');
 	}
@@ -17885,8 +17860,11 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	// A new, unsupported writer can still render normally, but must reject an
 	// attempted lease before publishing anything. It never opens a frame.
 	if (!supported)
-		return [...body.slice(0, directiveEnd), b.stmt(begin), ...body.slice(directiveEnd)];
-	return [
+		return wrapRenderWriters(
+			[...body.slice(0, directiveEnd), b.stmt(begin), ...body.slice(directiveEnd)],
+			ctx,
+		);
+	const prepared = [
 		...statements.slice(0, directiveEnd),
 		proof.host ? b.let(frame, begin) : b.const(frame, begin),
 		b.let(completed, b.literal(false)),
@@ -17920,6 +17898,61 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 			]),
 		),
 	];
+	return wrapRenderWriters(prepared, ctx);
+}
+
+// A presentation view has no commit function, so its render keeps calling these
+// writers. renderWrite queues each one for the commit of a render that can be
+// dropped (#2043); bound writers go through presentationWrite, which does too.
+const RENDER_WRITE_HELPERS = new Set(
+	[
+		'setAttribute',
+		'setPlainAttribute',
+		'setURLAttribute',
+		'setStringData',
+		'setBooleanAttribute',
+		'setAriaAttribute',
+		'setClassName',
+		'setClassAttr',
+		'setBindingClass',
+		'setStyle',
+		'setStyleProperty',
+		'setStyleProperties',
+		'setFormAction',
+		'setText',
+	].flatMap((name) => [name, `${name}IfChanged`]),
+);
+RENDER_WRITE_HELPERS.add('updateFreshClassName');
+RENDER_WRITE_HELPERS.add('updateFreshClassAttr');
+
+function wrapRenderWriters(statements, ctx) {
+	const helpers = new Map(
+		[...ctx.runtimeNeeded].map((name) => [runtimeAliasForContext(ctx, name), name]),
+	);
+	const visit = (value) => {
+		if (!value || typeof value !== 'object') return value;
+		if (Array.isArray(value)) return value.map(visit);
+		if (!value.type || /Function/.test(value.type)) return value;
+		const result = { ...value };
+		for (const key of Object.keys(value)) {
+			if (key !== 'loc' && key !== 'metadata') result[key] = visit(value[key]);
+		}
+		const helper =
+			value.type === 'CallExpression' && value.callee.type === 'Identifier'
+				? helpers.get(value.callee.name)
+				: undefined;
+		if (helper === undefined || !RENDER_WRITE_HELPERS.has(helper)) return result;
+		return inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'renderWrite'),
+				result.callee,
+				b.literal(helper),
+				...result.arguments,
+			),
+			value,
+		);
+	};
+	return statements.map(visit);
 }
 
 /**
@@ -18537,6 +18570,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				node,
 			),
 		);
+		// A staged render's pending cells (null until a binding changes).
+		if (plan.commitCells) bodyStatements.push(inheritOriginLoc(b.let('_n', b.literal(null)), node));
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
 		// re-render, so they live after the if/else; the mount branch only clones +
 		// stores refs, and `else` carries the re-render-only diffs (text / refs).
@@ -25308,7 +25343,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		const attrName = attr.name.name || attr.name;
 		// `key` is KEPT in props — `createElement` lifts it into `descriptor.key`,
 		// which the de-opt list path keys on. `ref` also flows through (the de-opt
-		// renderer's applyDeoptProps attaches it).
+		// renderer's setHostProps attaches it).
 		let valNode;
 		if (attr.value == null) {
 			valNode = inheritOriginLoc(b.literal(true), attr);
@@ -28020,7 +28055,7 @@ function emitInlineRenderableUpdate(previous, cachedNode, slowCall) {
 				]),
 				b.stmt(
 					b.call(
-						'_$setText',
+						'_$setRenderText',
 						b.id('_t'),
 						// Bare renderable booleans are empty; explicit text bindings
 						// retain their ordinary coercion through setText.
@@ -28296,6 +28331,10 @@ function planJsx(
 	// re-enters the mount branch instead of updating a half-populated bag.
 	// Control-flow-only bodies carry no bag, so all of it is skipped.
 	const bag = makeBag();
+	// #2043: the template's hoisted commit function (see makeCommitPlan). A
+	// presentation view keeps its direct writers for hydration to prepare;
+	// renderWrite holds them for a later render's commit (wrapRenderWriters).
+	const commit = !noTemplate && !ctx.presentationHydration ? makeCommitPlan() : null;
 	const BAG_LOCALS_PLACEHOLDER = `    /*__bagLocals__*/`;
 	if (!noTemplate) mountLines.push(BAG_LOCALS_PLACEHOLDER);
 
@@ -28519,8 +28558,12 @@ function planJsx(
 	// order-independent and byte-identical.
 	const spreadPaths = new Set();
 	const eventWriterCounts = new Map();
+	// A host with a writer that stays in render (a native-read binding) keeps
+	// every binding there in render too, so its writes keep their source order.
+	const renderWriterPaths = new Set();
 	for (const b of elementBindings) {
 		if (b.kind === 'spread') spreadPaths.add(b.path.join(','));
+		if (RENDER_WRITER_KINDS.has(b.kind)) renderWriterPaths.add(b.path.join(','));
 		if (b.kind === 'event' || b.kind === 'event-bundle') {
 			const key = `${b.path.join(',')}|${b.slotKey}`;
 			eventWriterCounts.set(key, (eventWriterCounts.get(key) || 0) + 1);
@@ -28556,6 +28599,17 @@ function planJsx(
 			!sharesSpreadHost &&
 			!b.beforeConnect &&
 			b.name !== 'dangerouslySetInnerHTML';
+		b.commitCell =
+			commit !== null && !renderWriterPaths.has(b.path.join(',')) && commitBindingKind(b)
+				? commit.cells(commitCellCount(b))
+				: -1;
+		if (b.commitCell >= 0)
+			for (const helper of commitRuntimeHelpers(b)) ctx.runtimeNeeded.add(helper);
+	}
+	if (commit !== null && commit.size() > COMMIT_MAX_CELLS) {
+		// The cell count shares the bag's state word with two flag bits.
+		for (const b of elementBindings) b.commitCell = -1;
+		commit.reset();
 	}
 
 	// Materialize compiler-owned event callbacks only where the DOM installs
@@ -28653,7 +28707,7 @@ function planJsx(
 				ctx.runtimeNeeded.add(attrBindingHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
-			ctx.runtimeNeeded.add('setText');
+			ctx.runtimeNeeded.add(b.commitCell >= 0 ? 'setText' : 'setRenderText');
 		}
 		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
@@ -28663,21 +28717,24 @@ function planJsx(
 		// a mount-only import for deferred writes.
 		const attrHelper = b.signalDirect ? null : attrBindingHelper(b);
 		if (attrHelper !== null) {
-			if (b.kind === 'class' && b.fresh && (!b.deferred || (!b.mountOnly && inlineBindingGuards)))
+			if (
+				b.kind === 'class' &&
+				b.fresh &&
+				(!b.deferred || (!b.mountOnly && (inlineBindingGuards || b.commitCell >= 0)))
+			)
 				ctx.runtimeNeeded.add('normalizeClass');
 			if (!b.deferred) {
 				ctx.runtimeNeeded.add(attrHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
 			}
 			if (!b.mountOnly) {
-				const updateHelper = attrBindingUpdateHelper(b, inlineBindingGuards);
+				const updateHelper =
+					b.commitCell >= 0 ? attrHelper : attrBindingUpdateHelper(b, inlineBindingGuards);
 				ctx.runtimeNeeded.add(updateHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, updateHelper, b.name);
 			}
 		}
 		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
-		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
-		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
 			if (ctx.nativeReads) b.readStyle = requireRuntimeForContext(ctx, 'readNativeDomStyle');
 			if (b.signalHostSources) ctx.runtimeNeeded.add('bindSignalHostPropSources');
@@ -28690,7 +28747,7 @@ function planJsx(
 		// so each source's name literal — not the shared helper — is what claims
 		// that attribute's name (see commitSourceRows). Registered once here; the
 		// literal carries the same authored location on the update path.
-		if (b.kind === 'hostCommit' || b.kind === 'formCommit') {
+		if (b.kind === 'hostCommit') {
 			for (const source of b.sources) {
 				if (source.spread !== true) {
 					registerAttrLoweringOrigin(ctx, source.nameOrigin, null, source.name);
@@ -28715,9 +28772,14 @@ function planJsx(
 			if (!b.mountOnly) ctx.runtimeNeeded.add(`evt${arity}u`);
 		}
 		if (b.kind === 'styleProperties') {
-			ctx.runtimeNeeded.add('setStyleProperty');
+			if (!b.spread) ctx.runtimeNeeded.add('setStyleProperty');
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
-			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
+			if (b.spread) {
+				ctx.runtimeNeeded.add('styleObjectPrototype');
+				// A spread style diffs during render, which stages its writes (#2043).
+				ctx.runtimeNeeded.add('setRenderStyle');
+				ctx.runtimeNeeded.add('setRenderStyleProperty');
+			}
 		}
 		if (b.kind === 'nativeStyle' || b.kind === 'nativeProjection') {
 			b.slotIndex = ++nativeStyleSlots;
@@ -28788,6 +28850,8 @@ function planJsx(
 			if (each) each(c);
 		}
 	};
+	// The cells of the element bindings; the holes' cells follow them.
+	const bindingCells = commit === null ? 0 : commit.size();
 	mountConstructs(forCalls, 'for', { anchorKey: 'forAnchor' });
 	mountConstructs(ifCalls, 'ifHost', { anchorKey: 'ifAnchor' });
 	mountConstructs(compCalls, 'compHost', {
@@ -28804,9 +28868,15 @@ function planJsx(
 				// children (an only child) or range (a sibling or whole-output hole)
 				// that no other binding owns.
 				bag.constField(`_chp$${cc.id}`, 'unset');
+				cc.commitCell =
+					commit !== null && holeCommits(cc, ctx) && commit.size() + 2 <= COMMIT_MAX_CELLS
+						? commit.cells(2)
+						: -1;
+				if (cc.commitCell >= 0) registerHoleCommit(ctx, cc, bag, commit, cc.origin ?? planOrigin);
 			}
 		},
 	});
+	const holes = compCalls.filter((cc) => cc.commitCell >= 0);
 	mountConstructs(tryCalls, 'tryHost', { anchorKey: 'tryAnchor' });
 	mountConstructs(ctx._switchCalls, 'switchHost', { anchorKey: 'switchAnchor' });
 	// Portal hosts — the logical parent of the createPortal JSX position, stashed
@@ -28875,9 +28945,17 @@ function planJsx(
 								`_$bag${bag.fields.length}`,
 								b.id('__s'),
 								rootArg(),
-								...optionalCallArgs(
-									...bag.fields.map((f) => (f.constExpr === 'undefined' ? null : bagFieldValue(f))),
-								),
+								...(commit !== null && commit.size() > 0
+									? [
+											...bag.fields.map(bagFieldValue),
+											b.literal(commit.size()),
+											b.id(commitFunctionName(ctx, commit)),
+										]
+									: optionalCallArgs(
+											...bag.fields.map((f) =>
+												f.constExpr === 'undefined' ? null : bagFieldValue(f),
+											),
+										)),
 							),
 						),
 					),
@@ -28898,7 +28976,18 @@ function planJsx(
 								'_$bagOf',
 								b.id('__s'),
 								rootArg(),
-								b.object(bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f)))),
+								b.object([
+									...bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f))),
+									// The same state fields as the arity factories (see bagRecord).
+									b.prop('init', b.id('$'), b.literal(commit?.size() ?? 0)),
+									b.prop(
+										'init',
+										b.id('next'),
+										commit !== null && commit.size() > 0
+											? b.id(commitFunctionName(ctx, commit))
+											: b.literal(null),
+									),
+								]),
 							),
 						),
 					),
@@ -28962,12 +29051,39 @@ function planJsx(
 	// change observable order.
 	const updateLines = [];
 	const everyRenderLines = [];
+	// Deferred commit bindings write directly at mount (in authored order) only
+	// when no other deferred writer shares the every-render position.
+	if (commit !== null)
+		commit.directMount = elementBindings.every(
+			(binding) => !binding.deferred || binding.commitCell >= 0,
+		);
+	const deferredCommitLines = [];
 	for (const b of elementBindings) {
-		const updateEmit = emitBindingUpdate(b, bag, inlineBindingGuards);
+		// Only the update branch declares `_r`; a directly mounted deferred binding
+		// records there too.
+		const updateEmit = emitBindingUpdate(
+			b,
+			bag,
+			inlineBindingGuards,
+			commit,
+			!b.deferred || commit?.directMount === true,
+		);
 		if (!updateEmit) continue;
-		if (b.deferred) everyRenderLines.push(updateEmit);
+		const mountWrite = b.deferred && b.commitCell >= 0 ? commit.mountWrite(b.commitCell) : null;
+		if (mountWrite !== null) {
+			// Mount writes the fresh host right after its bag, where the deferred
+			// diff wrote, so a mount never stages; only updates record.
+			mountLines.push(mountWrite);
+			deferredCommitLines.push(updateEmit);
+		} else if (b.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
 	}
+	updateLines.push(...deferredCommitLines);
+	if (commit?.owners)
+		updateLines.unshift(inheritOriginLoc(commitOwnersDeclaration(ctx), planOrigin));
+	if (commit?.resumed)
+		updateLines.unshift(inheritOriginLoc(commitResumedDeclaration(), planOrigin));
+	const commitName = commit !== null ? emitCommitFunction(ctx, commit, planOrigin) : null;
 	if (ctx.scalarBindingClaims) {
 		// Only opted-in scalar views can retain another writer's publication at
 		// hydration. Record their existing cache fields; ordinary output is unchanged.
@@ -29046,7 +29162,19 @@ function planJsx(
 				keyedSelection.selectedName,
 			]).size === 0
 		) {
-			keyedSelection.update = emitBindingUpdate(classes[0], bag, inlineBindingGuards);
+			const update = emitBindingUpdate(classes[0], bag, inlineBindingGuards, commit, true);
+			keyedSelection.update =
+				classes[0].commitCell >= 0
+					? inheritOriginLoc(
+							b.block([
+								b.let('_n', b.literal(null)),
+								commitResumedDeclaration(),
+								update,
+								commitDoneStatement(ctx, commitName, planOrigin),
+							]),
+							planOrigin,
+						)
+					: update;
 		}
 	}
 
@@ -29189,7 +29317,9 @@ function planJsx(
 		//        that only changes a survivor's position need not re-render it),
 		//        bit 4 = SSR emitted markerless direct-host items; hydrate them by root,
 		//        bit 5 = conditional item bodies require their active scope,
-		//        bits 6+ = the zero-based keyedForBlock selection dependency index.
+		//        bit 6 = dev: a mapped list without keys,
+		//        bit 7 = a sole component row whose template inserts its one root,
+		//        bits 8+ = the zero-based keyedForBlock selection dependency index.
 		// keyedForBlock itself identifies a selection, including dependency zero;
 		// ordinary forBlock reuses bit 5 without an argument or tuple allocation.
 		const flags =
@@ -29200,7 +29330,8 @@ function planJsx(
 			(fc.ssrMarkerless ? 16 : 0) |
 			(fc.requiresScope ? 32 : 0) |
 			(ctx.dev && fc.missingMapKey ? 64 : 0) |
-			(fc.keyedSelectionIndex >= 0 ? fc.keyedSelectionIndex << 6 : 0);
+			(fc.detachRoot ? 128 : 0) |
+			(fc.keyedSelectionIndex >= 0 ? fc.keyedSelectionIndex << 8 : 0);
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
 		// emptyBody?, anchor?, ownEnd?, selectionBody?). The final argument is
 		// emitted only for a certified keyed-selection call.
@@ -29492,11 +29623,18 @@ function planJsx(
 				const host = bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
 				return cc.hostChildrenBinding.signalHostSources ? b.member(host, 'resolved') : host;
 			};
-			cc.valueExpr = b.conditional(
-				propertyIsEnumerableCall(props(), 'children'),
-				b.member(props(), 'children'),
-				undefinedNode(),
-			);
+			// A committing host writes its props at commit; its child hole renders
+			// now, from the sources this render recorded.
+			const cell = cc.hostChildrenBinding.commitCell;
+			if (cell >= 0) ctx.runtimeNeeded.add('hostSourceChildren');
+			cc.valueExpr =
+				cell >= 0
+					? b.call('_$hostSourceChildren', b.id('_n'), b.literal(cell), props())
+					: b.conditional(
+							propertyIsEnumerableCall(props(), 'children'),
+							b.member(props(), 'children'),
+							undefinedNode(),
+						);
 		} else if (cc.directChildrenBinding != null) {
 			cc.valueExpr = bagFieldNode(bag, `_prev$${cc.directChildrenBinding.id}`);
 		}
@@ -29590,6 +29728,123 @@ function planJsx(
 				pushAfterStmt(cc.id, org, bindChild(cc.valueExpr));
 				continue;
 			}
+			if (cc.commitCell >= 0) {
+				// Render records the hole into its two cells; the commit function
+				// writes or publishes them (registerHoleCommit).
+				const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+				const helper = cc.onlyChildText ? 'bagChildHole' : 'bagHole';
+				ctx.runtimeNeeded.add(helper);
+				// A host that can receive raw HTML checks its child on every render.
+				const always = cc.potentialDangerouslySetInnerHTML ? b.literal(true) : null;
+				const record = (value) =>
+					b.stmt(
+						b.assignment(
+							'=',
+							b.id('_n'),
+							b.call(
+								`_$${helper}`,
+								b.id('_b'),
+								b.id('_n'),
+								b.literal(cc.commitCell),
+								value,
+								chp(),
+								bagFieldNode(bag, `_chv$${cc.id}`),
+								b.id('__s'),
+								b.literal(slotIndex),
+								hostExpr(),
+								...(cc.onlyChildText
+									? optionalCallArgs(always)
+									: [
+											childAnchor ?? b.literal(null),
+											...optionalCallArgs(
+												cc.anchorVar ? b.literal(true) : null,
+												cc.coalesceRange ? b.literal(true) : null,
+												always,
+											),
+										]),
+							),
+						),
+					);
+				if (cc.onlyChildText && cc.autoMemoValue === true && always === null) {
+					// Only a compiler-owned, non-escaping plain data array may skip
+					// descriptor reconciliation; see the ordinary only-child path below.
+					ctx.runtimeNeeded.add('compilerCacheArray');
+					const cached = emitAutoMemoRegion(
+						ctx,
+						['_v'],
+						slotIndex,
+						record(V()),
+						b.binary('!==', chp(), V()),
+						true,
+						undefined,
+						null,
+					);
+					pushAfterStmt(
+						cc.id,
+						org,
+						b.block([
+							b.const('_v', cc.valueExpr),
+							b.if(b.call('_$compilerCacheArray', V(), chp()), cached, record(V())),
+						]),
+					);
+				} else if (inlineBindingGuards && always === null) {
+					// Certified repeated rows mount their hole directly into the fresh
+					// row and call the recorder only for a change, an object, or a bag
+					// this transaction staged: a stable primitive costs no call.
+					const holeArgs = [b.id('__s'), b.literal(slotIndex), hostExpr(), V()];
+					if (cc.onlyChildText) holeArgs.push(b.literal(null));
+					else
+						holeArgs.push(
+							childAnchor ?? b.literal(null),
+							...optionalCallArgs(
+								cc.anchorVar ? b.literal(true) : null,
+								cc.coalesceRange ? b.literal(true) : null,
+							),
+						);
+					ctx.runtimeNeeded.add(cc.onlyChildText ? 'childTextHole' : 'textHole');
+					// The unmounted marker (`__s`) is never a value, so only a changed
+					// hole tests it. A staged bag records only a cell this transaction
+					// already moved; a render's own `_n` implies the bag is staged.
+					pushAfterStmt(
+						cc.id,
+						org,
+						b.block([
+							...inlineRenderableValueDeclarations(cc.valueExpr),
+							b.if(
+								b.logical(
+									'||',
+									b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
+									b.conditional(
+										b.binary('===', b.id('_n'), b.literal(null)),
+										b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)),
+										b.binary(
+											'!==',
+											b.member(b.id('_n'), b.literal(cc.commitCell), true),
+											b.id('_b'),
+										),
+									),
+								),
+								b.if(
+									b.binary('===', chp(), b.id('__s')),
+									b.block([
+										b.stmt(
+											b.assignment(
+												'=',
+												bagFieldNode(bag, `_chv$${cc.id}`),
+												b.call(cc.onlyChildText ? '_$childTextHole' : '_$textHole', ...holeArgs),
+											),
+										),
+										b.stmt(b.assignment('=', chp(), V())),
+									]),
+									record(V()),
+								),
+								null,
+							),
+						]),
+					);
+				} else pushAfterStmt(cc.id, org, record(cc.valueExpr));
+				continue;
+			}
 			// MARKERLESS only-child renderable: append a primitive as a single Text
 			// node (no `<!>`, no slot state). Either the shared helper or the inline
 			// row guard compares its cached value/node before the ordinary child path.
@@ -29627,7 +29882,7 @@ function planJsx(
 					continue;
 				}
 				ctx.runtimeNeeded.add(inlineBindingGuards ? 'childTextHole' : 'childTextHoleUpdate');
-				if (inlineBindingGuards) ctx.runtimeNeeded.add('setText');
+				if (inlineBindingGuards) ctx.runtimeNeeded.add('setRenderText');
 				const updateHole = () =>
 					inlineBindingGuards
 						? emitInlineRenderableUpdate(
@@ -29741,7 +29996,7 @@ function planJsx(
 			}
 			if (inlineBindingGuards) {
 				ctx.runtimeNeeded.add('textHole');
-				ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add('setRenderText');
 				pushAfterStmt(
 					cc.id,
 					org,
@@ -29926,6 +30181,11 @@ function planJsx(
 			__octaneInlineComponent: cc.inlineComponent,
 		});
 	}
+	if (holes.length !== 0) {
+		// After the last hole: commit or queue what the holes recorded.
+		const last = holes.reduce((latest, cc) => (cc.id > latest.id ? cc : latest));
+		pushAfterStmt(last.id, planOrigin, commitDoneStatement(ctx, commitName, planOrigin));
+	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
 		const org = pc.origin ?? planOrigin;
@@ -30016,9 +30276,10 @@ function planJsx(
 		if (switchAnchor) trailing.push(switchAnchor);
 		else if (swEnv) trailing.push(undefinedNode());
 		if (swEnv) trailing.push(swEnv);
-		if (sc.liteMask) {
+		if (sc.liteMask || sc.rootMask) {
 			while (trailing.length < 2) trailing.push(undefinedNode());
 			trailing.push(b.literal(sc.liteMask));
+			if (sc.rootMask) trailing.push(b.literal(sc.rootMask));
 		}
 		pushAfterStmt(
 			sc.id,
@@ -30063,7 +30324,14 @@ function planJsx(
 		hasBag: !noTemplate,
 		mount: mountLines,
 		update: updateLines,
-		everyRender: everyRenderLines,
+		everyRender:
+			commitName === null || bindingCells === 0
+				? everyRenderLines
+				: [
+						...everyRenderLines,
+						commitDoneStatement(ctx, commitName, planOrigin, holes.length !== 0),
+					],
+		commitCells: commitName !== null,
 		after: afterStatements,
 		head: headEmit.head,
 		resources: headEmit.resources,
@@ -30448,8 +30716,15 @@ function directSignalBindingHelper(bind) {
 	return 'bindSignalAttribute';
 }
 
-function directSignalBindingArgs(bind, host, previous, value = bind.expr, previousValue) {
-	const common = [b.id('__s'), previous, host];
+function directSignalBindingArgs(
+	bind,
+	host,
+	previous,
+	value = bind.expr,
+	previousValue,
+	scope = b.id('__s'),
+) {
+	const common = [scope, previous, host];
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
 		// (…, onlyChild, previousValue, seededText, bindingMarker). An ordinary
 		// update passes only its raw-value cache: seededText matters only before
@@ -30475,12 +30750,12 @@ function directSignalBindingArgs(bind, host, previous, value = bind.expr, previo
 		bind.kind === 'checked' ||
 		bind.kind === 'checkedCheckable'
 	) {
-		return [...common, bind.expr, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
+		return [...common, value, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
 	}
 	return [
 		...common,
 		attrLoweringToken(b.literal(bind.name), bind),
-		bind.expr,
+		value,
 		b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 		directSignalAttributeWriter(bind),
 	];
@@ -30657,8 +30932,6 @@ function emitBindingMount(bind, elVar, bag) {
 				]),
 			);
 		}
-		case 'dangerValue':
-		case 'formValue':
 		case 'hostValue': {
 			return st(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), bind.expr)));
 		}
@@ -30667,30 +30940,6 @@ function emitBindingMount(bind, elVar, bag) {
 			// wrapper is compiler scaffolding rebuilt here.
 			return st(
 				b.stmt(b.assignment('=', local(`_sp$${bind.id}`), b.call('_$snapshotSpread', bind.expr))),
-			);
-		}
-		case 'dangerCommit': {
-			const sources = b.array(
-				bind.sources.map(({ spread, binding }) =>
-					b.array([
-						b.literal(spread === true),
-						b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
-					]),
-				),
-			);
-			return st(
-				b.block([
-					b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', el(), sources)),
-					...mountHost(),
-				]),
-			);
-		}
-		case 'formCommit': {
-			const sources = commitSourceRows(bind.sources, (binding, spread) =>
-				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
-			);
-			return st(
-				b.block([b.stmt(b.call('_$setFormControlSources', el(), sources)), ...mountHost()]),
 			);
 		}
 		case 'hostCommit': {
@@ -31030,7 +31279,572 @@ function emitBindingMount(bind, elVar, bag) {
 	return null;
 }
 
-function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
+// ---------------------------------------------------------------------------
+// Commit functions (#2043 step 1). Render computes; commit writes.
+//
+// A template's bag slots hold COMMITTED values. An update binding compares its
+// new value with its committed slot inline, and only a difference calls the
+// runtime recorder, which records it into the bag's pending `next` cells:
+//
+//   { const _v = row.label; if (_v !== _b.g || _r) _n = _$bagRecord(__s, _n, 3, _v, _b.g); }
+//
+// `_r` is true when an earlier render of this transaction staged the bag, whose
+// cells this render must rewrite. A handler compares the same way; once anything
+// can give it signal authority (`_o`), it also refreshes that authority through
+// setEventHandler every render.
+// The template's hoisted commit function walks the cells straight-line, writes
+// each changed one through the ordinary setter, then publishes it:
+//
+//   function _c$7(_b) { const _n = _b.next; let _v; _b.$ &= 255;
+//     if ((_v = _n[3]) !== _b) { _$setText(_b.f, _v); _b.g = _v; } … }
+//
+// Handler slots and bundles are written in place unless the runtime passes
+// `careful` (`_f`: an open journal or a dispatch in flight). The bag factory
+// receives the commit function, so the first record of a render that may be
+// dropped queues it on the root's commit ops; the trailing bagDone runs it at
+// once when the render cannot be dropped (runtime.ts, "Commit functions").
+// Mount paths keep their direct writes; deferred (every-render) kinds reach the
+// commit function on mount, which runs at once for a fresh Block.
+// ---------------------------------------------------------------------------
+// The runtime packs the cell count into the low byte of the bag's state word.
+const COMMIT_MAX_CELLS = 255;
+const COMMIT_ATTR_KINDS = new Set(['attr', 'stringData', 'booleanAttr', 'ariaAttr']);
+const COMMIT_CONTROLLED_KINDS = new Set([
+	'value',
+	'checked',
+	'checkedCheckable',
+	'selectValue',
+	'defaultValue',
+	'defaultValueUncontrolled',
+	'defaultChecked',
+]);
+// Writers that stay in render; a host carrying one keeps its other writers there.
+// So does a host collector that commitBindingKind keeps in render.
+const RENDER_WRITER_KINDS = new Set(['spread', 'nativeStyle', 'nativeProjection']);
+
+function makeCommitPlan() {
+	let size = 0;
+	let writes = [];
+	const mounts = new Map();
+	return {
+		cells: (count) => {
+			const base = size;
+			size += count;
+			return base;
+		},
+		size: () => size,
+		reset: () => {
+			size = 0;
+			writes = [];
+		},
+		/** The commit function's name, allocated by commitFunctionName. */
+		name: null,
+		/** A write takes the commit function's `careful` parameter (`_f`). */
+		careful: false,
+		/** An update binding compares inline, so the update branch declares `_r`. */
+		resumed: false,
+		/** A handler compares inline, so the update branch declares `_o`. */
+		owners: false,
+		/** Register a binding's commit statement once (keyed selection re-emits it). */
+		write: (cell, make) => {
+			writes[cell] ??= make;
+		},
+		writes: () => writes,
+		/** A deferrable binding's direct mount write, by cell. */
+		mount: (cell, make) => {
+			if (!mounts.has(cell)) mounts.set(cell, make);
+		},
+		mountWrite: (cell) => mounts.get(cell)?.() ?? null,
+	};
+}
+
+function commitBindingKind(bind) {
+	// Raw HTML shares its host's children validation with the child holes, which
+	// stay in render until structure moves to commit (#2043 step 2).
+	if (bind.mountOnly || bind.name === 'dangerouslySetInnerHTML') return false;
+	// A direct signal binding reads its handle in render and binds it at commit.
+	if (bind.signalDirect) return true;
+	switch (bind.kind) {
+		case 'hostCommit':
+			// A host whose props resolve across sources (spreads, duplicate props,
+			// form cascades) commits them; a native-read host still reads its
+			// winning style in render (bagRecordHost).
+			return true;
+		case 'text':
+		case 'textOnlyChild':
+		case 'class':
+		case 'style':
+		case 'styleProperty':
+		case 'event':
+		case 'event-bundle':
+		case 'formAction':
+			return true;
+		case 'styleProperties':
+			return !bind.spread;
+		default:
+			return COMMIT_ATTR_KINDS.has(bind.kind) || COMMIT_CONTROLLED_KINDS.has(bind.kind);
+	}
+}
+
+function commitRuntimeHelpers(bind) {
+	if (bind.signalDirect) return ['bagRecordSignal'];
+	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitHostSources'];
+	if (bind.kind === 'event')
+		return ['bagRecord', 'setEventSlot', 'setEventHandler', 'signalOwnerUse'];
+	if (bind.kind === 'event-bundle')
+		return ['bagRecord', 'commitEventBundle', 'setEventHandler', 'signalOwnerUse'];
+	return ['bagRecord'];
+}
+
+function commitCellCount(bind) {
+	if (bind.kind === 'event-bundle') return bind.argExprs.length <= 2 ? 1 + bind.argExprs.length : 2;
+	return bind.kind === 'styleProperties' ? bind.properties.length : 1;
+}
+
+/** The template's commit function, named once its bag factory needs it. */
+function commitFunctionName(ctx, commit) {
+	commit.name ??= allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
+	return commit.name;
+}
+
+function emitCommitFunction(ctx, commit, origin) {
+	const writes = commit.writes();
+	if (writes.length === 0 && commit.name === null) return null;
+	const name = commitFunctionName(ctx, commit);
+	const cells = [];
+	for (const make of writes) if (make !== undefined) cells.push(make(commit.size()));
+	const body = [
+		b.const('_n', b.member(b.id('_b'), 'next')),
+		b.declaration('let', [b.declarator('_v')]),
+		// Clear the staged state first: a setter that throws leaves the bag idle,
+		// its committed slots still describing the DOM.
+		b.stmt(b.assignment('&=', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS))),
+		...cells,
+	];
+	const params = commit.careful ? [b.id('_b'), b.id('_f')] : [b.id('_b')];
+	// A body without its own origin (a helper's) takes its first binding's.
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(
+			b.function_declaration(b.id(name), params, b.block(body)),
+			origin?.loc != null ? origin : cells[0],
+		),
+	);
+	return name;
+}
+
+/** `_r`: an earlier render of this transaction staged the bag (see bagRecord). */
+function commitResumedDeclaration() {
+	return b.const('_r', b.binary('>', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS)));
+}
+
+/** `_o`: something may give a handler signal authority (signalOwnerUse). */
+function commitOwnersDeclaration(ctx) {
+	ctx.runtimeNeeded.add('signalOwnerUse');
+	return b.const('_o', b.member(b.id('_$signalOwnerUse'), 'active'));
+}
+
+// A render whose recorders staged the bag without queueing it (its state word
+// under 512) commits or queues it here. `reset` when holes record after it: a
+// bag its commit function already wrote (back under 256) stages afresh; a
+// queued one keeps its cells.
+function commitDoneStatement(ctx, name, origin, reset = false) {
+	ctx.runtimeNeeded.add('bagDone');
+	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b'), b.id(name)));
+	return inheritOriginLoc(
+		b.if(
+			b.logical(
+				'&&',
+				b.binary('!==', b.id('_n'), b.literal(null)),
+				b.binary('<', b.member(b.id('_b'), '$'), b.literal(2 * (COMMIT_MAX_CELLS + 1))),
+			),
+			reset
+				? b.block([
+						done,
+						b.if(
+							b.binary('<', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS + 1)),
+							b.stmt(b.assignment('=', b.id('_n'), b.literal(null))),
+							null,
+						),
+					])
+				: done,
+			null,
+		),
+		origin,
+	);
+}
+
+// A template's renderable hole commits through two cells (#2043): its raw value
+// and its Text (runtime bagHole). A bound or signal-capable hole keeps its own
+// writer.
+function holeCommits(cc, ctx) {
+	return (
+		!cc.bindingMarker && !(cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads))
+	);
+}
+
+/** The commit half of a hole: publish its pair, or write the committed Text. */
+function registerHoleCommit(ctx, cc, bag, commit, origin) {
+	const cell = cc.commitCell;
+	ctx.runtimeNeeded.add('commitHole');
+	const V = () => b.id('_v');
+	const nextAt = (i) => b.member(b.id('_n'), b.literal(i), true);
+	const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+	const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
+	commit.write(cell, () =>
+		inheritOriginLoc(
+			b.if(
+				b.binary('!==', b.assignment('=', V(), nextAt(cell)), b.id('_b')),
+				b.block([
+					b.stmt(
+						b.assignment(
+							'=',
+							chv(),
+							b.call('_$commitHole', b.id('_b'), nextAt(cell + 1), chv(), V()),
+						),
+					),
+					b.stmt(b.assignment('=', chp(), V())),
+				]),
+				null,
+			),
+			origin,
+		),
+	);
+}
+
+/**
+ * Render half of a commit binding: record; the write goes to the commit
+ * function. `inline` when the template's update branch declares `_r`: a value
+ * binding then compares with its committed slot itself.
+ */
+function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
+	const cell = bind.commitCell;
+	const V = () => b.id('_v');
+	const nextAt = (i) => b.member(b.id('_n'), b.literal(i), true);
+	const assignNext = (helper, first, i, value, rest) =>
+		b.stmt(
+			b.assignment(
+				'=',
+				b.id('_n'),
+				b.call(`_$${helper}`, first, b.id('_n'), b.literal(i), value, ...rest),
+			),
+		);
+	const record = (helper, i, value, ...rest) => assignNext(helper, b.id('_b'), i, value, rest);
+	// bagRecord takes the rendering Scope (the bag is its slot 0), so its first
+	// record can queue the commit function.
+	const recordScope = (helper, i, value, ...rest) =>
+		assignNext(helper, b.id('__s'), i, value, rest);
+	// A value binding calls bagRecord only when it changed, or when the bag
+	// resumed cells an earlier render of this transaction staged (`_r`).
+	const recordValue = (i, value, committed) => {
+		if (!inline) return recordScope('bagRecord', i, value, committed());
+		commit.resumed = true;
+		const local = value.type === 'Identifier' ? () => b.id(value.name) : V;
+		const test = b.logical('||', b.binary('!==', local(), committed()), b.id('_r'));
+		const stmt = b.if(test, recordScope('bagRecord', i, local(), committed()), null);
+		return local === V ? b.block([b.const('_v', value), stmt]) : stmt;
+	};
+	// A handler refreshes its signal authority every render once anything can
+	// give it one (`_o`; setEventHandler moves only an authority that changed),
+	// and records when it changed or its bag resumed (`_r`). Handlers are never
+	// deferred, so they always land in the update branch that declares both.
+	const recordHandler = (locals, host, changes, call) => {
+		commit.resumed = commit.owners = true;
+		return b.block([
+			...locals,
+			b.if(b.id('_o'), b.stmt(b.call('_$setEventHandler', host)), null),
+			changes.length === 0 ? call() : b.if(orChain([b.id('_r'), ...changes]), call(), null),
+		]);
+	};
+	// Handler slots and bundles: written in place unless the commit is careful.
+	const carefulWrite = (i, careful, writes) => {
+		commit.careful = true;
+		commit.write(i, () =>
+			inheritOriginLoc(
+				b.if(
+					b.binary('!==', b.assignment('=', V(), nextAt(i)), b.id('_b')),
+					b.if(b.id('_f'), b.stmt(careful()), b.block(writes())),
+					null,
+				),
+				org,
+			),
+		);
+	};
+	// The ordinary cell write: a changed cell reaches its setter, then publishes.
+	// `write(scope)` builds the setter call over `_v`. A deferrable kind passes
+	// `mountValue`: its mount writes the fresh host directly (commit.mount).
+	const writeCell = (i, write, publish, mountValue = null) => {
+		const publishStmt = () => (publish === null ? [] : [b.stmt(b.assignment('=', publish(), V()))]);
+		commit.write(i, () =>
+			inheritOriginLoc(
+				b.if(
+					b.binary('!==', b.assignment('=', V(), nextAt(i)), b.id('_b')),
+					b.block([b.stmt(write(nextAt(commit.size()))), ...publishStmt()]),
+					null,
+				),
+				org,
+			),
+		);
+		if (mountValue !== null && commit.directMount)
+			commit.mount(i, () =>
+				inheritOriginLoc(
+					b.block([b.const('_v', mountValue), b.stmt(write(b.id('__s'))), ...publishStmt()]),
+					org,
+				),
+			);
+	};
+	const callee = () => attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind);
+	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
+	const prev = () => F('_prev');
+	if (bind.signalDirect) {
+		// The commit binds, reads and subscribes through the ordinary bindSignal*
+		// call (bagRecordSignal). Text keeps its raw value beside its Text; value
+		// and checked compare against the bag, so a scalar reasserts every commit.
+		const helper = directSignalBindingHelper(bind);
+		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
+		const control = helper === 'bindSignalValue' || helper === 'bindSignalChecked';
+		const helperId = () => b.id(`_$${helper}`);
+		writeCell(
+			cell,
+			(scope) =>
+				b.assignment(
+					'=',
+					F('_sig'),
+					b.call(
+						text ? helperId() : attrLoweringToken(helperId(), bind),
+						...directSignalBindingArgs(
+							bind,
+							F('_el'),
+							F('_sig'),
+							V(),
+							text ? prev() : undefined,
+							scope,
+						),
+					),
+				),
+			text ? prev : null,
+			bind.deferred ? bind.expr : null,
+		);
+		return record(
+			'bagRecordSignal',
+			cell,
+			bind.expr,
+			F('_sig'),
+			b.id('__s'),
+			...(text ? [prev()] : control ? [b.id('_b')] : []),
+		);
+	}
+	if (bind.kind === 'hostCommit') {
+		const sources = commitSourceRows(bind.sources, (binding, spread) =>
+			bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
+		);
+		const nested = () => b.literal(bind.hasNestedChildren === true);
+		const readStyle = () => (bind.readStyle ? [b.id(bind.readStyle)] : []);
+		writeCell(
+			cell,
+			(scope) =>
+				b.assignment(
+					'=',
+					F('_host'),
+					b.call(
+						'_$commitHostSources',
+						scope,
+						F('_host'),
+						F('_el'),
+						V(),
+						b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+						nested(),
+						...readStyle(),
+					),
+				),
+			null,
+		);
+		return recordScope(
+			'bagRecordHost',
+			cell,
+			sources,
+			F('_el'),
+			nested(),
+			...optionalCallArgs(bind.signalHostSources ? b.literal(true) : null, ...readStyle()),
+		);
+	}
+	switch (bind.kind) {
+		case 'text':
+		case 'textOnlyChild':
+			writeCell(cell, () => b.call('_$setText', F('_txt'), V()), prev);
+			return recordValue(cell, bind.expr, prev);
+		case 'class': {
+			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
+			writeCell(cell, () => b.call(callee(), F('_el'), V()), prev, value);
+			return recordValue(cell, value, prev);
+		}
+		case 'style':
+			writeCell(
+				cell,
+				() => b.call(callee(), F('_el'), V(), F('_sty')),
+				() => F('_sty'),
+				bind.expr,
+			);
+			return recordValue(cell, bind.expr, () => F('_sty'));
+		case 'styleProperty':
+			// The previous value tells a first absent longhand (the unset seed) apart.
+			writeCell(
+				cell,
+				(scope) =>
+					b.call(
+						callee(),
+						F('_el'),
+						inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
+						V(),
+						inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
+						prev(),
+						scope,
+					),
+				prev,
+				bind.expr,
+			);
+			return recordValue(cell, bind.expr, prev);
+		case 'styleProperties': {
+			const valueName = (i) => bind.valueNames?.[i] ?? `_v${i}`;
+			const values = () => bind.evaluations.map((value, i) => b.const(valueName(i), value));
+			const valueOf = (property) => b.id(valueName(property.evaluationIndex));
+			const previous = (i) => bagFieldNode(bag, `_prev$${bind.id}_${i}`);
+			const propertyCallee = () =>
+				attrLoweringToken(b.id(`_$${attrBindingHelper({ kind: 'styleProperty' })}`), bind);
+			bind.properties.forEach((property, i) =>
+				writeCell(
+					cell + i,
+					() =>
+						b.call(
+							propertyCallee(),
+							F('_el'),
+							inheritOriginLoc(b.literal(property.name), property.key),
+							V(),
+							b.literal(''),
+							previous(i),
+						),
+					() => previous(i),
+				),
+			);
+			const entries = b.array(
+				bind.properties.flatMap((property) => [
+					inheritOriginLoc(b.literal(property.name), property.key),
+					valueOf(property),
+				]),
+			);
+			// Mount and hydration still compare and write one complete style.
+			const grouped = () => [
+				b.stmt(b.call(callee(), F('_el'), entries, b.literal(bind.staticCss))),
+				...(bind.deferred ? [b.stmt(b.assignment('=', F('_sty'), b.literal(null)))] : []),
+				...bind.properties.map((property, i) =>
+					b.stmt(b.assignment('=', previous(i), valueOf(property))),
+				),
+			];
+			const directMount = bind.deferred && commit.directMount;
+			if (directMount)
+				commit.mount(cell, () => inheritOriginLoc(b.block([...values(), ...grouped()]), org));
+			const hydrate = b.call('_$isHydratingStyle');
+			const needsGroup =
+				bind.deferred && !directMount
+					? b.logical('||', b.binary('===', F('_sty'), b.id('__s')), hydrate)
+					: hydrate;
+			return b.block([
+				...values(),
+				b.if(
+					needsGroup,
+					b.block(grouped()),
+					b.block(
+						bind.properties.map((property, i) =>
+							recordValue(cell + i, valueOf(property), () => previous(i)),
+						),
+					),
+				),
+			]);
+		}
+		case 'event': {
+			const key = () => slotKeyLiteral(bind);
+			const slot = () => b.member(F('_el'), key(), true);
+			carefulWrite(
+				cell,
+				() => b.call('_$setEventSlot', F('_el'), key(), V()),
+				() => [b.stmt(b.assignment('=', slot(), V()))],
+			);
+			const value = bind.dev
+				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
+				: bind.expr;
+			// The committed handler is the one installed on the host.
+			return recordHandler([b.const('_v', value)], F('_el'), [b.binary('!==', V(), slot())], () =>
+				recordScope('bagRecord', cell, V(), slot()),
+			);
+		}
+		case 'event-bundle': {
+			const n = bind.argExprs.length;
+			const bundle = () => F('_ev');
+			// A changed bundle recorded every cell: the callback, then its captures
+			// (a0/a1) or, for arity N, its argument array.
+			const field = (name, value) => b.stmt(b.assignment('=', b.member(bundle(), name), value));
+			carefulWrite(
+				cell,
+				() => b.call('_$commitEventBundle', b.id('_b'), bundle(), b.id('_n'), b.literal(cell)),
+				() => [
+					field('fn', V()),
+					...(n > 2
+						? [field('args', nextAt(cell + 1))]
+						: bind.argExprs.map((_, i) => field(`a${i}`, nextAt(cell + 1 + i)))),
+				],
+			);
+			// The committed callback and captures are the dispatched bundle's own,
+			// compared here (SameValue keeps signed zero and NaN captures observable).
+			// bagRecord sees the change (`_c`) as its new callback against the bag;
+			// an arity-N argument array is fresh every render, so it always records.
+			const capture = (i) => b.id(`_a${i}`);
+			const held = (name) => b.member(b.id('_e'), name);
+			const captures = n > 2 ? [b.array(bind.argExprs.slice())] : bind.argExprs;
+			const changed =
+				n > 2
+					? null
+					: orChain([
+							b.binary('!==', V(), held('fn')),
+							...captures.map((_, i) =>
+								b.unary('!', b.call(b.member(b.id('Object'), 'is'), capture(i), held(`a${i}`))),
+							),
+						]);
+			return recordHandler(
+				[
+					b.const('_v', bind.fnExpr),
+					...captures.map((arg, i) => b.const(`_a${i}`, arg)),
+					b.const('_e', bundle()),
+					...(changed === null ? [] : [b.const('_c', changed)]),
+				],
+				held('el'),
+				changed === null ? [] : [b.id('_c')],
+				() =>
+					recordScope(
+						'bagRecord',
+						cell,
+						changed === null ? V() : b.conditional(b.id('_c'), V(), b.id('_b')),
+						b.id('_b'),
+						b.id('_e'),
+						...captures.map((_, i) => capture(i)),
+					),
+			);
+		}
+		case 'formAction':
+			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V(), prev()), prev, bind.expr);
+			return recordValue(cell, bind.expr, prev);
+		default:
+			if (COMMIT_CONTROLLED_KINDS.has(bind.kind)) {
+				// A controlled property reasserts on every commit (React's contract).
+				writeCell(cell, () => b.call(callee(), F('_el'), V()), null);
+				// The bag is no committed value, so the binding records every render.
+				return recordScope('bagRecord', cell, bind.expr, b.id('_b'));
+			}
+			// attr / stringData / booleanAttr / ariaAttr
+			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V()), prev, bind.expr);
+			return recordValue(cell, bind.expr, prev);
+	}
+}
+
+function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null, inline = false) {
 	const knownExpression = resolveKnownAttributeSource(bind.expr, (source) =>
 		bagFieldNode(bag, `_prev$${source.binding.id}`),
 	);
@@ -31045,6 +31859,8 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	// 1-char bag field names (see makeBag) — resolved from the same registry the
 	// mount pass registered them in; an unmounted field throws at compile time.
 	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
+	if (commit !== null && bind.commitCell >= 0)
+		return st(emitCommitBindingUpdate(bind, bag, commit, F, org, inline));
 	// See emitBindingMount: the helper and the name literal carry the authored
 	// attribute name, so the name resolves to the update write too.
 	const callee = () =>
@@ -31143,7 +31959,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 					b.if(
 						b.binary('!==', F('_prev'), V()),
 						b.block([
-							b.stmt(b.call('_$setText', F('_txt'), V())),
+							b.stmt(b.call('_$setRenderText', F('_txt'), V())),
 							b.stmt(b.assignment('=', F('_prev'), V())),
 						]),
 						null,
@@ -31166,8 +31982,6 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 				]),
 			);
 		}
-		case 'dangerValue':
-		case 'formValue':
 		case 'hostValue': {
 			return st(
 				b.block([
@@ -31179,23 +31993,6 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		case 'hostSpread': {
 			// Same wrapper re-derivation as the mount.
 			return st(b.stmt(b.assignment('=', F('_sp'), b.call('_$snapshotSpread', bind.expr))));
-		}
-		case 'dangerCommit': {
-			const sources = b.array(
-				bind.sources.map(({ spread, binding }) =>
-					b.array([
-						b.literal(spread === true),
-						bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
-					]),
-				),
-			);
-			return st(b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', F('_el'), sources)));
-		}
-		case 'formCommit': {
-			const sources = commitSourceRows(bind.sources, (binding, spread) =>
-				bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
-			);
-			return st(b.stmt(b.call('_$setFormControlSources', F('_el'), sources)));
 		}
 		case 'hostCommit': {
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
@@ -31365,9 +32162,11 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 					F('_sty'),
 					styleSpreadObject(bind, F('_sty'), previous),
 				);
+				// It diffs during render, so a root render stages its writes (#2043).
+				const renderStyle = () => attrLoweringToken(b.id('_$setRenderStyle'), bind);
 				const full = b.stmt(
 					b.call(
-						callee(),
+						renderStyle(),
 						F('_el'),
 						merged,
 						bind.deferred ? b.conditional(initial, undefinedNode(), previousStyle) : previousStyle,
@@ -31379,7 +32178,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 						b.block([
 							b.stmt(
 								b.call(
-									attrLoweringToken(b.id('_$setStyleProperty'), bind),
+									attrLoweringToken(b.id('_$setRenderStyleProperty'), bind),
 									F('_el'),
 									inheritOriginLoc(b.literal(property.name), property.key),
 									valueOf(property),
@@ -31409,7 +32208,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 								b.stmt(b.assignment('=', F('_sty'), b.conditional(needsFull, merged, spread))),
 							]),
 							b.block([
-								b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))),
+								b.stmt(b.call(renderStyle(), F('_el'), spread, F('_sty'))),
 								...scalar,
 								b.stmt(b.assignment('=', F('_sty'), spread)),
 							]),
@@ -32124,11 +32923,6 @@ function emitElementHtml(
 	let hostCommitClientBinding = null;
 	const hasNestedJsxChildren =
 		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
-	const resolveDangerouslySetInnerHTMLAcrossSpreads = firstSpreadIdx !== -1;
-	const dangerHtmlClientSources = [];
-	const resolveFormControlsAcrossSpreads =
-		firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select');
-	const formControlClientSources = [];
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
@@ -32433,17 +33227,6 @@ function emitElementHtml(
 				obj === null
 					? b.literal(true, 'true', attr)
 					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
-			if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
-				const binding = {
-					id: bindings.length,
-					kind: 'dangerValue',
-					expr,
-					path,
-				};
-				bindings.push(binding);
-				dangerHtmlClientSources.push({ spread: false, binding });
-				continue;
-			}
 			const noChildren =
 				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
 			if (noChildren && !isAfterSpread) {
@@ -32472,32 +33255,6 @@ function emitElementHtml(
 		// literals and bare booleans (`<input checked/>`) included; nothing
 		// bakes into the template HTML (see controlledKindFor).
 		let ctlKind = controlledKindFor(tag, attrName);
-		if (
-			resolveFormControlsAcrossSpreads &&
-			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
-		) {
-			const sourceExpr =
-				val == null
-					? b.literal(true, 'true', attr)
-					: val.type === 'JSXExpressionContainer'
-						? val.expression
-						: val;
-			const binding = {
-				id: bindings.length,
-				kind: 'formValue',
-				name: attrName,
-				expr: tsrxExprNode(sourceExpr, ctx, componentName, inlinedSubs),
-				path,
-			};
-			bindings.push(binding);
-			formControlClientSources.push({
-				spread: false,
-				name: attrName,
-				nameOrigin: attr.name,
-				binding,
-			});
-			continue;
-		}
 		if (ctlKind !== null) {
 			if (ctlKind === 'defaultValue' && leanDefaultValue) {
 				ctlKind = 'defaultValueUncontrolled';
@@ -32972,23 +33729,6 @@ function emitElementHtml(
 			signalSite: signalHostSources ? hostSignalSite : null,
 		};
 		bindings.push(hostCommitClientBinding);
-	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
-		bindings.push({
-			id: bindings.length,
-			kind: 'dangerCommit',
-			path,
-			origin: node,
-			sources: dangerHtmlClientSources,
-		});
-	}
-	if (!resolveHostPropsAcrossSources && resolveFormControlsAcrossSpreads) {
-		bindings.push({
-			id: bindings.length,
-			kind: 'formCommit',
-			path,
-			origin: node,
-			sources: formControlClientSources,
-		});
 	}
 	if (ctx.dev) {
 		const selectedOption = tag === 'option' && directPropNames.has('selected');
@@ -33926,6 +34666,18 @@ function hoistBodyHelper(
 // ===========================================================================
 
 /**
+ * Whether a control-flow arm's only output is one template host element, as a
+ * direct-host row's is (isSsrMarkerlessForItem): a swap over committed DOM can
+ * keep that element detached until its commit inserts it (ifBlock's mask bits
+ * 4 and 8, switchBlock's root mask).
+ */
+function controlFlowArmIsSingleRoot(stmts) {
+	if (armMayExit(stmts)) return false;
+	const output = stmts.filter((s) => isJsxNode(s));
+	return output.length === 1 && isSingleTemplateHost(output[0]);
+}
+
+/**
  * Whether a control-flow arm may render without a Block of its own (the lite
  * mask ifBlock and switchBlock take). Mirrors componentSlotLite's proof,
  * tightened for arms: no hook, `use` or context read; no @try; and no call
@@ -34055,10 +34807,13 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
-		// ifBlock's lite mask: 1 when the then arm is hookless, 2 when the else arm is.
+		// ifBlock's arm mask: 1 when the then arm is hookless, 2 when the else arm
+		// is; 4 and 8 when each renders one template host (controlFlowArmIsSingleRoot).
 		liteMask:
 			(thenStmts !== null && controlFlowArmIsLite(thenStmts) ? 1 : 0) |
-			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0),
+			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0) |
+			(thenStmts !== null && controlFlowArmIsSingleRoot(thenStmts) ? 4 : 0) |
+			(elseStmts !== null && controlFlowArmIsSingleRoot(elseStmts) ? 8 : 0),
 		// `@else`'s own keyword — the clause is a BlockStatement starting at `{`.
 		alternateKeyword: node.alternateKeyword ?? null,
 		hostPath: null,
@@ -35308,12 +36063,17 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
 	);
 	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
+	// Its root mask marks the arms that render one template host the same way.
 	let liteMask = 0;
+	let rootMask = 0;
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
-		if ((isDefault || caseRecords.length < 30) && stmts.length > 0 && controlFlowArmIsLite(stmts))
-			liteMask |= isDefault ? 1 : 2 << caseRecords.length;
+		const bit = isDefault ? 1 : 2 << caseRecords.length;
+		if ((isDefault || caseRecords.length < 30) && stmts.length > 0) {
+			if (controlFlowArmIsLite(stmts)) liteMask |= bit;
+			if (controlFlowArmIsSingleRoot(stmts)) rootMask |= bit;
+		}
 		const helperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -35358,6 +36118,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		defaultHelper,
 		defaultKeyword,
 		liteMask,
+		rootMask,
 		hostPath: null,
 	};
 }
@@ -36052,6 +36813,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// ranges. An item that can exit early renders no root when it does.
 	let singleRoot = false;
 	let singleRootExpr = null;
+	// A sole component whose own template inserts the row's root (hostRoot).
+	let detachRoot = false;
 	if (!armMayExit(subStmts)) {
 		const jsxChildren = subStmts.filter((s) => isJsxNode(s));
 		if (jsxChildren.length === 1) {
@@ -36085,8 +36848,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 				if (bare && !hasSpread && !hasKeyOrChildren && !hasChildren) {
 					const compName = tagName.name;
 					const local = ctx.componentInfo?.get(compName);
-					if (local?.singleRoot === true) singleRoot = true;
-					else if (isImmutableComponentTag(tagName, ctx)) singleRootExpr = compName;
+					if (local?.singleRoot === true) {
+						singleRoot = true;
+						detachRoot = local.hostRoot === true;
+					} else if (isImmutableComponentTag(tagName, ctx)) singleRootExpr = compName;
 				}
 			}
 		}
@@ -36099,6 +36864,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	if (node._octaneBindingSite) {
 		singleRoot = false;
 		singleRootExpr = null;
+		detachRoot = false;
 	}
 	const ssrMarkerless = isSsrMarkerlessForItem(node, subStmts);
 	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
@@ -36189,6 +36955,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		singleRoot,
 		singleRootExpr,
 		ssrMarkerless,
+		detachRoot,
 		hostMountSafe,
 		// The env union doubles as the deps array: emitted whenever the helpers
 		// capture anything (Phase 2 — the runtime stamps it as block.extra), and

@@ -69,10 +69,10 @@ export function createLayoutWrapper(Layout, Page, pageProps) {
 export function createRootBoundaryWrapper(Content, boundary, runtime) {
 	let body = Content;
 
-	// Compose the catch boundary closest to the route. A Suspense boundary is
-	// allowed to retain its pending shell when an unhandled server render error
-	// reaches it, so putting Suspense inside ErrorBoundary would prevent the
-	// configured catch component from observing ordinary route errors.
+	// Compose the catch boundary closest to the route. As in React, the server
+	// never renders it: a server route error reaches the Suspense boundary, which
+	// ships the pending shell for the browser to render the route, where the
+	// catch component observes a repeated error before Suspense would.
 	if (boundary.catch) {
 		const child = body;
 		const Catch = boundary.catch;

@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 const SOURCE_REPO = path.resolve(process.argv[2] ?? REPO);
@@ -49,7 +50,7 @@ for (const [filename, label] of [
 	['runtime.server.ts', 'server'],
 	['universal-core.ts', 'universal'],
 ]) {
-	const source = fs.readFileSync(path.join(SOURCE, filename), 'utf8');
+	const source = readClientRuntime(path.join(SOURCE, filename));
 	for (const name of ['useSyncExternalStore', 'useDeferredValue']) {
 		restParameters[`${label}.${name}`] = Number(implementationRestParameter(source, name));
 	}
@@ -98,7 +99,7 @@ async function bundleRuntime(filename, observed) {
 							name: 'observe-hook-source-work',
 							setup(plugin) {
 								plugin.onLoad({ filter: /\/runtime\.ts$/ }, ({ path: sourceFile }) => ({
-									contents: observeHookCreations(fs.readFileSync(sourceFile, 'utf8')),
+									contents: observeHookCreations(readClientRuntime(sourceFile)),
 									loader: 'ts',
 								}));
 							},

@@ -85,7 +85,7 @@ changes break most often:
   reads behind `hydrating` guards that fold. Declare a driver above its readers
   and test it by truthiness (`if (D)`, `D ? D.f() : x`), never `D !== null` or
   `D?.f()`, or Vite's minifier keeps the code it guards (see the driver
-  declarations in `runtime.ts`).
+  declarations in `runtime/drivers.ts`).
 - **DOM.** The commit writes and does not read geometry. Measure in a batched
   phase or after paint.
 - **Scheduling.** `scheduleRender` coalesces a synchronous burst into one
@@ -97,7 +97,7 @@ changes break most often:
 
 ## Decide owner
 
-- Client behavior/hooks/events/refs/scheduler/context/Suspense/transitions/reconciler: `packages/octane/src/runtime.ts`
+- Client behavior/hooks/events/refs/scheduler/context/Suspense/transitions/reconciler: the concept module in `packages/octane/src/runtime/` (`runtime.ts` re-exports them)
 - SSR/server render: `packages/octane/src/runtime.server.ts`, `packages/octane/src/server/index.ts`
 - Compiler/AST/TSRX lowering/Vite/Volar: `packages/octane/src/compiler/*`
 - Public API: `packages/octane/src/index.ts`, `constants.ts`, README/types/tests

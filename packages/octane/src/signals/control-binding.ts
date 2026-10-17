@@ -18,11 +18,6 @@ import {
 } from './control-handoff.js';
 import { captureSignalOwner, currentSignalOwner } from './owner-context.js';
 import {
-	forwardNativeTransitionConsumer,
-	NATIVE_TRANSITION_CONSUMER,
-	type NativeTransitionNotify,
-} from './read-protocol.js';
-import {
 	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
@@ -30,7 +25,7 @@ import {
 	type SignalHandle,
 	type SignalOwner,
 } from './types.js';
-import { withoutSignalCandidate } from './transition-state.js';
+import { withCommittedSignals } from './transition-state.js';
 
 type SignalControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type ControlChannel = 'value' | 'checked';
@@ -82,14 +77,8 @@ export interface BindingControlPrepared {
 	commit(): void;
 }
 
-export interface BindingControlPreview extends BindingControlPrepared {
-	validate(): boolean;
-	discard(): void;
-}
-
 export interface BindingControlLease {
 	prepare(value: unknown): BindingControlPrepared;
-	preview(value: unknown): BindingControlPreview;
 	prepareCurrent(): BindingControlPrepared;
 	active(): boolean;
 	composing(): boolean;
@@ -138,7 +127,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				if (disposed || !isWritableSignal(active)) return;
 				const writable = active;
 				// Target listeners run before delegated event urgency is established.
-				withoutSignalCandidate(() =>
+				withCommittedSignals(() =>
 					run(() => {
 						const previous = read(writable);
 						if (
@@ -211,24 +200,21 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				if (channels.size === 0) CONTROL_BINDINGS.delete(control);
 				if (failed) throw failure;
 			};
-			const prepare = (
-				next: unknown,
-				preview = false,
-			): BindingControlPrepared | BindingControlPreview => {
-				if (disposed) return { validate: () => false, discard() {}, publish() {}, commit() {} };
+			const prepare = (next: unknown): BindingControlPrepared => {
+				if (disposed) return { publish() {}, commit() {} };
 				if (
 					isSignalHandle(next) &&
 					(typeof next[SIGNAL_BINDING_READ] !== 'function' ||
 						typeof next[SIGNAL_BINDING_SUBSCRIBE] !== 'function')
 				)
 					throw new TypeError(formatClientError(116));
-				if (!preview && raw !== next) {
+				if (raw !== next) {
 					const ticket = ++generation;
 					const stop = unsubscribe;
 					unsubscribe = undefined;
 					handle = undefined;
 					stop?.();
-					if (disposed) return { validate: () => false, discard() {}, publish() {}, commit() {} };
+					if (disposed) return { publish() {}, commit() {} };
 					raw = next;
 					// Reads, subscriptions and writes run inside the captured owner;
 					// a descriptor resolves itself without importing the graph here.
@@ -237,12 +223,12 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 						const candidate = handle;
 						const stopNext = run(() =>
 							candidate[SIGNAL_BINDING_SUBSCRIBE](
-								forwardNativeTransitionConsumer(notify, () => {
+								() => {
 									if (!disposed && generation === ticket) {
 										revision++;
 										notify();
 									}
-								}),
+								},
 								() => {
 									// The document may retire before application pagehide cleanup.
 									// Do not read dead authority or release a replacement's lease.
@@ -258,10 +244,10 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 						else unsubscribe = stopNext;
 					}
 				}
-				if (disposed) return { validate: () => false, discard() {}, publish() {}, commit() {} };
-				const candidate = preview ? (isSignalHandle(next) ? next : undefined) : handle;
+				if (disposed) return { publish() {}, commit() {} };
+				const candidate = handle;
 				const value = candidate ? read(candidate) : next;
-				if (disposed) return { validate: () => false, discard() {}, publish() {}, commit() {} };
+				if (disposed) return { publish() {}, commit() {} };
 				const multiple = control.localName === 'select' && (control as HTMLSelectElement).multiple;
 				if (
 					candidate &&
@@ -285,48 +271,11 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				}
 				const normalized =
 					channel === 'checked' ? !!value : value == null || multiple ? '' : controlString(value);
-				let ticket = generation;
+				const ticket = generation;
 				const version = revision;
-				let accepted = !preview;
-				let retired = false;
-				let invalid = false;
-				let staged =
-					preview && candidate && candidate !== handle
-						? run(() =>
-								candidate[SIGNAL_BINDING_SUBSCRIBE](
-									forwardNativeTransitionConsumer(notify, () => {
-										if (retired || disposed) return;
-										if (!accepted) invalid = true;
-										else if (generation === ticket) {
-											revision++;
-											notify();
-										}
-									}),
-									() => {
-										if (!accepted) invalid = true;
-										else if (!disposed && generation === ticket) {
-											ownerRetired = true;
-											dispose();
-										}
-									},
-								),
-							)
-						: undefined;
-				const prepared: BindingControlPrepared = {
+				return {
 					publish(): void {
-						if (retired || disposed || ticket !== generation) return;
-						if (!accepted) {
-							accepted = true;
-							if (raw !== next) {
-								const stop = unsubscribe;
-								ticket = ++generation;
-								raw = next;
-								handle = candidate;
-								unsubscribe = staged;
-								staged = undefined;
-								stop?.();
-							}
-						}
+						if (disposed || ticket !== generation) return;
 						active = candidate;
 						if (isWritableSignal(active)) {
 							// Document capture runs before the native target listener. Snapshot
@@ -366,7 +315,6 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 					},
 					commit(): void {
 						if (
-							retired ||
 							disposed ||
 							value == null ||
 							(multiple && selected === undefined) ||
@@ -395,22 +343,9 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 							control.value = normalized as string;
 					},
 				};
-				return preview
-					? Object.assign(prepared, {
-							validate: () =>
-								!retired && !invalid && !disposed && ticket === generation && version === revision,
-							discard() {
-								if (accepted || retired) return;
-								retired = true;
-								staged?.();
-								staged = undefined;
-							},
-						})
-					: prepared;
 			};
 			return {
 				prepare,
-				preview: (value) => prepare(value, true) as BindingControlPreview,
 				prepareCurrent: () => prepare(raw),
 				active: () => !disposed,
 				composing: () => composing,
@@ -460,7 +395,7 @@ export function bindSignalControl(
 		disposed = true;
 		lease.dispose();
 	};
-	const refresh: NativeTransitionNotify = (): void => {
+	const refresh = (): void => {
 		if (disposed) return;
 		dirty = true;
 		if (busy) return;
@@ -482,27 +417,6 @@ export function bindSignalControl(
 		} finally {
 			busy = false;
 		}
-	};
-	refresh[NATIVE_TRANSITION_CONSUMER] = {
-		active: () => !disposed,
-		prepare: () => {
-			const prepared = lease.preview(handle$);
-			return {
-				validate: () => !disposed && !busy && prepared.validate(),
-				discard: prepared.discard,
-				commit() {
-					if (!disposed) {
-						busy = true;
-						try {
-							prepared.publish();
-							prepared.commit();
-						} finally {
-							busy = false;
-						}
-					}
-				},
-			};
-		},
 	};
 	const owner = currentSignalOwner();
 	lease = __createBindingControls(owner).claim(control, channel, refresh);

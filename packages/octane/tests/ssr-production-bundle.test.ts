@@ -210,7 +210,7 @@ export function Page(props) @{
 			if (throws) expect(() => render(props)).toThrow(failure);
 			else {
 				expect(render(props)).toBe(
-					'<div title="final" data-middle="mutated <&amp;" data-last="last"></div>',
+					'<!--3--><div title="final" data-middle="mutated <&amp;" data-last="last"></div>',
 				);
 			}
 			expect(trace).toEqual([
@@ -229,7 +229,7 @@ export function Page(props) @{
 				...(throws ? [] : ['coerce:middle', 'coerce:last']),
 			]);
 			expect(render({ spread: {}, read: () => 'next', finalTitle: 'recovered' })).toBe(
-				'<div title="recovered" data-last="next"></div>',
+				'<!--3--><div title="recovered" data-last="next"></div>',
 			);
 		},
 	);
@@ -263,7 +263,11 @@ export const render = (props) => renderToString(Page, props).html;
 					id: tracked('id'),
 					last: { for: final === 'final' ? tracked(final) : final, title: null, class: false },
 				}),
-			).toBe(final === 'final' ? '<label id="id" for="final"></label>' : '<label id="id"></label>');
+			).toBe(
+				final === 'final'
+					? '<!--3--><label id="id" for="final"></label>'
+					: '<!--3--><label id="id"></label>',
+			);
 			expect(trace).toEqual(final === 'final' ? ['id', 'final'] : ['id']);
 		}
 	});
@@ -298,7 +302,7 @@ export function Page(props) @{
 				math: { mathvariant: 'bold', mathVariant: 'mixed' },
 			}),
 		).toBe(
-			'<main><custom-panel onclick="custom handler" data-ready="false"></custom-panel>' +
+			'<!--3--><main><custom-panel onclick="custom handler" data-ready="false"></custom-panel>' +
 				'<custom-panel htmlFor="verbatim" for="native" class="a b"></custom-panel>' +
 				'<svg viewBox="0 0 1 1" viewbox="lower"></svg>' +
 				'<svg></svg>' +

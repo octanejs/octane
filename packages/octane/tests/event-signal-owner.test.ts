@@ -43,6 +43,28 @@ function installCarrier(carrier: boolean) {
 }
 
 describe('explicit native event ownership', () => {
+	it('keeps a root-provided owner local to its native handlers', () => {
+		const ownedContainer = document.createElement('div');
+		const plainContainer = document.createElement('div');
+		document.body.append(ownedContainer, plainContainer);
+		const owned = createRoot(ownedContainer, { signalOwner: { scopeKey: 'owned-root' } });
+		const plain = createRoot(plainContainer);
+		const seen: (string | null)[] = [];
+		const invoke = () => seen.push(currentSignalOwner()?.scopeKey ?? null);
+		try {
+			owned.render(OwnerButton, { invoke });
+			plain.render(OwnerButton, { invoke });
+			ownedContainer.querySelector('button')!.click();
+			plainContainer.querySelector('button')!.click();
+			expect(seen).toEqual(['owned-root', null]);
+		} finally {
+			owned.unmount();
+			plain.unmount();
+			ownedContainer.remove();
+			plainContainer.remove();
+		}
+	});
+
 	it('keeps a carrier without an active owner empty for plain native handlers', () => {
 		const restore = installCarrier(true)!;
 		const container = document.createElement('div');

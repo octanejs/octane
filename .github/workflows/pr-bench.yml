@@ -16,7 +16,7 @@ name: PR bench
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, next]
     types: [opened, reopened, synchronize, ready_for_review]
     paths-ignore:
       - "**/*.md"
@@ -34,7 +34,7 @@ jobs:
   bench:
     name: benchmark report
     if: github.event.pull_request.draft == false
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'openai-oss-forks/octane' && 'ubuntu-24.04' || 'blacksmith-4vcpu-ubuntu-2404' }}
     timeout-minutes: 60
     env:
       EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}

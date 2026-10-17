@@ -22,13 +22,6 @@ const FILE = 'rebuilt-clone-blocks.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 const LINES = SOURCE.split('\n');
 
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index < 0) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
-
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	const copy = node.cloneNode(true) as Element;
@@ -41,12 +34,18 @@ function markup(node: Element): string {
 
 const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
-/** The one diagnostic a mismatched leaf reports: its `<i>` against the server `<b>`. */
-function wrongTag(leaf: string): string {
+/**
+ * The one diagnostic a mismatched branch reports: the server frames every
+ * component call, so its leaf's call names the server's `<b>` where its range
+ * belongs.
+ */
+function noRange(branch: string, leaf: string): string {
+	const start = LINES.findIndex((line) => line.startsWith(`export function ${branch}(`));
+	const index = LINES.findIndex((line, i) => i > start && line.includes(`<${leaf}`));
 	return (
-		`Octane hydration mismatch at ${FILE}:${lineOf(`function ${leaf}(`) + 1}:1: the client ` +
-		'expected <i> but the server rendered <b>. The nearest Suspense or Hydrate boundary, or ' +
-		'the root, will be regenerated on the client.'
+		`Octane hydration mismatch at ${FILE}:${index + 1}:${LINES[index].indexOf(`<${leaf}`)}: the ` +
+		'client expected a component range but the server rendered <b>. The nearest Suspense or ' +
+		'Hydrate boundary, or the root, will be regenerated on the client.'
 	);
 }
 
@@ -138,7 +137,7 @@ describe.each([
 			expect(markup(container.firstElementChild!)).toBe(html);
 			expect(served.filter((node) => node.isConnected)).toEqual([]);
 			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [wrongTag(leaf)] : []);
+			expect(warnings()).toEqual(dev ? [noRange(name, leaf)] : []);
 		},
 	);
 
@@ -159,7 +158,7 @@ describe.each([
 			expect(markup(container.firstElementChild!)).toBe(`<i>${html}</i>`);
 			expect(served.filter((node) => node.isConnected)).toEqual([]);
 			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [wrongTag(leaf)] : []);
+			expect(warnings()).toEqual(dev ? [noRange(name, leaf)] : []);
 		},
 	);
 
@@ -171,7 +170,7 @@ describe.each([
 		expect(markup(container.firstElementChild!)).toBe('<i><s>c</s>ok</i><em>e</em>');
 		expect(em.isConnected).toBe(false);
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		expect(warnings()).toEqual(dev ? [wrongTag('IfLeaf')] : []);
+		expect(warnings()).toEqual(dev ? [noRange('SiblingBranch', 'IfLeaf')] : []);
 	});
 
 	it('mounts live components when the root renders on the client', async () => {
@@ -187,7 +186,7 @@ describe.each([
 		);
 		expect(served.filter((node) => node.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		expect(warnings()).toEqual(dev ? [wrongTag('ComponentLeaf')] : []);
+		expect(warnings()).toEqual(dev ? [noRange('ComponentBranch', 'ComponentLeaf')] : []);
 
 		const inner = container.querySelector<HTMLButtonElement>('button.inner')!;
 		const keyed = container.querySelector<HTMLButtonElement>('button.keyed')!;

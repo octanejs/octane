@@ -5,15 +5,14 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A component call that finds no server range of its own, because the server
-// rendered another @if arm there, adopts the server nodes at the cursor in
-// place when its template matches them. When that template has several roots,
-// hydration must continue after all of them: the next component adopts its own
-// server range rather than the fragment's second root. When the server arm
-// lacks one of the fragment's roots, the server HTML does not match and the
-// root renders on the client, as React's does. The development compile renders
-// these calls through the lite component slot; the production compile through
-// the full component slot.
+// A component call whose template has several roots finds no server range of
+// its own, because the server rendered another @if arm there. React, which
+// compares only the DOM, adopts the server nodes when they match. Octane's
+// server frames every component call, so the call is a structural mismatch:
+// the root renders on the client and reports once, as it does when the server
+// arm lacks one of the fragment's roots. The development compile renders these
+// calls through the lite component slot; the production compile through the
+// full component slot.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -86,19 +85,22 @@ describe.each([
 		return { host, serverNodes, recoverable };
 	}
 
+	// OCTANE DIVERGENCE: React adopts the matching server nodes.
 	it.each([
 		{ shape: 'static roots', name: 'FX', html: '<s>s</s><i>i</i><b>a</b>' },
 		{ shape: 'a component as its last root', name: 'GX', html: '<s>s</s><b>a</b><b>a</b>' },
 	])(
-		'keeps a fragment of $shape, then the next call adopts its own range',
+		'renders the root on the client for a fragment of $shape the server rendered without its range',
 		async ({ name, html }) => {
 			const { host, serverNodes, recoverable } = await hydrate(name);
 
-			expect(markup(host)).toBe(html);
-			expect(host.children).toHaveLength(serverNodes.length);
-			serverNodes.forEach((node, index) => expect(host.children[index]).toBe(node));
-			expect(recoverable).toEqual([]);
-			expect(warnings()).toEqual([]);
+			expect(host.isConnected).toBe(false);
+			expect(serverNodes.some((node) => node.isConnected)).toBe(false);
+			expect(markup(container.firstElementChild!)).toBe(html);
+			expect(recoverable).toEqual([
+				expect.stringMatching(/^Hydration failed because the server rendered HTML didn't match/),
+			]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
 		},
 	);
 
@@ -123,12 +125,15 @@ describe.each([
 		expect(clientHost.querySelector('u')).toBe(after);
 	});
 
-	it('unmounts the adopted fragment with its arm', async () => {
-		const { host } = await hydrate('FX');
+	it('unmounts the client-rendered fragment with its arm', async () => {
+		await hydrate('FX');
+		const host = container.firstElementChild!;
+		const clientArm = [...host.children];
 
 		act(() => root!.render(client.FX, { server: true }));
 		expect(markup(host)).toBe('<s>s</s><i>i</i><b>a</b>');
 		const serverArm = [...host.children];
+		expect(serverArm.some((node) => clientArm.includes(node))).toBe(false);
 
 		act(() => root!.render(client.FX, {}));
 		expect(markup(host)).toBe('<s>s</s><i>i</i><b>a</b>');

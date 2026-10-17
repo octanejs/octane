@@ -1,12 +1,7 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
-import { __prepareBindingSources, __retiredBindingSource } from './dom-binding-styles.js';
-import {
-	forwardNativeTransitionConsumer,
-	setNativeReadObserver,
-	type NativeReadSource,
-	type NativeTransitionPresentation,
-} from './signals/read-protocol.js';
+import { __retiredBindingSource } from './dom-binding-styles.js';
+import { setNativeReadObserver, type NativeReadSource } from './signals/read-protocol.js';
 import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
@@ -20,17 +15,11 @@ export interface BindingSignalConnection {
 	read(value: unknown): unknown;
 	/** Read only the already connected channel; never reevaluate the authored projection. */
 	get(): unknown;
-	/** Prepare a different projection without replacing the currently published lease. */
-	preview(value: unknown): BindingPreparedValue;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
 	/** Error path only: whether the owner of a source this connection observes retired. */
 	retired(): boolean;
 	dispose(preservePresentation?: boolean): void;
-}
-
-export interface BindingPreparedValue<T = unknown> extends NativeTransitionPresentation {
-	readonly value: T;
 }
 
 /** @internal Imported accessors must not silently turn live reads into source snapshots. */
@@ -86,8 +75,6 @@ export interface BindingReadTracker {
 	size(): number;
 	/** A committed preparation owns exactly the sources it read. */
 	publish(): void;
-	/** Stage a transition preparation without releasing the published sources. */
-	preview(): NativeTransitionPresentation;
 	/**
 	 * A preparation threw. Keep the last DOM and wait on every source it reached,
 	 * plus the published ones: a pending value retries when it settles, and a
@@ -115,11 +102,9 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 	const acquire = (source: NativeReadSource): void => {
 		let live = true;
 		const stop = run(() =>
-			source.subscribe(
-				forwardNativeTransitionConsumer(notify, () => {
-					if (live && !disposed) notify();
-				}),
-			),
+			source.subscribe(() => {
+				if (live && !disposed) notify();
+			}),
 		);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(304));
 		const cleanup = (): void => {
@@ -185,9 +170,6 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 				});
 			return true;
 		},
-		preview() {
-			return __prepareBindingSources(reads, subscriptions, notify, () => !disposed, run);
-		},
 		retired: () => __retiredBindingSource(subscriptions),
 		dispose() {
 			if (disposed) return;
@@ -250,47 +232,6 @@ export function __createBindingSignals() {
 						return false;
 					}
 				},
-				preview(next): BindingPreparedValue {
-					const nextHandle = isSignal(next) ? next : undefined;
-					const ticket = generation;
-					const projected = nextHandle ? run(() => nextHandle[SIGNAL_BINDING_READ]()) : next;
-					let accepted = false;
-					let retired = false;
-					let invalid = false;
-					let acceptedGeneration = ticket;
-					const stopNext =
-						nextHandle && nextHandle !== handle
-							? run(() =>
-									nextHandle[SIGNAL_BINDING_SUBSCRIBE](
-										forwardNativeTransitionConsumer(notify, () => {
-											if (retired || disposed) return;
-											if (!accepted) invalid = true;
-											else if (generation === acceptedGeneration) notify();
-										}),
-									),
-								)
-							: undefined;
-					return {
-						value: projected,
-						validate: () => !retired && !invalid && !disposed && generation === ticket,
-						commit() {
-							if (retired || accepted || disposed) return;
-							accepted = true;
-							value = next;
-							if (nextHandle === handle) return;
-							const stop = unsubscribe;
-							acceptedGeneration = ++generation;
-							handle = nextHandle;
-							unsubscribe = stopNext;
-							stop?.();
-						},
-						discard() {
-							if (accepted || retired) return;
-							retired = true;
-							stopNext?.();
-						},
-					};
-				},
 				read(next): unknown {
 					if (disposed) return undefined;
 					const nextHandle = isSignal(next) ? next : undefined;
@@ -309,11 +250,9 @@ export function __createBindingSignals() {
 							)
 								throw new TypeError(formatClientError(309));
 							const stopNext = run(() =>
-								handle![SIGNAL_BINDING_SUBSCRIBE](
-									forwardNativeTransitionConsumer(notify, () => {
-										if (!disposed && ticket === generation) notify();
-									}),
-								),
+								handle![SIGNAL_BINDING_SUBSCRIBE](() => {
+									if (!disposed && ticket === generation) notify();
+								}),
 							);
 							if (typeof stopNext !== 'function') throw new TypeError(formatClientError(310));
 							if (disposed || ticket !== generation) stopNext();

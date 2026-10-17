@@ -2,7 +2,7 @@
  * Serialized built-in strategy parameters. An independent island reads these
  * because its lexical parent (which evaluated `when`) never runs on the client.
  *
- * They stay out of `hydration-markers.js`: the client reads them only from the
+ * They stay out of `hydration-protocol.js`: the client reads them only from the
  * on-demand strategies chunk, and a module that chunk shared with the islands
  * bootstrap would split into a separate chunk that every islands page loads.
  */

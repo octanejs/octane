@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
@@ -194,12 +194,14 @@ const CLIENT_ONLY_MODULES = new Set([
 	'signals/native-read-events.ts',
 	'signals/native-read-inspection.ts',
 	'signals/native-read-retry.ts',
-	'signals/transition-candidate.ts',
 ]);
 const SERVER_ONLY_MODULES = new Set(['signals/native-read-server.ts', 'signals/server.ts']);
 
+// The client runtime: runtime.ts and its concept modules (scripts/split-runtime.mjs).
+const CLIENT_RUNTIME_MODULE = /^runtime(?:\.ts|\/[^/]+\.ts)$/;
+
 export function frameworkErrorSurface(filename) {
-	if (filename === 'runtime.ts') return 'client';
+	if (CLIENT_RUNTIME_MODULE.test(filename)) return 'client';
 	if (filename === 'runtime.server.ts') return 'server';
 	if (!COVERED_MODULE.test(filename)) return undefined;
 	if (CLIENT_ONLY_MODULES.has(filename)) return 'client';
@@ -543,8 +545,8 @@ function validateFrameworkErrorConstruction(
 
 function runtimeSources() {
 	const sourceDir = join(root, 'packages/octane/src');
-	const filenames = ['.', 'signals', 'hydration'].flatMap((directory) =>
-		readdirSync(join(sourceDir, directory))
+	const filenames = ['.', 'signals', 'hydration', 'runtime'].flatMap((directory) =>
+		(existsSync(join(sourceDir, directory)) ? readdirSync(join(sourceDir, directory)) : [])
 			.filter((name) => name.endsWith('.ts') && !name.endsWith('.d.ts'))
 			.map((name) => (directory === '.' ? name : `${directory}/${name}`)),
 	);

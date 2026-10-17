@@ -85,6 +85,48 @@ it('invalidates a settled pending view witness before a later subscription', asy
 	}
 });
 
+it('keeps a promoted view witness valid and forwards its lease to the cell', () => {
+	const scope = createScope({ scopeKey: 'promotion-forward' });
+	try {
+		const input$ = scope.signal$('input', 1);
+		const node = new ScopedNode<number>(scope as unknown as GraphOwner, 'value', 'derived');
+		node.compute = (target) => derivedState(target, () => input$.get() + 1);
+		refreshNode(node);
+		const view = createDeclarationView(node, () => undefined);
+		const compute = (target: ScopedNode<number>) => derivedState(target, () => input$.get() * 10);
+		view.compute = compute;
+		let source: NativeReadSource | undefined;
+		let observed = -1;
+		const previous = setNativeReadObserver((current, revision) => {
+			source = current;
+			observed = revision;
+		});
+		try {
+			expect(view.get()).toBe(10);
+		} finally {
+			setNativeReadObserver(previous);
+		}
+		node.compute = compute;
+		signalBatch(() => promoteDeclarationView(view, node));
+		// The render that read the view presented the accepted value.
+		expect(source!.getVersion()).toBe(observed);
+		let notifications = 0;
+		const stop = source!.subscribe(() => {
+			notifications++;
+		});
+		try {
+			input$.set(2);
+			expect(notifications).toBe(1);
+			expect(Object.is(source!.getVersion(), observed)).toBe(false);
+			expect(node.get()).toBe(20);
+		} finally {
+			stop();
+		}
+	} finally {
+		scope.dispose();
+	}
+});
+
 it('notifies committed readers when an equal pending view was invalidated', () => {
 	const scope = createScope({ scopeKey: 'promotion-shared' });
 	let stop = () => {};

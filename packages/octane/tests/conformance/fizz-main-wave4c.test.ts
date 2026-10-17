@@ -478,7 +478,8 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 	});
 
 	// Per ReactDOMFizzServer-test.js:703/:1070.
-	it('replaces a streamed lazy fallback with the public catch outcome on rejection', async () => {
+	// OCTANE DIVERGENCE: a rejected lazy component reveals the authored error arm.
+	it('reveals a streamed lazy error fallback on rejection', async () => {
 		const module = deferred<{ default: () => unknown }>();
 		server.setRejectingLazyModule(module.promise);
 		const collector = createPipeableCollector();
@@ -488,12 +489,13 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 		}).pipe(collector.destination);
 		expect(collector.chunks.join('')).toContain('lazy-rejection-fallback');
 
-		module.reject(new Error('lazy failed'));
+		const error = new Error('lazy failed');
+		module.reject(error);
 		const container = activate(await collector.ended);
 		try {
 			expect(onError).not.toHaveBeenCalled();
-			expect(container.querySelector('#lazy-rejection-error')?.textContent).toBe('lazy failed');
 			expect(container.querySelector('#lazy-rejection-fallback')).toBeNull();
+			expect(container.querySelector('#lazy-rejection-error')?.textContent).toBe('lazy failed');
 		} finally {
 			container.remove();
 		}
@@ -501,12 +503,12 @@ describe('conformance: ReactDOMFizzServer public outcomes — Wave 4C', () => {
 
 	// Per ReactDOMFizzServer-test.js:2074.
 	it('restores the outer context after an error inside a nested provider', async () => {
-		const result = await collectPipeableStream(server.ContextErrorRecovery, {
-			error: new Error('provider failed'),
-		});
+		const error = new Error('provider failed');
+		const result = await collectPipeableStream(server.ContextErrorRecovery, { error });
+		expect(result.errors).toEqual([error]);
 		const container = activate(result.html);
 		try {
-			expect(container.querySelector('#context-error')?.textContent).toBe('provider failed');
+			expect(container.querySelector('#context-fallback')?.textContent).toBe('Loading');
 			expect(container.querySelector('#context-after-error')?.textContent).toBe('outer');
 			expect(container.querySelector('#context-outside-provider')?.textContent).toBe('default');
 		} finally {

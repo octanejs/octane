@@ -4,7 +4,7 @@ import { flushEffects } from '../../../octane/tests/_helpers';
 import { ServerFixture } from '../ssr/_fixtures/server.tsrx';
 
 const SERVER_HTML =
-	'<main id="draggable-server"><!--[--><!--[--><div id="html-drag" style="transform:translate(3px,4px);" class="authored react-draggable">html</div><!--]--><!--]--><!--[--><!--[--><svg id="svg-drag" style="transform:translate(5px,6px);" class="react-draggable"><circle cx="2" cy="2" r="2"></circle></svg><!--]--><!--]--><!--[--><!--[--><button id="core-drag">core</button><!--]--><!--]--></main>';
+	'<!--3--><main id="draggable-server"><!--[--><div id="html-drag" style="transform:translate(3px,4px);" class="authored react-draggable">html</div><!--]--><!--[--><svg id="svg-drag" style="transform:translate(5px,6px);" class="react-draggable"><circle cx="2" cy="2" r="2"></circle></svg><!--]--><!--[--><button id="core-drag">core</button><!--]--></main>';
 
 async function settle() {
 	flushSync(() => {});

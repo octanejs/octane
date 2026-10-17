@@ -1171,10 +1171,11 @@ for (const fixture of fixtures) {
 				result.unmount();
 			});
 
-			it(`${exportName} server-renders its nearest error fallback`, () => {
-				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
-				expect(html).toContain('data-fallback="inner"');
-				expect(html).not.toContain('data-fallback="outer"');
+			it(`${exportName} assigns a server error to its nearest boundary`, () => {
+				const markup = document.createElement('div');
+				markup.innerHTML = ServerRuntime.renderToString(fixture.server[exportName]).html;
+				expect(markup.querySelector('[data-fallback="inner"]')?.textContent).toBe('inner');
+				expect(markup.querySelector('[data-fallback="outer"]')).toBeNull();
 			});
 		}
 

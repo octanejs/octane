@@ -23,7 +23,7 @@ import type {
 	IndependentHydrateActivator,
 } from './hydration/independent-island.js';
 import { cloneHydrationReplayEvent } from './hydration/replay-event.js';
-import { HYDRATION_START } from './hydration-markers.js';
+import { HYDRATION_PROTOCOL_VERSION, HYDRATION_START } from './hydration-protocol.js';
 import { captureSignalOwner } from './signals/owner-context.js';
 import type { SignalRendererOwnerIdentity } from './signals/types.js';
 import { rendererRangeClose } from './stream-protocol.js';
@@ -35,14 +35,19 @@ const NO_PROPS: BindingSource<undefined> = {
 };
 
 /**
- * The server wraps the view in the island's frame ranges. Only those plain
- * opens and renderer-owned scripts may precede the view's own range.
+ * The island's output opens with the hydration protocol its server spoke
+ * (hydration-protocol.ts); another version's ranges would be misread. The
+ * server wraps the view in the island's frame ranges. Only those plain opens
+ * and renderer-owned scripts may precede the view's own range.
  */
 function islandRoot(
 	element: Element,
 	program: CompiledBindingProgram<undefined>,
 ): Element | BindingRange {
-	for (let node = element.firstChild; node !== null; node = node.nextSibling) {
+	const mark = element.firstChild;
+	if (mark?.nodeType !== 8 || (mark as Comment).data !== HYDRATION_PROTOCOL_VERSION)
+		throw new Error(formatClientError(286));
+	for (let node = mark.nextSibling; node !== null; node = node.nextSibling) {
 		if (node.nodeType === 8) {
 			const data = (node as Comment).data;
 			const marker = parseBindingMarker(data);

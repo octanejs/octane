@@ -730,10 +730,10 @@ describe('Float resources — precedence group discovery order', () => {
 		expect(sheetHrefs()).toEqual(['/x-first.css', '/second-static.css']);
 	});
 
-	it('an arm that fails while rendering a child keeps its already-registered sheet', async () => {
-		// Resources are page-global and never removed; registration precedes
-		// child evaluation on the server too, so client and server agree that a
-		// failed arm's sheet stays.
+	it('an arm that fails while rendering a child leaves its preload, not its sheet', async () => {
+		// As in React DOM, the sheet's preload starts as the render discovers it
+		// (getResource), but only a committed resource inserts the sheet itself
+		// (acquireResource). The failed arm never commits.
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			await act(() => mountInto(FailingArm, { arm: true }));
@@ -741,6 +741,9 @@ describe('Float resources — precedence group discovery order', () => {
 			errSpy.mockRestore();
 		}
 		expect(document.body.textContent).toContain('caught');
-		expect(sheetHrefs()).toEqual(['/doomed.css']);
+		expect(sheetHrefs()).toEqual([]);
+		expect(
+			document.head.querySelector('link[rel="preload"][as="style"][href="/doomed.css"]'),
+		).not.toBeNull();
 	});
 });

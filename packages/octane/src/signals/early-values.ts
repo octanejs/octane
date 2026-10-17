@@ -1,4 +1,4 @@
-import { SIGNAL_CONTROL_ATTR } from '../hydration-markers.js';
+import { SIGNAL_CONTROL_ATTR } from '../hydration-protocol.js';
 import type { SignalBindingIdentity, SignalOwner, SignalRendererOwnerIdentity } from './types.js';
 
 type ControlChannel = 'value' | 'checked';

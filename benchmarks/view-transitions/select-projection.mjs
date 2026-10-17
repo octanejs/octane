@@ -64,7 +64,10 @@ const output = {
 		chromium: browser.version(),
 		bundleSha256: hash(bundle),
 		fixtureSha256: hash(fixture),
-		adapterSha256: hash(fs.readFileSync(path.join(source.packageRoot, 'src/dom-stage.ts'))),
+		// Revisions before #2043 staged ViewTransition DOM through src/dom-stage.ts.
+		adapterSha256: fs.existsSync(path.join(source.packageRoot, 'src/dom-stage.ts'))
+			? hash(fs.readFileSync(path.join(source.packageRoot, 'src/dom-stage.ts')))
+			: null,
 		measurement:
 			'Native importNode(option) calls and selected getter calls, from scheduled update through native transition completion; excludes mount, assertions and teardown. Counts delegate unchanged to native operations.',
 	},

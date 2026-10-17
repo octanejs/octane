@@ -112,19 +112,24 @@ matrix.itRenders('can not deeply ignore reconnecting reordered children', {
 });
 
 // Per ReactDOMServerIntegrationReconnecting-test.js:345.
+// OCTANE DIVERGENCE: hydration adopts by structure. The server framed the
+// component call, where the client renders a text hole, so the root renders on
+// the client and reports one recoverable error. React compares only the empty
+// DOM and adopts it.
 matrix.itRenders('can distinguish an empty component from an empty text component', {
 	component: 'EmptyFunctionRoot',
-	modes: ['hydrate-match'],
-	hydrateMatch: {
+	modes: ['hydrate-mismatch'],
+	mismatch: {
 		serverComponent: 'EmptyFunctionRoot',
 		clientComponent: 'EmptyTextRoot',
 		serverProps: () => ({}),
 		clientProps: () => ({ text: '' }),
 	},
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#empty-root'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#empty-root')).toBe(before);
-		expect(before?.textContent).toBe('');
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
+		expect(root.querySelector('#empty-root')?.textContent).toBe('');
 	},
 });
 

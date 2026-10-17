@@ -13,6 +13,15 @@ export {
 	synchronousOwner as activeSynchronousSignalOwner,
 };
 
+/**
+ * @internal Set once anything can give a handler signal authority: an owner
+ * frame or environment, the signal document, or module signal bindings. A
+ * compiled template skips an unchanged handler's record only while it is unset
+ * (bagRecord rereads the exact state). An object, so compiled code that
+ * destructures its imports still reads it live.
+ */
+export const signalOwnerUse = { active: false };
+
 /** Install a concurrency-safe owner carrier without importing the signal engine. */
 export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironment): () => void {
 	if (
@@ -25,6 +34,7 @@ export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironmen
 	}
 	const previous = installedEnvironment;
 	installedEnvironment = environment;
+	signalOwnerUse.active = true;
 	return () => {
 		if (installedEnvironment === environment) installedEnvironment = previous;
 	};
@@ -57,6 +67,7 @@ export function runWithSignalOwner<T>(owner: SignalOwner, callback: () => T): T 
 	if (installedEnvironment) return installedEnvironment.run(owner, callback);
 	const previous = synchronousOwner;
 	synchronousOwner = owner;
+	signalOwnerUse.active = true;
 	try {
 		return callback();
 	} finally {
@@ -71,6 +82,7 @@ export function enterSynchronousSignalOwner(owner: SignalOwner): SignalOwner | n
 	if (installedEnvironment !== undefined) return undefined;
 	const previous = synchronousOwner;
 	synchronousOwner = owner;
+	signalOwnerUse.active = true;
 	return previous;
 }
 

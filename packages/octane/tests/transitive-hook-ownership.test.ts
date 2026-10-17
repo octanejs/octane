@@ -301,7 +301,7 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 						},
 					}).Pair;
 				expect(renderToString(load('server'), undefined).html).toBe(
-					'<div><button>first</button><output>second</output></div>',
+					'<!--3--><div><button>first</button><output>second</output></div>',
 				);
 				const view = mount(load('client'));
 				try {
@@ -331,7 +331,7 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 						},
 					}).Pair;
 				expect(renderToString(load('server'), undefined).html).toBe(
-					'<div><button>first</button><output>second</output></div>',
+					'<!--3--><div><button>first</button><output>second</output></div>',
 				);
 				const view = mount(load('client'));
 				try {

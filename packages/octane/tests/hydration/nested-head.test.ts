@@ -96,7 +96,7 @@ describe('nested-under-host document metadata', () => {
 		const r = await ServerRT.renderToString(srv.NestedHead, { title: 'Nested Title' });
 		// Land the head channel in the document head and the body in the container,
 		// the way a served page arrives.
-		const bodyStart = r.html.indexOf('<section');
+		const bodyStart = r.html.indexOf('<!--3-->');
 		document.head.insertAdjacentHTML('beforeend', r.html.slice(0, bodyStart));
 		container.innerHTML = r.html.slice(bodyStart);
 		hydrateRoot(container, NestedHead, { title: 'Nested Title' });

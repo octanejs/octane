@@ -1,4 +1,5 @@
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -20,9 +21,19 @@ import { octane } from 'octane/compiler/vite';
 // profiling.ts and devtools-hook.ts even with profiling off. These tests serve
 // a real app from a dev server, once with profiling off and once on.
 const PACKAGE_ROOT = realpathSync(resolve(import.meta.dirname, '..'));
-const RUNTIME_MODULES = ['src/runtime.ts', 'src/universal-core.ts'].map((file) =>
-	join(PACKAGE_ROOT, file),
-);
+// The client runtime's modules that name the define: runtime.ts, or each of
+// the concept modules scripts/split-runtime.mjs split it into.
+const RUNTIME_DIR = join(PACKAGE_ROOT, 'src/runtime');
+const CLIENT_RUNTIME_MODULES = [
+	join(PACKAGE_ROOT, 'src/runtime.ts'),
+	...(existsSync(RUNTIME_DIR)
+		? readdirSync(RUNTIME_DIR)
+				.filter((name) => name.endsWith('.ts'))
+				.sort()
+				.map((name) => join(RUNTIME_DIR, name))
+		: []),
+].filter((file) => readFileSync(file, 'utf8').includes('__OCTANE_PROFILE_ENABLED__'));
+const RUNTIME_MODULES = [...CLIENT_RUNTIME_MODULES, join(PACKAGE_ROOT, 'src/universal-core.ts')];
 const PROFILING_MODULES = ['src/profiling.ts', 'src/devtools-hook.ts'].map((file) =>
 	join(PACKAGE_ROOT, file),
 );
@@ -169,9 +180,11 @@ describe('vite dev profiling guards', () => {
 		const server = await serve(true);
 		let profiler: { clear(): void } | undefined;
 		try {
-			const runtime = await served(server, RUNTIME_MODULES[0]);
-			expect(runtime.code).toContain('__OCTANE_PROFILE_ENABLED__');
-			expect(runtime.imports).toEqual(expect.arrayContaining(PROFILING_MODULES));
+			const runtime = await Promise.all(CLIENT_RUNTIME_MODULES.map((file) => served(server, file)));
+			for (const { code } of runtime) expect(code).toContain('__OCTANE_PROFILE_ENABLED__');
+			expect(runtime.flatMap(({ imports }) => imports)).toEqual(
+				expect.arrayContaining(PROFILING_MODULES),
+			);
 
 			const environment = server.environments.app as RunnableDevEnvironment;
 			const profiling = await environment.runner.import('octane/profiling');

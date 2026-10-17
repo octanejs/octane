@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 process.env.NODE_ENV = 'production';
 const repo = path.resolve(
@@ -283,7 +284,7 @@ try {
 	const meta = {
 		node: process.version,
 		esbuild,
-		source: hash(fs.readFileSync(path.join(repo, 'packages/octane/src/runtime.ts'))),
+		source: hash(readClientRuntime(path.join(repo, 'packages/octane/src/runtime.ts'))),
 		compiler: hash(fs.readFileSync(path.join(repo, 'packages/octane/src/compiler/compile.js'))),
 		runner: hash(fs.readFileSync(import.meta.filename)),
 		compiled: hash(JSON.stringify([...compiled])),

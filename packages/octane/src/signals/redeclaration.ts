@@ -6,7 +6,6 @@ import {
 	type SignalCapture,
 	type SignalDeclarationStage,
 } from './read-protocol.js';
-import { activeCandidate } from './transition-state.js';
 
 /** One render's redeclaration, applied only when the renderer accepts that render. */
 interface StagedDeclaration<D> {
@@ -107,8 +106,6 @@ export abstract class RedeclarableBinding<D> {
 		if (stage === undefined) {
 			// Work belonging to a render still awaiting acceptance reads its view.
 			if (staged !== undefined && sequence >= staged.sequence) return staged.view ?? this.node;
-			// A candidate frame must not mutate committed state; a later render rebinds.
-			if (activeCandidate !== undefined) return this.node;
 			this.captures = captures;
 			this.presented = invocation;
 			this.installDefinition(definition, sequence);

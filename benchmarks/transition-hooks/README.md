@@ -31,7 +31,7 @@ every application creation event belongs to the compiled template.
 | --- | --- | --- |
 | `cycle` | `start(() => setValue(next))` | two renders: the pending cue with the committed value, then the new value with the falling edge in the transition's task; text `next:idle` |
 | `updater` | `start(() => setValue((v) => v + 1))` | identical render sequence to `cycle` through the queued-updater path |
-| `held` | transition to a value whose `use()` request is pending, then resolve it | hold: the pending cue with the committed value, the transition with its falling edge suspending in its task, then the cue re-render with the committed value, no fallback, previous text retained; release: promotion, then the falling edge with the new text |
+| `held` | transition to a value whose `use()` request is pending, then resolve it | hold: the pending cue with the committed value, the transition with its falling edge suspending in its task, then the cue re-render with the committed value, no fallback, previous text retained; release: one render of the new value with its falling edge, as React retries the transition |
 | `dispatch` | `setValue((v) => v + 1)` outside any transition | exactly one render |
 | `bail` | `setValue(same)` on an idle cell | no render at all |
 | `click` | a native `button.click()` whose delegated handler dispatches a functional update | exactly one render through the discrete-event flush |

@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
@@ -51,7 +52,7 @@ export function mount(parent) {
 			else process.env[flag] = previous;
 		}
 	}
-	const runtime = await readFile(path.join(source, 'runtime.ts'), 'utf8');
+	const runtime = readClientRuntime(path.join(source, 'runtime.ts'));
 	const declaration = /export function bindSignalAttribute\([\s\S]*?\): unknown \{/;
 	assert.equal(runtime.match(new RegExp(declaration.source, 'g'))?.length, 1);
 	let observedRuntime = runtime.replace(

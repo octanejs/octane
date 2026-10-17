@@ -26,7 +26,7 @@ import {
 	untrackCommitted,
 	type NodeState,
 	type GraphOwner,
-	type SignalCandidateFrame,
+	type CandidateContext,
 } from './graph.js';
 import {
 	SIGNAL_DEPENDENT_NODE,
@@ -139,12 +139,12 @@ function resolveHandle<T>(handle$: SignalHandle<T>, owner: Scope): ScopedNode<T>
 }
 
 export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
-	// Members that are not private are also used by an Action frame's producer
+	// Members that are not private are also used by a pending slot's producer
 	// (candidate-producers.ts), which forks and publishes this binding.
 	current: DerivedAttempt<T> | undefined;
 	compute: DerivedCompute<T> | undefined;
 	frozen = false;
-	candidate: SignalCandidateFrame | undefined;
+	candidate: CandidateContext | undefined;
 	/** The latest evaluation produced asynchronous work rather than a value. */
 	private asynchronous = false;
 	/** A later render's computation, evaluated privately until that render is accepted. */
@@ -218,8 +218,8 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 			}
 		}
 		this.releaseView();
-		const node: ScopedNode<T> = createDeclarationView(this.node, (target, frame) =>
-			candidateHooks.derived!.call(binding, target, frame),
+		const node: ScopedNode<T> = createDeclarationView(this.node, (target, context) =>
+			candidateHooks.derived!.call(binding, target, context),
 		);
 		const binding: DerivedBinding<T> = new DerivedBinding(this.owner, node, compute, this.options);
 		this.view = { node, binding };

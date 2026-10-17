@@ -25,10 +25,13 @@ export function deniedRangesFor(
 	ranges: readonly DeclarationRange[],
 ): DeclarationRange[];
 export function topLevelDeclarations(program: unknown): Map<string, { start: number; end: number }>;
+/** runtime.ts and its concept modules, as paths below packages/octane/src/. */
+export function runtimeSourceFiles(sourceDir?: string): string[];
 export function resolveDeclarationRanges(
 	readSource: (source: string) => string,
 	parse: (text: string, source: string) => unknown,
 	denied?: readonly DeniedDeclaration[],
+	runtimeFiles?: readonly string[],
 ): DeclarationRange[];
 export function mappedSourcePositions(mappings: string): Generator<[number, number, number]>;
 export function retainedDeclarations(

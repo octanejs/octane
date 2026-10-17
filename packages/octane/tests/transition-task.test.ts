@@ -231,13 +231,13 @@ describe('Action cues and native capture', () => {
 					else root.render(Animated, { value: 1 });
 				});
 				await microtasks();
-				if (work !== 'native signal') {
-					expect(native.calls).toHaveLength(0);
-					expect(container.querySelector('output')?.textContent ?? '').toBe(
-						work === 'initial root' ? '' : '0',
-					);
-					await act(async () => {});
-				}
+				// A signal write renders in the transition task like any other
+				// transition work: the cue commits first, without a capture.
+				expect(native.calls).toHaveLength(0);
+				expect(container.querySelector('output')?.textContent ?? '').toBe(
+					work === 'initial root' ? '' : '0',
+				);
+				await act(async () => {});
 				expect(native.calls).toHaveLength(1);
 				expect(container.querySelector('output')!.textContent).toBe('1');
 			} finally {

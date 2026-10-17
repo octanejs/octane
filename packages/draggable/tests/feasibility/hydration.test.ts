@@ -15,7 +15,7 @@ describe('react-draggable feasibility: hydration adoption', () => {
 		'adopts the same %s node and selects its transform after ref delivery',
 		(_kind, html, Body, selector) => {
 			const container = document.createElement('div');
-			container.innerHTML = html;
+			container.innerHTML = '<!--3-->' + html;
 			const serverNode = container.querySelector(selector)!;
 			const root = hydrateRoot(container, Body);
 			flushSync(() => {});

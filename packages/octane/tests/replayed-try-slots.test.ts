@@ -24,6 +24,8 @@ const SHAPES = [
 	'ReplayedStaleErrorBoundary',
 	'ReplayedStalePending',
 	'ReplayedStaleSuspension',
+	'ReplayedStaleThrowPending',
+	'ReplayedStaleChildTry',
 ] as const;
 
 // The octane project covers the development compile; octane-prod covers
@@ -75,7 +77,12 @@ describe.each(SHAPES)('%s', (shape) => {
 	});
 
 	it.each([{ a: true }, { a: false }])('hydrates in source order from %o', async (initial) => {
-		container.innerHTML = renderToString(server[shape], initial).html;
+		// The server's discarded pass reports nothing either.
+		const serverErrors: unknown[] = [];
+		container.innerHTML = renderToString(server[shape], initial, {
+			onError: (error) => serverErrors.push(error),
+		}).html;
+		expect(serverErrors).toEqual([]);
 		expect(text()).toBe(view(initial));
 		const nodes = [...container.querySelectorAll('span')];
 		const recoverable: unknown[] = [];

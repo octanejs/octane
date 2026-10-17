@@ -5,7 +5,7 @@ import type { NativeAdoptionOwner, NativeReadSource } from './read-protocol.js';
 import { decodeSignalValue, snapshotSignalValue } from '../data-encoding.js';
 
 export const NATIVE_SIGNAL_SEED_ATTR = 'data-octane-native-signals';
-export { NATIVE_SIGNAL_FRESH_COMMENT } from '../hydration-markers.js';
+export { NATIVE_SIGNAL_FRESH_COMMENT } from '../hydration-protocol.js';
 
 export interface NativeSignalReference {
 	readonly key: string;

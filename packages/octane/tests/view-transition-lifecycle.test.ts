@@ -116,6 +116,19 @@ describe('ViewTransition public lifecycle', () => {
 		expect(handles[0].skip).toHaveBeenCalled();
 	});
 
+	it('keeps an animation running when its activation callback flushes an urgent update', async () => {
+		const transition = {
+			onUpdate: () => flushSync(() => root.render(MatchingApp, { text: 'urgent', transition: {} })),
+		};
+		root.render(MatchingApp, { text: 'before', transition });
+		startTransition(() => root.render(MatchingApp, { text: 'transition', transition }));
+		await vi.waitFor(() => expect(handles).toHaveLength(1));
+		await handles[0].update();
+		handles[0].ready.resolve();
+		await vi.waitFor(() => expect(container.textContent).toBe('urgenturgent'));
+		expect(handles[0].skip).not.toHaveBeenCalled();
+	});
+
 	it('reports capture errors through the root and still commits exactly once', async () => {
 		root.render(MatchingApp, { text: 'before', transition: {} });
 		startTransition(() => root.render(MatchingApp, { text: 'after', transition: {} }));

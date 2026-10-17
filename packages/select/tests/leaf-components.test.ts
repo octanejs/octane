@@ -277,7 +277,7 @@ function canonicalCSS(css: string) {
 function canonicalMarkup(html: string) {
 	const window = new Window();
 	window.document.body.innerHTML = html
-		.replace(/<!--\[-->|<!--\]-->/g, '')
+		.replace(/<!--3-->|<!--\[-->|<!--\]-->/g, '')
 		.replace(/\bcss-[A-Za-z0-9_-]+/g, 'css-HASH');
 	for (const element of window.document.body.querySelectorAll('*')) {
 		const attributes = [...element.attributes]
@@ -325,7 +325,8 @@ describe('first default component unit', () => {
 			menuPosition: 'fixed',
 			children: 'Portal child',
 		});
-		expect(rendered.html).toBe('');
+		// Only the hydration protocol version: the portal renders nothing here.
+		expect(rendered.html).toBe('<!--3-->');
 		expect(rendered.css).toBe('');
 	});
 

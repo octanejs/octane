@@ -71,6 +71,7 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 					},
 				})
 			: undefined;
+		// Hydrate in the parsed document so the app retains its document-level SSR context.
 		const doc = parsed?.window.document ?? new DOMParser().parseFromString(html, 'text/html');
 		if (transport) {
 			expect(html).toContain('data-tsr-stream-part');
@@ -88,7 +89,6 @@ it.each(modes.flatMap((mode) => [false, true].map((transport) => ({ ...mode, tra
 		expect(scrollScript.nonce).toBe('fixture-nonce');
 		input.value = 'typed before hydration';
 		expect(button.textContent?.trim()).toBe('Count: 0');
-		document.body.append(container);
 		const serverScripts = new Set<Node>(container.querySelectorAll('script'));
 		const addedScripts: Node[] = [];
 		const recordScripts = (records: MutationRecord[]) => {

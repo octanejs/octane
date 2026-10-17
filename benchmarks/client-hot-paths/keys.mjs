@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 process.env.NODE_ENV = 'production';
 const repo = path.resolve(import.meta.dirname, '../..');
@@ -19,7 +20,7 @@ const { compile } = await import(
 	pathToFileURL(path.join(repo, 'packages/octane/src/compiler/index.js'))
 );
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'client-key-work-'));
-const source = fs.readFileSync(path.join(sourceRoot, 'packages/octane/src/runtime.ts'), 'utf8');
+const source = readClientRuntime(path.join(sourceRoot, 'packages/octane/src/runtime.ts'));
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const stat = (value) => ({ score: value, median: value, min: value, samples: 1 });
 const count = 128;

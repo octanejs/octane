@@ -12,6 +12,7 @@ import { performance } from 'node:perf_hooks';
 import { build, transformSync } from 'esbuild';
 import { createRequire } from 'node:module';
 import { Window } from 'happy-dom';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 const dependencies = createRequire(path.join(repo, 'packages/octane/package.json'));
@@ -23,7 +24,7 @@ const compilerRoot = path.resolve(process.env.CLIENT_COMPILER_ROOT ?? repo);
 const runtimeFile = path.resolve(
 	process.env.CLIENT_RUNTIME_FILE ?? path.join(sourceRoot, 'packages/octane/src/runtime.ts'),
 );
-const selectedRuntime = fs.readFileSync(runtimeFile, 'utf8');
+const selectedRuntime = readClientRuntime(runtimeFile);
 const { compile } = await import(
 	pathToFileURL(path.join(compilerRoot, 'packages/octane/src/compiler/compile.js'))
 );
@@ -239,7 +240,7 @@ try {
 		node: process.version,
 		sourceRoot,
 		compilerRoot,
-		runtimeSha256: hash(fs.readFileSync(runtimeFile)),
+		runtimeSha256: hash(selectedRuntime),
 		sourceSha256: hash(source),
 		compiledSha256: hash(compiled),
 		bundle: { minified: Buffer.byteLength(clean), gzip: gzipSync(clean).length },

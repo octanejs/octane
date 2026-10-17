@@ -2,29 +2,23 @@
 // This focused bench runs without DOM or workspace dependencies. It also checks
 // the expected postorder, including uneven sibling depths, before timing.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { stripTypeScriptTypes } from 'node:module';
 import { performance } from 'node:perf_hooks';
+import { readClientRuntime, runtimeDeclarations } from '../lib/client-runtime.mjs';
 
 const file = 'packages/octane/src/runtime.ts';
 const baseRef = process.argv[2] ?? 'upstream/main';
 
 function comparator(source) {
-	const start = source.indexOf('function blockIsAncestorOf(');
-	const end = source.indexOf('function finishEffectCommit()', start);
-	if (start < 0 || end < 0) throw new Error('Effect comparator source moved');
-	const code = stripTypeScriptTypes(source.slice(start, end));
+	const code = stripTypeScriptTypes(
+		runtimeDeclarations(source, ['blockIsAncestorOf', 'comparePostOrder']),
+	);
 	return Function(`${code}\nreturn comparePostOrder;`)();
 }
 
-const baseline = comparator(
-	execFileSync('git', ['show', `${baseRef}:${file}`], {
-		encoding: 'utf8',
-		maxBuffer: 8 * 1024 * 1024,
-	}),
-);
-const candidate = comparator(readFileSync(file, 'utf8'));
+const baseline = comparator(readClientRuntime(path.resolve(file), baseRef));
+const candidate = comparator(readClientRuntime(path.resolve(file)));
 
 function workload(shape, counted = false) {
 	let reads = 0;

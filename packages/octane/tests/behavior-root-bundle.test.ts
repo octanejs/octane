@@ -59,7 +59,7 @@ describe('production behavior-root entry points', () => {
 			);
 			expect(
 				bundle.inputs.some((input) =>
-					/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|compiler\/|server\/)/.test(
+					/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|compiler\/|server\/)/.test(
 						input,
 					),
 				),
@@ -120,7 +120,7 @@ export function mount(target, source) { return mountBindings(target, Tree, sourc
 		);
 		expect(
 			bundle.resolvedInputs.filter((input) =>
-				/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|compiler\/|server\/|internal\/)/.test(
+				/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|compiler\/|server\/|internal\/)/.test(
 					input,
 				),
 			),
@@ -192,7 +192,7 @@ export function mount(target, source) { return mountBindings(target, Tree, sourc
 		}
 		expect(
 			predicates.inputs.filter((input) =>
-				/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|behavior-root\.ts|signals\/(?:engine|facade|graph|owner-context)\.ts)$/.test(
+				/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|behavior-root\.ts|signals\/(?:engine|facade|graph|owner-context)\.ts)$/.test(
 					input,
 				),
 			),

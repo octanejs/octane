@@ -167,11 +167,10 @@ describe.each([
 	);
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's, and a dormant boundary never renders its stale
-	// captures to compare them. As React does for an update that reaches a
-	// dehydrated boundary it cannot hydrate, the boundary renders on the client
-	// and reports nothing.
-	it('renders a dormant boundary whose list emptied before activation on the client without reporting', async () => {
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it, the boundary adopts the server's list with the
+	// captures it rendered, then the update empties it, and nothing reports.
+	it('hydrates a dormant boundary, then empties its list without reporting', async () => {
 		const serverProps = { items: ['x'], when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantEmptyArm, serverProps).html;
 		const div = container.firstElementChild!;
@@ -188,9 +187,81 @@ describe.each([
 		await act(async () => {});
 
 		expect(container.firstElementChild).toBe(div);
-		expect(host.isConnected).toBe(false);
-		expect(markup(container.querySelector('i')!.parentElement!)).toBe('<i><b>none</b>ok</i>');
+		expect(container.querySelector('i')).toBe(host);
+		expect(markup(host.parentElement!)).toBe('<i><b>none</b>ok</i>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
+	});
+});
+
+// A list whose first fill adopts fewer items than the server rendered leaves
+// server items the client renders nothing for: as in React, the root renders
+// on the client and reports once.
+describe.each([
+	{ name: 'development compile', dev: true },
+	{ name: 'production compile', dev: false },
+])('hydrateRoot — server rendered more list items than the client ($name)', ({ dev }) => {
+	const server = loadServerFixture(FIXTURE, { id: FILE });
+	const client = loadCompiledFixtureSource(SOURCE, {
+		id: FILE,
+		mode: 'client',
+		compileOptions: { dev },
+	});
+
+	/** `line:column` of the first `text` after the line containing `after`. */
+	function siteOf(after: string, text: string): string {
+		const from = LINES.findIndex((line) => line.includes(after));
+		const index = LINES.findIndex((line, i) => i > from && line.includes(text));
+		return `${index + 1}:${LINES[index].indexOf(text)}`;
+	}
+
+	it.each([
+		// A @for names its own site.
+		{ list: 'a @for', component: 'FewerItems', site: '@for', rendered: '<s>' },
+		// An array of children has no site of its own: its host names it.
+		{
+			list: 'an array of children',
+			component: 'FewerChildren',
+			site: '<i>',
+			rendered: 'a control-flow block',
+		},
+	])('renders the root on the client over $list and reports it once', async (shape) => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRT.renderToString(server[shape.component], {
+			items: ['x', 'y'],
+		}).html;
+		const served = [...container.querySelectorAll('*')];
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable: string[] = [];
+
+		const root = hydrateRoot(
+			container,
+			client[shape.component],
+			{ items: ['x'] },
+			{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
+		);
+		flushSync(() => {});
+		await act(async () => {});
+		const warnings = errSpy.mock.calls
+			.map((call: unknown[]) => String(call[0]))
+			.filter((message: string) => message.includes('hydration mismatch'));
+		errSpy.mockRestore();
+
+		expect(markup(container.firstElementChild!)).toBe('<i><s>x</s>ok</i>');
+		expect(served.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings).toEqual(
+			dev
+				? [
+						`Octane hydration mismatch at ${FILE}:` +
+							`${siteOf(`function ${shape.component}(`, shape.site)}: the client expected ` +
+							`the end of its content but the server rendered ${shape.rendered}. The nearest ` +
+							`Suspense or Hydrate boundary, or the root, will be regenerated on the client.`,
+					]
+				: [],
+		);
+		root.unmount();
+		container.remove();
 	});
 });

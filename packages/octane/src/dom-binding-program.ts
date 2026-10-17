@@ -25,10 +25,10 @@ import {
 	HYDRATION_FOR_PREFIX,
 	HYDRATION_START,
 	NATIVE_SIGNAL_FRESH_COMMENT,
+	STREAM_CATCH_COMMENT,
 	STREAM_SEED_COMMENT,
 	SUSPENSE_RESOLVED_COMMENT,
-	TRY_CATCH_COMMENT,
-} from './hydration-markers.js';
+} from './hydration-protocol.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { rendererRangeClose, STREAM_BOUNDARY_ATTR } from './stream-protocol.js';
 import {
@@ -59,13 +59,7 @@ import type {
 	BindingControlPrepared,
 } from './dom-binding-controls.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
-import type { BindingControlPreview } from './signals/control-binding.js';
-import {
-	NATIVE_TRANSITION_CONSUMER,
-	forwardNativeTransitionConsumer,
-	type NativeTransitionNotify,
-	type NativeTransitionPresentation,
-} from './signals/read-protocol.js';
+import { renderSlice, watchRenderSlices } from './render-slice.js';
 
 export { __methodDep } from './method-dep.js';
 
@@ -421,9 +415,10 @@ interface RegionInstance {
 	reset?: () => void;
 	/**
 	 * A `@try` region still shows the server's resolved body, which no client
-	 * preparation has committed. It stays while the client's own read is pending.
+	 * preparation has committed. It stays while the client's own read is pending;
+	 * an Element retains the server-owned catch guard until commit.
 	 */
-	adopted?: boolean;
+	adopted?: boolean | Element;
 }
 
 interface FragmentInstance {
@@ -500,18 +495,6 @@ interface Transaction {
 	preparing?: boolean;
 	frame: number;
 	published?: (() => void) | undefined;
-	preview?: BindingPreview | undefined;
-	consumer?: NativeTransitionNotify;
-}
-
-interface BindingPreview {
-	receipts: NativeTransitionPresentation[];
-	controls: BindingControlPreview[];
-	fragments: Set<FragmentInstance>;
-	signals: Map<FragmentInstance, Map<number, BindingSignalConnection>>;
-	projections: Map<FragmentInstance, Map<number, BindingProjectionConnection>>;
-	text: Map<RegionInstance, BindingSignalConnection>;
-	disposals: Array<() => void>;
 }
 
 /** @internal Imported only by an artifact carrying the structural takeover proof. */
@@ -828,10 +811,7 @@ function resolveFragment(
 		activated: false,
 	};
 	transaction.all.add(instance);
-	if (fresh) {
-		transaction.candidates.add(instance);
-		transaction.preview?.fragments.add(instance);
-	}
+	if (fresh) transaction.candidates.add(instance);
 	const cursors = new Map<number, Node | null>([[-1, range.start.nextSibling]]);
 	const counts = new Map<number, number>();
 	const regions = new Map<number, BindingRegion>();
@@ -955,7 +935,7 @@ function adoptRegion(region: RegionInstance, id: string, transaction: Transactio
 /**
  * The server wraps its `@try` output in this region and records the arm it
  * rendered. Renderer protocol nodes may precede that arm's own range: resolved
- * seeds, a catch receipt, or a streamed boundary. A pending boundary that is
+ * seeds or a streamed boundary. A pending boundary that is
  * still streaming is claimed here, exactly as the renderer claims it, so its
  * late segment can no longer swap into binding-owned DOM. An arm the server could
  * not render for adoption is rebuilt by the first commit.
@@ -969,13 +949,19 @@ function adoptTry(
 	const range = region.range;
 	let arm = region.arm;
 	let node = range.start.nextSibling;
+	let guard: Element | undefined;
 	while (node !== range.end && node !== null) {
 		if (node.nodeType === 1 && (node as Element).localName === 'template') {
 			const next = node.nextSibling;
 			if (!(node as Element).hasAttribute(STREAM_BOUNDARY_ATTR)) mismatch();
-			// An errored boundary has no adoptable arm; otherwise its fallback is.
-			arm = (node as Element).hasAttribute('data-oct-err') ? -2 : 1;
-			node.parentNode!.removeChild(node);
+			const errored = (node as Element).hasAttribute('data-oct-err');
+			// A primary's guard still belongs to the server until this view commits.
+			if (arm === 0 && !errored) guard = node as Element;
+			else {
+				// An errored boundary has no adoptable arm; otherwise its fallback is.
+				arm = errored ? -2 : 1;
+				node.parentNode!.removeChild(node);
+			}
 			node = next;
 			continue;
 		}
@@ -985,11 +971,14 @@ function adoptTry(
 		}
 		if (node.nodeType !== 8) mismatch();
 		const data = (node as Comment).data;
-		if (data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)) arm = -2;
+		if (
+			data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT) ||
+			data === STREAM_CATCH_COMMENT ||
+			data.startsWith(STREAM_CATCH_COMMENT + ':')
+		)
+			arm = -2;
 		else if (data.startsWith(STREAM_SEED_COMMENT)) arm = 0;
-		else if (data.startsWith(TRY_CATCH_COMMENT)) {
-			if (arm !== -2) arm = 2;
-		} else if (!data.startsWith(SUSPENSE_RESOLVED_COMMENT)) break;
+		else if (!data.startsWith(SUSPENSE_RESOLVED_COMMENT)) break;
 		node = node.nextSibling;
 	}
 	region.arm = arm;
@@ -999,7 +988,7 @@ function adoptTry(
 	const fragment = definition.arms[arm];
 	if (fragment) {
 		region.child = resolveFragment(fragment, id, body, false, transaction);
-		region.adopted = arm === 0;
+		region.adopted = guard ?? arm === 0;
 	} else if (body.start.nextSibling !== body.end) mismatch();
 }
 
@@ -1043,7 +1032,7 @@ function projectValues(
 			: (instance.definition.signalIndices ?? []);
 		for (const index of indices) {
 			requireActive(transaction);
-			let connection = (transaction.preview?.signals.get(instance) ?? instance.signals)?.get(index);
+			let connection = instance.signals?.get(index);
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
 				const prepare = (): (() => void) => {
@@ -1061,9 +1050,7 @@ function projectValues(
 					}
 					return () => writeOperation(instance, index, value, group, transaction);
 				};
-				const notify = forwardNativeTransitionConsumer(transaction.consumer!, (): void =>
-					transaction.notifySignal!(prepare),
-				);
+				const notify = (): void => transaction.notifySignal!(prepare);
 				connection = style
 					? transaction.styles!.connect(
 							instance.nodes[operations[index]![0]] as Element,
@@ -1071,35 +1058,20 @@ function projectValues(
 							transaction.restoreStyles,
 						)
 					: transaction.signals!.connect(notify);
-				if (transaction.preview) {
-					let signals = transaction.preview.signals.get(instance);
-					if (!signals)
-						transaction.preview.signals.set(instance, (signals = new Map(instance.signals)));
-					signals.set(index, connection);
-					const created = connection;
-					transaction.preview.disposals.push(() => created.dispose(true));
-				} else (instance.signals ??= new Map()).set(index, connection);
+				(instance.signals ??= new Map()).set(index, connection);
 			}
 			if (connection) {
 				if (!copied) {
 					values = [...values];
 					copied = true;
 				}
-				if (transaction.preview) {
-					const receipt = connection.preview(values[index]);
-					transaction.preview.receipts.push(receipt);
-					(values as unknown[])[index] = receipt.value;
-				} else (values as unknown[])[index] = connection.read(values[index]);
+				(values as unknown[])[index] = connection.read(values[index]);
 			}
 		}
 	}
 	return values.map((value, index) => {
 		if (operations[index]![1] === 'control') {
-			const control = transaction.preview
-				? instance.controls!.get(index)!.preview(value)
-				: instance.controls!.get(index)!.prepare(value);
-			transaction.preview?.controls.push(control as BindingControlPreview);
-			controls!.set(index, control);
+			controls!.set(index, instance.controls!.get(index)!.prepare(value));
 			return null;
 		}
 		return __normalizeBinding(operations[index]!, value);
@@ -1179,7 +1151,7 @@ function prepareFragment(
 		controls,
 		adapters: instance.cleanup?.prepare?.(environment),
 	};
-	if (!transaction.preview && (instance.signals || instance.controls || instance.projections)) {
+	if (instance.signals || instance.controls || instance.projections) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
@@ -1200,7 +1172,7 @@ function prepareFragment(
 		if (descriptor.kind === 'text') {
 			let value = descriptor.read(environment);
 			if (descriptor.signal && transaction.signals) {
-				let connection = transaction.preview?.text.get(region) ?? region.signal;
+				let connection = region.signal;
 				if (!connection && transaction.signals.isSignal(value)) {
 					const prepare = (): (() => void) => {
 						if (
@@ -1217,27 +1189,14 @@ function prepareFragment(
 							if (!instance.disposed && !transaction.disposed) writeText(region, next);
 						};
 					};
-					connection = transaction.signals.connect(
-						forwardNativeTransitionConsumer(transaction.consumer!, () =>
-							transaction.notifySignal!(prepare),
-						),
+					connection = region.signal = transaction.signals.connect(() =>
+						transaction.notifySignal!(prepare),
 					);
-					if (transaction.preview) {
-						transaction.preview.text.set(region, connection);
-						const created = connection;
-						transaction.preview.disposals.push(() => created.dispose());
-					} else region.signal = connection;
 				}
 				if (connection) {
-					if (transaction.preview) {
-						const receipt = connection.preview(value);
-						transaction.preview.receipts.push(receipt);
-						value = receipt.value;
-					} else {
-						region.signalPlan = candidate;
-						region.signalFrame = transaction.frame;
-						value = connection.read(value);
-					}
+					region.signalPlan = candidate;
+					region.signalFrame = transaction.frame;
+					value = connection.read(value);
 				}
 			}
 			candidate.text = textValue(value, descriptor.generic);
@@ -1383,10 +1342,9 @@ function prepareTry(
 			transaction.refresh!();
 		});
 	};
-	// A catch arm is kept for its error. An adopted server catch arm has none
-	// yet, so the first client failure takes over its DOM instead of rebuilding it.
+	// A catch arm is kept for its error.
 	candidate.child = prepareFragment(
-		region.arm === 2 && region.child && (region.caught === caught || region.caught === undefined)
+		region.arm === 2 && region.child && region.caught === caught
 			? region.child
 			: createFragment(descriptor.arms[2]!, instance.id, document, transaction),
 		environment.concat([caught.error, region.reset]),
@@ -1439,7 +1397,7 @@ function insertBody(
 	transaction: Transaction,
 ): void {
 	if (armRange) {
-		instance.range.start.data = '[';
+		writeMarker(instance.range.start, '[');
 		moveRange(instance.range, range.end.parentNode!, range.end, transaction);
 	} else {
 		let node = instance.range.start.nextSibling;
@@ -1519,6 +1477,8 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 	region.arm = plan.arm;
 	if (definition.kind === 'slot') region.slot = plan.slot;
 	else if (definition.kind === 'try') {
+		const adopted = region.adopted;
+		if (adopted && adopted !== true) adopted.remove();
 		region.caught = plan.caught;
 		region.adopted = false;
 	}
@@ -1539,9 +1499,14 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 			);
 	}
 	if (definition.kind === 'if')
-		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};${plan.arm}`;
+		writeMarker(region.range.start, `${BINDING_OPEN_PREFIX}${id};${region.site};${plan.arm}`);
 	else if (definition.kind === 'try')
-		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};y${plan.arm}`;
+		writeMarker(region.range.start, `${BINDING_OPEN_PREFIX}${id};${region.site};y${plan.arm}`);
+}
+
+/** A marker that already names its arm, as adopted server markup does, takes no write. */
+function writeMarker(marker: Comment, data: string): void {
+	if (marker.data !== data) marker.data = data;
 }
 
 function writeText(region: RegionInstance, value: string): void {
@@ -1820,6 +1785,12 @@ function bindProgram<Props>(
 		if (transaction.disposed) return;
 		if (busy) return;
 		busy = true;
+		// Render never writes the document. A publication inside an Octane render
+		// stays pending, as busy as a drain, until the render slice closes.
+		if (renderSlice?.open) {
+			renderSlice.drains.push(resume);
+			return;
+		}
 		try {
 			while ((dirty || signalUpdates?.size) && !transaction.disposed) {
 				if (!dirty) {
@@ -1946,105 +1917,20 @@ function bindProgram<Props>(
 				drain();
 			}
 		};
-	const refresh: NativeTransitionNotify = (): void => {
+	const resume = (): void => {
+		busy = false;
+		drain();
+	};
+	const refresh = (): void => {
 		if (transaction.disposed) return;
 		revision++;
 		dirty = true;
 		drain();
 	};
-	transaction.consumer = refresh;
 	transaction.refresh = refresh;
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	transaction.run = run;
-	refresh[NATIVE_TRANSITION_CONSUMER] = {
-		active: () => !transaction.disposed,
-		prepare: () =>
-			run(() => {
-				const version = revision;
-				const preview: BindingPreview = {
-					receipts: [],
-					controls: [],
-					fragments: new Set(),
-					signals: new Map(),
-					projections: new Map(),
-					text: new Map(),
-					disposals: [],
-				};
-				let accepted = false;
-				let retired = false;
-				const discard = (): void => {
-					if (accepted || retired) return;
-					retired = true;
-					for (const receipt of preview.receipts) receipt.discard();
-					for (const control of preview.controls) control.discard();
-					for (const dispose of preview.disposals) dispose();
-					for (const fragment of preview.fragments) releaseInstance(fragment, transaction);
-				};
-				let plan: FragmentPlan;
-				transaction.preview = preview;
-				const previousBusy = busy;
-				busy = true;
-				try {
-					const snapshot = source.getSnapshot();
-					if (snapshot != null && typeof (snapshot as { then?: unknown }).then === 'function')
-						throw new TypeError(formatClientError(296));
-					const environment = descriptor.prepareProps
-						? descriptor.prepareProps(snapshot)
-						: [snapshot];
-					plan = transaction.reads
-						? transaction.reads.prepare(() => prepareFragment(instance!, environment, transaction))
-						: prepareFragment(instance!, environment, transaction);
-					if (transaction.reads) preview.receipts.push(transaction.reads.preview());
-				} catch (error) {
-					discard();
-					throw error;
-				} finally {
-					transaction.preview = undefined;
-					busy = previousBusy;
-				}
-				return {
-					validate: () =>
-						!retired &&
-						!transaction.disposed &&
-						!busy &&
-						version === revision &&
-						preview.receipts.every((receipt) => receipt.validate()) &&
-						preview.controls.every((control) => control.validate()),
-					discard,
-					commit() {
-						if (retired || accepted || transaction.disposed) return;
-						accepted = true;
-						busy = true;
-						try {
-							for (const [fragment, signals] of preview.signals) fragment.signals = signals;
-							for (const [fragment, projections] of preview.projections)
-								fragment.projections = projections;
-							for (const [region, signal] of preview.text) region.signal = signal;
-							for (const receipt of preview.receipts) receipt.commit();
-							transaction.hostOperations?.publish(plan, transaction);
-							const document = instance!.range.start.ownerDocument;
-							const tree = instance!.range.start.getRootNode();
-							transaction.focused =
-								'activeElement' in tree
-									? (tree as Document | ShadowRoot).activeElement
-									: document.activeElement;
-							while (transaction.focused?.shadowRoot?.activeElement)
-								transaction.focused = transaction.focused.shadowRoot.activeElement;
-							transaction.contentEditable = !!(transaction.focused as HTMLElement | null)
-								?.isContentEditable;
-							commitFragment(plan, transaction);
-							transaction.published?.();
-							for (const fragment of preview.fragments) transaction.candidates.delete(fragment);
-							activateInstance(instance!, transaction);
-							settleFirstCommit(true);
-						} finally {
-							busy = false;
-						}
-					},
-				};
-			}),
-	};
 	transaction.reads = descriptor.trackReads?.(refresh);
 	let handoff: BindingHandoff | undefined;
 	const handle = {
@@ -2150,6 +2036,7 @@ function bindProgram<Props>(
 			return handle;
 		}
 		signal?.addEventListener('abort', abort, { once: true });
+		watchRenderSlices();
 		const stop = source.subscribe(refresh);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(299));
 		if (transaction.disposed) stop();
@@ -2392,13 +2279,13 @@ function commitList(plan: RegionPlan, id: string, transaction: Transaction): voi
 		}
 		let anchor: Node = region.range.end;
 		for (const [key, item] of [...plan.items].reverse()) {
-			item.instance.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};k;${key}`;
+			writeMarker(item.instance.range.start, `${BINDING_OPEN_PREFIX}${id};${region.site};k;${key}`);
 			moveRange(item.instance.range, region.range.end.parentNode!, anchor, transaction);
 			if (transaction.disposed) return;
 			anchor = item.instance.range.start;
 		}
 	}
-	region.range.start.data = `${HYDRATION_FOR_PREFIX}${plan.arm};b;${id};${region.site}`;
+	writeMarker(region.range.start, `${HYDRATION_FOR_PREFIX}${plan.arm};b;${id};${region.site}`);
 	return;
 }
 
@@ -2425,9 +2312,7 @@ function claimProgramControl(
 		transaction.controls.claim(
 			node,
 			instance.definition.bindings[index]![2] as 'value' | 'checked',
-			forwardNativeTransitionConsumer(transaction.consumer!, () =>
-				transaction.notifySignal!(prepare),
-			),
+			() => transaction.notifySignal!(prepare),
 		),
 	);
 }
@@ -2443,9 +2328,7 @@ function projectHostValues(
 		for (const group of instance.definition.projectionGroups) {
 			requireActive(transaction);
 			const first = group[0]![0];
-			let connection = (
-				transaction.preview?.projections.get(instance) ?? instance.projections
-			)?.get(first);
+			let connection = instance.projections?.get(first);
 			if (!connection) {
 				const prepare = (): (() => void) => {
 					if (
@@ -2478,29 +2361,13 @@ function projectHostValues(
 					group,
 					operations,
 					instance.nodes,
-					forwardNativeTransitionConsumer(transaction.consumer!, () =>
-						transaction.notifySignal!(prepare),
-					),
+					() => transaction.notifySignal!(prepare),
 					transaction.restoreStyles,
 				);
-				if (transaction.preview) {
-					let projections = transaction.preview.projections.get(instance);
-					if (!projections)
-						transaction.preview.projections.set(
-							instance,
-							(projections = new Map(instance.projections)),
-						);
-					for (const [index] of group) projections.set(index, connection);
-					const created = connection;
-					transaction.preview.disposals.push(() => created.dispose(true));
-				} else {
-					instance.projections ??= new Map();
-					for (const [index] of group) instance.projections.set(index, connection);
-				}
+				instance.projections ??= new Map();
+				for (const [index] of group) instance.projections.set(index, connection);
 			}
-			const receipt = transaction.preview ? connection.preview(values[first]) : undefined;
-			if (receipt) transaction.preview!.receipts.push(receipt);
-			const projected = receipt ? receipt.value : connection.read(values[first]);
+			const projected = connection.read(values[first]);
 			for (const [index] of group) (values as unknown[])[index] = projected[index];
 		}
 	}

@@ -1,5 +1,5 @@
 import { evaluateCompiledFixtureCode } from './_server-fixture.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
@@ -218,7 +218,7 @@ describe('SSR parallel use() — the server mirror', () => {
 		expect(ic).toBeGreaterThan(ib);
 	});
 
-	it('routes a batch-registered rejection to @catch', async () => {
+	it('reports a batch-registered rejection and leaves its boundary for a client render', async () => {
 		const mod = evalServer(
 			`export function Page(p) @{
 				<main>
@@ -233,12 +233,19 @@ describe('SSR parallel use() — the server mirror', () => {
 			}`,
 			'rej.tsrx',
 		);
-		const out = await prerender(mod.Page, {
-			make: (name: string) =>
-				name === 'b' ? Promise.reject(new Error('boom-' + name)) : Promise.resolve(name),
-		});
+		const onError = vi.fn();
+		const out = await prerender(
+			mod.Page,
+			{
+				make: (name: string) =>
+					name === 'b' ? Promise.reject(new Error('boom-' + name)) : Promise.resolve(name),
+			},
+			{ onError },
+		);
 		expect(out.html).toContain('caught: boom-b');
+		expect(out.html).not.toContain('<i>w</i>');
 		expect(out.html).not.toContain('class="ok"');
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('renderToString (single pass, no await) still shows @pending for a batched suspend', () => {

@@ -151,7 +151,7 @@ describe('inline hook-memo tier — compile-mode and shape routing', () => {
 			{ ...PROD, autoMemo: false, inlineHookMemo: false },
 		).code;
 		expect(code.match(/\buseMemo\(/g)?.length).toBe(2);
-		expect(code).not.toMatch(/octane\/internal\/client/);
+		expect(code).not.toMatch(/\b(?:hookMemo\w*|compilerMemo\w*|markCompilerMemo) as\b/);
 	});
 
 	it('does not lend render-local cache bindings to a later class initializer', () => {

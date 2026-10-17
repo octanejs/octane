@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, onTestFinished } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
@@ -106,6 +106,10 @@ describe('hydrateRoot — first update after hydration', () => {
 			container.innerHTML = html.slice(open + '<div id="__app">'.length, close);
 			const serverButton = container.querySelector('.inner-button') as HTMLButtonElement;
 			expect(serverButton).toBeTruthy();
+			// The document's output opened with the protocol version, before <html>.
+			expect(html.startsWith('<!--3-->')).toBe(true);
+			const mark = document.insertBefore(document.createComment('3'), document.documentElement);
+			onTestFinished(() => mark.remove());
 
 			const root = hydrateRoot(container, StartShape, props);
 			flushSync(() => {});

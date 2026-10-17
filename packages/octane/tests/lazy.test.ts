@@ -602,9 +602,32 @@ describe('lazy — SSR', () => {
 		}
 	});
 
-	it('prerender routes a rejected load to @catch', async () => {
+	it('prerender renders @catch for a rejected load and hydration retries it', async () => {
+		const onError = vi.fn();
 		const L = Server.lazy(() => Promise.reject(new Error('chunk failed')));
-		const r = await prerender(m.LazyHost, { comp: L });
-		expect(r.html).toContain('caught: chunk failed');
+		const r = await prerender(m.LazyHost, { comp: L }, { onError });
+		expect(onError).not.toHaveBeenCalled();
+
+		const container = document.createElement('div');
+		container.innerHTML = r.html;
+		document.body.appendChild(container);
+		expect(container.querySelector('.error')?.textContent).toBe('caught: chunk failed');
+		const load = deferred<{ default: any }>();
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			LazyHost,
+			{ comp: lazy(() => load.promise) },
+			{ onRecoverableError: (error) => recoverable.push(error) },
+		);
+		try {
+			await act(() => load.reject(new Error('chunk failed')));
+			expect(container.querySelector('.error')?.textContent).toBe('caught: chunk failed');
+			expect(container.querySelector('.fallback')).toBeNull();
+			expect(recoverable).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 });

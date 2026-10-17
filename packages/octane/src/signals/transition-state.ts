@@ -3,103 +3,159 @@ import type {
 	CandidateProducer,
 	DeclarationViewFork,
 	GraphOwner,
-	ScopedNode,
 	NodeState,
-	SignalReadMode,
+	ScopedNode,
 	SignalGraph,
+	SignalObserver,
+	SignalReadMode,
 } from './graph.js';
+import type { NativeReadSource } from './read-protocol.js';
 import type { ResourceBinding } from './requests.js';
-import type { SignalActionFrame } from './transition-action.js';
-import type { SignalCandidateFrame } from './transition-candidate.js';
-import type { SignalTransitionCoordinatorFactory } from './transition-coordinator.js';
-import { setNativeCandidateResolver, type NativeReadSource } from './read-protocol.js';
 
-/** Shared state keeps model registration separate from optional native presentation. */
-interface CandidateGraph {
+/**
+ * The graph operations pending.ts and the server seed serializer need. The
+ * graph registers them, so pending state can live with the renderer
+ * (`octane-islands`, see action-capability.ts) and a server render that never
+ * creates a signal never loads the graph, without either importing it.
+ */
+interface GraphBridge {
 	ScopedNode: typeof import('./graph.js').ScopedNode;
 	graph: SignalGraph;
-	flags: { Dirty: number; Mutable: number; Watching: number };
 	historical(): boolean;
-	link(from: ScopedNode, to: ScopedNode): void;
-	removeQueued(node: ScopedNode): void;
 	assertAlive(owner: GraphOwner): void;
+	link(from: ScopedNode, to: ScopedNode | SignalObserver): void;
+	removeQueued(node: ScopedNode): void;
 	strictValue<T>(state: NodeState<T>, key?: string): T;
 	refreshNode<T>(node: ScopedNode<T>): NodeState<T>;
 	pure<T>(read: () => T): T;
 	untrack<T>(read: () => T): T;
 	signalBatch<T>(read: () => T): T;
+	presentQueued(): void;
 	publishNode<T>(node: ScopedNode<T>, state: NodeState<T>): void;
+	invalidateNode(node: ScopedNode): void;
 	readyState<T>(value: T): NodeState<T>;
 	commitState(node: ScopedNode, state: NodeState): void;
 	sameState(a: NodeState | undefined, b: NodeState): boolean;
 	releaseRetainedOwners(node: ScopedNode): void;
 	retainOwners(node: ScopedNode): void;
 	releaseRetention(node: ScopedNode): void;
-	createNativeSource(node: ScopedNode, mode: SignalReadMode): NativeReadSource;
 	attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void;
 	declarationViewFork(node: ScopedNode): DeclarationViewFork | undefined;
+	isDeclarationView(node: unknown): boolean;
 }
 
-/** Graph registration owns model transactions; native presentation remains optional. */
-export let candidateGraph: CandidateGraph;
-export function registerCandidateGraph(graph: CandidateGraph): void {
-	candidateGraph = graph;
+export let graphBridge: GraphBridge;
+export function registerGraphBridge(graph: GraphBridge): void {
+	graphBridge = graph;
 }
 
 /**
- * The graph's default registration (action-capability.ts). It is live, so it
- * also admits signals loaded after a renderer Action has awaited.
+ * What the renderer's transitions tell pending signals (runtime.ts installs it
+ * with startTransition). Batches are the renderer's own records; the graph only
+ * passes them back.
  */
-export let createSignalActionFrame: (() => SignalActionFrame) | undefined;
-export function registerSignalActionFrameFactory(factory: () => SignalActionFrame): void {
-	createSignalActionFrame = factory;
+export interface PendingHost {
+	/** The transition batch a write joins, or null for an urgent write. */
+	batch(): object | null;
+	/**
+	 * Whether the current read sees `batch`: a transition render that folds it,
+	 * or its synchronous transition callback. Undefined outside both, as at commit.
+	 */
+	visible(batch: object): boolean | undefined;
+	root(batch: object): object;
+	/** Commit two batches together, as transitions that update one hook cell are. */
+	entangle(into: object, from: object): void;
+	/** A Block that reads a node pending in `batch` renders with it. */
+	consume(batch: object, block: object): void;
+	/** Promote `slot` when `batch` finishes. */
+	hold(batch: object, slot: PendingSlotLike): void;
 }
 
-/** The renderer consults this live capability when its first native write occurs. */
-export let createSignalTransitionCoordinator: SignalTransitionCoordinatorFactory | undefined;
-export function registerSignalTransitionCoordinatorFactory(
-	factory: SignalTransitionCoordinatorFactory,
-): void {
-	createSignalTransitionCoordinator = factory;
+/** A node's pending state (pending.ts), opaque to the graph and the renderer. */
+export interface PendingSlotLike {
+	readonly node: ScopedNode;
+	readonly shadow: ScopedNode | undefined;
+	batch: object;
 }
 
-export function withoutSignalCandidate<T>(callback: () => T): T {
-	const previous = activeCandidate;
-	const resolver = setNativeCandidateResolver(null);
-	activeCandidate = undefined;
+/** A forked binding runs and resolves its reads in its slot's batch. */
+export interface CandidateContext {
+	run<T>(callback: () => T): T;
+	resolve<T>(node: ScopedNode<T>): ScopedNode<T>;
+	canonical<T>(node: ScopedNode<T>): ScopedNode<T>;
+}
+
+/** The graph's entry points into pending.ts. */
+export interface PendingSignals {
+	host: PendingHost | undefined;
+	/** The batch a write joins, or null when it is urgent. */
+	batch(): object | null;
+	write(node: ScopedNode, value: unknown, batch: object): void;
+	/** An urgent write re-applies on top of the node's pending value. */
+	rebase(node: ScopedNode, value: unknown): void;
+	resolve<T>(node: ScopedNode<T>): ScopedNode<T>;
+	/** Entered around every evaluation while any slot is live; returns the outer world. */
+	enter(node: ScopedNode): unknown;
+	leave(world: unknown, node: ScopedNode): void;
+	/** A committed node whose pending state the current read sees instead. */
+	hides(node: ScopedNode): boolean;
+	source(shadow: ScopedNode, read: SignalReadMode): NativeReadSource;
+	drop(slot: PendingSlotLike): void;
+	promote(slots: readonly PendingSlotLike[]): void;
+}
+
+/** Installed once both the renderer's transitions and the pending code are present. */
+export let pendingSignals: PendingSignals | undefined;
+/** pendingSignals while any node is pending: reads consult it only then. */
+export let pendingWorld: PendingSignals | undefined;
+let implementation: PendingSignals | undefined;
+let host: PendingHost | undefined;
+
+// Signals can load before or after the renderer's first transition.
+function activate(): void {
+	if (implementation === undefined || host === undefined) return;
+	implementation.host = host;
+	pendingSignals = implementation;
+}
+
+export function registerPendingSignals(value: PendingSignals): void {
+	implementation ??= value;
+	activate();
+}
+
+export function registerPendingHost(value: PendingHost): void {
+	host = value;
+	activate();
+}
+
+export function setPendingWorld(live: boolean): void {
+	pendingWorld = live ? pendingSignals : undefined;
+}
+
+/** Writes and reads inside are urgent and committed, whatever transition is active. */
+export let committedSignals = 0;
+export function withCommittedSignals<T>(callback: () => T): T {
+	committedSignals++;
 	try {
 		return callback();
 	} finally {
-		activeCandidate = previous;
-		setNativeCandidateResolver(resolver);
+		committedSignals--;
 	}
 }
 
 /** Internal capability refusal, distinct from an authored TypeError. */
 export class CandidateUnsupportedError extends TypeError {}
 
-export let activeCandidate: SignalActionFrame | undefined;
-/** Synchronous action scope; never keep a candidate active across an await. */
-export function swapActiveSignalCandidate(
-	frame: SignalActionFrame | undefined,
-): SignalActionFrame | undefined {
-	const previous = activeCandidate;
-	activeCandidate = frame;
-	return previous;
-}
-
 /**
- * What only an Action frame uses, consulted by the graph and the binding modules.
- * The frame (transition-action.ts) and its candidate producers
- * (candidate-producers.ts) install these, so a bundle that carries no frame
- * carries none of their code. Every field is declared up front: the graph reads
- * this object on writes and invalidation, and its shape never changes.
+ * What only pending state uses, consulted by the graph and the binding modules.
+ * pending.ts and its candidate producers (candidate-producers.ts) install these,
+ * so a bundle that carries neither carries none of their code. Every field is
+ * declared up front: the graph reads this object on invalidation, and its shape
+ * never changes.
  */
 export const candidateHooks: {
-	/** Accepting a frame runs its graph's producer invalidation after the graph settles. */
+	/** Promotion runs its graph's producer invalidation after the graph settles. */
 	defer: boolean;
-	/** Present while a frame holds a write: revokes or records it for an urgent write. */
-	urgentWrite?: ((node: ScopedNode, value: unknown) => (() => void)[] | undefined) | undefined;
 	/** Forks a resource (requests.ts) into a private candidate. */
 	resource?: ((this: ResourceBinding, target: ScopedNode) => CandidateProducer) | undefined;
 	/** Forks a general derived binding (computations.ts) into a private candidate. */
@@ -107,7 +163,7 @@ export const candidateHooks: {
 		| ((
 				this: DerivedBinding<any>,
 				target: ScopedNode,
-				frame: SignalCandidateFrame,
+				context: CandidateContext,
 		  ) => CandidateProducer)
 		| undefined;
-} = { defer: false, urgentWrite: undefined, resource: undefined, derived: undefined };
+} = { defer: false, resource: undefined, derived: undefined };

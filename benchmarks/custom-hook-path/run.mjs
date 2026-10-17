@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { COUNTER_GLOBAL, emptyCounters, instrumentJavaScript } from '../hook-memo/instrument.mjs';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 
 const repo = path.resolve(import.meta.dirname, '../..');
@@ -32,13 +33,7 @@ const names = new Set([
 
 function extract(mode, ref) {
 	const file = `packages/octane/src/${mode === 'client' ? 'runtime.ts' : mode === 'server' ? 'runtime.server.ts' : 'universal-core.ts'}`;
-	const source = ref
-		? execFileSync('git', ['show', `${ref}:${file}`], {
-				cwd: repo,
-				encoding: 'utf8',
-				maxBuffer: 8e6,
-			})
-		: readFileSync(path.join(repo, file), 'utf8');
+	const source = readClientRuntime(path.join(repo, file), ref);
 	const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const declarations = ast.statements.filter(
 		(node) =>

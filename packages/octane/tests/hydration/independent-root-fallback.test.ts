@@ -4,7 +4,7 @@ import {
 	bootstrapIndependentHydration,
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
-import { HYDRATE_INDEPENDENT_ATTR } from '../../src/hydration-markers.js';
+import { HYDRATE_INDEPENDENT_ATTR } from '../../src/hydration-protocol.js';
 import { flushSync, hasPendingWork, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { evaluateCompiledFixtureCode, loadCompiledFixtureSource } from '../_server-fixture.js';
@@ -340,6 +340,61 @@ export function App(props) @{
 				expect(page.errors).toEqual([]);
 			} finally {
 				root?.unmount();
+				page.dispose();
+			}
+		},
+	);
+});
+
+// An independent island hydrates on a root of its own, so its output opens with
+// the hydration protocol version as a root's does (hydration-protocol.ts),
+// whether or not it seeds anything. An island whose server spoke another
+// version renders on the client when it activates, instead of adopting ranges
+// it would misread; its sibling of this version adopts its server DOM.
+describe('the hydration protocol version of an independent island', () => {
+	it.each([false, true])(
+		'renders an island of another version on the client (dev: %s)',
+		async (dev) => {
+			const page = serveIslands(
+				`import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Widget } from './widgets';
+export function App() @{
+  <main>
+    <Hydrate independent when={interaction()}>
+      <Widget />
+    </Hydrate>
+    <Hydrate independent when={interaction()}>
+      <Widget />
+    </Hydrate>
+  </main>
+}`,
+				dev,
+				`version-${dev}`,
+				2,
+			);
+			try {
+				const { wrappers, buttons } = page;
+				for (const wrapper of wrappers) {
+					expect(wrapper.firstChild!.nodeType).toBe(Node.COMMENT_NODE);
+					expect((wrapper.firstChild as Comment).data).toBe('3');
+				}
+				(wrappers[1].firstChild as Comment).data = '2';
+
+				await page.activate(0);
+				expect(wrappers[0].querySelector('button')).toBe(buttons[0]);
+
+				buttons[1].click();
+				await expect.poll(() => wrappers[1].querySelector('button')).not.toBe(buttons[1]);
+				await settle();
+				expect(buttons[1].isConnected).toBe(false);
+				const rendered = wrappers[1].querySelector('button')!;
+				expect(rendered.textContent).toBe('0');
+				flushSync(() => rendered.click());
+				expect(rendered.textContent).toBe('1');
+				expect(page.mounted).toHaveBeenCalledTimes(2);
+				expect(page.errors).toEqual([]);
+			} finally {
 				page.dispose();
 			}
 		},

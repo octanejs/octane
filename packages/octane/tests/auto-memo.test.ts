@@ -4832,6 +4832,7 @@ describe('compiler-owned component-region memoization', () => {
 	it.each([
 		{ serverReceiver: 'native', clientReceiver: 'custom' },
 		{ serverReceiver: 'custom', clientReceiver: 'native' },
+		{ serverReceiver: 'custom', clientReceiver: 'custom' },
 	])(
 		'adopts keyed component rows when server rendering uses $serverReceiver map and hydration uses $clientReceiver map',
 		({ serverReceiver, clientReceiver }) => {

@@ -176,17 +176,11 @@ async function scenario(dev: boolean, split: boolean, name: string) {
 		};
 		await view.api.act(() => root.render(Component, latest));
 		const live = view.host.querySelector('#synthetic-control')! as HTMLButtonElement;
-		// Captures that changed before activation make the island's server HTML
-		// stale, so the island renders on the client, as React client-renders a
-		// dehydrated boundary it cannot hydrate with the props it now has. That is
-		// no mismatch: nothing is reported or logged. A native value that changed
-		// alone still adopts the server's control.
-		if (name === 'external-only') {
-			expect(live).toBe(control);
-		} else {
-			expect(live).not.toBe(control);
-			expect(control.isConnected).toBe(false);
-		}
+		// Captures that changed before activation: as React hydrates a dehydrated
+		// boundary before the update that reached it, the island adopts its server
+		// control with the captures it was claimed with, then applies the latest
+		// ones. A native value that changed alone adopts the server's control too.
+		expect(live).toBe(control);
 		expect(live.getAttribute('data-identity')).toBe(latest.identity);
 		expect(live.hidden).toBe(false);
 		expect(recoverable).toEqual([]);
@@ -196,7 +190,13 @@ async function scenario(dev: boolean, split: boolean, name: string) {
 		// Dev and prod render the child only live, inside native read collection.
 		expect(renders.length).toBeGreaterThan(0);
 		expect(renders.every((render) => render.guarded && render.observer)).toBe(true);
-		expect(view.diagnostics).toEqual([]);
+		// A claimed identity that differs from the server's is a value hydration
+		// keeps, which development reports, as React does.
+		expect(view.diagnostics).toEqual(
+			dev && initialMismatch
+				? [{ level: 'error', args: [expect.stringContaining('attribute `data-identity`')] }]
+				: [],
+		);
 		if (model) {
 			await view.api.act(() => model.hidden$.set(true));
 			expect(live.hidden).toBe(true);
@@ -300,37 +300,56 @@ for (const dev of [true, false])
 						localInitial: name !== 'local-corrected',
 					};
 					await view.api.act(() => root.render(Component, latest));
-					// Captures that changed before activation render the island on the
-					// client. The abandoned hydrating attempt's local state is discarded
-					// with it, so the client render's cell is the live one.
+					// Captures that changed before activation: the island hydrates the
+					// captures it was claimed with, so its local cell starts from the
+					// claimed initial value, then the latest captures apply as an update,
+					// which keeps that cell. The server's controls stay, and where the
+					// claimed status differs from the server's, hydration keeps the
+					// server's `hidden` until the cell changes it, as React keeps a
+					// mismatched attribute.
+					const claimed = initial.localInitial;
 					const liveControl = view.host.querySelector('#synthetic-control')! as HTMLButtonElement;
 					const liveStatus = view.host.querySelector('#synthetic-local-status')! as HTMLSpanElement;
-					expect(liveControl).not.toBe(control);
-					expect(liveStatus).not.toBe(status);
-					expect(control.isConnected).toBe(false);
+					expect(liveControl).toBe(control);
+					expect(liveStatus).toBe(status);
 					expect(cells.length).toBeGreaterThan(0);
 					const actual = cells[cells.length - 1];
 					expect(actual.owner.retired).toBe(false);
 					for (const cell of cells) if (cell !== actual) expect(cell.owner.retired).toBe(true);
-					expect(actual.get()).toBe(latest.localInitial);
-					expect(liveStatus.hidden).toBe(!latest.localInitial);
+					expect(actual.get()).toBe(claimed);
+					expect(liveStatus.hidden).toBe(true);
 					expect(rejectedWrites).toBe(cells.length);
 					expect(rejectedSubscriptions).toBe(cells.length);
 					expect(publications).toBe(0);
-					expect(view.diagnostics).toEqual([]);
+					expect(view.diagnostics).toEqual(
+						dev && name !== 'later-state'
+							? [
+									{
+										level: 'error',
+										args: [
+											expect.stringContaining(
+												name === 'primitive-corrected'
+													? 'attribute `data-identity`'
+													: 'attribute `hidden`',
+											),
+										],
+									},
+								]
+							: [],
+					);
 					expect(refs.filter(Boolean)).toEqual([liveControl]);
 					expect(effects).toEqual(['layout-mount', 'passive-mount']);
 					const rendered = cells.length;
 					await view.api.act(() => liveControl.click());
-					expect(actual.get()).toBe(!latest.localInitial);
-					expect(liveStatus.hidden).toBe(latest.localInitial);
+					expect(actual.get()).toBe(!claimed);
+					expect(liveStatus.hidden).toBe(claimed);
 					await view.api.act(() =>
 						root.render(Component, { ...latest, localInitial: !latest.localInitial }),
 					);
 					// Later renders keep the live cell.
 					expect(cells.slice(rendered).every((cell) => cell === actual)).toBe(true);
-					expect(actual.get()).toBe(!latest.localInitial);
-					expect(liveStatus.hidden).toBe(latest.localInitial);
+					expect(actual.get()).toBe(!claimed);
+					expect(liveStatus.hidden).toBe(claimed);
 					view.api.flushSync(() => root.unmount());
 					root = null;
 					await view.api.act(() => {});
@@ -402,9 +421,9 @@ for (const dev of [true, false])
 				expect(cells).toEqual([]);
 				const latest = { ...initial, when: view.api.load(), identity: 'later-client' };
 				await view.api.act(() => root.render(Component, latest));
-				// The changed identity renders the island on the client, discarding the
-				// hydrating attempt and the local state it initialized. Every
-				// initialization runs inside a live, observed render.
+				// The changed identity: the island hydrates the captures it was claimed
+				// with, initializing its local state once, then applies the latest ones.
+				// Every initialization runs inside a live, observed render.
 				const activated = initializations;
 				expect(activated).toBeGreaterThan(0);
 				expect(unobservedRenders).toBe(0);
@@ -415,8 +434,8 @@ for (const dev of [true, false])
 				expect(actual.get()).toBe(false);
 				const liveControl = view.host.querySelector('#synthetic-control')! as HTMLButtonElement;
 				const liveStatus = view.host.querySelector('#synthetic-local-status')! as HTMLSpanElement;
-				expect(liveControl).not.toBe(control);
-				expect(status.isConnected).toBe(false);
+				expect(liveControl).toBe(control);
+				expect(liveStatus).toBe(status);
 				expect(liveStatus.hidden).toBe(true);
 				expect(refs.filter(Boolean)).toEqual([liveControl]);
 				expect(effects).toEqual(['layout-mount', 'passive-mount']);

@@ -119,7 +119,7 @@ describe('native reads throughout component invocation', () => {
 					const host = client.clone(childTemplate);
 					bag = client.bag1(owner, host, host.firstChild);
 				}
-				client.setText(bag!.a, String(value));
+				client.setRenderText(bag!.a, String(value));
 			} finally {
 				client.endNativeReadScope(token, true);
 			}

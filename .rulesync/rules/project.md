@@ -13,8 +13,8 @@ of time from `.tsrx`. It works end to end, but this is beta and APIs still move.
 
 Trust the source over any summary, this file included:
 
-- `packages/octane/src/runtime.ts`: the client runtime. It is long and heavily
-  commented, and those comments are the design spec.
+- `packages/octane/src/runtime/`: the client runtime, one module per concept,
+  re-exported by `runtime.ts`. Its comments are the design spec.
 - `packages/octane/src/runtime.server.ts` and `src/server/`: SSR. `docs/ssr.md`
   documents the public surface.
 - `packages/octane/src/compiler/`: the `.tsrx` compiler.

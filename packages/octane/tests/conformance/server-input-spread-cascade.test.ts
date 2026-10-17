@@ -45,7 +45,7 @@ matrix.itRenders('resolves input controlled/default cascades across spreads', {
 	component: 'InputSpreadCascades',
 	mismatch: {
 		mutateServerDom(container) {
-			container.innerHTML = '<aside id="wrong-input-spread-tree">wrong</aside>';
+			container.innerHTML = '<!--3--><aside id="wrong-input-spread-tree">wrong</aside>';
 		},
 	},
 	hydrationDiagnostics: cascadeHydrationDiagnostics(
@@ -171,7 +171,7 @@ matrix.itRenders('resolves textarea and select form state across spreads', {
 	component: 'TextareaSelectSpreadCascades',
 	mismatch: {
 		mutateServerDom(container) {
-			container.innerHTML = '<aside id="wrong-textarea-select-tree">wrong</aside>';
+			container.innerHTML = '<!--3--><aside id="wrong-textarea-select-tree">wrong</aside>';
 		},
 	},
 	hydrationDiagnostics: cascadeHydrationDiagnostics([
@@ -322,7 +322,7 @@ matrix.itRenders('resolves arbitrary native attribute collisions across spreads'
 	component: 'AttributeSpreadCollisions',
 	mismatch: {
 		mutateServerDom(container) {
-			container.innerHTML = '<aside id="wrong-attribute-spread-tree">wrong</aside>';
+			container.innerHTML = '<!--3--><aside id="wrong-attribute-spread-tree">wrong</aside>';
 		},
 	},
 	assertCommon({ root }) {
@@ -405,7 +405,7 @@ it('preserves arbitrary attribute evaluation order while resolving collisions', 
 // Per ReactJSXTransformIntegration-test.js:95. Replacing an existing prop does
 // not move its insertion position in the JSX props snapshot.
 it('retains first insertion order when a later direct writer replaces the same prop', () => {
-	expect(renderToString(server.AttributeSpreadOrder).html).toBe('<div a="3" b="2"></div>');
+	expect(renderToString(server.AttributeSpreadOrder).html).toBe('<!--3--><div a="3" b="2"></div>');
 });
 
 // Distinct raw aliases share one host attribute, but the winning alias keeps
@@ -429,7 +429,7 @@ it('orders normalized alias winners by the winning raw prop position', () => {
 			id: value('id'),
 			finalFor: value('final for'),
 		}).html,
-	).toBe('<label id="id" for="final for">label</label>');
+	).toBe('<!--3--><label id="id" for="final for">label</label>');
 	expect(log).toEqual(['id', 'final for']);
 });
 

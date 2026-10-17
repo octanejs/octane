@@ -186,7 +186,10 @@ describe.each([
 		expect(container.querySelector('main')).toBe(main);
 	});
 
-	it('client-renders a dormant island silently when its host child changed before activation', async () => {
+	// As React hydrates a dehydrated boundary before the update that reached it,
+	// the island adopts the server's host child with the captures it rendered,
+	// then the update replaces it, and nothing reports.
+	it('hydrates a dormant island, then updates its host child silently when it changed before activation', async () => {
 		const serverProps = { when: condition(false), server: true };
 		container.innerHTML = ServerRT.renderToString(server.DormantHost, serverProps).html;
 		const host = container.querySelector('#host')!;
@@ -198,8 +201,8 @@ describe.each([
 		await act(() => root!.render(client.DormantHost, { when: load(), server: false }));
 		await act(async () => {});
 
-		expect(host.isConnected).toBe(false);
-		expect(markup(container.querySelector('#host')!)).toBe('<span><em>q</em></span>');
+		expect(container.querySelector('#host')).toBe(host);
+		expect(markup(host)).toBe('<span><em>q</em></span>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

@@ -346,7 +346,7 @@ describe('server renderable values', () => {
 		expect(Lazy.displayName).toBe('Lazy');
 		expect(loader).not.toHaveBeenCalled();
 		expect(getter).not.toHaveBeenCalled();
-		expect((await Static.prerender(Lazy)).html).toBe('loaded');
+		expect((await Static.prerender(Lazy)).html).toBe('<!--3-->loaded');
 		expect(Lazy.displayName).toBe('Named');
 		Lazy.displayName = 'Wrapped';
 		expect(Lazy.displayName).toBe('Wrapped');

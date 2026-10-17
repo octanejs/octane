@@ -1,10 +1,10 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { ScopeImpl } from './engine.js';
 import { encodeSignalValue } from './encoding.js';
-import { ScopeDisposedError, SignalFrameError } from './errors.js';
+import { assertAlive, ScopeDisposedError, SignalFrameError } from './errors.js';
 import type { ScopedNode, SignalReadMode } from './graph.js';
 import { isNativeAdoptionMiss, type NativeSerializedScope } from './read-protocol.js';
-import { candidateGraph } from './transition-state.js';
+import { graphBridge } from './transition-state.js';
 import type { SignalSeedEntry } from './types.js';
 
 // Kept out of native-read-seeds.ts, which every hydrating client imports. It
@@ -32,7 +32,7 @@ export function scopeSeedEntry(
 		read === 'latest' && node.state?.snapshot.status !== 'ready' ? node.lastState : node.state;
 	// A producer's cancellation callback may serialize before graph teardown.
 	// Only still-live inputs may be copied into a new historical handoff.
-	if (presented?.owners) for (const owner of presented.owners) candidateGraph.assertAlive(owner);
+	if (presented?.owners) for (const owner of presented.owners) assertAlive(owner);
 	const snapshot = presented?.snapshot;
 	if (snapshot?.status !== 'ready') {
 		if (read !== 'latest') return undefined;
@@ -82,7 +82,7 @@ export function serializeScopeRead(
 		if (seen.has(node)) continue;
 		seen.add(node);
 		const owner = node.owner as ScopeImpl;
-		candidateGraph.assertAlive(owner);
+		graphBridge.assertAlive(owner);
 		if (!owner.seedable) continue;
 		const other = keys.get(owner.scopeKey);
 		if (other && other !== owner) {
@@ -96,7 +96,7 @@ export function serializeScopeRead(
 			entries.push(entry);
 		}
 		for (let link = node.deps; link; link = link.nextDep) {
-			if (link.dep instanceof candidateGraph.ScopedNode) pending.push(link.dep);
+			if (link.dep instanceof graphBridge.ScopedNode) pending.push(link.dep);
 		}
 	}
 	return [...owners].map(([owner, entries]) => ({

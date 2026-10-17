@@ -14,7 +14,8 @@ import type * as Fixture from './_fixtures/split-hydrate-local-bindings.tsrx';
 // Directive-local bindings inside and around split `<Hydrate>` boundaries. The
 // server renders every boundary inline. The client parent and each split child
 // are compiled from the same source, bundled together, and hydrated over the
-// server HTML in development and production.
+// server HTML in development and production. The @catch cases render
+// successfully on the server and throw while the client hydrates.
 
 type Props = Fixture.Props;
 type Input = Omit<Props, 'when' | 'onPick'>;
@@ -85,7 +86,7 @@ function copy(input: Input): Input {
 	};
 }
 
-async function hydrate(dev: boolean, view: View, input: Input) {
+async function hydrate(dev: boolean, view: View, input: Input, serverInput = input) {
 	const code = await bundle(dev);
 	const window = new Window({ settings: { enableJavaScriptEvaluation: true } });
 	const diagnostics: unknown[][] = [];
@@ -106,7 +107,7 @@ async function hydrate(dev: boolean, view: View, input: Input) {
 	const api = (window as any).__SPLIT_LOCAL_BINDINGS__;
 	const host = window.document.getElementById('host')!;
 	host.innerHTML = renderToString(server[view], {
-		...copy(input),
+		...copy(serverInput),
 		when: load(),
 		onPick() {},
 	}).html;
@@ -163,14 +164,12 @@ const base: Input = {
 
 for (const dev of [false, true]) {
 	describe(`${dev ? 'development' : 'production'} split Hydrate directive bindings`, () => {
-		it('hydrates server error content and resets the boundary through the @catch reset parameter', async () => {
-			const page = await hydrate(dev, 'CatchReset', { ...base, state: { failed: true } });
+		it('renders client error content and resets the boundary through the @catch reset parameter', async () => {
+			const page = await hydrate(dev, 'CatchReset', { ...base, state: { failed: true } }, base);
 			try {
-				expect(page.serverHtml).toContain('catch failed');
-				const button = page.host.querySelector('.retry');
+				expect(page.serverHtml).toContain('catch ready');
 				expect(page.failures()).toEqual(none);
 				expect(page.caught).toEqual(['catch failed']);
-				expect(page.host.querySelector('.retry')).toBe(button);
 				expect(page.text('.retry')).toEqual(['catch failed']);
 
 				await page.click('.retry');
@@ -183,11 +182,12 @@ for (const dev of [false, true]) {
 		});
 
 		it('keeps nested @catch reset and destructured error parameters local to the split child', async () => {
-			const page = await hydrate(dev, 'NestedCatch', {
-				...base,
-				state: { failed: true },
-				inner: { failed: true },
-			});
+			const page = await hydrate(
+				dev,
+				'NestedCatch',
+				{ ...base, state: { failed: true }, inner: { failed: true } },
+				base,
+			);
 			try {
 				expect(page.failures()).toEqual(none);
 				expect(page.caught).toEqual(['outer failed']);
@@ -274,7 +274,7 @@ for (const dev of [false, true]) {
 		});
 
 		it('passes a @catch reset parameter that shadows a module function into a nested boundary', async () => {
-			const page = await hydrate(dev, 'ShadowedReset', { ...base, state: { failed: true } });
+			const page = await hydrate(dev, 'ShadowedReset', { ...base, state: { failed: true } }, base);
 			try {
 				expect(page.failures()).toEqual(none);
 				expect(page.text('.retry')).toEqual(['shadowed failed']);

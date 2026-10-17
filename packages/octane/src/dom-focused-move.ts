@@ -20,7 +20,10 @@ export function moveNativeNodeBefore(
 			}
 			// Native contains() stops at a shadow root. Its host remains part of
 			// the editing subtree, including across nested or closed shadow roots.
-			candidate = (candidate.getRootNode() as ShadowRoot).host;
+			// A retired link can now be its own root, and its .host is a URL
+			// string. Only a document fragment can be a ShadowRoot across realms.
+			const root = candidate.getRootNode();
+			candidate = root.nodeType === 11 ? (root as ShadowRoot).host : undefined;
 		} while (candidate !== undefined);
 	}
 	if (!containsFocused) {

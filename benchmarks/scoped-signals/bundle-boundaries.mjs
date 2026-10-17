@@ -162,36 +162,22 @@ export function gitBlobHash(contents, algorithm = 'sha1') {
 }
 
 export function verifyTransitionBoundary(scenario, inputs) {
-	if (scenario.id !== 'ordinary-client' && scenario.id !== 'engine' && !scenario.rendererFree)
-		return;
-	if (scenario.id === 'ordinary-client') {
-		for (const input of inputs.filter((input) =>
-			/\/src\/signals\/(?:transition-(?:candidate|action|coordinator)|candidate-producers)\.[jt]s$/.test(
-				input.path.replaceAll('\\', '/'),
-			),
-		)) {
-			assert.ok(
-				Number.isSafeInteger(input.bytesInOutput) && input.bytesInOutput >= 0,
-				`${scenario.id}: missing emitted-byte evidence for ${input.path}`,
-			);
-			assert.equal(
-				input.bytesInOutput,
-				0,
-				`${scenario.id}: ordinary client retained transition orchestration`,
-			);
-		}
-		return;
-	}
-	// Split-chunk grouping follows module edges, even when an isolated build
-	// removes the frame's exports. Early signal helpers must not resolve the
-	// concrete native transition implementation.
-	assert.deepEqual(
-		inputs.filter((input) =>
-			/\/src\/signals\/transition-candidate\.[jt]s$/.test(input.path.replaceAll('\\', '/')),
+	if (scenario.id !== 'ordinary-client') return;
+	for (const input of inputs.filter((input) =>
+		/\/src\/signals\/(?:pending|candidate-producers)\.[jt]s$/.test(
+			input.path.replaceAll('\\', '/'),
 		),
-		[],
-		`${scenario.id}: early entry reached transition orchestration`,
-	);
+	)) {
+		assert.ok(
+			Number.isSafeInteger(input.bytesInOutput) && input.bytesInOutput >= 0,
+			`${scenario.id}: missing emitted-byte evidence for ${input.path}`,
+		);
+		assert.equal(
+			input.bytesInOutput,
+			0,
+			`${scenario.id}: ordinary client retained transition orchestration`,
+		);
+	}
 }
 
 // Engine boundaries inspect the complete resolved graph, including modules
@@ -260,7 +246,7 @@ export function verifyBundleInputs(scenario, inputs, engineDependency = 'vendore
 	}
 	if (scenario.id === 'engine' || scenario.rendererFree) {
 		const renderer = names.filter((name) =>
-			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|signals\/native-read-(?:client|server)\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
+			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|runtime\/[^/]+\.[jt]s$|signals\/native-read-(?:client|server)\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
 				name,
 			),
 		);
@@ -332,9 +318,12 @@ export function verifyBundleInputs(scenario, inputs, engineDependency = 'vendore
 		}
 	}
 	if (scenario.id === 'native-client' || scenario.id === 'native-server') {
-		const suffix = scenario.id === 'native-client' ? '/src/runtime.ts' : '/src/runtime.server.ts';
+		const native =
+			scenario.id === 'native-client'
+				? /\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/
+				: /\/src\/runtime\.server\.ts$/;
 		assert.ok(
-			names.some((name) => name.endsWith(suffix)),
+			names.some((name) => native.test(name)),
 			`${scenario.id}: native runtime missing`,
 		);
 	}

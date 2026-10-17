@@ -8,12 +8,13 @@ import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const sourceRoot = resolve(process.argv.slice(2).find((arg) => !arg.startsWith('--')) || repo);
 const runtimeFile = join(sourceRoot, 'packages/octane/src/runtime.ts');
 const fixtureFile = join(repo, 'packages/octane/tests/_fixtures/suspense-preserves-dom.tsrx');
-const runtimeSource = await readFile(runtimeFile, 'utf8');
+const runtimeSource = readClientRuntime(runtimeFile);
 const fixtureSource = await readFile(fixtureFile, 'utf8');
 const { compile } = await import(
 	pathToFileURL(join(sourceRoot, 'packages/octane/src/compiler/compile.js'))
@@ -61,12 +62,11 @@ function instrument(variant) {
 	}
 	const reads = variant === 'binding-cache' ? 'cached' : 'live';
 	if (source.includes('function journalText(node: Text, previous: string | null)')) {
-		// setText journals the staged view's value when a staged DOM is active;
-		// the audit substitutes its own read for that previous value. The pattern
-		// accepts any spelling of the staged-view read.
+		// setText journals the node's previous value; the audit substitutes its
+		// own read. The pattern also accepts a revision's staged-view read.
 		source = replaceOnce(
 			source,
-			/journalText\(target, \(STAGED_DOM.*\)\.nodeValue\);/,
+			/journalText\(target, (?:\(STAGED_DOM.*\)|target)\.nodeValue\);/,
 			`journalText(target, globalThis.__rootContractAudit.${reads}Text(target));`,
 		);
 	} else {
@@ -76,17 +76,23 @@ function instrument(variant) {
 			`TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, globalThis.__rootContractAudit.${reads}Text(node), null);`,
 		);
 	}
-	source = source.includes('function journalAttr(el: Element, name: string, ns?: string | null)')
+	source = source.includes('(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name),\n\t);')
 		? replaceOnce(
 				source,
 				'(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name),\n\t);',
 				`globalThis.__rootContractAudit.${reads}Attr(el, name),\n\t);`,
 			)
-		: replaceOnce(
-				source,
-				'TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));',
-				`TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, globalThis.__rootContractAudit.${reads}Attr(el, name));`,
-			);
+		: source.includes('ns ? [ns, name] : name, el.getAttribute(name));')
+			? replaceOnce(
+					source,
+					'ns ? [ns, name] : name, el.getAttribute(name));',
+					`ns ? [ns, name] : name, globalThis.__rootContractAudit.${reads}Attr(el, name));`,
+				)
+			: replaceOnce(
+					source,
+					'TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));',
+					`TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, globalThis.__rootContractAudit.${reads}Attr(el, name));`,
+				);
 	return source;
 }
 

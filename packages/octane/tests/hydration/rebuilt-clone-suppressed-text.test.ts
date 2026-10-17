@@ -19,13 +19,6 @@ const FILE = 'rebuilt-clone-suppressed-text.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 const LINES = SOURCE.split('\n');
 
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index < 0) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
-
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	let out = '';
@@ -87,30 +80,30 @@ describe.each([
 		{
 			site: 'an only-child text hole',
 			name: 'Branch',
-			leaf: 'function Leaf(',
+			call: '<Leaf',
 			expected: '<i>ok</i>',
 		},
 		{
 			site: 'a sibling text hole',
 			name: 'SiblingBranch',
-			leaf: 'function SiblingLeaf(',
+			call: '<SiblingLeaf',
 			expected: '<i><u>x</u>ok</i>',
 		},
 		{
 			site: 'a nested element',
 			name: 'NestedBranch',
-			leaf: 'function NestedLeaf(',
+			call: '<NestedLeaf',
 			expected: '<i><u>ok</u></i>',
 		},
 		{
 			site: 'a renderable hole',
 			name: 'HoleBranch',
-			leaf: 'function HoleLeaf(',
+			call: '<HoleLeaf',
 			expected: '<i>ok</i>',
 		},
 	])(
 		'renders the root on the client for a wrong tag where $site is suppressed',
-		async ({ name, leaf, expected }) => {
+		async ({ name, call, expected }) => {
 			container.innerHTML = ServerRT.renderToString(server[name], { server: true }).html;
 			const before = [...container.querySelectorAll('*')];
 			const recoverable = await hydrate(name, {});
@@ -118,12 +111,16 @@ describe.each([
 			expect(markup(container.firstElementChild!)).toBe(expected);
 			expect(before.filter((node) => node.isConnected)).toEqual([]);
 			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			// The server frames every component call, so the call names the server's
+			// `<b>` where its range belongs.
+			const start = LINES.findIndex((line) => line.startsWith(`export function ${name}(`));
+			const at = LINES.findIndex((line, i) => i > start && line.includes(call));
 			expect(warnings()).toEqual(
 				dev
 					? [
-							`Octane hydration mismatch at ${FILE}:${lineOf(leaf) + 1}:1: the client expected ` +
-								'<i> but the server rendered <b>. The nearest Suspense or Hydrate boundary, or ' +
-								'the root, will be regenerated on the client.',
+							`Octane hydration mismatch at ${FILE}:${at + 1}:${LINES[at].indexOf(call)}: the client ` +
+								'expected a component range but the server rendered <b>. The nearest Suspense or ' +
+								'Hydrate boundary, or the root, will be regenerated on the client.',
 						]
 					: [],
 			);

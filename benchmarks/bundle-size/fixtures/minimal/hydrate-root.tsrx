@@ -5,7 +5,7 @@ function HydratedRoot(props: { value: string }) @{
 }
 
 export async function run(container: HTMLElement) {
-	container.innerHTML = '<main id="minimal-hydrated-root">server</main>';
+	container.innerHTML = '<!--3--><main id="minimal-hydrated-root">server</main>';
 	const serverNode = container.firstElementChild;
 	const root = hydrateRoot(container, HydratedRoot, { value: 'server' });
 	const adopted = container.firstElementChild === serverNode;

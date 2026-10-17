@@ -8,6 +8,7 @@ import * as ClientSignals from 'octane/signals/client';
 import * as ServerSignals from 'octane/signals/server';
 import {
 	createElement,
+	createRoot,
 	flushSync,
 	forBlock,
 	hostComponent,
@@ -57,6 +58,8 @@ import {
 	SuspendingRowConditionalList,
 	EarlySuspendingRowHostList,
 	EarlySuspendingRowComponentList,
+	InsertedRowList,
+	InsertedHookRowList,
 	NestedKeyedReorderList,
 	NestedKeyedReorderBoundary,
 	NestedKeyedReorderTransition,
@@ -2064,7 +2067,7 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
-	it('keeps render-time row methods able to observe previously connected rows', () => {
+	it('renders every row before any of them connects, as React does', () => {
 		const items = makeRows().map((row) => ({
 			id: row.id,
 			read: () =>
@@ -2076,7 +2079,7 @@ describe('large keyed list fills', () => {
 		const r = mount(FastHostRenderCallList, { items: [] });
 		r.update(FastHostRenderCallList, { items });
 		expect(r.findAll('.fast-host-render-call-row').map((row) => row.textContent)).toEqual(
-			items.map((_, index) => String(index)),
+			items.map(() => '0'),
 		);
 		r.unmount();
 	});
@@ -2097,7 +2100,7 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
-	it('renders dynamic mapped component values after each row connects', () => {
+	it('renders dynamic mapped component values before their rows connect', () => {
 		const renderRows: number[] = [];
 		const renderValues: string[] = [];
 		const attached: boolean[] = [];
@@ -2115,7 +2118,8 @@ describe('large keyed list fills', () => {
 		const r = mount(FastMappedRenderableList, { items: [], value: 'inside' });
 
 		r.update(FastMappedRenderableList, { items, value: 'inside' });
-		expect(renderRows).toEqual(items.map((_, index) => index + 1));
+		// Rows connect at commit, so no render sees one; refs attach after.
+		expect(renderRows).toEqual(items.map(() => 0));
 		expect(renderValues).toEqual(items.map(() => 'inside'));
 		expect(attached).toEqual(items.map(() => true));
 		expect(r.findAll('.fast-renderable-row').map((row) => row.textContent)).toEqual(
@@ -2126,9 +2130,10 @@ describe('large keyed list fills', () => {
 
 	it('disposes a throwing dynamic child together with every completed row', () => {
 		let shouldThrow = true;
+		let renders = 0;
 		const attached: boolean[] = [];
-		const onRender = (connectedRows: number) => {
-			if (connectedRows === 12 && shouldThrow) throw new Error('child failed');
+		const onRender = () => {
+			if (++renders === 12 && shouldThrow) throw new Error('child failed');
 		};
 		const onRef = (element: HTMLSpanElement | null) => {
 			if (element !== null) attached.push(element.isConnected);
@@ -2248,17 +2253,16 @@ describe('large keyed list fills', () => {
 		try {
 			r.update(FastSuspendingGetterList, { items });
 			expect(r.find('#fast-suspending-getter-retry').textContent).toBe('key failed');
-			expect(abortedPrefixes[0]).toHaveLength(2);
-			expect(abortedPrefixes[0]!.every((row) => !row.isConnected)).toBe(true);
-			expect(abortedPrefixes[0]!.every((row) => row.parentNode === null)).toBe(true);
+			// The completed prefix renders off-document and never connects.
+			expect(abortedPrefixes[0]).toHaveLength(0);
 			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
 
 			failKey = false;
 			r.click('#fast-suspending-getter-retry');
 			expect(r.find('#fast-suspending-getter-pending').textContent).toBe('loading');
-			expect(abortedPrefixes[1]).toHaveLength(2);
-			expect(abortedPrefixes[1]!.every((row) => !row.isConnected)).toBe(true);
-			expect(abortedPrefixes[1]!.every((row) => row.parentNode === null)).toBe(true);
+			// The retry builds a fresh body off-document too: its discarded prefix
+			// never connects.
+			expect(abortedPrefixes[1]).toHaveLength(0);
 			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
 
 			await act(() => resolve('resolved row 3'));
@@ -2788,7 +2792,10 @@ describe.each([
 			},
 		};
 	}
-	const readAndCoerce = [
+	// A mount writes its fresh row as it reads each binding. As in React, an
+	// update's render evaluates every binding and its commit coerces the written
+	// values afterwards, in binding order.
+	const readAndCoerceMount = [
 		'class',
 		'title',
 		'coerce-title',
@@ -2799,13 +2806,24 @@ describe.each([
 		'only',
 		'mixed',
 	];
+	const readAndCoerce = [
+		'class',
+		'title',
+		'data',
+		'aria',
+		'hidden',
+		'only',
+		'mixed',
+		'coerce-title',
+		'coerce-data',
+	];
 
 	it('evaluates bindings once in order and skips coercing unchanged scalar values', () => {
 		const log: string[] = [];
 		const r = mount(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' });
 		try {
 			const host = r.find('li');
-			expect(log.splice(0)).toEqual(readAndCoerce);
+			expect(log.splice(0)).toEqual(readAndCoerceMount);
 			const second = loggedRow('second', log);
 			r.update(Body, { items: [second], version: 1, context: 'inside' });
 			expect(log.splice(0)).toEqual(readAndCoerce);
@@ -2824,27 +2842,40 @@ describe.each([
 		}
 	});
 
-	it('retries the same scalar value after coercion throws without reading later bindings', () => {
+	it('reports a commit-time coercion error like React and stops that bag’s writes', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const errors: string[] = [];
+		const root = createRoot(container, {
+			onUncaughtError: (error) => errors.push((error as Error).message),
+		});
 		const log: string[] = [];
-		const r = mount(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' });
 		try {
-			log.length = 0;
-			let shouldThrow = true;
-			const second = loggedRow('second', log, () => {
-				if (shouldThrow) throw new Error('title coercion failed');
-			});
-			expect(() => r.update(Body, { items: [second], version: 1, context: 'inside' })).toThrow(
-				'title coercion failed',
+			flushSync(() =>
+				root.render(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' }),
 			);
-			expect(log.splice(0)).toEqual(['class', 'title', 'coerce-title']);
-			shouldThrow = false;
-			r.update(Body, { items: [second], version: 2, context: 'inside' });
-			expect(log).toEqual(readAndCoerce);
-			expect(r.find('li').getAttribute('title')).toBe('second');
-			expect(r.find('li').getAttribute('data-value')).toBe('second');
-			expect(r.find('[data-kind="only"]').textContent).toBe('second');
+			log.length = 0;
+			const second = loggedRow('second', log, () => {
+				throw new Error('title coercion failed');
+			});
+			flushSync(() => root.render(Body, { items: [second], version: 1, context: 'inside' }));
+			// Render read every binding; the commit stopped at the failed write, and
+			// with no boundary the root unmounts and reports it (React's commit phase).
+			expect(log).toEqual([
+				'class',
+				'title',
+				'data',
+				'aria',
+				'hidden',
+				'only',
+				'mixed',
+				'coerce-title',
+			]);
+			expect(errors).toEqual(['title coercion failed']);
+			expect(container.querySelector('li')).toBe(null);
 		} finally {
-			r.unmount();
+			root.unmount();
+			container.remove();
 		}
 	});
 
@@ -2909,4 +2940,33 @@ describe.each([
 			r.unmount();
 		}
 	});
+});
+
+describe('keyed component rows that an update inserts', () => {
+	it.each([
+		['a hookless', InsertedRowList, ''],
+		['a hookful', InsertedHookRowList, ':0'],
+	] as const)(
+		'lands %s component row anywhere, then updates, moves and removes it',
+		(_shape, List, suffix) => {
+			const r = mount(List, { rows: ['b', 'd'] });
+			try {
+				const text = () => r.findAll('li').map((li) => li.textContent);
+				const [b, d] = r.findAll('li');
+				r.update(List, { rows: ['a', 'b', 'c', 'd', 'e'] });
+				expect(text()).toEqual(['a', 'b', 'c', 'd', 'e'].map((row) => row + suffix));
+				const rows = r.findAll('li');
+				expect(rows[1]).toBe(b);
+				expect(rows[3]).toBe(d);
+				r.update(List, { rows: ['e', 'c', 'x', 'a'] });
+				expect(text()).toEqual(['e', 'c', 'x', 'a'].map((row) => row + suffix));
+				const moved = r.findAll('li');
+				expect([moved[0], moved[1], moved[3]]).toEqual([rows[4], rows[2], rows[0]]);
+				r.update(List, { rows: [] });
+				expect(r.findAll('li')).toHaveLength(0);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
 });

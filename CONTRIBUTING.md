@@ -42,8 +42,12 @@ pnpm test
 ## Repository layout
 
 - [`packages/octane`](./packages/octane) is the runtime and the compiler
-  together, including SSR and hydration. `src/runtime.ts` is long and heavily
-  commented, and those comments are the design spec.
+  together, including SSR and hydration. `src/runtime/` holds the client runtime,
+  one module per concept that `src/runtime.ts` re-exports, and its comments are
+  the design spec. Edit those modules directly. `node scripts/split-runtime.mjs
+  check`, which `pnpm ci:workflow:test` runs, keeps module-scope initializers to
+  their own module, drivers above their readers, and each module's order link;
+  the tool's map and its other commands were for the one-time split.
 - [`packages/app-core`](./packages/app-core) plus the Vite, Rspack, Rsbuild, and
   deployment-adapter packages are the app and build layer.
 - The `@octanejs/*` binding packages are ports of React ecosystem libraries, one

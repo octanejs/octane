@@ -80,9 +80,11 @@ describe('keyed rows during suspended render', () => {
 			expect(events).toEqual(['mount:a', 'mount:b', 'mount:c']);
 			events.length = 0;
 
+			// The removal and the suspension share one transition, so the held root
+			// discards both. An urgent removal would commit on its own, as in React.
 			await act(() => {
-				api.setStep(1);
 				startTransition(() => {
+					api.setStep(1);
 					api.setLocal(1);
 					api.setSusp(1);
 				});

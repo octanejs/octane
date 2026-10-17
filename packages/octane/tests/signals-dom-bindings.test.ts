@@ -822,3 +822,109 @@ export function Link(props) @{
 		});
 	}
 });
+
+describe('direct bindings across dropped renders', () => {
+	const never = () => new Promise<never>(() => {});
+	const subscribers = (scope: ReturnType<typeof createScope>, key: string) =>
+		scope.inspect().nodes.find((node) => node.key === key)?.subscribers;
+
+	it('keeps the committed handle bound when a render that swapped it is dropped', async () => {
+		const scope = createScope({ scopeKey: 'dropped-handle-swap' });
+		const first$ = scope.signal$('first', 'a');
+		const second$ = scope.signal$('second', 'b');
+		const rendered = mount(client.HeldSignalLabel, { label$: first$, wait: null });
+		try {
+			const label = rendered.find('[data-signal-label]') as HTMLElement;
+			expect([label.title, label.textContent]).toEqual(['a', 'a']);
+			await act(() =>
+				startTransition(() =>
+					rendered.root.render(client.HeldSignalLabel, { label$: second$, wait: never() }),
+				),
+			);
+			expect([label.title, label.textContent]).toEqual(['a', 'a']);
+			// The dropped render subscribed nothing; the committed handle still drives the DOM.
+			expect(subscribers(scope, 'second')).toBe(0);
+			flushSync(() => first$.set('a2'));
+			expect([label.title, label.textContent]).toEqual(['a2', 'a2']);
+
+			flushSync(() =>
+				rendered.root.render(client.HeldSignalLabel, { label$: second$, wait: null }),
+			);
+			expect(rendered.find('[data-signal-label]')).toBe(label);
+			expect([label.title, label.textContent]).toEqual(['b', 'b']);
+			expect(subscribers(scope, 'first')).toBe(0);
+			flushSync(() => first$.set('a3'));
+			flushSync(() => second$.set('b2'));
+			expect([label.title, label.textContent]).toEqual(['b2', 'b2']);
+		} finally {
+			rendered.unmount();
+			scope.dispose();
+		}
+	});
+
+	it('suspends in render when an update binds a pending handle', async () => {
+		const scope = createScope({ scopeKey: 'pending-handle-swap' });
+		const ready$ = scope.signal$('ready', 'ready');
+		let resolve!: (value: string) => void;
+		const request = query(
+			'pending-label',
+			() =>
+				new Promise<string>((done) => {
+					resolve = done;
+				}),
+		);
+		const pending$ = createResource(scope, 'pending', () => request(undefined));
+		const rendered = mount(client.GuardedSignalLabel, { label$: ready$ });
+		try {
+			expect(rendered.find('[data-signal-label]')?.textContent).toBe('ready');
+			await act(() => rendered.root.render(client.GuardedSignalLabel, { label$: pending$ }));
+			expect(rendered.find('[data-waiting]')?.textContent).toBe('waiting');
+			await act(() => resolve('loaded'));
+			const label = rendered.find('[data-signal-label]') as HTMLElement;
+			expect([label.title, label.textContent]).toEqual(['loaded', 'loaded']);
+			expect(subscribers(scope, 'ready')).toBe(0);
+		} finally {
+			rendered.unmount();
+			scope.dispose();
+		}
+	});
+
+	it('shows the committed value while a transition that wrote the signal is dropped', async () => {
+		const scope = createScope({ scopeKey: 'dropped-signal-write' });
+		const label$ = scope.signal$('label', 'committed');
+		const key$ = scope.signal$('key', 'first');
+		let resolve!: (value: number) => void;
+		const request = query('label-gate', (key: string) =>
+			key === 'first'
+				? Promise.resolve(1)
+				: new Promise<number>((done) => {
+						resolve = done;
+					}),
+		);
+		const gate$ = createResource(scope, 'gate', () => request(key$.get()));
+		const rendered = mount(client.GatedSignalLabel, { label$, gate$ });
+		try {
+			await act(() => {});
+			const label = rendered.find('[data-signal-label]') as HTMLElement;
+			expect([label.title, label.textContent]).toEqual(['committed', 'committed']);
+			await act(() =>
+				startTransition(() =>
+					scope.batch(() => {
+						label$.set('next');
+						key$.set('second');
+					}),
+				),
+			);
+			expect([label.title, label.textContent]).toEqual(['committed', 'committed']);
+			// An urgent write is a direct binding write, and wins over the transition's.
+			await act(() => label$.set('urgent'));
+			expect([label.title, label.textContent]).toEqual(['urgent', 'urgent']);
+			await act(() => resolve(2));
+			expect(rendered.find('[data-signal-label]')).toBe(label);
+			expect([label.title, label.textContent]).toEqual(['urgent', 'urgent']);
+		} finally {
+			rendered.unmount();
+			scope.dispose();
+		}
+	});
+});

@@ -8,7 +8,7 @@ import {
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
-} from '../hydration-markers.js';
+} from '../hydration-protocol.js';
 import {
 	isIndependentHydrateManifest,
 	type IndependentHydrateManifest,

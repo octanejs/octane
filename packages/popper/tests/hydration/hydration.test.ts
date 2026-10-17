@@ -3,7 +3,7 @@ import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
 import { ServerPopperHarness } from '../runtime/_fixtures/Harness.tsrx';
 
 const SERVER_HTML =
-	'<!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><button id="reference">reference</button><!--]--><!--]--><!--[--><!--[--><div id="popper" style="position:absolute;left:0;top:0;" data-placement="top"><div id="arrow" style="position:absolute;"></div></div><!--]--><!--]--><!--]--><!--]--><!--]--><!--]-->';
+	'<!--3--><!--[--><!--[--><!--[--><!--[--><button id="reference">reference</button><!--]--><!--[--><div id="popper" style="position:absolute;left:0;top:0;" data-placement="top"><div id="arrow" style="position:absolute;"></div></div><!--]--><!--]--><!--]--><!--]-->';
 
 describe('@octanejs/popper hydration', () => {
 	// @parity-case adapted:popper-hydration

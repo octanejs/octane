@@ -4,20 +4,24 @@
  * interaction capture before the main runtime must not initialize DOM tables.
  */
 import {
-	BINDING_OPEN_PREFIX,
-	isBindingOpenComment,
-	isForBindingOpenComment,
-} from './dom-binding-protocol.js';
-import {
-	HYDRATION_END,
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
 	HYDRATION_FOR_PREFIX,
 	HYDRATION_START,
-} from './hydration-markers.js';
+	isRangeClose,
+	isRangeOpen,
+} from './hydration-protocol.js';
 
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
+
+/**
+ * The property a hydrated client sets on a pending streamed boundary's open
+ * comment. The stream's swap (`$OCTRC`) or error (`$OCTRX`) calls it, as
+ * React's `$RC` calls a dehydrated boundary's `_reactRetry`, so the boundary
+ * retries its hydration.
+ */
+export const STREAM_RETRY_PROP = '_octR';
 
 /** Renderer-owned JSON script carrying resolved SSR Suspense values. */
 export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
@@ -28,40 +32,8 @@ export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 /** Render-unique token stamped on deferred-hydration owners in a streamed shell. */
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
 
-/**
- * Decode physical range markers for streaming capture and active hydration.
- * Counted pairs from earlier clients still represent a single DOM nesting
- * level. Reject non-canonical payloads as ordinary comments.
- */
-export function hydrationMarkerMultiplicity(data: string, open: boolean): number {
-	const marker = open ? HYDRATION_START : HYDRATION_END;
-	if (data === marker) return 1;
-	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;
-	if (
-		open &&
-		(data.startsWith(BINDING_OPEN_PREFIX) || data.startsWith(HYDRATION_FOR_PREFIX)) &&
-		isBindingOpenComment(data)
-	)
-		return 1;
-	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
-	const first = data.charCodeAt(1);
-	if (first < 49 || first > 57) return 0;
-	let value = first - 48;
-	for (let i = 2; i < data.length; i++) {
-		const digit = data.charCodeAt(i) - 48;
-		if (digit < 0 || digit > 9) return 0;
-		value = value * 10 + digit;
-		if (!Number.isSafeInteger(value)) return 0;
-	}
-	return value >= 2 ? value : 0;
-}
-
 function isHydrationOpen(node: Node | null): node is Comment {
-	return (
-		node !== null &&
-		node.nodeType === 8 &&
-		hydrationMarkerMultiplicity((node as Comment).data, true) !== 0
-	);
+	return node !== null && node.nodeType === 8 && isRangeOpen((node as Comment).data);
 }
 
 /** Find a physical hydration range's close without trusting malformed comment input. */
@@ -72,9 +44,9 @@ export function rendererRangeClose(open: Node | null): Comment | null {
 	while (node !== null) {
 		if (node.nodeType === 8) {
 			const data = (node as Comment).data;
-			if (hydrationMarkerMultiplicity(data, true) !== 0) {
+			if (isRangeOpen(data)) {
 				depth++;
-			} else if (hydrationMarkerMultiplicity(data, false) !== 0) {
+			} else if (isRangeClose(data)) {
 				if (depth === 0) return node as Comment;
 				depth--;
 			}
@@ -98,23 +70,14 @@ export function getLeadingHydrationListRange(host: Element): HydrationListRange 
 	let enclosingEnd: Comment | null = null;
 	while (start !== null && start.nodeType === 8) {
 		const data = (start as Comment).data;
-		const list =
-			data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS || isForBindingOpenComment(data);
-		const wrapperMultiplicity =
-			data === HYDRATION_START
-				? 1
-				: data.charCodeAt(1) >= 49 && data.charCodeAt(1) <= 57
-					? hydrationMarkerMultiplicity(data, true)
-					: 0;
-		if (!list && wrapperMultiplicity === 0) return null;
+		const list = data.startsWith(HYDRATION_FOR_PREFIX) && isRangeOpen(data);
+		if (!list && data !== HYDRATION_START) return null;
 		const end = rendererRangeClose(start);
 		// All ranges are direct host children; an inner close must precede its wrapper's close.
 		if (
 			end === null ||
 			(enclosingEnd !== null && (end.compareDocumentPosition(enclosingEnd) & 4) === 0)
 		)
-			return null;
-		if (hydrationMarkerMultiplicity(end.data, false) !== (list ? 1 : wrapperMultiplicity))
 			return null;
 		if (list) {
 			const suffix = data.slice(HYDRATION_FOR_EMPTY.length);

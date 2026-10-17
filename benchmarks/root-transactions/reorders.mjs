@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 process.env.NODE_ENV = 'production';
 const repo = path.resolve(import.meta.dirname, '../..');
@@ -17,7 +18,7 @@ const runtimeFile = path.resolve(
 	process.argv[2] ?? path.join(repo, 'packages/octane/src/runtime.ts'),
 );
 const runtimePath = path.join(repo, 'packages/octane/src/runtime.ts');
-const runtimeSource = fs.readFileSync(runtimeFile, 'utf8');
+const runtimeSource = readClientRuntime(runtimeFile);
 const commitSite = 'ROOT_RENDER_TRANSACTIONS = [];\n\tfor (const transaction of transactions) {';
 assert.equal(runtimeSource.split(commitSite).length, 2, 'one root commit loop');
 const observedRuntime = runtimeSource.replace(

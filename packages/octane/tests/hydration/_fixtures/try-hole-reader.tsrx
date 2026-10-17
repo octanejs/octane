@@ -1,15 +1,14 @@
 // A template reader whose use() runs in a text hole, inside a @try body. The
-// template clones its root before the hole reads the seed, so when the
-// server's read rejected, that clone meets the server's @catch arm. Hydration
-// must still adopt the server's catch arm, exactly as it does for a reader
-// whose use() runs in setup, before the template.
+// template clones its root before the hole reads its value. When the server's
+// read rejected, its catch arm renders; activation retries from client data,
+// as it does for a reader whose use() runs in setup, before the template.
 import { ErrorBoundary, use } from 'octane';
 
 function Reader(props: { value: Promise<string> }) @{
 	<i>{use(props.value) as string}</i>
 }
 
-// Its root has the catch arm's tag, so the clone adopts the server's <em>.
+// Its root has the catch arm's tag.
 function SameRoot(props: { value: Promise<string> }) @{
 	<em>
 		<b>{use(props.value) as string}</b>

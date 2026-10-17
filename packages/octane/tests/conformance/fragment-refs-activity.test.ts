@@ -4,6 +4,7 @@ import { FragmentInstance } from '../../src/index.js';
 import {
 	ActivityFragmentGroup,
 	ActivityFragmentPortal,
+	ActivityMixedRefs,
 	NestedActivityFragmentGroup,
 } from './_fixtures/fragment-refs-activity.tsrx';
 
@@ -48,6 +49,31 @@ function renderGroup(mode: 'visible' | 'hidden') {
 }
 
 describe('Fragment refs and Activity visibility', () => {
+	it('disconnects and reconnects direct, spread and Fragment refs together', () => {
+		const elementRef: { current: HTMLButtonElement | null } = { current: null };
+		const spreadRef: { current: HTMLButtonElement | null } = { current: null };
+		const fragmentRef: { current: FragmentInstance | null } = { current: null };
+		const props = { mode: 'visible' as const, elementRef, spread: { ref: spreadRef }, fragmentRef };
+		mounted = mount(ActivityMixedRefs, props);
+		const direct = elementRef.current;
+		const spread = spreadRef.current;
+		const fragment = fragmentRef.current;
+		expect(direct?.textContent).toBe('direct');
+		expect(spread?.textContent).toBe('spread');
+		expect(fragment).toBeInstanceOf(FragmentInstance);
+
+		mounted.update(ActivityMixedRefs, { ...props, mode: 'hidden' });
+		expect([elementRef.current, spreadRef.current, fragmentRef.current]).toEqual([
+			null,
+			null,
+			null,
+		]);
+		mounted.update(ActivityMixedRefs, props);
+		expect(elementRef.current).toBe(direct);
+		expect(spreadRef.current).toBe(spread);
+		expect(fragmentRef.current).toBe(fragment);
+	});
+
 	// Pins the Activity reveal routing Fragment refs through the live-ref trampoline, which publishes child ownership before the callback runs.
 	it('publishes Fragment child ownership before a revealed callback ref runs', () => {
 		const fragmentRef: { current: FragmentInstance | null } = { current: null };

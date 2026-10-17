@@ -302,8 +302,10 @@ the React island.
 
 React island HTML is limited to **8 MiB**. Pending React work belongs to the
 Octane server request and is released on abort, cancellation, timeout, or request
-completion. React server errors reach Octane's server catch path; React error
-boundaries do not catch server-render errors.
+completion. React server errors take Octane's server error path: the nearest
+Octane Suspense boundary ships its fallback for a client render, as React does.
+Neither React error boundaries nor Octane `@catch` arms catch server-render
+errors.
 
 React `useId` receives a per-island prefix derived from Octane `useId`. React's
 `hydrateRoot` adopts the existing island DOM, preserving nodes, refs, and

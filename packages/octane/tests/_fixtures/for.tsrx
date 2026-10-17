@@ -1030,3 +1030,30 @@ export function EarlySuspendingRowComponentList(props: { rows: string[]; text: P
 		<u id="suspending-row-pending">{'loading'}</u>
 	}
 }
+
+// Sole-component rows whose component's own template inserts the row element:
+// a committed list lands each new one's root alone at commit.
+function InsertedRow(props: { row: string }) @{
+	<li class="inserted-row">{props.row as string}</li>
+}
+
+function InsertedHookRow(props: { row: string }) @{
+	const [count] = useState(0);
+	<li class="inserted-row">{`${props.row}:${count}`}</li>
+}
+
+export function InsertedRowList(props: { rows: string[] }) @{
+	<ul>
+		@for (const row of props.rows; key row) {
+			<InsertedRow row={row} />
+		}
+	</ul>
+}
+
+export function InsertedHookRowList(props: { rows: string[] }) @{
+	<ul>
+		@for (const row of props.rows; key row) {
+			<InsertedHookRow row={row} />
+		}
+	</ul>
+}

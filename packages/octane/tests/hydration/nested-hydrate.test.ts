@@ -37,7 +37,7 @@ describe('hydrateRoot — nested component (SSR Phase 6 / M1)', () => {
 		});
 		// The nested <Item> output is wrapped in a hydration block range.
 		expect(html).toBe(
-			'<div id="panel"><h2>Headlines</h2>' +
+			'<!--3--><div id="panel"><h2>Headlines</h2>' +
 				'<!--[--><li class="item"><span class="label">Story</span>' +
 				'<button class="bump">x0</button></li><!--]-->' +
 				'</div>',

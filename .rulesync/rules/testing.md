@@ -124,6 +124,30 @@ Two regression layers sit beyond the `octane` project:
   and the production `octane-preview` server and drives every route in headless
   Chromium, failing on hydration-mismatch warnings or page errors.
 
+## No DOM writes during render
+
+A render writes no DOM the page shows (#2043): it may build nodes it owns
+off-document, and writes to connected nodes land at commit.
+`tests/_render-write-guard.ts`, loaded by `_per-test-setup.ts` in `octane`,
+`octane-prod`, `octane-signals*` and `octane-profile`, enforces this. It wraps
+every DOM mutator and fails a test when one changes a connected node while a
+render is open. The open check reads runtime state (`renderWritesForbidden`:
+a root render frame or a rendering Block, and no commit applying its writes),
+never the stack.
+
+- It exempts writes whose caller is outside `packages/octane/src` (a test's
+  own DOM work) and the resource hint writers, `'hint'` in
+  `scripts/render-writers.mjs`, which insert at call time as React's do.
+- Known writers awaiting a fix are listed in `tests/_render-write-allowlist.ts`
+  by test file and writer, each with an owner and a reason. Fix the writer
+  rather than adding an entry; the list must end up empty.
+- `RENDER_WRITE_REPORT=<file>` appends every violation as JSON, which is how
+  the list is rebuilt.
+
+A hand-written body over the compiler ABI follows the same rule: stage text
+with `setRenderText` and a style with `setRenderStyle`, place roots through a
+bag factory, and write anything else from a layout effect.
+
 `scripts/scaffold-react-port.mjs` turns a React test file into a triage skeleton
 of in-scope `it.todo`s plus out-of-scope reasons. Resolve or remove every todo
 before committing the port.

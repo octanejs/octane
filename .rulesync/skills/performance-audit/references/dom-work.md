@@ -2,7 +2,7 @@
 
 The commit is meant to be write-only. Rendering writes the DOM; geometry is read
 in layout effects, in a batched measure phase, or after paint. Cite symbols, not
-line numbers: `runtime.ts` moves daily.
+line numbers: the runtime moves daily.
 
 ## Forced synchronous layout
 
@@ -13,15 +13,14 @@ line numbers: `runtime.ts` moves daily.
   `scrollIntoView()`, `elementFromPoint()`, and `focus()`. Alternating reads and
   writes in a loop forces one layout per iteration: layout thrash.
 - Read everything first, then write everything. `vtMeasureElements` in
-  `runtime.ts` measures every ViewTransition participant in one loop before any
+  `runtime/view-transition.ts` measures every ViewTransition participant in one loop before any
   name or style is applied. A layout effect that measures and then updates state
   should measure every target, then update once.
-- Never read geometry in the render walk or per node. The ViewTransition stage
-  keeps geometry, scrolling, selection, and resource readiness reading the
-  committed host while writes are prepared (`dom-stage.ts`,
-  `PROJECTED_PROPERTIES`). `scripts/check-staged-dom.mjs` lists those native
-  reads in `NATIVE_READS` and fails on an unclassified native operation in
-  `runtime.ts`.
+- Never read geometry in the render walk or per node. A render writes no
+  committed DOM, so geometry, scrolling, selection, and resource readiness read
+  the committed host until the commit lands. `scripts/check-render-writes.mjs`
+  fails on a native DOM write in the client runtime outside a function classified in
+  `scripts/render-writers.mjs`.
 - `getComputedStyle()` after a style write forces a style recalculation even for
   values that need no layout. Read it before writing, or once per commit.
 

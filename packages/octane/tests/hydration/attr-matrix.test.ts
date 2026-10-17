@@ -77,17 +77,25 @@ describe('client and SSR attribute policy agree', () => {
 				const originalError = console.error;
 				console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
 				console.error = (...args: unknown[]) => warnings.push(String(args[0]));
+				const writes = new MutationObserver(() => {});
+				writes.observe(container, { subtree: true, attributes: true });
 				try {
 					const root = hydrateRoot(container, ClientComponent, value);
 					flushSync(() => {});
-					// Adoption, not reconstruction: identical markup after hydration.
+					// Adoption, not reconstruction: identical markup after hydration,
+					// and no attribute the server rendered is written again.
 					expect(container.innerHTML, `${name} markup after hydration (${label})`).toBe(serverDom);
+					expect(
+						writes.takeRecords().map((record) => record.attributeName),
+						`${name} attribute writes (${label})`,
+					).toEqual([]);
 					expect(
 						warnings.filter((w) => /mismatch|hydrat/i.test(w)),
 						`${name} hydration warnings (${label})`,
 					).toEqual([]);
 					root.unmount();
 				} finally {
+					writes.disconnect();
 					console.warn = originalWarn;
 					console.error = originalError;
 					container.remove();
@@ -215,7 +223,7 @@ describe('server autofocus survives hydration without stealing focus', () => {
 		const props = { attributes: { autoFocus: true } };
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = '<span id="stale-server-element"></span>';
+		container.innerHTML = '<!--3--><span id="stale-server-element"></span>';
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		let root: ReturnType<typeof hydrateRoot> | undefined;
 		try {

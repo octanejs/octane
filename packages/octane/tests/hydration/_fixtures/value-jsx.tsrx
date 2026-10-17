@@ -65,3 +65,30 @@ export function ReturnMaybeParent(props) @{
 		<span id="after-maybe">after</span>
 	</section>
 }
+
+// Components that return text, another component that returns a host, or a
+// list. Each returned value renders in the range of the call that returned it.
+function ReturnText(props) {
+	return props.text;
+}
+
+function ReturnHost(props) {
+	return <em class="returned-host">{props.text}</em>;
+}
+
+function ReturnChain(props) {
+	return <ReturnHost text={props.text} />;
+}
+
+function ReturnList(props) {
+	return props.items.map((item) => <i key={item}>{item}</i>);
+}
+
+export function ReturnShapes(props) @{
+	<section id="return-shapes">
+		<ReturnText text={props.text} />
+		<ReturnChain text={props.text} />
+		<ReturnList items={props.items} />
+		<span id="after-shapes">after</span>
+	</section>
+}

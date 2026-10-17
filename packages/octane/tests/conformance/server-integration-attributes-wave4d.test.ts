@@ -21,7 +21,8 @@ function attr(root: ParentNode, id: string, name: string): string | null {
 function replaceWithMismatchedMarkup(container: HTMLElement): void {
 	const wrong = document.createElement('aside');
 	wrong.id = 'wrong-server-tree';
-	container.replaceChildren(wrong);
+	// The server's protocol version stays: only the tree it rendered differs.
+	container.replaceChildren(document.createComment('3'), wrong);
 }
 
 const mismatch = { mutateServerDom: replaceWithMismatchedMarkup } as const;

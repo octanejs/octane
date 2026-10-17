@@ -133,7 +133,7 @@ describe('hydrateRoot of a folded body-only render (head prefix in the container
 				// title now lives where a client render and a split-head host put it.
 				expect(container.querySelector('div')).toBe(serverDiv);
 				expect(document.head.querySelector('title')).toBe(serverTitle);
-				expect(container.innerHTML).toBe('<div></div>');
+				expect(container.innerHTML).toBe('<!--3--><div></div>');
 				expect(document.querySelectorAll('title')).toHaveLength(1);
 
 				flushSync(() => root.render(client.Title, { a: 'Beta', rest: {} }));

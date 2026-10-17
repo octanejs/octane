@@ -1,13 +1,13 @@
 // Untimed work guard for the actual production effect-dispatch helper. Runtime
 // source is extracted by AST; fixture callbacks and observer work are excluded.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { COUNTER_GLOBAL, emptyCounters, instrumentJavaScript } from '../hook-memo/instrument.mjs';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 const requireDependencies = createRequire(
@@ -230,17 +230,11 @@ const result = {
 	node: process.version,
 	v8: process.versions.v8,
 	effectsPerCase: count * 3,
-	candidate: measure(readFileSync(path.join(repo, file), 'utf8')),
+	candidate: measure(readClientRuntime(path.join(repo, file))),
 };
 if (baselineRef) {
 	result.baselineRef = baselineRef;
-	result.baseline = measure(
-		execFileSync('git', ['show', `${baselineRef}:${file}`], {
-			cwd: repo,
-			encoding: 'utf8',
-			maxBuffer: 8 * 1024 * 1024,
-		}),
-	);
+	result.baseline = measure(readClientRuntime(path.join(repo, file), baselineRef));
 	for (const name of ['omitted', 'empty', 'values']) {
 		const {
 			emptyArrayCreations: before,

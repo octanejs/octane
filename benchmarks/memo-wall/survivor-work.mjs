@@ -19,6 +19,7 @@ import { Session } from 'node:inspector/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 if (!process.execArgv.includes('--jitless')) {
 	const child = spawnSync(
@@ -37,7 +38,7 @@ const here = import.meta.dirname;
 const repo = path.resolve(here, '../..');
 const runtimePath = path.join(repo, 'packages/octane/src/runtime.ts');
 const runtimeFile = path.resolve(process.argv[2] ?? runtimePath);
-const runtimeSource = fs.readFileSync(runtimeFile, 'utf8');
+const runtimeSource = readClientRuntime(runtimeFile);
 const commitSite = 'ROOT_RENDER_TRANSACTIONS = [];\n\tfor (const transaction of transactions) {';
 assert.equal(runtimeSource.split(commitSite).length, 2, 'one root commit loop');
 const observedRuntime = runtimeSource.replace(

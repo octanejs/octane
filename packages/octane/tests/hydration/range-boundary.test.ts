@@ -12,6 +12,7 @@ import {
 	BoundaryFailingSuspenseClient,
 	BoundaryListClient,
 	BoundaryNestedListClient,
+	BoundaryPendingBodyClient,
 	BoundaryPendingHeadClient,
 	BoundarySuspendingArrayClient,
 	BoundarySuspendingListClient,
@@ -375,6 +376,37 @@ describe('hydration range boundary', () => {
 		root.unmount();
 		expect(container.querySelector('#range-boundary-counter')).toBeNull();
 		expect(portalTarget.textContent).toBe('');
+	});
+
+	// The boundary's content mounts in a later render, once its data arrives: it
+	// builds off-document, so nothing it renders reaches the page before its
+	// commit, and then it lands.
+	it('mounts a resumed boundary body off-document under an adopted owner', async () => {
+		container.innerHTML = ServerRuntime.renderToString(server.ServerListSelection).html;
+		const button = container.querySelector('#range-boundary-counter') as HTMLButtonElement;
+		let resolve!: () => void;
+		const deferred = {
+			ready: false,
+			promise: new Promise<void>((done) => {
+				resolve = done;
+			}),
+		};
+		const observer = new MutationObserver(() => {});
+		observer.observe(container, { subtree: true, childList: true, characterData: true });
+		const seen: number[] = [];
+		const record = () => seen.push(observer.takeRecords().length);
+		const root = hydrateRoot(container, BoundaryPendingBodyClient, { deferred, record });
+		expect(container.querySelector('#range-boundary-ready')).toBeNull();
+		observer.takeRecords();
+		await act(() => {
+			deferred.ready = true;
+			resolve();
+		});
+		observer.disconnect();
+		expect(seen).toEqual([0]);
+		expect(container.querySelector('#range-boundary-ready')?.textContent).toBe('ready');
+		expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
+		root.unmount();
 	});
 
 	for (const failOwner of [false, true]) {

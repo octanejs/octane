@@ -217,7 +217,9 @@ export function App(props: any) @{
 	</div>
 }`;
 	const call = /ifBlock\(([^;]*)\)/s.exec(compile(source, 'arm.tsrx').code)![1];
-	return /,\s*1\s*$/.test(call);
+	// The mask's bit 1 is the then arm's lite proof; bit 4 says it is one host.
+	const mask = /,\s*(\d+)\s*$/.exec(call);
+	return mask !== null && (Number(mask[1]) & 1) !== 0;
 }
 
 describe('hookless control-flow arm proof', () => {

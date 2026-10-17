@@ -88,10 +88,10 @@ describe.each([
 		'The nearest Suspense or Hydrate boundary, or the root, will be regenerated on the client.';
 
 	const tailReport = (component: string, directive: string, server = 'a control-flow block') =>
-		report(component, directive, 'the end of the branch', server);
+		report(component, directive, 'the end of its content', server);
 
 	const emptyReport = (component: string) =>
-		report(component, '@if', 'an empty branch', 'a control-flow block');
+		report(component, '@if', 'the end of its content', 'a control-flow block');
 
 	async function hydrate(
 		name: string,
@@ -287,33 +287,45 @@ describe.each([
 			swapped: '<em>x</em><b>b</b><em>z</em>',
 			server: 'a control-flow block',
 		},
+		// The server frames every component call, so a call whose range the
+		// server did not render names the element there.
 		{
 			name: 'IfInheritedHost',
 			directive: '@if',
+			call: '<Leaf',
 			from: { on: false },
 			to: { on: true },
 			html: '<em>x</em>',
 			swapped: '<em>x</em><b>z</b>',
-			server: '<b>',
+			server: '<em>',
 		},
 		{
 			name: 'IfLaterHost',
 			directive: '@if',
+			call: '<Leaf v="y"',
 			from: { on: false },
 			to: { on: true },
 			html: '<em>x</em><em>y</em>',
 			swapped: '<em>x</em><em>y</em><b>z</b>',
-			server: '<b>',
+			server: '<em>',
 		},
 	])(
 		'client-renders the root when server content follows the roots a $name arm adopts',
-		async ({ name, directive, from, to, html, swapped, server: described }) => {
+		async ({ name, directive, call, from, to, html, swapped, server: described }) => {
 			const s = await hydrate(name, from, to);
 
 			expectClientRoot(s);
 			expect(markup(s.live())).toBe(html);
 			expect(s.recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [tailReport(name, directive, described)] : []);
+			expect(warnings()).toEqual(
+				dev
+					? [
+							call === undefined
+								? tailReport(name, directive, described)
+								: report(name, call, 'a component range', described),
+						]
+					: [],
+			);
 
 			s.render(from);
 			expect(markup(s.live())).toBe(swapped);
@@ -322,20 +334,24 @@ describe.each([
 		},
 	);
 
-	// React compares DOM only, and the client's arm renders exactly the
-	// server's elements.
-	it('adopts another arm whose DOM matches when a component in a hole adopts in place', async () => {
+	// OCTANE DIVERGENCE: React compares DOM only, and adopts an arm that renders
+	// exactly the server's elements. Octane's component ranges are part of the
+	// hydration protocol, so the client's component call, whose range the
+	// server's arm does not have, falls back.
+	it('client-renders the root for another arm whose DOM matches but whose component has no range', async () => {
 		const s = await hydrate('HoleWithoutRange', { on: false }, { on: true });
 
-		expect(markup(s.host)).toBe('<em>x</em><b>b</b>');
-		expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
-		expect(s.recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expectClientRoot(s);
+		expect(markup(s.live())).toBe('<em>x</em><b>b</b>');
+		expect(s.recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toEqual(
+			dev ? [report('HoleWithoutRange', '<Leaf', 'a component range', '<em>')] : [],
+		);
 
 		s.render({ on: false });
-		expect(markup(s.host)).toBe('<em>x</em><b>b</b>');
+		expect(markup(s.live())).toBe('<em>x</em><b>b</b>');
 		s.render({ on: true });
-		expect(markup(s.host)).toBe('<em>x</em><b>b</b>');
+		expect(markup(s.live())).toBe('<em>x</em><b>b</b>');
 	});
 
 	it.each([
@@ -506,10 +522,11 @@ describe.each([
 	});
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: the island renders on the client, but reports
-	// nothing, as React reports nothing for an update that reaches a dehydrated
-	// boundary.
-	it('client-renders a dormant island silently when its branch changed before activation', async () => {
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it, the island adopts the server's arm with the
+	// captures it rendered, then the update switches the branch, and nothing
+	// reports.
+	it('hydrates a dormant island, then switches its branch silently when it changed before activation', async () => {
 		const serverProps = { on: false, when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantIf, serverProps).html;
 		const host = container.querySelector('#r')!;
@@ -526,8 +543,8 @@ describe.each([
 		await act(async () => {});
 
 		expect(container.querySelector('#r')).toBe(host);
-		expect(section.isConnected).toBe(false);
-		expect(markup(container.querySelector('section')!)).toBe('<em>x</em>');
+		expect(container.querySelector('section')).toBe(section);
+		expect(markup(section)).toBe('<em>x</em>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

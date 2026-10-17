@@ -5,6 +5,8 @@ import { loadServerFixture } from './_server-fixture.js';
 import {
 	DocumentView,
 	DocumentWithMetadata,
+	GatedDocument,
+	HoistedTitleDocument,
 	Label,
 	NestedChildren,
 	SuppressedLabel,
@@ -24,7 +26,7 @@ afterEach(() => {
 describe('public root containers and test environment', () => {
 	it('rebuilds an incompatible host descriptor root without stale insertion anchors', () => {
 		const container = document.createElement('div');
-		container.innerHTML = '<aside>wrong</aside>';
+		container.innerHTML = '<!--3--><aside>wrong</aside>';
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(container, NoscriptChildren);
 		expect(container.querySelector('noscript')?.textContent).toBe(
@@ -95,6 +97,60 @@ describe('public root containers and test environment', () => {
 		}
 		root.unmount();
 	});
+	it("keeps a Document's content until its first render commits, then keeps its doctype", async () => {
+		const container = document.implementation.createHTMLDocument('old');
+		const doctype = container.doctype;
+		const html = container.documentElement;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, { subtree: true, childList: true, attributes: true });
+		let open!: () => void;
+		const gate = new Promise<void>((resolve) => (open = resolve));
+		const root = createRoot(container);
+		try {
+			// The first render builds off-document and suspends: the document is as it was.
+			flushSync(() => root.render(GatedDocument, { gate, label: 'mounted' }));
+			records.push(...observer.takeRecords());
+			expect(records).toEqual([]);
+			expect(container.documentElement).toBe(html);
+			expect(container.title).toBe('old');
+			await act(async () => open());
+			expect(container.documentElement).not.toBe(html);
+			expect(container.title).toBe('mounted');
+			expect(container.querySelector('p')?.textContent).toBe('mounted');
+			expect(container.doctype).toBe(doctype);
+		} finally {
+			observer.disconnect();
+			root.unmount();
+		}
+		expect(container.doctype).toBe(doctype);
+	});
+	it("replaces a Document root's component at commit, keeping its doctype", async () => {
+		const container = document.implementation.createHTMLDocument('old');
+		const doctype = container.doctype;
+		const root = createRoot(container);
+		root.render(DocumentView, { label: 'first' });
+		const button = container.querySelector('button')!;
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(container, { subtree: true, childList: true, attributes: true });
+		let open!: () => void;
+		const gate = new Promise<void>((resolve) => (open = resolve));
+		try {
+			flushSync(() => root.render(GatedDocument, { gate, label: 'second' }));
+			records.push(...observer.takeRecords());
+			expect(records).toEqual([]);
+			expect(button.isConnected).toBe(true);
+			await act(async () => open());
+			expect(button.isConnected).toBe(false);
+			expect(container.querySelectorAll('html')).toHaveLength(1);
+			expect(container.title).toBe('second');
+			expect(container.doctype).toBe(doctype);
+		} finally {
+			observer.disconnect();
+			root.unmount();
+		}
+	});
 	it.each([false, true])(
 		'mounts and updates metadata in its Document head (global: %s)',
 		(global) => {
@@ -109,6 +165,43 @@ describe('public root containers and test environment', () => {
 			root.unmount();
 		},
 	);
+	it("mounts over a server Document with its own head, not the server's", () => {
+		const html = renderToString(server.HoistedTitleDocument, { label: 'server' }).html;
+		const container = new DOMParser().parseFromString('<!DOCTYPE html>' + html, 'text/html');
+		const doctype = container.doctype;
+		const root = createRoot(container);
+		flushSync(() => root.render(HoistedTitleDocument, { label: 'client' }));
+		expect(container.querySelectorAll('title')).toHaveLength(1);
+		expect(container.title).toBe('client');
+		expect(container.body.textContent).toBe('client');
+		expect(container.doctype).toBe(doctype);
+		root.unmount();
+	});
+	it('replaces a server Document whose hydration fails with its own head', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const html = renderToString(server.HoistedTitleDocument, { label: 'server' }).html;
+		const container = new DOMParser().parseFromString('<!DOCTYPE html>' + html, 'text/html');
+		const doctype = container.doctype;
+		const serverHtml = container.documentElement;
+		// A body that no longer matches fails the attempt, which claimed the head's title.
+		container.querySelector('p')!.replaceWith(container.createElement('div'));
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(
+			container,
+			HoistedTitleDocument,
+			{ label: 'client' },
+			{ onRecoverableError },
+		);
+		flushSync(() => {});
+		expect(serverHtml.isConnected).toBe(false);
+		expect(container.querySelectorAll('title')).toHaveLength(1);
+		expect(container.title).toBe('client');
+		expect(container.body.textContent).toBe('client');
+		expect(container.doctype).toBe(doctype);
+		await Promise.resolve();
+		expect(onRecoverableError).toHaveBeenCalledOnce();
+		root.unmount();
+	});
 	it('renders and hydrates detached DocumentFragment containers', () => {
 		const mounted = document.createDocumentFragment();
 		const root = createRoot(mounted);
@@ -159,7 +252,7 @@ describe('public root containers and test environment', () => {
 	it('removes surplus server children and reports their recovery', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const container = document.createElement('div');
-		container.innerHTML = '<span>same<em>extra</em></span>';
+		container.innerHTML = '<!--3--><span>same<em>extra</em></span>';
 		const onRecoverableError = vi.fn();
 		const root = hydrateRoot(container, Label, { label: 'same' }, { onRecoverableError });
 		expect(container.textContent).toBe('same');

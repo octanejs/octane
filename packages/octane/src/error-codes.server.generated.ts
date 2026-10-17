@@ -23,7 +23,6 @@ type ServerErrorArguments = {
 	10: [unknown];
 	11: [];
 	12: [unknown];
-	23: [];
 	30: [unknown];
 	31: [];
 	32: [unknown];
@@ -37,7 +36,6 @@ type ServerErrorArguments = {
 	42: [];
 	43: [];
 	44: [];
-	45: [];
 	47: [unknown];
 	48: [unknown];
 	57: [];
@@ -174,12 +172,6 @@ type ServerErrorArguments = {
 	203: [];
 	204: [];
 	205: [];
-	206: [];
-	207: [];
-	208: [];
-	209: [];
-	210: [];
-	211: [];
 	213: [];
 	214: [];
 	215: [];
@@ -310,8 +302,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				);
 			case 12:
 				return formatDevErrorMessage('%s(): argument is not a Context nor a thenable', args);
-			case 23:
-				return formatDevErrorMessage('Server-rendered use() rejected', args);
 			case 30:
 				return formatDevErrorMessage('Invalid tag: %s', args);
 			case 31:
@@ -356,8 +346,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('The stream consumer cancelled.', args);
 			case 44:
 				return formatDevErrorMessage('The readable stream is closed.', args);
-			case 45:
-				return formatDevErrorMessage('Server-rendered use() rejected (function)', args);
 			case 47:
 				return formatDevErrorMessage(
 					'octane SSR: exceeded %s suspense passes — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.',
@@ -789,18 +777,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('The request description is still pending.', args);
 			case 205:
 				return formatDevErrorMessage('Frozen scalar candidates are not supported.', args);
-			case 206:
-				return formatDevErrorMessage('Nested signal candidates are not supported.', args);
-			case 207:
-				return formatDevErrorMessage('Only live candidate-capable owners are supported.', args);
-			case 208:
-				return formatDevErrorMessage('Rebase the signal candidate before writing.', args);
-			case 209:
-				return formatDevErrorMessage('Native signal presentation is not installed.', args);
-			case 210:
-				return formatDevErrorMessage('The candidate owner changed lifetime.', args);
-			case 211:
-				return formatDevErrorMessage('Candidate dependency escaped its frame.', args);
 			case 213:
 				return formatDevErrorMessage(
 					'A signal document lifecycle requires a live document and build identity.',

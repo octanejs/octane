@@ -213,7 +213,9 @@ function rendererElement(type) {
 	return (
 		['Element', 'ElementDescriptor', 'OctaneElement', 'ReactElement'].includes(name(type)) &&
 		declarationFiles(type).some((file) =>
-			/\/octane\/(?:src|dist)\/(?:jsx-runtime\.d\.ts|public-types\.ts|runtime\.ts)$/.test(file),
+			/\/octane\/(?:src|dist)\/(?:jsx-runtime\.d\.ts|public-types\.ts|runtime\.ts|runtime\/[^/]+\.ts)$/.test(
+				file,
+			),
 		)
 	);
 }
@@ -511,7 +513,7 @@ export function newOpaquePublicType(
 	const sameDeclaration = namingSymbolOf(type) && namingSymbolOf(type) === namingSymbolOf(witness);
 	const nativePlatform = declarationFiles(type).some(
 		(file) =>
-			/\/octane\/(?:src|dist)\/(?:runtime\.ts|jsx-runtime\.d\.ts|public-types\.ts|index\.ts)$/.test(
+			/\/octane\/(?:src|dist)\/(?:runtime\.ts|runtime\/[^/]+\.ts|jsx-runtime\.d\.ts|public-types\.ts|index\.ts)$/.test(
 				file,
 			) ||
 			/\/node_modules\/@types\/node\//.test(file) ||

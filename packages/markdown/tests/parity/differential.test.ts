@@ -7,7 +7,7 @@ import { expect, test } from 'vitest';
 import Markdown from '../../src/index';
 
 function visibleOctaneHtml(html: string): string {
-	return html.replace(/<!--\[-->|<!--\]-->/g, '');
+	return html.replace(/<!--3-->|<!--\[-->|<!--\]-->/g, '');
 }
 
 // @parity-case react-markdown:differential:sync

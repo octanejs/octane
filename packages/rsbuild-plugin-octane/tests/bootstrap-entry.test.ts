@@ -63,7 +63,7 @@ export default defineConfig({ build: { minify: false }, router: { routes: [new R
 					chunks: 'all' as const,
 					cacheGroups: {
 						bootstrapVendor: {
-							test: /[\\/]runtime\.ts$/,
+							test: /[\\/]src[\\/]runtime(?:\.ts|[\\/][^\\/]+\.ts)$/,
 							name: 'bootstrap-vendor',
 							enforce: true,
 						},
@@ -99,7 +99,7 @@ export default defineConfig({ build: { minify: false }, router: { routes: [new R
 									config.optimization.splitChunks = {
 										cacheGroups: {
 											bootstrapVendor: {
-												test: /[\\/]runtime\.ts$/,
+												test: /[\\/]src[\\/]runtime(?:\.ts|[\\/][^\\/]+\.ts)$/,
 												name: 'bootstrap-vendor',
 												chunks: 'all',
 												enforce: true,

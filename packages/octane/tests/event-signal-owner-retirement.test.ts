@@ -7,7 +7,7 @@ import {
 	signal$,
 	type SignalOwner,
 } from '../src/signals/index.js';
-import { OwnerNestedBubble } from './_fixtures/event-signal-owner.tsrx';
+import { OwnerNestedBubble, OwnerRows, SharedOwnerRows } from './_fixtures/event-signal-owner.tsrx';
 
 // The signal document is process-wide, so this file owns its activation.
 __enableSignalDocument();
@@ -53,3 +53,41 @@ it('keeps a deleted component retired for its queued bubble handler', () => {
 		container.remove();
 	}
 });
+
+for (const [name, Rows] of [
+	['owns its parent', OwnerRows],
+	['shares its parent', SharedOwnerRows],
+] as const) {
+	it(`retires an inert row's authority when a list that ${name} clears in bulk`, () => {
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		const reads: unknown[] = [];
+		const rows = Array.from({ length: 20 }, (_, i) => i);
+		try {
+			const props = {
+				rows,
+				remove() {
+					flushSync(() => root.render(Rows, { ...props, rows: [] }));
+				},
+				bubble() {
+					try {
+						reads.push(signal$(0, { key: 'cleared-row-draft' }).get());
+					} catch (error) {
+						reads.push(error);
+					}
+				},
+			};
+			flushSync(() => root.render(Rows, props));
+			container.querySelector('button')!.click();
+			expect(container.querySelectorAll('li')).toHaveLength(0);
+			// The row's queued bubble handler runs after the clear deleted the row:
+			// it must not mint live instance state for it.
+			expect(reads).toHaveLength(1);
+			expect(reads[0]).toBeInstanceOf(ScopeDisposedError);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+}

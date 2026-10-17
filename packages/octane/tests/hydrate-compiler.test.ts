@@ -1265,6 +1265,24 @@ export function App() @{
 		expect(thrown.message).toContain('split={false}');
 	});
 
+	it('reports a straddling style in a later component at its authored location', () => {
+		const source = `import { Hydrate } from 'octane';
+export function First() @{ <Hydrate when={true}><span>first</span></Hydrate> }
+export function Second() @{
+  <div>
+    <Hydrate when={true}><span class="x">second</span></Hydrate>
+    <style>.x { color: red; }</style>
+  </div>
+}`;
+		expect(() => compiler().transform(source, FILE, { environment: 'client' })).toThrowError(
+			expect.objectContaining({
+				code: 'OCTANE_HYDRATE_SPLIT_STYLE',
+				filename: '/src/App.tsrx',
+				loc: expect.objectContaining({ line: 6, column: 4 }),
+			}),
+		);
+	});
+
 	it('rejects a style scope that straddles a split boundary through a namespaced host', () => {
 		// A namespaced host is stamped by the style-scope pass. If the
 		// straddle check missed it, a parent-list <style> would extract

@@ -29,7 +29,13 @@ import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { selectMinimalScenarios } from './minimal-gates.mjs';
-import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
+import {
+	exportedNames,
+	isRuntimeModule,
+	renderedRuntimeExports,
+	resolveDeclarationRanges,
+	retainedDeclarations,
+} from './hydration-free-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -52,6 +58,7 @@ const existingScenarios = [
 	['server-hooks', 'ts'],
 	['server-render', 'ts'],
 	['component-owned-effects', 'ts'],
+	['descriptor-children', 'ts'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -187,6 +194,12 @@ const productionDefines = {
 	'process.env.NODE_ENV': JSON.stringify('production'),
 };
 const compiler = createOctaneCompiler({ root: directory });
+// runtime.ts's exports: the names scenarios assert a build renders or drops.
+const runtimeSurface = exportedNames(
+	parseAst(fs.readFileSync(path.join(repository, 'packages/octane/src/runtime.ts'), 'utf8'), {
+		lang: 'ts',
+	}),
+);
 const stat = (value) => ({ median: value, min: value, samples: 1 });
 const forbidden = [
 	['React', /\/node_modules\/react(?:-dom)?\//],
@@ -279,16 +292,42 @@ const effectControls = {
 		'scheduleRegisteredPassiveFlush',
 	],
 };
+// Optional runtime implementations follow the features that create them. A
+// control that uses each feature proves the source-map oracle still sees it.
+const signalOwnerDeclarations = [
+	'scopeSignalOwner',
+	'resolveSignalInstanceKey',
+	'retainSignalRetryScope',
+	'pruneSignalRetryVisit',
+	'trackSignalRetryListKeys',
+];
+const featureControls = {
+	'descriptor-children': {
+		dropped: ['renderPortalChild', 'bindImplicitSignalChild', 'useContextInternal'],
+		kept: ['childSlot'],
+	},
+	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
+	'hydrate-frame': {
+		dropped: [],
+		kept: ['renderPortalChild', 'bindImplicitSignalChild', ...signalOwnerDeclarations],
+	},
+};
 const effectDeclarations = Object.values(effectControls).flat();
+const featureDeclarations = [
+	...new Set(Object.values(featureControls).flatMap(({ dropped, kept }) => [...dropped, ...kept])),
+];
+// `node scripts/split-runtime.mjs order` scores runtime module orders against
+// each Rolldown scenario's chunk and source map, which it reads from here.
+const MAP_DIR = process.env.BUNDLE_SIZE_MAP_DIR;
+const mappedScenario = (id) =>
+	Boolean(MAP_DIR) || Object.hasOwn(effectControls, id) || Object.hasOwn(featureControls, id);
 // The split shell uses neither ViewTransition nor Activity, so its runtime chunk
 // must drop their optional drivers as a single bundle does; renderBlockInner is
 // the control that proves the source-map oracle sees the chunk.
 const splitControls = {
 	dropped: [
-		'STAGED_DOM',
 		'VIEW_TRANSITION_DRIVER',
 		'DEFERRED_LAYOUT_DRIVER',
-		'STAGED_COMMIT_CAPTURE',
 		'activityRefState',
 		'renderHiddenActivity',
 		'rehideActivityAfterDescendantRender',
@@ -301,8 +340,8 @@ const runtimeRanges = (names) =>
 		(text, source) => parseAst(text, { lang: 'ts' }, source),
 		names.map((name) => ({ name, source: 'runtime.ts' })),
 	);
-const effectRanges = selectedScenarios.some(({ id }) => Object.hasOwn(effectControls, id))
-	? runtimeRanges(effectDeclarations)
+const effectRanges = selectedScenarios.some(({ id }) => mappedScenario(id))
+	? runtimeRanges([...effectDeclarations, ...featureDeclarations])
 	: [];
 const splitRanges = selectedScenarios.some(({ bundler }) => bundler === 'vite-split')
 	? runtimeRanges([...splitControls.dropped, ...splitControls.kept])
@@ -477,9 +516,6 @@ async function buildSplitScenario(scenario, entry) {
 	);
 	const entryChunk = chunks.find((chunk) => chunk.isEntry);
 	const modules = chunks.flatMap((chunk) => Object.keys(chunk.modules));
-	const runtimeModule = Object.keys(runtime.modules).find((id) =>
-		id.endsWith('/packages/octane/src/runtime.ts'),
-	);
 	const files = chunks.map((chunk) => chunk.code);
 	return {
 		code: files.join('\n'),
@@ -498,7 +534,7 @@ async function buildSplitScenario(scenario, entry) {
 			},
 		],
 		modules,
-		runtimeExports: runtime.modules[runtimeModule].renderedExports,
+		runtimeExports: renderedRuntimeExports(runtime.modules, runtimeSurface),
 	};
 }
 
@@ -576,7 +612,7 @@ async function buildScenario(scenario, entry) {
 		build: {
 			write: false,
 			minify: 'oxc',
-			sourcemap: Object.hasOwn(effectControls, scenario.id) ? 'hidden' : false,
+			sourcemap: mappedScenario(scenario.id) ? 'hidden' : false,
 			target: 'esnext',
 			lib: {
 				entry,
@@ -606,7 +642,6 @@ async function buildScenario(scenario, entry) {
 	const emittedModules = Object.entries(chunk.modules)
 		.filter(([, module]) => module.renderedLength > 0)
 		.map(([id]) => id);
-	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
 	const serverRuntimeModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/runtime.server.ts'),
 	);
@@ -614,11 +649,18 @@ async function buildScenario(scenario, entry) {
 	const hookPathModule = modules.find((id) =>
 		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
 	);
+	if (MAP_DIR) {
+		fs.writeFileSync(path.join(MAP_DIR, `${scenario.id}.js`), chunk.code);
+		fs.writeFileSync(path.join(MAP_DIR, `${scenario.id}.js.map`), chunk.map.toString());
+	}
 	return {
 		code: chunk.code,
 		modules,
 		emittedModules,
-		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
+		runtimeExports: renderedRuntimeExports(
+			Object.fromEntries(modules.map((id) => [id, chunk.modules[id]])),
+			runtimeSurface,
+		),
 		serverRuntimeExports: serverRuntimeModule
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
@@ -645,6 +687,18 @@ try {
 			hookPathExports = [],
 			effects,
 		} = await buildScenario(scenario, entry);
+		if (Object.hasOwn(featureControls, id)) {
+			assert.ok(effects, `${name}: missing feature reachability map`);
+			const { dropped, kept } = featureControls[id];
+			assert.deepEqual(
+				[
+					...dropped.filter((name) => effects.has(name)),
+					...kept.filter((name) => !effects.has(name)),
+				],
+				[],
+				`${name}: optional runtime implementations must follow their features`,
+			);
+		}
 		if (Object.hasOwn(effectControls, id)) {
 			assert.ok(effects, `${name}: missing effect reachability map`);
 			const required = effectControls[id];
@@ -710,7 +764,7 @@ try {
 				`${name}: a client that never hydrates retained the binding-marker validator`,
 			);
 		}
-		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
+		const hasRuntime = modules.some(isRuntimeModule);
 		const hasServerRuntime = modules.some((module) =>
 			module.endsWith('/packages/octane/src/runtime.server.ts'),
 		);

@@ -4,6 +4,7 @@ import {
 	enterSynchronousSignalOwner,
 	installDefaultSignalOwner,
 	restoreSynchronousSignalOwner,
+	signalOwnerUse,
 } from './owner-context.js';
 import type { SignalOwner, SignalOwnerIdentity } from './types.js';
 
@@ -39,6 +40,7 @@ export function documentSignalOwner(container: Node): SignalOwnerIdentity {
 export function enableSignalDocument(abi = 1): void {
 	if (abi !== 1) throw new TypeError(formatClientError(74));
 	signalDocumentEnabled = true;
+	signalOwnerUse.active = true;
 	if (defaultInstalled) return;
 	defaultInstalled = true;
 	signalOwnerFrame = { enter: enterSynchronousSignalOwner, restore: restoreSynchronousSignalOwner };

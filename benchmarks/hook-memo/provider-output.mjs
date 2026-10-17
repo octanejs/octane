@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const REPO = path.resolve(
 	process.env.OCTANE_PROVIDER_ROOT || path.join(import.meta.dirname, '../..'),
@@ -456,7 +457,7 @@ try {
 			repeats: REPEATS,
 			fixtureSha256: hash(fixture),
 			runnerSha256: hash(fs.readFileSync(import.meta.filename)),
-			runtimeSha256: hash(fs.readFileSync(path.join(SOURCE, 'runtime.ts'))),
+			runtimeSha256: hash(readClientRuntime(path.join(SOURCE, 'runtime.ts'))),
 			compilerSha256: hash(fs.readFileSync(path.join(SOURCE, 'compiler/compile.js'))),
 			compiledSha256: hash(compiled),
 			semanticsSha256: hash(JSON.stringify(clean.snapshot)),

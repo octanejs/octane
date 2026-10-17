@@ -1,4 +1,4 @@
-import { HYDRATE_ID_ATTR, HYDRATE_INDEPENDENT_ATTR } from './hydration-markers.js';
+import { HYDRATE_ID_ATTR, HYDRATE_INDEPENDENT_ATTR } from './hydration-protocol.js';
 import { getNativeHydrationDocument, getNativeHydrationDOM } from './hydration/native-intent.js';
 
 export const FORM_SUBMISSION_ATTR = 'data-octane-capture-submit';

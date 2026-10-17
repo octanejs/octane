@@ -140,28 +140,28 @@ describe('native conditions preserve dormant server content', () => {
 		expect(probe.onCleanup).not.toHaveBeenCalled();
 	}
 	/**
-	 * The boundary is live. Captures that changed before it activated give it
-	 * output the server never rendered, and a dormant boundary never renders its
-	 * stale captures to compare them. As React does for an update that reaches a
-	 * dehydrated boundary it cannot hydrate, the boundary then renders on the
-	 * client instead of adopting the server's button, and reports nothing.
+	 * The boundary is live and kept the server's button. Captures that changed
+	 * before it activated (`updated`) give it output the server never rendered:
+	 * as React hydrates a dehydrated boundary before the update that reached it,
+	 * the boundary hydrates with the captures the server rendered, and the newer
+	 * ones apply as an update, so its effect mounts and then updates. Nothing
+	 * reports a mismatch.
 	 */
 	async function assertLive(
 		probe: ActivationReceipts,
 		label = 'server label:closed',
-		rendered: 'adopted' | 'client' = 'adopted',
+		updated = false,
 	) {
 		await vi.waitFor(async () => {
 			await act(() => {});
 			expect(probe.onHydrated).toHaveBeenCalled();
 		});
 		const button = container.querySelector<HTMLButtonElement>('#deferred-action')!;
-		if (rendered === 'adopted') expect(button).toBe(probe.button);
-		else expect(probe.button.isConnected).toBe(false);
+		expect(button).toBe(probe.button);
 		expect(button.textContent).toBe(label);
 		expect(probe.onHydrated).toHaveBeenCalledOnce();
-		expect(probe.onEffect).toHaveBeenCalledOnce();
-		expect(probe.onCleanup).not.toHaveBeenCalled();
+		expect(probe.onEffect).toHaveBeenCalledTimes(updated ? 2 : 1);
+		expect(probe.onCleanup).toHaveBeenCalledTimes(updated ? 1 : 0);
 		await act(() => button.click());
 		expect(probe.onClick).toHaveBeenCalledOnce();
 		expect(recoverable).toEqual([]);
@@ -274,10 +274,12 @@ describe('native conditions preserve dormant server content', () => {
 				onClick: onLatestClick,
 			}),
 		);
-		await assertLive({ ...probe, onClick: onLatestClick }, 'latest label:closed', 'client');
+		await assertLive({ ...probe, onClick: onLatestClick }, 'latest label:closed', true);
 		expect(probe.onClick).not.toHaveBeenCalled();
 	});
-	it('opens preserved content for a genuine parent render with unchanged child capture', async () => {
+	// The children close over the owner's whole props object, so a new one is a
+	// changed capture even where the values they read are unchanged.
+	it('opens preserved content and updates it for a genuine parent render', async () => {
 		const probe = setup$({ constantFalse: true });
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
@@ -290,7 +292,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() =>
 			root!.render(client.NativeConditionDemand, { ...probe.props, ownerRevision: 1 }),
 		);
-		await assertLive(probe);
+		await assertLive(probe, 'server label:closed', true);
 		expect(container.querySelector('#boundary-owner')?.getAttribute('data-revision')).toBe('1');
 	});
 	it('opens preserved content for a genuine changed context while the predicate stays false', async () => {
@@ -306,7 +308,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() =>
 			root!.render(client.NativeConditionDemand, { ...probe.props, contextValue: 'still closed' }),
 		);
-		await assertLive(probe, 'server label:still closed', 'client');
+		await assertLive(probe, 'server label:still closed', true);
 	});
 	it('opens changed context when a false native predicate has also queued a refresh', async () => {
 		const probe = setup$({ context: 'both' });
@@ -322,7 +324,7 @@ describe('native conditions preserve dormant server content', () => {
 			probe.scope.set(probe.gate$, { open: false, revision: 1 });
 			root!.render(client.NativeConditionDemand, { ...probe.props, contextValue: 'still closed' });
 		});
-		await assertLive(probe, 'server label:still closed', 'client');
+		await assertLive(probe, 'server label:still closed', true);
 	});
 	it('opens memo-wrapped preserved content for changed context with unchanged boundary props', async () => {
 		const receipts = setupReceipts(document.createElement('button'));
@@ -348,6 +350,8 @@ describe('native conditions preserve dormant server content', () => {
 		expect(receipts.onHydrated).not.toHaveBeenCalled();
 		expect(receipts.onEffect).not.toHaveBeenCalled();
 		await act(() => root!.render(clientFixture.App, { value: 'still closed' }));
-		await assertLive(receipts, 'server label:still closed', 'client');
+		// The cached element keeps the child's props, so the update re-renders it
+		// for the context alone, and its effect's inferred dependencies hold.
+		await assertLive(receipts, 'server label:still closed');
 	});
 });

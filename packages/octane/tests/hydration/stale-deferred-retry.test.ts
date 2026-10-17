@@ -5,16 +5,17 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A deferred boundary whose first attempt suspends keeps that attempt's blocks
-// and retries from where it stopped. When a mounted parent changes the
-// boundary's captures while it is pending, the retry reconciles what it already
-// adopted as an update, and that update can create content the server never
-// rendered: a swapped component, a new keyed row, or a renderable hole's new
-// value. That content must not adopt or rebuild over a server node that
-// another block owns, including when it suspends and a later retry resumes
-// it. The server HTML predates the captures, so nothing is reported: as React
-// reports nothing for an update that reaches a dehydrated boundary, a retry
-// whose server DOM no longer matches renders the island on the client silently.
+// A deferred boundary whose first attempt suspends retries once its data
+// settles. When a mounted parent changes the boundary's captures while it is
+// pending, the retry hydrates with the captures the server rendered, as React
+// hydrates a dehydrated boundary before the update that reached it, and the
+// newer captures then apply as an update. That update can create content the
+// server never rendered: a swapped component, a new keyed row, or a renderable
+// hole's new value. That content must not adopt or rebuild over a server node
+// that another block owns, including when it suspends and a later retry
+// resumes it. A retry whose data no longer matches the server's DOM is a real
+// mismatch, whether or not the captures changed: the island renders on the
+// client and reports once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -236,7 +237,7 @@ describe.each([
 			expect(recoverable).toHaveLength(1);
 		});
 
-		it('renders the island on the client silently when its retry finds other text after its captures changed', async () => {
+		it('renders the island on the client and reports once when its retry finds other text after its captures changed', async () => {
 			const { nodes, leaf, slow } = await hydratePending('DynProbe', {
 				k: 'a',
 				items: SERVER_ITEMS,
@@ -249,7 +250,7 @@ describe.each([
 			expect(section).not.toBe(nodes.section);
 			expect(nodes.section.isConnected).toBe(false);
 			expect(markup(section)).toBe(`<i>B</i>${rows(SERVER_ITEMS)}<u>w</u><em>e</em>`);
-			expectNoDiagnostics();
+			expect(recoverable).toHaveLength(1);
 		});
 	});
 

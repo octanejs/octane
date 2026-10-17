@@ -8,23 +8,26 @@ import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import {
 	activateStreamedMarkup,
 	collectReadableStream,
+	deferred,
 	resetStreamRuntimeGlobals,
 } from '../_server-stream.js';
 
-// The server rendered a boundary's @catch arm because its try body threw, and
-// the client's try body throws again while hydrating. Without a record of which
-// arm the server rendered, the client claimed the catch DOM for the try body:
-// a try body that renders a host first mismatched against the catch arm, and a
-// sole-root boundary's rebuilt catch arm left the root's tail unclaimed.
+// OCTANE DIVERGENCE: server render errors reach the nearest authored error
+// boundary. On activation the client retries the primary content in that
+// boundary, without replacing the surrounding page or reporting a mismatch.
 
 const SOURCE = readFileSync(
 	join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/try-catch-arm.tsrx'),
 	'utf8',
 );
 
-const pending = (): Promise<string> => new Promise<string>(() => {});
+type Mode = 'renderToString' | 'prerender' | 'stream';
+const MODES: Mode[] = ['renderToString', 'prerender', 'stream'];
+const BOUNDARY_CASES = MODES.flatMap((mode) =>
+	['Recovering', 'CatchInsidePending', 'JsxBoundaries'].map((name) => [name, mode] as const),
+);
 
-describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', (dev) => {
+describe.each([true, false])('server render errors (dev=%s)', (dev) => {
 	const server = loadCompiledFixtureSource(SOURCE, {
 		id: 'try-catch-arm.tsrx',
 		mode: 'server',
@@ -52,6 +55,27 @@ describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', 
 		resetStreamRuntimeGlobals();
 	});
 
+	/** The page `name` renders on the server, with the errors it reported. */
+	async function serverRender(
+		name: string,
+		props: Record<string, unknown>,
+		mode: Mode,
+	): Promise<unknown[]> {
+		const errors: unknown[] = [];
+		const onError = (value: unknown) => errors.push(value);
+		if (mode === 'stream') {
+			const result = await collectReadableStream(server[name], props, { onError });
+			container.innerHTML = result.html;
+			activateStreamedMarkup(container);
+		} else {
+			container.innerHTML =
+				mode === 'prerender'
+					? (await prerender(server[name], props, { onError })).html
+					: ServerRT.renderToString(server[name], props, { onError }).html;
+		}
+		return errors;
+	}
+
 	async function hydrate(name: string, props: Record<string, unknown>) {
 		const recoverable: unknown[] = [];
 		const caught: string[] = [];
@@ -65,51 +89,110 @@ describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', 
 		return { root, recoverable, caught };
 	}
 
-	function expectQuiet(recoverable: unknown[]): void {
-		expect(recoverable).toEqual([]);
-		expect(error).not.toHaveBeenCalled();
-		expect(warn).not.toHaveBeenCalled();
+	/** Waits out the Suspense retry window until `check` passes. */
+	async function settle(check: () => void): Promise<void> {
+		await vi.waitFor(async () => {
+			await act(async () => {});
+			check();
+		});
 	}
 
-	it.each(['Wrapped', 'SoleRoot', 'HostBody', 'JsxBoundary'])(
-		'%s adopts the catch arm and retries into the try body',
-		async (name) => {
-			container.innerHTML = ServerRT.renderToString(server[name], {
-				state: { failed: true },
-			}).html;
+	it.each(BOUNDARY_CASES)(
+		'%s (%s) renders the catch arm and retries successfully on activation',
+		async (name, mode) => {
+			const errors = await serverRender(name, { state: { failed: true } }, mode);
+			expect(errors).toEqual([]);
+			expect(container.querySelector('button')?.textContent).toBe('failed');
+			expect(container.querySelector('i, p')).toBeNull();
+			const main = container.querySelector('main')!;
+			const footer = container.querySelector('footer')!;
+
+			const { root, recoverable, caught } = await hydrate(name, { state: { failed: false } });
+			expect(container.querySelector('p')!.textContent).toBe('ready');
+			expect(container.querySelector('i, button')).toBeNull();
+			expect(container.querySelector('main')).toBe(main);
+			expect(container.querySelector('footer')).toBe(footer);
+			expect(caught).toEqual([]);
+			expect(recoverable).toEqual([]);
+			root.unmount();
+		},
+	);
+
+	it.each(BOUNDARY_CASES)(
+		'%s (%s) activates a live catch arm when the client throws too',
+		async (name, mode) => {
+			await serverRender(name, { state: { failed: true } }, mode);
+			expect(container.querySelector('button')?.textContent).toBe('failed');
+			const main = container.querySelector('main')!;
+
+			const state = { failed: true };
+			const { root, recoverable, caught } = await hydrate(name, { state });
 			const button = container.querySelector('button')!;
 			expect(button.textContent).toBe('failed');
-
-			const { root, recoverable, caught } = await hydrate(name, { state: { failed: true } });
-			expect(container.querySelector('button')).toBe(button);
-			expect(container.querySelector('p')).toBeNull();
+			expect(container.querySelector('i, p')).toBeNull();
+			expect(container.querySelector('main')).toBe(main);
 			expect(caught).toEqual(['failed']);
-			expectQuiet(recoverable);
+			expect(recoverable).toEqual([]);
 
 			flushSync(() => button.click());
 			expect(container.querySelector('button')).toBeNull();
 			expect(container.querySelector('p')!.textContent).toBe('ready');
-			expectQuiet(recoverable);
 			root.unmount();
 		},
 	);
 
-	it.each(['SoleRoot', 'HostBody', 'JsxBoundary'])(
-		'%s renders the try body when only the server threw',
-		async (name) => {
-			container.innerHTML = ServerRT.renderToString(server[name], {
-				state: { failed: true },
-			}).html;
+	it.each(
+		MODES.flatMap((mode) => ['CatchOnly', 'JsxCatchOnly'].map((name) => [name, mode] as const)),
+	)('%s (%s) renders its catch arm without a pending boundary', async (name, mode) => {
+		const errors = await serverRender(name, { state: { failed: true } }, mode);
+		expect(container.querySelector('button')?.textContent).toBe('failed');
+		expect(errors).toEqual([]);
+	});
 
-			const { root, recoverable, caught } = await hydrate(name, { state: { failed: false } });
-			expect(container.querySelector('button')).toBeNull();
-			expect(container.querySelectorAll('p')).toHaveLength(1);
-			expect(container.querySelector('p')!.textContent).toBe('ready');
-			expect(caught).toEqual([]);
-			expectQuiet(recoverable);
-			root.unmount();
-		},
-	);
+	it('streams the catch arm when a retry throws after the shell', async () => {
+		const server$ = deferred<string>();
+		const streamed = collectReadableStream(server.Streamed, { promise: server$.promise });
+		await Promise.resolve();
+		server$.resolve('bad');
+		const result = await streamed;
+		expect(result.errors).toEqual([]);
+		container.innerHTML = result.html;
+		activateStreamedMarkup(container);
+		expect(container.querySelector('button')?.textContent).toBe('bad value');
+		expect(container.querySelector('i, p')).toBeNull();
+		const footer = container.querySelector('footer')!;
+
+		const client$ = deferred<string>();
+		const { root, recoverable, caught } = await hydrate('Streamed', { promise: client$.promise });
+		expect(container.querySelector('i')!.textContent).toBe('loading');
+		expect(recoverable).toEqual([]);
+
+		await act(async () => client$.resolve('good'));
+		await settle(() => expect(container.querySelector('p')?.textContent).toBe('good'));
+		expect(container.querySelector('i, button')).toBeNull();
+		expect(container.querySelector('footer')).toBe(footer);
+		expect(caught).toEqual([]);
+		expect(recoverable).toEqual([]);
+		root.unmount();
+	});
+
+	it('shows the client catch arm when a boundary that threw after the shell throws again', async () => {
+		const server$ = deferred<string>();
+		const streamed = collectReadableStream(server.Streamed, { promise: server$.promise });
+		await Promise.resolve();
+		server$.reject(new Error('server rejected'));
+		const result = await streamed;
+		expect(result.errors).toEqual([]);
+		container.innerHTML = result.html;
+		activateStreamedMarkup(container);
+		expect(container.querySelector('button')?.textContent).toBe('server rejected');
+
+		const { root, caught } = await hydrate('Streamed', { promise: Promise.resolve('bad') });
+		await settle(() => expect(container.querySelector('button')?.textContent).toBe('bad value'));
+		expect(container.querySelector('i, p')).toBeNull();
+		expect(caught).toEqual(['bad value']);
+		root.unmount();
+	});
 
 	it('a sole-root boundary keeps its server range when only the client throws', async () => {
 		container.innerHTML = ServerRT.renderToString(server.SoleRoot, {
@@ -121,191 +204,14 @@ describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', 
 		const button = container.querySelector('button')!;
 		expect(button.textContent).toBe('failed');
 		expect(caught).toEqual(['failed']);
-		expectQuiet(recoverable);
+		expect(recoverable).toEqual([]);
+		expect(error).not.toHaveBeenCalled();
+		expect(warn).not.toHaveBeenCalled();
 
 		flushSync(() => button.click());
 		expect(container.querySelector('p')!.textContent).toBe('ready');
 		root.unmount();
 	});
-
-	it('adopts the arm caught from a seeded rejection beneath a host', async () => {
-		const rejected = Promise.reject(new Error('rejected'));
-		const { html } = await prerender(server.Seeded, {
-			first: rejected,
-			after: Promise.resolve('after'),
-		});
-		container.innerHTML = html;
-		const button = container.querySelector('button')!;
-		const after = container.querySelector('span')!;
-		expect(button.textContent).toBe('rejected');
-
-		const { root, recoverable } = await hydrate('Seeded', {
-			first: pending(),
-			after: pending(),
-		});
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('section')).toBeNull();
-		expect(container.querySelector('span')).toBe(after);
-		expect(after.textContent).toBe('after');
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	it('replays the seeds the server read before throwing', async () => {
-		const { html } = await prerender(server.Seeded, {
-			first: Promise.resolve('bad'),
-			after: Promise.resolve('after'),
-		});
-		container.innerHTML = html;
-		const button = container.querySelector('button')!;
-		const after = container.querySelector('span')!;
-		expect(button.textContent).toBe('bad value');
-		expect(after.textContent).toBe('after');
-
-		const { root, recoverable, caught } = await hydrate('Seeded', {
-			first: pending(),
-			after: pending(),
-		});
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('section')).toBeNull();
-		expect(container.querySelector('span')).toBe(after);
-		expect(after.textContent).toBe('after');
-		expect(caught).toEqual(['bad value']);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	it('replays the seeds of a nested boundary the server resolved before throwing', async () => {
-		const { html } = await prerender(server.NestedResolved, {
-			nested: Promise.resolve('nested'),
-			first: Promise.resolve('bad'),
-			after: Promise.resolve('after'),
-		});
-		container.innerHTML = html;
-		const button = container.querySelector('button')!;
-		const after = container.querySelector('span')!;
-		expect(button.textContent).toBe('bad value');
-		expect(after.textContent).toBe('after');
-
-		const { root, recoverable, caught } = await hydrate('NestedResolved', {
-			nested: pending(),
-			first: pending(),
-			after: pending(),
-		});
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('section')).toBeNull();
-		expect(container.querySelector('i')).toBeNull();
-		expect(container.querySelectorAll('span')).toHaveLength(1);
-		expect(container.querySelector('span')).toBe(after);
-		expect(after.textContent).toBe('after');
-		expect(caught).toEqual(['bad value']);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	const nestedCases: Array<[string, Record<string, string>]> = [
-		['NestedDeep', { a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', first: 'bad', after: 'after' }],
-		['NestedInnerCatch', { inner: 'bad', nested: 'nested', first: 'bad', after: 'after' }],
-		['NestedRetried', { nested: 'nested', first: 'bad', after: 'after' }],
-		['NestedIsland', { nested: 'nested', first: 'bad', after: 'after' }],
-	];
-	it.each(nestedCases)(
-		'%s replays every nested seed run ahead of the catch arm',
-		async (name, values) => {
-			const resolved = Object.fromEntries(
-				Object.entries(values).map(([key, value]) => [key, Promise.resolve(value)]),
-			);
-			const { html } = await prerender(server[name], resolved);
-			container.innerHTML = html;
-			const button = container.querySelector('button')!;
-			const after = container.querySelector('span')!;
-			expect(button.textContent).toBe('bad value');
-			expect(after.textContent).toBe('after');
-
-			const waiting = Object.fromEntries(Object.keys(values).map((key) => [key, pending()]));
-			const { root, recoverable, caught } = await hydrate(name, waiting);
-			expect(container.querySelector('button')).toBe(button);
-			expect(container.querySelector('section')).toBeNull();
-			expect(container.querySelectorAll('span')).toHaveLength(1);
-			expect(container.querySelector('span')).toBe(after);
-			expect(caught).toEqual(['bad value']);
-			expectQuiet(recoverable);
-			root.unmount();
-		},
-	);
-
-	it("keeps the sidecar of the catch arm's own resolved boundary", async () => {
-		const { html } = await prerender(server.CatchArmNested, {
-			nested: Promise.resolve('nested'),
-			first: Promise.resolve('bad'),
-			after: Promise.resolve('after'),
-		});
-		container.innerHTML = html;
-		const button = container.querySelector('button')!;
-		const [nested, after] = container.querySelectorAll('span');
-		expect(nested.textContent).toBe('nested');
-
-		const { root, recoverable, caught } = await hydrate('CatchArmNested', {
-			nested: pending(),
-			first: pending(),
-			after: pending(),
-		});
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('i')).toBeNull();
-		expect([...container.querySelectorAll('span')]).toEqual([nested, after]);
-		expect(after.textContent).toBe('after');
-		expect(caught).toEqual(['bad value']);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	it.each([
-		['StreamedNested', { gate: 'gate', nested: 'nested', first: 'bad' }],
-		['StreamedInnerCatch', { inner: 'bad', nested: 'nested', more: 'more', first: 'bad' }],
-	])('%s replays a streamed nested boundary inside a streamed catch arm', async (name, values) => {
-		const gates: Array<() => void> = [];
-		const props = Object.fromEntries(
-			Object.entries(values).map(([key, value]) => [
-				key,
-				new Promise<string>((done) => gates.push(() => done(value))),
-			]),
-		);
-		const streamed = collectReadableStream(server[name], props);
-		await Promise.resolve();
-		for (const open of gates) open();
-		container.innerHTML = (await streamed).html;
-		activateStreamedMarkup(container);
-		const button = container.querySelector('button')!;
-		expect(button.textContent).toBe('bad value');
-
-		const waiting = Object.fromEntries(Object.keys(values).map((key) => [key, pending()]));
-		const { root, recoverable, caught } = await hydrate(name, waiting);
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('i')).toBeNull();
-		expect(container.querySelector('section')).toBeNull();
-		expect(caught).toEqual(['bad value']);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	it.each(['RootSiblingStatic', 'RootSiblingComponent', 'HostSibling'])(
-		'%s keeps its sibling when the client retries into the try body the server caught',
-		async (name) => {
-			container.innerHTML = ServerRT.renderToString(server[name], {
-				state: { failed: true },
-			}).html;
-			const after = container.querySelector('.after')!;
-
-			const { root, recoverable, caught } = await hydrate(name, { state: { failed: false } });
-			expect(container.querySelector('.after')).toBe(after);
-			expect(container.querySelectorAll('.after')).toHaveLength(1);
-			expect(container.querySelectorAll('button')).toHaveLength(0);
-			expect(container.querySelectorAll('p:not(.after)')).toHaveLength(1);
-			expect(caught).toEqual([]);
-			expectQuiet(recoverable);
-			root.unmount();
-		},
-	);
 
 	// Only the client's try body throws, so it throws while hydrating. As in
 	// React, that fails the root's hydration even though the catch arm would
@@ -325,129 +231,8 @@ describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', 
 			expect(container.querySelectorAll('button')).toHaveLength(1);
 			expect(container.querySelectorAll('p:not(.after)')).toHaveLength(0);
 			expect(caught).toEqual(['failed']);
-			expectQuiet(recoverable);
+			expect(recoverable).toEqual([]);
 			root.unmount();
 		},
 	);
-
-	it('keeps a streamed catch arm through a discarded hydration attempt', async () => {
-		let resolve!: (value: string) => void;
-		const promise = new Promise<string>((done) => {
-			resolve = done;
-		});
-		const streamed = collectReadableStream(server.StreamedDiscarded, {
-			make: () => promise,
-			wait: null,
-		});
-		await Promise.resolve();
-		resolve('bad');
-		container.innerHTML = (await streamed).html;
-		activateStreamedMarkup(container);
-		const button = container.querySelector('button')!;
-		expect(button.textContent).toBe('bad value');
-
-		let release!: (value: string) => void;
-		const wait = new Promise<string>((done) => {
-			release = done;
-		});
-		const { root, recoverable, caught } = await hydrate('StreamedDiscarded', {
-			make: pending,
-			wait,
-		});
-		expect(container.querySelector('button')).toBe(button);
-
-		await act(async () => release('go'));
-		await act(async () => {
-			await new Promise((done) => setTimeout(done, 350));
-		});
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('i')).toBeNull();
-		expect(container.querySelector('.tail')!.textContent).toBe('tail');
-		expect(caught.every((message) => message === 'bad value')).toBe(true);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	it('shows its fallback when the client body waits where the server threw', async () => {
-		container.innerHTML = ServerRT.renderToString(server.WaitingPending, {
-			state: { failed: true },
-			promise: pending(),
-		}).html;
-		let resolve!: (value: string) => void;
-		const promise = new Promise<string>((done) => {
-			resolve = done;
-		});
-
-		const { root, recoverable, caught } = await hydrate('WaitingPending', {
-			state: { failed: false },
-			promise,
-		});
-		expect(container.querySelector('button')).toBeNull();
-		expect(container.querySelector('i')!.textContent).toBe('loading');
-
-		await act(async () => resolve('done'));
-		await act(async () => {
-			await new Promise((done) => setTimeout(done, 350));
-		});
-		expect(container.querySelector('i')).toBeNull();
-		expect(container.querySelector('p')!.textContent).toBe('done');
-		expect(caught).toEqual([]);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
-
-	it.each(['WaitingOuterPending', 'WaitingRoot'])(
-		'%s keeps the server catch arm while a retried hydration waits for client data',
-		async (name) => {
-			container.innerHTML = ServerRT.renderToString(server[name], {
-				state: { failed: true },
-				promise: pending(),
-			}).html;
-			const button = container.querySelector('button')!;
-			let resolve!: (value: string) => void;
-			const promise = new Promise<string>((done) => {
-				resolve = done;
-			});
-
-			const { root, recoverable, caught } = await hydrate(name, {
-				state: { failed: false },
-				promise,
-			});
-			expect(container.querySelector('button')).toBe(button);
-			expect(container.querySelector('section')).toBeNull();
-
-			await act(async () => resolve('done'));
-			await act(async () => {
-				await new Promise((done) => setTimeout(done, 350));
-			});
-			expect(container.querySelector('button')).toBeNull();
-			expect(container.querySelectorAll('p')).toHaveLength(1);
-			expect(container.querySelector('p')!.textContent).toBe('done');
-			expect(caught).toEqual([]);
-			expectQuiet(recoverable);
-			root.unmount();
-		},
-	);
-
-	it('adopts a streamed catch arm', async () => {
-		let resolve!: (value: string) => void;
-		const promise = new Promise<string>((done) => {
-			resolve = done;
-		});
-		const streamed = collectReadableStream(server.Streamed, { promise });
-		await Promise.resolve();
-		resolve('bad');
-		container.innerHTML = (await streamed).html;
-		activateStreamedMarkup(container);
-		const button = container.querySelector('button')!;
-		expect(button.textContent).toBe('bad value');
-
-		const { root, recoverable, caught } = await hydrate('Streamed', { promise: pending() });
-		expect(container.querySelector('button')).toBe(button);
-		expect(container.querySelector('i')).toBeNull();
-		expect(container.querySelector('section')).toBeNull();
-		expect(caught).toEqual(['bad value']);
-		expectQuiet(recoverable);
-		root.unmount();
-	});
 });

@@ -3,7 +3,7 @@ import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
 import { HydrationForm } from '../_fixtures/hydration.tsrx';
 
 const SERVER_HTML =
-	'<form><input id="name" name="[&quot;name&quot;]" value="Ada"/><output id="name-output">Ada</output></form>';
+	'<!--3--><form><input id="name" name="[&quot;name&quot;]" value="Ada"/><output id="name-output">Ada</output></form>';
 
 let container: HTMLDivElement;
 let error: ReturnType<typeof vi.spyOn>;

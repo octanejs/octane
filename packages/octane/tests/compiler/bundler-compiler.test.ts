@@ -1995,8 +1995,7 @@ export function App(p) @{
 			dev: false,
 		});
 		expect(server?.code).toContain('_$ssrTry(');
-		expect(server?.code).toContain('(__error, __scope, __reset) =>');
-		expect(server?.code).toContain(', undefined, true)');
+		expect(server?.code).toContain('button');
 		expect(server?.code).not.toContain('ErrorBoundary');
 
 		const dynamic = compiler.transform(

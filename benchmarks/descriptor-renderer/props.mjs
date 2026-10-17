@@ -10,12 +10,13 @@ import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
 import ts from 'typescript';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 process.env.NODE_ENV = 'production';
 const repo = path.resolve(import.meta.dirname, '../..');
 const runtimePath = path.join(repo, 'packages/octane/src/runtime.ts');
 const runtimeFile = path.resolve(process.argv[2] ?? runtimePath);
-const source = fs.readFileSync(runtimeFile, 'utf8');
+const source = readClientRuntime(runtimeFile);
 const setters = {
 	setAttribute: 'attributes',
 	setDeoptClass: 'classes',

@@ -48,7 +48,7 @@ ceded to a future event-dispatch-storm suite.
 - **`octane-ts` / plain createElement**: everything above plus the whole tree is
   a fresh descriptor graph per render, reconciled by the runtime de-opt path
   (`childSlot` → `reconcileDeoptNode`/`reconcileDeoptChildren` keyed matching +
-  `patchDeoptProps` prop loops). Regressions point at the de-opt reconciler —
+  `setHostProps` prop loops). Regressions point at the de-opt reconciler —
   the path every `@octanejs/*` binding lives on.
 
 ## Running

@@ -12,6 +12,7 @@ import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
 import { exerciseSlots } from './slots-work.mjs';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 const slotAudit = process.env.CLIENT_FUNCTION_SET === 'slots';
 const names = slotAudit
@@ -254,7 +255,7 @@ if (process.argv[2] === '--worker') {
 } else {
 	const sourceRoot = resolve(process.env.CLIENT_SOURCE_ROOT || process.argv[2] || repo);
 	const sourceFile = join(sourceRoot, 'packages/octane/src/runtime.ts');
-	const source = await readFile(process.env.CLIENT_RUNTIME_FILE || sourceFile, 'utf8');
+	const source = readClientRuntime(process.env.CLIENT_RUNTIME_FILE || sourceFile);
 	const out = join(repo, 'node_modules/.cache/client-hot-functions');
 	await mkdir(out, { recursive: true });
 	let entry = `export {${exports.join(',')}} from './packages/octane/src/runtime.ts';`;

@@ -235,7 +235,7 @@ describe('module-declared custom hooks in plain modules', () => {
 		it.each(MODES)(`keeps state separate for ${shape} (%j)`, ({ dev, inlineHookMemo }) => {
 			const load = (mode: 'client' | 'server') => loadPair(source, mode, dev, inlineHookMemo);
 			expect(renderToString(load('server'), undefined).html).toBe(
-				'<div><button>d1</button><output>d0</output></div>',
+				'<!--3--><div><button>d1</button><output>d0</output></div>',
 			);
 			const root = mount(load('client'));
 			try {

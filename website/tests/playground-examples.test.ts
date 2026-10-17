@@ -102,6 +102,10 @@ describe('curated examples', () => {
 				for (const literal of source.matchAll(/class="([^"]+)"/g)) {
 					for (const cls of literal[1].split(/\s+/)) {
 						if (!targeted.has(cls)) continue;
+						// The server never renders a `@catch` arm (React's server error
+						// model), so its markup carries no class to stamp.
+						const emitted = new RegExp(`class=\\\\?"(?:[^"]* )?${cls}[ "\\\\]`);
+						if (mode === 'server' && !emitted.test(out.code)) continue;
 						const stamped = new RegExp(`class=\\\\?"(?:[^"]* )?${cls}(?: [^"]*)? tsrx-[a-z0-9]+`);
 						expect(out.code, `${mode}: class "${cls}" carries no scope hash`).toMatch(stamped);
 					}

@@ -17,6 +17,8 @@ const style = {
 function normalizeServerMarkup(html: string): string {
 	return (
 		html
+			// The hydration protocol version opens Octane's output; React has none.
+			.replace(/^<!--3-->/, '')
 			// Compiler-owned input identity does not change the native control contract.
 			.replace(/ data-octane-input="[^"]*"/g, '')
 			.replace(/style="([^"]*)"/g, function (_match, css: string) {

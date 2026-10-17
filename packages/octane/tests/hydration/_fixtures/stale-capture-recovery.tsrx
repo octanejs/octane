@@ -179,3 +179,26 @@ export function PlainSwap(props: { v: string }) @{
 		</section>
 	</div>
 }
+
+// One element whose attribute, class, style and click handler are all captures.
+export function DormantValues(props: {
+	title: string;
+	tone: string;
+	width: string;
+	onPress: () => void;
+}) @{
+	<div>
+		<Hydrate split={false} when={condition(false)}>
+			<section>
+				<em
+					title={props.title}
+					class={props.tone}
+					style={{ width: props.width }}
+					onClick={props.onPress}
+				>
+					{'values'}
+				</em>
+			</section>
+		</Hydrate>
+	</div>
+}

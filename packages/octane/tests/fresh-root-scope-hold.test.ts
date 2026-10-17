@@ -15,7 +15,7 @@ function fulfilled<T>(value: T): PromiseLike<T> {
 }
 
 describe('new scopes in a held root render', () => {
-	it('removes newly mounted content while restoring committed and external writes', async () => {
+	it('removes newly mounted content and leaves committed and external DOM until commit', async () => {
 		const pending = deferred<string>();
 		const external = document.createElement('div');
 		external.textContent = 'external:initial';

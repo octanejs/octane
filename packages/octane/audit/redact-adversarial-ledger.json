@@ -815,8 +815,8 @@
         {
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
-          "symbol": "finishRoot",
-          "note": "Intentionally diagnoses and removes unclaimed root siblings."
+          "symbol": "installHydrationFallback",
+          "note": "Diagnoses a root whose hydration failed, discards its unclaimed server content, and client-renders it, as React's clearContainer does."
         },
         {
           "kind": "test",

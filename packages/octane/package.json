@@ -48,6 +48,10 @@
       "octane-islands": "./src/signals/action-capability-renderer.ts",
       "default": "./src/signals/action-capability-elsewhere.ts"
     },
+    "#octane/signals/server-reads": {
+      "browser": "./src/signals/server-reads-elsewhere.ts",
+      "default": "./src/signals/server-reads.ts"
+    },
     "#octane/signal-actions/bindings": {
       "octane-islands": "./src/signals/action-capability-elsewhere.ts",
       "default": "./src/signals/candidate-producers.ts"
@@ -59,6 +63,10 @@
     "#octane/dist/signal-actions/renderer": {
       "octane-islands": "./dist/signals/action-capability-renderer.js",
       "default": "./dist/signals/action-capability-elsewhere.js"
+    },
+    "#octane/dist/signals/server-reads": {
+      "browser": "./dist/signals/server-reads-elsewhere.js",
+      "default": "./dist/signals/server-reads.js"
     },
     "#octane/dist/signal-actions/bindings": {
       "octane-islands": "./dist/signals/action-capability-elsewhere.js",
@@ -139,6 +147,10 @@
       "#octane/dist/signal-actions/renderer": {
         "octane-islands": "./dist/signals/action-capability-renderer.js",
         "default": "./dist/signals/action-capability-elsewhere.js"
+      },
+      "#octane/dist/signals/server-reads": {
+        "browser": "./dist/signals/server-reads-elsewhere.js",
+        "default": "./dist/signals/server-reads.js"
       },
       "#octane/dist/signal-actions/bindings": {
         "octane-islands": "./dist/signals/action-capability-elsewhere.js",

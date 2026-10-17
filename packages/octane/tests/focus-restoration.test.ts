@@ -73,6 +73,35 @@ function DescriptorInputRows(props: { items: FocusRow[] }) {
 }
 
 describe('focus and text selection survive DOM updates', () => {
+	it('reorders later keyed rows after an earlier focused link is retired', () => {
+		function NavigationRows(props: { items: FocusRow[]; showLink: boolean }) {
+			return createElement(
+				'main',
+				null,
+				props.showLink
+					? createElement('a', { href: 'https://example.test/next', children: 'Next page' })
+					: null,
+				createElement(FastHostControlledList, { items: props.items }),
+			);
+		}
+		const rendered = mount(NavigationRows, { items: rows, showLink: true });
+		try {
+			const link = rendered.find('a') as HTMLAnchorElement;
+			const initial = rendered.findAll('input') as HTMLInputElement[];
+			link.focus();
+			expect(document.activeElement).toBe(link);
+
+			rendered.update(NavigationRows, { items: rows.toReversed(), showLink: false });
+
+			expect(rendered.findAll('input')).toEqual(initial.toReversed());
+			expect(initial.map((input) => input.value)).toEqual(rows.map((row) => row.label));
+			expect(link.isConnected).toBe(false);
+			expect(rendered.container.textContent).not.toContain('Next page');
+		} finally {
+			rendered.unmount();
+		}
+	});
+
 	it.each([true, false])(
 		'restores a focused editor moved into another container during its update (anchor=%s)',
 		(anchor) => {

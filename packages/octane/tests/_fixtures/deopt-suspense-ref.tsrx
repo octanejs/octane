@@ -2,7 +2,7 @@ import { use } from 'octane';
 
 interface DeoptRefInBoundaryProps {
 	promise: Promise<string>;
-	r: { current: Element | null } | ((el: Element | null) => void);
+	r: { current: HTMLElement | null } | ((el: HTMLElement | null) => void);
 }
 
 function Value(props: { promise: Promise<string> }) @{
@@ -24,6 +24,26 @@ export function DeoptRefInBoundary(props: DeoptRefInBoundaryProps) @{
 				{host}
 				<Value promise={props.promise} />
 			</div>
+		} @pending {
+			<span class="fallback">loading</span>
+		}
+	</div>
+}
+
+// The ref sits on a pure child of a value-position host that also renders a
+// component, so the host is one Block and the child another, inside it.
+export function DeoptHostChildRefInBoundary(props: DeoptRefInBoundaryProps) @{
+	const host = (
+		<section>
+			<b id="deopt-target" ref={props.r}>
+				x
+			</b>
+			<Value promise={props.promise} />
+		</section>
+	);
+	<div class="wrap">
+		@try {
+			<div class="content">{host}</div>
 		} @pending {
 			<span class="fallback">loading</span>
 		}

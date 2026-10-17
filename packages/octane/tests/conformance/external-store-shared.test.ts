@@ -261,7 +261,7 @@ describe('Shared useSyncExternalStore behavior', () => {
 			store,
 			hostRef: null,
 		});
-		expect(html).toBe('<div id="hydrated-store">server</div>');
+		expect(html).toBe('<!--3--><div id="hydrated-store">server</div>');
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);

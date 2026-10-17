@@ -35,7 +35,7 @@ describe('direct server script compilation', () => {
 
 		expect(result.stderr).toBe('');
 		expect(result.status).toBe(0);
-		expect(result.stdout).toBe('<main>Hello, Octane!</main>');
+		expect(result.stdout).toBe('<!--3--><main>Hello, Octane!</main>');
 	});
 
 	it('prerenders an extensionless TypeScript component import through the public preload', () => {
@@ -50,7 +50,7 @@ describe('direct server script compilation', () => {
 
 		expect(result.stderr).toBe('');
 		expect(result.status).toBe(0);
-		expect(result.stdout).toBe('<main>Hello, Octane!</main>');
+		expect(result.stdout).toBe('<!--3--><main>Hello, Octane!</main>');
 	});
 
 	it('targets the server runtime inside pass-through manual-slot packages', () => {
@@ -65,6 +65,6 @@ describe('direct server script compilation', () => {
 
 		expect(result.stderr).toBe('');
 		expect(result.status).toBe(0);
-		expect(result.stdout).toBe('<main>Hello from a package, Octane!</main>');
+		expect(result.stdout).toBe('<!--3--><main>Hello from a package, Octane!</main>');
 	});
 });

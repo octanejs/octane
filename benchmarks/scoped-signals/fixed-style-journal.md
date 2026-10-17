@@ -25,6 +25,11 @@ assertions, then bundles against the selected worktree's source. The scalar and
 opaque consumers must produce matching CSS, preserve host and uncontrolled input
 identity and draft values, and release their DOM on unmount.
 
+Since the compiled commit functions (#2043, `dc409debd6`), the commit writes
+the declarations outside any journal window, so neither consumer snapshots the
+style attribute and Happy DOM's reads fall to 600 for both. The results below
+are from the measured revision.
+
 For a matched baseline, save `packages/octane/src/runtime.ts` from the base
 commit and pass that path as the optional argument to the second command.
 `buildFixedStyleJournal` and `measureFixedStyleJournal` also accept `{ dev,

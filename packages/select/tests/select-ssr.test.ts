@@ -37,7 +37,7 @@ function canonicalMarkup(html: string, removeLiveRegion = false) {
 	const window = new Window();
 	window.document.body.innerHTML = html
 		.replace(/<style data-emotion="[^"]+">[^<]*<\/style>/g, '')
-		.replace(/<!--\[-->|<!--\]-->/g, '')
+		.replace(/<!--3-->|<!--\[-->|<!--\]-->/g, '')
 		.replace(/\bcss-[A-Za-z0-9_-]+/g, 'css-HASH')
 		.replace(/react-select-\d+/g, 'react-select-ID');
 	if (removeLiveRegion) {

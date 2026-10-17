@@ -270,7 +270,9 @@ globalThis.renderedValue = container.children[0].props.value;
 		);
 		expect(
 			inputs.some((input) =>
-				/(?:^|\/)(?:runtime\.ts|dom-tables\.[jt]s|hydration(?:\/|\.))|react|preact/i.test(input),
+				/(?:^|\/)(?:runtime\.ts|runtime\/[^/]+\.ts|dom-tables\.[jt]s|hydration(?:\/|\.))|react|preact/i.test(
+					input,
+				),
 			),
 		).toBe(false);
 		expect(output).not.toMatch(/\b(?:document|window|MutationObserver|HTMLElement)\b/);
@@ -297,7 +299,9 @@ globalThis.renderedValue = container.children[0].props.value;
 		const inputs = Object.keys(Object.values(result.metafile!.outputs)[0].inputs);
 
 		expect(inputs).toEqual(
-			expect.arrayContaining([expect.stringMatching(/packages\/octane\/src\/runtime\.ts$/)]),
+			expect.arrayContaining([
+				expect.stringMatching(/packages\/octane\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/),
+			]),
 		);
 		expect(
 			inputs.some((input) =>

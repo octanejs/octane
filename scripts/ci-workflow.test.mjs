@@ -4,6 +4,7 @@ import { existsSync, globSync, readFileSync, readdirSync, statSync } from 'node:
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
+import { projectSelects } from './react-parity/vitest-contract.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
@@ -26,9 +27,11 @@ const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.conf
 const parityVitestModule = await import(
 	pathToFileURL(path.join(REPO, 'vitest.react-parity.config.js'))
 );
-const { configureShardedProjects, default: shardedVitestConfig } = await import(
-	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
-);
+const {
+	configureShardedProjects,
+	ISOLATED_COMPILER_SPEC,
+	default: shardedVitestConfig,
+} = await import(pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js')));
 const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
 const releaseWorkflow = readFileSync(path.join(REPO, '.github/workflows/release.yml'), 'utf8');
 const draftWorkflow = readFileSync(
@@ -113,7 +116,7 @@ describe('CI workflow aggregation', () => {
 	test('runs only required-check reporters for draft pull requests', () => {
 		assert.match(
 			workflow,
-			/^  pull_request:\n    branches: \[main, "jon\/update-bindings-\*"\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
+			/^  pull_request:\n    branches: \[main, next, "jon\/update-bindings-\*"\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
 		);
 
 		const draftGuard =
@@ -752,6 +755,34 @@ describe('CI workflow aggregation', () => {
 		]);
 		assert.equal(projects.get('rspeedy-plugin').test.exclude, undefined);
 		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
+	});
+
+	test('keeps isolated compiler coverage in the required Node integration lane', () => {
+		const spec = ISOLATED_COMPILER_SPEC;
+		assert.ok(existsSync(path.join(REPO, spec)));
+		const baseProject = baseVitestModule.default.test.projects.find(
+			({ test }) => test?.name === 'octane',
+		);
+		const shardedProject = shardedVitestConfig.test.projects.find(
+			({ test }) => test?.name === 'octane',
+		);
+		assert.equal(baseProject.testExecution, undefined);
+		assert.deepEqual(shardedProject?.test.include, baseProject.test.include);
+		const owners = (projects) =>
+			projects.filter((entry) => projectSelects(entry, spec, REPO)).map(({ test }) => test.name);
+		assert.deepEqual(owners(baseVitestModule.default.test.projects), ['octane']);
+		assert.deepEqual(owners(shardedVitestConfig.test.projects), []);
+		const lane = jobSource('heavy_node_integration');
+		assert.equal(lane.split(spec).length - 1, 1);
+		assert.ok(
+			lane.includes(
+				[
+					'      - name: Run compiler Vite options tests',
+					"        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}",
+					`        run: pnpm vitest run --project octane ${spec} --maxWorkers=1`,
+				].join('\n'),
+			),
+		);
 	});
 
 	test('derives sharded projects generically from execution-group ownership', () => {

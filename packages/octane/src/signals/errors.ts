@@ -1,9 +1,15 @@
 import { formatClientError } from '../error-codes.client.generated.js';
+import type { GraphOwner } from './graph.js';
+
 export class ScopeDisposedError extends Error {
 	constructor(scopeKey: string) {
 		super(formatClientError(151, scopeKey));
 		this.name = 'ScopeDisposedError';
 	}
+}
+
+export function assertAlive(owner: GraphOwner): void {
+	if (owner.retired) throw new ScopeDisposedError(owner.scopeKey);
 }
 
 export class SignalWriteError extends Error {

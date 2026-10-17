@@ -19,11 +19,30 @@
  *   node scripts/perf-review-scan.mjs --json [path-prefix...]
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RUNTIME = 'packages/octane/src/runtime.ts';
+// Once split, the client runtime's declarations live in its concept modules.
+const RUNTIME_DIR = 'packages/octane/src/runtime/';
+const isRuntimeSource = (file) =>
+	file === RUNTIME ||
+	(file.startsWith(RUNTIME_DIR) && /^[^/]+\.ts$/.test(file.slice(RUNTIME_DIR.length)));
+
+/** The client runtime's source files in a checkout, as `{ path, text }`. */
+export function runtimeSources(base = root()) {
+	const dir = path.join(base, RUNTIME_DIR);
+	const modules = existsSync(dir)
+		? readdirSync(dir)
+				.filter((name) => name.endsWith('.ts'))
+				.sort()
+				.map((name) => RUNTIME_DIR + name)
+		: [];
+	return [RUNTIME, ...modules]
+		.filter((file) => existsSync(path.join(base, file)))
+		.map((file) => ({ path: file, text: readFileSync(path.join(base, file), 'utf8') }));
+}
 const HOT_CLASSES = ['BlockImpl', 'ScopeImpl', 'LiteBlockImpl'];
 const CONTEXT_LINES = 25;
 
@@ -508,14 +527,9 @@ function readOptions(argv) {
 function collect(options) {
 	if (options.diff !== undefined) {
 		const text = readFileSync(options.diff === '-' ? 0 : options.diff, 'utf8');
-		const runtime = path.join(root(), RUNTIME);
-		// The local checkout stands in for the diff's runtime.ts, so its shape is
+		// The local checkout stands in for the diff's runtime, so its shape is
 		// only an approximation of the reviewed head's.
-		return {
-			text,
-			exact: false,
-			runtime: () => (existsSync(runtime) ? readFileSync(runtime, 'utf8') : null),
-		};
+		return { text, exact: false, runtime: () => runtimeSources() };
 	}
 	const unified = `--unified=${CONTEXT_LINES}`;
 	if (options.head !== undefined) {
@@ -532,7 +546,11 @@ function collect(options) {
 				'packages',
 			]),
 			exact: true,
-			runtime: () => git(['show', `${options.head}:${RUNTIME}`]),
+			runtime: () =>
+				git(['ls-tree', '-r', '--name-only', options.head, '--', RUNTIME, RUNTIME_DIR])
+					.split('\n')
+					.filter(isRuntimeSource)
+					.map((file) => ({ path: file, text: git(['show', `${options.head}:${file}`]) })),
 		};
 	}
 	const base = resolveBase(options.base);
@@ -545,14 +563,14 @@ function collect(options) {
 		const lines = readFileSync(path.join(root(), file), 'utf8').split('\n');
 		text += `\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => '+' + l).join('\n')}\n`;
 	}
-	return { text, exact: true, runtime: () => readFileSync(path.join(root(), RUNTIME), 'utf8') };
+	return { text, exact: true, runtime: () => runtimeSources() };
 }
 
-/** Fields a diff declares in runtime.ts, which a stand-in checkout may not have yet. */
+/** Fields a diff declares in the runtime, which a stand-in checkout may not have yet. */
 export function addedDeclarations(files) {
 	const fields = new Set();
 	for (const file of files) {
-		if (file.path !== RUNTIME) continue;
+		if (!isRuntimeSource(file.path)) continue;
 		for (const hunk of file.hunks) {
 			for (const entry of hunk) {
 				const match = entry.kind === 'add' && /^\s*declare\s+([\w$]+)\??\s*:/.exec(entry.text);
@@ -611,15 +629,17 @@ export function run(argv) {
 	const { text, exact, runtime } = collect(options);
 	const files = parseDiff(text);
 	const scanned = files.filter((file) => isScannedFile(file.path, options.only));
-	const source = scanned.some((file) => writesHotRecords(file.path)) ? runtime() : null;
-	const hotFields = source === null ? null : hotClassFields(source);
+	const sources = scanned.some((file) => writesHotRecords(file.path)) ? runtime() : null;
+	const hotFields =
+		sources === null ? null : new Set(sources.flatMap(({ text }) => [...hotClassFields(text)]));
 	if (hotFields !== null && !exact)
 		for (const field of addedDeclarations(files)) hotFields.add(field);
 	const findings = scanFiles(files, { only: options.only, hotFields });
-	// The structural check needs the reviewed head's runtime.ts; a pasted diff
+	// The structural check needs the reviewed head's runtime; a pasted diff
 	// does not carry it, so use --head for that check.
-	if (exact && source !== null && scanned.some((file) => file.path === RUNTIME)) {
-		findings.push(...checkHotClasses(source));
+	if (exact && sources !== null && scanned.some((file) => isRuntimeSource(file.path))) {
+		for (const { path: file, text } of sources)
+			findings.push(...checkHotClasses(text, HOT_CLASSES, file));
 	}
 	return findings;
 }

@@ -252,9 +252,12 @@ describe('deferred hydration', () => {
 		expect(container.querySelector('#split-eager-prefix')).toBe(eagerPrefix);
 		expect(deferredButton.dataset.capturedLabel).toBe('captured:reviews');
 		expect(deferredButton.textContent).toBe('captured:reviews');
-		expect(onEffect).not.toHaveBeenCalled();
-		expect(onActivatedEffect).toHaveBeenCalledOnce();
-		expect(onActivatedEffect).toHaveBeenCalledWith('captured:reviews');
+		// The child hydrates with the captures it was claimed with, as React
+		// hydrates before applying the update, so its mount-only effect runs with
+		// the handler of that first render.
+		expect(onEffect).toHaveBeenCalledOnce();
+		expect(onEffect).toHaveBeenCalledWith('captured:reviews');
+		expect(onActivatedEffect).not.toHaveBeenCalled();
 		expect(onHydrated).toHaveBeenCalledOnce();
 
 		await act(() => deferredButton.click());

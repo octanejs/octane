@@ -7,16 +7,24 @@ import {
 	resetStreamRuntimeGlobals,
 } from '../_server-stream.js';
 import { loadServerFixture } from '../_server-fixture.js';
-import {
-	InitialAdoptionScreen,
-	NestedInitialAdoption,
-	type AdoptionGate,
-	type AdoptionProps,
-} from '../_fixtures/initial-suspense-hydration.tsrx';
+import * as Client from '../_fixtures/initial-suspense-hydration.tsrx';
+import type { AdoptionGate, AdoptionProps } from '../_fixtures/initial-suspense-hydration.tsrx';
 
-const server = loadServerFixture<typeof import('../_fixtures/initial-suspense-hydration.tsrx')>(
+const { InitialAdoptionScreen, NestedInitialAdoption } = Client;
+const server = loadServerFixture<typeof Client>(
 	'packages/octane/tests/_fixtures/initial-suspense-hydration.tsrx',
 );
+// The adopted content returned directly or through relay components, as one
+// section or as a fragment of hosts that render through runtime descriptors.
+const SCREENS = [
+	'InitialAdoptionScreen',
+	'InitialFragmentScreen',
+	'InitialSectionRelayScreen',
+	'InitialSectionRelayChainScreen',
+	'InitialFragmentRelayScreen',
+	'InitialFragmentRelayChainScreen',
+] as const;
+type Screen = (typeof SCREENS)[number];
 const cleanups: (() => void)[] = [];
 afterEach(() => {
 	for (const cleanup of cleanups.splice(0).reverse()) cleanup();
@@ -41,7 +49,12 @@ function gate() {
 function fulfilled(value: string) {
 	return Object.assign(Promise.resolve(value), { status: 'fulfilled' as const, value });
 }
-function setup(gateInChild: boolean, secondGate?: AdoptionGate, gatePromise?: Promise<void>) {
+function setup(
+	gateInChild: boolean,
+	secondGate?: AdoptionGate,
+	gatePromise?: Promise<void>,
+	screen: Screen = 'InitialAdoptionScreen',
+) {
 	const waiting = gate();
 	if (gatePromise) waiting.value.promise = gatePromise;
 	const props: AdoptionProps = {
@@ -57,7 +70,7 @@ function setup(gateInChild: boolean, secondGate?: AdoptionGate, gatePromise?: Pr
 	};
 	const container = document.createElement('div');
 	document.body.append(container);
-	container.innerHTML = renderToString(server.InitialAdoptionScreen, props).html;
+	container.innerHTML = renderToString(server[screen], props).html;
 	const input = container.querySelector('input')!;
 	const sibling = container.querySelector('aside button') as HTMLButtonElement;
 	const id = input.id;
@@ -77,7 +90,7 @@ function setup(gateInChild: boolean, secondGate?: AdoptionGate, gatePromise?: Pr
 		container.remove();
 	});
 	const recoverable: unknown[] = [];
-	root = hydrateRoot(container, InitialAdoptionScreen, props, {
+	root = hydrateRoot(container, Client[screen], props, {
 		onRecoverableError: (error) => recoverable.push(error),
 	});
 	return {
@@ -239,6 +252,55 @@ describe.each([false, true])('initial suspended hydration (gate in child: %s)', 
 		expect(props.onRef).not.toHaveBeenCalled();
 	});
 });
+
+// Each gate the adopted content waits on is one more attempt over the same
+// server DOM. The attempt that commits attaches the ref, once, to the server's
+// input, however its hosts render: none before it attached anything.
+describe.each(SCREENS.flatMap((screen) => [false, true].map((child) => [screen, child] as const)))(
+	'initial suspended hydration of %s (gate in child: %s)',
+	(screen, gateInChild) => {
+		it('adopts the input through the first gate and attaches its ref once', async () => {
+			const { props, container, input, sibling, waiting, recoverable } = setup(
+				gateInChild,
+				undefined,
+				undefined,
+				screen,
+			);
+			await act(() => {});
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('user draft');
+			expect(document.activeElement).toBe(input);
+			await act(() => sibling.click());
+			expect(props.onSiblingClick).toHaveBeenCalledOnce();
+			await act(() => waiting.resolve());
+			expect(recoverable).toEqual([]);
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('user draft');
+			expect(props.onLifecycle).toHaveBeenCalledExactlyOnceWith('mount:server');
+			expect(props.onRef).toHaveBeenCalledExactlyOnceWith(input);
+		});
+
+		it('attaches the ref once after the last of several gates', async () => {
+			const second = gate();
+			const { props, container, input, waiting, root, recoverable } = setup(
+				gateInChild,
+				second.value,
+				undefined,
+				screen,
+			);
+			await act(() => waiting.resolve());
+			expect(container.querySelector('input')).toBe(input);
+			expect(props.onRef).not.toHaveBeenCalled();
+			await act(() => second.resolve());
+			expect(recoverable).toEqual([]);
+			expect(container.querySelector('input')).toBe(input);
+			expect(props.onLifecycle).toHaveBeenCalledExactlyOnceWith('mount:server');
+			expect(props.onRef).toHaveBeenCalledExactlyOnceWith(input);
+			await act(() => root.unmount());
+			expect(vi.mocked(props.onRef).mock.calls.map(([node]) => node)).toEqual([input, null]);
+		});
+	},
+);
 
 it('keeps a nested boundary’s server data when a later sibling postpones outer adoption', async () => {
 	const waiting = gate();

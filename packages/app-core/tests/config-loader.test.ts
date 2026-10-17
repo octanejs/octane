@@ -156,7 +156,7 @@ export default { platform: { env: { marker: typeof ConfigMarker, html: (await re
 
 		const loaded = await loadOctaneConfigWithMetadata(fixtureRoot);
 		expect(loaded.config.platform.env.marker).toBe('function');
-		expect(loaded.config.platform.env.html).toBe('<span>ready</span>');
+		expect(loaded.config.platform.env.html).toBe('<!--3--><span>ready</span>');
 		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'ConfigMarker.tsrx'));
 		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'node_modules/octane/server.mjs'));
 		expect(loaded.missingDependencies).toEqual([]);

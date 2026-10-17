@@ -296,6 +296,33 @@ export function BoundaryPendingHeadClient(props: { portalTarget: Element; deferr
 
 BoundaryPendingHeadClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
 
+// Renders after the arm content before it, so it sees what that content wrote.
+function RenderProbe(props: { record: () => void }) {
+	props.record();
+	return null;
+}
+
+function DeferredReady(props: { deferred: Deferred }) {
+	if (!props.deferred.ready) throw props.deferred.promise;
+	return createElement('p', { id: 'range-boundary-ready' }, 'ready');
+}
+
+export function BoundaryPendingBodyClient(props: { deferred: Deferred; record: () => void }) {
+	return createElement(
+		Passthrough,
+		{},
+		createElement(
+			Suspense as ComponentBody<BoundaryConfig>,
+			{ key: 'head', fallback: null },
+			createElement(DeferredReady, { deferred: props.deferred }),
+			createElement(RenderProbe, { record: props.record }),
+		),
+		createElement(BoundaryHost, { key: 'body' }, createElement(Interactive)),
+	);
+}
+
+BoundaryPendingBodyClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
+
 export function BoundaryFailingListClient(props: FailingListProps) {
 	return createElement(
 		ErrorBoundary as ComponentBody<BoundaryConfig>,

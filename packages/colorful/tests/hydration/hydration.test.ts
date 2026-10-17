@@ -14,20 +14,7 @@ delegateEvents([
 ]);
 
 const SERVER_HTML =
-	'<!--[--><!--[--><!--[--><div data-testid="hex" class="react-colorful"><!--[--><!--[-->' +
-	'<div class="react-colorful__saturation" style="background-color:hsl(0, 100%, 50%);">' +
-	'<!--[--><!--[--><div aria-label="Color" aria-valuetext="Saturation 100%, Brightness 100%" ' +
-	'class="react-colorful__interactive" tabindex="0" role="slider"><!--[--><!--[-->' +
-	'<div class="react-colorful__pointer react-colorful__saturation-pointer" style="top:0%;left:100%;">' +
-	'<div class="react-colorful__pointer-fill" style="background-color:hsl(0, 100%, 50%);"></div>' +
-	'</div><!--]--><!--]--></div><!--]--><!--]--></div><!--]--><!--]--><!--[--><!--[-->' +
-	'<div class="react-colorful__hue react-colorful__last-control"><!--[--><!--[-->' +
-	'<div aria-label="Hue" aria-valuenow="0" aria-valuemax="360" aria-valuemin="0" ' +
-	'class="react-colorful__interactive" tabindex="0" role="slider"><!--[--><!--[-->' +
-	'<div class="react-colorful__pointer react-colorful__hue-pointer" style="top:50%;left:0%;">' +
-	'<div class="react-colorful__pointer-fill" style="background-color:hsl(0, 100%, 50%);"></div>' +
-	'</div><!--]--><!--]--></div><!--]--><!--]--></div><!--]--><!--]--></div><!--]--><!--]-->' +
-	'<!--]-->';
+	'<!--3--><!--[--><div data-testid="hex" class="react-colorful"><!--[--><div class="react-colorful__saturation" style="background-color:hsl(0, 100%, 50%);"><!--[--><div aria-label="Color" aria-valuetext="Saturation 100%, Brightness 100%" class="react-colorful__interactive" tabindex="0" role="slider"><!--[--><div class="react-colorful__pointer react-colorful__saturation-pointer" style="top:0%;left:100%;"><div class="react-colorful__pointer-fill" style="background-color:hsl(0, 100%, 50%);"></div></div><!--]--></div><!--]--></div><!--]--><!--[--><div class="react-colorful__hue react-colorful__last-control"><!--[--><div aria-label="Hue" aria-valuenow="0" aria-valuemax="360" aria-valuemin="0" class="react-colorful__interactive" tabindex="0" role="slider"><!--[--><div class="react-colorful__pointer react-colorful__hue-pointer" style="top:50%;left:0%;"><div class="react-colorful__pointer-fill" style="background-color:hsl(0, 100%, 50%);"></div></div><!--]--></div><!--]--></div><!--]--></div><!--]-->';
 
 function settle() {
 	// Commit the render a dispatched event left queued, then run its passive effects.

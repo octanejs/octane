@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bagOf, clone, setText, template, type Scope } from '../src/index.js';
+import { bagOf, clone, template, type Scope } from '../src/index.js';
+import { setRenderText } from '../src/runtime.js';
 import { act, mount } from './_helpers.js';
 
 function pending() {
@@ -20,8 +21,9 @@ describe('root snapshot values', () => {
 		const source = template('<section><p> </p><button>inspect</button><output></output></section>');
 		const gate = pending();
 		let held = true;
-		// Binding integrations can use the compiler ABI directly. Observe the
-		// accepted values through a native event, without inspecting its bag.
+		// Binding integrations can use the compiler ABI directly; a render stages
+		// its text write as compiled output does. Observe the accepted values
+		// through a native event, without inspecting its bag.
 		function App(props: { label: string; suspend?: boolean }, scope: Scope) {
 			let bindings = scope.slots[0];
 			if (bindings === undefined) {
@@ -45,7 +47,7 @@ describe('root snapshot values', () => {
 				});
 				bagOf(scope, host, bindings);
 			}
-			setText(bindings.text, props.label);
+			setRenderText(bindings.text, props.label);
 			bindings[value] = props.label;
 			if (props.suspend) {
 				delete bindings[removed];
@@ -112,7 +114,7 @@ describe('root snapshot values', () => {
 					});
 					bagOf(scope, host, bindings);
 				}
-				setText(bindings.text, props.label);
+				setRenderText(bindings.text, props.label);
 				bindings[field] = props.label;
 				if (props.suspend) {
 					delete bindings.removed;
@@ -153,7 +155,7 @@ describe('root snapshot values', () => {
 				});
 				bagOf(scope, host, bindings);
 			}
-			setText(bindings.text, props.label);
+			setRenderText(bindings.text, props.label);
 			bindings[0] = props.label;
 			if (props.suspend) {
 				bindings.length = 1;

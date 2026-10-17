@@ -81,7 +81,7 @@ describe('octane/server — withSlot + startTransition (BLOCKER 1)', () => {
 		const server = serverModule(); // throws if any octane/server import is missing
 		const { html } = await ServerRT.renderToString(server.Widget, { start: 5 });
 		// The custom hook's useState returned its initial; rendered through withSlot.
-		expect(html).toBe('<button id="w">count:5</button>');
+		expect(html).toBe('<!--3--><button id="w">count:5</button>');
 	});
 
 	it('hydrates the SSR output and the transition setter is interactive', async () => {

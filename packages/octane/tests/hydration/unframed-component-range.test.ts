@@ -9,9 +9,9 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // The server HTML does not match the client, so, as in React 19, the nearest
 // fallback owner discards its server DOM and renders on the client, reporting
 // once: a <Hydrate> island when one encloses the call, otherwise the root.
-// Everything outside the island keeps its server nodes. Where the server's
-// elements are exactly what the call renders, the call adopts them, whether
-// or not it suspended first.
+// Everything outside the island keeps its server nodes. The server frames every
+// component call, so a call falls back even where the server's elements are
+// exactly what it renders, unlike React, which compares only the DOM.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -139,13 +139,6 @@ describe.each([
 			html: '<u>z</u><i>x</i>',
 			island: true,
 		},
-		// The call before it adopted the server's last element.
-		{
-			shape: 'after the server’s last element, under an island',
-			name: 'LateBranch',
-			html: '<b>a</b><p>z</p>',
-			island: true,
-		},
 	];
 
 	it.each(SUSPENDING)(
@@ -180,31 +173,52 @@ describe.each([
 		},
 	);
 
-	// The server rendered exactly the elements the component renders once its
-	// data arrives. React's retry hydrates them, as a render that never
-	// suspended would: nothing is replaced or reported.
+	// OCTANE DIVERGENCE: the server rendered exactly the elements the component
+	// renders once its data arrives, but not the range of its call. As in React,
+	// the suspension keeps the server HTML while the data is pending. React's
+	// retry then hydrates the elements; Octane's finds the call without its
+	// range, and the owner renders on the client, reporting once.
 	it.each([
-		{ shape: 'under a <Hydrate> island', name: 'MatchBranch' },
-		{ shape: 'whose child suspends, under an island', name: 'MatchChildBranch' },
-		{ shape: 'in the root', name: 'MatchRoot' },
+		{ shape: 'under a <Hydrate> island', name: 'MatchBranch', island: true },
+		{ shape: 'whose child suspends, under an island', name: 'MatchChildBranch', island: true },
+		{ shape: 'in the root', name: 'MatchRoot', island: false },
 	])(
-		'adopts the server elements of a component that suspends $shape once it resolves',
-		async ({ name }) => {
-			const { section, nodes, recoverable, settle } = await hydrate(name);
+		'client-renders the owner of a component that suspends $shape without its server range',
+		async ({ name, island }) => {
+			const { outer, section, nodes, content, recoverable, settle } = await hydrate(name);
 
-			await settle();
 			expect(container.querySelector('section')).toBe(section);
-			expect(markup(section)).toBe(FRAG);
-			expect(section.children).toHaveLength(nodes.length);
 			nodes.forEach((node, index) => expect(section.children[index]).toBe(node));
 			expect(recoverable).toEqual([]);
-			expect(warnings()).toEqual([]);
+
+			await settle();
+			expect(markup(container.querySelector('section')!)).toBe(FRAG);
+			for (const node of content) expect(node.isConnected).toBe(false);
+			expect(outer.isConnected).toBe(island);
+			expectReportedOnce(recoverable);
 		},
 	);
 
-	// The component around the call suspends first, inside its own server
-	// range, and the call suspends only once the island retries.
-	it('adopts the server elements of a component that suspends after the island resumed', async () => {
+	// OCTANE DIVERGENCE: a call before the suspending one finds the server's
+	// last element without its range. React adopts that element and suspends
+	// in the next call; Octane's mismatch comes first in React's order, so the
+	// island renders on the client at once.
+	it('client-renders an island whose call before a suspending one has no server range', async () => {
+		const { outer, content, recoverable, settle } = await hydrate('LateBranch');
+
+		for (const node of content) expect(node.isConnected).toBe(false);
+		expect(outer.isConnected).toBe(true);
+		expectReportedOnce(recoverable);
+
+		await settle();
+		expect(markup(container.querySelector('section')!)).toBe('<b>a</b><p>z</p>');
+	});
+
+	// OCTANE DIVERGENCE: the component around the call suspends first, inside
+	// its own server range, and the call suspends only once the island retries;
+	// that call then finds no server range of its own, so the island renders on
+	// the client where React adopts the matching elements.
+	it('client-renders the island when a component that suspends after the island resumed has no server range', async () => {
 		container.innerHTML = ServerRT.renderToString(server.GateBranch, {
 			server: true,
 			gate: Promise.resolve('unused'),
@@ -233,12 +247,10 @@ describe.each([
 			await leaf;
 		});
 
-		expect(container.querySelector('section')).toBe(section);
-		expect(markup(section)).toBe(FRAG);
-		expect(section.children).toHaveLength(nodes.length);
-		nodes.forEach((node, index) => expect(section.children[index]).toBe(node));
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(markup(container.querySelector('section')!)).toBe(FRAG);
+		for (const node of nodes) expect(node.isConnected).toBe(false);
+		expect(section.isConnected).toBe(false);
+		expectReportedOnce(recoverable);
 	});
 
 	// The island's server HTML has an element the client renders nothing for,

@@ -30,13 +30,6 @@ function siteOf(after: string, text: string): string {
 	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
 }
 
-/** The `file:line:col` of the declaration `function name(`. */
-function definitionOf(name: string): string {
-	const index = LINES.findIndex((line) => line.startsWith(`function ${name}(`));
-	if (index < 0) throw new Error(`fixture has no function ${name}`);
-	return `${FILE}:${index + 1}:0`;
-}
-
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	const copy = node.cloneNode(true) as Element;
@@ -55,7 +48,7 @@ function expectSame(actual: ArrayLike<Node>, expected: readonly Node[]): void {
 
 function tail(site: string): string {
 	return (
-		`Octane hydration mismatch at ${site}: the client expected the end of the component but ` +
+		`Octane hydration mismatch at ${site}: the client expected the end of its content but ` +
 		`the server rendered <s>. The nearest Suspense or Hydrate boundary, or the root, will be ` +
 		`regenerated on the client.`
 	);
@@ -65,8 +58,8 @@ const SHAPES = [
 	{
 		shape: 'a component whose identity differs on the client',
 		name: 'DynamicIdentity',
-		// The client component returns its content into its range.
-		site: () => definitionOf('ClientArm'),
+		// The client component's returned value renders in the call's frame.
+		site: () => siteOf('function DynamicIdentity(', '<Arm />'),
 	},
 	{
 		shape: 'a lite component in a renderable hole',
@@ -81,7 +74,12 @@ const SHAPES = [
 	{
 		shape: 'a component that returns less on the client',
 		name: 'ConditionalReturn',
-		site: () => definitionOf('Returning'),
+		site: () => siteOf('function ConditionalReturn(', '<Returning'),
+	},
+	{
+		shape: 'a component whose content is its lite calls',
+		name: 'LiteCalls',
+		site: () => siteOf('function LiteCalls(', '<Calls />'),
 	},
 	{
 		shape: 'a component in a list item range',

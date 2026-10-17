@@ -464,6 +464,85 @@ for (const mode of ['render', 'hydrate'] as const) {
 			expect(container.querySelector('aside, [data-second-prefix]')).toBeNull();
 			expect(container.querySelector('article')!.textContent).toBe('one');
 		});
+
+		it.each(['direct', 'dynamic host'] as const)(
+			'renders a body update with its committed captures after a dropped render through %s',
+			async (kind) => {
+				let ready = false;
+				let resolve!: () => void;
+				const pending = new Promise<void>((done) => {
+					resolve = done;
+				});
+				const read = () => {
+					if (!ready) throw pending;
+					return 'ready';
+				};
+				const props = { label: 'one', wait: false, host: kind === 'dynamic host', read };
+				const app = start('DroppedCaptureValue', props);
+				const button = container.querySelector('button')!;
+				expect(button.textContent).toBe('one:0');
+				// New captures reach the body, then a sibling suspends: the render drops.
+				app.update({ ...props, label: 'two', wait: true });
+				expect(container.querySelector('button')).toBe(button);
+				expect(button.textContent).toBe('one:0');
+				app.click('button');
+				expect(button.textContent).toBe('one:1');
+				await act(() => {
+					ready = true;
+					resolve();
+				});
+				expect(container.querySelector('button')).toBe(button);
+				expect(button.textContent).toBe('two:1');
+				expect(container.querySelector('i')!.textContent).toBe('ready');
+			},
+		);
+
+		// One click replaces a forwarded body twice in one drain: the parent's
+		// urgent update, then the owner's transition in the boundary's window.
+		it.each([false, true])(
+			'lands the last of two replacements in one drain (transition suspends: %s)',
+			async (suspends) => {
+				let ready = !suspends;
+				let resolve!: () => void;
+				const pending = new Promise<void>((done) => {
+					resolve = done;
+				});
+				const read = () => {
+					if (!ready) throw pending;
+					return 'ready';
+				};
+				const app = start(
+					'NestedReplacement',
+					{
+						read,
+						forward: (content) =>
+							Client.createElement(fixture.DynamicHost, { tag: 'div', content }),
+					},
+					{
+						read,
+						forward: (content: Parameters<typeof Server.createElement>[2]) =>
+							Server.createElement(server.DynamicHost, { tag: 'div', content }),
+					},
+				);
+				const host = container.querySelector('section > div')!;
+				expect(host.querySelector('article')!.textContent).toBe('first');
+				app.click('button');
+				expect(container.querySelector('section > div')).toBe(host);
+				expect(container.querySelector('[role=status]')).toBeNull();
+				if (suspends) {
+					// The held transition's window drops; the urgent replacement commits.
+					expect(host.querySelector('article')).toBeNull();
+					expect(host.querySelector('aside')!.textContent).toBe('second');
+					await act(() => {
+						ready = true;
+						resolve();
+					});
+				}
+				expect(host.querySelector('aside')).toBeNull();
+				expect(host.querySelector('article')!.textContent).toBe('first');
+				expect(container.querySelector('i')!.textContent).toBe('ready');
+			},
+		);
 	});
 }
 

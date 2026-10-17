@@ -1,7 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
-import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { ScopedNode, SignalReadMode } from './graph.js';
+import type { createNativeServerReadDriver } from './native-read-server.js';
 
 /** Explicit async reads own an observer edge instead of a synchronous graph edge. */
 export const SIGNAL_DEPENDENT_NODE: unique symbol = Symbol('octane.signalDependent');
@@ -17,23 +17,15 @@ export interface SignalCapture {
 	[SIGNAL_SAME_CAPTURE](committed: unknown, owner: object): boolean;
 }
 
-/** Only presentation subscriptions participate; public subscribers are never replayed. */
+/**
+ * The renderer Block a native read subscription renders. A transition that
+ * writes what it reads renders that Block with its batch (pending.ts); other
+ * subscribers, public ones included, hear only of the batch's commit.
+ */
 export const NATIVE_TRANSITION_CONSUMER: unique symbol = Symbol('octane.transitionConsumer');
 
-export interface NativeTransitionConsumer {
-	active(): boolean;
-	prepare(): void | NativeTransitionPresentation;
-}
-
-/** Prepared host work stays private until every participating presentation is ready. */
-export interface NativeTransitionPresentation {
-	validate(): boolean;
-	commit(): void;
-	discard(): void;
-}
-
 export type NativeTransitionNotify = (() => void) & {
-	[NATIVE_TRANSITION_CONSUMER]?: NativeTransitionConsumer;
+	[NATIVE_TRANSITION_CONSUMER]?: object;
 };
 
 /** Preserve presentation identity when an owner or lifetime wraps a subscription. */
@@ -42,7 +34,8 @@ export function forwardNativeTransitionConsumer<T extends () => void>(
 	wrapped: T,
 ): T {
 	const consumer = notify[NATIVE_TRANSITION_CONSUMER];
-	if (consumer) (wrapped as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER] = consumer;
+	if (consumer !== undefined)
+		(wrapped as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER] = consumer;
 	return wrapped;
 }
 
@@ -92,31 +85,6 @@ export function setSignalDeclarationInvocation(invocation: number): number {
 	return previous;
 }
 
-let nativeActionResolver: (() => SignalCandidateFrame | undefined) | undefined;
-let nativeCandidateResolver: (() => SignalCandidateFrame | undefined) | null | undefined;
-
-/** Lazy renderer registration survives a reentrant synchronous input scope. */
-export function registerNativeActionResolver(
-	resolver: () => SignalCandidateFrame | undefined,
-): void {
-	nativeActionResolver = resolver;
-}
-
-export function getNativeCandidate(): SignalCandidateFrame | undefined {
-	return nativeCandidateResolver === undefined
-		? nativeActionResolver?.()
-		: nativeCandidateResolver?.();
-}
-
-/** Restore before yielding; null suppresses even a newly registered Action resolver. */
-export function setNativeCandidateResolver(
-	resolver: (() => SignalCandidateFrame | undefined) | null | undefined,
-): typeof resolver {
-	const previous = nativeCandidateResolver;
-	nativeCandidateResolver = resolver;
-	return previous;
-}
-
 /** Detached DevTools metadata. Reading it must never evaluate or expose a value. */
 export interface NativeReadInspection {
 	readonly scopeKey: string;
@@ -152,8 +120,13 @@ export interface NativeReadSource {
 	subscribe(notify: () => void): () => void;
 	/** Ready values from the observed revision, without running computations. */
 	serialize?(observedVersion: number): readonly NativeSerializedScope[] | undefined;
-	/** On-demand metadata for a currently referenced source, with no global graph registry. */
-	inspect?(): NativeReadInspection;
+	/** Whether the data scope this source reads has retired. Never evaluates. */
+	retired?(): boolean;
+	/**
+	 * On-demand DevTools metadata for a currently referenced source, with no
+	 * global graph registry. Present only in profiling builds.
+	 */
+	inspect?: (() => NativeReadInspection) | undefined;
 }
 
 export type NativeReadObserver = (source: NativeReadSource, version: number) => void;
@@ -209,6 +182,17 @@ export function supplyNativeReadSerializer(
 	serializer: NonNullable<typeof nativeReadSerializer>,
 ): void {
 	nativeReadSerializer = serializer;
+}
+
+/**
+ * The server read driver's factory. The graph supplies it outside the browser
+ * (server-reads.ts), so a server render collects its reads whenever signals
+ * exist, and a server bundle with no signals keeps no collector.
+ */
+export let nativeServerReads: typeof createNativeServerReadDriver | null = null;
+
+export function supplyNativeServerReads(factory: typeof createNativeServerReadDriver): void {
+	nativeServerReads = factory;
 }
 
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;
@@ -340,9 +324,10 @@ export function registerNativeReadRebase(rebase: NativeReadRebase): void {
 export interface NativeBatchHooks {
 	startBatch(): void;
 	endBatch(): void;
+	present(): void;
 }
 
-let nativeBatchHooks: NativeBatchHooks | null = null;
+export let nativeBatchHooks: NativeBatchHooks | null = null;
 
 /** Engine registration does not make either renderer import the graph package. */
 export function registerNativeBatchHooks(hooks: NativeBatchHooks): void {
