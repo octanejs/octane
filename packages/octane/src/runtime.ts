@@ -27,6 +27,7 @@ import type {
 } from './layout-snapshot-types.js';
 import { domBindingClaims } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
+import { radioGroupCandidates } from './radio-group.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import type { BindingHandle } from './dom-bindings.js';
 import {
@@ -5385,20 +5386,8 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
 }
 
 /** Find a radio's native group in its document, shadow tree, or containing form. */
-function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
-	const form = (STAGED_DOM ? STAGED_DOM.view(input) : input).form;
-	if (form !== null) return (STAGED_DOM ? STAGED_DOM.view(form) : form).elements;
-	const root = (STAGED_DOM ? STAGED_DOM.view(input) : input).getRootNode();
-	// Document.getElementsByName is the common fast path; ShadowRoot and
-	// detached fragments need a tree-local lookup that includes their radios.
-	return root.nodeType === 9
-		? (STAGED_DOM ? STAGED_DOM.view(root as Document) : (root as Document)).getElementsByName(
-				(STAGED_DOM ? STAGED_DOM.view(input) : input).name,
-			)
-		: (STAGED_DOM
-				? STAGED_DOM.view(root as Element | DocumentFragment)
-				: (root as Element | DocumentFragment)
-			).querySelectorAll('input[type="radio"]');
+function radioCousins(input: HTMLInputElement): ArrayLike<Node> {
+	return STAGED_DOM ? STAGED_DOM.radioCousins(input) : radioGroupCandidates(input);
 }
 
 /**

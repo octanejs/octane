@@ -1,3 +1,5 @@
+import { radioGroupCandidates } from './radio-group.js';
+
 /**
  * DOM preparation for an optional ViewTransition commit. Only runtime receivers
  * are wrapped: every node stored by the renderer remains its original identity.
@@ -167,6 +169,15 @@ export class DOMStage {
 			this.views.set(node, view);
 		}
 		return view as T;
+	}
+
+	/** Query the native projection before mapping only this group's candidates. */
+	radioCousins(input: HTMLInputElement): Node[] {
+		const projected = this.projection(input, true);
+		const group = radioGroupCandidates(projected.node as HTMLInputElement);
+		const originals: Node[] = [];
+		for (let i = 0; i < group.length; i++) originals.push(projected.originals.get(group[i])!);
+		return originals;
 	}
 
 	/** Lifecycle work is interleaved with host writes, especially before removal. */
@@ -617,14 +628,18 @@ export class DOMStage {
 			const projected = this.projection(node, true);
 			const target = projected.node as HTMLInputElement;
 			Reflect.set(target, key, value);
-			for (const [copy, original] of projected.originals) {
-				if (copy.nodeType !== 1 || (copy as Element).localName !== 'input') continue;
-				const input = copy as HTMLInputElement;
+			const group = radioGroupCandidates(target);
+			const name = target.name;
+			const form = target.form;
+			for (let i = 0; i < group.length; i++) {
+				const input = group[i] as HTMLInputElement;
 				if (
-					input !== target &&
-					(input.type !== 'radio' || input.name !== target.name || input.form !== target.form)
+					input.localName !== 'input' ||
+					(input !== target &&
+						(input.type !== 'radio' || input.name !== name || input.form !== form))
 				)
 					continue;
+				const original = projected.originals.get(input)!;
 				this.states.set(original as Element, this.inertDocument(original).importNode(input, false));
 				this.values.get(original)?.delete('checked');
 			}

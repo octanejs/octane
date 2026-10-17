@@ -6806,5 +6806,37 @@
     "reference": "render-values-reference",
     "maxRatio": 0,
     "note": "Strong keyed Fragment groups, scoped and try bodies, and component spreads in either source order must compile without descriptor construction; live same-key updates preserve input identity and changed keys reset it."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "checked_reads",
+    "target": "radio-update-512",
+    "reference": "radio-update-128",
+    "maxRatio": 5,
+    "note": "Four times as many independent two-choice radios may perform at most five times the native getter work. Clean and observed runs preserve checked values, original input identity, teardown, and native staged capture. Counts cover the complete operation, including projection construction and state copies."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "checked_reads",
+    "target": "radio-unchanged-512",
+    "reference": "radio-unchanged-128",
+    "maxRatio": 5,
+    "note": "Four times as many independent two-choice radios may perform at most five times the native getter work. Clean and observed runs preserve checked values, original input identity, teardown, and native staged capture. Counts cover the complete operation, including projection construction and state copies."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "type_reads",
+    "target": "radio-reset-512",
+    "reference": "radio-reset-128",
+    "maxRatio": 5,
+    "note": "Four times as many independent two-choice radios may perform at most five times the native getter work. Clean and observed runs preserve checked values, original input identity, teardown, and native staged capture. Counts cover the complete operation, including projection construction and state copies."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "name_reads",
+    "target": "radio-staged-512",
+    "reference": "radio-staged-128",
+    "maxRatio": 5,
+    "note": "Four times as many independent two-choice radios may perform at most five times the native getter work. Clean and observed runs preserve checked values, original input identity, teardown, and native staged capture. Counts cover the complete operation, including projection construction and state copies."
   }
 ]

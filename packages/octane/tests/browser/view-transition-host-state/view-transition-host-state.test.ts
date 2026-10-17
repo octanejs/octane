@@ -214,3 +214,203 @@ it('updates a fresh multi-select option after a select-wide staged write', async
 		await page.close();
 	}
 });
+
+it.each(['', 'detached'])('preserves independent radio dirty state when name=%j', async (name) => {
+	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
+	try {
+		const observed = await page.evaluate((name) => {
+			const form = document.createElement('form');
+			form.innerHTML = '<input type="radio" checked><input type="radio" checked>';
+			const input = form.firstElementChild as HTMLInputElement;
+			input.name = name;
+			if (name) form.removeChild(input);
+			else document.body.append(form);
+			const stage = new window.OctaneStage.DOMStage();
+			const prepared = stage.view(input);
+			prepared.checked = false;
+			prepared.defaultChecked = false;
+			prepared.defaultChecked = true;
+			const before = [input.checked, input.defaultChecked];
+			const state = [prepared.checked, prepared.defaultChecked];
+			stage.commit();
+			return {
+				before,
+				state,
+				after: [input.checked, input.defaultChecked],
+				neighbor: (form.lastElementChild as HTMLInputElement).checked,
+			};
+		}, name);
+		expect(observed).toEqual({
+			before: [true, true],
+			state: [false, true],
+			after: [false, true],
+			neighbor: true,
+		});
+	} finally {
+		await page.close();
+	}
+});
+
+it('uses current staged form ownership when selecting an external radio', async () => {
+	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
+	try {
+		const observed = await page.evaluate(() => {
+			document.body.innerHTML =
+				'<form id="owner-a"><input id="a" type="radio" name="choice" checked></form><form id="owner-b"><input id="b" type="radio" name="choice" checked><input id="choice" value="collision"></form><input id="external" type="radio" name="choice" form="owner-a">';
+			const nodes = ['a', 'b', 'external'].map(
+				(id) => document.getElementById(id) as HTMLInputElement,
+			);
+			const stage = new window.OctaneStage.DOMStage();
+			const originalOwner = stage.view(nodes[2]!).form!.id;
+			stage.view(nodes[2]!).setAttribute('form', 'owner-b');
+			stage.view(nodes[2]!).name = 'renamed';
+			stage.view(nodes[1]!).name = 'renamed';
+			stage.view(nodes[2]!).checked = true;
+			const prepared = nodes.map((node) => stage.view(node).checked);
+			const before = nodes.map((node) => node.checked);
+			stage.commit();
+			return {
+				originalOwner,
+				prepared,
+				before,
+				after: nodes.map((node) => node.checked),
+				owner: nodes[2]!.form!.id,
+				identity: nodes.every((node) => document.getElementById(node.id) === node),
+				collision: (document.getElementById('choice') as HTMLInputElement).value,
+			};
+		});
+		expect(observed).toEqual({
+			originalOwner: 'owner-a',
+			prepared: [true, false, true],
+			before: [true, true, false],
+			after: [true, false, true],
+			owner: 'owner-b',
+			identity: true,
+			collision: 'collision',
+		});
+	} finally {
+		await page.close();
+	}
+});
+
+it.each(['text', 'radio'])(
+	'restores the owning radio group despite a %s ID collision',
+	async (collisionType) => {
+		const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
+		try {
+			const observed = await page.evaluate(async (collisionType) => {
+				const {
+					createRoot,
+					createElement: h,
+					flushSync,
+					act,
+					startTransition,
+					requestFormReset,
+				} = window.OctaneStage;
+				const host = document.createElement('div');
+				document.body.append(host);
+				const root = createRoot(host);
+				const radio = (id: string, form: string | undefined, checked: boolean) =>
+					h('input', { id, type: 'radio', name: 'choice', form, checked, readOnly: true });
+				const tree = (external: boolean) =>
+					h(
+						'div',
+						{},
+						h(
+							'form',
+							{ id: 'radio-owner' },
+							radio('inside', undefined, !external),
+							h('input', {
+								id: 'choice',
+								type: collisionType,
+								name: 'independent',
+								checked: true,
+								defaultValue: 'collision',
+								readOnly: true,
+							}),
+						),
+						h('form', {}, radio('other-owner', undefined, true)),
+						radio('external', 'radio-owner', external),
+						radio('formless', undefined, true),
+					);
+				flushSync(() => root.render(tree(false)));
+				const nodes = [...host.querySelectorAll('input')];
+				flushSync(() => root.render(tree(true)));
+				(host.querySelector('#inside') as HTMLInputElement).click();
+				const afterEvent = nodes.map((node) => node.checked);
+				await act(() => startTransition(() => requestFormReset(host.querySelector('form')!)));
+				const afterReset = nodes.map((node) => node.checked);
+				const identity = nodes.every((node, i) => node === host.querySelectorAll('input')[i]);
+				const value = (host.querySelector('#choice') as HTMLInputElement).value;
+				root.unmount();
+				host.remove();
+				return { afterEvent, afterReset, identity, value };
+			}, collisionType);
+			expect(observed).toEqual({
+				afterEvent: [false, true, true, true, true],
+				afterReset: [false, true, true, true, true],
+				identity: true,
+				value: 'collision',
+			});
+		} finally {
+			await page.close();
+		}
+	},
+);
+
+it('restores an uncontrolled external cousin through a held root update', async () => {
+	const page = await openStagePage(browser, process.env.OCTANE_VT_BROWSER_PACKAGE);
+	try {
+		const observed = await page.evaluate(async () => {
+			const { createRoot, createElement: h, flushSync, act, use } = window.OctaneStage;
+			const host = document.createElement('div');
+			document.body.append(host);
+			const root = createRoot(host);
+			let resolve!: (value: string) => void;
+			const pending = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const ready = { status: 'fulfilled', value: 'ready', then() {} };
+			function Reader({ value }: { value: unknown }) {
+				return h('span', {}, use(value as Promise<string>));
+			}
+			const tree = (checked: boolean, value: unknown) =>
+				h(
+					'div',
+					{},
+					h(
+						'form',
+						{ id: 'held-owner' },
+						h('input', {
+							id: 'controlled',
+							type: 'radio',
+							name: 'held-choice',
+							checked,
+							readOnly: true,
+						}),
+					),
+					h('input', {
+						id: 'uncontrolled',
+						type: 'radio',
+						form: 'held-owner',
+						name: 'held-choice',
+						defaultChecked: true,
+					}),
+					h(Reader, { value }),
+				);
+			flushSync(() => root.render(tree(false, ready)));
+			const nodes = [...host.querySelectorAll('input')];
+			flushSync(() => root.render(tree(true, pending)));
+			const held = nodes.map((node) => node.checked);
+			await act(() => resolve('resolved'));
+			const resolved = nodes.map((node) => node.checked);
+			const identity = nodes.every((node, i) => node === host.querySelectorAll('input')[i]);
+			root.unmount();
+			host.remove();
+			return { held, resolved, identity };
+		});
+		expect(observed).toEqual({ held: [false, true], resolved: [true, false], identity: true });
+	} finally {
+		await page.close();
+	}
+});

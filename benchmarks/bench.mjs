@@ -411,6 +411,9 @@ const SUITES = [
 					args: (n) => [target, String(n)],
 				}),
 			),
+			...(name === 'controlled-form'
+				? [{ label: 'radio-work', script: 'radio-work.mjs', args: () => [] }]
+				: []),
 			...(name === 'event-delegation' || name === 'external-store-fanout'
 				? [{ label: 'work', script: 'work.mjs', args: () => [] }]
 				: []),
