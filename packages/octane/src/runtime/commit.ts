@@ -918,18 +918,6 @@ export function journalObjectOnce(obj: object): void {
 	TRANSITION_JOURNAL!.push(JOURNAL_BAG, obj, { ...obj }, Array.isArray(obj) ? obj.length : null);
 }
 
-/** Find a radio's native group in its document, shadow tree, or containing form. */
-export function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
-	const form = input.form;
-	if (form !== null) return form.elements;
-	const root = input.getRootNode();
-	// Document.getElementsByName is the common fast path; ShadowRoot and
-	// detached fragments need a tree-local lookup that includes their radios.
-	return root.nodeType === 9
-		? (root as Document).getElementsByName(input.name)
-		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
-}
-
 /**
  * A keyed list's rollback record for one journal window. The full form copies
  * the chain, and the key Map's order where it differs, before a reconcile

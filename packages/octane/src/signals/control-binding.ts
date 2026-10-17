@@ -1,4 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
+import { radioGroupCandidates } from '../radio-group.js';
 import {
 	consumeHydrationControl,
 	initializeHydrationControlCapture,
@@ -44,12 +45,7 @@ function controlString(value: unknown): string {
 /** Publish the platform's native radio-group edit, never arbitrate a checked write. */
 function publishRadioInput(input: HTMLInputElement): void {
 	const root = input.getRootNode();
-	const group =
-		input.form !== null
-			? input.form.elements
-			: root.nodeType === 9
-				? (root as Document).getElementsByName(input.name)
-				: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
+	const group = radioGroupCandidates(input);
 	// Read every affected value before a synchronous subscriber can project DOM.
 	const edits: Array<readonly [(value: unknown) => void, boolean]> = [];
 	for (let index = 0; index < group.length; index++) {

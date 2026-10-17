@@ -45,7 +45,8 @@ import {
 import { DIRECT_SIGNAL_BINDING, type DirectSignalBinding } from './signal-bindings.js';
 import { HTML_NS, isHtmlCustomElement } from './host-props.js';
 import { componentSourceLoc } from './diagnostics.js';
-import { JOURNAL_PROP, atCommit, journalBag, journalObjectOnce, radioCousins } from './commit.js';
+import { JOURNAL_PROP, atCommit, journalBag, journalObjectOnce } from './commit.js';
+import { radioGroupCandidates } from '../radio-group.js';
 import { getFirstChild, getNextSibling } from './templates.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
@@ -1418,7 +1419,7 @@ function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): vo
 
 function restoreRadioCousins(input: HTMLInputElement): void {
 	const name = input.name;
-	const group = radioCousins(input);
+	const group = radioGroupCandidates(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (

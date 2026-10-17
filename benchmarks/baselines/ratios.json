@@ -737,7 +737,7 @@
     "target": "news-50/octane-tsrx",
     "reference": "news-50/react",
     "maxRatio": 1.2,
-    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x \u2192 octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
+    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x → octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
   },
   {
     "suite": "ssr-throughput",
@@ -746,7 +746,7 @@
     "reference": "deopt-page/octane-fast",
     "minRatio": 1.2,
     "maxRatio": 4.0,
-    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
+    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio→1) or a runaway deopt (ratio>4) both surface."
   },
   {
     "suite": "ssr-scope-keys",
@@ -1833,7 +1833,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) \u2014 the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
+    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) — the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
   },
   {
     "suite": "tanstack-start",
@@ -1849,7 +1849,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) \u2014 per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
+    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) — per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
   },
   {
     "suite": "tanstack-start",
@@ -1913,7 +1913,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.3,
-    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 \u2014 octane must not fall behind react at bulk d-churn."
+    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 — octane must not fall behind react at bulk d-churn."
   },
   {
     "suite": "svg-dashboard",
@@ -1929,7 +1929,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 2.5,
-    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
+    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) — a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
   },
   {
     "suite": "svg-dashboard",
@@ -1953,7 +1953,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 0.9,
-    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 \u2014 octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
+    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 — octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
   },
   {
     "suite": "svg-dashboard",
@@ -1969,7 +1969,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 2.1,
-    "note": "480 foreignObject insert/removals per sample \u2014 the SVG\u2192HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
+    "note": "480 foreignObject insert/removals per sample — the SVG→HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
   },
   {
     "suite": "svg-dashboard",
@@ -1977,7 +1977,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.8,
-    "note": "360 portal commits per batch into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting. #1069 had raised it to 0.78x (2.03 ms per batch on a paired runner); reading deferred JSX values' fields once per classification brought it back to 0.70x (1.79-1.83 ms, paired A/B run 37117916097, 2026-10-03)."
+    "note": "360 portal commits per batch into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 — octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting. #1069 had raised it to 0.78x (2.03 ms per batch on a paired runner); reading deferred JSX values' fields once per classification brought it back to 0.70x (1.79-1.83 ms, paired A/B run 37117916097, 2026-10-03)."
   },
   {
     "suite": "svg-dashboard",
@@ -1993,7 +1993,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 3,
-    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 \u2014 octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
+    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 — octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
   },
   {
     "suite": "svg-dashboard",
@@ -2408,7 +2408,7 @@
     "target": "octane",
     "reference": "work-model",
     "maxRatio": 1,
-    "note": "A useTransition start \u2192 pending render \u2192 settle cycle renders the owner exactly twice: the pending cue with the new value and the falling edge."
+    "note": "A useTransition start → pending render → settle cycle renders the owner exactly twice: the pending cue with the new value and the falling edge."
   },
   {
     "suite": "transition-hooks",
@@ -6838,5 +6838,21 @@
     "reference": "render-values-reference",
     "maxRatio": 0,
     "note": "Strong keyed Fragment groups, scoped and try bodies, and component spreads in either source order must compile without descriptor construction; live same-key updates preserve input identity and changed keys reset it."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "type_reads",
+    "target": "radio-reset-512",
+    "reference": "radio-reset-128",
+    "maxRatio": 5,
+    "note": "Four times as many independent two-choice radios may perform at most five times the native getter work during a complete requested reset or native click sequence. Clean and observed runs preserve checked values, original input identity, and teardown."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "type_reads",
+    "target": "radio-input-512",
+    "reference": "radio-input-128",
+    "maxRatio": 5,
+    "note": "Four times as many independent two-choice radios may perform at most five times the native getter work during a complete requested reset or native click sequence. Clean and observed runs preserve checked values, original input identity, and teardown."
   }
 ]
