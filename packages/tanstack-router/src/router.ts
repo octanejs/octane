@@ -11,7 +11,9 @@ import {
 	createNonReactiveMutableStore,
 	createNonReactiveReadonlyStore,
 } from '@tanstack/router-core';
+import { isServer } from '@tanstack/router-core/isServer';
 import { createAtom, batch } from '@tanstack/store';
+import { prepareInitialHistoryState } from './historyState';
 import type { RouterHistory } from '@tanstack/history';
 import type {
 	AnyRoute,
@@ -73,6 +75,9 @@ export class Router<
 		// render-readiness boundary and the previous view-transition/load wrapper is
 		// no longer needed. HTTP status is derived on demand by the SSR layer
 		// (`getSsrStatus`), not stored on the router.
+		if (!options.history && !(isServer ?? options.isServer ?? isServerEnv)) {
+			prepareInitialHistoryState();
+		}
 		super(options, octaneStoreFactory);
 	}
 }

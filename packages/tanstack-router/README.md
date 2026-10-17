@@ -62,6 +62,16 @@ tree renders **pull-based**: `RouterProvider` renders the first match, and each 
 component's `<Outlet/>` looks up the next match via `matchContext` — so navigation
 re-renders only the matches that changed.
 
+## Headless routing
+
+Use `@octanejs/tanstack-router/core` when an application owns its render tree and
+only needs matching, loading, and navigation. It exposes Octane's router adapter,
+the framework-neutral `@tanstack/router-core` APIs, and history constructors
+without importing route components or hooks.
+
+Browser and hash histories created by this package preserve existing application
+fields in History API state objects and Navigation API entry state during initialization.
+
 ## Same-route search navigation
 
 Same-route search navigations now render store updates urgently. If the route
