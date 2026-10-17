@@ -32,6 +32,7 @@ const PATHS = {
 	'octane/internal/server': [
 		fileURLToPath(new URL('../../src/internal/server.ts', import.meta.url)),
 	],
+	'octane/signals': [fileURLToPath(new URL('../../src/signals/index.ts', import.meta.url))],
 };
 
 // Resolve against the runtime's actual signatures: synthetic adapters cannot
@@ -114,6 +115,11 @@ const COMPONENTS = {
 		export default ((props) => @{ <p title={props.label} /> }) satisfies ((props: Props) => unknown);`,
 	returned: `export interface Props { label: string }
 		export function App(props: Props) { return <p>{props.label as string}</p>; }`,
+	nativeReads: `import { use } from 'octane'; import 'octane/signals';
+		export function App(props: { load: () => Promise<string> }) @{
+			const value = use(props.load());
+			<p>{value as string}</p>
+		}`,
 };
 
 const IMPORTS = `import { App as Empty } from './empty';

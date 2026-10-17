@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { flushSync, hydrateRoot } from 'octane';
+import { renderToString } from 'octane/server';
+import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import { BoundEventArguments } from './_fixtures/attrs-event-arguments';
@@ -25,6 +28,124 @@ import {
 } from './_fixtures/attrs-events.tsrx';
 
 describe('attributes', () => {
+	it.each([false, true])('updates fixed-field spreads (non-null: %s)', async (nonNull) => {
+		const source = `import * as styles from 'fixture-styles';
+import 'octane/signals';
+function Reader(props) @{ <p>{props.read() as string}</p> }
+export function Button(props) @{ <section><button {...styles.attrs(props.tone$.get() + props.suffix, props.color, props.active)}><span>stable</span></button><Reader read={props.read} /></section> }`;
+		const fixtureStyles = Object.freeze({
+			prefix: 'p-',
+			attrs(tone: string, color: string, active: boolean) {
+				if (!active) return nonNull ? { className: null, style: null } : null;
+				return { className: this.prefix + tone, style: { color } };
+			},
+		});
+		const options = {
+			id: '/fixed-field-spread.tsrx',
+			compileOptions: {
+				strong: true,
+				dev: false,
+				hmr: false,
+				knownAttributeSpreads: [
+					{
+						source: 'fixture-styles',
+						imported: '*',
+						members: ['attrs'],
+						fields: ['className', 'style'],
+						style: 'object',
+						...(nonNull ? { nonNull: true } : {}),
+					},
+				],
+			},
+			runtimeModules: { 'fixture-styles': fixtureStyles },
+		};
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const container = document.createElement('div');
+		const scope = createScope({ scopeKey: 'fixed-field-spread' });
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		let resume!: () => void;
+		const pending = new Promise<void>((resolve) => {
+			resume = resolve;
+		});
+		let waiting = false;
+		let interrupted = false;
+		const read = () => {
+			if (waiting) {
+				interrupted = true;
+				throw pending;
+			}
+			return 'ready';
+		};
+		try {
+			const tone$ = scope.signal$('tone', 'first');
+			const props = { active: true, tone$, suffix: '', color: 'red', read };
+			container.innerHTML = renderToString(server.Button, props).html;
+			document.body.appendChild(container);
+			const host = container.querySelector('button')!;
+			const hydratedRoot = hydrateRoot(container, client.Button, props);
+			root = hydratedRoot;
+			flushSync(() => {});
+			expect(container.querySelector('button')).toBe(host);
+			expect([host.className, host.style.color]).toEqual(['p-first', 'red']);
+			flushSync(() => tone$.set('second'));
+			expect([host.className, host.style.color]).toEqual(['p-second', 'red']);
+			waiting = true;
+			flushSync(() =>
+				hydratedRoot.render(client.Button, { ...props, suffix: '-next', color: 'blue' }),
+			);
+			expect(interrupted).toBe(true);
+			expect([host.className, host.style.color]).toEqual(['p-second', 'red']);
+			waiting = false;
+			await act(() => resume());
+			expect(container.querySelector('button')).toBe(host);
+			expect([host.className, host.style.color]).toEqual(['p-second-next', 'blue']);
+			flushSync(() => hydratedRoot.render(client.Button, { ...props, active: false }));
+			expect([host.getAttribute('class'), host.style.color]).toEqual([null, '']);
+		} finally {
+			waiting = false;
+			resume();
+			try {
+				root?.unmount();
+			} finally {
+				container.remove();
+				scope.dispose();
+			}
+		}
+	});
+	it.each([false, true])(
+		'preserves nested direct eval in a fixed-field spread component (dev: %s)',
+		(dev) => {
+			const { Button } = loadCompiledFixtureSource(
+				`import { attrs } from 'fixture-styles';
+export function Button(props) @{ const seen = (() => eval('typeof _a'))(); <button {...attrs(seen, props.tone)} /> }`,
+				{
+					id: '/fixed-field-spread-eval.tsrx',
+					mode: 'client',
+					compileOptions: {
+						dev,
+						hmr: false,
+						knownAttributeSpreads: [
+							{ source: 'fixture-styles', imported: 'attrs', fields: ['className'] },
+						],
+					},
+					runtimeModules: {
+						'fixture-styles': {
+							attrs: (seen: string, tone: string) => ({ className: seen + '-' + tone }),
+						},
+					},
+				},
+			);
+			const rendered = mount(Button, { tone: 'first' });
+			try {
+				expect(rendered.find('button').className).toBe('undefined-first');
+				rendered.update(Button, { tone: 'second' });
+				expect(rendered.find('button').className).toBe('undefined-second');
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
 	for (const dev of [false, true]) {
 		it(`preserves binding evaluation, coercion, and namespace order (${dev ? 'dev' : 'prod'})`, () => {
 			const { Surface } = loadCompiledFixtureSource(

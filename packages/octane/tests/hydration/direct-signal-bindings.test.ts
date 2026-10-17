@@ -974,9 +974,9 @@ export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`
 		owner.dispose();
 	});
 
-	it('keeps a hydrated signal-capable only-child text hole on its server Text node', () => {
+	it('keeps hydrated signal-capable child holes independent on their server nodes', async () => {
 		const source = `function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
-export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`;
+export function App(props) @{ <div><p>{props.value}</p><output>{props.other}</output><Tag kind="x" /></div> }`;
 		const id = '/src/hydrated-only-child-text-hole.tsrx';
 		const server = loadCompiledFixtureSource(source, { id, mode: 'server' });
 		const client = loadCompiledFixtureSource(source, {
@@ -986,18 +986,35 @@ export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`
 		});
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = renderToString(server.App, { value: 'a' }).html;
-		const hole = container.querySelector('p')!.firstChild as Text;
-		flushSync(() => {
-			root = hydrateRoot(container, client.App, { value: 'a' });
-		});
+		container.innerHTML = renderToString(server.App, { value: 'a', other: 'left' }).html;
 		const paragraph = container.querySelector('p')!;
-		expect(paragraph.firstChild).toBe(hole);
-		for (const value of ['a', 'b', 'b', 7, 'c']) {
-			flushSync(() => root!.render(client.App, { value }));
-			expect(paragraph.childNodes.length).toBe(1);
+		const output = container.querySelector('output')!;
+		const hole = paragraph.firstChild as Text;
+		const owner = createScope({ scopeKey: id });
+		const value$ = owner.signal$('value', 'c');
+		const other$ = owner.signal$('other', 'left');
+		try {
+			flushSync(() => {
+				root = hydrateRoot(container, client.App, { value: 'a', other: 'left' });
+			});
+			expect(container.querySelector('p')).toBe(paragraph);
+			expect(container.querySelector('output')).toBe(output);
 			expect(paragraph.firstChild).toBe(hole);
-			expect(hole.nodeValue).toBe(String(value));
+			for (const value of ['a', 'b', 'b', 7, 'c']) {
+				flushSync(() => root!.render(client.App, { value, other: 'left' }));
+				expect(paragraph.childNodes.length).toBe(1);
+				expect(paragraph.firstChild).toBe(hole);
+				expect(hole.nodeValue).toBe(String(value));
+			}
+			flushSync(() => root!.render(client.App, { value: value$, other: other$ }));
+			await act(() => owner.set(value$, 'live'));
+			expect([paragraph.textContent, output.textContent]).toEqual(['live', 'left']);
+			await act(() => owner.set(other$, 'right'));
+			expect([paragraph.textContent, output.textContent]).toEqual(['live', 'right']);
+		} finally {
+			root?.unmount();
+			root = undefined;
+			owner.dispose();
 		}
 	});
 

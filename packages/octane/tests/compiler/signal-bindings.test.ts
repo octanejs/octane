@@ -26,7 +26,7 @@ function controlSites(code: string) {
 	return [...code.matchAll(/data-octane-input=\\?"(i:[^"\\]+)\\?"/g)].map((match) => match[1]);
 }
 
-function callArguments(code: string) {
+function callArguments(code: string, callee?: string) {
 	const argumentsList: any[][] = [];
 	const visit = (node: any) => {
 		if (node === null || typeof node !== 'object') return;
@@ -34,7 +34,11 @@ function callArguments(code: string) {
 			for (const child of node) visit(child);
 			return;
 		}
-		if (node.type === 'CallExpression') argumentsList.push(node.arguments);
+		if (
+			node.type === 'CallExpression' &&
+			(callee === undefined || (node.callee.type === 'Identifier' && node.callee.name === callee))
+		)
+			argumentsList.push(node.arguments);
 		for (const [key, value] of Object.entries(node)) {
 			if (key !== 'metadata' && key !== 'loc' && key !== 'parent') visit(value);
 		}
@@ -44,6 +48,33 @@ function callArguments(code: string) {
 }
 
 describe('direct signal bindings', () => {
+	it('preserves distinct child identities for an explicitly routed runtime', () => {
+		const route = { module: 'custom-child-runtime', imported: new Set(['bindSignalChild']) };
+		const options = { dev: false, hmr: false, __runtimeImportRoutes: [route] };
+		const { code } = compile(
+			`import 'octane/signals';
+export function App(props) @{ <main>{props.first}<i />{props.second}</main> }`,
+			'/src/routed-child-identities.tsrx',
+			options,
+		);
+		const aliases = parseModule(code, 'routed-child-identities.js').body.flatMap((statement) =>
+			statement.type === 'ImportDeclaration' && statement.source.value === route.module
+				? statement.specifiers
+						.filter(
+							(specifier) =>
+								specifier.type === 'ImportSpecifier' &&
+								specifier.imported.type === 'Identifier' &&
+								specifier.imported.name === 'bindSignalChild',
+						)
+						.map((specifier) => specifier.local.name)
+				: [],
+		);
+		expect(aliases).toHaveLength(1);
+		const sites = callArguments(code, aliases[0]).map((args) => args[5]?.value);
+		expect(sites.every((site) => typeof site === 'string' && site.length > 0)).toBe(true);
+		expect(new Set(sites).size).toBe(2);
+	});
+
 	it.each([
 		['textarea alias', '<textarea value={props.read(handle)} />', 'draft$', 'edited'],
 		['textarea spread', '<textarea {...{ value: props.read(handle) }} />', 'draft$', 'edited'],
