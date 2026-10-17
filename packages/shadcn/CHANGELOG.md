@@ -1,5 +1,63 @@
 # @octanejs/shadcn
 
+## 0.0.56
+
+### Patch Changes
+
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [59e83ac]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [da83e7a]
+- Updated dependencies [12e2417]
+- Updated dependencies [175b85d]
+- Updated dependencies [996a44e]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [1924a92]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [4a33765]
+- Updated dependencies [bb2f650]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [3203b52]
+- Updated dependencies [5dc82f5]
+- Updated dependencies [ed24d6b]
+- Updated dependencies [9bceb81]
+- Updated dependencies [175b85d]
+- Updated dependencies [c144725]
+  - octane@0.14.0
+  - @octanejs/aria@0.0.63
+  - @octanejs/base-ui@0.1.67
+  - @octanejs/lucide@0.1.60
+  - @octanejs/radix@0.1.67
+  - @octanejs/sonner@0.1.61
+
 ## 0.0.55
 
 ### Patch Changes
