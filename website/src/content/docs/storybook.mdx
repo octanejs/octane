@@ -1,0 +1,167 @@
+---
+title: Storybook
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Develop components in isolation</p>
+	<h1>Storybook</h1>
+	<p className="doc-lede">
+		{
+			'Render native Octane components written in TSRX inside a React + Vite Storybook. Keep ordinary CSF3 stories and use OctaneCompat to host each component.'
+		}
+	</p>
+</div>
+
+<h2 id="run-the-example">Run the example</h2>
+
+The [Storybook example](https://github.com/octanejs/octane/tree/main/examples/storybook)
+contains a native `Counter.tsrx`, a shared `asReact` helper, and typed stories.
+From the Octane repository root, using its Node.js and pnpm versions:
+
+```bash
+pnpm install
+pnpm --filter storybook-example dev
+```
+
+Open the local URL printed by Storybook and select **Octane → Counter**. Change
+`label`, `step`, or `disabled` in Controls after incrementing the counter: its
+local state stays intact. Switch to **Large Step** and back to start a fresh
+counter.
+
+<h2 id="configure-vite">Configure Vite</h2>
+
+Use Storybook's React + Vite framework with matching React and React DOM 19
+versions. The example's [package manifest](https://github.com/octanejs/octane/blob/main/examples/storybook/package.json)
+and workspace lockfile record the tested dependencies.
+
+Configure the component workbench with Octane's compiler plugin:
+
+```ts
+// .storybook/main.ts
+import type { StorybookConfig } from '@storybook/react-vite';
+import react from '@vitejs/plugin-react';
+import { octane } from 'octane/compiler/vite';
+import { mergeConfig } from 'vite';
+
+const config: StorybookConfig = {
+	stories: ['../src/**/*.stories.tsx'],
+	framework: '@storybook/react-vite',
+	typescript: { reactDocgen: false },
+	async viteFinal(config) {
+		return mergeConfig(config, {
+			plugins: [octane({ requireDirective: true }), react()],
+			optimizeDeps: { exclude: ['octane'], include: ['octane > devalue'] },
+		});
+	},
+};
+
+export default config;
+```
+
+Keep Octane before the single React plugin. If your consumer Vite config already
+supplies these plugins, keep them there instead of adding a second instance in
+`viteFinal`. This workbench uses `octane/compiler/vite`; it does not need the
+full application integration from `@octanejs/vite-plugin`.
+
+Octane compiles `.tsrx` components. With `requireDirective: true`, unmarked
+application TSX stays React-owned; the leading `/** @jsxImportSource react */`
+pragma also selects React's JSX types for stories and the helper below. See
+[compiler ownership](/docs/react-compat#set-up) for mixed projects.
+
+The optimizer settings support the example's linked Octane source package.
+Excluding `octane` keeps that source in the compiler pipeline; eagerly including
+its `devalue` dependency avoids a late optimization reload on the first preview.
+
+<h2 id="share-the-bridge">Share the bridge</h2>
+
+Create one small helper for the stories in your project:
+
+```tsx
+/** @jsxImportSource react */
+// src/asReact.tsx
+import { OctaneCompat, type OctaneHostedComponent } from 'octane/react';
+
+export function asReact<P>(component: OctaneHostedComponent<P>) {
+	return function OctaneWrapper(props: P) {
+		return <OctaneCompat component={component} props={props} />;
+	};
+}
+```
+
+`OctaneCompat` lets React host the component while Octane owns its hooks, native
+events, state, and DOM. The helper infers the native component's props, so each
+story needs only a one-line alias. Create that alias once at module scope to
+keep the React component identity stable across Controls updates.
+
+<h2 id="write-typed-stories">Write typed stories</h2>
+
+Import your native component into an ordinary `.stories.tsx` file. This example
+uses the [counter](https://github.com/octanejs/octane/blob/main/examples/storybook/src/Counter.tsrx)
+with `label`, `step`, and `disabled` props:
+
+```tsx
+/** @jsxImportSource react */
+// src/Counter.stories.tsx
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Counter } from './Counter.tsrx';
+import { asReact } from './asReact.tsx';
+
+const CounterStory = asReact(Counter);
+
+const meta = {
+	title: 'Octane/Counter',
+	component: CounterStory,
+	args: { label: 'Increment', step: 1, disabled: false },
+	argTypes: {
+		label: { control: 'text' },
+		step: { control: 'number' },
+		disabled: { control: 'boolean' },
+	},
+} satisfies Meta<typeof CounterStory>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};
+export const LargeStep: Story = {
+	args: { label: 'Add five', step: 5 },
+};
+```
+
+Set `component` to the React wrapper so React invokes the bridge. Passing the
+raw Octane function would give React a component owned by another renderer.
+Explicit `args` and `argTypes` supply Controls; automatic native `.tsrx` prop
+documentation is not part of this recipe, so React docgen is disabled.
+
+<h2 id="check-and-build">Check and build</h2>
+
+Typecheck programs containing `.tsrx` with `octane-tsc`. The example's
+[TypeScript configuration](https://github.com/octanejs/octane/blob/main/examples/storybook/tsconfig.json)
+keeps React JSX typing and native Octane prop checking without casts or ambient
+`declare module '*.tsrx'` shims.
+
+```bash
+pnpm --filter storybook-example typecheck
+pnpm --filter storybook-example build
+```
+
+The static site is written to `examples/storybook/dist`. To run the example's
+browser checks against both development Storybook and the served static build:
+
+```bash
+pnpm --filter storybook-example exec playwright install chromium
+pnpm --filter storybook-example test:e2e
+```
+
+<h2 id="limits">Limits</h2>
+
+This is a client-rendered component workbench. `OctaneCompat` adds a `div` host;
+place it where a div is valid, rather than directly inside a table row, select,
+or SVG tree. Component and style edits update the preview; preserving local
+state through Fast Refresh is not guaranteed.
+
+The stories stay in `.stories.tsx`; `.stories.tsrx` discovery and Storybook
+repository changes are not needed. The helper adapts Octane components only.
+Other TSRX targets, such as Solid and Vue, need their own compiler and compatible
+Storybook renderer. See [React compatibility](/docs/react-compat) for the bridge's
+full behavior and boundaries.

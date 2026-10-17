@@ -15,6 +15,7 @@ import StrongMode from './docs/strong-mode.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Lynx from './docs/lynx.mdx';
 import ReactCompat from './docs/react-compat.mdx';
+import Storybook from './docs/storybook.mdx';
 import PublishingLibraries from './docs/publishing-libraries.mdx';
 import BrowserSupport from './docs/browser-support.mdx';
 import Bindings from './docs/bindings.mdx';
@@ -40,6 +41,7 @@ const components: Record<string, DocEntry['component']> = {
 	'differences-from-react': DifferencesFromReact,
 	lynx: Lynx,
 	'react-compat': ReactCompat,
+	storybook: Storybook,
 	profiling: Profiling,
 	'publishing-libraries': PublishingLibraries,
 	'browser-support': BrowserSupport,

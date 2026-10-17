@@ -65,6 +65,7 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Browser support](https://octanejs.dev/docs/browser-support): Recommended browser targets, required core APIs, optional fallbacks, and polyfills.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
 - [React interoperability](https://octanejs.dev/docs/react-compat): `ReactCompat` for real React inside Octane, `OctaneCompat` for Octane inside React, compiler ownership, contexts, boundaries, SSR, and hydration.
+- [Storybook](https://octanejs.dev/docs/storybook): React + Vite stories hosting native Octane TSRX components through OctaneCompat, a shared typed asReact helper, Controls, and static builds.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
 - [Playground](https://octanejs.dev/playground): Write TSRX or TSX in the browser and see the compiled octane output and the live rendered result side by side.
 
