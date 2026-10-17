@@ -761,7 +761,10 @@ const SUITES = [
 		cwd: 'ssr-final-replay',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
-		runs: [{ script: 'work.mjs', args: () => [] }],
+		runs: [
+			{ script: 'work.mjs', args: () => [] },
+			{ script: 'boundaries.mjs', args: () => [] },
+		],
 	},
 	{
 		// Real naive JSX/TSRX app work and compiled Suspense list coverage.
