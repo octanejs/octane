@@ -36,49 +36,19 @@ window.__reset = () => {
 // mutation to complete synchronously so the harness can time it inside the call
 // (matching the other adapters' flushSync). Without it the setter returns before
 // the update lands and the op would read as an unfairly tiny ~0ms.
-window.__bumpAt1 = () => {
-	bumpAt1();
-	flush();
-};
-window.__bumpAt11 = () => {
-	bumpAt11();
-	flush();
-};
-window.__bumpAt21 = () => {
-	bumpAt21();
-	flush();
-};
-window.__bumpAt31 = () => {
-	bumpAt31();
-	flush();
-};
-window.__bumpAt41 = () => {
-	bumpAt41();
-	flush();
-};
-window.__bumpAt51 = () => {
-	bumpAt51();
-	flush();
-};
-window.__bumpAt61 = () => {
-	bumpAt61();
-	flush();
-};
-window.__bumpAt71 = () => {
-	bumpAt71();
-	flush();
-};
-window.__bumpAt81 = () => {
-	bumpAt81();
-	flush();
-};
-window.__bumpAt91 = () => {
-	bumpAt91();
-	flush();
-};
+window.__bumpAt1 = () => flush(bumpAt1);
+window.__bumpAt11 = () => flush(bumpAt11);
+window.__bumpAt21 = () => flush(bumpAt21);
+window.__bumpAt31 = () => flush(bumpAt31);
+window.__bumpAt41 = () => flush(bumpAt41);
+window.__bumpAt51 = () => flush(bumpAt51);
+window.__bumpAt61 = () => flush(bumpAt61);
+window.__bumpAt71 = () => flush(bumpAt71);
+window.__bumpAt81 = () => flush(bumpAt81);
+window.__bumpAt91 = () => flush(bumpAt91);
 // Batched sweep: enqueue all 10 stateful bumps, then ONE flush() — Solid's natural
 // microtask coalescing, bounded synchronously. Contrast bump_sweep (flush per bump).
-window.__sweepBatched = () => {
+window.__sweepBatched = () => flush(() => {
 	bumpAt1();
 	bumpAt11();
 	bumpAt21();
@@ -89,10 +59,9 @@ window.__sweepBatched = () => {
 	bumpAt71();
 	bumpAt81();
 	bumpAt91();
-	flush();
-};
+});
 // Same batch queued DESCENDANT-first (deepest stateful node first).
-window.__sweepBatchedReverse = () => {
+window.__sweepBatchedReverse = () => flush(() => {
 	bumpAt91();
 	bumpAt81();
 	bumpAt71();
@@ -103,6 +72,5 @@ window.__sweepBatchedReverse = () => {
 	bumpAt21();
 	bumpAt11();
 	bumpAt1();
-	flush();
-};
+});
 window.__ready = true;
