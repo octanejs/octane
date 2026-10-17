@@ -3,18 +3,22 @@
 import {
 	CompiledOutlet as CompiledComponent,
 	CompiledContext,
+	Hydrate,
+	trustHTML,
 	useContext,
 	useLayoutEffect,
 } from 'octane';
+import { never } from 'octane/hydration';
 import type { AnyRouter, NotFoundError } from '@tanstack/router-core';
 import { rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
+import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
 import { routerContext, matchContext, useRouter } from './bindings';
 import { useStore } from '../useStore';
 import { useTransitioner, usePresentedMatches } from '../Transitioner.tsrx';
 import { useHydrated } from '../ClientOnly.tsrx';
 import { ErrorComponent } from '../ErrorComponent.tsrx';
-import { CompiledFailure, CompiledPending, CompiledScrollRestoration } from './MatchLifecycle.tsrx';
+import { CompiledFailure, CompiledPending } from './MatchLifecycle.tsrx';
 
 export function PreconfiguredRouterProvider(props: { router: AnyRouter }) @{
 	const router = props.router;
@@ -95,6 +99,21 @@ export function CompiledMatch(props: { routeId: string }) @{
 			<CompiledScrollRestoration />
 		}
 	</CompiledWrap>
+}
+
+function CompiledScrollRestoration() @{
+	const router = useRouter();
+	const hydrated = useHydrated();
+	const option = router.options.scrollRestoration;
+	const script = getScrollRestorationScriptForRouter(router);
+	// Keep the location predicate live: the router identity survives location changes.
+	let rendersScript = true;
+	if (typeof option === 'function') rendersScript = option({ location: router.latestLocation });
+	@if ((script !== null || rendersScript) && ((isServer ?? router.isServer) || !hydrated)) {
+		<Hydrate split={false} when={never()}>
+			<script nonce={router.options.ssr?.nonce} dangerouslySetInnerHTML={trustHTML(script ?? '')} />
+		</Hydrate>
+	}
 }
 
 // Without a configured Suspense boundary, both lazy imports and loader promises

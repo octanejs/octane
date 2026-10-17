@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
+import { PreconfiguredRouterProvider } from '@octanejs/tanstack-router/compiled';
 import { RouterClient } from '@octanejs/tanstack-router/ssr/client';
 import { mount, nextPaint } from '../_helpers';
 import {
@@ -39,12 +40,16 @@ afterEach(() => {
 async function hydrateScrollRestoration(options: ScrollRestorationRouterOptions) {
 	const serverRouter = server.makeScrollRestorationRouter({ ...options, isServer: true });
 	await serverRouter.load();
-	const { html } = renderToString(server.RouterServer, { router: serverRouter });
+	const serverProvider = options.compiled
+		? server.PreconfiguredRouterProvider
+		: server.RouterServer;
+	const { html } = renderToString(serverProvider, { router: serverRouter });
 
 	const container = document.createElement('div');
 	container.innerHTML = html;
 	document.body.append(container);
 	const serverRoot = container.querySelector('.root');
+	const serverScript = container.querySelector('script');
 	const serverScripts = container.querySelectorAll('script').length;
 
 	const messages: string[] = [];
@@ -58,12 +63,12 @@ async function hydrateScrollRestoration(options: ScrollRestorationRouterOptions)
 	await router.load();
 	const root = hydrateRoot(
 		container,
-		RouterClient as any,
+		(options.compiled ? PreconfiguredRouterProvider : RouterClient) as any,
 		{ router },
 		{ onRecoverableError: (error) => errors.push(error) },
 	);
 	await flush();
-	return { container, router, root, serverRoot, serverScripts, messages, errors };
+	return { container, router, root, serverRoot, serverScript, serverScripts, messages, errors };
 }
 
 // The server build of router-core's `getScrollRestorationScriptForRouter` returns
@@ -71,11 +76,16 @@ async function hydrateScrollRestoration(options: ScrollRestorationRouterOptions)
 // ScriptOnce makes the script remove itself before React hydrates; Octane's
 // hydration claims the server's structure, so the client has to render the same
 // arm and drop the adopted script once hydration commits.
-describe('@octanejs/tanstack-router — scroll restoration script hydration', () => {
+describe.each([
+	{ label: 'ordinary', compiled: false },
+	{ label: 'compiled', compiled: true },
+])('@octanejs/tanstack-router — scroll restoration script hydration ($label)', ({ compiled }) => {
 	it('adopts and then removes the server scroll restoration script', async () => {
-		const result = await hydrateScrollRestoration({ nonce: 'octane-csp' });
+		const result = await hydrateScrollRestoration({ compiled, nonce: 'octane-csp' });
 		try {
 			expect(result.serverScripts).toBe(1);
+			expect(result.serverScript?.getAttribute('nonce')).toBe('octane-csp');
+			expect(result.serverScript?.textContent).toBeTruthy();
 			expect(result.errors).toEqual([]);
 			expect(result.messages).toEqual([]);
 			expect(result.container.querySelector('.root')).toBe(result.serverRoot);
@@ -88,7 +98,7 @@ describe('@octanejs/tanstack-router — scroll restoration script hydration', ()
 	});
 
 	it('hydrates without a script when the scrollRestoration option declines the location', async () => {
-		const result = await hydrateScrollRestoration({ scrollRestoration: () => false });
+		const result = await hydrateScrollRestoration({ compiled, scrollRestoration: () => false });
 		try {
 			expect(result.serverScripts).toBe(0);
 			expect(result.errors).toEqual([]);
@@ -103,6 +113,7 @@ describe('@octanejs/tanstack-router — scroll restoration script hydration', ()
 
 	it('adopts the script when the scrollRestoration option accepts the location', async () => {
 		const result = await hydrateScrollRestoration({
+			compiled,
 			scrollRestoration: ({ location }) => location.pathname === '/',
 		});
 		try {
@@ -118,7 +129,7 @@ describe('@octanejs/tanstack-router — scroll restoration script hydration', ()
 	});
 
 	it('inserts no script when a client navigation mounts the next route', async () => {
-		const result = await hydrateScrollRestoration({});
+		const result = await hydrateScrollRestoration({ compiled });
 		const inserted: string[] = [];
 		const observer = new MutationObserver((records) => {
 			for (const record of records) {
@@ -132,6 +143,7 @@ describe('@octanejs/tanstack-router — scroll restoration script hydration', ()
 			await result.router.navigate({ to: '/about' });
 			await flush();
 			expect(result.container.querySelector('.about')?.textContent).toBe('About');
+			expect(result.container.querySelector('.root')).toBe(result.serverRoot);
 			expect(inserted).toEqual([]);
 			expect(result.container.querySelectorAll('script')).toHaveLength(0);
 			expect(result.errors).toEqual([]);
