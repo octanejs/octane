@@ -98,18 +98,36 @@ describe('FragmentInstance — future children', () => {
 	it('removes eager DOM fragment handles when a later sibling aborts the render', () => {
 		const captured: FragmentHostElement[] = [];
 		const attached: FragmentInstance[] = [];
-		const r = mount(AbortedFragmentOwnership, {
-			fragRef: (fragment: FragmentInstance | null) => {
-				if (fragment !== null) attached.push(fragment);
+		// The aborted child never reaches the document, so record each host as
+		// it gains its handle set.
+		Object.defineProperty(Element.prototype, 'reactFragments', {
+			configurable: true,
+			set(this: FragmentHostElement, value: Set<FragmentInstance>) {
+				captured.push(this);
+				Object.defineProperty(this, 'reactFragments', {
+					configurable: true,
+					enumerable: true,
+					writable: true,
+					value,
+				});
 			},
-			capture: (node: Element) => captured.push(node as FragmentHostElement),
 		});
-		expect(r.find('#aborted-fragment-fallback').textContent).toBe('fallback');
-		expect(attached).toEqual([]);
-		expect(captured).toHaveLength(1);
-		expect(captured[0].reactFragments).toBeInstanceOf(Set);
-		expect(Array.from(captured[0].reactFragments!)).toEqual([]);
-		r.unmount();
+		try {
+			const r = mount(AbortedFragmentOwnership, {
+				fragRef: (fragment: FragmentInstance | null) => {
+					if (fragment !== null) attached.push(fragment);
+				},
+				capture: () => {},
+			});
+			expect(r.find('#aborted-fragment-fallback').textContent).toBe('fallback');
+			expect(attached).toEqual([]);
+			expect(captured.map((node) => node.id)).toEqual(['aborted-fragment-child']);
+			expect(captured[0].reactFragments).toBeInstanceOf(Set);
+			expect(Array.from(captured[0].reactFragments!)).toEqual([]);
+			r.unmount();
+		} finally {
+			delete (Element.prototype as { reactFragments?: unknown }).reactFragments;
+		}
 	});
 
 	// Per ReactDOMFragmentRefs-test.js:867.

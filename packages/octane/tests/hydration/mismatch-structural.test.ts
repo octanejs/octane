@@ -176,7 +176,7 @@ describe('hydrateRoot — STRUCTURAL mismatch with no boundary renders the root 
 	// root component and both sides of the divergence.
 	it('a fragment root over unmatched server markup renders on the client and warns with the root location in dev', async () => {
 		const { serverNodes, recovered, root } = await hydrateOver(
-			'<section id="stale">server</section>',
+			'<!--3--><section id="stale">server</section>',
 			devClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
 			{},
 		);
@@ -642,7 +642,7 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		},
 		{
 			name: 'an unframed string root over stale server markup',
-			html: async () => '<p id="stale">server</p>',
+			html: async () => '<!--3--><p id="stale">server</p>',
 			body: () =>
 				function StringRoot() {
 					return 'client';
@@ -654,7 +654,7 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		},
 		{
 			name: 'a fragment root whose statics do not match the server',
-			html: async () => '<section id="stale">server</section>',
+			html: async () => '<!--3--><section id="stale">server</section>',
 			body: () => prodClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
 			props: {},
 			expected: '<div class="leaf">A</div><input type="text">',
@@ -1182,10 +1182,10 @@ describe.each([
 			);
 		});
 
-		// Captures that changed before a dormant island activated legitimately
-		// differ from the server's: the island renders on the client, and its
-		// server output predating the client state is not reported as a mismatch.
-		it('renders a dormant island on the client without reporting when its value became an element before activation', async () => {
+		// Captures that changed before a dormant island activated: the island
+		// hydrates with the server's captures, then patches its adopted nodes with
+		// the newer ones, and nothing reports a mismatch.
+		it('hydrates a dormant island, then updates it without reporting when its value became an element before activation', async () => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
 			const main = container.querySelector('main')!;
@@ -1199,8 +1199,8 @@ describe.each([
 				expect(div.textContent).toBe('A');
 				await act(() => root.render(client.DormantHole, { when: load(), kind: 'p', v: 'A' }));
 				expect(container.querySelector('main')).toBe(main);
-				expect(div.isConnected).toBe(false);
 				const live = container.querySelector('section > div')!;
+				expect(live).toBe(div);
 				expect(markup(live)).toBe('<p class="x">A</p>');
 				await act(async () => {});
 				expect(recovered).toEqual([]);
@@ -1218,9 +1218,10 @@ describe.each([
 // an outer value pair wrapping one pair per keyed item. Today's client claims that
 // hole as an @if-lowered block whose branch hosts the keyed list, so every adopted
 // pair sits one nesting level off from where the client expects it. Hydration must
-// never throw over that misalignment — stale server HTML (an older octane version,
-// a cached edge response) is exactly what the fallback exists for — and must leave
-// a tree whose later updates keep working.
+// never throw over that misalignment — stale server HTML that names the current
+// protocol version (a cached edge response) is exactly what the fallback exists
+// for; an older version's falls back at the root — and must leave a tree whose
+// later updates keep working.
 describe.each([
 	{
 		name: 'development compile',
@@ -1256,7 +1257,7 @@ describe.each([
 	}
 
 	const LEGACY_HTML =
-		'<div><button class="next">next</button><div class="host">' +
+		'<!--3--><div><button class="next">next</button><div class="host">' +
 		'<!--[--><!--[--><i>x</i><!--]--><!--[--><i>y</i><!--]--><!--]-->' +
 		'</div></div>';
 
@@ -1665,11 +1666,11 @@ describe.each([
 		);
 	});
 
-	// Captures that changed before a dormant island activated legitimately
-	// differ from the server's: the island renders on the client, and its server
-	// output predating the client state is not reported as a mismatch.
+	// Captures that changed before a dormant island activated: the island
+	// hydrates with the server's captures, then patches its adopted nodes with
+	// the newer ones, and nothing reports a mismatch.
 	it.each(EMPTY_KINDS)(
-		'renders a dormant island on the client without reporting when its value became %j before activation',
+		'hydrates a dormant island, then updates it without reporting when its value became %j before activation',
 		async (kind) => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
@@ -1684,8 +1685,8 @@ describe.each([
 				expect(div.textContent).toBe('A');
 				await act(() => root.render(client.DormantHole, { when: load(), kind, v: 'A' }));
 				expect(container.querySelector('main')).toBe(main);
-				expect(div.isConnected).toBe(false);
 				const live = container.querySelector('section > div')!;
+				expect(live).toBe(div);
 				expect(markup(live)).toBe('');
 				await act(async () => {});
 				expect(recovered).toEqual([]);
@@ -1758,6 +1759,34 @@ describe.each([
 		);
 	}
 
+	it('adopts an only-child hole after its server content removes itself', async () => {
+		container.innerHTML = ServerRT.renderToString(server.Hole, {
+			kind: 'p',
+			v: 'A',
+			tail: 't',
+		}).html;
+		const host = container.querySelector('section > div')!;
+		const tail = container.querySelector('i');
+		host.querySelector('p')!.remove();
+		const recovered: unknown[] = [];
+		const props = { kind: 'undefined', v: 'A', tail: 't' };
+		const root = hydrateRoot(container, client.Hole, props, {
+			onRecoverableError: (error) => recovered.push(error),
+		});
+		try {
+			await act(() => {});
+			expect(container.querySelector('section > div')).toBe(host);
+			expect(container.querySelector('i')).toBe(tail);
+			expect(recovered).toEqual([]);
+			flushSync(() => root.render(client.Hole, { ...props, kind: 'text', v: 'B' }));
+			expect(host.textContent).toBe('B');
+			flushSync(() => root.render(client.Hole, { ...props, kind: 'p', v: 'C' }));
+			expect(markup(host)).toBe('<p class="x">C</p>');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	// OCTANE DIVERGENCE: where the hole is its host's only child and the client
 	// value is text, React compares only the host's whole textContent, so a
 	// server `<div><p>A</p></div>` passes for a client `<div>A</div>` and keeps
@@ -1796,17 +1825,21 @@ describe.each([
 			{ from: 'p', to: 'undefined', text: '', server: '<p>' },
 			{ from: 'inner', to: null, text: '', server: '<b>' },
 			{ from: 'list', to: null, text: '', server: undefined },
-			{ from: 'textThenP', to: null, text: '', server: 'text "A"' },
+			// An only-child hole names the first element of the range it finds.
+			{ from: 'textThenP', to: null, text: '', server: 'text "A"', onlyChild: '<p>' },
 			{ from: 'textThenP', to: 'text', text: 'A', server: '<p>' },
 		])(
 			'renders the root on the client for a server $from and a client $to value, reporting it once',
-			async ({ from, to, text, server: serverDescription }) => {
+			async ({ from, to, text, server: serverDescription, onlyChild }) => {
 				const s = hydrate({ kind: from, v: 'A', tail: 't' }, { kind: to, v: 'A', tail: 't' });
 				try {
 					expect(survivors(s.serverNodes)).toEqual([]);
 					const parent = s.parent();
 					expect(markup(parent)).toBe(text + tailHtml('t'));
-					await expectReported(s.recovered, serverDescription);
+					await expectReported(
+						s.recovered,
+						name === 'Hole' && onlyChild !== undefined ? onlyChild : serverDescription,
+					);
 
 					// The client-rendered tree updates like any other.
 					s.render({ kind: 'text', v: 'B', tail: 't' });
@@ -1905,10 +1938,10 @@ describe.each([
 		);
 	});
 
-	// Captures that changed before a dormant island activated legitimately
-	// differ from the server's: the island renders on the client, and its server
-	// output predating the client state is not reported as a mismatch.
-	it('renders a dormant island on the client without reporting when it was updated before activation', async () => {
+	// Captures that changed before a dormant island activated: the island
+	// hydrates with the server's captures, then patches its adopted nodes with
+	// the newer ones, and nothing reports a mismatch.
+	it('hydrates a dormant island, then updates it without reporting when it was updated before activation', async () => {
 		const serverProps = { when: condition(false), kind: 'p', v: 'A' };
 		container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
 		const main = container.querySelector('main')!;
@@ -1922,8 +1955,8 @@ describe.each([
 			expect(markup(div)).toBe('<p class="x">A</p>');
 			await act(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'A' }));
 			expect(container.querySelector('main')).toBe(main);
-			expect(div.isConnected).toBe(false);
-			expect(markup(container.querySelector('section > div')!)).toBe('A');
+			expect(container.querySelector('section > div')).toBe(div);
+			expect(markup(div)).toBe('A');
 			await act(async () => {});
 			expect(recovered).toEqual([]);
 			expect(warns()).toEqual([]);

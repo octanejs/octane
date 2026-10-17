@@ -53,7 +53,8 @@ describe('renderToString — synchronous, fallbacks for suspended', () => {
 
 	it('keeps hydration block markers', () => {
 		const r = Server.renderToString(susp.App, { promise: new Promise(() => {}) });
-		expect(r.html).toContain('<!--[-->');
+		expect(r.html).toContain('<!--[');
+		expect(r.html).toContain('<!--]-->');
 	});
 });
 

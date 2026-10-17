@@ -3,8 +3,8 @@ import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
 import { Toaster, toast } from '@octanejs/sonner';
 
 const SERVER_HTML =
-	'<section aria-label="Notifications alt+T" tabindex="-1" aria-live="polite" ' +
-	'aria-relevant="additions text" aria-atomic="false"><!--[--><!--[--><!--[-->' +
+	'<!--3--><section aria-label="Notifications alt+T" tabindex="-1" aria-live="polite" ' +
+	'aria-relevant="additions text" aria-atomic="false"><!--[f1--><!--[--><!--[-->' +
 	'<!--]--><!--]--><!--]--></section>';
 
 async function settle(): Promise<void> {

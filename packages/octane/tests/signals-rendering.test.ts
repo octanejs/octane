@@ -36,6 +36,7 @@ import {
 	SignalReader,
 	ThrowingReader,
 } from './_fixtures/signals-native.tsrx';
+import { HooklessBindings } from './_fixtures/signal-hookless-bindings.tsrx';
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -944,6 +945,160 @@ describe('native signal rendering', () => {
 				setTransitionFallbackTimeout(previousTimeout);
 				vi.useRealTimers();
 			}
+		}
+	});
+
+	it('keeps committed readers and DOM bindings while a transition is held, and rebases urgent writes', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const state = createResource$('held-rebase', (key) =>
+			key === 'a' ? first.promise : second.promise,
+		);
+		const rendered = mount(NativeHeldBoundary, state);
+		// Other roots read the same signals: they wait with the root that holds.
+		const bindings = mount(NativeHeldBindings, state);
+		const reader = mount(SignalReader, state);
+		const notifications: number[] = [];
+		const stop = state.count$.subscribe(() => notifications.push(state.count$.get()));
+		const view = () => [
+			rendered.find('.count').textContent,
+			rendered.find('.async-value').textContent,
+			(bindings.find('.direct-control') as HTMLInputElement).value,
+			(bindings.find('.direct-style') as HTMLElement).style.left,
+			reader.find('.signal-value').textContent,
+		];
+		try {
+			await act(() => first.resolve('old'));
+			await act(() =>
+				startTransition(() => {
+					state.count$.set((count) => count + 1);
+					state.key$.set('b');
+				}),
+			);
+			expect(view()).toEqual(['0', 'old', 'a', '0px', '0']);
+			expect([state.count$.get(), state.key$.get()]).toEqual([0, 'a']);
+			// The urgent update commits over the committed value; the held
+			// transition applies its own update on top of it when it commits.
+			await act(() => state.count$.set((count) => count + 10));
+			expect(view()).toEqual(['10', 'old', 'a', '10px', '10']);
+			expect(notifications).toEqual([10]);
+			await act(() => second.resolve('new'));
+			expect(view()).toEqual(['11', 'new', 'b', '11px', '11']);
+			expect([state.count$.get(), state.key$.get()]).toEqual([11, 'b']);
+			expect(notifications).toEqual([10, 11]);
+		} finally {
+			stop();
+			rendered.unmount();
+			bindings.unmount();
+			reader.unmount();
+			state.scope.dispose();
+		}
+	});
+
+	it('holds a transition write into hookless components with the Block that owns them', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const state = createResource$('hookless-held', (key) =>
+			key === 'a' ? first.promise : second.promise,
+		);
+		const rendered = mount(HooklessBindings, state);
+		const view = () => {
+			const key = rendered.find('.hookless-key');
+			return [key.title, key.textContent, rendered.find('.hookless-value').textContent];
+		};
+		try {
+			await act(() => first.resolve('old'));
+			expect(view()).toEqual(['a', 'a', 'old']);
+			await act(() => startTransition(() => state.key$.set('b')));
+			expect(view()).toEqual(['a', 'a', 'old']);
+			await act(() => second.resolve('new'));
+			expect(view()).toEqual(['b', 'b', 'new']);
+			await act(() => startTransition(() => state.key$.set('a')));
+			expect(view()).toEqual(['a', 'a', 'old']);
+		} finally {
+			rendered.unmount();
+			state.scope.dispose();
+		}
+	});
+
+	it('commits two transitions that write one signal together', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const third = deferred<string>();
+		const state = createResource$('entangled-writes', (key) =>
+			key === 'a' ? first.promise : key === 'b' ? second.promise : third.promise,
+		);
+		const label$ = state.scope.signal$('label', 'idle');
+		const rendered = mount(NativeHeldBoundary, state);
+		const view = () => [
+			state.key$.get(),
+			state.count$.get(),
+			label$.get(),
+			rendered.find('.count').textContent,
+			rendered.find('.async-value').textContent,
+		];
+		try {
+			await act(() => first.resolve('A'));
+			await act(() =>
+				startTransition(() => {
+					state.key$.set('b');
+					label$.set('first');
+				}),
+			);
+			expect(view()).toEqual(['a', 0, 'idle', '0', 'A']);
+			// The second transition writes the key the first one holds, so neither
+			// commits without the other, although the first wrote another signal too.
+			await act(() =>
+				startTransition(() => {
+					state.key$.set('c');
+					state.count$.set(1);
+				}),
+			);
+			expect(view()).toEqual(['a', 0, 'idle', '0', 'A']);
+			await act(() => second.resolve('B'));
+			expect(view()).toEqual(['a', 0, 'idle', '0', 'A']);
+			await act(() => third.resolve('C'));
+			expect(view()).toEqual(['c', 1, 'first', '1', 'C']);
+		} finally {
+			rendered.unmount();
+			state.scope.dispose();
+		}
+	});
+
+	it('leaves no pending state behind a transition whose render is dropped', async () => {
+		const first = deferred<string>();
+		const never = deferred<string>();
+		let aborted = 0;
+		const state = createResource$('dropped-transition', (key, context) => {
+			if (key === 'a') return first.promise;
+			context.signal.addEventListener('abort', () => aborted++);
+			return never.promise;
+		});
+		const rendered = mount(NativeHeldBoundary, state);
+		let bindings: ReturnType<typeof mount> | undefined;
+		try {
+			await act(() => first.resolve('old'));
+			await act(() => startTransition(() => state.key$.set('b')));
+			expect(rendered.find('.async-value').textContent).toBe('old');
+			expect(state.key$.get()).toBe('a');
+			// Unmounting drops the held render. The write still commits, and the
+			// request only its pending query started is aborted.
+			await act(() => rendered.unmount());
+			expect(state.key$.get()).toBe('b');
+			expect(aborted).toBe(1);
+			// A later transition on the same signal commits on its own.
+			bindings = mount(NativeHeldBindings, state);
+			await act(() => startTransition(() => state.key$.set('c')));
+			expect(state.key$.get()).toBe('c');
+			expect((bindings.find('.direct-control') as HTMLInputElement).value).toBe('c');
+			await act(() => state.key$.set('d'));
+			expect((bindings.find('.direct-control') as HTMLInputElement).value).toBe('d');
+			await act(() => {});
+			expect(state.key$.get()).toBe('d');
+		} finally {
+			rendered.unmount();
+			bindings?.unmount();
+			state.scope.dispose();
 		}
 	});
 });

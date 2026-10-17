@@ -85,6 +85,25 @@ describe('scoped synchronous signals', () => {
 		expect(Object.is(values[1], -0)).toBe(true);
 	});
 
+	it('does not rerun readers of a derived value that recomputes equal', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 1);
+		const parity$ = scope.derived$('parity', () =>
+			scope.get(count$) < 0 ? Number.NaN : scope.get(count$) % 2,
+		);
+		const runs: number[] = [];
+		const label$ = scope.derived$('label', () => {
+			const parity = scope.get(parity$);
+			runs.push(parity);
+			return parity;
+		});
+		const stop = label$.subscribe(() => {});
+		expect(label$.get()).toBe(1);
+		for (const count of [3, -1, -3, 2, 4, 6]) count$.set(count);
+		expect(runs).toEqual([1, Number.NaN, 0]);
+		stop();
+	});
+
 	it('does not turn undefined, null, empty text, or false into pending', () => {
 		const scope = owner();
 		for (const [index, value] of [undefined, null, '', false].entries()) {
@@ -306,6 +325,33 @@ describe('scoped synchronous signals', () => {
 		const card$ = view.derived$('card', () => ({ value: secret$.get() }));
 		expect(card$.get()).toEqual({ value: 'old account' });
 		shared.dispose();
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
+	it('stops retaining a foreign value once another dependency owner retires', () => {
+		const data = owner('retained-data');
+		const gate = owner('retiring-gate');
+		const view = owner('retaining-view');
+		const value$ = data.signal$('value', 'private value');
+		const reason$ = gate.signal$('reason', 'closed');
+		const blocked$ = view.signal$('blocked', false);
+		const card$ = view.derived$('card', () => {
+			if (blocked$.get()) throw new Error(reason$.get());
+			return value$.get();
+		});
+		let notifications = 0;
+		card$.subscribe(() => notifications++);
+		expect(card$.get()).toBe('private value');
+		blocked$.set(true);
+		expect(card$.latest(null)).toBe('private value');
+
+		gate.dispose();
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+		const delivered = notifications;
+		// The view no longer reads or retains the data owner's value, so that
+		// owner retiring later is not another change to the card.
+		data.dispose();
+		expect(notifications).toBe(delivered);
 		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
 	});
 

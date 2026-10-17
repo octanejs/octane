@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { act, mount } from './_helpers';
-import { DeoptRefInBoundary } from './_fixtures/deopt-suspense-ref.tsrx';
+import {
+	DeoptHostChildRefInBoundary,
+	DeoptRefInBoundary,
+} from './_fixtures/deopt-suspense-ref.tsrx';
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -37,5 +40,24 @@ describe('de-opt descriptor refs across suspense hide/reveal', () => {
 		expect((r.current as Element | null)?.id).toBe('deopt-target'); // re-attached
 		m.unmount();
 		expect(r.current).toBeNull();
+	});
+
+	// The host's Block and its child's each hold the child's ref only once.
+	it('calls a ref on a host child once per hide, reveal and unmount', async () => {
+		const calls: (string | null)[] = [];
+		const r = (el: Element | null) => calls.push(el === null ? null : el.id);
+		const m = mount(DeoptHostChildRefInBoundary as any, { promise: fulfilled('one'), r });
+		expect(calls).toEqual(['deopt-target']);
+
+		const pending = deferred<string>();
+		m.update(DeoptHostChildRefInBoundary as any, { promise: pending.promise, r });
+		expect(m.container.querySelector('.fallback')).not.toBeNull();
+		expect(calls).toEqual(['deopt-target', null]);
+
+		await act(() => pending.resolve('two'));
+		expect(m.container.querySelector('.fallback')).toBeNull();
+		expect(calls).toEqual(['deopt-target', null, 'deopt-target']);
+		m.unmount();
+		expect(calls).toEqual(['deopt-target', null, 'deopt-target', null]);
 	});
 });

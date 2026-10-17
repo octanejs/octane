@@ -137,13 +137,11 @@ function ReadRecoveryContext(props) @{
 export function ContextErrorRecovery(props) @{
 	<>
 		<RecoveryContext value="outer">
-			@try {
+			<Suspense fallback={<b id="context-fallback">{'Loading'}</b>}>
 				<RecoveryContext value="inner">
 					<ThrowContextError error={props.error} />
 				</RecoveryContext>
-			} @catch (error) {
-				<b id="context-error">{error.message as string}</b>
-			}
+			</Suspense>
 			<ReadRecoveryContext id="context-after-error" />
 		</RecoveryContext>
 		<ReadRecoveryContext id="context-outside-provider" />

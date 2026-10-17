@@ -1,11 +1,11 @@
 // Untimed source-work guard over the actual active warm-plan helpers.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { COUNTER_GLOBAL, emptyCounters, instrumentJavaScript } from '../hook-memo/instrument.mjs';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 
 const repo = path.resolve(import.meta.dirname, '../..');
@@ -156,15 +156,9 @@ function measure(source) {
 	return { sourceHash: hash(source), helperHash: hash(clean), cases };
 }
 
-const candidate = measure(readFileSync(path.join(repo, file), 'utf8'));
+const candidate = measure(readClientRuntime(path.join(repo, file)));
 const baseline = baselineRef
-	? measure(
-			execFileSync('git', ['show', `${baselineRef}:${file}`], {
-				cwd: repo,
-				encoding: 'utf8',
-				maxBuffer: 8 * 1024 * 1024,
-			}),
-		)
+	? measure(readClientRuntime(path.join(repo, file), baselineRef))
 	: undefined;
 console.log(
 	JSON.stringify(

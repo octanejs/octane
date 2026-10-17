@@ -117,4 +117,40 @@ describe('hydrateRoot — mapped-fallback keyed list', () => {
 		expect(compiled.map((row) => row.textContent)).toEqual(['a', 'b', 'c']);
 		root.unmount();
 	});
+
+	it.each([true, false])('adopts a shared list at mapped and ordinary sites (dev=%s)', (dev) => {
+		const source = `
+			function Row() { return <input defaultValue="server" />; }
+			export function App() {
+				const rows = [<Row key="row" />];
+				const receiver = { map() { return rows; } };
+				return <main><section>{receiver.map((item) => <Row key={item.id} />)}</section><section>{rows}</section></main>;
+			}
+		`;
+		const options = { id: 'shared-mapped-rows.tsx', compileOptions: { dev, hmr: false } };
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		container.innerHTML = ServerRT.renderToString(server.App).html;
+		const served = [...container.querySelectorAll('input')];
+		expect(served).toHaveLength(2);
+		served[0]!.value = 'mapped edit';
+		served[1]!.value = 'ordinary edit';
+		const errors: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			client.App,
+			{},
+			{ onRecoverableError: (error) => errors.push(error) },
+		);
+		try {
+			flushSync(() => {});
+			const adopted = [...container.querySelectorAll('input')];
+			expect(adopted[0]).toBe(served[0]);
+			expect(adopted[1]).toBe(served[1]);
+			expect(adopted.map((input) => input.value)).toEqual(['mapped edit', 'ordinary edit']);
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
 });

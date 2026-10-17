@@ -15,7 +15,9 @@ type Kind =
 	| 'wait-p'
 	| 'item-empty'
 	| 'item-i'
-	| 'item-p';
+	| 'item-p'
+	| 'p-tail'
+	| 'text-tail';
 
 interface HoleProps {
 	kind: Kind;
@@ -30,6 +32,13 @@ function Waits(props: { text: Promise<string> }) @{
 
 function Now(props: { v: string }) @{
 	<em class="now">{props.v}</em>
+}
+
+function TextTail(props: { v: string }) @{
+	<>
+		{props.v as string}
+		<s>{'f'}</s>
+	</>
 }
 
 function Nothing(): OctaneNode {
@@ -62,6 +71,16 @@ function pick(kind: Kind, v: string, text: Promise<string> | null): OctaneNode {
 			return [createElement('i', { key: 'a', class: 'x' }, child(null, v))];
 		case 'item-p':
 			return [createElement('p', { key: 'a', class: 'x' }, child(text, v))];
+		// An element, or text, followed by content the client renders nothing for.
+		case 'p-tail':
+			return createElement(
+				Fragment,
+				null,
+				createElement('p', { class: 'x' }, v),
+				createElement('s', null, 'f'),
+			);
+		case 'text-tail':
+			return createElement(TextTail, { v });
 		default:
 			return v;
 	}

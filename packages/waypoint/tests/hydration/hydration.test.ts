@@ -3,7 +3,7 @@ import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
 import { ServerWaypoint } from '../ssr/_fixtures/server.tsrx';
 
 const SERVER_HTML =
-	'<main><!--[--><!--[--><span style="font-size:0;"></span><!--]--><!--]--><!--[--><!--[--><div id="custom">Marker</div><!--]--><!--]--></main>';
+	'<!--3--><main><!--[--><span style="font-size:0;"></span><!--]--><!--[--><div id="custom">Marker</div><!--]--></main>';
 
 afterEach(() => {
 	document.body.replaceChildren();

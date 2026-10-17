@@ -918,7 +918,7 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 **Octane references**
 
-- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `finishRoot` — Intentionally diagnoses and removes unclaimed root siblings.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `installHydrationFallback` — Diagnoses a root whose hydration failed, discards its unclaimed server content, and client-renders it, as React's clearContainer does.
 - [packages/octane/tests/conformance/hydration-mismatch.test.ts](../packages/octane/tests/conformance/hydration-mismatch.test.ts) — “server renders an extra element the client omits (Per :834)”
 
 **Rationale.** Octane hydrates a supplied Element rather than Document. Redact's body-level tolerance must not become blanket permissiveness inside an application-owned container. Revisit only if Octane introduces document/body hydration.

@@ -396,8 +396,8 @@ describe.each([
 		const { paragraph, adopt } = badge();
 		const scope = createScope({ scopeKey: `scalar-transition-${dev}-${lane}` });
 		const count$ = scope.signal$('count', 1);
-		// Registered before adoption: only a prepared presentation, committed with
-		// the publication itself, is visible to an earlier public subscriber.
+		// Registered before adoption: the view already shows the settled value when
+		// an earlier public subscriber hears of the commit.
 		const published: string[] = [];
 		const unsubscribe = count$.subscribe(() => published.push(paragraph.textContent!));
 		const handle = adopt(source({ ...plain, count: count$ }).state);

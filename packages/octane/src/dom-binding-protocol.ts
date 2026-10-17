@@ -4,9 +4,8 @@ import {
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
-	HYDRATION_FOR_PREFIX,
 	HYDRATION_START,
-} from './hydration-markers.js';
+} from './hydration-protocol.js';
 
 export type BindingKey = string | number;
 
@@ -104,63 +103,4 @@ export function parseBindingMarker(data: string): BindingMarker | null {
 		if (Number.isSafeInteger(arm)) return { id, site, kind: 'if', arm };
 	}
 	return null;
-}
-
-/**
- * `isBindingOpenComment` as regular-expression source over the payload after
- * its leading `[`. The inline stream swap runtime is script text and cannot
- * call this module, so it embeds the source to balance binding ranges in a
- * streamed fallback; a stream test holds both spellings of the grammar equal.
- * `[^]` rather than `.` keeps line separators inside an encoded string key, and
- * the groups capture because a non-capturing group costs every streamed page.
- */
-export const BINDING_OPEN_TAIL_SOURCE =
-	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]?|k;[sn]:[^]+))';
-
-export function isBindingOpenComment(data: string): boolean {
-	// The general hydration/early-stream path only counts balanced ranges. Keep
-	// exact receipt decoding, key validation, and allocations in adoption itself.
-	const list =
-		data.startsWith(BINDING_FOR_EMPTY_PREFIX) || data.startsWith(BINDING_FOR_ITEMS_PREFIX);
-	if (!list && !data.startsWith(BINDING_OPEN_PREFIX)) return false;
-	const idStart = list ? BINDING_FOR_ID_START : BINDING_ID_START;
-	const idEnd = data.indexOf(';', idStart);
-	if (idEnd <= idStart || idEnd === data.length - 1) return false;
-	if (list) return data.indexOf(';', idEnd + 1) === -1;
-	if (data.length - idEnd === BINDING_ROOT_SUFFIX.length && data.endsWith(BINDING_ROOT_SUFFIX))
-		return true;
-	const siteEnd = data.indexOf(';', idEnd + 1);
-	if (siteEnd <= idEnd + 1 || siteEnd === data.length - 1) return false;
-	const tail = siteEnd + 1;
-	// A `@try` range records its arm: `y0` content, `y1` pending, `y2` catch. A
-	// client template's bare `y` has not selected one yet.
-	if (data[tail] === 'y') return /^y[012]?$/.test(data.slice(tail));
-	if (data.length === tail + 1) {
-		const code = data.charCodeAt(tail);
-		return (
-			code === 116 || code === 118 || code === 115 || code === 111 || (code >= 48 && code <= 57)
-		);
-	}
-	if (data.charCodeAt(tail) === 107 && data.charCodeAt(tail + 1) === 59)
-		return (
-			(data.charCodeAt(tail + 2) === 115 || data.charCodeAt(tail + 2) === 110) &&
-			data.charCodeAt(tail + 3) === 58 &&
-			data.length > tail + 4
-		);
-	if (data.length === tail + 2 && data.endsWith('-1')) return true;
-	if (data.charCodeAt(tail) < 49 || data.charCodeAt(tail) > 57) return false;
-	for (let index = tail + 1; index < data.length; index++) {
-		const code = data.charCodeAt(index);
-		if (code < 48 || code > 57) return false;
-	}
-	return true;
-}
-
-/**
- * True when a binding-open payload carries an `@for` outer arm. The prefix test
- * alone is not a decision: `isBindingOpenComment` still requires the full
- * receipt, so this only spares callers from spelling the arm prefixes again.
- */
-export function isForBindingOpenComment(data: string): boolean {
-	return data.startsWith(HYDRATION_FOR_PREFIX) && isBindingOpenComment(data);
 }

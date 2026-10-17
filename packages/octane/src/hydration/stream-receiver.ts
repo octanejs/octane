@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { HYDRATE_INPUT_ATTR } from '../hydration-markers.js';
+import { HYDRATE_INPUT_ATTR } from '../hydration-protocol.js';
 import { rendererRangeClose } from '../stream-protocol.js';
 import {
 	sameStreamFrameIdentity,

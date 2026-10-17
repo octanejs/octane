@@ -1,4 +1,4 @@
-import { Activity } from 'octane';
+import { Activity, use, useState } from 'octane';
 import { useSignal$ } from 'octane/signals/client';
 import type { CSSProperties, SignalCSSProperties } from 'octane/jsx-runtime';
 import { signal$, type SignalHandle } from 'octane/signals';
@@ -163,4 +163,54 @@ export function AbortableStyles(props: { left$: SignalHandle<number | null>; fai
 		<SignalStyles left$={props.left$} />
 		<MaybeError fail={props.fail} />
 	</section>
+}
+
+// Hookful, so a transition's signal write prepares this Block itself.
+function SignalLabel(props: { label$: SignalHandle<string> }) @{
+	const [id] = useState('label');
+	<p data-signal-label={id} title={props.label$}>
+		{props.label$}
+	</p>
+}
+
+function Gate(props: { wait: Promise<unknown> }) @{
+	use(props.wait);
+	<b>{'resolved'}</b>
+}
+
+// A direct attribute and text binding beside a gate that suspends the root.
+export function HeldSignalLabel(props: {
+	label$: SignalHandle<string>;
+	wait: Promise<unknown> | null;
+}) @{
+	<section>
+		<SignalLabel label$={props.label$} />
+		@if (props.wait) {
+			<Gate wait={props.wait} />
+		}
+	</section>
+}
+
+function GateText(props: { gate$: SignalHandle<number | null> }) @{
+	const [id] = useState('gate');
+	<i data-gate={id}>{props.gate$}</i>
+}
+
+// The same bindings beside a sibling whose resource suspends a transition.
+export function GatedSignalLabel(props: {
+	label$: SignalHandle<string>;
+	gate$: SignalHandle<number | null>;
+}) @{
+	<section>
+		<SignalLabel label$={props.label$} />
+		<GateText gate$={props.gate$} />
+	</section>
+}
+
+export function GuardedSignalLabel(props: { label$: SignalHandle<string> }) @{
+	@try {
+		<SignalLabel label$={props.label$} />
+	} @pending {
+		<p data-waiting>{'waiting'}</p>
+	}
 }

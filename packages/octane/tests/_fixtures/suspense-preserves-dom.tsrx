@@ -1,6 +1,7 @@
 import {
 	createElement,
 	createPortal,
+	ErrorBoundary,
 	memo,
 	use,
 	useEffect,
@@ -10,6 +11,98 @@ import {
 	useSyncExternalStore,
 	useTransition,
 } from 'octane';
+
+interface DelayedBoundaryProps {
+	value: PromiseLike<string>;
+	probe: () => void;
+	tail?: PromiseLike<string>;
+}
+
+function ObservePendingBoundary(props: { probe: () => void }) @{
+	props.probe();
+	<></>
+}
+
+function DelayedTail(props: { value?: PromiseLike<string> }) @{
+	const tail = props.value === undefined ? '' : use(props.value);
+	<output id="late-tail">{tail as string}</output>
+}
+
+function DelayedBoundary(props: DelayedBoundaryProps) @{
+	const value = use(props.value);
+	<>
+		<ErrorBoundary fallback={<i>{'Unable to load'}</i>}>
+			<b id="late-loaded">{value as string}</b>
+		</ErrorBoundary>
+		<ObservePendingBoundary probe={props.probe} />
+		<DelayedTail value={props.tail} />
+	</>
+}
+
+function ResumedLeaf(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<span id="resumed-leaf">{value as string}</span>
+}
+
+function ResumedPair(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<>
+		<em id="resumed-first">{value as string}</em>
+		<strong>{'second'}</strong>
+	</>
+}
+
+function SoleRootLeaf(props: { label: string }) @{
+	<span id="sole-leaf">{props.label}</span>
+}
+
+// Its sole root is a component the retry mounts for the first time.
+function SoleRootResume(props: { value: PromiseLike<string> }) @{
+	const value = use(props.value);
+	<SoleRootLeaf label={value} />
+}
+
+export function SoleRootResumeApp(props: DelayedBoundaryProps) @{
+	<main>
+		@try {
+			<>
+				<SoleRootResume value={props.value} />
+				<ObservePendingBoundary probe={props.probe} />
+			</>
+		} @pending {
+			<label id="late-waiting">{'Loading'}</label>
+		}
+	</main>
+}
+
+// A child that suspended on its first render mounts its template on the
+// retry: a single root, a two-root template, and a try body revealed after it.
+export function ResumedTemplateApp(props: DelayedBoundaryProps) @{
+	<main>
+		@try {
+			<>
+				<ResumedLeaf value={props.value} />
+				<ResumedPair value={props.value} />
+				<ObservePendingBoundary probe={props.probe} />
+			</>
+		} @pending {
+			<label id="late-waiting">{'Loading'}</label>
+		}
+	</main>
+}
+
+export function DelayedBoundaryApp(props: DelayedBoundaryProps) @{
+	<main>
+		@try {
+			<DelayedBoundary value={props.value} probe={props.probe} tail={props.tail} />
+		} @pending {
+			<label id="late-waiting">
+				{'Loading'}
+				<input defaultValue="pending note" />
+			</label>
+		}
+	</main>
+}
 
 function PreservedPanel() @{
 	const [count, setCount] = useState(0);

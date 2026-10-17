@@ -47,9 +47,10 @@ describe('keyed @empty rollback', () => {
 
 			await act(() => api.setStep(1));
 
-			expect(r.findAll('#list li').map((node) => node.id)).toEqual(['empty']);
+			// The urgent fallback does not discard the refill transition: as in
+			// React, its update stays queued and commits behind the fallback.
+			expect(r.findAll('#list li').map((node) => node.id)).toEqual(['row-d', 'detail-d']);
 			expect(r.findAll('#fallback')).toHaveLength(1);
-			expect(r.findAll('#row-d')).toHaveLength(0);
 			expect([...rows.values()].every((node) => !node.isConnected)).toBe(true);
 			expect(events.sort()).toEqual(['cleanup:a', 'cleanup:b', 'cleanup:c']);
 			expect(cleanupConnected.sort((a, b) => a.id.localeCompare(b.id))).toEqual([

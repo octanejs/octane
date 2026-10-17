@@ -77,6 +77,7 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		cleaned: true,
 	},
 	'deferred-hydration': {
+		adopted: true,
 		before: 'dormant',
 		after: 'active',
 		clicks: 1,
@@ -126,6 +127,12 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		auxclickRegistered: false,
 		retainedStyle: true,
 		unusedStyle: false,
+		cleaned: true,
+	},
+	'descriptor-children': {
+		before: 'ab',
+		after: 'bc',
+		survivor: true,
 		cleaned: true,
 	},
 	'binding-vanilla': {

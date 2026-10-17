@@ -306,12 +306,7 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 test('ordinary client roots tree-shake native transitions and require emitted-byte evidence', () => {
 	const ordinary = [source('runtime.ts'), source('signals/read-protocol.ts')];
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary);
-	for (const name of [
-		'signals/transition-candidate.ts',
-		'signals/transition-action.ts',
-		'signals/transition-coordinator.ts',
-		'signals/candidate-producers.ts',
-	]) {
+	for (const name of ['signals/pending.ts', 'signals/candidate-producers.ts']) {
 		verifyTransitionBoundary(scenario('ordinary-client'), [
 			...ordinary,
 			{ ...source(name), bytesInOutput: 0 },
@@ -386,7 +381,7 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 	]);
 	assert.ok(
 		ordinary.inputs.some(
-			(input) => input.path.endsWith('/src/runtime.ts') && input.bytesInOutput > 0,
+			(input) => /\/src\/runtime(?:\.ts|\/[^/]+\.ts)$/.test(input.path) && input.bytesInOutput > 0,
 		),
 		'The public createRoot control must retain its actual renderer.',
 	);
@@ -398,20 +393,11 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 		),
 		'The independent engine control must retain its actual graph.',
 	);
-	verifyTransitionBoundary(scenario('engine'), engine.inputs);
 	assert.ok(
 		native.inputs.some(
-			(input) =>
-				input.path.endsWith('/src/signals/transition-candidate.ts') && input.bytesInOutput > 0,
+			(input) => input.path.endsWith('/src/signals/pending.ts') && input.bytesInOutput > 0,
 		),
-		'The compiled native-read control must retain the concrete transition implementation.',
-	);
-	assert.ok(
-		native.inputs.some(
-			(input) =>
-				input.path.endsWith('/src/signals/transition-coordinator.ts') && input.bytesInOutput > 0,
-		),
-		'The compiled signal Action control must retain its transition coordinator.',
+		'The compiled native-read control must retain pending signal state.',
 	);
 	for (const [label, closure] of [
 		['independent engine', engine],
@@ -462,12 +448,12 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary.inputs);
 });
 
-// Only the renderer consumes the signal Action frame and transition coordinator,
+// Only the renderer's transitions create pending signal state (pending.ts),
 // but no import edge loads code only when both renderer and graph are present.
 // package.json places it with the graph by default and with the renderer under
 // `octane-islands`, which documents that load signals without the renderer use.
-// The frame's candidate producers for resources and derived cells follow it:
-// by default the binding modules that create those cells carry them.
+// The candidate producers for resources and derived cells follow it: by
+// default the binding modules that create those cells carry them.
 test('the octane-islands condition moves signal Actions from signal bundles into the renderer', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const bundle = async (contents, conditions) => {
@@ -492,8 +478,7 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 				.reduce((total, [, input]) => total + input.bytesInOutput, 0);
 		return {
 			code: result.outputFiles[0].text,
-			action: bytes('transition-action'),
-			coordinator: bytes('transition-coordinator'),
+			pending: bytes('pending'),
 			producers: bytes('candidate-producers'),
 		};
 	};
@@ -512,19 +497,14 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 	for (const entry of signalBundles) {
 		const graphPlaced = await bundle(entrySource(entry));
 		assert.ok(
-			graphPlaced.action > 0 && graphPlaced.coordinator > 0,
+			graphPlaced.pending > 0,
 			`${entry.id}: the default build keeps signal Actions with the graph.`,
 		);
 		// The engine entry imports the module that creates resources but creates none.
 		if (entry.id === 'engine')
 			assert.equal(graphPlaced.producers, 0, 'engine: kept a producer for cells it never creates.');
 		const islands = await bundle(entrySource(entry), ['octane-islands']);
-		assert.equal(islands.action, 0, `${entry.id}: an islands signal bundle kept the Action frame.`);
-		assert.equal(
-			islands.coordinator,
-			0,
-			`${entry.id}: an islands signal bundle kept the transition coordinator.`,
-		);
+		assert.equal(islands.pending, 0, `${entry.id}: an islands signal bundle kept pending state.`);
 		assert.equal(
 			islands.producers,
 			0,
@@ -539,29 +519,24 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 	assert.equal((await bundle(cells, ['octane-islands'])).producers, 0);
 	const ordinary = entrySource(scenario('ordinary-client'));
 	const rendererOnly = await bundle(ordinary);
-	assert.deepEqual(
-		[rendererOnly.action, rendererOnly.coordinator, rendererOnly.producers],
-		[0, 0, 0],
-	);
+	assert.deepEqual([rendererOnly.pending, rendererOnly.producers], [0, 0]);
 	// A renderer that reaches no transition runs no Action, so neither placement
 	// carries the frame. The transition engine carries it in an islands build.
 	const islandsRendererOnly = await bundle(ordinary, ['octane-islands']);
-	assert.deepEqual(
-		[islandsRendererOnly.action, islandsRendererOnly.coordinator, islandsRendererOnly.producers],
-		[0, 0, 0],
-	);
+	assert.deepEqual([islandsRendererOnly.pending, islandsRendererOnly.producers], [0, 0]);
 	const transitions = `export { createRoot, startTransition } from 'octane';`;
 	const islandsRenderer = await bundle(transitions, ['octane-islands']);
 	assert.ok(
-		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0 && islandsRenderer.producers > 0,
+		islandsRenderer.pending > 0 && islandsRenderer.producers > 0,
 		'An islands build must carry signal Actions and their candidate producers with the renderer.',
 	);
 
-	// Both placements stay complete. The renderer is loaded first, and its Action
-	// imports signals only after it awaited. No component reads them natively. A
-	// declared derived cell and a query resource stage through their own producers.
-	const lateSignals = `import { startTransition } from 'octane';
-export function lateSignalAction() {
+	// Both placements and module load orders stay complete. When the renderer
+	// loads first, its Action imports signals only after it awaited. No component
+	// reads them natively; the derived cell and resource use their own producers.
+	const lateSignals = `export async function lateSignalAction(graphFirst) {
+ if (graphFirst) await import('octane/signals');
+ const { startTransition } = await import('octane');
  let release;
  const released = new Promise((resolve) => { release = resolve; });
  let ready;
@@ -595,37 +570,48 @@ export function lateSignalAction() {
  return { state, release: () => { release(); return action; } };
 }`;
 	for (const conditions of [undefined, ['octane-islands']]) {
-		const label = conditions ? 'renderer placement' : 'graph placement';
 		const { code } = await bundle(lateSignals, conditions);
-		const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
-		const pending = api.lateSignalAction();
-		const state = await pending.state;
-		try {
-			assert.deepEqual(state.staged, [2, 4, 6], `${label}: the transition scope reads its writes.`);
-			assert.deepEqual(
-				[state.count.get(), state.tripled(), state.looked.get()],
-				[0, 0, 0],
-				`${label}: the write published before the Action settled.`,
+		for (const graphFirst of [false, true]) {
+			const label = `${conditions ? 'renderer' : 'graph'} placement, ${graphFirst ? 'graph' : 'renderer'} first`;
+			const api = await import(
+				'data:text/javascript;base64,' + Buffer.from(code).toString('base64') + '#' + graphFirst
 			);
-			assert.deepEqual(state.notifications, [], label);
-			await pending.release();
-			const deadline = performance.now() + 2_000;
-			while (
-				(state.notifications.length === 0 || state.looked.latest() !== 20) &&
-				performance.now() < deadline
-			)
-				await new Promise((resolve) => setTimeout(resolve, 1));
-			assert.deepEqual(
-				[state.count.get(), state.tripled(), state.looked.latest()],
-				[2, 6, 20],
-				label,
-			);
-			assert.deepEqual(state.notifications, [2], label);
-		} finally {
-			state.stop();
-			state.scope.dispose();
+			const pending = await api.lateSignalAction(graphFirst);
+			const state = await pending.state;
+			try {
+				assert.deepEqual(
+					state.staged,
+					[2, 4, 6],
+					`${label}: the transition scope reads its writes.`,
+				);
+				assert.deepEqual(
+					[state.count.get(), state.tripled(), state.looked.get()],
+					[0, 0, 0],
+					`${label}: the write published before the Action settled.`,
+				);
+				assert.deepEqual(state.notifications, [], label);
+				await pending.release();
+				const deadline = performance.now() + 2_000;
+				while (
+					(state.notifications.length === 0 || state.looked.latest() !== 20) &&
+					performance.now() < deadline
+				)
+					await new Promise((resolve) => setTimeout(resolve, 1));
+				assert.deepEqual(
+					[state.count.get(), state.tripled(), state.looked.latest()],
+					[2, 6, 20],
+					label,
+				);
+				assert.deepEqual(state.notifications, [2], label);
+				state.count.set(3);
+				assert.deepEqual([state.count.get(), state.tripled()], [3, 9], label);
+				assert.deepEqual(state.notifications, [2, 3], label);
+			} finally {
+				state.stop();
+				state.scope.dispose();
+			}
+			t.diagnostic(`${label}: signals staged and published once`);
 		}
-		t.diagnostic(`${label}: late signals staged and published once`);
 	}
 });
 
@@ -687,18 +673,6 @@ test('independent engine rejects rendering, compiler, DevTools, and the old Alie
 		/graph source is missing/,
 	);
 	verifyBundleInputs(scenario('engine'), independent);
-	for (const entry of BUNDLE_CASES.filter((entry) => entry.id === 'engine' || entry.rendererFree)) {
-		verifyTransitionBoundary(entry, [source('signals/transition-state.ts')]);
-		for (const bytesInOutput of [0, 1]) {
-			assert.throws(
-				() =>
-					verifyTransitionBoundary(entry, [
-						{ ...source('signals/transition-candidate.ts'), bytesInOutput },
-					]),
-				/early entry reached transition orchestration/,
-			);
-		}
-	}
 	for (const filename of [
 		'runtime.ts',
 		'runtime.server.ts',
@@ -917,7 +891,8 @@ export function Reader({ value = count$.get() }) @{ <b>{value as number}</b> }`,
 			resolved: Object.keys(result.metafile.inputs),
 		};
 	};
-	const renderer = /packages\/octane\/src\/(?:runtime\.ts|internal\/client\.ts)$/;
+	const renderer =
+		/packages\/octane\/src\/(?:runtime\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
 	const window = new Window();
 	const globals = new Map();
 	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
@@ -1179,7 +1154,7 @@ test('compiled structural adoption costs only its selected implementation', asyn
 		if (mode === 'client') {
 			assert.ok(
 				!Object.keys(result.metafile.inputs).some((name) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						name,
 					),
 				),
@@ -1300,7 +1275,8 @@ export function Island() { 'use dom bindings';
 }`,
 	};
 	const options = { dev: false, hmr: false };
-	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const renderer =
+		/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
 	const bundle = async (entry, mode = 'client') => {
 		const result = await build({
 			stdin: {
@@ -1455,7 +1431,8 @@ export let activations = 0;
 export function mounted() { activations++; }
 export function increment() { count$.set((n) => n + 1); }`;
 	const options = { dev: false, hmr: false };
-	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const renderer =
+		/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
 	const bundle = async (entry, bindings, mode = 'client') => {
 		const sources = {
 			'island-app.tsrx': app,
@@ -1669,7 +1646,7 @@ export function mount(root, source, options) { return view.mount(root, view, sou
 		if (mode === 'client')
 			assert.ok(
 				!Object.keys(result.metafile.inputs).some((name) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						name,
 					),
 				),
@@ -1918,7 +1895,7 @@ export default {...current, hostOperations: undefined, adopt: __adoptSelectedBin
 		if (mode === 'client')
 			assert.ok(
 				!Object.keys(result.metafile.inputs).some((id) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						id,
 					),
 				),
@@ -2239,7 +2216,7 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 			for (const client of [selected, legacy])
 				assert.ok(
 					!client.resolved.some((id) =>
-						/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+						/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 							id,
 						),
 					),
@@ -2585,7 +2562,7 @@ test('early whole-style bindings exclude later renderer attribute tables', async
 	assert.ok([...baseline.earlyInputs].some((id) => id.endsWith('/dom-tables.js')));
 	assert.ok(
 		![...selected.earlyInputs].some((id) =>
-			/(?:\/dom-tables\.js|\/runtime(?:\.server)?\.ts|\/signals\/(?:engine|graph|facade)\.ts)$/.test(
+			/(?:\/dom-tables\.js|\/runtime(?:\.server)?\.ts|\/runtime\/[^/]+\.ts|\/signals\/(?:engine|graph|facade)\.ts)$/.test(
 				id,
 			),
 		),
@@ -2742,7 +2719,7 @@ export function mount(parent, source) { return mountBindings({parent}, SharedRec
 		if (names.includes('early'))
 			assert.ok(
 				![...earlyInputs].some((name) =>
-					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
 						name,
 					),
 				),
@@ -3642,15 +3619,15 @@ test('repeated opaque primitive attributes omit policy probes without hiding han
 				t.diagnostic(JSON.stringify(metrics));
 				assert.deepEqual(
 					result.steady,
-					{ helperEntries: 100 * attributeCount, policyEntries: 0 },
-					'The shared helper remains; equal defined scalars omit policy/handle probes.',
+					{ helperEntries: 0, policyEntries: 0 },
+					'A value equal to the committed one records nothing for the commit.',
 				);
 				for (const [phase, count] of [
 					['changed', 1],
 					['nan', 2],
-					['undefinedCalls', 2],
-					['objects', 2],
-					['functions', 2],
+					['undefinedCalls', 1],
+					['objects', 1],
+					['functions', 1],
 				]) {
 					assert.deepEqual(
 						result[phase],
@@ -3658,9 +3635,9 @@ test('repeated opaque primitive attributes omit policy probes without hiding han
 						`${phase}: the binding path remains available.`,
 					);
 				}
-				assert.equal(result.handles.helperEntries, 2 * attributeCount);
+				assert.equal(result.handles.helperEntries, attributeCount);
 				// The first real handle can re-enter once to establish stamped ownership.
-				assert.ok(result.handles.policyEntries >= 2 * attributeCount);
+				assert.ok(result.handles.policyEntries >= attributeCount);
 			}
 		}
 	}

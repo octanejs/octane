@@ -14,7 +14,11 @@
 // would let the $$ctxDepsEpoch fast path mask that stale version. Skewed
 // copies sharing the cell only see foreign bumps as "epoch moved", which is
 // the conservative direction.
-const EPOCH_CELL: { value: number } = ((globalThis as any)[Symbol.for('octane.contextEpoch')] ??= {
+// Hot runtime paths read `EPOCH_CELL.value` directly rather than call
+// contextEpochNow.
+export const EPOCH_CELL: { value: number } = ((globalThis as any)[
+	Symbol.for('octane.contextEpoch')
+] ??= {
 	value: 0,
 });
 

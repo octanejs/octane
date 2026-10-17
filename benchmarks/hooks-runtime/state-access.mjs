@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
+import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 // Actual production runtime, with ordinary and observed executions kept apart.
 // Map probes count the canonical state/reducer stores identified at insertion;
@@ -163,7 +164,7 @@ for (const getter of [false, true]) {
 		};
 	}
 }
-const source = await readFile(join(sourceRoot, 'packages/octane/src/runtime.ts'), 'utf8');
+const source = readClientRuntime(join(sourceRoot, 'packages/octane/src/runtime.ts'));
 const report = {
 	sourceRoot,
 	node: process.version,

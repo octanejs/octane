@@ -4,24 +4,22 @@ import { build } from 'esbuild';
 import { realpathSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import type { Browser, Page } from 'playwright';
-import type { DOMStage } from '../../../src/dom-stage.js';
 
 declare global {
 	interface Window {
-		OctaneStage: { DOMStage: typeof DOMStage } & typeof import('../../../src/index.js');
+		OctaneHost: typeof import('../../../src/index.js');
 	}
 }
 
 export const packageRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** The adapter contract complements the public renderer cases; no mock DOM. */
-export async function openStagePage(
+export async function openHostStatePage(
 	browser: Browser,
 	selectedPackage = packageRoot,
 ): Promise<Page> {
 	const result = await build({
 		stdin: {
-			contents: 'export {DOMStage} from "./src/dom-stage.ts"; export * from "./src/index.ts";',
+			contents: 'export * from "./src/index.ts";',
 			resolveDir: selectedPackage,
 		},
 		metafile: true,
@@ -29,7 +27,7 @@ export async function openStagePage(
 		bundle: true,
 		write: false,
 		format: 'iife',
-		globalName: 'OctaneStage',
+		globalName: 'OctaneHost',
 		target: 'esnext',
 	});
 	for (const input of Object.keys(result.metafile!.inputs)) {

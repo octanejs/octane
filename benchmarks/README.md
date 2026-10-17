@@ -491,8 +491,8 @@ All emitted JS counts, including the lazy page. Both rows use the same
 production Oxc settings as every comparative app. The byte deltas are reported
 in pull request benchmarks and have no pass/fail budget.
 
-`bundle-reachability` builds twenty-nine independent public-entry feature fixtures
-across thirty-eight production builds with the production Octane compiler,
+`bundle-reachability` builds thirty independent public-entry feature fixtures
+across thirty-nine production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's
 `'oxc'` and esbuild's `minify: true`. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
@@ -507,7 +507,10 @@ client runtime, while the hook binding must retain the real vanilla store.
 The isolated server-hook entry also rejects unrelated DOM namespace tables, and
 the component-owned-effects entry verifies that unused sibling styles, delegated
 events, and ViewTransition initialization disappear while retained styles and
-click handlers remain live. The `octane/behavior` fixture adopts existing DOM,
+click handlers remain live. The plain `createElement` descriptor fixture
+renders and reorders a keyed list through the generic child slot while dropping
+its portal, signal-handle and Context regimes, which only their creators
+install. The `octane/behavior` fixture adopts existing DOM,
 registers an externally owned range, handles a native click, and disposes its
 owners and handlers while preserving the original nodes. Both production builds
 reject renderer, compiler, and server modules.

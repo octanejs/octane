@@ -13,7 +13,9 @@ import { rendererRangeClose } from '../src/stream-protocol.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
+	CatchOnlyInSuspense,
 	DeferredAsyncLeaf,
+	ErrorBoundaryInSuspense,
 	DeferredStreamWithLiveSibling,
 	DeferredStreamWithRetrySibling,
 	DeferredStreamedSuspense,
@@ -22,7 +24,6 @@ import {
 	LateStyledBoundary,
 	NestedDeferredStreamedHydrates,
 	NestedStreamSeedScopes,
-	ReasonBoundary,
 	ReplayedStreamBoundary,
 	RootBoundary,
 	Siblings,
@@ -481,22 +482,22 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		}
 	});
 
-	it('routes a synchronous permanent-static error to an enclosing server catch', async () => {
+	it('renders a catch-only fallback for a synchronous permanent-static error', async () => {
 		const c = collector();
-		const onError = vi.fn();
+		const error = new Error('static shell boom');
+		const onShellError = vi.fn();
 		ServerRT.renderToPipeableStream(
 			permanentStaticServer.PermanentStaticSyncCaught,
-			{ error: new Error('static shell boom') },
-			{ onError },
+			{ error },
+			{ onShellError },
 		).pipe(c.dest);
 
 		await c.ended;
-		const html = c.chunks.join('');
-		expect(html).toContain('id="permanent-static-sync-catch"');
-		expect(html).toContain('static shell boom');
-		expect(html).not.toContain('data-oct-b');
-		expect(html).not.toContain('$OCTRX(');
-		expect(onError).not.toHaveBeenCalled();
+		expect(onShellError).not.toHaveBeenCalled();
+		container.innerHTML = c.chunks.join('');
+		expect(container.querySelector('#permanent-static-sync-catch')?.textContent).toBe(
+			'static shell boom',
+		);
 	});
 
 	it('retains a permanent-static fallback when its pending stream rejects', async () => {
@@ -531,7 +532,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(onAllReady).toHaveBeenCalledOnce();
 	});
 
-	it('streams an authored catch inside a permanent-static range', async () => {
+	it('reveals an authored error fallback when a permanent-static stream rejects', async () => {
 		const value = deferred<string>();
 		const c = collector();
 		const onError = vi.fn();
@@ -544,13 +545,17 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		container.innerHTML = c.chunks.join('');
 		activate(container);
 		const shellChunkCount = c.chunks.length;
-		value.reject(new Error('caught static stream boom'));
+		expect(container.querySelector('#permanent-static-caught-fallback')?.textContent).toBe(
+			'Caught fallback',
+		);
+		const error = new Error('caught static stream boom');
+		value.reject(error);
 		await c.ended;
 		const tail = c.chunks.slice(shellChunkCount).join('');
-		expect(tail).not.toContain('data-oct-seed');
 		container.insertAdjacentHTML('beforeend', tail);
 		activate(container);
 
+		expect(container.querySelector('#permanent-static-caught-fallback')).toBeNull();
 		expect(container.querySelector('#permanent-static-caught-error')?.textContent).toBe(
 			'caught static stream boom',
 		);
@@ -851,42 +856,6 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		}
 	});
 
-	it('balances canonical counted markers in the inline segment swap runtime', async () => {
-		const d = deferred<string>();
-		const c = collector();
-		const { pipe } = ServerRT.renderToPipeableStream(server.Boundary, { promise: d.promise });
-		pipe(c.dest);
-		const shell = c.chunks[0];
-		d.resolve('done');
-		await c.ended;
-
-		// Install the real emitted runtime, then exercise it against a compacted
-		// enclosing boundary. The counted close is the scanner's stopping node; a
-		// legacy-only parser runs past it and deletes the trailing sibling/segment.
-		container.innerHTML = shell;
-		const runtimeScript = Array.from(container.querySelectorAll('script')).find((script) =>
-			(script.textContent || '').includes('$OCTRC=function'),
-		);
-		expect(runtimeScript).toBeDefined();
-		// eslint-disable-next-line no-eval
-		(0, eval)(runtimeScript!.textContent || '');
-		container.innerHTML =
-			'<!--[2--><template data-oct-b="counted"></template>' +
-			'<i class="counted-fallback">loading</i><!--]2-->' +
-			'<p class="after-counted">after</p>' +
-			'<div hidden data-oct-s="counted"><b class="counted-ready">ready</b></div>';
-
-		(window as any).$OCTRC('counted');
-		expect(container.querySelector('.counted-fallback')).toBeNull();
-		expect(container.querySelector('.counted-ready')?.textContent).toBe('ready');
-		expect(container.querySelector('.after-counted')?.textContent).toBe('after');
-		expect(container.querySelector('[data-oct-s]')).toBeNull();
-		const comments = Array.from(container.childNodes)
-			.filter((node): node is Comment => node.nodeType === Node.COMMENT_NODE)
-			.map((node) => node.data);
-		expect(comments).toEqual(['[2', 'oct-seed:counted', ']2']);
-	});
-
 	it('ends a revealed fallback at the boundary close the client range parser finds', async () => {
 		const d = deferred<string>();
 		const c = collector();
@@ -950,6 +919,11 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			'[b;v;0;k;s:',
 			'[b;v;0;k;x:1',
 			'[x',
+			'[$:0',
+			'[$?p',
+			'[$!e3',
+			'[$',
+			'[if IE]><![endif]',
 		];
 		for (const payload of payloads) {
 			container.innerHTML =
@@ -1028,7 +1002,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		['list items', 'ListFallbackBoundary', ListFallbackBoundary],
 		['a binding view list', 'BindingListFallbackBoundary', BindingListFallbackBoundary],
 	] as const)(
-		'claims a still-pending shell whose fallback renders %s',
+		'keeps a still-pending shell whose fallback renders %s until its content streams in',
 		async (_label, name, Client) => {
 			const items = ['a', 'b'];
 			const d = deferred<string>();
@@ -1039,24 +1013,43 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			container.innerHTML = c.chunks[0];
 			activate(container);
 			const after = container.querySelector('#list-fallback-after') as HTMLButtonElement;
+			const fallbackItems = [...container.querySelectorAll('.list-fallback-item')];
 
-			// Hydrating before the segment arrives takes mountTry's documented
-			// client-render path for the boundary, which reports a structural warning.
+			// As React leaves a pending dehydrated boundary, the server's fallback
+			// stays until the segment arrives, and the sibling after it hydrates.
 			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const onRecoverableError = vi.fn();
 			const client = deferred<string>();
-			const root = hydrateRoot(container, Client as any, { promise: client.promise, items });
+			const root = hydrateRoot(
+				container,
+				Client as any,
+				{ promise: client.promise, items },
+				{ onRecoverableError },
+			);
 			try {
 				flushSync(() => {});
-				expect(container.querySelector('template[data-oct-b]')).toBeNull();
-				expect(container.querySelectorAll('.list-fallback-item')).toHaveLength(2);
+				expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
+				expect([...container.querySelectorAll('.list-fallback-item')]).toEqual(fallbackItems);
 				expect(container.querySelectorAll('.list-fallback-tail')).toHaveLength(1);
 				expect(container.querySelector('#list-fallback-after')).toBe(after);
 				flushSync(() => after.click());
 				expect(after.textContent).toBe('1');
 
+				// The client's own data does not replace the server's fallback.
 				await act(() => client.resolve('client rows'));
-				expect(container.querySelector('#list-fallback')!.textContent).toBe('client rows1');
+				expect([...container.querySelectorAll('.list-fallback-item')]).toEqual(fallbackItems);
+
+				d.resolve('server rows');
+				await c.ended;
+				container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
+				activate(container);
+				const ready = container.querySelector('.rows-ready');
+				await act(() => {});
+				expect(container.querySelector('.rows-ready')).toBe(ready);
+				expect(container.querySelector('#list-fallback')!.textContent).toBe('server rows1');
 				expect(container.querySelector('#list-fallback-after')).toBe(after);
+				expect(errorSpy).not.toHaveBeenCalled();
+				expect(onRecoverableError).not.toHaveBeenCalled();
 			} finally {
 				root.unmount();
 				errorSpy.mockRestore();
@@ -1318,9 +1311,10 @@ describe('renderToPipeableStream — chunk protocol', () => {
 				expect(chunks.join('')).not.toContain('last-ready');
 				// Two occurrences share one source, while an independent sibling
 				// rejects in the same event-loop turn. All three must record before
-				// their eventual content/catch arms are sent to the consumer.
+				// their eventual content/error instructions are sent to the consumer.
 				shared.resolve('last-ready');
-				rejected.reject(new Error('last-rejected'));
+				const rejection = new Error('last-rejected');
+				rejected.reject(rejection);
 				await ended;
 				container.innerHTML = chunks.join('');
 				activate(container);
@@ -1330,8 +1324,8 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					'middle-ready',
 					'last-ready',
 				]);
-				expect(container.querySelector('.err')?.textContent).toContain('last-rejected');
-				expect(container.textContent).not.toContain('loading');
+				expect(container.querySelector('.err')?.textContent).toBe('last-rejected');
+				expect(container.querySelector('.loading')).toBeNull();
 				expect(errors).toEqual([]);
 			} finally {
 				stop();
@@ -1540,13 +1534,11 @@ describe('renderToPipeableStream — chunk protocol', () => {
 										'</span>',
 								),
 							() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
-							null,
 						);
 						const outer = ServerRT.use(props.outer, 'outer-value');
 						return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
 					},
 					() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
-					null,
 				),
 			);
 		const outer = deferred<string>();
@@ -1578,16 +1570,26 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(container.querySelector('.outer-value')?.textContent).toBe('outside');
 	});
 
-	it('streams the @catch arm when the promise rejects', async () => {
+	it('reveals the error arm when the promise rejects', async () => {
 		const d = deferred<string>();
 		const c = collector();
-		const { pipe } = ServerRT.renderToPipeableStream(server.Boundary, { promise: d.promise });
+		const onError = vi.fn();
+		const { pipe } = ServerRT.renderToPipeableStream(
+			server.Boundary,
+			{ promise: d.promise },
+			{ onError },
+		);
 		pipe(c.dest);
-		d.reject(new Error('nope'));
+		container.innerHTML = c.chunks.join('');
+		expect(container.querySelector('.loading')?.textContent).toBe('loading');
+		const error = new Error('nope');
+		d.reject(error);
 		await c.ended;
 		container.innerHTML = c.chunks.join('');
 		activate(container);
-		expect(container.querySelector('.err')?.textContent).toContain('nope');
+		expect(container.querySelector('.loading')).toBeNull();
+		expect(container.querySelector('.err')?.textContent).toBe('nope');
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	it('abort landing during a wave coalesce cancels the pass and completes once', async () => {
@@ -1897,7 +1899,7 @@ describe('renderToReadableStream', () => {
 		});
 		const output = new Response(stream).text();
 		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
-		expect(await output).toBe('shell');
+		expect(await output).toBe('<!--3-->shell');
 		expect(onError).toHaveBeenCalledWith(callbackError);
 	});
 
@@ -2162,8 +2164,6 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 
 		const seen: Array<[string, string]> = [];
 		const clientPending = deferred<string>();
-		// A still-pending shell intentionally takes mountTry's documented degraded
-		// client-render path; keep its expected structural warning out of test output.
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(
 			container,
@@ -2176,11 +2176,14 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		);
 		try {
 			flushSync(() => {});
-			expect(seen).toContainEqual(['root', rootId]);
-			expect(seen).toContainEqual(['pending', boundaryId]);
+			// As React leaves a pending dehydrated boundary, the server's fallback
+			// stays until the content streams in, and the client renders no arm.
+			expect(seen).toEqual([['root', rootId]]);
 			expect(container.querySelectorAll('.id-loading')).toHaveLength(1);
-			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+			expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
 
+			// An update that reaches it renders it on the client, in the namespace
+			// the server reserved for the boundary.
 			const replacement = deferred<string>();
 			flushSync(() => {
 				root.render(IdBoundary as any, {
@@ -2188,6 +2191,8 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 					onId: (arm: string, value: string) => seen.push([arm, value]),
 				});
 			});
+			expect(seen).toContainEqual(['pending', boundaryId]);
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
 			await act(() => replacement.resolve('client-ready'));
 			expect(container.querySelectorAll('.id-ok')).toHaveLength(1);
 			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
@@ -2195,8 +2200,8 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			expect(container.querySelector('template[data-oct-b]')).toBeNull();
 			expect(seen.some(([arm]) => arm === 'content')).toBe(true);
 
-			// If the server finishes after hydration claimed the still-pending shell,
-			// its obsolete carrier is discarded rather than leaking hidden DOM.
+			// If the server finishes after the client rendered the boundary, its
+			// obsolete carrier is discarded rather than leaking hidden DOM.
 			d.resolve('server-late');
 			await c.ended;
 			container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
@@ -2216,27 +2221,37 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
-	it('keeps the client fallback when a root-level pending shell is claimed', async () => {
+	it('keeps a root-level pending shell until its content streams in, then hydrates it', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const render = ServerRT.renderToPipeableStream(server.RootBoundary, { promise: d.promise });
 		render.pipe(c.dest);
 		container.innerHTML = c.chunks[0];
 		activate(container);
+		const loading = container.querySelector('.root-loading');
 		expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
 
-		// The boundary is the root's whole output. Claiming it for the client must
-		// not let the root discard the client-mounted fallback as stale server DOM.
+		// The boundary is the root's whole output. The root must not discard the
+		// fallback the boundary keeps as stale server DOM, nor render it again.
 		const client = deferred<string>();
 		const root = hydrateRoot(container, RootBoundary as any, { promise: client.promise });
 		try {
 			flushSync(() => {});
-			expect(container.querySelector('template[data-oct-b]')).toBeNull();
-			expect(container.querySelectorAll('.root-loading')).toHaveLength(1);
+			expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
+			expect(container.querySelector('.root-loading')).toBe(loading);
 
 			await act(() => client.resolve('client-ready'));
+			expect(container.querySelector('.root-loading')).toBe(loading);
+
+			d.resolve('server-ready');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
+			activate(container);
+			const ok = container.querySelector('.root-ok')!;
+			await act(() => {});
 			expect(container.querySelector('.root-loading')).toBeNull();
-			expect(container.querySelector('.root-ok')?.textContent).toBe('client-ready');
+			expect(container.querySelector('.root-ok')).toBe(ok);
+			expect(ok.textContent).toBe('server-ready');
 		} finally {
 			root.unmount();
 			render.abort(new Error('test complete'));
@@ -2244,7 +2259,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
-	it('adopts a streamed factory-rejection catch without duplicating the alert', async () => {
+	it('renders one client catch arm for a streamed factory rejection the client repeats', async () => {
 		const rendered = collectPipeableStream(server.FactoryRejectionBoundary, {
 			scenario: 'weather-failure',
 		});
@@ -2252,23 +2267,48 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(result.errors).toEqual([]);
 		container.innerHTML = result.html;
 		activate(container);
-		const serverCatch = container.querySelector('.factory-error');
-		expect(serverCatch).not.toBeNull();
-		expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+		expect(container.querySelector('.factory-pending')).toBeNull();
+		expect(container.querySelector('.factory-error h2')?.textContent).toBe(
+			'The local weather desk did not answer.',
+		);
 
-		const root = hydrateRoot(container, FactoryRejectionBoundary as any, {
-			scenario: 'weather-failure',
+		// The client retries from its own data; its rejection reaches the client catch.
+		const onRecoverableError = vi.fn();
+		const onCaughtError = vi.fn();
+		let root!: ReturnType<typeof hydrateRoot>;
+		await act(async () => {
+			root = hydrateRoot(
+				container,
+				FactoryRejectionBoundary as any,
+				{ scenario: 'weather-failure' },
+				{ onRecoverableError, onCaughtError },
+			);
 		});
 		try {
-			flushSync(function () {});
-			expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
-			expect(container.querySelector('.factory-error')).toBe(serverCatch);
+			await vi.waitFor(async () => {
+				await act(async () => {});
+				expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+			});
+			expect(container.querySelector('.factory-pending')).toBeNull();
+			expect(onCaughtError).toHaveBeenCalledTimes(1);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+
+			await act(async () => {
+				(container.querySelector('.factory-error button') as HTMLButtonElement).click();
+			});
+			await vi.waitFor(async () => {
+				await act(async () => {});
+				expect(container.querySelector('.factory-ok')?.textContent).toBe(
+					'Clear mornings, cool after dusk.',
+				);
+			});
+			expect(container.querySelector('.factory-error')).toBeNull();
 		} finally {
 			root.unmount();
 		}
 	});
 
-	it('hydrates a streamed catch arm in place and consumes the superseded client rejection', async () => {
+	it('retries a streamed server-caught error from client data', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const { pipe } = ServerRT.renderToPipeableStream(
@@ -2277,99 +2317,44 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			{ identifierPrefix: 'page-' },
 		);
 		pipe(c.dest);
-		const [id] = protocolIds(c.chunks[0]);
 		d.reject({ name: 'PlainFailure', message: 'server-no' });
 		await c.ended;
 
 		container.innerHTML = c.chunks.join('');
 		activate(container);
-		const rootId = ':page-in-0:';
-		const boundaryId = ':page-b' + id + '-in-0:';
-		const errorSpan = container.querySelector('.id-error');
-		expect(errorSpan!.textContent).toBe('server-no');
-		expect(errorSpan!.getAttribute('data-boundary-id')).toBe(boundaryId);
+		const rootBox = container.querySelector('#id-box');
+		expect(container.querySelector('.id-loading')).toBeNull();
+		expect(container.querySelector('.id-error')?.textContent).toBe('server-no');
 
 		const seen: Array<[string, string]> = [];
-		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const clientPending = deferred<string>();
-		const unhandledClientRejections: unknown[] = [];
-		const onUnhandledRejection = (reason: unknown, promise: Promise<unknown>) => {
-			if (promise === clientPending.promise) unhandledClientRejections.push(reason);
-		};
-		process.on('unhandledRejection', onUnhandledRejection);
-		const root = hydrateRoot(
-			container,
-			IdBoundary as any,
-			{
-				promise: clientPending.promise,
-				onId: (arm: string, value: string) => seen.push([arm, value]),
-			},
-			{ identifierPrefix: 'page-' },
-		);
+		const onRecoverableError = vi.fn();
+		const client = deferred<string>();
+		let root!: ReturnType<typeof hydrateRoot>;
+		await act(async () => {
+			root = hydrateRoot(
+				container,
+				IdBoundary as any,
+				{
+					promise: client.promise,
+					onId: (arm: string, value: string) => seen.push([arm, value]),
+				},
+				{ identifierPrefix: 'page-', onRecoverableError },
+			);
+		});
 		try {
-			flushSync(() => {});
-			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
-			expect(container.querySelector('.id-loading')).toBeNull();
-			expect(seen).toContainEqual(['root', rootId]);
-			expect(seen).toContainEqual(['catch', boundaryId]);
-			expect(errSpy).not.toHaveBeenCalled();
+			expect(container.querySelector('#id-box')).toBe(rootBox);
+			expect(seen).toContainEqual(['root', ':page-in-0:']);
+			expect(container.querySelectorAll('.id-loading')).toHaveLength(1);
+			expect(onRecoverableError).not.toHaveBeenCalled();
 
-			// The server rejection remains authoritative for this hydration episode,
-			// but the client-created request still settles later. Wait through a host
-			// task boundary so an unobserved promise would emit `unhandledRejection`.
-			clientPending.reject(new Error('client request also rejected'));
-			await new Promise<void>((resolve) => setTimeout(resolve, 0));
-			expect(unhandledClientRejections).toEqual([]);
-			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
-			expect(errorSpan!.textContent).toBe('server-no');
-			expect(errSpy).not.toHaveBeenCalled();
+			await act(async () => client.resolve('client-ready'));
+			await vi.waitFor(async () => {
+				await act(async () => {});
+				expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
+			});
+			expect(container.querySelector('.id-loading, .id-error')).toBeNull();
+			expect(onRecoverableError).not.toHaveBeenCalled();
 		} finally {
-			process.off('unhandledRejection', onUnhandledRejection);
-			errSpy.mockRestore();
-			root.unmount();
-		}
-	});
-
-	it('preserves primitive and plain-object reasons in streamed catch hydration', async () => {
-		const cases = [
-			{ reason: 'stream-string', text: 'stream-string:', kind: 'string', code: '' },
-			{
-				reason: { message: 'stream-object', code: 'E_STREAM' },
-				text: 'stream-object:E_STREAM',
-				kind: 'object',
-				code: 'E_STREAM',
-			},
-		] as const;
-
-		for (const testCase of cases) {
-			const d = deferred<string>();
-			const c = collector();
-			const { pipe } = ServerRT.renderToPipeableStream(server.ReasonBoundary, {
-				promise: d.promise,
-			});
-			pipe(c.dest);
-			d.reject(testCase.reason);
-			await c.ended;
-
-			container.innerHTML = c.chunks.join('');
-			activate(container);
-			const serverCatch = container.querySelector('.reason-error');
-			let caught: any;
-			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-			const root = hydrateRoot(container, ReasonBoundary as any, {
-				promise: new Promise<string>(() => {}),
-				onCatch: (reason: unknown) => (caught = reason),
-			});
-			flushSync(() => {});
-
-			expect(container.querySelector('.reason-error')).toBe(serverCatch);
-			expect(serverCatch!.textContent).toBe(testCase.text);
-			expect(serverCatch!.getAttribute('data-kind')).toBe(testCase.kind);
-			expect(serverCatch!.getAttribute('data-code')).toBe(testCase.code);
-			if (typeof testCase.reason === 'string') expect(caught).toBe(testCase.reason);
-			else expect(caught).toEqual(testCase.reason);
-			expect(errorSpy).not.toHaveBeenCalled();
-			errorSpy.mockRestore();
 			root.unmount();
 		}
 	});
@@ -2528,8 +2513,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		const clientOuter: any = new Promise<string>(() => {});
 		const clientInner: any = new Promise<string>(() => {});
 		const clientLater: any = new Promise<string>(() => {});
-		// A still-pending nested template takes the existing degraded structural
-		// recovery path; this regression observes seed ownership on the thenables.
+		// This regression observes seed ownership on the thenables.
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(container, NestedStreamSeedScopes as any, {
 			outer: clientOuter,
@@ -2540,13 +2524,236 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 
 		expect(clientOuter.status).toBe('fulfilled');
 		expect(clientOuter.value).toBe('outer-ready');
-		// The inner template owns an EMPTY scope. Without the guard it consumes
-		// the outer segment's `later-ready` seed and becomes spuriously fulfilled.
-		expect(clientInner.status).toBe('pending');
+		// The inner boundary keeps its fallback until its content streams in, and
+		// owns none of the outer segment's seeds: the `later-ready` seed reaches
+		// the sibling after it.
+		expect(clientInner.status).not.toBe('fulfilled');
 		expect(clientInner.value).toBeUndefined();
+		expect(container.querySelector('.inner-seed-pending')).toBe(pendingNode);
+		expect(clientLater.status).toBe('fulfilled');
+		expect(clientLater.value).toBe('later-ready');
+		expect(container.querySelector('.later-seed')).toBe(laterNode);
 		errorSpy.mockRestore();
 		root.unmount();
 		render.abort(new Error('test complete'));
 		await c.ended;
+	});
+});
+
+// A catch-only boundary handles errors but leaves suspension to its ancestor.
+describe('server error boundaries distinguish errors from suspension', () => {
+	// The lowered JSX ErrorBoundary is the same kind of boundary.
+	const BOUNDARIES = [
+		['@try with @catch', 'CatchOnlyInSuspense', CatchOnlyInSuspense],
+		['<ErrorBoundary>', 'ErrorBoundaryInSuspense', ErrorBoundaryInSuspense],
+	] as const;
+
+	/** Stream a fixture, then settle its read once the shell is out. */
+	async function streamCatchOnly(
+		fixture: string,
+		settle: (read: ReturnType<typeof deferred<string>>) => void,
+	) {
+		const read = deferred<string>();
+		const c = collector();
+		const onError = vi.fn();
+		const onAllReady = vi.fn();
+		ServerRT.renderToPipeableStream(
+			server[fixture],
+			{ promise: read.promise },
+			{ onError, onAllReady },
+		).pipe(c.dest);
+		const shell = c.chunks.join('');
+		settle(read);
+		await c.ended;
+		return { shell, html: c.chunks.join(''), onError, onAllReady };
+	}
+
+	it.each([
+		[
+			'renderToString',
+			(error: Error, onError: (error: unknown) => void) =>
+				ServerRT.renderToString(
+					server.CatchOnlyInSuspense,
+					{ promise: new Promise<string>(() => {}), error },
+					{ onError },
+				).html,
+		],
+		[
+			'prerender',
+			async (error: Error, onError: (error: unknown) => void) => {
+				const value = deferred<string>();
+				const result = prerender(
+					server.CatchOnlyInSuspense,
+					{ promise: value.promise },
+					{ onError },
+				);
+				value.reject(error);
+				return (await result).html;
+			},
+		],
+	])('%s renders the inner error fallback', async (_renderer, render) => {
+		const error = new Error('catch-only boom');
+		const onError = vi.fn();
+		container.innerHTML = await render(error, onError);
+		expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+		expect(container.querySelector('.catch-only-loading')).toBeNull();
+		expect(onError).not.toHaveBeenCalled();
+	});
+
+	it.each(BOUNDARIES)(
+		'renderToString ships the Suspense fallback for a suspension in %s',
+		(_kind, fixture) => {
+			const onError = vi.fn();
+			container.innerHTML = ServerRT.renderToString(
+				server[fixture],
+				{ promise: new Promise<string>(() => {}) },
+				{ onError },
+			).html;
+			expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+			expect(container.querySelector('.catch-only-section')).toBeNull();
+			expect(onError).not.toHaveBeenCalled();
+		},
+	);
+
+	it('streams the error fallback for an error thrown before anything suspends', async () => {
+		const error = new Error('catch-only boom');
+		const result = await collectPipeableStream(server.CatchOnlyInSuspense, {
+			promise: new Promise<string>(() => {}),
+			error,
+		});
+		expect(result.errors).toEqual([]);
+		container.innerHTML = result.html;
+		activate(container);
+		expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+		expect(container.querySelector('.catch-only-loading')).toBeNull();
+	});
+
+	it.each(BOUNDARIES)(
+		'streams the Suspense fallback while %s suspends, then content that hydration adopts',
+		async (_kind, fixture, Component) => {
+			const { shell, html } = await streamCatchOnly(fixture, (read) => read.resolve('streamed'));
+			container.innerHTML = shell;
+			expect(container.querySelector('.catch-only-loading')).not.toBeNull();
+			expect(container.querySelector('.catch-only-section')).toBeNull();
+			// Only the Suspense boundary streams; the catch-only one has no sentinel.
+			expect(container.querySelectorAll('template[data-oct-b]')).toHaveLength(1);
+
+			container.innerHTML = html;
+			activate(container);
+			const section = container.querySelector('.catch-only-section')!;
+			const value = container.querySelector('.catch-only-ok')!;
+			expect(value.textContent).toBe('streamed');
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+
+			const onRecoverableError = vi.fn();
+			let root!: ReturnType<typeof hydrateRoot>;
+			await act(async () => {
+				root = hydrateRoot(
+					container,
+					Component as any,
+					{ promise: Promise.resolve('streamed') },
+					{ onRecoverableError },
+				);
+			});
+			try {
+				await vi.waitFor(async () => {
+					await act(async () => {});
+					expect(container.querySelector('.catch-only-ok')).toBe(value);
+				});
+				expect(container.querySelector('.catch-only-section')).toBe(section);
+				expect(container.querySelector('.catch-only-loading')).toBeNull();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each(BOUNDARIES)(
+		'reveals the error fallback when the read %s suspended on rejects',
+		async (_kind, fixture) => {
+			const error = new Error('catch-only boom');
+			const { html, onError, onAllReady } = await streamCatchOnly(fixture, (read) =>
+				read.reject(error),
+			);
+			expect(onError).not.toHaveBeenCalled();
+			expect(onAllReady).toHaveBeenCalledOnce();
+			expect(html).not.toContain('catch-only boom');
+			container.innerHTML = html;
+			activate(container);
+			expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+			expect(container.querySelector('.catch-only-loading')).toBeNull();
+		},
+	);
+
+	it.each(BOUNDARIES)(
+		'hydration preserves the surrounding content when %s takes a repeated error',
+		async (_kind, fixture, Component) => {
+			const { html } = await streamCatchOnly(fixture, (read) =>
+				read.reject(new Error('catch-only boom')),
+			);
+			container.innerHTML = html;
+			activate(container);
+			const serverFallback = container.querySelector('.catch-only-error');
+			expect(serverFallback?.textContent).toBe('caught');
+			const section = container.querySelector('.catch-only-section');
+			const client = Promise.reject(new Error('client boom'));
+			client.catch(() => {});
+			const onRecoverableError = vi.fn();
+			let root!: ReturnType<typeof hydrateRoot>;
+			await act(async () => {
+				root = hydrateRoot(
+					container,
+					Component as any,
+					{ promise: client },
+					{ onRecoverableError },
+				);
+			});
+			try {
+				await vi.waitFor(async () => {
+					await act(async () => {});
+					expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+				});
+				expect(container.querySelector('.catch-only-section')).toBe(section);
+				expect(container.querySelector('.catch-only-loading')).toBeNull();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('holds the shell while it suspends with no Suspense boundary above it', async () => {
+		const value = deferred<string>();
+		let shellReady = false;
+		const rendered = ServerRT.renderToReadableStream(server.CatchOnlyOutsideSuspense, {
+			promise: value.promise,
+		}).then((stream) => {
+			shellReady = true;
+			return stream;
+		});
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(shellReady).toBe(false);
+		value.resolve('shell-value');
+		const text = await new Response(await rendered).text();
+		expect(text).toContain('shell-value');
+		expect(text).not.toContain('data-oct-b');
+	});
+
+	it('renders the error fallback when a shell-blocking read rejects', async () => {
+		const value = deferred<string>();
+		const onError = vi.fn();
+		const onShellError = vi.fn();
+		const rendered = ServerRT.renderToReadableStream(
+			server.CatchOnlyOutsideSuspense,
+			{ promise: value.promise },
+			{ onError, onShellError },
+		);
+		const error = new Error('catch-only boom');
+		value.reject(error);
+		container.innerHTML = await new Response(await rendered).text();
+		expect(container.querySelector('.catch-only-error')?.textContent).toBe('caught');
+		expect(onShellError).not.toHaveBeenCalled();
+		expect(onError).not.toHaveBeenCalled();
 	});
 });

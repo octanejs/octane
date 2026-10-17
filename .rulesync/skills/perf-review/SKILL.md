@@ -31,7 +31,7 @@ node scripts/perf-review-scan.mjs packages/<binding>/src/ # a binding's hot path
   benchmarks are always excluded. `--json` prints machine-readable findings.
 - `gh pr diff` carries only three lines of context, so the loop and
   read-after-write notes see less. A pasted diff also lacks the head's
-  `runtime.ts`, so `--diff` skips `hot-class-shape`. For a full review, check
+  runtime modules, so `--diff` skips `hot-class-shape`. For a full review, check
   out the PR head in a worktree and use `--head`.
 
 ## 2. Classify the change before judging it
@@ -76,7 +76,7 @@ The scan cannot see the following, so check them by hand:
   compiler. Diff it for per-render closures, literals whose keys vary, extra
   runtime calls per node, changed `bagN` arity, and new runtime imports.
 - **Reachability.** A new reference from a hot or compiled path to a large
-  function or driver, a new import into `runtime.ts`, or a `hydrating` guard
+  function or driver, a new import into a runtime module, or a `hydrating` guard
   that does not fold.
 - **Polymorphism and representation.** A hot function that now receives a new
   receiver shape or argument type, returns a different shape, or stores a new

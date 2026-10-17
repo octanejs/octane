@@ -172,7 +172,7 @@ it('keeps revealed resources while repeatedly discarding a completed boundary fa
 
 const mod = evalServer(
 	`
-    import { use, useId, useState } from 'octane';
+    import { Suspense, use, useId, useState } from 'octane';
 
     export function DiscardedBoundary(props) @{
       const [settled, setSettled] = useState(false);
@@ -263,6 +263,11 @@ const mod = evalServer(
 			} @pending {
 				<i data-waiting={props.label}>{props.label + ':waiting' as string}</i>
 			}
+		}
+		function SharedRecoveringBoundary(props) @{
+			<Suspense fallback={<i data-waiting={props.label}>{props.label + ':waiting' as string}</i>}>
+				<SharedValue label={props.label} promise={props.promise} />
+			</Suspense>
 		}
 		export function PendingFallbackWithSibling(props) @{
 			<main>
@@ -433,7 +438,7 @@ const mod = evalServer(
 					<strong class="replayed-discarded">{value as string}</strong>
 				}
 			} @pending {
-				<SharedBoundary label="fallback" promise={props.fallback} />
+				<SharedRecoveringBoundary label="fallback" promise={props.fallback} />
 			}
 		}
 
@@ -449,7 +454,7 @@ const mod = evalServer(
 				/>
 				<SharedBoundary label="trigger" promise={props.trigger} />
 				@if (props.trailing) {
-					<SharedBoundary label="trailing" promise={props.trailing} />
+					<SharedRecoveringBoundary label="trailing" promise={props.trailing} />
 				}
 			</main>
 		}
@@ -690,7 +695,7 @@ describe('SSR stream state regressions', () => {
 		resetStreamRuntimeGlobals();
 	});
 
-	it('retires unresolved content descendants omitted by an outer catch segment', async () => {
+	it('retires unresolved content descendants of an errored outer boundary', async () => {
 		const outer = deferred<string>();
 		const inner = deferred<string>();
 		const output = collector();
@@ -701,10 +706,13 @@ describe('SSR stream state regressions', () => {
 			{ timeoutMs: 80, onError },
 		).pipe(output.destination);
 
+		// The outer content errors while an inner boundary in it is still pending.
+		// The outer catch replaces its content, so the inner boundary is unreachable
+		// and the stream ends without waiting for its data.
 		outer.reject(new Error('outer failed'));
 		await output.ended;
 		const container = activateChunks(output.chunks);
-		expect(container.querySelector('.outer-catch')!.textContent).toBe('outer failed');
+		expect(container.querySelector('.outer-catch')?.textContent).toBe('outer failed');
 		expect(container.querySelector('.outer-pending')).toBeNull();
 		expect(container.querySelector('.content-inner-pending')).toBeNull();
 		expect(onError).not.toHaveBeenCalled();
@@ -893,7 +901,7 @@ describe('SSR stream state regressions', () => {
 		resetStreamRuntimeGlobals();
 	});
 
-	it('keeps a late content error inside its already-flushed Suspense boundary', async () => {
+	it('reveals an outer catch after an inner pending-only boundary rejects', async () => {
 		const inner = deferred<string>();
 		const output = collector();
 		const onError = vi.fn();
@@ -902,16 +910,18 @@ describe('SSR stream state regressions', () => {
 			{ inner: inner.promise },
 			{ onError, timeoutMs: 100 },
 		).pipe(output.destination);
+		const shell = document.createElement('div');
+		shell.innerHTML = output.chunks.join('');
+		expect(shell.querySelector('.late-pending')?.textContent).toBe('waiting');
 
 		const error = new Error('inner failed');
 		inner.reject(error);
 		await output.ended;
-		expect(onError).toHaveBeenCalledTimes(1);
-		expect(onError).toHaveBeenCalledWith(error);
+		expect(onError).not.toHaveBeenCalled();
 
 		const container = activateChunks(output.chunks);
-		expect(container.querySelector('.late-pending')?.textContent).toBe('waiting');
-		expect(container.querySelector('.late-catch')).toBeNull();
+		expect(container.querySelector('.late-pending')).toBeNull();
+		expect(container.querySelector('.late-catch')?.textContent).toBe('inner failed');
 		container.remove();
 		resetStreamRuntimeGlobals();
 	});

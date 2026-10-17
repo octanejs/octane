@@ -283,7 +283,7 @@ describe('streaming injection — fragment renders', () => {
 			chunks.push(decoder.decode(value));
 		}
 		await stream.allReady;
-		expect(chunks).toEqual(['shell', first, second]);
+		expect(chunks).toEqual(['<!--3-->shell', first, second]);
 	});
 
 	it('rejects pending injected writes and unsubscribes when the web-stream reader cancels', async () => {
@@ -610,7 +610,7 @@ describe('streaming injection — failure modes', () => {
 		aborter.abort(reason);
 		const output = new Response(stream).text();
 		await expect(stream.allReady).rejects.toBe(reason);
-		expect(await output).toBe('shell' + script);
+		expect(await output).toBe('<!--3-->shell' + script);
 		expect(injection.unsubscribed).toBe(true);
 	});
 

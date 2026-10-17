@@ -46,7 +46,7 @@ describe('useStateManager SSR parity', () => {
 				rootExportResult = result;
 			},
 		});
-		expect(octane.html).toBe(react);
+		expect(octane.html).toBe('<!--3-->' + react);
 		expect(rootExportResult?.inputValue).toBe(
 			managerProps.inputValue ?? managerProps.defaultInputValue,
 		);

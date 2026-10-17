@@ -1,7 +1,7 @@
 /** Native lookup candidates; consumers still filter exact radio/name/form matches. */
 export function radioGroupCandidates(input: HTMLInputElement): ArrayLike<Node> {
 	const name = input.name;
-	// Nameless and isolated radios still need their own staged state synchronized.
+	// Nameless radios are independent, but still publish their own checked state.
 	if (name === '') return [input];
 	const form = input.form;
 	if (form !== null) {

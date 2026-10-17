@@ -294,6 +294,20 @@ export function MountThrower() @{
 	}
 }
 
+function RenderRecord(props: { record: () => void }) @{
+	props.record();
+	<i />
+}
+
+// Records during render, after content of its own, then throws on mount.
+export function RecordingMountThrower(props: { record: () => void }) @{
+	<section>
+		<b>{'before'}</b>
+		<RenderRecord record={props.record} />
+		<MountThrower />
+	</section>
+}
+
 function throwOnMount(): string {
 	throw new Error('mount-boom');
 }

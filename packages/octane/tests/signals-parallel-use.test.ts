@@ -203,7 +203,10 @@ describe('native reads in use() creations', () => {
 					},
 				}),
 			).toThrow(failure);
-			expect(constructed).toEqual(['construct', 'first']);
+			// The root renders off-document and its button would upgrade only as it
+			// connects at commit. The throw comes first, as in React, where it
+			// precedes the host's creation.
+			expect(constructed).toEqual(['first']);
 		}
 		for (const View of [
 			client.ParallelJsxAttribute,
@@ -822,12 +825,17 @@ describe('native reads in use() creations', () => {
 		expect(conditionalStarts).toEqual([]);
 		expect(conditional.html).toContain('hidden');
 		for (const View of [server.ParallelErrors, server.ParallelJsxErrors]) {
+			// The source-order first rejection reaches the authored catch arm even
+			// when a later one settles first.
 			const firstError = deferred<string>();
 			const secondError = deferred<string>();
 			let completed = false;
-			const errors = prerender(View, {
-				load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
-			});
+			const onError = vi.fn();
+			const errors = prerender(
+				View,
+				{ load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise) },
+				{ onError },
+			);
 			void errors.then(() => {
 				completed = true;
 			});
@@ -836,17 +844,28 @@ describe('native reads in use() creations', () => {
 			await drain();
 			expect(completed).toBe(false);
 			firstError.reject(new Error('first error'));
-			expect((await errors).html).toContain('first error');
-			expect((await errors).html).not.toContain('later error');
+			const markup = document.createElement('div');
+			markup.innerHTML = (await errors).html;
+			expect(markup.querySelector('.error')?.textContent).toBe('first error');
+			expect(markup.querySelector('.pending')).toBeNull();
+			expect(onError).not.toHaveBeenCalled();
 			const failedStarts: string[] = [];
-			const failed = await prerender(View, {
-				load: (key: string) => {
-					failedStarts.push(key);
-					throw new Error('synchronous first error');
+			const failedOnError = vi.fn();
+			const failed = await prerender(
+				View,
+				{
+					load: (key: string) => {
+						failedStarts.push(key);
+						throw new Error('synchronous first error');
+					},
 				},
-			});
+				{ onError: failedOnError },
+			);
 			expect(failedStarts).toEqual(['first']);
-			expect(failed.html).toContain('synchronous first error');
+			markup.innerHTML = failed.html;
+			expect(markup.querySelector('.error')?.textContent).toBe('synchronous first error');
+			expect(markup.querySelector('.pending')).toBeNull();
+			expect(failedOnError).not.toHaveBeenCalled();
 		}
 	});
 

@@ -158,7 +158,6 @@ it('releases 32 staggered query regions without waiting for earlier siblings', a
 						`staggered-region-${index}`,
 						() => ssrBlock(`<p data-index="${index}">${value.get()}</p>`),
 						() => ssrBlock(`<i data-index="${index}">waiting</i>`),
-						null,
 					),
 				)
 				.join(''),
@@ -582,7 +581,6 @@ it('announces a query first discovered after the readable shell', async () => {
 					return ssrBlock(`<p>${value$.snapshot().status}</p>`);
 				},
 				() => ssrBlock('<p>waiting</p>'),
-				null,
 			),
 		);
 	}

@@ -199,24 +199,17 @@ describe.each([
 		},
 	);
 
-	// As in React, which compares only the DOM, the call without a server range
-	// of its own adopts the server's <u> in place: it renders exactly that node.
-	it('adopts the other arm’s node at the hole when the call renders exactly it', async () => {
+	// OCTANE DIVERGENCE: React, which compares only the DOM, adopts the server's
+	// <u> for the call: it renders exactly that node. Octane's server frames
+	// every component call, so the call without its range falls back.
+	it('client-renders the root where the call renders exactly the other arm’s node', async () => {
 		const s = await hydrate('AdoptLast', { tail: 't', server: true }, { tail: 't' });
 
-		const expectServerNodes = () => {
-			const live = [...container.querySelectorAll('*')];
-			expect(live).toHaveLength(s.nodes.length);
-			live.forEach((node, i) => expect(node).toBe(s.nodes[i]));
-		};
 		expect(markup(s.host())).toBe('<i>t</i><u>z</u>');
-		expectServerNodes();
-		expect(s.recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expectRootFellBack(s);
 
 		s.render({ tail: 'w' });
 		expect(markup(s.host())).toBe('<i>w</i><u>z</u>');
-		expectServerNodes();
 	});
 
 	it.each([

@@ -7,7 +7,14 @@ import { launchBrowser } from '../../test-utils/playwright-browser.ts';
 import { countStat, octanePackageAt, parseOptions, writePayload } from '../activity/harness.mjs';
 
 const selected = octanePackageAt(parseOptions(process.argv.slice(2)).revision);
-const sourceFiles = ['runtime.ts', 'dom-stage.ts', 'radio-group.ts', 'signals/control-binding.ts']
+const sourceFiles = [
+	'runtime.ts',
+	'runtime/forms.ts',
+	'runtime/commit.ts',
+	'dom-stage.ts',
+	'radio-group.ts',
+	'signals/control-binding.ts',
+]
 	.map((file) => path.join(selected.packageRoot, 'src', file))
 	.filter(existsSync);
 const hashSources = () =>
@@ -72,12 +79,12 @@ const output = {
 try {
 	const configurations = [
 		...[128, 512].flatMap((size) =>
-			['update', 'unchanged', 'reset', 'staged'].map((mode) => ({ size, mode })),
+			['update', 'unchanged', 'reset', 'input', 'transition'].map((mode) => ({ size, mode })),
 		),
-		{ size: 128, mode: 'update', type: 'checkbox' },
-		{ size: 128, mode: 'update', texts: 512 },
-		{ size: 128, mode: 'staged', texts: 512 },
-		{ size: 128, mode: 'update', singleGroup: true },
+		{ size: 128, mode: 'input', type: 'checkbox' },
+		{ size: 128, mode: 'reset', texts: 512 },
+		{ size: 128, mode: 'transition', texts: 512 },
+		{ size: 128, mode: 'input', singleGroup: true },
 	];
 	for (const configuration of configurations) {
 		const { size, mode, type = 'radio', texts = 0, singleGroup = false } = configuration;
@@ -113,7 +120,9 @@ try {
 									h('input', { key: 'text' + i, type: 'text', defaultValue: 'field' + i }),
 								),
 							]);
-							return mode === 'staged' ? h(r.ViewTransition, { name: 'radio-work' }, form) : form;
+							return mode === 'transition'
+								? h(r.ViewTransition, { name: 'radio-work' }, form)
+								: form;
 						};
 						r.flushSync(() => root.render(tree()));
 						const nodes = [...host.querySelectorAll('input[type=' + type + ']')];
@@ -150,7 +159,7 @@ try {
 									return Reflect.apply(nativeImport, this, [node, deep]);
 								};
 							}
-							if (mode === 'staged') {
+							if (mode === 'transition') {
 								document.startViewTransition = function (options) {
 									captures++;
 									const transition = nativeStart.call(this, options);
@@ -164,6 +173,8 @@ try {
 								r.startTransition(() => r.requestFormReset(host.querySelector('form')));
 								await Promise.resolve();
 								r.flushSync(() => {});
+							} else if (mode === 'input') {
+								for (const node of nodes) node.click();
 							} else {
 								if (mode === 'update') tick = 1;
 								r.flushSync(() => root.render(tree()));
@@ -193,7 +204,7 @@ try {
 				assert.deepEqual(result.semantic, {
 					values: true,
 					identity: true,
-					captures: mode === 'staged' ? 1 : 0,
+					captures: mode === 'transition' ? 1 : 0,
 				});
 				assert.equal(result.unmounted, true);
 				if (observed) samples.push(result);

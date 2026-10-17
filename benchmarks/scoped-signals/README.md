@@ -359,10 +359,11 @@ The opaque-attribute work guard compiles the same consumer with one or 100
 attributes in TSX/TSRX and development/production modes. An observed build counts
 attribute helper and policy entries after compilation; its output, evaluation
 counts, host identity, input restoration, handle updates, and teardown must agree
-with an unobserved build. Repeated strictly equal defined scalar attributes retain
-the shared helper call and omit deeper policy/handle probes. Changed values,
-undefined, objects, functions, and handles exercise the binding path. NaN also
-re-enters conservatively. Bundle bytes use only the unobserved build. This guard
+with an unobserved build. A value strictly equal to the committed one, including
+undefined, an object, a function, or a handle whose value is unchanged, records
+nothing for the commit, so neither the helper nor the policy runs. A changed
+value enters both once, and NaN re-enters on every update because it never
+equals itself. Bundle bytes use only the unobserved build. This guard
 measures deterministic work, not CPU time or browser layout, and its used-signal
 fixture does not establish a reduction in generic runtime bundle size.
 

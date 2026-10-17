@@ -1,7 +1,7 @@
 // `@catch` parameters written as destructuring patterns. Each boundary renders
-// its error arm from the bindings the pattern declares, and the server and the
-// client render the same error output. A caught value is `unknown`, so, as with
-// a TypeScript `catch` clause, a pattern is annotated `any`.
+// its error arm from the bindings the pattern declares. A
+// caught value is `unknown`, so, as with a TypeScript `catch` clause, a pattern
+// is annotated `any`.
 
 export type Failure = { failed: boolean };
 

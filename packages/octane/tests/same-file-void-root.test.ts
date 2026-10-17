@@ -325,16 +325,16 @@ let ready=false,release;const gate=new Promise(resolve=>release=resolve);
 function Waiting() @{ if(!ready)throw gate; <span>ready</span> }
 function Thrower() @{ if(true)throw new Error('replacement-boom'); <span>unreachable</span> }
 function Replacement() @{ @try { <Thrower /> } @catch(error) { <strong>{error.message as string}</strong> } }
-export async function run(){const host=document.querySelector('#host');host.innerHTML='<span>ready</span>';
- const original=host.firstChild,reads=[],reports=[];let phase='adopt';
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<!--3--><span>ready</span>';
+ const original=host.lastChild,reads=[],reports=[];let phase='adopt';
  const options={
   get onCaughtError(){const label=phase;reads.push(label+':caught');return error=>reports.push(label+':caught:'+error.message);},
   get onUncaughtError(){reads.push(phase+':uncaught');return undefined;},
   get onRecoverableError(){reads.push(phase+':recoverable');return undefined;}
  };
- const root=hydrateRoot(host,Waiting,undefined,options),pending={same:host.firstChild===original,reads:reads.slice()};
+ const root=hydrateRoot(host,Waiting,undefined,options),pending={same:host.lastChild===original,reads:reads.slice()};
  phase='retry';ready=true;release();await Promise.resolve();await Promise.resolve();flushSync(()=>{});
- const adopted={same:host.firstChild===original,text:host.textContent,reads:reads.slice()};
+ const adopted={same:host.lastChild===original,text:host.textContent,reads:reads.slice()};
  phase='replacement';root.render(Replacement);flushSync(()=>{});
  const replaced={text:host.textContent,reads:reads.slice(),reports};root.unmount();
  return {pending,adopted,replaced,cleaned:host.childNodes.length===0};}`;
@@ -366,7 +366,7 @@ let evaluations=[],cleanups=0;
 function View(props) @{ const id=useId(); const [count,update]=useState(0); useLayoutEffect(()=>()=>{cleanups++});
  <main><button id={id} onClick={()=>update(count+1)}>{props.label + ':' + count as string}</button><input defaultValue="initial" /></main> }
 export async function run(){const host=document.querySelector('#host');
- host.innerHTML='<main><button id=":adopt-in-3:">server:0</button><input value="initial"></main>';
+ host.innerHTML='<!--3--><main><button id=":adopt-in-3:">server:0</button><input value="initial"></main>';
  const main=host.firstElementChild,button=host.querySelector('button'),input=host.querySelector('input');input.value='typed';input.focus();input.setSelectionRange(1,3);
  const target=()=>{evaluations.push('target');return host};const props=()=>{evaluations.push('props');return {label:'server'}};
  const options=()=>{evaluations.push('options');return {identifierPrefix:'adopt-',identifierSeed:3}};
@@ -396,7 +396,7 @@ export async function run(){const host=document.querySelector('#host');
 	it('discovers late opaque handles on adopted text and controls without replacing drafts', async () => {
 		const source = `import {hydrateRoot,flushSync} from 'octane';
 function View(props) @{ <main><span>{props.value as string}</span><input value={props.value}/><textarea /></main> }
-export async function run(){const host=document.querySelector('#host');host.innerHTML='<main><span>ordinary</span><input value="ordinary"><textarea></textarea></main>';
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<!--3--><main><span>ordinary</span><input value="ordinary"><textarea></textarea></main>';
  const span=host.querySelector('span'),input=host.querySelector('input'),spare=host.querySelector('textarea');spare.value='draft';
  const root=hydrateRoot(host,View,{value:'ordinary'});const adopted=span===host.querySelector('span');
  const {createScope}=await import('octane/signals');const scope=createScope({scopeKey:'late-hydrated-root'}),value=scope.signal$('value','first');
@@ -432,7 +432,7 @@ function View(props) @{
 }
 export async function run(){
  const host=document.querySelector('#host');
- host.innerHTML='<main><span>server</span><textarea></textarea></main>';
+ host.innerHTML='<!--3--><main><span>server</span><textarea></textarea></main>';
  const script=document.createElement('script');script.type='application/json';script.setAttribute('data-octane-native-signals','');
  const seed={version:1,scopeKey:'octane:document',entries:[{key:'text',kind:'signal',value:['string','server'],complete:true}]};
  script.textContent=JSON.stringify(${compact ? "{version:2,scopes:[],initialDocument:{scopeKey:seed.scopeKey,entries:[{key:'text',read:'value'}]}}" : '{version:1,scopes:[seed]}'});
@@ -488,7 +488,7 @@ export async function run(){
 let effects=0,cleanups=0,refs=[];
 function View(props) @{ useLayoutEffect(()=>{effects++;return()=>{cleanups++}},[]);if(!props.ready.value)throw props.gate;const id=useId();
  <main><button id={id} ref={node=>refs.push(node?'attach':'detach')}>{props.label as string}</button><input defaultValue="initial" /></main> }
-export async function run(){const host=document.querySelector('#host');host.innerHTML='<main><button id=":pending-in-2:">server</button><input value="initial"></main>';
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<!--3--><main><button id=":pending-in-2:">server</button><input value="initial"></main>';
  const main=host.firstElementChild,input=host.querySelector('input');input.value='typed';let release;const gate=new Promise(resolve=>release=resolve),ready={value:false};
  const root=hydrateRoot(host,View,{ready,gate,label:'server'},{identifierPrefix:'pending-',identifierSeed:2});
  const pending={text:host.textContent,same:main===host.firstElementChild,effects,refs:[...refs]};
@@ -594,7 +594,7 @@ export function run(){const host=document.querySelector('#host');host.innerHTML=
 	it('keeps descriptor keys and options in their public argument positions', async () => {
 		const source = `import {hydrateRoot,flushSync,useId,useState} from 'octane';let evaluations=[];
 function View(props) @{const id=useId();const [count,update]=useState(0);<main><button id={id} onClick={()=>update(count+1)}>{props.label+':'+count as string}</button><input /></main>}
-export function run(){const host=document.querySelector('#host');host.innerHTML='<main><button id=":descriptor-in-4:">server:0</button><input></main>';
+export function run(){const host=document.querySelector('#host');host.innerHTML='<!--3--><main><button id=":descriptor-in-4:">server:0</button><input></main>';
  const first=host.firstElementChild,input=host.querySelector('input');input.value='typed';
  const descriptor=()=>{evaluations.push('descriptor');return <View label="server" key="one"/>};
  const options=()=>{evaluations.push('options');return {get identifierPrefix(){evaluations.push('prefix');return 'descriptor-';},identifierSeed:4}};
@@ -638,7 +638,7 @@ function attach(host,label) {
 }
 export async function run() {
  const host=document.querySelector('#host'), other=document.body.appendChild(document.createElement('div'));
- ${hydrate ? `host.innerHTML='<main><button>a:0</button><input value="initial"></main>'; other.innerHTML='<main><button>b:0</button><input value="initial"></main>';` : ''}
+ ${hydrate ? `host.innerHTML='<!--3--><main><button>a:0</button><input value="initial"></main>'; other.innerHTML='<!--3--><main><button>b:0</button><input value="initial"></main>';` : ''}
  const server=host.querySelector('button'), a=attach(host,'a'), b=attach(other,'b');
  const button=host.querySelector('button'), input=host.querySelector('input');
  input.value='typed'; button.click(); await Promise.resolve();
@@ -783,7 +783,7 @@ export function run() { return {order, keyed, same, cleaned}; }`;
 		const source = `import {hydrateRoot} from 'octane';
 function View(props) @{ <main><span>{props.label as string}</span><input /></main> }
 const host = document.querySelector('#host');
-host.innerHTML = '<main><span>server</span><input></main>';
+host.innerHTML = '<!--3--><main><span>server</span><input></main>';
 const main = host.firstElementChild;
 host.querySelector('input').value = 'typed';
 hydrateRoot(host, <View label="server" />).render(<View label="client" />);

@@ -43,7 +43,7 @@ describe('native read inspection records', () => {
 			render(() => {
 				left$.get();
 			});
-			const pending = driver.inspectScope(scope)!;
+			const pending = driver.inspectScope!(scope)!;
 			expect(pending.committed).toBeNull();
 			expect(pending.pending[0].reads[0].source).toMatchObject({ key: 'left', status: 'ready' });
 			driver.acceptCapture(capture);
@@ -51,19 +51,19 @@ describe('native read inspection records', () => {
 			render(() => {
 				right$.get();
 			});
-			const next = driver.inspectScope(scope)!;
+			const next = driver.inspectScope!(scope)!;
 			expect(next.committed?.reads[0].source?.key).toBe('left');
 			expect(next.pending[0].reads[0].source?.key).toBe('right');
 			expect(evaluations).toBe(0);
 			driver.discardCapture(capture);
-			expect(driver.inspectScope(scope)?.pending).toEqual([]);
+			expect(driver.inspectScope!(scope)?.pending).toEqual([]);
 			left$.set(3);
 			expect(scheduled).toBeGreaterThan(0);
-			const accepted = driver.inspectScope(scope)!.committed!.reads[0];
+			const accepted = driver.inspectScope!(scope)!.committed!.reads[0];
 			expect(accepted.observedVersion).toBeLessThan(accepted.currentVersion);
 			expect(evaluations).toBe(0);
 			for (const cleanup of cleanups) cleanup();
-			expect(driver.inspectScope(scope)).toBeNull();
+			expect(driver.inspectScope!(scope)).toBeNull();
 			expect(data.inspect().nodes.map((node) => node.subscribers)).toEqual([0, 0, 0]);
 		} finally {
 			for (const cleanup of cleanups) cleanup();

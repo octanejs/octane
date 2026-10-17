@@ -28,7 +28,7 @@ describe('useAsync SSR parity', () => {
 					result = next;
 				},
 			});
-			expect(octane.html).toBe(react);
+			expect(octane.html).toBe('<!--3-->' + react);
 			expect(result?.filterOption).toBeNull();
 		},
 	);

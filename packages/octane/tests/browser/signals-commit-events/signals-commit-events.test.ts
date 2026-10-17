@@ -10,10 +10,13 @@ import type * as Runtime from '../../../src/index.js';
 import type * as Signals from '../../../src/signals/index.js';
 import type { LiveForm, LiveFormProps } from './live-form.tsrx';
 
-// Chromium blurs a focused control synchronously while a render disables or
+// Chromium blurs a focused control synchronously while a DOM patch disables or
 // removes it. jsdom does not, so only a real browser runs these listeners from
-// inside the render's DOM patch. The listeners still belong to a live component:
-// they must run, write signals, and publish those writes like any other event.
+// inside the patch. A host whose props resolve across sources (the spread here)
+// writes them at commit (9d80f4d61d), so the patch is its render's commit. The
+// listeners still belong to a live component: they must run, write signals, and
+// publish those writes like any other event, and the commit must go on after
+// them.
 
 declare global {
 	interface Window {
@@ -29,7 +32,7 @@ interface ScenarioResult {
 	listeners: string[];
 	/** The rendered count of blur-listener writes before and after the patch. */
 	blurs: [string | null, string | null];
-	/** Writes attempted later in the same DOM patch, after the listeners returned. */
+	/** Writes made later in the same DOM patch, after the listeners returned. */
 	afterListeners: { listeners: string[]; outcome: string }[];
 	probe: number;
 	/** A public subscriber of the listener-written signal, and what its own write did. */
@@ -168,7 +171,7 @@ function runScenario(page: Page, scenario: Scenario): Promise<ScenarioResult> {
 		// the same patch, after the browser's synchronous listeners returned.
 		const afterProbe = {
 			toString() {
-				let outcome = 'write escaped';
+				let outcome = 'written';
 				try {
 					probe$.set(1);
 				} catch (error) {
@@ -233,18 +236,20 @@ function expectLiveListeners(
 	expect(result.unrelatedRenders).toBe(0);
 }
 
-function expectRenderStillGuarded(result: ScenarioResult, listeners: string[]): void {
+// The commit goes on after the listeners, outside any render, where authored
+// code may write signals, as React lets commit-phase code set state.
+function expectCommitContinues(result: ScenarioResult, listeners: string[]): void {
 	const probed = result.afterListeners.filter((entry) =>
 		listeners.every((listener) => entry.listeners.includes(listener)),
 	);
 	expect(probed.length).toBeGreaterThan(0);
 	expect(result.afterListeners.map((entry) => entry.outcome)).toEqual(
-		result.afterListeners.map(() => 'SignalWriteError'),
+		result.afterListeners.map(() => 'written'),
 	);
-	expect(result.probe).toBe(0);
+	expect(result.probe).toBe(1);
 }
 
-describe.sequential('native listeners fired synchronously by a render DOM patch', () => {
+describe.sequential('native listeners fired synchronously by a commit DOM patch', () => {
 	for (const mode of Object.keys(MODES) as Mode[]) {
 		describe(mode, () => {
 			it('run and write signals when the render disables their focused input', async () => {
@@ -253,7 +258,7 @@ describe.sequential('native listeners fired synchronously by a render DOM patch'
 					const result = await runScenario(page, 'disable');
 					// The setup focus wrote `events$` once, outside rendering.
 					expectLiveListeners(result, BLUR, { blurs: ['0', '2'], events: 3 });
-					expectRenderStillGuarded(result, BLUR);
+					expectCommitContinues(result, BLUR);
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
@@ -278,19 +283,19 @@ describe.sequential('native listeners fired synchronously by a render DOM patch'
 					const listeners = ['focus', 'focus-write'];
 					// Nothing re-renders afterwards, so a leaked listener read would persist.
 					expectLiveListeners(result, listeners, { blurs: ['0', '0'], events: 1 });
-					expectRenderStillGuarded(result, listeners);
+					expectCommitContinues(result, listeners);
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
 				}
 			});
 
-			it('report a throwing listener and keep the rest of the render guarded', async () => {
+			it('report a throwing listener and continue the rest of the commit', async () => {
 				const { page, errors } = await openPage(mode);
 				try {
 					const result = await runScenario(page, 'throwing-listener');
 					expectLiveListeners(result, BLUR, { blurs: ['0', '2'], events: 3 });
-					expectRenderStillGuarded(result, BLUR);
+					expectCommitContinues(result, BLUR);
 					expect(errors).toEqual(['Error: listener failed']);
 				} finally {
 					await page.close();

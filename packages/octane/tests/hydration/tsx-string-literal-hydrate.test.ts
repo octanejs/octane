@@ -107,7 +107,7 @@ describe('hydrateRoot — .tsx string-literal expression children', function () 
 			expect(container.querySelector('p')!.textContent).toBe('Try the items page');
 			expect(container.querySelector('p')!.innerHTML.replace(/<!--[^>]*-->/g, '')).toBe(
 				html
-					.replace(/^<p>/, '')
+					.replace(/^<!--3--><p>/, '')
 					.replace(/<\/p>$/, '')
 					.replace(/<!--[^>]*-->/g, ''),
 			);

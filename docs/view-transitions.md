@@ -27,11 +27,11 @@ startTransition(() => setOpen(true));
 
 A boundary only activates on **transition-lane** commits — updates inside
 `startTransition`, `useDeferredValue` re-renders, and Suspense reveals
-(fallback → content). Urgent updates and `flushSync` never animate. As in React,
-they skip a transition while it is still preparing. Once every boundary in its
-batch is animating (`ready` resolved for each scope), they commit under the
-animation without skipping it. Removing the last element-scoped boundary on a
-host still skips that host's animation.
+(fallback → content). Urgent updates and `flushSync` do not start an animation.
+An urgent update skips a transition only while it is still preparing; once its
+`ready` promise resolves, the urgent commit updates the live DOM under the running
+animation. Removing the last element-scoped boundary on a host still skips that
+host's animation.
 Event handlers can opt updates into animation with `startTransition`. Octane uses the native options overload (`document.startViewTransition({ update, types })`)
 and detects older callback-only implementations once per native function. Those
 implementations animate without native transition types. Without the native API,
@@ -110,8 +110,9 @@ Names and shared-element matching are local to each scope, so separate panels
 can both use `name="content"`. Sibling scopes can animate independently, and a
 nested scope can begin after its ancestor finishes capture while the ancestor's
 animation continues. Updates to an ancestor that might remove an active child
-scope wait for that child. `flushSync` interrupts all active scopes; ordinary
-urgent work interrupts the scopes it touches.
+scope wait for that child. `flushSync` interrupts all scopes still preparing;
+ordinary urgent work interrupts preparing scopes it touches. Already-running
+animations continue.
 If draining pending passive effects introduces urgent work into a transition
 batch, the whole batch commits without animation.
 

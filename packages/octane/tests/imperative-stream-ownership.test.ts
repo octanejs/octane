@@ -19,7 +19,7 @@ function mountMixedHost({ hydrate = false }: { hydrate?: boolean } = {}) {
 	document.body.append(container);
 	if (hydrate) {
 		container.innerHTML =
-			'<div class="mixed" data-version="0">' +
+			'<!--3--><div class="mixed" data-version="0">' +
 			'<h3 class="owned-heading">Heading 0</h3>' +
 			'<p class="owned-description">Description 0</p>' +
 			'</div>';

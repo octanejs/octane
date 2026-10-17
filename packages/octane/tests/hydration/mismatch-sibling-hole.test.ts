@@ -446,13 +446,12 @@ describe.each([
 	});
 
 	// Captures that changed before a dormant island activated legitimately
-	// differ from the server's. Octane never renders the island with its
-	// earlier captures (docs/deferred-hydration.md), so, as React does for an
-	// update that reaches a dehydrated boundary it cannot hydrate first, the
-	// island renders on the client and nothing is reported. The host around
-	// the island keeps its server node.
+	// differ from the server's. As React hydrates a dehydrated boundary before
+	// the update that reached it (docs/deferred-hydration.md), the island
+	// adopts the server's nodes with the captures it rendered, then the update
+	// patches them, and nothing is reported.
 	it.each(['keyed', 'list', 'portal'])(
-		'client-renders a dormant island whose value became a %s before activation, without reporting',
+		'hydrates a dormant island, then updates its value to a %s, without reporting',
 		async (kind) => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A', tail: 't' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
@@ -467,12 +466,13 @@ describe.each([
 			try {
 				const main = container.querySelector('main')!;
 				const section = container.querySelector('section')!;
-				const islandNodes = [section, ...contentNodes(section)];
+				const tail = container.querySelector('b')!;
 				expect(markup(section)).toBe('A<b>t</b>');
 				const props = { when: load(), kind, v: 'A', tail: 't', target };
 				await act(() => root.render(client.DormantHole, props));
 				expect(container.querySelector('main')).toBe(main);
-				expectDiscarded(container, islandNodes);
+				expect(container.querySelector('section')).toBe(section);
+				expect(section.lastElementChild).toBe(tail);
 				expect(markup(container.querySelector('section')!)).toBe(
 					clientMarkup(client.DormantHole, props, (node) => node.querySelector('section')!),
 				);

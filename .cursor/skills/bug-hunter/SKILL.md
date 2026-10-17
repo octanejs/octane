@@ -30,7 +30,7 @@ Use this to find, reproduce, minimize, and fix a suspected Octane bug.
    - Confirm the test fails for the intended reason, not setup/aliasing/jsdom.
 
 4. **Localize**
-   - Runtime: inspect `packages/octane/src/runtime.ts` comments and closest tests.
+   - Runtime: inspect the owning `packages/octane/src/runtime/` module's comments and closest tests.
    - Compiler: inspect `packages/octane/src/compiler/compile.js` and emitted output if needed.
    - SSR: inspect `runtime.server.ts`, `server/index.ts`, hydration tests.
    - Bindings: compare existing package patterns and upstream React binding behavior.

@@ -1626,14 +1626,20 @@ drain. Finite layout-effect cascades complete before DOM mutation observers run,
 including commits started by the scheduler. `flushSync` drains them before returning.
 
 Commit phases retain Octane's ordering: insertion effects mount with connected
-DOM, refs attach before layout bodies, and layout cleanups can observe DOM
-already changed by the render walk. A changed ref detaches after its owner's
-layout cleanup; deletion cleanups interleave insertion and layout work. This
-does not provide React's per-component ref/layout interleaving or a global
-before-mutation ref-detach phase.
+DOM, refs attach before layout bodies, and layout cleanups observe the DOM the
+commit's mutation phase has already changed, as in React. A changed ref
+detaches after its owner's layout cleanup; deletion cleanups interleave
+insertion and layout work. This does not provide React's per-component
+ref/layout interleaving or a global before-mutation ref-detach phase.
 
 Other consequences:
 
+- A render writes no DOM the page shows, so a dropped render leaves the page as
+  it was. A hand-written body over the compiler ABI follows the same rule:
+  writing committed DOM during render, including through `setText` or
+  `setAttribute`, is unsupported. Its staged forms are a bag factory's host,
+  `setRenderText` and `setRenderStyle` from `octane/internal/client`, and
+  layout effects.
 - Priority (`urgent` vs `transition`) governs Suspense hold semantics and
   whether a render waits for a later host task (above), not time-slicing.
 - Fallback-visible boundaries whose retries fully stage reveal together,
@@ -1648,9 +1654,10 @@ Other consequences:
   [Suspense retry timing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#5-retry-reveal-throttling--distinct-from-transition-shell-retention).
 - Resource readers can suspend by throwing a thenable during render, on the
   client and during SSR; `use()` is not required. Pending and error fallback
-  renders can also suspend through an enclosing pending boundary. A catch-only
-  error boundary does not own suspension; promises thrown by effects remain
-  application errors.
+  renders can also suspend through an enclosing pending boundary. As in React,
+  a catch-only error boundary (`ErrorBoundary`, or a `@try` with only
+  `@catch`) does not own suspension, on the client or the server; promises
+  thrown by effects remain application errors.
 - A Suspense retry runs on the settling thenable's microtask; React waits for a
   Scheduler task. If the retry suspends again on a thenable Octane has already
   seen settle, the next retry yields one macrotask after that thenable notifies,
@@ -1783,22 +1790,28 @@ Controlled `value`, `checked` and `selected` are held too. Each carries a
 back together — restoring the node alone would leave the record believing the new
 value had already landed, so re-projecting it on resume would be skipped.
 
-A held synchronous transition now defers its whole commit: content the
-transition patched outside the suspended boundary — shell text, attributes,
-keyed structure — reverts with the hold and lands in one step on resolve, with
-`isPending` staying on throughout. `benchmarks/async-composition` pins the
-update at zero exposed intermediate states, level with React. One residual is
-pinned at its own ceiling there: after the dependent request resolves, the
-promoted round re-creates the warm-started panel fetches (13 creations against
-the 8-call floor; the app-level cache serves the same promises, so nothing
-refetches over the network) until the resume/warm work in
-[the deferred-commit plan](./transition-deferred-commit-plan.md) restores the
-floor. Both need the transition to become a deferred commit — a keyed
-removal disposes blocks and runs their cleanups, which cannot be undone, and
-reverting content outside a boundary needs the reveal to re-render where the
-transition began rather than just the boundary. See
-[Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
-benchmark pins the exposed-state count at zero.
+A held transition defers its whole commit. `useState`, `useReducer` and
+`useLinkedState` keep React's update queue: a transition's updates stay queued
+until a transition render folds them, and a render that suspends into a hold
+commits nothing, so content the transition patched outside the suspended
+boundary — shell text, attributes, keyed structure — never shows early, and
+`isPending` stays on throughout. When the data arrives, the transition renders
+again from where it started and lands in one step, reusing the requests the
+held render already started. An urgent update to the same state commits on the
+committed value first and the transition then applies the queue in order, as
+React rebases it; an urgent update no longer discards a held transition.
+`benchmarks/async-composition` pins the update at zero exposed intermediate
+states and the 8-request floor, level with React. A transition driven by
+something other than hook state, such as an external store, still holds per
+boundary. See [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).
+
+Signals written inside a transition hold the same way, which React's external
+stores cannot: React renders an external store's change during a transition
+urgently. A signal keeps its committed value for committed readers,
+subscriptions and DOM bindings until the transition commits, while the renders
+that fold the transition read its pending value. Urgent writes rebase as state
+updates do, and two transitions that write the same signal commit together. See
+[signals](./signals.md).
 
 ## Root component entry points and container ownership
 
@@ -1910,6 +1923,13 @@ behavior.
 error-boundary lifecycles. Catch fallbacks mount fresh nodes (like React's
 `forceUnmountCurrentAndReconcile`); deletion-phase and ref-detach errors route
 to the enclosing boundary.
+
+Octane also runs authored error boundaries during server rendering. A render
+error or rejected `use()` selects `@catch` or `<ErrorBoundary>`; `@pending`
+handles suspension. React does not run error boundaries on the server. Octane
+deliberately diverges so the same boundary handles errors on the server and
+client and an application does not have to represent failure as loading. See
+[Render errors](./ssr.md#render-errors) for streaming and unhandled errors.
 
 Directives are also renderable values. A module-level arrow can return a
 boundary directly, with or without parentheses or an explicit `return`:
@@ -2050,10 +2070,8 @@ normalizer accepts, in addition to ordinary objects.
 Server `useSyncExternalStore` falls back to `getSnapshot` when
 `getServerSnapshot` is absent. Transition starters and optimistic setters from
 server hooks are no-ops; a server hook's transition starter does not invoke its
-callback. Portals emit an empty placeholder. Unlike React's client-only error
-boundaries, template `@catch` also catches during SSR. JSX Suspense errors render
-its fallback and notify `onError`; a pending promise with no boundary makes a
-synchronous buffered render throw instead of returning partial HTML.
+callback. Portals emit an empty placeholder. A pending promise with no boundary
+makes a synchronous buffered render throw instead of returning partial HTML.
 
 ### Streaming
 
@@ -2135,7 +2153,9 @@ As in React:
   scripts, styles and stylesheet links inside them: the client render's own
   elements replace them. A `Document` keeps its doctype.
 - A suspension while hydrating keeps the server HTML; it never causes a
-  fallback.
+  fallback. A streamed boundary whose content has not arrived keeps the
+  server's fallback until the stream swaps the content in, which then
+  hydrates, or until an update reaches it, which renders it on the client.
 
 A boundary that falls back renders from client data. The `use()` values its
 attempt read from the server's seeds are discarded, and so is captured
@@ -2143,23 +2163,48 @@ interaction intent whose target was in the discarded DOM. An early host
 binding (`adoptBindings`, a behavior root) whose server DOM lies in a
 boundary that falls back loses it: its lease ends when the fallback commits,
 its cleanup runs once, and it stops writing, even if its host was moved
-elsewhere while the boundary was pending. A boundary whose captures changed
-before it activated (a dormant `<Hydrate>` island) falls back without a
-report when its server content differs, as React reports nothing for an
-update that reaches a dehydrated boundary.
+elsewhere while the boundary was pending.
+
+A dormant `<Hydrate>` island whose captures or provided context values changed
+before it activated hydrates first, as React hydrates a dehydrated boundary
+before the update that reached it: its first render uses the values its server
+HTML was rendered with, and the newer ones apply as an update once it commits.
+Its effects mount and then update, and the update patches the adopted server
+nodes and any draft in them. One difference here is intentional. An update
+that reaches an island while its hydration attempt waits on data leaves the
+server HTML in place until the attempt retries, which then hydrates and
+applies the update. React instead gives up hydrating the boundary and renders
+it on the client, showing its fallback, unless the update is a transition.
+Octane keeps the server HTML because the island's attempt still owns it and
+the retry can adopt it.
 
 Two differences are intentional. Matching React exactly would mean shipping
 and running a structural comparison of everything hydration adopts, which is
 the work compiled templates exist to avoid.
 
-First, control-flow ranges are part of the hydration protocol, as React's
-Suspense markers are part of React's. A client `@if` or `@switch` branch, or a
-catch-only `@try` or `ErrorBoundary`, whose server output has no range of its
-own is a structural mismatch and falls back, even where the elements inside
-it match; React, which has no markers for them, adopts them. (A `@try` with
-`@pending` is a Suspense boundary, so React falls back there too.) The markers
-do not record which arm rendered, so an arm whose elements match the server's
-arm adopts them, as in React.
+First, hydration adopts by structure. Component, hole and control-flow ranges
+are part of the hydration protocol, as React's Suspense markers are part of
+React's: the server frames every component call and renderable hole, and
+renders a value a component returns directly inside that component's range.
+A client component call, `@if` or `@switch` branch, or catch-only `@try` or
+`ErrorBoundary` whose server output has no range of its own is a structural
+mismatch and falls back with one recoverable error, even where the elements
+inside it match; React, which has no markers for them, adopts them. This
+happens when the server rendered a different tree whose DOM happens to match,
+such as another `@if` arm that renders a component's elements inline. In
+development the warning names the call site whose range is missing. (A `@try`
+with `@pending` is a Suspense boundary, so React falls back there too.) The
+markers do not record which arm rendered, so an arm whose ranges and elements
+match the server's arm adopts them, as in React. As in React, a suspension in
+a component's body, before hydration would reach the elements it renders,
+keeps the server HTML even where those elements then mismatch.
+
+Since the ranges are versioned, a root's server output opens with a comment
+naming the hydration protocol version (`<!--3-->`), whether or not it seeds
+`use()` values, and so does an independent `<Hydrate>` island's. A root whose
+server HTML names another version, or none, as HTML from React's server or an
+older Octane does not, renders on the client with one recoverable error
+instead of adopting ranges it would misread. React has no such marker.
 
 Second, development compares a template's static structure and attributes and warns
 about differences, but development-only comparisons never cause a fallback,
@@ -2176,9 +2221,10 @@ hydration walk, two static branches that share a root tag are not told apart:
 <span class="expanded">...</span>
 ```
 
-A `@try` body whose server render threw adopts the server's `@catch` arm
-rather than rendering the boundary on the client (template `@catch` also
-catches during SSR).
+An authored error boundary can render its fallback on the server; see
+[Errors](#errors-try--catch-not-class-boundaries) for this divergence from
+React. JSX `<Suspense>` retains React-compatible client recovery for an
+otherwise unhandled server error; see [Render errors](./ssr.md#render-errors).
 
 A `<Hydrate>` boundary replays captured interaction events as constructed,
 untrusted copies that keep the captured event's `timeStamp`, including through

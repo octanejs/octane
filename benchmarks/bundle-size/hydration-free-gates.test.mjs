@@ -121,14 +121,7 @@ test('esbuild is held to every hydration body but not to the foldOnly state cell
 	// The committed state cells are the only foldOnly entries.
 	assert.deepEqual(
 		HYDRATION_ONLY_DECLARATIONS.filter(({ foldOnly }) => foldOnly).map(({ name }) => name),
-		[
-			'currentHydration',
-			'activeHydration',
-			'seedHydration',
-			'PRESENTATION_HYDRATION',
-			'preservedHydrateActivationCount',
-			'NATIVE_ADOPTION_RELEASES',
-		],
+		['HYDRATION_PASS', 'CURSOR', 'PRESENTATION_HYDRATION', 'NATIVE_ADOPTION_RELEASES'],
 	);
 });
 

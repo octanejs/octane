@@ -466,8 +466,15 @@ describe('DOMPropertyOperations — attributes and reflected properties', () => 
 		const insert = vi.spyOn(Node.prototype, 'insertBefore').mockImplementation(function <
 			T extends Node,
 		>(this: Node, node: T, before: Node | null): T {
-			if (this.isConnected && node instanceof HTMLIFrameElement) {
-				connectedSources.push(node.getAttribute('src'));
+			// A mount lands as one fragment insert; record every frame it connects.
+			if (this.isConnected) {
+				const frames =
+					node instanceof HTMLIFrameElement
+						? [node]
+						: node instanceof DocumentFragment
+							? Array.from(node.querySelectorAll('iframe'))
+							: [];
+				for (const frame of frames) connectedSources.push(frame.getAttribute('src'));
 			}
 			return insertBefore.call(this, node, before) as T;
 		});

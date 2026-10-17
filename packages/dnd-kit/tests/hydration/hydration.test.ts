@@ -9,7 +9,7 @@ import { ServerFixture, latestManager } from '../ssr/_fixtures/server.tsrx';
 // The SSR test independently verifies the semantic payload; this exact shape
 // verifies that the client adapter adopts the server component boundaries.
 const SERVER_HTML =
-	'<!--[--><!--[--><!--[--><!--]--><!--[--><!--[--><main id="server-dnd"><button id="server-drag">server card</button><div id="server-drop">server target</div><div id="server-sort">server sortable</div></main><!--]--><!--[--><!--[--><!--[--><div data-dnd-overlay="true"></div><!--]--><!--]--><!--]--><!--]--><!--]--><!--]-->';
+	'<!--3--><!--[--><!--[--><!--[--><!--]--><!--[--><!--[--><main id="server-dnd"><button id="server-drag">server card</button><div id="server-drop">server target</div><div id="server-sort">server sortable</div></main><!--]--><!--[--><!--[--><div data-dnd-overlay="true"></div><!--]--><!--]--><!--]--><!--]--><!--]-->';
 
 function expandCountedMarkers(html: string): string {
 	return html.replace(/<!--([\[\]])([1-9]\d*)-->/g, (whole, marker: string, raw: string) => {
