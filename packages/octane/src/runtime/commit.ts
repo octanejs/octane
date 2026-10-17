@@ -378,8 +378,7 @@ export function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	)
 		return false;
 	// A Block this render created writes fresh DOM, unless it adopted live DOM.
-	let owner = parentBlock;
-	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
+	const owner = parentBlock instanceof LiteBlockImpl ? parentBlock.ownerBlock : parentBlock;
 	if (owner.createdStamp === transaction.createdStamp && !transaction.retainedCreated?.has(owner)) {
 		if (!hydrationStarted) return false;
 		// A root's hydrating attempt creates every Block, and the server DOM they
@@ -761,8 +760,7 @@ export function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNe
 	// is it parentless, so an ordinary list update makes no extra call.
 	const parent = state.end.parentNode ?? markerParent(state.end)!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
-	let owner = parentBlock;
-	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
+	const owner = parentBlock instanceof LiteBlockImpl ? parentBlock.ownerBlock : parentBlock;
 	// Its members list starts with its first run (listRun).
 	const next: SlotNext = (state.next = {
 		tx,

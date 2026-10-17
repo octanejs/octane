@@ -936,37 +936,46 @@ describe('deleted rows retire with the render that deletes them', () => {
 });
 
 describe('a one-host arm lands at commit', () => {
-	it('renders a swapped-in arm detached and inserts its root at commit', () => {
-		const container = document.createElement('div');
-		document.body.appendChild(container);
-		const root = createRoot(container);
-		const controls = {} as ArmSwapControls;
-		let during: MutationRecord[] | null = null;
-		const observer = new MutationObserver(() => {});
-		const probe = () => {
-			during = observer.takeRecords();
-		};
-		try {
-			flushSync(() => root.render(ArmSwapApp, { start: false, controls, probe }));
-			const owner = container.querySelector('#arm-swap')!;
-			const tail = owner.querySelector('i');
-			observer.observe(container, { childList: true, subtree: true, attributes: true });
-			flushSync(() => root.render(ArmSwapApp, { start: true, controls, probe }));
-			// The probe renders after the arm: nothing had touched the DOM.
-			expect(during).toEqual([]);
-			expect([...owner.children].map((el) => el.localName)).toEqual(['b', 'i', 'u']);
-			expect(owner.querySelector('i')).toBe(tail);
-			// The commit's own insert.
-			observer.takeRecords();
-			flushSync(() => root.render(ArmSwapApp, { start: false, controls, probe }));
-			expect(during).toEqual([]);
-			expect([...owner.children].map((el) => el.localName)).toEqual(['i', 'u']);
-		} finally {
-			observer.disconnect();
-			root.unmount();
-			container.remove();
-		}
-	});
+	it.each(['connected element', 'detached element', 'fragment', 'shadow root'] as const)(
+		'renders a swapped-in arm detached and inserts its root at commit in a %s',
+		(kind) => {
+			const host = document.createElement('div');
+			if (kind === 'connected element' || kind === 'shadow root') document.body.appendChild(host);
+			const container =
+				kind === 'fragment'
+					? document.createDocumentFragment()
+					: kind === 'shadow root'
+						? host.attachShadow({ mode: 'open' })
+						: host;
+			const root = createRoot(container);
+			const controls = {} as ArmSwapControls;
+			let during: MutationRecord[] | null = null;
+			const observer = new MutationObserver(() => {});
+			const probe = () => {
+				during = observer.takeRecords();
+			};
+			try {
+				flushSync(() => root.render(ArmSwapApp, { start: false, controls, probe }));
+				const owner = container.querySelector('#arm-swap')!;
+				const tail = owner.querySelector('i');
+				observer.observe(container, { childList: true, subtree: true, attributes: true });
+				flushSync(() => root.render(ArmSwapApp, { start: true, controls, probe }));
+				// The probe renders after the arm: nothing had touched the DOM.
+				expect(during).toEqual([]);
+				expect([...owner.children].map((el) => el.localName)).toEqual(['b', 'i', 'u']);
+				expect(owner.querySelector('i')).toBe(tail);
+				// The commit's own insert.
+				observer.takeRecords();
+				flushSync(() => root.render(ArmSwapApp, { start: false, controls, probe }));
+				expect(during).toEqual([]);
+				expect([...owner.children].map((el) => el.localName)).toEqual(['i', 'u']);
+			} finally {
+				observer.disconnect();
+				root.unmount();
+				host.remove();
+			}
+		},
+	);
 
 	for (const start of [false, true]) {
 		it(`drops an arm that a later swap of the same render replaced (starting ${start ? 'on' : 'off'})`, async () => {
