@@ -1136,7 +1136,7 @@ export function createdInRootRender(block: Block): void {
 	// child's stand-in is not a Block; its owner's teardown reaches what is
 	// created below it.
 	let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
-	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
+	if (parent instanceof LiteBlockImpl) parent = parent.ownerBlock;
 	if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
 		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, null, null);
 }

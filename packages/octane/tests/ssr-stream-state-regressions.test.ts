@@ -55,6 +55,109 @@ function activateChunks(chunks: string[]): HTMLElement {
 	return container;
 }
 
+it.each([
+	'<!-- data-oct-b=" -->',
+	`<!-- data-oct-b="unknown" data-oct-b="unknown" data-oct-b='single' data-oct-b=" -->`,
+])('reveals nested children beside marker-like raw comments: %s', async (comment) => {
+	const parent = deferred<string>();
+	const children = deferred<string>();
+	const output = collector();
+	const errors: unknown[] = [];
+	const { createElement: h, Suspense, use, renderToPipeableStream } = ServerRuntime;
+	const Child = ({ id }: { id: number }) => h('b', { 'data-row': id }, use(children.promise) + id);
+	const child = (id: number) =>
+		h(Suspense, { fallback: h('i', null, 'child waiting') }, h(Child, { id }));
+	const Group = () => {
+		use(parent.promise);
+		return h(
+			'section',
+			null,
+			child(0),
+			h('span', { dangerouslySetInnerHTML: { __html: comment } }),
+			child(1),
+		);
+	};
+	const App = () =>
+		h('main', null, h(Suspense, { fallback: h('p', null, 'parent waiting') }, h(Group)));
+	const stream = renderToPipeableStream(h(App), undefined, {
+		timeoutMs: 1000,
+		onError: (error) => errors.push(error),
+	});
+	stream.pipe({
+		write(chunk) {
+			output.chunks.push(chunk);
+			if (output.chunks.length === 1) parent.resolve('ready');
+			if (output.chunks.length === 2) children.resolve('row:');
+			return true;
+		},
+		end: output.destination.end,
+	});
+	try {
+		await output.ended;
+		expect(errors).toEqual([]);
+		const container = activateChunks(output.chunks);
+		try {
+			expect(Array.from(container.querySelectorAll('b'), (row) => row.textContent)).toEqual([
+				'row:0',
+				'row:1',
+			]);
+			expect(container.querySelector('i, p')).toBeNull();
+		} finally {
+			container.remove();
+		}
+	} finally {
+		stream.abort();
+		resetStreamRuntimeGlobals();
+	}
+});
+
+it('retires fallback descendants below a non-suspending owner after a sibling render retry', async () => {
+	const parent = deferred<string>();
+	const never = new Promise<string>(() => {});
+	const output = collector();
+	const errors: unknown[] = [];
+	const { createElement: h, Suspense, use, useState, renderToPipeableStream } = ServerRuntime;
+	const Child = () => h('b', null, use(never));
+	const fallback = h(
+		Suspense,
+		{ fallback: h('i', null, 'unused') },
+		h('section', null, h(Suspense, { fallback: h('i', null, 'child waiting') }, h(Child))),
+	);
+	const Ready = () => h('strong', null, use(parent.promise));
+	const RetryingSibling = () => {
+		const [phase, setPhase] = useState(0);
+		if (phase === 0) setPhase(1);
+		return h('span', null, 'sibling ' + phase);
+	};
+	const App = () => h('main', null, h(Suspense, { fallback }, h(Ready)), h(RetryingSibling));
+	const stream = renderToPipeableStream(h(App), undefined, {
+		timeoutMs: 1000,
+		onError: (error) => errors.push(error),
+	});
+	stream.pipe({
+		write(chunk) {
+			output.chunks.push(chunk);
+			if (output.chunks.length === 1) parent.resolve('parent ready');
+			return true;
+		},
+		end: output.destination.end,
+	});
+	try {
+		await output.ended;
+		expect(errors).toEqual([]);
+		const container = activateChunks(output.chunks);
+		try {
+			expect(container.querySelector('main')?.textContent).toBe('parent readysibling 1');
+			expect(container.querySelector('i, section')).toBeNull();
+		} finally {
+			container.remove();
+		}
+	} finally {
+		stream.abort();
+		resetStreamRuntimeGlobals();
+	}
+});
+
 it('keeps a later boundary streaming after an earlier sibling has completed', async () => {
 	const first = deferred<string>();
 	const last = deferred<string>();

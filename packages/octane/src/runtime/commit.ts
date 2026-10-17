@@ -378,8 +378,7 @@ export function usesFrontier(parentBlock: Block, domParent: Node): boolean {
 	)
 		return false;
 	// A Block this render created writes fresh DOM, unless it adopted live DOM.
-	let owner = parentBlock;
-	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
+	const owner = parentBlock instanceof LiteBlockImpl ? parentBlock.ownerBlock : parentBlock;
 	if (owner.createdStamp === transaction.createdStamp && !transaction.retainedCreated?.has(owner)) {
 		if (!hydrationStarted) return false;
 		// A root's hydrating attempt creates every Block, and the server DOM they
@@ -761,8 +760,7 @@ export function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNe
 	// is it parentless, so an ordinary list update makes no extra call.
 	const parent = state.end.parentNode ?? markerParent(state.end)!;
 	if (state.adopt !== null || !usesFrontier(parentBlock, parent)) return null;
-	let owner = parentBlock;
-	while (owner instanceof LiteBlockImpl) owner = owner.parentBlock!;
+	const owner = parentBlock instanceof LiteBlockImpl ? parentBlock.ownerBlock : parentBlock;
 	// Its members list starts with its first run (listRun).
 	const next: SlotNext = (state.next = {
 		tx,
@@ -916,18 +914,6 @@ export function journalObjectOnce(obj: object): void {
 	// enumerating keys and removing speculative additions belongs to rollback.
 	// Event argument arrays also need their non-enumerable length restored.
 	TRANSITION_JOURNAL!.push(JOURNAL_BAG, obj, { ...obj }, Array.isArray(obj) ? obj.length : null);
-}
-
-/** Find a radio's native group in its document, shadow tree, or containing form. */
-export function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
-	const form = input.form;
-	if (form !== null) return form.elements;
-	const root = input.getRootNode();
-	// Document.getElementsByName is the common fast path; ShadowRoot and
-	// detached fragments need a tree-local lookup that includes their radios.
-	return root.nodeType === 9
-		? (root as Document).getElementsByName(input.name)
-		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
 }
 
 /**

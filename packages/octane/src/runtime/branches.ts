@@ -387,8 +387,7 @@ function delimitMarkerlessBranch(
 
 /** The nearest real Block that owns a Scope's output; lite stand-ins are not Blocks. */
 export function owningBlock(block: Block): Block {
-	while (block instanceof LiteBlockImpl) block = block.parentBlock;
-	return block;
+	return block instanceof LiteBlockImpl ? block.ownerBlock : block;
 }
 
 /**

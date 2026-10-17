@@ -110,7 +110,7 @@ export function BranchProbeApp(props: { show: boolean; probe: () => void }) @{
 }
 
 function Row(props: { id: string; onCleanup: CleanupReport }) @{
-	const ref = useRef<HTMLElement | null>(null);
+	const ref = useRef<HTMLLIElement | null>(null);
 	useLayoutEffect(() => {
 		const node = ref.current!;
 		return () => props.onCleanup(props.id, node.isConnected);
@@ -369,13 +369,23 @@ function ArmSwapOwner(props: {
 	props.controls.setLocal = setLocal;
 	const flipped = props.step === 1 && local === 0;
 	const on = props.start ? !flipped : flipped;
-	<div id="arm-swap">
-		@if (on) {
-			<b class="lone">{'lone'}</b>
-		}
-		<i>{'tail'}</i>
-		<Probe probe={props.probe} />
-	</div>
+	<ArmSwapBody depth={3} on={on} probe={props.probe} />
+}
+
+// Stateless nesting keeps the stateful owner's commit boundary, even when
+// several component and branch scopes stand between it and the swapped arm.
+function ArmSwapBody(props: { depth: number; on: boolean; probe: () => void }) @{
+	@if (props.depth > 0) {
+		<ArmSwapBody depth={props.depth - 1} on={props.on} probe={props.probe} />
+	} @else {
+		<div id="arm-swap">
+			@if (props.on) {
+				<b class="lone">{'lone'}</b>
+			}
+			<i>{'tail'}</i>
+			<Probe probe={props.probe} />
+		</div>
+	}
 }
 
 // One drain swaps the arm twice: the parent's urgent update flips it, and the

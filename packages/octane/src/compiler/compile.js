@@ -29181,9 +29181,6 @@ function planJsx(
 			classes.length === 1 &&
 			!classes[0].fresh &&
 			!classes[0].mountOnly &&
-			// This detached update cannot reference a local from the render body.
-			(!ctx.knownSpreadRenderLocals ||
-				classes[0].expr?.metadata?.octaneKnownAttributeRead !== true) &&
 			collectFreeIdentifiers(classes[0].expr, [
 				keyedSelection.itemName,
 				keyedSelection.selectedName,
