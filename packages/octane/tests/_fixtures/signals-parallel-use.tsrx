@@ -310,3 +310,26 @@ export function NativeWarmBoundary(props: NativeCreationProps & { gate: () => Pr
 		}
 	</>
 }
+
+interface NativeWarmGetterProps {
+	child: NativeCreationProps;
+	gate: () => Promise<string>;
+}
+
+function NativeWarmGetterParent(props: NativeWarmGetterProps) @{
+	const parent = use(props.gate());
+	<section>
+		<p>{parent as string}</p>
+		<NativeCreationValue make$={props.child.make$} />
+	</section>
+}
+
+export function NativeWarmGetterBoundary(props: NativeWarmGetterProps & { read$: () => string }) @{
+	<>
+		@try {
+			<NativeWarmGetterParent child={props.child} gate={props.gate} />
+		} @pending {
+			<output>{props.read$() as string}</output>
+		}
+	</>
+}
