@@ -314,7 +314,8 @@ export class BlockImpl {
 		this.crossRenderUpdate = false;
 		this.deoptNode = null;
 		this.deoptRefs = false;
-		this.slots = [];
+		// Slot zero starts unmounted; a one-slot body keeps a one-entry backing store.
+		this.slots = [undefined];
 		this.compilerMemo = null;
 		this.forSlot = null;
 		this.prevSibling = null;
@@ -454,7 +455,7 @@ export class ScopeImpl {
 		this.$$ctxCache = null;
 		this.$$ctxCacheOwner = null;
 		this.mounted = false;
-		this.slots = [];
+		this.slots = [undefined];
 		this.compilerMemo = null;
 		this.signalInstanceParent = null;
 		this.signalInstanceSite = undefined;

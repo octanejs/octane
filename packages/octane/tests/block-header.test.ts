@@ -78,10 +78,24 @@ describe('components whose output is a range', () => {
 		r.unmount();
 	});
 
-	it('renders a component as the sole root', () => {
-		const r = mount(ComponentRoot, { text: 'leaf' });
-		expect(texts(r)).toEqual(['leaf']);
-		r.unmount();
+	it('keeps sole-root component instances independent through updates and unmounts', () => {
+		const left = mount(ComponentRoot, { text: 'left' });
+		const right = mount(ComponentRoot, { text: 'right' });
+		const leftNode = left.find('.out');
+		const rightNode = right.find('.out');
+		expect(texts(left)).toEqual(['left']);
+		expect(texts(right)).toEqual(['right']);
+		left.update(ComponentRoot, { text: 'changed' });
+		expect(left.find('.out')).toBe(leftNode);
+		expect(texts(left)).toEqual(['changed']);
+		expect(texts(right)).toEqual(['right']);
+		left.unmount();
+		right.update(ComponentRoot, { text: 'survivor' });
+		expect(right.find('.out')).toBe(rightNode);
+		expect(texts(right)).toEqual(['survivor']);
+		right.unmount();
+		expect(left.container.textContent).toBe('');
+		expect(right.container.textContent).toBe('');
 	});
 
 	it('renders a Suspense root that never suspends', () => {
@@ -128,10 +142,17 @@ describe('components whose output is a single element', () => {
 		r.unmount();
 	});
 
-	it('renders an @if nested inside an element root', () => {
-		const r = mount(NestedIf, { on: true });
-		expect(texts(r)).toEqual(['nested']);
+	it('fills, clears and remounts an initially empty branch inside an element', () => {
+		const r = mount(NestedIf, { on: false });
+		const host = r.container.firstElementChild;
+		expect(texts(r)).toEqual([]);
+		for (const on of [true, false, true]) {
+			r.update(NestedIf, { on });
+			expect(texts(r)).toEqual(on ? ['nested'] : []);
+			expect(r.container.firstElementChild).toBe(host);
+		}
 		r.unmount();
+		expect(r.container.textContent).toBe('');
 	});
 
 	it('renders a portal from an element root', () => {
