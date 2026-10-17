@@ -1,5 +1,37 @@
 [
   {
+    "suite": "ssr-final-replay",
+    "op": "prune_visits",
+    "target": "boundary-groups-512",
+    "reference": "boundary-groups-128",
+    "maxRatio": 5,
+    "note": "Fourfold nested-parent scaling with one direct child per owner. Current candidate iteration is linear; the former full-registry loop grows approximately 16-fold. Complete clean/observed wire, ordered values, three canonical passes and orphan/flat controls gate equal work."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "op": "prune_visits",
+    "target": "boundary-groups-2048",
+    "reference": "boundary-groups-512",
+    "maxRatio": 5,
+    "note": "Fourfold nested-parent scaling with one direct child per owner. Current candidate iteration is linear; the former full-registry loop grows approximately 16-fold. Complete clean/observed wire, ordered values, three canonical passes and orphan/flat controls gate equal work."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "op": "html_units",
+    "target": "boundary-wide-512",
+    "reference": "boundary-wide-128",
+    "maxRatio": 5,
+    "note": "Fourfold width scaling under one streamed owner. One initial includes plus one literal batch query grows with owner output length; separate includes for each child grows approximately 16-fold. The group scan is guarded separately; request-prefix-only wire normalization retains child identities."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "op": "html_units",
+    "target": "boundary-wide-2048",
+    "reference": "boundary-wide-512",
+    "maxRatio": 5,
+    "note": "Fourfold width scaling under one streamed owner. One initial includes plus one literal batch query grows with owner output length; separate includes for each child grows approximately 16-fold. The group scan is guarded separately; request-prefix-only wire normalization retains child identities."
+  },
+  {
     "suite": "memo-wall",
     "op": "consumer_renders",
     "target": "provider-scope-unaffected-128",

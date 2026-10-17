@@ -10727,8 +10727,8 @@ interface StreamBoundary {
 
 interface StreamState {
 	boundaries: Map<string, StreamBoundary>;
-	/** Conservative index of registered boundary owners; stale entries only cost a scan. */
-	boundaryOwnerKeys: Set<string>;
+	/** Candidate children by enclosing owner; stale keys are rechecked after replay. */
+	boundaryChildren: Map<string, Set<string>>;
 	nextId: number;
 	token: string;
 	/** Boundary positions reached by the active full-tree pass, when tracked. */
@@ -10798,8 +10798,13 @@ function rewindStreamBoundaryReplay(stream: StreamState, checkpoint: number): vo
 	}
 }
 
-function recordStreamBoundaryOwners(stream: StreamState, owners: string[]): void {
-	for (const owner of owners) stream.boundaryOwnerKeys.add(owner);
+function recordStreamBoundaryOwners(stream: StreamState, childKey: string, owners: string[]): void {
+	// Retaining old memberships keeps restored owner paths reachable after replay.
+	for (const owner of owners) {
+		let children = stream.boundaryChildren.get(owner);
+		if (children === undefined) stream.boundaryChildren.set(owner, (children = new Set()));
+		children.add(childKey);
+	}
 }
 
 // Every boundary id includes a render-unique token. The counter proves
@@ -10831,6 +10836,20 @@ function createStreamToken(): string {
 // enclosing registry without registering their boundaries into it.
 let STREAM: StreamState | null = null;
 
+function representedStreamBoundaryIds(html: string): Set<string> {
+	const prefix = STREAM_BOUNDARY_ATTR + '="';
+	const ids = new Set<string>();
+	let cursor = 0;
+	for (;;) {
+		const at = html.indexOf(prefix, cursor);
+		if (at === -1) return ids;
+		cursor = at + prefix.length;
+		const end = html.indexOf('"', cursor);
+		if (end !== -1) ids.add(html.slice(cursor, end));
+		// Preserve literal includes semantics when raw text contains nested prefixes.
+	}
+}
+
 // Once a boundary finalizes, only descendant entries whose template sentinel is
 // present in that FINAL segment remain reachable. A child registered while
 // rendering a fallback, or in content later replaced by an outer catch arm,
@@ -10844,12 +10863,18 @@ function pruneUnrepresentedStreamDescendants(
 ): void {
 	// Independent siblings are the common case. Without this guard every
 	// completed sibling scans every other registered sibling in the wave.
-	if (!stream.boundaryOwnerKeys.has(ownerKey)) return;
+	const children = stream.boundaryChildren.get(ownerKey);
+	if (children === undefined) return;
+	let firstChildId: string | null = null;
+	let firstRepresented = false;
+	let representedIds: Set<string> | null = null;
 	let removed = true;
 	while (removed) {
 		removed = false;
-		for (const [childKey, child] of stream.boundaries) {
+		for (const childKey of children) {
 			if (childKey === ownerKey) continue;
+			const child = stream.boundaries.get(childKey);
+			if (child === undefined) continue;
 			let nearestOwner: string | null = null;
 			for (let i = child.owners.length - 1; i >= 0; i--) {
 				const candidate = child.owners[i];
@@ -10859,7 +10884,17 @@ function pruneUnrepresentedStreamDescendants(
 				}
 			}
 			if (nearestOwner !== ownerKey) continue;
-			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			if (representedIds === null && firstChildId !== null && firstChildId !== child.id)
+				representedIds = representedStreamBoundaryIds(ownerHtml);
+			if (representedIds !== null) {
+				if (representedIds.has(child.id)) continue;
+			} else {
+				if (firstChildId === null) {
+					firstChildId = child.id;
+					firstRepresented = ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"');
+				}
+				if (firstRepresented) continue;
+			}
 			recordStreamBoundaryMutation(stream, childKey);
 			stream.boundaries.delete(childKey);
 			removed = true;
@@ -10953,7 +10988,7 @@ export function ssrTry(
 		entry = stream.boundaries.get(key);
 		if (entry !== undefined) {
 			recordStreamBoundaryMutation(stream, key);
-			if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
+			if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, key, ownerKeys);
 			entry.namespace = namespace;
 		}
 		if (entry !== undefined && entry.state === 'pending') {
@@ -11269,7 +11304,7 @@ export function ssrTry(
 						};
 						recordStreamBoundaryMutation(stream, key);
 						stream.boundaries.set(key, entry);
-						if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
+						if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, key, ownerKeys);
 						enterBoundaryIds(pendingIdOffset);
 					} else {
 						ID_COUNTER = entry.pendingIdOffset;
@@ -11369,7 +11404,7 @@ export function ssrTry(
 					};
 					recordStreamBoundaryMutation(stream, key);
 					stream.boundaries.set(key, entry);
-					if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
+					if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, key, ownerKeys);
 					enterBoundaryIds(pendingIdOffset);
 				} else if (entry.state === 'pending') {
 					entry.state = 'errored';
@@ -12082,7 +12117,7 @@ async function runStream(
 	const identifierPrefix = options?.identifierPrefix ?? '';
 	const stream: StreamState = {
 		boundaries: new Map(),
-		boundaryOwnerKeys: new Set(),
+		boundaryChildren: new Map(),
 		nextId: 0,
 		token: createStreamToken(),
 		activePassBoundaryKeys: null,

@@ -185,3 +185,36 @@ The [recorded evidence](./measurements.json) contains baseline/candidate work,
 V8 function diagnostics and rope observations. It distinguishes retained work
 from removed copies, and does not present source-line reduction, JIT tier
 selection, or benchmark observer calls as a speed measurement.
+
+## Nested boundary cleanup scaling
+
+`boundaries.mjs` is a second deterministic pass in this suite. The public
+`octane/server` fixture has two consumer-coordinated promise waves and three
+complete output chunks. `wide` puts N children under one parent; `groups` has
+N parents with one child each. Sizes 128/512/2,048 distinguish linear candidate
+iteration and owner-string querying from quadratic work. `flat` has no nested
+owners; `orphan` must retire forever-pending fallback children after its parent
+resolves, finishing in two passes/chunks.
+
+Every clean/observed pair compares the complete per-chunk wire after replacing
+only the request prefix, preserving boundary numbers, and verifies all ordered
+values through the existing JSON-carrier decoder. Counts describe executed loop
+visits and total string-query input lengths, not actual V8 character comparisons
+or allocations. Candidate buckets and distinct owner/child memberships are
+counted separately. Flat controls require zero bucket or membership creation,
+candidate visits and HTML queries.
+
+```sh
+BENCH_JSON=/tmp/boundaries.json node benchmarks/ssr-final-replay/boundaries.mjs
+BENCH_JSON=/tmp/boundaries-base.json node benchmarks/ssr-final-replay/boundaries.mjs --octane-revision=<commit>
+node benchmarks/bench.mjs --quick --ratios ssr-final-replay
+```
+
+Revision selection uses the existing complete-package snapshot helper. Every
+Octane source in the esbuild graph must resolve within that selected package;
+package/runtime/fixture/bundle hashes and raw/gzip/brotli sizes are recorded.
+Counted bundles are diagnostic; this pass makes no wall-time assertion. The
+ratio guards allow at most 5× work for a 4× scale increase; the prior quadratic
+loops exceed this bound at approximately 16×. Historical candidate memberships
+retain key strings for the request lifetime; they are checked against current
+entries/ownership and do not retain HTML, components or promises.
