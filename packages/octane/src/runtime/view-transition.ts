@@ -1448,14 +1448,15 @@ export function vtPrepareGroup(group: VtGroup, types: string[]): void {
 	vtCheckNames(group);
 }
 
-export function vtFinalizeGroup(group: VtGroup, types: string[]): void {
+export function vtFinalizeGroup(group: VtGroup, types: string[], blocks?: Block[]): void {
 	const { recs, records, styles, visibleBefore, acts, animations: cancelledAnimations } = group;
 	const owner = vtOwnerDocument(group.owner);
 	const visibleAfter = new Set<Block>();
 	const entered = new Set<Block>();
 	const changed = new Set<Block>();
-	for (const block of VT_REGISTRY) {
-		if (block.disposed || vtScopeForBlock(block) !== group.owner) continue;
+	for (const block of blocks ?? VT_REGISTRY) {
+		if (block.disposed || (blocks === undefined && vtScopeForBlock(block) !== group.owner))
+			continue;
 		const els = vtCaptureElements(block, group.owner);
 		if (els.length === 0) continue;
 		visibleAfter.add(block);

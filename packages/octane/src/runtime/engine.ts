@@ -3070,10 +3070,22 @@ function vtFlush(
 			if (waiting !== null) resources.push(waiting);
 		}
 		const finalize = (): void => {
-			if (!interrupted)
-				for (const group of participants) {
-					if (!group.interrupted && !group.settled) vtFinalizeGroup(group, types);
+			if (!interrupted) {
+				let blocksByOwner: Map<VTOwner, Block[]> | undefined;
+				if (participants.length > 1) {
+					blocksByOwner = new Map();
+					for (const group of participants) blocksByOwner.set(group.owner, []);
+					for (const block of VT_REGISTRY) {
+						if (block.disposed) continue;
+						const owner = vtScopeForBlock(block);
+						if (owner !== null) blocksByOwner.get(owner)?.push(block);
+					}
 				}
+				for (const group of participants) {
+					if (!group.interrupted && !group.settled)
+						vtFinalizeGroup(group, types, blocksByOwner?.get(group.owner));
+				}
+			}
 			if (drainError !== null) throw drainError.error;
 		};
 		const afterResources = (): void | Promise<void> => {
