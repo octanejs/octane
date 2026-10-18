@@ -61,6 +61,24 @@ export function ShadowedCaptures(props) @{
 	</section>
 }
 
+export function SparseUnionCaptures(props: {
+	visible: boolean;
+	first: (value: string) => void;
+	middle: string;
+	third: string;
+}) @{
+	const first = props.first;
+	const middle = props.middle;
+	const third = props.third;
+	<section>
+		@if (props.visible) {
+			<button onClick={() => first(third)}>{third as string}</button>
+		} @else {
+			<span>{middle as string}</span>
+		}
+	</section>
+}
+
 export function FoldedCaptures(props) {
 	const label = props.label;
 	return (

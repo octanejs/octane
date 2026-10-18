@@ -34582,7 +34582,9 @@ function hoistBodyHelper(
 		// Read only this helper's captures at their positions in the construct's
 		// shared UNION tuple. Union-only names must not become local bindings: an
 		// arm may have a same-named local shadowing another arm's capture. Direct
-		// indexed reads avoid iterator work before these helpers optimize.
+		// indexed reads avoid iterator work before these helpers optimize. A
+		// numeric-key object pattern shares the tuple receiver across multiple
+		// captures while preserving the same indexed reads and their order.
 		// Each binding maps to the construct body it feeds.
 		const envOrigin =
 			(Array.isArray(stmts) && stmts.find((s) => s != null && s.loc != null)) ||
@@ -34592,14 +34594,15 @@ function hoistBodyHelper(
 		for (let i = 0; i < envNames.length; i++) {
 			const name = envNames[i];
 			if (!ownEnv.has(name)) continue;
-			captures.push(
-				inheritOriginLoc(
-					b.const(b.id(name), b.member(b.id('__extra'), b.literal(i), true)),
-					envOrigin,
-				),
-			);
+			captures.push(b.prop('init', b.literal(i), b.id(name)));
 		}
-		bodyStmts = [...captures, ...stmts];
+		if (captures.length > 0) {
+			const binding =
+				captures.length === 1
+					? b.const(captures[0].value, b.member(b.id('__extra'), captures[0].key, true))
+					: b.const(b.object_pattern(captures), b.id('__extra'));
+			bodyStmts = [inheritOriginLoc(binding, envOrigin), ...stmts];
+		}
 	}
 	// The synthetic helper shell maps to the construct body it hoists.
 	const fakeOrigin =
