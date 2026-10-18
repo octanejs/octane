@@ -12,7 +12,7 @@ const SUITES = [
   "recursive-context", "external-store-fanout", "controlled-form",
   "event-delegation", "application-composition", "suspense-recovery",
   "scheduler-responsiveness", "hydration-interactivity", "lifecycle-memory",
-  "ssr-throughput", "streaming-ssr"
+  "ssr-throughput", "streaming-ssr", "uibench"
 ];
 
 const geo = xs => (xs.length ? Math.exp(xs.reduce((s, x) => s + Math.log(x), 0) / xs.length) : null);
