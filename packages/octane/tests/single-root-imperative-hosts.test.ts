@@ -192,6 +192,30 @@ const listShapes: Record<string, ListShape> = {
 			),
 		},
 	},
+	'a component whose branches share a transitive leaf': {
+		program: {
+			app: list(
+				`<Row id={row.id}/>`,
+				`function Row({id}) @{ @if (id % 2) { <Branch id={id}/> } @else { <Leaf id={id}/> } }
+				function Branch({id}) @{ @switch (id % 3) {
+					@case 0: { <Leaf id={id}/> }
+					@default: { <Leaf id={id}/> }
+				} }
+				function Leaf({id}) @{ <p class="row">{String(id)}</p> }`,
+			),
+		},
+	},
+	'a component whose transitive branches mix one and two roots': {
+		program: {
+			app: list(
+				`<Row id={row.id}/>`,
+				`function Row({id}) @{ @if (id % 2) { <Branch id={id}/> } @else { <Leaf id={id}/> } }
+				function Branch({id}) @{ @if (id % 3) { <Leaf id={id}/> } @else { <Pair id={id}/> } }
+				function Leaf({id}) @{ <p class="row">{String(id)}</p> }
+				function Pair({id}) @{ <><p class="row">{String(id)}</p><b>tail</b></> }`,
+			),
+		},
+	},
 	'an imported keyed component root': {
 		program: {
 			app: list(`<Row id={row.id}/>`, `import { Row } from '${ROW_MODULE}';`),
@@ -241,6 +265,7 @@ async function reordersAndRemoves(kind: 'mount' | 'hydrate', program: Program) {
 	s.render({ rows: rows([3, 2, 5]) });
 	expect(rowsOf().map((row) => row.textContent)).toEqual(['3', '2', '5']);
 	s.render({ rows: [] });
+	expect(content(between(s.container, '.list'))).toEqual([]);
 	expect(between(s.container, '.list')).toEqual(empty);
 
 	await Promise.resolve();
@@ -248,7 +273,7 @@ async function reordersAndRemoves(kind: 'mount' | 'hydrate', program: Program) {
 	expect(s.mismatches()).toEqual([]);
 }
 
-describe('@for rows whose sole host is not a template element', () => {
+describe('@for rows with component and non-template roots', () => {
 	describe.each(['mount', 'hydrate'] as const)('%s', (kind) => {
 		it.each(Object.entries(listShapes).filter(([, shape]) => kind === 'mount' || !shape.mountOnly))(
 			'reorders and removes %s without leaking nodes',

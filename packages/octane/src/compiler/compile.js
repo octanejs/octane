@@ -12785,29 +12785,30 @@ function compileInternal(
 		classifyStableHookfulChildCalls(ast.body, ctx);
 		ctx.privateMappedProviderComponents = collectPrivateMappedProviderComponents(ast.body, ctx);
 	}
-	// Single-root output is transitive across same-module `@if` arms (see
-	// collectSingleRootIfDeps): flip false → true until stable so declaration
-	// order and recursion through a proven base case don't matter. Pessimistic —
-	// an unproven cycle (`A = @{ <B/> arm }`, `B = @{ <A/> arm }` with no host
-	// base) stays false. Runs before lowering, so call sites, the `$$singleRoot`
-	// module-tail stamps, and the @for item proof all consume the widened result
-	// through the existing channels.
-	let singleRootChanged = true;
-	while (singleRootChanged) {
-		singleRootChanged = false;
-		for (const [, info] of ctx.componentInfo) {
-			if (info.singleRoot === true || info.singleRootIfDeps == null) continue;
-			let proven = true;
-			for (const name of info.singleRootIfDeps) {
-				if (ctx.componentInfo.get(name)?.singleRoot !== true) {
-					proven = false;
-					break;
-				}
+	// Prove each component only after all of its single-root dependencies are
+	// proven. Reverse edges avoid rescanning the module for each link in a chain;
+	// cycles and dependencies without a proof remain unresolved.
+	const singleRootDependents = new Map();
+	const singleRootQueue = [];
+	for (const [name, info] of ctx.componentInfo) {
+		if (info.singleRoot === true || info.singleRootIfDeps == null) continue;
+		const state = { name, info, pending: 0 };
+		for (const dependency of info.singleRootIfDeps) {
+			if (ctx.componentInfo.get(dependency)?.singleRoot === true) continue;
+			state.pending++;
+			let dependents = singleRootDependents.get(dependency);
+			if (dependents === undefined) {
+				singleRootDependents.set(dependency, (dependents = []));
 			}
-			if (proven) {
-				info.singleRoot = true;
-				singleRootChanged = true;
-			}
+			dependents.push(state);
+		}
+		if (state.pending === 0) singleRootQueue.push(state);
+	}
+	for (let index = 0; index < singleRootQueue.length; index++) {
+		const state = singleRootQueue[index];
+		state.info.singleRoot = true;
+		for (const dependent of singleRootDependents.get(state.name) ?? []) {
+			if (--dependent.pending === 0) singleRootQueue.push(dependent);
 		}
 	}
 	// Anchorless append-safety for componentSlotLite call sites (see
