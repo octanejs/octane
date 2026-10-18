@@ -680,6 +680,76 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(refs.at(-1)).toBe(newInstance);
 		expect(rightOwner.textContent).toBe('later');
 	});
+	it('captures entering and exiting boundaries in their own nested scopes after images load', async () => {
+		vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(false);
+		const animate = vi.spyOn(Element.prototype, 'animate');
+		const activations: Array<[string, unknown]> = [];
+		const cleanups: string[] = [];
+		const activate = (id: string, kind: 'enter' | 'exit') => (instance: ViewTransitionInstance) => {
+			instance[kind === 'enter' ? 'new' : 'old'].animate({ opacity: [0, 1] }, 100);
+			activations.push([id + ':' + kind, animate.mock.contexts.at(-1)]);
+			return () => {
+				cleanups.push(id + ':' + kind);
+			};
+		};
+		const scope = (id: string, changed: boolean, child?: ReturnType<typeof createElement>) =>
+			createElement(
+				ViewTransition,
+				{ scope: 'element' },
+				createElement(
+					'section',
+					{ 'data-scope': id },
+					createElement(
+						ViewTransition,
+						{
+							key: changed ? 'after' : 'before',
+							name: changed ? 'incoming' : 'outgoing',
+							onEnter: activate(id, 'enter'),
+							onExit: activate(id, 'exit'),
+						},
+						createElement('span', null, changed ? 'after' : 'before'),
+					),
+					createElement('img', { src: changed ? 'after.png' : 'before.png' }),
+					child,
+				),
+			);
+		await act(() => root.render(scope('left', false, scope('right', false))));
+		const leftOwner = owner('left');
+		const rightOwner = owner('right');
+		startTransition(() => root.render(scope('left', true, scope('right', true))));
+		const left = await nextCapture('left');
+		const right = await nextCapture('right');
+		let updated = false;
+		const updating = Promise.all([left.update(), right.update()]).then(() => {
+			updated = true;
+		});
+		await Promise.resolve();
+		expect(updated).toBe(false);
+		expect(activations).toEqual([]);
+		for (const image of container.querySelectorAll('img')) image.dispatchEvent(new Event('load'));
+		await updating;
+		expect(owner('left')).toBe(leftOwner);
+		expect(owner('right')).toBe(rightOwner);
+		expect(rightOwner.textContent).toBe('after');
+		left.ready.resolve();
+		right.ready.resolve();
+		await vi.waitFor(() => expect(activations).toHaveLength(4));
+		expect(activations).toEqual(
+			expect.arrayContaining([
+				['left:exit', leftOwner],
+				['left:enter', leftOwner],
+				['right:exit', rightOwner],
+				['right:enter', rightOwner],
+			]),
+		);
+		expect(cleanups).toEqual([]);
+		left.finished.resolve();
+		await vi.waitFor(() => expect(cleanups.toSorted()).toEqual(['left:enter', 'left:exit']));
+		right.finished.resolve();
+		await vi.waitFor(() =>
+			expect(cleanups.toSorted()).toEqual(['left:enter', 'left:exit', 'right:enter', 'right:exit']),
+		);
+	});
 	it.each([false, true])(
 		'preserves existing destination boundaries when a separate root inserts a portal (moving=%s)',
 		async (moving) => {

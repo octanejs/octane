@@ -287,3 +287,32 @@ The exact before/after comparison is recorded in
 [`measurements/effect-cleanup.json`](measurements/effect-cleanup.json). Cold work
 is unchanged; each dialect removes 2,000 function entries for clear/remount and
 200 for scattered removal, with the original lifecycle snapshots preserved.
+
+## Finalizing many element scopes
+
+```sh
+pnpm exec playwright install chromium
+BENCH_JSON=/tmp/vt-finalize-work.json node benchmarks/view-transitions/finalize.mjs --base=f665de94cd4d647c3310edd4dd2ac157c737d596
+BENCH_JSON=/tmp/vt-finalize-time.json node benchmarks/view-transitions/finalize.mjs --base=f665de94cd4d647c3310edd4dd2ac157c737d596 --mode=timing
+```
+
+The paired comparison substitutes the two finalization modules from the selected
+base into the current package, rejecting other source changes. The compiler,
+fixture, dependencies and production options remain the same. JSON records the
+base/head revisions, source/fixture/harness/lockfile and bundle hashes, Node and
+Chromium versions, raw observations and semantic controls.
+
+The default mode counts finalization registry visits and owner classifications
+for 16, 64, 128 and 256 element scopes, with matching document-transition controls.
+It uses real native captures and requires every ready/update/finished promise to
+fulfill, while checking callbacks, host identity, user draft, focus, events and
+unmount. At 256 scopes and 512 boundaries, owner classifications fall from
+131,072 to 512 per update; the single-owner path remains 512.
+
+Timing mode measures only synchronous finalization with real Chromium layout
+but mocked native capture scheduling. It removes the per-boundary counters,
+warms each variant three times, and records 20 alternating A/B and B/A pairs.
+It also compares clean active, static-root and stateful-root bundles; the ordinary
+controls must produce identical bytes and behavior. This is not end-to-end user
+latency, paint, heap/GC or cross-browser evidence. Multi-owner batches allocate a
+temporary map and boundary arrays; single-owner batches keep the direct scan.
