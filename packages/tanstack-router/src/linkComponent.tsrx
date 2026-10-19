@@ -51,7 +51,7 @@ export function createLinkComponent(useLinkProps: typeof UseLinkProps) {
 				: children;
 
 		@if (AsChild) {
-			<AsChild {...linkProps}>{resolvedChildren}</AsChild>
+			<AsChild {...linkProps} children={resolvedChildren} />
 		} @else {
 			<a {...(aProps as Record<string, any>)}>{resolvedChildren}</a>
 		}
