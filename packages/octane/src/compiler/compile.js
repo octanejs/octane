@@ -31639,11 +31639,8 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 		case 'event': {
 			const key = () => slotKeyLiteral(bind);
 			const slot = () => b.member(F('_el'), key(), true);
-			carefulWrite(
-				cell,
-				() => b.call('_$setEventSlot', F('_el'), key(), V()),
-				() => [b.stmt(b.assignment('=', slot(), V()))],
-			);
+			// setEventSlot journals only for an open window, as `careful` would.
+			writeCell(cell, () => b.call('_$setEventSlot', F('_el'), key(), V()), null);
 			const value = bind.dev
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
