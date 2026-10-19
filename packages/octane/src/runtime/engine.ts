@@ -1904,8 +1904,10 @@ export function scheduleRender(
 		block.crossRenderUpdate = true;
 		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
 	}
+	// Ordinary updates should not pay for Action caller classification.
 	const mode: 'urgent' | 'transition' =
-		isTransitionUpdateContext() || (renderPhaseSelf && block.currentRenderMode === 'transition')
+		((TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0) && isTransitionUpdateContext()) ||
+		(renderPhaseSelf && block.currentRenderMode === 'transition')
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
