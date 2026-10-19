@@ -242,6 +242,7 @@ type ServerErrorArguments = {
 	344: [];
 	345: [];
 	346: [];
+	350: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -989,6 +990,8 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 					'CompiledOutlet requires a compiled component function with no returned renderable.',
 					args,
 				);
+			case 350:
+				return formatDevErrorMessage('__runOnCatch must be called from an active catch arm.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

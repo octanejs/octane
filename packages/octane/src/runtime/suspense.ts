@@ -209,6 +209,24 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> 
 export const ViewTransition: ComponentBody<ViewTransitionProps> =
 	/* @__PURE__ */ initializeViewTransitionComponent();
 
+const CATCH_ENTRY = /* @__PURE__ */ Symbol('octane.catch-entry');
+
+function catchProps(error: unknown, reset: () => void, entered: boolean) {
+	return { err: error, reset, [CATCH_ENTRY]: entered };
+}
+
+/** Run binding-owned error reporting once, synchronously, in the active catch arm. */
+export function __runOnCatch(callback: () => void): void {
+	const props = CURRENT_SCOPE === CURRENT_BLOCK ? CURRENT_BLOCK?.props : null;
+	if (props == null || typeof props[CATCH_ENTRY] !== 'boolean') {
+		throw new Error(formatClientError(350));
+	}
+	if (props[CATCH_ENTRY]) {
+		props[CATCH_ENTRY] = false;
+		callback();
+	}
+}
+
 /**
  * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX component form of
  * `@try { … } @catch (e) { fallback }`. `fallback` is either a renderable or a
@@ -903,7 +921,7 @@ function mountPassthroughCatch(
 	const block = passthroughArm(
 		state,
 		state.catchBody,
-		{ err: error, reset: state.reset },
+		catchProps(error, state.reset, true),
 		hydration !== null,
 	);
 	try {
@@ -931,7 +949,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 function renderPassthroughTry(state: TrySlot): void {
 	if (state.branch === 0 && state.block !== null) {
 		state.block.body = state.catchBody!;
-		state.block.props = { err: state.err, reset: state.reset };
+		state.block.props = catchProps(state.err, state.reset, false);
 		state.block.extra = state.env;
 		renderBlock(state.block);
 		return;
@@ -1082,7 +1100,7 @@ export function errorBlock(
 	if (state.branch === 0) {
 		const caught = state.block!;
 		caught.body = state.catchBody;
-		caught.props = { err: state.err, reset: state.reset };
+		caught.props = catchProps(state.err, state.reset, false);
 		caught.extra = state.env;
 		renderBlock(caught);
 	} else if (state.branch === 1 && state.block !== null) {
@@ -1206,7 +1224,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 		start,
 		end,
 		state.catchBody,
-		{ err: error, reset: state.reset },
+		catchProps(error, state.reset, true),
 		state.env,
 	);
 	caught.idState = state.idState;
@@ -1437,7 +1455,7 @@ export function tryBlock(
 	} else if (s.branch === 0) {
 		// Already showing catch — re-render with current err (props identity unchanged).
 		s.block!.body = s.catchBody!;
-		s.block!.props = { err: s.err, reset: s.reset };
+		s.block!.props = catchProps(s.err, s.reset, false);
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
 	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.hiddenDom) {
@@ -3211,7 +3229,7 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 		bStart,
 		bEnd,
 		state.catchBody,
-		{ err, reset },
+		catchProps(err, reset, true),
 		state.env,
 	);
 	b.idState = state.idState;

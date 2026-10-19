@@ -3555,6 +3555,11 @@
       "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "350": {
+      "message": "__runOnCatch must be called from an active catch arm.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

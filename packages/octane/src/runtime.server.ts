@@ -425,6 +425,30 @@ export type ServerRenderNode =
 	| undefined;
 
 let CURRENT_SCOPE: SSRScope | null = null;
+let CATCH_ENTRY: { scope: SSRScope | null; arm: string; entered: boolean } | null = null;
+
+function renderCatchEntry<T>(render: () => T): T {
+	const previous = CATCH_ENTRY;
+	CATCH_ENTRY = { scope: CURRENT_SCOPE, arm: ASYNC_SCOPE, entered: true };
+	try {
+		return render();
+	} finally {
+		CATCH_ENTRY = previous;
+	}
+}
+
+/** Run binding-owned error reporting once in the current server catch pass. */
+export function __runOnCatch(callback: () => void): void {
+	const entry = CATCH_ENTRY;
+	if (entry === null || entry.scope !== CURRENT_SCOPE || entry.arm !== ASYNC_SCOPE) {
+		throw new Error(formatServerError(350));
+	}
+	if (entry.entered) {
+		entry.entered = false;
+		callback();
+	}
+}
+
 // A JSX Suspense boundary only performs React-style server recovery when no
 // enclosing Octane error handler can take the error. The scope identity keeps
 // an independent nested render from inheriting its caller's boundary.
@@ -11329,7 +11353,7 @@ export function ssrTry(
 				let caught: string;
 				try {
 					caught = ssrTryBody(
-						withContentArm(() => catchFn(e, scope, NOOP), 'catch'),
+						withContentArm(() => renderCatchEntry(() => catchFn(e, scope, NOOP)), 'catch'),
 						bindingMarker,
 					);
 				} finally {

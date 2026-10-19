@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'octane';
+import { __runOnCatch, useState, useEffect } from 'octane';
 
 // Inner component that throws on render when `props.bang` is true.
 function ThrowsOnRender(props) @{
@@ -33,6 +33,38 @@ export function RenderBoundary(props) @{
 			</div>
 		}
 	</>
+}
+
+interface ReportingBoundaryProps {
+	bang: boolean;
+	label: string;
+	state: { reported?: unknown };
+	report: (error: unknown) => void;
+	fromChild?: boolean;
+}
+
+function NestedCatchReporter(props: { report: (error: unknown) => void }) @{
+	__runOnCatch(() => props.report('nested child'));
+	<p>nested callback ran</p>
+}
+
+export function ReportingBoundary(props: ReportingBoundaryProps) @{
+	@try {
+		@try {
+			<ThrowsOnRender bang={props.bang} />
+		} @catch (error, reset) {
+			if (!props.fromChild) __runOnCatch(() => props.report(error));
+			<div class="reported-catch" data-reported={String(props.state.reported === error)}>
+				@if (props.fromChild) {
+					<NestedCatchReporter report={props.report} />
+				}
+				<span>{(props.label + ':' + (error as Error).message) as string}</span>
+				<button onClick={() => reset()}>retry</button>
+			</div>
+		}
+	} @catch (error) {
+		<p class="reporting-outer">{String(error)}</p>
+	}
 }
 
 // Boundary catches effect errors too.

@@ -1,16 +1,18 @@
 'use strong';
 
 import {
+	__runOnCatch,
 	CompiledOutlet as CompiledComponent,
 	CompiledContext,
 	Hydrate,
 	trustHTML,
 	useContext,
 	useLayoutEffect,
+	useRef,
 } from 'octane';
 import { never } from 'octane/hydration';
 import type { AnyRouter, NotFoundError } from '@tanstack/router-core';
-import { rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
+import { isNotFound, rootRouteId, setupScrollRestoration } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
 import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
 import { routerContext, matchContext, useRouter } from './bindings';
@@ -18,7 +20,6 @@ import { useStore } from '../useStore';
 import { useTransitioner, usePresentedMatches } from '../Transitioner.tsrx';
 import { useHydrated } from '../ClientOnly.tsrx';
 import { ErrorComponent } from '../ErrorComponent.tsrx';
-import { CompiledFailure } from './MatchLifecycle.tsrx';
 
 export function PreconfiguredRouterProvider(props: { router: AnyRouter }) @{
 	const router = props.router;
@@ -47,7 +48,14 @@ function CompiledMatches() @{
 		<CompiledPending route={rootRoute} />
 	} @catch (error, reset) {
 		if (router.options.disableGlobalCatchBoundary) throw error;
-		<CompiledFailure error={error} reset={reset} route={rootRoute} global={true} />
+		const failure = resolveFailure(error, rootRoute, router, true);
+		<CompiledFailure
+			error={error}
+			reset={reset}
+			route={rootRoute}
+			router={router}
+			failure={failure}
+		/>
 	}
 }
 
@@ -136,8 +144,65 @@ function CompiledMatchContent(props: { route: any; routeId: string; noSsr: boole
 	@try {
 		<CompiledMatchInner routeId={props.routeId} noSsr={props.noSsr} />
 	} @catch (error, reset) {
-		<CompiledFailure error={error} reset={reset} route={props.route} />
+		const router = useRouter();
+		const failure = resolveFailure(error, props.route, router, false);
+		<CompiledFailure
+			error={error}
+			reset={reset}
+			route={props.route}
+			router={router}
+			failure={failure}
+		/>
 	}
+}
+
+function resolveFailure(error: any, route: any, router: AnyRouter, global: boolean) {
+	const errorComponent = global
+		? ErrorComponent
+		: (route.options.errorComponent ?? router.options.defaultErrorComponent);
+	const notFoundComponent = route.isRoot
+		? (route.options.notFoundComponent ?? router.options.notFoundRoute?.options.component)
+		: route.options.notFoundComponent;
+	const missing = isNotFound(error);
+	if (missing) {
+		error.routeId ??= route.id;
+		if (!notFoundComponent || error.routeId !== route.id) throw error;
+	} else {
+		if (!errorComponent) throw error;
+		// The compatibility owner initializes its reported-error ref to null.
+		if (!global && error !== null) {
+			__runOnCatch(() => {
+				const onCatch = route.options.onCatch ?? router.options.defaultOnCatch;
+				onCatch?.(error, { componentStack: '' });
+			});
+		}
+	}
+	return { component: missing ? notFoundComponent : errorComponent, missing };
+}
+
+function CompiledFailure(props: {
+	error: any;
+	reset: () => void;
+	route: any;
+	router: AnyRouter;
+	failure: ReturnType<typeof resolveFailure>;
+}) @{
+	const match = useStore(props.router.stores.getMatchStore(props.route.id), (value: any) => value);
+	const firstMatch = useRef(match);
+	useLayoutEffect(() => {
+		if (firstMatch.current !== match) {
+			firstMatch.current = match;
+			props.reset();
+		}
+	});
+	<CompiledComponent
+		component={props.failure.component}
+		props={
+			props.failure.missing
+				? props.error
+				: { error: props.error, reset: props.reset, info: { componentStack: '' } }
+		}
+	/>
 }
 
 function CompiledMatchInner(props: { routeId: string; noSsr: boolean }) @{

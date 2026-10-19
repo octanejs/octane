@@ -311,6 +311,7 @@ type ClientErrorArguments = {
 	347: [];
 	348: [];
 	349: [unknown];
+	350: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1376,6 +1377,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					'A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.',
 					args,
 				);
+			case 350:
+				return formatDevErrorMessage('__runOnCatch must be called from an active catch arm.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}
