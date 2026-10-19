@@ -1287,6 +1287,23 @@ interface SuspendedMemoEntry {
 	readonly value: PromiseLike<unknown>;
 }
 
+interface SuspendedMemoIndex {
+	segment: SuspendedOwnerSegment | null;
+	child: SuspendedMemoIndex | null;
+	children: OwnerIdentityIndex<Map<number, SuspendedMemoIndex>> | null;
+	memo: SuspendedMemoEntry | null;
+	memos: Map<unknown, SuspendedMemoEntry> | null;
+}
+
+interface SuspendedReplayIndex {
+	memos: SuspendedMemoIndex | null;
+	ordinals: Map<DraftOwner, number> | null;
+	chains: Map<
+		DraftOwner,
+		{ last: DraftOwner | null; owners: Set<DraftOwner>; ordinals: OwnerIdentityIndex<number> }
+	> | null;
+}
+
 interface SuspendedMemoReplay {
 	readonly entries: readonly SuspendedMemoEntry[];
 	readonly component: UniversalComponent<any>;
@@ -2217,14 +2234,6 @@ function getComponentMetadata(component: UniversalComponent): UniversalRendererM
 	return metadata;
 }
 
-function identityPathEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
-	if (left.length !== right.length) return false;
-	for (let index = 0; index < left.length; index++) {
-		if (!Object.is(left[index], right[index])) return false;
-	}
-	return true;
-}
-
 const OWNER_IDENTITY_NEGATIVE_ZERO = Symbol('octane.universal.owner-identity.-0');
 
 function ownerIdentityMapKey(value: unknown): unknown {
@@ -2349,33 +2358,80 @@ function draftOwner(
 	};
 }
 
-function ownerReplayPath(owner: DraftOwner): readonly SuspendedOwnerSegment[] {
+// Short scans avoid index construction; cap their work before indexing larger sets.
+const SUSPENDED_MEMO_SCAN_LIMIT = 64;
+
+// Repeated unkeyed owners at one site need their claim ordinal on replay.
+function ownerReplayOrdinal(owner: DraftOwner, replay: SuspendedReplayIndex): number {
+	if (owner.priorClaimedSibling === null) return 0;
+	const cached = replay.ordinals?.get(owner);
+	if (cached !== undefined) return cached;
+	const parent = owner.parent!;
+	let chain = replay.chains?.get(parent);
+	if (chain === undefined) {
+		let ordinal = 0;
+		let sibling: DraftOwner | null = owner.priorClaimedSibling;
+		const record = owner.record;
+		for (
+			let remaining = SUSPENDED_MEMO_SCAN_LIMIT;
+			sibling !== null && remaining > 0;
+			remaining--
+		) {
+			const previous = sibling.record;
+			if (
+				previous.component === record.component &&
+				Object.is(previous.key, record.key) &&
+				identityPathsEqual(previous.identityPath, record.identityPath)
+			) {
+				ordinal++;
+			}
+			sibling = sibling.priorClaimedSibling;
+		}
+		if (sibling === null) return ordinal;
+		chain = { last: null, owners: new Set(), ordinals: createOwnerIdentityIndex() };
+		(replay.chains ??= new Map()).set(parent, chain);
+	}
+	const ordinals = (replay.ordinals ??= new Map());
+	const pending: DraftOwner[] = [];
+	let sibling: DraftOwner | null = owner;
+	while (sibling !== null && !chain.owners.has(sibling)) {
+		pending.push(sibling);
+		sibling = sibling.priorClaimedSibling;
+	}
+	// Retained Activities and render-phase retries can fork the claim chain.
+	// Roll back to their shared prefix without rescanning its siblings.
+	while (chain.last !== sibling) {
+		const previous = chain.last!;
+		const { component, identityPath, key } = previous.record;
+		writeOwnerIdentity(chain.ordinals, component, identityPath, key, ordinals.get(previous)!);
+		chain.owners.delete(previous);
+		chain.last = previous.priorClaimedSibling;
+	}
+	for (let index = pending.length - 1; index >= 0; index--) {
+		const current = pending[index];
+		const { component, identityPath, key } = current.record;
+		const ordinal = readOwnerIdentity(chain.ordinals, component, identityPath, key) ?? 0;
+		writeOwnerIdentity(chain.ordinals, component, identityPath, key, ordinal + 1);
+		ordinals.set(current, ordinal);
+		chain.owners.add(current);
+		chain.last = current;
+	}
+	return ordinals.get(owner)!;
+}
+
+function ownerReplayPath(
+	owner: DraftOwner,
+	index: SuspendedReplayIndex,
+): readonly SuspendedOwnerSegment[] {
 	if (owner.replayPath !== null) return owner.replayPath;
 	const record = owner.record;
-	let ordinal = 0;
-	// Claims of the same component at the same site may be unkeyed. Their
-	// encounter order distinguishes pending memos during a Suspense replay.
-	for (
-		let sibling = owner.priorClaimedSibling;
-		sibling !== null;
-		sibling = sibling.priorClaimedSibling
-	) {
-		const previous = sibling.record;
-		if (
-			previous.component === record.component &&
-			Object.is(previous.key, record.key) &&
-			identityPathsEqual(previous.identityPath, record.identityPath)
-		) {
-			ordinal++;
-		}
-	}
 	return (owner.replayPath = [
-		...ownerReplayPath(owner.parent!),
+		...ownerReplayPath(owner.parent!, index),
 		{
 			component: record.component,
 			identityPath: record.identityPath,
 			key: record.key,
-			ordinal,
+			ordinal: ownerReplayOrdinal(owner, index),
 		},
 	]);
 }
@@ -5450,24 +5506,91 @@ function runCommitTasks(tasks: readonly (() => void)[]): void {
 	if (hasError) throw firstError;
 }
 
-function suspendedOwnerPathEqual(
-	left: readonly SuspendedOwnerSegment[],
-	right: readonly SuspendedOwnerSegment[],
+// Saved entries can outlive a render through public suspended-attempt handles.
+// The lookup index belongs only to the render that consumes those entries.
+const SUSPENDED_MEMO_INDEXES = new WeakMap<RenderAttempt, SuspendedReplayIndex>();
+
+function createSuspendedReplayIndex(): SuspendedReplayIndex {
+	return { memos: null, ordinals: null, chains: null };
+}
+
+function createSuspendedMemoIndex(): SuspendedMemoIndex {
+	// Most replay paths have one child and one memo; only branches need Maps.
+	return { segment: null, child: null, children: null, memo: null, memos: null };
+}
+
+function suspendedOwnerSegmentEqual(
+	left: SuspendedOwnerSegment,
+	right: SuspendedOwnerSegment,
 ): boolean {
-	if (left.length !== right.length) return false;
-	for (let index = 0; index < left.length; index++) {
-		const leftSegment = left[index];
-		const rightSegment = right[index];
-		if (
-			leftSegment.component !== rightSegment.component ||
-			!Object.is(leftSegment.key, rightSegment.key) ||
-			leftSegment.ordinal !== rightSegment.ordinal ||
-			!identityPathEqual(leftSegment.identityPath, rightSegment.identityPath)
-		) {
-			return false;
+	return (
+		left.component === right.component &&
+		Object.is(left.key, right.key) &&
+		left.ordinal === right.ordinal &&
+		identityPathsEqual(left.identityPath, right.identityPath)
+	);
+}
+
+function suspendedMemoOwner(
+	index: SuspendedMemoIndex,
+	path: readonly SuspendedOwnerSegment[],
+): SuspendedMemoIndex {
+	for (const segment of path) {
+		if (index.segment === null) {
+			index.segment = segment;
+			index.child = createSuspendedMemoIndex();
 		}
+		if (suspendedOwnerSegmentEqual(index.segment, segment)) {
+			index = index.child!;
+			continue;
+		}
+		const { component, identityPath, key, ordinal } = segment;
+		const children = (index.children ??= createOwnerIdentityIndex());
+		let siblings = readOwnerIdentity(children, component, identityPath, key);
+		if (siblings === undefined) {
+			siblings = new Map();
+			writeOwnerIdentity(children, component, identityPath, key, siblings);
+		}
+		let child = siblings.get(ordinal);
+		if (child === undefined) {
+			child = createSuspendedMemoIndex();
+			siblings.set(ordinal, child);
+		}
+		index = child;
 	}
-	return true;
+	return index;
+}
+
+function readSuspendedMemo(index: SuspendedMemoIndex, slot: unknown): SuspendedMemoEntry | null {
+	if (index.memo !== null && Object.is(index.memo.slot, slot)) return index.memo;
+	return index.memos?.get(ownerIdentityMapKey(slot)) ?? null;
+}
+
+function writeSuspendedMemo(index: SuspendedMemoIndex, entry: SuspendedMemoEntry): void {
+	if (index.memo === null) index.memo = entry;
+	else (index.memos ??= new Map()).set(ownerIdentityMapKey(entry.slot), entry);
+}
+
+function findSuspendedMemoEntry(
+	entries: readonly SuspendedMemoEntry[],
+	path: readonly SuspendedOwnerSegment[],
+	slot: unknown,
+	deps: readonly unknown[] | null,
+): SuspendedMemoEntry | null {
+	entries: for (const entry of entries) {
+		if (
+			!Object.is(entry.slot, slot) ||
+			(deps !== null && !depsEqual(entry.deps, deps)) ||
+			entry.ownerPath.length !== path.length
+		) {
+			continue;
+		}
+		for (let index = 0; index < path.length; index++) {
+			if (!suspendedOwnerSegmentEqual(entry.ownerPath[index], path[index])) continue entries;
+		}
+		return entry;
+	}
+	return null;
 }
 
 function findSuspendedMemo(
@@ -5476,20 +5599,47 @@ function findSuspendedMemo(
 	deps: readonly unknown[] | null,
 ): SuspendedMemoEntry | null {
 	if (deps === null) return null;
-	for (const entry of currentAttempt().replayEntries) {
-		if (
-			Object.is(entry.slot, slot) &&
-			depsEqual(entry.deps, deps) &&
-			suspendedOwnerPathEqual(entry.ownerPath, ownerReplayPath(owner))
-		) {
-			return entry;
+	const attempt = currentAttempt();
+	if (attempt.replayEntries.length === 0) return null;
+	let replay = SUSPENDED_MEMO_INDEXES.get(attempt);
+	if (replay === undefined) {
+		replay = createSuspendedReplayIndex();
+		SUSPENDED_MEMO_INDEXES.set(attempt, replay);
+	}
+	const ownerPath = ownerReplayPath(owner, replay);
+	if (attempt.replayEntries.length <= SUSPENDED_MEMO_SCAN_LIMIT) {
+		return findSuspendedMemoEntry(attempt.replayEntries, ownerPath, slot, deps);
+	}
+	let index = replay.memos;
+	if (index === null) {
+		index = replay.memos = createSuspendedMemoIndex();
+		for (const entry of attempt.replayEntries) {
+			writeSuspendedMemo(suspendedMemoOwner(index, entry.ownerPath), entry);
 		}
 	}
-	return null;
+	for (const segment of ownerPath) {
+		if (index.segment !== null && suspendedOwnerSegmentEqual(index.segment, segment)) {
+			index = index.child!;
+		} else {
+			if (index.children === null) return null;
+			const { component, identityPath, key, ordinal } = segment;
+			const child: SuspendedMemoIndex | undefined = readOwnerIdentity(
+				index.children,
+				component,
+				identityPath,
+				key,
+			)?.get(ordinal);
+			if (child === undefined) return null;
+			index = child;
+		}
+	}
+	const entry = readSuspendedMemo(index, slot);
+	return entry !== null && depsEqual(entry.deps, deps) ? entry : null;
 }
 
 function collectSuspendedMemos(attempt: RenderAttempt): readonly SuspendedMemoEntry[] {
 	const entries: SuspendedMemoEntry[] = [];
+	let index: SuspendedReplayIndex | null = null;
 	for (let ownerIndex = attempt.owners.length - 1; ownerIndex >= 0; ownerIndex--) {
 		const owner = attempt.owners[ownerIndex];
 		for (const [slot, hook] of owner.hooks) {
@@ -5501,21 +5651,22 @@ function collectSuspendedMemos(attempt: RenderAttempt): readonly SuspendedMemoEn
 			) {
 				continue;
 			}
-			if (
-				entries.some(
-					(entry) =>
-						Object.is(entry.slot, slot) &&
-						suspendedOwnerPathEqual(entry.ownerPath, ownerReplayPath(owner)),
-				)
-			) {
-				continue;
+			index ??= createSuspendedReplayIndex();
+			const ownerPath = ownerReplayPath(owner, index);
+			if (index.memos === null) {
+				if (findSuspendedMemoEntry(entries, ownerPath, slot, null) !== null) continue;
+				if (entries.length === SUSPENDED_MEMO_SCAN_LIMIT) {
+					index.memos = createSuspendedMemoIndex();
+					for (const entry of entries) {
+						writeSuspendedMemo(suspendedMemoOwner(index.memos, entry.ownerPath), entry);
+					}
+				}
 			}
-			entries.push({
-				ownerPath: ownerReplayPath(owner),
-				slot,
-				deps: hook.deps,
-				value: hook.value,
-			});
+			const memos = index.memos === null ? null : suspendedMemoOwner(index.memos, ownerPath);
+			if (memos !== null && readSuspendedMemo(memos, slot) !== null) continue;
+			const entry = { ownerPath, slot, deps: hook.deps, value: hook.value };
+			if (memos !== null) writeSuspendedMemo(memos, entry);
+			entries.push(entry);
 		}
 	}
 	return entries;
@@ -10006,6 +10157,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			throw error;
 		} finally {
+			if (replayEntries.length !== 0) SUSPENDED_MEMO_INDEXES.delete(attempt);
 			ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
 			ACTIVE_UNIVERSAL_WARM_PLANS.push(...previousWarmPlans);
 			CURRENT_UNIVERSAL_WARM = previousWarm;

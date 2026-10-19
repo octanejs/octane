@@ -34,3 +34,21 @@ describe the Node object driver, not browser DOM or device/Hermes latency.
 ```sh
 node benchmarks/bench.mjs universal-retention --ratios
 ```
+
+## Suspended request replay
+
+The standalone replay comparison builds the current native source and a Git
+baseline with identical adjacent sources. It measures 8, 128, and 2,048 sibling
+Suspense boundaries, hidden Activities, and a ready control. Each sample verifies
+request identity, final host values, and complete teardown. Three warmups precede
+seven alternating AB/BA pairs; JSON retains the individual samples and paired
+intervals. Results describe the Node object driver, not Hermes or device latency.
+
+```sh
+node benchmarks/universal-retention/memo-replay.mjs --base=<baseline-commit>
+```
+
+Set `BENCH_JSON` to an ignored local output path to retain the full report. The
+reported full native-entry byte sizes include exports unused by this fixture.
+Small and ready controls can regress despite a large suspended-workload gain;
+inspect every row before drawing a conclusion.
