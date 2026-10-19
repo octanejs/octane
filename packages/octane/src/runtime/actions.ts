@@ -17,6 +17,7 @@ import {
 	TRANSITION_PENDING_COUNT,
 	isTransitionUpdateContext,
 	scheduleRender,
+	scheduleUrgentRender,
 } from './engine.js';
 import { ensureHooks, registerHookCleanup, missingSlot } from './hooks.js';
 import {
@@ -651,7 +652,8 @@ export function useOptimistic<S, V = S>(
 			if (hadUpdates && !block.disposed) {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(block, 'optimistic-revert', slot);
-				scheduleRender(block);
+				if (indices === undefined) scheduleRender(block);
+				else scheduleUrgentRender(block);
 			}
 		};
 		const slotRef: OptimisticSlot<V> = {

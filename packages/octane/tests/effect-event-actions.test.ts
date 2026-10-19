@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createElement, createRoot, requestFormReset, startTransition } from 'octane';
+import { createElement, createRoot, flushSync, requestFormReset, startTransition } from 'octane';
 import { createScope } from 'octane/signals';
-import { act, mount } from './_helpers';
+import { act, mount, nextTask } from './_helpers';
 import {
 	ExternalEffectEvent,
 	ExternalEffectEventUpdates,
@@ -122,6 +122,26 @@ describe('Effect Event transition ownership', () => {
 			expect(r.find('output').textContent).toBe('owned-after');
 			expect(error).toHaveBeenCalledWith(expect.stringContaining('outside a transition or action'));
 			await act(() => release());
+			expect(r.find('output').textContent).toBe('idle');
+		} finally {
+			release();
+			await act(() => {});
+			r.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('reverts an unwrapped optimistic update before the next host task', async () => {
+		let release!: () => void;
+		const pending = new Promise<void>((resolve) => (release = resolve));
+		let event!: () => void;
+		const r = mount(OptimisticEffectEvent, { bind: (callback) => (event = callback) });
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			startTransition(() => pending);
+			flushSync(() => event());
+			expect(r.find('output').textContent).toBe('optimistic');
+			await nextTask();
 			expect(r.find('output').textContent).toBe('idle');
 		} finally {
 			release();

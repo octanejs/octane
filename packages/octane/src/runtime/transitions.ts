@@ -233,7 +233,7 @@ export function createTransitionActionBatch(): TransitionActionBatch {
  * Like React, their updates are urgent and never join an in-flight Action;
  * commitEffects also clears any transition the commit inherited. A transition
  * started inside the callback still owns its own updates. Store consistency
- * checks need no case here: scheduleStoreRender is already urgent.
+ * checks need no case here: external-store updates already schedule urgently.
  */
 export function inCommitCallback(): boolean {
 	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;

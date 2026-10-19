@@ -1964,6 +1964,20 @@ export function scheduleRender(
 	}
 }
 
+/** Schedule an urgent update independently of any ambient Action. */
+export function scheduleUrgentRender(block: Block): void {
+	const depth = TRANSITION_DEPTH;
+	const asyncCount = ASYNC_TRANSITION_COUNT;
+	TRANSITION_DEPTH = 0;
+	ASYNC_TRANSITION_COUNT = 0;
+	try {
+		scheduleRender(block);
+	} finally {
+		TRANSITION_DEPTH = depth;
+		ASYNC_TRANSITION_COUNT = asyncCount;
+	}
+}
+
 /**
  * An urgent update moves a waiting block onto the microtask flush, transition
  * work included. A pending cue does not: outside a flush, the block renders its
@@ -4424,20 +4438,6 @@ export function countLayoutSnapshotChange(cell: object, block: Block): void {
  * motivating concurrent-interleaving window, and any store that actually notifies
  * is unaffected (onStoreChange uses the render-fresh getSnapshot).
  */
-/** External stores expose one live snapshot; their writes cannot be deferred. */
-function scheduleStoreRender(block: Block): void {
-	const depth = TRANSITION_DEPTH;
-	const asyncCount = ASYNC_TRANSITION_COUNT;
-	TRANSITION_DEPTH = 0;
-	ASYNC_TRANSITION_COUNT = 0;
-	try {
-		scheduleRender(block);
-	} finally {
-		TRANSITION_DEPTH = depth;
-		ASYNC_TRANSITION_COUNT = asyncCount;
-	}
-}
-
 let DID_WARN_UNCACHED_SNAPSHOT = false;
 
 export function useSyncExternalStore<T>(
@@ -4507,9 +4507,9 @@ export function useSyncExternalStore<T>(
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
 					? () => {
 							if (!block.disposed) __profileSchedule(block, 'external-store', slot);
-							scheduleStoreRender(block);
+							scheduleUrgentRender(block);
 						}
-					: () => scheduleStoreRender(block),
+					: () => scheduleUrgentRender(block),
 			onStoreChange: () => {
 				if (block.disposed) return;
 				// An urgent, non-deferred render already queued for this owner will
