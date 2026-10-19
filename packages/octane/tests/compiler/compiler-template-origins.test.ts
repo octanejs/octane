@@ -189,6 +189,38 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		});
 	});
 
+	it('aliases a repeated binding onto the commit code it shares in production', () => {
+		const source =
+			'export function First(props) @{ <p title={props.value}>a</p> }\n' +
+			'export function Second(props) @{ <em title={props.value}>b</em> }';
+		const second = source.indexOf('\n');
+		const span = (text: string, from: number) => {
+			const start = source.indexOf(text, from);
+			return { start, end: start + text.length };
+		};
+		const firstValue = span('props.value', 0);
+		const secondValue = span('props.value', second);
+		const firstName = span('title', 0);
+		const secondName = span('title', second);
+
+		const options = { hmr: false as const, dev: false };
+		const plain = compile(source, 'repeated-binding.tsrx', options);
+		const inspected = compile(source, 'repeated-binding.tsrx', { ...options, inspect: true });
+		expect(inspected.code).toBe(plain.code);
+		expect(inspected.inspect.aliases).toEqual(
+			expect.arrayContaining([
+				{ srcStart: secondValue.start, srcEnd: secondValue.end, ofStart: firstValue.start },
+				{ srcStart: secondName.start, srcEnd: secondName.end, ofStart: firstName.start },
+			]),
+		);
+
+		// A dev build emits each template's own commit code, so nothing borrows.
+		const dev = compile(source, 'repeated-binding.tsrx', { hmr: false, dev: true, inspect: true });
+		expect(dev.inspect.aliases).not.toContainEqual(
+			expect.objectContaining({ srcStart: secondValue.start }),
+		);
+	});
+
 	it('keeps identical markup separate when its parser namespace differs', () => {
 		const source =
 			'export function Opaque() @{ <a /> }\n' +

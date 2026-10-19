@@ -11861,7 +11861,7 @@ function compileInternal(
 		hoistedTemplates: [], // { name, ast, html, ns, frag, origins }
 		internedTemplates: new Map(), // HTML -> one template or namespace/fragment variants
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
-		commitFunctions: new Map(), // structural key -> hoisted commit function name (emitCommitFunction)
+		commitFunctions: new Map(), // structural key -> { name, body } of a shared commit function (emitCommitFunction)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		// Descriptor capabilities this module's JSX values can select (see
@@ -31279,7 +31279,11 @@ function commitCellCount(bind) {
 	return bind.kind === 'styleProperties' ? bind.properties.length : 1;
 }
 
-/** The template's commit function; byte-identical ones share one declaration. */
+/**
+ * The template's commit function. A production build shares byte-identical
+ * ones, as allocTemplate interns templates; dev, HMR and profile builds keep
+ * one per template, so each debugs and maps to its own component.
+ */
 function emitCommitFunction(ctx, commit, origin) {
 	const writes = commit.writes();
 	if (writes.length === 0 && commit.factory === null) return null;
@@ -31287,11 +31291,15 @@ function emitCommitFunction(ctx, commit, origin) {
 	for (const make of writes) if (make !== undefined) cells.push(make(commit.size()));
 	const body = [b.declaration('let', [b.declarator('_v')]), ...cells];
 	const params = [b.id('_b'), b.id('_n'), ...(commit.careful ? [b.id('_f')] : [])];
-	const key = astStructuralKey([params, body]);
-	const shared = ctx.commitFunctions.get(key);
-	if (shared !== undefined) return shared;
+	const share = !ctx.hmr && !ctx.dev && !ctx.profile;
+	const key = share ? astStructuralKey([params, body]) : null;
+	const shared = share ? ctx.commitFunctions.get(key) : undefined;
+	if (shared !== undefined) {
+		if (ctx.inspect) aliasSharedOrigins(ctx, body, shared.body, new Set());
+		return shared.name;
+	}
 	const name = allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
-	ctx.commitFunctions.set(key, name);
+	if (share) ctx.commitFunctions.set(key, { name, body });
 	// A body without its own origin (a helper's) takes its first binding's.
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -31300,6 +31308,28 @@ function emitCommitFunction(ctx, commit, origin) {
 		),
 	);
 	return name;
+}
+
+/**
+ * A shared commit function emits only its first template's bindings: alias each
+ * later one onto the node it shares, so inspection still reaches its code. The
+ * two trees match node for node (their structural keys are equal).
+ */
+function aliasSharedOrigins(ctx, copy, canonical, seen) {
+	if (copy === null || typeof copy !== 'object') return;
+	if (Array.isArray(copy)) {
+		for (let i = 0; i < copy.length; i++) aliasSharedOrigins(ctx, copy[i], canonical[i], seen);
+		return;
+	}
+	if (typeof copy.type === 'string' && copy.start != null && canonical.start != null) {
+		const pair = `${copy.start}:${copy.end}:${canonical.start}`;
+		if (!seen.has(pair)) {
+			seen.add(pair);
+			registerOriginAlias(ctx, copy, canonical);
+		}
+	}
+	for (const key of Object.keys(copy))
+		if (!AST_STRUCTURAL_KEY_SKIP.has(key)) aliasSharedOrigins(ctx, copy[key], canonical[key], seen);
 }
 
 /** `_r`: an earlier render of this transaction staged the bag (see bagRecord). */
