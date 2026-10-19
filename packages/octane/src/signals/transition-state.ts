@@ -60,7 +60,8 @@ export interface PendingHost {
 	/**
 	 * Whether the current read sees `batch`: true for a transition render that
 	 * folds it, 'action' for its synchronous transition callback, or undefined
-	 * outside both, as at commit.
+	 * outside both, as at commit. Test truthiness for visibility; exact `true`
+	 * excludes Action reads.
 	 */
 	visible(batch: object): boolean | 'action' | undefined;
 	root(batch: object): object;

@@ -92,23 +92,8 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 					publish: () => {
 						const previous = this.selected;
 						const resolve = this.resolvePending;
-						// Install the accepted consumer before releasing either lease. No
-						// selector, loader or abort callback executes in this phase.
-						entry?.consumers.add(this);
-						entry?.consumers.delete(fork);
-						this.selected = entry;
-						this.selectedIdentity = fork.selectedIdentity;
-						this.retainedRequest = fork.retainedRequest;
-						this.describedAttempt = fork.describedAttempt;
-						this.observedAttempt = fork.observedAttempt;
+						this.adoptSelection(fork);
 						this.selectionAuthority = fork.selectionAuthority;
-						this.pendingObserver = undefined;
-						this.pendingPromise = fork.pendingPromise;
-						this.resolvePending = fork.resolvePending;
-						this.seeded = undefined;
-						fork.selected = undefined;
-						fork.pendingPromise = undefined;
-						fork.resolvePending = undefined;
 						return () => {
 							if (resolve !== this.resolvePending) resolve?.();
 							// Acceptance or earlier abort cleanup can select the old request

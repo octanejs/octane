@@ -111,7 +111,8 @@ describe('pending presentation in signal transitions', () => {
 				read === 'get' ? 'ready-A' : 'pending',
 			);
 			if (read === 'get') {
-				await act(() => root.unmount());
+				await act(() => root.render(() => 'replacement'));
+				expect(host.textContent).toBe('replacement');
 				expect(selected$.get()).toBe('B');
 				expect(requests[0]!.aborted).toBe(true);
 				expect(requests).toHaveLength(1);

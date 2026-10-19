@@ -472,6 +472,7 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 	for (let stable = false; !stable;) {
 		stable = true;
 		const shadows = new Set(installs.map((install) => install.slot.shadow!));
+		// A dropped presentation can remove demand for its dependencies, so rebuild each pass.
 		let presented: Set<ScopedNode> | undefined;
 		installs = installs.filter((install) => {
 			if (
@@ -524,6 +525,7 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 		if (currentChanged) graph.commitState(node, state);
 		const wakeup = shadow.wakeup;
 		if (wakeup && wakeup.promise === state.waiting) {
+			// commitState already resolved any committed wakeup displaced by this waiter.
 			shadow.wakeup = undefined;
 			node.wakeup = wakeup;
 			wakeup.node = node;
