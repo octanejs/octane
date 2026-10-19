@@ -1,16 +1,56 @@
 import { describe, expect, it } from 'vitest';
-import { act, createRoot, startTransition } from 'octane';
+import { act, createRoot, flushSync, startTransition } from 'octane';
 import {
 	createResource,
 	createScope,
 	query,
 	type DerivedCompute,
 	type DerivedContext,
+	type QueryContext,
 } from 'octane/signals';
 import { deferred } from './_fixtures/signals-async-controls.js';
-import { DerivedPresentation, Presentation } from './_fixtures/signals-resource-transition.tsrx';
+import {
+	DerivedPresentation,
+	Presentation,
+	RedeclaredResource,
+} from './_fixtures/signals-resource-transition.tsrx';
 
 describe('pending presentation in signal transitions', () => {
+	it('preserves a newer accepted selection when an older Action settles', async () => {
+		const gate = deferred<void>();
+		const pendingB = deferred<string>();
+		const pendingC = deferred<string>();
+		const requests: { key: string; signal: AbortSignal }[] = [];
+		const scope = createScope({ scopeKey: 'resource-transition-selection-authority' });
+		const selected$ = scope.signal$('selected', 'A');
+		const load = (key: string, { signal }: QueryContext<string>) => {
+			requests.push({ key, signal });
+			return key === 'A' ? 'ready-A' : key === 'B' ? pendingB.promise : pendingC.promise;
+		};
+		const host = document.createElement('div');
+		document.body.append(host);
+		const root = createRoot(host);
+		const props = { selected$, load, gate: gate.promise };
+		try {
+			await act(() => root.render(RedeclaredResource, props));
+			expect(host.querySelector('output')?.textContent).toBe('ready-A');
+			await act(() => host.querySelector('button')!.click());
+			expect(requests.map(({ key }) => key)).toEqual(['A', 'B']);
+			flushSync(() => root.render(RedeclaredResource, { ...props, selection: 'C' }));
+			expect(requests.map(({ key }) => key)).toEqual(['A', 'B', 'C']);
+			await act(() => gate.resolve());
+			expect(selected$.get()).toBe('B');
+			expect(requests.slice(1).map(({ signal }) => signal.aborted)).toEqual([true, false]);
+			await act(() => pendingC.resolve('ready-C'));
+			expect(host.querySelector('output')?.textContent).toBe('ready-C');
+		} finally {
+			gate.resolve();
+			root.unmount();
+			scope.dispose();
+			host.remove();
+		}
+	});
+
 	it('preserves a request read by the synchronous transition callback', async () => {
 		const pending = deferred<string>();
 		const requests: { key: string; signal: AbortSignal }[] = [];
