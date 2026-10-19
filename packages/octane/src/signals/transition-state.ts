@@ -58,10 +58,12 @@ export interface PendingHost {
 	/** The transition batch a write joins, or null for an urgent write. */
 	batch(): object | null;
 	/**
-	 * Whether the current read sees `batch`: a transition render that folds it,
-	 * or its synchronous transition callback. Undefined outside both, as at commit.
+	 * Whether the current read sees `batch`: true for a transition render that
+	 * folds it, 'action' for its synchronous transition callback, or undefined
+	 * outside both, as at commit. Test truthiness for visibility; exact `true`
+	 * excludes Action reads.
 	 */
-	visible(batch: object): boolean | undefined;
+	visible(batch: object): boolean | 'action' | undefined;
 	root(batch: object): object;
 	/** Commit two batches together, as transitions that update one hook cell are. */
 	entangle(into: object, from: object): void;

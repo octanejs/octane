@@ -282,6 +282,10 @@ export function validateDirectSignalControl(element: Element, site: string): voi
 	}
 }
 
+function writeCommittedDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
+	if (!binding.disposed) binding.policy.writeBinding(binding, value);
+}
+
 export function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
 	// A render that can be dropped writes committed DOM at its commit; text
@@ -291,7 +295,7 @@ export function writeDirectSignalBinding(binding: DirectSignalBinding, value: un
 	if (transaction === null) policy.writeBinding(binding, value);
 	else
 		transaction.ops.push(commitRenderWrite, [
-			policy.writeBinding,
+			writeCommittedDirectSignalBinding,
 			[binding, value],
 			binding.scope.block,
 		]);
