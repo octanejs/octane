@@ -50,6 +50,7 @@ import {
 	retryTransitionHolder,
 	wakeHeldTransitions,
 	COMMIT_OP,
+	journalRootProperty,
 	journalUndo,
 	retireDetachedBindingLeases,
 	unmountPresentationRefs,
@@ -535,6 +536,8 @@ function devFormLifetime(owner: Scope): { active: boolean } {
 		lifetimes.set(owner, lifetime);
 		if (lifetime.active) {
 			const current = lifetime;
+			if (ROOT_RENDER_TRANSACTION !== null && owner.cleanups === null)
+				journalRootProperty(owner, 'cleanups', null);
 			const cleanups = (owner.cleanups ??= []);
 			const retire = () => {
 				current.active = false;

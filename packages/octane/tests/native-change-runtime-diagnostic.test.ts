@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot, startTransition } from '../src/index.js';
 import { createScope } from 'octane/signals';
 import * as ServerRuntime from 'octane/server';
 import { act, mount } from './_helpers.js';
@@ -33,15 +33,19 @@ function diagnosticCalls(spy: ReturnType<typeof vi.spyOn>) {
 }
 
 describe('native text change development diagnostic', () => {
-	it.each(['inline', 'component'] as const)(
-		'does not warn for an abandoned %s signal-backed control',
-		(kind) => {
+	it.each([
+		['inline', 'mount'],
+		['component', 'mount'],
+		['inline', 'transition'],
+	] as const)(
+		'does not write or warn after abandoning the %s signal-backed control during %s',
+		async (kind, mode) => {
 			const { View } = loadCompiledFixtureSource(
 				`function Field(props) @{ <textarea value={props.draft$} /> }
-function Stop() { throw new Error('failed'); }
+function Stop(props) { props.beforeFailure(); throw new Error('failed'); }
 export function View(props) @{
   @try {
-    <>${kind === 'inline' ? '<textarea value={props.draft$} />' : '<Field draft$={props.draft$} />'}<Stop /></>
+    <>${kind === 'inline' ? '<textarea value={props.draft$} />' : '<Field draft$={props.draft$} />'}<Stop beforeFailure={props.beforeFailure} /></>
   } @catch (error) { <p>fallback</p> }
 }`,
 				{
@@ -50,12 +54,22 @@ export function View(props) @{
 					compileOptions: { dev: !PROD_COMPILE, hmr: false, strong: true },
 				},
 			);
-			const scope = createScope({ scopeKey: `abandoned-control-${kind}` });
+			const scope = createScope({ scopeKey: `abandoned-control-${kind}-${mode}` });
 			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-			const result = mount(View, { draft$: scope.signal$('draft', 'draft') });
+			const write = vi.spyOn(HTMLTextAreaElement.prototype, 'value', 'set');
+			// Rendering may initialize detached DOM before the body is abandoned.
+			const props = {
+				draft$: scope.signal$('draft', 'draft'),
+				beforeFailure: () => write.mockClear(),
+			};
+			const result =
+				mode === 'transition' ? mount(SpreadText, { hostProps: {} }) : mount(View, props);
 			try {
+				if (mode === 'transition')
+					await act(() => startTransition(() => result.root.render(View, props)));
 				expect(result.container.textContent).toBe('fallback');
 				expect(result.findAll('textarea')).toHaveLength(0);
+				expect(write).not.toHaveBeenCalledWith('draft');
 				expect(
 					error.mock.calls.filter((call) =>
 						String(call[0]).includes('without an `onInput` handler'),
