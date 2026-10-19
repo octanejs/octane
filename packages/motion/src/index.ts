@@ -408,6 +408,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						// Plain static values stay in the style bag for host/domProps — do not blank
 						// them after a MotionValue→static switch (domProps already applied them).
 						if (next !== undefined) continue;
+						if (key === 'transform' || isTransformKey(key)) latest.layout?.stop();
 						if (isTransformKey(key)) removeTransformFn(node, key);
 						else (node.style as any)[key] = '';
 					}
@@ -424,12 +425,15 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					const v = style[key];
 					if (isMotionValue(v)) {
 						function apply(val: any) {
+							// Author writes take ownership after removing the temporary projection.
+							if (key === 'transform' || isTransformKey(key)) latest.layout?.stop();
 							applyStyleValue(node, key, val, transformState);
 						}
 						apply(v.get());
 						appliedKeys.push(key);
 						cleanups.push(v.on('change', apply));
 					} else if (isTransformKey(key)) {
+						latest.layout?.stop();
 						applyStyleValue(node, key, v, transformState);
 						appliedKeys.push(key);
 					}

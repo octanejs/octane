@@ -1,5 +1,6 @@
 import { createElement, createRoot, flushSync, type Root } from 'octane';
 import { motion, MotionConfig } from '@octanejs/motion';
+export { motionValue } from 'motion';
 
 interface Options {
 	left: number;
@@ -13,6 +14,8 @@ interface Options {
 	scroll: boolean;
 	important: boolean;
 	duration: number;
+	transition?: Record<string, unknown>;
+	style?: Record<string, unknown>;
 	layout: boolean | 'position' | 'size';
 	layoutId?: string;
 	reducedMotion: 'never' | 'always';
@@ -48,7 +51,9 @@ function App(props: Options) {
 			className: 'layout-box',
 			layout: props.layout,
 			layoutId: props.layoutId,
-			transition: { layout: { duration: props.duration, ease: 'linear', onComplete } },
+			transition: props.transition ?? {
+				layout: { duration: props.duration, ease: 'linear', onComplete },
+			},
 			ref,
 			style: {
 				position: props.scroll ? 'relative' : 'absolute',
@@ -60,6 +65,7 @@ function App(props: Options) {
 				transform: props.transform,
 				scale: props.scale,
 				rotate: props.rotate,
+				...props.style,
 			},
 			children: 'layout',
 		}),

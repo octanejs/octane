@@ -92,6 +92,8 @@ real `<tag>` through `hostComponent`, captures the node, and drives:
   `layout="position"` applies only translation, `layout="size"` only scaling, and
   layout animations use `transition.layout` when provided. Updates during an active
   animation preserve its visible position and can retarget it to a new layout.
+  A changed transform style or MotionValue settles the layout animation before
+  applying the new authored transform; unrelated style values leave it running.
 
 ## Not yet ported
 

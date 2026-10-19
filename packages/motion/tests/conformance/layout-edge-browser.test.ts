@@ -162,6 +162,13 @@ for (const mode of ['development', 'production']) {
 			{ name: 'independent CSS rotate', css: 'rotate: 90deg;', style: {} },
 			{ name: 'Motion style.scale', css: '', style: { scale: 2 } },
 			{ name: 'Motion style.rotate', css: '', style: { rotate: 90 } },
+			{ name: 'CSS scale with Motion translation', css: 'scale: 2;', style: { style: { x: 30 } } },
+			{
+				name: 'CSS rotation with Motion translation',
+				css: 'rotate: 90deg;',
+				style: { style: { x: 30 } },
+			},
+			{ name: 'CSS scale with Motion rotation', css: 'scale: 2 3;', style: { rotate: 30 } },
 		])('preserves $name while animating a layout move', async ({ css, style }) => {
 			if (css) await page.addStyleTag({ content: `#layout-target { ${css} }` });
 			const state = await page.evaluate(async (style) => {
@@ -179,6 +186,106 @@ for (const mode of ['development', 'production']) {
 			expectBox(state.start, state.before);
 			expectBox(state.finished, { ...state.before, left: state.before.left + 50 });
 			expectBox(state.unchanged, state.finished);
+		});
+
+		it('inherits the root duration when the layout transition requests inheritance', async () => {
+			const state = await page.evaluate(async () => {
+				const api = window.layoutEdges;
+				let completed = false;
+				api.mount({
+					transition: {
+						duration: 0,
+						layout: {
+							inherit: true,
+							onComplete: () => {
+								completed = true;
+							},
+						},
+					},
+				});
+				api.update({ left: 200 });
+				await api.nextFrame();
+				await api.nextFrame();
+				return { completed, box: api.snapshot() };
+			});
+			expect(state.completed).toBe(true);
+			expectBox(state.box, { left: 200, top: 100, width: 100, height: 50 });
+		});
+
+		it.each([
+			{ key: 'x', from: 10, to: 40, box: { left: 240, top: 100, width: 100, height: 50 } },
+			{ key: 'y', from: 10, to: 40, box: { left: 200, top: 140, width: 100, height: 50 } },
+			{ key: 'scale', from: 1, to: 2, box: { left: 200, top: 100, width: 200, height: 100 } },
+			{ key: 'rotate', from: 0, to: 90, box: { left: 150, top: 100, width: 50, height: 100 } },
+			{
+				key: 'transform',
+				from: 'translateX(10px)',
+				to: 'translateX(40px)',
+				box: { left: 240, top: 100, width: 100, height: 50 },
+			},
+		])(
+			'settles the layout projection before a style.$key MotionValue takes ownership',
+			async ({ key, from, to, box }) => {
+				const state = await page.evaluate(
+					async ({ key, from, to }) => {
+						const api = window.layoutEdges;
+						const value = api.motionValue(from);
+						api.mount({ origin: '0 0', duration: 10, style: { [key]: value } });
+						api.update({ left: 200 });
+						value.set(to);
+						const changed = api.snapshot();
+						await api.nextFrame();
+						await api.nextFrame();
+						return { changed, later: api.snapshot() };
+					},
+					{ key, from, to },
+				);
+				expectBox(state.changed, box);
+				expectBox(state.later, box);
+			},
+		);
+
+		it.each(['rebind', 'static', 'remove'] as const)(
+			'clears the layout projection when a transform binding is changed: %s',
+			async (action) => {
+				const state = await page.evaluate(async (action) => {
+					const api = window.layoutEdges;
+					const first = api.motionValue(10);
+					const second = api.motionValue(40);
+					api.mount({ origin: '0 0', duration: 10, style: { x: first, y: 15 } });
+					api.update({ left: 200 });
+					api.update({
+						style:
+							action === 'remove' ? { y: 15 } : { x: action === 'rebind' ? second : 40, y: 15 },
+					});
+					const changed = api.snapshot();
+					first.set(90);
+					await api.nextFrame();
+					await api.nextFrame();
+					return { changed, later: api.snapshot() };
+				}, action);
+				const box = { left: action === 'remove' ? 200 : 240, top: 115, width: 100, height: 50 };
+				expectBox(state.changed, box);
+				expectBox(state.later, box);
+			},
+		);
+
+		it('keeps a layout animation running when an opacity MotionValue changes', async () => {
+			const state = await page.evaluate(async () => {
+				const api = window.layoutEdges;
+				const opacity = api.motionValue(1);
+				api.mount({ style: { opacity } });
+				const completed = api.nextCompletion();
+				api.update({ left: 200 });
+				const before = api.snapshot();
+				opacity.set(0.5);
+				const after = api.snapshot();
+				await completed;
+				return { before, after, finished: api.snapshot(), opacity: api.target().style.opacity };
+			});
+			expectBox(state.after, state.before);
+			expectBox(state.finished, { left: 200, top: 100, width: 100, height: 50 });
+			expect(state.opacity).toBe('0.5');
 		});
 
 		it('continues from the visible box when another layout move and resize interrupts an animation', async () => {
