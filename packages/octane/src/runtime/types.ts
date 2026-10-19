@@ -582,7 +582,7 @@ export interface RootRenderTransaction {
 	retired: Set<Block> | null;
 	/**
 	 * The commit queue: `(fn, target)` pairs that commitRootRenders runs in render
-	 * order, before refs and layout effects. A template queues `(commitStagedBag, bag)`
+	 * order, before refs and layout effects. A template queues `(C, bag)`
 	 * (bagDone); a slot whose structure changed queues `(applySlotNext, slot)`
 	 * when it starts reconciling, ahead of its descendants' entries. A dropped
 	 * window truncates the queue and touches no DOM (dropRootOps).
