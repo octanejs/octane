@@ -260,7 +260,7 @@ export function transitionActionBatchForUpdate(block?: Block): TransitionActionB
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
 	// (including continuous events), Effect Events, flushSync and commit callbacks
-	// opt out. An explicit transition or captured Action context still wins above.
+	// opt out. An explicit transition still wins above.
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH !== null && canInheritAsyncAction()
 		? IN_FLIGHT_TRANSITION_ACTION_BATCH
 		: null;

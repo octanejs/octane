@@ -1,5 +1,5 @@
 ---
-'octane': minor
+'octane': patch
 ---
 
-Keep externally invoked Effect Event updates independent of unrelated pending Actions. Add `captureActionContext` to explicitly re-enter the originating Action from a synchronous continuation.
+Keep unwrapped Effect Event updates independent of pending Actions. Wrap an Effect Event in `startTransition` to join a pending Action explicitly.

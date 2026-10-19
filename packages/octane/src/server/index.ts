@@ -59,7 +59,7 @@ export {
 	retireSignalOwnerIdentity,
 } from '../signals/owner-context.js';
 export type { SignalOwner, SignalOwnerEnvironment } from '../signals/types.js';
-export type { ActionContext, CompiledComponent } from '../runtime.js';
+export type { CompiledComponent } from '../runtime.js';
 export {
 	__registerServerFunction,
 	__serverCall,
@@ -145,7 +145,6 @@ export {
 	manualHook,
 	invokeManualHook,
 	startTransition,
-	captureActionContext,
 	flushSync,
 	__createDiscreteEventListener,
 	isChildrenBlock,

@@ -1,4 +1,11 @@
-import { startTransition, useEffectEvent, useLayoutEffect, useReducer, useState } from 'octane';
+import {
+	startTransition,
+	useEffectEvent,
+	useLayoutEffect,
+	useOptimistic,
+	useReducer,
+	useState,
+} from 'octane';
 
 export function ExternalEffectEventUpdates(props: {
 	count$: { get(): number; set(value: number): void };
@@ -23,8 +30,29 @@ export function ExternalEffectEventUpdates(props: {
 			if (mode === 'throw') throw new Error('event failed');
 		}
 	});
-	useLayoutEffect(() => props.bind(event), [props.bind]);
+	useLayoutEffect(() => {
+		props.bind(event);
+	}, [props.bind]);
 	<output>
 		{String(state)}:{String(reduced)}:{String(props.count$.get())}
 	</output>
+}
+
+export function ExternalEffectEvent(props: { bind(event: () => void): void; run(): void }) @{
+	const event = useEffectEvent(() => props.run());
+	useLayoutEffect(() => {
+		props.bind(event);
+	}, [props.bind]);
+	<div />
+}
+
+export function OptimisticEffectEvent(props: {
+	bind(event: () => void, add: (value: string) => void): void;
+}) @{
+	const [value, add] = useOptimistic('idle');
+	const event = useEffectEvent(() => add('optimistic'));
+	useLayoutEffect(() => {
+		props.bind(event, add);
+	}, [props.bind]);
+	<output>{value as string}</output>
 }

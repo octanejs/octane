@@ -2098,18 +2098,6 @@
       "argumentCount": 1,
       "runtime": ["client"],
       "status": "active"
-    },
-    "350": {
-      "message": "captureActionContext must be called during an Action callback.",
-      "argumentCount": 0,
-      "runtime": ["client"],
-      "status": "active"
-    },
-    "351": {
-      "message": "Cannot enter an Action context after its Action has settled.",
-      "argumentCount": 0,
-      "runtime": ["client"],
-      "status": "active"
     }
   }
 }

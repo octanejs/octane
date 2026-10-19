@@ -30,7 +30,6 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 
 import { resolveHookPath } from './hook-slot-cache.js';
 import type {
-	ActionContext,
 	useEffect as ClientUseEffect,
 	useImperativeHandle as ClientUseImperativeHandle,
 } from './runtime.js';
@@ -8321,15 +8320,6 @@ export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args
 // promise is ignored — SSR captures the synchronous pass only.
 export function startTransition(fn: () => void | Promise<unknown>): void {
 	fn();
-}
-
-const SERVER_ACTION_CONTEXT: ActionContext = /* @__PURE__ */ Object.freeze({
-	run: <T>(fn: () => T): T => fn(),
-});
-
-/** The server has no transition scheduler or Action lifetime to capture. */
-export function captureActionContext(): ActionContext {
-	return SERVER_ACTION_CONTEXT;
 }
 
 // flushSync — on the client this drains the update queue synchronously around

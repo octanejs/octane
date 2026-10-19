@@ -1,19 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import {
-	captureActionContext,
-	createElement,
-	createRoot,
-	startTransition,
-	useTransition,
-	type ActionContext,
-} from 'octane';
+import { describe, expect, it, vi } from 'vitest';
+import { createElement, createRoot, requestFormReset, startTransition } from 'octane';
 import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers';
-import { ExternalEffectEventUpdates } from './_fixtures/effect-event-actions.tsrx';
+import {
+	ExternalEffectEvent,
+	ExternalEffectEventUpdates,
+	OptimisticEffectEvent,
+} from './_fixtures/effect-event-actions.tsrx';
 
 describe('Effect Event transition ownership', () => {
-	it('keeps a captured post-await Effect Event in the same Action as direct updates', async () => {
-		const scope = createScope({ scopeKey: 'captured-effect-event-action' });
+	it('keeps a post-await Effect Event wrapped in a transition in the same Action as direct updates', async () => {
+		const scope = createScope({ scopeKey: 'nested-effect-event-action' });
 		const count$ = scope.signal$('count', 0);
 		const direct$ = scope.signal$('direct', 0);
 		let resume!: () => void;
@@ -28,12 +25,9 @@ describe('Effect Event transition ownership', () => {
 		});
 		try {
 			startTransition(async () => {
-				const context = captureActionContext();
 				await continuation;
-				context.run(() => {
-					event('normal');
-					direct$.set(1);
-				});
+				direct$.set(1);
+				startTransition(() => event('normal'));
 				await pending;
 			});
 			await act(() => resume());
@@ -50,155 +44,6 @@ describe('Effect Event transition ownership', () => {
 			await act(() => {});
 			r.unmount();
 			scope.dispose();
-		}
-	});
-
-	it('revokes each Action independently and restores nested and throwing runs', async () => {
-		let release!: () => void;
-		const pending = new Promise<void>((resolve) => (release = resolve));
-		let releaseInner!: () => void;
-		const innerPending = new Promise<void>((resolve) => (releaseInner = resolve));
-		let outer!: ActionContext;
-		let inner!: ActionContext;
-		let synchronous!: ActionContext;
-		let reenteredOuter!: ActionContext;
-		let restoredInner!: ActionContext;
-		let restoredOuter!: ActionContext;
-		try {
-			expect(() => captureActionContext()).toThrow();
-			startTransition(() => {
-				outer = captureActionContext();
-				startTransition(() => {
-					inner = captureActionContext();
-					reenteredOuter = outer.run(() => captureActionContext());
-					restoredInner = captureActionContext();
-					return innerPending;
-				});
-				startTransition(() => {
-					synchronous = captureActionContext();
-				});
-				expect(() => synchronous.run(() => {})).toThrow();
-				expect(() =>
-					outer.run(() => {
-						throw new Error('callback failed');
-					}),
-				).toThrow('callback failed');
-				restoredOuter = captureActionContext();
-				return pending;
-			});
-			await act(() => releaseInner());
-			expect(() => inner.run(() => {})).toThrow();
-			expect(() => restoredInner.run(() => {})).toThrow();
-			expect(outer.run(() => 42)).toBe(42);
-			expect(reenteredOuter.run(() => 43)).toBe(43);
-			expect(restoredOuter.run(() => 44)).toBe(44);
-			await outer.run(async () => {
-				await Promise.resolve();
-				expect(() => captureActionContext()).toThrow();
-			});
-			expect(() => captureActionContext()).toThrow();
-			await act(() => release());
-			let called = false;
-			expect(() =>
-				outer.run(() => {
-					called = true;
-				}),
-			).toThrow();
-			expect(() => reenteredOuter.run(() => {})).toThrow();
-			expect(() => restoredOuter.run(() => {})).toThrow();
-			expect(called).toBe(false);
-		} finally {
-			releaseInner();
-			release();
-			await act(() => {});
-		}
-	});
-
-	it.each(['rejection', 'subscription failure'] as const)(
-		'revokes an Action on %s',
-		async (mode) => {
-			const container = document.createElement('div');
-			const errors: unknown[] = [];
-			const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
-			let begin!: (fn: () => Promise<void>) => void;
-			let context!: ActionContext;
-			const error = new Error('Action failed');
-			try {
-				root.render(() => {
-					const [, start] = useTransition(Symbol.for('failed-captured-action'));
-					begin = start;
-					return createElement('output', null, 'ready');
-				});
-				await act(() =>
-					begin(() => {
-						context = captureActionContext();
-						return mode === 'rejection'
-							? Promise.reject(error)
-							: ({
-									then() {
-										throw error;
-									},
-								} as unknown as Promise<void>);
-					}),
-				);
-				expect(errors).toEqual([error]);
-				expect(() => context.run(() => {})).toThrow();
-			} finally {
-				root.unmount();
-			}
-		},
-	);
-
-	it('captures a useTransition Action until that invocation settles', async () => {
-		let begin!: (fn: () => Promise<void>) => void;
-		let context!: ActionContext;
-		let release!: () => void;
-		const pending = new Promise<void>((resolve) => (release = resolve));
-		const r = mount(() => {
-			const [isPending, start] = useTransition(Symbol.for('captured-action-context'));
-			begin = start;
-			return createElement('output', null, isPending ? 'pending' : 'idle');
-		});
-		try {
-			await act(() =>
-				begin(() => {
-					context = captureActionContext();
-					return pending;
-				}),
-			);
-			expect(r.find('output').textContent).toBe('pending');
-			expect(context.run(() => 42)).toBe(42);
-			await act(() => release());
-			expect(r.find('output').textContent).toBe('idle');
-			expect(() => context.run(() => {})).toThrow();
-		} finally {
-			release();
-			await act(() => {});
-			r.unmount();
-		}
-	});
-
-	it('does not let a commit callback capture its enclosing Action', () => {
-		let captureError: unknown;
-		let r!: ReturnType<typeof mount>;
-		startTransition(() => {
-			r = mount(() =>
-				createElement('div', {
-					ref: (node: Element | null) => {
-						if (node === null) return;
-						try {
-							captureActionContext();
-						} catch (error) {
-							captureError = error;
-						}
-					},
-				}),
-			);
-		});
-		try {
-			expect(captureError).toBeInstanceOf(Error);
-		} finally {
-			r.unmount();
 		}
 	});
 
@@ -248,4 +93,94 @@ describe('Effect Event transition ownership', () => {
 			}
 		},
 	);
+
+	it('reverts only the unwrapped optimistic update while an Action is pending', async () => {
+		let release!: () => void;
+		const pending = new Promise<void>((resolve) => (release = resolve));
+		let event!: () => void;
+		let add!: (value: string) => void;
+		const r = mount(OptimisticEffectEvent, {
+			bind: (callback, update) => {
+				event = callback;
+				add = update;
+			},
+		});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			await act(() =>
+				startTransition(() => {
+					add('owned');
+					return pending;
+				}),
+			);
+			expect(r.find('output').textContent).toBe('owned');
+			await act(() => {
+				event();
+				startTransition(() => add('owned-after'));
+				event();
+			});
+			expect(r.find('output').textContent).toBe('owned-after');
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('outside a transition or action'));
+			await act(() => release());
+			expect(r.find('output').textContent).toBe('idle');
+		} finally {
+			release();
+			await act(() => {});
+			r.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('resets a form immediately from an unwrapped Effect Event', async () => {
+		let release!: () => void;
+		const pending = new Promise<void>((resolve) => (release = resolve));
+		const form = document.createElement('form');
+		const input = document.createElement('input');
+		input.defaultValue = 'default';
+		input.value = 'changed';
+		form.append(input);
+		let event!: () => void;
+		const r = mount(ExternalEffectEvent, {
+			bind: (callback) => (event = callback),
+			run: () => requestFormReset(form),
+		});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			startTransition(() => pending);
+			event();
+			expect(input.value).toBe('default');
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('outside a transition or action'));
+		} finally {
+			release();
+			await act(() => {});
+			r.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('mounts and replaces an independent root synchronously from an unwrapped Effect Event', async () => {
+		let release!: () => void;
+		const pending = new Promise<void>((resolve) => (release = resolve));
+		const container = document.createElement('div');
+		const root = createRoot(container);
+		let event!: () => void;
+		let render = () => root.render(() => createElement('span', null, 'first'));
+		const r = mount(ExternalEffectEvent, {
+			bind: (callback) => (event = callback),
+			run: () => render(),
+		});
+		try {
+			startTransition(() => pending);
+			event();
+			expect(container.textContent).toBe('first');
+			render = () => root.render(() => createElement('span', null, 'second'));
+			event();
+			expect(container.textContent).toBe('second');
+		} finally {
+			release();
+			await act(() => {});
+			root.unmount();
+			r.unmount();
+		}
+	});
 });

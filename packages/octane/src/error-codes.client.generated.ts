@@ -311,8 +311,6 @@ type ClientErrorArguments = {
 	347: [];
 	348: [];
 	349: [unknown];
-	350: [];
-	351: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1376,16 +1374,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 349:
 				return formatDevErrorMessage(
 					'A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.',
-					args,
-				);
-			case 350:
-				return formatDevErrorMessage(
-					'captureActionContext must be called during an Action callback.',
-					args,
-				);
-			case 351:
-				return formatDevErrorMessage(
-					'Cannot enter an Action context after its Action has settled.',
 					args,
 				);
 			default:

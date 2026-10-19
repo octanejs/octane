@@ -1452,7 +1452,7 @@ several Actions that settle together. Octane posts the task with
 `scheduler.postTask` where available, then `MessageChannel`, then `setTimeout`.
 Waiting there are updates inside `startTransition`, Action results, and, while an
 async Action is pending, every update made outside a delegated event, `flushSync`,
-an externally invoked Effect Event, or a commit callback, which Octane already
+an unwrapped Effect Event, or a commit callback, which Octane already
 treats as part of the Action. Three kinds of update stay on the microtask flush,
 because they announce the transition rather
 than complete it: `useTransition` and `useActionState` raising `isPending`, and
@@ -1479,24 +1479,20 @@ when the cue starts during a render, a commit, or the transition's task. An urge
 update to a component whose transition is waiting renders it in the microtask
 flush. `flushSync` and `act()` drain both priorities.
 
-An unwrapped Effect Event invoked after `await` remains urgent because it cannot
-identify which Action called it. Direct setters retain the in-flight Action
-fallback. Capture the Action during its synchronous callback and re-enter it
-explicitly to keep that Effect Event's updates in the same Action:
+An unwrapped Effect Event stays urgent even when an async Action is pending,
+including when called after `await` inside that Action. Direct setters after
+`await` retain Octane's in-flight Action fallback. To keep an Effect Event's
+updates in the Action, wrap the call in `startTransition` after `await`:
 
 ```ts
 startTransition(async () => {
-  const action = captureActionContext();
   await load();
-  action.run(() => updateFromEffectEvent());
+  startTransition(() => updateFromEffectEvent());
 });
 ```
 
-`run` applies only to its callback's synchronous execution; it does not carry
-context across another `await` or create a new Action. On the client, capture
-outside an Action callback and re-entry after that Action settles throw. On the
-server, there is no transition scheduler: capture returns an inert context whose
-`run` invokes the callback inline, even outside an Action.
+The nested transition joins the pending Action. This explicit post-`await`
+pattern is portable to React.
 
 Action result rendering is task-batched; Action callback invocation is not paced.
 As in React, a callback can run synchronously during dispatch, and queued callbacks
