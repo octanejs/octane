@@ -11,6 +11,32 @@ import { deferred } from './_fixtures/signals-async-controls.js';
 import { DerivedPresentation, Presentation } from './_fixtures/signals-resource-transition.tsrx';
 
 describe('pending presentation in signal transitions', () => {
+	it('preserves a request read by the synchronous transition callback', async () => {
+		const pending = deferred<string>();
+		const requests: { key: string; signal: AbortSignal }[] = [];
+		const scope = createScope({ scopeKey: 'resource-transition-action' });
+		const selected$ = scope.signal$('selected', 'A');
+		const lookup = query('resource-transition-action', (key: string, { signal }) => {
+			requests.push({ key, signal });
+			return key === 'A' ? 'ready-A' : pending.promise;
+		});
+		const resource$ = createResource(scope, 'result', () => lookup(selected$.get()));
+		try {
+			await act(() =>
+				startTransition(() => {
+					selected$.set('B');
+					expect(resource$.snapshot().status).toBe('pending');
+				}),
+			);
+			expect(requests.map(({ key }) => key)).toEqual(['A', 'B']);
+			expect(requests[1]!.signal.aborted).toBe(false);
+			await act(() => pending.resolve('ready-B'));
+			expect(resource$.get()).toBe('ready-B');
+		} finally {
+			scope.dispose();
+		}
+	});
+
 	it.each(['snapshot', 'latest', 'get'] as const)(
 		'preserves the selected request for a %s read',
 		async (read) => {
@@ -51,6 +77,55 @@ describe('pending presentation in signal transitions', () => {
 			}
 		},
 	);
+
+	it.each([
+		['synchronous', 'get'],
+		['synchronous', 'snapshot'],
+		['asynchronous', 'snapshot'],
+	] as const)('owns a request through a %s derived %s presentation', async (kind, read) => {
+		const pending = deferred<string>();
+		const requests: AbortSignal[] = [];
+		const scope = createScope({ scopeKey: `derived-request-${kind}-${read}` });
+		const selected$ = scope.signal$('selected', 'A');
+		const lookup = query(`derived-request-${kind}-${read}`, (key: string, { signal }) => {
+			if (key === 'A') return 'ready-A';
+			requests.push(signal);
+			return pending.promise;
+		});
+		const resource$ = createResource(scope, 'resource', () => lookup(selected$.get()));
+		const host = document.createElement('div');
+		document.body.append(host);
+		const root = createRoot(host);
+		try {
+			if (kind === 'synchronous') {
+				const value$ = scope.derived$('value', () => resource$.get());
+				await act(() => root.render(Presentation, { selected$, value$, read }));
+			} else {
+				const compute$: DerivedCompute<string> = ({ read: read$ }) => read$(resource$);
+				await act(() => root.render(DerivedPresentation, { selected$, compute$, read }));
+			}
+			await act(() => startTransition(() => selected$.set('B')));
+			expect(requests).toHaveLength(1);
+			expect(requests[0]!.aborted).toBe(false);
+			expect(host.querySelector('output')?.textContent).toBe(
+				read === 'get' ? 'ready-A' : 'pending',
+			);
+			if (read === 'get') {
+				await act(() => root.unmount());
+				expect(selected$.get()).toBe('B');
+				expect(requests[0]!.aborted).toBe(true);
+				expect(requests).toHaveLength(1);
+			} else {
+				await act(() => pending.resolve('ready-B'));
+				expect(host.querySelector('output')?.textContent).toBe('ready');
+				expect(requests[0]!.aborted).toBe(false);
+			}
+		} finally {
+			root.unmount();
+			scope.dispose();
+			host.remove();
+		}
+	});
 
 	it.each(['snapshot', 'latest', 'get'] as const)(
 		'preserves an async derived attempt and its explicit dependency for a %s read',
