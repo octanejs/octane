@@ -242,7 +242,11 @@ let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) 
 //    allocates no diagnostic array or per-element diagnostic record.
 let SELECT_SYNCS: HTMLSelectElement[] = [];
 let SELECT_DEFAULT_SYNCS: { el: HTMLSelectElement; value: unknown }[] = [];
-let DEV_FORM_CHECKS: Element[] | null = process.env.NODE_ENV === 'production' ? null : [];
+export interface DevFormCheck {
+	element: Element;
+	lifetime: { active: boolean } | null;
+}
+let DEV_FORM_CHECKS: DevFormCheck[] | null = process.env.NODE_ENV === 'production' ? null : [];
 export const DEV_FORM_CHECK_MARK = /* @__PURE__ */ Symbol('octane.devFormCheck');
 const DEV_FORM_CHECK_LINEAR_LIMIT = 8;
 export let DEV_FORM_CHECK_GENERATION = 1;
@@ -470,6 +474,11 @@ function hasPotentialFormDiagnostic(el: Element): boolean {
 	);
 }
 
+function indexOfDevFormCheck(queue: DevFormCheck[], element: Element): number {
+	for (let i = 0; i < queue.length; i++) if (queue[i].element === element) return i;
+	return -1;
+}
+
 // Queue once per element/commit. Validation itself runs at the head of commit,
 // after final source/spread order has settled and before layout effects.
 export function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false): void {
@@ -480,17 +489,17 @@ export function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false
 	// Keep the usual tiny queue property-free, then cap membership work by stamping
 	// the first full batch and every later host with this queue's generation.
 	if (q.length < DEV_FORM_CHECK_LINEAR_LIMIT) {
-		if (q.indexOf(el) !== -1) return;
-		queueDevFormCheck(q, el);
+		if (indexOfDevFormCheck(q, el) !== -1) return;
+		queueDevFormCheck(q, el, scope ?? CURRENT_SCOPE ?? CURRENT_BLOCK);
 		if (q.length < DEV_FORM_CHECK_LINEAR_LIMIT) return;
 		for (let i = 0; i < q.length; i++) {
-			(q[i] as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
+			(q[i].element as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
 		}
 		return;
 	}
 	const host = el as any;
 	if (host[DEV_FORM_CHECK_MARK] === DEV_FORM_CHECK_GENERATION) return;
-	queueDevFormCheck(q, el);
+	queueDevFormCheck(q, el, scope ?? CURRENT_SCOPE ?? CURRENT_BLOCK);
 	host[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
 }
 
@@ -1269,17 +1278,19 @@ export function drainDevFormDiagnostics(target?: Element): void {
 		// A direct signal subscription has already committed this native host.
 		// Its diagnostic is not pending render work: leaving it in the queue can
 		// make a native input flushSync and publish an unrelated held transition.
-		const index = q.indexOf(target);
+		const index = indexOfDevFormCheck(q, target);
 		if (index < 0) return;
+		const check = q[index];
 		q.splice(index, 1);
 		delete (target as any)[DEV_FORM_CHECK_MARK];
-		q = [target];
+		q = [check];
 	} else DEV_FORM_CHECKS = [];
 	// Advance before validation: a console.error hook may synchronously render and
 	// enqueue any still-pending host into the fresh queue owned by the reentrant commit.
 	if (target === undefined) DEV_FORM_CHECK_GENERATION++;
 	for (let i = 0; i < q.length; i++) {
-		const el = q[i];
+		const { element: el, lifetime } = q[i];
+		if (lifetime !== null && !lifetime.active) continue;
 		const authoring = getDevFormDiagnosticState(el);
 		if (authoring !== undefined) {
 			let props = authoring.authoringProps;

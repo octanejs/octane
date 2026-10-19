@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot, startTransition } from '../src/index.js';
+import { createScope } from 'octane/signals';
 import * as ServerRuntime from 'octane/server';
 import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
@@ -32,6 +33,71 @@ function diagnosticCalls(spy: ReturnType<typeof vi.spyOn>) {
 }
 
 describe('native text change development diagnostic', () => {
+	it.each([
+		['inline', 'mount'],
+		['component', 'mount'],
+		['inline', 'transition'],
+	] as const)(
+		'does not write or warn after abandoning the %s signal-backed control during %s',
+		async (kind, mode) => {
+			const { View } = loadCompiledFixtureSource(
+				`function Field(props) @{ <textarea value={props.draft$} /> }
+function Stop(props) { props.beforeFailure(); throw new Error('failed'); }
+export function View(props) @{
+  @try {
+    <>${kind === 'inline' ? '<textarea value={props.draft$} />' : '<Field draft$={props.draft$} />'}<Stop beforeFailure={props.beforeFailure} /></>
+  } @catch (error) { <p>fallback</p> }
+}`,
+				{
+					id: `/src/AbandonedControl-${kind}.tsrx`,
+					mode: 'client',
+					compileOptions: { dev: !PROD_COMPILE, hmr: false, strong: true },
+				},
+			);
+			const scope = createScope({ scopeKey: `abandoned-control-${kind}-${mode}` });
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const write = vi.spyOn(HTMLTextAreaElement.prototype, 'value', 'set');
+			// Rendering may initialize detached DOM before the body is abandoned.
+			const props = {
+				draft$: scope.signal$('draft', 'draft'),
+				beforeFailure: () => write.mockClear(),
+			};
+			const result =
+				mode === 'transition' ? mount(SpreadText, { hostProps: {} }) : mount(View, props);
+			try {
+				if (mode === 'transition')
+					await act(() => startTransition(() => result.root.render(View, props)));
+				expect(result.container.textContent).toBe('fallback');
+				expect(result.findAll('textarea')).toHaveLength(0);
+				expect(write).not.toHaveBeenCalledWith('draft');
+				expect(
+					error.mock.calls.filter((call) =>
+						String(call[0]).includes('without an `onInput` handler'),
+					),
+				).toHaveLength(0);
+			} finally {
+				result.unmount();
+				scope.dispose();
+			}
+		},
+	);
+
+	it('warns for a live broken control in a detached root', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = document.createElement('div');
+		const root = createRoot(container);
+		try {
+			root.render(SpreadTextarea, { hostProps: { value: 'broken' } });
+			flushSync(() => {});
+			expect(container.querySelector('textarea')?.value).toBe('broken');
+			expect(
+				error.mock.calls.filter((call) => String(call[0]).includes('without an `onInput` handler')),
+			).toHaveLength(PROD_COMPILE ? 0 : 1);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('keeps dynamic input diagnostics live in Strong modules with cached hook inputs', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const { Input } = loadCompiledFixtureSource(
