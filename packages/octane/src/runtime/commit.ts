@@ -110,14 +110,16 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // Commit functions (#2043 step 1).
 //
 // Render computes, commit writes. For each template the compiler hoists one
-// commit function `C(bag, careful)`. The bag's binding slots hold COMMITTED
+// commit function `C(bag, cells, careful)`. The bag's binding slots hold COMMITTED
 // values, the ones the DOM shows. A render compares each binding against its
 // committed slot, inline in the compiled template, and only a difference calls
 // a recorder. The first one stages the bag: `bag.next` becomes an array of
 // pending cells, whose cells hold the bag itself as the "unchanged" marker
 // until a binding records into them. `C` walks the cells straight-line: it
 // writes each changed cell through the ordinary setter and only then publishes
-// it to the committed slot.
+// it to the committed slot. Its caller (bagDone, commitRootRenders) clears the
+// staged state and passes the cells, so a setter that throws leaves the bag
+// idle, its committed slots still describing the DOM.
 //
 // `bag.$` packs the template's cell count (low byte, the bag factory's
 // argument) with the STAGED and QUEUED bits. An idle bag's `next` holds the
@@ -240,9 +242,16 @@ function bagResume(bag: any): any[] {
  * keep the snapshots a dispatch in flight holds (preserveDispatchedBundle);
  * commitRootRenders passes it too.
  */
-export function bagDone(s: Scope, bag: any, commit: (bag: any, careful: boolean) => void): void {
-	bag.next[bag.$ & BAG_SIZE] = s;
-	commit(bag, TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0));
+export function bagDone(s: Scope, bag: any): void {
+	const next = bag.next;
+	const size = bag.$ & BAG_SIZE;
+	next[size] = s;
+	bag.$ = size;
+	next[size + 2](
+		bag,
+		next,
+		TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
+	);
 }
 
 /** The open root render's pending structure for `slot`, queued for its commit. */

@@ -29071,7 +29071,7 @@ function planJsx(
 								b.let('_n', b.literal(null)),
 								commitResumedDeclaration(),
 								update,
-								commitDoneStatement(ctx, commitName, planOrigin),
+								commitDoneStatement(ctx, planOrigin),
 							]),
 							planOrigin,
 						)
@@ -30065,7 +30065,7 @@ function planJsx(
 	if (holes.length !== 0) {
 		// After the last hole: commit or queue what the holes recorded.
 		const last = holes.reduce((latest, cc) => (cc.id > latest.id ? cc : latest));
-		pushAfterStmt(last.id, planOrigin, commitDoneStatement(ctx, commitName, planOrigin));
+		pushAfterStmt(last.id, planOrigin, commitDoneStatement(ctx, planOrigin));
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
@@ -30210,7 +30210,7 @@ function planJsx(
 				? everyRenderLines
 				: [
 						...everyRenderLines,
-						commitDoneStatement(ctx, commitName, planOrigin, holes.length !== 0),
+						commitDoneStatement(ctx, planOrigin, holes.length !== 0),
 					],
 		commitCells: commitName !== null,
 		after: afterStatements,
@@ -31176,8 +31176,10 @@ function emitBindingMount(bind, elVar, bag) {
 // The template's hoisted commit function walks the cells straight-line, writes
 // each changed one through the ordinary setter, then publishes it:
 //
-//   function _c$7(_b) { const _n = _b.next; let _v; _b.$ &= 255;
+//   function _c$7(_b, _n) { let _v;
 //     if ((_v = _n[3]) !== _b) { _$setText(_b.f, _v); _b.g = _v; } … }
+//
+// Its caller clears the bag's staged state and passes the cells (`_n`).
 //
 // Handler slots and bundles are written in place unless the runtime passes
 // `careful` (`_f`: an open journal or a dispatch in flight). The bag factory
@@ -31294,15 +31296,8 @@ function emitCommitFunction(ctx, commit, origin) {
 	const name = commitFunctionName(ctx, commit);
 	const cells = [];
 	for (const make of writes) if (make !== undefined) cells.push(make(commit.size()));
-	const body = [
-		b.const('_n', b.member(b.id('_b'), 'next')),
-		b.declaration('let', [b.declarator('_v')]),
-		// Clear the staged state first: a setter that throws leaves the bag idle,
-		// its committed slots still describing the DOM.
-		b.stmt(b.assignment('&=', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS))),
-		...cells,
-	];
-	const params = commit.careful ? [b.id('_b'), b.id('_f')] : [b.id('_b')];
+	const body = [b.declaration('let', [b.declarator('_v')]), ...cells];
+	const params = [b.id('_b'), b.id('_n'), ...(commit.careful ? [b.id('_f')] : [])];
 	// A body without its own origin (a helper's) takes its first binding's.
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -31328,9 +31323,9 @@ function commitOwnersDeclaration(ctx) {
 // under 512) commits or queues it here. `reset` when holes record after it: a
 // bag its commit function already wrote (back under 256) stages afresh; a
 // queued one keeps its cells.
-function commitDoneStatement(ctx, name, origin, reset = false) {
+function commitDoneStatement(ctx, origin, reset = false) {
 	ctx.runtimeNeeded.add('bagDone');
-	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b'), b.id(name)));
+	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b')));
 	return inheritOriginLoc(
 		b.if(
 			b.logical(
