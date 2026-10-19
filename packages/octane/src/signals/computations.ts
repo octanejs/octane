@@ -189,6 +189,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		}
 		this.compute = compute;
 		this.sequence = sequence;
+		this.node.pending?.refreshDeclaration();
 		if (this.asynchronous) return;
 		// The render already evaluated this computation against the same inputs.
 		if (probed?.compute === compute && readsMatch(this.node, probed.reads)) return;
@@ -263,6 +264,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		this.sequence = sequence;
 		this.adoptAttempt(fork);
 		signalBatch(() => {
+			this.node.pending?.refreshDeclaration();
 			promoteDeclarationView(node, this.node);
 			fork.dispose();
 			if (previous !== current) this.stop(previous);

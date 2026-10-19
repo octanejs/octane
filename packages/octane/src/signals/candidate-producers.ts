@@ -114,13 +114,25 @@ function forkDerived<T>(
 	context: CandidateContext,
 ): CandidateProducer {
 	const Binding = this.constructor as typeof DerivedBinding<T>;
-	if (this.frozen || this.owner.readBarrier || !this.compute) {
+	// A later accepted declaration supersedes work forked from this definition.
+	const compute = this.compute;
+	if (this.frozen || this.owner.readBarrier || !compute) {
 		throw new CandidateUnsupportedError(formatClientError(110));
 	}
-	const fork = new Binding(this.owner, target, this.compute, this.options);
+	const fork = new Binding(this.owner, target, compute, this.options);
 	fork.candidate = context;
 	return {
 		dispose: () => fork.dispose(),
+		refreshDeclaration: () => {
+			const next = this.compute;
+			if (!next || next === fork.compute) return;
+			fork.compute = next;
+			bridge.signalBatch(() => {
+				const previous = fork.current;
+				bridge.invalidateNode(target);
+				if (fork.current === previous) fork.invalidateGraph();
+			});
+		},
 		dependencies: () => fork.current?.dependencies.keys() ?? [],
 		prepare: () => {
 			const state = target.state;
@@ -135,6 +147,7 @@ function forkDerived<T>(
 				return state?.waiting
 					? { status: 'pending', waiting: state.waiting }
 					: { status: 'invalid' };
+			const preparedCompute = fork.compute;
 			const previous = this.current;
 			return {
 				status: 'ready',
@@ -142,7 +155,8 @@ function forkDerived<T>(
 					validate: () =>
 						!this.owner.retired &&
 						this.owner.readBarrier === undefined &&
-						this.compute !== undefined &&
+						this.compute === preparedCompute &&
+						fork.compute === preparedCompute &&
 						this.current === previous &&
 						fork.current === current &&
 						target.state === state &&

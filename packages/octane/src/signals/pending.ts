@@ -53,6 +53,11 @@ import {
  */
 let world: object | null | undefined;
 let live = 0;
+// A promotion can reenter from a committed cancellation callback. Only its
+// explicitly refreshed pending computation may read that batch at the inherited
+// committed depth; nested cancellation callbacks still see committed state.
+let reprepareCommittedDepth = 0;
+let reprepareBatch: object | undefined;
 
 function inWorld<T>(batch: object, callback: () => T): T {
 	const previous = world;
@@ -78,6 +83,10 @@ class PendingSlot implements PendingSlotLike, CandidateContext {
 		readonly node: ScopedNode,
 		public batch: object,
 	) {}
+
+	refreshDeclaration(): void {
+		this.producer?.refreshDeclaration?.();
+	}
 
 	run<T>(callback: () => T): T {
 		return inWorld(this.batch, callback);
@@ -148,6 +157,16 @@ function sees(slot: PendingSlot): boolean | 'action' {
 function sameRoot(a: object, b: object): boolean {
 	const host = pending.host!;
 	return host.root(a) === host.root(b);
+}
+
+function readsRepreparedWorld(): boolean {
+	return (
+		committedSignals === reprepareCommittedDepth &&
+		world !== undefined &&
+		world !== null &&
+		reprepareBatch !== undefined &&
+		sameRoot(world, reprepareBatch)
+	);
 }
 
 function createSlot(node: ScopedNode, batch: object): PendingSlot {
@@ -276,7 +295,8 @@ function rebase(node: ScopedNode, value: unknown): void {
 }
 
 function resolve<T>(node: ScopedNode<T>): ScopedNode<T> {
-	if (committedSignals !== 0 || world === null || graph.historical()) return node;
+	if (world === null || (committedSignals !== 0 && !readsRepreparedWorld()) || graph.historical())
+		return node;
 	let slot = node.pending as PendingSlot | undefined;
 	if (slot === undefined) {
 		if (node.kind === 'signal') return node;
@@ -325,7 +345,7 @@ function leave(previous: unknown, node: ScopedNode): void {
 }
 
 function hides(node: ScopedNode): boolean {
-	if (committedSignals !== 0 || world === null) return false;
+	if (world === null || (committedSignals !== 0 && !readsRepreparedWorld())) return false;
 	const slot = node.pending as PendingSlot | undefined;
 	return slot !== undefined && slot.shadow !== node && !!sees(slot);
 }
@@ -410,32 +430,46 @@ function installable(slot: PendingSlot): Install | undefined {
 		: undefined;
 }
 
+/** Whether an Action or surviving reader owns this presentation directly. */
+function presentationRoot(slot: PendingSlot): boolean {
+	if (slot.actionRead) return true;
+	for (let link = slot.shadow!.subs; link !== undefined; link = link.nextSub) {
+		const sub = link.sub;
+		const dependent =
+			sub instanceof graph.ScopedNode
+				? sub
+				: ((sub as SignalObserver).notify as SignalDependencyNotify | undefined)?.[
+						SIGNAL_DEPENDENT_NODE
+					];
+		if (dependent === undefined || !isShadow(dependent)) return true;
+	}
+	return false;
+}
+
+function reprepare(slot: PendingSlot, shadow: ScopedNode): void {
+	if (committedSignals === 0) {
+		graph.refreshNode(shadow);
+		return;
+	}
+	const previousDepth = reprepareCommittedDepth;
+	const previousBatch = reprepareBatch;
+	reprepareCommittedDepth = committedSignals;
+	reprepareBatch = slot.batch;
+	try {
+		graph.refreshNode(shadow);
+	} finally {
+		reprepareCommittedDepth = previousDepth;
+		reprepareBatch = previousBatch;
+	}
+}
+
 /** Shadows read by an Action or surviving reader, including their dependencies. */
 function presentedShadows(
 	installs: readonly Install[],
 	shadows: ReadonlySet<ScopedNode>,
 ): Set<ScopedNode> {
 	const presented = new Set<ScopedNode>();
-	for (const { slot } of installs) {
-		const shadow = slot.shadow!;
-		if (slot.actionRead) {
-			presented.add(shadow);
-			continue;
-		}
-		for (let link = shadow.subs; link !== undefined; link = link.nextSub) {
-			const sub = link.sub;
-			const dependent =
-				sub instanceof graph.ScopedNode
-					? sub
-					: ((sub as SignalObserver).notify as SignalDependencyNotify | undefined)?.[
-							SIGNAL_DEPENDENT_NODE
-						];
-			if (dependent === undefined || !isShadow(dependent)) {
-				presented.add(shadow);
-				break;
-			}
-		}
-	}
+	for (const { slot } of installs) if (presentationRoot(slot)) presented.add(slot.shadow!);
 	// Set iteration visits dependencies added during the walk exactly once.
 	for (const shadow of presented) {
 		for (let link = shadow.deps; link !== undefined; link = link.nextDep) {
@@ -452,7 +486,22 @@ function presentedShadows(
 
 function promote(slots: readonly PendingSlotLike[]): void {
 	graph.signalBatch(() => {
-		withCommittedSignals(() => promoteSlots(slots as PendingSlot[]));
+		const candidates = slots as readonly PendingSlot[];
+		// Reprepare live readers in their pending world while request forks still
+		// own their leases. Their current definitions discover the dependencies
+		// that must survive; obsolete reads never grant publication authority.
+		for (const slot of candidates) {
+			const shadow = slot.shadow;
+			if (
+				!slot.dead &&
+				!slot.node.owner.retired &&
+				shadow &&
+				shadow.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) &&
+				presentationRoot(slot)
+			)
+				reprepare(slot, shadow);
+		}
+		withCommittedSignals(() => promoteSlots(candidates));
 		// DOM bindings present the batch before any public subscriber hears of it,
 		// once the batch ends outside committed scope.
 		graph.presentQueued();

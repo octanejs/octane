@@ -78,6 +78,8 @@ export interface PendingSlotLike {
 	readonly node: ScopedNode;
 	readonly shadow: ScopedNode | undefined;
 	batch: object;
+	/** Refresh private work when its owning binding accepts a new declaration. */
+	refreshDeclaration(): void;
 }
 
 /** A forked binding runs and resolves its reads in its slot's batch. */
