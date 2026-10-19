@@ -228,6 +228,7 @@ import { type WarmEntry, warmCacheForOwner, blockIsAncestor } from './use.js';
 import {
 	createTransitionActionBatch,
 	inCommitCallback,
+	canInheritAsyncAction,
 	transitionActionBatchForUpdate,
 	transitionBatchReady,
 	noteTransitionBlock,
@@ -633,12 +634,17 @@ export let TRANSITION_DEPTH = 0;
  * after the first `await` runs, so post-await setters would otherwise schedule
  * at urgent priority. Keeping this count elevated across the in-flight window
  * preserves Octane's automatic post-await transition priority. Caveat: it's a
- * process-global window, so an unrelated update outside a delegated event,
- * flushSync or commit callback (see inCommitCallback) while an async action is
- * pending is also tagged transition — perfect per-action scoping would need
- * AsyncContext, which isn't available in the browser target.
+ * process-global window, so an unrelated update outside a known callback
+ * boundary (see canInheritAsyncAction) while an async action is pending is also
+ * tagged transition — perfect per-action scoping would need AsyncContext, which
+ * isn't available in the browser target.
  */
 export let ASYNC_TRANSITION_COUNT = 0;
+
+/** Whether the current update has transition priority. */
+export function isTransitionUpdateContext(): boolean {
+	return TRANSITION_DEPTH > 0 || (ASYNC_TRANSITION_COUNT > 0 && canInheritAsyncAction());
+}
 
 /**
  * @internal Adapt a renderer-owned discrete native listener to the DOM scheduler.
@@ -1898,14 +1904,10 @@ export function scheduleRender(
 		block.crossRenderUpdate = true;
 		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
 	}
+	// Ordinary updates should not pay for Action caller classification.
 	const mode: 'urgent' | 'transition' =
-		TRANSITION_DEPTH > 0 ||
-		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush &&
-			_dispatchDepth === 0 &&
-			ASYNC_TRANSITION_COUNT > 0 &&
-			RENDERER_DISCRETE_EVENT_DEPTH === 0 &&
-			!inCommitCallback())
+		((TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0) && isTransitionUpdateContext()) ||
+		(renderPhaseSelf && block.currentRenderMode === 'transition')
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -1961,6 +1963,20 @@ export function scheduleRender(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
+	}
+}
+
+/** Schedule an urgent update independently of any ambient Action. */
+export function scheduleUrgentRender(block: Block): void {
+	const depth = TRANSITION_DEPTH;
+	const asyncCount = ASYNC_TRANSITION_COUNT;
+	TRANSITION_DEPTH = 0;
+	ASYNC_TRANSITION_COUNT = 0;
+	try {
+		scheduleRender(block);
+	} finally {
+		TRANSITION_DEPTH = depth;
+		ASYNC_TRANSITION_COUNT = asyncCount;
 	}
 }
 
@@ -4424,20 +4440,6 @@ export function countLayoutSnapshotChange(cell: object, block: Block): void {
  * motivating concurrent-interleaving window, and any store that actually notifies
  * is unaffected (onStoreChange uses the render-fresh getSnapshot).
  */
-/** External stores expose one live snapshot; their writes cannot be deferred. */
-function scheduleStoreRender(block: Block): void {
-	const depth = TRANSITION_DEPTH;
-	const asyncCount = ASYNC_TRANSITION_COUNT;
-	TRANSITION_DEPTH = 0;
-	ASYNC_TRANSITION_COUNT = 0;
-	try {
-		scheduleRender(block);
-	} finally {
-		TRANSITION_DEPTH = depth;
-		ASYNC_TRANSITION_COUNT = asyncCount;
-	}
-}
-
 let DID_WARN_UNCACHED_SNAPSHOT = false;
 
 export function useSyncExternalStore<T>(
@@ -4507,9 +4509,9 @@ export function useSyncExternalStore<T>(
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
 					? () => {
 							if (!block.disposed) __profileSchedule(block, 'external-store', slot);
-							scheduleStoreRender(block);
+							scheduleUrgentRender(block);
 						}
-					: () => scheduleStoreRender(block),
+					: () => scheduleUrgentRender(block),
 			onStoreChange: () => {
 				if (block.disposed) return;
 				// An urgent, non-deferred render already queued for this owner will
@@ -5166,7 +5168,7 @@ export function makeRoot(
 			mode === undefined &&
 			rootBlock !== null &&
 			!rootBlock.disposed &&
-			(TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0)
+			isTransitionUpdateContext()
 		) {
 			renderOwner.request = (nextMode) => renderResolved(body, props, nextKey, nextMode);
 			scheduleRender(rootBlock);
@@ -5175,13 +5177,7 @@ export function makeRoot(
 		// A direct synchronous mount/replacement mutates before the scheduler's
 		// commit guard. Finish any earlier deferred layout while its DOM is intact.
 		// Transition-priority requests remain queued and retain their own capture.
-		if (
-			!inFlush &&
-			CURRENT_BLOCK === null &&
-			mode === undefined &&
-			TRANSITION_DEPTH === 0 &&
-			ASYNC_TRANSITION_COUNT === 0
-		) {
+		if (!inFlush && CURRENT_BLOCK === null && mode === undefined && !isTransitionUpdateContext()) {
 			if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 			if (unmounted) return;
 		}
@@ -5274,12 +5270,15 @@ export function makeRoot(
 			// — schedule at transition priority so the commit is view-transition-
 			// wrappable (boundaries mounting WITH the initial content enter-animate,
 			// e.g. a Suspense fallback appearing under a <ViewTransition>).
-			if (mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0)) {
+			const transitionMount = mode === undefined && isTransitionUpdateContext();
+			// A renderer-owned discrete listener still commits an urgent mount at
+			// its listener boundary while an Action is pending.
+			if (
+				transitionMount ||
+				(mode === undefined && ASYNC_TRANSITION_COUNT > 0 && RENDERER_DISCRETE_EVENT_DEPTH > 0)
+			) {
 				rootBlock.pending = true;
-				// A renderer event commits its implicit Action-window mount at the
-				// listener boundary; an explicit transition still owns its task.
-				rootBlock.pendingMode =
-					TRANSITION_DEPTH === 0 && RENDERER_DISCRETE_EVENT_DEPTH > 0 ? 'urgent' : 'transition';
+				rootBlock.pendingMode = transitionMount ? 'transition' : 'urgent';
 				if (
 					TRANSITION_TASK_DRIVER &&
 					rootBlock.pendingMode === 'transition' &&
@@ -5365,8 +5364,7 @@ export function makeRoot(
 				!inFlush &&
 				CURRENT_BLOCK === null &&
 				!inNestedUpdateCallback() &&
-				TRANSITION_DEPTH === 0 &&
-				ASYNC_TRANSITION_COUNT === 0
+				!isTransitionUpdateContext()
 			) {
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 				if (unmounted) return;

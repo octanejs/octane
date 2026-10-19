@@ -442,6 +442,8 @@ export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[
 	}
 }
 
+export let EFFECT_EVENT_INVOCATION_DEPTH = 0;
+
 /**
  * React 19 `useEffectEvent` — returns a fresh wrapper each render whose shared
  * cell invokes the latest COMMITTED `fn`. Effect Events are non-reactive (the
@@ -481,7 +483,12 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 		if (CURRENT_SCOPE !== null && EFFECT_EVENT_LIFECYCLE_DEPTH === 0) {
 			throw new Error(formatClientError(11));
 		}
-		return cell.impl.apply(undefined, args);
+		EFFECT_EVENT_INVOCATION_DEPTH++;
+		try {
+			return cell.impl.apply(undefined, args);
+		} finally {
+			EFFECT_EVENT_INVOCATION_DEPTH--;
+		}
 	}) as F;
 }
 

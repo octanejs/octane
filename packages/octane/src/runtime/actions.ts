@@ -15,7 +15,9 @@ import {
 	TRANSITION_DEPTH,
 	ASYNC_TRANSITION_COUNT,
 	TRANSITION_PENDING_COUNT,
+	isTransitionUpdateContext,
 	scheduleRender,
+	scheduleUrgentRender,
 } from './engine.js';
 import { ensureHooks, registerHookCleanup, missingSlot } from './hooks.js';
 import {
@@ -191,7 +193,7 @@ function resetFormNow(form: HTMLFormElement): void {
  * same and applies the reset immediately (the least surprising fallback).
  */
 export function requestFormReset(form: HTMLFormElement): void {
-	if (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0) {
+	if (isTransitionUpdateContext()) {
 		(PENDING_FORM_RESETS ??= new Set()).add(form);
 		return;
 	}
@@ -629,40 +631,53 @@ export function useOptimistic<S, V = S>(
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as OptimisticSlot<V> | undefined;
 	if (s === undefined) {
-		const clear = (): void => {
-			slotRef.armed = false;
-			if (slotRef.queue.length > 0) {
+		let unownedIndices: number[] | null = null;
+		const clear = (indices?: number[]): void => {
+			if (indices !== undefined && unownedIndices !== indices) return;
+			unownedIndices = null;
+			const hadUpdates = slotRef.queue.length > 0;
+			if (indices === undefined) {
+				slotRef.armed = false;
 				slotRef.queue.length = 0;
-				if (!block.disposed) {
-					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-						__profileSchedule(block, 'optimistic-revert', slot);
-					scheduleRender(block);
+			} else {
+				// Compact once so an unowned burst is linear in the queue length.
+				let write = indices[0];
+				let skip = 0;
+				for (let read = write; read < slotRef.queue.length; read++) {
+					if (read === indices[skip]) skip++;
+					else slotRef.queue[write++] = slotRef.queue[read];
 				}
+				slotRef.queue.length = write;
+			}
+			if (hadUpdates && !block.disposed) {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileSchedule(block, 'optimistic-revert', slot);
+				if (indices === undefined) scheduleRender(block);
+				else scheduleUrgentRender(block);
 			}
 		};
 		const slotRef: OptimisticSlot<V> = {
 			queue: [],
 			armed: false,
 			add: (value: V) => {
-				if (
-					process.env.NODE_ENV !== 'production' &&
-					TRANSITION_DEPTH === 0 &&
-					ASYNC_TRANSITION_COUNT === 0
-				) {
+				const inAction = isTransitionUpdateContext();
+				if (process.env.NODE_ENV !== 'production' && !inAction) {
 					console.error(
 						'An optimistic update was dispatched outside a transition or action. Wrap it in startTransition or call it from an action.',
 					);
 				}
 				slotRef.queue.push(value);
-				if (TRANSITION_PENDING_COUNT > 0) {
+				if (inAction && TRANSITION_PENDING_COUNT > 0) {
 					// Inside an Action: the optimistic value is held until that
 					// transition settles (the listener below clears it then).
 					slotRef.armed = true;
 				} else {
-					// Outside any Action: React warns and shows the value only
-					// briefly. Clear on the next microtask so it renders once and
-					// reverts — never left stuck waiting on a transition that won't come.
-					queueMicrotask(clear);
+					// Revert only unowned updates: this slot may already contain
+					// optimistic updates owned by a pending Action.
+					if (unownedIndices === null) {
+						const indices = (unownedIndices = [slotRef.queue.length - 1]);
+						queueMicrotask(() => clear(indices));
+					} else unownedIndices.push(slotRef.queue.length - 1);
 				}
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)

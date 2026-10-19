@@ -24,6 +24,7 @@ import {
 	TRANSITION_TASK_DRIVER,
 	TRANSITION_ROOT_DRIVER,
 	SCHEDULED_VISIBILITY_DRIVER,
+	EFFECT_EVENT_INVOCATION_DEPTH,
 	resolveSlot,
 } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
@@ -234,10 +235,21 @@ export function createTransitionActionBatch(): TransitionActionBatch {
  * Like React, their updates are urgent and never join an in-flight Action;
  * commitEffects also clears any transition the commit inherited. A transition
  * started inside the callback still owns its own updates. Store consistency
- * checks need no case here: scheduleStoreRender is already urgent.
+ * checks need no case here: external-store updates already schedule urgently.
  */
 export function inCommitCallback(): boolean {
 	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
+}
+
+/** Callback boundaries do not infer ownership from an unrelated in-flight Action. */
+export function canInheritAsyncAction(): boolean {
+	return (
+		!syncFlush &&
+		_dispatchDepth === 0 &&
+		RENDERER_DISCRETE_EVENT_DEPTH === 0 &&
+		EFFECT_EVENT_INVOCATION_DEPTH === 0 &&
+		!inCommitCallback()
+	);
 }
 
 /**
@@ -249,18 +261,11 @@ export function transitionActionBatchForUpdate(block?: Block): TransitionActionB
 	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
-	// (including continuous events), flushSync and commit callbacks opt out of
-	// that fallback. This only selects the batch: continuous events still flush
-	// in a microtask, and an explicit transition inside a handler wins above.
-	if (
-		IN_FLIGHT_TRANSITION_ACTION_BATCH === null ||
-		syncFlush ||
-		_dispatchDepth > 0 ||
-		RENDERER_DISCRETE_EVENT_DEPTH > 0 ||
-		inCommitCallback()
-	)
-		return null;
-	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
+	// (including continuous events), Effect Events, flushSync and commit callbacks
+	// opt out. An explicit transition still wins above.
+	return IN_FLIGHT_TRANSITION_ACTION_BATCH !== null && canInheritAsyncAction()
+		? IN_FLIGHT_TRANSITION_ACTION_BATCH
+		: null;
 }
 
 /**
