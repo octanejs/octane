@@ -11861,6 +11861,7 @@ function compileInternal(
 		hoistedTemplates: [], // { name, ast, html, ns, frag, origins }
 		internedTemplates: new Map(), // HTML -> one template or namespace/fragment variants
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
+		commitFunctions: new Map(), // structural key -> hoisted commit function name (emitCommitFunction)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		// Descriptor capabilities this module's JSX values can select (see
@@ -28242,6 +28243,7 @@ function planJsx(
 	const commit = !noTemplate && !ctx.presentationHydration ? makeCommitPlan() : null;
 	const BAG_LOCALS_PLACEHOLDER = `    /*__bagLocals__*/`;
 	if (!noTemplate) mountLines.push(BAG_LOCALS_PLACEHOLDER);
+	const BAG_FACTORY_PLACEHOLDER = `    /*__bagFactory__*/`;
 
 	let elementVars;
 	let ensureVar;
@@ -28832,12 +28834,15 @@ function planJsx(
 					? constArgNode(f.constExpr)
 					: b.id(f.local);
 		const rootArg = () => (single ? b.id('_root') : b.literal(null));
-		if (bag.fields.length <= BAG_FACTORY_MAX) {
-			ctx.runtimeNeeded.add(`bag${bag.fields.length}`);
-			// The arity factory's object literal still declares every field, so an
-			// omitted trailing `undefined` seed keeps the same bag shape.
-			mountLines.push(
-				inheritOriginLoc(
+		const commits = commit !== null && commit.size() > 0;
+		ctx.runtimeNeeded.add(
+			bag.fields.length <= BAG_FACTORY_MAX ? `bag${bag.fields.length}` : 'bagOf',
+		);
+		const factoryLine = (commitName) => {
+			if (bag.fields.length <= BAG_FACTORY_MAX) {
+				// The arity factory's object literal still declares every field, so an
+				// omitted trailing `undefined` seed keeps the same bag shape.
+				return inheritOriginLoc(
 					b.stmt(
 						b.assignment(
 							'=',
@@ -28846,12 +28851,8 @@ function planJsx(
 								`_$bag${bag.fields.length}`,
 								b.id('__s'),
 								rootArg(),
-								...(commit !== null && commit.size() > 0
-									? [
-											...bag.fields.map(bagFieldValue),
-											b.literal(commit.size()),
-											b.id(commitFunctionName(ctx, commit)),
-										]
+								...(commits
+									? [...bag.fields.map(bagFieldValue), b.literal(commit.size()), b.id(commitName)]
 									: optionalCallArgs(
 											...bag.fields.map((f) =>
 												f.constExpr === 'undefined' ? null : bagFieldValue(f),
@@ -28861,41 +28862,36 @@ function planJsx(
 						),
 					),
 					planOrigin,
-				),
-			);
-		} else {
+				);
+			}
 			// Spill path — beyond the shared-factory arities: one inline literal
 			// (still real values, single allocation) through the generic commit.
-			ctx.runtimeNeeded.add('bagOf');
-			mountLines.push(
-				inheritOriginLoc(
-					b.stmt(
-						b.assignment(
-							'=',
-							b.id('_b'),
-							b.call(
-								'_$bagOf',
-								b.id('__s'),
-								rootArg(),
-								b.object([
-									...bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f))),
-									// The same state fields as the arity factories (see bagRecord).
-									b.prop('init', b.id('$'), b.literal(commit?.size() ?? 0)),
-									b.prop(
-										'init',
-										b.id('next'),
-										commit !== null && commit.size() > 0
-											? b.id(commitFunctionName(ctx, commit))
-											: b.literal(null),
-									),
-								]),
-							),
+			return inheritOriginLoc(
+				b.stmt(
+					b.assignment(
+						'=',
+						b.id('_b'),
+						b.call(
+							'_$bagOf',
+							b.id('__s'),
+							rootArg(),
+							b.object([
+								...bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f))),
+								// The same state fields as the arity factories (see bagRecord).
+								b.prop('init', b.id('$'), b.literal(commit?.size() ?? 0)),
+								b.prop('init', b.id('next'), commits ? b.id(commitName) : b.literal(null)),
+							]),
 						),
 					),
-					planOrigin,
 				),
+				planOrigin,
 			);
-		}
+		};
+		// A commit function is named once its body is known (emitCommitFunction).
+		if (commits) {
+			commit.factory = factoryLine;
+			mountLines.push(BAG_FACTORY_PLACEHOLDER);
+		} else mountLines.push(factoryLine(null));
 		// REF MANIFEST (compiled-output plan, ref-manifest phase): bodies with
 		// ref-carrying bindings stamp a module-scope constant on the scope so the
 		// runtime's suspense-hide walk (detachSubtreeRefs) finds the bag fields
@@ -28985,6 +28981,8 @@ function planJsx(
 	if (commit?.resumed)
 		updateLines.unshift(inheritOriginLoc(commitResumedDeclaration(), planOrigin));
 	const commitName = commit !== null ? emitCommitFunction(ctx, commit, planOrigin) : null;
+	if (commit?.factory)
+		mountLines[mountLines.indexOf(BAG_FACTORY_PLACEHOLDER)] = commit.factory(commitName);
 	if (ctx.scalarBindingClaims) {
 		// Only opted-in scalar views can retain another writer's publication at
 		// hydration. Record their existing cache fields; ordinary output is unchanged.
@@ -30208,10 +30206,7 @@ function planJsx(
 		everyRender:
 			commitName === null || bindingCells === 0
 				? everyRenderLines
-				: [
-						...everyRenderLines,
-						commitDoneStatement(ctx, planOrigin, holes.length !== 0),
-					],
+				: [...everyRenderLines, commitDoneStatement(ctx, planOrigin, holes.length !== 0)],
 		commitCells: commitName !== null,
 		after: afterStatements,
 		head: headEmit.head,
@@ -31220,8 +31215,8 @@ function makeCommitPlan() {
 			size = 0;
 			writes = [];
 		},
-		/** The commit function's name, allocated by commitFunctionName. */
-		name: null,
+		/** Builds the bag factory call once the commit function is named. */
+		factory: null,
 		/** A write takes the commit function's `careful` parameter (`_f`). */
 		careful: false,
 		/** An update binding compares inline, so the update branch declares `_r`. */
@@ -31284,20 +31279,19 @@ function commitCellCount(bind) {
 	return bind.kind === 'styleProperties' ? bind.properties.length : 1;
 }
 
-/** The template's commit function, named once its bag factory needs it. */
-function commitFunctionName(ctx, commit) {
-	commit.name ??= allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
-	return commit.name;
-}
-
+/** The template's commit function; byte-identical ones share one declaration. */
 function emitCommitFunction(ctx, commit, origin) {
 	const writes = commit.writes();
-	if (writes.length === 0 && commit.name === null) return null;
-	const name = commitFunctionName(ctx, commit);
+	if (writes.length === 0 && commit.factory === null) return null;
 	const cells = [];
 	for (const make of writes) if (make !== undefined) cells.push(make(commit.size()));
 	const body = [b.declaration('let', [b.declarator('_v')]), ...cells];
 	const params = [b.id('_b'), b.id('_n'), ...(commit.careful ? [b.id('_f')] : [])];
+	const key = astStructuralKey([params, body]);
+	const shared = ctx.commitFunctions.get(key);
+	if (shared !== undefined) return shared;
+	const name = allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
+	ctx.commitFunctions.set(key, name);
 	// A body without its own origin (a helper's) takes its first binding's.
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
