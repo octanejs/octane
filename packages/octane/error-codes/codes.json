@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 350,
+  "nextCode": 352,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2096,6 +2096,18 @@
     "349": {
       "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
       "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "350": {
+      "message": "captureActionContext must be called during an Action callback.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "351": {
+      "message": "Cannot enter an Action context after its Action has settled.",
+      "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
     }

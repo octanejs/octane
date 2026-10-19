@@ -4800,103 +4800,182 @@ export function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 	}
 }
 
+/**
+ * Re-enter a captured Action for the synchronous duration of a callback.
+ * On the client the context expires when that Action settles. On the server,
+ * where there is no Action scheduler, `run` simply invokes the callback.
+ */
+export interface ActionContext {
+	run<T>(fn: () => T): T;
+}
+
+interface CapturedAction {
+	batch: TransitionActionBatch | null;
+	context: ActionContext;
+}
+
+// undefined: outside an Action callback; null: inside one, but not captured.
+// The record is allocated only if that invocation explicitly captures it.
+let currentActionCapture: CapturedAction | null | undefined;
+
+/** Capture the current client Action so a later synchronous callback can re-enter it. */
+export function captureActionContext(): ActionContext {
+	const batch = ACTIVE_TRANSITION_ACTION_BATCH;
+	if (
+		currentActionCapture === undefined ||
+		batch === null ||
+		(currentActionCapture !== null && currentActionCapture.batch !== batch)
+	) {
+		throw new Error(formatClientError(350));
+	}
+	if (currentActionCapture !== null) return currentActionCapture.context;
+	const captured: CapturedAction = {
+		batch,
+		context: {
+			run(fn) {
+				if (captured.batch === null) throw new Error(formatClientError(351));
+				const previousBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+				const previousCapture = currentActionCapture;
+				ACTIVE_TRANSITION_ACTION_BATCH = captured.batch;
+				currentActionCapture = captured;
+				TRANSITION_DEPTH++;
+				try {
+					return fn();
+				} finally {
+					TRANSITION_DEPTH--;
+					currentActionCapture = previousCapture;
+					ACTIVE_TRANSITION_ACTION_BATCH = previousBatch;
+				}
+			},
+		},
+	};
+	currentActionCapture = captured;
+	return captured.context;
+}
+
 export function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookSlot): void {
-	// Install the optional off-screen swap graph before any listener or user
-	// update can observe transition priority.
-	ensureTransitionDrivers();
-	// Bump the priority flag FIRST so any scheduleRender calls fired by the
-	// listener notification (and by fn itself) are tagged as transition.
-	TRANSITION_DEPTH++;
-	const parentActionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
-	const pendingActionBatch = IN_FLIGHT_TRANSITION_ACTION_BATCH;
-	const actionBatch = parentActionBatch ?? pendingActionBatch ?? createTransitionActionBatch();
-	const ownsActionBatch = parentActionBatch === null && pendingActionBatch === null;
-	ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
-	if (hook !== undefined) {
-		addTransitionHookToBatch(actionBatch, hook);
-		publishTransitionHookBatch(actionBatch);
-	}
-	// A transition started synchronously during a form's submit dispatch
-	// entangles with that form's status (manual-action useFormStatus activation —
-	// see publishManualFormPending). Registered here; every settle path below
-	// notifies the record exactly once.
-	const submitRec = ACTIVE_SUBMIT_DISPATCH;
-	if (submitRec !== null) {
-		if (publishManualFormPending === noop) installManualFormPending();
-		submitRec.transitions++;
-	}
-	let result: unknown;
+	const previousCapture = currentActionCapture;
+	currentActionCapture = undefined;
 	try {
-		tickTransitionCount(+1);
-		try {
-			result = fn();
-			if (result != null && typeof (result as { then?: unknown }).then === 'function') {
-				actionBatch.pendingActions++;
-				IN_FLIGHT_TRANSITION_ACTION_BATCH = actionBatch;
-			}
-			if (ownsActionBatch) {
-				actionBatch.closed = true;
-				flushTransitionActionBatchIfReady(actionBatch);
-			}
-		} catch (error) {
-			if (ownsActionBatch) {
-				actionBatch.closed = true;
-				flushTransitionActionBatchIfReady(actionBatch);
-			}
-			throw error;
-		} finally {
-			ACTIVE_TRANSITION_ACTION_BATCH = parentActionBatch;
-			TRANSITION_DEPTH--;
+		// Install the optional off-screen swap graph before any listener or user
+		// update can observe transition priority.
+		ensureTransitionDrivers();
+		// Bump the priority flag FIRST so any scheduleRender calls fired by the
+		// listener notification (and by fn itself) are tagged as transition.
+		TRANSITION_DEPTH++;
+		const parentActionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+		const pendingActionBatch = IN_FLIGHT_TRANSITION_ACTION_BATCH;
+		const actionBatch = parentActionBatch ?? pendingActionBatch ?? createTransitionActionBatch();
+		const ownsActionBatch = parentActionBatch === null && pendingActionBatch === null;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
+		if (hook !== undefined) {
+			addTransitionHookToBatch(actionBatch, hook);
+			publishTransitionHookBatch(actionBatch);
 		}
-	} catch (err) {
-		tickTransitionCount(-1);
-		if (submitRec !== null) settleSubmitTransition(submitRec);
-		// Don't strand resets queued before the throw — they'd fire on an unrelated
-		// later transition's settle otherwise. (flushFormResets self-guards if an
-		// outer transition window is still open.)
-		flushFormResets();
-		actionBatch.workComplete = true;
-		finishTransitionHookBatch(actionBatch);
-		reportTransitionError(err, hook);
-		return;
-	}
-	if (result != null && typeof (result as { then?: unknown }).then === 'function') {
-		// React 19 Actions parity: an async callback returns a promise. Keep the
-		// transition pending until that promise settles — the awaited
-		// continuation (and any setters after `await`) resumes on a later
-		// microtask, AFTER a fixed queueMicrotask decrement would have already
-		// dropped isPending. Decrement exactly once on settle (fulfil OR reject).
-		// ASYNC_TRANSITION_COUNT stays elevated across the same window so setters
-		// fired after the `await` schedule at transition priority (TRANSITION_DEPTH
-		// is already 0 by then — the synchronous slice has returned).
-		ASYNC_TRANSITION_COUNT++;
-		let settled = false;
-		const settle = () => {
-			if (settled) return;
-			settled = true;
-			actionBatch.pendingActions--;
-			flushTransitionActionBatchIfReady(actionBatch);
-			// Notify pending listeners while the async priority window is still
-			// active, so their render cannot upgrade the just-promoted Action batch
-			// to urgent before a suspending transition render gets to hold its DOM.
+		// A transition started synchronously during a form's submit dispatch
+		// entangles with that form's status (manual-action useFormStatus activation —
+		// see publishManualFormPending). Registered here; every settle path below
+		// notifies the record exactly once.
+		const submitRec = ACTIVE_SUBMIT_DISPATCH;
+		if (submitRec !== null) {
+			if (publishManualFormPending === noop) installManualFormPending();
+			submitRec.transitions++;
+		}
+		let result: unknown;
+		let capturedAction: CapturedAction | null = null;
+		let isAsync = false;
+		try {
+			tickTransitionCount(+1);
+			try {
+				currentActionCapture = null;
+				try {
+					result = fn();
+				} finally {
+					// The callback may have populated the capture slot.
+					capturedAction = currentActionCapture as CapturedAction | null;
+					currentActionCapture = undefined;
+				}
+				isAsync = result != null && typeof (result as { then?: unknown }).then === 'function';
+				if (isAsync) {
+					actionBatch.pendingActions++;
+					IN_FLIGHT_TRANSITION_ACTION_BATCH = actionBatch;
+				} else if (capturedAction !== null) {
+					capturedAction.batch = null;
+				}
+				if (ownsActionBatch) {
+					actionBatch.closed = true;
+					flushTransitionActionBatchIfReady(actionBatch);
+				}
+			} catch (error) {
+				if (capturedAction !== null) capturedAction.batch = null;
+				if (ownsActionBatch) {
+					actionBatch.closed = true;
+					flushTransitionActionBatchIfReady(actionBatch);
+				}
+				throw error;
+			} finally {
+				ACTIVE_TRANSITION_ACTION_BATCH = parentActionBatch;
+				TRANSITION_DEPTH--;
+			}
+		} catch (err) {
 			tickTransitionCount(-1);
-			ASYNC_TRANSITION_COUNT--;
 			if (submitRec !== null) settleSubmitTransition(submitRec);
-			// The action window (may have) closed — apply queued requestFormReset()s.
+			// Don't strand resets queued before the throw — they'd fire on an unrelated
+			// later transition's settle otherwise. (flushFormResets self-guards if an
+			// outer transition window is still open.)
 			flushFormResets();
-			// isPending falls with the render of the Action's promoted updates.
-			queueTransitionFall(actionBatch, undefined);
-		};
-		(result as Promise<unknown>).then(settle, (error) => {
-			settle();
-			reportTransitionError(error, hook);
-		});
-	} else {
-		// Synchronous callback: decrement once the drain that renders the queued
-		// work this transition produced has decided its holds — a render that held
-		// the transition open by suspending incremented the count itself via
-		// handleSuspense, so the net count stays > 0 (settleTransitionFalls).
-		queueTransitionFall(actionBatch, submitRec);
+			actionBatch.workComplete = true;
+			finishTransitionHookBatch(actionBatch);
+			reportTransitionError(err, hook);
+			return;
+		}
+		if (isAsync) {
+			// React 19 Actions parity: an async callback returns a promise. Keep the
+			// transition pending until that promise settles — the awaited
+			// continuation (and any setters after `await`) resumes on a later
+			// microtask, AFTER a fixed queueMicrotask decrement would have already
+			// dropped isPending. Decrement exactly once on settle (fulfil OR reject).
+			// ASYNC_TRANSITION_COUNT stays elevated across the same window so setters
+			// fired after the `await` schedule at transition priority (TRANSITION_DEPTH
+			// is already 0 by then — the synchronous slice has returned).
+			ASYNC_TRANSITION_COUNT++;
+			let settled = false;
+			const settle = () => {
+				if (settled) return;
+				settled = true;
+				if (capturedAction !== null) capturedAction.batch = null;
+				actionBatch.pendingActions--;
+				flushTransitionActionBatchIfReady(actionBatch);
+				// Notify pending listeners while the async priority window is still
+				// active, so their render cannot upgrade the just-promoted Action batch
+				// to urgent before a suspending transition render gets to hold its DOM.
+				tickTransitionCount(-1);
+				ASYNC_TRANSITION_COUNT--;
+				if (submitRec !== null) settleSubmitTransition(submitRec);
+				// The action window (may have) closed — apply queued requestFormReset()s.
+				flushFormResets();
+				// isPending falls with the render of the Action's promoted updates.
+				queueTransitionFall(actionBatch, undefined);
+			};
+			const reject = (error: unknown) => {
+				if (settled) return;
+				settle();
+				reportTransitionError(error, hook);
+			};
+			try {
+				(result as Promise<unknown>).then(settle, reject);
+			} catch (error) {
+				reject(error);
+			}
+		} else {
+			// Synchronous callback: decrement once the drain that renders the queued
+			// work this transition produced has decided its holds — a render that held
+			// the transition open by suspending incremented the count itself via
+			// handleSuspense, so the net count stays > 0 (settleTransitionFalls).
+			queueTransitionFall(actionBatch, submitRec);
+		}
+	} finally {
+		currentActionCapture = previousCapture;
 	}
 }
 

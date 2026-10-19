@@ -1452,8 +1452,9 @@ several Actions that settle together. Octane posts the task with
 `scheduler.postTask` where available, then `MessageChannel`, then `setTimeout`.
 Waiting there are updates inside `startTransition`, Action results, and, while an
 async Action is pending, every update made outside a delegated event, `flushSync`,
-or a commit callback, which Octane already treats as part of the Action. Three kinds
-of update stay on the microtask flush, because they announce the transition rather
+an externally invoked Effect Event, or a commit callback, which Octane already
+treats as part of the Action. Three kinds of update stay on the microtask flush,
+because they announce the transition rather
 than complete it: `useTransition` and `useActionState` raising `isPending`, and
 `useOptimistic` showing a value. As React renders these cues in an urgent lane, a
 cue renders at urgent priority and without the transition's own updates, whether
@@ -1477,6 +1478,25 @@ boundary that is holding a suspended transition, when `flushSync` drains both, o
 when the cue starts during a render, a commit, or the transition's task. An urgent
 update to a component whose transition is waiting renders it in the microtask
 flush. `flushSync` and `act()` drain both priorities.
+
+An unwrapped Effect Event invoked after `await` remains urgent because it cannot
+identify which Action called it. Direct setters retain the in-flight Action
+fallback. Capture the Action during its synchronous callback and re-enter it
+explicitly to keep that Effect Event's updates in the same Action:
+
+```ts
+startTransition(async () => {
+  const action = captureActionContext();
+  await load();
+  action.run(() => updateFromEffectEvent());
+});
+```
+
+`run` applies only to its callback's synchronous execution; it does not carry
+context across another `await` or create a new Action. On the client, capture
+outside an Action callback and re-entry after that Action settles throw. On the
+server, there is no transition scheduler: capture returns an inert context whose
+`run` invokes the callback inline, even outside an Action.
 
 Action result rendering is task-batched; Action callback invocation is not paced.
 As in React, a callback can run synchronously during dispatch, and queued callbacks

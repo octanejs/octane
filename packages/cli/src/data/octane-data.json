@@ -3555,6 +3555,16 @@
       "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "350": {
+      "message": "captureActionContext must be called during an Action callback.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "351": {
+      "message": "Cannot enter an Action context after its Action has settled.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

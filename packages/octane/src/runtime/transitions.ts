@@ -239,7 +239,7 @@ export function inCommitCallback(): boolean {
 	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
 }
 
-/** Known synchronous callback boundaries cannot be post-await Action continuations. */
+/** Callback boundaries do not infer ownership from an unrelated in-flight Action. */
 export function canInheritAsyncAction(): boolean {
 	return (
 		!syncFlush &&
@@ -260,7 +260,7 @@ export function transitionActionBatchForUpdate(block?: Block): TransitionActionB
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
 	// (including continuous events), Effect Events, flushSync and commit callbacks
-	// opt out. An explicit transition inside a callback still wins above.
+	// opt out. An explicit transition or captured Action context still wins above.
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH !== null && canInheritAsyncAction()
 		? IN_FLIGHT_TRANSITION_ACTION_BATCH
 		: null;

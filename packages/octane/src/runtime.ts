@@ -134,6 +134,8 @@ export {
 	act,
 	useSyncExternalStore,
 	useTransition,
+	captureActionContext,
+	type ActionContext,
 } from './runtime/engine.js';
 export { renderWritesForbidden, drainPassiveEffects, hasPendingWork } from './runtime/effects.js';
 export {

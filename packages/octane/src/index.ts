@@ -72,6 +72,8 @@ export {
 	useDebugValue,
 	type FormStatus,
 	startTransition,
+	captureActionContext,
+	type ActionContext,
 	requestFormReset,
 	memo,
 	lazy,
