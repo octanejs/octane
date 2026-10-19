@@ -84,8 +84,14 @@ class ScalarBinding<T>
 		this.compute = compute;
 		this.sequence = sequence;
 		// The render already evaluated this computation against the same inputs.
-		if (probed?.compute === compute && readsMatch(this.node, probed.reads)) return;
-		signalBatch(() => reevaluateNode(this.node));
+		const unchanged = probed?.compute === compute && readsMatch(this.node, probed.reads);
+		// A pending shadow may still cache the superseded declaration's result.
+		const shadow = this.node.pending?.shadow;
+		if (unchanged && shadow === undefined) return;
+		signalBatch(() => {
+			if (shadow !== undefined) invalidateNode(shadow);
+			if (!unchanged) reevaluateNode(this.node);
+		});
 	}
 
 	/** An equal value needs no view; a changed one is evaluated once, privately. */
@@ -126,7 +132,11 @@ class ScalarBinding<T>
 		this.view = undefined;
 		this.compute = view.binding.compute;
 		this.sequence = sequence;
-		signalBatch(() => promoteDeclarationView(node, this.node));
+		signalBatch(() => {
+			const shadow = this.node.pending?.shadow;
+			if (shadow !== undefined) invalidateNode(shadow);
+			promoteDeclarationView(node, this.node);
+		});
 		view.binding.dispose();
 	}
 

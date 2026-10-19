@@ -3,6 +3,7 @@ import {
 	captureSignalOwner,
 	currentSignalOwner,
 	derived$,
+	query$,
 	type SignalHandle,
 } from 'octane/signals';
 
@@ -72,6 +73,7 @@ interface RedeclaredWhilePendingProps {
 	route$: SignalHandle<string>;
 	suffix: string;
 	load(route: string): Promise<string>;
+	scalar?: boolean;
 }
 
 function PendingRoute(props: RedeclaredWhilePendingProps) @{
@@ -81,7 +83,9 @@ function PendingRoute(props: RedeclaredWhilePendingProps) @{
 }
 
 export function RedeclaredWhilePending(props: RedeclaredWhilePendingProps) @{
-	const selected$ = derived$(() => props.route$.get() + ':' + props.suffix);
+	const selected$ = props.scalar
+		? derived$(() => `${props.route$.get()}:${props.suffix}`)
+		: derived$(() => props.route$.get() + ':' + props.suffix);
 	const available$ = derived$(() => selected$.snapshot().status);
 	const value$ = derived$(() => {
 		const snapshot = selected$.snapshot();
@@ -92,6 +96,22 @@ export function RedeclaredWhilePending(props: RedeclaredWhilePendingProps) @{
 		<output>
 			{available$.get()}|{value$.get()}
 		</output>
+		<PendingRoute {...props} />
+	</main>
+}
+
+export function AsyncRedeclaredWhilePending(
+	props: RedeclaredWhilePendingProps & {
+		fetch(route: string, context: { signal: AbortSignal }): Promise<string>;
+		selection?: string;
+	},
+) @{
+	const request$ = query$(() => props.selection ?? props.route$.get(), props.fetch);
+	const selected$ = derived$(async ({ read }) => `${await read(request$)}:${props.suffix}`);
+	const snapshot = selected$.snapshot();
+	<main>
+		<i>{props.suffix}</i>
+		<output>{snapshot.status === 'ready' ? snapshot.value : snapshot.status}</output>
 		<PendingRoute {...props} />
 	</main>
 }
