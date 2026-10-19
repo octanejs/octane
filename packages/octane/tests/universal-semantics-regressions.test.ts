@@ -7,6 +7,7 @@ import {
 	defineUniversalComponent,
 	rendererRegion,
 	startTransition as startUniversalTransition,
+	universalActivity,
 	universalComponent,
 	universalFor,
 	universalKey,
@@ -316,6 +317,57 @@ describe('universal runtime semantic regressions', () => {
 		root.unmount();
 	});
 
+	it.each([8, 128])('retains both request stages across %i sibling boundaries', async (count) => {
+		const { container, root } = objectRoot();
+		const inputs = Array.from({ length: count }, (_, index) => `row-${index}`);
+		const first = new Map<string, ReturnType<typeof deferred<string>>>();
+		const second = new Map<string, ReturnType<typeof deferred<string>>>();
+		const loadFirst = vi.fn((input: string) => {
+			const request = deferred<string>();
+			first.set(input, request);
+			return request.promise;
+		});
+		const loadSecond = vi.fn((input: string, value: string) => {
+			expect(value).toBe(`first-${input}`);
+			const request = deferred<string>();
+			second.set(input, request);
+			return request.promise;
+		});
+		const committed = vi.fn();
+		const Scene = defineUniversalComponent('object', () =>
+			inputs.map((input) =>
+				universalTry(
+					() =>
+						universalComponent(
+							'object',
+							RootFreshPromiseScene,
+							{ input, loadFirst, loadSecond, committed },
+							input,
+						),
+					() => null,
+				),
+			),
+		);
+		root.render(Scene, undefined);
+		expect(first.size).toBe(count);
+		expect(container.children).toEqual([]);
+		for (const input of inputs.toReversed()) first.get(input)!.resolve(`first-${input}`);
+		await flushMicrotasks();
+		expect(loadFirst).toHaveBeenCalledTimes(count);
+		expect(second.size).toBe(count);
+		expect(container.children).toEqual([]);
+		for (const input of inputs.toReversed()) second.get(input)!.resolve(`second-${input}`);
+		await flushMicrotasks();
+		expect(loadFirst).toHaveBeenCalledTimes(count);
+		expect(loadSecond).toHaveBeenCalledTimes(count);
+		expect(container.children.map((child) => child.props)).toEqual(
+			inputs.map((input) => ({ input, value: `second-${input}` })),
+		);
+		expect(committed).toHaveBeenCalledTimes(count);
+		root.unmount();
+		expect(container.children).toEqual([]);
+	});
+
 	it('drops an older suspended memo replay when newer props supersede it', async () => {
 		const { container, root } = objectRoot();
 		const firstByInput = new Map<string, ReturnType<typeof deferred<string>>>();
@@ -516,6 +568,103 @@ describe('universal runtime semantic regressions', () => {
 		]);
 		root.unmount();
 	});
+
+	it.each(['key', 'component'] as const)(
+		'does not reuse a suspended request after its child %s changes',
+		async (change) => {
+			const { container, root } = objectRoot();
+			const requests: ReturnType<typeof deferred<string>>[] = [];
+			const result = universalPlan('object', {
+				kind: 'host',
+				type: 'result',
+				bindings: [['value', 0]],
+			});
+			const renderChild = () => {
+				const promise = useUniversalMemo(
+					() => {
+						const request = deferred<string>();
+						requests.push(request);
+						return request.promise;
+					},
+					[],
+					'request',
+				);
+				return universalValue(result, [useUniversal(promise)]);
+			};
+			let Child = defineUniversalComponent('object', renderChild);
+			let key = 0;
+			const Scene = defineUniversalComponent('object', () =>
+				universalComponent('object', Child, {}, key),
+			);
+			root.render(Scene, undefined);
+			expect(requests).toHaveLength(1);
+			if (change === 'key') key = -0;
+			else Child = defineUniversalComponent('object', () => renderChild());
+			requests[0].resolve('stale');
+			await flushMicrotasks();
+			expect(container.children).toEqual([]);
+			expect(requests).toHaveLength(2);
+			requests[1].resolve('fresh');
+			await flushMicrotasks();
+			expect(container.children.map((child) => child.props.value)).toEqual(['fresh']);
+			root.unmount();
+		},
+	);
+
+	it.each([3, 256])(
+		'keeps pending requests with %i hidden Activities through a render-phase retry',
+		async (count) => {
+			const { container, root } = objectRoot();
+			const ids = Array.from({ length: count }, (_, index) => String(index));
+			const requests = new Map<string, ReturnType<typeof deferred<string>>[]>();
+			const result = universalPlan('object', {
+				kind: 'host',
+				type: 'result',
+				bindings: [['value', 0]],
+			});
+			const Scene = defineUniversalComponent('object', ({ pending }: { pending: boolean }) => {
+				const [retried, setRetried] = useUniversalState(false, 'retried');
+				if (pending && !retried) setRetried(true);
+				return ids.map((id) =>
+					universalActivity(pending ? 'hidden' : 'visible', () => {
+						if (!pending) return universalValue(result, [id]);
+						const promise = useUniversalMemo(
+							() => {
+								const request = deferred<string>();
+								const previous = requests.get(id) ?? [];
+								previous.push(request);
+								requests.set(id, previous);
+								return request.promise;
+							},
+							[],
+							'shared-request',
+						);
+						return universalValue(result, [useUniversal(promise)]);
+					}),
+				);
+			});
+			root.render(Scene, { pending: false });
+			const accepted = [...container.children];
+			root.render(Scene, { pending: true });
+			expect(container.children).toEqual(accepted);
+			expect(accepted.map((child) => child.props.value)).toEqual(ids);
+			expect(accepted.every((child) => !child.visible)).toBe(true);
+			const pendingCounts = [...requests.values()].map((values) => values.length);
+			for (const group of [[ids[1]], [ids[0]], ids.slice(2)]) {
+				for (const id of group) requests.get(id)!.at(-1)!.resolve(`ready-${id}`);
+				await flushMicrotasks();
+				expect([...requests.values()].map((values) => values.length)).toEqual(pendingCounts);
+				expect(container.children).toEqual(accepted);
+			}
+			expect(accepted.map((child) => child.props.value)).toEqual(ids.map((id) => `ready-${id}`));
+			root.unmount();
+			for (const values of requests.values()) {
+				for (const request of values) request.resolve('abandoned');
+			}
+			await flushMicrotasks();
+			expect(container.children).toEqual([]);
+		},
+	);
 
 	it('keeps Effect Events callable through deletion and root-unmount cleanup phases', async () => {
 		const removed = objectRoot();
