@@ -380,7 +380,7 @@ export function App() @{
 					// that read it are declared outside the callback.
 					const bound =
 						mode === 'client'
-							? /const row = __extra\[\d+\]/
+							? /const (?:row = __extra\[\d+\]|\{[^}]*\d+:\s*row\b[^}]*\} = __extra)/
 							: /const \[[^\]]*\brow\b[^\]]*\] = __props/;
 					expect(code).toMatch(bound);
 				});

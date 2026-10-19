@@ -7,6 +7,7 @@ import {
 	NestedCaptures,
 	BranchHoldCaptures,
 	ShadowedCaptures,
+	SparseUnionCaptures,
 	ClassCaptures,
 	FoldedCaptures,
 	ElseCaptures,
@@ -19,6 +20,28 @@ import {
 const fixture = 'packages/octane/tests/_fixtures/branch-captures.tsrx';
 
 describe('branch captures', () => {
+	it('reads each arm from its positions in the shared capture tuple', () => {
+		const calls: string[] = [];
+		const props = {
+			visible: true,
+			first: (value: string) => calls.push(value),
+			middle: 'other arm',
+			third: 'first render',
+		};
+		const mounted = mount(SparseUnionCaptures, props);
+		try {
+			expect(mounted.find('button').textContent).toBe('first render');
+			mounted.click('button');
+			mounted.update(SparseUnionCaptures, { ...props, visible: false });
+			expect(mounted.find('span').textContent).toBe('other arm');
+			mounted.update(SparseUnionCaptures, { ...props, third: 'second render' });
+			mounted.click('button');
+			expect(calls).toEqual(['first render', 'second render']);
+		} finally {
+			mounted.unmount();
+		}
+	});
+
 	it.each(['render', 'hydrate'] as const)(
 		'%s preserves branch captures and lifetimes across a held root update',
 		async (mode) => {
