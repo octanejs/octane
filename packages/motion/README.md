@@ -85,11 +85,15 @@ real `<tag>` through `hostComponent`, captures the node, and drives:
   when it finishes.
 - **`layout` / `layoutId`** via FLIP: measure the box, and if it moved/resized —
   vs the previous commit (`layout`) or a same-id element that just unmounted
-  (`layoutId`) — apply the inverse transform then animate it back to identity. The
+  (`layoutId`) — apply a projection over the authored transform, then restore the
+  authored styling when the animation finishes. The
   same cleanup-before-detach ordering lets a leaving `layoutId` element record its
   box for a same-commit replacement; unused boxes expire after that commit.
   `layout="position"` applies only translation, `layout="size"` only scaling, and
-  layout animations use `transition.layout` when provided.
+  layout animations use `transition.layout` when provided. Updates during an active
+  animation preserve its visible position and can retarget it to a new layout.
+  A changed transform style or MotionValue settles the layout animation before
+  applying the new authored transform; unrelated style values leave it running.
 
 ## Not yet ported
 

@@ -37,12 +37,11 @@ import { useReducedMotionAtSlot } from './useReducedMotion';
 import {
 	layoutAnimationMode,
 	layoutCellKey,
-	layoutTransition,
-	projectLayout,
 	recordLayoutCell,
 	takeLayoutCell,
 	type LayoutBox,
 } from './layout';
+import { LayoutAnimation } from './layout-animation';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -56,6 +55,7 @@ const DRAG = Symbol.for('octane-motion:drag');
 const INVIEW = Symbol.for('octane-motion:inview');
 const MV = Symbol.for('octane-motion:motionvalues');
 const LAYOUT_ID = Symbol.for('octane-motion:layoutid');
+const LAYOUT_CLEANUP = Symbol.for('octane-motion:layout-cleanup');
 const STAGGER_ORCH = Symbol.for('octane-motion:stagger-orch');
 const STAGGER = Symbol.for('octane-motion:stagger');
 const CONFIG_REDUCED = Symbol.for('octane-motion:config-reduced');
@@ -235,7 +235,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		const transition = animateVariantTransition ?? props.transition ?? config.transition;
 
 		// Stable holder (also our stagger token) — created before we register/provide.
-		const [latest] = useState(() => ({}) as any, REFS);
+		const [latest] = useState(() => ({ layout: null, layoutActive: false }) as any, REFS);
 
 		// As a child: register with the parent's orchestration to get a stable index.
 		if (parentStagger && parentStagger.active && inheritsAnimate) {
@@ -408,6 +408,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						// Plain static values stay in the style bag for host/domProps — do not blank
 						// them after a MotionValue→static switch (domProps already applied them).
 						if (next !== undefined) continue;
+						if (key === 'transform' || isTransformKey(key)) latest.layout?.stop();
 						if (isTransformKey(key)) removeTransformFn(node, key);
 						else (node.style as any)[key] = '';
 					}
@@ -424,12 +425,15 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					const v = style[key];
 					if (isMotionValue(v)) {
 						function apply(val: any) {
+							// Author writes take ownership after removing the temporary projection.
+							if (key === 'transform' || isTransformKey(key)) latest.layout?.stop();
 							applyStyleValue(node, key, val, transformState);
 						}
 						apply(v.get());
 						appliedKeys.push(key);
 						cleanups.push(v.on('change', apply));
 					} else if (isTransformKey(key)) {
+						latest.layout?.stop();
 						applyStyleValue(node, key, v, transformState);
 						appliedKeys.push(key);
 					}
@@ -575,39 +579,26 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			DRAG,
 		);
 
-		// `layout`: animate layout changes with FLIP. Each commit, measure the box
-		// (transform reset so it's the LAYOUT box, not the transformed one); if it
-		// moved/resized vs the previous commit, apply the inverse transform instantly
-		// then animate it back to identity. (A single-element FLIP; the full projection
-		// tree — nested/shared layout, scale correction — is out of scope.)
+		// Single-element FLIP preserves author transforms and owns only its projection.
 		// OCTANE DIVERGENCE[motion-bounded-layout-flip][conformance:bounded-layout-flip]
 		useLayoutEffect(
 			() => {
+				if (latest.shouldReduceMotion) latest.layout?.stop();
 				if (!layoutEnabled || !props.layout) {
-					latest.layoutBox = undefined;
-					return;
-				}
-				const prevTransform = node.style.transform;
-				node.style.transform = '';
-				const r = node.getBoundingClientRect();
-				const box = { left: r.left, top: r.top, width: r.width, height: r.height };
-				const prev = latest.layoutBox;
-				latest.layoutBox = box;
-				if (!prev) {
-					node.style.transform = prevTransform;
-					return;
-				}
-				const projection = projectLayout(prev, box, latest.layoutMode);
-				if (projection) {
-					if (latest.shouldReduceMotion) {
-						node.style.transform = prevTransform;
-					} else {
-						node.style.transform = projection.from;
-						animate(node, { transform: projection.to }, layoutTransition(latest.transition));
+					if (!layoutEnabled || latest.layoutActive || !layoutIdKey) latest.layout?.reset();
+					latest.layoutActive = false;
+					if (layoutEnabled && layoutIdKey) {
+						latest.layout?.update(false, latest.transition, latest.shouldReduceMotion);
 					}
-				} else {
-					node.style.transform = prevTransform;
+					return;
 				}
+				if (!latest.layoutActive) latest.layout?.reset();
+				latest.layoutActive = true;
+				(latest.layout ??= new LayoutAnimation(node)).update(
+					latest.layoutMode,
+					latest.transition,
+					latest.shouldReduceMotion,
+				);
 			},
 			undefined,
 			LAYOUT,
@@ -622,20 +613,13 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				const id = layoutIdKey;
 				if (!id) return;
 				const prev = takeLayoutCell(id);
-				if (prev) {
-					if (!latest.shouldReduceMotion) {
-						const prevTransform = node.style.transform;
-						node.style.transform = '';
-						const box = boxOf(node);
-						const projection = projectLayout(prev, box, latest.layoutMode);
-						if (projection) {
-							node.style.transform = projection.from;
-							animate(node, { transform: projection.to }, layoutTransition(latest.transition));
-						} else {
-							node.style.transform = prevTransform;
-						}
-					}
-				}
+				if (prev)
+					(latest.layout ??= new LayoutAnimation(node)).update(
+						latest.layoutMode,
+						latest.transition,
+						latest.shouldReduceMotion,
+						prev,
+					);
 			},
 			[layoutEnabled, layoutIdKey],
 			LAYOUT_ID,
@@ -675,6 +659,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			[],
 			EXIT,
 		);
+		useLayoutEffect(() => () => latest.layout?.stop(), [], LAYOUT_CLEANUP);
 	};
 }
 

@@ -11,9 +11,16 @@
     "integrity": "sha256:d99821507dace914ef6924e95c25beb2d618438fc925517569dd6b083a4df793",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/motion/src"], "include": ["\\.ts$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/motion/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/motion/tests/upstream"],
       "include": ["\\.test\\.ts$"],
@@ -395,24 +402,24 @@
       ]
     },
     {
-      "path": "packages/motion/tests/conformance/layout.test.ts",
-      "sha256": "15b62d0b32a107d9cc24d535d9caf4157e4f7fb75eecb4250f0794be5e20fc5e",
+      "path": "packages/motion/tests/conformance/layout-edge-browser.test.ts",
+      "sha256": "7e57c1c146b19fdb2a1171a17f3f1fdf6c123b5ce5d7c9f4fb77c21ba4b12015",
       "cases": [
         {
           "id": "conformance:bounded-layout-flip",
-          "testName": "FLIPs from the old box to the new when layout changes between renders",
-          "fullName": "layout (FLIP) FLIPs from the old box to the new when layout changes between renders"
+          "testName": "starts resizing at the previous visual box with the default transform origin",
+          "fullName": "layout geometry in development starts resizing at the previous visual box with the default transform origin"
         }
       ]
     },
     {
-      "path": "packages/motion/tests/conformance/layoutId.test.ts",
-      "sha256": "ac080b2e7fb310b363eb06c35f4f6e62e060b7220354bd9581f5c8c8fd99c3ba",
+      "path": "packages/motion/tests/conformance/layout-shared-browser.test.ts",
+      "sha256": "4202978f5e6f0be2d87e73badabc011ebc306441ce1bca74f9dd42885473a0d1",
       "cases": [
         {
           "id": "conformance:bounded-layoutId",
-          "testName": "FLIPs a newly-mounted element from a same-id element that just unmounted",
-          "fullName": "layoutId (shared-element crossfade) FLIPs a newly-mounted element from a same-id element that just unmounted"
+          "testName": "starts a same-id replacement at the departing element and finishes at its own layout",
+          "fullName": "shared layout in development starts a same-id replacement at the departing element and finishes at its own layout"
         }
       ]
     },

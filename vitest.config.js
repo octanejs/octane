@@ -3980,6 +3980,14 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'heavy-browser',
+					include: [
+						'packages/motion/tests/conformance/layout-browser.test.ts',
+						'packages/motion/tests/conformance/layout-edge-browser.test.ts',
+						'packages/motion/tests/conformance/layout-shared-browser.test.ts',
+					],
+				},
 				test: {
 					name: 'motion',
 					include: ['packages/motion/tests/**/*.test.ts'],
