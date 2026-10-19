@@ -104,10 +104,14 @@ export function AsyncRedeclaredWhilePending(
 	props: RedeclaredWhilePendingProps & {
 		fetch(route: string, context: { signal: AbortSignal }): Promise<string>;
 		selection?: string;
+		readRequest?: boolean;
 	},
 ) @{
 	const request$ = query$(() => props.selection ?? props.route$.get(), props.fetch);
-	const selected$ = derived$(async ({ read }) => `${await read(request$)}:${props.suffix}`);
+	const selected$ = derived$(
+		async ({ read }) =>
+			`${props.readRequest === false ? 'static' : await read(request$)}:${props.suffix}`,
+	);
 	const snapshot = selected$.snapshot();
 	<main>
 		<i>{props.suffix}</i>

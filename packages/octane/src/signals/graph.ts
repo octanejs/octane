@@ -73,6 +73,8 @@ export interface GraphOwner {
 
 export interface CandidateProducer {
 	dispose(): void;
+	/** Rebind work to a later accepted declaration before its next evaluation. */
+	refreshDeclaration?(): void;
 	/** Explicit async reads complement the synchronous graph edges. */
 	dependencies?(): Iterable<ScopedNode>;
 	prepare():

@@ -137,8 +137,8 @@ it.each(
 	},
 );
 
-it.each(['resolve', 'cancel', 'replace'] as const)(
-	'keeps a pending query selected while an accepted declaration is refreshed, then %s',
+it.each(['resolve', 'cancel', 'replace', 'skip', 'repeat'] as const)(
+	'keeps or releases a pending query according to the accepted declaration (%s)',
 	async (finish) => {
 		const scope = createScope({ scopeKey: 'redeclared-pending-query' });
 		const route$ = scope.signal$('route', 'A');
@@ -153,32 +153,41 @@ it.each(['resolve', 'cancel', 'replace'] as const)(
 		const container = document.createElement('div');
 		document.body.append(container);
 		const root = createRoot(container);
-		const render = (suffix: string, selection?: string) =>
+		const render = (suffix: string, selection?: string, readRequest = true) =>
 			root.render(AsyncRedeclaredWhilePending, {
 				route$,
 				suffix,
 				load: () => gate.promise,
 				fetch,
 				selection,
+				readRequest,
 			});
 		try {
 			await act(() => render('old'));
 			expect(container.querySelector('output')!.textContent).toBe('A:old');
 			await act(() => startTransition(() => route$.set('B')));
 			expect(requests).toHaveLength(1);
-			flushSync(() => render('new', finish === 'replace' ? 'C' : undefined));
+			flushSync(() => render('new', finish === 'replace' ? 'C' : undefined, finish !== 'skip'));
+			if (finish === 'repeat') flushSync(() => render('replacement'));
 			await act(() => gate.resolve('ready'));
 			expect(route$.get()).toBe('B');
-			expect(requests.map(({ route }) => route)).toEqual(finish === 'replace' ? ['B', 'C'] : ['B']);
-			expect(requests[0]!.signal.aborted).toBe(finish === 'replace');
+			if (finish !== 'skip')
+				expect(requests.map(({ route }) => route)).toEqual(
+					finish === 'replace' ? ['B', 'C'] : ['B'],
+				);
+			expect(requests[0]!.signal.aborted).toBe(finish === 'replace' || finish === 'skip');
 			if (finish === 'cancel') {
 				root.unmount();
 				expect(requests[0]!.signal.aborted).toBe(true);
+			} else if (finish === 'skip') {
+				expect(container.querySelector('output')!.textContent).toBe('static:new');
 			} else {
 				const selected = finish === 'replace' ? 'C' : 'B';
 				expect(requests.at(-1)!.signal.aborted).toBe(false);
 				await act(() => delivery.resolve(selected));
-				expect(container.querySelector('output')!.textContent).toBe(`${selected}:new`);
+				expect(container.querySelector('output')!.textContent).toBe(
+					`${selected}:${finish === 'repeat' ? 'replacement' : 'new'}`,
+				);
 			}
 		} finally {
 			gate.resolve('ready');
