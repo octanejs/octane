@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 352,
+  "nextCode": 350,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
