@@ -30,6 +30,8 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 	if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key)) {
 		throw new CandidateUnsupportedError(formatClientError(201));
 	}
+	// A candidate may publish only over the selection it was forked from.
+	const authority = this.selectionAuthority;
 	const fork = new (this.constructor as typeof ResourceBinding<T>)(
 		this.owner,
 		target,
@@ -52,12 +54,17 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 				// when another resource selected this canonical request first.
 				if (attempt?.streamed) return { status: 'invalid' };
 				const snapshot = entry.state.snapshot;
-				if (attempt && (entry.request.definition.kind !== 'stream' || snapshot.status !== 'ready'))
+				if (
+					attempt &&
+					snapshot.status !== 'pending' &&
+					(entry.request.definition.kind !== 'stream' || snapshot.status !== 'ready')
+				)
 					return { status: 'pending', waiting: target.state?.waiting ?? attempt.settled };
 				if (!(
 					(snapshot.status === 'ready' &&
 						(snapshot.complete || entry.request.definition.kind === 'stream')) ||
-					snapshot.status === 'error'
+					snapshot.status === 'error' ||
+					(snapshot.status === 'pending' && attempt)
 				))
 					return { status: 'invalid' };
 			} else if (target.state?.snapshot.status !== 'idle') {
@@ -70,7 +77,6 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 				return { status: 'invalid' };
 			}
 			const state = entry?.state;
-			const authority = this.selectionAuthority;
 			const forkAuthority = fork.selectionAuthority;
 			return {
 				status: 'ready',
@@ -87,23 +93,10 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 					publish: () => {
 						const previous = this.selected;
 						const resolve = this.resolvePending;
-						// Install the accepted consumer before releasing either lease. No
-						// selector, loader or abort callback executes in this phase.
-						entry?.consumers.add(this);
-						entry?.consumers.delete(fork);
-						this.selected = entry;
-						this.selectedIdentity = fork.selectedIdentity;
-						this.retainedRequest = fork.retainedRequest;
-						this.describedAttempt = fork.describedAttempt;
-						this.observedAttempt = fork.observedAttempt;
+						this.adoptSelection(fork);
 						this.selectionAuthority = fork.selectionAuthority;
-						this.pendingObserver = undefined;
-						this.pendingPromise = undefined;
-						this.resolvePending = undefined;
-						this.seeded = undefined;
-						fork.selected = undefined;
 						return () => {
-							resolve?.();
+							if (resolve !== this.resolvePending) resolve?.();
 							// Acceptance or earlier abort cleanup can select the old request
 							// again. Its new current lease is not this retired selection.
 							if (previous !== entry && previous !== this.selected) previous?.remove(this);
@@ -131,13 +124,17 @@ function forkDerived<T>(
 		dependencies: () => fork.current?.dependencies.keys() ?? [],
 		prepare: () => {
 			const state = target.state;
+			const current = fork.current;
 			// A caught error is an authoritative presentation, just like a ready
-			// value. Unhandled reads still report the authored error to the frame.
-			if (state?.snapshot.status !== 'ready' && state?.snapshot.status !== 'error')
+			// value. A presented pending result needs a live attempt or graph wakeup.
+			if (
+				state?.snapshot.status !== 'ready' &&
+				state?.snapshot.status !== 'error' &&
+				!(state?.snapshot.status === 'pending' && (current || target.wakeup))
+			)
 				return state?.waiting
 					? { status: 'pending', waiting: state.waiting }
 					: { status: 'invalid' };
-			const current = fork.current;
 			const previous = this.current;
 			return {
 				status: 'ready',
@@ -153,12 +150,8 @@ function forkDerived<T>(
 					publish: () => {
 						// Transfer producer authority without aborting the old attempt or
 						// invoking authored code while canonical graph state is installing.
-						this.current = current;
-						if (current) current.binding = this;
-						this.node.invalidateAttempt = current ? () => this.invalidateGraph() : undefined;
-						fork.current = undefined;
+						this.adoptAttempt(fork);
 						fork.candidate = undefined;
-						target.invalidateAttempt = undefined;
 						return () => {
 							if (previous !== this.current) this.stop(previous);
 						};

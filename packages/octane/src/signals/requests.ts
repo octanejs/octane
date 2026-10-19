@@ -656,30 +656,38 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		signalBatch(() => reevaluateNode(this.node));
 	}
 
+	/** Move a private binding's selection without releasing the displaced lease or waiter. */
+	adoptSelection(fork: ResourceBinding<T>): void {
+		const entry = fork.selected;
+		// Acquire the accepted lease before releasing the fork's. No selector,
+		// loader or abort callback runs until the caller finishes publication.
+		entry?.consumers.add(this);
+		entry?.consumers.delete(fork);
+		this.selected = entry;
+		this.selectedIdentity = fork.selectedIdentity;
+		this.retainedRequest = fork.retainedRequest;
+		this.describedAttempt = fork.describedAttempt;
+		this.observedAttempt = fork.observedAttempt;
+		this.pendingObserver = undefined;
+		this.pendingPromise = fork.pendingPromise;
+		this.resolvePending = fork.resolvePending;
+		this.seeded = undefined;
+		fork.selected = undefined;
+		fork.pendingPromise = undefined;
+		fork.resolvePending = undefined;
+	}
+
 	/** The accepted render presented the view; make its selection canonical. */
 	protected acceptView(node: ScopedNode, sequence: number): void {
 		const view = this.view;
 		if (view?.node !== node) return;
 		const fork = view.binding;
-		const entry = fork.selected;
 		const previous = this.selected;
 		const resolve = this.resolvePending;
 		signalBatch(() => {
-			// Acquire the accepted lease before releasing the old one. No selector,
-			// loader or abort callback runs until both cells are consistent.
-			entry?.consumers.add(this);
-			entry?.consumers.delete(fork);
-			this.releaseStreamedSelection(entry?.request.identity);
-			this.selected = entry;
-			this.selectedIdentity = fork.selectedIdentity;
-			this.retainedRequest = fork.retainedRequest;
-			this.describedAttempt = fork.describedAttempt;
-			this.observedAttempt = fork.observedAttempt;
+			this.adoptSelection(fork);
+			this.releaseStreamedSelection(this.selected?.request.identity);
 			this.selectionAuthority = {};
-			this.pendingObserver = undefined;
-			this.pendingPromise = fork.pendingPromise;
-			this.resolvePending = fork.resolvePending;
-			this.seeded = undefined;
 			this.describe = fork.describe;
 			this.sequence = sequence;
 			if (fork.queryDefinition !== undefined) {
@@ -689,9 +697,6 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 					fork.queryDefinition,
 				);
 			}
-			fork.selected = undefined;
-			fork.pendingPromise = undefined;
-			fork.resolvePending = undefined;
 			this.view = undefined;
 			promoteDeclarationView(view.node, this.node);
 			fork.dispose();

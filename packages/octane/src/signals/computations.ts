@@ -241,6 +241,17 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		}
 	}
 
+	/** Transfer an accepted binding's attempt and evaluation classification. */
+	adoptAttempt(fork: DerivedBinding<T>): void {
+		const current = fork.current;
+		this.asynchronous = fork.asynchronous;
+		this.current = current;
+		if (current) current.binding = this;
+		this.node.invalidateAttempt = current ? () => this.invalidateGraph() : undefined;
+		fork.current = undefined;
+		fork.node.invalidateAttempt = undefined;
+	}
+
 	protected acceptView(node: ScopedNode, sequence: number, compute: DerivedCompute<T>): void {
 		const view = this.view;
 		if (view?.node !== node) return;
@@ -250,12 +261,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		const current = fork.current;
 		this.compute = compute;
 		this.sequence = sequence;
-		this.asynchronous = fork.asynchronous;
-		this.current = current;
-		if (current) current.binding = this;
-		this.node.invalidateAttempt = current ? () => this.invalidateGraph() : undefined;
-		fork.current = undefined;
-		fork.node.invalidateAttempt = undefined;
+		this.adoptAttempt(fork);
 		signalBatch(() => {
 			promoteDeclarationView(node, this.node);
 			fork.dispose();
