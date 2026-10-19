@@ -28377,6 +28377,8 @@ function planJsx(
 		}
 		// Template paths prove the node kind and presence; the runtime's generic
 		// navigation signatures cannot express that compile-time topology.
+		// sibling() steps once by default.
+		const siblingCount = (n) => (n === 1 ? [] : [b.literal(n)]);
 		const typedPath = (expression) =>
 			ctx.typescriptWeb ? b.ts_as(expression, b.ts_keyword_type('any')) : expression;
 		ensureVar = (path) => {
@@ -28413,7 +28415,7 @@ function planJsx(
 				// hydrating); raw `.nextSibling` for hole-free templates. sibVar already resolves to the
 				// (k−sibSteps)-th child, so n steps across lands on the k-th.
 				if (hasHoles) {
-					step = typedPath(b.call('_$sibling', b.id(sibVar), b.literal(sibSteps)));
+					step = typedPath(b.call('_$sibling', b.id(sibVar), ...siblingCount(sibSteps)));
 				} else {
 					step = b.id(sibVar);
 					for (let i = 0; i < sibSteps; i++) step = typedPath(b.member(step, 'nextSibling'));
@@ -28428,7 +28430,7 @@ function planJsx(
 				const parentVar = prefix.length === 0 ? '_root' : ensureVar(prefix);
 				if (hasHoles) {
 					step = typedPath(b.call('_$child', b.id(parentVar)));
-					if (k > 0) step = typedPath(b.call('_$sibling', step, b.literal(k)));
+					if (k > 0) step = typedPath(b.call('_$sibling', step, ...siblingCount(k)));
 				} else {
 					step = typedPath(b.member(b.id(parentVar), 'firstChild'));
 					for (let n = 0; n < k; n++) step = typedPath(b.member(step, 'nextSibling'));
