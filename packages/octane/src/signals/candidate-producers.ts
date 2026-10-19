@@ -30,6 +30,8 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 	if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key)) {
 		throw new CandidateUnsupportedError(formatClientError(201));
 	}
+	// A candidate may publish only over the selection it was forked from.
+	const authority = this.selectionAuthority;
 	const fork = new (this.constructor as typeof ResourceBinding<T>)(
 		this.owner,
 		target,
@@ -75,7 +77,6 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 				return { status: 'invalid' };
 			}
 			const state = entry?.state;
-			const authority = this.selectionAuthority;
 			const forkAuthority = fork.selectionAuthority;
 			return {
 				status: 'ready',
