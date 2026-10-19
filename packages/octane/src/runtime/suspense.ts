@@ -166,6 +166,7 @@ import {
 	JOURNAL_BAG,
 	JOURNAL_PROP,
 	BAG_SIZE,
+	commitQueuedBag,
 	slotNext,
 	slotFrontier,
 	queueFrontier,
@@ -3100,7 +3101,7 @@ function dropBodyOps(transaction: RootRenderTransaction, body: Block): void {
 		const slot = ops[i] === applySlotNext;
 		const owner: Block | null | undefined = slot
 			? target.next?.owner
-			: typeof target?.$ === 'number' && target.$ > BAG_SIZE
+			: ops[i] === commitQueuedBag && target.$ > BAG_SIZE
 				? target.next[target.$ & BAG_SIZE]?.block
 				: null;
 		if (owner == null || !blockIsAncestor(body, owner)) continue;
