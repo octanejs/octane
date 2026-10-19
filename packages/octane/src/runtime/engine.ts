@@ -1316,15 +1316,11 @@ export function commitRootRenders(): void {
 							COMMIT_OP = i;
 							try {
 								// A commit function's `careful` flag, as bagDone passes it.
-								const careful =
+								ops[i](
+									target,
 									TRANSITION_JOURNAL !== null ||
-									(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0);
-								// A queued bag commits as bagDone commits it: idle, from its cells.
-								if (target?.$ > BAG_SIZE) {
-									const next = target.next;
-									target.$ &= BAG_SIZE;
-									ops[i](target, next, careful);
-								} else ops[i](target, careful);
+										(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
+								);
 							} catch (error) {
 								// React routes a commit-phase error to the nearest boundary and keeps
 								// committing; the failed bag's state was cleared before its first write.

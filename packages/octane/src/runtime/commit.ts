@@ -117,9 +117,9 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // pending cells, whose cells hold the bag itself as the "unchanged" marker
 // until a binding records into them. `C` walks the cells straight-line: it
 // writes each changed cell through the ordinary setter and only then publishes
-// it to the committed slot. Its caller (bagDone, commitRootRenders) clears the
-// staged state and passes the cells, so a setter that throws leaves the bag
-// idle, its committed slots still describing the DOM.
+// it to the committed slot. commitBag clears the staged state and passes the
+// cells, so a setter that throws leaves the bag idle, its committed slots still
+// describing the DOM.
 //
 // `bag.$` packs the template's cell count (low byte, the bag factory's
 // argument) with the STAGED and QUEUED bits. An idle bag's `next` holds the
@@ -135,7 +135,7 @@ let TRANSITION_JOURNAL_REPLAYING = false;
 // with no open root transaction, and a hydrating render, whose adoption and
 // mismatch checks live in the setters (on an adopted element they keep the
 // server's value and write nothing). Every other render, urgent included,
-// queues `(C, bag)` on `transaction.ops` as it stages, so a changed row costs
+// queues `(commitBag, bag)` on `transaction.ops` as it stages, so a changed row costs
 // its recorders and `C` alone. commitRootRenders runs the ops in render order
 // before deletions, refs and effects. A dropped window truncates the ops back
 // to its checkpoint and clears the dropped bags' state; their committed slots
@@ -211,7 +211,7 @@ export function bagRecord(
 			next![size] = s;
 			next![size + 1] = transaction.ops.length;
 			bag.$ = state | BAG_QUEUED;
-			transaction.ops.push(next![size + 2], bag);
+			transaction.ops.push(commitBag, bag);
 		}
 	}
 	next![cell] = changed ? value : bag;
@@ -243,15 +243,17 @@ function bagResume(bag: any): any[] {
  * commitRootRenders passes it too.
  */
 export function bagDone(s: Scope, bag: any): void {
-	const next = bag.next;
-	const size = bag.$ & BAG_SIZE;
-	next[size] = s;
-	bag.$ = size;
-	next[size + 2](
+	bag.next[bag.$ & BAG_SIZE] = s;
+	commitBag(
 		bag,
-		next,
 		TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
 	);
+}
+
+/** A staged bag's commit op: leave it idle, then run its `C` over its cells. */
+function commitBag(bag: any, careful: boolean): void {
+	const next = bag.next;
+	next[(bag.$ &= BAG_SIZE) + 2](bag, next, careful);
 }
 
 /** The open root render's pending structure for `slot`, queued for its commit. */
