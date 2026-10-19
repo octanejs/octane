@@ -1,4 +1,4 @@
-import { ViewTransition } from 'octane';
+import { use, ViewTransition } from 'octane';
 import {
 	captureSignalOwner,
 	currentSignalOwner,
@@ -66,4 +66,32 @@ export function ReadyStaged(props: ReadyStagedProps) @{
 			<ReadyChild {...props} />
 		</div>
 	</ViewTransition>
+}
+
+interface RedeclaredWhilePendingProps {
+	route$: SignalHandle<string>;
+	suffix: string;
+	load(route: string): Promise<string>;
+}
+
+function PendingRoute(props: RedeclaredWhilePendingProps) @{
+	const route = props.route$.get();
+	if (route === 'B') use(props.load(route));
+	<span>gate</span>
+}
+
+export function RedeclaredWhilePending(props: RedeclaredWhilePendingProps) @{
+	const selected$ = derived$(() => props.route$.get() + ':' + props.suffix);
+	const available$ = derived$(() => selected$.snapshot().status);
+	const value$ = derived$(() => {
+		const snapshot = selected$.snapshot();
+		return snapshot.status === 'ready' ? snapshot.value : '';
+	});
+	<main>
+		<i>{props.suffix}</i>
+		<output>
+			{available$.get()}|{value$.get()}
+		</output>
+		<PendingRoute {...props} />
+	</main>
 }

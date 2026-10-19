@@ -1,8 +1,12 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { act, createRoot, flushSync, startTransition } from 'octane';
 import { createScope, type WritableSignal } from 'octane/signals';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks.js';
-import { PendingStaged, ReadyStaged } from './_fixtures/signals-staged-invalidation.tsrx';
+import {
+	PendingStaged,
+	ReadyStaged,
+	RedeclaredWhilePending,
+} from './_fixtures/signals-staged-invalidation.tsrx';
 
 function holdViewTransitions() {
 	const mocks = installViewTransitionMocks();
@@ -90,6 +94,43 @@ it('keeps a ready view whose dependency changes back before a held transition is
 		result.cleanup();
 	}
 });
+
+it.each([{ suffixes: ['new'] }, { suffixes: ['new', 'replacement'] }])(
+	'publishes the accepted declaration after urgent updates $suffixes during a pending transition',
+	async ({ suffixes }) => {
+		const scope = createScope({ scopeKey: 'redeclared-while-pending' });
+		const route$ = scope.signal$('route', 'A');
+		const delivery = Promise.withResolvers<string>();
+		const load = vi.fn(() => delivery.promise);
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		const render = (suffix: string) =>
+			root.render(RedeclaredWhilePending, { route$, suffix, load });
+		try {
+			await act(() => render('old'));
+			await act(() => startTransition(() => route$.set('B')));
+			expect(load).toHaveBeenCalledWith('B');
+			expect(container.querySelector('output')!.textContent).toBe('ready|A:old');
+			for (const suffix of suffixes) {
+				flushSync(() => render(suffix));
+				expect(container.querySelector('output')!.textContent).toBe(`ready|A:${suffix}`);
+			}
+			await act(() => delivery.resolve('ready'));
+			const suffix = suffixes.at(-1)!;
+			expect(container.querySelector('i')!.textContent).toBe(suffix);
+			await vi.waitFor(() =>
+				expect(container.querySelector('output')!.textContent).toBe(`ready|B:${suffix}`),
+			);
+			expect(route$.get()).toBe('B');
+		} finally {
+			delivery.resolve('ready');
+			root.unmount();
+			scope.dispose();
+			container.remove();
+		}
+	},
+);
 
 /** Render, redeclare the derived over `next$` in a held transition, then accept it. */
 async function acceptReadyStaged$(whileHeld: (next$: WritableSignal<boolean>) => void) {

@@ -121,10 +121,12 @@ function forkDerived<T>(
 	context: CandidateContext,
 ): CandidateProducer {
 	const Binding = this.constructor as typeof DerivedBinding<T>;
-	if (this.frozen || this.owner.readBarrier || !this.compute) {
+	// A later accepted declaration supersedes work forked from this definition.
+	const compute = this.compute;
+	if (this.frozen || this.owner.readBarrier || !compute) {
 		throw new CandidateUnsupportedError(formatClientError(110));
 	}
-	const fork = new Binding(this.owner, target, this.compute, this.options);
+	const fork = new Binding(this.owner, target, compute, this.options);
 	fork.candidate = context;
 	return {
 		dispose: () => fork.dispose(),
@@ -145,7 +147,7 @@ function forkDerived<T>(
 					validate: () =>
 						!this.owner.retired &&
 						this.owner.readBarrier === undefined &&
-						this.compute !== undefined &&
+						this.compute === compute &&
 						this.current === previous &&
 						fork.current === current &&
 						target.state === state &&
