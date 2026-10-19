@@ -228,6 +228,7 @@ import { type WarmEntry, warmCacheForOwner, blockIsAncestor } from './use.js';
 import {
 	createTransitionActionBatch,
 	inCommitCallback,
+	canInheritAsyncAction,
 	transitionActionBatchForUpdate,
 	transitionBatchReady,
 	noteTransitionBlock,
@@ -633,10 +634,10 @@ export let TRANSITION_DEPTH = 0;
  * after the first `await` runs, so post-await setters would otherwise schedule
  * at urgent priority. Keeping this count elevated across the in-flight window
  * preserves Octane's automatic post-await transition priority. Caveat: it's a
- * process-global window, so an unrelated update outside a delegated event,
- * flushSync or commit callback (see inCommitCallback) while an async action is
- * pending is also tagged transition — perfect per-action scoping would need
- * AsyncContext, which isn't available in the browser target.
+ * process-global window, so an unrelated update outside a known callback
+ * boundary (see canInheritAsyncAction) while an async action is pending is also
+ * tagged transition — perfect per-action scoping would need AsyncContext, which
+ * isn't available in the browser target.
  */
 export let ASYNC_TRANSITION_COUNT = 0;
 
@@ -1901,11 +1902,7 @@ export function scheduleRender(
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush &&
-			_dispatchDepth === 0 &&
-			ASYNC_TRANSITION_COUNT > 0 &&
-			RENDERER_DISCRETE_EVENT_DEPTH === 0 &&
-			!inCommitCallback())
+		(ASYNC_TRANSITION_COUNT > 0 && canInheritAsyncAction())
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);

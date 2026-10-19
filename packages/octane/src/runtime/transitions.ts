@@ -24,6 +24,7 @@ import {
 	TRANSITION_TASK_DRIVER,
 	TRANSITION_ROOT_DRIVER,
 	SCHEDULED_VISIBILITY_DRIVER,
+	EFFECT_EVENT_INVOCATION_DEPTH,
 	resolveSlot,
 } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
@@ -238,6 +239,17 @@ export function inCommitCallback(): boolean {
 	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
 }
 
+/** Known synchronous callback boundaries cannot be post-await Action continuations. */
+export function canInheritAsyncAction(): boolean {
+	return (
+		!syncFlush &&
+		_dispatchDepth === 0 &&
+		RENDERER_DISCRETE_EVENT_DEPTH === 0 &&
+		EFFECT_EVENT_INVOCATION_DEPTH === 0 &&
+		!inCommitCallback()
+	);
+}
+
 /**
  * The batch an update joins. A state update passes its Block: a render-phase
  * update belongs to the render processing it, never to an Action.
@@ -247,18 +259,11 @@ export function transitionActionBatchForUpdate(block?: Block): TransitionActionB
 	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
-	// (including continuous events), flushSync and commit callbacks opt out of
-	// that fallback. This only selects the batch: continuous events still flush
-	// in a microtask, and an explicit transition inside a handler wins above.
-	if (
-		IN_FLIGHT_TRANSITION_ACTION_BATCH === null ||
-		syncFlush ||
-		_dispatchDepth > 0 ||
-		RENDERER_DISCRETE_EVENT_DEPTH > 0 ||
-		inCommitCallback()
-	)
-		return null;
-	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
+	// (including continuous events), Effect Events, flushSync and commit callbacks
+	// opt out. An explicit transition inside a callback still wins above.
+	return IN_FLIGHT_TRANSITION_ACTION_BATCH !== null && canInheritAsyncAction()
+		? IN_FLIGHT_TRANSITION_ACTION_BATCH
+		: null;
 }
 
 /**
