@@ -154,13 +154,15 @@ export interface HookUpdate {
  * Whether the current read sees `batch`'s pending signals (PendingHost.visible):
  * a render folds them exactly when it folds the batch's hook updates.
  */
-function pendingSignalVisible(batch: object): boolean | undefined {
+function pendingSignalVisible(batch: object): boolean | 'action' | undefined {
 	const block = CURRENT_BLOCK;
 	if (block === null) {
 		const active = ACTIVE_TRANSITION_ACTION_BATCH;
 		return active === null
 			? undefined
-			: rootTransitionBatch(active) === rootTransitionBatch(batch as TransitionActionBatch);
+			: rootTransitionBatch(active) === rootTransitionBatch(batch as TransitionActionBatch)
+				? 'action'
+				: false;
 	}
 	return foldTransitionUpdate(
 		batch as TransitionActionBatch,
