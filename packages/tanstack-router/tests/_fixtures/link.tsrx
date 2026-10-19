@@ -74,9 +74,9 @@ function Page() @{
 // createLink integration — a design-system anchor that renders the built link
 // props onto its own markup.
 function FancyAnchor(props) @{
-	const { children, ...rest } = props;
+	const { children, label, ...rest } = props;
 	<a {...rest} data-fancy="true">
-		{children}
+		{children ?? label}
 	</a>
 }
 
@@ -84,6 +84,7 @@ export const FancyLink = createLink(FancyAnchor);
 
 function CreateLinkPage() @{
 	<div class="cl-page">
+		<FancyLink to="/about" class="l-fallback" label="Fallback label" />
 		<FancyLink to="/about" class="l-fancy" ref={(node) => (lastLinkRef = node)}>
 			{'Fancy'}
 		</FancyLink>

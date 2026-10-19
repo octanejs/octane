@@ -153,6 +153,7 @@ describe('@octanejs/tanstack-router — Link', () => {
 		const fancy = r.find('.l-fancy');
 		expect(fancy.getAttribute('data-fancy')).toBe('true');
 		expect(fancy.getAttribute('href')).toBe('/about');
+		expect(r.find('.l-fallback').textContent).toBe('Fallback label');
 
 		(fancy as HTMLElement).click();
 		await flush();
