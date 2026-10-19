@@ -1,10 +1,11 @@
-import { use, ViewTransition } from 'octane';
+import { startTransition, use, ViewTransition } from 'octane';
 import {
 	captureSignalOwner,
 	currentSignalOwner,
 	derived$,
 	query$,
 	type SignalHandle,
+	type WritableSignal,
 } from 'octane/signals';
 
 export interface PendingStagedProps {
@@ -117,5 +118,50 @@ export function AsyncRedeclaredWhilePending(
 		<i>{props.suffix}</i>
 		<output>{snapshot.status === 'ready' ? snapshot.value : snapshot.status}</output>
 		<PendingRoute {...props} />
+	</main>
+}
+
+export function NonSuspendingPending(props: {
+	selected$: WritableSignal<string>;
+	fetch(selection: string, context: { signal: AbortSignal }): string | Promise<string>;
+	fetchAlternative(selection: string, context: { signal: AbortSignal }): string | Promise<string>;
+	suffix: string;
+	read: 'snapshot' | 'latest';
+	dependency: 'same' | 'switch' | 'drop';
+	projected: boolean;
+	present: boolean;
+	gate: Promise<void>;
+	onRead(value: string): void;
+}) @{
+	const request$ = query$(() => props.selected$.get(), props.fetch);
+	const alternative$ = query$(() => props.selected$.get(), props.fetchAlternative);
+	const value$ = derived$(async ({ read }) => {
+		const value =
+			props.dependency === 'drop'
+				? 'static'
+				: await read(props.dependency === 'switch' ? alternative$ : request$);
+		return `${value}:${props.suffix}`;
+	});
+	const readValue$ = () => {
+		if (props.read === 'latest') return value$.latest('none');
+		const snapshot = value$.snapshot();
+		return snapshot.status === 'ready' ? snapshot.value : snapshot.status;
+	};
+	const projected$ = derived$(() => readValue$());
+	<main>
+		<button
+			onClick={() =>
+				startTransition(() => {
+					props.selected$.set('B');
+					if (props.projected) projected$.snapshot();
+					else readValue$();
+					return props.gate;
+				})
+			}
+		>
+			start
+		</button>
+		<button onClick={() => props.onRead(readValue$())}>read</button>
+		<output>{props.present ? readValue$() : 'deferred'}</output>
 	</main>
 }
