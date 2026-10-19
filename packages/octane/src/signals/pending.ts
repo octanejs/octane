@@ -388,14 +388,15 @@ function installable(slot: PendingSlot): Install | undefined {
 	const state = shadow.state;
 	if (state === undefined) return undefined;
 	if (node.kind === 'signal') return { slot, state, receipt: undefined };
-	// A computation installs only a complete result its batch read and that no
-	// input has changed since. Anything else recomputes from committed state.
-	if (
-		shadow.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ||
-		state.snapshot.status === 'pending' ||
-		state.snapshot.status === 'idle'
-	)
+	// Install only a result the batch read and whose inputs are still current.
+	// A pending presentation also needs a producer or live graph wakeup to own it.
+	if (shadow.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) || state.snapshot.status === 'idle')
 		return undefined;
+	if (state.snapshot.status === 'pending') {
+		const wakeup = shadow.wakeup;
+		if (wakeup ? wakeup.promise !== state.waiting || wakeup.settled : slot.producer === undefined)
+			return undefined;
+	}
 	if (slot.producer === undefined) return { slot, state, receipt: undefined };
 	const outcome = slot.producer.prepare();
 	return outcome.status === 'ready' && outcome.receipt.validate()
@@ -466,6 +467,12 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 			!Object.is(node.last, last) ||
 			(lastState ? !graph.sameState(node.lastState, lastState) : node.lastState !== undefined);
 		if (currentChanged) graph.commitState(node, state);
+		const wakeup = shadow.wakeup;
+		if (wakeup && wakeup.promise === state.waiting) {
+			shadow.wakeup = undefined;
+			node.wakeup = wakeup;
+			wakeup.node = node;
+		}
 		if (node.lastState?.owners !== lastState?.owners) graph.releaseRetainedOwners(node);
 		node.last = last;
 		node.lastState = lastState;
