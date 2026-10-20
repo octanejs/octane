@@ -18,7 +18,12 @@ import {
 } from '../html-tree-validation.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import { fixedBindingProps } from './dom-binding-fixed-props.js';
-import { isLayoutText, needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
+import {
+	canHandoffTextareaView,
+	isLayoutText,
+	needsBindingProgram,
+	planBindingProgram,
+} from './dom-binding-program.js';
 import {
 	DOM_BINDING_DIRECTIVE as DIRECTIVE,
 	isDomBindingDirective as isDirective,
@@ -1405,6 +1410,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		id,
 		hostHandoff,
 		unboundAttributes,
+		allSetupProjected: native === null && read.size === aliases.size,
 	};
 }
 
@@ -2842,7 +2848,10 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			) ||
 			// Only a program subscribes to the imported signals its projections read.
 			readsImportedSignal(node);
-		if (structural || (helpers.mount && selectedExport === node.id.name)) {
+		const scalar = structural ? null : planView(node, filename, source, imports, lexical);
+		const textareaHandoff =
+			scalar !== null && scalar.allSetupProjected && canHandoffTextareaView(scalar);
+		if (structural || textareaHandoff || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,
 				render,
@@ -2850,11 +2859,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				false,
 				selectedExport === node.id.name ? helpers.fixedProps : null,
 			);
-			if (!structural) plan.scalar = planView(node, filename, source, imports, lexical);
+			if (!structural && !textareaHandoff) plan.scalar = scalar;
 			plans.set(node.id.name, plan);
 			return false;
 		}
-		const plan = planView(node, filename, source, imports, lexical);
+		const plan = scalar;
 		plans.set(node.id.name, plan);
 		const rewritten = new Map([...plan.unbound, ...plan.classAttributes]);
 		// Rewrite from leaves to root so parent replacements retain every child
