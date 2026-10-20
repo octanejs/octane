@@ -10,6 +10,21 @@ import {
 import { readServerResult } from './server-rpc-stream-client.js';
 import { enqueueServerCall } from './server-rpc-batch-client.js';
 
+// The native getter validates the AbortSignal brand across same-origin realms.
+const signalAborted = /* @__PURE__ */ (() =>
+	typeof AbortSignal === 'undefined'
+		? undefined
+		: Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')?.get)();
+function isAbortSignal(signal: unknown): signal is AbortSignal {
+	if (signalAborted === undefined) return false;
+	try {
+		signalAborted.call(signal);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /**
  * Compiler target for browser calls to a `module server` export.
  * @internal
@@ -25,9 +40,9 @@ export async function __serverRpc(
 		options === null ||
 		typeof options !== 'object' ||
 		Object.keys(options).some((key) => key !== 'signal') ||
-		(options.signal !== undefined && !(options.signal instanceof AbortSignal))
+		(options.signal !== undefined && !isAbortSignal(options.signal))
 	)
-		throw new TypeError('Server function options accept only a local AbortSignal');
+		throw new TypeError('Server function options accept only a genuine AbortSignal');
 	options.signal?.throwIfAborted();
 	const resolvedLimits = stream ? serverResultLimits(limits) : undefined;
 	// Encoding can fail (for example an unresolved Promise); never dispatch first.
