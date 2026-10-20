@@ -533,6 +533,8 @@ export interface TransitionActionBatch {
 	 * and every batch entangled into it finish; null once they have been.
 	 */
 	signals?: PendingSlotLike[] | null;
+	/** useOptimistic reverts for values dispatched in this batch, run when it finishes. */
+	optimistic: ((batch: TransitionActionBatch) => void)[] | null;
 }
 
 export interface RootRenderOwner {

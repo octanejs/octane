@@ -111,7 +111,12 @@ import {
 	resumeOnSettle,
 	blockIsAncestor,
 } from './use.js';
-import { releaseTransitionHookHolder, HELD_TRANSITIONS, STAGED_REVEALS } from './transitions.js';
+import {
+	releaseTransitionHookHolder,
+	HELD_TRANSITIONS,
+	STAGED_REVEALS,
+	stagedRevealGroup,
+} from './transitions.js';
 import {
 	RENDERER_REGION_OWNER_COUNT,
 	rendererRegionOwnerForBlock,
@@ -2877,19 +2882,15 @@ function abandonHeldTransition(state: TrySlot): void {
 	flushStagedRevealsIfReady();
 }
 
-/** Commit a staged group once exact membership shows every held boundary is ready. */
+/** Commit the staged groups whose every held member is ready (stagedRevealGroup). */
 export function flushStagedRevealsIfReady(): void {
 	// Stale readiness can never satisfy the barrier. Defensive pruning covers
-	// terminal paths as well as superseding hidden retries; then require exact set
-	// membership rather than relying on equal cardinality alone.
+	// terminal paths as well as superseding hidden retries.
 	for (const state of STAGED_REVEALS) {
 		if (!HELD_TRANSITIONS.has(state)) STAGED_REVEALS.delete(state);
 	}
-	if (STAGED_REVEALS.size === 0 || STAGED_REVEALS.size !== HELD_TRANSITIONS.size) return;
-	for (const state of HELD_TRANSITIONS) {
-		if (!STAGED_REVEALS.has(state)) return;
-	}
-	flushStagedReveals();
+	const group = STAGED_REVEALS.size === 0 ? null : stagedRevealGroup();
+	if (group !== null) flushStagedReveals(group);
 }
 
 function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
@@ -2900,7 +2901,7 @@ function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
 	return 0;
 }
 
-function flushStagedReveals(): void {
+function flushStagedReveals(group: TrySlot[]): void {
 	if (flushingStagedReveals) return; // re-entrancy guard (a reveal may abandon a sibling)
 	// A boundary holding a dropped transition reveals by rendering it again:
 	// the batches' Blocks re-render at transition priority and reach every held
@@ -2908,10 +2909,10 @@ function flushStagedReveals(): void {
 	// hidden-retry path instead.
 	if (TRANSITION_ROOT_DRIVER) {
 		let retried = false;
-		for (const state of STAGED_REVEALS)
+		for (const state of group)
 			if (state.hiddenDom === null && TRANSITION_ROOT_DRIVER.retry(state)) retried = true;
 		if (retried) {
-			STAGED_REVEALS.clear();
+			for (const state of group) STAGED_REVEALS.delete(state);
 			flush();
 			return;
 		}
@@ -2919,8 +2920,8 @@ function flushStagedReveals(): void {
 	flushingStagedReveals = true;
 	try {
 		const run = (): void => {
-			const batch = [...STAGED_REVEALS];
-			STAGED_REVEALS.clear();
+			const batch = group;
+			for (const state of batch) STAGED_REVEALS.delete(state);
 			// Only fallback-hidden members have completed rollback-safe render
 			// captures. A pre-timeout visible hold remains within Octane's documented
 			// per-swap/global-WIP limitation and may discover another suspension while
@@ -2958,9 +2959,7 @@ function flushStagedReveals(): void {
 		// pre-timeout batch retains the documented per-swap limitation.
 		if (
 			!VIEW_TRANSITION_DRIVER ||
-			!VIEW_TRANSITION_DRIVER.wrapResume(run, () =>
-				[...STAGED_REVEALS].map((state) => state.parentBlock),
-			)
+			!VIEW_TRANSITION_DRIVER.wrapResume(run, () => group.map((state) => state.parentBlock))
 		)
 			run();
 	} finally {
@@ -2977,7 +2976,10 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
 	const retry = () => {
-		if (state.pendingThenable !== thenable) return; // superseded by a fresher suspend
+		// A fresher suspend supersedes this one, unless the boundary holds
+		// transitions: each holds its own batches (Transition holds), so any
+		// thenable they suspended on may let one of them commit.
+		if (state.pendingThenable !== thenable && !HELD_TRANSITIONS.has(state)) return;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.BOUNDARY_RETRY);
 		state.pendingThenable = null;
@@ -3015,8 +3017,7 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 				return;
 			}
 			STAGED_REVEALS.add(state);
-			if (STAGED_REVEALS.size < HELD_TRANSITIONS.size) return; // others still pending
-			flushStagedReveals();
+			flushStagedRevealsIfReady(); // waits while its group has members pending
 			return;
 		}
 		if (state.branch === 2 && (state.tryBlock === null || state.tryBlock.disposed)) {

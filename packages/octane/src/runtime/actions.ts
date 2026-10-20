@@ -8,7 +8,7 @@ export {} from './templates.js';
 import { hydrating } from '../hydration-flag.js';
 import { __profileSchedule } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
-import type { HookSlot, Block } from './types.js';
+import type { HookSlot, Block, TransitionActionBatch } from './types.js';
 import { resolveSlot, noop } from './drivers.js';
 import {
 	VIEW_TRANSITION_DRIVER,
@@ -587,6 +587,8 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 
 interface OptimisticSlot<V> {
 	queue: V[];
+	/** The transition batch each queued value was dispatched in, or null. */
+	batches: (TransitionActionBatch | null)[];
 	add: (value: V) => void;
 	/**
 	 * True when the queue was populated INSIDE a transition, so it should clear
@@ -629,19 +631,39 @@ export function useOptimistic<S, V = S>(
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as OptimisticSlot<V> | undefined;
 	if (s === undefined) {
+		const revert = (): void => {
+			if (!block.disposed) {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileSchedule(block, 'optimistic-revert', slot);
+				scheduleRender(block);
+			}
+		};
 		const clear = (): void => {
 			slotRef.armed = false;
 			if (slotRef.queue.length > 0) {
-				slotRef.queue.length = 0;
-				if (!block.disposed) {
-					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-						__profileSchedule(block, 'optimistic-revert', slot);
-					scheduleRender(block);
-				}
+				slotRef.queue.length = slotRef.batches.length = 0;
+				revert();
 			}
+		};
+		// As React reverts an optimistic update when its transition lane commits,
+		// a value dispatched in a batch reverts when that batch finishes, while
+		// values from unrelated transitions stay applied.
+		const revertBatch = (batch: TransitionActionBatch): void => {
+			const { queue, batches } = slotRef;
+			let kept = 0;
+			for (let i = 0; i < queue.length; i++)
+				if (batches[i] !== batch) {
+					queue[kept] = queue[i];
+					batches[kept++] = batches[i];
+				}
+			if (kept === queue.length) return;
+			queue.length = batches.length = kept;
+			if (kept === 0) slotRef.armed = false;
+			revert();
 		};
 		const slotRef: OptimisticSlot<V> = {
 			queue: [],
+			batches: [],
 			armed: false,
 			add: (value: V) => {
 				if (
@@ -653,7 +675,13 @@ export function useOptimistic<S, V = S>(
 						'An optimistic update was dispatched outside a transition or action. Wrap it in startTransition or call it from an action.',
 					);
 				}
+				const batch = transitionActionBatchForUpdate();
 				slotRef.queue.push(value);
+				slotRef.batches.push(batch);
+				if (batch !== null) {
+					if (batch.optimistic === null) batch.optimistic = [revertBatch];
+					else if (!batch.optimistic.includes(revertBatch)) batch.optimistic.push(revertBatch);
+				}
 				if (TRANSITION_PENDING_COUNT > 0) {
 					// Inside an Action: the optimistic value is held until that
 					// transition settles (the listener below clears it then).
