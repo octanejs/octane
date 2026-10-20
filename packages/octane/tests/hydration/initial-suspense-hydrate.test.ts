@@ -345,6 +345,113 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 		expect(onRef).toHaveBeenCalledWith(original);
 	});
 
+	it.each(['unrelated', 'changed source', 'changed reader', 'changed domain'] as const)(
+		'retries a selected request with a guarded layout callback: %s',
+		async (scenario) => {
+			const scope = Signals.createScope({ scopeKey: `guarded-layout-${dev}-${scenario}` });
+			const selection$ = scope.signal$('selection', { id: 'original' } as { id: string } | null);
+			cleanups.push(() => scope.dispose());
+			const gateSource = `import { useLayoutEffect } from 'octane';
+import { selection$ } from './selection';
+export function Gate(props) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    const value = active ? props.read() : "inactive";
+    useLayoutEffect(() => { if (active) { props.onReady?.(value, value); } });
+    const stage = props.second();
+    <label data-domain={props.domain} data-stage={stage}><input defaultValue={value} ref={props.onRef} /></label>;
+  } @pending { <p>Loading</p>; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}</span><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+					runtimeModules: { './selection': { selection$ } },
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const first = gate();
+			const second = gate();
+			const firstReady = vi.fn();
+			const onRef = vi.fn();
+			const calls: { receiver: unknown; args: string[] }[] = [];
+			function latestReady(this: unknown, ...args: string[]) {
+				calls.push({ receiver: this, args });
+			}
+			const initial = {
+				domain: 'original',
+				onReady: firstReady,
+				onRef,
+				read: () => {
+					if (first.value.pending) throw first.value.promise;
+					return 'server';
+				},
+				second: () => {
+					if (second.value.pending) throw second.value.promise;
+					return 'ready';
+				},
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], { ready: false, gate: initial }).html;
+			const original = container.querySelector('input')!;
+			original.value = 'typed';
+			first.value.pending = second.value.pending = true;
+			const root = hydrateRoot(container, client['App'], { ready: false, gate: initial });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			const next = { ...initial, onReady: latestReady };
+			if (scenario === 'changed reader') next.read = () => 'replacement';
+			if (scenario === 'changed domain') next.domain = 'other';
+			await act(() => {
+				if (scenario === 'changed source') selection$.set(null);
+				root.render(client['App'], { ready: true, gate: next });
+			});
+			expect(container.querySelector('input') === original).toBe(scenario === 'unrelated');
+			expect(container.querySelector('span')?.textContent).toBe('ready');
+			await act(() => first.resolve());
+			expect(calls).toHaveLength(0);
+			expect(onRef).not.toHaveBeenCalled();
+			await act(() => second.resolve());
+			const accepted = container.querySelector('input')!;
+			expect(accepted === original).toBe(scenario === 'unrelated');
+			expect(accepted.value).toBe(
+				scenario === 'unrelated'
+					? 'typed'
+					: scenario === 'changed reader'
+						? 'replacement'
+						: 'inactive',
+			);
+			expect(firstReady).not.toHaveBeenCalled();
+			expect(calls).toEqual(
+				scenario === 'unrelated' || scenario === 'changed reader'
+					? [
+							{
+								receiver: expect.objectContaining({ onReady: latestReady }),
+								args: Array(2).fill(scenario === 'unrelated' ? 'server' : 'replacement'),
+							},
+						]
+					: [],
+			);
+			expect(onRef).toHaveBeenCalledExactlyOnceWith(accepted);
+			expect(container.querySelector('label')?.dataset['domain']).toBe(
+				scenario === 'changed domain' ? 'other' : 'original',
+			);
+		},
+	);
+
 	it.each([
 		'no update',
 		'unrelated update',

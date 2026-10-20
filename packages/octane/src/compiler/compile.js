@@ -7568,7 +7568,16 @@ function hydrationSetupExpression(node, propsName, required, setupLocals) {
 			)
 				return false;
 			let receiver = unwrapTsExpr(member.object);
-			if (receiver?.type === 'Identifier') receiver = unwrapTsExpr(setupLocals.get(receiver.name));
+			if (receiver?.type === 'Identifier') {
+				receiver = unwrapTsExpr(setupLocals.get(receiver.name));
+				// Reuse the prior const's admitted zero-argument `.get()` setup;
+				// its returned value and any try-arm captures still run as authored.
+				if (
+					receiver?.type === 'CallExpression' &&
+					unwrapTsExpr(receiver.callee)?.object?.type === 'Identifier'
+				)
+					return hydrationSetupExpression(receiver, propsName, required, setupLocals);
+			}
 			// The optional read stays in authored setup. Its receiver must be an
 			// own-data props field, possibly held by one preceding const local.
 			return (
@@ -7690,6 +7699,26 @@ function hydrationBlockingBodies(ctx, bodies) {
 	return [{ ...bodies[0], stmts }, ...bodies.slice(1)];
 }
 
+function hydrationLayoutCaptureName(node, propsName) {
+	const name = node?.type === 'Identifier' ? node.name : null;
+	return name === propsName || name === 'arguments' || name === 'eval' ? null : name;
+}
+
+function hydrationLayoutMethodDep(node, helper, propsName, field, guarded) {
+	return (
+		node?.type === 'CallExpression' &&
+		!node.optional &&
+		node.callee?.type === 'Identifier' &&
+		node.callee.name === helper &&
+		node.arguments.length === (guarded ? 3 : 2) &&
+		node.arguments[0]?.type === 'Identifier' &&
+		node.arguments[0].name === propsName &&
+		node.arguments[1]?.type === 'Literal' &&
+		node.arguments[1].value === field &&
+		(!guarded || (node.arguments[2]?.type === 'Literal' && node.arguments[2].value === true))
+	);
+}
+
 // A layout callback is published only after an arm commits. Dependency
 // inference still evaluates its method witness during render, so require that
 // field to be own data without treating the callback as a blocking input.
@@ -7711,40 +7740,61 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 			callback.params.length !== 0 ||
 			callback.body.type !== 'BlockStatement' ||
 			callback.body.body.length !== 1 ||
-			callback.body.body[0].type !== 'ExpressionStatement' ||
-			deps?.type !== 'ArrayExpression' ||
-			deps.elements.length !== 2
+			deps?.type !== 'ArrayExpression'
 		)
 			continue;
-		const expression = callback.body.body[0].expression;
+		let action = callback.body.body[0];
+		let guard = null;
+		if (action.type === 'IfStatement') {
+			guard = hydrationLayoutCaptureName(action.test, propsName);
+			if (guard === null || action.alternate !== null) continue;
+			action = action.consequent;
+			if (action.type === 'BlockStatement' && action.body.length === 1) action = action.body[0];
+		}
+		if (action.type !== 'ExpressionStatement') continue;
+		const expression = action.expression;
 		const invoked = expression.type === 'ChainExpression' ? expression.expression : expression;
 		const member = invoked?.callee;
-		const argument = invoked?.arguments?.[0];
 		const field = staticDepMemberName(member);
-		const [method, value] = deps.elements;
 		if (
 			invoked?.type !== 'CallExpression' ||
-			invoked.arguments.length !== 1 ||
+			invoked.arguments.length === 0 ||
 			member?.type !== 'MemberExpression' ||
 			member.optional ||
 			field === null ||
 			member.object?.type !== 'Identifier' ||
-			member.object.name !== propsName ||
-			argument?.type !== 'Identifier' ||
-			argument.name === propsName ||
-			method?.type !== 'CallExpression' ||
-			method.optional ||
-			method.callee?.type !== 'Identifier' ||
-			method.callee.name !== methodDepLocal ||
-			method.arguments.length !== 2 ||
-			method.arguments[0]?.type !== 'Identifier' ||
-			method.arguments[0].name !== propsName ||
-			method.arguments[1]?.type !== 'Literal' ||
-			method.arguments[1].value !== field ||
-			value?.type !== 'Identifier' ||
-			value.name !== argument.name
+			member.object.name !== propsName
 		)
 			continue;
+		// Inferred dependencies deduplicate repeated arguments. Require the exact
+		// set of lexical captures and retain those dependencies in the analysis.
+		const captures = new Set();
+		if (guard !== null) captures.add(guard);
+		let valid = true;
+		for (const argument of invoked.arguments) {
+			const name = hydrationLayoutCaptureName(argument, propsName);
+			if (name === null) {
+				valid = false;
+				break;
+			}
+			captures.add(name);
+		}
+		if (!valid || deps.elements.length !== captures.size + 1) continue;
+		let methodIndex = -1;
+		for (let depIndex = 0; depIndex < deps.elements.length; depIndex++) {
+			const dependency = deps.elements[depIndex];
+			if (dependency?.type === 'Identifier' && captures.delete(dependency.name)) continue;
+			if (
+				methodIndex === -1 &&
+				hydrationLayoutMethodDep(dependency, methodDepLocal, propsName, field, guard !== null)
+			) {
+				methodIndex = depIndex;
+				continue;
+			}
+			valid = false;
+			break;
+		}
+		if (!valid || methodIndex === -1 || captures.size !== 0) continue;
 		// The helper alias is allocated against every authored identifier before
 		// inference, so an explicit dependency list cannot counterfeit this call.
 		required.add(field);
@@ -7752,7 +7802,10 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 			...statement,
 			expression: {
 				...effect,
-				arguments: [b.arrow([], b.block([])), { ...deps, elements: [value] }],
+				arguments: [
+					b.arrow([], b.block([])),
+					{ ...deps, elements: deps.elements.filter((_, depIndex) => depIndex !== methodIndex) },
+				],
 			},
 		};
 	}
