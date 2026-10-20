@@ -1,10 +1,32 @@
+import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { act, createRoot, startTransition } from 'octane';
 import { createScope } from 'octane/signals';
+import * as SignalsClient from 'octane/signals/client';
 import { deferred } from './_fixtures/signals-async-controls.js';
 import { IncompletePrimaryRollbackApp } from './_fixtures/suspense-incomplete-primary.tsrx';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 
-it('reveals a live child after an incomplete primary retry is rolled back', async () => {
+const fixturePath = 'packages/octane/tests/_fixtures/suspense-incomplete-primary.tsrx';
+const strong = loadCompiledFixtureSource<
+	typeof import('./_fixtures/suspense-incomplete-primary.tsrx')
+>(readFileSync(fixturePath, 'utf8'), {
+	id: fixturePath,
+	mode: 'client',
+	compileOptions: {
+		strong: true,
+		dev: process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod',
+		hmr: false,
+	},
+	runtimeModules: { 'octane/signals/client': SignalsClient },
+}).IncompletePrimaryRollbackApp;
+
+const cases = [
+	['default', IncompletePrimaryRollbackApp],
+	['strong', strong],
+] as const;
+
+it.each(cases)('reveals a live child after incomplete primary rollback (%s)', async (_, App) => {
 	const scope = createScope({ scopeKey: 'incomplete-primary-rollback' });
 	const step$ = scope.signal$('step', 0);
 	const initial = deferred<void>();
@@ -16,7 +38,7 @@ it('reveals a live child after an incomplete primary retry is rolled back', asyn
 	const root = createRoot(container, { onCaughtError: onError, onUncaughtError: onError });
 	try {
 		await act(() =>
-			root.render(IncompletePrimaryRollbackApp, {
+			root.render(App, {
 				step$,
 				initial: initial.promise,
 				retry: retry.promise,
