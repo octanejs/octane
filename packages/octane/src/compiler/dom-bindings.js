@@ -1358,9 +1358,10 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		!(render.openingElement?.attributes ?? render.attributes ?? []).some(
 			(attr) => attrName(attr)?.toLowerCase() === 'dangerouslysetinnerhtml',
 		);
-	// Pure setup aliases run first in the projector, but only those a bound value
-	// reads: adoption must not evaluate a prop that only an unbound value uses.
-	const aliases = bindingSetup(fn, lexical);
+	// Pure setup aliases run first in a scalar view's projector, but only those a
+	// bound value reads: adoption must not evaluate a prop only an unbound value
+	// uses. A program declares its setup once for all of its native elements.
+	const aliases = native === null ? bindingSetup(fn, lexical) : new Map();
 	const read = new Set();
 	const readAliases = (expression) =>
 		walk(expression, (node, parent, key) => {
