@@ -623,6 +623,7 @@ export class OctaneRspackPlugin {
 		};
 		compiler.options.module.rules.push({
 			test: OCTANE_RULE,
+			dependency: { not: 'url' },
 			type: 'javascript/auto',
 			enforce: 'pre',
 			use:
@@ -645,6 +646,7 @@ export class OctaneRspackPlugin {
 		if (this.options.transpile !== false) {
 			compiler.options.module.rules.push({
 				test: TYPESCRIPT_RULE,
+				dependency: { not: 'url' },
 				type: 'javascript/auto',
 				use: [{ loader: 'builtin:swc-loader', options: { detectSyntax: 'auto' } }],
 			});
