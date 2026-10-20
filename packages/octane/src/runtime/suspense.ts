@@ -1269,9 +1269,9 @@ export function tryBlock(
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
 	// A compiler proof for comparing captured inputs while initial hydration waits.
-	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean,
-	// Compiler capture modes: 1 = unobserved optional input; 2 = validated source witness.
-	preserveHydrationCapture?: 1 | 2,
+	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean | 2,
+	// Private capture mode: 1 = unobserved optional input; 2 = validated source witness; object = first-query descriptor.
+	hydrationCapture?: 1 | 2 | InitialHydrationQueryDescriptor,
 ): () => void {
 	// Slot arguments can queue a parent self-update. Like every other slot, wait
 	// for the replay: mounting now would put this range before earlier siblings
@@ -1321,7 +1321,7 @@ export function tryBlock(
 					env,
 					propagateSuspense,
 					hydrationInputsEqual,
-					preserveHydrationCapture,
+					hydrationCapture,
 				);
 			} finally {
 				settleFreshSlot(parentScope, end, anchor);
@@ -1333,6 +1333,7 @@ export function tryBlock(
 	let initial =
 		state === undefined || !hydrationStarted ? undefined : initialSuspenseHydrations?.get(state);
 	let updated = false;
+	let inputContinuity: boolean | 2 | undefined;
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -1368,7 +1369,7 @@ export function tryBlock(
 					env,
 					propagateSuspense,
 					hydrationInputsEqual,
-					preserveHydrationCapture,
+					hydrationCapture,
 				),
 			);
 		} else {
@@ -1420,8 +1421,7 @@ export function tryBlock(
 		// before an optional input's first read, or after validating a source witness.
 		const unchangedCapture =
 			initial !== undefined &&
-			(preserveHydrationCapture === 2 ||
-				(preserveHydrationCapture === 1 && initial.waits !== undefined)) &&
+			(hydrationCapture === 2 || (hydrationCapture === 1 && initial.waits !== undefined)) &&
 			hydrationInputsEqual !== undefined &&
 			state.tryBody === tryBody &&
 			state.env !== env &&
@@ -1432,8 +1432,8 @@ export function tryBlock(
 			(state.tryBody !== tryBody ||
 				(state.env !== env &&
 					(initial !== undefined && hydrationInputsEqual && state.env && env
-						? !(unchangedCapture && preserveHydrationCapture === 1) &&
-							!hydrationInputsEqual(state.env, env)
+						? !(unchangedCapture && hydrationCapture === 1) &&
+							!(inputContinuity = hydrationInputsEqual(state.env, env))
 						: depsChanged(state.env, env))));
 		if (unchangedCapture && !changed) env = state.env;
 		supersedesInputs = retains && changed;
@@ -1472,7 +1472,13 @@ export function tryBlock(
 		if (initial !== undefined) registerInitialSuspenseHydration(s, initial);
 	}
 	if (initial !== undefined) {
-		initialSuspenseHydrationRenderer!(s, initial, updated);
+		initialSuspenseHydrationRenderer!(
+			s,
+			initial,
+			updated,
+			typeof hydrationCapture === 'object' ? hydrationCapture : undefined,
+			inputContinuity === 2,
+		);
 	} else if (s.passthrough) {
 		renderPassthroughTry(s);
 		return s.reset;
@@ -1596,6 +1602,25 @@ export interface InitialSuspenseHydration {
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
+	/** The exact first query read which suspended this initial adoption. */
+	query?:
+		| {
+				witness: unknown;
+				waiting: TrackedThenable<unknown>;
+				refined?: InitialHydrationQueryDescriptor;
+		  }
+		| undefined;
+}
+
+export interface InitialHydrationQueryInput {
+	read(source: any): unknown;
+	witness?: unknown;
+	waiting?: PromiseLike<unknown> | null | undefined;
+}
+
+export interface InitialHydrationQueryDescriptor {
+	capture(): InitialHydrationQueryInput;
+	retains(witness: unknown): boolean;
 }
 
 // Server metadata gives each resolved arm an independent adoption scope. The
@@ -1957,7 +1982,15 @@ export function retryInitialSuspenseHydration(
 ): void {
 	const hiddenActivity = TRY_OPS!.hiddenActivity(state.parentBlock);
 	try {
-		renderInitialSuspenseHydration(state, initial);
+		const query = initial.query;
+		// Switching selections resolves the binding's own waiter even if its
+		// old loader has not settled. A committed input refinement must not
+		// adopt that successor as though the original request became ready.
+		const updated =
+			query?.refined !== undefined &&
+			state.pendingThenable === query.waiting &&
+			!query.refined.retains(query.witness);
+		renderInitialSuspenseHydration(state, initial, updated);
 	} catch (error) {
 		TRY_OPS!.resumeError(state.parentBlock, error);
 	} finally {

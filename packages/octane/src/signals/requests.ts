@@ -178,7 +178,7 @@ export class RequestEntry {
 	readonly consumers = new Set<ResourceBinding>();
 	state: NodeState;
 	attempt: Attempt | undefined;
-	private generation = 0;
+	#generation = 0;
 
 	constructor(
 		readonly owner: RequestOwner,
@@ -194,12 +194,16 @@ export class RequestEntry {
 			: pendingState(Promise.resolve(), 'none', request.identity);
 	}
 
+	static hydrationGeneration(value: object): number | undefined {
+		return #generation in value ? value.#generation : undefined;
+	}
+
 	get active(): boolean {
 		return this.attempt !== undefined;
 	}
 
 	get attemptGeneration(): number {
-		return this.generation;
+		return this.#generation;
 	}
 
 	observe(nodeKey: string): Attempt | undefined {
@@ -221,12 +225,12 @@ export class RequestEntry {
 
 	start(pending: boolean): void {
 		if (this.owner.readBarrier !== undefined) return;
-		const generation = ++this.generation;
+		const generation = ++this.#generation;
 		this.stopAttempt();
 		// Abort and iterator cleanup run producer code. A nested retry can finish
 		// synchronously, so an empty attempt alone does not grant this call a lease.
 		if (
-			generation !== this.generation ||
+			generation !== this.#generation ||
 			this.owner.readBarrier !== undefined ||
 			this.owner.retired ||
 			this.owner.requests?.get(this.request.identity) !== this ||
@@ -275,9 +279,9 @@ export class RequestEntry {
 		if (
 			this.owner.readBarrier !== undefined ||
 			identity.selectionKey !== this.request.identity ||
-			identity.attempt < this.generation ||
+			identity.attempt < this.#generation ||
 			(this.attempt === undefined &&
-				identity.attempt === this.generation &&
+				identity.attempt === this.#generation &&
 				this.state.snapshot.status !== 'pending') ||
 			this.owner.retired ||
 			!this.consumers.size
@@ -287,10 +291,10 @@ export class RequestEntry {
 		if (this.attempt?.streamed && this.attempt.generation === identity.attempt) {
 			return true;
 		}
-		this.generation = identity.attempt;
+		this.#generation = identity.attempt;
 		this.stopAttempt();
 		if (
-			this.generation !== identity.attempt ||
+			this.#generation !== identity.attempt ||
 			this.owner.readBarrier !== undefined ||
 			this.owner.retired ||
 			this.owner.requests?.get(this.request.identity) !== this ||
@@ -333,6 +337,9 @@ export class RequestEntry {
 		this.stopAttempt();
 	}
 }
+
+export const hydrationRequestGeneration = /* @__PURE__ */ (() =>
+	RequestEntry.hydrationGeneration)();
 
 function currentEntry(attempt: Attempt): RequestEntry | undefined {
 	const entry = attempt.entry;
@@ -550,7 +557,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 	describedAttempt: Attempt | undefined;
 	observedAttempt: Attempt | undefined;
 	pendingObserver: (<V>(callback: () => V) => V) | undefined;
-	pendingPromise: PromiseLike<unknown> | undefined;
+	#pendingPromise: PromiseLike<unknown> | undefined;
 	resolvePending: (() => void) | undefined;
 	streamedSelection: StreamFrameIdentity | undefined;
 	selectionAuthority: object = {};
@@ -583,6 +590,10 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 				: pending(() => this.compute());
 		};
 		node.retryRequest = (options) => this.retry(options);
+	}
+
+	static hydrationWaiter(value: object): PromiseLike<unknown> | null | undefined {
+		return #pendingPromise in value ? (value.#pendingPromise ?? null) : undefined;
 	}
 
 	private request(describe = this.describe!): Request<T> | typeof skip {
@@ -669,11 +680,11 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		this.describedAttempt = fork.describedAttempt;
 		this.observedAttempt = fork.observedAttempt;
 		this.pendingObserver = undefined;
-		this.pendingPromise = fork.pendingPromise;
+		this.#pendingPromise = fork.#pendingPromise;
 		this.resolvePending = fork.resolvePending;
 		this.seeded = undefined;
 		fork.selected = undefined;
-		fork.pendingPromise = undefined;
+		fork.#pendingPromise = undefined;
 		fork.resolvePending = undefined;
 	}
 
@@ -807,23 +818,23 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		if (this.describedAttempt !== entry.attempt) {
 			this.resolvePending?.();
 			this.resolvePending = undefined;
-			this.pendingPromise = undefined;
+			this.#pendingPromise = undefined;
 			this.describedAttempt = entry.attempt;
 		}
 		if (entry.state.snapshot.status !== 'pending') {
 			if (entry.state.snapshot.status === 'ready') this.retainedRequest = this.selectedIdentity;
 			this.resolvePending?.();
 			this.resolvePending = undefined;
-			this.pendingPromise = undefined;
+			this.#pendingPromise = undefined;
 			return entry.state as NodeState<T>;
 		}
-		if (!this.pendingPromise) {
-			this.pendingPromise = new Promise<void>((resolve) => {
+		if (!this.#pendingPromise) {
+			this.#pendingPromise = new Promise<void>((resolve) => {
 				this.resolvePending = resolve;
 			});
 		}
 		return pendingState(
-			this.pendingPromise,
+			this.#pendingPromise,
 			entry.state.snapshot.connection,
 			entry.request.identity,
 			this.resolvePending,
@@ -852,7 +863,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		this.observedAttempt = undefined;
 		this.resolvePending?.();
 		this.resolvePending = undefined;
-		this.pendingPromise = undefined;
+		this.#pendingPromise = undefined;
 		this.streamedSelection = undefined;
 		this.selectionAuthority = {};
 		entry?.remove(this);
@@ -1068,3 +1079,5 @@ export function failResourceStreamedResult(
 	failAttempt(entry.attempt, error);
 	return true;
 }
+
+export const hydrationResourceWaiter = /* @__PURE__ */ (() => ResourceBinding.hydrationWaiter)();

@@ -365,6 +365,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	'./internal/signal-read': ['readNativeDomValue'],
 	'./internal/hydration-signal': ['__hydrationSignalRevision'],
+	'./internal/hydration-query': ['__createHydrationQueryInput', '__retainsHydrationQueryInput'],
 	'./internal/context': ['isContext', 'registerContext'],
 	'./internal/client': [
 		'queueOwnRefDetach',

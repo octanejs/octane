@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToPipeableStream, renderToString } from 'octane/server';
 import * as Signals from 'octane/signals';
+import { createSignalOwnerLifecycle } from '../../src/signals/facade.js';
 import { __hydrationSignalRevision } from 'octane/internal/hydration-signal';
+import {
+	__createHydrationQueryInput,
+	__retainsHydrationQueryInput,
+} from 'octane/internal/hydration-query';
 import { __captureHydrationInput, __ownedHydrationInputs } from '../../src/hydration-inputs.js';
 import {
 	activateStreamedMarkup,
@@ -665,6 +670,278 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 			expect(onRecoverableError).not.toHaveBeenCalled();
 		},
 	);
+
+	it.each([
+		'no update',
+		'request changes without parent update',
+		'rolled-back parent update',
+		'same request',
+		'ready same request',
+		'rejected same request',
+		'changed request',
+		'later sibling changes request',
+		'in-place ready request',
+		'changed domain',
+		'new attempt',
+		'frozen owner',
+		'second wakeable',
+		'latest layout callback',
+		'first operation',
+		'overridden state',
+		'arguments',
+		'arm receiver',
+		'no redundant request description',
+	] as const)('reconciles a native query during suspended hydration: %s', async (scenario) => {
+		const scopeKey = `query-continuity-${dev}-${scenario}`;
+		const serverScope = Signals.createScope({ scopeKey });
+		const scope = Signals.createScope({ scopeKey });
+		const lifecycle = scenario === 'frozen owner' ? createSignalOwnerLifecycle(scope) : undefined;
+		cleanups.push(() => {
+			scope.dispose();
+			serverScope.dispose();
+		});
+		const serverSelection$ = serverScope.signal$('selection', { id: 'saved', request: 'a' });
+		const selection$ = scope.signal$('selection', { id: 'saved', request: 'a' });
+		const requestKey$ = scope.signal$('request-key', 'a');
+		const waiting = gate();
+		const later = gate();
+		const serverQuery = Signals.query(scopeKey, (_key: string) => Promise.resolve('original'));
+		const serverRequest$ = Signals.createResource(serverScope, 'request', () =>
+			serverQuery('server'),
+		);
+		const query = Signals.query(scopeKey, (key: string) =>
+			key === 'a'
+				? waiting.value.promise.then(() => {
+						if (scenario === 'rejected same request') throw new Error('request failed');
+						return 'original';
+					})
+				: Promise.resolve('new'),
+		);
+		let reenter: (() => void) | undefined;
+		const request$ = Signals.createResource(scope, 'request', () => {
+			const action = reenter;
+			reenter = undefined;
+			action?.();
+			return query(requestKey$.get());
+		});
+		const ready$ = Signals.createResource(scope, 'ready-request', () => query('b'));
+		await act(() => {});
+		expect(serverRequest$.get()).toBe('original');
+		expect(ready$.get()).toBe('new');
+		const gateSource = `import { selection$, request$ } from './model';
+${scenario === 'latest layout callback' ? "import { useLayoutEffect } from 'octane';" : ''}
+export function Gate(props) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    ${scenario === 'first operation' ? 'props.before();' : ''}
+    const value = request$.get();
+    ${scenario === 'latest layout callback' ? 'useLayoutEffect(() => { props.onReady?.(value); });' : ''}
+    ${scenario === 'arguments' ? 'props.observe(arguments.length);' : scenario === 'arm receiver' ? 'props.observe(this);' : ''}
+    const status = props.finish();
+    <input data-active={active ? "yes" : "no"} data-domain={props.domain} data-status={status} defaultValue={value} ref={props.onRef} />;
+  } @pending { <span>Loading</span>; } ${scenario === 'rejected same request' ? '@catch (error) { <p role="alert">{error.message as string}</p>; }' : ''}
+}`;
+		const laterSource =
+			scenario === 'later sibling changes request'
+				? "import { useLayoutEffect } from 'octane'; function Later(props) @{ useLayoutEffect(() => { props.visit?.(); }, [props.visit]); <button>after</button>; }"
+				: scenario === 'rolled-back parent update'
+					? 'function Later(props) @{ props.visit?.(); <button>after</button>; }'
+					: '';
+		const appSource = `import { Gate } from './gate';
+${laterSource}
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} />${laterSource ? '<Later visit={props.visit} />' : ''}</section>; }
+${scenario === 'no redundant request description' ? 'export function Replacement() @{ <output>replacement</output>; }' : ''}`;
+		const load = (mode: 'client' | 'server') => {
+			const options = { mode, compileOptions: { dev, hmr: false } };
+			const gateModule = loadCompiledFixtureSource(gateSource, {
+				...options,
+				id: '/src/query-gate.tsrx',
+				runtimeModules: {
+					'octane/internal/hydration-query': {
+						__createHydrationQueryInput,
+						__retainsHydrationQueryInput,
+					},
+					'./model':
+						mode === 'server'
+							? { selection$: serverSelection$, request$: serverRequest$ }
+							: { selection$, request$ },
+				},
+			});
+			return loadCompiledFixtureSource(appSource, {
+				...options,
+				id: '/src/query-app.tsrx',
+				runtimeModules: { './gate': gateModule },
+			});
+		};
+		const server = load('server');
+		const client = load('client');
+		const onRef = vi.fn();
+		const firstReady = vi.fn();
+		const latestReady = vi.fn();
+		const observations: unknown[] = [];
+		const props = {
+			sibling: 'waiting',
+			gate: {
+				domain: 'saved',
+				before: () => {},
+				observe: (value: unknown) => observations.push(value),
+				finish: () => {
+					if (later.value.pending) throw later.value.promise;
+					return 'complete';
+				},
+				onRef,
+				onReady: firstReady,
+			},
+		};
+		const container = document.createElement('div');
+		document.body.append(container);
+		const html = renderToString(server['App'], props, { signalOwner: serverScope }).html;
+		observations.length = 0;
+		expect(html).toContain('data-octane-native-signals');
+		container.innerHTML = html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed';
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, client['App'], props, {
+			onRecoverableError,
+			signalOwner: scope,
+		});
+		const replaceRoot = vi.fn(() => root.render(client['Replacement']));
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		expect(container.querySelector('input')).toBe(original);
+		expect(onRef).not.toHaveBeenCalled();
+		const preserves =
+			scenario === 'no update' ||
+			scenario === 'request changes without parent update' ||
+			scenario === 'rolled-back parent update' ||
+			scenario === 'same request' ||
+			scenario === 'ready same request' ||
+			scenario === 'arm receiver' ||
+			scenario === 'latest layout callback' ||
+			scenario === 'no redundant request description' ||
+			scenario === 'second wakeable';
+		if (scenario === 'request changes without parent update') {
+			await act(() => requestKey$.set('b'));
+			expect(container.querySelector('input')).toBe(original);
+		} else if (scenario !== 'no update') {
+			if (scenario === 'rolled-back parent update') later.value.pending = true;
+			const update = () => {
+				if (scenario === 'changed request') {
+					selection$.set({ id: 'saved', request: 'b' });
+					requestKey$.set('b');
+				}
+				if (scenario === 'in-place ready request') {
+					selection$.get().request = 'b';
+					requestKey$.set(selection$.get().request);
+				}
+				if (scenario === 'new attempt') request$.retry({ pending: true });
+				lifecycle?.freeze();
+				if (scenario === 'overridden state')
+					Object.defineProperty(request$, 'state', {
+						configurable: true,
+						get() {
+							Reflect.deleteProperty(request$, 'state');
+							return { snapshot: { status: 'ready', value: 'forged' } };
+						},
+					});
+				if (scenario === 'no redundant request description') reenter = replaceRoot;
+				root.render(client['App'], {
+					...props,
+					sibling: 'ready',
+					visit:
+						scenario === 'later sibling changes request'
+							? () => requestKey$.set('b')
+							: scenario === 'rolled-back parent update'
+								? () => {
+										if (later.value.pending) throw later.value.promise;
+									}
+								: undefined,
+					gate:
+						scenario === 'changed domain'
+							? { ...props.gate, domain: 'new' }
+							: scenario === 'latest layout callback'
+								? { ...props.gate, onReady: latestReady }
+								: props.gate,
+				});
+			};
+			if (scenario === 'rolled-back parent update') {
+				await act(update);
+				expect(container.querySelector('output')?.textContent).toBe('waiting');
+				await act(() => requestKey$.set('b'));
+				expect(container.querySelector('input')).toBe(original);
+				await act(() => later.resolve());
+				expect(container.querySelector('input')).toBe(original);
+				expect(original.defaultValue).toBe('new');
+			} else
+				await act(
+					scenario === 'ready same request' || scenario === 'rejected same request'
+						? async () => {
+								waiting.resolve();
+								await Promise.resolve();
+								await Promise.resolve();
+								expect(request$.snapshot().status).toBe(
+									scenario === 'ready same request' ? 'ready' : 'error',
+								);
+								expect(onRef).not.toHaveBeenCalled();
+								update();
+							}
+						: update,
+				);
+			if (scenario === 'no redundant request description') {
+				expect(replaceRoot).not.toHaveBeenCalled();
+				reenter = undefined;
+			}
+			if (scenario === 'rejected same request') {
+				expect(container.querySelector('[role="alert"]')?.textContent).toBe('request failed');
+				expect(onRef).not.toHaveBeenCalled();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+				return;
+			}
+			expect(container.querySelector('output')?.textContent).toBe('ready');
+			if (preserves) expect(container.querySelector('input')).toBe(original);
+			else expect(container.querySelector('input')).not.toBe(original);
+			if (
+				scenario === 'changed request' ||
+				scenario === 'in-place ready request' ||
+				scenario === 'later sibling changes request'
+			)
+				expect(container.querySelector('input')?.value).toBe('new');
+		}
+		lifecycle?.resume();
+		if (scenario === 'second wakeable') later.value.pending = true;
+		await act(() => waiting.resolve());
+		if (scenario === 'second wakeable') {
+			expect(container.querySelector('input')).toBe(original);
+			expect(onRef).not.toHaveBeenCalled();
+			await act(() => later.resolve());
+		}
+		const accepted = container.querySelector('input')!;
+		expect(accepted === original).toBe(preserves);
+		expect(accepted.value).toBe(
+			preserves
+				? 'typed'
+				: scenario === 'overridden state'
+					? 'forged'
+					: scenario === 'changed request' ||
+						  scenario === 'in-place ready request' ||
+						  scenario === 'later sibling changes request'
+						? 'new'
+						: 'original',
+		);
+		expect(accepted.dataset['domain']).toBe(scenario === 'changed domain' ? 'new' : 'saved');
+		if (preserves) expect(onRef).toHaveBeenCalledExactlyOnceWith(original);
+		if (scenario === 'arguments') expect(observations).toEqual([3]);
+		if (scenario === 'arm receiver') expect(observations).toEqual([expect.any(Object)]);
+		if (scenario === 'latest layout callback') {
+			expect(firstReady).not.toHaveBeenCalled();
+			expect(latestReady).toHaveBeenCalledExactlyOnceWith('original');
+		}
+		expect(onRecoverableError).not.toHaveBeenCalled();
+	});
 
 	it('publishes the latest layout callback only after the adopted arm commits', async () => {
 		const gateSource = `import { useLayoutEffect } from 'octane';
