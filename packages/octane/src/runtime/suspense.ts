@@ -2890,13 +2890,12 @@ export function flushStagedRevealsIfReady(): void {
 		if (!HELD_TRANSITIONS.has(state)) STAGED_REVEALS.delete(state);
 	}
 	// Each group commits on its own: a retry renders only its own batches, so a
-	// group flushed with it would lose its staged reveal.
+	// group flushed with it would lose its staged reveal. A group whose reveal a
+	// view transition defers stays staged until it runs, so each flushes once here.
+	const seen = new Set<TrySlot>();
 	let group: TrySlot[] | null;
-	while (!flushingStagedReveals && (group = stagedRevealGroup()) !== null) {
+	while (!flushingStagedReveals && (group = stagedRevealGroup(seen)) !== null)
 		flushStagedReveals(group);
-		// A view transition runs the reveal later; its members stay staged until then.
-		if (group.some((state) => STAGED_REVEALS.has(state))) return;
-	}
 }
 
 function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
@@ -2926,7 +2925,9 @@ function flushStagedReveals(group: TrySlot[]): void {
 	flushingStagedReveals = true;
 	try {
 		const run = (): void => {
-			const batch = group;
+			// A deferred run commits only the members still staged: another flush may
+			// have revealed them first.
+			const batch = group.filter((state) => STAGED_REVEALS.has(state));
 			for (const state of batch) STAGED_REVEALS.delete(state);
 			// Only fallback-hidden members have completed rollback-safe render
 			// captures. A pre-timeout visible hold remains within Octane's documented
@@ -2984,11 +2985,14 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 	const retry = () => {
 		if (state.pendingThenable !== thenable) {
 			// A fresher suspend supersedes this one. A boundary holding transitions
-			// holds each one's batches (Transition holds), though, and this may be all
-			// one of them waited for: render them again. Those still waiting hold
-			// again, and the fresher thenable keeps its resume and fallback timeout.
+			// on screen holds each one's batches (Transition holds), though, and this
+			// may be all one of them waited for: render them again. Those still
+			// waiting hold again, and the fresher thenable keeps its resume and
+			// fallback timeout. Behind a fallback the holds no longer suspend, and the
+			// hidden primary reveals only once its fresher thenable settles.
 			if (
 				TRANSITION_ROOT_DRIVER &&
+				state.hiddenDom === null &&
 				HELD_TRANSITIONS.has(state) &&
 				TRANSITION_ROOT_DRIVER.retry(state)
 			)

@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setTransitionFallbackTimeout, getTransitionFallbackTimeout } from 'octane';
 import { act, mount, type MountResult } from '../_helpers.js';
+import { installViewTransitionMocks } from './_helpers/view-transition-mocks.js';
 import {
 	SeparateBoundaries,
 	SharedBoundary,
+	ViewTransitionBoundaries,
 	type TextCache,
 } from './_fixtures/parallel-transitions.tsrx';
 
@@ -161,6 +163,57 @@ describe('parallel transitions', () => {
 			await resolve('a: 1');
 			expect(r.findAll('.fallback')).toHaveLength(0);
 			expect(counter(r, 'a')).toBe('idle|1|a: 1');
+		});
+
+		it('keeps a waiting transition pending when a superseded thenable settles behind its fallback', async () => {
+			const { r, resolve } = await mountCounters(SharedBoundary);
+			await act(() => r.click('.a .go'));
+			await act(() => r.click('.b .go'));
+			await act(() => vi.advanceTimersByTime(150));
+			expect(r.findAll('.fallback')).toHaveLength(1);
+
+			// B's data alone cannot reveal the boundary, and A is still waiting.
+			await resolve('b: 1');
+			expect(r.findAll('.fallback')).toHaveLength(1);
+			expect(counter(r, 'a')).toBe('pending|saving|a: 0');
+
+			await resolve('a: 1');
+			expect(r.findAll('.fallback')).toHaveLength(0);
+			expect(counter(r, 'a')).toBe('idle|1|a: 1');
+			expect(counter(r, 'b')).toBe('idle|1|b: 1');
+		});
+
+		it('reveals every ready group while a view transition defers one of them', async () => {
+			const vt = installViewTransitionMocks();
+			try {
+				const { r, resolve } = await mountCounters(ViewTransitionBoundaries);
+				await act(() => r.click('.a .go'));
+				await act(() => r.click('.b .go'));
+				await act(() => vi.advanceTimersByTime(150));
+				expect(r.findAll('.fallback-a')).toHaveLength(1);
+				expect(r.findAll('.fallback-b')).toHaveLength(1);
+
+				// Each reveal now waits for its view transition's update callback.
+				const updates: Array<() => unknown> = [];
+				(document as any).startViewTransition = (input: any) => {
+					updates.push(typeof input === 'function' ? input : input.update);
+					const done = Promise.resolve();
+					return { ready: done, finished: done, updateCallbackDone: done, skipTransition() {} };
+				};
+				await resolve('a: 1', 'b: 1');
+				// Both reveals start their view transitions now: B's does not wait for A's.
+				const started = updates.splice(0);
+				expect(started).toHaveLength(2);
+				await act(async () => {
+					for (const update of started) await update();
+				});
+				expect(r.findAll('.fallback-a')).toHaveLength(0);
+				expect(r.findAll('.fallback-b')).toHaveLength(0);
+				expect(counter(r, 'a')).toBe('idle|1|a: 1');
+				expect(counter(r, 'b')).toBe('idle|1|b: 1');
+			} finally {
+				vt.restore();
+			}
 		});
 	});
 });

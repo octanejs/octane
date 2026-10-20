@@ -1,4 +1,4 @@
-import { use, useOptimistic, useState, useTransition } from 'octane';
+import { ViewTransition, use, useOptimistic, useState, useTransition } from 'octane';
 
 export interface TextCache {
 	read(key: string): Promise<string>;
@@ -63,5 +63,28 @@ export function SharedBoundary(props: { cache: TextCache }) @{
 		} @pending {
 			<span class="fallback">{'loading'}</span>
 		}
+	</main>
+}
+
+export function ViewTransitionBoundaries(props: { cache: TextCache }) @{
+	<main>
+		<ViewTransition>
+			<section>
+				@try {
+					<Counter name="a" cache={props.cache} />
+				} @pending {
+					<span class="fallback-a">{'loading a'}</span>
+				}
+			</section>
+		</ViewTransition>
+		<ViewTransition>
+			<section>
+				@try {
+					<Counter name="b" cache={props.cache} />
+				} @pending {
+					<span class="fallback-b">{'loading b'}</span>
+				}
+			</section>
+		</ViewTransition>
 	</main>
 }

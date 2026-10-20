@@ -452,13 +452,13 @@ export const HELD_TRANSITIONS = new Set<TrySlot>();
 export const STAGED_REVEALS = new Set<TrySlot>();
 
 /**
- * A group of held boundaries that is fully staged, or null. A group joins held
- * boundaries that share a batch, transitively. A held boundary with no batch hold
- * (its transition folded no hook work) joins every group, the barrier before
+ * A group of held boundaries that is fully staged, or null, skipping the groups
+ * of boundaries in `seen` and adding the result's members to it. A group joins
+ * held boundaries that share a batch, transitively. A held boundary with no batch
+ * hold (its transition folded no hook work) joins every group, the barrier before
  * parallel transitions. Runs when a boundary stages, on a handful of boundaries.
  */
-export function stagedRevealGroup(): TrySlot[] | null {
-	const seen = new Set<TrySlot>();
+export function stagedRevealGroup(seen: Set<TrySlot>): TrySlot[] | null {
 	for (const start of STAGED_REVEALS) {
 		if (seen.has(start)) continue;
 		const group = [start];
@@ -478,8 +478,8 @@ export function stagedRevealGroup(): TrySlot[] | null {
 				if (shares) group.push(other);
 			}
 		}
-		if (group.every((member) => STAGED_REVEALS.has(member))) return group;
 		for (const member of group) seen.add(member);
+		if (group.every((member) => STAGED_REVEALS.has(member))) return group;
 	}
 	return null;
 }
