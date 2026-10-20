@@ -18,7 +18,12 @@ import {
 } from '../html-tree-validation.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import { fixedBindingProps } from './dom-binding-fixed-props.js';
-import { isLayoutText, needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
+import {
+	canHandoffTextareaView,
+	isLayoutText,
+	needsBindingProgram,
+	planBindingProgram,
+} from './dom-binding-program.js';
 import {
 	DOM_BINDING_DIRECTIVE as DIRECTIVE,
 	isDomBindingDirective as isDirective,
@@ -2844,16 +2849,16 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			) ||
 			// Only a program subscribes to the imported signals its projections read.
 			readsImportedSignal(node);
-		const scalar =
-			!structural && setup.some((statement) => statement.type === 'VariableDeclaration')
-				? planView(node, filename, source, imports, lexical)
-				: null;
+		const scalar = structural ? null : planView(node, filename, source, imports, lexical);
+		const textareaHandoff =
+			scalar !== null && scalar.allSetupProjected && canHandoffTextareaView(scalar);
 		// A scalar host can hand off its presentation channels independently of
 		// opaque children. A complete fixed view instead needs the program's
 		// whole-view hydration proof. Keep externally owned channels on the scalar
 		// path so omitted setup is neither validated nor evaluated.
 		const fixedSetup =
-			scalar &&
+			scalar !== null &&
+			setup.some((statement) => statement.type === 'VariableDeclaration') &&
 			node.body.type === 'JSXCodeBlock' &&
 			!scalar.hostHandoff &&
 			scalar.unbound.size === 0 &&
@@ -2863,7 +2868,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			scalar.bindings.length > 0 &&
 			// The program's handoff proof cannot transfer native control ownership.
 			scalar.bindings.every(([, kind]) => kind !== 'control');
-		if (structural || fixedSetup || (helpers.mount && selectedExport === node.id.name)) {
+		const handoff = textareaHandoff || fixedSetup;
+		if (structural || handoff || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,
 				render,
@@ -2871,12 +2877,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				false,
 				selectedExport === node.id.name ? helpers.fixedProps : null,
 			);
-			if (!structural && !fixedSetup)
-				plan.scalar = scalar ?? planView(node, filename, source, imports, lexical);
+			if (!structural && !handoff) plan.scalar = scalar;
 			plans.set(node.id.name, plan);
 			return false;
 		}
-		const plan = scalar ?? planView(node, filename, source, imports, lexical);
+		const plan = scalar;
 		plans.set(node.id.name, plan);
 		const rewritten = new Map([...plan.unbound, ...plan.classAttributes]);
 		// Rewrite from leaves to root so parent replacements retain every child

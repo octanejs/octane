@@ -106,6 +106,7 @@ describe('OctaneRspackPlugin', () => {
 		});
 		expect(compiler.options.module.rules[1]).toEqual({
 			test: expect.any(RegExp),
+			dependency: { not: 'url' },
 			type: 'javascript/auto',
 			use: [{ loader: 'builtin:swc-loader', options: { detectSyntax: 'auto' } }],
 		});

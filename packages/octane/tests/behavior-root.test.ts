@@ -1366,6 +1366,100 @@ export function EventHost(props) @{ 'use dom bindings';
 			}
 		});
 
+		it.each([
+			['root', '<textarea value={unbound(props.model)} placeholder={props.hint} />'],
+			['nested', '<div><textarea value={unbound(props.model)} placeholder={props.hint} /></div>'],
+		])(
+			`hands off a %s textarea control from a props-object binding view (${dev ? 'dev' : 'prod'})`,
+			async (_, view) => {
+				const source = `import { unbound } from 'octane/behavior';
+export function Field(props) @{ 'use dom bindings';
+  ${view}
+}`;
+				const scope = createScope({ scopeKey: `props-object-textarea-${dev}` });
+				const props = { model: scope.signal$('model', 'initial'), hint: 'Type here' };
+				const fixture = authoredPresentation('Field', props, dev, source);
+				container.innerHTML = fixture.html;
+				const textarea = container.querySelector('textarea')!;
+				const control = runWithSignalOwner(scope, () =>
+					bindSignalControl(textarea, 'value', props.model),
+				);
+				const binding = fixture.attach(container.firstElementChild!, fixture.state);
+				try {
+					textarea.value = 'early edit';
+					textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
+					expect(props.model.get()).toBe('early edit');
+					hydratedRoot = hydrateRoot(container, fixture.loadClient()['Field'], props, {
+						signalOwner: scope,
+						bindingLeases: [binding],
+						controlLeases: [control],
+					});
+					await act(() => {});
+					expect(container.querySelector('textarea')).toBe(textarea);
+					expect(textarea.value).toBe('early edit');
+					control();
+					await act(() => props.model.set('model update'));
+					expect(textarea.value).toBe('model update');
+					textarea.value = 'later edit';
+					await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
+					expect(props.model.get()).toBe('later edit');
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					binding.dispose();
+					control();
+					scope.dispose();
+				}
+			},
+		);
+
+		it.each([
+			[
+				'external sibling',
+				'<div><textarea value={unbound(props.model)} placeholder={props.hint} /><span>{unbound(props.extra)}</span></div>',
+			],
+			[
+				'unbound spread',
+				'<textarea {...unbound(props.attrs)} value={unbound(props.model)} placeholder={props.hint} />',
+			],
+			[
+				'owned sibling control',
+				'<div><textarea value={unbound(props.model)} placeholder={props.hint} /><input value={props.bound} /></div>',
+			],
+		])(
+			`keeps a textarea view with an %s on its scalar ownership path (${dev ? 'dev' : 'prod'})`,
+			(_, view) => {
+				const source = `import { unbound } from 'octane/behavior';
+export function Field(props) @{ 'use dom bindings'; ${view} }`;
+				const props = {
+					model: 'initial',
+					hint: 'before',
+					extra: 'external',
+					attrs: { title: 'external' },
+					bound: 'bound',
+				};
+				const fixture = authoredPresentation('Field', props, dev, source);
+				container.innerHTML = fixture.html;
+				const textarea = container.querySelector('textarea')!;
+				textarea.value = 'early edit';
+				const binding = fixture.attach(container.firstElementChild!, fixture.state);
+				try {
+					fixture.publish({ hint: 'after' });
+					expect(() =>
+						hydrateRoot(container, fixture.loadClient()['Field'], props, {
+							bindingLeases: [binding],
+						}),
+					).toThrow(/active fixed native views|#77/);
+					expect(container.querySelector('textarea')).toBe(textarea);
+					expect(textarea.value).toBe('early edit');
+					expect(textarea.placeholder).toBe('after');
+					expect(fixture.cleanup).not.toHaveBeenCalled();
+				} finally {
+					binding.dispose();
+				}
+			},
+		);
+
 		for (const spread of [
 			undefined,
 			'unbound(stylex.attrs(sx))',

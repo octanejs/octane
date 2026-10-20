@@ -62,7 +62,8 @@ export function needsBindingProgram(node, isUnbound) {
 	if (!significant(node)) return false;
 	if (node.type === 'JSXExpressionContainer' && isUnbound(node.expression)) return false;
 	if (node.type !== 'JSXElement' && node.type !== 'Element') return true;
-	if (!/^[a-z]/.test(tagOf(node) ?? '')) return true;
+	const tag = tagOf(node);
+	if (!/^[a-z]/.test(tag ?? '')) return true;
 	if (
 		(node.openingElement?.attributes ?? node.attributes ?? []).some(
 			(attr) =>
@@ -71,7 +72,7 @@ export function needsBindingProgram(node, isUnbound) {
 		)
 	)
 		return true;
-	if (tagOf(node) === 'textarea') return false;
+	if (tag === 'textarea') return false;
 	const children = (node.children ?? []).filter(significant);
 	const child = children.length === 1 ? children[0] : null;
 	const expression = child?.type === 'JSXExpressionContainer' ? child.expression : null;
@@ -108,6 +109,45 @@ function attrValue(attr) {
 		: attr.value?.type === 'JSXExpressionContainer'
 			? attr.value.expression
 			: attr.value;
+}
+
+function hasTextareaValueHandoff(node, namespace, hasChildren, isUnbound) {
+	if (namespace !== 0 || hasChildren) return false;
+	const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+	return (
+		attributes.some((attr) => rawName(attr) === 'value' && isUnbound(attrValue(attr))) &&
+		!attributes.some((attr) => rawName(attr) === 'dangerouslySetInnerHTML')
+	);
+}
+
+/** A scalar view can transfer its whole topology when only native textarea values are opaque. */
+export function canHandoffTextareaView(plan) {
+	if (
+		plan.addressed ||
+		plan.bindings.some(([, kind]) => kind === 'control') ||
+		!plan.nodes.some(([, tag]) => tag === 'textarea')
+	)
+		return false;
+	return plan.nodes.every(([, tag, namespace, children], index) => {
+		const element = plan.elements[index];
+		// A spread can override the control or introduce externally owned content.
+		if (
+			(element.openingElement?.attributes ?? element.attributes ?? []).some(
+				(attr) => attr.type === 'JSXSpreadAttribute' || attr.type === 'SpreadAttribute',
+			)
+		)
+			return false;
+		return (
+			children !== null ||
+			(tag === 'textarea' &&
+				hasTextareaValueHandoff(
+					element,
+					namespace,
+					(element.children ?? []).some(significant),
+					(value) => plan.unbound.has(unwrap(value)),
+				))
+		);
+	});
 }
 
 function blockNodes(node) {
@@ -853,12 +893,9 @@ export function planBindingProgram(fn, render, context) {
 			];
 			if (
 				tag === 'textarea' &&
-				selfNs === 0 &&
-				normalizedChildren.length === 0 &&
-				(node.attributes ?? []).some(
-					(attr) => rawName(attr) === 'value' && native.unbound.has(unwrap(attrValue(attr))),
-				) &&
-				!(node.attributes ?? []).some((attr) => rawName(attr) === 'dangerouslySetInnerHTML')
+				hasTextareaValueHandoff(node, selfNs, normalizedChildren.length !== 0, (value) =>
+					native.unbound.has(unwrap(value)),
+				)
 			) {
 				// Its SSR text is native value content, not an arbitrary opaque subtree.
 				// The handoff validates the live text-only topology before accepting it.
