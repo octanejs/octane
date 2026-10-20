@@ -7704,18 +7704,39 @@ function hydrationLayoutCaptureName(node, propsName) {
 	return name === propsName || name === 'arguments' || name === 'eval' ? null : name;
 }
 
-function hydrationLayoutMethodDep(node, helper, propsName, field, guarded) {
+// Inference witnesses the first optional member. Keep that generated read
+// dependency intact; the authored effect still evaluates the full chain.
+function hydrationLayoutReadCapture(node, propsName) {
+	if (node?.type !== 'ChainExpression') return null;
+	let member = node.expression;
+	for (let depth = 0; depth < 2; depth++) {
+		if (
+			member?.type !== 'MemberExpression' ||
+			!member.optional ||
+			member.computed ||
+			member.property?.type !== 'Identifier'
+		)
+			return null;
+		const name = hydrationLayoutCaptureName(member.object, propsName);
+		if (name !== null) return [name, member.property.name];
+		member = member.object;
+	}
+	return null;
+}
+
+function hydrationLayoutMethodDep(node, helper, receiver, field, guarded, read = false) {
 	return (
 		node?.type === 'CallExpression' &&
 		!node.optional &&
 		node.callee?.type === 'Identifier' &&
 		node.callee.name === helper &&
-		node.arguments.length === (guarded ? 3 : 2) &&
+		node.arguments.length === (read ? 4 : guarded ? 3 : 2) &&
 		node.arguments[0]?.type === 'Identifier' &&
-		node.arguments[0].name === propsName &&
+		node.arguments[0].name === receiver &&
 		node.arguments[1]?.type === 'Literal' &&
 		node.arguments[1].value === field &&
-		(!guarded || (node.arguments[2]?.type === 'Literal' && node.arguments[2].value === true))
+		(!guarded || (node.arguments[2]?.type === 'Literal' && node.arguments[2].value === true)) &&
+		(!read || (node.arguments[3]?.type === 'Literal' && node.arguments[3].value === true))
 	);
 }
 
@@ -7723,10 +7744,8 @@ function hydrationLayoutMethodDep(node, helper, propsName, field, guarded) {
 // inference still evaluates its method witness during render, so require that
 // field to be own data without treating the callback as a blocking input.
 // Change only this analysis copy; the emitted hook, deps and receiver stay intact.
-function hydrationLayoutBodies(ctx, bodies, propsName, required) {
-	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
-	if (methodDepLocal === undefined) return bodies;
-	const stmts = bodies[0].stmts;
+function hydrationLayoutBody(body, methodDepLocal, propsName, required) {
+	const stmts = body.stmts;
 	let next = null;
 	for (let index = 0; index < stmts.length; index++) {
 		const statement = stmts[index];
@@ -7770,20 +7789,44 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 		// set of lexical captures and retain those dependencies in the analysis.
 		const captures = new Set();
 		if (guard !== null) captures.add(guard);
+		let readCapture = null;
 		let valid = true;
 		for (const argument of invoked.arguments) {
+			if (argument?.type === 'Literal' && argument.value === null) continue;
 			const name = hydrationLayoutCaptureName(argument, propsName);
-			if (name === null) {
-				valid = false;
-				break;
+			if (name !== null) {
+				captures.add(name);
+				continue;
 			}
-			captures.add(name);
+			if (
+				guard !== null &&
+				readCapture === null &&
+				(readCapture = hydrationLayoutReadCapture(argument, propsName)) !== null
+			)
+				continue;
+			valid = false;
+			break;
 		}
-		if (!valid || deps.elements.length !== captures.size + 1) continue;
+		if (!valid || deps.elements.length !== captures.size + 1 + (readCapture === null ? 0 : 1))
+			continue;
 		let methodIndex = -1;
 		for (let depIndex = 0; depIndex < deps.elements.length; depIndex++) {
 			const dependency = deps.elements[depIndex];
 			if (dependency?.type === 'Identifier' && captures.delete(dependency.name)) continue;
+			if (
+				readCapture !== null &&
+				hydrationLayoutMethodDep(
+					dependency,
+					methodDepLocal,
+					readCapture[0],
+					readCapture[1],
+					true,
+					true,
+				)
+			) {
+				readCapture = null;
+				continue;
+			}
 			if (
 				methodIndex === -1 &&
 				hydrationLayoutMethodDep(dependency, methodDepLocal, propsName, field, guard !== null)
@@ -7794,7 +7837,7 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 			valid = false;
 			break;
 		}
-		if (!valid || methodIndex === -1 || captures.size !== 0) continue;
+		if (!valid || methodIndex === -1 || captures.size !== 0 || readCapture !== null) continue;
 		// The helper alias is allocated against every authored identifier before
 		// inference, so an explicit dependency list cannot counterfeit this call.
 		required.add(field);
@@ -7809,7 +7852,16 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 			},
 		};
 	}
-	return next === null ? bodies : [{ ...bodies[0], stmts: next }, ...bodies.slice(1)];
+	return next === null ? body : { ...body, stmts: next };
+}
+
+function hydrationLayoutBodies(ctx, bodies, propsName, required) {
+	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
+	if (methodDepLocal === undefined) return bodies;
+	// Pending can publish while adoption is unresolved, so analyze it unchanged.
+	const primary = hydrationLayoutBody(bodies[0], methodDepLocal, propsName, required);
+	const caught = bodies[2] && hydrationLayoutBody(bodies[2], methodDepLocal, propsName, required);
+	return primary === bodies[0] && caught === bodies[2] ? bodies : [primary, bodies[1], caught];
 }
 
 // An exported component can also receive arbitrary caller-owned props. Its

@@ -345,7 +345,7 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 		expect(onRef).toHaveBeenCalledWith(original);
 	});
 
-	it.each(['unrelated', 'changed source', 'changed reader', 'changed domain'] as const)(
+	it.each(['unrelated', 'changed source', 'changed reader', 'changed domain', 'rejected'] as const)(
 		'retries a selected request with a guarded layout callback: %s',
 		async (scenario) => {
 			const scope = Signals.createScope({ scopeKey: `guarded-layout-${dev}-${scenario}` });
@@ -358,10 +358,14 @@ export function Gate(props) @{
   const active = selection?.id === props.domain;
   @try {
     const value = active ? props.read() : "inactive";
-    useLayoutEffect(() => { if (active) { props.onReady?.(value, value); } });
+    const detail = props.detail;
+    useLayoutEffect(() => { if (active) { props.onReady?.(value, value, detail?.nested?.value); } });
     const stage = props.second();
     <label data-domain={props.domain} data-stage={stage}><input defaultValue={value} ref={props.onRef} /></label>;
-  } @pending { <p>Loading</p>; }
+  } @pending { <p>Loading</p>; } @catch (error) {
+    useLayoutEffect(() => { props.onReady?.(null); });
+    <p role="alert">{error.message}</p>;
+  }
 }`;
 			const appSource = `import { Gate } from './gate';
 export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}</span><Gate {...props.gate} /></section>; }`;
@@ -384,12 +388,20 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 			const second = gate();
 			const firstReady = vi.fn();
 			const onRef = vi.fn();
-			const calls: { receiver: unknown; args: string[] }[] = [];
-			function latestReady(this: unknown, ...args: string[]) {
+			const calls: { receiver: unknown; args: (string | null)[] }[] = [];
+			function latestReady(this: unknown, ...args: (string | null)[]) {
 				calls.push({ receiver: this, args });
 			}
+			let detailReads = 0;
+			let rejected = false;
 			const initial = {
 				domain: 'original',
+				detail: {
+					get nested() {
+						detailReads++;
+						return { value: 'effect' };
+					},
+				},
 				onReady: firstReady,
 				onRef,
 				read: () => {
@@ -398,6 +410,7 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 				},
 				second: () => {
 					if (second.value.pending) throw second.value.promise;
+					if (rejected) throw new Error('rejected request');
 					return 'ready';
 				},
 			};
@@ -419,12 +432,29 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 				if (scenario === 'changed source') selection$.set(null);
 				root.render(client['App'], { ready: true, gate: next });
 			});
-			expect(container.querySelector('input') === original).toBe(scenario === 'unrelated');
+			expect(container.querySelector('input') === original).toBe(
+				scenario === 'unrelated' || scenario === 'rejected',
+			);
 			expect(container.querySelector('span')?.textContent).toBe('ready');
+			expect(detailReads).toBe(0);
 			await act(() => first.resolve());
+			expect(detailReads).toBe(0);
 			expect(calls).toHaveLength(0);
 			expect(onRef).not.toHaveBeenCalled();
-			await act(() => second.resolve());
+			await act(() => {
+				rejected = scenario === 'rejected';
+				second.resolve();
+			});
+			if (rejected) {
+				expect(container.querySelector('[role="alert"]')?.textContent).toBe('rejected request');
+				expect(calls).toEqual([
+					{ receiver: expect.objectContaining({ onReady: latestReady }), args: [null] },
+				]);
+				expect(detailReads).toBe(0);
+				expect(firstReady).not.toHaveBeenCalled();
+				expect(onRef).not.toHaveBeenCalled();
+				return;
+			}
 			const accepted = container.querySelector('input')!;
 			expect(accepted === original).toBe(scenario === 'unrelated');
 			expect(accepted.value).toBe(
@@ -440,11 +470,15 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 					? [
 							{
 								receiver: expect.objectContaining({ onReady: latestReady }),
-								args: Array(2).fill(scenario === 'unrelated' ? 'server' : 'replacement'),
+								args: [
+									...Array(2).fill(scenario === 'unrelated' ? 'server' : 'replacement'),
+									'effect',
+								],
 							},
 						]
 					: [],
 			);
+			expect(detailReads).toBe(scenario === 'unrelated' || scenario === 'changed reader' ? 1 : 0);
 			expect(onRef).toHaveBeenCalledExactlyOnceWith(accepted);
 			expect(container.querySelector('label')?.dataset['domain']).toBe(
 				scenario === 'changed domain' ? 'other' : 'original',
