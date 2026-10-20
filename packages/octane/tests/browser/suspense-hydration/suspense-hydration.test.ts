@@ -514,6 +514,7 @@ declare global {
 				| 'react-baseline'
 				| 'direct-ref-unmount'
 				| 'focus-restoration'
+				| 'relocated-focus-restoration'
 				| 'editable-focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;

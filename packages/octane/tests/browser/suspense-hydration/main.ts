@@ -476,7 +476,7 @@ function mountRelocatedFocusRestorationCase(): void {
 	input.focus();
 	input.setSelectionRange(2, 7);
 	window.__suspenseHydration = {
-		kind: 'focus-restoration',
+		kind: 'relocated-focus-restoration',
 		urgent() {
 			flushSync(() =>
 				root.render(EditorRows, { items: [...rows.slice(1), rows[0]!], revision: 1 }),
@@ -697,6 +697,7 @@ declare global {
 				| 'react-baseline'
 				| 'direct-ref-unmount'
 				| 'focus-restoration'
+				| 'relocated-focus-restoration'
 				| 'editable-focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;
