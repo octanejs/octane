@@ -124,11 +124,16 @@ describe('executeServerFunction', () => {
 
 	it('round-trips rich values JSON cannot represent', async () => {
 		const echo = (v: unknown) => v;
+		const shared = { label: 'shared' };
+		const cycle: { self?: unknown } = {};
+		cycle.self = cycle;
 		const payload = {
 			when: new Date(0),
 			tags: new Map([['a', 1]]),
 			set: new Set([1, 2]),
 			missing: undefined,
+			aliases: [shared, shared],
+			cycle,
 		};
 		const response = await executeServerFunction(echo, clientCall([payload]));
 		const out = clientRead(response) as typeof payload;
@@ -138,6 +143,8 @@ describe('executeServerFunction', () => {
 		expect(out.tags.get('a')).toBe(1);
 		expect(out.set).toBeInstanceOf(Set);
 		expect('missing' in out && out.missing === undefined).toBe(true);
+		expect(out.aliases[0]).toBe(out.aliases[1]);
+		expect(out.cycle.self).toBe(out.cycle);
 	});
 
 	it('propagates a thrown server error as a rejection', async () => {
