@@ -25,7 +25,7 @@ const SHARED_PACKAGES = Object.freeze({
 	// Node, so every lane installs it at the version octane declares.
 	'@tsrx/oxc': '0.20.0',
 	typescript: '5.9.3',
-	webpack: '5.108.4',
+	webpack: '5.112.0',
 });
 
 function lane(description, rspack) {
