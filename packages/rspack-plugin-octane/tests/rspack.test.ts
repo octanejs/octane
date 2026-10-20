@@ -257,6 +257,53 @@ export function App() @{
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
+	it('emits URL dependencies without executing them as source modules', async () => {
+		write(root, 'src/asset.js', 'globalThis.assetExecuted = true;\n');
+		write(root, 'src/asset.ts', 'globalThis.assetExecuted = true;\n');
+		write(root, 'src/source.ts', 'export const value: number = 42;\n');
+		write(
+			root,
+			'src/url-entry.js',
+			`import { value } from './source.ts';
+globalThis.urlAssetResult = {
+	value,
+	js: new URL('./asset.js', import.meta.url).href,
+	ts: new URL('./asset.ts', import.meta.url).href,
+};`,
+		);
+		const outputPath = join(root, 'dist-url-assets');
+		await compile({
+			context: root,
+			mode: 'development',
+			target: 'web',
+			entry: './src/url-entry.js',
+			output: {
+				path: outputPath,
+				filename: 'entry.js',
+				assetModuleFilename: 'assets/[name][ext]',
+				publicPath: 'https://example.test/',
+			},
+			plugins: [new OctaneRspackPlugin({ parallel: false })],
+		});
+		const dom = new JSDOM('', { url: 'https://example.test/', runScripts: 'outside-only' });
+		try {
+			dom.window.eval(readFileSync(join(outputPath, 'entry.js'), 'utf8'));
+			expect((dom.window as any).urlAssetResult).toEqual({
+				value: 42,
+				js: 'https://example.test/assets/asset.js',
+				ts: 'https://example.test/assets/asset.ts',
+			});
+			expect((dom.window as any).assetExecuted).toBeUndefined();
+			for (const asset of ['asset.js', 'asset.ts']) {
+				expect(readFileSync(join(outputPath, 'assets', asset), 'utf8')).toBe(
+					'globalThis.assetExecuted = true;\n',
+				);
+			}
+		} finally {
+			dom.window.close();
+		}
+	});
+
 	it('retains Lynx worklet feature installation through a production re-export', async () => {
 		const lynxPackage = join(repositoryRoot, 'packages/lynx');
 		const featureEntry = join(lynxPackage, 'src/core/main-thread-worklet-feature.ts');
