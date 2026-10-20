@@ -360,7 +360,7 @@ transport `0.3.0`, tasm `0.0.39`, testing environment `0.3.0`, Lynx types
 `@lynx-js/web-core@0.22.2`. The minimum lane uses Rspack `2.1.3`; the current
 lane uses Rspack `2.1.5`, the newest patch allowed by Rsbuild `2.1.4`, and
 verifies registry drift for that upstream build graph. Both lanes retain the
-audited Webpack `5.108.4` tooling peer; the strict external install and builds
+audited Webpack `5.112.0` tooling peer; the strict external install and builds
 prove its compatibility without requiring every new Webpack 5 release. Newer
 standalone Lynx types releases remain excluded until their renderer-owned
 compatibility slice is audited. Each required CI job packs the Octane packages,
