@@ -2889,8 +2889,14 @@ export function flushStagedRevealsIfReady(): void {
 	for (const state of STAGED_REVEALS) {
 		if (!HELD_TRANSITIONS.has(state)) STAGED_REVEALS.delete(state);
 	}
-	const group = STAGED_REVEALS.size === 0 ? null : stagedRevealGroup();
-	if (group !== null) flushStagedReveals(group);
+	// Each group commits on its own: a retry renders only its own batches, so a
+	// group flushed with it would lose its staged reveal.
+	let group: TrySlot[] | null;
+	while (!flushingStagedReveals && (group = stagedRevealGroup()) !== null) {
+		flushStagedReveals(group);
+		// A view transition runs the reveal later; its members stay staged until then.
+		if (group.some((state) => STAGED_REVEALS.has(state))) return;
+	}
 }
 
 function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
@@ -2976,10 +2982,19 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
 	const retry = () => {
-		// A fresher suspend supersedes this one, unless the boundary holds
-		// transitions: each holds its own batches (Transition holds), so any
-		// thenable they suspended on may let one of them commit.
-		if (state.pendingThenable !== thenable && !HELD_TRANSITIONS.has(state)) return;
+		if (state.pendingThenable !== thenable) {
+			// A fresher suspend supersedes this one. A boundary holding transitions
+			// holds each one's batches (Transition holds), though, and this may be all
+			// one of them waited for: render them again. Those still waiting hold
+			// again, and the fresher thenable keeps its resume and fallback timeout.
+			if (
+				TRANSITION_ROOT_DRIVER &&
+				HELD_TRANSITIONS.has(state) &&
+				TRANSITION_ROOT_DRIVER.retry(state)
+			)
+				flush();
+			return;
+		}
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.BOUNDARY_RETRY);
 		state.pendingThenable = null;

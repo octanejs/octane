@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setTransitionFallbackTimeout, getTransitionFallbackTimeout } from 'octane';
 import { act, mount, type MountResult } from '../_helpers.js';
 import {
 	SeparateBoundaries,
@@ -24,7 +25,12 @@ function createCache() {
 		return found;
 	};
 	const cache: TextCache = { read: (key) => entry(key).promise };
-	return { cache, resolve: (key: string) => act(() => entry(key).resolve()) };
+	// Keys resolve in order within one act, as data that lands together.
+	const resolve = (...keys: string[]) =>
+		act(() => {
+			for (const key of keys) entry(key).resolve();
+		});
+	return { cache, resolve };
 }
 
 /** `pending|optimistic|text` for counter `name`. */
@@ -108,5 +114,53 @@ describe('parallel transitions', () => {
 
 		await resolve('b: 1');
 		expect(counter(r, 'b')).toBe('idle|1|b: 1');
+	});
+
+	describe('with a transition fallback timeout', () => {
+		let previousTimeout: number;
+		beforeEach(() => {
+			vi.useFakeTimers({ shouldAdvanceTime: false });
+			previousTimeout = getTransitionFallbackTimeout();
+			setTransitionFallbackTimeout(100);
+		});
+		afterEach(() => {
+			setTransitionFallbackTimeout(previousTimeout);
+			vi.useRealTimers();
+		});
+
+		it('reveals a fallback-hidden boundary when an unrelated group commits with it', async () => {
+			const { r, resolve } = await mountCounters(SeparateBoundaries);
+			await act(() => r.click('.a .go'));
+			await act(() => vi.advanceTimersByTime(150));
+			expect(r.findAll('.fallback-a')).toHaveLength(1);
+			await act(() => r.click('.b .go'));
+			expect(counter(r, 'b')).toBe('pending|saving|b: 0');
+
+			// A's hidden primary stages first, then B's visible hold: two ready groups.
+			await resolve('a: 1', 'b: 1');
+			expect(r.findAll('.fallback-a')).toHaveLength(0);
+			expect(counter(r, 'a')).toBe('idle|1|a: 1');
+			expect(counter(r, 'b')).toBe('idle|1|b: 1');
+		});
+
+		it('keeps the fallback deadline when a superseded thenable settles', async () => {
+			const { r, resolve } = await mountCounters(SharedBoundary);
+			await act(() => r.click('.a .go'));
+			await act(() => r.click('.b .go'));
+			await act(() => vi.advanceTimersByTime(60));
+
+			// B's data lets B commit; A, the boundary's current wait, is still pending.
+			await resolve('b: 1');
+			expect(counter(r, 'b')).toBe('idle|1|b: 1');
+			expect(counter(r, 'a')).toBe('pending|saving|a: 0');
+
+			// A's budget started with its suspension, not with B's settle.
+			await act(() => vi.advanceTimersByTime(50));
+			expect(r.findAll('.fallback')).toHaveLength(1);
+
+			await resolve('a: 1');
+			expect(r.findAll('.fallback')).toHaveLength(0);
+			expect(counter(r, 'a')).toBe('idle|1|a: 1');
+		});
 	});
 });
