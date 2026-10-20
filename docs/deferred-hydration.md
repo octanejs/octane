@@ -684,9 +684,9 @@ Declare scalar text explicitly when its type is not evident in the template: `<s
 
 Binding views may use flat destructured props, including aliases, primitive literal defaults, and a final rest binding: `function Action({ label: text = 'Send', ...props }) @{ ... }`. Destructuring runs once for each prepared snapshot, so projections and event handlers share the same captured values and rest object. Defaults apply only to `undefined`, not `null`. Nested or computed patterns and nonliteral defaults fail extraction. A rendered `children` slot may be aliased or read through rest when it was not excluded; a non-null default for that slot is unsupported. A rest binding does not authorize an arbitrary native JSX spread: the existing spread restrictions still apply.
 
-For a child binding view called with explicit props, the compiler can specialize a native spread of that child's destructured rest parameter to the caller's known prop names. Authors keep normal component imports and JSX; the ordered prop-shape request is compiler-owned. This does not permit arbitrary object spreads, aliases of rest, conflicting native writers, or unsupported property channels. A generic `adoptBindings` call on a rest-spreading component without a proven caller shape still fails clearly. Normal SSR keeps the authored spread and shares its structural and class-group annotation allocation with the extracted view; it does not acquire the extracted artifact's narrower prop API.
+For a child binding view called with explicit props, the compiler can specialize a native spread of that child's destructured rest parameter to the caller's known prop names. Authors keep normal component imports and JSX; the ordered prop-shape request is compiler-owned. This does not permit arbitrary object spreads, aliases of rest, conflicting native writers, or unsupported property channels. A generic `adoptBindings` call on a rest-spreading component without a proven caller shape still fails clearly. Normal SSR keeps the authored spread and shares its structural and class-group annotation allocation with the extracted view; it does not acquire the extracted artifact's narrower prop API. The same caller shape also lets a view forward its rest parameter to another child view, through any number of wrappers: `<Leaf disabled={true} {...props} disabled={props.locked} />` passes each known key as an explicit child prop. As with an object spread, a repeated key keeps its first position and takes its last value. An unknown caller shape still fails extraction.
 
-When an eligible view returns only another view, `adoptBindings(element, View, source)` can resolve its enclosing compiler-owned range from the existing native element. Resolution follows only adjacent, single-content view/root wrappers and requires one exact `View` match; it does not search DOM ancestors, skip siblings, or cross conditional, slot, or list boundaries. Views with multiple root nodes still require an explicit range. Adopt the enclosing view whose explicit child props establish a closed spread shape, not the generic rest-spreading child itself.
+When an eligible view returns only another view, `adoptBindings(element, View, source)` can resolve its enclosing compiler-owned range from the existing native element. Resolution follows only adjacent, single-content view/root wrappers, including an `@if` whose selected arm is only that view, and requires one exact `View` match; it does not search DOM ancestors, skip siblings, or cross slot or list boundaries. Views with multiple root nodes still require an explicit range. Adopt the enclosing view whose explicit child props establish a closed spread shape, not the generic rest-spreading child itself.
 
 Pass the exact element emitted by the matching server build. Adoption validates
 template compatibility, native topology, and conflicting binding ownership
@@ -843,11 +843,12 @@ Normal hydration still renders them in the same application tree; independently
 bound textarea controls and deferred children keep their own ownership. Other
 host properties can remain outside this lease through `unbound`.
 
-This parent-only proof currently requires a named `props` parameter and no local
-setup declarations. Inline pure expressions, props-based signal `.get()` samples, and imported
-pure projections retain that scalar shape. Destructured parameters or local
-`const` declarations select the general binding program, which supports those
-forms but cannot transfer a parent with opaque children. This is a handoff
+This parent-only proof currently requires a named `props` parameter. Inline pure
+expressions, pure local `const` aliases, props-based signal `.get()` samples, and
+imported pure projections retain that scalar shape; the early artifact evaluates
+only the aliases its bound fields read. Destructured parameters or local callbacks
+select the general binding program, which supports those forms but cannot
+transfer a parent with opaque children. This is a handoff
 capability limit, not a restriction on renderer-free authoring generally.
 
 The compiler must prove the single host and its owned presentation fields.
@@ -879,7 +880,10 @@ An unused generic-content branch does not
 prevent takeover of a supported slot branch, but switching into unsupported
 content while takeover is pending causes a clear refusal. A native rest spread
 also requires the same compiler-proven caller prop shape; proof from another
-instance or call site cannot authorize it.
+instance or call site cannot authorize it. Its keys may be refs, events,
+`aria-*` and `data-*` fields, and the scalar `disabled`, `hidden`, `type`,
+`command`, `commandfor`, `popovertarget` and `popovertargetaction` attributes,
+but never on an `input`, `textarea` or `select`.
 
 An externally bound textarea value can transfer alongside a fixed presentation.
 Keep `value={unbound(draft$)}` in the authored view and explicitly offer the
@@ -926,6 +930,9 @@ owner, and compiler-proven textarea value content without authored children.
 Disposed, already-claimed, foreign or unoffered control ownership fails closed.
 Known-provider style spreads such as `unbound(stylex.attrs(sx))` can use their
 existing closed-field compiler contract; arbitrary spreads remain unsupported.
+Inside a structural view, such a spread applies its declared fields only when the
+program constructs a fresh node, so its native nodes can transfer. A whole-style
+`style: 'object'` contract has no fixed fields and stays non-constructible.
 No control lease or renderer is needed for a textarea that stays renderer-free.
 
 Other writable controls and unsupported normal-renderer writers do not

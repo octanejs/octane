@@ -345,6 +345,7 @@ export function planBindingProgram(fn, render, context) {
 		const projections = [];
 		const initializers = [];
 		const initialValues = [];
+		const initialTemporaries = [];
 		const regions = [];
 		const adapters = [];
 		const restSites = [];
@@ -876,11 +877,42 @@ export function planBindingProgram(fn, render, context) {
 				);
 				values.push(native.values[i]);
 			}
+			const attributeKind = (name) =>
+				name === 'class'
+					? 'class'
+					: shouldSanitizeURLAttribute(tag, name)
+						? 'url'
+						: name.startsWith('aria-') ||
+							  name.startsWith('data-') ||
+							  isEnumeratedBooleanAttr(name.toLowerCase())
+							? 'aria'
+							: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
+								? 'boolean'
+								: 'attr';
 			const attributes = createTemplateIr();
 			for (const attr of node.attributes ?? []) {
 				if (attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound) continue;
 				if (rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? '')) continue;
 				if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+					const known = attr._octaneKnownAttributeSpread;
+					// A verified provider names its exact fields, so a fresh node calls it
+					// once and applies each one. Adoption never evaluates these values.
+					if (known && known.style !== 'object') {
+						const call = native.unbound.get(unwrap(attr.argument));
+						validate(call);
+						const provided = b.id(allocateProgramName('_bindingAttrs'));
+						initialTemporaries.push(b.const(provided, call));
+						for (const raw of known.fields) {
+							const name = raw === 'className' ? 'class' : raw;
+							initializers.push([
+								index,
+								name === 'style' ? 'styleAttribute' : attributeKind(name),
+								name,
+							]);
+							initialValues.push(b.member(provided, b.literal(raw), true, known.nonNull !== true));
+						}
+						continue;
+					}
 					constructionError ??=
 						'This view contains an external attribute spread without a native construction adapter.';
 					continue;
@@ -951,23 +983,11 @@ export function planBindingProgram(fn, render, context) {
 					external ||
 					(name === 'class' && !native.bindings.some((binding) => binding[1] === 'class'))
 				) {
-					const kind =
-						name === 'class'
-							? 'class'
-							: shouldSanitizeURLAttribute(tag, name)
-								? 'url'
-								: name.startsWith('aria-') ||
-									  name.startsWith('data-') ||
-									  isEnumeratedBooleanAttr(name.toLowerCase())
-									? 'aria'
-									: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
-										? 'boolean'
-										: 'attr';
 					// HTML names are case-insensitive. The runtime matches canonical
 					// names, such as React's numeric `rowSpan`, in lowercase.
 					initialize(
 						index,
-						kind,
+						attributeKind(name),
 						selfNs === 0 ? name.toLowerCase() : name,
 						mapCow(value, native.unbound),
 					);
@@ -1049,7 +1069,7 @@ export function planBindingProgram(fn, render, context) {
 		initialOperations ||= initializers.length > 0;
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
-			properties.initialize = project(names, b.array(initialValues), fn, [], true);
+			properties.initialize = project(names, b.array(initialValues), fn, initialTemporaries, true);
 		}
 		if (bindings.some((binding) => binding[1] === 'classGroup')) {
 			if (classFactory === null) {

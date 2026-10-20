@@ -35,6 +35,16 @@ export { DOM_BINDINGS_QUERY, DOM_BINDINGS_MOUNT_QUERY } from './dom-binding-requ
 export const DOM_BINDING_COMPILER_ABI_VERSION = 1;
 const MARKER = 'data-octane-bindings';
 const NODE_MARKER = 'data-octane-binding-node';
+// Scalar native channels a closed rest may hand to the renderer's host writer.
+const CONDITIONAL_REST_ATTRIBUTES = new Set([
+	'disabled',
+	'hidden',
+	'type',
+	'command',
+	'commandfor',
+	'popovertarget',
+	'popovertargetaction',
+]);
 const SKIP = new Set([
 	'loc',
 	'start',
@@ -673,6 +683,25 @@ function bindingRender(fn, filename, required = true) {
 	return render;
 }
 
+/** A view's setup `const` declarations by name, with the scope each one binds in. */
+function bindingSetup(fn, lexical) {
+	return new Map(
+		statements(fn)
+			.filter((statement) => statement.type === 'VariableDeclaration')
+			.flatMap((statement) => statement.declarations)
+			.map((declaration) => [
+				declaration.id.name,
+				{
+					scope: lexical.resolveBinding(
+						lexical.nodeScopes.get(declaration.id) ?? lexical.nodeScopes.get(fn.body),
+						declaration.id.name,
+					)?.scope,
+					declaration,
+				},
+			]),
+	);
+}
+
 function bindingRestSpreads(fn, render, props, lexical, filename) {
 	const parameter = fn.params[0];
 	const rest =
@@ -690,21 +719,25 @@ function bindingRestSpreads(fn, render, props, lexical, filename) {
 	const replacements = new Map();
 	const sites = new Map();
 	let nextSite = 0;
-	let conditional = keys?.every(
+	// Takeover hands only these closed native rest channels to the renderer's
+	// transactional host writer. Child components prove their own channels.
+	const conditionalKeys = keys?.every(
 		(name) =>
-			name === 'ref' || /^on[A-Z]/.test(name) || /^(?:aria|data)-[a-z][a-z0-9-]*$/.test(name),
+			name === 'ref' ||
+			/^on[A-Z]/.test(name) ||
+			/^(?:aria|data)-[a-z][a-z0-9-]*$/.test(name) ||
+			CONDITIONAL_REST_ATTRIBUTES.has(name),
 	);
+	let conditional = keys !== undefined;
 	let hasRest = false;
 	walk(render, (node) => {
 		if (
 			['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
 		)
 			return false;
-		if (
-			!['JSXElement', 'Element'].includes(node.type) ||
-			!/^[a-z]/.test(node.openingElement?.name?.name ?? node.id?.name ?? '')
-		)
-			return;
+		if (!['JSXElement', 'Element'].includes(node.type)) return;
+		const tag = node.openingElement?.name?.name ?? node.id?.name;
+		const native = /^[a-z]/.test(tag ?? '');
 		const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
 		const nativeSites = [];
 		let spread = 0;
@@ -719,13 +752,12 @@ function bindingRestSpreads(fn, render, props, lexical, filename) {
 			)
 				continue;
 			hasRest = true;
-			nativeSites.push({ attribute, site: nextSite++, spread: ordinal, keys });
-			if (
-				['input', 'textarea', 'select'].includes(node.openingElement?.name?.name ?? node.id?.name)
-			)
-				conditional = false;
+			if (native) {
+				nativeSites.push({ attribute, site: nextSite++, spread: ordinal, keys });
+				if (!conditionalKeys || ['input', 'textarea', 'select'].includes(tag)) conditional = false;
+			}
 			if (keys === undefined) continue;
-			if (keys.some((name) => ['class', 'className'].includes(name)))
+			if (native && keys.some((name) => ['class', 'className'].includes(name)))
 				error(filename, attribute, 'closed binding rest cannot supply class groups');
 			replacements.set(
 				attribute,
@@ -743,6 +775,20 @@ function bindingRestSpreads(fn, render, props, lexical, filename) {
 		if (nativeSites.length > 0) sites.set(attributes, nativeSites);
 		if (!attributes.some((attribute) => replacements.has(attribute))) return;
 		const expanded = attributes.flatMap((attribute) => replacements.get(attribute) ?? [attribute]);
+		if (!native) {
+			// A child receives one props object: a repeated key keeps its first
+			// position and takes its last value, exactly like an object spread.
+			const positions = new Map();
+			const props = [];
+			for (const attribute of expanded) {
+				const name = attrName(attribute);
+				if (typeof name !== 'string') props.push(attribute);
+				else if (positions.has(name)) props[positions.get(name)] = attribute;
+				else positions.set(name, props.push(attribute) - 1);
+			}
+			replacements.set(attributes, props);
+			return;
+		}
 		sites.set(expanded, nativeSites);
 		const names = new Set();
 		for (const attribute of expanded) {
@@ -1312,6 +1358,36 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		!(render.openingElement?.attributes ?? render.attributes ?? []).some(
 			(attr) => attrName(attr)?.toLowerCase() === 'dangerouslysetinnerhtml',
 		);
+	// Pure setup aliases run first in a scalar view's projector, but only those a
+	// bound value reads: adoption must not evaluate a prop only an unbound value
+	// uses. A program declares its setup once for all of its native elements.
+	const aliases = native === null ? bindingSetup(fn, lexical) : new Map();
+	const read = new Set();
+	const readAliases = (expression) =>
+		walk(expression, (node, parent, key) => {
+			if (!isRuntimeReference(node, lexical, parent, key)) return;
+			const { declaration, scope } = aliases.get(node.name) ?? {};
+			if (
+				!declaration ||
+				read.has(declaration) ||
+				lexical.resolveBinding(lexical.nodeScopes.get(node) ?? parameterScope, node.name)?.scope !==
+					scope
+			)
+				return;
+			read.add(declaration);
+			assertProjection(declaration.init, filename, imports, lexical, parameterScope);
+			readAliases(declaration.init);
+		});
+	readAliases(values);
+	readAliases(projections);
+	projections.unshift(
+		...[...aliases.values()]
+			.map(({ declaration }) => declaration)
+			.filter((declaration) => read.has(declaration))
+			.map((declaration) =>
+				inheritHookMemoOrigin(b.const(b.id(declaration.id.name), declaration.init), declaration),
+			),
+	);
 	return {
 		fn,
 		render,
@@ -2450,18 +2526,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					lexical,
 					lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
 				);
-		const setupBindings = new Map(
-			setup.map((declaration) => [
-				declaration.id.name,
-				{
-					scope: lexical.resolveBinding(
-						lexical.nodeScopes.get(declaration.id) ?? lexical.nodeScopes.get(fn.body),
-						declaration.id.name,
-					)?.scope,
-					declaration,
-				},
-			]),
-		);
+		const setupBindings = bindingSetup(fn, lexical);
 		const fixed = fixedBindingProps(fn, fixedProps, lexical, localDeclaration, isRuntimeReference);
 		const effects = statements(fn)
 			.filter(isMountEffectShape)
@@ -2770,7 +2835,10 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			node.params[0]?.type === 'ObjectPattern' ||
 			needsBindingProgram(render, isUnbound) ||
 			statements(node).some(
-				(statement) => statement.type === 'VariableDeclaration' || isMountEffectShape(statement),
+				(statement) =>
+					isMountEffectShape(statement) ||
+					(statement.type === 'VariableDeclaration' &&
+						statement.declarations.some((declaration) => callbackFor(declaration.init))),
 			) ||
 			// Only a program subscribes to the imported signals its projections read.
 			readsImportedSignal(node);
