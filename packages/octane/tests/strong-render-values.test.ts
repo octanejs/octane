@@ -21,6 +21,50 @@ const inspect = (value: unknown) =>
 const clone = (value: Client.OctaneNode) =>
 	Client.cloneElement(value as Client.ElementDescriptor, { title: 'cloned' });
 
+for (const dev of [true, false]) {
+	for (const strong of [true, false]) {
+		it.each([
+			['plain child', '@{ <Child /> }'],
+			['template child', '@{ <Frame>@if (show) { <Child /> }</Frame> }'],
+		])(
+			`preserves sibling input while hydrating a %s render block (dev: ${dev}, strong: ${strong})`,
+			(_, content) => {
+				const source = `
+		${strong ? "'use strong';" : ''}
+		import { useState } from 'octane';
+		function Slot({ content }) @{ <section>{content}</section> }
+		function Frame({ children }) @{ <aside>{children}</aside> }
+		function Child() @{
+			const [expanded] = useState(false);
+			<><button>Action</button>@if (expanded) { <span>Extra</span> }</>
+		}
+		export function View({ show }) @{
+			<main>
+				<Slot content={show ? ${content} : undefined} />
+				<input defaultValue="draft" />
+			</main>
+		}
+	`;
+				const options = {
+					id: '/conditional-render-block.tsrx',
+					compileOptions: { dev, hmr: false },
+				};
+				const serverView = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+				const clientView = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+				container = document.createElement('div');
+				container.innerHTML = Server.renderToString(serverView['View'], { show: true }).html;
+				const input = container.querySelector('input')!;
+				input.value = 'typed before hydration';
+				root = Client.hydrateRoot(container, clientView['View'], { show: true });
+				Client.flushSync(() => {});
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed before hydration');
+				expect(container.querySelector('button')?.textContent).toBe('Action');
+			},
+		);
+	}
+}
+
 for (const mode of ['render', 'hydrate'] as const) {
 	describe(`Strong named render values (${mode})`, () => {
 		function start<K extends keyof typeof fixture>(

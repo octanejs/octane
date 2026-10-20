@@ -24530,7 +24530,9 @@ function serverValueDirectiveFold(
 			'opaque',
 			null,
 			true,
-			true,
+			// Mirror lowerHostFragment's templateComponentChildren: only a component
+			// retained in the extracted client template inherits the renderer's range.
+			requiresTemplateNormalization(preparedDirective, parentNs, true, ctx),
 		);
 		inlinedSubs.push(sub.fn);
 		ctx.hoistedHelpers.push(
