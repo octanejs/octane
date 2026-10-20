@@ -36762,24 +36762,24 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 				...(read ? [] : [b.literal(true)]),
 			),
 		),
-		...(plan?.optional
-			? [
-					b.call(
-						requireRuntimeForContext(ctx, '__sameHydrationOptionalInput'),
-						b.id('previous'),
-						b.id('next'),
-						slot('next', propsIndex),
-						b.literal(plan.optional.field),
-					),
-				]
-			: []),
 	]);
 	const inputTerm = b.logical('||', ordinary, refined);
 	const terms = plan?.optional ? [] : [inputTerm];
 	for (let index = 0; index < envNames.length; index++)
 		if (index !== propsIndex && index !== derivedIndex) terms.push(sameSlot(index));
-	// Arming the next actual access is the final comparator operation.
-	if (plan?.optional) terms.push(inputTerm);
+	// Arming the next actual access is the final comparator operation, including
+	// when the component reuses its previous props record.
+	if (plan?.optional)
+		terms.push(
+			inputTerm,
+			b.call(
+				requireRuntimeForContext(ctx, '__sameHydrationOptionalInput'),
+				b.id('previous'),
+				b.id('next'),
+				slot('next', propsIndex),
+				b.literal(plan.optional.field),
+			),
+		);
 	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(

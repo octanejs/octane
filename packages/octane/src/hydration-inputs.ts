@@ -160,21 +160,30 @@ function optionalInputValue(props: object, name: string): unknown {
 
 /** @internal Observe a proven record immediately before its authored optional call. */
 export function __observeHydrationOptionalInput(env: object, props: object, name: string): void {
-	if (!hydrating || !hydrationInputTuples?.has(env)) return;
+	if (!hydrating) return;
 	const observation = optionalInputObservations?.get(env);
-	const value = optionalInputValue(props, name);
 	if (observation?.armed) {
 		observation.armed = false;
 		if (
 			observation.props !== props ||
 			observation.name !== name ||
-			!Object.is(observation.value, value)
+			!Object.is(observation.value, optionalInputValue(props, name))
 		) {
 			optionalInputObservations!.delete(env);
 			throw INITIAL_ADOPTION_INPUT_CHANGED;
 		}
 		return;
 	}
+	// A previous accepted access authenticates only this record and field; it
+	// can refresh that narrow observation without granting tuple provenance.
+	if (
+		!hydrationInputTuples?.has(env) &&
+		(observation?.props !== props || observation.name !== name)
+	) {
+		if (observation !== undefined) optionalInputObservations!.delete(env);
+		return;
+	}
+	const value = optionalInputValue(props, name);
 	if (value !== UNSAFE_OPTIONAL_INPUT)
 		(optionalInputObservations ??= new WeakMap()).set(env, { props, name, value, armed: false });
 	else if (observation !== undefined) optionalInputObservations!.delete(env);
@@ -188,7 +197,15 @@ export function __sameHydrationOptionalInput(
 	name: string,
 ): boolean {
 	const observation = optionalInputObservations?.get(previous);
-	if (!observation || observation.armed || observation.name !== name) return false;
+	// The same exact record carries its original proof across a self-update.
+	// A different record still needs independently issued tuple provenance.
+	if (
+		!observation ||
+		observation.armed ||
+		observation.name !== name ||
+		(observation.props !== props && !hydrationInputTuples?.has(next))
+	)
+		return false;
 	const value = optionalInputValue(props, name);
 	if (value === UNSAFE_OPTIONAL_INPUT || !Object.is(observation.value, value)) return false;
 	optionalInputObservations!.set(next, { props, name, value, armed: true });

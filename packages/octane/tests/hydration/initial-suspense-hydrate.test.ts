@@ -248,9 +248,15 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 		},
 	);
 
-	it('falls back before invoking an optional reader changed after comparison', async () => {
+	const optionalUpdates = ['new props', 'same props'] as const;
+	it.each(optionalUpdates)('guards changed optional readers (%s)', async (scenario) => {
+		const scope = Signals.createScope({ scopeKey: `optional-reader-${dev}-${scenario}` });
+		const tick$ = scope.signal$('tick', 0);
+		cleanups.push(() => scope.dispose());
 		const gateSource = `import { use } from 'octane';
+${scenario === 'same props' ? "import { tick$ } from './tick';" : ''}
 export function Gate(props) @{
+  ${scenario === 'same props' ? 'const tick = tick$.get(); void tick;' : ''}
   @try {
     const value = props.octaneOptionalTestReader?.() ?? props.read();
     const suffix = use(props.seed);
@@ -264,6 +270,7 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 			const gateModule = loadCompiledFixtureSource(gateSource, {
 				...options,
 				id: '/src/gate.tsrx',
+				runtimeModules: { './tick': { tick$ } },
 			});
 			return loadCompiledFixtureSource(appSource, {
 				...options,
@@ -319,7 +326,11 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 			return result;
 		});
 		try {
-			await act(() => root.render(client['App'], { sibling: 'ready', gate: props.gate }));
+			await act(() => {
+				// A component's own signal update reuses its exact props record.
+				if (scenario === 'same props') tick$.set(1);
+				else root.render(client['App'], { sibling: 'ready', gate: props.gate });
+			});
 			expect(installed).toBe(true);
 			expect(container.querySelector('input')).not.toBe(original);
 			expect(container.querySelector('p')?.textContent).toBe('application failure');
