@@ -17534,6 +17534,11 @@ function compileComponent(node, ctx, options) {
 	const presentationView =
 		node._octaneBindingView ??
 		(node._octanePresentationHydration?.fixed ? node._octanePresentationHydration : null);
+	// Fixed views need the identity stamp for composed handoff, but their SSR
+	// output has no authored range and may inherit the caller's boundary.
+	const presentationArgs = presentationView
+		? [b.literal(presentationView.id), ...(node._octaneBindingView ? [] : [b.literal(false)])]
+		: null;
 
 	// The compiled function stays a NODE (M2 AST emit): compileComponent returns
 	// `{ nodes }` — the declaration statement plus any capability-stamp/HMR/
@@ -17621,13 +17626,13 @@ function compileComponent(node, ctx, options) {
 			// back to a full reload — the capture predates the wrapper).
 			statements.push(guarded(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))));
 		}
-		if (presentationView) {
+		if (presentationArgs) {
 			statements.push(
 				guarded(
 					b.call(
 						requireRuntimeForContext(ctx, 'bindPresentationView'),
 						b.id(name),
-						b.literal(presentationView.id),
+						...presentationArgs,
 					),
 				),
 			);
@@ -17661,13 +17666,13 @@ function compileComponent(node, ctx, options) {
 	// its fresh body to the previous canonical wrapper and re-export that same
 	// identity. Production components retain their tree-shakeable const binding.
 	let valueExpr = hmrWrap && isExported ? inheritOriginLoc(b.call('_$hmr', abiFn), node) : abiFn;
-	if (presentationView) {
+	if (presentationArgs) {
 		valueExpr = markPure(
 			inheritOriginLoc(
 				b.call(
 					requireRuntimeForContext(ctx, 'bindPresentationView'),
 					valueExpr,
-					b.literal(presentationView.id),
+					...presentationArgs,
 				),
 				node,
 			),

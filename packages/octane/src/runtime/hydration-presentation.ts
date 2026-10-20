@@ -439,6 +439,8 @@ export function beginPresentationHydration(
 				? new Map([...pending.writes].map(([node, writes]) => [node, new Map(writes)]))
 				: new Map(),
 		native: setNativeAdoptionResolver(null),
+		// An ordinary prop getter can perform the first native read during takeover.
+		// Install its owner and witness before evaluating the view.
 		readToken: beginNativeReadScope(scope),
 		witnessToken: beginNativeReadWitness(),
 		witnesses: pending?.scope === scope ? new Map(pending.witnesses) : new Map(),
@@ -1018,6 +1020,8 @@ export function presentationFixedWrite<T>(
 ): T {
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
 	if (frame === null) return writeAtCommit(writer, kind, args);
+	// A host lease owns only its declared channels, never a fixed descendant view.
+	if (frame.lease.host !== undefined) presentationMiss(false);
 	// An explicit lease publishes these caches with its staged writes. Historical
 	// hydration without a lease still invalidates retained early publications.
 	if (kind === 'hydrateClaimedBindingCaches') return undefined as T;
@@ -1186,10 +1190,10 @@ export function presentationWrite<T>(
 	return result as T;
 }
 
-/** @internal Authored presentation ranges may not inherit an unrelated caller's boundary. */
-export function bindPresentationView<T extends Function>(view: T, id: string): T {
+/** @internal Stamp the view identity and prevent authored ranges from inheriting a caller's boundary. */
+export function bindPresentationView<T extends Function>(view: T, id: string, ownsRange = true): T {
 	(view as T & { [BINDING_VIEW_ROOT]: string })[BINDING_VIEW_ROOT] = bindingRootMarker(id);
-	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
+	return ownsRange ? markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name) : view;
 }
 
 export const BINDING_CHILDREN_SITE = /* @__PURE__ */ Symbol.for('octane.binding.children-site');

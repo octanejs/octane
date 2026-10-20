@@ -1432,26 +1432,28 @@ function literalData(value) {
 
 // Mirrors the runtime's fixed scalar channels, plus URLs, whose sanitizer the
 // artifact carries as its `url` capability. Richer kinds, addressed targets,
-// handoff and grouped projections keep the general fixed-layout adopter.
+// host handoff and grouped projections keep the general fixed-layout adopter.
 const SCALAR_ADOPTER_CHANNELS = new Set(['attr', 'boolean', 'aria', 'class', 'text', 'url']);
 
-function scalarAdopter(plan) {
-	if (plan.handoff === 'view') return '__adoptFixedViewBindings';
-	return !plan.addressed &&
-		!plan.handoff &&
+function usesScalarAdopter(plan) {
+	return (
+		!plan.addressed &&
+		(!plan.handoff || plan.handoff === 'view') &&
 		plan.styleIndices.length === 0 &&
 		plan.projectionGroups.length === 0 &&
 		plan.bindings.every((binding) => SCALAR_ADOPTER_CHANNELS.has(binding[1]))
-		? '__adoptScalarBindings'
-		: '__adoptBindings';
+	);
+}
+
+function scalarAdopter(plan) {
+	if (usesScalarAdopter(plan))
+		return plan.handoff === 'view' ? '__adoptFixedScalarViewBindings' : '__adoptScalarBindings';
+	return plan.handoff === 'view' ? '__adoptFixedViewBindings' : '__adoptBindings';
 }
 
 /** Whether the selected scalar adopter needs the artifact's URL capability. */
 function scalarURL(plan) {
-	return (
-		scalarAdopter(plan) === '__adoptScalarBindings' &&
-		plan.bindings.some((binding) => binding[1] === 'url')
-	);
+	return usesScalarAdopter(plan) && plan.bindings.some((binding) => binding[1] === 'url');
 }
 
 function scalarProperties(

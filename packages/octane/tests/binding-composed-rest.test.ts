@@ -74,7 +74,7 @@ function Local(props) @{ <em>{props.label as string}</em>; }
 export function Outer(props) @{ 'use dom bindings'; <div><Inner label={props.label} /><Local label={props.label} /></div>; }`,
 			'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
 import { ${name} } from '${file}';
-export function adopt(root, state) { return adoptBindings(root, ${name}, state); }`,
+export function adopt(root, state, options) { return adoptBindings(root, ${name}, state, options); }`,
 			'/src/mount.tsrx': `import { mountBindings } from 'octane/behavior';
 import { ${name} } from '${file}';
 export function mount(target, state) { return mountBindings(target, ${name}, state); }`,
@@ -101,7 +101,11 @@ function source<Props>(initial: Props) {
 	};
 }
 
-type Adopt = (root: Element, state: ReturnType<typeof source>) => DomBindings.BindingHandle;
+type Adopt = (
+	root: Element,
+	state: ReturnType<typeof source>,
+	options?: DomBindings.BindingOptions,
+) => DomBindings.BindingHandle;
 type Mount = (
 	target: DomBindingPrograms.BindingMountTarget,
 	state: ReturnType<typeof source>,
@@ -259,6 +263,35 @@ export function adopt(root, state) { return adoptBindings(root, Action, state); 
 			}
 		});
 
+		it('refuses a nested component whose structural range was replaced', () => {
+			const { load, file, name } = fixedTextGraph(options, true);
+			const state = source({ label: 'Server' });
+			document.body.innerHTML = renderToString(
+				load(file, 'server')[name] as never,
+				state.getSnapshot(),
+			).html;
+			const outer = document.querySelector('div')!;
+			const button = outer.querySelector('button')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(outer, state);
+			const original = button.previousSibling!;
+			expect(original.nodeType).toBe(Node.COMMENT_NODE);
+			const foreign = document.createComment('external');
+			original.replaceWith(foreign);
+			try {
+				expect(() =>
+					hydrateRoot(document.body, load(file, 'client')[name] as never, state.getSnapshot(), {
+						bindingLeases: [binding],
+					}),
+				).toThrow(/binding leases/);
+				expect(button.previousSibling).toBe(foreign);
+				expect(state.subscriptions.size).toBe(1);
+				state.publish({ label: 'Still active' });
+				expect(button.textContent).toBe('Still active');
+			} finally {
+				binding.dispose();
+			}
+		});
+
 		it('keeps a fixed text signal active after hydration takes ownership', async () => {
 			const { load, file, name } = fixedTextGraph(options, false);
 			const scope = createScope({ scopeKey: `fixed-text-handoff-${dev}` });
@@ -375,6 +408,72 @@ export function adopt(root, state) { return adoptBindings(root, Action, state); 
 				expect(state.subscriptions.size).toBe(0);
 			},
 		);
+
+		it('captures a fixed text leaf before reading adoption options', () => {
+			const { load, file, name } = fixedTextGraph(options, false);
+			const state = source({ label: 'Server' });
+			document.body.innerHTML = renderToString(
+				load(file, 'server')[name] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const foreign = document.createTextNode('External');
+			const controller = new AbortController();
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state, {
+				get signal() {
+					button.firstChild!.replaceWith(foreign);
+					return controller.signal;
+				},
+			});
+			try {
+				expect(() =>
+					hydrateRoot(document.body, load(file, 'client')[name] as never, state.getSnapshot(), {
+						bindingLeases: [binding],
+					}),
+				).toThrow(/binding leases/);
+				expect(button.firstChild).toBe(foreign);
+				expect(state.subscriptions.size).toBe(1);
+			} finally {
+				binding.dispose();
+			}
+		});
+
+		it('keeps a partially owned native view active after rejecting a whole-view lease', () => {
+			const load = moduleGraph(
+				{
+					'/src/action.tsrx': `import { unbound } from 'octane/behavior';
+export function Action(props) @{ 'use dom bindings'; <button data-state={props.label} title={unbound(props.title)}>Act</button>; }`,
+					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { Action } from './action.tsrx';
+export function adopt(root, state) { return adoptBindings(root, Action, state); }`,
+				},
+				options,
+			);
+			const state = source({ label: 'Server', title: 'External' });
+			document.body.innerHTML = renderToString(
+				load('./action.tsrx', 'server')['Action'] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
+			try {
+				expect(() =>
+					hydrateRoot(
+						document.body,
+						load('./action.tsrx', 'client')['Action'] as never,
+						state.getSnapshot(),
+						{ bindingLeases: [binding] },
+					),
+				).toThrow(/binding leases/);
+				expect(document.querySelector('button')).toBe(button);
+				expect(state.subscriptions.size).toBe(1);
+				state.publish({ label: 'Still active', title: 'Ignored' });
+				expect(button.getAttribute('data-state')).toBe('Still active');
+				expect(button.title).toBe('External');
+			} finally {
+				binding.dispose();
+			}
+		});
 
 		it('keeps a controlled binding active when hydration cannot take it over', () => {
 			const load = moduleGraph(
