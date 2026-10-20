@@ -17059,7 +17059,9 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 			expr,
 		);
 		inlinedSubs.push(
-			ssrCompileBody(synth, ctx, helperName, cssHash, [], parentNs, false, componentNs),
+			withNestedTemplateScope(synth, ctx, () =>
+				ssrCompileBody(synth, ctx, helperName, cssHash, [], parentNs, false, componentNs),
+			),
 		);
 		lowered = inheritOriginLoc(b.id(helperName), expr);
 	} else {

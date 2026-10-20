@@ -579,3 +579,32 @@ it('keeps keyed Fragment identities and nested captures stable across server asy
 		controller.abort();
 	}
 });
+
+it('preserves setup locals across a keyed Fragment during server rendering and hydration', () => {
+	const source = `
+		'use strong';
+		import { Fragment, useState } from 'octane';
+		export function View({ value }) @{
+			@{
+				const label = value;
+				<Fragment key={label}>
+					@{ const [text] = useState(() => label); <span>{text}</span> }
+				</Fragment>
+			}
+		}
+	`;
+	const options = { id: '/keyed-setup-capture.tsrx', compileOptions: { dev: false, hmr: false } };
+	const serverView = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+	const clientView = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+	const props = { value: 'hello' };
+	container = document.createElement('div');
+	document.body.appendChild(container);
+	container.innerHTML = Server.renderToString(serverView['View'], props).html;
+	const span = container.querySelector('span');
+	expect(span?.textContent).toBe('hello');
+	const onRecoverableError = vi.fn();
+	root = Client.hydrateRoot(container, clientView['View'], props, { onRecoverableError });
+	Client.flushSync(() => {});
+	expect(container.querySelector('span')).toBe(span);
+	expect(onRecoverableError).not.toHaveBeenCalled();
+});
