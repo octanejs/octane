@@ -258,6 +258,25 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		expect(after.globalFailures).toEqual([]);
 	});
 
+	it.each(['detached', 'foreign'])(
+		'restores an editor relocated to a %s container during a keyed update',
+		async (external) => {
+			await openCase(`case=relocated-focus-restoration&external=${external}`);
+			expect(await page!.evaluate(() => typeof Reflect.get(document.body, 'moveBefore'))).toBe(
+				'function',
+			);
+			await page!.evaluate(() => window.__suspenseHydration.urgent!());
+			expect(await snapshot()).toMatchObject({
+				values: ['field 2', 'field 3', 'field 4', 'unsaved draft'],
+				inputSame: true,
+				focused: true,
+				selection: [2, 7],
+				externalEmpty: true,
+				globalFailures: [],
+			});
+		},
+	);
+
 	it.each([
 		{
 			selection: 'backward',
@@ -495,6 +514,7 @@ declare global {
 				| 'react-baseline'
 				| 'direct-ref-unmount'
 				| 'focus-restoration'
+				| 'relocated-focus-restoration'
 				| 'editable-focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;

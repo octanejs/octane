@@ -14,6 +14,7 @@ import {
 	SuspensePreservationApp,
 } from '../../_fixtures/suspense-preserves-dom.tsrx';
 import { FastHostControlledList } from '../../_fixtures/for.tsrx';
+import { createRelocatingNativeEditors } from '../../_fixtures/relocating-native-editor.js';
 import {
 	StructuralRoot,
 	StructuralRootReplacement,
@@ -460,6 +461,44 @@ function mountFocusRestorationCase(): void {
 	};
 }
 
+function mountRelocatedFocusRestorationCase(): void {
+	const container = document.querySelector('#suspense-root') as HTMLElement;
+	const external =
+		search.get('external') === 'foreign'
+			? document.implementation.createHTMLDocument('external').body
+			: document.createElement('aside');
+	const EditorRows = createRelocatingNativeEditors(external, 1);
+	const rows = [1, 2, 3, 4].map((id) => ({ id, label: `field ${id}` }));
+	const root = createRoot(container);
+	root.render(EditorRows, { items: rows, revision: 0 });
+	const input = container.querySelector('input')!;
+	input.value = 'unsaved draft';
+	input.focus();
+	input.setSelectionRange(2, 7);
+	window.__suspenseHydration = {
+		kind: 'relocated-focus-restoration',
+		urgent() {
+			flushSync(() =>
+				root.render(EditorRows, { items: [...rows.slice(1), rows[0]!], revision: 1 }),
+			);
+		},
+		resolve() {},
+		unmount() {
+			root.unmount();
+		},
+		snapshot() {
+			return {
+				values: Array.from(container.querySelectorAll('input'), (element) => element.value),
+				inputSame: container.querySelectorAll('input')[3] === input,
+				focused: document.activeElement === input,
+				selection: [input.selectionStart, input.selectionEnd],
+				externalEmpty: external.childNodes.length === 0,
+				globalFailures: globalFailures.slice(),
+			};
+		},
+	};
+}
+
 function mountEditableFocusRestorationCase(): void {
 	const container = document.querySelector('#suspense-root') as HTMLElement;
 	const react = search.get('implementation') === 'react';
@@ -644,6 +683,7 @@ else if (testCase === 'suspense') mountSuspenseCase();
 else if (testCase === 'root-suspension') mountRootSuspensionCase();
 else if (testCase === 'direct-ref-unmount') mountDirectRefUnmountCase();
 else if (testCase === 'focus-restoration') mountFocusRestorationCase();
+else if (testCase === 'relocated-focus-restoration') mountRelocatedFocusRestorationCase();
 else if (testCase === 'editable-focus-restoration') mountEditableFocusRestorationCase();
 else if (testCase === 'react-baseline') mountReactBaselineCase();
 
@@ -657,6 +697,7 @@ declare global {
 				| 'react-baseline'
 				| 'direct-ref-unmount'
 				| 'focus-restoration'
+				| 'relocated-focus-restoration'
 				| 'editable-focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;

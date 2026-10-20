@@ -26,7 +26,7 @@ export function createRelocatingNativeEditors(
 			}
 			attributeChangedCallback(_name: string, previous: string | null, next: string) {
 				// A native editor may relocate its own host while its configuration changes.
-				if (previous === '0' && next === '1' && Number(this.dataset.row) === focusedId)
+				if (previous === '0' && next === '1' && Number(this.dataset['row']) === focusedId)
 					external.appendChild(this);
 			}
 		},
