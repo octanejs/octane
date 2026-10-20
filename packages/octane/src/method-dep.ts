@@ -86,7 +86,7 @@ export function __methodDep(
 // Anything this does not recognize counts as a method, which only costs a
 // spurious recompute. A method named `async` also reads as `async(`, so only a
 // parenthesized arrow skips the name check.
-const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
+export const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
 
 function ownMethodDep(receiver: object, method: unknown): unknown {
 	if (typeof method !== 'function') return method;

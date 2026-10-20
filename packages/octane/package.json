@@ -102,6 +102,7 @@
     "./internal/server": "./src/internal/server.ts",
     "./internal/context": "./src/internal/context.ts",
     "./internal/signal-read": "./src/internal/signal-read.ts",
+    "./internal/hydration-signal": "./src/signals/hydration-input-source.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
@@ -259,6 +260,11 @@
         "types": "./dist/internal/signal-read.d.ts",
         "node": "./dist/node/internal/signal-read.js",
         "default": "./dist/internal/signal-read.js"
+      },
+      "./internal/hydration-signal": {
+        "types": "./dist/signals/hydration-input-source.d.ts",
+        "node": "./dist/node/signals/hydration-input-source.js",
+        "default": "./dist/signals/hydration-input-source.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

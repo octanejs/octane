@@ -17,6 +17,7 @@ import {
 	restartUncommittedTry,
 	type InitialSuspenseHydration,
 	initialSuspenseHydrations,
+	retireInitialSuspenseHydration,
 	TRY_OPS,
 	claimStreamedIds,
 	waitForStreamedArm,
@@ -1950,7 +1951,7 @@ export function renderInitialSuspenseHydration(
 	}
 	if (!failed) {
 		if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
-		initialSuspenseHydrations?.delete(state);
+		retireInitialSuspenseHydration(state);
 		// An enclosing boundary may still suspend after this arm rendered. Leave
 		// its server metadata and ranges replayable until that capture commits.
 		(capture.renderCleanups ??= []).push((discarded) => {
@@ -1973,7 +1974,7 @@ export function renderInitialSuspenseHydration(
 		});
 		return;
 	}
-	initialSuspenseHydrations?.delete(state);
+	retireInitialSuspenseHydration(state);
 	if (failure instanceof HydrationMismatch) {
 		// The arm's own close matched before this attempt, so the mismatch lies
 		// inside it: as React does for a Suspense boundary, discard its server DOM

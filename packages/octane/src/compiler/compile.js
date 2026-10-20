@@ -1632,6 +1632,12 @@ function requireRuntimeForContext(ctx, name) {
 		name === 'isContext' ||
 		name === '__delegateEvents' ||
 		name === '__delegateCaptureEvents' ||
+		name === '__sameHydrationInput' ||
+		name === '__captureHydrationInput' ||
+		name === '__hydrationSignalRevision' ||
+		name === '__hydrationComponentSlot' ||
+		name === '__registerHydrationInputComponent' ||
+		name === '__ownedHydrationInputs' ||
 		name === METHOD_DEP_IMPORT ||
 		HOOK_MEMO_RUNTIME_HELPERS.has(name) ||
 		NATIVE_READ_RUNTIME_HELPERS.has(name)
@@ -1734,6 +1740,11 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__captureHydrationInput',
+	'__hydrationComponentSlot',
+	'__registerHydrationInputComponent',
+	'__ownedHydrationInputs',
+	'__sameHydrationInput',
 	'__createVoidRootDefaultOptions',
 	'__createRootDefaultOptions',
 	'__delegateEvents',
@@ -1829,6 +1840,8 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 		if (route.locals?.has(local) || route.imported?.has(imported)) return route.module;
 	}
 	if (local === (ctx.privateRuntimeAliases?.get(imported) ?? rtAlias(imported))) {
+		if (fallback === 'octane' && imported === '__hydrationSignalRevision')
+			return 'octane/internal/hydration-signal';
 		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
 			return 'octane/internal/client';
 		}
@@ -4789,7 +4802,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		// ROOT objects, and dynamic `<{expr}/>` expressions count.
 		if (t === 'Element' || t === 'JSXElement') {
 			const tag = n.openingElement?.name || n.id;
-			if (tag) {
+			if (tag && !ignoreNodes?.has(tag)) {
 				if (
 					(tag.type === 'Identifier' || tag.type === 'JSXIdentifier') &&
 					typeof tag.name === 'string'
@@ -7419,8 +7432,42 @@ function collectPrivateUnescapedComponents(body, ctx) {
 			candidates.add(statement.id.name);
 		}
 	}
+	return collectPrivateRenderedComponents(body, ctx, candidates, (node, name, returnedOwner) => {
+		const attrs = node.attributes || node.openingElement?.attributes || [];
+		// Returned roots fold in declaration order. A later component has no
+		// renderer yet, so its descriptor can escape through the returned props.
+		return (
+			attrs.length === 0 &&
+			!node.children?.length &&
+			(returnedOwner === null ||
+				ctx.moduleFunctionDeclarations.get(name).start < returnedOwner.start)
+		);
+	});
+}
+
+// A private component whose every reference is an admitted template output
+// cannot be invoked through another ABI or escape through a descriptor's type.
+function collectPrivateRenderedComponents(body, ctx, candidates, acceptSite) {
 	if (candidates.size === 0) return candidates;
 
+	const allowed = collectRenderedComponentReferences(ctx, candidates, acceptSite);
+	// An array deliberately does not introduce a synthetic module Block scope:
+	// sibling function references must remain free for the escape proof.
+	const escaped = collectFreeIdentifiers(body, [], allowed);
+	for (const name of candidates) {
+		if (escaped.has(name)) {
+			candidates.delete(name);
+			continue;
+		}
+		// A declaration binds its own name inside its body. Scan that disjoint
+		// subtree once more so self-assigned properties cannot hide behind it.
+		const declaration = ctx.moduleFunctionDeclarations.get(name);
+		if (collectFreeIdentifiers(declaration.body, [], allowed).has(name)) candidates.delete(name);
+	}
+	return candidates;
+}
+
+function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
 	const allowed = new Set();
 	const visitOutput = (node, returnedOwner = null) => {
 		if (node == null) return;
@@ -7430,18 +7477,8 @@ function collectPrivateUnescapedComponents(body, ctx) {
 			if (!isComponentTag(node)) visitOutput(node.children, returnedOwner);
 			else {
 				const name = tagBindingName(node);
-				const attrs = node.attributes || node.openingElement?.attributes || [];
-				// Returned roots fold in declaration order. A later component has no
-				// renderer yet, so its descriptor can escape through the returned props.
-				if (
-					candidates.has(name) &&
-					attrs.length === 0 &&
-					!node.children?.length &&
-					(returnedOwner === null ||
-						ctx.moduleFunctionDeclarations.get(name).start < returnedOwner.start)
-				) {
-					allowed.add(node);
-				}
+				if (candidates.has(name) && acceptSite(node, name, returnedOwner))
+					allowed.add(node.openingElement?.name ?? node.id);
 			}
 		} else if (node.type === 'JSXFragment' || node.type === 'Fragment') {
 			visitOutput(node.children, returnedOwner);
@@ -7474,20 +7511,391 @@ function collectPrivateUnescapedComponents(body, ctx) {
 		}
 	}
 
-	// An array deliberately does not introduce a synthetic module Block scope:
-	// sibling function references must remain free for the escape proof.
-	const escaped = collectFreeIdentifiers(body, [], allowed);
-	for (const name of candidates) {
-		if (escaped.has(name)) {
-			candidates.delete(name);
-			continue;
+	return allowed;
+}
+
+// No setup code can expose the props record before this component's boundary.
+function isHydrationPropsComponent(node, ctx) {
+	return (
+		node?.type === 'FunctionDeclaration' &&
+		node.body?.type === 'JSXCodeBlock' &&
+		node.body.body.length === 0 &&
+		node.body.render?.type === 'JSXTryExpression' &&
+		node.params?.length === 1 &&
+		node.params[0].type === 'Identifier' &&
+		ctx.moduleFunctionDeclarations.has(node.id?.name)
+	);
+}
+
+// The caller owns a normal props record only at immediately rendered JSX
+// sites. Save those sites for private, immutable component declarations; the
+// boundary later checks that every site materializes each field it compares.
+function privateHydrationPropsSites(ctx) {
+	const body = ctx.hydrationPropsModule.body;
+	const candidates = new Set();
+	for (const node of body) if (isHydrationPropsComponent(node, ctx)) candidates.add(node.id.name);
+	const sites = new Map();
+	collectPrivateRenderedComponents(body, ctx, candidates, (node, name, returnedOwner) => {
+		if (returnedOwner !== null || node.children?.length) return false;
+		let calls = sites.get(name);
+		if (calls === undefined) sites.set(name, (calls = []));
+		calls.push(node.attributes || node.openingElement?.attributes || []);
+		return true;
+	});
+	for (const name of sites.keys()) if (!candidates.has(name)) sites.delete(name);
+	return sites;
+}
+
+// Setup executes in its authored position. Its result is an ordinary try-arm
+// capture, but it must not expose or mutate the newly materialized props record
+// before the boundary. Record every first-level read so callers can prove it
+// was an own data property before setup. A zero-argument `.get()` may read a
+// signal or another nested receiver, never the ephemeral props record itself.
+function hydrationSetupExpression(node, propsName, required, setupLocals) {
+	node = unwrapTsExpr(node);
+	if (!node) return false;
+	switch (node.type) {
+		case 'Literal':
+			return true;
+		case 'Identifier':
+			return node.name !== propsName && node.name !== 'arguments' && node.name !== 'eval';
+		case 'ChainExpression': {
+			const member = node.expression;
+			if (
+				member?.type !== 'MemberExpression' ||
+				!member.optional ||
+				staticDepMemberName(member) === null
+			)
+				return false;
+			let receiver = unwrapTsExpr(member.object);
+			if (receiver?.type === 'Identifier') receiver = unwrapTsExpr(setupLocals.get(receiver.name));
+			// The optional read stays in authored setup. Its receiver must be an
+			// own-data props field, possibly held by one preceding const local.
+			return (
+				receiver?.type === 'MemberExpression' &&
+				!receiver.optional &&
+				receiver.object?.type === 'Identifier' &&
+				receiver.object.name === propsName &&
+				hydrationSetupExpression(receiver, propsName, required, setupLocals)
+			);
 		}
-		// A declaration binds its own name inside its body. Scan that disjoint
-		// subtree once more so self-assigned properties cannot hide behind it.
-		const declaration = ctx.moduleFunctionDeclarations.get(name);
-		if (collectFreeIdentifiers(declaration.body, [], allowed).has(name)) candidates.delete(name);
+		case 'MemberExpression': {
+			const field = staticDepMemberName(node);
+			if (node.optional || field === null) return false;
+			if (node.object?.type === 'Identifier' && node.object.name === propsName) {
+				required.add(field);
+				return true;
+			}
+			return hydrationSetupExpression(node.object, propsName, required, setupLocals);
+		}
+		case 'CallExpression': {
+			const callee = unwrapTsExpr(node.callee);
+			return (
+				!node.optional &&
+				node.arguments.length === 0 &&
+				callee?.type === 'MemberExpression' &&
+				!callee.optional &&
+				staticDepMemberName(callee) === 'get' &&
+				hydrationSetupExpression(callee.object, propsName, required, setupLocals)
+			);
+		}
+		case 'UnaryExpression':
+			return (
+				node.operator !== 'delete' &&
+				hydrationSetupExpression(node.argument, propsName, required, setupLocals)
+			);
+		case 'BinaryExpression':
+		case 'LogicalExpression':
+			return (
+				hydrationSetupExpression(node.left, propsName, required, setupLocals) &&
+				hydrationSetupExpression(node.right, propsName, required, setupLocals)
+			);
+		case 'ConditionalExpression':
+			return (
+				hydrationSetupExpression(node.test, propsName, required, setupLocals) &&
+				hydrationSetupExpression(node.consequent, propsName, required, setupLocals) &&
+				hydrationSetupExpression(node.alternate, propsName, required, setupLocals)
+			);
+		case 'TemplateLiteral':
+			return node.expressions.every((expression) =>
+				hydrationSetupExpression(expression, propsName, required, setupLocals),
+			);
+		default:
+			return false;
 	}
-	return candidates;
+}
+
+function confinedHydrationDerivedRead(render, name, propsName = null) {
+	const first = render.block.body[0];
+	let read =
+		first?.type === 'VariableDeclaration' && first.declarations.length === 1
+			? unwrapTsExpr(first.declarations[0].init)
+			: null;
+	if (propsName !== null) {
+		if (
+			read?.type !== 'CallExpression' ||
+			read.optional ||
+			read.arguments.length !== 1 ||
+			read.callee?.type !== 'MemberExpression' ||
+			read.callee.optional ||
+			staticDepMemberName(read.callee) === null ||
+			read.callee.object?.type !== 'Identifier' ||
+			read.callee.object.name !== propsName
+		)
+			return false;
+		read = unwrapTsExpr(read.arguments[0]);
+	}
+	const receiver = read?.callee?.object;
+	return (
+		read?.type === 'CallExpression' &&
+		!read.optional &&
+		read.arguments.length === 0 &&
+		read.callee.type === 'MemberExpression' &&
+		!read.callee.optional &&
+		staticDepMemberName(read.callee) === 'get' &&
+		receiver?.type === 'Identifier' &&
+		receiver.name === name &&
+		!collectFreeIdentifiers(render, [], new Set([receiver])).has(name)
+	);
+}
+
+// A passive effect's callback cannot execute during an unfinished adoption.
+// Its latest closure still belongs to the retried arm, but it does not decide
+// whether the initial suspended read was superseded. Only discard a callback
+// for a statically resolved Octane import with an authored empty dependency list.
+function hydrationBlockingBodies(ctx, bodies) {
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const stmts = bodies[0].stmts.map((statement) => {
+		const call =
+			statement.type === 'ExpressionStatement' ? unwrapTsExpr(statement.expression) : null;
+		const callee = call?.callee;
+		if (
+			call?.type !== 'CallExpression' ||
+			call.optional ||
+			callee?.type !== 'Identifier' ||
+			ctx.octaneImportLocals?.get(callee.name) !== 'useEffect' ||
+			lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope !==
+				lexical.rootScope ||
+			call.arguments.length !== 2 ||
+			call.arguments[0]?.type !== 'ArrowFunctionExpression' ||
+			call.arguments[1]?.type !== 'ArrayExpression' ||
+			call.arguments[1].elements.length !== 0
+		)
+			return statement;
+		return {
+			...statement,
+			expression: { ...call, arguments: [b.arrow([], b.block([])), call.arguments[1]] },
+		};
+	});
+	return [{ ...bodies[0], stmts }, ...bodies.slice(1)];
+}
+
+// A layout callback is published only after an arm commits. Dependency
+// inference still evaluates its method witness during render, so require that
+// field to be own data without treating the callback as a blocking input.
+// Change only this analysis copy; the emitted hook, deps and receiver stay intact.
+function hydrationLayoutBodies(ctx, bodies, propsName, required) {
+	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
+	if (methodDepLocal === undefined) return bodies;
+	const stmts = bodies[0].stmts;
+	let next = null;
+	for (let index = 0; index < stmts.length; index++) {
+		const statement = stmts[index];
+		const effect = statement.type === 'ExpressionStatement' ? statement.expression : null;
+		if (effect?._octaneImportedHook !== 'useLayoutEffect' || effect.arguments.length !== 2)
+			continue;
+		const [callback, deps] = effect.arguments;
+		if (
+			callback?.type !== 'ArrowFunctionExpression' ||
+			callback.async ||
+			callback.params.length !== 0 ||
+			callback.body.type !== 'BlockStatement' ||
+			callback.body.body.length !== 1 ||
+			callback.body.body[0].type !== 'ExpressionStatement' ||
+			deps?.type !== 'ArrayExpression' ||
+			deps.elements.length !== 2
+		)
+			continue;
+		const expression = callback.body.body[0].expression;
+		const invoked = expression.type === 'ChainExpression' ? expression.expression : expression;
+		const member = invoked?.callee;
+		const argument = invoked?.arguments?.[0];
+		const field = staticDepMemberName(member);
+		const [method, value] = deps.elements;
+		if (
+			invoked?.type !== 'CallExpression' ||
+			invoked.arguments.length !== 1 ||
+			member?.type !== 'MemberExpression' ||
+			member.optional ||
+			field === null ||
+			member.object?.type !== 'Identifier' ||
+			member.object.name !== propsName ||
+			argument?.type !== 'Identifier' ||
+			argument.name === propsName ||
+			method?.type !== 'CallExpression' ||
+			method.optional ||
+			method.callee?.type !== 'Identifier' ||
+			method.callee.name !== methodDepLocal ||
+			method.arguments.length !== 2 ||
+			method.arguments[0]?.type !== 'Identifier' ||
+			method.arguments[0].name !== propsName ||
+			method.arguments[1]?.type !== 'Literal' ||
+			method.arguments[1].value !== field ||
+			value?.type !== 'Identifier' ||
+			value.name !== argument.name
+		)
+			continue;
+		// The helper alias is allocated against every authored identifier before
+		// inference, so an explicit dependency list cannot counterfeit this call.
+		required.add(field);
+		(next ??= stmts.slice())[index] = {
+			...statement,
+			expression: {
+				...effect,
+				arguments: [b.arrow([], b.block([])), { ...deps, elements: [value] }],
+			},
+		};
+	}
+	return next === null ? bodies : [{ ...bodies[0], stmts: next }, ...bodies.slice(1)];
+}
+
+// An exported component can also receive arbitrary caller-owned props. Its
+// comparator requires provenance from each actual invocation: same-module JSX
+// sites prove own fields statically; imported spreads use a callable capability.
+function exportedHydrationPropsPlans(ctx) {
+	const plans = new Map();
+	const candidates = new Set();
+	for (const statement of ctx.hydrationPropsModule.body) {
+		if (
+			statement.type !== 'ExportNamedDeclaration' &&
+			statement.type !== 'ExportDefaultDeclaration'
+		)
+			continue;
+		const component = statement.declaration;
+		if (
+			component?.type !== 'FunctionDeclaration' ||
+			component.body?.type !== 'JSXCodeBlock' ||
+			component.body.render?.type !== 'JSXTryExpression' ||
+			!component.body.render.pending?.body?.length ||
+			component.params?.length !== 1 ||
+			component.params[0].type !== 'Identifier' ||
+			ctx.moduleFunctionDeclarations.get(component.id?.name) !== component
+		)
+			continue;
+		const propsName = component.params[0].name;
+		const required = new Set();
+		const setupLocals = new Map();
+		let derived = null;
+		let safe = true;
+		for (const setup of component.body.body) {
+			if (
+				setup.type === 'ExpressionStatement' &&
+				setup.expression?.type === 'UnaryExpression' &&
+				setup.expression.operator === 'void' &&
+				setup.expression.argument?.type === 'Identifier' &&
+				setupLocals.has(setup.expression.argument.name) &&
+				derived === null
+			)
+				continue;
+			if (setup.type !== 'VariableDeclaration' || setup.kind !== 'const') {
+				safe = false;
+				break;
+			}
+			for (const declaration of setup.declarations) {
+				const proof = unwrapTsExpr(declaration.init)?.metadata?.hydrationDerived;
+				if (declaration.id.type !== 'Identifier' || derived !== null) {
+					safe = false;
+					break;
+				}
+				if (
+					proof?.source &&
+					confinedHydrationDerivedRead(component.body.render, declaration.id.name, propsName)
+				) {
+					const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+					const binding = lexical.resolveBinding(
+						lexical.nodeScopes.get(proof.source),
+						proof.source.name,
+					);
+					if (binding?.scope !== lexical.rootScope || binding.importSource === null) {
+						safe = false;
+						break;
+					}
+					derived = { name: declaration.id.name, source: proof.source };
+				} else if (
+					proof?.root === propsName &&
+					confinedHydrationDerivedRead(component.body.render, declaration.id.name)
+				)
+					derived = { name: declaration.id.name, field: proof.field };
+				else if (!hydrationSetupExpression(declaration.init, propsName, required, setupLocals)) {
+					safe = false;
+					break;
+				}
+				setupLocals.set(declaration.id.name, declaration.init);
+			}
+			if (!safe) break;
+		}
+		if (!safe) continue;
+		const bodies = hydrationLayoutBodies(
+			ctx,
+			tryBodies(component.body.render, ctx),
+			propsName,
+			required,
+		);
+		const fields = hydrationPropsFields(
+			ctx,
+			propsName,
+			derived ? hydrationBlockingBodies(ctx, bodies) : bodies,
+		);
+		if (fields === null) continue;
+		if (derived?.field) fields.set(derived.field, false);
+		for (const field of fields.keys()) required.add(field);
+		plans.set(component.id.name, {
+			fields,
+			derived: derived?.source ? null : derived,
+			source: derived?.source,
+			origin: component,
+			required: { warmRequiredProps: required },
+			sites: new Set(),
+		});
+		candidates.add(component.id.name);
+	}
+	if (candidates.size === 0) return plans;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	collectRenderedComponentReferences(ctx, candidates, (node, name, returnedOwner) => {
+		if (returnedOwner !== null || node.children?.length) return false;
+		const plan = plans.get(name);
+		const attrs = node.attributes || node.openingElement?.attributes || [];
+		if (!warmCallsiteOwnsRequiredProps(plan.required, attrs)) return false;
+		const tag = node.openingElement?.name ?? node.id;
+		if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
+			return false;
+		plan.sites.add(tag);
+		return true;
+	});
+	// HMR can rebind the exported wrapper after definition-site initialization.
+	// Keep the existing same-module proof there; do not issue a cross-module
+	// callable capability whose required fields could belong to an older body.
+	if (ctx.hmr) for (const [name, plan] of plans) if (plan.sites.size === 0) plans.delete(name);
+	return plans;
+}
+
+function hydrationInputPlanName(ctx, plan) {
+	return (plan.name ??= hoistHydrationInputPlan(
+		ctx,
+		plan.fields,
+		plan.required.warmRequiredProps,
+		plan.origin,
+	));
+}
+
+function exportedHydrationPropsPlan(ctx, name) {
+	if (
+		ctx.mode !== 'client' ||
+		ctx._universalRuntimeUnit != null ||
+		ctx.componentInfo?.get(name)?.node.body?.render?.type !== 'JSXTryExpression'
+	)
+		return null;
+	return (ctx.exportedHydrationPropsPlans ??= exportedHydrationPropsPlans(ctx)).get(name) ?? null;
 }
 
 // An authored @for normally hides its children from speculative warming: its
@@ -12819,6 +13227,7 @@ function compileInternal(
 	// M2 AST emit: the module is assembled as an array of top-level statement
 	// NODES — in exactly the historical statement order — and printed ONCE by
 	// esrap at the end, which also yields the entire module source map.
+	ctx.hydrationPropsModule = ast;
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	for (let node of ast.body) {
@@ -17202,6 +17611,14 @@ function singleRootInitializer(ctx, component) {
 	return markPure(b.call('_$__s', component));
 }
 
+function hydrationComponentInitializer(ctx, component, plan) {
+	return b.call(
+		requireRuntimeForContext(ctx, '__registerHydrationInputComponent'),
+		component,
+		b.id(plan.capture.name),
+	);
+}
+
 function isOctaneMemoCallee(callee, ctx, memoImportNames) {
 	if (callee?.type === 'Identifier') return memoImportNames.has(callee.name);
 	return (
@@ -17518,6 +17935,7 @@ function compileComponent(node, ctx, options) {
 	const pendingWarm = ctx._pendingWarm;
 	ctx._pendingWarm = null;
 	const componentInfo = ctx.componentInfo.get(name);
+	const hydrationPlan = !ctx.hmr ? ctx.exportedHydrationPropsPlans?.get(name) : undefined;
 	const memoCaptures = compilerMemoCaptures(ctx, componentInfo, name, isExported);
 	// Importers admit a cached region only for an export that carries a proof.
 	if (memoCaptures !== null) {
@@ -17628,6 +18046,8 @@ function compileComponent(node, ctx, options) {
 				),
 			);
 		}
+		if (hydrationPlan?.capture)
+			statements.push(guarded(hydrationComponentInitializer(ctx, b.id(name), hydrationPlan)));
 		return { nodes: statements };
 	}
 
@@ -17674,6 +18094,11 @@ function compileComponent(node, ctx, options) {
 		componentInfo.singleRootInitialized = true;
 	}
 	if (memoCaptures) valueExpr = inheritOriginLoc(markPure(memoInitializer(valueExpr)), node);
+	if (hydrationPlan?.capture)
+		valueExpr = inheritOriginLoc(
+			markPure(hydrationComponentInitializer(ctx, valueExpr, hydrationPlan)),
+			node,
+		);
 	const declKind = options && options.hmrMutable ? 'let' : 'const';
 	const declNode = inheritOriginLoc(
 		b.declaration(declKind, [
@@ -30067,13 +30492,10 @@ function planJsx(
 		if (cc.autoMemoDeps !== null) {
 			const liteMemo = cc.autoMemoLite === true && !cc.inheritRange;
 			const componentHelper = liteMemo
-				? '_$componentSlotLite'
+				? 'componentSlotLite'
 				: cc.voidComponent
-					? '_$componentSlotVoid'
-					: '_$componentSlot';
-			ctx.runtimeNeeded.add(
-				liteMemo ? 'componentSlotLite' : cc.voidComponent ? 'componentSlotVoid' : 'componentSlot',
-			);
+					? 'componentSlotVoid'
+					: 'componentSlot';
 			const memoAnchor = liteMemo
 				? slotAnchorNodeFor(cc, 'compAnchor')
 				: anchorNodeFor(cc, 'compAnchor');
@@ -30089,15 +30511,14 @@ function planJsx(
 								: null,
 						cc.inheritRange ? b.literal(true) : null,
 					);
-			let invocation = b.call(
-				componentHelper,
+			let invocation = hydrationComponentInvocation(ctx, cc, componentHelper, [
 				b.id('__s'),
 				b.literal(slotIndex),
 				hostExpr(),
 				cc.compNode,
 				cc.propsExpr,
 				...trailing,
-			);
+			]);
 			if (ctx.presentationHydration?.structural && cc.bindingSite)
 				invocation = b.call(
 					requireRuntimeForContext(ctx, 'presentationStructure'),
@@ -30185,8 +30606,7 @@ function planJsx(
 			});
 			continue;
 		}
-		const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
-		ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
+		const componentHelper = cc.voidComponent ? 'componentSlotVoid' : 'componentSlot';
 		// Anchor selection — see anchorNodeFor (the endMarker case keeps the
 		// slot's markers inside the block's range so for-of reorder / tryBlock
 		// unmount move the slot DOM along with the block; an element host with
@@ -30200,15 +30620,14 @@ function planJsx(
 			cc.keyExpr ?? null,
 			cc.keyExpr != null ? b.literal(true) : null,
 		);
-		let invocation = b.call(
-			componentHelper,
+		let invocation = hydrationComponentInvocation(ctx, cc, componentHelper, [
 			b.id('__s'),
 			b.literal(slotIndex),
 			hostExpr(),
 			cc.compNode,
 			cc.propsExpr,
 			...trailing,
-		);
+		]);
 		if (ctx.presentationHydration?.structural && cc.bindingSite)
 			invocation = b.call(
 				requireRuntimeForContext(ctx, 'presentationStructure'),
@@ -30279,13 +30698,27 @@ function planJsx(
 		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @try).
 		const tryAnchor = anchorNodeFor(tc, 'tryAnchor');
-		const tryEnv = envNodeFor(tc);
+		let tryEnv = envNodeFor(tc);
+		if (tc.hydrationInputCapture)
+			tryEnv = b.call(
+				requireRuntimeForContext(ctx, '__captureHydrationInput'),
+				tryEnv,
+				b.literal(tc.hydrationInputCapture.propsIndex),
+				b.id(tc.hydrationInputCapture.name),
+				...(tc.hydrationInputCapture.source
+					? [b.literal(false), b.id(tc.hydrationInputCapture.source)]
+					: tc.hydrationInputCapture.closed
+						? [b.literal(true)]
+						: []),
+			);
 		const trailing = [];
 		if (tryAnchor || tryEnv || (!catchOnly && tc.propagateSuspense)) {
 			trailing.push(tryAnchor || undefinedNode());
 		}
 		if (tryEnv || (!catchOnly && tc.propagateSuspense)) trailing.push(tryEnv || undefinedNode());
-		if (!catchOnly && tc.propagateSuspense) trailing.push(b.literal(true));
+		if (!catchOnly && (tc.propagateSuspense || tc.hydrationInputsEqual))
+			trailing.push(b.literal(tc.propagateSuspense === true));
+		if (tc.hydrationInputsEqual) trailing.push(b.id(tc.hydrationInputsEqual));
 		const boundaryArgs = [
 			b.id('__s'),
 			b.literal(slotIndex),
@@ -30549,6 +30982,30 @@ function optionalCallArgs(...entries) {
 	let end = entries.length;
 	while (end > 0 && entries[end - 1] == null) end--;
 	return entries.slice(0, end).map((entry) => entry ?? undefinedNode());
+}
+
+// Preserve each selected writer and its first seven arguments. Longer tails
+// (key, single-root and inherited ranges), presentation and lite writers keep
+// their original ABI and use ordinary boundary identity checks.
+function hydrationComponentInvocation(ctx, call, helper, args) {
+	ctx.runtimeNeeded.add(helper);
+	if (
+		!call.hydrationInput ||
+		(helper !== 'componentSlot' && helper !== 'componentSlotVoid') ||
+		args.length > 7 ||
+		call.bindingSite
+	) {
+		return b.call(rtAlias(helper), ...args);
+	}
+	if (typeof call.hydrationInput === 'string') {
+		while (args.length < 7) args.push(undefinedNode());
+		args.push(b.id(call.hydrationInput));
+	}
+	return b.call(
+		requireRuntimeForContext(ctx, '__hydrationComponentSlot'),
+		b.id(rtAlias(helper)),
+		...args,
+	);
 }
 
 // Reference a compiled mount local / host var by NAME. ensureVar hands back
@@ -32695,7 +33152,10 @@ function emitNodeHtml(
 		return registerConstruct(makeForCall(node, ctx, inlinedSubs, parentNs, cssHash), forCalls);
 	}
 	if (node.type === 'TryStatement') {
-		return registerConstruct(makeTryCall(node, ctx, inlinedSubs, parentNs, cssHash), tryCalls);
+		return registerConstruct(
+			makeTryCall(node, ctx, inlinedSubs, parentNs, cssHash, componentName),
+			tryCalls,
+		);
 	}
 	if (node.type === 'SwitchStatement') {
 		return registerConstruct(
@@ -34341,7 +34801,7 @@ function emitElementHtml(
 				appendTemplatePart(html, '<!>', 'anchor');
 				childIdx++;
 			} else if (child.type === 'TryStatement') {
-				const tc = makeTryCall(child, ctx, inlinedSubs, childNs, cssHash);
+				const tc = makeTryCall(child, ctx, inlinedSubs, childNs, cssHash, componentName);
 				tc.hostPath = path;
 				// Emit a `<!>` anchor at the tryBlock's source-order position so
 				// tryBlock inserts BEFORE this anchor — preserving sibling order
@@ -35665,7 +36125,7 @@ function makeCompCall(
 	}
 
 	// The props object as a node; the call-site emit embeds it directly.
-	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
+	let propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
 		// Dynamic tags can still select a host with function actions or a Fragment.
 		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
@@ -35697,6 +36157,8 @@ function makeCompCall(
 			),
 		};
 	}
+	const localHydrationPlan =
+		staticFragmentRenderer === undefined ? exportedHydrationPropsPlan(ctx, compName) : null;
 
 	// Design (c) v0: decide whether the call site can use componentSlotLite
 	// (Scope-only, no Block / no Comment markers / no CompSlot wrapper).
@@ -35956,6 +36418,16 @@ function makeCompCall(
 		!liteEligible ||
 		(ctx.componentInfo?.get(compName)?.anchorlessRootSafe ??
 			isProvenAnchorlessImport(ctx, compName)) === true;
+	const importedHydrationInput =
+		ctx.mode === 'client' &&
+		!ctx.hmr &&
+		ctx._universalRuntimeUnit == null &&
+		hasSpreadProp &&
+		!hasChildrenProp &&
+		propsExpr.type === 'ObjectExpression' &&
+		compNode.type === 'Identifier' &&
+		ctx.importedComponentBindings?.has(compName) &&
+		isImmutableComponentTag(node.openingElement?.name ?? node.id, ctx);
 
 	return {
 		id,
@@ -35963,6 +36435,11 @@ function makeCompCall(
 		compNode,
 		inlineComponent: staticFragmentRenderer ? compName : undefined,
 		propsExpr,
+		hydrationInput: localHydrationPlan?.sites.has(node.openingElement?.name ?? node.id)
+			? hydrationInputPlanName(ctx, localHydrationPlan)
+			: importedHydrationInput
+				? true
+				: null,
 		hostPath: null,
 		keyExpr,
 		bindingSite: node._octaneBindingSite,
@@ -35986,7 +36463,163 @@ function makeCompCall(
 // try/catch → tryBlock call
 // ===========================================================================
 
-function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
+function hydrationPropsFields(ctx, propsName, bodies) {
+	const callbacks = bodies
+		.filter(Boolean)
+		.map(({ stmts, params }) => b.arrow(params, b.block(stmts)));
+	// Dependency inference describes reads. An assignment, update, deletion or
+	// tagged call may observe the receiver itself even when its field is equal.
+	let opaque = false;
+	for (const callback of callbacks) {
+		mapAst(callback, (node) => {
+			if (
+				node.type === 'AssignmentExpression' ||
+				node.type === 'UpdateExpression' ||
+				(node.type === 'UnaryExpression' && node.operator === 'delete') ||
+				node.type === 'TaggedTemplateExpression' ||
+				((node.type === 'ForInStatement' || node.type === 'ForOfStatement') &&
+					node.left.type !== 'VariableDeclaration')
+			)
+				opaque = true;
+			return opaque ? node : null;
+		});
+		if (opaque) return null;
+	}
+	// Bind only the proven props record; dependency inference must account for
+	// all arms and distinguish captures from their own declarations.
+	const analysis = {
+		...ctx.authoredModuleAst,
+		body: [b.stmt(b.arrow([b.id(propsName)], b.array(callbacks)))],
+	};
+	const fields = new Map();
+	for (const dependencies of analyzeCallbackDependencies(analysis, callbacks).values()) {
+		if (dependencies === null) return null;
+		for (const { node, binding, method } of dependencies) {
+			if (binding.name !== propsName) continue;
+			const root = depPathRoot(depPathMember(node));
+			const name = staticDepMemberName(node);
+			if (root?.name !== propsName || name === null) return null;
+			fields.set(name, fields.get(name) === false ? false : !method || method.read === true);
+		}
+	}
+	return fields.size === 0 ? null : fields;
+}
+
+function hoistHydrationInputPlan(ctx, fields, required, origin) {
+	const methods = [...fields].filter(([, read]) => !read).map(([field]) => field);
+	const ordinary = [...required].filter((field) => fields.get(field) !== false);
+	const name = allocCompilerName(ctx, '__hydrationInputPlan');
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(
+			b.const(
+				name,
+				b.array([
+					b.literal(methods.length),
+					...methods.concat(ordinary).map((field) => b.literal(field)),
+				]),
+			),
+			origin,
+		),
+	);
+	return name;
+}
+
+// Private boundary-only components have a closed caller proof. Exported
+// components instead require both actual invocations to carry a capability
+// issued only for compiler-created records at admitted JSX sites.
+function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName) {
+	if (!envNames?.length || ctx.mode !== 'client' || ctx._universalRuntimeUnit != null) return null;
+	const component = ctx.componentInfo?.get(componentName)?.node;
+	if (component?.body?.render?.start !== origin.start) return null;
+	const propsName = component.params?.[0]?.name;
+	const propsIndex = envNames.indexOf(propsName);
+	if (propsIndex < 0) return null;
+	const plan = exportedHydrationPropsPlan(ctx, componentName);
+	const derivedIndex = plan?.derived ? envNames.indexOf(plan.derived.name) : -1;
+	if (plan?.derived && derivedIndex < 0) return null;
+	let fields = plan?.fields;
+	if (fields === undefined) {
+		if (!isHydrationPropsComponent(component, ctx)) return null;
+		const sites = (ctx.hydrationPropsSites ??= privateHydrationPropsSites(ctx)).get(componentName);
+		if (!sites?.length) return null;
+		fields = hydrationPropsFields(ctx, propsName, bodies);
+		if (fields === null) return null;
+		const required = { warmRequiredProps: new Set(fields.keys()) };
+		if (!sites.every((attrs) => warmCallsiteOwnsRequiredProps(required, attrs))) return null;
+	}
+	const methods = [...fields].filter(([, read]) => !read).map(([field]) => field);
+	let capture = null;
+	if (plan || methods.length > 0) {
+		const planName = plan
+			? hydrationInputPlanName(ctx, plan)
+			: hoistHydrationInputPlan(ctx, fields, [], origin);
+		let source = null;
+		if (plan?.source) {
+			source = allocCompilerName(ctx, '__hydrationSource');
+			ctx.hoistedHelpers.push(
+				inheritOriginLoc(
+					b.const(
+						source,
+						b.arrow(
+							[],
+							b.call(requireRuntimeForContext(ctx, '__hydrationSignalRevision'), {
+								...plan.source,
+							}),
+						),
+					),
+					origin,
+				),
+			);
+		}
+		capture = { name: planName, propsIndex, closed: !plan, source };
+		if (plan) plan.capture = capture;
+	}
+	const slot = (parameter, index) => b.member(b.id(parameter), b.literal(index), true);
+	const sameSlot = (index) => hkObjectIs(ctx, slot('previous', index), slot('next', index));
+	const conjunction = (terms) => terms.reduce((left, right) => b.logical('&&', left, right));
+	const ordinary =
+		derivedIndex < 0
+			? sameSlot(propsIndex)
+			: conjunction([sameSlot(propsIndex), sameSlot(derivedIndex)]);
+	const refined = conjunction([
+		...(capture
+			? [
+					b.call(
+						requireRuntimeForContext(ctx, '__ownedHydrationInputs'),
+						b.id('previous'),
+						b.id('next'),
+						...(capture.source ? [b.literal(true)] : []),
+					),
+				]
+			: []),
+		...[...fields].map(([field, read]) =>
+			b.call(
+				requireRuntimeForContext(ctx, '__sameHydrationInput'),
+				slot('previous', propsIndex),
+				slot('next', propsIndex),
+				b.literal(field),
+				...(read ? [] : [b.literal(true)]),
+			),
+		),
+	]);
+	const terms = [b.logical('||', ordinary, refined)];
+	for (let index = 0; index < envNames.length; index++)
+		if (index !== propsIndex && index !== derivedIndex) terms.push(sameSlot(index));
+	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(
+			b.function_declaration(
+				b.id(name),
+				[b.id('previous'), b.id('next')],
+				b.block([b.return(conjunction(terms))]),
+			),
+			origin,
+		),
+	);
+	return { name, capture };
+}
+
+function tryBodies(node, ctx) {
 	// node.block = try BlockStatement, node.handler = CatchClause (param, resetParam, body),
 	// node.pending = optional BlockStatement (TSRX `pending { ... }`)
 	//
@@ -36045,11 +36678,30 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	}
 
 	const catchParams = [b.id('__props', node.handler ?? node)];
-	const envNames = unionEnv(ctx, [
+	const bodies = [
 		{ stmts: tryStmts, params: [] },
 		pendingStmts && { stmts: pendingStmts, params: [] },
 		catchBodyStmts && { stmts: catchBodyStmts, params: catchParams },
-	]);
+	];
+	return bodies;
+}
+
+function makeTryCall(
+	node,
+	ctx,
+	inlinedSubs,
+	parentNs = 'html',
+	cssHash = null,
+	componentName = null,
+) {
+	const bodies = tryBodies(node, ctx);
+	const tryStmts = bodies[0].stmts;
+	const pendingStmts = bodies[1]?.stmts;
+	const catchBodyStmts = bodies[2]?.stmts;
+	const catchParams = bodies[2]?.params;
+	const envNames = unionEnv(ctx, bodies);
+	const hydrationInputsEqual =
+		pendingStmts && hoistHydrationInputsEqual(ctx, bodies, envNames, node, componentName);
 
 	const tryHelperName = hoistBodyHelper(
 		ctx,
@@ -36097,6 +36749,8 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		loc: devLoc(ctx, node),
 		origin: node,
 		envNames,
+		hydrationInputsEqual: hydrationInputsEqual?.name,
+		hydrationInputCapture: hydrationInputsEqual?.capture,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,

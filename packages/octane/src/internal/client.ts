@@ -5,5 +5,12 @@
  */
 export * from '../runtime.js';
 export { isContext } from '../context-identity.js';
+export {
+	__captureHydrationInput,
+	__hydrationComponentSlot,
+	__registerHydrationInputComponent,
+	__ownedHydrationInputs,
+	__sameHydrationInput,
+} from '../hydration-inputs.js';
 export { markSingleRoot as __s } from '../runtime.js';
 export { signalOwnerUse } from '../signals/owner-context.js';

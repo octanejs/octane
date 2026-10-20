@@ -36,6 +36,14 @@ export let hydrating = false;
  */
 export let hydrationStarted = false;
 
+/** Initial Suspense adoptions still awaiting a terminal outcome. */
+export let pendingInitialHydrations = 0;
+
+/** Called only when an initial Suspense adoption enters or leaves its registry. */
+export function changePendingInitialHydrations(delta: 1 | -1): void {
+	pendingInitialHydrations += delta;
+}
+
 /** Hydration entry points only. */
 export function setHydrating(value: boolean): void {
 	hydrating = value;

@@ -748,6 +748,11 @@ function settleThrown(wakeup: Wakeup, thrown: object): void {
 }
 
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
+	/** Recognize a native node without observing an arbitrary imported value. */
+	static hasNativeBrand(value: object): value is ScopedNode {
+		return #nativeSnapshotSource in value;
+	}
+
 	get [SIGNAL_HANDLE](): true {
 		return true;
 	}
@@ -777,7 +782,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	wakeup: Wakeup | undefined;
 	nativeSource: NativeReadSource | undefined;
 	nativeLatestSource: NativeReadSource | undefined;
-	nativeSnapshotSource: NativeReadSource | undefined;
+	#nativeSnapshotSource: NativeReadSource | undefined;
 	/** A resource's retry. Kept in a field so an async node keeps the shared layout. */
 	retryRequest: ((options?: { pending?: boolean }) => void) | undefined = undefined;
 	/**
@@ -823,13 +828,14 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 
 	/** This node's native read channel for `read`, created on first use. */
 	nativeReadSource(read: SignalReadMode): NativeReadSource {
-		const field =
-			read === 'value'
-				? 'nativeSource'
-				: read === 'latest'
-					? 'nativeLatestSource'
-					: 'nativeSnapshotSource';
-		return (this[field] ??= createNativeSource(this, read));
+		if (read === 'value') return (this.nativeSource ??= createNativeSource(this, read));
+		if (read === 'latest') return (this.nativeLatestSource ??= createNativeSource(this, read));
+		return (this.#nativeSnapshotSource ??= createNativeSource(this, read));
+	}
+
+	/** The existing snapshot channel, without creating one during transition cleanup. */
+	get nativeSnapshotSource(): NativeReadSource | undefined {
+		return this.#nativeSnapshotSource;
 	}
 
 	constructor(
@@ -937,6 +943,11 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return attachObserver(this, notify, false, state);
 	}
 }
+
+// Capture these alongside the class, before a caller can replace either public
+// method and later load a separately compiled hydration consumer.
+export const hasScopedNodeBrand = /* @__PURE__ */ (() => ScopedNode.hasNativeBrand)();
+export const originalScopedNodeGet = /* @__PURE__ */ (() => ScopedNode.prototype.get)();
 
 /** Inspect only cached metadata; never refresh a dormant or invalidated node. */
 export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): NativeReadInspection {

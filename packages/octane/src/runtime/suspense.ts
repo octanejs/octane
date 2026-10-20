@@ -4,7 +4,7 @@
 // and revealing content, retries, resuming, and initial Suspense hydration.
 
 import { HYDRATE_STREAM_ERROR_ATTR, reserveHydrationIds } from './hydrate-boundary.js';
-import { hydrationStarted, hydrating } from '../hydration-flag.js';
+import { changePendingInitialHydrations, hydrationStarted, hydrating } from '../hydration-flag.js';
 import {
 	STREAM_BOUNDARY_ATTR,
 	SUSPENSE_RESOLVED_SEED_ATTR,
@@ -724,7 +724,7 @@ export function releaseHiddenText(text: Text, restore = true): void {
 // The visible arm must still unmount before its preserved hidden primary.
 export function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
-	if (hydrationStarted) initialSuspenseHydrations?.delete(state);
+	if (hydrationStarted) retireInitialSuspenseHydration(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	if (state.block !== null) unmountBlock(state.block, detachDom);
@@ -1268,6 +1268,8 @@ export function tryBlock(
 	env?: any[],
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
+	// A compiler proof for comparing captured inputs while initial hydration waits.
+	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean,
 ): () => void {
 	// Slot arguments can queue a parent self-update. Like every other slot, wait
 	// for the replay: mounting now would put this range before earlier siblings
@@ -1316,6 +1318,7 @@ export function tryBlock(
 					end,
 					env,
 					propagateSuspense,
+					hydrationInputsEqual,
 				);
 			} finally {
 				settleFreshSlot(parentScope, end, anchor);
@@ -1361,6 +1364,7 @@ export function tryBlock(
 					anchor,
 					env,
 					propagateSuspense,
+					hydrationInputsEqual,
 				),
 			);
 		} else {
@@ -1411,7 +1415,11 @@ export function tryBlock(
 		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
 		const changed =
 			(retains || initial !== undefined) &&
-			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)));
+			(state.tryBody !== tryBody ||
+				(state.env !== env &&
+					(initial !== undefined && hydrationInputsEqual && state.env && env
+						? !hydrationInputsEqual(state.env, env)
+						: depsChanged(state.env, env))));
 		supersedesInputs = retains && changed;
 		// New inputs, not the retry its wakeable scheduled, reached a boundary
 		// whose hydration is suspended: as React does, it renders on the client.
@@ -1445,7 +1453,7 @@ export function tryBlock(
 		return s.reset;
 	if (initial === undefined && hydration !== null && s.branch === -1 && !s.propagateSuspense) {
 		initial = takeInitialSuspenseHydration(s, hydration) ?? undefined;
-		if (initial !== undefined) (initialSuspenseHydrations ??= new WeakMap()).set(s, initial);
+		if (initial !== undefined) registerInitialSuspenseHydration(s, initial);
 	}
 	if (initial !== undefined) {
 		initialSuspenseHydrationRenderer!(s, initial, updated);
@@ -1577,6 +1585,16 @@ export interface InitialSuspenseHydration {
 // Server metadata gives each resolved arm an independent adoption scope. The
 // map retains only boundaries whose first client attempt has not completed.
 export let initialSuspenseHydrations: WeakMap<TrySlot, InitialSuspenseHydration> | null = null;
+
+function registerInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
+	const records = (initialSuspenseHydrations ??= new WeakMap());
+	if (!records.has(state)) changePendingInitialHydrations(1);
+	records.set(state, initial);
+}
+
+export function retireInitialSuspenseHydration(state: TrySlot): void {
+	if (initialSuspenseHydrations?.delete(state)) changePendingInitialHydrations(-1);
+}
 // Transfer streamed payloads off the document-global stash as soon as hydration
 // claims them. A weak DOM owner survives discarded nested attempts, but cannot
 // retain a removed boundary for the remaining lifetime of the page.
@@ -1752,11 +1770,20 @@ export function waitForStreamedArm(
 		});
 		return null;
 	}
-	initialSuspenseHydrations!.delete(state);
-	const caught = revealed
-		? initial.reader!.streamedArmMarker(open)?.nodeType === 8
-		: sentinel.getAttribute(HYDRATE_STREAM_ERROR_ATTR) === BOUNDARY_CLIENT_CAUGHT;
-	const taken = revealed && !caught ? TRY_OPS!.take(state, initial.reader!) : null;
+	// Extraction may reenter or throw. Hide the old record as before, but keep
+	// its pending lease until extraction either installs a successor or ends.
+	const held = initialSuspenseHydrations!.delete(state);
+	let caught: boolean;
+	let taken: InitialSuspenseHydration | null;
+	try {
+		caught = revealed
+			? initial.reader!.streamedArmMarker(open)?.nodeType === 8
+			: sentinel.getAttribute(HYDRATE_STREAM_ERROR_ATTR) === BOUNDARY_CLIENT_CAUGHT;
+		taken = revealed && !caught ? TRY_OPS!.take(state, initial.reader!) : null;
+		if (taken !== null) registerInitialSuspenseHydration(state, taken);
+	} finally {
+		if (held) changePendingInitialHydrations(-1);
+	}
 	if (taken === null) {
 		claimStreamedIds(state, sentinel.getAttribute(STREAM_BOUNDARY_ATTR)!);
 		markArmDiscard(state);
@@ -1764,7 +1791,6 @@ export function waitForStreamedArm(
 			noteRecoverableHydrationError(() => new Error(formatClientError(347)), state.parentBlock);
 		return null;
 	}
-	initialSuspenseHydrations!.set(state, taken);
 	return taken;
 }
 
@@ -1882,7 +1908,7 @@ export function clientRenderDehydratedTry(
 	state: TrySlot,
 	outer: HydrationCapability | null,
 ): boolean {
-	initialSuspenseHydrations?.delete(state);
+	retireInitialSuspenseHydration(state);
 	// This discards the arm's metadata too. Leave a streamed payload with its
 	// weak marker owner: a discarded enclosing attempt leaves the marker, and
 	// hydrates the arm from it again, and a commit drops both together.
