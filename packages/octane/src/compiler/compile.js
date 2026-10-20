@@ -1633,6 +1633,8 @@ function requireRuntimeForContext(ctx, name) {
 		name === '__delegateEvents' ||
 		name === '__delegateCaptureEvents' ||
 		name === '__sameHydrationInput' ||
+		name === '__sameHydrationOptionalInput' ||
+		name === '__observeHydrationOptionalInput' ||
 		name === '__captureHydrationInput' ||
 		name === '__hydrationSignalRevision' ||
 		name === '__hydrationComponentSlot' ||
@@ -1745,6 +1747,8 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'__registerHydrationInputComponent',
 	'__ownedHydrationInputs',
 	'__sameHydrationInput',
+	'__sameHydrationOptionalInput',
+	'__observeHydrationOptionalInput',
 	'__createVoidRootDefaultOptions',
 	'__createRootDefaultOptions',
 	'__delegateEvents',
@@ -7859,6 +7863,49 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 	return primary === bodies[0] && caught === bodies[2] ? bodies : [primary, bodies[1], caught];
 }
 
+// Only a direct optional call at the first authored operation can place an
+// observation immediately beside the actual read without moving user code.
+function hydrationFirstOptionalReader(body, propsName) {
+	const statement = body.stmts[0];
+	const declaration = statement?.declarations?.[0];
+	const init = declaration?.init;
+	const chain = init?.left;
+	const call = chain?.expression;
+	const member = call?.callee;
+	if (
+		statement?.type !== 'VariableDeclaration' ||
+		statement.kind !== 'const' ||
+		statement.declarations.length !== 1 ||
+		declaration.id.type !== 'Identifier' ||
+		init?.type !== 'LogicalExpression' ||
+		init.operator !== '??' ||
+		chain?.type !== 'ChainExpression' ||
+		call?.type !== 'CallExpression' ||
+		!call.optional ||
+		call.arguments.length !== 0 ||
+		member?.type !== 'MemberExpression' ||
+		member.optional ||
+		member.computed ||
+		member.object?.type !== 'Identifier' ||
+		member.object.name !== propsName ||
+		member.property?.type !== 'Identifier'
+	)
+		return null;
+	return { field: member.property.name, propsName };
+}
+
+function replaceHydrationFirstOptionalReader(body, left) {
+	const statement = body.stmts[0];
+	const declaration = statement.declarations[0];
+	return {
+		...body,
+		stmts: [
+			{ ...statement, declarations: [{ ...declaration, init: { ...declaration.init, left } }] },
+			...body.stmts.slice(1),
+		],
+	};
+}
+
 // An exported component can also receive arbitrary caller-owned props. Its
 // comparator requires provenance from each actual invocation: same-module JSX
 // sites prove own fields statically; imported spreads use a callable capability.
@@ -7947,10 +7994,24 @@ function exportedHydrationPropsPlans(ctx) {
 			derived ? hydrationBlockingBodies(ctx, bodies) : bodies,
 		);
 		if (fields === null) continue;
+		let optional = hydrationFirstOptionalReader(bodies[0], propsName);
+		if (optional !== null) {
+			// An optional first call cannot weaken any other use of the same field.
+			const remaining =
+				fields.get(optional.field) === false && !required.has(optional.field)
+					? hydrationPropsFields(ctx, propsName, [
+							replaceHydrationFirstOptionalReader(bodies[0], b.literal(null)),
+							...bodies.slice(1),
+						])
+					: null;
+			if (remaining === null || remaining.has(optional.field)) optional = null;
+			else fields.delete(optional.field);
+		}
 		if (derived?.field) fields.set(derived.field, false);
 		for (const field of fields.keys()) required.add(field);
 		plans.set(component.id.name, {
 			fields,
+			optional,
 			derived: derived?.source ? null : derived,
 			source: derived?.source,
 			origin: component,
@@ -36701,10 +36762,24 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 				...(read ? [] : [b.literal(true)]),
 			),
 		),
+		...(plan?.optional
+			? [
+					b.call(
+						requireRuntimeForContext(ctx, '__sameHydrationOptionalInput'),
+						b.id('previous'),
+						b.id('next'),
+						slot('next', propsIndex),
+						b.literal(plan.optional.field),
+					),
+				]
+			: []),
 	]);
-	const terms = [b.logical('||', ordinary, refined)];
+	const inputTerm = b.logical('||', ordinary, refined);
+	const terms = plan?.optional ? [] : [inputTerm];
 	for (let index = 0; index < envNames.length; index++)
 		if (index !== propsIndex && index !== derivedIndex) terms.push(sameSlot(index));
+	// Arming the next actual access is the final comparator operation.
+	if (plan?.optional) terms.push(inputTerm);
 	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -36716,7 +36791,7 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 			origin,
 		),
 	);
-	return { name, capture };
+	return { name, capture, optional: plan?.optional };
 }
 
 function tryBodies(node, ctx) {
@@ -36795,13 +36870,26 @@ function makeTryCall(
 	componentName = null,
 ) {
 	const bodies = tryBodies(node, ctx);
-	const tryStmts = bodies[0].stmts;
+	let tryStmts = bodies[0].stmts;
 	const pendingStmts = bodies[1]?.stmts;
 	const catchBodyStmts = bodies[2]?.stmts;
 	const catchParams = bodies[2]?.params;
 	const envNames = unionEnv(ctx, bodies);
 	const hydrationInputsEqual =
 		pendingStmts && hoistHydrationInputsEqual(ctx, bodies, envNames, node, componentName);
+	if (hydrationInputsEqual?.optional) {
+		const { propsName, field } = hydrationInputsEqual.optional;
+		const call = b.call(
+			requireRuntimeForContext(ctx, '__observeHydrationOptionalInput'),
+			b.id('__extra'),
+			b.id(propsName),
+			b.literal(field),
+		);
+		tryStmts = replaceHydrationFirstOptionalReader(
+			bodies[0],
+			b.sequence([call, tryStmts[0].declarations[0].init.left]),
+		).stmts;
+	}
 
 	const tryHelperName = hoistBodyHelper(
 		ctx,

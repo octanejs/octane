@@ -159,6 +159,182 @@ it('witnesses only canonical writable signal sources without observing unknown v
 
 describe.each([false, true])('parent updates during suspended hydration (dev: %s)', (dev) => {
 	it.each([
+		'missing optional reader',
+		'present optional reader',
+		'own undefined',
+		'receiver-aware reader',
+		'changed optional reader',
+		'changed reader',
+	] as const)(
+		'preserves a suspended arm whose first optional reader is absent: %s',
+		async (scenario) => {
+			const gateSource = `export function Gate(props) @{
+  @try {
+    const value = props.optionalReader?.() ?? props.read();
+    <input defaultValue={value} />;
+  } @pending { <span>Loading</span>; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const waiting = gate();
+			const props = {
+				sibling: 'waiting',
+				gate: {
+					read: () => {
+						if (waiting.value.pending) throw waiting.value.promise;
+						return 'server';
+					},
+					...(scenario === 'present optional reader'
+						? { optionalReader: () => undefined }
+						: scenario === 'own undefined'
+							? { optionalReader: undefined }
+							: scenario === 'receiver-aware reader'
+								? {
+										optionalReader: function (this: { read: () => string }) {
+											return this.read();
+										},
+									}
+								: {}),
+				},
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], props).html;
+			const original = container.querySelector('input')!;
+			original.value = 'typed';
+			waiting.value.pending = true;
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			await act(() =>
+				root.render(client['App'], {
+					sibling: 'ready',
+					gate: {
+						...props.gate,
+						...(scenario === 'changed optional reader'
+							? { optionalReader: () => 'replacement' }
+							: {}),
+						...(scenario === 'changed reader' ? { read: () => 'replacement' } : {}),
+					},
+				}),
+			);
+			const retained = !scenario.startsWith('changed ') && scenario !== 'receiver-aware reader';
+			expect(container.querySelector('input') === original).toBe(retained);
+			expect(container.querySelector('output')?.textContent).toBe('ready');
+			await act(() => waiting.resolve());
+			const accepted = container.querySelector('input')!;
+			expect(accepted === original).toBe(retained);
+			expect(accepted.value).toBe(
+				retained ? 'typed' : scenario.startsWith('changed ') ? 'replacement' : 'server',
+			);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
+	it('falls back before invoking an optional reader changed after comparison', async () => {
+		const gateSource = `import { use } from 'octane';
+export function Gate(props) @{
+  @try {
+    const value = props.octaneOptionalTestReader?.() ?? props.read();
+    const suffix = use(props.seed);
+    <input defaultValue={value + suffix} />;
+  } @pending { <span>Loading</span>; } @catch (error) { <p>{error.message as string}</p>; }
+}`;
+		const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} /></section>; }`;
+		const load = (mode: 'client' | 'server') => {
+			const options = { mode, compileOptions: { dev, hmr: false } };
+			const gateModule = loadCompiledFixtureSource(gateSource, {
+				...options,
+				id: '/src/gate.tsrx',
+			});
+			return loadCompiledFixtureSource(appSource, {
+				...options,
+				id: '/src/app.tsrx',
+				runtimeModules: { './gate': gateModule },
+			});
+		};
+		const server = load('server');
+		const client = load('client');
+		const waiting = gate();
+		const read = () => {
+			if (waiting.value.pending) throw waiting.value.promise;
+			return 'server';
+		};
+		const props = { sibling: 'waiting', gate: { read, seed: fulfilled('optional-seed') } };
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['App'], props).html;
+		const original = container.querySelector('input')!;
+		waiting.value.pending = true;
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		let installed = false;
+		let getterReads = 0;
+		const receivers: unknown[] = [];
+		const parse = JSON.parse;
+		const spy = vi.spyOn(JSON, 'parse').mockImplementation((text, reviver) => {
+			const result = parse(text, reviver);
+			if (!installed && text.includes('optional-seed')) {
+				installed = true;
+				Object.defineProperty(Object.prototype, 'then', {
+					configurable: true,
+					value: () => {
+						throw new Error('adoption control became a wakeable');
+					},
+				});
+				Object.defineProperty(Object.prototype, 'octaneOptionalTestReader', {
+					configurable: true,
+					get() {
+						getterReads++;
+						Reflect.deleteProperty(Object.prototype, 'then');
+						return function (this: unknown) {
+							receivers.push(this);
+							throw new Error('application failure');
+						};
+					},
+				});
+			}
+			return result;
+		});
+		try {
+			await act(() => root.render(client['App'], { sibling: 'ready', gate: props.gate }));
+			expect(installed).toBe(true);
+			expect(container.querySelector('input')).not.toBe(original);
+			expect(container.querySelector('p')?.textContent).toBe('application failure');
+			expect(getterReads).toBe(1);
+			expect(receivers).toHaveLength(1);
+			expect(receivers[0]).toMatchObject({ read });
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			spy.mockRestore();
+			Reflect.deleteProperty(Object.prototype, 'then');
+			Reflect.deleteProperty(Object.prototype, 'octaneOptionalTestReader');
+		}
+	});
+
+	it.each([
 		['required', 'unrelated'],
 		['optional', 'unrelated'],
 		['alias', 'unrelated'],

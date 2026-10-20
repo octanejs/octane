@@ -49,6 +49,7 @@ import {
 	handleResumeError,
 } from './suspense.js';
 import { hydrating } from '../hydration-flag.js';
+import { INITIAL_ADOPTION_INPUT_CHANGED } from '../hydration-input-control.js';
 import { renderSlice, type RenderSlice } from '../render-slice.js';
 import { EPOCH_CELL } from '../context-epoch.js';
 import { STREAM_BOUNDARY_ATTR } from '../constants.js';
@@ -112,6 +113,7 @@ import {
 	signalRetryBoundary,
 	retainSignalRetryScope,
 	clearSignalRetryOwners,
+	supersedeSignalRetryOwners,
 	type SignalRetryVisit,
 	takeSignalRetryVisit,
 	pruneSignalRetryVisit,
@@ -1924,7 +1926,8 @@ export function renderInitialSuspenseHydration(
 				if (!created.disposed && blockIsAncestorOf(block, created))
 					retainSignalRetryScope(created, block, state);
 			RETAINED_SIGNAL_OWNERS = state.retrySignalOwners;
-		} else if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
+		} else if (failure === INITIAL_ADOPTION_INPUT_CHANGED) supersedeSignalRetryOwners(state);
+		else if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 		try {
 			withRefDetachSuppression(refs, () => unmountBlock(block, false));
 		} finally {
@@ -1941,7 +1944,12 @@ export function renderInitialSuspenseHydration(
 		// The arm's client render reads client data, and a retry seeds afresh.
 		// Seeds an attempt that a catch arm replaces settled stay with the
 		// enclosing hydration, whose own fallback discards them.
-		if (failure instanceof HydrationMismatch || suspended !== null) discardSeeds(hydration);
+		if (
+			failure instanceof HydrationMismatch ||
+			failure === INITIAL_ADOPTION_INPUT_CHANGED ||
+			suspended !== null
+		)
+			discardSeeds(hydration);
 		else if (failed) passSeeds(hydration, previousHydration);
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
@@ -1972,6 +1980,14 @@ export function renderInitialSuspenseHydration(
 				return;
 			TRY_OPS!.inBoundary(state, retryInitialSuspenseHydration, initial);
 		});
+		return;
+	}
+	if (failure === INITIAL_ADOPTION_INPUT_CHANGED) {
+		// The comparator accepted before the arm could observe this input. A
+		// reentrant change invalidated it at the actual read, so use the same
+		// silent client fallback as inputs changed before the attempt began.
+		markArmDiscard(state);
+		clientRenderDehydratedTry(state, previousHydration);
 		return;
 	}
 	retireInitialSuspenseHydration(state);
