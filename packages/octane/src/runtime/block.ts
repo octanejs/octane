@@ -1162,9 +1162,9 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 export function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
 	const transaction = ROOT_RENDER_TRANSACTION;
-	// An incomplete scope can predate this attempt. Its new slots must still be
-	// removed on rollback; only a scope whose owning block was created in this
-	// attempt goes away with them. A lite scope uses its owner's creation stamp.
+	// Every new slot under a preexisting owner must be removed on rollback,
+	// including slots in incomplete or newly created child scopes. Only an owner
+	// created in this attempt goes away with them. Lite scopes use their owner's stamp.
 	if (transaction !== null && !isCreatedInRootRender(transaction, owningBlock(scope.block))) {
 		journalUndo(() => {
 			unmountSlot(slot, true);
