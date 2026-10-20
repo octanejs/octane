@@ -1,5 +1,97 @@
 # @octanejs/tanstack-router
 
+## 0.3.0
+
+### Minor Changes
+
+- a3a2b9b: Add a Strong preconfigured provider for compiled routes and use it in compiled Start. Navigation acknowledgement now belongs to the mounted router and resolves only after the offered match tree commits. The existing provider continues to accept synchronous router option props.
+- 600442e: Expose a headless router entry for applications that manage their own rendering, and preserve existing browser-entry state when initializing router history.
+
+### Patch Changes
+
+- ed6845c: Pass resolved `createLink` children as a `children` prop so custom components can use their fallback label when children are omitted.
+- 2c635ad: Move compiled Router failure presentation into the Strong match tree and preserve synchronous error reporting through the owning catch arm.
+- f665de9: Move compiled pending-route presentation and transition suspension into the Strong match tree.
+- f79cfa9: Allow async actions to await router navigation or invalidation without deadlocking the pending render acknowledgement.
+- 1924a92: Commit Router Link's transition cue through Octane's scheduled interaction work before navigation callbacks, while leaving unrelated deferred transition work scheduled.
+- 3203b52: Initialize link hooks before creating Link and separate link API module names so
+  browser bundlers resolve native and custom links correctly on case-insensitive
+  filesystems.
+- 3203b52: Make published runtime and router source compile with exact optional properties,
+  index-signature property checks, and explicit overrides, without requiring Node
+  ambient types for browser-only router components.
+
+  Keep fragment listener snapshots on one internal object shape while preserving
+  undefined native option defaults at the DOM boundary.
+- 91dae8d: Compile the Router match projection and default error UI in Strong mode while preserving compatibility-owned navigation and error lifecycles.
+- 9c79968: Move compiled Router scroll-restoration script ownership into the Strong match tree.
+- 9bceb81: Support Router-owned executable templates through an internal compiler capability, preserving ordinary template inertness and adopting server scripts without replaying them during hydration.
+
+  Keep permanent static hydration ranges independent of the deferred activation implementation in client bundles.
+
+  Render Router-managed scripts with Strong keyed templates while preserving inline/external execution on navigation, managed keys, CSP nonces and self-removing Start transport. Preserve server-only scroll-restoration content in a static hydration range and remove it after hydration.
+- Updated dependencies [069aa15]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [59e83ac]
+- Updated dependencies [6ad2083]
+- Updated dependencies [2c635ad]
+- Updated dependencies [6d1f75e]
+- Updated dependencies [bfccf26]
+- Updated dependencies [b8b772a]
+- Updated dependencies [175b85d]
+- Updated dependencies [d57645f]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [da83e7a]
+- Updated dependencies [12e2417]
+- Updated dependencies [175b85d]
+- Updated dependencies [996a44e]
+- Updated dependencies [3c8272e]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [d91942b]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [ab18fa6]
+- Updated dependencies [1924a92]
+- Updated dependencies [217ce34]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [4a33765]
+- Updated dependencies [bb2f650]
+- Updated dependencies [1842a3a]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [3203b52]
+- Updated dependencies [5dc82f5]
+- Updated dependencies [ed24d6b]
+- Updated dependencies [9bceb81]
+- Updated dependencies [175b85d]
+- Updated dependencies [e62eee2]
+- Updated dependencies [c144725]
+  - octane@0.14.0
+
 ## 0.2.10
 
 ### Patch Changes

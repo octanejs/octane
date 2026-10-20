@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.3.6
+
+### Patch Changes
+
+- 5e63f5e: Expose the defect-resolution skill to agents working in the Octane repository.
+
 ## 0.3.5
 
 ### Patch Changes

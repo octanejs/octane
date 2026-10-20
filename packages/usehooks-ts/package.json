@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/usehooks-ts",
-  "version": "0.0.46",
+  "version": "0.0.47",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -42,7 +42,7 @@
     "lodash.debounce": "4.0.8"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.13.0"
+    "octane": "workspace:^0.14.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
