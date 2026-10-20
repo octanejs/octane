@@ -1388,7 +1388,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				inheritHookMemoOrigin(b.const(b.id(declaration.id.name), declaration.init), declaration),
 			),
 	);
-	return {
+	const plan = {
 		fn,
 		render,
 		nodes,
@@ -1406,6 +1406,8 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		hostHandoff,
 		unboundAttributes,
 	};
+	if (native === null) plan.allSetupProjected = read.size === aliases.size;
+	return plan;
 }
 
 function literalData(value) {
@@ -2814,7 +2816,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			!['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
 		)
 			return;
-		if (!statements(node).some(isDirective)) return;
+		const setup = statements(node);
+		if (!setup.some(isDirective)) return;
 		if (
 			node.type !== 'FunctionDeclaration' ||
 			parent?.type !== 'ExportNamedDeclaration' ||
@@ -2834,7 +2837,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		const structural =
 			node.params[0]?.type === 'ObjectPattern' ||
 			needsBindingProgram(render, isUnbound) ||
-			statements(node).some(
+			setup.some(
 				(statement) =>
 					isMountEffectShape(statement) ||
 					(statement.type === 'VariableDeclaration' &&
@@ -2842,7 +2845,25 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			) ||
 			// Only a program subscribes to the imported signals its projections read.
 			readsImportedSignal(node);
-		if (structural || (helpers.mount && selectedExport === node.id.name)) {
+		const scalar =
+			!structural && setup.some((statement) => statement.type === 'VariableDeclaration')
+				? planView(node, filename, source, imports, lexical)
+				: null;
+		// A scalar host can hand off its presentation channels independently of
+		// opaque children. A complete fixed view instead needs the program's
+		// whole-view hydration proof. Keep externally owned channels on the scalar
+		// path so omitted setup is neither validated nor evaluated.
+		const fixedSetup =
+			scalar &&
+			node.body.type === 'JSXCodeBlock' &&
+			!scalar.hostHandoff &&
+			scalar.unbound.size === 0 &&
+			scalar.allSetupProjected &&
+			!scalar.addressed &&
+			scalar.nodes.every(([, , , children]) => children !== null) &&
+			scalar.bindings.length > 0 &&
+			scalar.bindings.every(([, kind]) => kind !== 'text' && kind !== 'control');
+		if (structural || fixedSetup || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,
 				render,
@@ -2850,11 +2871,12 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				false,
 				selectedExport === node.id.name ? helpers.fixedProps : null,
 			);
-			if (!structural) plan.scalar = planView(node, filename, source, imports, lexical);
+			if (!structural && !fixedSetup)
+				plan.scalar = scalar ?? planView(node, filename, source, imports, lexical);
 			plans.set(node.id.name, plan);
 			return false;
 		}
-		const plan = planView(node, filename, source, imports, lexical);
+		const plan = scalar ?? planView(node, filename, source, imports, lexical);
 		plans.set(node.id.name, plan);
 		const rewritten = new Map([...plan.unbound, ...plan.classAttributes]);
 		// Rewrite from leaves to root so parent replacements retain every child

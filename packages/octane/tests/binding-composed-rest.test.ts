@@ -90,6 +90,90 @@ for (const dev of [false, true]) {
 	describe(`composed binding views (${dev ? 'dev' : 'prod'})`, () => {
 		const options = { dev, hmr: false, strong: !dev };
 
+		it('hands a complete fixed view with a pure setup local to hydration', async () => {
+			const load = moduleGraph(
+				{
+					'/src/action.tsrx': `export function Action(props) @{ 'use dom bindings';
+ const disabled = props.disabled === true;
+ <button disabled={disabled}>Act</button>;
+}`,
+					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { Action } from './action.tsrx';
+export function adopt(root, state) { return adoptBindings(root, Action, state); }`,
+				},
+				options,
+			);
+			const state = source({ disabled: false });
+			document.body.innerHTML = renderToString(
+				load('./action.tsrx', 'server')['Action'] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				state.publish({ disabled: true });
+				expect(button.disabled).toBe(true);
+				const Action = load('./action.tsrx', 'client')['Action'] as never;
+				root = hydrateRoot(document.body, Action, state.getSnapshot(), {
+					bindingLeases: [binding],
+				});
+				await act(() => {});
+				expect(document.querySelector('button')).toBe(button);
+				expect(state.subscriptions.size).toBe(0);
+				await act(() => root!.render(Action, { disabled: false }));
+				expect(button.disabled).toBe(false);
+			} finally {
+				root?.unmount();
+				binding.dispose();
+			}
+		});
+
+		it.each([
+			['an unbound attribute', 'title={unbound(external)}', 'Server'],
+			['an unused local', '', ''],
+		])(
+			'does not evaluate setup omitted from the binding projection (%s)',
+			(_, attribute, title) => {
+				const load = moduleGraph(
+					{
+						'/src/action.tsrx': `import { unbound } from 'octane/behavior';
+export function Action(props) @{ 'use dom bindings';
+ const disabled = props.disabled === true;
+ const external = props.readOnly();
+ <button disabled={disabled} ${attribute}>Act</button>;
+}`,
+						'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { Action } from './action.tsrx';
+export function adopt(root, state) { return adoptBindings(root, Action, state); }`,
+					},
+					options,
+				);
+				document.body.innerHTML = renderToString(
+					load('./action.tsrx', 'server')['Action'] as never,
+					{
+						disabled: false,
+						readOnly: () => 'Server',
+					},
+				).html;
+				const readOnly = vi.fn(() => {
+					throw new Error('adoption evaluated an unbound setup local');
+				});
+				const button = document.querySelector('button')!;
+				const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(
+					button,
+					source({ disabled: true, readOnly }),
+				);
+				try {
+					expect(button.disabled).toBe(true);
+					expect(button.title).toBe(title);
+					expect(readOnly).not.toHaveBeenCalled();
+				} finally {
+					binding.dispose();
+				}
+			},
+		);
+
 		it('forwards a closed parameter rest to a child with later props taking precedence', () => {
 			const load = moduleGraph(
 				{
