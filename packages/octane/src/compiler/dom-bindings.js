@@ -2820,7 +2820,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			!['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
 		)
 			return;
-		if (!statements(node).some(isDirective)) return;
+		const setup = statements(node);
+		if (!setup.some(isDirective)) return;
 		if (
 			node.type !== 'FunctionDeclaration' ||
 			parent?.type !== 'ExportNamedDeclaration' ||
@@ -2840,7 +2841,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		const structural =
 			node.params[0]?.type === 'ObjectPattern' ||
 			needsBindingProgram(render, isUnbound) ||
-			statements(node).some(
+			setup.some(
 				(statement) =>
 					isMountEffectShape(statement) ||
 					(statement.type === 'VariableDeclaration' &&
@@ -2851,7 +2852,24 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		const scalar = structural ? null : planView(node, filename, source, imports, lexical);
 		const textareaHandoff =
 			scalar !== null && scalar.allSetupProjected && canHandoffTextareaView(scalar);
-		if (structural || textareaHandoff || (helpers.mount && selectedExport === node.id.name)) {
+		// A scalar host can hand off its presentation channels independently of
+		// opaque children. A complete fixed view instead needs the program's
+		// whole-view hydration proof. Keep externally owned channels on the scalar
+		// path so omitted setup is neither validated nor evaluated.
+		const fixedSetup =
+			scalar !== null &&
+			setup.some((statement) => statement.type === 'VariableDeclaration') &&
+			node.body.type === 'JSXCodeBlock' &&
+			!scalar.hostHandoff &&
+			scalar.unbound.size === 0 &&
+			scalar.allSetupProjected &&
+			!scalar.addressed &&
+			scalar.nodes.every(([, , , children]) => children !== null) &&
+			scalar.bindings.length > 0 &&
+			// The program's handoff proof cannot transfer native control ownership.
+			scalar.bindings.every(([, kind]) => kind !== 'control');
+		const handoff = textareaHandoff || fixedSetup;
+		if (structural || handoff || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,
 				render,
@@ -2859,7 +2877,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				false,
 				selectedExport === node.id.name ? helpers.fixedProps : null,
 			);
-			if (!structural && !textareaHandoff) plan.scalar = scalar;
+			if (!structural && !handoff) plan.scalar = scalar;
 			plans.set(node.id.name, plan);
 			return false;
 		}
