@@ -579,3 +579,24 @@ it('keeps keyed Fragment identities and nested captures stable across server asy
 		controller.abort();
 	}
 });
+
+it('preserves setup locals across a keyed Fragment during server rendering', () => {
+	const compiled = loadCompiledFixtureSource(
+		`
+		'use strong';
+		import { Fragment, useState } from 'octane';
+		export function View({ value }) @{
+			@{
+				const label = value;
+				<Fragment key={label}>
+					@{ const [text] = useState(() => label); <span>{text}</span> }
+				</Fragment>
+			}
+		}
+	`,
+		{ id: '/keyed-setup-capture.tsrx', mode: 'server', compileOptions: { dev: false, hmr: false } },
+	);
+	container = document.createElement('div');
+	container.innerHTML = Server.renderToString(compiled['View'], { value: 'hello' }).html;
+	expect(container.querySelector('span')?.textContent).toBe('hello');
+});
