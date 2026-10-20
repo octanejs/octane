@@ -704,15 +704,22 @@ function rootRange(root: Element | BindingRange, id: string): BindingRange {
 		let start: Node = root as Element;
 		let end: Node = start;
 		let match: BindingRange | undefined;
-		// A composite may return only another view. Cross its adjacent wrappers,
-		// never siblings, DOM parents, or conditional/slot/list ownership boundaries.
+		// A composite may return only another view, or an `@if` whose selected arm
+		// is only that view. Cross those adjacent wrappers, never siblings, DOM
+		// parents, or slot/list ownership boundaries.
 		while (start.previousSibling?.nodeType === 8) {
 			const open = start.previousSibling as Comment;
 			const marker = parseBindingMarker(open.data);
-			if (marker?.kind !== 'root' && marker?.kind !== 'view') break;
+			// The renderer's plain arm wrapper sits directly inside its `@if` region.
+			const arm =
+				open.data === '[' &&
+				open.previousSibling?.nodeType === 8 &&
+				parseBindingMarker((open.previousSibling as Comment).data)?.kind === 'if';
+			if (!arm && marker?.kind !== 'root' && marker?.kind !== 'view' && marker?.kind !== 'if')
+				break;
 			const close = rendererRangeClose(open);
 			if (close === null || close.previousSibling !== end) break;
-			if (marker.kind === 'root' && marker.id === id) {
+			if (marker?.kind === 'root' && marker.id === id) {
 				if (match !== undefined) mismatch();
 				match = { start: open, end: close };
 			}

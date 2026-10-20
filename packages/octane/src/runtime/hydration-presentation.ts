@@ -844,7 +844,17 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 /** @internal Only authored host spreads retain generic host preparation. */
 export function presentationHostWrite<T>(writer: (...args: any[]) => T, ...args: any[]): T {
 	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
-	if (frame === null) return writer(...args);
+	if (frame === null) {
+		// A mount builds a detached host. An update rebinds the same committed
+		// binding, so it commits like every other presentation writer (#2043).
+		const transaction =
+			args[1] === undefined || ROOT_RENDER_TRANSACTION === null
+				? null
+				: pendingWrites(CURRENT_BLOCK);
+		if (transaction === null) return writer(...args);
+		transaction.ops.push(commitRenderWrite, [writer, args, CURRENT_BLOCK]);
+		return args[1] as T;
+	}
 	const [scope, previous, element, sources, site, hasNestedChildren, readStyle, proofs] = args as [
 		Scope,
 		unknown,

@@ -876,11 +876,39 @@ export function planBindingProgram(fn, render, context) {
 				);
 				values.push(native.values[i]);
 			}
+			const attributeKind = (name) =>
+				name === 'class'
+					? 'class'
+					: shouldSanitizeURLAttribute(tag, name)
+						? 'url'
+						: name.startsWith('aria-') ||
+							  name.startsWith('data-') ||
+							  isEnumeratedBooleanAttr(name.toLowerCase())
+							? 'aria'
+							: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
+								? 'boolean'
+								: 'attr';
 			const attributes = createTemplateIr();
 			for (const attr of node.attributes ?? []) {
 				if (attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound) continue;
 				if (rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? '')) continue;
 				if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+					const known = attr._octaneKnownAttributeSpread;
+					// A verified provider names its exact fields, so a fresh node applies
+					// each one. Adoption never evaluates these unbound values.
+					if (known && known.style !== 'object') {
+						const provided = native.unbound.get(unwrap(attr.argument));
+						for (const raw of known.fields) {
+							const name = raw === 'className' ? 'class' : raw;
+							initialize(
+								index,
+								name === 'style' ? 'styleAttribute' : attributeKind(name),
+								name,
+								b.member(provided, b.literal(raw), true, known.nonNull !== true),
+							);
+						}
+						continue;
+					}
 					constructionError ??=
 						'This view contains an external attribute spread without a native construction adapter.';
 					continue;
@@ -951,23 +979,11 @@ export function planBindingProgram(fn, render, context) {
 					external ||
 					(name === 'class' && !native.bindings.some((binding) => binding[1] === 'class'))
 				) {
-					const kind =
-						name === 'class'
-							? 'class'
-							: shouldSanitizeURLAttribute(tag, name)
-								? 'url'
-								: name.startsWith('aria-') ||
-									  name.startsWith('data-') ||
-									  isEnumeratedBooleanAttr(name.toLowerCase())
-									? 'aria'
-									: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
-										? 'boolean'
-										: 'attr';
 					// HTML names are case-insensitive. The runtime matches canonical
 					// names, such as React's numeric `rowSpan`, in lowercase.
 					initialize(
 						index,
-						kind,
+						attributeKind(name),
 						selfNs === 0 ? name.toLowerCase() : name,
 						mapCow(value, native.unbound),
 					);
