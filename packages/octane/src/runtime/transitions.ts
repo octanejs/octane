@@ -453,14 +453,17 @@ export const STAGED_REVEALS = new Set<TrySlot>();
 
 /**
  * A group of held boundaries that is fully staged, or null, skipping the groups
- * of boundaries in `seen` and adding the result's members to it. A group joins
- * held boundaries that share a batch, transitively. A held boundary with no batch
- * hold (its transition folded no hook work) joins every group, the barrier before
+ * already `flushed` and adding the result's members to it. A group joins held
+ * boundaries that share a batch, transitively. A held boundary with no batch hold
+ * (its transition folded no hook work) joins every group, the barrier before
  * parallel transitions. Runs when a boundary stages, on a handful of boundaries.
  */
-export function stagedRevealGroup(seen: Set<TrySlot>): TrySlot[] | null {
+export function stagedRevealGroup(flushed: Set<TrySlot>): TrySlot[] | null {
+	// A group still waiting is scanned again on the next call: flushing another
+	// group can make it ready.
+	const seen = new Set<TrySlot>();
 	for (const start of STAGED_REVEALS) {
-		if (seen.has(start)) continue;
+		if (seen.has(start) || flushed.has(start)) continue;
 		const group = [start];
 		const batches = new Set<TransitionActionBatch>();
 		let unbounded = false;
@@ -479,7 +482,10 @@ export function stagedRevealGroup(seen: Set<TrySlot>): TrySlot[] | null {
 			}
 		}
 		for (const member of group) seen.add(member);
-		if (group.every((member) => STAGED_REVEALS.has(member))) return group;
+		if (group.every((member) => STAGED_REVEALS.has(member))) {
+			for (const member of group) flushed.add(member);
+			return group;
+		}
 	}
 	return null;
 }

@@ -2892,9 +2892,9 @@ export function flushStagedRevealsIfReady(): void {
 	// Each group commits on its own: a retry renders only its own batches, so a
 	// group flushed with it would lose its staged reveal. A group whose reveal a
 	// view transition defers stays staged until it runs, so each flushes once here.
-	const seen = new Set<TrySlot>();
+	const flushed = new Set<TrySlot>();
 	let group: TrySlot[] | null;
-	while (!flushingStagedReveals && (group = stagedRevealGroup(seen)) !== null)
+	while (!flushingStagedReveals && (group = stagedRevealGroup(flushed)) !== null)
 		flushStagedReveals(group);
 }
 
@@ -2928,6 +2928,7 @@ function flushStagedReveals(group: TrySlot[]): void {
 			// A deferred run commits only the members still staged: another flush may
 			// have revealed them first.
 			const batch = group.filter((state) => STAGED_REVEALS.has(state));
+			if (batch.length === 0) return;
 			for (const state of batch) STAGED_REVEALS.delete(state);
 			// Only fallback-hidden members have completed rollback-safe render
 			// captures. A pre-timeout visible hold remains within Octane's documented
