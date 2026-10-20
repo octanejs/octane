@@ -120,6 +120,21 @@ export function __ownedHydrationInputs(previous: object, next: object, source = 
 	return left != null && right != null && left[0] === right[0] && left[1] === right[1];
 }
 
+/** @internal Validate an authenticated source when a self-update reuses the props record. */
+export function __sameHydrationSource(
+	previous: object,
+	source: () => HydrationSourceWitness | undefined,
+): boolean {
+	const left = hydrationInputTuples?.get(previous);
+	if (left == null) return false;
+	try {
+		const right = source();
+		return right !== undefined && left[0] === right[0] && left[1] === right[1];
+	} catch {
+		return false;
+	}
+}
+
 /** @internal Compare fields only on records proven to be compiler-created. */
 export function __sameHydrationInput(
 	previous: object,

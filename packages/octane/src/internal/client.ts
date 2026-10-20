@@ -11,6 +11,7 @@ export {
 	__registerHydrationInputComponent,
 	__ownedHydrationInputs,
 	__sameHydrationInput,
+	__sameHydrationSource,
 	__sameHydrationOptionalInput,
 	__observeHydrationOptionalInput,
 } from '../hydration-inputs.js';

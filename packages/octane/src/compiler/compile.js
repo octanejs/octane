@@ -1633,6 +1633,7 @@ function requireRuntimeForContext(ctx, name) {
 		name === '__delegateEvents' ||
 		name === '__delegateCaptureEvents' ||
 		name === '__sameHydrationInput' ||
+		name === '__sameHydrationSource' ||
 		name === '__sameHydrationOptionalInput' ||
 		name === '__observeHydrationOptionalInput' ||
 		name === '__captureHydrationInput' ||
@@ -1747,6 +1748,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'__registerHydrationInputComponent',
 	'__ownedHydrationInputs',
 	'__sameHydrationInput',
+	'__sameHydrationSource',
 	'__sameHydrationOptionalInput',
 	'__observeHydrationOptionalInput',
 	'__createVoidRootDefaultOptions',
@@ -30880,6 +30882,7 @@ function planJsx(
 		if (!catchOnly && (tc.propagateSuspense || tc.hydrationInputsEqual))
 			trailing.push(b.literal(tc.propagateSuspense === true));
 		if (tc.hydrationInputsEqual) trailing.push(b.id(tc.hydrationInputsEqual));
+		if (tc.preserveHydrationCapture) trailing.push(b.literal(tc.preserveHydrationCapture));
 		const boundaryArgs = [
 			b.id('__s'),
 			b.literal(slotIndex),
@@ -36763,8 +36766,18 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 			),
 		),
 	]);
-	const inputTerm = b.logical('||', ordinary, refined);
-	const terms = plan?.optional ? [] : [inputTerm];
+	const inputTerm = capture?.source
+		? b.conditional(
+				ordinary,
+				b.call(
+					requireRuntimeForContext(ctx, '__sameHydrationSource'),
+					b.id('previous'),
+					b.id(capture.source),
+				),
+				refined,
+			)
+		: b.logical('||', ordinary, refined);
+	const terms = plan?.optional || capture?.source ? [] : [inputTerm];
 	for (let index = 0; index < envNames.length; index++)
 		if (index !== propsIndex && index !== derivedIndex) terms.push(sameSlot(index));
 	// Arming the next actual access is the final comparator operation, including
@@ -36780,6 +36793,7 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 				b.literal(plan.optional.field),
 			),
 		);
+	else if (capture?.source) terms.push(inputTerm);
 	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -36932,6 +36946,12 @@ function makeTryCall(
 			node.handlerKeyword ?? null,
 		);
 	}
+	// Match tryBlock's private capture modes; decline overlapping proofs.
+	let preserveHydrationCapture = 0;
+	if (hydrationInputsEqual?.optional && !hydrationInputsEqual.capture?.source)
+		preserveHydrationCapture = 1;
+	else if (!hydrationInputsEqual?.optional && hydrationInputsEqual?.capture?.source)
+		preserveHydrationCapture = 2;
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
@@ -36939,6 +36959,7 @@ function makeTryCall(
 		envNames,
 		hydrationInputsEqual: hydrationInputsEqual?.name,
 		hydrationInputCapture: hydrationInputsEqual?.capture,
+		preserveHydrationCapture,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,

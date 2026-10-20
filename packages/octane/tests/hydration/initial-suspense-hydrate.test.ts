@@ -249,18 +249,22 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 		},
 	);
 
-	it.each(['unchanged', 'changed'] as const)(
-		'handles %s captures before the streamed arm’s first optional read',
+	it.each(['unchanged', 'changed', 'unchanged source', 'changed source'] as const)(
+		'handles %s captures before a streamed arm’s first read',
 		async (captures) => {
+			const sourceBacked = captures.endsWith(' source');
 			const scope = Signals.createScope({
-				scopeKey: `streamed-optional-reader-${dev}-${captures}`,
+				scopeKey: `streamed-reader-${dev}-${captures}`,
 			});
 			const tick$ = scope.signal$('tick', 0);
-			const gateSource = `import { tick$ } from './tick';
+			const selection$ = scope.signal$('selection', 'server');
+			const gateSource = `${sourceBacked ? "import { derived$ } from 'octane/signals';" : ''}
+import { tick$, selection$ } from './selection';
 export function Gate(props) @{
   const tick = tick$.get(); void tick;
+  ${sourceBacked ? 'const selected$ = derived$(() => selection$.get());' : ''}
   @try {
-    const value = props.optionalReader?.() ?? props.read();
+    const value = ${sourceBacked ? 'props.read(selected$.get())' : 'props.optionalReader?.() ?? props.read()'};
     <input data-stage="ready" defaultValue={value${captures === 'changed' ? ' + tick' : ''}} />;
   } @pending { <input data-stage="pending" defaultValue="Waiting" />; }
 }`;
@@ -271,7 +275,11 @@ export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
 				const gateModule = loadCompiledFixtureSource(gateSource, {
 					...options,
 					id: '/src/gate.tsrx',
-					runtimeModules: { './tick': { tick$ } },
+					runtimeModules: {
+						'./selection': { tick$, selection$ },
+						'octane/signals': Signals,
+						'octane/internal/hydration-signal': { __hydrationSignalRevision },
+					},
 				});
 				return loadCompiledFixtureSource(appSource, {
 					...options,
@@ -286,10 +294,10 @@ export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
 			const clientWait = gate();
 			clientWait.value.pending = true;
 			let clientReads = 0;
-			const clientRead = () => {
+			const clientRead = (selected = 'server') => {
 				clientReads++;
 				if (clientWait.value.pending) throw clientWait.value.promise;
-				return 'server';
+				return selected;
 			};
 			const collector = createPipeableCollector();
 			let shellReady!: () => void;
@@ -331,8 +339,11 @@ export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
 				{ onRecoverableError },
 			);
 			expect(clientReads).toBe(0);
-			await act(() => tick$.set(1));
-			if (captures === 'changed') {
+			await act(() => {
+				if (captures === 'changed source') selection$.set('replacement');
+				tick$.set(1);
+			});
+			if (captures.startsWith('changed')) {
 				expect(container.querySelector('[data-stage="pending"]')).not.toBe(pending);
 				expect(clientReads).toBeGreaterThan(0);
 			} else {
@@ -347,10 +358,10 @@ export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
 				container.insertAdjacentHTML('beforeend', collector.chunks.slice(shellChunks).join(''));
 				activateStreamedMarkup(container);
 			};
-			if (captures === 'changed') {
+			if (captures.startsWith('changed')) {
 				await act(() => clientWait.resolve());
 				const accepted = container.querySelector<HTMLInputElement>('[data-stage="ready"]')!;
-				expect(accepted.value).toBe('server1');
+				expect(accepted.value).toBe(captures === 'changed source' ? 'replacement' : 'server1');
 				await act(deliver);
 				expect(container.querySelector('[data-stage="ready"]')).toBe(accepted);
 				expect(onRecoverableError).not.toHaveBeenCalled();
@@ -365,6 +376,9 @@ export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
 			expect(clientReads).toBeGreaterThan(0);
 			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
 			await act(() => tick$.set(2));
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			expect(revealed.value).toBe('typed after reveal');
+			await act(() => tick$.set(3));
 			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
 			expect(revealed.value).toBe('typed after reveal');
 			await act(() => clientWait.resolve());
