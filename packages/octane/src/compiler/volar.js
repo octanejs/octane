@@ -56,9 +56,9 @@ import {
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
  * descriptor with the small set of differences for octane:
  *
- *   - `imports.errorBoundary` / `imports.dynamic` point at octane
- *     itself (we don't ship separate sub-packages for these — the runtime
- *     exports them directly).
+ *   - `imports.dynamic` / `imports.errorBoundary` point at
+ *     `octane/tsrx-boundary`, whose type-only components preserve dynamic-tag
+ *     props and provide the `@catch` boundary surface.
  *   - `jsx.classAttrName: 'class'` because octane keeps authored
  *     `class` instead of rewriting to React's `className`.
  *   - `jsx.multiRefStrategy: 'array'` — the octane runtime accepts a
@@ -97,7 +97,7 @@ const OCTANE_PLATFORM = {
 	imports: {
 		fragment: 'octane',
 		suspense: 'octane/tsrx-boundary',
-		dynamic: 'octane',
+		dynamic: 'octane/tsrx-boundary',
 		errorBoundary: 'octane/tsrx-boundary',
 		forOfIterableHelper: 'octane/tsrx-iterable',
 		// Host-element spreads in the virtual TSX lower to
@@ -353,7 +353,7 @@ function projectServerContextCalls(ast, filename) {
 		: ast;
 }
 
-const octaneTransformWithAuthoredSuspense = createJsxTransform({
+const OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE = {
 	...OCTANE_PLATFORM,
 	hooks: {
 		...OCTANE_PLATFORM.hooks,
@@ -365,10 +365,13 @@ const octaneTransformWithAuthoredSuspense = createJsxTransform({
 			return null;
 		},
 	},
-});
+};
+const octaneTransformWithAuthoredSuspense = createJsxTransform(
+	OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE,
+);
 
 /** @param {import('@tsrx/core/types').AST.Program} ast */
-function selectOctaneTransform(ast) {
+function selectOctaneTransform(ast, dynamicTypeLocal = undefined) {
 	const hasSuspenseImport = ast.body.some(
 		(statement) =>
 			statement.type === 'ImportDeclaration' &&
@@ -382,7 +385,13 @@ function selectOctaneTransform(ast) {
 					(specifier.imported.name ?? specifier.imported.value) === 'Suspense',
 			),
 	);
-	return hasSuspenseImport ? octaneTransformWithAuthoredSuspense : octaneTransform;
+	if (dynamicTypeLocal === undefined)
+		return hasSuspenseImport ? octaneTransformWithAuthoredSuspense : octaneTransform;
+	const platform = hasSuspenseImport ? OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE : OCTANE_PLATFORM;
+	return createJsxTransform({
+		...platform,
+		imports: { ...platform.imports, dynamicTypeLocal },
+	});
 }
 
 /**
@@ -431,6 +440,62 @@ function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics 
 		end: ast.start ?? 0,
 		loc: { start: { ...start }, end: { ...start } },
 		context: null,
+	};
+}
+
+function prepareDynamicJsxTypes(ast, comments) {
+	const pragma = authoredLeadingPragma(ast, comments);
+	const jsxImportSource = pragma ? jsxImportSourcePragmaModule(pragma.value) : null;
+	if (!jsxImportSource) return { ast, componentAlias: undefined };
+	const identifiers = new Set();
+	let hasDynamicElement = false;
+	const visit = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'Identifier' || node.type === 'JSXIdentifier') identifiers.add(node.name);
+		if (
+			node.type === 'JSXElement' &&
+			node.openingElement?.name?.type === 'JSXExpressionContainer' &&
+			node.openingElement.name.isDynamic === true
+		)
+			hasDynamicElement = true;
+		for (const key of Object.keys(node)) {
+			if (['metadata', 'loc', 'start', 'end', 'parent'].includes(key)) continue;
+			visit(node[key]);
+		}
+	};
+	visit(ast);
+	if (!hasDynamicElement) return { ast, componentAlias: undefined };
+
+	const uniqueIdentifier = (name) => {
+		let candidate = name;
+		while (identifiers.has(candidate)) candidate += '_';
+		identifiers.add(candidate);
+		return candidate;
+	};
+	const namespace = uniqueIdentifier('__octane_DynamicJSX');
+	const componentAlias = uniqueIdentifier('__octane_Dynamic');
+	const dynamicForName = uniqueIdentifier('__octane_DynamicFor');
+	const jsxIntrinsics = b.ts_type_reference(
+		b.ts_qualified_name(b.id(namespace), b.id('IntrinsicElements')),
+	);
+	const imports = [
+		b.imports([['JSX', namespace]], `${jsxImportSource}/jsx-runtime`, [], 'type'),
+		b.imports([['DynamicFor', dynamicForName]], 'octane/tsrx-boundary', [], 'type'),
+	];
+	const aliasDeclaration = b.const(
+		componentAlias,
+		b.ts_as(
+			b.ts_as(b.id('TsrxDynamic'), b.ts_keyword_type('unknown')),
+			b.ts_type_reference(b.id(dynamicForName), b.ts_type_parameter_instantiation([jsxIntrinsics])),
+		),
+	);
+	return {
+		ast: { ...ast, body: [...imports, aliasDeclaration, ...ast.body] },
+		componentAlias,
 	};
 }
 
@@ -587,6 +652,8 @@ export function compileToVolarMappings(source, filename, options) {
 		);
 		transformAst = { ...ast, body: [first, ...ast.body.slice(1)] };
 	}
+	const dynamicJsxTypes = prepareDynamicJsxTypes(transformAst, printComments);
+	transformAst = dynamicJsxTypes.ast;
 
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
@@ -594,7 +661,7 @@ export function compileToVolarMappings(source, filename, options) {
 	// @tsrx/core: `ast` (passed below as `ast_from_source`) stays the
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
-	const transform = selectOctaneTransform(ast);
+	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
 	const transformed = transform(
 		projectServerContextCalls(
 			renderer.target === 'dom'
@@ -845,10 +912,13 @@ export function compileTypesInspection(source, filename, options) {
 	const rendererPragma = authoredLeadingPragma(ast, comments)
 		? null
 		: createRendererTypePragma(renderer, ast);
-	const transform = selectOctaneTransform(ast);
+	const typeOnlyComments = rendererPragma === null ? comments : [rendererPragma, ...comments];
+	const dynamicJsxTypes = prepareDynamicJsxTypes(ast, typeOnlyComments);
+	const transformAst = dynamicJsxTypes.ast;
+	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
 	const transformed = transform(
 		projectServerContextCalls(
-			renderer.target === 'dom' ? projectNativeDomReads(ast) : ast,
+			renderer.target === 'dom' ? projectNativeDomReads(transformAst) : transformAst,
 			filename,
 		),
 		source,
@@ -859,7 +929,7 @@ export function compileTypesInspection(source, filename, options) {
 			typeOnly: true,
 			inspect: true,
 			errors,
-			comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
+			comments: typeOnlyComments,
 		},
 	);
 	markNativeTemplateBodies(ast);

@@ -1,15 +1,55 @@
 diff --git a/src/parse/index.js b/src/parse/index.js
-index 16f3d394e5dff7971d50aacc22032d444f39bf2b..084af4ffab408ff3bc88eeca831906fa26ee7dd7 100644
+index 16f3d39..084af4f 100644
 --- a/src/parse/index.js
 +++ b/src/parse/index.js
-@@ -3422,7 +3422,9 @@ export function get_comment_handlers(source, comments, index = 0) {
- 									!isAfterParent &&
- 									(opensNamedSpecifiers ? /^[,{ \t]*$/ : /^[,) \t]*$/).test(slice);
- 								const onlyWhitespace = /^\s*$/.test(slice);
+@@ -3425 +3425,3 @@ export function get_comment_handlers(source, comments, index = 0) {
 -								const hasBlankLine = includesBlankLine(slice);
 +								// Read only alongside `onlyWhitespace`. Testing it first keeps each
 +								// node from scanning all the code before the next comment
 +								const hasBlankLine = onlyWhitespace && includesBlankLine(slice);
- 								const nodeEndLine = end_node.loc?.end?.line ?? null;
- 								const commentStartLine = comments[0].loc?.start?.line ?? null;
- 								const commentOnSameLine =
+diff --git a/src/transform/jsx/index.js b/src/transform/jsx/index.js
+index 54d0f11..5065736 100644
+--- a/src/transform/jsx/index.js
++++ b/src/transform/jsx/index.js
+@@ -896,3 +896,3 @@ function lower_dynamic_jsx_element(node, transform_context) {
+-	// Type-only output always uses the `<TsrxDynamic is={expr}>` component
+-	// shape; production output prefers the platform's runtime factory when one
+-	// is configured (e.g. Solid's `dynamic`).
++	// Type-only output uses a component from `imports.dynamic`, optionally under
++	// `imports.dynamicTypeLocal`; production output prefers the platform's
++	// runtime factory when one is configured (e.g. Solid's `dynamic`).
+@@ -1023,6 +1023,5 @@ function lower_dynamic_jsx_element(node, transform_context) {
+-		rebuild_element(b.jsx_id(DYNAMIC_IMPORT_LOCAL), [
+-			b.jsx_attribute(
+-				b.jsx_id('is'),
+-				b.jsx_expression_container(generated_expression, name_loc),
+-				false,
+-				name_loc,
++		rebuild_element(
++			b.jsx_id(
++				transform_context.typeOnly
++					? (transform_context.platform.imports.dynamicTypeLocal ?? DYNAMIC_IMPORT_LOCAL)
++					: DYNAMIC_IMPORT_LOCAL,
+@@ -1030 +1029,9 @@ function lower_dynamic_jsx_element(node, transform_context) {
+-		]),
++			[
++				b.jsx_attribute(
++					b.jsx_id('is'),
++					b.jsx_expression_container(generated_expression, name_loc),
++					false,
++					name_loc,
++				),
++			],
++		),
+diff --git a/types/jsx-platform.d.ts b/types/jsx-platform.d.ts
+index eb345b0..db9f321 100644
+--- a/types/jsx-platform.d.ts
++++ b/types/jsx-platform.d.ts
+@@ -369 +369,3 @@ export interface JsxPlatform {
+-		 * `<TsrxDynamic is={expr}>` imported from `imports.dynamic`.
++		 * `<TsrxDynamic is={expr}>` imported from `imports.dynamic`. A platform
++		 * may set `dynamicTypeLocal` to use a locally declared, host-typed alias
++		 * for the generated JSX tag while retaining the dynamic helper import.
+@@ -371,0 +374,2 @@ export interface JsxPlatform {
++		/** Local JSX name for dynamic tags in type-only output. */
++		dynamicTypeLocal?: string;
