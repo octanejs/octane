@@ -7570,16 +7570,11 @@ function hydrationSetupExpression(node, propsName, required, setupLocals) {
 			let receiver = unwrapTsExpr(member.object);
 			if (receiver?.type === 'Identifier') {
 				receiver = unwrapTsExpr(setupLocals.get(receiver.name));
-				// Reuse the prior const's admitted zero-argument `.get()` setup;
-				// its returned value and any try-arm captures still run as authored.
-				if (
-					receiver?.type === 'CallExpression' &&
-					unwrapTsExpr(receiver.callee)?.object?.type === 'Identifier'
-				)
-					return hydrationSetupExpression(receiver, propsName, required, setupLocals);
 			}
 			// The optional read stays in authored setup. Its receiver must be an
-			// own-data props field, possibly held by one preceding const local.
+			// own-data props field, possibly held by one preceding const local. A
+			// projected value from an opaque call cannot prove that the suspended
+			// request is unchanged when the projection itself compares equal.
 			return (
 				receiver?.type === 'MemberExpression' &&
 				!receiver.optional &&

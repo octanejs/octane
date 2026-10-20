@@ -257,6 +257,88 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 		});
 	});
 
+	it.each(['same request', 'changed request', 'in-place request'] as const)(
+		'keeps the selected request current when its projected value is unchanged: %s',
+		async (scenario) => {
+			const scope = Signals.createScope({ scopeKey: `same-projection-${dev}-${scenario}` });
+			const selection$ = scope.signal$('selection', { id: 'saved', request: 'a' });
+			cleanups.push(() => scope.dispose());
+			const gateSource = `import { selection$ } from './selection';
+export function Gate(props) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    const value = active ? props.read() : "inactive";
+    <input data-request={value} defaultValue={value} />;
+  } @pending { <span>Loading</span>; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+					runtimeModules: { './selection': { selection$ } },
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const first = gate();
+			const second = gate();
+			const read$ = () => {
+				const request = selection$.get().request;
+				const pending = request === 'a' ? first : second;
+				if (pending.value.pending) throw pending.value.promise;
+				return `request-${request}`;
+			};
+			const props = {
+				sibling: 'waiting',
+				gate: { domain: 'saved', read: read$ },
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], props).html;
+			const original = container.querySelector('input')!;
+			original.value = 'typed';
+			first.value.pending = second.value.pending = true;
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			await act(() => {
+				if (scenario === 'changed request') selection$.set({ id: 'saved', request: 'b' });
+				if (scenario === 'in-place request') {
+					selection$.get().request = 'b';
+					second.value.pending = false;
+				}
+				root.render(client['App'], { ...props, sibling: 'ready' });
+			});
+			expect(container.querySelector('output')?.textContent).toBe('ready');
+			if (scenario !== 'same request') expect(container.querySelector('input')).not.toBe(original);
+			if (scenario === 'in-place request')
+				expect(container.querySelector('input')?.dataset['request']).toBe('request-b');
+			await act(() => first.resolve());
+			await act(() => second.resolve());
+			const accepted = container.querySelector('input')!;
+			expect(accepted.dataset['request']).toBe(
+				scenario === 'same request' ? 'request-a' : 'request-b',
+			);
+			if (scenario !== 'same request') {
+				expect(accepted).not.toBe(original);
+				expect(accepted.value).toBe('request-b');
+			}
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
 	it('publishes the latest layout callback only after the adopted arm commits', async () => {
 		const gateSource = `import { useLayoutEffect } from 'octane';
 export function Gate(props) @{
@@ -345,16 +427,12 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 		expect(onRef).toHaveBeenCalledWith(original);
 	});
 
-	it.each(['unrelated', 'changed source', 'changed reader', 'changed domain', 'rejected'] as const)(
+	it.each(['unrelated', 'new selection', 'changed reader', 'changed domain', 'rejected'] as const)(
 		'retries a selected request with a guarded layout callback: %s',
 		async (scenario) => {
-			const scope = Signals.createScope({ scopeKey: `guarded-layout-${dev}-${scenario}` });
-			const selection$ = scope.signal$('selection', { id: 'original' } as { id: string } | null);
-			cleanups.push(() => scope.dispose());
 			const gateSource = `import { useLayoutEffect } from 'octane';
-import { selection$ } from './selection';
 export function Gate(props) @{
-  const selection = selection$.get();
+  const selection = props.selection;
   const active = selection?.id === props.domain;
   @try {
     const value = active ? props.read() : "inactive";
@@ -374,7 +452,6 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 				const gateModule = loadCompiledFixtureSource(gateSource, {
 					...options,
 					id: '/src/gate.tsrx',
-					runtimeModules: { './selection': { selection$ } },
 				});
 				return loadCompiledFixtureSource(appSource, {
 					...options,
@@ -396,6 +473,7 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 			let rejected = false;
 			const initial = {
 				domain: 'original',
+				selection: { id: 'original' } as { id: string } | null,
 				detail: {
 					get nested() {
 						detailReads++;
@@ -429,7 +507,7 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 			if (scenario === 'changed reader') next.read = () => 'replacement';
 			if (scenario === 'changed domain') next.domain = 'other';
 			await act(() => {
-				if (scenario === 'changed source') selection$.set(null);
+				if (scenario === 'new selection') next.selection = null;
 				root.render(client['App'], { ready: true, gate: next });
 			});
 			expect(container.querySelector('input') === original).toBe(
