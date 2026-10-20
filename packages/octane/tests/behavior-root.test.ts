@@ -1366,6 +1366,47 @@ export function EventHost(props) @{ 'use dom bindings';
 			}
 		});
 
+		it(`hands off a textarea control from a props-object binding view (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function Field(props) @{ 'use dom bindings';
+  <textarea value={unbound(props.model)} placeholder={props.hint} />
+}`;
+			const scope = createScope({ scopeKey: `props-object-textarea-${dev}` });
+			const props = { model: scope.signal$('model', 'initial'), hint: 'Type here' };
+			const fixture = authoredPresentation('Field', props, dev, source);
+			container.innerHTML = fixture.html;
+			const textarea = container.querySelector('textarea')!;
+			const control = runWithSignalOwner(scope, () =>
+				bindSignalControl(textarea, 'value', props.model),
+			);
+			const binding = fixture.attach(textarea, fixture.state);
+			try {
+				textarea.value = 'early edit';
+				textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				expect(props.model.get()).toBe('early edit');
+				hydratedRoot = hydrateRoot(container, fixture.loadClient()['Field'], props, {
+					signalOwner: scope,
+					bindingLeases: [binding],
+					controlLeases: [control],
+				});
+				await act(() => {});
+				expect(container.querySelector('textarea')).toBe(textarea);
+				expect(textarea.value).toBe('early edit');
+				control();
+				await act(() => props.model.set('model update'));
+				expect(textarea.value).toBe('model update');
+				textarea.value = 'later edit';
+				await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
+				expect(props.model.get()).toBe('later edit');
+			} finally {
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				binding.dispose();
+				control();
+				scope.dispose();
+			}
+		});
+
 		for (const spread of [
 			undefined,
 			'unbound(stylex.attrs(sx))',
