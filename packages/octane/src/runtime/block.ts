@@ -1162,7 +1162,9 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 export function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
 	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction !== null && scope.mounted && !isCreatedInRootRender(transaction, scope.block)) {
+	// An incomplete scope can predate this attempt. Its new slots must still be
+	// removed on rollback; only a scope created in this attempt goes away with them.
+	if (transaction !== null && !isCreatedInRootRender(transaction, scope.block)) {
 		journalUndo(() => {
 			unmountSlot(slot, true);
 			const index = scope.slots.indexOf(slot);
