@@ -90,6 +90,40 @@ for (const dev of [false, true]) {
 	describe(`composed binding views (${dev ? 'dev' : 'prod'})`, () => {
 		const options = { dev, hmr: false, strong: !dev };
 
+		it('omits unread setup from an early textarea binding projection', () => {
+			const load = moduleGraph(
+				{
+					'/src/field.tsrx': `import { unbound } from 'octane/behavior';
+export function Field(props) @{ 'use dom bindings';
+ const unused = props.compute();
+ <div><textarea value={unbound(props.model)} placeholder={props.hint} /></div>
+}`,
+					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { Field } from './field.tsrx';
+export function adopt(root, state) { return adoptBindings(root, Field, state); }`,
+				},
+				options,
+			);
+			const props = { model: 'initial', hint: 'before', compute: vi.fn(() => 'unused') };
+			document.body.innerHTML = renderToString(
+				load('./field.tsrx', 'server')['Field'] as never,
+				props,
+			).html;
+			props.compute.mockClear();
+			const state = source(props);
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(
+				document.body.firstElementChild!,
+				state,
+			);
+			try {
+				state.publish({ hint: 'after' });
+				expect(document.querySelector('textarea')!.placeholder).toBe('after');
+				expect(props.compute).not.toHaveBeenCalled();
+			} finally {
+				binding.dispose();
+			}
+		});
+
 		it('forwards a closed parameter rest to a child with later props taking precedence', () => {
 			const load = moduleGraph(
 				{

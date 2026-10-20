@@ -58,7 +58,7 @@ function significant(node) {
 	);
 }
 
-export function needsBindingProgram(node, isUnbound, isRoot = true) {
+export function needsBindingProgram(node, isUnbound) {
 	if (!significant(node)) return false;
 	if (node.type === 'JSXExpressionContainer' && isUnbound(node.expression)) return false;
 	if (node.type !== 'JSXElement' && node.type !== 'Element') return true;
@@ -72,11 +72,7 @@ export function needsBindingProgram(node, isUnbound, isRoot = true) {
 		)
 	)
 		return true;
-	// A nested textarea alone cannot prove its surrounding view is transferable.
-	if (tag === 'textarea')
-		return (
-			isRoot && hasTextareaValueHandoff(node, 0, (node.children ?? []).some(significant), isUnbound)
-		);
+	if (tag === 'textarea') return false;
 	const children = (node.children ?? []).filter(significant);
 	const child = children.length === 1 ? children[0] : null;
 	const expression = child?.type === 'JSXExpressionContainer' ? child.expression : null;
@@ -88,7 +84,7 @@ export function needsBindingProgram(node, isUnbound, isRoot = true) {
 				expression.typeAnnotation.type === 'TSNumberKeyword'))
 	)
 		return false;
-	return children.some((child) => needsBindingProgram(child, isUnbound, false));
+	return children.some((child) => needsBindingProgram(child, isUnbound));
 }
 
 function data(value) {
@@ -122,6 +118,36 @@ function hasTextareaValueHandoff(node, namespace, hasChildren, isUnbound) {
 		attributes.some((attr) => rawName(attr) === 'value' && isUnbound(attrValue(attr))) &&
 		!attributes.some((attr) => rawName(attr) === 'dangerouslySetInnerHTML')
 	);
+}
+
+/** A scalar view can transfer its whole topology when only native textarea values are opaque. */
+export function canHandoffTextareaView(plan) {
+	if (
+		plan.addressed ||
+		plan.bindings.some(([, kind]) => kind === 'control') ||
+		!plan.nodes.some(([, tag]) => tag === 'textarea')
+	)
+		return false;
+	return plan.nodes.every(([, tag, namespace, children], index) => {
+		const element = plan.elements[index];
+		// A spread can override the control or introduce externally owned content.
+		if (
+			(element.openingElement?.attributes ?? element.attributes ?? []).some(
+				(attr) => attr.type === 'JSXSpreadAttribute' || attr.type === 'SpreadAttribute',
+			)
+		)
+			return false;
+		return (
+			children !== null ||
+			(tag === 'textarea' &&
+				hasTextareaValueHandoff(
+					element,
+					namespace,
+					(element.children ?? []).some(significant),
+					(value) => plan.unbound.has(unwrap(value)),
+				))
+		);
+	});
 }
 
 function blockNodes(node) {
