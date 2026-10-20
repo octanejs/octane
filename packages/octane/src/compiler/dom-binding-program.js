@@ -345,6 +345,7 @@ export function planBindingProgram(fn, render, context) {
 		const projections = [];
 		const initializers = [];
 		const initialValues = [];
+		const initialTemporaries = [];
 		const regions = [];
 		const adapters = [];
 		const restSites = [];
@@ -894,18 +895,21 @@ export function planBindingProgram(fn, render, context) {
 				if (rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? '')) continue;
 				if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 					const known = attr._octaneKnownAttributeSpread;
-					// A verified provider names its exact fields, so a fresh node applies
-					// each one. Adoption never evaluates these unbound values.
+					// A verified provider names its exact fields, so a fresh node calls it
+					// once and applies each one. Adoption never evaluates these values.
 					if (known && known.style !== 'object') {
-						const provided = native.unbound.get(unwrap(attr.argument));
+						const call = native.unbound.get(unwrap(attr.argument));
+						validate(call);
+						const provided = b.id(allocateProgramName('_bindingAttrs'));
+						initialTemporaries.push(b.const(provided, call));
 						for (const raw of known.fields) {
 							const name = raw === 'className' ? 'class' : raw;
-							initialize(
+							initializers.push([
 								index,
 								name === 'style' ? 'styleAttribute' : attributeKind(name),
 								name,
-								b.member(provided, b.literal(raw), true, known.nonNull !== true),
-							);
+							]);
+							initialValues.push(b.member(provided, b.literal(raw), true, known.nonNull !== true));
 						}
 						continue;
 					}
@@ -1065,7 +1069,7 @@ export function planBindingProgram(fn, render, context) {
 		initialOperations ||= initializers.length > 0;
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
-			properties.initialize = project(names, b.array(initialValues), fn, [], true);
+			properties.initialize = project(names, b.array(initialValues), fn, initialTemporaries, true);
 		}
 		if (bindings.some((binding) => binding[1] === 'classGroup')) {
 			if (classFactory === null) {

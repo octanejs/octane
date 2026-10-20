@@ -25,10 +25,10 @@ const RUNTIME_MODULES = {
 };
 
 const PROVIDER = {
-	attrs: (paint?: { className?: string; style?: string }) => ({
+	attrs: vi.fn((paint?: { className?: string; style?: string }) => ({
 		class: paint?.className,
 		style: paint?.style,
-	}),
+	})),
 	href: (icon: string) => '#' + icon,
 };
 
@@ -77,6 +77,10 @@ function source<Props>(initial: Props) {
 }
 
 type Adopt = (root: Element, state: ReturnType<typeof source>) => DomBindings.BindingHandle;
+type Mount = (
+	target: DomBindingPrograms.BindingMountTarget,
+	state: ReturnType<typeof source>,
+) => DomBindings.BindingHandle;
 
 afterEach(() => {
 	document.body.innerHTML = '';
@@ -273,6 +277,9 @@ export function Host(props) @{ 'use dom bindings';
 						'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
 import { ${view} } from './view.tsrx';
 export function adopt(root, state) { return adoptBindings(root, ${view}, state); }`,
+						'/src/mount.tsrx': `import { mountBindings } from 'octane/behavior';
+import { ${view} } from './view.tsrx';
+export function mount(target, state) { return mountBindings(target, ${view}, state); }`,
 					},
 					options,
 				);
@@ -329,6 +336,20 @@ export function adopt(root, state) { return adoptBindings(root, ${view}, state);
 					expect(onClick).toHaveBeenCalledOnce();
 				}
 				await act(() => root.unmount());
+
+				if (view !== 'Nested') return;
+				// A fresh node applies every provider field from one provider call.
+				PROVIDER.attrs.mockClear();
+				const parent = document.createElement('div');
+				document.body.append(parent);
+				const mounted = (load('./mount.tsrx', 'client')['mount'] as Mount)(
+					{ parent },
+					source(props),
+				);
+				const fresh = parent.querySelector('svg')!;
+				expect(PROVIDER.attrs).toHaveBeenCalledOnce();
+				expect([fresh.getAttribute('class'), fresh.style.color]).toEqual(['original', 'red']);
+				mounted.dispose();
 			});
 		}
 	});
