@@ -12,6 +12,7 @@ import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import rspack from '@rspack/core';
 import { JSDOM } from 'jsdom';
 import { compile as compileOctane } from 'octane/compiler';
@@ -257,10 +258,15 @@ export function App() @{
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
-	it('emits URL dependencies without executing them as source modules', async () => {
+	it('emits URL assets while transpiling Worker entries', async () => {
 		write(root, 'src/asset.js', 'globalThis.assetExecuted = true;\n');
 		write(root, 'src/asset.ts', 'globalThis.assetExecuted = true;\n');
 		write(root, 'src/source.ts', 'export const value: number = 42;\n');
+		write(
+			root,
+			'src/worker.ts',
+			'const message: string = "worker ready"; self.postMessage(message);\n',
+		);
 		write(
 			root,
 			'src/url-entry.js',
@@ -269,7 +275,8 @@ globalThis.urlAssetResult = {
 	value,
 	js: new URL('./asset.js', import.meta.url).href,
 	ts: new URL('./asset.ts', import.meta.url).href,
-};`,
+};
+new Worker(new URL('./worker.ts', import.meta.url));`,
 		);
 		const outputPath = join(root, 'dist-url-assets');
 		await compile({
@@ -286,8 +293,19 @@ globalThis.urlAssetResult = {
 			plugins: [new OctaneRspackPlugin({ parallel: false })],
 		});
 		const dom = new JSDOM('', { url: 'https://example.test/', runScripts: 'outside-only' });
+		const workerMessages: unknown[] = [];
+		Object.assign(dom.window, {
+			Worker: class {
+				constructor(url: URL) {
+					runInNewContext(readFileSync(join(outputPath, url.pathname), 'utf8'), {
+						self: { postMessage: (message: unknown) => workerMessages.push(message) },
+					});
+				}
+			},
+		});
 		try {
 			dom.window.eval(readFileSync(join(outputPath, 'entry.js'), 'utf8'));
+			expect(workerMessages).toEqual(['worker ready']);
 			expect((dom.window as any).urlAssetResult).toEqual({
 				value: 42,
 				js: 'https://example.test/assets/asset.js',
