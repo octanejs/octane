@@ -468,7 +468,7 @@ export function releaseTransitionHookHolder(holder: object, retry = true): boole
 	return true;
 }
 
-// ── Global commit coordination (entangled transitions) ──────────────────────
+// ── Commit coordination (entangled transitions) ─────────────────────────────
 // React commits a transition's whole tree atomically. Octane's documented model
 // is narrower: it coordinates per-boundary reveals, while ordinary pre-timeout
 // same-identity renders retain the global-WIP divergence documented in
@@ -480,12 +480,54 @@ export function releaseTransitionHookHolder(holder: object, retry = true): boole
 // `HELD_TRANSITIONS` is the set of boundaries currently holding prior content for an
 // in-flight transition (transitionHeld === true). `STAGED_REVEALS` is the subset
 // whose current retry is staged waiting for the rest. A fallback-hidden retry joins
-// only after its entire body completes (not merely its first thenable). When exact
-// membership matches, `flushStagedReveals` commits the group. Abandoning a held
-// boundary (urgent supersede / error / unmount) removes it and re-checks, so the
-// remaining group isn't stranded waiting on a boundary that will never resolve.
+// only after its entire body completes (not merely its first thenable). Held
+// boundaries that hold a common batch form a group (stagedRevealGroup), as React
+// renders and commits each transition lane on its own (parallel transitions,
+// React 19.3): when every member of a group is staged, `flushStagedReveals`
+// commits it while unrelated groups keep holding. Abandoning a held boundary
+// (urgent supersede / error / unmount) removes it and re-checks, so the remaining
+// group isn't stranded waiting on a boundary that will never resolve.
 export const HELD_TRANSITIONS = new Set<TrySlot>();
 export const STAGED_REVEALS = new Set<TrySlot>();
+
+/**
+ * A group of held boundaries that is fully staged, or null, skipping the groups
+ * already `flushed` and adding the result's members to it. A group joins held
+ * boundaries that share a batch, transitively. A held boundary with no batch hold
+ * (its transition folded no hook work) joins every group, the barrier before
+ * parallel transitions. Runs when a boundary stages, on a handful of boundaries.
+ */
+export function stagedRevealGroup(flushed: Set<TrySlot>): TrySlot[] | null {
+	// A group still waiting is scanned again on the next call: flushing another
+	// group can make it ready.
+	const seen = new Set<TrySlot>();
+	for (const start of STAGED_REVEALS) {
+		if (seen.has(start) || flushed.has(start)) continue;
+		const group = [start];
+		const batches = new Set<TransitionActionBatch>();
+		let unbounded = false;
+		for (let i = 0; i < group.length; i++) {
+			const hold = TRANSITION_HOLDERS?.get(group[i]);
+			if (hold === undefined) unbounded = true;
+			else for (const batch of hold.batches) batches.add(rootTransitionBatch(batch));
+			for (const other of HELD_TRANSITIONS) {
+				if (group.includes(other)) continue;
+				const peer = TRANSITION_HOLDERS?.get(other);
+				let shares = unbounded || peer === undefined;
+				if (!shares)
+					for (const batch of peer!.batches)
+						if (batches.has(rootTransitionBatch(batch))) shares = true;
+				if (shares) group.push(other);
+			}
+		}
+		for (const member of group) seen.add(member);
+		if (group.every((member) => STAGED_REVEALS.has(member))) {
+			for (const member of group) flushed.add(member);
+			return group;
+		}
+	}
+	return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Transition holds (#2029).
