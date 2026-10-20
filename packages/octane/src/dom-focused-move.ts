@@ -35,7 +35,15 @@ export function moveNativeNodeBefore(
 		.moveBefore;
 	// A state-preserving move keeps native input composition alive, but Chromium
 	// still collapses live Range selections inside a moved content-editable tree.
-	if (!contentEditable && typeof moveBefore === 'function') {
+	// It also requires connected nodes in the same document; a previously focused
+	// host can have been relocated or disconnected during the update.
+	if (
+		!contentEditable &&
+		typeof moveBefore === 'function' &&
+		parent.isConnected &&
+		node.isConnected &&
+		parent.ownerDocument === node.ownerDocument
+	) {
 		moveBefore.call(parent, node, anchor);
 		return;
 	}

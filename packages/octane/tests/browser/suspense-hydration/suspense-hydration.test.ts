@@ -258,6 +258,22 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		expect(after.globalFailures).toEqual([]);
 	});
 
+	it.each(['detached', 'foreign'])(
+		'restores an editor relocated to a %s container during a keyed update',
+		async (external) => {
+			await openCase(`case=relocated-focus-restoration&external=${external}`);
+			await page!.evaluate(() => window.__suspenseHydration.urgent!());
+			expect(await snapshot()).toMatchObject({
+				values: ['field 2', 'field 3', 'field 4', 'unsaved draft'],
+				inputSame: true,
+				focused: true,
+				selection: [2, 7],
+				externalEmpty: true,
+				globalFailures: [],
+			});
+		},
+	);
+
 	it.each([
 		{
 			selection: 'backward',
