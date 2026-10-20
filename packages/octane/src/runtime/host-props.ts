@@ -33,6 +33,7 @@ import {
 } from '../host-property-diagnostics.js';
 import { unpatchedAttribute, unpatchedClass, unpatchedStyle } from '../hydration/dev-values.js';
 import { sanitizeURLAttribute, sanitizeURL } from '../sanitize-url.js';
+import { trustedOr } from '../trusted-types.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	normalizeClass,
@@ -302,7 +303,7 @@ export function setScriptText(el: Element, value: any): void {
 	const text = value == null ? '' : String(value);
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
 	if (transaction !== null) {
-		transaction.ops.push(commitScriptText, [el, text]);
+		transaction.ops.push(commitScriptText, [el, trustedOr(value, text)]);
 		return;
 	}
 	const first = getFirstChild(el);
@@ -310,7 +311,7 @@ export function setScriptText(el: Element, value: any): void {
 		updateTextValue(first as Text, text);
 	} else {
 		if (ROOT_RENDER_TRANSACTION !== null) journalBag();
-		el.textContent = text;
+		el.textContent = trustedOr(value, text);
 	}
 }
 
@@ -321,13 +322,14 @@ export function setScriptText(el: Element, value: any): void {
  */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
+	const html = trustedOr(value, next);
 	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
-		hydration.adoptHTML(el, next);
+		hydration.adoptHTML(el, html);
 		return;
 	}
 	if (el.localName === 'script') {
-		setScriptText(el, next);
+		setScriptText(el, html);
 		return;
 	}
 	// Fresh wrappers must not replace identical children. Compare accepted authored
@@ -341,8 +343,8 @@ export function setHTML(el: Element, value: any): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
 	if (transaction !== null) {
 		journalBag();
-		transaction.ops.push(commitHTML, [el, next]);
-	} else el.innerHTML = next;
+		transaction.ops.push(commitHTML, [el, html]);
+	} else el.innerHTML = html;
 }
 
 function commitHTML(write: [Element, string]): void {
@@ -799,8 +801,9 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	if (ns) el.setAttributeNS(ns, name, next);
-	else el.setAttribute(name, next);
+	const raw = trustedOr(value, next);
+	if (ns) el.setAttributeNS(ns, name, raw);
+	else el.setAttribute(name, raw);
 }
 
 // React's `warnedProperties` cache is module-global and keyed by prop name: once
@@ -899,7 +902,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
-	else el.setAttribute(name, next);
+	else el.setAttribute(name, trustedOr(value, next));
 }
 
 /** Same scalar contract for a statically proven, unnamespaced native URL sink. */
@@ -927,7 +930,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
-	else el.setAttribute(name, next);
+	else el.setAttribute(name, trustedOr(value, next));
 }
 
 /**

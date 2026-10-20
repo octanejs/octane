@@ -1,4 +1,5 @@
 import { formatClientError } from './error-codes.client.generated.js';
+import { frameworkHTML } from './trusted-types.js';
 import {
 	type __adoptBindings,
 	type __adoptScalarBindings,
@@ -989,7 +990,9 @@ function createFragment(
 	if (definition.constructible === false)
 		throw new Error(definition.constructionError ?? formatClientError(287));
 	const template = document.createElement('template');
-	template.innerHTML = definition.ns === 1 ? `<svg>${definition.html}</svg>` : definition.html;
+	template.innerHTML = frameworkHTML(
+		definition.ns === 1 ? `<svg>${definition.html}</svg>` : definition.html,
+	);
 	const content = document.createDocumentFragment();
 	const start = document.createComment(bindingRootMarker(id));
 	const end = document.createComment(']');
