@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot, type Root } from '../../src/index.js';
-import { renderToString } from 'octane/server';
+import { renderToPipeableStream, renderToString } from 'octane/server';
 import * as Signals from 'octane/signals';
 import { __hydrationSignalRevision } from 'octane/internal/hydration-signal';
 import { __captureHydrationInput, __ownedHydrationInputs } from '../../src/hydration-inputs.js';
 import {
 	activateStreamedMarkup,
 	collectReadableStream,
+	createPipeableCollector,
 	resetStreamRuntimeGlobals,
 } from '../_server-stream.js';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
@@ -244,6 +245,131 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 			expect(accepted.value).toBe(
 				retained ? 'typed' : scenario.startsWith('changed ') ? 'replacement' : 'server',
 			);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
+	it.each(['unchanged', 'changed'] as const)(
+		'handles %s captures before the streamed arm’s first optional read',
+		async (captures) => {
+			const scope = Signals.createScope({
+				scopeKey: `streamed-optional-reader-${dev}-${captures}`,
+			});
+			const tick$ = scope.signal$('tick', 0);
+			const gateSource = `import { tick$ } from './tick';
+export function Gate(props) @{
+  const tick = tick$.get(); void tick;
+  @try {
+    const value = props.optionalReader?.() ?? props.read();
+    <input data-stage="ready" defaultValue={value${captures === 'changed' ? ' + tick' : ''}} />;
+  } @pending { <input data-stage="pending" defaultValue="Waiting" />; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+					runtimeModules: { './tick': { tick$ } },
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const serverWait = gate();
+			serverWait.value.pending = true;
+			const clientWait = gate();
+			clientWait.value.pending = true;
+			let clientReads = 0;
+			const clientRead = () => {
+				clientReads++;
+				if (clientWait.value.pending) throw clientWait.value.promise;
+				return 'server';
+			};
+			const collector = createPipeableCollector();
+			let shellReady!: () => void;
+			const shell = new Promise<void>((resolve) => (shellReady = resolve));
+			const stream = renderToPipeableStream(
+				server['App'],
+				{
+					gate: {
+						read: () => {
+							if (serverWait.value.pending) throw serverWait.value.promise;
+							return 'server';
+						},
+					},
+				},
+				{ onShellReady: shellReady },
+			);
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			cleanups.push(() => {
+				root?.unmount();
+				stream.abort();
+				scope.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			});
+			stream.pipe(collector.destination);
+			await shell;
+			const shellChunks = collector.chunks.length;
+			container.innerHTML = collector.chunks.join('');
+			activateStreamedMarkup(container);
+			const pending = container.querySelector<HTMLInputElement>('[data-stage="pending"]')!;
+			pending.value = 'typed while waiting';
+			const onRecoverableError = vi.fn();
+			root = hydrateRoot(
+				container,
+				client['App'],
+				{ gate: { read: clientRead } },
+				{ onRecoverableError },
+			);
+			expect(clientReads).toBe(0);
+			await act(() => tick$.set(1));
+			if (captures === 'changed') {
+				expect(container.querySelector('[data-stage="pending"]')).not.toBe(pending);
+				expect(clientReads).toBeGreaterThan(0);
+			} else {
+				expect(container.querySelector('[data-stage="pending"]')).toBe(pending);
+				expect(pending.value).toBe('typed while waiting');
+				expect(clientReads).toBe(0);
+			}
+
+			serverWait.resolve();
+			await collector.ended;
+			const deliver = () => {
+				container.insertAdjacentHTML('beforeend', collector.chunks.slice(shellChunks).join(''));
+				activateStreamedMarkup(container);
+			};
+			if (captures === 'changed') {
+				await act(() => clientWait.resolve());
+				const accepted = container.querySelector<HTMLInputElement>('[data-stage="ready"]')!;
+				expect(accepted.value).toBe('server1');
+				await act(deliver);
+				expect(container.querySelector('[data-stage="ready"]')).toBe(accepted);
+				expect(onRecoverableError).not.toHaveBeenCalled();
+				return;
+			}
+			let revealed!: HTMLInputElement;
+			await act(() => {
+				deliver();
+				revealed = container.querySelector<HTMLInputElement>('[data-stage="ready"]')!;
+				revealed.value = 'typed after reveal';
+			});
+			expect(clientReads).toBeGreaterThan(0);
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			await act(() => tick$.set(2));
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			expect(revealed.value).toBe('typed after reveal');
+			await act(() => clientWait.resolve());
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			expect(revealed.value).toBe('typed after reveal');
 			expect(onRecoverableError).not.toHaveBeenCalled();
 		},
 	);

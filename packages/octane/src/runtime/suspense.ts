@@ -1412,6 +1412,17 @@ export function tryBlock(
 		if (domParent.nodeType === 11) noteFrontierMember(domParent, newState);
 		state = newState;
 	} else {
+		// A streamed arm still waiting for its server segment has not executed
+		// its first client read. Retain the original compiler capture when its
+		// values are unchanged so that read can use its existing invocation proof.
+		if (
+			initial?.waits !== undefined &&
+			hydrationInputsEqual !== undefined &&
+			state.tryBody === tryBody &&
+			state.env !== env &&
+			!depsChanged(state.env, env)
+		)
+			env = state.env;
 		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
 		const changed =
 			(retains || initial !== undefined) &&
