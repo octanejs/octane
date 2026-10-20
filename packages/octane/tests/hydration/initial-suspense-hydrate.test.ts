@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToString } from 'octane/server';
 import * as Signals from 'octane/signals';
-import { __hydrationSignalRevision } from 'octane/internal/signal-read';
+import { __hydrationSignalRevision } from 'octane/internal/hydration-signal';
 import { __captureHydrationInput, __ownedHydrationInputs } from '../../src/hydration-inputs.js';
 import {
 	activateStreamedMarkup,
@@ -159,6 +159,193 @@ it('witnesses only canonical writable signal sources without observing unknown v
 
 describe.each([false, true])('parent updates during suspended hydration (dev: %s)', (dev) => {
 	it.each([
+		['required', 'unrelated'],
+		['optional', 'unrelated'],
+		['alias', 'unrelated'],
+		['optional', 'null selection'],
+		['optional', 'changed reader'],
+		['optional', 'changed domain'],
+		['optional', 'changed selection'],
+	] as const)('keeps setup selection semantics (%s, %s)', async (access, update) => {
+		const setup =
+			access === 'alias'
+				? 'const selection = props.selection; const currentId = selection?.id; const active = currentId === props.id;'
+				: `const active = props.selection${access === 'optional' ? '?' : ''}.id === props.id;`;
+		const gateSource = `export function Gate(props) @{
+  ${setup}
+  @try {
+    const value = props.read();
+    <label data-active={active ? "yes" : "no"} data-domain={props.domain}><input defaultValue={value} /></label>;
+  } @pending { <p>Loading</p>; }
+}`;
+		const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}</span><Gate {...props.gate} /></section>; }`;
+		const load = (mode: 'client' | 'server') => {
+			const options = { mode, compileOptions: { dev, hmr: false } };
+			const gateModule = loadCompiledFixtureSource(gateSource, {
+				...options,
+				id: '/src/gate.tsrx',
+			});
+			return loadCompiledFixtureSource(appSource, {
+				...options,
+				id: '/src/app.tsrx',
+				runtimeModules: { './gate': gateModule },
+			});
+		};
+		const server = load('server');
+		const client = load('client');
+		const waiting = gate();
+		let reads = 0;
+		const selection =
+			update === 'null selection'
+				? null
+				: new Proxy(
+						{ id: 'same' },
+						{
+							get(target, key, receiver) {
+								if (key === 'id') reads++;
+								return Reflect.get(target, key, receiver);
+							},
+						},
+					);
+		const props = {
+			ready: false,
+			gate: {
+				selection,
+				id: 'same',
+				domain: 'original',
+				read: () => {
+					if (waiting.value.pending) throw waiting.value.promise;
+					return 'server';
+				},
+			},
+		};
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['App'], props).html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed';
+		waiting.value.pending = true;
+		const root = hydrateRoot(container, client['App'], props);
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		const beforeUpdate = reads;
+		const nextGate = {
+			...props.gate,
+			...(update === 'changed reader' ? { read: () => 'replacement' } : {}),
+			...(update === 'changed domain' ? { domain: 'new' } : {}),
+			...(update === 'changed selection' ? { selection: { id: 'different' } } : {}),
+		};
+		await act(() => root.render(client['App'], { ready: true, gate: nextGate }));
+		const superseded = update.startsWith('changed ');
+		expect(container.querySelector('input') === original).toBe(!superseded);
+		expect(container.querySelector('span')?.textContent).toBe('ready');
+		expect(reads - beforeUpdate).toBe(
+			update === 'null selection' || update === 'changed selection' ? 0 : 1,
+		);
+		await act(() => waiting.resolve());
+		const accepted = container.querySelector('input')!;
+		expect(accepted === original).toBe(!superseded);
+		expect(accepted.value).toBe(
+			update === 'changed reader' ? 'replacement' : superseded ? 'server' : 'typed',
+		);
+		expect(container.querySelector('label')?.dataset).toMatchObject({
+			active: update === 'changed selection' || update === 'null selection' ? 'no' : 'yes',
+			domain: update === 'changed domain' ? 'new' : 'original',
+		});
+	});
+
+	it('publishes the latest layout callback only after the adopted arm commits', async () => {
+		const gateSource = `import { useLayoutEffect } from 'octane';
+export function Gate(props) @{
+  const active = props.selection?.id === props.id;
+  @try {
+    const value = props.read();
+    useLayoutEffect(() => { props.onReady?.(value); });
+    const suffix = props.second();
+    <label data-domain={props.domain} data-active={active ? "yes" : "no"} data-suffix={suffix}><input defaultValue={value} ref={props.onRef} /></label>;
+  } @pending { <p>Loading</p>; }
+}`;
+		const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}</span><Gate {...props.gate} /></section>; }`;
+		const load = (mode: 'client' | 'server') => {
+			const options = { mode, compileOptions: { dev, hmr: false } };
+			const gateModule = loadCompiledFixtureSource(gateSource, {
+				...options,
+				id: '/src/gate.tsrx',
+			});
+			return loadCompiledFixtureSource(appSource, {
+				...options,
+				id: '/src/app.tsrx',
+				runtimeModules: { './gate': gateModule },
+			});
+		};
+		const server = load('server');
+		const client = load('client');
+		const first = gate();
+		const second = gate();
+		const firstReady = vi.fn();
+		const onRef = vi.fn();
+		const calls: { receiver: unknown; value: string }[] = [];
+		function latestReady(this: unknown, value: string) {
+			calls.push({ receiver: this, value });
+		}
+		const props = {
+			ready: false,
+			gate: {
+				selection: { id: 'same' },
+				id: 'same',
+				domain: 'original',
+				onReady: firstReady,
+				onRef,
+				read: () => {
+					if (first.value.pending) throw first.value.promise;
+					return 'server';
+				},
+				second: () => {
+					if (second.value.pending) throw second.value.promise;
+					return 'ready';
+				},
+			},
+		};
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['App'], props).html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed';
+		first.value.pending = second.value.pending = true;
+		const root = hydrateRoot(container, client['App'], props);
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		await act(() =>
+			root.render(client['App'], { ready: true, gate: { ...props.gate, onReady: latestReady } }),
+		);
+		expect(container.querySelector('input')).toBe(original);
+		expect(container.querySelector('span')?.textContent).toBe('ready');
+		await act(() => first.resolve());
+		expect(container.querySelector('input')).toBe(original);
+		expect(firstReady).not.toHaveBeenCalled();
+		expect(calls).toHaveLength(0);
+		expect(onRef).not.toHaveBeenCalled();
+		await act(() => second.resolve());
+		expect(container.querySelector('input')).toBe(original);
+		expect(original.value).toBe('typed');
+		expect(firstReady).not.toHaveBeenCalled();
+		expect(calls).toEqual([
+			{
+				receiver: expect.objectContaining({ onReady: latestReady, domain: 'original' }),
+				value: 'server',
+			},
+		]);
+		expect(onRef).toHaveBeenCalledOnce();
+		expect(onRef).toHaveBeenCalledWith(original);
+	});
+
+	it.each([
 		'no update',
 		'unrelated update',
 		'changed nonblocking',
@@ -191,7 +378,7 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 				id: '/src/gate.tsrx',
 				runtimeModules: {
 					'octane/signals': Signals,
-					'octane/internal/signal-read': { __hydrationSignalRevision },
+					'octane/internal/hydration-signal': { __hydrationSignalRevision },
 					'./selection': { selection$ },
 				},
 			});

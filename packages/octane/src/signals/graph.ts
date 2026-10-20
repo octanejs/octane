@@ -750,7 +750,7 @@ function settleThrown(wakeup: Wakeup, thrown: object): void {
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	/** Recognize a native node without observing an arbitrary imported value. */
 	static hasNativeBrand(value: object): value is ScopedNode {
-		return #buildState in value;
+		return #nativeSnapshotSource in value;
 	}
 
 	get [SIGNAL_HANDLE](): true {
@@ -782,7 +782,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	wakeup: Wakeup | undefined;
 	nativeSource: NativeReadSource | undefined;
 	nativeLatestSource: NativeReadSource | undefined;
-	nativeSnapshotSource: NativeReadSource | undefined;
+	#nativeSnapshotSource: NativeReadSource | undefined;
 	/** A resource's retry. Kept in a field so an async node keeps the shared layout. */
 	retryRequest: ((options?: { pending?: boolean }) => void) | undefined = undefined;
 	/**
@@ -792,7 +792,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	pending: PendingSlotLike | undefined = undefined;
 
 	get state(): NodeState<T> | undefined {
-		if (this.valueOnly && this.storedState === undefined) this.#buildState();
+		if (this.valueOnly && this.storedState === undefined) this.buildState();
 		return this.storedState;
 	}
 
@@ -810,13 +810,13 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		this.storedLastState = state;
 	}
 
-	#buildState(): void {
+	private buildState(): void {
 		this.storedState = this.storedLastState = readyState(this.last as T);
 	}
 
 	/** Leave value-only: the built states become ordinary stored states. */
 	private storeStates(): void {
-		if (this.storedState === undefined) this.#buildState();
+		if (this.storedState === undefined) this.buildState();
 		this.valueOnly = false;
 	}
 
@@ -828,13 +828,14 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 
 	/** This node's native read channel for `read`, created on first use. */
 	nativeReadSource(read: SignalReadMode): NativeReadSource {
-		const field =
-			read === 'value'
-				? 'nativeSource'
-				: read === 'latest'
-					? 'nativeLatestSource'
-					: 'nativeSnapshotSource';
-		return (this[field] ??= createNativeSource(this, read));
+		if (read === 'value') return (this.nativeSource ??= createNativeSource(this, read));
+		if (read === 'latest') return (this.nativeLatestSource ??= createNativeSource(this, read));
+		return (this.#nativeSnapshotSource ??= createNativeSource(this, read));
+	}
+
+	/** The existing snapshot channel, without creating one during transition cleanup. */
+	get nativeSnapshotSource(): NativeReadSource | undefined {
+		return this.#nativeSnapshotSource;
 	}
 
 	constructor(

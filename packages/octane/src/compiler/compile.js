@@ -1841,7 +1841,7 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	}
 	if (local === (ctx.privateRuntimeAliases?.get(imported) ?? rtAlias(imported))) {
 		if (fallback === 'octane' && imported === '__hydrationSignalRevision')
-			return 'octane/internal/signal-read';
+			return 'octane/internal/hydration-signal';
 		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
 			return 'octane/internal/client';
 		}
@@ -7551,7 +7551,7 @@ function privateHydrationPropsSites(ctx) {
 // before the boundary. Record every first-level read so callers can prove it
 // was an own data property before setup. A zero-argument `.get()` may read a
 // signal or another nested receiver, never the ephemeral props record itself.
-function hydrationSetupExpression(node, propsName, required) {
+function hydrationSetupExpression(node, propsName, required, setupLocals) {
 	node = unwrapTsExpr(node);
 	if (!node) return false;
 	switch (node.type) {
@@ -7559,6 +7559,26 @@ function hydrationSetupExpression(node, propsName, required) {
 			return true;
 		case 'Identifier':
 			return node.name !== propsName && node.name !== 'arguments' && node.name !== 'eval';
+		case 'ChainExpression': {
+			const member = node.expression;
+			if (
+				member?.type !== 'MemberExpression' ||
+				!member.optional ||
+				staticDepMemberName(member) === null
+			)
+				return false;
+			let receiver = unwrapTsExpr(member.object);
+			if (receiver?.type === 'Identifier') receiver = unwrapTsExpr(setupLocals.get(receiver.name));
+			// The optional read stays in authored setup. Its receiver must be an
+			// own-data props field, possibly held by one preceding const local.
+			return (
+				receiver?.type === 'MemberExpression' &&
+				!receiver.optional &&
+				receiver.object?.type === 'Identifier' &&
+				receiver.object.name === propsName &&
+				hydrationSetupExpression(receiver, propsName, required, setupLocals)
+			);
+		}
 		case 'MemberExpression': {
 			const field = staticDepMemberName(node);
 			if (node.optional || field === null) return false;
@@ -7566,7 +7586,7 @@ function hydrationSetupExpression(node, propsName, required) {
 				required.add(field);
 				return true;
 			}
-			return hydrationSetupExpression(node.object, propsName, required);
+			return hydrationSetupExpression(node.object, propsName, required, setupLocals);
 		}
 		case 'CallExpression': {
 			const callee = unwrapTsExpr(node.callee);
@@ -7576,28 +7596,29 @@ function hydrationSetupExpression(node, propsName, required) {
 				callee?.type === 'MemberExpression' &&
 				!callee.optional &&
 				staticDepMemberName(callee) === 'get' &&
-				hydrationSetupExpression(callee.object, propsName, required)
+				hydrationSetupExpression(callee.object, propsName, required, setupLocals)
 			);
 		}
 		case 'UnaryExpression':
 			return (
-				node.operator !== 'delete' && hydrationSetupExpression(node.argument, propsName, required)
+				node.operator !== 'delete' &&
+				hydrationSetupExpression(node.argument, propsName, required, setupLocals)
 			);
 		case 'BinaryExpression':
 		case 'LogicalExpression':
 			return (
-				hydrationSetupExpression(node.left, propsName, required) &&
-				hydrationSetupExpression(node.right, propsName, required)
+				hydrationSetupExpression(node.left, propsName, required, setupLocals) &&
+				hydrationSetupExpression(node.right, propsName, required, setupLocals)
 			);
 		case 'ConditionalExpression':
 			return (
-				hydrationSetupExpression(node.test, propsName, required) &&
-				hydrationSetupExpression(node.consequent, propsName, required) &&
-				hydrationSetupExpression(node.alternate, propsName, required)
+				hydrationSetupExpression(node.test, propsName, required, setupLocals) &&
+				hydrationSetupExpression(node.consequent, propsName, required, setupLocals) &&
+				hydrationSetupExpression(node.alternate, propsName, required, setupLocals)
 			);
 		case 'TemplateLiteral':
 			return node.expressions.every((expression) =>
-				hydrationSetupExpression(expression, propsName, required),
+				hydrationSetupExpression(expression, propsName, required, setupLocals),
 			);
 		default:
 			return false;
@@ -7669,6 +7690,75 @@ function hydrationBlockingBodies(ctx, bodies) {
 	return [{ ...bodies[0], stmts }, ...bodies.slice(1)];
 }
 
+// A layout callback is published only after an arm commits. Dependency
+// inference still evaluates its method witness during render, so require that
+// field to be own data without treating the callback as a blocking input.
+// Change only this analysis copy; the emitted hook, deps and receiver stay intact.
+function hydrationLayoutBodies(ctx, bodies, propsName, required) {
+	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
+	if (methodDepLocal === undefined) return bodies;
+	const stmts = bodies[0].stmts;
+	let next = null;
+	for (let index = 0; index < stmts.length; index++) {
+		const statement = stmts[index];
+		const effect = statement.type === 'ExpressionStatement' ? statement.expression : null;
+		if (effect?._octaneImportedHook !== 'useLayoutEffect' || effect.arguments.length !== 2)
+			continue;
+		const [callback, deps] = effect.arguments;
+		if (
+			callback?.type !== 'ArrowFunctionExpression' ||
+			callback.async ||
+			callback.params.length !== 0 ||
+			callback.body.type !== 'BlockStatement' ||
+			callback.body.body.length !== 1 ||
+			callback.body.body[0].type !== 'ExpressionStatement' ||
+			deps?.type !== 'ArrayExpression' ||
+			deps.elements.length !== 2
+		)
+			continue;
+		const expression = callback.body.body[0].expression;
+		const invoked = expression.type === 'ChainExpression' ? expression.expression : expression;
+		const member = invoked?.callee;
+		const argument = invoked?.arguments?.[0];
+		const field = staticDepMemberName(member);
+		const [method, value] = deps.elements;
+		if (
+			invoked?.type !== 'CallExpression' ||
+			invoked.arguments.length !== 1 ||
+			member?.type !== 'MemberExpression' ||
+			member.optional ||
+			field === null ||
+			member.object?.type !== 'Identifier' ||
+			member.object.name !== propsName ||
+			argument?.type !== 'Identifier' ||
+			argument.name === propsName ||
+			method?.type !== 'CallExpression' ||
+			method.optional ||
+			method.callee?.type !== 'Identifier' ||
+			method.callee.name !== methodDepLocal ||
+			method.arguments.length !== 2 ||
+			method.arguments[0]?.type !== 'Identifier' ||
+			method.arguments[0].name !== propsName ||
+			method.arguments[1]?.type !== 'Literal' ||
+			method.arguments[1].value !== field ||
+			value?.type !== 'Identifier' ||
+			value.name !== argument.name
+		)
+			continue;
+		// The helper alias is allocated against every authored identifier before
+		// inference, so an explicit dependency list cannot counterfeit this call.
+		required.add(field);
+		(next ??= stmts.slice())[index] = {
+			...statement,
+			expression: {
+				...effect,
+				arguments: [b.arrow([], b.block([])), { ...deps, elements: [value] }],
+			},
+		};
+	}
+	return next === null ? bodies : [{ ...bodies[0], stmts: next }, ...bodies.slice(1)];
+}
+
 // An exported component can also receive arbitrary caller-owned props. Its
 // comparator requires provenance from each actual invocation: same-module JSX
 // sites prove own fields statically; imported spreads use a callable capability.
@@ -7694,7 +7784,7 @@ function exportedHydrationPropsPlans(ctx) {
 			continue;
 		const propsName = component.params[0].name;
 		const required = new Set();
-		const setupLocals = new Set();
+		const setupLocals = new Map();
 		let derived = null;
 		let safe = true;
 		for (const setup of component.body.body) {
@@ -7736,16 +7826,21 @@ function exportedHydrationPropsPlans(ctx) {
 					confinedHydrationDerivedRead(component.body.render, declaration.id.name)
 				)
 					derived = { name: declaration.id.name, field: proof.field };
-				else if (!hydrationSetupExpression(declaration.init, propsName, required)) {
+				else if (!hydrationSetupExpression(declaration.init, propsName, required, setupLocals)) {
 					safe = false;
 					break;
 				}
-				setupLocals.add(declaration.id.name);
+				setupLocals.set(declaration.id.name, declaration.init);
 			}
 			if (!safe) break;
 		}
 		if (!safe) continue;
-		const bodies = tryBodies(component.body.render, ctx);
+		const bodies = hydrationLayoutBodies(
+			ctx,
+			tryBodies(component.body.render, ctx),
+			propsName,
+			required,
+		);
 		const fields = hydrationPropsFields(
 			ctx,
 			propsName,

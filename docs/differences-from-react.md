@@ -1069,8 +1069,9 @@ When initial hydration suspends, an unrelated parent update can leave the
 server-rendered boundary in place when Octane can prove the update does not
 change the suspended request or rendered presentation. This preserves the
 original DOM nodes and pre-hydration edits while the boundary waits. React 19
-can instead render the updated boundary on the client. Changed or unprovable
-relevant inputs still supersede Octane's unfinished hydration.
+can instead render the updated boundary on the client, though memoization or a
+transition can avoid that fallback. Changed or unprovable relevant inputs still
+supersede Octane's unfinished hydration.
 
 Uncontrolled `defaultValue` updates change an input or textarea's reset baseline
 without replacing its live value. A select uses `defaultValue` on mount and

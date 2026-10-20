@@ -1,4 +1,4 @@
-import { afterEach } from 'vitest';
+import { afterEach, expect } from 'vitest';
 import { drainPassiveEffects } from '../src/index.js';
 import './_render-write-guard.js';
 
@@ -10,6 +10,14 @@ import './_render-write-guard.js';
 // act-wrapped auto-cleanup.
 afterEach(() => {
 	drainPassiveEffects();
+	// Resolve the current runtime graph after suites that reset modules. A
+	// discarded nested attempt must release its pending adoption as well.
+	if (
+		/[/\\]packages[/\\]octane[/\\]tests[/\\]hydration[/\\]/.test(expect.getState().testPath ?? '')
+	)
+		return import('../src/hydration-flag.js').then(({ pendingInitialHydrations }) => {
+			expect(pendingInitialHydrations).toBe(0);
+		});
 });
 
 if (process.env.OCTANE_HYDRATION_PROBE_AUDIT) await import('./_hydration-probe-audit.js');

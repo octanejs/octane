@@ -364,6 +364,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'withSlot',
 	],
 	'./internal/signal-read': ['readNativeDomValue'],
+	'./internal/hydration-signal': ['__hydrationSignalRevision'],
 	'./internal/context': ['isContext', 'registerContext'],
 	'./internal/client': [
 		'queueOwnRefDetach',

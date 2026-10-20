@@ -563,7 +563,6 @@ const ORDER_BASELINE = new Set([
 	'renderBlock > CURSOR',
 	'seedOrCreate > HYDRATION_PASS',
 	'setHostProps > DESCRIPTOR_FORM_ACTION',
-	'teardownTrySlot > initialSuspenseHydrations',
 	'unmountSlot > UNMOUNT_LITE_ARM',
 	'useBatch > HYDRATION_PASS',
 	'useSyncExternalStore > CURSOR',
