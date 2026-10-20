@@ -125,9 +125,10 @@ test('retrying deeper signal-owner trees bounds ancestry copying', async (t) => 
 		assert.deepEqual(shallow.visible, clean.visible);
 		assert.deepEqual(deep.visible, clean.visible);
 		t.diagnostic(`concat entries: depth 16 ${shallow.copied}; depth 64 ${deep.copied}`);
+		// Allow a small fixed amount of incidental work in the measured transition window.
 		assert.ok(
-			deep.copied <= shallow.copied * 9,
-			'four times the depth should not copy quadratically more entries',
+			deep.copied <= shallow.copied + 16,
+			'four times the depth should not meaningfully increase copied entries',
 		);
 	} finally {
 		window.close();
