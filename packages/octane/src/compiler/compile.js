@@ -24530,7 +24530,9 @@ function serverValueDirectiveFold(
 			'opaque',
 			null,
 			true,
-			true,
+			// Only a component retained in the extracted client template can
+			// inherit the renderer's range. An ordinary component becomes a hole.
+			requiresTemplateNormalization(preparedDirective, parentNs, true, ctx),
 		);
 		inlinedSubs.push(sub.fn);
 		ctx.hoistedHelpers.push(
