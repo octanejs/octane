@@ -24530,8 +24530,8 @@ function serverValueDirectiveFold(
 			'opaque',
 			null,
 			true,
-			// Only a component retained in the extracted client template can
-			// inherit the renderer's range. An ordinary component becomes a hole.
+			// Mirror lowerHostFragment's templateComponentChildren: only a component
+			// retained in the extracted client template inherits the renderer's range.
 			requiresTemplateNormalization(preparedDirective, parentNs, true, ctx),
 		);
 		inlinedSubs.push(sub.fn);

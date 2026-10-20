@@ -21,11 +21,16 @@ const inspect = (value: unknown) =>
 const clone = (value: Client.OctaneNode) =>
 	Client.cloneElement(value as Client.ElementDescriptor, { title: 'cloned' });
 
-it.each([true, false])(
-	'preserves sibling input while hydrating a conditional render block (dev: %s)',
-	(dev) => {
-		const source = `
-		'use strong';
+for (const dev of [true, false]) {
+	for (const strong of [true, false]) {
+		it.each([
+			['plain child', '@{ <Child /> }'],
+			['template child', '@{ <Frame>@if (show) { <Child /> }</Frame> }'],
+		])(
+			`preserves sibling input while hydrating a %s render block (dev: ${dev}, strong: ${strong})`,
+			(_, content) => {
+				const source = `
+		${strong ? "'use strong';" : ''}
 		import { useState } from 'octane';
 		function Slot({ content }) @{ <section>{content}</section> }
 		function Frame({ children }) @{ <aside>{children}</aside> }
@@ -35,29 +40,30 @@ it.each([true, false])(
 		}
 		export function View({ show }) @{
 			<main>
-				<Slot content={show ? @{ <Child /> } : undefined} />
-				<Slot content={show ? @{ <Frame>@if (show) { <Child /> }</Frame> } : undefined} />
+				<Slot content={show ? ${content} : undefined} />
 				<input defaultValue="draft" />
 			</main>
 		}
 	`;
-		const options = { id: '/conditional-render-block.tsrx', compileOptions: { dev, hmr: false } };
-		const serverView = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
-		const clientView = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
-		container = document.createElement('div');
-		container.innerHTML = Server.renderToString(serverView['View'], { show: true }).html;
-		const input = container.querySelector('input')!;
-		input.value = 'typed before hydration';
-		root = Client.hydrateRoot(container, clientView['View'], { show: true });
-		Client.flushSync(() => {});
-		expect(container.querySelector('input')).toBe(input);
-		expect(input.value).toBe('typed before hydration');
-		expect([...container.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
-			'Action',
-			'Action',
-		]);
-	},
-);
+				const options = {
+					id: '/conditional-render-block.tsrx',
+					compileOptions: { dev, hmr: false },
+				};
+				const serverView = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+				const clientView = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+				container = document.createElement('div');
+				container.innerHTML = Server.renderToString(serverView['View'], { show: true }).html;
+				const input = container.querySelector('input')!;
+				input.value = 'typed before hydration';
+				root = Client.hydrateRoot(container, clientView['View'], { show: true });
+				Client.flushSync(() => {});
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed before hydration');
+				expect(container.querySelector('button')?.textContent).toBe('Action');
+			},
+		);
+	}
+}
 
 for (const mode of ['render', 'hydrate'] as const) {
 	describe(`Strong named render values (${mode})`, () => {
