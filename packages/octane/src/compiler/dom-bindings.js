@@ -1388,7 +1388,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				inheritHookMemoOrigin(b.const(b.id(declaration.id.name), declaration.init), declaration),
 			),
 	);
-	const plan = {
+	return {
 		fn,
 		render,
 		nodes,
@@ -1405,9 +1405,8 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		id,
 		hostHandoff,
 		unboundAttributes,
+		allSetupProjected: native === null && read.size === aliases.size,
 	};
-	if (native === null) plan.allSetupProjected = read.size === aliases.size;
-	return plan;
 }
 
 function literalData(value) {
@@ -2862,7 +2861,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			!scalar.addressed &&
 			scalar.nodes.every(([, , , children]) => children !== null) &&
 			scalar.bindings.length > 0 &&
-			scalar.bindings.every(([, kind]) => kind !== 'text' && kind !== 'control');
+			// The program's handoff proof cannot transfer native control ownership.
+			scalar.bindings.every(([, kind]) => kind !== 'control');
 		if (structural || fixedSetup || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,

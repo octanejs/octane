@@ -90,41 +90,107 @@ for (const dev of [false, true]) {
 	describe(`composed binding views (${dev ? 'dev' : 'prod'})`, () => {
 		const options = { dev, hmr: false, strong: !dev };
 
-		it('hands a complete fixed view with a pure setup local to hydration', async () => {
-			const load = moduleGraph(
-				{
-					'/src/action.tsrx': `export function Action(props) @{ 'use dom bindings';
- const disabled = props.disabled === true;
- <button disabled={disabled}>Act</button>;
+		it.each([
+			{
+				channel: 'attribute',
+				setup: 'const disabled = props.disabled === true;',
+				view: '<button disabled={disabled}>Act</button>',
+				read: (button: HTMLButtonElement) => button.disabled,
+				early: true,
+				updated: false,
+			},
+			{
+				channel: 'text',
+				setup: 'const label = props.label;',
+				view: '<button>{label as string}</button>',
+				read: (button: HTMLButtonElement) => button.textContent,
+				early: 'Early',
+				updated: 'Updated',
+			},
+		])(
+			'hands a complete fixed $channel view with a pure setup local to hydration',
+			async (test) => {
+				const load = moduleGraph(
+					{
+						'/src/action.tsrx': `export function Action(props) @{ 'use dom bindings';
+ ${test.setup}
+ ${test.view};
 }`,
-					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+						'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
 import { Action } from './action.tsrx';
 export function adopt(root, state) { return adoptBindings(root, Action, state); }`,
+					},
+					options,
+				);
+				const state = source({ disabled: false, label: 'Server' });
+				document.body.innerHTML = renderToString(
+					load('./action.tsrx', 'server')['Action'] as never,
+					state.getSnapshot(),
+				).html;
+				const button = document.querySelector('button')!;
+				const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
+				let root: ReturnType<typeof hydrateRoot> | undefined;
+				try {
+					state.publish({ disabled: true, label: 'Early' });
+					expect(test.read(button)).toBe(test.early);
+					const Action = load('./action.tsrx', 'client')['Action'] as never;
+					root = hydrateRoot(document.body, Action, state.getSnapshot(), {
+						bindingLeases: [binding],
+					});
+					await act(() => {});
+					expect(document.querySelector('button')).toBe(button);
+					expect(state.subscriptions.size).toBe(0);
+					await act(() => root!.render(Action, { disabled: false, label: 'Updated' }));
+					expect(test.read(button)).toBe(test.updated);
+				} finally {
+					root?.unmount();
+					binding.dispose();
+				}
+			},
+		);
+
+		it('keeps a controlled binding active when hydration cannot take it over', () => {
+			const load = moduleGraph(
+				{
+					'/src/field.tsrx': `export function Field(props) @{ 'use dom bindings';
+ const value = props.value;
+ <input value={value} />;
+}`,
+					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { Field } from './field.tsrx';
+export function adopt(root, state) { return adoptBindings(root, Field, state); }`,
 				},
 				options,
 			);
-			const state = source({ disabled: false });
+			const state = source({ value: 'Server' });
 			document.body.innerHTML = renderToString(
-				load('./action.tsrx', 'server')['Action'] as never,
+				load('./field.tsrx', 'server')['Field'] as never,
 				state.getSnapshot(),
 			).html;
-			const button = document.querySelector('button')!;
-			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
-			let root: ReturnType<typeof hydrateRoot> | undefined;
+			const input = document.querySelector('input')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(input, state);
 			try {
-				state.publish({ disabled: true });
-				expect(button.disabled).toBe(true);
-				const Action = load('./action.tsrx', 'client')['Action'] as never;
-				root = hydrateRoot(document.body, Action, state.getSnapshot(), {
-					bindingLeases: [binding],
-				});
-				await act(() => {});
-				expect(document.querySelector('button')).toBe(button);
-				expect(state.subscriptions.size).toBe(0);
-				await act(() => root!.render(Action, { disabled: false }));
-				expect(button.disabled).toBe(false);
+				state.publish({ value: 'Early' });
+				expect(input.value).toBe('Early');
+				input.value = 'Typed';
+				expect(() =>
+					hydrateRoot(
+						document.body,
+						load('./field.tsrx', 'client')['Field'] as never,
+						state.getSnapshot(),
+						{
+							bindingLeases: [binding],
+						},
+					),
+				).toThrow(
+					'Hydration binding leases require active fixed native views owned by this container.',
+				);
+				expect(document.querySelector('input')).toBe(input);
+				expect(input.value).toBe('Typed');
+				expect(state.subscriptions.size).toBe(1);
+				state.publish({ value: 'Updated' });
+				expect(input.value).toBe('Updated');
 			} finally {
-				root?.unmount();
 				binding.dispose();
 			}
 		});
