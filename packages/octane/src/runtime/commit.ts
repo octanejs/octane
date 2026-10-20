@@ -831,9 +831,10 @@ export function listRun(next: SlotNext, anchor: Node): DocumentFragment {
  *
  * Slot 0 only holds a bag when the body has a template root; a body made purely
  * of control flow puts its first block slot there instead (`tryBlock(__s, 0, …)`).
- * Fixed-arity bags have a private brand. The spill bagOf path retains the
- * `__kind` test so user-supplied keys cannot impersonate a runtime slot or a
- * fixed bag; restoring a boundary's own state as a bag would corrupt its hold.
+ * The private brand holds a nonnegative fixed arity, or -1 for a
+ * compiler-owned spill bag that caches its DOM parent. Both can be rehomed at commit, but a
+ * spill keeps the generic exact snapshot. Unbranded integrations retain the
+ * `__kind` test so a runtime slot is never restored as a bag.
  */
 export const BINDING_BAG_ARITY = Symbol();
 // Keep one spread site per arity for monomorphic cloning, without an extra call.
@@ -892,7 +893,7 @@ export function journalBag(): void {
 	const bag = scope.slots[0];
 	if (bag === null || typeof bag !== 'object') return;
 	const arity = (bag as any)[BINDING_BAG_ARITY];
-	if (arity !== undefined) {
+	if (arity !== undefined && arity !== -1) {
 		const window = TRANSITION_JOURNAL_BAG_WINDOW;
 		if (bag.__journalWindow === window) return;
 		const snapshot = cloneBindingBag(bag, arity);
