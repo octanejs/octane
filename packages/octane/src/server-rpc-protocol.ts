@@ -2,6 +2,14 @@ import { yieldForHostBudget } from './host-budget.js';
 import { decodeSignalValue, encodeSignalValue } from './data-encoding.js';
 import type { EncodedSignalValue } from './signals/types.js';
 
+declare global {
+	// devalue's bundled types name Float16Array, which only ES2025 libs declare
+	// (esnext.float16 on TypeScript 5.9). Both devalue RPC sides import this
+	// module, so this empty declaration keeps ES2024 consumers compiling; its
+	// type parameter matches lib's, so it merges with the real interface.
+	interface Float16Array<TArrayBuffer extends ArrayBufferLike = ArrayBufferLike> {}
+}
+
 /** The streamed protocol is opt-in; legacy devalue RPC remains unchanged. */
 export const SERVER_RESULT_CONTENT_TYPE = 'application/x-octane-rpc+ndjson';
 

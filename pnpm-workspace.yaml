@@ -359,7 +359,7 @@ catalogs:
     '@visx/zoom': 4.0.0
     '@use-gesture/react': 10.3.1
     '@use-gesture/core': 10.3.1
-    devalue: ^5.8.2
+    devalue: ^6.0.3
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
     esrap: ^2.3.2
