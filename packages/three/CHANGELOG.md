@@ -1,5 +1,73 @@
 # @octanejs/three
 
+## 0.1.60
+
+### Patch Changes
+
+- 175b85d: Render the Canvas DOM boundary as a Strong template and publish committed callback updates through effect events. Preserve asynchronous renderer setup, retained scene ownership, and discrete event timing.
+- 5dc82f5: Commit Three discrete mesh-event updates before the native listener returns without flushing unrelated deferred transitions.
+- Updated dependencies [069aa15]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [59e83ac]
+- Updated dependencies [6ad2083]
+- Updated dependencies [2c635ad]
+- Updated dependencies [6d1f75e]
+- Updated dependencies [bfccf26]
+- Updated dependencies [b8b772a]
+- Updated dependencies [175b85d]
+- Updated dependencies [d57645f]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [da83e7a]
+- Updated dependencies [12e2417]
+- Updated dependencies [175b85d]
+- Updated dependencies [996a44e]
+- Updated dependencies [3c8272e]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [d91942b]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [ab18fa6]
+- Updated dependencies [1924a92]
+- Updated dependencies [217ce34]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [4a33765]
+- Updated dependencies [bb2f650]
+- Updated dependencies [1842a3a]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [175b85d]
+- Updated dependencies [3203b52]
+- Updated dependencies [5dc82f5]
+- Updated dependencies [ed24d6b]
+- Updated dependencies [9bceb81]
+- Updated dependencies [175b85d]
+- Updated dependencies [e62eee2]
+- Updated dependencies [c144725]
+  - octane@0.14.0
+
 ## 0.1.59
 
 ### Patch Changes

@@ -1,5 +1,249 @@
 # octane
 
+## 0.14.0
+
+### Minor Changes
+
+- 175b85d: Render computes, commit writes, for compiled template bindings. An update now
+  records changed text, attribute, class, style, event-handler and
+  controlled-form values, and a commit function the compiler generates per
+  template writes them at commit, before refs and effects. A transition or
+  other render that is dropped never touches the DOM, and an event during a held
+  transition calls the committed handler.
+
+  As in React, an update coerces attribute and style values while it commits, so
+  an error from a value's `toString` reaches the nearest error boundary as a
+  commit-phase error instead of a render error. Mounts still write as they render.
+- 175b85d: A dormant `<Hydrate>` island whose captures or provided context values changed
+  before it activated now hydrates first, as React hydrates a dehydrated boundary
+  before the update that reached it, instead of rendering on the client. The
+  newer values then apply as an update in a render of their own. This changes
+  what an island observes when a parent update reaches it before activation:
+
+  - The island's first render runs with the captures and context values its
+    server HTML was rendered with.
+  - Its effects mount with that first render's values, then update.
+  - A callback ref that the update replaces goes from the server node to `null`
+    and back to the node.
+  - In development, server attributes that differ from the captures the island
+    was claimed with now log the "won't be patched up" warning, as in any other
+    hydration pass, and a structural difference from them is reported as a
+    mismatch.
+  - The update patches the adopted server nodes, including any draft the user
+    typed in them, instead of replacing them with client-rendered ones.
+
+  An update that reaches an island while its hydration attempt waits on data
+  still leaves the server HTML in place until the attempt retries, an intentional
+  difference from React that `docs/differences-from-react.md` records.
+- 175b85d: A descriptor list item (an array of `createElement` or `.tsx` children) now
+  serializes without a comment range of its own whenever it renders exactly one
+  host element and no component or portal inside it, as a compiled `@for` row with one
+  element does. A host whose children are other elements or arrays no longer
+  gets a range. Hydration decides the same from the item's value, so an item
+  that arrives in a range it does not need, as from an older server, is a
+  structural mismatch: the nearest Suspense or `<Hydrate>` boundary, or the root,
+  renders on the client and reports one recoverable error.
+- 175b85d: Change the server HTML that hydration reads (hydration protocol version 3). A
+  value a component returns now renders directly inside that component's comment
+  range instead of in a second range of its own, as do the values of the
+  components it returns in turn: a component returning `<em>` serializes as
+  `<!--[--><em>…</em><!--]-->` rather than `<!--[--><!--[--><em>…</em><!--]--><!--]-->`.
+  A component that is a `@for` or `.map()` item's only content now keeps its own
+  range inside the item's, also when `.map()` runs another collection's `map`
+  method. A keyed or configured `<Activity>` in a `.tsx` component's returned JSX
+  passes its children to the server as a children block, as the client does. An
+  element's only child that is a signal holding text, or a ternary with a JSX arm
+  in a `.tsx` component's returned JSX, serializes as the element's bare text when
+  its value is text, as the client renders it. On the client, a component's
+  returned value renders inside the component's own markers on a fresh mount
+  too, so it adds no anchor comments.
+
+  Hydration now adopts by structure. The server frames every component call, and
+  a client call whose range the server did not render is a structural mismatch:
+  the nearest Suspense or `<Hydrate>` boundary, or the root, renders on the client
+  and reports one recoverable error, and the development warning names the call
+  site. So does a list, branch or text hole whose server range has another shape:
+  a list range without its item marker, a range around each row of a list whose
+  rows are one element each, a branch whose server arm is longer than the
+  client's, or a range where an element's only child is text. React adopts such a
+  tree when its DOM happens to match, as when the server rendered another branch
+  that renders a component's elements inline. As in React, a suspension in a
+  component's body still keeps the server HTML until it resolves. Every
+  structural mismatch, a server range without its close included, reaches
+  `onRecoverableError` as the same `HydrationMismatch` error.
+
+  Every hydratable root's server output now opens with a comment naming the
+  protocol version, `<!--3-->`, whether or not it seeds `use()` values, and so does
+  an independent `<Hydrate>` island's. Head metadata folded into a fragment root
+  comes before it, so `head + html` under `headChannel: 'separate'` is still the
+  folded output. The comment stays in the DOM, as the range comments do. A root
+  whose server rendered another version, or named none, renders on the client and
+  reports error 348 through `onRecoverableError`; a root that hydrates an app
+  container inside a server-rendered document finds the version before `<html>`.
+  Deploy the server and the client from the same Octane version.
+- 175b85d: Change the server HTML that hydration reads (hydration protocol version 2). A
+  Suspense boundary is now one comment range whose opening comment records what the
+  server rendered: `<!--[$:N-->` its content, `<!--[$?id-->` a streamed boundary,
+  or `<!--[$!rN-->` a boundary the client renders. The `oct-suspense:`,
+  `oct-seed:`, `oct-client:`, `oct-client-error:` and `oct-native-fresh:` comments
+  and the arm's own nested range are gone, and so is the range an `@if` or
+  `@switch` arm had inside its slot's. Pages carry fewer comment nodes.
+
+  The server and the client must come from the same Octane version: a root whose
+  server rendered another protocol version renders on the client and reports
+  error 348 through `onRecoverableError`. A presentation-binding view keeps its
+  own boundary and arm shapes.
+- 175b85d: Server rendering errors now follow React: the server never renders a `@catch` arm or an `<ErrorBoundary>` fallback.
+
+  A render error, or a rejected `use()`, inside a Suspense boundary (a `@try` with `@pending`, or `<Suspense>`) now reports through `onError` and ships that boundary's fallback, marked for the client to render, in `renderToString`, `prerender`, and streams before and after the shell. Previously the server rendered the boundary's `@catch` arm and serialized the rejection's name, message, and fields so hydration could adopt it. Now no part of the error reaches the page. `hydrateRoot` renders the boundary afresh from client data, starting its requests again, and reports it once through `onRecoverableError`. If the client render throws too, the boundary's `@catch` arm or the nearest client error boundary shows it, as in any client render.
+
+  A server error with no Suspense boundary above it, even inside a `@try` that has only `@catch` or an `<ErrorBoundary>`, now fails the render: `renderToString` throws, `prerender` rejects, and a stream fails its shell through `onShellError`. An app that relied on a server-rendered catch arm, such as a root `catch` boundary without a `pending` one, should wrap the content in a Suspense boundary, whose fallback the server sends while the browser renders the catch arm. An authored `@try`/`@pending` boundary inside `renderToString` now recovers a server error as `<Suspense>` did, instead of failing the render.
+
+  A `@try` with only `@catch` no longer holds a suspension on the server, matching React's error boundaries and Octane's client. While something inside it waits, the nearest Suspense boundary's fallback ships, instead of an empty placeholder for that `@try` alone, and with no Suspense boundary above it the shell waits.
+- 175b85d: Signal writes inside `startTransition` keep their fork semantics on the same
+  update queues as `useState`. A signal written in a transition keeps its
+  committed value for committed reads, subscriptions and DOM bindings, and gains
+  one pending value that the transition's renders and its synchronous callback
+  read. Those renders suspend, hold and commit with the transition's state
+  updates, and an urgent write rebases as a state update does. Two transitions
+  that write the same signal now commit together, as React entangles transitions
+  that update one queue; a later transition no longer replaces an earlier one's
+  write. A transition whose boundary shows its timeout fallback renders the rest
+  of its work in the next task, after the fallback commits.
+
+  Apps that use signals with transitions ship about 9.4 kB raw and 2.8 kB gzip
+  less framework code. Compiled DOM binding views and their controls drop the
+  transition preview path that no transition reaches any more, and ship 0.3 to
+  1.2 kB gzip less.
+- 175b85d: A streamed Suspense boundary whose content has not arrived when hydration
+  reaches it now keeps the server's fallback until the stream swaps the content
+  in, as React leaves a pending dehydrated boundary, instead of rendering on the
+  client at once. The swap then hydrates the server's content, adopting its nodes
+  and `use()` seeds. An update that reaches the boundary first still renders it
+  on the client, and a boundary the stream marks errored (`$OCTRX`) renders on
+  the client and reports once through `onRecoverableError`. The stream's swap and
+  error scripts call a retry the client leaves on the boundary's open comment, so
+  deploy the server and the client from the same Octane version.
+
+### Patch Changes
+
+- 069aa15: Upgrade `devalue` to 6.0.3 for faster serialization and improved malformed-input handling. Octane declares the `Float16Array` type devalue's typings name, so strict consumers on an ES2024 `lib` keep compiling.
+- 175b85d: Register compiler commit writers by cell without searching and sorting the plan.
+- 59e83ac: Reduce generated component code for native signal reads, recognized fixed-field attribute spreads, and signal-backed child bindings. Known attribute spread providers can opt into additional savings by declaring that successful returns are non-null.
+- 6ad2083: Reduce generated code for template helpers that capture multiple values.
+- 2c635ad: Move compiled Router failure presentation into the Strong match tree and preserve synchronous error reporting through the owning catch arm.
+- 6d1f75e: Avoid repeated whole-module scans when proving single-root components across conditional component chains.
+- bfccf26: Binding views can forward a closed parameter rest to a child view, adopt a native root inside a child's `@if` arm, and hand off composed native buttons to `hydrateRoot`. That includes closed-rest `disabled`, `hidden`, `type`, `command`, `commandfor`, `popovertarget` and `popovertargetaction` channels, unbound provider spreads inside structural views, and hosts behind pure `const` aliases. Renderer updates to a presentation view's host spread now write at commit.
+- b8b772a: Type-check dynamic `.tsrx` tags against the props of the selected element or component.
+- 175b85d: A `'use dom bindings'` view no longer writes the page while an Octane render is
+  running. When render code publishes to a binding's source or calls its
+  `refresh()`, the binding writes once that render returns, whether the root
+  commits it or drops it, so the next paint shows the new value as before.
+  Outside a render, notifications and `refresh()` still write synchronously.
+- d57645f: Keep unwrapped Effect Event updates independent of pending Actions. Wrap an Effect Event in `startTransition` to join a pending Action explicitly.
+- 175b85d: Float resource elements (`<link rel="stylesheet" precedence>`,
+  `<style href precedence>` and `<script async src>`) now reach `document.head`
+  when their render commits, as React DOM's do, instead of while it renders. A
+  render that never commits, or an arm that fails, inserts none of them. As in
+  React, a stylesheet resource the document lacks starts loading while it
+  renders, through a `<link rel="preload" as="style">`. Resource hints
+  (`preload`, `preinit`, `preinitModule`, `preloadModule`, `preconnect` and
+  `prefetchDNS`) are unchanged and insert when called.
+- 175b85d: Prevent keyed reorders from failing when the same update has already removed a focused link. Keep focus preservation through shadow roots while ignoring URL hosts on detached anchors.
+- 175b85d: A style update to a host that `<Activity mode="hidden">` or a showing Suspense
+  fallback hides now reaches the host at its render's commit, under the hide,
+  instead of while the render runs. A render that never commits leaves the hidden
+  host untouched, and a reveal in the same render writes the new style once the
+  hide lifts. A style value that fails to coerce at that commit reaches the
+  nearest error boundary, as other commit-time binding errors do.
+- 175b85d: Avoid redundant scoped-style validation when compiling style-free modules with multiple split hydration boundaries.
+- 175b85d: Hydrating a Suspense boundary, a `@try` or an `ErrorBoundary` no longer inserts
+  comment nodes into the server's HTML: the boundary's content keeps the server's
+  range. A fallback that later shows beside that content adds one comment with
+  its own nodes, when it commits.
+- 175b85d: A Suspense or `@try` boundary whose hydration suspended now retries alone when
+  its wakeable settles: only the boundary renders again, over its server arm, with
+  the inputs and context it holds, and its parent component does not run again.
+  A retry inside a hidden `<Activity>` stays hidden. An error that a resumed
+  boundary's render throws, and that no boundary catches, now reaches the root's
+  `onUncaughtError` instead of `console.error`, and the root unmounts, as React's
+  does. A root reports that error alone, not the hydration failure it replaced.
+- 175b85d: Hydrate an empty only-child range without replacing the server-rendered root.
+- 175b85d: A hydration attempt no longer changes the server's HTML while it renders.
+  What it would have changed waits for the commit of the attempt that completes:
+  the Text for an empty server text, a Suspense, `@try` or `ErrorBoundary`
+  boundary the client renders instead of the server's arm (one the server could
+  not finish, a streamed one whose content has not arrived, or one whose content
+  throws on the client), a `<Hydrate>` island or root that falls back, and the
+  client render that replaces them. A dropped attempt, such as one that
+  suspends, leaves the page exactly as the server sent it, with no mutation for
+  a `MutationObserver` to report, and its retry adopts the server DOM afresh.
+- 175b85d: A root whose returned component's server markup has no hydration range, which
+  only a server other than Octane's renders, no longer adopts that markup as if
+  it had one: as for any other markup that does not match the client render, the
+  root renders on the client and reports one recoverable error. Octane's server
+  renders a root's returned component in a range of its own, which hydration
+  adopts as before.
+- da83e7a: Preserve keyed list order and surviving rows when inserting a row suspends.
+- 12e2417: Reduce nested streaming SSR cleanup work while preserving boundary output, abandoned fallback cleanup, and resolution-wave delivery.
+- 175b85d: Reduce compiled-list bundle size by keeping host-upgrade bookkeeping in the descriptor renderer.
+- 996a44e: Report `OCTANE_NATIVE_SIGNAL_IMPORT` when the compiler can identify a native signal read during rendering in a module without a signals runtime import. Add `import 'octane/signals';` to the consuming module when no named signals API is needed.
+- 3c8272e: Avoid quadratic Promise memo lookup when universal and native renderers suspend and retry many sibling components. Preserve each request's owner identity and dependencies while releasing the lookup index after rendering.
+- 175b85d: Preserve server-rendered input state when a custom mapped result is reused or a server render starts inside another render. Respect an incompatible root protocol even when the surrounding document uses a compatible version, and stage a markerless host's keyed replacement until commit.
+- 175b85d: Reduce client bundle size when applications do not register capture-phase event handlers.
+- d91942b: Preserve pending signal work when a transition accepts a snapshot or latest-value presentation.
+- 175b85d: A server render that reads a pending or failed query through `snapshot()` no
+  longer throws "A completed native server read has no serializable ready value"
+  once the server has loaded a module that reads signals. The snapshot renders
+  the state as it is and adds nothing to the hydration snapshot, rather than an
+  invented ready value: the client resolves that state itself, or takes the
+  result a stream delivers, as it does when no module reads signals. A completed
+  `get()` of a value that is not ready still throws.
+- 175b85d: Remove a Provider's previous children when they become `null` or `undefined`, for both a `.tsx` `<Context value>` and `CompiledContext`. They used to stay mounted, with their effects and state, until the Provider rendered children again.
+- 175b85d: Validate serialized retained signal owners directly, without retaining optional transition operations through the graph bridge.
+- ab18fa6: Avoid controlled form warnings from controls discarded before commit.
+- 1924a92: Commit Router Link's transition cue through Octane's scheduled interaction work before navigation callbacks, while leaving unrelated deferred transition work scheduled.
+- 217ce34: Accept genuine same-origin iframe AbortSignals for browser server-function calls while continuing to reject signal lookalikes.
+- 175b85d: `renderToString(<App />)` and the other server entry points render a component
+  element as its component's root, so `hydrateRoot` with either entry form adopts
+  it.
+- 175b85d: Render `@catch` and `<ErrorBoundary>` fallbacks for server render errors, including rejected suspended work. `@pending` handles suspension rather than errors, so applications can use the same error boundary on the server and client.
+- 175b85d: Shrink apps that never use signals by about 4.4 kB raw (1.6 kB gzip). A renderable child now looks for a signal handle only once the signal engine has loaded or a module has enabled signal bindings, so a bundle without signals drops that detection and the code behind it. A handle passed through an opaque child still renders and updates, including one from a lazily imported module.
+- 175b85d: Reduce signal and transition bundle overhead by sharing graph flag constants directly.
+- 175b85d: Ship DevTools inspection of signal reads only in profiling builds. Native read sources, the native read driver and retry leases now carry their inspection metadata only when Octane's profiling flag is on, which takes about 1.1 kB raw (0.3 kB gzip) out of production apps that use signals. A DOM binding still ends quietly when the scope it observes retires.
+- 175b85d: Reduce production bundle size for applications that do not use signal ownership.
+- 175b85d: A server render now collects the signal values it reads for the hydration
+  snapshot whenever the application uses signals. Before, it collected only once
+  a module that reads signals had loaded somewhere in the server process, so the
+  same page could render with or without its snapshot. Hydration then presents
+  the server's value and applies the client's newer one as an update, as React
+  hydrates a `useSyncExternalStore` value from `getServerSnapshot`: a control
+  keeps its server node, focus and any captured command, instead of rendering on
+  the client. A signal the server's snapshot of a scope lacks is read live during
+  hydration, suspending while it is pending, as it is when there is no snapshot.
+  A page that reads no signals still adds no snapshot.
+- 4a33765: Limit controlled radio restoration and signal publication to native named candidates, avoiding repeated scans of unrelated form controls while preserving external form association and native group behavior.
+- bb2f650: Reduce mounted component memory by reserving the initial scope slot without growing an empty array's backing storage.
+- 1842a3a: Keep accepted derived signal declarations current when an earlier pending transition finishes.
+- 175b85d: Validate streamed selection identities directly during registration.
+- 175b85d: Avoid serializing scoped styles twice when streaming the server-rendered shell.
+- 3203b52: Make published runtime and router source compile with exact optional properties,
+  index-signature property checks, and explicit overrides, without requiring Node
+  ambient types for browser-only router components.
+
+  Keep fragment listener snapshots on one internal object shape while preserving
+  undefined native option defaults at the DOM boundary.
+- 5dc82f5: Commit Three discrete mesh-event updates before the native listener returns without flushing unrelated deferred transitions.
+- ed24d6b: Speed up mounting deeply nested component and context trees by caching the nearest full component owner on lightweight scopes.
+- 9bceb81: Support Router-owned executable templates through an internal compiler capability, preserving ordinary template inertness and adopting server scripts without replaying them during hydration.
+
+  Keep permanent static hydration ranges independent of the deferred activation implementation in client bundles.
+
+  Render Router-managed scripts with Strong keyed templates while preserving inline/external execution on navigation, managed keys, CSP nonces and self-removing Start transport. Preserve server-only scroll-restoration content in a static hydration range and remove it after hydration.
+- 175b85d: Make signal writes and reads cheaper. A writable signal, and a derived value whose result is plain and ready, now keeps only its value: writing, recomputing and reading it no longer allocate snapshot objects, which are built only when `snapshot()`, a subscriber or serialization asks for one. A `set()` with no subscribers runs about 3 times faster, and a write that recomputes a derived value about 1.5 times faster. Resource cells now share the same object layout as every other signal.
+- e62eee2: Avoid rescanning every ViewTransition boundary for each element scope when finalizing a transition batch.
+- c144725: An urgent update (`flushSync`, an event's `setState`, or a layout-effect `setState`) no longer skips a View Transition whose update callback already committed. Like React, it skips only a transition that is still preparing; once the animation runs, the urgent commit changes the live DOM under it.
+
 ## 0.13.8
 
 ### Patch Changes
