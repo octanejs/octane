@@ -29017,6 +29017,9 @@ function planJsx(
 											: b.literal(null),
 									),
 								]),
+								// The compiler owns this literal; opt into rehoming only
+								// when a field actually caches the block's DOM parent.
+								...(bag.hosts.has('__block.parentNode') ? [b.literal(1)] : []),
 							),
 						),
 					),
@@ -30508,6 +30511,8 @@ function makeBag() {
 			if (r === undefined) throw new Error(`octane compiler: bag field ${key} never mounted`);
 			return r.name;
 		},
+		/** Host-to-field index used to prove whether the DOM parent was cached. */
+		hosts: byHost,
 		fields,
 	};
 }

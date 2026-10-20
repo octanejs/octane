@@ -2943,6 +2943,64 @@ describe.each([
 });
 
 describe('keyed component rows that an update inserts', () => {
+	it.each([7, 8])('opens a conditional sibling after replacing a row with %i bindings', (count) => {
+		const fields = Array.from({ length: count }, () => '<span title={id}></span>').join('');
+		const { App } = loadCompiledFixtureSource(
+			`
+import { use, useState } from 'octane';
+function Row({ id }) @{
+	const [expanded, setExpanded] = useState(false);
+	<>
+		<div><button onClick={() => setExpanded(true)}>Expand</button>${fields}</div>
+		@if (expanded) { <p>expanded</p>; }
+	</>;
+}
+function Gate({ gate }) @{
+	use(gate);
+	<i>ready</i>;
+}
+export function App({ items, gate }) @{
+	<section>
+		@for (const id of items; key id) { <Row id={id} />; }
+		@if (gate) { <Gate gate={gate} />; }
+	</section>;
+}`,
+			{
+				id: '/keyed-conditional-row.tsrx',
+				mode: 'client',
+				compileOptions: {
+					dev: process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod',
+					hmr: false,
+					strong: true,
+				},
+			},
+		);
+		const view = mount(App, { items: ['first'] });
+		try {
+			view.update(App, { items: ['second'] });
+			view.click('button');
+			const expanded = view.find('p');
+			expect(expanded.textContent).toBe('expanded');
+			expect(view.findAll('span').map((span) => span.getAttribute('title'))).toEqual(
+				Array(count).fill('second'),
+			);
+			view.update(App, { items: ['abandoned'], gate: new Promise(() => {}) });
+			expect(view.find('p')).toBe(expanded);
+			view.update(App, { items: ['left', 'second', 'right'] });
+			view.click('section > div:first-of-type button');
+			view.click('section > div:last-of-type button');
+			const paragraphs = view.findAll('p');
+			expect(paragraphs.map((paragraph) => paragraph.textContent)).toEqual([
+				'expanded',
+				'expanded',
+				'expanded',
+			]);
+			expect(paragraphs[1]).toBe(expanded);
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it.each([
 		['a hookless', InsertedRowList, ''],
 		['a hookful', InsertedHookRowList, ':0'],

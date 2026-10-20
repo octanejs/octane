@@ -630,7 +630,9 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 /* prettier-ignore */ export function bag14(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 14 }); }
 /* prettier-ignore */ export function bag15(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 15 }); }
 /* prettier-ignore */ export function bag16(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, p: any, $ = 0, next: any = null): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, __journalWindow: 0, $, next, [BINDING_BAG_ARITY]: 16 }); }
-/* prettier-ignore */ export function bagOf(s: Scope, r: Node | null, bag: any): any { return commitBag(s, r, bag); }
+// Only a compiler-owned literal that caches its DOM parent opts into the spill brand;
+// direct integrations retain their original object and generic journal path.
+/* prettier-ignore */ export function bagOf(s: Scope, r: Node | null, bag: any, compilerOwned?: 1): any { if (compilerOwned) bag[BINDING_BAG_ARITY] = -1; return commitBag(s, r, bag); }
 
 /**
  * Text-binding coercion, shared by htext / htextSwap / setText: null/undefined/
