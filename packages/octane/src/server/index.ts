@@ -248,6 +248,7 @@ export {
 	ssrArm,
 	ssrForItem,
 	ssrTry,
+	__runOnCatch,
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,

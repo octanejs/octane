@@ -129,6 +129,7 @@ export {
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
 	// `@try`/`@catch` as the language tooling's type-only virtual TSX spells it.
 	TsrxErrorBoundary,
+	__runOnCatch,
 	__createDiscreteEventListener,
 	__useCommittedState,
 	__useStateWithGetter,

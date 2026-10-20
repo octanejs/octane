@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 350,
+  "nextCode": 351,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2097,6 +2097,12 @@
       "message": "A committed render left %s pointing at the fragment it was built in. This is a bug in Octane.",
       "argumentCount": 1,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "350": {
+      "message": "__runOnCatch must be called from an active catch arm.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
       "status": "active"
     }
   }

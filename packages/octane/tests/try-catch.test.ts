@@ -1,8 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { flushSync, startTransition } from '../src/index.js';
+import { describe, it, expect, vi } from 'vitest';
+import { renderToString } from 'octane/server';
+import { __runOnCatch, flushSync, startTransition } from '../src/index.js';
 import { act, mount, nextPaint } from './_helpers';
-import { loadCompiledFixtureSource } from './_server-fixture';
-import { RenderBoundary, EffectBoundary, Nested, StatefulInside } from './_fixtures/try-catch.tsrx';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
+import {
+	RenderBoundary,
+	ReportingBoundary,
+	EffectBoundary,
+	Nested,
+	StatefulInside,
+} from './_fixtures/try-catch.tsrx';
 
 describe('tryBlock — render errors', () => {
 	it('catches a child render error and shows the fallback', () => {
@@ -29,6 +36,89 @@ describe('tryBlock — render errors', () => {
 		expect(r.find('.ok').textContent).toBe('rendered');
 		expect(r.findAll('.caught')).toHaveLength(0);
 		r.unmount();
+	});
+});
+
+describe('catch-arm reporting', () => {
+	it('reports once per catch entry before rendering its fallback', () => {
+		const state = { reported: undefined as unknown };
+		const report = vi.fn((error: unknown) => {
+			state.reported = error;
+		});
+		const props = { bang: false, label: 'first', state, report };
+		const r = mount(ReportingBoundary, props);
+		try {
+			expect(r.find('.ok').textContent).toBe('rendered');
+			expect(report).not.toHaveBeenCalled();
+			r.update(ReportingBoundary, { ...props, bang: true });
+			expect(r.find('.reported-catch').getAttribute('data-reported')).toBe('true');
+			expect(report).toHaveBeenCalledTimes(1);
+			r.update(ReportingBoundary, { ...props, bang: true, label: 'second' });
+			expect(r.find('.reported-catch span').textContent).toBe('second:render boom');
+			expect(report).toHaveBeenCalledTimes(1);
+			r.click('.reported-catch button');
+			expect(r.find('.reported-catch').getAttribute('data-reported')).toBe('true');
+			expect(report).toHaveBeenCalledTimes(2);
+			r.update(ReportingBoundary, props);
+			r.click('.reported-catch button');
+			expect(r.find('.ok').textContent).toBe('rendered');
+			expect(report).toHaveBeenCalledTimes(2);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('passes a reporting failure to the ancestor boundary', () => {
+		const report = vi.fn(() => {
+			throw new Error('delegated');
+		});
+		const r = mount(ReportingBoundary, { bang: true, label: '', state: {}, report });
+		try {
+			expect(r.find('.reporting-outer').textContent).toBe('Error: delegated');
+			expect(report).toHaveBeenCalledTimes(1);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('rejects reporting outside the direct catch arm', () => {
+		const report = vi.fn();
+		const invalidCatchArm = /active catch arm|Minified Octane error #350;/;
+		expect(() => __runOnCatch(report)).toThrow(invalidCatchArm);
+		const r = mount(ReportingBoundary, {
+			bang: true,
+			label: '',
+			state: {},
+			report,
+			fromChild: true,
+		});
+		try {
+			expect(r.find('.reporting-outer').textContent).toMatch(invalidCatchArm);
+			expect(report).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('reports a server catch before rendering its fallback', async () => {
+		const server = loadServerFixture<{ ReportingBoundary: typeof ReportingBoundary }>(
+			'packages/octane/tests/_fixtures/try-catch.tsrx',
+		);
+		const state = { reported: undefined as unknown };
+		const report = vi.fn((error: unknown) => {
+			state.reported = error;
+		});
+		const { html } = await renderToString(server.ReportingBoundary, {
+			bang: true,
+			label: 'server',
+			state,
+			report,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		expect(container.querySelector('.reported-catch')?.getAttribute('data-reported')).toBe('true');
+		expect(container.querySelector('.reported-catch span')?.textContent).toBe('server:render boom');
+		expect(report).toHaveBeenCalledTimes(1);
 	});
 });
 

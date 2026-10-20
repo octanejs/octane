@@ -83,6 +83,7 @@ function Item() @{
 function RecoverableItem() @{
 	const params = useParams({ from: '/items/$id' }) as { id: string };
 	if (params.id === 'broken') throw new Error('item render failed');
+	if (params.id === 'render-missing') throw notFound({ routeId: '/items', data: 'render missing' });
 	<Item />
 }
 

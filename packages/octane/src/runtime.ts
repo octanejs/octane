@@ -237,6 +237,7 @@ export {
 	Suspense,
 	ViewTransition,
 	ErrorBoundary,
+	__runOnCatch,
 	TsrxErrorBoundary,
 	setTransitionFallbackTimeout,
 	getTransitionFallbackTimeout,

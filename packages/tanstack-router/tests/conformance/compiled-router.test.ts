@@ -386,9 +386,14 @@ describe('opt-in compiled router rendering', () => {
 		view.unmount();
 	});
 
-	it('reports a render error once and recovers when its route match changes', async () => {
-		const onCatch = vi.fn();
-		const router = makeCompiledRouter('/items/broken', { renderError: true, onCatch });
+	it('keeps the selected fallback when reporting an error and recovers when its match changes', async () => {
+		const router = makeCompiledRouter('/items/broken', { renderError: true });
+		const route = Object.values(router.routesById).find(({ id }) => String(id) === '/items/$id')!;
+		const errorComponent = route.options.errorComponent;
+		const onCatch = vi.fn<(error: unknown) => void>(() =>
+			route.update({ errorComponent: undefined }),
+		);
+		route.update({ onCatch });
 		await router.load();
 		const view = mount(CompiledRouterProvider as any, { router });
 		try {
@@ -398,12 +403,38 @@ describe('opt-in compiled router rendering', () => {
 			expect(onCatch.mock.calls[0][0]).toMatchObject({ message: 'item render failed' });
 			const parent = view.find('.items-layout');
 
+			route.update({ errorComponent });
 			await router.navigate({ to: '/items/a' });
 			await settle();
 			expect(view.find('.items-layout')).toBe(parent);
 			expect(view.findAll('.route-error')).toHaveLength(0);
 			expect(view.find('.value').textContent).toBe('a:Name a');
 			expect(onCatch).toHaveBeenCalledTimes(1);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('places a render-time not-found at its owning route and recovers on navigation', async () => {
+		const onCatch = vi.fn();
+		const router = makeCompiledRouter('/items/render-missing', {
+			renderError: true,
+			onCatch,
+			parentOnCatch: onCatch,
+		});
+		await router.load();
+		const view = mount(CompiledRouterProvider as any, { router });
+		try {
+			await settle();
+			expect(view.find('.not-found').textContent).toBe('render missing');
+			expect(view.findAll('.items-layout')).toHaveLength(0);
+			expect(view.find('header').textContent).toBe('Routes');
+			expect(onCatch).not.toHaveBeenCalled();
+
+			await router.navigate({ to: '/items/a' });
+			await settle();
+			expect(view.findAll('.not-found')).toHaveLength(0);
+			expect(view.find('.value').textContent).toBe('a:Name a');
 		} finally {
 			view.unmount();
 		}
