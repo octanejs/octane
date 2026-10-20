@@ -192,10 +192,11 @@ const signalRetryPath = function signalRetryPath(scope: Scope, root: Scope): unk
 			: ['slot', location.slot, location.kind, location.branch, location.component, location.key];
 	if (segment === null) return null;
 	const path = signalRetryPath(parent, root);
-	if (path === null) return null;
 	// The path belongs only to this root walk. Append while unwinding so no
 	// ancestor prefix is copied again for every descendant.
-	for (let i = 0; i < segment.length; i++) path.push(segment[i]);
+	if (path !== null) {
+		for (const key of segment) path.push(key);
+	}
 	return path;
 };
 
