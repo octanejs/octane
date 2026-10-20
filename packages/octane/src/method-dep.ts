@@ -45,6 +45,7 @@
  * successful read whose own data value is null or undefined.
  */
 import { hasOwnProp } from './has-own.js';
+import { hydrationStarted } from './hydration-flag.js';
 
 const guardedNullReceiver = Symbol();
 const guardedUndefinedReceiver = Symbol();
@@ -77,6 +78,25 @@ export function __methodDep(
 		return ownMethodDep(receiver, (receiver as Record<string, unknown>)[name]);
 	}
 	return name in (receiver as object) ? receiver : undefined;
+}
+
+let hydrationInputRecords: WeakSet<object> | undefined;
+
+/** @internal Mark the fresh props literal at an admitted compiled JSX invocation. */
+export function __markHydrationInput<T extends object>(props: T): T {
+	// The first record is created during hydration; later parent updates can
+	// arrive outside the pass, so the sticky flag must cover both invocations.
+	if (hydrationStarted) (hydrationInputRecords ??= new WeakSet()).add(props);
+	return props;
+}
+
+/** @internal Check provenance without observing either caller-owned value. */
+export function __ownedHydrationInputs(previous: object, next: object): boolean {
+	return (
+		hydrationInputRecords !== undefined &&
+		hydrationInputRecords.has(previous) &&
+		hydrationInputRecords.has(next)
+	);
 }
 
 /** @internal Compare fields only on records proven to be compiler-created. */

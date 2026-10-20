@@ -108,67 +108,79 @@ function setup(
 }
 
 describe.each([false, true])('parent updates during suspended hydration (dev: %s)', (dev) => {
-	it.each(['unchanged', 'changed reader', 'changed receiver'] as const)(
-		'%s child inputs',
-		async (scenario) => {
-			const source = `const _$__sameHydrationInput = '!';
-function Gate(props) @{
+	it.each([
+		['private boundary', 'unchanged'],
+		['private boundary', 'changed reader'],
+		['private boundary', 'changed receiver'],
+		['exported with setup', 'unchanged'],
+		['exported with setup', 'changed reader'],
+		['exported with setup', 'changed receiver'],
+		['exported with setup', 'changed setup'],
+	] as const)('%s, %s child inputs', async (shape, scenario) => {
+		const exported = shape === 'exported with setup';
+		const source = `const _$__sameHydrationInput = '!';
+${exported ? 'export ' : ''}function Gate(props) @{
+  ${exported ? 'const caption = props.caption;' : ''}
   @try {
     const value = props.read();
-    <label><input defaultValue={value} /><button>{props.caption + _$__sameHydrationInput}</button></label>;
+    <label><input defaultValue={value} /><button>{${exported ? 'caption' : 'props.caption'} + _$__sameHydrationInput}</button></label>;
   } @pending { <p>Loading</p>; }
 }
 export function App(props) @{
   <section><span>{props.revision}</span><Gate read={props.read} caption={props.caption} version={props.version} /></section>;
 }`;
-			const options = { id: '/suspended-hydration.tsrx', compileOptions: { dev, hmr: false } };
-			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
-			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
-			const waiting = gate();
-			const read =
-				scenario === 'changed receiver'
-					? function (this: { version: string }) {
-							if (this.version === 'server' && waiting.value.pending) throw waiting.value.promise;
-							return this.version;
-						}
-					: () => {
-							if (waiting.value.pending) throw waiting.value.promise;
-							return 'server';
-						};
-			const props = { revision: 'first', read, caption: 'Action', version: 'server' };
-			const container = document.createElement('div');
-			document.body.append(container);
-			container.innerHTML = renderToString(server['App'], props).html;
-			const original = container.querySelector('input')!;
-			original.value = 'typed';
-			waiting.value.pending = true;
-			const onRecoverableError = vi.fn();
-			const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
-			cleanups.push(() => {
-				root.unmount();
-				container.remove();
-			});
-			await act(() => {});
-			expect(container.querySelector('input')).toBe(original);
-			await act(() =>
-				root.render(client['App'], {
-					...props,
-					revision: 'second',
-					read: scenario === 'changed reader' ? () => 'replacement' : read,
-					version: scenario === 'changed receiver' ? 'replacement' : 'server',
-				}),
-			);
-			const changed = scenario !== 'unchanged';
-			const accepted = container.querySelector('input');
-			expect(accepted === original).toBe(!changed);
-			expect(accepted?.value).toBe(changed ? 'replacement' : 'typed');
-			expect(container.querySelector('span')?.textContent).toBe('second');
-			await act(() => waiting.resolve());
-			expect(container.querySelector('input')).toBe(accepted);
-			expect(accepted?.value).toBe(changed ? 'replacement' : 'typed');
-			expect(onRecoverableError).not.toHaveBeenCalled();
-		},
-	);
+		const options = { id: '/suspended-hydration.tsrx', compileOptions: { dev, hmr: false } };
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const waiting = gate();
+		const read =
+			scenario === 'changed receiver'
+				? function (this: { version: string }) {
+						if (this.version === 'server' && waiting.value.pending) throw waiting.value.promise;
+						return this.version;
+					}
+				: () => {
+						if (waiting.value.pending) throw waiting.value.promise;
+						return 'server';
+					};
+		const props = { revision: 'first', read, caption: 'Action', version: 'server' };
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['App'], props).html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed';
+		waiting.value.pending = true;
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		await act(() => {});
+		expect(container.querySelector('input')).toBe(original);
+		if (scenario === 'changed setup') waiting.value.pending = false;
+		await act(() =>
+			root.render(client['App'], {
+				...props,
+				revision: 'second',
+				read: scenario === 'changed reader' ? () => 'replacement' : read,
+				caption: scenario === 'changed setup' ? 'Updated' : props.caption,
+				version: scenario === 'changed receiver' ? 'replacement' : 'server',
+			}),
+		);
+		const changed = scenario !== 'unchanged';
+		const accepted = container.querySelector('input');
+		expect(accepted === original).toBe(!changed);
+		const value = scenario === 'changed setup' ? 'server' : changed ? 'replacement' : 'typed';
+		expect(accepted?.value).toBe(value);
+		if (scenario === 'changed setup')
+			expect(container.querySelector('button')?.textContent).toBe('Updated!');
+		expect(container.querySelector('span')?.textContent).toBe('second');
+		await act(() => waiting.resolve());
+		expect(container.querySelector('input')).toBe(accepted);
+		expect(accepted?.value).toBe(value);
+		expect(onRecoverableError).not.toHaveBeenCalled();
+	});
 });
 
 it.each(['resolve', 'error'] as const)(
@@ -176,11 +188,12 @@ it.each(['resolve', 'error'] as const)(
 	async (outcome) => {
 		const source = `import { useEffect } from 'octane';
 function Second(props) @{ <output>{props.read()}</output>; }
-function Gate(props) @{
+export function Gate(props) @{
+  const ref = props.onRef;
   @try {
     const value = props.first();
     useEffect(() => { props.lifecycle('mount'); return () => props.lifecycle('cleanup'); }, []);
-    <label><input defaultValue={value} ref={props.onRef} /><Second read={props.second} /></label>;
+    <label><input defaultValue={value} ref={ref} /><Second read={props.second} /></label>;
   } @pending { <p>Loading</p>; } @catch (error) { <p role="alert">{error.message}</p>; }
 }
 export function App(props) @{
@@ -249,45 +262,61 @@ export function App(props) @{
 	},
 );
 
-it('does not inspect an opaque captured receiver when new inputs supersede hydration', async () => {
-	const source = `export function Gate({ input }) @{
+it.each(['direct exported props', 'opaque captured receiver'] as const)(
+	'does not inspect %s when new inputs supersede hydration',
+	async (scenario) => {
+		const source =
+			scenario === 'direct exported props'
+				? `export function Gate(props) @{
+  const caption = props.caption;
+  @try { const value = props.read(); <input aria-label={caption} defaultValue={value} />; }
+  @pending { <p>Loading</p>; }
+}
+export function App(props) @{ <section><Gate read={props.read} caption={props.caption} /></section>; }`
+				: `export function Gate({ input }) @{
   @try { const value = input.read(); <input defaultValue={value} />; }
   @pending { <p>Loading</p>; }
 }`;
-	const options = { id: '/opaque-hydration-input.tsrx', compileOptions: { hmr: false } };
-	const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
-	const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
-	const waiting = gate();
-	const descriptorRead = () => 'descriptor';
-	const getOwnPropertyDescriptor = vi.fn(Reflect.getOwnPropertyDescriptor);
-	const input = (read: () => string) =>
-		new Proxy(
-			{ read: descriptorRead },
-			{ get: (_target, key) => (key === 'read' ? read : undefined), getOwnPropertyDescriptor },
-		);
-	const previous = input(() => {
-		if (waiting.value.pending) throw waiting.value.promise;
-		return 'server';
-	});
-	const container = document.createElement('div');
-	document.body.append(container);
-	container.innerHTML = renderToString(server['Gate'], { input: previous }).html;
-	const original = container.querySelector('input')!;
-	original.value = 'typed';
-	waiting.value.pending = true;
-	const root = hydrateRoot(container, client['Gate'], { input: previous });
-	cleanups.push(() => {
-		root.unmount();
-		container.remove();
-	});
-	await act(() => root.render(client['Gate'], { input: input(() => 'replacement') }));
-	const replacement = container.querySelector('input');
-	expect(replacement).not.toBe(original);
-	expect(replacement?.value).toBe('replacement');
-	expect(getOwnPropertyDescriptor).not.toHaveBeenCalled();
-	await act(() => waiting.resolve());
-	expect(container.querySelector('input')).toBe(replacement);
-});
+		const options = { id: '/opaque-hydration-input.tsrx', compileOptions: { hmr: false } };
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const waiting = gate();
+		const descriptorRead = () => 'descriptor';
+		const getOwnPropertyDescriptor = vi.fn(Reflect.getOwnPropertyDescriptor);
+		const input = (read: () => string) =>
+			new Proxy(
+				{ read: descriptorRead },
+				{
+					get: (_target, key) => (key === 'read' ? read : key === 'caption' ? 'Value' : undefined),
+					getOwnPropertyDescriptor,
+				},
+			);
+		const previous = input(() => {
+			if (waiting.value.pending) throw waiting.value.promise;
+			return 'server';
+		});
+		const props = (value: ReturnType<typeof input>) =>
+			scenario === 'direct exported props' ? value : { input: value };
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['Gate'], props(previous)).html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed';
+		waiting.value.pending = true;
+		const root = hydrateRoot(container, client['Gate'], props(previous));
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		await act(() => root.render(client['Gate'], props(input(() => 'replacement'))));
+		const replacement = container.querySelector('input');
+		expect(replacement).not.toBe(original);
+		expect(replacement?.value).toBe('replacement');
+		expect(getOwnPropertyDescriptor).not.toHaveBeenCalled();
+		await act(() => waiting.resolve());
+		expect(container.querySelector('input')).toBe(replacement);
+	},
+);
 
 it.each(['accessor', 'proxy prototype'] as const)(
 	'does not inspect a %s installed by a suspended method',
