@@ -2038,7 +2038,70 @@ export default {...current, hostOperations: undefined, adopt: __adoptSelectedBin
 		}
 });
 
-test('fixed scalar views select the scalar adopter and match the general adopter', async (t) => {
+const fixedBindingBundleOptions = {
+	bundle: true,
+	write: false,
+	minify: true,
+	metafile: true,
+	format: 'esm',
+	platform: 'browser',
+	target: 'es2022',
+	legalComments: 'none',
+	tsconfigRaw: { compilerOptions: {} },
+	define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+};
+
+// A whole-view lease needs these tokens, but none of the other machinery in
+// their modules. Keep the lease-free cohort at zero and calibrate the leased
+// cohort against a bundle importing only the exact protocol exports.
+const fixedBindingHandoffTokens = [
+	['stream-protocol', ['STREAM_SCRIPT_ATTR', 'SUSPENSE_SCRIPT_ATTR']],
+	['signals/native-read-seeds', ['NATIVE_SIGNAL_SEED_ATTR']],
+	['signals/control-handoff', ['BINDING_HANDOFF']],
+];
+function fixedBindingRetainedCode(result) {
+	const inputs = Object.entries(Object.values(result.metafile.outputs)[0].inputs);
+	return {
+		handoff: fixedBindingHandoffTokens.map(
+			([module]) =>
+				inputs.find(([id]) => id.replaceAll('\\', '/').endsWith(`/src/${module}.ts`))?.[1]
+					.bytesInOutput ?? 0,
+		),
+		rich: inputs
+			.filter(
+				([id, input]) =>
+					input.bytesInOutput > 0 &&
+					/\/src\/dom-binding-(?:classes|controls|island|program|projections|styles)\.ts$/.test(
+						id.replaceAll('\\', '/'),
+					),
+			)
+			.map(([id]) => id),
+	};
+}
+let fixedBindingTokenReference;
+async function assertOnlyFixedBindingHandoffTokens(actual, directory, label) {
+	const reference = await (fixedBindingTokenReference ??= build({
+		...fixedBindingBundleOptions,
+		stdin: {
+			contents: fixedBindingHandoffTokens
+				.map(([module, names]) => `export {${names.join(',')}} from './src/${module}.js';`)
+				.join('\n'),
+			resolveDir: directory,
+		},
+	}).then((result) => fixedBindingRetainedCode(result).handoff));
+	for (let index = 0; index < fixedBindingHandoffTokens.length; index++) {
+		const [module, names] = fixedBindingHandoffTokens[index];
+		assert.ok(reference[index] > 0, `${module}: missing token reference`);
+		// A larger minified bundle can assign each token an identifier up to two
+		// bytes longer than in the isolated reference.
+		assert.ok(
+			actual[index] > 0 && actual[index] <= reference[index] + 2 * names.length,
+			`${label}: ${module} retained ${actual[index]} bytes; tokens alone retained ${reference[index]}`,
+		);
+	}
+}
+
+test('fixed scalar views preserve adoption boundaries across handoff capabilities', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const views = {
 		// Every channel is a fixed scalar: attr, boolean, aria, class and text.
@@ -2053,12 +2116,12 @@ export function Scalar(props) @{ 'use dom bindings';
 		Link: `export function Link(props) @{ 'use dom bindings';
  <a href={props.href} class={props.classes}><b>{props.status as string}</b></a>
 }`,
+		// External ownership rules out a whole-view lease without disabling URLs.
+		LinkExternal: `import { unbound } from 'octane/behavior';
+export function LinkExternal(props) @{ 'use dom bindings';
+ <a href={props.href} class={props.classes} aria-current={unbound(props.current)}><b>{props.status as string}</b></a>
+}`,
 	};
-	// An adopt-only scalar artifact omits these. The general adopter retains the
-	// host-handoff sidecar protocol in every artifact, and URL sanitization even
-	// in views without a URL.
-	const generalOnly =
-		/\/src\/(?:stream-protocol\.ts|signals\/(?:native-read-seeds|control-handoff)\.ts)$/;
 	const sanitizer = /\/src\/sanitize-url\.js$/;
 	const bundle = async (view, mode, legacy = false, mount = false) => {
 		const entry =
@@ -2068,25 +2131,20 @@ export function render(props) { return renderToString(${view}, props).html; }`
 				: `import view from './${view}.tsrx?octane-bindings=${view}${mount ? '&octane-mount=1' : ''}';
 export function adopt(root, source, options) { return view.adopt(root, view, source, options); }`;
 		const result = await build({
+			...fixedBindingBundleOptions,
 			stdin: { contents: entry, resolveDir: directory },
-			bundle: true,
-			write: false,
-			minify: true,
-			metafile: true,
-			format: 'esm',
 			platform: mode === 'server' ? 'node' : 'browser',
-			target: 'es2022',
-			legalComments: 'none',
-			tsconfigRaw: { compilerOptions: {} },
-			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 			plugins: [
 				{
 					name: 'fixed-scalar-artifacts',
 					setup(plugin) {
-						plugin.onResolve({ filter: /(?:Scalar|Link)\.tsrx(?:\?.*)?$/ }, ({ path: id }) => ({
-							path: id,
-							namespace: 'fixed-scalar',
-						}));
+						plugin.onResolve(
+							{ filter: /(?:Scalar|Link|LinkExternal)\.tsrx(?:\?.*)?$/ },
+							({ path: id }) => ({
+								path: id,
+								namespace: 'fixed-scalar',
+							}),
+						);
 						plugin.onLoad({ filter: /.*/, namespace: 'fixed-scalar' }, ({ path: id }) => {
 							const current = id.startsWith('current:');
 							const request = current ? id.slice('current:'.length) : id;
@@ -2117,9 +2175,7 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
 			gzip: gzipSync(code, { level: 9 }).length,
 			resolved: Object.keys(result.metafile.inputs),
-			generalBytes: Object.entries(output.inputs)
-				.filter(([id]) => generalOnly.test(id.replaceAll('\\', '/')))
-				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
+			retained: fixedBindingRetainedCode(result),
 			sanitizerBytes: Object.entries(output.inputs)
 				.filter(([id]) => sanitizer.test(id.replaceAll('\\', '/')))
 				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
@@ -2173,6 +2229,12 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 				assert.ok(host.querySelector('b').firstChild === text, 'the text node was replaced');
 				trace.push(host.innerHTML);
 			}
+			if ('current' in props)
+				assert.equal(
+					root.getAttribute('aria-current'),
+					props.current,
+					'the external owner was replaced',
+				);
 			controller.abort();
 			assert.equal(listeners.size, 0);
 			snapshot = { ...snapshot, status: 'After abort' };
@@ -2207,9 +2269,17 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 				{ href: '/next', classes: null },
 			],
 		],
+		LinkExternal: [
+			{ href: '/start', classes: 'nav', status: 'Start', current: 'page' },
+			[
+				{ href: 'javascript:alert(1)', status: 'Blocked', current: 'step' },
+				{ href: '/next', classes: null },
+			],
+		],
 	};
 	for (const [view, [props, updates]] of Object.entries(cases)) {
 		const server = await bundle(view, 'server');
+		let adoptOnly;
 		for (const mount of [false, true]) {
 			const selected = await bundle(view, 'client', false, mount);
 			const legacy = await bundle(view, 'client', true, mount);
@@ -2222,31 +2292,52 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 					),
 					`${view}: fixed bindings reached the renderer or signal graph`,
 				);
+			const trace = exercise(server, selected, props, updates);
 			assert.deepEqual(
-				exercise(server, selected, props, updates),
+				trace,
 				exercise(server, legacy, props, updates),
 				`${view}: selected and general adopters diverged`,
 			);
-			assert.ok(legacy.generalBytes > 0, `${view}: the general adopter control lost its leaves`);
+			assert.ok(
+				legacy.retained.handoff.some(Boolean),
+				`${view}: the general adopter control lost its leaves`,
+			);
 			// A mountable artifact's structural program writes these channels itself.
 			if (!mount) {
-				assert.equal(
-					selected.generalBytes,
-					0,
-					`${view}: the scalar adopter retained general-only leaves`,
+				adoptOnly = { selected, trace };
+				assert.deepEqual(
+					selected.retained.rich,
+					[],
+					`${view}: adoption retained an unrelated binding capability`,
 				);
-				if (view === 'Link')
+				if (view === 'Link') {
+					await assertOnlyFixedBindingHandoffTokens(selected.retained.handoff, directory, view);
+					assert.ok(!selected.resolved.some((id) => /\/src\/dom-binding-program\.ts$/.test(id)));
+				} else
+					assert.ok(
+						selected.retained.handoff.every((bytes) => bytes === 0),
+						`${view}: lease-free adoption retained handoff code`,
+					);
+				if (view.startsWith('Link'))
 					assert.ok(selected.sanitizerBytes > 0, 'URL views must keep URL sanitization');
 				else assert.equal(selected.sanitizerBytes, 0, 'A URL-free view loaded URL sanitization');
+			} else if (view === 'Link') {
+				assert.deepEqual(trace, adoptOnly.trace, 'mount-capable and adopt-only artifacts diverged');
+				assert.ok(selected.retained.rich.some((id) => /\/src\/dom-binding-program\.ts$/.test(id)));
+				assert.ok(
+					adoptOnly.selected.gzip / selected.gzip < 0.65,
+					`${view}: adopt-only/mount-capable gzip ratio: ${adoptOnly.selected.gzip}/${selected.gzip}`,
+				);
 			}
 			t.diagnostic(
 				JSON.stringify({ view, mount, selectedGzip: selected.gzip, generalGzip: legacy.gzip }),
 			);
-			// Measured 0.50 (Scalar) and 0.57 (Link) adopt-only, 0.82 for both with mounting.
-			assert.ok(
-				selected.gzip / legacy.gzip < (mount ? 0.88 : view === 'Link' ? 0.65 : 0.6),
-				`${view}: selected/general gzip ratio: ${selected.gzip}/${legacy.gzip}`,
-			);
+			// Only lease-free adoption is expected to omit the general lifetime.
+			if (view !== 'Link')
+				assert.ok(
+					selected.gzip / legacy.gzip < (mount ? 0.88 : view === 'LinkExternal' ? 0.65 : 0.6),
+					`${view}: selected/general gzip ratio: ${selected.gzip}/${legacy.gzip}`,
+				);
 		}
 	}
 });
@@ -2255,18 +2346,20 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 // stays on the scalar adopter, so its server output must be the text that the
 // selected artifact binds. Each view's control drops the casts: a bare handle
 // is a renderable hole, which selects the structural program the cast avoids.
-test('handle text casts keep fixed views on the scalar adopter', async (t) => {
+test('handle text casts preserve scalar adoption and whole-view handoff', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const state = `import { signal$, derived$ } from 'octane/signals';
 export const count$ = signal$(1);
 export const label$ = derived$(() => 'n=' + count$.get());`;
 	const views = {
 		Count: '<p title={props.title}>{count$ as number}</p>',
+		CountExternal: '<p title={unbound(props.title)}>{count$ as number}</p>',
 		Label: '<p title={props.title}>{label$ as number}</p>',
 		Nested: '<p title={props.title}><b>{count$ as number}</b><i>{label$ as number}</i></p>',
 	};
 	const expected = {
 		Count: ['1', '7'],
+		CountExternal: ['1', '7'],
 		Label: ['n=1', 'n=7'],
 		Nested: ['1n=1', '7n=7'],
 	};
@@ -2274,9 +2367,6 @@ export const label$ = derived$(() => 'n=' + count$.get());`;
 		name.endsWith('Bare')
 			? views[name.slice(0, -'Bare'.length)].replaceAll(' as number', '')
 			: views[name];
-	// Leaves only the general adopter retains, as in the fixed scalar guard above.
-	const generalOnly =
-		/\/src\/(?:stream-protocol\.ts|signals\/(?:native-read-seeds|control-handoff)\.ts)$/;
 	const program = /\/src\/dom-binding-program\.ts$/;
 	const bundle = async (view, mode, legacy = false) => {
 		const entry =
@@ -2287,17 +2377,9 @@ export function render(props) { return renderToString(View, props).html; }`
 export { count$ } from './state.tsrx';
 export function adopt(root, source) { return view.adopt(root, view, source); }`;
 		const result = await build({
+			...fixedBindingBundleOptions,
 			stdin: { contents: entry, resolveDir: directory },
-			bundle: true,
-			write: false,
-			minify: true,
-			metafile: true,
-			format: 'esm',
 			platform: mode === 'server' ? 'node' : 'browser',
-			target: 'es2022',
-			legalComments: 'none',
-			tsconfigRaw: { compilerOptions: {} },
-			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 			plugins: [
 				{
 					name: 'handle-cast-artifacts',
@@ -2321,7 +2403,8 @@ export default {...current, adopt: __adoptBindings};`
 										: compile(
 												name === 'state'
 													? state
-													: `import { count$, label$ } from './state.tsrx';
+													: `${name.startsWith('CountExternal') ? "import { unbound } from 'octane/behavior';" : ''}
+import { count$, label$ } from './state.tsrx';
 export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
 												path.join(directory, request),
 												{ mode, dev: false, hmr: false },
@@ -2339,14 +2422,11 @@ export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
 			],
 		});
 		const code = result.outputFiles[0].text;
-		const [output] = Object.values(result.metafile.outputs);
 		return {
 			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
 			gzip: gzipSync(code, { level: 9 }).length,
 			resolved: Object.keys(result.metafile.inputs).map((id) => id.replaceAll('\\', '/')),
-			generalBytes: Object.entries(output.inputs)
-				.filter(([id]) => generalOnly.test(id.replaceAll('\\', '/')))
-				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
+			retained: fixedBindingRetainedCode(result),
 		};
 	};
 	const window = new Window();
@@ -2376,13 +2456,15 @@ export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
 		const walker = window.document.createTreeWalker(root, 4);
 		while (walker.nextNode()) texts.push(walker.currentNode);
 		const handle = client.api.adopt(root, {
-			getSnapshot: () => ({ title: 'Count' }),
+			getSnapshot: () => ({ title: view === 'CountExternal' ? 'Source update' : 'Count' }),
 			subscribe: () => () => {},
 		});
 		try {
 			assert.equal(root.textContent, expected[view][0], `${view}: initial text`);
 			client.api.count$.set(7);
 			assert.equal(root.textContent, expected[view][1], `${view}: updated text`);
+			if (view === 'CountExternal')
+				assert.equal(root.title, 'Count', 'the external owner was replaced');
 			// Identity checks avoid assert's deep inspection of DOM graphs.
 			assert.ok(host.firstElementChild === root, `${view}: the adopted root was replaced`);
 			const after = window.document.createTreeWalker(root, 4);
@@ -2403,19 +2485,28 @@ export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
 		exercise(view, server, legacy);
 		exercise(view, await bundle(view + 'Bare', 'server'), bare);
 		assert.ok(
-			bare.resolved.some((id) => program.test(id)),
+			bare.retained.rich.some((id) => program.test(id)),
 			`${view}: the bare-handle control no longer selects the structural program`,
 		);
 		assert.ok(
 			!selected.resolved.some((id) => program.test(id)),
 			`${view}: a cast handle selected the structural program`,
 		);
-		assert.ok(legacy.generalBytes > 0, `${view}: the general adopter control lost its leaves`);
-		assert.equal(
-			selected.generalBytes,
-			0,
-			`${view}: the scalar adopter retained general-only leaves`,
+		assert.ok(
+			legacy.retained.handoff.some(Boolean),
+			`${view}: the general adopter control lost its leaves`,
 		);
+		assert.deepEqual(
+			selected.retained.rich,
+			[],
+			`${view}: adoption retained an unrelated binding capability`,
+		);
+		if (view === 'CountExternal')
+			assert.ok(
+				selected.retained.handoff.every((bytes) => bytes === 0),
+				`${view}: lease-free adoption retained handoff code`,
+			);
+		else await assertOnlyFixedBindingHandoffTokens(selected.retained.handoff, directory, view);
 		t.diagnostic(
 			JSON.stringify({
 				view,
@@ -2424,9 +2515,10 @@ export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
 				bareGzip: bare.gzip,
 			}),
 		);
-		// Measured 0.76 (Count) and 0.78 (Label, Nested).
+		// The lease-free cast retains the original scalar margin. Closed views
+		// keep the handoff capability while still avoiding the structural program.
 		assert.ok(
-			selected.gzip / bare.gzip < 0.82,
+			selected.gzip / bare.gzip < (view === 'CountExternal' ? 0.82 : 0.88),
 			`${view}: cast/bare gzip ratio: ${selected.gzip}/${bare.gzip}`,
 		);
 	}
