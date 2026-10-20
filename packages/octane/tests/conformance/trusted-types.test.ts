@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Installed before Octane loads, as a page's `trustedTypes` global is: the
-// framework policy is created once, on the first template parse.
+// framework policy is created once, at module load. The per-test setup has
+// already loaded the runtime, so this file loads a fresh copy after the fake.
 const tt = vi.hoisted(() => {
 	class Trusted {
 		constructor(readonly value: string) {}
@@ -22,6 +23,7 @@ const tt = vi.hoisted(() => {
 		isScript: (v: unknown) => v instanceof TrustedScript,
 		isScriptURL: (v: unknown) => v instanceof TrustedScriptURL,
 	};
+	vi.resetModules();
 	return {
 		policies,
 		html: (s: string) => new TrustedHTML(s),

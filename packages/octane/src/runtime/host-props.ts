@@ -301,9 +301,10 @@ export function updateFreshClassAttr(value: unknown, previous: unknown, el: Elem
  */
 export function setScriptText(el: Element, value: any): void {
 	const text = value == null ? '' : String(value);
+	const raw = typeof value === 'object' ? trustedOr(value, text) : text;
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
 	if (transaction !== null) {
-		transaction.ops.push(commitScriptText, [el, trustedOr(value, text)]);
+		transaction.ops.push(commitScriptText, [el, raw]);
 		return;
 	}
 	const first = getFirstChild(el);
@@ -311,7 +312,7 @@ export function setScriptText(el: Element, value: any): void {
 		updateTextValue(first as Text, text);
 	} else {
 		if (ROOT_RENDER_TRANSACTION !== null) journalBag();
-		el.textContent = trustedOr(value, text);
+		el.textContent = raw;
 	}
 }
 
@@ -322,7 +323,7 @@ export function setScriptText(el: Element, value: any): void {
  */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
-	const html = trustedOr(value, next);
+	const html = typeof value === 'object' ? trustedOr(value, next) : next;
 	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
 		hydration.adoptHTML(el, html);
@@ -801,7 +802,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	const raw = trustedOr(value, next);
+	const raw = typeof value === 'object' ? trustedOr(value, next) : next;
 	if (ns) el.setAttributeNS(ns, name, raw);
 	else el.setAttribute(name, raw);
 }
@@ -902,7 +903,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
-	else el.setAttribute(name, trustedOr(value, next));
+	else el.setAttribute(name, type === 'object' ? trustedOr(value as object, next) : next);
 }
 
 /** Same scalar contract for a statically proven, unnamespaced native URL sink. */
@@ -930,7 +931,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 	}
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	if (next === null) el.removeAttribute(name);
-	else el.setAttribute(name, trustedOr(value, next));
+	else el.setAttribute(name, type === 'object' ? trustedOr(value as object, next) : next);
 }
 
 /**

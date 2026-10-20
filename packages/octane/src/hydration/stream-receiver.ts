@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { frameworkHTML } from '../trusted-types.js';
+import { FRAMEWORK_POLICY } from '../trusted-types.js';
 import { HYDRATE_INPUT_ATTR } from '../hydration-protocol.js';
 import { rendererRangeClose } from '../stream-protocol.js';
 import {
@@ -125,7 +125,7 @@ function placeFullRegion(registration: StreamedRegionRegistration, html: string)
 
 	const template = start.ownerDocument!.createElement('template');
 	// This sink receives only a protocol-validated renderer artifact.
-	template.innerHTML = frameworkHTML(html);
+	template.innerHTML = FRAMEWORK_POLICY ? FRAMEWORK_POLICY.createHTML(html) : html;
 	const incomingOpen = template.content.firstChild;
 	const incomingClose = rendererRangeClose(incomingOpen);
 	if (
