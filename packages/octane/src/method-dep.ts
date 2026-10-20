@@ -45,7 +45,6 @@
  * successful read whose own data value is null or undefined.
  */
 import { hasOwnProp } from './has-own.js';
-import { hydrationStarted } from './hydration-flag.js';
 
 const guardedNullReceiver = Symbol();
 const guardedUndefinedReceiver = Symbol();
@@ -80,57 +79,6 @@ export function __methodDep(
 	return name in (receiver as object) ? receiver : undefined;
 }
 
-let hydrationInputRecords: WeakSet<object> | undefined;
-
-/** @internal Mark the fresh props literal at an admitted compiled JSX invocation. */
-export function __markHydrationInput<T extends object>(props: T): T {
-	// The first record is created during hydration; later parent updates can
-	// arrive outside the pass, so the sticky flag must cover both invocations.
-	if (hydrationStarted) (hydrationInputRecords ??= new WeakSet()).add(props);
-	return props;
-}
-
-/** @internal Check provenance without observing either caller-owned value. */
-export function __ownedHydrationInputs(previous: object, next: object): boolean {
-	return (
-		hydrationInputRecords !== undefined &&
-		hydrationInputRecords.has(previous) &&
-		hydrationInputRecords.has(next)
-	);
-}
-
-/** @internal Compare fields only on records proven to be compiler-created. */
-export function __sameHydrationInput(
-	previous: object,
-	next: object,
-	name: string,
-	method = false,
-): boolean {
-	// An earlier arm may have mutated the record before suspending. Inspect
-	// only its own descriptor: a missing field may now inherit from a Proxy,
-	// and an accessor must stay in the authored render's error boundary.
-	const left = Object.getOwnPropertyDescriptor(previous, name);
-	const right = Object.getOwnPropertyDescriptor(next, name);
-	if (
-		!left ||
-		!right ||
-		!hasOwnProp.call(left, 'value') ||
-		!hasOwnProp.call(right, 'value') ||
-		!Object.is(left.value, right.value)
-	)
-		return false;
-	if (!method) return true;
-	if (typeof left.value !== 'function') return false;
-	try {
-		const source = Function.prototype.toString.call(left.value);
-		// An async-prefixed source is ambiguous without reading the callback's
-		// authored `name` property. Decline rather than invoke that getter here.
-		return ARROW_HEAD.test(source) && (source[0] === '(' || !/^async\b/.test(source));
-	} catch {
-		return false;
-	}
-}
-
 // An arrow's source text starts with its parameters, after an optional
 // `async`: a parenthesized list, or one identifier followed by `=>`. Every
 // other function starts with `function`, `class`, or a method's property key,
@@ -138,7 +86,7 @@ export function __sameHydrationInput(
 // Anything this does not recognize counts as a method, which only costs a
 // spurious recompute. A method named `async` also reads as `async(`, so only a
 // parenthesized arrow skips the name check.
-const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
+export const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
 
 function ownMethodDep(receiver: object, method: unknown): unknown {
 	if (typeof method !== 'function') return method;

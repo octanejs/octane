@@ -257,6 +257,40 @@ function captureExpression(dependency, helper) {
 	);
 }
 
+// Carry the declaration pass's complete capture proof for these deliberately
+// small lazy-derived shapes. A module read needs a separate native-source
+// witness; a props method can relax the derived handle only when confined.
+function hydrationDerivedCapture(node, listed) {
+	if (node.arguments?.length !== 1 || listed === undefined || listed.length > 1) return null;
+	const callback = unwrapExpression(node.arguments[0]);
+	const call = unwrapExpression(callback?.body);
+	const method = call?.callee;
+	if (
+		callback?.type !== 'ArrowFunctionExpression' ||
+		callback.async ||
+		callback.params.length !== 0 ||
+		call?.type !== 'CallExpression' ||
+		call.optional ||
+		call.arguments.length !== 0 ||
+		method?.type !== 'MemberExpression' ||
+		method.computed ||
+		method.optional ||
+		method.object?.type !== 'Identifier' ||
+		method.property?.type !== 'Identifier'
+	)
+		return null;
+	if (listed.length === 0) return method.property.name === 'get' ? { source: method.object } : null;
+	const capture = listed[0].method;
+	if (
+		capture?.root?.name !== method.object.name ||
+		capture.name !== method.property.name ||
+		capture.guarded ||
+		capture.read
+	)
+		return null;
+	return { root: capture.root.name, field: capture.name };
+}
+
 function captureSource(dependency, source, helper) {
 	if (!dependency.method) return source.slice(dependency.node.start, dependency.node.end);
 	const { root, name } = dependency.method;
@@ -892,8 +926,15 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			if (revision !== null) elements.push({ ...revision });
 			args.push(inheritHookMemoOrigin(b.array(elements), node));
 		}
+		const hydration =
+			trusted.factory === 'derived$' && revision === null
+				? hydrationDerivedCapture(node, listed)
+				: null;
 		return {
 			...node,
+			...(hydration === null
+				? null
+				: { metadata: { ...node.metadata, hydrationDerived: hydration } }),
 			...(pureSignalDeclaration(trusted.factory, node) ? { __octanePure: true } : null),
 			callee: inheritHookMemoOrigin(
 				trusted.helper(declarationHelper(trusted.factory, node)),

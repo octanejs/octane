@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToString } from 'octane/server';
+import * as Signals from 'octane/signals';
+import { __hydrationSignalRevision } from 'octane/internal/signal-read';
+import { __captureHydrationInput, __ownedHydrationInputs } from '../../src/hydration-inputs.js';
 import {
 	activateStreamedMarkup,
 	collectReadableStream,
@@ -107,14 +110,308 @@ function setup(
 	};
 }
 
+it('stops issuing invocation provenance after the last initial adoption retires', () => {
+	const admitted = () => {
+		const env = __captureHydrationInput([{}], 0, [0], true);
+		return __ownedHydrationInputs(env, env);
+	};
+	expect(admitted()).toBe(false);
+	const first = setup(false);
+	const second = setup(false);
+	expect(admitted()).toBe(true);
+	first.root.unmount();
+	expect(admitted()).toBe(true);
+	second.root.unmount();
+	expect(admitted()).toBe(false);
+});
+
+it('witnesses only canonical writable signal sources without observing unknown values', () => {
+	const scope = Signals.createScope({ scopeKey: 'hydration-source-witness' });
+	const source$ = scope.signal$('selection', 'first');
+	const observe = vi.fn(() => {
+		throw new Error('unexpected observation');
+	});
+	try {
+		const initial = __hydrationSignalRevision(source$);
+		expect(initial?.[0]).toBe(source$);
+		source$.set('second');
+		expect(__hydrationSignalRevision(source$)?.[1]).not.toBe(initial?.[1]);
+		const arbitrary = new Proxy(
+			{},
+			{ get: observe, getPrototypeOf: observe, getOwnPropertyDescriptor: observe },
+		);
+		expect(__hydrationSignalRevision(arbitrary)).toBeUndefined();
+		const prototype = Object.getPrototypeOf(source$);
+		const get = Object.getOwnPropertyDescriptor(prototype, 'get')!;
+		let replaced: unknown;
+		try {
+			Object.defineProperty(prototype, 'get', { configurable: true, get: observe });
+			replaced = __hydrationSignalRevision(source$);
+		} finally {
+			Object.defineProperty(prototype, 'get', get);
+		}
+		expect(replaced).toBeUndefined();
+		expect(observe).not.toHaveBeenCalled();
+	} finally {
+		scope.dispose();
+	}
+});
+
 describe.each([false, true])('parent updates during suspended hydration (dev: %s)', (dev) => {
+	it.each([
+		'no update',
+		'unrelated update',
+		'changed nonblocking',
+		'changed reader',
+		'changed domain',
+		'changed selection',
+	] as const)('retains a module-derived single blocker: %s', async (scenario) => {
+		const scope = Signals.createScope({ scopeKey: `single-blocker-${dev}-${scenario}` });
+		const selection$ = scope.signal$('selection', 'server');
+		cleanups.push(() => scope.dispose());
+		const gateSource = `import { useEffect } from 'octane';
+import { derived$ } from 'octane/signals';
+import { selection$ } from './selection';
+export function Gate(props) @{
+  const seed = props.seed;
+  void seed;
+  const selected$ = derived$(() => selection$.get());
+  @try {
+    const value = props.read(selected$.get());
+    useEffect(() => { props.lifecycle('mount'); return () => props.lifecycle('cleanup'); }, []);
+    <label data-domain={props.domain}><input defaultValue={value} ref={props.onRef} /></label>;
+  } @pending { <p>Loading</p>; }
+}`;
+		const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}</span><Gate {...props.gate} /></section>; }`;
+		const load = (mode: 'client' | 'server') => {
+			const options = { mode, compileOptions: { dev, hmr: false } };
+			const gateModule = loadCompiledFixtureSource(gateSource, {
+				...options,
+				id: '/src/gate.tsrx',
+				runtimeModules: {
+					'octane/signals': Signals,
+					'octane/internal/signal-read': { __hydrationSignalRevision },
+					'./selection': { selection$ },
+				},
+			});
+			return loadCompiledFixtureSource(appSource, {
+				...options,
+				id: '/src/app.tsrx',
+				runtimeModules: { './gate': gateModule },
+			});
+		};
+		const server = load('server');
+		const client = load('client');
+		const waiting = gate();
+		const lifecycle = vi.fn();
+		const nextLifecycle = vi.fn();
+		const onRef = vi.fn();
+		const props = {
+			ready: false,
+			gate: {
+				seed: { marker: 'first' },
+				domain: 'first',
+				read: (value: string) => {
+					if (waiting.value.pending) throw waiting.value.promise;
+					return value;
+				},
+				lifecycle,
+				onRef,
+			},
+		};
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['App'], props).html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed';
+		waiting.value.pending = true;
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		if (scenario !== 'no update') {
+			let nextGate = props.gate;
+			if (scenario === 'changed reader') nextGate = { ...nextGate, read: () => 'replacement' };
+			if (scenario === 'changed domain') nextGate = { ...nextGate, domain: 'next' };
+			if (scenario === 'changed nonblocking')
+				nextGate = { ...nextGate, seed: { marker: 'next' }, lifecycle: nextLifecycle };
+			await act(() => {
+				if (scenario === 'changed selection') selection$.set('next');
+				root.render(client['App'], { ready: true, gate: nextGate });
+			});
+		}
+		const changed =
+			scenario === 'changed reader' ||
+			scenario === 'changed domain' ||
+			scenario === 'changed selection';
+		expect(container.querySelector('input') === original).toBe(!changed);
+		expect(container.querySelector('span')?.textContent).toBe(
+			scenario === 'no update' ? 'waiting' : 'ready',
+		);
+		await act(() => waiting.resolve());
+		const accepted = container.querySelector('input');
+		expect(accepted === original).toBe(!changed);
+		expect(accepted?.value).toBe(
+			scenario === 'changed reader'
+				? 'replacement'
+				: scenario === 'changed selection'
+					? 'next'
+					: changed
+						? 'server'
+						: 'typed',
+		);
+		expect(container.querySelector('label')?.getAttribute('data-domain')).toBe(
+			scenario === 'changed domain' ? 'next' : 'first',
+		);
+		await act(() => root.unmount());
+		const active = scenario === 'changed nonblocking' ? nextLifecycle : lifecycle;
+		const stale = scenario === 'changed nonblocking' ? lifecycle : nextLifecycle;
+		expect(active.mock.calls.map(([event]) => event)).toEqual(['mount', 'cleanup']);
+		expect(stale).not.toHaveBeenCalled();
+		expect(onRef.mock.calls.map(([node]) => node)).toEqual([accepted, null]);
+		expect(onRecoverableError).not.toHaveBeenCalled();
+	});
+
+	it.each(['resolve', 'changed nonblocking', 'changed reader', 'error'] as const)(
+		'keeps imported spread hydration atomic through a derived read: %s',
+		async (scenario) => {
+			const gateSource = `import { useEffect } from 'octane';
+import { derived$ } from 'octane/signals';
+function Secondary(props) @{ <output>{props.read()}</output>; }
+export function Gate(props) @{
+  const seed = props.seed;
+  void seed;
+  const selected$ = derived$(() => props.first());
+  @try {
+    const value = selected$.get();
+    useEffect(() => { props.lifecycle('mount'); return () => props.lifecycle('cleanup'); }, []);
+    <label><input defaultValue={value} ref={props.onRef} /><Secondary read={props.second} /></label>;
+  } @pending { <p>Loading</p>; } @catch (error) { <p role="alert">{error.message}</p>; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><span>{props.revision}</span><i>{props.ready ? "ready" : "waiting"}</i><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const compileOptions = { dev, hmr: false };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					id: '/src/gate.tsrx',
+					mode,
+					compileOptions,
+					runtimeModules: { 'octane/signals': Signals },
+				});
+				return loadCompiledFixtureSource(appSource, {
+					id: '/src/app.tsrx',
+					mode,
+					compileOptions,
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const first = gate();
+			const second = gate();
+			const lifecycle = vi.fn();
+			const nextLifecycle = vi.fn();
+			const onRef = vi.fn();
+			const props = {
+				revision: 'first',
+				ready: false,
+				gate: {
+					seed: { marker: 'initial' },
+					first: () => {
+						if (first.value.pending) throw first.value.promise;
+						return 'server';
+					},
+					second: () => {
+						if (second.value.pending) throw second.value.promise;
+						if (second.value.error) throw second.value.error;
+						return 'ready';
+					},
+					lifecycle,
+					onRef,
+				},
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], props).html;
+			const input = container.querySelector('input')!;
+			input.value = 'typed';
+			first.value.pending = second.value.pending = true;
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			await act(() =>
+				root.render(client['App'], {
+					...props,
+					revision: 'second',
+					ready: true,
+					gate:
+						scenario === 'changed reader'
+							? { ...props.gate, first: () => 'replacement' }
+							: scenario === 'changed nonblocking'
+								? { ...props.gate, seed: { marker: 'next' }, lifecycle: nextLifecycle }
+								: props.gate,
+				}),
+			);
+			if (scenario === 'changed reader') expect(container.querySelector('input')).not.toBe(input);
+			else {
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed');
+			}
+			expect(container.querySelector('span')?.textContent).toBe('second');
+			expect(container.querySelector('i')?.textContent).toBe('ready');
+			await act(() => first.resolve());
+			expect(lifecycle).not.toHaveBeenCalled();
+			expect(nextLifecycle).not.toHaveBeenCalled();
+			expect(onRef).not.toHaveBeenCalled();
+			if (scenario !== 'changed reader') {
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed');
+			}
+			if (scenario === 'error') second.value.error = new Error('unavailable');
+			await act(() => second.resolve());
+			if (scenario === 'error') {
+				expect(container.querySelector('[role="alert"]')?.textContent).toBe('unavailable');
+				expect(container.querySelector('input')).toBeNull();
+			} else {
+				const accepted = container.querySelector('input');
+				expect(accepted === input).toBe(scenario !== 'changed reader');
+				expect(accepted?.value).toBe(scenario !== 'changed reader' ? 'typed' : 'replacement');
+				expect(
+					(scenario === 'changed nonblocking' ? nextLifecycle : lifecycle).mock.calls.map(
+						([event]) => event,
+					),
+				).toEqual(['mount']);
+				expect(onRef.mock.calls.map(([node]) => node)).toEqual([accepted]);
+			}
+			await act(() => root.unmount());
+			expect(
+				(scenario === 'changed nonblocking' ? nextLifecycle : lifecycle).mock.calls.map(
+					([event]) => event,
+				),
+			).toEqual(scenario === 'error' ? [] : ['mount', 'cleanup']);
+			if (scenario === 'changed nonblocking') expect(lifecycle).not.toHaveBeenCalled();
+			expect(onRef.mock.calls.map(([node]) => (node === null ? 'clear' : 'attach'))).toEqual(
+				scenario === 'error' ? [] : ['attach', 'clear'],
+			);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
 	it.each([
 		['private boundary', 'unchanged'],
 		['private boundary', 'changed reader'],
 		['private boundary', 'changed receiver'],
+		['private boundary', 'rewritten receiver'],
 		['exported with setup', 'unchanged'],
 		['exported with setup', 'changed reader'],
 		['exported with setup', 'changed receiver'],
+		['exported with setup', 'rewritten receiver'],
 		['exported with setup', 'changed setup'],
 	] as const)('%s, %s child inputs', async (shape, scenario) => {
 		const exported = shape === 'exported with setup';
@@ -133,16 +430,25 @@ export function App(props) @{
 		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 		const waiting = gate();
+		const replacement = () => 'replacement';
 		const read =
-			scenario === 'changed receiver'
-				? function (this: { version: string }) {
-						if (this.version === 'server' && waiting.value.pending) throw waiting.value.promise;
-						return this.version;
-					}
-				: () => {
-						if (waiting.value.pending) throw waiting.value.promise;
+			scenario === 'rewritten receiver'
+				? function (this: { read: () => string }) {
+						if (waiting.value.pending) {
+							this.read = replacement;
+							throw waiting.value.promise;
+						}
 						return 'server';
-					};
+					}
+				: scenario === 'changed receiver'
+					? function (this: { version: string }) {
+							if (this.version === 'server' && waiting.value.pending) throw waiting.value.promise;
+							return this.version;
+						}
+					: () => {
+							if (waiting.value.pending) throw waiting.value.promise;
+							return 'server';
+						};
 		const props = { revision: 'first', read, caption: 'Action', version: 'server' };
 		const container = document.createElement('div');
 		document.body.append(container);
@@ -163,7 +469,8 @@ export function App(props) @{
 			root.render(client['App'], {
 				...props,
 				revision: 'second',
-				read: scenario === 'changed reader' ? () => 'replacement' : read,
+				read:
+					scenario === 'changed reader' || scenario === 'rewritten receiver' ? replacement : read,
 				caption: scenario === 'changed setup' ? 'Updated' : props.caption,
 				version: scenario === 'changed receiver' ? 'replacement' : 'server',
 			}),

@@ -748,6 +748,11 @@ function settleThrown(wakeup: Wakeup, thrown: object): void {
 }
 
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
+	/** Recognize a native node without observing an arbitrary imported value. */
+	static hasNativeBrand(value: object): value is ScopedNode {
+		return #buildState in value;
+	}
+
 	get [SIGNAL_HANDLE](): true {
 		return true;
 	}
@@ -787,7 +792,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	pending: PendingSlotLike | undefined = undefined;
 
 	get state(): NodeState<T> | undefined {
-		if (this.valueOnly && this.storedState === undefined) this.buildState();
+		if (this.valueOnly && this.storedState === undefined) this.#buildState();
 		return this.storedState;
 	}
 
@@ -805,13 +810,13 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		this.storedLastState = state;
 	}
 
-	private buildState(): void {
+	#buildState(): void {
 		this.storedState = this.storedLastState = readyState(this.last as T);
 	}
 
 	/** Leave value-only: the built states become ordinary stored states. */
 	private storeStates(): void {
-		if (this.storedState === undefined) this.buildState();
+		if (this.storedState === undefined) this.#buildState();
 		this.valueOnly = false;
 	}
 
@@ -937,6 +942,11 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return attachObserver(this, notify, false, state);
 	}
 }
+
+// Capture these alongside the class, before a caller can replace either public
+// method and later load a separately compiled hydration consumer.
+export const hasScopedNodeBrand = /* @__PURE__ */ (() => ScopedNode.hasNativeBrand)();
+export const originalScopedNodeGet = /* @__PURE__ */ (() => ScopedNode.prototype.get)();
 
 /** Inspect only cached metadata; never refresh a dormant or invalidated node. */
 export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): NativeReadInspection {
