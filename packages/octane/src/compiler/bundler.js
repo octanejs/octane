@@ -462,6 +462,20 @@ const VOID_PRESERVING_WRAPPERS = new Map([
 ]);
 const VOID_WRAPPER_REQUESTS = new Set(['octane', 'octane/internal/client']);
 
+function voidPreservingWrapperCall(wrapper, args) {
+	const arity = VOID_PRESERVING_WRAPPERS.get(wrapper);
+	return (
+		arity !== undefined &&
+		(args?.length === arity ||
+			// Fixed presentation views retain the component ABI while inheriting
+			// the caller's range. Admit only the compiler-emitted literal flag.
+			(wrapper === 'bindPresentationView' &&
+				args?.length === 3 &&
+				args[2]?.type === 'Literal' &&
+				args[2].value === false))
+	);
+}
+
 // The value a parameterless IIFE evaluates to: compiled initializers run setup
 // (style injection, event delegation) as `(() => (setup, Component))()`, which
 // transpilers lower to `(function () { return setup, Component; })()`.
@@ -528,7 +542,7 @@ function compiledVoidExports(ast) {
 					specifier.importKind !== 'type' &&
 					VOID_PRESERVING_WRAPPERS.has(imported)
 				)
-					wrappers.set(specifier.local.name, VOID_PRESERVING_WRAPPERS.get(imported));
+					wrappers.set(specifier.local.name, imported);
 			}
 			continue;
 		}
@@ -563,10 +577,8 @@ function compiledVoidExports(ast) {
 			case 'CallExpression': {
 				if (node.optional === true) return false;
 				if (node.callee?.type === 'Identifier') {
-					const arity = wrappers.get(node.callee.name);
 					return (
-						arity !== undefined &&
-						node.arguments?.length === arity &&
+						voidPreservingWrapperCall(wrappers.get(node.callee.name), node.arguments) &&
 						node.arguments[0].type !== 'SpreadElement' &&
 						isVoid(node.arguments[0], seen)
 					);
