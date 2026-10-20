@@ -1163,8 +1163,9 @@ export function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	// An incomplete scope can predate this attempt. Its new slots must still be
-	// removed on rollback; only a scope created in this attempt goes away with them.
-	if (transaction !== null && !isCreatedInRootRender(transaction, scope.block)) {
+	// removed on rollback; only a scope whose owning block was created in this
+	// attempt goes away with them. A lite scope uses its owner's creation stamp.
+	if (transaction !== null && !isCreatedInRootRender(transaction, owningBlock(scope.block))) {
 		journalUndo(() => {
 			unmountSlot(slot, true);
 			const index = scope.slots.indexOf(slot);
