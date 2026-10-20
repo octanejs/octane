@@ -1632,6 +1632,7 @@ function requireRuntimeForContext(ctx, name) {
 		name === 'isContext' ||
 		name === '__delegateEvents' ||
 		name === '__delegateCaptureEvents' ||
+		name === '__sameHydrationInput' ||
 		name === METHOD_DEP_IMPORT ||
 		HOOK_MEMO_RUNTIME_HELPERS.has(name) ||
 		NATIVE_READ_RUNTIME_HELPERS.has(name)
@@ -1734,6 +1735,7 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__sameHydrationInput',
 	'__createVoidRootDefaultOptions',
 	'__createRootDefaultOptions',
 	'__delegateEvents',
@@ -4789,7 +4791,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		// ROOT objects, and dynamic `<{expr}/>` expressions count.
 		if (t === 'Element' || t === 'JSXElement') {
 			const tag = n.openingElement?.name || n.id;
-			if (tag) {
+			if (tag && !ignoreNodes?.has(tag)) {
 				if (
 					(tag.type === 'Identifier' || tag.type === 'JSXIdentifier') &&
 					typeof tag.name === 'string'
@@ -7419,6 +7421,22 @@ function collectPrivateUnescapedComponents(body, ctx) {
 			candidates.add(statement.id.name);
 		}
 	}
+	return collectPrivateRenderedComponents(body, ctx, candidates, (node, name, returnedOwner) => {
+		const attrs = node.attributes || node.openingElement?.attributes || [];
+		// Returned roots fold in declaration order. A later component has no
+		// renderer yet, so its descriptor can escape through the returned props.
+		return (
+			attrs.length === 0 &&
+			!node.children?.length &&
+			(returnedOwner === null ||
+				ctx.moduleFunctionDeclarations.get(name).start < returnedOwner.start)
+		);
+	});
+}
+
+// A private component whose every reference is an admitted template output
+// cannot be invoked through another ABI or escape through a descriptor's type.
+function collectPrivateRenderedComponents(body, ctx, candidates, acceptSite) {
 	if (candidates.size === 0) return candidates;
 
 	const allowed = new Set();
@@ -7430,18 +7448,8 @@ function collectPrivateUnescapedComponents(body, ctx) {
 			if (!isComponentTag(node)) visitOutput(node.children, returnedOwner);
 			else {
 				const name = tagBindingName(node);
-				const attrs = node.attributes || node.openingElement?.attributes || [];
-				// Returned roots fold in declaration order. A later component has no
-				// renderer yet, so its descriptor can escape through the returned props.
-				if (
-					candidates.has(name) &&
-					attrs.length === 0 &&
-					!node.children?.length &&
-					(returnedOwner === null ||
-						ctx.moduleFunctionDeclarations.get(name).start < returnedOwner.start)
-				) {
-					allowed.add(node);
-				}
+				if (candidates.has(name) && acceptSite(node, name, returnedOwner))
+					allowed.add(node.openingElement?.name ?? node.id);
 			}
 		} else if (node.type === 'JSXFragment' || node.type === 'Fragment') {
 			visitOutput(node.children, returnedOwner);
@@ -7488,6 +7496,38 @@ function collectPrivateUnescapedComponents(body, ctx) {
 		if (collectFreeIdentifiers(declaration.body, [], allowed).has(name)) candidates.delete(name);
 	}
 	return candidates;
+}
+
+// No setup code can expose the props record before this component's boundary.
+function isHydrationPropsComponent(node, ctx) {
+	return (
+		node?.type === 'FunctionDeclaration' &&
+		node.body?.type === 'JSXCodeBlock' &&
+		node.body.body.length === 0 &&
+		node.body.render?.type === 'JSXTryExpression' &&
+		node.params?.length === 1 &&
+		node.params[0].type === 'Identifier' &&
+		ctx.moduleFunctionDeclarations.has(node.id?.name)
+	);
+}
+
+// The caller owns a normal props record only at immediately rendered JSX
+// sites. Save those sites for private, immutable component declarations; the
+// boundary later checks that every site materializes each field it compares.
+function privateHydrationPropsSites(ctx) {
+	const body = ctx.hydrationPropsModule.body;
+	const candidates = new Set();
+	for (const node of body) if (isHydrationPropsComponent(node, ctx)) candidates.add(node.id.name);
+	const sites = new Map();
+	collectPrivateRenderedComponents(body, ctx, candidates, (node, name, returnedOwner) => {
+		if (returnedOwner !== null || node.children?.length) return false;
+		let calls = sites.get(name);
+		if (calls === undefined) sites.set(name, (calls = []));
+		calls.push(node.attributes || node.openingElement?.attributes || []);
+		return true;
+	});
+	for (const name of sites.keys()) if (!candidates.has(name)) sites.delete(name);
+	return sites;
 }
 
 // An authored @for normally hides its children from speculative warming: its
@@ -12819,6 +12859,7 @@ function compileInternal(
 	// M2 AST emit: the module is assembled as an array of top-level statement
 	// NODES — in exactly the historical statement order — and printed ONCE by
 	// esrap at the end, which also yields the entire module source map.
+	ctx.hydrationPropsModule = ast;
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	for (let node of ast.body) {
@@ -30278,7 +30319,9 @@ function planJsx(
 			trailing.push(tryAnchor || undefinedNode());
 		}
 		if (tryEnv || (!catchOnly && tc.propagateSuspense)) trailing.push(tryEnv || undefinedNode());
-		if (!catchOnly && tc.propagateSuspense) trailing.push(b.literal(true));
+		if (!catchOnly && (tc.propagateSuspense || tc.hydrationInputsEqual))
+			trailing.push(b.literal(tc.propagateSuspense === true));
+		if (tc.hydrationInputsEqual) trailing.push(b.id(tc.hydrationInputsEqual));
 		const boundaryArgs = [
 			b.id('__s'),
 			b.literal(slotIndex),
@@ -32686,7 +32729,10 @@ function emitNodeHtml(
 		return registerConstruct(makeForCall(node, ctx, inlinedSubs, parentNs, cssHash), forCalls);
 	}
 	if (node.type === 'TryStatement') {
-		return registerConstruct(makeTryCall(node, ctx, inlinedSubs, parentNs, cssHash), tryCalls);
+		return registerConstruct(
+			makeTryCall(node, ctx, inlinedSubs, parentNs, cssHash, componentName),
+			tryCalls,
+		);
 	}
 	if (node.type === 'SwitchStatement') {
 		return registerConstruct(
@@ -34332,7 +34378,7 @@ function emitElementHtml(
 				appendTemplatePart(html, '<!>', 'anchor');
 				childIdx++;
 			} else if (child.type === 'TryStatement') {
-				const tc = makeTryCall(child, ctx, inlinedSubs, childNs, cssHash);
+				const tc = makeTryCall(child, ctx, inlinedSubs, childNs, cssHash, componentName);
 				tc.hostPath = path;
 				// Emit a `<!>` anchor at the tryBlock's source-order position so
 				// tryBlock inserts BEFORE this anchor — preserving sibling order
@@ -35977,7 +36023,101 @@ function makeCompCall(
 // try/catch → tryBlock call
 // ===========================================================================
 
-function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
+// A private component consisting solely of this boundary cannot expose its
+// props before rendering. If every reference is an immediate JSX invocation
+// that materializes the required fields, those fields belong to ordinary
+// compiler-created records. Other captures retain identity comparison.
+function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName) {
+	if (!envNames?.length || ctx.mode !== 'client' || ctx._universalRuntimeUnit != null) return null;
+	const component = ctx.componentInfo?.get(componentName)?.node;
+	if (!isHydrationPropsComponent(component, ctx)) return null;
+	const propsName = component.params[0].name;
+	const propsIndex = envNames.indexOf(propsName);
+	if (propsIndex < 0) return null;
+	const sites = (ctx.hydrationPropsSites ??= privateHydrationPropsSites(ctx)).get(componentName);
+	if (!sites?.length) return null;
+	const callbacks = bodies
+		.filter(Boolean)
+		.map(({ stmts, params }) => b.arrow(params, b.block(stmts)));
+	// Dependency inference describes reads. An assignment, update, deletion or
+	// tagged call may observe the receiver itself even when its field is equal.
+	let opaque = false;
+	for (const callback of callbacks) {
+		mapAst(callback, (node) => {
+			if (
+				node.type === 'AssignmentExpression' ||
+				node.type === 'UpdateExpression' ||
+				(node.type === 'UnaryExpression' && node.operator === 'delete') ||
+				node.type === 'TaggedTemplateExpression' ||
+				((node.type === 'ForInStatement' || node.type === 'ForOfStatement') &&
+					node.left.type !== 'VariableDeclaration')
+			)
+				opaque = true;
+			return opaque ? node : null;
+		});
+		if (opaque) return null;
+	}
+	// Bind only the proven props record; dependency inference must account for
+	// all arms and distinguish captures from their own declarations.
+	const analysis = {
+		...ctx.authoredModuleAst,
+		body: [b.stmt(b.arrow([b.id(propsName)], b.array(callbacks)))],
+	};
+	const fields = new Map();
+	for (const dependencies of analyzeCallbackDependencies(analysis, callbacks).values()) {
+		if (dependencies === null) return null;
+		for (const { node, binding, method } of dependencies) {
+			if (binding.name !== propsName) continue;
+			const root = depPathRoot(depPathMember(node));
+			const name = staticDepMemberName(node);
+			if (root?.name !== propsName || name === null) return null;
+			fields.set(name, fields.get(name) === false ? false : !method || method.read === true);
+		}
+	}
+	if (fields.size === 0) return null;
+	const required = { warmRequiredProps: new Set(fields.keys()) };
+	if (!sites.every((attrs) => warmCallsiteOwnsRequiredProps(required, attrs))) return null;
+	const slot = (parameter, index) => b.member(b.id(parameter), b.literal(index), true);
+	const terms = envNames.map((_, index) => {
+		const sameRoot = hkObjectIs(ctx, slot('previous', index), slot('next', index));
+		if (index !== propsIndex) return sameRoot;
+		const fieldTerms = [...fields].map(([field, read]) =>
+			b.call(
+				requireRuntimeForContext(ctx, '__sameHydrationInput'),
+				slot('previous', index),
+				slot('next', index),
+				b.literal(field),
+				...(read ? [] : [b.literal(true)]),
+			),
+		);
+		return b.logical(
+			'||',
+			sameRoot,
+			fieldTerms.reduce((left, right) => b.logical('&&', left, right)),
+		);
+	});
+	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(
+			b.function_declaration(
+				b.id(name),
+				[b.id('previous'), b.id('next')],
+				b.block([b.return(terms.reduce((left, right) => b.logical('&&', left, right)))]),
+			),
+			origin,
+		),
+	);
+	return name;
+}
+
+function makeTryCall(
+	node,
+	ctx,
+	inlinedSubs,
+	parentNs = 'html',
+	cssHash = null,
+	componentName = null,
+) {
 	// node.block = try BlockStatement, node.handler = CatchClause (param, resetParam, body),
 	// node.pending = optional BlockStatement (TSRX `pending { ... }`)
 	//
@@ -36036,11 +36176,14 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	}
 
 	const catchParams = [b.id('__props', node.handler ?? node)];
-	const envNames = unionEnv(ctx, [
+	const bodies = [
 		{ stmts: tryStmts, params: [] },
 		pendingStmts && { stmts: pendingStmts, params: [] },
 		catchBodyStmts && { stmts: catchBodyStmts, params: catchParams },
-	]);
+	];
+	const envNames = unionEnv(ctx, bodies);
+	const hydrationInputsEqual =
+		pendingStmts && hoistHydrationInputsEqual(ctx, bodies, envNames, node, componentName);
 
 	const tryHelperName = hoistBodyHelper(
 		ctx,
@@ -36088,6 +36231,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		loc: devLoc(ctx, node),
 		origin: node,
 		envNames,
+		hydrationInputsEqual,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,

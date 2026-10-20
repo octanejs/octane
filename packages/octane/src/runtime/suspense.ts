@@ -1268,6 +1268,8 @@ export function tryBlock(
 	env?: any[],
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
+	// A compiler proof for comparing captured inputs while initial hydration waits.
+	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean,
 ): () => void {
 	// Slot arguments can queue a parent self-update. Like every other slot, wait
 	// for the replay: mounting now would put this range before earlier siblings
@@ -1316,6 +1318,7 @@ export function tryBlock(
 					end,
 					env,
 					propagateSuspense,
+					hydrationInputsEqual,
 				);
 			} finally {
 				settleFreshSlot(parentScope, end, anchor);
@@ -1361,6 +1364,7 @@ export function tryBlock(
 					anchor,
 					env,
 					propagateSuspense,
+					hydrationInputsEqual,
 				),
 			);
 		} else {
@@ -1411,7 +1415,11 @@ export function tryBlock(
 		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
 		const changed =
 			(retains || initial !== undefined) &&
-			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)));
+			(state.tryBody !== tryBody ||
+				(state.env !== env &&
+					(initial !== undefined && hydrationInputsEqual && state.env && env
+						? !hydrationInputsEqual(state.env, env)
+						: depsChanged(state.env, env))));
 		supersedesInputs = retains && changed;
 		// New inputs, not the retry its wakeable scheduled, reached a boundary
 		// whose hydration is suspended: as React does, it renders on the client.
