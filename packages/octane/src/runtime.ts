@@ -263,6 +263,7 @@ export {
 	presentationHostWrite,
 	renderWrite,
 	presentationWrite,
+	presentationFixedWrite,
 	bindPresentationView,
 	markBindingChildren,
 	presentationStructure,

@@ -133,8 +133,8 @@ export type BindingValue = string | null | BindingStyleSnapshot;
 /** @internal No application function is invoked to discover the DOM topology. */
 export interface CompiledBindings<Props> {
 	readonly id: string;
-	/** Compiler-proven single native host, with no descendant ownership. */
-	readonly handoff?: 'host';
+	/** Compiler-proven host channels or a complete fixed native view. */
+	readonly handoff?: 'host' | 'view';
 	/** Targets carry compiler-issued addresses when unbound siblings may change. */
 	readonly addressed?: true;
 	readonly nodes: readonly BindingNode[];
@@ -221,8 +221,8 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
-/** No child, or exactly one Text node. */
-function isTextLeaf(node: Element): boolean {
+/** @internal No child, or exactly one Text node. */
+export function __isBindingTextLeaf(node: Node): boolean {
 	const first = node.firstChild;
 	return first === null || (!first.nextSibling && first.nodeType === 3);
 }
@@ -244,7 +244,7 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 			openChildren === true ||
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
-			(text && !isTextLeaf(node))
+			(text && !__isBindingTextLeaf(node))
 		) {
 			throw new Error(formatClientError(318));
 		}
@@ -264,6 +264,23 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 		if (cursors[i] !== null) throw new Error(formatClientError(318));
 	}
 	return nodes;
+}
+
+function matchesFixedNodes(
+	root: Element,
+	descriptor: CompiledBindings<unknown>,
+	nodes: readonly Element[],
+	text: ReadonlyMap<Element, ChildNode | null> | undefined,
+): boolean {
+	try {
+		if (!resolveFixedNodes(root, descriptor).every((node, index) => node === nodes[index]))
+			return false;
+		if (text !== undefined)
+			for (const [node, original] of text) if (node.firstChild !== original) return false;
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
@@ -319,7 +336,7 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 					// A parent without a cursor claims no children.
 					(descriptor.nodes[parent]![4] !== true && cursors[parent] !== node)) ||
 			(openChildren && children === null) ||
-			(text && !isTextLeaf(node))
+			(text && !__isBindingTextLeaf(node))
 		) {
 			throw new Error(formatClientError(321));
 		}
@@ -462,6 +479,25 @@ function write(
 
 export { normalize as __normalizeBinding, write as __writeBinding };
 
+/** @internal Establishes a missing text witness at the writer's creation seam. */
+export function __writeBindingWithTextWitness(
+	node: Element,
+	binding: BindingOperation,
+	value: string | null,
+	fixedText: Map<Element, ChildNode | null>,
+): string | null | void {
+	if (binding[1] === 'text' && fixedText.get(node) === null) {
+		// Source callbacks may have populated a leaf resolved as empty. Only the
+		// writer-created node belongs to this binding lifetime.
+		if (node.firstChild !== null) throw new Error(formatClientError(318));
+		const text = node.ownerDocument.createTextNode(value!);
+		node.appendChild(text);
+		fixedText.set(node, text);
+		return value;
+	}
+	return write(node, binding, value);
+}
+
 /**
  * @internal Widens the scalar adopter's channels to sanitized URLs through the
  * general channel rules. The compiler attaches it only to artifacts that bind
@@ -540,12 +576,41 @@ export function __createBindingStyleRestoration(
 	};
 }
 
+function prepareFixedBindingView(
+	root: Element,
+	descriptor: CompiledBindings<unknown>,
+	nodes: Element[],
+): { valid(): boolean; write: typeof write } {
+	let fixedText: Map<Element, ChildNode | null> | undefined;
+	for (let index = 0; index < nodes.length; index++)
+		if (descriptor.nodes[index]![5])
+			(fixedText ??= new Map()).set(nodes[index]!, nodes[index]!.firstChild);
+	return {
+		valid: () => matchesFixedNodes(root, descriptor, nodes, fixedText),
+		write:
+			fixedText === undefined
+				? write
+				: (node, binding, value) => __writeBindingWithTextWitness(node, binding, value, fixedText),
+	};
+}
+
+/** @internal Whole-view handoff adds topology proof to the existing fixed-layout lifetime. */
+export function __adoptFixedViewBindings<Props>(
+	root: Element,
+	descriptor: CompiledBindings<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	return __adoptBindings(root, descriptor, source, options, prepareFixedBindingView);
+}
+
 /** @internal Fixed-layout adopter and compatibility dispatch for earlier compiler output. */
 export function __adoptBindings<Props>(
 	root: Element | BindingRange,
 	descriptor: CompiledBindings<Props> | CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
 	options?: BindingOptions,
+	prepareView?: typeof prepareFixedBindingView,
 ): BindingHandle {
 	// Only structural programs carry a root. Scalar artifacts also expose their
 	// selected adopter, so dispatching by that method would recurse into itself.
@@ -555,6 +620,8 @@ export function __adoptBindings<Props>(
 	const nodes = descriptor.addressed
 		? resolveAddressedNodes(assertBindingRoot(root as Element, descriptor), descriptor)
 		: resolveFixedNodes(root as Element, descriptor);
+	const view = prepareView?.(root as Element, descriptor, nodes);
+	const writeChannel = view?.write ?? write;
 	const bindings = descriptor.bindings;
 	const owned: Array<readonly [Element, string]> = [];
 	const previous: Array<BindingValue | undefined> = [];
@@ -722,7 +789,7 @@ export function __adoptBindings<Props>(
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
 				style.write(prepared as string | null);
-			} else written = write(nodes[binding[0]]!, binding, prepared as string | null);
+			} else written = writeChannel(nodes[binding[0]]!, binding, prepared as string | null);
 			if (!disposed) {
 				previous[i] = prepared;
 				// Only fixed scalar, URL and style channels participate in this legacy
@@ -966,7 +1033,7 @@ export function __adoptBindings<Props>(
 		drain();
 	};
 	const handle: BindingHandle & Partial<BindingHandoffCapability> = { refresh, dispose };
-	if (descriptor.handoff === 'host') {
+	if (descriptor.handoff) {
 		published = () => {
 			if (!publicationRetries?.size) return;
 			const pending = [...publicationRetries];
@@ -1009,15 +1076,27 @@ export function __adoptBindings<Props>(
 				id: descriptor.id,
 				root: host,
 				anchor: host,
-				host: new Set(
-					bindings.map((binding) =>
-						binding[1] === 'styleProperty'
-							? 'style:' + binding[2]
-							: binding[1].startsWith('style')
-								? 'style'
-								: binding[2],
-					),
-				),
+				...(view
+					? { end: host }
+					: {
+							host: new Set(
+								bindings.map((binding) =>
+									binding[1] === 'styleProperty'
+										? 'style:' + binding[2]
+										: binding[1].startsWith('style')
+											? 'style'
+											: binding[2],
+								),
+							),
+							// The authored node before the host still marks its site after the
+							// host leaves, including when an external clone now stands there.
+							displaced: (parent: Node, node: Node | null) =>
+								parent === site &&
+								node !== host &&
+								(node === null || node.parentNode === parent) &&
+								(node === null ? skip(parent.lastChild, true) : sibling(node, true)) ===
+									previousSibling,
+						}),
 				revision: () => (busy ? -1 : revision),
 				afterPublication: (callback) => {
 					(publicationRetries ??= new Set()).add(callback);
@@ -1029,14 +1108,8 @@ export function __adoptBindings<Props>(
 					ancestry.every(([node, parent]) => node.parentNode === parent) &&
 					adjacent(previousSibling, true) &&
 					adjacent(nextSibling, false) &&
-					host.getAttribute('data-octane-bindings') === descriptor.id,
-				// The authored node before the host still marks its site after the
-				// host leaves, including when an external clone now stands there.
-				displaced: (parent, node) =>
-					parent === site &&
-					node !== host &&
-					(node === null || node.parentNode === parent) &&
-					(node === null ? skip(parent.lastChild, true) : sibling(node, true)) === previousSibling,
+					host.getAttribute('data-octane-bindings') === descriptor.id &&
+					(view?.valid() ?? true),
 				active: () => !disposed,
 				retire: (publish) => dispose(undefined, publish, true),
 			});
