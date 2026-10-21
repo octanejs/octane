@@ -1633,6 +1633,9 @@ function requireRuntimeForContext(ctx, name) {
 		name === '__delegateEvents' ||
 		name === '__delegateCaptureEvents' ||
 		name === '__sameHydrationInput' ||
+		name === '__sameHydrationSource' ||
+		name === '__sameHydrationOptionalInput' ||
+		name === '__observeHydrationOptionalInput' ||
 		name === '__captureHydrationInput' ||
 		name === '__hydrationSignalRevision' ||
 		name === '__hydrationComponentSlot' ||
@@ -1745,6 +1748,9 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'__registerHydrationInputComponent',
 	'__ownedHydrationInputs',
 	'__sameHydrationInput',
+	'__sameHydrationSource',
+	'__sameHydrationOptionalInput',
+	'__observeHydrationOptionalInput',
 	'__createVoidRootDefaultOptions',
 	'__createRootDefaultOptions',
 	'__delegateEvents',
@@ -7569,9 +7575,13 @@ function hydrationSetupExpression(node, propsName, required, setupLocals) {
 			)
 				return false;
 			let receiver = unwrapTsExpr(member.object);
-			if (receiver?.type === 'Identifier') receiver = unwrapTsExpr(setupLocals.get(receiver.name));
+			if (receiver?.type === 'Identifier') {
+				receiver = unwrapTsExpr(setupLocals.get(receiver.name));
+			}
 			// The optional read stays in authored setup. Its receiver must be an
-			// own-data props field, possibly held by one preceding const local.
+			// own-data props field, possibly held by one preceding const local. A
+			// projected value from an opaque call cannot prove that the suspended
+			// request is unchanged when the projection itself compares equal.
 			return (
 				receiver?.type === 'MemberExpression' &&
 				!receiver.optional &&
@@ -7691,14 +7701,53 @@ function hydrationBlockingBodies(ctx, bodies) {
 	return [{ ...bodies[0], stmts }, ...bodies.slice(1)];
 }
 
+function hydrationLayoutCaptureName(node, propsName) {
+	const name = node?.type === 'Identifier' ? node.name : null;
+	return name === propsName || name === 'arguments' || name === 'eval' ? null : name;
+}
+
+// Inference witnesses the first optional member. Keep that generated read
+// dependency intact; the authored effect still evaluates the full chain.
+function hydrationLayoutReadCapture(node, propsName) {
+	if (node?.type !== 'ChainExpression') return null;
+	let member = node.expression;
+	for (let depth = 0; depth < 2; depth++) {
+		if (
+			member?.type !== 'MemberExpression' ||
+			!member.optional ||
+			member.computed ||
+			member.property?.type !== 'Identifier'
+		)
+			return null;
+		const name = hydrationLayoutCaptureName(member.object, propsName);
+		if (name !== null) return [name, member.property.name];
+		member = member.object;
+	}
+	return null;
+}
+
+function hydrationLayoutMethodDep(node, helper, receiver, field, guarded, read = false) {
+	return (
+		node?.type === 'CallExpression' &&
+		!node.optional &&
+		node.callee?.type === 'Identifier' &&
+		node.callee.name === helper &&
+		node.arguments.length === (read ? 4 : guarded ? 3 : 2) &&
+		node.arguments[0]?.type === 'Identifier' &&
+		node.arguments[0].name === receiver &&
+		node.arguments[1]?.type === 'Literal' &&
+		node.arguments[1].value === field &&
+		(!guarded || (node.arguments[2]?.type === 'Literal' && node.arguments[2].value === true)) &&
+		(!read || (node.arguments[3]?.type === 'Literal' && node.arguments[3].value === true))
+	);
+}
+
 // A layout callback is published only after an arm commits. Dependency
 // inference still evaluates its method witness during render, so require that
 // field to be own data without treating the callback as a blocking input.
 // Change only this analysis copy; the emitted hook, deps and receiver stay intact.
-function hydrationLayoutBodies(ctx, bodies, propsName, required) {
-	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
-	if (methodDepLocal === undefined) return bodies;
-	const stmts = bodies[0].stmts;
+function hydrationLayoutBody(body, methodDepLocal, propsName, required) {
+	const stmts = body.stmts;
 	let next = null;
 	for (let index = 0; index < stmts.length; index++) {
 		const statement = stmts[index];
@@ -7712,40 +7761,85 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 			callback.params.length !== 0 ||
 			callback.body.type !== 'BlockStatement' ||
 			callback.body.body.length !== 1 ||
-			callback.body.body[0].type !== 'ExpressionStatement' ||
-			deps?.type !== 'ArrayExpression' ||
-			deps.elements.length !== 2
+			deps?.type !== 'ArrayExpression'
 		)
 			continue;
-		const expression = callback.body.body[0].expression;
+		let action = callback.body.body[0];
+		let guard = null;
+		if (action.type === 'IfStatement') {
+			guard = hydrationLayoutCaptureName(action.test, propsName);
+			if (guard === null || action.alternate !== null) continue;
+			action = action.consequent;
+			if (action.type === 'BlockStatement' && action.body.length === 1) action = action.body[0];
+		}
+		if (action.type !== 'ExpressionStatement') continue;
+		const expression = action.expression;
 		const invoked = expression.type === 'ChainExpression' ? expression.expression : expression;
 		const member = invoked?.callee;
-		const argument = invoked?.arguments?.[0];
 		const field = staticDepMemberName(member);
-		const [method, value] = deps.elements;
 		if (
 			invoked?.type !== 'CallExpression' ||
-			invoked.arguments.length !== 1 ||
+			invoked.arguments.length === 0 ||
 			member?.type !== 'MemberExpression' ||
 			member.optional ||
 			field === null ||
 			member.object?.type !== 'Identifier' ||
-			member.object.name !== propsName ||
-			argument?.type !== 'Identifier' ||
-			argument.name === propsName ||
-			method?.type !== 'CallExpression' ||
-			method.optional ||
-			method.callee?.type !== 'Identifier' ||
-			method.callee.name !== methodDepLocal ||
-			method.arguments.length !== 2 ||
-			method.arguments[0]?.type !== 'Identifier' ||
-			method.arguments[0].name !== propsName ||
-			method.arguments[1]?.type !== 'Literal' ||
-			method.arguments[1].value !== field ||
-			value?.type !== 'Identifier' ||
-			value.name !== argument.name
+			member.object.name !== propsName
 		)
 			continue;
+		// Inferred dependencies deduplicate repeated arguments. Require the exact
+		// set of lexical captures and retain those dependencies in the analysis.
+		const captures = new Set();
+		if (guard !== null) captures.add(guard);
+		let readCapture = null;
+		let valid = true;
+		for (const argument of invoked.arguments) {
+			if (argument?.type === 'Literal' && argument.value === null) continue;
+			const name = hydrationLayoutCaptureName(argument, propsName);
+			if (name !== null) {
+				captures.add(name);
+				continue;
+			}
+			if (
+				guard !== null &&
+				readCapture === null &&
+				(readCapture = hydrationLayoutReadCapture(argument, propsName)) !== null
+			)
+				continue;
+			valid = false;
+			break;
+		}
+		if (!valid || deps.elements.length !== captures.size + 1 + (readCapture === null ? 0 : 1))
+			continue;
+		let methodIndex = -1;
+		for (let depIndex = 0; depIndex < deps.elements.length; depIndex++) {
+			const dependency = deps.elements[depIndex];
+			if (dependency?.type === 'Identifier' && captures.delete(dependency.name)) continue;
+			if (
+				readCapture !== null &&
+				hydrationLayoutMethodDep(
+					dependency,
+					methodDepLocal,
+					readCapture[0],
+					readCapture[1],
+					true,
+					true,
+				)
+			) {
+				readCapture = null;
+				continue;
+			}
+			if (
+				methodIndex === -1 &&
+				hydrationLayoutMethodDep(dependency, methodDepLocal, propsName, field, guard !== null)
+			) {
+				methodIndex = depIndex;
+				continue;
+			}
+			valid = false;
+			break;
+		}
+		if (!valid || methodIndex === -1 || captures.size !== 0 || readCapture !== null) continue;
 		// The helper alias is allocated against every authored identifier before
 		// inference, so an explicit dependency list cannot counterfeit this call.
 		required.add(field);
@@ -7753,11 +7847,66 @@ function hydrationLayoutBodies(ctx, bodies, propsName, required) {
 			...statement,
 			expression: {
 				...effect,
-				arguments: [b.arrow([], b.block([])), { ...deps, elements: [value] }],
+				arguments: [
+					b.arrow([], b.block([])),
+					{ ...deps, elements: deps.elements.filter((_, depIndex) => depIndex !== methodIndex) },
+				],
 			},
 		};
 	}
-	return next === null ? bodies : [{ ...bodies[0], stmts: next }, ...bodies.slice(1)];
+	return next === null ? body : { ...body, stmts: next };
+}
+
+function hydrationLayoutBodies(ctx, bodies, propsName, required) {
+	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
+	if (methodDepLocal === undefined) return bodies;
+	// Pending can publish while adoption is unresolved, so analyze it unchanged.
+	const primary = hydrationLayoutBody(bodies[0], methodDepLocal, propsName, required);
+	const caught = bodies[2] && hydrationLayoutBody(bodies[2], methodDepLocal, propsName, required);
+	return primary === bodies[0] && caught === bodies[2] ? bodies : [primary, bodies[1], caught];
+}
+
+// Only a direct optional call at the first authored operation can place an
+// observation immediately beside the actual read without moving user code.
+function hydrationFirstOptionalReader(body, propsName) {
+	const statement = body.stmts[0];
+	const declaration = statement?.declarations?.[0];
+	const init = declaration?.init;
+	const chain = init?.left;
+	const call = chain?.expression;
+	const member = call?.callee;
+	if (
+		statement?.type !== 'VariableDeclaration' ||
+		statement.kind !== 'const' ||
+		statement.declarations.length !== 1 ||
+		declaration.id.type !== 'Identifier' ||
+		init?.type !== 'LogicalExpression' ||
+		init.operator !== '??' ||
+		chain?.type !== 'ChainExpression' ||
+		call?.type !== 'CallExpression' ||
+		!call.optional ||
+		call.arguments.length !== 0 ||
+		member?.type !== 'MemberExpression' ||
+		member.optional ||
+		member.computed ||
+		member.object?.type !== 'Identifier' ||
+		member.object.name !== propsName ||
+		member.property?.type !== 'Identifier'
+	)
+		return null;
+	return { field: member.property.name, propsName };
+}
+
+function replaceHydrationFirstOptionalReader(body, left) {
+	const statement = body.stmts[0];
+	const declaration = statement.declarations[0];
+	return {
+		...body,
+		stmts: [
+			{ ...statement, declarations: [{ ...declaration, init: { ...declaration.init, left } }] },
+			...body.stmts.slice(1),
+		],
+	};
 }
 
 // An exported component can also receive arbitrary caller-owned props. Its
@@ -7848,10 +7997,24 @@ function exportedHydrationPropsPlans(ctx) {
 			derived ? hydrationBlockingBodies(ctx, bodies) : bodies,
 		);
 		if (fields === null) continue;
+		let optional = hydrationFirstOptionalReader(bodies[0], propsName);
+		if (optional !== null) {
+			// An optional first call cannot weaken any other use of the same field.
+			const remaining =
+				fields.get(optional.field) === false && !required.has(optional.field)
+					? hydrationPropsFields(ctx, propsName, [
+							replaceHydrationFirstOptionalReader(bodies[0], b.literal(null)),
+							...bodies.slice(1),
+						])
+					: null;
+			if (remaining === null || remaining.has(optional.field)) optional = null;
+			else fields.delete(optional.field);
+		}
 		if (derived?.field) fields.set(derived.field, false);
 		for (const field of fields.keys()) required.add(field);
 		plans.set(component.id.name, {
 			fields,
+			optional,
 			derived: derived?.source ? null : derived,
 			source: derived?.source,
 			origin: component,
@@ -30760,6 +30923,7 @@ function planJsx(
 		if (!catchOnly && (tc.propagateSuspense || tc.hydrationInputsEqual))
 			trailing.push(b.literal(tc.propagateSuspense === true));
 		if (tc.hydrationInputsEqual) trailing.push(b.id(tc.hydrationInputsEqual));
+		if (tc.preserveHydrationCapture) trailing.push(b.literal(tc.preserveHydrationCapture));
 		const boundaryArgs = [
 			b.id('__s'),
 			b.literal(slotIndex),
@@ -36643,9 +36807,34 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 			),
 		),
 	]);
-	const terms = [b.logical('||', ordinary, refined)];
+	const inputTerm = capture?.source
+		? b.conditional(
+				ordinary,
+				b.call(
+					requireRuntimeForContext(ctx, '__sameHydrationSource'),
+					b.id('previous'),
+					b.id(capture.source),
+				),
+				refined,
+			)
+		: b.logical('||', ordinary, refined);
+	const terms = plan?.optional || capture?.source ? [] : [inputTerm];
 	for (let index = 0; index < envNames.length; index++)
 		if (index !== propsIndex && index !== derivedIndex) terms.push(sameSlot(index));
+	// Arming the next actual access is the final comparator operation, including
+	// when the component reuses its previous props record.
+	if (plan?.optional)
+		terms.push(
+			inputTerm,
+			b.call(
+				requireRuntimeForContext(ctx, '__sameHydrationOptionalInput'),
+				b.id('previous'),
+				b.id('next'),
+				slot('next', propsIndex),
+				b.literal(plan.optional.field),
+			),
+		);
+	else if (capture?.source) terms.push(inputTerm);
 	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -36657,7 +36846,7 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 			origin,
 		),
 	);
-	return { name, capture };
+	return { name, capture, optional: plan?.optional };
 }
 
 function tryBodies(node, ctx) {
@@ -36736,13 +36925,26 @@ function makeTryCall(
 	componentName = null,
 ) {
 	const bodies = tryBodies(node, ctx);
-	const tryStmts = bodies[0].stmts;
+	let tryStmts = bodies[0].stmts;
 	const pendingStmts = bodies[1]?.stmts;
 	const catchBodyStmts = bodies[2]?.stmts;
 	const catchParams = bodies[2]?.params;
 	const envNames = unionEnv(ctx, bodies);
 	const hydrationInputsEqual =
 		pendingStmts && hoistHydrationInputsEqual(ctx, bodies, envNames, node, componentName);
+	if (hydrationInputsEqual?.optional) {
+		const { propsName, field } = hydrationInputsEqual.optional;
+		const call = b.call(
+			requireRuntimeForContext(ctx, '__observeHydrationOptionalInput'),
+			b.id('__extra'),
+			b.id(propsName),
+			b.literal(field),
+		);
+		tryStmts = replaceHydrationFirstOptionalReader(
+			bodies[0],
+			b.sequence([call, tryStmts[0].declarations[0].init.left]),
+		).stmts;
+	}
 
 	const tryHelperName = hoistBodyHelper(
 		ctx,
@@ -36785,6 +36987,12 @@ function makeTryCall(
 			node.handlerKeyword ?? null,
 		);
 	}
+	// Match tryBlock's private capture modes; decline overlapping proofs.
+	let preserveHydrationCapture = 0;
+	if (hydrationInputsEqual?.optional && !hydrationInputsEqual.capture?.source)
+		preserveHydrationCapture = 1;
+	else if (!hydrationInputsEqual?.optional && hydrationInputsEqual?.capture?.source)
+		preserveHydrationCapture = 2;
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
@@ -36792,6 +37000,7 @@ function makeTryCall(
 		envNames,
 		hydrationInputsEqual: hydrationInputsEqual?.name,
 		hydrationInputCapture: hydrationInputsEqual?.capture,
+		preserveHydrationCapture,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,

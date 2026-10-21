@@ -1270,6 +1270,8 @@ export function tryBlock(
 	propagateSuspense = false,
 	// A compiler proof for comparing captured inputs while initial hydration waits.
 	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean,
+	// Compiler capture modes: 1 = unobserved optional input; 2 = validated source witness.
+	preserveHydrationCapture?: 1 | 2,
 ): () => void {
 	// Slot arguments can queue a parent self-update. Like every other slot, wait
 	// for the replay: mounting now would put this range before earlier siblings
@@ -1319,6 +1321,7 @@ export function tryBlock(
 					env,
 					propagateSuspense,
 					hydrationInputsEqual,
+					preserveHydrationCapture,
 				);
 			} finally {
 				settleFreshSlot(parentScope, end, anchor);
@@ -1365,6 +1368,7 @@ export function tryBlock(
 					env,
 					propagateSuspense,
 					hydrationInputsEqual,
+					preserveHydrationCapture,
 				),
 			);
 		} else {
@@ -1412,14 +1416,26 @@ export function tryBlock(
 		if (domParent.nodeType === 11) noteFrontierMember(domParent, newState);
 		state = newState;
 	} else {
+		// Reuse an equivalent compiler capture only with its original proof:
+		// before an optional input's first read, or after validating a source witness.
+		const unchangedCapture =
+			initial !== undefined &&
+			(preserveHydrationCapture === 2 ||
+				(preserveHydrationCapture === 1 && initial.waits !== undefined)) &&
+			hydrationInputsEqual !== undefined &&
+			state.tryBody === tryBody &&
+			state.env !== env &&
+			!depsChanged(state.env, env);
 		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
 		const changed =
 			(retains || initial !== undefined) &&
 			(state.tryBody !== tryBody ||
 				(state.env !== env &&
 					(initial !== undefined && hydrationInputsEqual && state.env && env
-						? !hydrationInputsEqual(state.env, env)
+						? !(unchangedCapture && preserveHydrationCapture === 1) &&
+							!hydrationInputsEqual(state.env, env)
 						: depsChanged(state.env, env))));
+		if (unchangedCapture && !changed) env = state.env;
 		supersedesInputs = retains && changed;
 		// New inputs, not the retry its wakeable scheduled, reached a boundary
 		// whose hydration is suspended: as React does, it renders on the client.

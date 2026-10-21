@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot, type Root } from '../../src/index.js';
-import { renderToString } from 'octane/server';
+import { renderToPipeableStream, renderToString } from 'octane/server';
 import * as Signals from 'octane/signals';
 import { __hydrationSignalRevision } from 'octane/internal/hydration-signal';
 import { __captureHydrationInput, __ownedHydrationInputs } from '../../src/hydration-inputs.js';
 import {
 	activateStreamedMarkup,
 	collectReadableStream,
+	createPipeableCollector,
 	resetStreamRuntimeGlobals,
 } from '../_server-stream.js';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
@@ -159,6 +160,332 @@ it('witnesses only canonical writable signal sources without observing unknown v
 
 describe.each([false, true])('parent updates during suspended hydration (dev: %s)', (dev) => {
 	it.each([
+		'missing optional reader',
+		'present optional reader',
+		'own undefined',
+		'receiver-aware reader',
+		'changed optional reader',
+		'changed reader',
+	] as const)(
+		'preserves a suspended arm whose first optional reader is absent: %s',
+		async (scenario) => {
+			const gateSource = `export function Gate(props) @{
+  @try {
+    const value = props.optionalReader?.() ?? props.read();
+    <input defaultValue={value} />;
+  } @pending { <span>Loading</span>; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const waiting = gate();
+			const props = {
+				sibling: 'waiting',
+				gate: {
+					read: () => {
+						if (waiting.value.pending) throw waiting.value.promise;
+						return 'server';
+					},
+					...(scenario === 'present optional reader'
+						? { optionalReader: () => undefined }
+						: scenario === 'own undefined'
+							? { optionalReader: undefined }
+							: scenario === 'receiver-aware reader'
+								? {
+										optionalReader: function (this: { read: () => string }) {
+											return this.read();
+										},
+									}
+								: {}),
+				},
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], props).html;
+			const original = container.querySelector('input')!;
+			original.value = 'typed';
+			waiting.value.pending = true;
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			await act(() =>
+				root.render(client['App'], {
+					sibling: 'ready',
+					gate: {
+						...props.gate,
+						...(scenario === 'changed optional reader'
+							? { optionalReader: () => 'replacement' }
+							: {}),
+						...(scenario === 'changed reader' ? { read: () => 'replacement' } : {}),
+					},
+				}),
+			);
+			const retained = !scenario.startsWith('changed ') && scenario !== 'receiver-aware reader';
+			expect(container.querySelector('input') === original).toBe(retained);
+			expect(container.querySelector('output')?.textContent).toBe('ready');
+			await act(() => waiting.resolve());
+			const accepted = container.querySelector('input')!;
+			expect(accepted === original).toBe(retained);
+			expect(accepted.value).toBe(
+				retained ? 'typed' : scenario.startsWith('changed ') ? 'replacement' : 'server',
+			);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
+	it.each(['unchanged', 'changed', 'unchanged source', 'changed source'] as const)(
+		'handles %s captures before a streamed arm’s first read',
+		async (captures) => {
+			const sourceBacked = captures.endsWith(' source');
+			const scope = Signals.createScope({
+				scopeKey: `streamed-reader-${dev}-${captures}`,
+			});
+			const tick$ = scope.signal$('tick', 0);
+			const selection$ = scope.signal$('selection', 'server');
+			const gateSource = `${sourceBacked ? "import { derived$ } from 'octane/signals';" : ''}
+import { tick$, selection$ } from './selection';
+export function Gate(props) @{
+  const tick = tick$.get(); void tick;
+  ${sourceBacked ? 'const selected$ = derived$(() => selection$.get());' : ''}
+  @try {
+    const value = ${sourceBacked ? 'props.read(selected$.get())' : 'props.optionalReader?.() ?? props.read()'};
+    <input data-stage="ready" defaultValue={value${captures === 'changed' ? ' + tick' : ''}} />;
+  } @pending { <input data-stage="pending" defaultValue="Waiting" />; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+					runtimeModules: {
+						'./selection': { tick$, selection$ },
+						'octane/signals': Signals,
+						'octane/internal/hydration-signal': { __hydrationSignalRevision },
+					},
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const serverWait = gate();
+			serverWait.value.pending = true;
+			const clientWait = gate();
+			clientWait.value.pending = true;
+			let clientReads = 0;
+			const clientRead = (selected = 'server') => {
+				clientReads++;
+				if (clientWait.value.pending) throw clientWait.value.promise;
+				return selected;
+			};
+			const collector = createPipeableCollector();
+			let shellReady!: () => void;
+			const shell = new Promise<void>((resolve) => (shellReady = resolve));
+			const stream = renderToPipeableStream(
+				server['App'],
+				{
+					gate: {
+						read: () => {
+							if (serverWait.value.pending) throw serverWait.value.promise;
+							return 'server';
+						},
+					},
+				},
+				{ onShellReady: shellReady },
+			);
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			cleanups.push(() => {
+				root?.unmount();
+				stream.abort();
+				scope.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			});
+			stream.pipe(collector.destination);
+			await shell;
+			const shellChunks = collector.chunks.length;
+			container.innerHTML = collector.chunks.join('');
+			activateStreamedMarkup(container);
+			const pending = container.querySelector<HTMLInputElement>('[data-stage="pending"]')!;
+			pending.value = 'typed while waiting';
+			const onRecoverableError = vi.fn();
+			root = hydrateRoot(
+				container,
+				client['App'],
+				{ gate: { read: clientRead } },
+				{ onRecoverableError },
+			);
+			expect(clientReads).toBe(0);
+			await act(() => {
+				if (captures === 'changed source') selection$.set('replacement');
+				tick$.set(1);
+			});
+			if (captures.startsWith('changed')) {
+				expect(container.querySelector('[data-stage="pending"]')).not.toBe(pending);
+				expect(clientReads).toBeGreaterThan(0);
+			} else {
+				expect(container.querySelector('[data-stage="pending"]')).toBe(pending);
+				expect(pending.value).toBe('typed while waiting');
+				expect(clientReads).toBe(0);
+			}
+
+			serverWait.resolve();
+			await collector.ended;
+			const deliver = () => {
+				container.insertAdjacentHTML('beforeend', collector.chunks.slice(shellChunks).join(''));
+				activateStreamedMarkup(container);
+			};
+			if (captures.startsWith('changed')) {
+				await act(() => clientWait.resolve());
+				const accepted = container.querySelector<HTMLInputElement>('[data-stage="ready"]')!;
+				expect(accepted.value).toBe(captures === 'changed source' ? 'replacement' : 'server1');
+				await act(deliver);
+				expect(container.querySelector('[data-stage="ready"]')).toBe(accepted);
+				expect(onRecoverableError).not.toHaveBeenCalled();
+				return;
+			}
+			let revealed!: HTMLInputElement;
+			await act(() => {
+				deliver();
+				revealed = container.querySelector<HTMLInputElement>('[data-stage="ready"]')!;
+				revealed.value = 'typed after reveal';
+			});
+			expect(clientReads).toBeGreaterThan(0);
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			await act(() => tick$.set(2));
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			expect(revealed.value).toBe('typed after reveal');
+			await act(() => tick$.set(3));
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			expect(revealed.value).toBe('typed after reveal');
+			await act(() => clientWait.resolve());
+			expect(container.querySelector('[data-stage="ready"]')).toBe(revealed);
+			expect(revealed.value).toBe('typed after reveal');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
+	const optionalUpdates = ['new props', 'same props'] as const;
+	it.each(optionalUpdates)('guards changed optional readers (%s)', async (scenario) => {
+		const scope = Signals.createScope({ scopeKey: `optional-reader-${dev}-${scenario}` });
+		const tick$ = scope.signal$('tick', 0);
+		cleanups.push(() => scope.dispose());
+		const gateSource = `import { use } from 'octane';
+${scenario === 'same props' ? "import { tick$ } from './tick';" : ''}
+export function Gate(props) @{
+  ${scenario === 'same props' ? 'const tick = tick$.get(); void tick;' : ''}
+  @try {
+    const value = props.octaneOptionalTestReader?.() ?? props.read();
+    const suffix = use(props.seed);
+    <input defaultValue={value + suffix} />;
+  } @pending { <span>Loading</span>; } @catch (error) { <p>{error.message as string}</p>; }
+}`;
+		const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} /></section>; }`;
+		const load = (mode: 'client' | 'server') => {
+			const options = { mode, compileOptions: { dev, hmr: false } };
+			const gateModule = loadCompiledFixtureSource(gateSource, {
+				...options,
+				id: '/src/gate.tsrx',
+				runtimeModules: { './tick': { tick$ } },
+			});
+			return loadCompiledFixtureSource(appSource, {
+				...options,
+				id: '/src/app.tsrx',
+				runtimeModules: { './gate': gateModule },
+			});
+		};
+		const server = load('server');
+		const client = load('client');
+		const waiting = gate();
+		const read = () => {
+			if (waiting.value.pending) throw waiting.value.promise;
+			return 'server';
+		};
+		const props = { sibling: 'waiting', gate: { read, seed: fulfilled('optional-seed') } };
+		const container = document.createElement('div');
+		document.body.append(container);
+		container.innerHTML = renderToString(server['App'], props).html;
+		const original = container.querySelector('input')!;
+		waiting.value.pending = true;
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+		cleanups.push(() => {
+			root.unmount();
+			container.remove();
+		});
+		let installed = false;
+		let getterReads = 0;
+		const receivers: unknown[] = [];
+		const parse = JSON.parse;
+		const spy = vi.spyOn(JSON, 'parse').mockImplementation((text, reviver) => {
+			const result = parse(text, reviver);
+			if (!installed && text.includes('optional-seed')) {
+				installed = true;
+				Object.defineProperty(Object.prototype, 'then', {
+					configurable: true,
+					value: () => {
+						throw new Error('adoption control became a wakeable');
+					},
+				});
+				Object.defineProperty(Object.prototype, 'octaneOptionalTestReader', {
+					configurable: true,
+					get() {
+						getterReads++;
+						Reflect.deleteProperty(Object.prototype, 'then');
+						return function (this: unknown) {
+							receivers.push(this);
+							throw new Error('application failure');
+						};
+					},
+				});
+			}
+			return result;
+		});
+		try {
+			await act(() => {
+				// A component's own signal update reuses its exact props record.
+				if (scenario === 'same props') tick$.set(1);
+				else root.render(client['App'], { sibling: 'ready', gate: props.gate });
+			});
+			expect(installed).toBe(true);
+			expect(container.querySelector('input')).not.toBe(original);
+			expect(container.querySelector('p')?.textContent).toBe('application failure');
+			expect(getterReads).toBe(1);
+			expect(receivers).toHaveLength(1);
+			expect(receivers[0]).toMatchObject({ read });
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			spy.mockRestore();
+			Reflect.deleteProperty(Object.prototype, 'then');
+			Reflect.deleteProperty(Object.prototype, 'octaneOptionalTestReader');
+		}
+	});
+
+	it.each([
 		['required', 'unrelated'],
 		['optional', 'unrelated'],
 		['alias', 'unrelated'],
@@ -257,6 +584,88 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 		});
 	});
 
+	it.each(['same request', 'changed request', 'in-place request'] as const)(
+		'keeps the selected request current when its projected value is unchanged: %s',
+		async (scenario) => {
+			const scope = Signals.createScope({ scopeKey: `same-projection-${dev}-${scenario}` });
+			const selection$ = scope.signal$('selection', { id: 'saved', request: 'a' });
+			cleanups.push(() => scope.dispose());
+			const gateSource = `import { selection$ } from './selection';
+export function Gate(props) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    const value = active ? props.read() : "inactive";
+    <input data-request={value} defaultValue={value} />;
+  } @pending { <span>Loading</span>; }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><output>{props.sibling}</output><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+					runtimeModules: { './selection': { selection$ } },
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const first = gate();
+			const second = gate();
+			const read$ = () => {
+				const request = selection$.get().request;
+				const pending = request === 'a' ? first : second;
+				if (pending.value.pending) throw pending.value.promise;
+				return `request-${request}`;
+			};
+			const props = {
+				sibling: 'waiting',
+				gate: { domain: 'saved', read: read$ },
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], props).html;
+			const original = container.querySelector('input')!;
+			original.value = 'typed';
+			first.value.pending = second.value.pending = true;
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client['App'], props, { onRecoverableError });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			await act(() => {
+				if (scenario === 'changed request') selection$.set({ id: 'saved', request: 'b' });
+				if (scenario === 'in-place request') {
+					selection$.get().request = 'b';
+					second.value.pending = false;
+				}
+				root.render(client['App'], { ...props, sibling: 'ready' });
+			});
+			expect(container.querySelector('output')?.textContent).toBe('ready');
+			if (scenario !== 'same request') expect(container.querySelector('input')).not.toBe(original);
+			if (scenario === 'in-place request')
+				expect(container.querySelector('input')?.dataset['request']).toBe('request-b');
+			await act(() => first.resolve());
+			await act(() => second.resolve());
+			const accepted = container.querySelector('input')!;
+			expect(accepted.dataset['request']).toBe(
+				scenario === 'same request' ? 'request-a' : 'request-b',
+			);
+			if (scenario !== 'same request') {
+				expect(accepted).not.toBe(original);
+				expect(accepted.value).toBe('request-b');
+			}
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
 	it('publishes the latest layout callback only after the adopted arm commits', async () => {
 		const gateSource = `import { useLayoutEffect } from 'octane';
 export function Gate(props) @{
@@ -344,6 +753,143 @@ export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}
 		expect(onRef).toHaveBeenCalledOnce();
 		expect(onRef).toHaveBeenCalledWith(original);
 	});
+
+	it.each(['unrelated', 'new selection', 'changed reader', 'changed domain', 'rejected'] as const)(
+		'retries a selected request with a guarded layout callback: %s',
+		async (scenario) => {
+			const gateSource = `import { useLayoutEffect } from 'octane';
+export function Gate(props) @{
+  const selection = props.selection;
+  const active = selection?.id === props.domain;
+  @try {
+    const value = active ? props.read() : "inactive";
+    const detail = props.detail;
+    useLayoutEffect(() => { if (active) { props.onReady?.(value, value, detail?.nested?.value); } });
+    const stage = props.second();
+    <label data-domain={props.domain} data-stage={stage}><input defaultValue={value} ref={props.onRef} /></label>;
+  } @pending { <p>Loading</p>; } @catch (error) {
+    useLayoutEffect(() => { props.onReady?.(null); });
+    <p role="alert">{error.message}</p>;
+  }
+}`;
+			const appSource = `import { Gate } from './gate';
+export function App(props) @{ <section><span>{props.ready ? "ready" : "waiting"}</span><Gate {...props.gate} /></section>; }`;
+			const load = (mode: 'client' | 'server') => {
+				const options = { mode, compileOptions: { dev, hmr: false } };
+				const gateModule = loadCompiledFixtureSource(gateSource, {
+					...options,
+					id: '/src/gate.tsrx',
+				});
+				return loadCompiledFixtureSource(appSource, {
+					...options,
+					id: '/src/app.tsrx',
+					runtimeModules: { './gate': gateModule },
+				});
+			};
+			const server = load('server');
+			const client = load('client');
+			const first = gate();
+			const second = gate();
+			const firstReady = vi.fn();
+			const onRef = vi.fn();
+			const calls: { receiver: unknown; args: (string | null)[] }[] = [];
+			function latestReady(this: unknown, ...args: (string | null)[]) {
+				calls.push({ receiver: this, args });
+			}
+			let detailReads = 0;
+			let rejected = false;
+			const initial = {
+				domain: 'original',
+				selection: { id: 'original' } as { id: string } | null,
+				detail: {
+					get nested() {
+						detailReads++;
+						return { value: 'effect' };
+					},
+				},
+				onReady: firstReady,
+				onRef,
+				read: () => {
+					if (first.value.pending) throw first.value.promise;
+					return 'server';
+				},
+				second: () => {
+					if (second.value.pending) throw second.value.promise;
+					if (rejected) throw new Error('rejected request');
+					return 'ready';
+				},
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server['App'], { ready: false, gate: initial }).html;
+			const original = container.querySelector('input')!;
+			original.value = 'typed';
+			first.value.pending = second.value.pending = true;
+			const root = hydrateRoot(container, client['App'], { ready: false, gate: initial });
+			cleanups.push(() => {
+				root.unmount();
+				container.remove();
+			});
+			const next = { ...initial, onReady: latestReady };
+			if (scenario === 'changed reader') next.read = () => 'replacement';
+			if (scenario === 'changed domain') next.domain = 'other';
+			await act(() => {
+				if (scenario === 'new selection') next.selection = null;
+				root.render(client['App'], { ready: true, gate: next });
+			});
+			expect(container.querySelector('input') === original).toBe(
+				scenario === 'unrelated' || scenario === 'rejected',
+			);
+			expect(container.querySelector('span')?.textContent).toBe('ready');
+			expect(detailReads).toBe(0);
+			await act(() => first.resolve());
+			expect(detailReads).toBe(0);
+			expect(calls).toHaveLength(0);
+			expect(onRef).not.toHaveBeenCalled();
+			await act(() => {
+				rejected = scenario === 'rejected';
+				second.resolve();
+			});
+			if (rejected) {
+				expect(container.querySelector('[role="alert"]')?.textContent).toBe('rejected request');
+				expect(calls).toEqual([
+					{ receiver: expect.objectContaining({ onReady: latestReady }), args: [null] },
+				]);
+				expect(detailReads).toBe(0);
+				expect(firstReady).not.toHaveBeenCalled();
+				expect(onRef).not.toHaveBeenCalled();
+				return;
+			}
+			const accepted = container.querySelector('input')!;
+			expect(accepted === original).toBe(scenario === 'unrelated');
+			expect(accepted.value).toBe(
+				scenario === 'unrelated'
+					? 'typed'
+					: scenario === 'changed reader'
+						? 'replacement'
+						: 'inactive',
+			);
+			expect(firstReady).not.toHaveBeenCalled();
+			expect(calls).toEqual(
+				scenario === 'unrelated' || scenario === 'changed reader'
+					? [
+							{
+								receiver: expect.objectContaining({ onReady: latestReady }),
+								args: [
+									...Array(2).fill(scenario === 'unrelated' ? 'server' : 'replacement'),
+									'effect',
+								],
+							},
+						]
+					: [],
+			);
+			expect(detailReads).toBe(scenario === 'unrelated' || scenario === 'changed reader' ? 1 : 0);
+			expect(onRef).toHaveBeenCalledExactlyOnceWith(accepted);
+			expect(container.querySelector('label')?.dataset['domain']).toBe(
+				scenario === 'changed domain' ? 'other' : 'original',
+			);
+		},
+	);
 
 	it.each([
 		'no update',

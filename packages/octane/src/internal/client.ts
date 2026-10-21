@@ -11,6 +11,9 @@ export {
 	__registerHydrationInputComponent,
 	__ownedHydrationInputs,
 	__sameHydrationInput,
+	__sameHydrationSource,
+	__sameHydrationOptionalInput,
+	__observeHydrationOptionalInput,
 } from '../hydration-inputs.js';
 export { markSingleRoot as __s } from '../runtime.js';
 export { signalOwnerUse } from '../signals/owner-context.js';

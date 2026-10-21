@@ -2,6 +2,7 @@
 import { hasOwnProp } from './has-own.js';
 import { hydrating, pendingInitialHydrations } from './hydration-flag.js';
 import { ARROW_HEAD } from './method-dep.js';
+import { INITIAL_ADOPTION_INPUT_CHANGED } from './hydration-input-control.js';
 import type { componentSlot } from './runtime/component-slots.js';
 import type { ComponentBody, Scope } from './runtime/types.js';
 
@@ -13,6 +14,11 @@ type HydrationInputPlan = readonly [methodCount: number, ...required: string[]];
 let hydrationInputComponents: WeakMap<object, HydrationInputPlan> | undefined;
 let currentHydrationProps: object | null = null;
 let currentHydrationPlan: HydrationInputPlan | null = null;
+
+const UNSAFE_OPTIONAL_INPUT = /* @__PURE__ */ Symbol();
+const ABSENT_OPTIONAL_INPUT = /* @__PURE__ */ Symbol();
+type OptionalInputObservation = { props: object; name: string; value: unknown; armed: boolean };
+let optionalInputObservations: WeakMap<object, OptionalInputObservation> | undefined;
 
 /** @internal Register the exact compiled callable and its required own fields. */
 export function __registerHydrationInputComponent<T extends object>(
@@ -114,6 +120,21 @@ export function __ownedHydrationInputs(previous: object, next: object, source = 
 	return left != null && right != null && left[0] === right[0] && left[1] === right[1];
 }
 
+/** @internal Validate an authenticated source when a self-update reuses the props record. */
+export function __sameHydrationSource(
+	previous: object,
+	source: () => HydrationSourceWitness | undefined,
+): boolean {
+	const left = hydrationInputTuples?.get(previous);
+	if (left == null) return false;
+	try {
+		const right = source();
+		return right !== undefined && left[0] === right[0] && left[1] === right[1];
+	} catch {
+		return false;
+	}
+}
+
 /** @internal Compare fields only on records proven to be compiler-created. */
 export function __sameHydrationInput(
 	previous: object,
@@ -135,6 +156,75 @@ export function __sameHydrationInput(
 	)
 		return false;
 	return !method || isHydrationArrow(left.value);
+}
+
+function optionalInputValue(props: object, name: string): unknown {
+	const descriptor = Object.getOwnPropertyDescriptor(props, name);
+	if (descriptor !== undefined) {
+		if (!hasOwnProp.call(descriptor, 'value')) return UNSAFE_OPTIONAL_INPUT;
+		const value = descriptor.value;
+		return value == null || isHydrationArrow(value) ? value : UNSAFE_OPTIONAL_INPUT;
+	}
+	const prototype = Object.getPrototypeOf(props);
+	return prototype === null ||
+		(prototype === Object.prototype &&
+			Object.getOwnPropertyDescriptor(prototype, name) === undefined)
+		? ABSENT_OPTIONAL_INPUT
+		: UNSAFE_OPTIONAL_INPUT;
+}
+
+/** @internal Observe a proven record immediately before its authored optional call. */
+export function __observeHydrationOptionalInput(env: object, props: object, name: string): void {
+	if (!hydrating) return;
+	const observation = optionalInputObservations?.get(env);
+	if (observation?.armed) {
+		observation.armed = false;
+		if (
+			observation.props !== props ||
+			observation.name !== name ||
+			!Object.is(observation.value, optionalInputValue(props, name))
+		) {
+			optionalInputObservations!.delete(env);
+			throw INITIAL_ADOPTION_INPUT_CHANGED;
+		}
+		return;
+	}
+	// A previous accepted access authenticates only this record and field; it
+	// can refresh that narrow observation without granting tuple provenance.
+	if (
+		!hydrationInputTuples?.has(env) &&
+		(observation?.props !== props || observation.name !== name)
+	) {
+		if (observation !== undefined) optionalInputObservations!.delete(env);
+		return;
+	}
+	const value = optionalInputValue(props, name);
+	if (value !== UNSAFE_OPTIONAL_INPUT)
+		(optionalInputObservations ??= new WeakMap()).set(env, { props, name, value, armed: false });
+	else if (observation !== undefined) optionalInputObservations!.delete(env);
+}
+
+/** @internal Accept a previous actual read and require the next access to validate it. */
+export function __sameHydrationOptionalInput(
+	previous: object,
+	next: object,
+	props: object,
+	name: string,
+): boolean {
+	const observation = optionalInputObservations?.get(previous);
+	// The same exact record carries its original proof across a self-update.
+	// A different record still needs independently issued tuple provenance.
+	if (
+		!observation ||
+		observation.armed ||
+		observation.name !== name ||
+		(observation.props !== props && !hydrationInputTuples?.has(next))
+	)
+		return false;
+	const value = optionalInputValue(props, name);
+	if (value === UNSAFE_OPTIONAL_INPUT || !Object.is(observation.value, value)) return false;
+	optionalInputObservations!.set(next, { props, name, value, armed: true });
+	return true;
 }
 
 function isHydrationArrow(value: unknown): boolean {

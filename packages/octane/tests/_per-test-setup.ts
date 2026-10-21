@@ -2,6 +2,9 @@ import { afterEach, expect } from 'vitest';
 import { drainPassiveEffects } from '../src/index.js';
 import './_render-write-guard.js';
 
+const hydrationSuitePath =
+	/[/\\]tests[/\\](?:hydration[/\\]|(?:(?:conformance|runtime)[/\\])?(?:ssr|stream(?:ed|ing)?|islands?)[-.])/;
+
 // Per-test isolation for DEFERRED passive work. Unmount passive destroys run
 // in the passive flush, not synchronously (React parity — see unmountScope) —
 // so a test that unmounts without flushing would otherwise leak its deferred
@@ -12,9 +15,7 @@ afterEach(() => {
 	drainPassiveEffects();
 	// Resolve the current runtime graph after suites that reset modules. A
 	// discarded nested attempt must release its pending adoption as well.
-	if (
-		/[/\\]packages[/\\]octane[/\\]tests[/\\]hydration[/\\]/.test(expect.getState().testPath ?? '')
-	)
+	if (hydrationSuitePath.test(expect.getState().testPath ?? ''))
 		return import('../src/hydration-flag.js').then(({ pendingInitialHydrations }) => {
 			expect(pendingInitialHydrations).toBe(0);
 		});
