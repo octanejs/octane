@@ -1,5 +1,11 @@
 # octane
 
+## 0.14.3
+
+### Patch Changes
+
+- 6e1ba80: Preserve suspended server-rendered content when a guarded native query remains unchanged during an unrelated parent update.
+
 ## 0.14.2
 
 ### Patch Changes
