@@ -55,6 +55,7 @@ import {
 	retireDetachedBindingLeases,
 	unmountPresentationRefs,
 	releaseRootLeases,
+	acceptHydrationHostEvents,
 	refAttachQueue,
 	upgradeTransitionBlock,
 	adoptTransitionQueue,
@@ -228,6 +229,8 @@ export let SIGNAL_COMMIT_RETRY: typeof retryPendingCommit | null = null;
  * of the driver, so that hydrating bundles without binding views keep none.
  */
 export interface HydrationDriver {
+	/** Publish resumed-arm handlers before a root's mutation callbacks. */
+	acceptHostEvents: typeof acceptHydrationHostEvents;
 	/** A commit's accepted native-signal adoptions end after its layout phase. */
 	releaseNativeAdoptions(): void;
 	/** Whether every early presentation a capture prepared is still current. */
@@ -503,6 +506,7 @@ export function installHydrationDriver(): void {
 	startHydration();
 	supplyNativeAdoptionMiss();
 	HYDRATION_DRIVER ??= {
+		acceptHostEvents: acceptHydrationHostEvents,
 		releaseNativeAdoptions,
 		currentPresentations,
 		retryPresentations,

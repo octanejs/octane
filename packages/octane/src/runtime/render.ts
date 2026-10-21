@@ -88,6 +88,7 @@ import type {
 	TransitionActionBatch,
 	RootRenderOwner,
 	RootRenderTransaction,
+	HydrationEventReveal,
 	Phase,
 	SuspenseRefEntry,
 	OffscreenCapture,
@@ -191,6 +192,7 @@ import {
 	releaseDiagnostics,
 	claimDeferred,
 	hydrationFailure,
+	hydrationHostFailure,
 	settleTexts,
 	parseSeedJson,
 	isBlockClose,
@@ -1842,6 +1844,8 @@ export function renderInitialSuspenseHydration(
 	initial: InitialSuspenseHydration,
 	updated = false,
 ): void {
+	if (state.pendingThenable !== null && ROOT_RENDER_TRANSACTION?.rootRequest === true)
+		journalObjectOnce(state);
 	state.pendingThenable = null;
 	if (updated) {
 		// New inputs reached the arm while its hydration was suspended, or its
@@ -1880,6 +1884,9 @@ export function renderInitialSuspenseHydration(
 	const capture = createOffscreenCapture();
 	// What the attempt queued for its root's commit goes with a discarded one.
 	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && previousCapture !== null)
+		hydration.recoverHostEvent = (error) =>
+			TRY_OPS!.inBoundary(state, recoverHydrationEvent, error);
 	const opsMark = transaction === null ? 0 : transaction.ops.length;
 	const retiredMark = transaction?.retired?.size ?? 0;
 	swapHydration(hydration);
@@ -1959,7 +1966,10 @@ export function renderInitialSuspenseHydration(
 	}
 	if (!failed) {
 		if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
-		retireInitialSuspenseHydration(state);
+		retireInitialSuspenseHydration(
+			state,
+			capture.hostEvents !== undefined && transaction?.rootRequest === true ? initial : undefined,
+		);
 		// An enclosing boundary may still suspend after this arm rendered. Leave
 		// its server metadata and ranges replayable until that capture commits.
 		(capture.renderCleanups ??= []).push((discarded) => {
@@ -2016,6 +2026,13 @@ export function renderInitialSuspenseHydration(
 	}
 }
 
+function recoverHydrationEvent(state: TrySlot, error: unknown): void {
+	const failure = hydrationHostFailure(error);
+	markArmDiscard(state);
+	if (!clientRenderDehydratedTry(state, null))
+		noteRecoverableHydrationError(() => failure, state.parentBlock);
+}
+
 export function commitResumeInner(state: TrySlot): void {
 	if (state.parentBlock.disposed) return;
 	let deferredNativeAcceptance = false;
@@ -2042,10 +2059,24 @@ export function commitResumeInner(state: TrySlot): void {
 		if (WIP_CAPTURE === null)
 			deferredNativeAcceptance = acceptNativeCapture(staged, state.parentBlock.idState.renderOwner);
 	}
+	const stagedCapture = state.stagedCapture;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (
+		stagedCapture?.hostEvents !== undefined &&
+		transaction !== null &&
+		!transaction.aborted &&
+		!ROOT_RENDER_ROLLBACK &&
+		transaction.owner === state.parentBlock.idState.renderOwner
+	) {
+		// A sibling can release this reveal inside its root render. Preserve the
+		// parked owner and its actions until the transferred host events are accepted.
+		journalRootReveal(state);
+	}
 	const wasPending = state.branch === 2;
 	const hiddenActivity = findHiddenActivity(state.parentBlock);
 	const wasHeld = state.transitionHeld;
 	let releaseHeld = wasHeld;
+	let eventReveal: HydrationEventReveal | undefined;
 	if (wasHeld) state.transitionHeld = false;
 	// Leave the coordination sets — this boundary is committing now (a re-suspend
 	// during the re-render re-adds it via handleSuspense → enterHeldTransition).
@@ -2055,7 +2086,6 @@ export function commitResumeInner(state: TrySlot): void {
 		const tryBlock = state.tryBlock;
 		if (tryBlock && !tryBlock.disposed) {
 			const reconnectEffects = state.hiddenDom !== null;
-			const stagedCapture = state.stagedCapture;
 			state.stagedCapture = null;
 			state.stagedEffectDeps = null;
 			if (state.hiddenDom) {
@@ -2097,6 +2127,10 @@ export function commitResumeInner(state: TrySlot): void {
 				// Ref attach closures captured by a hidden pass can be stale after a
 				// later same-node ref supersession. Reveal uses the current manifest.
 				if (state.detachedRefs !== null) stagedCapture.refs.length = 0;
+				if (stagedCapture.hostEvents !== undefined && ROOT_RENDER_TRANSACTION !== null) {
+					eventReveal = { state, capture: stagedCapture, releasedHold: false };
+					(ROOT_RENDER_TRANSACTION.hostEventReveals ??= []).push(eventReveal);
+				}
 				spliceOffscreenCapture(stagedCapture, deferredNativeAcceptance);
 				state.hasResolved = true;
 			} else {
@@ -2221,6 +2255,11 @@ export function commitResumeInner(state: TrySlot): void {
 	} finally {
 		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 		if (releaseHeld) {
+			if (eventReveal !== undefined) {
+				eventReveal.releasedHold = true;
+				// A reentrant rollback may already have restored the parked slot.
+				if (state.stagedCapture === eventReveal.capture) state.transitionHeld = false;
+			}
 			tickTransitionCount(-1);
 			releaseTransitionHookHolder(state);
 		}

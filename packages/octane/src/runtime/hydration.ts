@@ -69,11 +69,13 @@ import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
 	ROOT_RENDER_TRANSACTION,
+	WIP_CAPTURE,
+	preserveRootCreatedDom,
 	renderInitialSuspenseHydration,
 } from './render.js';
 import { noteRecoverableHydrationError, isDocumentSingleton } from './roots.js';
 import { isAdoptionControl } from './hydration-presentation.js';
-import { isHostElementOfType } from './host-props.js';
+import { isHostElementOfType, setCustomElementListener } from './host-props.js';
 import { isElementDescriptor, isHostDescriptor } from './elements.js';
 import { siteLoc, componentSourceLoc } from './diagnostics.js';
 import { nodeAfter, atCommit, discardMarker, placeHydratedText, applyOutgoing } from './commit.js';
@@ -452,6 +454,76 @@ function caughtGuardState(node: Node | null): string | null {
 		: null;
 }
 
+const EVENT_CELL = Symbol();
+
+interface EventCell {
+	value: unknown;
+	version: number;
+	activation: number;
+}
+
+interface NativeEventStage {
+	previous: NativeEventStage | undefined;
+	active: boolean;
+}
+
+type EventCellGetter = (() => unknown) & { [EVENT_CELL]: EventCell };
+
+function writableEventProperty(target: object, key: string): boolean {
+	for (
+		let current: object | null = target;
+		current !== null;
+		current = Object.getPrototypeOf(current)
+	) {
+		const property = Object.getOwnPropertyDescriptor(current, key);
+		if (property !== undefined)
+			return property.writable === true && (current === target || Object.isExtensible(target));
+	}
+	return Object.isExtensible(target);
+}
+
+function canPrepareEventCell(target: Element, key: string): boolean {
+	const own = Object.getOwnPropertyDescriptor(target, key);
+	if (own !== undefined)
+		return (
+			(own.get as EventCellGetter | undefined)?.[EVENT_CELL] !== undefined ||
+			(own.configurable === true && own.writable === true)
+		);
+	return writableEventProperty(target, key);
+}
+
+function prepareEventCell(target: Element, key: string): EventCell {
+	const own = Object.getOwnPropertyDescriptor(target, key);
+	const existing = (own?.get as EventCellGetter | undefined)?.[EVENT_CELL];
+	if (existing !== undefined) return existing;
+	const initial = (target as any)[key];
+	const cell: EventCell = { value: initial, version: 0, activation: 0 };
+	const get = (() => cell.value) as EventCellGetter;
+	get[EVENT_CELL] = cell;
+	Object.defineProperty(target, key, {
+		configurable: true,
+		enumerable: own?.enumerable ?? true,
+		get,
+		set(value: unknown) {
+			cell.version++;
+			cell.value = value;
+		},
+	});
+	(WIP_CAPTURE!.renderCleanups ??= []).push((discarded) => {
+		const current = Object.getOwnPropertyDescriptor(target, key);
+		if (current?.get !== get || current.configurable !== true) return;
+		if (discarded && own === undefined && cell.value === initial) delete (target as any)[key];
+		else
+			Object.defineProperty(target, key, {
+				configurable: own?.configurable ?? true,
+				enumerable: own?.enumerable ?? true,
+				writable: own?.writable ?? true,
+				value: cell.value,
+			});
+	});
+	return cell;
+}
+
 /**
  * Root-local hydration state and the dynamic dispatch boundary for hydration-only
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
@@ -459,6 +531,69 @@ function caughtGuardState(node: Node | null): string | null {
  */
 export class HydrationCapability {
 	depth = 0;
+	recoverHostEvent: ((error: unknown) => void) | undefined;
+	private nativeEventStages?: WeakMap<Element, Map<string, NativeEventStage>>;
+
+	stageEvent(target: Element, key: string, handler: unknown): boolean {
+		if (
+			this.recoverHostEvent === undefined ||
+			WIP_CAPTURE === null ||
+			ROOT_RENDER_TRANSACTION === null ||
+			!canPrepareEventCell(target, key) ||
+			(key !== '$$signalOwner' && !canPrepareEventCell(target, '$$signalOwner'))
+		)
+			return false;
+		const cell = prepareEventCell(target, key);
+		const version = cell.version;
+		(WIP_CAPTURE.hostEvents ??= []).push(() => {
+			if (cell.version !== version) return;
+			const previous = cell.value;
+			const activation = ++cell.activation;
+			cell.value = handler;
+			return () => {
+				if (cell.version !== version || cell.activation !== activation) return;
+				cell.value = previous;
+				cell.activation--;
+			};
+		});
+		return true;
+	}
+
+	stageNativeEvent(target: Element, name: string, value: unknown): boolean {
+		if (
+			this.recoverHostEvent === undefined ||
+			WIP_CAPTURE === null ||
+			ROOT_RENDER_TRANSACTION === null
+		)
+			return false;
+		let stages = this.nativeEventStages?.get(target);
+		const previous = stages?.get(name);
+		if (typeof value !== 'function' && previous === undefined) return false;
+		if (stages === undefined) {
+			stages = new Map();
+			(this.nativeEventStages ??= new WeakMap()).set(target, stages);
+		}
+		const pending = stages;
+		const stage: NativeEventStage = { previous, active: true };
+		pending.set(name, stage);
+		(WIP_CAPTURE.renderCleanups ??= []).push(() => {
+			stage.active = false;
+			if (pending.get(name) !== stage) return;
+			let prior = previous;
+			while (prior !== undefined && !prior.active) prior = prior.previous;
+			if (prior === undefined) pending.delete(name);
+			else pending.set(name, prior);
+		});
+		preserveRootCreatedDom(this.rootBlock);
+		// Preserve native listener identity by waiting to register until acceptance.
+		// This can reorder it relative to a third-party listener registered during render.
+		function activateHydrationNativeEvent(): void {
+			if (pending.get(name) === stage) setCustomElementListener(target, name, value);
+		}
+		activateHydrationNativeEvent.recover = this.recoverHostEvent;
+		(WIP_CAPTURE.hostEvents ??= []).push(activateHydrationNativeEvent);
+		return true;
+	}
 	/**
 	 * Depth of a render that adopts nothing but still consumes positional seeds:
 	 * the client render that continues after a deferred mismatch (adoptOrDefer).
@@ -1816,6 +1951,10 @@ export function hydrationFailure(h: HydrationCapability, error: unknown): unknow
 function thrownWhileAdopting(h: HydrationCapability, error: unknown): HydrationMismatch | null {
 	if (HYDRATION_THROWN !== error || HYDRATION_THROWN_BY !== h) return null;
 	clearHydrationThrow();
+	return hydrationHostFailure(error);
+}
+
+export function hydrationHostFailure(error: unknown): HydrationMismatch {
 	const failure = new HydrationMismatch(formatClientError(340));
 	(failure as Error & { cause?: unknown }).cause = error;
 	return failure;

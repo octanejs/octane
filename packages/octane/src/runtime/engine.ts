@@ -1177,6 +1177,12 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 			}
 			transaction.log.length = 0;
 		}
+		// Slot snapshots restore render state, but cannot restore a transition
+		// hold the parked reveal has already released outside the journal.
+		if (transaction.hostEventReveals !== undefined)
+			for (const reveal of transaction.hostEventReveals)
+				if (reveal.releasedHold && reveal.state.stagedCapture === reveal.capture)
+					reveal.state.transitionHeld = false;
 		// After the replay, which can restore a bag's queued state.
 		dropRootOps(transaction, 0, 0);
 		// A Block discarded with its parent has no creation entry
@@ -1257,6 +1263,68 @@ export function releaseRootLeases(owner: RootRenderOwner, root: Block | null): v
 	}
 }
 
+/** Publish a resumed arm's handlers before commit callbacks can observe it. */
+export function acceptHydrationHostEvents(transaction: RootRenderTransaction): boolean {
+	const hostEvents = transaction.capture.hostEvents!;
+	transaction.capture.hostEvents = undefined;
+	const owner = transaction.owner;
+	const previousOwner = COMMITTING_OWNER;
+	const previousGeneration = COMMITTING_GENERATION;
+	COMMITTING_OWNER = owner;
+	COMMITTING_GENERATION = owner.generation;
+	let failed: { recover: (error: unknown) => void; error: unknown } | undefined;
+	let stale: boolean;
+	try {
+		for (const install of hostEvents) {
+			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
+			try {
+				const undo = install();
+				// A later installer may revoke this acceptance. Undo belongs to this
+				// transaction even though no render frame is active here.
+				if (undo !== undefined) transaction.log.push(JOURNAL_UNDO, undo, null, null);
+			} catch (error) {
+				if (install.recover === undefined) throw error;
+				failed = { recover: install.recover, error };
+				break;
+			}
+		}
+		stale = owner.disposed || owner.generation !== COMMITTING_GENERATION;
+	} finally {
+		COMMITTING_OWNER = previousOwner;
+		COMMITTING_GENERATION = previousGeneration;
+	}
+	if (failed === undefined && !stale) return true;
+	if (!transaction.aborted) rollbackRootRender(transaction);
+	if (owner.transaction === transaction) owner.transaction = null;
+	if (!owner.disposed) {
+		if (stale) owner.retry();
+		else {
+			const recoveryGeneration = owner.generation;
+			failed!.recover(failed!.error);
+			// Recovering the failed arm does not recover unrelated root work.
+			// Its fallback may itself replace the root, superseding this retry.
+			if (!owner.disposed && owner.generation === recoveryGeneration) {
+				if (transaction.rootRequest) owner.retry();
+				else if (transaction.hostEventReveals !== undefined) {
+					// This transaction may have consumed a resolved parent's reveal.
+					// Its parked capture was transferred and discarded during rollback;
+					// render the recovered subtree again instead of replaying that capture.
+					for (const { state, capture } of transaction.hostEventReveals) {
+						if (owner.disposed || owner.generation !== recoveryGeneration) break;
+						if (
+							state.branch === 2 &&
+							state.stagedCapture === capture &&
+							state.pendingThenable === null
+						)
+							SCHEDULED_VISIBILITY_DRIVER!.reveal(state, 'urgent');
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
 /**
  * Commit every finished root render, in order. Each runs its queued commit ops
  * in render order (the mutation phase); a deletion cleanup that unmounts the
@@ -1312,6 +1380,12 @@ export function commitRootRenders(): void {
 					}
 					continue;
 				}
+				if (
+					hydrationStarted &&
+					transaction.capture.hostEvents !== undefined &&
+					!HYDRATION_DRIVER!.acceptHostEvents(transaction)
+				)
+					continue;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileRootCommitted(transaction);
 				if (owner.transaction === transaction) owner.transaction = null;

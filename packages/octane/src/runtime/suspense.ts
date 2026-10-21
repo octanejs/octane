@@ -1608,8 +1608,18 @@ function registerInitialSuspenseHydration(state: TrySlot, initial: InitialSuspen
 	records.set(state, initial);
 }
 
-export function retireInitialSuspenseHydration(state: TrySlot): void {
-	if (initialSuspenseHydrations?.delete(state)) changePendingInitialHydrations(-1);
+export function retireInitialSuspenseHydration(
+	state: TrySlot,
+	restoreOnRollback?: InitialSuspenseHydration,
+): void {
+	if (initialSuspenseHydrations?.delete(state)) {
+		changePendingInitialHydrations(-1);
+		if (restoreOnRollback !== undefined)
+			journalUndo(() => {
+				if (!state.parentBlock.disposed && !initialSuspenseHydrations?.has(state))
+					registerInitialSuspenseHydration(state, restoreOnRollback);
+			});
+	}
 }
 // Transfer streamed payloads off the document-global stash as soon as hydration
 // claims them. A weak DOM owner survives discarded nested attempts, but cannot

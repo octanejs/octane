@@ -1285,7 +1285,12 @@ export let SIGNAL_EVENT_OWNERS_RECORDED = false;
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
 export function setEventHandler(el: Element, key?: string, handler?: any, foreign?: boolean): void {
-	if (key !== undefined) {
+	const staged = hydrating
+		? key !== undefined &&
+			PRESENTATION_HYDRATION === null &&
+			CURSOR?.stageEvent(el, key, handler) === true
+		: false;
+	if (key !== undefined && !staged) {
 		// A handler on a host of a Block the root attempt discards (ROOT_DISCARD_STAMP)
 		// needs no undo: compiled bindings write their own cloned hosts. `foreign`
 		// marks runtime callers that may write a host the current scope does not
@@ -1334,6 +1339,13 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			// Compare queued writes at publication: an earlier preparation may
 			// replace even the authority that is currently committed.
 			const transaction = ROOT_RENDER_TRANSACTION;
+			if (
+				hydrating &&
+				PRESENTATION_HYDRATION === null &&
+				(staged || key === undefined) &&
+				CURSOR?.stageEvent(el, '$$signalOwner', owner) === true
+			)
+				return;
 			if (
 				key === undefined &&
 				transaction !== null &&

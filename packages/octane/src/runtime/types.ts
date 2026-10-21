@@ -570,6 +570,12 @@ export interface RootRenderOwner {
 	spareOps: any[] | null;
 }
 
+export interface HydrationEventReveal {
+	state: TrySlot;
+	capture: OffscreenCapture;
+	releasedHold: boolean;
+}
+
 export interface RootRenderTransaction {
 	owner: RootRenderOwner;
 	log: any[];
@@ -603,6 +609,8 @@ export interface RootRenderTransaction {
 	texts: Set<Text> | null;
 	aborted: boolean;
 	rootRequest: boolean;
+	/** Parked reveals whose staged host events this root must accept. */
+	hostEventReveals?: HydrationEventReveal[];
 	hydrating?: boolean;
 	/** A ViewTransition holds its commit for the native update (vtFlush). */
 	held?: boolean;
@@ -793,6 +801,9 @@ export interface OffscreenCapture {
 	renderCleanups: Array<(discarded: boolean) => void> | undefined;
 	/** Only a structural binding lease records current-tree adoption receipts. */
 	presentations?: PresentationHydrationFrame[];
+	/** Host events become observable at root acceptance, before mutation callbacks. */
+	hostEvents?:
+		Array<(() => void | (() => void)) & { recover?: (error: unknown) => void }> | undefined;
 }
 
 // A target has one effective ref binding; array refs remain one composite value.

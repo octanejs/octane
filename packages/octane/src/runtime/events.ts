@@ -10,6 +10,8 @@ import {
 	snapshotSubmitDispatch,
 } from './actions.js';
 import { beginBindingEvent, consumeBindingEvent } from '../dom-binding-handoff.js';
+import { hydrating } from '../hydration-flag.js';
+import { CURSOR } from './hydration.js';
 import {
 	isDelegatedEventProp,
 	delegatedEventFlags,
@@ -318,7 +320,9 @@ export function evt0(el: Element, key: string, fn: any): HandlerBundle {
 	if (
 		signalOwnerUse.active ||
 		(TRANSITION_JOURNAL !== null &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+			(TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
+				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
 	)
 		setEventHandler(el, key, d);
 	else (el as any)[key] = d;
@@ -349,7 +353,9 @@ export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle 
 	if (
 		signalOwnerUse.active ||
 		(TRANSITION_JOURNAL !== null &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+			(TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
+				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
 	)
 		setEventHandler(el, key, d);
 	else (el as any)[key] = d;
@@ -381,7 +387,9 @@ export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): Handl
 	if (
 		signalOwnerUse.active ||
 		(TRANSITION_JOURNAL !== null &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+			(TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
+				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
 	)
 		setEventHandler(el, key, d);
 	else (el as any)[key] = d;
@@ -417,7 +425,9 @@ export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle
 	if (
 		signalOwnerUse.active ||
 		(TRANSITION_JOURNAL !== null &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+			(TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
+				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
 	)
 		setEventHandler(el, key, d);
 	else (el as any)[key] = d;
@@ -428,7 +438,9 @@ export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): Hand
 	if (
 		signalOwnerUse.active ||
 		(TRANSITION_JOURNAL !== null &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+			(TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
+				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
 	)
 		setEventHandler(el, key, d);
 	else (el as any)[key] = d;
@@ -439,7 +451,9 @@ export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBun
 	if (
 		signalOwnerUse.active ||
 		(TRANSITION_JOURNAL !== null &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP))
+			(TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
+				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
 	)
 		setEventHandler(el, key, d);
 	else (el as any)[key] = d;
