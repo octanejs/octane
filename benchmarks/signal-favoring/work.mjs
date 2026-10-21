@@ -46,37 +46,37 @@ const OPS = [
 ];
 
 // These are ceilings on scaffolding, not exact implementation pins: every
-// planned TSX optimization should make them smaller. Text writes remain exact
+// optimization may make them smaller. Text writes remain exact
 // because every update changes a known number of visible counters.
 const GATES = {
 	'octane-tsrx': {
 		mount: {
 			maxFullSlotCalls: 18,
 			maxSlotCalls: 100,
-			max: { renderBlock: 19, componentSlot: 0, childSlot: 10, createElement: 0 },
+			max: { renderBlock: 19, componentSlot: 0, childSlot: 0, createElement: 0 },
 		},
 		bump_shallow: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
-			max: { renderBlock: 1, componentSlot: 0, childSlot: 0, createElement: 0 },
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 1 },
 		},
 		bump_middle: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
-			max: { renderBlock: 1, componentSlot: 0, childSlot: 0, createElement: 0 },
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 1 },
 		},
 		bump_deep: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
-			max: { renderBlock: 1, componentSlot: 0, childSlot: 0, createElement: 0 },
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 1 },
 		},
 		bump_batched: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
-			max: { renderBlock: 10, componentSlot: 0, childSlot: 0, createElement: 0 },
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 10 },
 		},
 		unmount: {
@@ -92,27 +92,27 @@ const GATES = {
 			max: { renderBlock: 21, componentSlot: 11, childSlot: 19, createElement: 20 },
 		},
 		bump_shallow: {
-			maxFullSlotCalls: 10,
-			maxSlotCalls: 100,
-			max: { renderBlock: 20, componentSlot: 10, childSlot: 9, createElement: 19 },
+			maxFullSlotCalls: 0,
+			maxSlotCalls: 0,
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 1 },
 		},
 		bump_middle: {
-			maxFullSlotCalls: 5,
-			maxSlotCalls: 50,
-			max: { renderBlock: 10, componentSlot: 5, childSlot: 4, createElement: 9 },
+			maxFullSlotCalls: 0,
+			maxSlotCalls: 0,
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 1 },
 		},
 		bump_deep: {
-			maxFullSlotCalls: 1,
-			maxSlotCalls: 10,
-			max: { renderBlock: 2, componentSlot: 1, childSlot: 0, createElement: 1 },
+			maxFullSlotCalls: 0,
+			maxSlotCalls: 0,
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 1 },
 		},
 		bump_batched: {
-			maxFullSlotCalls: 10,
-			maxSlotCalls: 100,
-			max: { renderBlock: 20, componentSlot: 10, childSlot: 9, createElement: 19 },
+			maxFullSlotCalls: 0,
+			maxSlotCalls: 0,
+			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
 			exact: { setText: 10 },
 		},
 		unmount: {

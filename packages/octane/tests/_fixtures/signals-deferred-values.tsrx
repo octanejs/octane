@@ -7,7 +7,7 @@ import {
 	type OctaneNode,
 } from 'octane';
 import type { SignalHandle } from 'octane/signals';
-import 'octane/signals';
+import { useSignal$ } from 'octane/signals/client';
 
 export function FiveInputs(props: { a: string; b: string; c: string; d: string; e: string }) {
 	const values = [props.a, props.b, props.c, props.d, props.e];
@@ -169,5 +169,34 @@ export function ReturnedHead(props: { title$: SignalHandle<string> }) {
 			<meta name="deferred-native-head" content={props.title$.get()} />
 			<p class="deferred-head-value">{props.title$.get() as string}</p>
 		</>
+	);
+}
+
+function LocalCounterLabel() {
+	const label = use(LabelContext);
+	return <i>{label}</i>;
+}
+
+function LocalCounter() {
+	const value$ = useSignal$(0);
+	return (
+		<button onClick={() => value$.set((value) => value + 1)}>
+			<span>{value$}</span>
+			<LocalCounterLabel />
+		</button>
+	);
+}
+
+export function LocalCounterPair(props: { label: string }) {
+	return (
+		<article>
+			<LabelContext value={props.label}>
+				<section class="local-counter-pair">
+					<output>{use(LabelContext)}</output>
+					<LocalCounter />
+					<LocalCounter />
+				</section>
+			</LabelContext>
+		</article>
 	);
 }

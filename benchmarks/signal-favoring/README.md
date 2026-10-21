@@ -4,15 +4,14 @@ A second adjacent benchmark to [`recursive-context`](../recursive-context/). The
 recursive-context bench measures wide fan-out across a balanced binary tree. This
 one measures the **signal vs hook update cascade** along a deep linear chain.
 
-The bench is named honestly: it has a structural bias toward fine-grained
-reactivity (Solid, Ripple, Svelte, Vue Vapor) over hook-based reactivity
-(React, Preact, Octane). When state changes at a mid-chain node, signal frameworks
-re-evaluate **only the text expression that read the signal** — they don't
-re-render any component bodies. Hook frameworks re-render the owning component;
-without memoization, that cascades through every descendant. Octane's TSRX
-compiler skips provably stable descendant call sites. React Compiler caches
-eligible unchanged child elements automatically, so the React column can skip
-descendant work even though its stateful owner still re-renders.
+The bench has a structural bias toward fine-grained text updates. Both Octane
+targets use `useSignal$` from `octane/signals/client` and bind each handle directly
+as `{v$}`. Solid, Ripple, Svelte and Vue Vapor likewise update the text expression
+that consumes their native reactive value.
+
+React and Preact use hooks. React Compiler caches eligible unchanged child
+elements automatically, so the React column can skip descendant work even though
+its stateful owner still re-renders.
 
 The point of the bench is not to declare a winner — it's to **quantify how much
 the cascade, compiler-assisted avoidance, or fine-grained update actually costs**
@@ -31,6 +30,7 @@ benchmarks/signal-favoring/
 │                      #   link (Vue is one component per SFC); bumps return nextTick()
 ├── preact/           # Vite app, dev :5265 — Preact hooks/VDOM cascade
 ├── svelte/           # Vite app, dev :5276 — Svelte 5 runes, 100 generated SFCs
+├── inferno/          # Vite app, dev :5329 — Inferno component state
 ├── gen.mjs            # Source generator for the App fixtures (scaffold; see note below)
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── work.mjs           # untimed Chromium precise-call-coverage gates for Octane
@@ -39,9 +39,9 @@ benchmarks/signal-favoring/
 ```
 
 The octane app is authored twice — `.tsrx` (directive `@{ … }`, `class`,
-`{v as number}`) and React-style `.tsx` (`return <jsx>`, `className`, `{v}`) — over
-the same octane core, so the two octane columns read the JSX backwards-compat
-path's cost for this hook-cascade workload.
+`{v$}`) and React-style `.tsx` (`return <jsx>`, `className`, `{v$}`) — over
+the same Octane core. Both counters are component-owned native signals; the
+columns compare the two dialects with the same state and text-binding model.
 
 ## Shape
 
@@ -54,8 +54,8 @@ Each stateful component owns its own counter via the framework's native primitiv
 
 | framework        | primitive                | what a `setN(v+1)` triggers                                            |
 | ---------------- | ------------------------ | ---------------------------------------------------------------------- |
-| **octane-tsrx**  | `useState` (React-shape) | re-render of `CN`; compiler skips stable descendant call sites         |
-| **octane-jsx**   | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
+| **octane-tsrx** | `useSignal$` | update the `{v$}` text binding; component bodies and descendants untouched |
+| **octane-jsx** | `useSignal$` | update the `{v$}` text binding; component bodies and descendants untouched |
 | **react**        | `useState`               | re-render of `CN`; React Compiler skips eligible unchanged descendants |
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
 | **ripple**     | `track()`                | re-evaluate the `{v}` text expression in `CN`; descendants untouched   |
@@ -86,10 +86,10 @@ recreating descendants.
 
 - **MOUNT** — initial render of all 100 components.
 - **BUMP_SHALLOW** — `__bumpAt1()`. An uncached hook cascade can visit 99
-  descendants; compiled Octane TSRX skips provably stable child calls, while
-  signal frameworks update one text node without re-rendering its component.
+  descendants; direct signal bindings, including Octane TSRX, update one text
+  node without re-rendering its component.
 - **BUMP_MIDDLE** — `__bumpAt51()`. An uncached hook cascade can visit ~50
-  descendants; compiled Octane TSRX again skips unchanged child calls.
+  descendants; a direct signal binding still updates one text node.
 - **BUMP_DEEP** — `__bumpAt91()`. An uncached hook cascade can visit ~10
   descendants. As the depth approaches the leaf, less descendant work remains
   for either compiler memoization or fine-grained reactivity to avoid.
@@ -105,9 +105,12 @@ recreating descendants.
   order de-coalesces back toward the per-bump cost.
 - **UNMOUNT** — full teardown via the framework's unmount API.
 
-A single sweep is sub-millisecond, so each sweep op is timed as a tight loop of
-25 sweeps divided back down — the per-sweep cost escapes the OS timer's ~0.1ms
-quantization floor.
+A single sweep is sub-millisecond. Each sweep op starts with 25 repetitions and
+doubles until a batch spans at least 20 ms, then divides the samples back to
+per-sweep costs. The same calibration applies to every framework and every sweep
+mode. This avoids zero timings at Chromium's 100 µs clock resolution; it replaces
+the old fixed 25-sweep batches. Published bump/sweep rows retain `repeat` and
+`sampleMs` so their calibration is auditable.
 
 The harness also prints three derived ratios per target:
 
@@ -129,7 +132,7 @@ pnpm install
 # 2. (Optional) regenerate fixtures if you edited gen.mjs:
 node benchmarks/signal-favoring/gen.mjs
 
-# 3. Production-build, preview, and drive all eight targets:
+# 3. Production-build, preview, and drive all nine targets:
 node benchmarks/bench.mjs --quick signal-favoring
 node benchmarks/bench.mjs signal-favoring
 ```
@@ -161,10 +164,12 @@ The harness:
   sub-microsecond bump spans 200 or more ticks of Chromium's 100 µs clock. The
   harness prints the chosen batch size for each op.
 - **BUMP_SWEEP**: same shape but executes all 10 bumps in a single in-page loop
-  before the rAF gate.
+  in each repetition, preserving every adapter flush boundary.
 - **UNMOUNT**: one page; per iteration `__mount()` (untimed), time `__unmount()`,
   then `__reset()`.
 
+The semantic gate also verifies retained chain hosts and leaf identity across
+updates, then remounts to check fresh counter state and working bump closures.
 After the semantic gate, the harness publishes a zero-variance mounted DOM
 census. Visible element/text counts control for equivalent output; total/comment
 counts expose framework bookkeeping. The Octane timing rows also have
@@ -180,21 +185,18 @@ component tree. Every row requires live production-bundle coverage. C1/C51/C91
 must still perform exactly one text write, and the ancestor-first batch exactly
 ten.
 
-Each individual TSRX update renders only its owning block, dispatches no
-component slots, and writes exactly one text node. A batched sweep renders its
-ten owning blocks, dispatches no component slots, and writes exactly ten text
-nodes. Mount and teardown ceilings remain unchanged; the TSX twin remains the
-unchanged cascade control.
-
-The TSX chain's private, hookless components reuse their existing compiled host
-renderers through lightweight component slots. Its shallow update is limited to
-20 block renders, 10 full slots, 100 total slots, 9 child slots, and 19
-descriptors. Stateful or escaping components retain normal component boundaries
-and inspectable return values.
+Each individual Octane update must render zero blocks, dispatch zero component
+slots, and write exactly one text node. A batched sweep must likewise render no
+blocks or component slots and write exactly ten text nodes. These gates apply to
+both dialects. Mount and teardown remain measured and bounded, including the
+cost of creating and disposing each component-owned signal.
 
 Default: 5 warmups + 20 iters. Pass an integer to `bench` to override iters.
 
-## October 2026 breach recovery
+## Historical hook-fixture breach recovery (October 2026)
+
+The following investigation predates the switch to native signals on 21 October.
+Its `useState` timings describe the old fixtures, not the current comparison.
 
 On 2026-10-02 main breached the `bump_shallow` dialect guard (33.8×, max 5.5),
 and `work.mjs` reported 30 deterministic gate failures. `git bisect` over

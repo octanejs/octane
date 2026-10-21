@@ -1,49 +1,50 @@
-import { useState } from 'octane';
+/** @jsxImportSource octane */
+import { useSignal$ } from 'octane/signals/client';
 
 // 100 uniquely-named components in a chain. Stateful counters at C1, C11, C21, C31, C41, C51, C61, C71, C81, C91.
-// React-style .tsx twin of ../../octane-tsrx/src/App.tsrx — hook frameworks cascade
-// re-renders down the chain on each bump.
+// React-style .tsx twin of ../../octane-tsrx/src/App.tsrx — native signal bindings
+// update the counter text without re-rendering the chain.
 
-let _set1 = null;
-let _set11 = null;
-let _set21 = null;
-let _set31 = null;
-let _set41 = null;
-let _set51 = null;
-let _set61 = null;
-let _set71 = null;
-let _set81 = null;
-let _set91 = null;
+let _set1: (() => void) | null = null;
+let _set11: (() => void) | null = null;
+let _set21: (() => void) | null = null;
+let _set31: (() => void) | null = null;
+let _set41: (() => void) | null = null;
+let _set51: (() => void) | null = null;
+let _set61: (() => void) | null = null;
+let _set71: (() => void) | null = null;
+let _set81: (() => void) | null = null;
+let _set91: (() => void) | null = null;
 
 export function bumpAt1() {
-	if (_set1) _set1((v) => v + 1);
+	if (_set1) _set1();
 }
 export function bumpAt11() {
-	if (_set11) _set11((v) => v + 1);
+	if (_set11) _set11();
 }
 export function bumpAt21() {
-	if (_set21) _set21((v) => v + 1);
+	if (_set21) _set21();
 }
 export function bumpAt31() {
-	if (_set31) _set31((v) => v + 1);
+	if (_set31) _set31();
 }
 export function bumpAt41() {
-	if (_set41) _set41((v) => v + 1);
+	if (_set41) _set41();
 }
 export function bumpAt51() {
-	if (_set51) _set51((v) => v + 1);
+	if (_set51) _set51();
 }
 export function bumpAt61() {
-	if (_set61) _set61((v) => v + 1);
+	if (_set61) _set61();
 }
 export function bumpAt71() {
-	if (_set71) _set71((v) => v + 1);
+	if (_set71) _set71();
 }
 export function bumpAt81() {
-	if (_set81) _set81((v) => v + 1);
+	if (_set81) _set81();
 }
 export function bumpAt91() {
-	if (_set91) _set91((v) => v + 1);
+	if (_set91) _set91();
 }
 
 function C100() {
@@ -106,11 +107,11 @@ function C92() {
 	);
 }
 function C91() {
-	const [v, set] = useState(0);
-	_set91 = set;
+	const v$ = useSignal$(0);
+	_set91 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			91:{v} <C92 />
+			91:{v$} <C92 />
 		</div>
 	);
 }
@@ -178,11 +179,11 @@ function C82() {
 	);
 }
 function C81() {
-	const [v, set] = useState(0);
-	_set81 = set;
+	const v$ = useSignal$(0);
+	_set81 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			81:{v} <C82 />
+			81:{v$} <C82 />
 		</div>
 	);
 }
@@ -250,11 +251,11 @@ function C72() {
 	);
 }
 function C71() {
-	const [v, set] = useState(0);
-	_set71 = set;
+	const v$ = useSignal$(0);
+	_set71 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			71:{v} <C72 />
+			71:{v$} <C72 />
 		</div>
 	);
 }
@@ -322,11 +323,11 @@ function C62() {
 	);
 }
 function C61() {
-	const [v, set] = useState(0);
-	_set61 = set;
+	const v$ = useSignal$(0);
+	_set61 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			61:{v} <C62 />
+			61:{v$} <C62 />
 		</div>
 	);
 }
@@ -394,11 +395,11 @@ function C52() {
 	);
 }
 function C51() {
-	const [v, set] = useState(0);
-	_set51 = set;
+	const v$ = useSignal$(0);
+	_set51 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			51:{v} <C52 />
+			51:{v$} <C52 />
 		</div>
 	);
 }
@@ -466,11 +467,11 @@ function C42() {
 	);
 }
 function C41() {
-	const [v, set] = useState(0);
-	_set41 = set;
+	const v$ = useSignal$(0);
+	_set41 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			41:{v} <C42 />
+			41:{v$} <C42 />
 		</div>
 	);
 }
@@ -538,11 +539,11 @@ function C32() {
 	);
 }
 function C31() {
-	const [v, set] = useState(0);
-	_set31 = set;
+	const v$ = useSignal$(0);
+	_set31 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			31:{v} <C32 />
+			31:{v$} <C32 />
 		</div>
 	);
 }
@@ -610,11 +611,11 @@ function C22() {
 	);
 }
 function C21() {
-	const [v, set] = useState(0);
-	_set21 = set;
+	const v$ = useSignal$(0);
+	_set21 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			21:{v} <C22 />
+			21:{v$} <C22 />
 		</div>
 	);
 }
@@ -682,11 +683,11 @@ function C12() {
 	);
 }
 function C11() {
-	const [v, set] = useState(0);
-	_set11 = set;
+	const v$ = useSignal$(0);
+	_set11 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			11:{v} <C12 />
+			11:{v$} <C12 />
 		</div>
 	);
 }
@@ -754,11 +755,11 @@ function C2() {
 	);
 }
 function C1() {
-	const [v, set] = useState(0);
-	_set1 = set;
+	const v$ = useSignal$(0);
+	_set1 = () => v$.set((v) => v + 1);
 	return (
 		<div className="c">
-			1:{v} <C2 />
+			1:{v$} <C2 />
 		</div>
 	);
 }

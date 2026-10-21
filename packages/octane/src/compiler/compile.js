@@ -22973,21 +22973,47 @@ function compileReturnJsxFunction(node, ctx, options) {
 				// the factory runs. Reuse value lowering in both emitters so its
 				// public type/props and deferred children also stay inspectable.
 				// Like other returned records, it reads variables when it renders.
-				if (ctx.nativeReads) {
-					return {
-						...h,
-						argument: markDeferredLive(
-							nativeReturnedJsxValue(
-								h.argument,
-								ctx,
-								name,
-								compInlinedSubs,
-								cssHash,
-								cssEntries,
-								scoping.runtimeApplied,
-							),
+				// A proven private component only runs in its represented render
+				// scope, so it can reuse the compiled-fragment path below.
+				if (
+					ctx.nativeReads &&
+					!(ctx.autoMemo && isPlainHostRoot(h.argument) && ctx.privateUnescapedComponents.has(name))
+				) {
+					let value = markDeferredLive(
+						nativeReturnedJsxValue(
+							h.argument,
+							ctx,
+							name,
+							compInlinedSubs,
+							cssHash,
+							cssEntries,
+							scoping.runtimeApplied,
 						),
-					};
+					);
+					if (isPlainHostRoot(h.argument) && !node._octaneDirectCallTwin) {
+						renderCall ??= renderCallScopeParam(node, ctx);
+						value = inheritOriginLoc(
+							b.conditional(
+								b.call(
+									requireRuntimeForContext(ctx, 'isRenderCall'),
+									cloneAstNode(renderCall.scope),
+								),
+								ctx.mode === 'server'
+									? serverValueDirectiveFold(
+											ctx,
+											name,
+											compInlinedSubs,
+											cssHash,
+											false,
+											'html',
+										)(h.argument)
+									: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash),
+								value,
+							),
+							h.argument,
+						);
+					}
+					return { ...h, argument: value };
 				}
 				if (autoCalculatedDeclarations !== null) {
 					// Unlike a JSXCodeBlock, a returned-JSX body's statement list also
