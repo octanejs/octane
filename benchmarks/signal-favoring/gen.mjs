@@ -61,40 +61,6 @@ function genOctaneTsrx() {
 }
 
 // ----------------------------------------------------------------------------
-// octane JSX twin (.tsx, the same native signals)
-// ----------------------------------------------------------------------------
-// The same chain authored in React-style `.tsx` instead of `.tsrx`: `@{ … }`
-// bodies become `return <jsx>` and `class` becomes `className`.
-// Both bind component-owned signal handles directly in text.
-function genOctaneJsx() {
-	let out = `/** @jsxImportSource octane */\nimport { useSignal$ } from 'octane/signals/client';\n\n`;
-	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
-	out += `// React-style .tsx twin of ../../octane-tsrx/src/App.tsrx — native signal bindings\n`;
-	out += `// update the counter text without re-rendering the chain.\n\n`;
-	for (const i of STATEFUL_INDICES) out += `let _set${i}: (() => void) | null = null;\n`;
-	out += '\n';
-	for (const i of STATEFUL_INDICES) {
-		out += `export function bumpAt${i}() { if (_set${i}) _set${i}(); }\n`;
-	}
-	out += '\n';
-	for (let i = N; i >= 1; i--) {
-		if (i === N) {
-			out += `function C${i}() { return <span className="leaf">${i}</span>; }\n`;
-		} else if (isStateful(i)) {
-			out += `function C${i}() {\n`;
-			out += `  const v$ = useSignal$(0);\n`;
-			out += `  _set${i} = () => v$.set((v) => v + 1);\n`;
-			out += `  return <div className="c">${i}:{v$} <C${i + 1} /></div>;\n`;
-			out += `}\n`;
-		} else {
-			out += `function C${i}() { return <div className="c">${i} <C${i + 1} /></div>; }\n`;
-		}
-	}
-	out += '\nexport default function App() { return <C1 />; }\n';
-	return out;
-}
-
-// ----------------------------------------------------------------------------
 // ripple (existing framework, signal-based via track)
 // ----------------------------------------------------------------------------
 function genRipple() {
@@ -227,7 +193,6 @@ function genSvelteApp() {
 
 const targets = [
 	{ rel: 'octane-tsrx/src/App.tsrx', content: genOctaneTsrx() },
-	{ rel: 'octane-jsx/src/App.tsx', content: genOctaneJsx() },
 	{ rel: 'ripple/src/App.tsrx', content: genRipple() },
 	{ rel: 'react/src/App.jsx', content: genReact() },
 	{ rel: 'solid/src/App.jsx', content: genSolid() },

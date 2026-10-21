@@ -374,7 +374,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		signalFavoring,
 		'signal-favoring',
 		'signal-favoring',
-		'Deep-tree counter updates using native reactive primitives. Both Octane variants use component-owned useSignal$ signals and direct text bindings; React and Preact use hooks.',
+		'Deep-tree counter updates using native reactive primitives. Octane uses its TSRX implementation with component-owned useSignal$ signals and direct text bindings; React and Preact use hooks.',
 	),
 	frameworkCard(
 		portalSwarm,

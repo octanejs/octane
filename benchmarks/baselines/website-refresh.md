@@ -1,60 +1,13 @@
 # Website benchmark refresh — main, 21 October 2026
 
-The website imports 29 records from `local/`. The `signal-favoring` record was
-refreshed separately with native Octane signals as described below. The other 28
-records retain the original full snapshot, including its two auxiliary diagnostic
-failures and 16 performance-guard breaches. The homepage's 20 summary rows and
-bundle-size ranges are recomputed with `createHomeSummary(FRAMEWORK_CARDS)`.
+The website imports 29 records from `local/`. This snapshot measures every
+published suite with its normal sample count and complete framework timing matrix.
+Two auxiliary diagnostic harnesses failed; their failure flags are preserved and
+their unavailable measurements are not substituted from an older snapshot.
+The homepage's 20 summary rows and bundle-size ranges are recomputed with
+`createHomeSummary(FRAMEWORK_CARDS)`.
 
-## Native-signals refresh — 21 October 2026
-
-Both Octane variants in `signal-favoring` now use component-owned `useSignal$`
-and direct signal text bindings. The same 100-component chain, ten independent
-counters and adapter flush boundaries remain; peer fixture sources and locked
-dependency versions are unchanged. The measured compiler also fixes direct
-signal children in rendered return-JSX host components, with matching server
-lowering for hydration.
-
-- Measured revision:
-  [`e96875266d87c4dc0945530628ce0ea8b90e3830`](https://github.com/octanejs/octane/commit/e96875266d87c4dc0945530628ce0ea8b90e3830),
-  based on main `1c69b865d46da1425799b7bcb4923d3bcc11017e` plus the native-signals
-  fixture/compiler changes (package version 0.14.1). This is a source snapshot,
-  not a measurement of the published release.
-- [Measurement run](https://github.com/octanejs/octane/actions/runs/39607694772):
-  `full: true`, `suites: signal-favoring`; five warmups and 20 timing samples,
-  with all nine framework targets measured in one invocation. The record also
-  includes the two ABBA dialect aliases and two deterministic work targets:
-  13 targets and 208 target/operation measurements in total.
-- Environment recorded at 13:25:49 UTC: AMD EPYC, four vCPUs, Linux 6.6.141 x64,
-  Node 24.19.0, pnpm 12.9.1, Playwright 1.61.1 and Chromium 149.0.7827.55.
-  The run uses the same frozen peer versions listed for the original snapshot.
-- All semantic gates, both deterministic work gates and both applicable ratio
-  guards passed. Every timing score is finite and positive. Both Octane variants
-  perform zero block/slot/descriptor work and one text write per individual bump,
-  or ten writes per batched bump. Mount and teardown costs are still measured.
-
-Sweeps now calibrate repetitions to about 20 ms for every framework, retaining
-one awaited adapter flush per update. Individual bumps already used this
-calibration approach. Primary timing records include `repeat` and `sampleMs`;
-ABBA aliases combine normalized samples. This avoids zero timings for very fast
-signal updates. Sweep timings must not be presented as direct speedups over the
-previous fixed 25-repetition protocol. No ratio threshold or waiver changed.
-
-To reproduce, check out the measured revision above, install the frozen lockfile
-and Playwright Chromium as below, then run:
-
-```sh
-node benchmarks/bench.mjs --ratios signal-favoring
-```
-
-Only `local/signal-favoring.json` was imported from this run's `bench-results`
-artifact, without changing its values. Target/operation names and sample counts
-match the previous record. Only the signal-favoring homepage summary row changes;
-all other summary rows and bundle-size ranges retain the original snapshot.
-The remaining sections describe that original full run, not this successful
-partial refresh.
-
-## Original full snapshot: source and environment
+## Source and environment
 
 - Measured Octane main revision:
   [`80d230b879a6234d2f204ddddb189ca25fd6e81f`](https://github.com/octanejs/octane/commit/80d230b879a6234d2f204ddddb189ca25fd6e81f)

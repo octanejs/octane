@@ -272,12 +272,6 @@ export function Counter() @{
 }
 ```
 
-Pass a signal handle directly as a text child (`{count$}`) for binding-only
-updates in a rendered component template, including a named component with a
-`return <...>` body. Explicit `.get()` reads subscribe the scope that evaluates
-them. Direct function calls that produce stored JSX retain their inspectable
-descriptor behavior; use explicit reads in those stored values.
-
 When a component receives its signal reader through props and has no signal API binding to import, import the signals module for its native-read compilation:
 
 ```tsrx

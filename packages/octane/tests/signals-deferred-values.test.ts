@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import {
 	Children,
 	cloneElement,
-	createRoot,
 	Fragment,
 	flushSync,
 	hydrateRoot,
@@ -12,7 +11,6 @@ import {
 	type Root,
 } from 'octane';
 import * as ServerRuntime from 'octane/server';
-import * as ServerSignals from 'octane/signals/server';
 import { createResource, createScope, query } from 'octane/signals';
 import { prerender } from 'octane/static';
 import { act, mount } from './_helpers.js';
@@ -20,70 +18,12 @@ import { loadServerFixture } from './_server-fixture.js';
 import { deferred } from './_server-stream.js';
 import * as client from './_fixtures/signals-deferred-values.tsrx';
 
-const baseTheme = loadServerFixture(
-	'packages/octane/tests/_fixtures/style-applied-theme-base.tsrx',
-);
 const server = loadServerFixture<typeof client>(
 	resolve(__dirname, '_fixtures/signals-deferred-values.tsrx'),
-	{
-		compileOptions: {},
-		runtimeModules: {
-			'octane/signals/server': ServerSignals,
-			'./style-applied-theme-base.tsrx': baseTheme,
-		},
-	},
+	{ compileOptions: {} },
 );
 
 describe('native reads in deferred JSX values', () => {
-	it.each(['mount', 'hydrate'] as const)(
-		'keeps private local signals independent through %s, context changes and remount',
-		(mode) => {
-			const container = document.createElement('div');
-			document.body.appendChild(container);
-			let root: Root | undefined;
-			try {
-				if (mode === 'hydrate') {
-					container.innerHTML = ServerRuntime.renderToString(server.LocalCounterPair, {
-						label: 'before',
-					}).html;
-				}
-				const serverButtons = Array.from(container.querySelectorAll('button'));
-				flushSync(() => {
-					if (mode === 'hydrate')
-						root = hydrateRoot(container, client.LocalCounterPair, { label: 'before' });
-					else {
-						root = createRoot(container);
-						root.render(client.LocalCounterPair, { label: 'before' });
-					}
-				});
-				const buttons = Array.from(container.querySelectorAll('button'));
-				expect(buttons.map((button) => button.textContent)).toEqual(['0before', '0before']);
-				if (mode === 'hydrate')
-					buttons.forEach((button, i) => expect(button).toBe(serverButtons[i]));
-				expect(container.querySelector('output')?.textContent).toBe('before');
-				flushSync(() => buttons[0].click());
-				expect(buttons.map((button) => button.textContent)).toEqual(['1before', '0before']);
-				flushSync(() => root!.render(client.LocalCounterPair, { label: 'after' }));
-				flushSync(() => buttons[1].click());
-				Array.from(container.querySelectorAll('button')).forEach((button, i) =>
-					expect(button).toBe(buttons[i]),
-				);
-				expect(container.querySelector('output')?.textContent).toBe('after');
-				expect(buttons.map((button) => button.textContent)).toEqual(['1after', '1after']);
-				root!.unmount();
-				expect(container.textContent).toBe('');
-				root = createRoot(container);
-				root.render(client.LocalCounterPair, { label: 'fresh' });
-				expect(
-					Array.from(container.querySelectorAll('button'), (button) => button.textContent),
-				).toEqual(['0fresh', '0fresh']);
-			} finally {
-				root?.unmount();
-				container.remove();
-			}
-		},
-	);
-
 	it('keeps a hookless function callable outside render with ordinary data dependencies', async () => {
 		const props = { a: 'one', b: 'two', c: 'three', d: 'four', e: 'five' };
 		const view = client.FiveInputs(props);
@@ -318,39 +258,6 @@ describe('native reads in deferred JSX values', () => {
 			scope.dispose();
 		}
 	});
-
-	it.each(['component', 'stored'] as const)(
-		'collects applied themes before native host CSS through %s rendering',
-		(mode) => {
-			const scope = createScope({ scopeKey: 'native-themed-host-' + mode });
-			const count$ = scope.signal$('count', 1);
-			try {
-				const props = { count$ };
-				const view = mode === 'stored' ? server.ThemedNativeHost(props) : null;
-				for (const nonce of ['first', 'second']) {
-					const output =
-						mode === 'stored'
-							? ServerRuntime.renderToString(
-									server.DeferredHost,
-									{ view, label: 'theme' },
-									{ nonce },
-								)
-							: ServerRuntime.renderToString(server.ThemedNativeHost, props, { nonce });
-					expect(output.html).toContain('>1</span>');
-					expect(output.css).toContain('color: red;');
-					expect(output.css).toContain('color: blue;');
-					expect(output.css.indexOf('color: red;')).toBeLessThan(
-						output.css.indexOf('color: blue;'),
-					);
-					expect(output.css.match(/<style /g)).toHaveLength(2);
-					expect(output.css.match(new RegExp('nonce="' + nonce + '"', 'g'))).toHaveLength(2);
-				}
-				expect(ServerRuntime.renderToString(() => 'plain').css).toBe('');
-			} finally {
-				scope.dispose();
-			}
-		},
-	);
 
 	it('collects scoped styles when stored JSX renders without leaking them into unrelated server output', () => {
 		const scope = createScope({ scopeKey: 'native-factory-style' });

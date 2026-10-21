@@ -22973,53 +22973,21 @@ function compileReturnJsxFunction(node, ctx, options) {
 				// the factory runs. Reuse value lowering in both emitters so its
 				// public type/props and deferred children also stay inspectable.
 				// Like other returned records, it reads variables when it renders.
-				// A proven private component only runs in its represented render
-				// scope, so it can reuse the compiled-fragment path below.
-				// Normalized native values already own a compiled template. Keep
-				// that single extraction instead of lowering its syntax twice.
-				const nativeHostTemplate =
-					ctx.nativeReads &&
-					isPlainHostRoot(h.argument) &&
-					!requiresTemplateNormalization(h.argument, 'html', true, ctx);
-				if (
-					ctx.nativeReads &&
-					!(ctx.autoMemo && nativeHostTemplate && ctx.privateUnescapedComponents.has(name))
-				) {
-					let value = markDeferredLive(
-						nativeReturnedJsxValue(
-							h.argument,
-							ctx,
-							name,
-							compInlinedSubs,
-							cssHash,
-							cssEntries,
-							scoping.runtimeApplied,
-						),
-					);
-					if (nativeHostTemplate && !node._octaneDirectCallTwin) {
-						renderCall ??= renderCallScopeParam(node, ctx);
-						value = inheritOriginLoc(
-							b.conditional(
-								b.call(
-									requireRuntimeForContext(ctx, 'isRenderCall'),
-									cloneAstNode(renderCall.scope),
-								),
-								ctx.mode === 'server'
-									? serverValueDirectiveFold(
-											ctx,
-											name,
-											compInlinedSubs,
-											cssHash,
-											false,
-											'html',
-										)(h.argument)
-									: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash),
-								value,
+				if (ctx.nativeReads) {
+					return {
+						...h,
+						argument: markDeferredLive(
+							nativeReturnedJsxValue(
+								h.argument,
+								ctx,
+								name,
+								compInlinedSubs,
+								cssHash,
+								cssEntries,
+								scoping.runtimeApplied,
 							),
-							h.argument,
-						);
-					}
-					return { ...h, argument: value };
+						),
+					};
 				}
 				if (autoCalculatedDeclarations !== null) {
 					// Unlike a JSXCodeBlock, a returned-JSX body's statement list also
@@ -23136,23 +23104,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 			}),
 		);
 	}
-	if (ctx.mode === 'server' && scoping.runtimeApplied.length > 0) {
-		// Rendered host templates need their themes before this body's CSS.
-		// Direct native factories retain the deferred record's theme touches.
-		const touches = serverThemeTouchStatements(scoping.runtimeApplied, ctx, node);
-		if (!ctx.nativeReads || (ctx.autoMemo && ctx.privateUnescapedComponents.has(name))) {
-			returnBody.unshift(...touches);
-		} else if (renderCall?.scope) {
-			returnBody.unshift(
-				inheritOriginLoc(
-					b.if(
-						b.call(requireRuntimeForContext(ctx, 'isRenderCall'), cloneAstNode(renderCall.scope)),
-						b.block(touches),
-					),
-					node,
-				),
-			);
-		}
+	if (ctx.mode === 'server' && !ctx.nativeReads) {
+		// Imported themes inject on read; touch them ahead of this body's own CSS.
+		returnBody.unshift(...serverThemeTouchStatements(scoping.runtimeApplied, ctx, node));
 	}
 	const emittedFunction = b.function_declaration(
 		node.id,

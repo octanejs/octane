@@ -4,9 +4,9 @@ A second adjacent benchmark to [`recursive-context`](../recursive-context/). The
 recursive-context bench measures wide fan-out across a balanced binary tree. This
 one measures the **signal vs hook update cascade** along a deep linear chain.
 
-The bench has a structural bias toward fine-grained text updates. Both Octane
-targets use `useSignal$` from `octane/signals/client` and bind each handle directly
-as `{v$}`. Solid, Ripple, Svelte and Vue Vapor likewise update the text expression
+The bench has a structural bias toward fine-grained text updates. Octane uses
+its TSRX implementation with `useSignal$` from `octane/signals/client` and binds
+each handle directly as `{v$}`. Solid, Ripple, Svelte and Vue Vapor likewise update the text expression
 that consumes their native reactive value.
 
 React and Preact use hooks. React Compiler caches eligible unchanged child
@@ -22,7 +22,6 @@ in absolute terms. Often less than you'd expect.
 ```
 benchmarks/signal-favoring/
 ├── octane-tsrx/       # Vite app, dev :5190 — octane authored in .tsrx
-├── octane-jsx/        # Vite app, dev :5194 — same app authored in React-style .tsx
 ├── solid/             # Vite app, dev :5191 (Solid 2.0 beta)
 ├── react/             # Vite app, dev :5192 (React 19 + React Compiler)
 ├── ripple/            # Vite app, dev :5193
@@ -38,10 +37,8 @@ benchmarks/signal-favoring/
 └── README.md
 ```
 
-The octane app is authored twice — `.tsrx` (directive `@{ … }`, `class`,
-`{v$}`) and React-style `.tsx` (`return <jsx>`, `className`, `{v$}`) — over
-the same Octane core. Both counters are component-owned native signals; the
-columns compare the two dialects with the same state and text-binding model.
+Octane uses `.tsrx` template bodies with component-owned native signals and
+`{v$}` text bindings. This suite does not include an Octane JSX target.
 
 ## Shape
 
@@ -55,7 +52,6 @@ Each stateful component owns its own counter via the framework's native primitiv
 | framework        | primitive                | what a `setN(v+1)` triggers                                            |
 | ---------------- | ------------------------ | ---------------------------------------------------------------------- |
 | **octane-tsrx** | `useSignal$` | update the `{v$}` text binding; component bodies and descendants untouched |
-| **octane-jsx** | `useSignal$` | update the `{v$}` text binding; component bodies and descendants untouched |
 | **react**        | `useState`               | re-render of `CN`; React Compiler skips eligible unchanged descendants |
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
 | **ripple**     | `track()`                | re-evaluate the `{v}` text expression in `CN`; descendants untouched   |
@@ -65,7 +61,7 @@ Each stateful component owns its own counter via the framework's native primitiv
 
 Generator-driven so the chain length, stateful spacing, and per-component shape
 stay consistent across frameworks. Edit `gen.mjs` and re-run `node gen.mjs` to
-regenerate the component fixtures (octane-tsrx, octane-jsx, ripple, react,
+regenerate the component fixtures (octane-tsrx, ripple, react,
 solid, preact, and the Svelte SFC chain).
 The vue-vapor chain is the same shape spread over 100 SFC files (Vue is one
 component per SFC), with the stateful links registering their bump closures in
@@ -132,14 +128,14 @@ pnpm install
 # 2. (Optional) regenerate fixtures if you edited gen.mjs:
 node benchmarks/signal-favoring/gen.mjs
 
-# 3. Production-build, preview, and drive all nine targets:
+# 3. Production-build, preview, and drive all eight targets:
 node benchmarks/bench.mjs --quick signal-favoring
 node benchmarks/bench.mjs signal-favoring
 ```
 
 The unified runner also executes `work.mjs` against the already-built Octane
-previews. Run it directly with `pnpm --dir benchmarks/signal-favoring
-bench:work` when those two previews are already running.
+preview. Run it directly with `pnpm --dir benchmarks/signal-favoring
+bench:work` when that preview is already running.
 
 ## Measurement contract
 
@@ -172,9 +168,9 @@ The semantic gate also verifies retained chain hosts and leaf identity across
 updates, then remounts to check fresh counter state and working bump closures.
 After the semantic gate, the harness publishes a zero-variance mounted DOM
 census. Visible element/text counts control for equivalent output; total/comment
-counts expose framework bookkeeping. The Octane timing rows also have
-order-balanced aliases: the primary TSRX→TSX pass is repeated TSX→TSRX, and the
-two fully-warmed sample sets are combined for TSX/TSRX ratio guards.
+counts expose framework bookkeeping. The former JSX/TSRX aliases and their two
+dialect ratio guards were removed along with the JSX target; the deterministic
+Octane work gate remains.
 
 `work.mjs` uses jitless Chromium precise call coverage rather than source
 counters, which would change the program presented to the compiler. It caps
@@ -187,51 +183,7 @@ ten.
 
 Each individual Octane update must render zero blocks, dispatch zero component
 slots, and write exactly one text node. A batched sweep must likewise render no
-blocks or component slots and write exactly ten text nodes. These gates apply to
-both dialects. Mount and teardown remain measured and bounded, including the
-cost of creating and disposing each component-owned signal.
+blocks or component slots and write exactly ten text nodes. Mount and teardown
+remain measured and bounded, including the cost of creating and disposing each component-owned signal.
 
 Default: 5 warmups + 20 iters. Pass an integer to `bench` to override iters.
-
-## Historical hook-fixture breach recovery (October 2026)
-
-The following investigation predates the switch to native signals on 21 October.
-Its `useState` timings describe the old fixtures, not the current comparison.
-
-On 2026-10-02 main breached the `bump_shallow` dialect guard (33.8×, max 5.5),
-and `work.mjs` reported 30 deterministic gate failures. `git bisect` over
-compiled output of both twins put every failure on `5ead1ff2c` (#1069):
-
-- **TSX:** component descriptors became
-  `_$createElementFromConfig(site, Component, props)`. The proof that lets a
-  private static component render through its parent's template still matched
-  only `_$createElement(Component, props)`. Every chain link therefore fell back
-  to a full component slot plus a descriptor child slot: the shallow bump went
-  from 10 full and 90 lite slots to 100 full slots, and from 0.010 to 0.034 ms.
-  `df0a0863a` (#1378) later wrapped the same return in its direct-call split,
-  so the proof now reads the body call's record.
-- **TSRX:** after any prop-bound attribute such as `class={kind}`, the module
-  renders signal-capable bindings, and later identifier holes compile to
-  `bindSignalChild`. For a primitive, that binding always reached `childSlot`,
-  so C1's counter wrote through the general child path instead of one `setText`.
-  `bindSignalChild` now keeps `textHoleUpdate`'s primitive fast path.
-
-With both fixes every work count matches the 2026-09-14 baseline again. The
-timing guard needed a harness change too. With 50 bumps per sample, a TSRX bump
-(about 0.5 µs) spans less than one 100 µs clock tick, so its samples read 0 or
-0.002 ms and the ratio swung between about 5× and 12× on unchanged code. Bump
-samples are now calibrated to at least 20 ms. The same runner on the same
-machine, with identical batch sizes (51,200 TSRX and 3,200 TSX bumps):
-
-| Checkout | TSRX bump | TSX bump | TSX/TSRX |
-| --- | ---: | ---: | ---: |
-| `1ed5d2ab9` (before #1069), two runs | 0.42–0.47 µs | 6.46–6.95 µs | 14.66–15.26× |
-| This fix, two runs | 0.47–0.48 µs | 6.18–6.37 µs | 13.23–13.26× |
-
-The fix restores the pre-#1069 ratio and does not leave a residual TSX cost. The
-guard's ceiling moves from 5.5 to 18. The earlier ceiling was calibrated on
-floor-clamped TSRX samples, below the true pre-regression ratio. The #1069 TSX
-regression, about 34 µs over 0.47 µs, still breaches the new ceiling by a wide
-margin. Shorter calibrated samples (5 ms) read the TSX bump 15–30% slower,
-because the first bumps after each sample's `gc()` cost more, so the sample
-length matters when comparing runs.

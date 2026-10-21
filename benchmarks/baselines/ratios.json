@@ -708,22 +708,6 @@
     "note": "Order-balanced A-B-B-A full teardown guard. Current and historical production ratios are 4.05-5.25x; the ceiling catches growth while deterministic work gates bound block/scope teardown."
   },
   {
-    "suite": "signal-favoring",
-    "op": "mount",
-    "target": "octane-jsx-dialect-pair",
-    "reference": "octane-tsrx-dialect-pair",
-    "maxRatio": 1.8,
-    "note": "Order-balanced A-B-B-A 100-component chain mount guard. Current and historical production ratios are 1.19-1.41x; 1.8 leaves cold-page noise headroom."
-  },
-  {
-    "suite": "signal-favoring",
-    "op": "bump_shallow",
-    "target": "octane-jsx-dialect-pair",
-    "reference": "octane-tsrx-dialect-pair",
-    "maxRatio": 18,
-    "note": "Order-balanced A-B-B-A shallow cascade guard. With 20 ms calibrated bump samples, 1ed5d2ab9 (before #1069) measured 14.66-15.26x and the October 2026 fix 13.23-13.26x on the same runner; 50-bump samples had put the TSRX side at Chromium's 100 us clock floor. The #1069 JSX regression is about 72x. Precise work gates separately require one text write and cap every extra block/descriptor path."
-  },
-  {
     "suite": "dbmon",
     "op": "tick",
     "target": "octane-tsrx",

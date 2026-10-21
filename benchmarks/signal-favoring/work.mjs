@@ -1,4 +1,4 @@
-// Deterministic, untimed production-work gate for Octane's TSRX/TSX twins.
+// Deterministic, untimed production-work gate for Octane's native-signals fixture.
 // Rebuild the production previews without minification after the timed run so
 // --jitless precise call coverage can attribute the original function names.
 
@@ -9,10 +9,7 @@ import { chromium } from 'playwright';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
 
-const TARGETS = [
-	{ name: 'octane-tsrx', url: 'http://localhost:5190/' },
-	{ name: 'octane-jsx', url: 'http://localhost:5194/' },
-];
+const TARGETS = [{ name: 'octane-tsrx', url: 'http://localhost:5190/' }];
 
 // Normal benchmark builds stay minified. These diagnostic assets are used only
 // by this untimed work pass, matching the recursive-context work harness.
@@ -83,42 +80,6 @@ const GATES = {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
 			max: { unmountBlock: 19, unmountScope: 101 },
-		},
-	},
-	'octane-jsx': {
-		mount: {
-			maxFullSlotCalls: 11,
-			maxSlotCalls: 101,
-			max: { renderBlock: 21, componentSlot: 11, childSlot: 19, createElement: 20 },
-		},
-		bump_shallow: {
-			maxFullSlotCalls: 0,
-			maxSlotCalls: 0,
-			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
-			exact: { setText: 1 },
-		},
-		bump_middle: {
-			maxFullSlotCalls: 0,
-			maxSlotCalls: 0,
-			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
-			exact: { setText: 1 },
-		},
-		bump_deep: {
-			maxFullSlotCalls: 0,
-			maxSlotCalls: 0,
-			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
-			exact: { setText: 1 },
-		},
-		bump_batched: {
-			maxFullSlotCalls: 0,
-			maxSlotCalls: 0,
-			max: { renderBlock: 0, componentSlot: 0, childSlot: 0, createElement: 0 },
-			exact: { setText: 10 },
-		},
-		unmount: {
-			maxFullSlotCalls: 0,
-			maxSlotCalls: 0,
-			max: { unmountBlock: 21, unmountScope: 111 },
 		},
 	},
 };

@@ -24,7 +24,6 @@
 //
 // Usage:
 //   pnpm --filter octane-tsrx-signal-bench dev  # :5190 (.tsrx)
-//   pnpm --filter octane-jsx-signal-bench dev   # :5194 (.tsx / JSX)
 //   pnpm --filter solid-signal-bench dev        # :5191
 //   pnpm --filter react-signal-bench dev        # :5192
 //   pnpm --filter ripple-signal-bench dev       # :5193
@@ -44,7 +43,6 @@ const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5190/' },
-			{ name: 'octane-jsx', url: 'http://localhost:5194/' },
 			{ name: 'solid', url: 'http://localhost:5191/' },
 			{ name: 'react', url: 'http://localhost:5192/' },
 			{ name: 'ripple', url: 'http://localhost:5193/' },
@@ -427,17 +425,10 @@ const OPS = [
 	'unmount',
 ];
 
-const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
-
 (async () => {
 	const all = {};
-	const dialectPairs = {};
 	const failures = [];
 	const failedTargets = new Set();
-	const dialectTargets = DIALECT_PAIR_NAMES.map((name) =>
-		TARGETS.find((target) => target.name === name),
-	).filter(Boolean);
-	const remainingTargets = TARGETS.filter((target) => !DIALECT_PAIR_NAMES.includes(target.name));
 	const runVerifiedTarget = async (t) => {
 		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
 		try {
@@ -459,41 +450,7 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			console.error(`  ✗ ${message}`);
 		}
 	};
-	for (const t of dialectTargets) await runVerifiedTarget(t);
-
-	// Repeat only the Octane twins in reverse and combine the two independent,
-	// fully-warmed sample sets. Ratio guards use these A-B-B-A aliases so a fixed
-	// target order cannot masquerade as a dialect cost.
-	if (dialectTargets.length === 2 && dialectTargets.every((target) => all[target.name])) {
-		const repeat = {};
-		for (const t of [...dialectTargets].reverse()) {
-			console.error(`Repeating ${t.name} for order-balanced dialect pair…`);
-			try {
-				const { results } = await runTarget(t, { verify: false });
-				repeat[t.name] = results;
-			} catch (error) {
-				const alias = `${t.name}-dialect-pair`;
-				failedTargets.add(alias);
-				const message = `${alias}: ${error instanceof Error ? error.message : String(error)}`;
-				failures.push(message);
-				console.error(`  ✗ ${message}`);
-			}
-		}
-		if (dialectTargets.every((target) => repeat[target.name])) {
-			for (const t of dialectTargets) {
-				const alias = `${t.name}-dialect-pair`;
-				dialectPairs[alias] = Object.fromEntries(
-					OPS.map((op) => [
-						op,
-						summarize([...all[t.name][op].__samples, ...repeat[t.name][op].__samples], {
-							scoreMode: 'mean',
-						}),
-					]),
-				);
-			}
-		}
-	}
-	for (const t of remainingTargets) await runVerifiedTarget(t);
+	for (const t of TARGETS) await runVerifiedTarget(t);
 
 	const successfulTargets = TARGETS.filter((t) => all[t.name]);
 	const cols = successfulTargets.map((t) => t.name);
@@ -511,17 +468,6 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			row.push(`${fmt(r.median)} (min ${fmt(r.min)}, sd ${fmt(r.stddev)})`.padEnd(W));
 		}
 		console.log(row.join('| '));
-	}
-
-	const tsrxPair = dialectPairs['octane-tsrx-dialect-pair'];
-	const jsxPair = dialectPairs['octane-jsx-dialect-pair'];
-	if (tsrxPair && jsxPair) {
-		console.log('\norder-balanced octane-jsx / octane-tsrx dialect ratio:');
-		for (const op of OPS) {
-			console.log(
-				`  ${op.padEnd(14)} ${(scoreOf(jsxPair[op]) / scoreOf(tsrxPair[op])).toFixed(2)}x`,
-			);
-		}
 	}
 
 	if (successfulTargets.length > 1) {
@@ -620,11 +566,6 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 						gates: failedTargets.has(t.name) ? 'fail' : 'pass',
 						...(all[t.name]?.__dom ? { dom: all[t.name].__dom } : null),
 					},
-				})),
-				...Object.entries(dialectPairs).map(([name, results]) => ({
-					name,
-					ops: Object.fromEntries(OPS.map((op) => [op, timingStatForJson(results[op])])),
-					meta: { gates: failedTargets.has(name) ? 'fail' : 'pass', order: 'ABBA' },
 				})),
 			],
 		};
