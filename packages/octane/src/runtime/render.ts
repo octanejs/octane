@@ -15,6 +15,7 @@ import {
 	discardServerArm,
 	setTryBranch,
 	restartUncommittedTry,
+	type InitialHydrationQueryCapture,
 	type InitialSuspenseHydration,
 	initialSuspenseHydrations,
 	retireInitialSuspenseHydration,
@@ -1839,11 +1840,41 @@ export function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 }
 
+function acceptInitialHydrationQuery(
+	state: TrySlot,
+	initial: InitialSuspenseHydration,
+	query: NonNullable<InitialSuspenseHydration['query']>,
+): void {
+	if (
+		query.refined ||
+		initial.query !== query ||
+		state.pendingThenable !== query.waiting ||
+		initialSuspenseHydrations?.get(state) !== initial
+	)
+		return;
+	journalRootProperty(query, 'refined', undefined);
+	query.refined = true;
+}
+
 export function renderInitialSuspenseHydration(
 	state: TrySlot,
 	initial: InitialSuspenseHydration,
 	updated = false,
+	queryCapture?: InitialHydrationQueryCapture,
+	refineQuery?: InitialSuspenseHydration['query'],
 ): void {
+	if (refineQuery !== undefined) {
+		if (!refineQuery.refined) {
+			if (WIP_CAPTURE === null) acceptInitialHydrationQuery(state, initial, refineQuery);
+			else
+				(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
+					if (!discarded) acceptInitialHydrationQuery(state, initial, refineQuery);
+				});
+		}
+		// Preserve the original wake, which retries with the latest committed environment.
+		if (HYDRATION_PASS !== null) HYDRATION_PASS.node = getNextSibling(state.end);
+		return;
+	}
 	if (state.pendingThenable !== null && ROOT_RENDER_TRANSACTION?.rootRequest === true)
 		journalObjectOnce(state);
 	state.pendingThenable = null;
@@ -1864,11 +1895,14 @@ export function renderInitialSuspenseHydration(
 		return;
 	}
 	if (initial.waits !== undefined) {
+		queryCapture ??= initial.queryCapture;
+		if (queryCapture !== undefined) initial.queryCapture = queryCapture;
 		const taken = waitForStreamedArm(state, initial);
 		if (taken === null) return;
 		initial = taken;
 	}
 	state.idState.next = initial.idStart;
+	const firstAttempt = state.branch === -1;
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
@@ -1894,6 +1928,7 @@ export function renderInitialSuspenseHydration(
 	const previousNative = setNativeAdoptionResolver(null);
 	const diagnostics = holdDiagnostics();
 	let suspended: TrackedThenable<unknown> | null = null;
+	let finishQuery: ReturnType<InitialHydrationQueryCapture> = undefined;
 	let failed = false;
 	let failure: unknown;
 	try {
@@ -1901,6 +1936,7 @@ export function renderInitialSuspenseHydration(
 			hydration.nativeAdoption = ownNativeAdoption(block, initial.nativeRaw);
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
+		finishQuery = firstAttempt && state.env !== undefined ? queryCapture?.(state.env) : undefined;
 		renderBlock(block);
 		if (hydration.deferred !== null) claimDeferred(hydration);
 		drainHydrationRenderPhaseUpdates(block, true);
@@ -1910,7 +1946,14 @@ export function renderInitialSuspenseHydration(
 	} catch (error) {
 		failed = true;
 		failure = hydrationFailure(hydration, error);
-		if (isSuspenseException(error)) suspended = error.thenable;
+		const finish = finishQuery;
+		finishQuery = undefined;
+		if (isSuspenseException(error)) {
+			suspended = error.thenable;
+			// Finish the exact authored read before disposing this attempt can release its owner.
+			const retains = finish?.(suspended);
+			if (retains !== undefined) initial.query = { waiting: suspended, retains };
+		} else finish?.();
 		// The next attempt finds the server arm as the server rendered it.
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.ROLLBACK_HYDRATION);
@@ -1944,6 +1987,7 @@ export function renderInitialSuspenseHydration(
 		state.tryBlock = null;
 		discardOffscreenCapture(capture);
 	} finally {
+		finishQuery?.();
 		// The attempt that commits, or the catch arm that replaces this one,
 		// reports what it finds. An attempt that found a mismatch is final: the
 		// arm renders on the client, and its diagnostics describe why.

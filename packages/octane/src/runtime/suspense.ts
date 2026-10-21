@@ -1269,9 +1269,10 @@ export function tryBlock(
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
 	// A compiler proof for comparing captured inputs while initial hydration waits.
-	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean,
-	// Compiler capture modes: 1 = unobserved optional input; 2 = validated source witness.
-	preserveHydrationCapture?: 1 | 2,
+	hydrationInputsEqual?: (previous: any[], next: any[]) => boolean | 2,
+	// Compiler capture modes: 1 = unobserved optional input; 2 = validated source witness;
+	// a function observes the query read responsible for an initial suspension.
+	preserveHydrationCapture?: 1 | 2 | InitialHydrationQueryCapture,
 ): () => void {
 	// Slot arguments can queue a parent self-update. Like every other slot, wait
 	// for the replay: mounting now would put this range before earlier siblings
@@ -1333,6 +1334,7 @@ export function tryBlock(
 	let initial =
 		state === undefined || !hydrationStarted ? undefined : initialSuspenseHydrations?.get(state);
 	let updated = false;
+	let refineQuery: InitialSuspenseHydration['query'];
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -1416,25 +1418,36 @@ export function tryBlock(
 		if (domParent.nodeType === 11) noteFrontierMember(domParent, newState);
 		state = newState;
 	} else {
-		// Reuse an equivalent compiler capture only with its original proof:
-		// before an optional input's first read, or after validating a source witness.
+		// Keep the original provenance when a self-render rebuilds an identical
+		// capture for a source/query proof, or for an optional input not yet read.
 		const unchangedCapture =
 			initial !== undefined &&
 			(preserveHydrationCapture === 2 ||
+				typeof preserveHydrationCapture === 'function' ||
 				(preserveHydrationCapture === 1 && initial.waits !== undefined)) &&
 			hydrationInputsEqual !== undefined &&
 			state.tryBody === tryBody &&
 			state.env !== env &&
 			!depsChanged(state.env, env);
 		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
-		const changed =
-			(retains || initial !== undefined) &&
-			(state.tryBody !== tryBody ||
-				(state.env !== env &&
-					(initial !== undefined && hydrationInputsEqual && state.env && env
-						? !(unchangedCapture && preserveHydrationCapture === 1) &&
-							!hydrationInputsEqual(state.env, env)
-						: depsChanged(state.env, env))));
+		let changed = false;
+		if (retains || initial !== undefined) {
+			changed = state.tryBody !== tryBody;
+			if (!changed && state.env !== env) {
+				if (initial !== undefined && hydrationInputsEqual && state.env && env) {
+					const equal =
+						unchangedCapture && preserveHydrationCapture === 1
+							? true
+							: hydrationInputsEqual(state.env, env);
+					if (equal === 2) {
+						const query = initial.query;
+						if (query !== undefined && state.pendingThenable === query.waiting && query.retains())
+							refineQuery = query;
+						else changed = true;
+					} else changed = !equal;
+				} else changed = depsChanged(state.env, env);
+			}
+		}
 		if (unchangedCapture && !changed) env = state.env;
 		supersedesInputs = retains && changed;
 		// New inputs, not the retry its wakeable scheduled, reached a boundary
@@ -1472,7 +1485,13 @@ export function tryBlock(
 		if (initial !== undefined) registerInitialSuspenseHydration(s, initial);
 	}
 	if (initial !== undefined) {
-		initialSuspenseHydrationRenderer!(s, initial, updated);
+		initialSuspenseHydrationRenderer!(
+			s,
+			initial,
+			updated,
+			typeof preserveHydrationCapture === 'function' ? preserveHydrationCapture : undefined,
+			refineQuery,
+		);
 	} else if (s.passthrough) {
 		renderPassthroughTry(s);
 		return s.reset;
@@ -1596,7 +1615,15 @@ export interface InitialSuspenseHydration {
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
+	/** Deferred until a streamed server arm reaches its first client read. */
+	queryCapture?: InitialHydrationQueryCapture;
+	/** The original request and whether a committed parent reused its server arm. */
+	query?: { waiting: TrackedThenable<unknown>; retains: () => boolean; refined?: boolean };
 }
+
+export type InitialHydrationQueryCapture = (
+	env: object,
+) => ((waiting?: PromiseLike<unknown>) => (() => boolean) | undefined) | undefined;
 
 // Server metadata gives each resolved arm an independent adoption scope. The
 // map retains only boundaries whose first client attempt has not completed.
@@ -1967,7 +1994,11 @@ export function retryInitialSuspenseHydration(
 ): void {
 	const hiddenActivity = TRY_OPS!.hiddenActivity(state.parentBlock);
 	try {
-		renderInitialSuspenseHydration(state, initial);
+		const query = initial.query;
+		const updated =
+			query?.refined === true && state.pendingThenable === query.waiting && !query.retains();
+		if (updated) supersedeSignalRetryOwners(state);
+		renderInitialSuspenseHydration(state, initial, updated);
 	} catch (error) {
 		TRY_OPS!.resumeError(state.parentBlock, error);
 	} finally {
