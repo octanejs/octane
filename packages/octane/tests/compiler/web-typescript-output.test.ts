@@ -82,13 +82,16 @@ function typecheck(files: Record<string, string>) {
 	}
 }
 
-it('keeps the type scope of an observed query read in its component', () => {
+it.each([
+	'request$.get() as typeof props.domain',
+	"active ? (request$.get() as typeof props.domain) : 'inactive'",
+])('keeps the type scope of an observed query read in its component: %s', (read) => {
 	const source = `import { selection$, request$ } from './model';
 export function QueryInput(props: { domain: string }) @{
   const selection = selection$.get();
   const active = selection?.id === props.domain;
   @try {
-    const value = request$.get() as typeof props.domain;
+    const value = ${read};
     <input data-domain={props.domain} disabled={!active} defaultValue={value} />;
   } @pending { <span>Loading</span>; }
 }`;
