@@ -29,6 +29,9 @@ const PATHS = {
 	'octane/internal/client': [
 		fileURLToPath(new URL('../../src/internal/client.ts', import.meta.url)),
 	],
+	'octane/internal/hydration-query': [
+		fileURLToPath(new URL('../../src/signals/hydration-query-input.ts', import.meta.url)),
+	],
 	'octane/internal/server': [
 		fileURLToPath(new URL('../../src/internal/server.ts', import.meta.url)),
 	],
@@ -78,6 +81,32 @@ function typecheck(files: Record<string, string>) {
 		rmSync(directory, { recursive: true, force: true });
 	}
 }
+
+it('keeps the type scope of an observed query read in its component', () => {
+	const source = `import { selection$, request$ } from './model';
+export function QueryInput(props: { domain: string }) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    const value = request$.get() as typeof props.domain;
+    <input data-domain={props.domain} disabled={!active} defaultValue={value} />;
+  } @pending { <span>Loading</span>; }
+}`;
+	const result = compile(source, '/src/query-input.tsrx', {
+		mode: 'client',
+		hmr: false,
+		output: 'ts',
+	});
+	expect(result.diagnostics).toEqual([]);
+	expect(result.code).toContain('octane/internal/hydration-query');
+	expect(
+		typecheck({
+			'query-input.ts': result.code,
+			'model.ts': `export const selection$ = { get: (): { id: string } | undefined => undefined };
+export const request$ = { get: (): unknown => '' };`,
+		}),
+	).toEqual([]);
+});
 
 const COMPONENTS = {
 	empty: `export function App() @{ <p>ready</p> }`,

@@ -944,10 +944,12 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	}
 }
 
-// Capture these alongside the class, before a caller can replace either public
-// method and later load a separately compiled hydration consumer.
+// Capture these alongside the class, before a caller can replace a public
+// read and later load a separately compiled hydration consumer.
 export const hasScopedNodeBrand = /* @__PURE__ */ (() => ScopedNode.hasNativeBrand)();
 export const originalScopedNodeGet = /* @__PURE__ */ (() => ScopedNode.prototype.get)();
+export const originalScopedNodeStateGetter = /* @__PURE__ */ (() =>
+	Object.getOwnPropertyDescriptor(ScopedNode.prototype, 'state')!.get)();
 
 /** Inspect only cached metadata; never refresh a dormant or invalidated node. */
 export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): NativeReadInspection {

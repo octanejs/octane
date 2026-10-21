@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToPipeableStream, renderToString } from 'octane/server';
 import * as Signals from 'octane/signals';
+import * as HydrationQuery from 'octane/internal/hydration-query';
 import { __hydrationSignalRevision } from 'octane/internal/hydration-signal';
 import { __captureHydrationInput, __ownedHydrationInputs } from '../../src/hydration-inputs.js';
 import {
@@ -665,6 +666,243 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 			expect(onRecoverableError).not.toHaveBeenCalled();
 		},
 	);
+
+	it.each([
+		{ label: 'unchanged request', request: 'unchanged', streamed: false },
+		{ label: 'changed request', request: 'changed', streamed: false },
+		{ label: 'restarted request', request: 'restarted', streamed: false },
+		{
+			label: 'request restarted after the parent update',
+			request: 'restarted after update',
+			streamed: false,
+		},
+		{
+			label: 'unchanged request revealed by streamed server delivery',
+			request: 'unchanged',
+			streamed: true,
+		},
+	] as const)(
+		'preserves suspended hydration until the current query completes ($label)',
+		async ({ request, streamed }) => {
+			const scopeKey = `pending-query-${dev}-${request}-${streamed}`;
+			const serverScope = Signals.createScope({ scopeKey });
+			const clientScope = Signals.createScope({ scopeKey });
+			cleanups.push(() => {
+				clientScope.dispose();
+				serverScope.dispose();
+			});
+			const first = gate();
+			const replacement = gate();
+			const serverWait = streamed ? gate() : undefined;
+			let clientAttempt = 0;
+			const query = Signals.query(scopeKey, (key: string) => {
+				if (key === 'server')
+					return serverWait ? serverWait.value.promise.then(() => 'original') : 'original';
+				const pending = clientAttempt++ === 0 ? first : replacement;
+				return pending.value.promise.then(() => (pending === first ? 'original' : 'replacement'));
+			});
+			const requestKey$ = clientScope.signal$('request-key', 'original');
+			const serverModel = {
+				selection$: serverScope.signal$('selection', { id: 'saved' }),
+				request$: Signals.createResource(serverScope, 'request', () => query('server')),
+			};
+			const clientModel = {
+				selection$: clientScope.signal$('selection', { id: 'saved' }),
+				request$: Signals.createResource(clientScope, 'request', () => query(requestKey$.get())),
+			};
+			await act(() => {});
+			const source = `import { selection$, request$ } from './model';
+function QueryInput(props) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    const value = request$.get();
+    <label>{value as string}<input disabled={!active} defaultValue={value} ref={props.onRef} /></label>;
+  } @pending { <span>Loading</span>; }
+}
+export function App(props) @{ <section><output>{props.sibling}</output><QueryInput domain={props.domain} onRef={props.onRef} /></section>; }`;
+			const load = (mode: 'server' | 'client') =>
+				loadCompiledFixtureSource(source, {
+					id: '/src/pending-query.tsrx',
+					mode,
+					compileOptions: { dev, hmr: false },
+					runtimeModules: {
+						'octane/internal/hydration-query': HydrationQuery,
+						'./model': mode === 'server' ? serverModel : clientModel,
+					},
+				});
+			const server = load('server');
+			const client = load('client');
+			const onRef = vi.fn();
+			const props = { sibling: 'waiting', domain: 'saved', onRef };
+			const container = document.createElement('div');
+			document.body.append(container);
+			cleanups.push(() => container.remove());
+			let revealQueryArm: (() => Promise<HTMLInputElement>) | undefined;
+			if (serverWait) {
+				const collector = createPipeableCollector();
+				let shellReady!: () => void;
+				const shell = new Promise<void>((resolve) => (shellReady = resolve));
+				const stream = renderToPipeableStream(server['App'], props, {
+					signalOwner: serverScope,
+					onShellReady: shellReady,
+				});
+				cleanups.push(() => {
+					stream.abort();
+					resetStreamRuntimeGlobals();
+				});
+				stream.pipe(collector.destination);
+				await shell;
+				const shellChunks = collector.chunks.length;
+				container.innerHTML = collector.chunks.join('');
+				activateStreamedMarkup(container);
+				revealQueryArm = async () => {
+					serverWait.resolve();
+					await collector.ended;
+					let revealed!: HTMLInputElement;
+					await act(() => {
+						container.insertAdjacentHTML('beforeend', collector.chunks.slice(shellChunks).join(''));
+						activateStreamedMarkup(container);
+						revealed = container.querySelector('input')!;
+						revealed.value = 'typed';
+					});
+					return revealed;
+				};
+			} else {
+				container.innerHTML = renderToString(server['App'], props, {
+					signalOwner: serverScope,
+				}).html;
+			}
+			const serverInput = container.querySelector('input');
+			if (revealQueryArm) expect(serverInput).toBeNull();
+			else {
+				expect(serverInput).not.toBeNull();
+				serverInput!.value = 'typed';
+			}
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client['App'], props, {
+				signalOwner: clientScope,
+				onRecoverableError,
+			});
+			cleanups.push(() => root.unmount());
+			const original = revealQueryArm ? await revealQueryArm() : serverInput!;
+			expect(container.querySelector('input')).toBe(original);
+			expect(onRef).not.toHaveBeenCalled();
+			await act(() => {
+				if (request === 'changed') requestKey$.set('replacement');
+				if (request === 'restarted') clientModel.request$.retry({ pending: true });
+				root.render(client['App'], { ...props, sibling: 'ready' });
+			});
+			expect(container.querySelector('output')?.textContent).toBe('ready');
+			if (request === 'unchanged' || request === 'restarted after update') {
+				expect(container.querySelector('input')).toBe(original);
+				expect(original.value).toBe('typed');
+			}
+			if (request === 'restarted after update')
+				await act(() => clientModel.request$.retry({ pending: true }));
+			await act(() => first.resolve());
+			if (request !== 'unchanged') {
+				expect(onRef).not.toHaveBeenCalled();
+				await act(() => replacement.resolve());
+			}
+			const accepted = container.querySelector('input')!;
+			expect(container.querySelector('label')?.textContent).toBe(
+				request === 'unchanged' ? 'original' : 'replacement',
+			);
+			if (request === 'unchanged') {
+				expect(accepted).toBe(original);
+				expect(accepted.value).toBe('typed');
+			}
+			expect(onRef).toHaveBeenCalledExactlyOnceWith(accepted);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		},
+	);
+
+	it('discards stale server content when later work reads a newer query attempt', async () => {
+		const scopeKey = `later-query-restart-${dev}`;
+		const waiting = gate();
+		const createModel$ = (side: 'server' | 'client') => {
+			const scope = Signals.createScope({ scopeKey });
+			cleanups.push(() => scope.dispose());
+			const earlierSeed = scope.serialize();
+			let attempt = 0;
+			const query = Signals.query(scopeKey, () => {
+				if (side === 'server' || attempt++ === 0) return 'original';
+				return waiting.value.promise.then(() => 'replacement');
+			});
+			return {
+				scope,
+				earlierSeed,
+				selection$: scope.signal$('selection', { id: 'saved' }),
+				request$: Signals.createResource(scope, 'request', () => query()),
+			};
+		};
+		const serverModel = createModel$('server');
+		const clientModel = createModel$('client');
+		await act(() => {});
+		// The root can present the server's ready query, but an earlier embedding
+		// snapshot without that query must read the newer live attempt.
+		const earlierFrame = clientModel.scope.beginAdoption(clientModel.earlierSeed);
+		cleanups.push(() => earlierFrame.release());
+		const clientReadFresh = vi.fn((value: string) =>
+			value === 'original' ? earlierFrame.run(() => clientModel.request$.get()) : value,
+		);
+		const source = `import { selection$, request$, readFresh } from './model';
+function QueryInput(props) @{
+  const selection = selection$.get();
+  const active = selection?.id === props.domain;
+  @try {
+    const value = request$.get();
+    const fresh = readFresh(value);
+    <label>{fresh as string}<input disabled={!active} defaultValue={fresh} ref={props.onRef} /></label>;
+  } @pending { <span>Loading</span>; }
+}
+export function App(props) @{ <section><output>{props.sibling}</output><QueryInput domain={props.domain} onRef={props.onRef} /></section>; }`;
+		const load = (mode: 'server' | 'client') =>
+			loadCompiledFixtureSource(source, {
+				id: '/src/ready-query-restart.tsrx',
+				mode,
+				compileOptions: { dev, hmr: false },
+				runtimeModules: {
+					'octane/internal/hydration-query': HydrationQuery,
+					'./model':
+						mode === 'server'
+							? { ...serverModel, readFresh: (value: string) => value }
+							: { ...clientModel, readFresh: clientReadFresh },
+				},
+			});
+		const server = load('server');
+		const client = load('client');
+		const onRef = vi.fn();
+		const props = { sibling: 'waiting', domain: 'saved', onRef };
+		const container = document.createElement('div');
+		document.body.append(container);
+		cleanups.push(() => container.remove());
+		container.innerHTML = renderToString(server['App'], props, {
+			signalOwner: serverModel.scope,
+		}).html;
+		const original = container.querySelector('input')!;
+		original.value = 'typed for original';
+		clientModel.request$.retry({ pending: true });
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, client['App'], props, {
+			signalOwner: clientModel.scope,
+			onRecoverableError,
+		});
+		cleanups.push(() => root.unmount());
+		expect(clientReadFresh).toHaveBeenCalledWith('original');
+		expect(container.querySelector('input')).toBe(original);
+		expect(onRef).not.toHaveBeenCalled();
+		await act(() => root.render(client['App'], { ...props, sibling: 'ready' }));
+		expect(container.querySelector('output')?.textContent).toBe('ready');
+		expect(container.querySelector('input')).not.toBe(original);
+		await act(() => waiting.resolve());
+		const accepted = container.querySelector('input')!;
+		expect(container.querySelector('label')?.textContent).toBe('replacement');
+		expect(accepted.value).toBe('replacement');
+		expect(onRef).toHaveBeenCalledExactlyOnceWith(accepted);
+		expect(onRecoverableError).not.toHaveBeenCalled();
+	});
 
 	it('publishes the latest layout callback only after the adopted arm commits', async () => {
 		const gateSource = `import { useLayoutEffect } from 'octane';
