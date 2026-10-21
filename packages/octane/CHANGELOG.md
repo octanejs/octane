@@ -1,5 +1,14 @@
 # octane
 
+## 0.14.2
+
+### Patch Changes
+
+- 87bf841: Reduce context dependency allocation for consumers reading one or two contexts while preserving memoized provider updates.
+- 9eede44: Resolve `useFormStatus` through portal source frontiers on the first render.
+- 1b42344: Preserve server-rendered input state when a pending query remains current across an unrelated hydration update.
+- 1a278e0: Allow fixed textarea binding views with one verified renderer-owned attribute spread to transfer their early binding lease during hydration.
+
 ## 0.14.1
 
 ### Patch Changes
