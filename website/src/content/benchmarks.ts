@@ -436,7 +436,9 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 const MIN_TREE_SHAKING_RATIO = 1.1;
 {
 	const card = FRAMEWORK_CARDS.find((c) => c.id === 'bundle-size')!;
-	const byName = new Map((bundleSize as SuiteBaseline).targets.map((t) => [t.name, t.ops]));
+	const byName = new Map<string, Partial<Record<string, OpStat>>>(
+		bundleSize.targets.map((t) => [t.name, t.ops]),
+	);
 	const prefixes: Record<string, string> = {
 		'rows total gzip': '',
 		'TodoMVC total gzip': 'todo_',
