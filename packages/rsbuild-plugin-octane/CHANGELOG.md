@@ -1,5 +1,13 @@
 # @octanejs/rsbuild-plugin
 
+## 0.1.67
+
+### Patch Changes
+
+- Updated dependencies [78ee7f4]
+  - @octanejs/rspack-plugin@0.2.6
+  - @octanejs/app-core@0.1.8
+
 ## 0.1.66
 
 ### Patch Changes

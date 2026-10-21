@@ -1,5 +1,24 @@
 # octane
 
+## 0.14.1
+
+### Patch Changes
+
+- 8766299: Preserve server-rendered DOM when hydrating component props containing conditional render blocks.
+- 3b1610d: Restore hydration handoff for complete fixed DOM binding views with pure setup locals.
+- b6f8ff4: Allow early DOM bindings for a complete fixed native view to hand ownership to hydration without requiring a structural binding program.
+- bc93c30: Restore focused hosts that were disconnected or moved to another document during an update.
+- 5b641bd: Keep children of an incomplete pending primary usable after a suspended root render is rolled back.
+- b5794e8: Preserve setup locals captured by keyed Fragment children during server rendering.
+- 80d230b: Preserve destructured rows backed by one-shot iterators in universal `@for` loops.
+- a992b16: Prevent handlers from discarded suspended hydration attempts from receiving events during rendering. Custom-element listeners register when resumed hydration is accepted, which can change their order relative to third-party listeners registered while rendering.
+- 81d1181: Preserve pre-hydration input edits through unrelated updates to suspended boundaries with qualified layout callbacks or a stable optional reader.
+- 238f4fb: Reduce ancestry copying when retrying suspended signal owners inside deeply nested hookless components.
+- 4550907: Reduce ancestry-path copying when retaining and reclaiming signal owners during suspended render retries.
+- 2778142: Fix conditional content in replaced keyed rows with many dynamic bindings.
+- 119f105: Preserve server-rendered inputs during suspended hydration when an unrelated parent update leaves the boundary's captured inputs verifiably unchanged.
+- 0640f0e: Allow fixed textarea binding views with props-object parameters to hand off an early signal control to hydration, including a textarea nested in an owned native view.
+
 ## 0.14.0
 
 ### Minor Changes
