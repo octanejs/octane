@@ -68,6 +68,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'cloneElement',
 		'compilerCacheContext',
 		'componentSlot',
+		'componentSlotFunction',
 		'componentSlotLite',
 		'componentSlotVoid',
 		'createContext',
