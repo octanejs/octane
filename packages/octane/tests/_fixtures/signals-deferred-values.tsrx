@@ -8,6 +8,7 @@ import {
 } from 'octane';
 import type { SignalHandle } from 'octane/signals';
 import { useSignal$ } from 'octane/signals/client';
+import { base } from './style-applied-theme-base.tsrx';
 
 export function FiveInputs(props: { a: string; b: string; c: string; d: string; e: string }) {
 	const values = [props.a, props.b, props.c, props.d, props.e];
@@ -164,11 +165,11 @@ export function GlobalStyleHost(props: { view: OctaneNode }) @{
 
 export function ReturnedHead(props: { title$: SignalHandle<string> }) {
 	return (
-		<>
+		<section>
 			<title data-deferred-native-head="yes">{props.title$.get() as string}</title>
 			<meta name="deferred-native-head" content={props.title$.get()} />
 			<p class="deferred-head-value">{props.title$.get() as string}</p>
-		</>
+		</section>
 	);
 }
 
@@ -198,5 +199,20 @@ export function LocalCounterPair(props: { label: string }) {
 				</section>
 			</LabelContext>
 		</article>
+	);
+}
+
+export function ThemedNativeHost(props: { count$: SignalHandle<number> }) {
+	return (
+		<div class="native-themed-host">@{
+			<>
+				<style apply={base}>
+					.native-themed-host {
+						color: blue;
+					}
+				</style>
+				<span>{props.count$.get() as number}</span>
+			</>
+		}</div>
 	);
 }

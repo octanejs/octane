@@ -20,9 +20,18 @@ import { loadServerFixture } from './_server-fixture.js';
 import { deferred } from './_server-stream.js';
 import * as client from './_fixtures/signals-deferred-values.tsrx';
 
+const baseTheme = loadServerFixture(
+	'packages/octane/tests/_fixtures/style-applied-theme-base.tsrx',
+);
 const server = loadServerFixture<typeof client>(
 	resolve(__dirname, '_fixtures/signals-deferred-values.tsrx'),
-	{ compileOptions: {}, runtimeModules: { 'octane/signals/server': ServerSignals } },
+	{
+		compileOptions: {},
+		runtimeModules: {
+			'octane/signals/server': ServerSignals,
+			'./style-applied-theme-base.tsrx': baseTheme,
+		},
+	},
 );
 
 describe('native reads in deferred JSX values', () => {
@@ -309,6 +318,39 @@ describe('native reads in deferred JSX values', () => {
 			scope.dispose();
 		}
 	});
+
+	it.each(['component', 'stored'] as const)(
+		'collects applied themes before native host CSS through %s rendering',
+		(mode) => {
+			const scope = createScope({ scopeKey: 'native-themed-host-' + mode });
+			const count$ = scope.signal$('count', 1);
+			try {
+				const props = { count$ };
+				const view = mode === 'stored' ? server.ThemedNativeHost(props) : null;
+				for (const nonce of ['first', 'second']) {
+					const output =
+						mode === 'stored'
+							? ServerRuntime.renderToString(
+									server.DeferredHost,
+									{ view, label: 'theme' },
+									{ nonce },
+								)
+							: ServerRuntime.renderToString(server.ThemedNativeHost, props, { nonce });
+					expect(output.html).toContain('>1</span>');
+					expect(output.css).toContain('color: red;');
+					expect(output.css).toContain('color: blue;');
+					expect(output.css.indexOf('color: red;')).toBeLessThan(
+						output.css.indexOf('color: blue;'),
+					);
+					expect(output.css.match(/<style /g)).toHaveLength(2);
+					expect(output.css.match(new RegExp('nonce="' + nonce + '"', 'g'))).toHaveLength(2);
+				}
+				expect(ServerRuntime.renderToString(() => 'plain').css).toBe('');
+			} finally {
+				scope.dispose();
+			}
+		},
+	);
 
 	it('collects scoped styles when stored JSX renders without leaking them into unrelated server output', () => {
 		const scope = createScope({ scopeKey: 'native-factory-style' });
