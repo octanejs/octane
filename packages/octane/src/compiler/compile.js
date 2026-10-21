@@ -7672,11 +7672,19 @@ function hydrationFirstQueryRead(ctx, render) {
 		first.declarations[0].id.type !== 'Identifier'
 	)
 		return null;
-	const read = unwrapTsExpr(first.declarations[0].init);
+	let read = unwrapTsExpr(first.declarations[0].init);
+	let guard = null;
+	if (read?.type === 'ConditionalExpression') {
+		const condition = unwrapTsExpr(read.test);
+		if (condition?.type !== 'Identifier') return null;
+		guard = condition;
+		read = unwrapTsExpr(read.consequent);
+	}
 	// Type syntax inside the call cannot move out of this component's scope.
 	if (read?.typeArguments || (read?.callee?.computed && read.callee.property?.type !== 'Literal'))
 		return null;
-	return hydrationImportedGetReceiver(ctx, read);
+	const receiver = hydrationImportedGetReceiver(ctx, read);
+	return receiver === null ? null : { receiver, guard };
 }
 
 function confinedHydrationDerivedRead(render, name, propsName = null) {
@@ -8046,6 +8054,18 @@ function hydrationPropsPlans(ctx) {
 			if (!safe) break;
 		}
 		if (!safe || (!exported && query === null) || (query !== null && derived !== null)) continue;
+		if (query?.guard) {
+			const initializer = setupLocals.get(query.guard.name);
+			const lexical = ctx.activityLexical;
+			const binding = lexical.resolveBinding(lexical.nodeScopes.get(query.guard), query.guard.name);
+			// A same-named declaration inside the primary arm is not the setup binding.
+			if (
+				initializer === undefined ||
+				binding === null ||
+				binding.scope !== lexical.nodeScopes.get(initializer)
+			)
+				continue;
+		}
 		const bodies = hydrationLayoutBodies(
 			ctx,
 			tryBodies(component.body.render, ctx),
@@ -36807,6 +36827,7 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 	const propsIndex = envNames.indexOf(propsName);
 	if (propsIndex < 0) return null;
 	const plan = hydrationPropsPlan(ctx, componentName);
+	if (plan?.query?.guard && !envNames.includes(plan.query.guard.name)) return null;
 	const derivedIndex = plan?.derived ? envNames.indexOf(plan.derived.name) : -1;
 	if (plan?.derived && derivedIndex < 0) return null;
 	let fields = plan?.fields;
@@ -37020,10 +37041,21 @@ function makeTryCall(
 		// waiter after this one returned through a different adoption frame.
 		const first = tryStmts[0];
 		const declaration = first.declarations[0];
-		const authoredRead = unwrapTsExpr(declaration.init);
+		const initializer = unwrapTsExpr(declaration.init);
+		const branch = hydrationInputsEqual.query.guard === null ? initializer : initializer.consequent;
+		const authoredRead = unwrapTsExpr(branch);
 		const read = allocCompilerName(ctx, '__queryRead');
 		ctx.hoistedHelpers.push(
 			inheritOriginLoc(b.const(read, b.arrow([], authoredRead)), authoredRead),
+		);
+		const observedRead = replaceTsInner(
+			branch,
+			authoredRead,
+			b.call(
+				requireRuntimeForContext(ctx, '__readHydrationQueryInput'),
+				b.id('__extra'),
+				b.id(read),
+			),
 		);
 		tryStmts = [
 			{
@@ -37033,12 +37065,8 @@ function makeTryCall(
 						...declaration,
 						init: replaceTsInner(
 							declaration.init,
-							authoredRead,
-							b.call(
-								requireRuntimeForContext(ctx, '__readHydrationQueryInput'),
-								b.id('__extra'),
-								b.id(read),
-							),
+							initializer,
+							branch === initializer ? observedRead : { ...initializer, consequent: observedRead },
 						),
 					},
 				],
@@ -37103,7 +37131,7 @@ function makeTryCall(
 						b.call(
 							requireRuntimeForContext(ctx, '__beginHydrationQueryRead'),
 							b.id(env),
-							b.arrow([], { ...hydrationInputsEqual.query }),
+							b.arrow([], { ...hydrationInputsEqual.query.receiver }),
 						),
 					),
 				),

@@ -669,6 +669,15 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 
 	it.each([
 		{ label: 'unchanged request', request: 'unchanged', streamed: false },
+		{ label: 'unchanged guarded request', request: 'unchanged', streamed: false, guarded: true },
+		{ label: 'changed guarded request', request: 'changed', streamed: false, guarded: true },
+		{ label: 'disabled guard', request: 'guard disabled', streamed: false, guarded: true },
+		{
+			label: 'query read in the alternate arm',
+			request: 'alternate query',
+			streamed: false,
+			guarded: true,
+		},
 		{ label: 'changed request', request: 'changed', streamed: false },
 		{ label: 'restarted request', request: 'restarted', streamed: false },
 		{
@@ -683,7 +692,12 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 		},
 	] as const)(
 		'preserves suspended hydration until the current query completes ($label)',
-		async ({ request, streamed }) => {
+		async (scenario) => {
+			const { request, streamed } = scenario;
+			const guardDisabled = request === 'guard disabled';
+			const alternateQuery = request === 'alternate query';
+			const replacementExpected =
+				request === 'changed' || request === 'restarted' || request === 'restarted after update';
 			const scopeKey = `pending-query-${dev}-${request}-${streamed}`;
 			const serverScope = Signals.createScope({ scopeKey });
 			const clientScope = Signals.createScope({ scopeKey });
@@ -711,12 +725,16 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 				request$: Signals.createResource(clientScope, 'request', () => query(requestKey$.get())),
 			};
 			await act(() => {});
+			const read =
+				'guarded' in scenario
+					? `active ? request$.get() : ${alternateQuery ? 'request$.get()' : '"inactive"'}`
+					: 'request$.get()';
 			const source = `import { selection$, request$ } from './model';
 function QueryInput(props) @{
   const selection = selection$.get();
   const active = selection?.id === props.domain;
   @try {
-    const value = request$.get();
+    const value = ${read};
     <label>{value as string}<input disabled={!active} defaultValue={value} ref={props.onRef} /></label>;
   } @pending { <span>Loading</span>; }
 }
@@ -734,7 +752,7 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 			const server = load('server');
 			const client = load('client');
 			const onRef = vi.fn();
-			const props = { sibling: 'waiting', domain: 'saved', onRef };
+			const props = { sibling: 'waiting', domain: alternateQuery ? 'other' : 'saved', onRef };
 			const container = document.createElement('div');
 			document.body.append(container);
 			cleanups.push(() => container.remove());
@@ -791,7 +809,11 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 			await act(() => {
 				if (request === 'changed') requestKey$.set('replacement');
 				if (request === 'restarted') clientModel.request$.retry({ pending: true });
-				root.render(client['App'], { ...props, sibling: 'ready' });
+				root.render(client['App'], {
+					...props,
+					domain: guardDisabled ? 'other' : props.domain,
+					sibling: 'ready',
+				});
 			});
 			expect(container.querySelector('output')?.textContent).toBe('ready');
 			if (request === 'unchanged' || request === 'restarted after update') {
@@ -801,17 +823,23 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 			if (request === 'restarted after update')
 				await act(() => clientModel.request$.retry({ pending: true }));
 			await act(() => first.resolve());
-			if (request !== 'unchanged') {
+			if (replacementExpected) {
 				expect(onRef).not.toHaveBeenCalled();
 				await act(() => replacement.resolve());
 			}
 			const accepted = container.querySelector('input')!;
-			expect(container.querySelector('label')?.textContent).toBe(
-				request === 'unchanged' ? 'original' : 'replacement',
-			);
+			const expected = guardDisabled
+				? 'inactive'
+				: replacementExpected
+					? 'replacement'
+					: 'original';
+			expect(container.querySelector('label')?.textContent).toBe(expected);
 			if (request === 'unchanged') {
 				expect(accepted).toBe(original);
 				expect(accepted.value).toBe('typed');
+			} else if ('guarded' in scenario) {
+				expect(accepted).not.toBe(original);
+				expect(accepted.value).toBe(expected);
 			}
 			expect(onRef).toHaveBeenCalledExactlyOnceWith(accepted);
 			expect(onRecoverableError).not.toHaveBeenCalled();
