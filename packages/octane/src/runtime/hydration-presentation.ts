@@ -1209,11 +1209,11 @@ export let SIGNAL_EVENT_OWNERS_RECORDED = false;
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
 export function setEventHandler(el: Element, key?: string, handler?: any, foreign?: boolean): void {
-	const staged =
-		key !== undefined &&
-		hydrating &&
-		PRESENTATION_HYDRATION === null &&
-		CURSOR?.stageEvent(el, key, handler) === true;
+	const staged = hydrating
+		? key !== undefined &&
+			PRESENTATION_HYDRATION === null &&
+			CURSOR?.stageEvent(el, key, handler) === true
+		: false;
 	if (key !== undefined && !staged) {
 		// A handler on a host of a Block the root attempt discards (ROOT_DISCARD_STAMP)
 		// needs no undo: compiled bindings write their own cloned hosts. `foreign`
