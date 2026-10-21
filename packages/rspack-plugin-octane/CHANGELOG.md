@@ -1,5 +1,11 @@
 # @octanejs/rspack-plugin
 
+## 0.2.6
+
+### Patch Changes
+
+- 78ee7f4: Preserve Rspack URL dependencies as emitted assets instead of compiling them as source modules.
+
 ## 0.2.5
 
 ### Patch Changes
