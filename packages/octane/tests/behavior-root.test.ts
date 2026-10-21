@@ -1366,19 +1366,52 @@ export function EventHost(props) @{ 'use dom bindings';
 			}
 		});
 
+		const fieldAttrsModules = {
+			'field-attrs': {
+				attrs: (tone: string) => ({ class: tone }),
+				styleAttrs: (color: string) => ({ style: { color } }),
+			},
+		};
+		const fieldAttrsOptions = {
+			knownAttributeSpreads: [
+				{ source: 'field-attrs', imported: 'attrs', fields: ['class'] },
+				{ source: 'field-attrs', imported: 'styleAttrs', fields: ['style'], style: 'object' },
+			],
+		};
 		it.each([
-			['root', '<textarea value={unbound(props.model)} placeholder={props.hint} />'],
-			['nested', '<div><textarea value={unbound(props.model)} placeholder={props.hint} /></div>'],
+			['root', '<textarea value={unbound(props.model)} placeholder={props.hint} />', ''],
+			[
+				'nested',
+				'<div><textarea value={unbound(props.model)} placeholder={props.hint} /></div>',
+				'',
+			],
+			[
+				'styled',
+				'<textarea {...unbound(attrs(props.tone))} value={unbound(props.model)} placeholder={props.hint} />',
+				'accent',
+			],
 		])(
 			`hands off a %s textarea control from a props-object binding view (${dev ? 'dev' : 'prod'})`,
-			async (_, view) => {
+			async (_, view, expectedClass) => {
 				const source = `import { unbound } from 'octane/behavior';
+import { attrs } from 'field-attrs';
 export function Field(props) @{ 'use dom bindings';
   ${view}
 }`;
 				const scope = createScope({ scopeKey: `props-object-textarea-${dev}` });
-				const props = { model: scope.signal$('model', 'initial'), hint: 'Type here' };
-				const fixture = authoredPresentation('Field', props, dev, source);
+				const props = {
+					model: scope.signal$('model', 'initial'),
+					hint: 'Type here',
+					tone: 'accent',
+				};
+				const fixture = authoredPresentation(
+					'Field',
+					props,
+					dev,
+					source,
+					fieldAttrsModules,
+					fieldAttrsOptions,
+				);
 				container.innerHTML = fixture.html;
 				const textarea = container.querySelector('textarea')!;
 				const control = runWithSignalOwner(scope, () =>
@@ -1389,7 +1422,8 @@ export function Field(props) @{ 'use dom bindings';
 					textarea.value = 'early edit';
 					textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
 					expect(props.model.get()).toBe('early edit');
-					hydratedRoot = hydrateRoot(container, fixture.loadClient()['Field'], props, {
+					const client = fixture.loadClient()['Field'];
+					hydratedRoot = hydrateRoot(container, client, props, {
 						signalOwner: scope,
 						bindingLeases: [binding],
 						controlLeases: [control],
@@ -1397,6 +1431,13 @@ export function Field(props) @{ 'use dom bindings';
 					await act(() => {});
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(textarea.value).toBe('early edit');
+					expect(textarea.className).toBe(expectedClass);
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					if (expectedClass) {
+						await act(() => hydratedRoot!.render(client, { ...props, tone: 'muted' }));
+						expect(container.querySelector('textarea')).toBe(textarea);
+						expect(textarea.className).toBe('muted');
+					}
 					control();
 					await act(() => props.model.set('model update'));
 					expect(textarea.value).toBe('model update');
@@ -1423,6 +1464,18 @@ export function Field(props) @{ 'use dom bindings';
 				'<textarea {...unbound(props.attrs)} value={unbound(props.model)} placeholder={props.hint} />',
 			],
 			[
+				'overlapping renderer-owned spreads',
+				'<textarea {...unbound(attrs(props.hint))} {...unbound(attrs(props.hint))} value={unbound(props.model)} placeholder={props.hint} />',
+			],
+			[
+				'object-style provider spread',
+				'<textarea {...unbound(styleAttrs("red"))} value={unbound(props.model)} placeholder={props.hint} />',
+			],
+			[
+				'ancestor spread',
+				'<div {...unbound(attrs(props.hint))}><textarea value={unbound(props.model)} placeholder={props.hint} /></div>',
+			],
+			[
 				'owned sibling control',
 				'<div><textarea value={unbound(props.model)} placeholder={props.hint} /><input value={props.bound} /></div>',
 			],
@@ -1430,6 +1483,7 @@ export function Field(props) @{ 'use dom bindings';
 			`keeps a textarea view with an %s on its scalar ownership path (${dev ? 'dev' : 'prod'})`,
 			(_, view) => {
 				const source = `import { unbound } from 'octane/behavior';
+import { attrs, styleAttrs } from 'field-attrs';
 export function Field(props) @{ 'use dom bindings'; ${view} }`;
 				const props = {
 					model: 'initial',
@@ -1438,7 +1492,14 @@ export function Field(props) @{ 'use dom bindings'; ${view} }`;
 					attrs: { title: 'external' },
 					bound: 'bound',
 				};
-				const fixture = authoredPresentation('Field', props, dev, source);
+				const fixture = authoredPresentation(
+					'Field',
+					props,
+					dev,
+					source,
+					fieldAttrsModules,
+					fieldAttrsOptions,
+				);
 				container.innerHTML = fixture.html;
 				const textarea = container.querySelector('textarea')!;
 				textarea.value = 'early edit';

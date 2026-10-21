@@ -120,6 +120,10 @@ function hasTextareaValueHandoff(node, namespace, hasChildren, isUnbound) {
 	);
 }
 
+function canConstructUnboundAttributeSpread(known) {
+	return known?.unbound === true && known.style !== 'object';
+}
+
 /** A scalar view can transfer its whole topology when only native textarea values are opaque. */
 export function canHandoffTextareaView(plan) {
 	if (
@@ -130,13 +134,18 @@ export function canHandoffTextareaView(plan) {
 		return false;
 	return plan.nodes.every(([, tag, namespace, children], index) => {
 		const element = plan.elements[index];
-		// A spread can override the control or introduce externally owned content.
-		if (
-			(element.openingElement?.attributes ?? element.attributes ?? []).some(
-				(attr) => attr.type === 'JSXSpreadAttribute' || attr.type === 'SpreadAttribute',
+		let hasSpread = false;
+		for (const attr of element.openingElement?.attributes ?? element.attributes ?? []) {
+			if (attr.type !== 'JSXSpreadAttribute' && attr.type !== 'SpreadAttribute') continue;
+			// A single verified renderer-owned spread cannot alter the control or its topology.
+			if (
+				tag !== 'textarea' ||
+				hasSpread ||
+				!canConstructUnboundAttributeSpread(attr._octaneKnownAttributeSpread)
 			)
-		)
-			return false;
+				return false;
+			hasSpread = true;
+		}
 		return (
 			children !== null ||
 			(tag === 'textarea' &&
@@ -942,7 +951,7 @@ export function planBindingProgram(fn, render, context) {
 					const known = attr._octaneKnownAttributeSpread;
 					// A verified provider names its exact fields, so a fresh node calls it
 					// once and applies each one. Adoption never evaluates these values.
-					if (known && known.style !== 'object') {
+					if (canConstructUnboundAttributeSpread(known)) {
 						const call = native.unbound.get(unwrap(attr.argument));
 						validate(call);
 						const provided = b.id(allocateProgramName('_bindingAttrs'));
