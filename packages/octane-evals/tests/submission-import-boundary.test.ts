@@ -82,12 +82,17 @@ export function SeatCount(props: { count: number }) @{
 	<output aria-label="Seat count">{props.count as number}</output>
 }
 
+export function Heading(props: { title: string }) @{
+	'use dom bindings';
+	<h1>{props.title as string}</h1>
+}
+
 export function App() @{
 	const [count, setCount] = useState(0);
 	const emphasis = count === 3 ? { fontWeight: 'bold' } : {};
 
 	<main>
-		<h1>{'Seat selector'}</h1>
+		<Heading title="Seat selector" />
 		<div role="group" aria-label="Seats" style={{ ...emphasis, opacity: count === 0 ? 0.5 : 1 }}>
 			<button
 				aria-label="Remove seat"

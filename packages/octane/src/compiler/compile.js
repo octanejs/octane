@@ -1756,6 +1756,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'beginPresentationHydration',
 	'endPresentationHydration',
 	'presentationWrite',
+	'presentationFixedWrite',
 	'renderWrite',
 	'presentationHostWrite',
 	'presentationStructure',
@@ -17948,6 +17949,14 @@ function compileComponent(node, ctx, options) {
 			component,
 			memoCaptures.length === 0 ? b.literal(null) : b.arrow([], b.array(memoCaptures)),
 		);
+	const presentationView =
+		node._octaneBindingView ??
+		(node._octanePresentationHydration?.fixed ? node._octanePresentationHydration : null);
+	// Fixed views need the identity stamp for composed handoff, but their SSR
+	// output has no authored range and may inherit the caller's boundary.
+	const presentationArgs = presentationView
+		? [b.literal(presentationView.id), ...(node._octaneBindingView ? [] : [b.literal(false)])]
+		: null;
 
 	// The compiled function stays a NODE (M2 AST emit): compileComponent returns
 	// `{ nodes }` — the declaration statement plus any capability-stamp/HMR/
@@ -18035,13 +18044,13 @@ function compileComponent(node, ctx, options) {
 			// back to a full reload — the capture predates the wrapper).
 			statements.push(guarded(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))));
 		}
-		if (node._octaneBindingView) {
+		if (presentationArgs) {
 			statements.push(
 				guarded(
 					b.call(
 						requireRuntimeForContext(ctx, 'bindPresentationView'),
 						b.id(name),
-						b.literal(node._octaneBindingView.id),
+						...presentationArgs,
 					),
 				),
 			);
@@ -18077,13 +18086,13 @@ function compileComponent(node, ctx, options) {
 	// its fresh body to the previous canonical wrapper and re-export that same
 	// identity. Production components retain their tree-shakeable const binding.
 	let valueExpr = hmrWrap && isExported ? inheritOriginLoc(b.call('_$hmr', abiFn), node) : abiFn;
-	if (node._octaneBindingView) {
+	if (presentationArgs) {
 		valueExpr = markPure(
 			inheritOriginLoc(
 				b.call(
 					requireRuntimeForContext(ctx, 'bindPresentationView'),
 					valueExpr,
-					b.literal(node._octaneBindingView.id),
+					...presentationArgs,
 				),
 				node,
 			),
@@ -18133,6 +18142,29 @@ function compileComponent(node, ctx, options) {
 }
 
 /** Gate explicitly eligible presentation views; ordinary codegen stays direct. */
+// These fixed-view operations share the ordinary presentation frame without
+// retaining host, controlled-input, style, or native-projection dispatch.
+const FIXED_PRESENTATION_WRITERS = new Set([
+	'htext',
+	'hydrateClaimedBindingCaches',
+	'bindSignalAttribute',
+	'bindSignalText',
+	'setText',
+	'setRenderText',
+	'updateFreshClassName',
+	'updateFreshClassAttr',
+	...[
+		'setAttribute',
+		'setPlainAttribute',
+		'setURLAttribute',
+		'setStringData',
+		'setBooleanAttribute',
+		'setAriaAttribute',
+		'setClassName',
+		'setClassAttr',
+	].flatMap((name) => [name, `${name}IfChanged`]),
+]);
+
 function preparePresentationHydration(body, node, ctx, hostEnd) {
 	const proof = node._octanePresentationHydration;
 	if (!proof || ctx.mode === 'server' || ctx._universalRuntimeUnit != null) return body;
@@ -18163,6 +18195,10 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 		writers.add('setRenderText');
 		writers.add('bindSignalText');
 		writers.add('markDangerouslySetInnerHTMLChildren');
+	}
+	if (proof.fixed) {
+		writers.add('htext');
+		writers.add('hydrateClaimedBindingCaches');
 	}
 	for (const name of [...writers]) {
 		if (name.startsWith('set')) writers.add(`${name}IfChanged`);
@@ -18269,7 +18305,12 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 		return rewrite && writers.has(helper)
 			? inheritOriginLoc(
 					b.call(
-						requireRuntimeForContext(ctx, 'presentationWrite'),
+						requireRuntimeForContext(
+							ctx,
+							proof.fixed && FIXED_PRESENTATION_WRITERS.has(helper)
+								? 'presentationFixedWrite'
+								: 'presentationWrite',
+						),
 						result.callee,
 						b.literal(helper),
 						...result.arguments,

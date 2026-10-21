@@ -129,12 +129,17 @@ export type BindingScalarChannels = readonly [
 
 /** @internal Whole styles carry canonical snapshots; scalar channels remain strings. */
 export type BindingValue = string | null | BindingStyleSnapshot;
+type BindingWriter<T extends string | null | void = string | null | void> = (
+	node: Element,
+	binding: BindingOperation,
+	value: string | null,
+) => T;
 
 /** @internal No application function is invoked to discover the DOM topology. */
 export interface CompiledBindings<Props> {
 	readonly id: string;
-	/** Compiler-proven single native host, with no descendant ownership. */
-	readonly handoff?: 'host';
+	/** Compiler-proven host channels or a complete fixed native view. */
+	readonly handoff?: 'host' | 'view';
 	/** Targets carry compiler-issued addresses when unbound siblings may change. */
 	readonly addressed?: true;
 	readonly nodes: readonly BindingNode[];
@@ -221,8 +226,8 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
-/** No child, or exactly one Text node. */
-function isTextLeaf(node: Element): boolean {
+/** @internal No child, or exactly one Text node. */
+export function __isBindingTextLeaf(node: Node): boolean {
 	const first = node.firstChild;
 	return first === null || (!first.nextSibling && first.nodeType === 3);
 }
@@ -244,7 +249,7 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 			openChildren === true ||
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
-			(text && !isTextLeaf(node))
+			(text && !__isBindingTextLeaf(node))
 		) {
 			throw new Error(formatClientError(318));
 		}
@@ -264,6 +269,23 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 		if (cursors[i] !== null) throw new Error(formatClientError(318));
 	}
 	return nodes;
+}
+
+function matchesFixedNodes(
+	root: Element,
+	descriptor: CompiledBindings<unknown>,
+	nodes: readonly Element[],
+	text: ReadonlyMap<Element, ChildNode | null> | undefined,
+): boolean {
+	try {
+		if (!resolveFixedNodes(root, descriptor).every((node, index) => node === nodes[index]))
+			return false;
+		if (text !== undefined)
+			for (const [node, original] of text) if (node.firstChild !== original) return false;
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
@@ -319,7 +341,7 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 					// A parent without a cursor claims no children.
 					(descriptor.nodes[parent]![4] !== true && cursors[parent] !== node)) ||
 			(openChildren && children === null) ||
-			(text && !isTextLeaf(node))
+			(text && !__isBindingTextLeaf(node))
 		) {
 			throw new Error(formatClientError(321));
 		}
@@ -462,6 +484,35 @@ function write(
 
 export { normalize as __normalizeBinding, write as __writeBinding };
 
+/** @internal Establishes a missing text witness at the writer's creation seam. */
+function writeBindingWithTextWitness<T extends string | null | void>(
+	node: Element,
+	binding: BindingOperation,
+	value: string | null,
+	fixedText: Map<Element, ChildNode | null>,
+	writer: BindingWriter<T>,
+): T | string | null {
+	if (binding[1] === 'text' && fixedText.get(node) === null) {
+		// Source callbacks may have populated a leaf resolved as empty. Only the
+		// writer-created node belongs to this binding lifetime.
+		if (node.firstChild !== null) throw new Error(formatClientError(318));
+		const text = node.ownerDocument.createTextNode(value!);
+		node.appendChild(text);
+		fixedText.set(node, text);
+		return value;
+	}
+	return writer(node, binding, value);
+}
+
+export function __writeBindingWithTextWitness(
+	node: Element,
+	binding: BindingOperation,
+	value: string | null,
+	fixedText: Map<Element, ChildNode | null>,
+): string | null | void {
+	return writeBindingWithTextWitness(node, binding, value, fixedText, write);
+}
+
 /**
  * @internal Widens the scalar adopter's channels to sanitized URLs through the
  * general channel rules. The compiler attaches it only to artifacts that bind
@@ -540,12 +591,158 @@ export function __createBindingStyleRestoration(
 	};
 }
 
+function skipBindingSidecars(next: Node | null, previous: boolean): Node | null {
+	while (
+		next?.nodeType === 1 &&
+		(next as Element).localName === 'script' &&
+		((next as Element).hasAttribute(NATIVE_SIGNAL_SEED_ATTR) ||
+			(next as Element).hasAttribute(SUSPENSE_SCRIPT_ATTR) ||
+			(next as Element).hasAttribute(STREAM_SCRIPT_ATTR))
+	)
+		next = previous ? next.previousSibling : next.nextSibling;
+	return next;
+}
+
+function bindingSibling(node: Node, previous: boolean): Node | null {
+	return skipBindingSidecars(previous ? node.previousSibling : node.nextSibling, previous);
+}
+
+function captureBindingSite(root: Element) {
+	const ancestry: Array<readonly [Node, ParentNode | null]> = [];
+	for (let node: Node | null = root; node !== null; node = node.parentNode)
+		ancestry.push([node, node.parentNode]);
+	return {
+		document: root.ownerDocument,
+		ancestry,
+		parent: root.parentNode,
+		previous: bindingSibling(root, true),
+		next: bindingSibling(root, false),
+	};
+}
+
+function validBindingSite(root: Element, id: string, site: ReturnType<typeof captureBindingSite>) {
+	return (
+		root.parentNode !== null &&
+		root.ownerDocument === site.document &&
+		site.ancestry.every(([node, parent]) => node.parentNode === parent) &&
+		bindingSibling(root, true) === site.previous &&
+		bindingSibling(root, false) === site.next &&
+		root.getAttribute('data-octane-bindings') === id
+	);
+}
+
+function displacedBindingSite(
+	root: Element,
+	site: ReturnType<typeof captureBindingSite>,
+	parent: Node,
+	node: Node | null,
+): boolean {
+	return (
+		parent === site.parent &&
+		node !== root &&
+		(node === null || node.parentNode === parent) &&
+		(node === null ? skipBindingSidecars(parent.lastChild, true) : bindingSibling(node, true)) ===
+			site.previous
+	);
+}
+
+function flushBindingPublication(retries: Set<() => void> | undefined, active: () => boolean) {
+	if (!retries?.size) return;
+	const pending = [...retries];
+	retries.clear();
+	for (const retry of pending)
+		queueMicrotask(() => {
+			if (active()) retry();
+		});
+}
+
+function prepareFixedBindingView<T extends string | null | void>(
+	root: Element,
+	descriptor: CompiledBindings<unknown>,
+	nodes: Element[],
+	writer: BindingWriter<T>,
+): { valid(): boolean; write: BindingWriter<T | string | null> } {
+	let fixedText: Map<Element, ChildNode | null> | undefined;
+	for (let index = 0; index < nodes.length; index++)
+		if (descriptor.nodes[index]![5])
+			(fixedText ??= new Map()).set(nodes[index]!, nodes[index]!.firstChild);
+	return {
+		valid: () => matchesFixedNodes(root, descriptor, nodes, fixedText),
+		write:
+			fixedText === undefined
+				? writer
+				: (node, binding, value) =>
+						writeBindingWithTextWitness(node, binding, value, fixedText, writer),
+	};
+}
+
+function prepareFixedScalarBindingView(
+	root: Element,
+	descriptor: CompiledBindings<unknown>,
+	nodes: Element[],
+	writer: BindingScalarChannels[2],
+	lifetime: {
+		handle: BindingHandle;
+		active(): boolean;
+		busy(): boolean;
+		retire(publish?: () => void): void;
+	},
+) {
+	const fixed = prepareFixedBindingView(root, descriptor, nodes, writer);
+	const site = captureBindingSite(root);
+	let retries: Set<() => void> | undefined;
+	let handoff: BindingHandoff | undefined;
+	const view = {
+		revision: 0,
+		write: fixed.write,
+		published: () => flushBindingPublication(retries, lifetime.active),
+		dispose: () => retries?.clear(),
+	};
+	(lifetime.handle as BindingHandle & Partial<BindingHandoffCapability>)[BINDING_HANDOFF] = () =>
+		(handoff ??= {
+			id: descriptor.id,
+			root,
+			anchor: root,
+			end: root,
+			revision: () => (lifetime.busy() ? -1 : view.revision),
+			afterPublication: (callback) => {
+				(retries ??= new Set()).add(callback);
+				return () => retries!.delete(callback);
+			},
+			valid: () => validBindingSite(root, descriptor.id, site) && fixed.valid(),
+			active: lifetime.active,
+			retire: lifetime.retire,
+		});
+	return view;
+}
+
+/** @internal Whole-view handoff adds topology proof to the existing fixed-layout lifetime. */
+export function __adoptFixedViewBindings<Props>(
+	root: Element,
+	descriptor: CompiledBindings<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	return __adoptBindings(root, descriptor, source, options, prepareFixedBindingView);
+}
+
+/** @internal Closed scalar views share the scalar adopter's ownership lifetime. */
+export function __adoptFixedScalarViewBindings<Props>(
+	root: Element,
+	descriptor: CompiledBindings<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	return __adoptScalarBindings(root, descriptor, source, options, prepareFixedScalarBindingView);
+}
+
 /** @internal Fixed-layout adopter and compatibility dispatch for earlier compiler output. */
 export function __adoptBindings<Props>(
 	root: Element | BindingRange,
 	descriptor: CompiledBindings<Props> | CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
 	options?: BindingOptions,
+	prepareView?: typeof prepareFixedBindingView,
 ): BindingHandle {
 	// Only structural programs carry a root. Scalar artifacts also expose their
 	// selected adopter, so dispatching by that method would recurse into itself.
@@ -555,6 +752,8 @@ export function __adoptBindings<Props>(
 	const nodes = descriptor.addressed
 		? resolveAddressedNodes(assertBindingRoot(root as Element, descriptor), descriptor)
 		: resolveFixedNodes(root as Element, descriptor);
+	const view = prepareView?.(root as Element, descriptor, nodes, write);
+	const writeChannel = view?.write ?? write;
 	const bindings = descriptor.bindings;
 	const owned: Array<readonly [Element, string]> = [];
 	const previous: Array<BindingValue | undefined> = [];
@@ -722,7 +921,7 @@ export function __adoptBindings<Props>(
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
 				style.write(prepared as string | null);
-			} else written = write(nodes[binding[0]]!, binding, prepared as string | null);
+			} else written = writeChannel(nodes[binding[0]]!, binding, prepared as string | null);
 			if (!disposed) {
 				previous[i] = prepared;
 				// Only fixed scalar, URL and style channels participate in this legacy
@@ -966,78 +1165,44 @@ export function __adoptBindings<Props>(
 		drain();
 	};
 	const handle: BindingHandle & Partial<BindingHandoffCapability> = { refresh, dispose };
-	if (descriptor.handoff === 'host') {
-		published = () => {
-			if (!publicationRetries?.size) return;
-			const pending = [...publicationRetries];
-			publicationRetries.clear();
-			for (const retry of pending)
-				queueMicrotask(() => {
-					if (!disposed) retry();
-				});
-		};
+	if (descriptor.handoff) {
+		const active = () => !disposed;
+		published = () => flushBindingPublication(publicationRetries, active);
 		const host = root as Element;
-		const document = host.ownerDocument;
-		const ancestry: Array<readonly [Node, ParentNode | null]> = [];
-		for (let node: Node | null = host; node !== null; node = node.parentNode)
-			ancestry.push([node, node.parentNode]);
 		// Renderer seed/reveal sidecars are consumed before native hydration.
 		// Authored siblings still identify the exact host site across that cleanup.
-		const skip = (next: Node | null, previous: boolean): Node | null => {
-			while (
-				next?.nodeType === 1 &&
-				(next as Element).localName === 'script' &&
-				((next as Element).hasAttribute(NATIVE_SIGNAL_SEED_ATTR) ||
-					(next as Element).hasAttribute(SUSPENSE_SCRIPT_ATTR) ||
-					(next as Element).hasAttribute(STREAM_SCRIPT_ATTR))
-			)
-				next = previous ? next.previousSibling : next.nextSibling;
-			return next;
-		};
-		const sibling = (node: Node, previous: boolean): Node | null =>
-			skip(previous ? node.previousSibling : node.nextSibling, previous);
-		const site = host.parentNode;
-		const previousSibling = sibling(host, true);
-		const nextSibling = sibling(host, false);
+		const site = captureBindingSite(host);
 		let handoff: BindingHandoff | undefined;
 		handle[BINDING_HANDOFF] = () => {
 			if (handoff !== undefined) return handoff;
-			// Any change of neighbor is a different site.
-			const adjacent = (recorded: Node | null, previous: boolean): boolean =>
-				sibling(host, previous) === recorded;
 			return (handoff = {
 				id: descriptor.id,
 				root: host,
 				anchor: host,
-				host: new Set(
-					bindings.map((binding) =>
-						binding[1] === 'styleProperty'
-							? 'style:' + binding[2]
-							: binding[1].startsWith('style')
-								? 'style'
-								: binding[2],
-					),
-				),
+				...(view
+					? { end: host }
+					: {
+							host: new Set(
+								bindings.map((binding) =>
+									binding[1] === 'styleProperty'
+										? 'style:' + binding[2]
+										: binding[1].startsWith('style')
+											? 'style'
+											: binding[2],
+								),
+							),
+							// The authored node before the host still marks its site after the
+							// host leaves, including when an external clone now stands there.
+							displaced: (parent: Node, node: Node | null) =>
+								displacedBindingSite(host, site, parent, node),
+						}),
 				revision: () => (busy ? -1 : revision),
 				afterPublication: (callback) => {
 					(publicationRetries ??= new Set()).add(callback);
 					return () => publicationRetries!.delete(callback);
 				},
-				valid: () =>
-					host.parentNode !== null &&
-					host.ownerDocument === document &&
-					ancestry.every(([node, parent]) => node.parentNode === parent) &&
-					adjacent(previousSibling, true) &&
-					adjacent(nextSibling, false) &&
-					host.getAttribute('data-octane-bindings') === descriptor.id,
-				// The authored node before the host still marks its site after the
-				// host leaves, including when an external clone now stands there.
-				displaced: (parent, node) =>
-					parent === site &&
-					node !== host &&
-					(node === null || node.parentNode === parent) &&
-					(node === null ? skip(parent.lastChild, true) : sibling(node, true)) === previousSibling,
-				active: () => !disposed,
+				valid: () => validBindingSite(host, descriptor.id, site) && (view?.valid() ?? true),
+				active,
 				retire: (publish) => dispose(undefined, publish, true),
 			});
 		};
@@ -1102,18 +1267,19 @@ export function __adoptScalarBindings<Props>(
 	descriptor: CompiledBindings<Props>,
 	source: BindingSource<Props>,
 	options?: BindingOptions,
+	prepareView?: typeof prepareFixedScalarBindingView,
 ): BindingHandle {
 	// A URL artifact carries the sanitizing channel; every other one is fixed.
 	const [
 		accepts = isFixedScalarChannel,
 		normalizeChannel = normalizeFixedScalar,
-		writeChannel = writeFixedScalar,
+		selectedWriter = writeFixedScalar,
 	] = descriptor.url ?? [];
 	// The compiler selects this entry only with proof. Refuse a richer artifact
 	// rather than silently dropping its sanitization or ownership behavior.
 	if (
 		descriptor.addressed ||
-		descriptor.handoff ||
+		descriptor.handoff !== (prepareView ? 'view' : undefined) ||
 		descriptor.connectProjection ||
 		!descriptor.bindings.every(accepts)
 	)
@@ -1131,16 +1297,29 @@ export function __adoptScalarBindings<Props>(
 	let busy = true;
 	let dirty = false;
 	let unsubscribe: (() => void) | undefined;
-	const signal = options?.signal;
-	const dispose = (): void => {
-		if (disposed) return;
+	const dispose = (
+		_disposal?: { preserveDOM?: boolean } | Event,
+		publish?: () => void,
+		preservePresentation = false,
+	): void => {
+		if (disposed) {
+			publish?.();
+			return;
+		}
 		disposed = true;
+		view?.dispose();
 		signal?.removeEventListener('abort', dispose);
 		let failed = false;
 		let failure: unknown;
+		try {
+			publish?.();
+		} catch (error) {
+			failed = true;
+			failure = error;
+		}
 		for (const connection of signalConnections?.values() ?? []) {
 			try {
-				connection.dispose();
+				connection.dispose(preservePresentation);
 			} catch (error) {
 				if (!failed) {
 					failed = true;
@@ -1221,6 +1400,7 @@ export function __adoptScalarBindings<Props>(
 							if (!connection && signalFactory.isSignal(values[index])) {
 								connection = signalFactory.connect(() => {
 									if (!disposed) {
+										if (view) view.revision++;
 										signalUpdates!.add(index);
 										drain();
 									}
@@ -1265,6 +1445,7 @@ export function __adoptScalarBindings<Props>(
 			throw error;
 		} finally {
 			busy = false;
+			view?.published();
 		}
 	};
 	const resume = (): void => {
@@ -1273,10 +1454,19 @@ export function __adoptScalarBindings<Props>(
 	};
 	const refresh = (): void => {
 		if (disposed) return;
+		if (view) view.revision++;
 		dirty = true;
 		drain();
 	};
 	const handle: BindingHandle = { refresh, dispose };
+	const view = prepareView?.(root, descriptor, nodes, selectedWriter, {
+		handle,
+		active: () => !disposed,
+		busy: () => busy,
+		retire: (publish) => dispose(undefined, publish, true),
+	});
+	const writeChannel = view?.write ?? selectedWriter;
+	const signal = options?.signal;
 	if (signal?.aborted) {
 		dispose();
 		return handle;

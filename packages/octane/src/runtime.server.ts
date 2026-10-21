@@ -2314,8 +2314,12 @@ export function ssrBindingHtml(html: string, id: string): string {
 }
 
 /** @internal Match the client definition-site boundary capability. */
-export function bindPresentationView<T extends Function>(view: T, _id: string): T {
-	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
+export function bindPresentationView<T extends Function>(
+	view: T,
+	_id: string,
+	ownsRange = true,
+): T {
+	return ownsRange ? markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name) : view;
 }
 
 function serverComponentOutput(

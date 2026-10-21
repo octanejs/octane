@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
 import { act, flushSync, hydrateRoot } from '../../src/index.js';
+import { bindPresentationView, type SSRScope } from '../../src/runtime.server.js';
 import * as ServerRuntime from 'octane/server';
 import * as BehaviorRuntime from 'octane/behavior';
 import { getLeadingHydrationListRange } from 'octane/hydration';
@@ -64,6 +65,21 @@ afterEach(() => {
 });
 
 describe('hydration range boundary', () => {
+	it('lets a fixed presentation view inherit its caller range during server rendering', () => {
+		const child = () => ServerRuntime.ssrHtml('<p>child</p>');
+		const renderNested = (view: () => string) =>
+			ServerRuntime.renderToString(
+				(_props: object, scope: SSRScope) =>
+					ServerRuntime.ssrHtml(ServerRuntime.ssrComponent(scope, view, {}, true)),
+				{},
+			).html;
+		const inherited = renderNested(child);
+		expect(renderNested(bindPresentationView(() => child(), 'fixed', false))).toBe(inherited);
+		expect(renderNested(bindPresentationView(() => child(), 'owned'))).toBe(
+			inherited.replace('<p>child</p>', '<!--[--><p>child</p><!--]-->'),
+		);
+	});
+
 	it('hydrates the owned body between siblings rendered into portals', () => {
 		container.innerHTML = ServerRuntime.renderToString(server.ServerListSelection).html;
 		const style = document.createElement('style');

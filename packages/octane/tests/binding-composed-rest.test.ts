@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, hydrateRoot } from 'octane';
+import { createScope } from 'octane/signals';
 import { renderToString } from 'octane/server';
 import { compile } from '../src/compiler/index.js';
 import { evaluateCompiledFixtureCode, type CompiledFixtureModule } from './_server-fixture.js';
@@ -59,6 +60,30 @@ function moduleGraph(sources: Record<string, string>, compileOptions: Record<str
 	return load;
 }
 
+function fixedTextGraph(options: Record<string, unknown>, composed: boolean) {
+	const name = composed ? 'Outer' : 'Inner';
+	const file = composed ? './outer.tsrx' : './inner.tsrx';
+	const load = moduleGraph(
+		{
+			'/src/inner.tsrx': `export function Inner(props) @{ 'use dom bindings';
+const label = props.label;
+<button>{label as string}</button>;
+}`,
+			'/src/outer.tsrx': `import { Inner } from './inner.tsrx';
+function Local(props) @{ <em>{props.label as string}</em>; }
+export function Outer(props) @{ 'use dom bindings'; <div><Inner label={props.label} /><Local label={props.label} /></div>; }`,
+			'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { ${name} } from '${file}';
+export function adopt(root, state, options) { return adoptBindings(root, ${name}, state, options); }`,
+			'/src/mount.tsrx': `import { mountBindings } from 'octane/behavior';
+import { ${name} } from '${file}';
+export function mount(target, state) { return mountBindings(target, ${name}, state); }`,
+		},
+		options,
+	);
+	return { load, name, file };
+}
+
 function source<Props>(initial: Props) {
 	let snapshot = initial;
 	const subscriptions = new Set<() => void>();
@@ -76,7 +101,11 @@ function source<Props>(initial: Props) {
 	};
 }
 
-type Adopt = (root: Element, state: ReturnType<typeof source>) => DomBindings.BindingHandle;
+type Adopt = (
+	root: Element,
+	state: ReturnType<typeof source>,
+	options?: DomBindings.BindingOptions,
+) => DomBindings.BindingHandle;
 type Mount = (
 	target: DomBindingPrograms.BindingMountTarget,
 	state: ReturnType<typeof source>,
@@ -124,64 +153,327 @@ export function adopt(root, state) { return adoptBindings(root, Field, state); }
 			}
 		});
 
-		it.each([
-			{
-				channel: 'attribute',
-				setup: 'const disabled = props.disabled === true;',
-				view: '<button disabled={disabled}>Act</button>',
-				read: (button: HTMLButtonElement) => button.disabled,
-				early: true,
-				updated: false,
-			},
-			{
-				channel: 'text',
-				setup: 'const label = props.label;',
-				view: '<button>{label as string}</button>',
-				read: (button: HTMLButtonElement) => button.textContent,
-				early: 'Early',
-				updated: 'Updated',
-			},
-		])(
-			'hands a complete fixed $channel view with a pure setup local to hydration',
-			async (test) => {
-				const load = moduleGraph(
-					{
-						'/src/action.tsrx': `export function Action(props) @{ 'use dom bindings';
- ${test.setup}
- ${test.view};
+		it.each(
+			[
+				{
+					channel: 'attribute',
+					expression: 'props.disabled === true',
+					view: (value: string) => `<button disabled={${value}}>Act</button>`,
+					read: (button: HTMLButtonElement) => button.disabled,
+					early: true,
+					updated: false,
+				},
+				{
+					channel: 'text',
+					expression: 'props.label',
+					view: (value: string) => `<button>{${value} as string}</button>`,
+					read: (button: HTMLButtonElement) => button.textContent,
+					early: 'Early',
+					updated: 'Updated',
+				},
+			].flatMap((test) => [
+				{ ...test, form: 'inline', body: test.view(test.expression) },
+				{
+					...test,
+					form: 'setup local',
+					body: `const value = ${test.expression}; ${test.view('value')}`,
+				},
+			]),
+		)('hands a complete fixed $channel view to hydration ($form)', async (test) => {
+			const load = moduleGraph(
+				{
+					'/src/action.tsrx': `export function Action(props) @{ 'use dom bindings';
+	${test.body};
 }`,
-						'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
 import { Action } from './action.tsrx';
 export function adopt(root, state) { return adoptBindings(root, Action, state); }`,
-					},
-					options,
+				},
+				options,
+			);
+			const state = source({ disabled: false, label: 'Server' });
+			document.body.innerHTML = renderToString(
+				load('./action.tsrx', 'server')['Action'] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				state.publish({ disabled: true, label: 'Early' });
+				expect(test.read(button)).toBe(test.early);
+				const Action = load('./action.tsrx', 'client')['Action'] as never;
+				root = hydrateRoot(document.body, Action, state.getSnapshot(), {
+					bindingLeases: [binding],
+				});
+				await act(() => {});
+				expect(document.querySelector('button')).toBe(button);
+				expect(state.subscriptions.size).toBe(0);
+				await act(() => root!.render(Action, { disabled: false, label: 'Updated' }));
+				expect(test.read(button)).toBe(test.updated);
+			} finally {
+				root?.unmount();
+				binding.dispose();
+			}
+		});
+
+		it('hands a composed fixed text child to hydration', async () => {
+			const { load, file, name } = fixedTextGraph(options, true);
+			const state = source({ label: '' });
+			document.body.innerHTML = renderToString(
+				load(file, 'server')[name] as never,
+				state.getSnapshot(),
+			).html;
+			const outer = document.querySelector('div')!;
+			const button = outer.querySelector('button')!;
+			let retirementText: string | null = null;
+			const subscribe = state.subscribe;
+			state.subscribe = (notify) => {
+				const stop = subscribe(notify);
+				return () => {
+					retirementText = button.textContent;
+					state.publish({ label: 'Retired' });
+					return stop();
+				};
+			};
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(outer, state);
+			const text = button.firstChild;
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				state.publish({ label: 'Early' });
+				expect(button.textContent).toBe('Early');
+				expect(outer.querySelector('em')!.textContent).toBe('Early');
+				const Outer = load(file, 'client')[name] as never;
+				root = hydrateRoot(
+					document.body,
+					Outer,
+					{ label: 'Renderer' },
+					{ bindingLeases: [binding] },
 				);
-				const state = source({ disabled: false, label: 'Server' });
+				await act(() => {});
+				expect(outer.querySelector('button')).toBe(button);
+				expect(button.firstChild).toBe(text);
+				expect(button.textContent).toBe('Renderer');
+				expect(outer.querySelector('em')!.textContent).toBe('Renderer');
+				expect(retirementText).toBe('Renderer');
+				expect(state.subscriptions.size).toBe(0);
+			} finally {
+				root?.unmount();
+				binding.dispose();
+			}
+		});
+
+		it('refuses a nested component whose structural range was replaced', () => {
+			const { load, file, name } = fixedTextGraph(options, true);
+			const state = source({ label: 'Server' });
+			document.body.innerHTML = renderToString(
+				load(file, 'server')[name] as never,
+				state.getSnapshot(),
+			).html;
+			const outer = document.querySelector('div')!;
+			const button = outer.querySelector('button')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(outer, state);
+			const original = button.previousSibling!;
+			expect(original.nodeType).toBe(Node.COMMENT_NODE);
+			const foreign = document.createComment('external');
+			original.replaceWith(foreign);
+			try {
+				expect(() =>
+					hydrateRoot(document.body, load(file, 'client')[name] as never, state.getSnapshot(), {
+						bindingLeases: [binding],
+					}),
+				).toThrow(/binding leases/);
+				expect(button.previousSibling).toBe(foreign);
+				expect(state.subscriptions.size).toBe(1);
+				state.publish({ label: 'Still active' });
+				expect(button.textContent).toBe('Still active');
+			} finally {
+				binding.dispose();
+			}
+		});
+
+		it('keeps a fixed text signal active after hydration takes ownership', async () => {
+			const { load, file, name } = fixedTextGraph(options, false);
+			const scope = createScope({ scopeKey: `fixed-text-handoff-${dev}` });
+			const label$ = scope.signal$('label', 'Server');
+			const state = source({ label: label$ });
+			document.body.innerHTML = renderToString(
+				load(file, 'server')[name] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const text = button.firstChild;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				await act(() => label$.set('Early'));
+				expect(button.textContent).toBe('Early');
+				root = hydrateRoot(
+					document.body,
+					load(file, 'client')[name] as never,
+					state.getSnapshot(),
+					{ bindingLeases: [binding] },
+				);
+				await act(() => label$.set('Renderer'));
+				expect(button.firstChild).toBe(text);
+				expect(button.textContent).toBe('Renderer');
+				expect(state.subscriptions.size).toBe(0);
+			} finally {
+				root?.unmount();
+				binding.dispose();
+				scope.dispose();
+			}
+		});
+
+		it('mounts a fixed text view through its program artifact', () => {
+			const { load } = fixedTextGraph(options, false);
+			const state = source({ label: '' });
+			const binding = (load('./mount.tsrx', 'client')['mount'] as Mount)(
+				{ parent: document.body },
+				state,
+			);
+			try {
+				const button = document.querySelector('button')!;
+				const text = button.firstChild;
+				state.publish({ label: 'First' });
+				expect(button.firstChild).toBe(text);
+				expect(button.textContent).toBe('First');
+				state.publish({ label: '' });
+				expect(button.firstChild).toBe(text);
+				expect(button.textContent).toBe('');
+			} finally {
+				binding.dispose();
+			}
+		});
+
+		it.each([false, true])(
+			'refuses a replaced text leaf after early publication (composed=%s)',
+			(composed) => {
+				const { load, file, name } = fixedTextGraph(options, composed);
+				const state = source({ label: 'Original' });
 				document.body.innerHTML = renderToString(
-					load('./action.tsrx', 'server')['Action'] as never,
+					load(file, 'server')[name] as never,
 					state.getSnapshot(),
 				).html;
+				const host = document.body.firstElementChild!;
 				const button = document.querySelector('button')!;
-				const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
-				let root: ReturnType<typeof hydrateRoot> | undefined;
+				const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(host, state);
+				const replacement = document.createTextNode('External');
+				button.firstChild!.replaceWith(replacement);
+				state.publish({ label: 'Published' });
 				try {
-					state.publish({ disabled: true, label: 'Early' });
-					expect(test.read(button)).toBe(test.early);
-					const Action = load('./action.tsrx', 'client')['Action'] as never;
-					root = hydrateRoot(document.body, Action, state.getSnapshot(), {
-						bindingLeases: [binding],
-					});
-					await act(() => {});
-					expect(document.querySelector('button')).toBe(button);
-					expect(state.subscriptions.size).toBe(0);
-					await act(() => root!.render(Action, { disabled: false, label: 'Updated' }));
-					expect(test.read(button)).toBe(test.updated);
+					expect(() =>
+						hydrateRoot(
+							document.body,
+							load(file, 'client')[name] as never,
+							{ label: 'Renderer' },
+							{ bindingLeases: [binding] },
+						),
+					).toThrow(/binding leases/);
+					expect(button.firstChild).toBe(replacement);
+					expect(button.textContent).toBe('Published');
+					expect(state.subscriptions.size).toBe(1);
+					state.publish({ label: 'Still active' });
+					expect(button.textContent).toBe('Still active');
 				} finally {
-					root?.unmount();
 					binding.dispose();
 				}
 			},
 		);
+
+		it.each([false, true])(
+			'refuses text inserted during source subscription (composed=%s)',
+			(composed) => {
+				const { load, file, name } = fixedTextGraph(options, composed);
+				const state = source({ label: '' });
+				document.body.innerHTML = renderToString(
+					load(file, 'server')[name] as never,
+					state.getSnapshot(),
+				).html;
+				const button = document.querySelector('button')!;
+				const foreign = document.createTextNode('External');
+				const subscribe = state.subscribe;
+				state.subscribe = (notify) => {
+					button.appendChild(foreign);
+					return subscribe(notify);
+				};
+				expect(() =>
+					(load('./activate.tsrx', 'client')['adopt'] as Adopt)(
+						document.body.firstElementChild!,
+						state,
+					),
+				).toThrow(/mismatched static element topology/);
+				expect(button.firstChild).toBe(foreign);
+				expect(foreign.data).toBe('External');
+				expect(state.subscriptions.size).toBe(0);
+			},
+		);
+
+		it('captures a fixed text leaf before reading adoption options', () => {
+			const { load, file, name } = fixedTextGraph(options, false);
+			const state = source({ label: 'Server' });
+			document.body.innerHTML = renderToString(
+				load(file, 'server')[name] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const foreign = document.createTextNode('External');
+			const controller = new AbortController();
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state, {
+				get signal() {
+					button.firstChild!.replaceWith(foreign);
+					return controller.signal;
+				},
+			});
+			try {
+				expect(() =>
+					hydrateRoot(document.body, load(file, 'client')[name] as never, state.getSnapshot(), {
+						bindingLeases: [binding],
+					}),
+				).toThrow(/binding leases/);
+				expect(button.firstChild).toBe(foreign);
+				expect(state.subscriptions.size).toBe(1);
+			} finally {
+				binding.dispose();
+			}
+		});
+
+		it('keeps a partially owned native view active after rejecting a whole-view lease', () => {
+			const load = moduleGraph(
+				{
+					'/src/action.tsrx': `import { unbound } from 'octane/behavior';
+export function Action(props) @{ 'use dom bindings'; <button data-state={props.label} title={unbound(props.title)}>Act</button>; }`,
+					'/src/activate.tsrx': `import { adoptBindings } from 'octane/behavior';
+import { Action } from './action.tsrx';
+export function adopt(root, state) { return adoptBindings(root, Action, state); }`,
+				},
+				options,
+			);
+			const state = source({ label: 'Server', title: 'External' });
+			document.body.innerHTML = renderToString(
+				load('./action.tsrx', 'server')['Action'] as never,
+				state.getSnapshot(),
+			).html;
+			const button = document.querySelector('button')!;
+			const binding = (load('./activate.tsrx', 'client')['adopt'] as Adopt)(button, state);
+			try {
+				expect(() =>
+					hydrateRoot(
+						document.body,
+						load('./action.tsrx', 'client')['Action'] as never,
+						state.getSnapshot(),
+						{ bindingLeases: [binding] },
+					),
+				).toThrow(/binding leases/);
+				expect(document.querySelector('button')).toBe(button);
+				expect(state.subscriptions.size).toBe(1);
+				state.publish({ label: 'Still active', title: 'Ignored' });
+				expect(button.getAttribute('data-state')).toBe('Still active');
+				expect(button.title).toBe('External');
+			} finally {
+				binding.dispose();
+			}
+		});
 
 		it('keeps a controlled binding active when hydration cannot take it over', () => {
 			const load = moduleGraph(

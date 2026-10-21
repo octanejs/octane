@@ -99,6 +99,7 @@ import {
 	coerceAttrValue,
 	setClassAttr,
 	setStyle,
+	setText,
 } from './host-props.js';
 import { JOURNAL_PROP, JOURNAL_EVENT_OWNER, journalBag } from './commit.js';
 import { getFirstChild, getNextSibling, coerceText, bindingText } from './templates.js';
@@ -438,6 +439,8 @@ export function beginPresentationHydration(
 				? new Map([...pending.writes].map(([node, writes]) => [node, new Map(writes)]))
 				: new Map(),
 		native: setNativeAdoptionResolver(null),
+		// An ordinary prop getter can perform the first native read during takeover.
+		// Install its owner and witness before evaluating the view.
 		readToken: beginNativeReadScope(scope),
 		witnessToken: beginNativeReadWitness(),
 		witnesses: pending?.scope === scope ? new Map(pending.witnesses) : new Map(),
@@ -604,10 +607,39 @@ export function preparedPresentationAttribute(
 	return result === '' && BOOLEAN_ATTR_PROPS.has(name.toLowerCase()) ? true : result;
 }
 
+/** A fixed scalar view owns a markerless single-text-child leaf. */
+function prepareFixedPresentationText(
+	frame: PresentationHydrationFrame,
+	element: Element,
+	value: unknown,
+): Text {
+	const node = getFirstChild(element);
+	let root = frame.lease.root;
+	if (frame.lease.end !== root) {
+		const start = CURRENT_SCOPE?.block.startMarker;
+		const range = start == null ? undefined : frame.lease.ranges?.().get(start);
+		root = start?.nextSibling ?? root;
+		if (range?.kind !== 'view' || root.nextSibling !== range.end) presentationMiss(false);
+	}
+	if (
+		frame.lease.host !== undefined ||
+		!root.contains(element) ||
+		node?.nodeType !== 3 ||
+		getNextSibling(node) !== null
+	)
+		presentationMiss(false);
+	const text = coerceText(value);
+	preparePresentationOperation(frame, node, 'text', () => {
+		if (node.nodeValue !== text) setText(node as Text, text);
+	});
+	return node as Text;
+}
+
 function preparePresentationSignalBinding(
 	args: any[],
 	frame: PresentationHydrationFrame,
 	text = false,
+	fixedText?: typeof prepareFixedPresentationText,
 ): unknown {
 	const [scope, previous, element] = args as [Scope, unknown, Element];
 	const name = text ? undefined : (args[3] as string);
@@ -640,11 +672,13 @@ function preparePresentationSignalBinding(
 		if (
 			text &&
 			((current !== null && (typeof current === 'object' || typeof current === 'function')) ||
-				typeof args[8] !== 'string')
+				(typeof args[8] !== 'string' && (args[5] !== true || fixedText === undefined)))
 		)
 			presentationMiss(false);
 		const prepared = text
-			? bindingText(element, current, args[8])
+			? typeof args[8] === 'string'
+				? bindingText(element, current, args[8])
+				: fixedText!(frame, element, current)
 			: preparedPresentationAttribute(element, name!, current, attributeKind!);
 		if (handle === null) {
 			if (text) {
@@ -942,6 +976,68 @@ export function commitRenderWrite([writer, args, block]: [
 	}
 }
 
+function preparePresentationTextWrite<T>(
+	frame: PresentationHydrationFrame,
+	writer: (...args: any[]) => T,
+	args: any[],
+): T {
+	const [node, value, host] = args as [Text | null, unknown, Node | undefined];
+	const text = coerceText(value);
+	// A text binding that keeps only its host passes no Text (see setText), so
+	// the host keys its prepared write; the host also reaches the deferred write.
+	preparePresentationOperation(frame, node ?? host!, 'text', () => writer(node, text, host));
+	return undefined as T;
+}
+
+function preparePresentationAttributeWrite<T>(
+	frame: PresentationHydrationFrame,
+	writer: (...args: any[]) => T,
+	kind: string,
+	args: any[],
+	prepared = args.slice(),
+): T {
+	const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
+	const valueIndex = changed ? 0 : kind === 'setClassName' || kind === 'setClassAttr' ? 1 : 2;
+	const element = args[changed ? 2 : 0] as Element;
+	const className = kind.includes('Class');
+	const name = className ? 'class' : args[changed ? 3 : 1];
+	const attributeKind = className ? 'class' : kind.includes('Boolean') ? 'booleanAttr' : 'attr';
+	prepared[valueIndex] = preparedPresentationAttribute(
+		element,
+		name,
+		args[valueIndex],
+		attributeKind,
+	);
+	preparePresentationOperation(frame, element, name, () => writer(...prepared));
+	return (kind.startsWith('updateFresh') ? prepared[valueIndex] : args[valueIndex]) as T;
+}
+
+/** @internal Fixed native views retain only the writer capabilities they use. */
+export function presentationFixedWrite<T>(
+	writer: (...args: any[]) => T,
+	kind: string,
+	...args: any[]
+): T {
+	const frame = hydrationStarted ? PRESENTATION_HYDRATION : null;
+	if (frame === null) return writeAtCommit(writer, kind, args);
+	// A host lease owns only its declared channels, never a fixed descendant view.
+	if (frame.lease.host !== undefined) presentationMiss(false);
+	// An explicit lease publishes these caches with its staged writes. Historical
+	// hydration without a lease still invalidates retained early publications.
+	if (kind === 'hydrateClaimedBindingCaches') return undefined as T;
+	if (kind === 'htext') return prepareFixedPresentationText(frame, args[0], args[1]) as T;
+	if (kind === 'bindSignalText' || kind === 'bindSignalAttribute')
+		return preparePresentationSignalBinding(
+			args,
+			frame,
+			kind === 'bindSignalText',
+			prepareFixedPresentationText,
+		) as T;
+	if (kind === 'setText' || kind === 'setRenderText')
+		return preparePresentationTextWrite(frame, writer, args);
+	return preparePresentationAttributeWrite(frame, writer, kind, args);
+}
+
 /** @internal Compiler-selected writer seam; ordinary renderer setters stay unchanged. */
 export function presentationWrite<T>(
 	writer: (...args: any[]) => T,
@@ -1007,14 +1103,8 @@ export function presentationWrite<T>(
 		return undefined as T;
 	}
 	if (kind === 'bindSignalText') return preparePresentationSignalBinding(args, frame, true) as T;
-	if (kind === 'setText' || kind === 'setRenderText') {
-		const [node, value, host] = args as [Text | null, unknown, Node | undefined];
-		const text = coerceText(value);
-		// A text binding that keeps only its host passes no Text (see setText), so
-		// the host keys its prepared write; the host also reaches the deferred write.
-		preparePresentationOperation(frame, node ?? host!, 'text', () => writer(node, text, host));
-		return undefined as T;
-	}
+	if (kind === 'setText' || kind === 'setRenderText')
+		return preparePresentationTextWrite(frame, writer, args);
 	if (kind === 'bindSignalAttribute') return preparePresentationSignalBinding(args, frame) as T;
 	if (kind === 'bindSignalValue') return preparePresentationSignalValue(args, frame) as T;
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
@@ -1084,21 +1174,7 @@ export function presentationWrite<T>(
 		const value = args[index];
 		prepared[index] = [normalizeClass(value[0]), value[1].map(normalizeClass)];
 		result = value;
-	} else {
-		const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
-		const valueIndex = changed ? 0 : kind === 'setClassName' || kind === 'setClassAttr' ? 1 : 2;
-		const element = args[changed ? 2 : 0] as Element;
-		const className = kind.includes('Class');
-		const name = className ? 'class' : args[changed ? 3 : 1];
-		const attributeKind = className ? 'class' : kind.includes('Boolean') ? 'booleanAttr' : 'attr';
-		prepared[valueIndex] = preparedPresentationAttribute(
-			element,
-			name,
-			args[valueIndex],
-			attributeKind,
-		);
-		result = kind.startsWith('updateFresh') ? prepared[valueIndex] : args[valueIndex];
-	}
+	} else return preparePresentationAttributeWrite(frame, writer, kind, args, prepared);
 	const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
 	const element = args[changed ? 2 : 0];
 	const key = kind.includes('Class')
@@ -1114,10 +1190,10 @@ export function presentationWrite<T>(
 	return result as T;
 }
 
-/** @internal Authored presentation ranges may not inherit an unrelated caller's boundary. */
-export function bindPresentationView<T extends Function>(view: T, id: string): T {
+/** @internal Stamp the view identity and prevent authored ranges from inheriting a caller's boundary. */
+export function bindPresentationView<T extends Function>(view: T, id: string, ownsRange = true): T {
 	(view as T & { [BINDING_VIEW_ROOT]: string })[BINDING_VIEW_ROOT] = bindingRootMarker(id);
-	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
+	return ownsRange ? markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name) : view;
 }
 
 export const BINDING_CHILDREN_SITE = /* @__PURE__ */ Symbol.for('octane.binding.children-site');

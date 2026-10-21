@@ -235,7 +235,12 @@ export function planBindingProgram(fn, render, context) {
 			} else if (isChildSlot(node.expression)) {
 				next = { ...node, _octaneBindingSlot: metadata() };
 			} else if (helpers.isText(node.expression)) {
-				next = { ...node, _octaneBindingText: metadata() };
+				next = {
+					...node,
+					_octaneBindingText: context.fixedText?.has(node.expression)
+						? { fixed: true }
+						: metadata(),
+				};
 			} else if (canCarryValue(node.expression)) {
 				next = { ...node, _octaneBindingValue: metadata() };
 			}
@@ -881,6 +886,8 @@ export function planBindingProgram(fn, render, context) {
 			controls ||= native.bindings.some((binding) => binding[1] === 'control');
 			styles ||= native.styleIndices.length > 0;
 			const normalizedChildren = normalize(node.children ?? [], selfNs);
+			const fixedText =
+				normalizedChildren.length === 1 && normalizedChildren[0]._octaneBindingText?.fixed === true;
 			const opaqueChildren =
 				normalizedChildren.length > 0 &&
 				normalizedChildren.every((child) => child._octaneBindingOpaque);
@@ -901,6 +908,7 @@ export function planBindingProgram(fn, render, context) {
 				// The handoff validates the live text-only topology before accepting it.
 				nativeNode.push('value');
 			}
+			if (fixedText) nativeNode.push('text');
 			if (opaqueChildren)
 				constructionError ??=
 					'This view contains externally owned children that cannot be constructed by a binding program.';
@@ -1051,6 +1059,15 @@ export function planBindingProgram(fn, render, context) {
 					} else if (text.length > 0)
 						constructionError ??= 'This textarea has external children without an initial value.';
 				}
+			} else if (fixedText) {
+				const value = normalizedChildren[0].expression;
+				validate(value);
+				if (helpers.canCarryDirectSignalHandle(value)) {
+					signals = true;
+					signalIndices.push(bindings.length);
+				}
+				bindings.push([index, 'text', '#text']);
+				values.push(value);
 			} else if (nativeNode[4] !== null) {
 				for (const child of normalizedChildren)
 					appendTemplateIr(children, emit(child, index, selfNs, [...parents, tag]));

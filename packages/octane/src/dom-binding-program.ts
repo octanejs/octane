@@ -4,9 +4,11 @@ import {
 	type __adoptScalarBindings,
 	__claimBinding,
 	__createBindingStyleRestoration,
+	__isBindingTextLeaf,
 	__normalizeBinding,
 	__releaseBinding,
 	__writeBinding,
+	__writeBindingWithTextWitness,
 	type BindingHandle,
 	type BindingOperation,
 	type BindingOptions,
@@ -71,7 +73,7 @@ export type BindingProgramNode =
 			tag: string,
 			namespace: 0 | 1,
 			children: number | null,
-			nativeControlContent?: 'value',
+			nativeContent?: 'value' | 'text',
 	  ]
 	| readonly [parent: number, kind: 'text', text: string]
 	| readonly [parent: number, kind: 'region', site: string];
@@ -426,6 +428,8 @@ interface FragmentInstance {
 	definition: BindingFragment;
 	range: BindingRange;
 	nodes: Node[];
+	/** Original markerless leaf identity, or the writer-created node for empty SSR. */
+	fixedText?: Map<Element, ChildNode | null>;
 	regions: RegionInstance[];
 	owned: Array<readonly [Element, string]>;
 	previous: Array<BindingValue | undefined>;
@@ -602,8 +606,15 @@ export function __createStructuralBindingHandoff(
 			)
 				return false;
 			let next = node.nextSibling;
-			if (proof[1] === 'element') cursors.set(index, node.firstChild);
-			else if (proof[1] === 'text') {
+			if (proof[1] === 'element') {
+				if (
+					proof[5] === 'text' &&
+					(node.firstChild !== current.fixedText?.get(node as Element) ||
+						!__isBindingTextLeaf(node))
+				)
+					return false;
+				cursors.set(index, proof[5] === 'text' ? null : node.firstChild);
+			} else if (proof[1] === 'text') {
 				if (node.nodeValue !== proof[2]) return false;
 			} else {
 				const region = current.regions.find((item) => item.range.start === node)!;
@@ -850,7 +861,11 @@ function resolveFragment(
 					(proof[3] === 0 ? 'http://www.w3.org/1999/xhtml' : 'http://www.w3.org/2000/svg')
 			)
 				mismatch();
-			if (proof[4] !== null) cursors.set(index, node.firstChild);
+			if (proof[5] === 'text') {
+				if (proof[4] !== 0 || !__isBindingTextLeaf(node)) mismatch();
+				(instance.fixedText ??= new Map()).set(node as Element, node.firstChild);
+			}
+			if (proof[4] !== null) cursors.set(index, proof[5] === 'text' ? null : node.firstChild);
 		} else if (proof[1] === 'text') {
 			if (node.nodeType !== 3 || node.nodeValue !== proof[2]) mismatch();
 		} else {
@@ -1559,7 +1574,11 @@ function writeOperation(
 				)),
 			);
 		style.write(value as string | null);
-	} else __writeBinding(instance.nodes[operation[0]] as Element, operation, value as string | null);
+	} else {
+		const node = instance.nodes[operation[0]] as Element;
+		if (instance.fixedText === undefined) __writeBinding(node, operation, value as string | null);
+		else __writeBindingWithTextWitness(node, operation, value as string | null, instance.fixedText);
+	}
 	if (!transaction.disposed && !instance.disposed) instance.previous[index] = value;
 }
 

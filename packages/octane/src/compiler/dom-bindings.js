@@ -1393,6 +1393,18 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				inheritHookMemoOrigin(b.const(b.id(declaration.id.name), declaration.init), declaration),
 			),
 	);
+	const allSetupProjected = native === null && read.size === aliases.size;
+	const handoff = hostHandoff
+		? 'host'
+		: fn.body.type === 'JSXCodeBlock' &&
+			  allSetupProjected &&
+			  unbound.size === 0 &&
+			  !addressed &&
+			  nodes.every(([, , , children]) => children !== null) &&
+			  bindings.length > 0 &&
+			  bindings.every(([, kind]) => kind !== 'control')
+			? 'view'
+			: null;
 	return {
 		fn,
 		render,
@@ -1408,9 +1420,9 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		unbound,
 		classAttributes,
 		id,
-		hostHandoff,
+		handoff,
 		unboundAttributes,
-		allSetupProjected: native === null && read.size === aliases.size,
+		allSetupProjected,
 	};
 }
 
@@ -1423,22 +1435,25 @@ function literalData(value) {
 // host handoff and grouped projections keep the general fixed-layout adopter.
 const SCALAR_ADOPTER_CHANNELS = new Set(['attr', 'boolean', 'aria', 'class', 'text', 'url']);
 
-function scalarAdopter(plan) {
-	return !plan.addressed &&
-		!plan.hostHandoff &&
+function usesScalarAdopter(plan) {
+	return (
+		!plan.addressed &&
+		(!plan.handoff || plan.handoff === 'view') &&
 		plan.styleIndices.length === 0 &&
 		plan.projectionGroups.length === 0 &&
 		plan.bindings.every((binding) => SCALAR_ADOPTER_CHANNELS.has(binding[1]))
-		? '__adoptScalarBindings'
-		: '__adoptBindings';
+	);
+}
+
+function scalarAdopter(plan) {
+	if (usesScalarAdopter(plan))
+		return plan.handoff === 'view' ? '__adoptFixedScalarViewBindings' : '__adoptScalarBindings';
+	return plan.handoff === 'view' ? '__adoptFixedViewBindings' : '__adoptBindings';
 }
 
 /** Whether the selected scalar adopter needs the artifact's URL capability. */
 function scalarURL(plan) {
-	return (
-		scalarAdopter(plan) === '__adoptScalarBindings' &&
-		plan.bindings.some((binding) => binding[1] === 'url')
-	);
+	return usesScalarAdopter(plan) && plan.bindings.some((binding) => binding[1] === 'url');
 }
 
 function scalarProperties(
@@ -1457,7 +1472,7 @@ function scalarProperties(
 		b.prop('init', b.id('nodes'), literalData(plan.nodes)),
 		b.prop('init', b.id('bindings'), literalData(plan.bindings)),
 		b.prop('init', b.id('project'), project),
-		...(plan.hostHandoff ? [b.prop('init', b.id('handoff'), b.literal('host'))] : []),
+		...(plan.handoff ? [b.prop('init', b.id('handoff'), b.literal(plan.handoff))] : []),
 		...(plan.signalIndices.length
 			? [
 					b.prop('init', b.id('signalIndices'), literalData(plan.signalIndices)),
@@ -2322,12 +2337,15 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 	);
 	const plans = new Map();
 	const replacements = new Map();
-	const localFunctions = new Map(
-		ast.body.flatMap((statement) => {
-			const fn = statement.declaration ?? statement;
-			return fn.type === 'FunctionDeclaration' && fn.id ? [[fn.id.name, fn]] : [];
-		}),
-	);
+	const localFunctions = new Map();
+	const exportedBindingViews = new Set();
+	for (const statement of ast.body) {
+		const fn = statement.declaration ?? statement;
+		if (fn.type !== 'FunctionDeclaration' || !fn.id) continue;
+		localFunctions.set(fn.id.name, fn);
+		if (statement.type === 'ExportNamedDeclaration' && statements(fn).some(isDirective))
+			exportedBindingViews.add(fn);
+	}
 	// Local child views may recurse into each other, so programs are planned depth
 	// first with Tarjan's bookkeeping. A view that enters one still open joins
 	// its strongly connected component, which completes as one unit once the
@@ -2393,6 +2411,24 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		return ['ArrowFunctionExpression', 'FunctionExpression'].includes(value?.type) ? value : null;
 	};
 	lexical.domBindingCallback = callbackFor;
+	const scalarPlans = new WeakMap();
+	const scalarFor = (fn, render) => {
+		if (scalarPlans.has(fn)) return scalarPlans.get(fn);
+		const structural =
+			fn.params[0]?.type === 'ObjectPattern' ||
+			needsBindingProgram(render, isUnbound) ||
+			statements(fn).some(
+				(statement) =>
+					isMountEffectShape(statement) ||
+					(statement.type === 'VariableDeclaration' &&
+						statement.declarations.some((declaration) => callbackFor(declaration.init))),
+			) ||
+			// Only a program subscribes to the imported signals its projections read.
+			readsImportedSignal(fn);
+		const scalar = structural ? null : planView(fn, filename, source, imports, lexical);
+		scalarPlans.set(fn, scalar);
+		return scalar;
+	};
 	const allocateProgramName = (prefix) => {
 		let name = prefix;
 		for (let i = 1; programNames.has(name); i++) name = `${prefix}${i}`;
@@ -2533,6 +2569,12 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
 				);
 		const setupBindings = bindingSetup(fn, lexical);
+		const scalar = !annotationsOnly && exportedBindingViews.has(fn) ? scalarFor(fn, render) : null;
+		let fixedText = null;
+		if (scalar?.handoff === 'view')
+			for (let index = 0; index < scalar.bindings.length; index++)
+				if (scalar.bindings[index][1] === 'text')
+					(fixedText ??= new Set()).add(scalar.values[index]);
 		const fixed = fixedBindingProps(fn, fixedProps, lexical, localDeclaration, isRuntimeReference);
 		const effects = statements(fn)
 			.filter(isMountEffectShape)
@@ -2587,6 +2629,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			]);
 		};
 		const context = {
+			fixedText,
 			source,
 			filename,
 			helpers,
@@ -2775,21 +2818,22 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					...(conditionalRest ? [b.prop('init', b.id('conditionalRest'), b.literal(true))] : []),
 				],
 			};
-			replacements.set(fn, {
-				...mapCow(fn, authored.replacements),
-				_octaneBindingView: { id: plan.id },
-				// Normal renderer ownership transfer is narrower than binding-program
-				// adoption. Keep its proof separate from the existing SSR view stamp.
-				_octanePresentationHydration: {
-					id: plan.id,
-					supported: fixedPresentation || structuralPresentation,
-					...(field('nodes').elements.some((node) => node.elements[5]?.value === 'value')
-						? { nativeControl: true }
-						: {}),
-					...(structuralPresentation || conditionalRest ? { structural: true } : {}),
-					...(conditionalRest ? { conditionalRest: true } : {}),
-				},
-			});
+			if (scalar?.handoff !== 'view')
+				replacements.set(fn, {
+					...mapCow(fn, authored.replacements),
+					_octaneBindingView: { id: plan.id },
+					// Normal renderer ownership transfer is narrower than binding-program
+					// adoption. Keep its proof separate from the existing SSR view stamp.
+					_octanePresentationHydration: {
+						id: plan.id,
+						supported: fixedPresentation || structuralPresentation,
+						...(field('nodes').elements.some((node) => node.elements[5]?.value === 'value')
+							? { nativeControl: true }
+							: {}),
+						...(structuralPresentation || conditionalRest ? { structural: true } : {}),
+						...(conditionalRest ? { conditionalRest: true } : {}),
+					},
+				});
 		};
 		if (annotationsOnly) {
 			finish();
@@ -2838,38 +2882,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			programFor(node, render, null, true);
 			return false;
 		}
-		const structural =
-			node.params[0]?.type === 'ObjectPattern' ||
-			needsBindingProgram(render, isUnbound) ||
-			setup.some(
-				(statement) =>
-					isMountEffectShape(statement) ||
-					(statement.type === 'VariableDeclaration' &&
-						statement.declarations.some((declaration) => callbackFor(declaration.init))),
-			) ||
-			// Only a program subscribes to the imported signals its projections read.
-			readsImportedSignal(node);
-		const scalar = structural ? null : planView(node, filename, source, imports, lexical);
+		const scalar = scalarFor(node, render);
+		const structural = scalar === null;
 		const textareaHandoff =
 			scalar !== null && scalar.allSetupProjected && canHandoffTextareaView(scalar);
-		// A scalar host can hand off its presentation channels independently of
-		// opaque children. A complete fixed view instead needs the program's
-		// whole-view hydration proof. Keep externally owned channels on the scalar
-		// path so omitted setup is neither validated nor evaluated.
-		const fixedSetup =
-			scalar !== null &&
-			setup.some((statement) => statement.type === 'VariableDeclaration') &&
-			node.body.type === 'JSXCodeBlock' &&
-			!scalar.hostHandoff &&
-			scalar.unbound.size === 0 &&
-			scalar.allSetupProjected &&
-			!scalar.addressed &&
-			scalar.nodes.every(([, , , children]) => children !== null) &&
-			scalar.bindings.length > 0 &&
-			// The program's handoff proof cannot transfer native control ownership.
-			scalar.bindings.every(([, kind]) => kind !== 'control');
-		const handoff = textareaHandoff || fixedSetup;
-		if (structural || handoff || (helpers.mount && selectedExport === node.id.name)) {
+		if (structural || textareaHandoff || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,
 				render,
@@ -2877,7 +2894,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				false,
 				selectedExport === node.id.name ? helpers.fixedProps : null,
 			);
-			if (!structural && !handoff) plan.scalar = scalar;
+			if (!structural && !textareaHandoff) plan.scalar = scalar;
 			plans.set(node.id.name, plan);
 			return false;
 		}
@@ -2918,19 +2935,21 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			);
 		}
 		for (const [node, replacement] of rewritten) replacements.set(node, replacement);
-		if (!plan.hostHandoff)
+		if (!plan.handoff)
 			replacements.set(node, {
 				...mapCow(node, rewritten),
 				_octaneScalarBindingClaims: true,
 			});
-		if (plan.hostHandoff)
+		else
 			replacements.set(node, {
 				...mapCow(node, rewritten),
+				...(plan.handoff === 'view' ? { _octaneScalarBindingClaims: true } : {}),
 				_octanePresentationHydration: {
 					id: plan.id,
 					supported: true,
-					host: true,
-					unboundAttributes: plan.unboundAttributes,
+					...(plan.handoff === 'host'
+						? { host: true, unboundAttributes: plan.unboundAttributes }
+						: { structural: true, fixed: true }),
 				},
 			});
 	});
