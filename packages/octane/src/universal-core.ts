@@ -1868,6 +1868,21 @@ export function universalSwitch(
 	return { $$kind: UNIVERSAL_SWITCH, value, cases, default: defaultValue };
 }
 
+function prepareUniversalForItems<T>(
+	items: Iterable<T>,
+	prepare: (item: T, index: number, prepared: unknown[]) => unknown,
+): Iterable<unknown> {
+	return {
+		*[Symbol.iterator]() {
+			const prepared: unknown[] = [];
+			let index = 0;
+			for (const item of items) {
+				yield prepare(item, index++, prepared);
+			}
+		},
+	};
+}
+
 export function universalFor<T>(
 	items: Iterable<T>,
 	key: (item: T, index: number) => UniversalKey,
@@ -1879,11 +1894,13 @@ export function universalFor<T>(
 	leafPlan?: UniversalPlan,
 	leafSignature?: string,
 	componentScope = false,
+	prepare?: (item: T, index: number, prepared: unknown[]) => unknown,
 ): UniversalForValue {
+	const universalItems = prepare === undefined ? items : prepareUniversalForItems(items, prepare);
 	if (componentScope) {
 		return {
 			$$kind: UNIVERSAL_FOR,
-			items,
+			items: universalItems,
 			key,
 			render,
 			empty,
@@ -1893,12 +1910,21 @@ export function universalFor<T>(
 		};
 	}
 	if (hostComponent === true) {
-		return { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, template: true };
+		return {
+			$$kind: UNIVERSAL_FOR,
+			items: universalItems,
+			key,
+			render,
+			empty,
+			ownerless,
+			compact,
+			template: true,
+		};
 	}
 	if (leafSignature !== undefined) {
 		return {
 			$$kind: UNIVERSAL_FOR,
-			items,
+			items: universalItems,
 			key,
 			render,
 			empty,
@@ -1911,10 +1937,19 @@ export function universalFor<T>(
 	}
 	if (leafPlan !== undefined) {
 		return hostComponent === undefined
-			? { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, leafPlan }
+			? {
+					$$kind: UNIVERSAL_FOR,
+					items: universalItems,
+					key,
+					render,
+					empty,
+					ownerless,
+					compact,
+					leafPlan,
+				}
 			: {
 					$$kind: UNIVERSAL_FOR,
-					items,
+					items: universalItems,
 					key,
 					render,
 					empty,
@@ -1925,8 +1960,17 @@ export function universalFor<T>(
 				};
 	}
 	return hostComponent === undefined
-		? { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact }
-		: { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, hostComponent };
+		? { $$kind: UNIVERSAL_FOR, items: universalItems, key, render, empty, ownerless, compact }
+		: {
+				$$kind: UNIVERSAL_FOR,
+				items: universalItems,
+				key,
+				render,
+				empty,
+				ownerless,
+				compact,
+				hostComponent,
+			};
 }
 
 export function universalTry(

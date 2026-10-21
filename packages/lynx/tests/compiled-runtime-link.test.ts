@@ -22,6 +22,24 @@ const repositoryRoot = resolve(packageDirectory, '../..');
 
 const PLAIN_SOURCE = `export function App() @{ <view id="simple" /> }`;
 
+const KEYED_DESTRUCTURED_FOR_SOURCE = `
+	export function App() @{
+		const rows = [['A'].values(), ['B'].values()];
+		@for (const [name] of rows; key name) {
+			<view><text>{name as string}</text></view>
+		}
+	}
+`;
+
+const KEYED_DESTRUCTURED_OBJECT_FOR_SOURCE = `
+	export function App() @{
+		const rows = [{ name: 'A' }, { name: 'B' }];
+		@for (const { name } of rows; key name) {
+			<view><text>{name as string}</text></view>
+		}
+	}
+`;
+
 const SETUP_BLOCK_SOURCE = `
 	export function App(props) @{
 		<view>@{
@@ -92,6 +110,8 @@ process.stdout.write(JSON.stringify({
 			encoding: 'utf8',
 			input: JSON.stringify({
 				plain: PLAIN_SOURCE,
+				keyedDestructuredFor: KEYED_DESTRUCTURED_FOR_SOURCE,
+				keyedDestructuredObjectFor: KEYED_DESTRUCTURED_OBJECT_FOR_SOURCE,
 				setupBlock: SETUP_BLOCK_SOURCE,
 				statefulBlock: STATEFUL_BLOCK_SOURCE,
 			}),
@@ -250,6 +270,21 @@ describe('Lynx compiled output links against its renderer runtime', () => {
 				{ op: 'insert', parent: null, id: 1, before: null },
 			],
 		});
+	});
+
+	it.each([
+		['keyedDestructuredFor', 'iterator'],
+		['keyedDestructuredObjectFor', 'object'],
+	])('prepares keyed destructured %s rows on the Lynx first screen (%s)', async (program) => {
+		const main = await renderMainThread(program, {});
+		const background = await renderBackground(program, {});
+
+		for (const value of ['A', 'B']) {
+			expect(main.commands).toContainEqual(
+				expect.objectContaining({ op: 'create', type: '#text', props: { value } }),
+			);
+		}
+		expect(main).toEqual(background);
 	});
 
 	it('bundles and renders a setup-bearing child block on the main thread', async () => {

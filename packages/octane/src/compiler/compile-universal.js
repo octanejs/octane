@@ -3695,6 +3695,63 @@ function compileForAst(authored, context, state) {
 	const itemBinding = declaration.id;
 	const indexBinding =
 		node.index ?? generatedIdentifier(allocName(state, '__octaneUniversalIndex'), node);
+	let renderItemBinding = itemBinding;
+	let keyItemBinding = itemBinding;
+	let prepareItem = null;
+	if (itemBinding.type !== 'Identifier') {
+		if (node.key) {
+			// Loop bindings initialize before an authored key expression. Prepare
+			// one row so the key and body read the same extracted values.
+			const names = new Set();
+			addPatternNames(itemBinding, names);
+			const preparedPattern = () =>
+				inheritGeneratedOrigin(
+					b.array_pattern([...names].map((name) => generatedIdentifier(name, itemBinding))),
+					itemBinding,
+				);
+			renderItemBinding = preparedPattern();
+			if (collectEntryCaptures(node.key, new Set()).some(({ source }) => names.has(source))) {
+				keyItemBinding = preparedPattern();
+			} else {
+				keyItemBinding = generatedIdentifier(allocName(state, '__octaneUniversalRawItem'), node);
+			}
+			const rawItemBinding = generatedIdentifier(
+				allocName(state, '__octaneUniversalRawItem'),
+				node,
+			);
+			const preparedItemBinding = generatedIdentifier(
+				allocName(state, '__octaneUniversalPreparedItem'),
+				node,
+			);
+			const prepareBody = b.block([
+				inheritGeneratedOrigin(
+					b[authored.left.kind](rewriteSourceAst(itemBinding, state), rawItemBinding),
+					authored,
+				),
+				...[...names].map((name, index) =>
+					inheritGeneratedOrigin(
+						b.stmt(
+							b.assignment(
+								'=',
+								b.member(preparedItemBinding, b.literal(index), true),
+								generatedIdentifier(name, itemBinding),
+							),
+						),
+						itemBinding,
+					),
+				),
+				inheritGeneratedOrigin(b.return(preparedItemBinding), authored),
+			]);
+			prepareItem = generatedArrow(
+				[rawItemBinding, indexBinding, preparedItemBinding],
+				prepareBody,
+				node,
+			);
+		} else {
+			// A synthesized positional key needs no destructured binding.
+			keyItemBinding = generatedIdentifier(allocName(state, '__octaneUniversalRawItem'), node);
+		}
+	}
 	assertNoResidualTemplate(node.right, state, '@for source');
 	if (node.key) assertNoResidualTemplate(node.key, state, '@for key');
 	const host = !state.hmr ? ownerFreeForHost(node) : null;
@@ -3704,11 +3761,11 @@ function compileForAst(authored, context, state) {
 			? templateProgramForComponent(node, state)
 			: null;
 	const compactHost =
-		host === null ? null : compileOwnerFreeForHostAst(host, state, itemBinding, indexBinding);
+		host === null ? null : compileOwnerFreeForHostAst(host, state, renderItemBinding, indexBinding);
 	const compactComponent =
 		component === null
 			? null
-			: compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, indexBinding);
+			: compileOwnerFreeThreeHostComponentAst(component, state, renderItemBinding, indexBinding);
 	const args = [
 		rewriteSourceAst(node.right, state),
 		// The universal runtime reconciles ranges by key only — there is no
@@ -3717,9 +3774,9 @@ function compileForAst(authored, context, state) {
 		// follows the slot rather than the item across reorders; `key item.id`
 		// remains the way to keep state attached to a moving item.
 		node.key
-			? generatedArrow([itemBinding, indexBinding], rewriteSourceAst(node.key, state), node.key)
+			? generatedArrow([keyItemBinding, indexBinding], rewriteSourceAst(node.key, state), node.key)
 			: generatedArrow(
-					[itemBinding, indexBinding],
+					[keyItemBinding, indexBinding],
 					generatedIdentifier(indexBinding.name, node),
 					node,
 				),
@@ -3730,13 +3787,13 @@ function compileForAst(authored, context, state) {
 				: compileTemplateProgramForComponentAst(
 						templateComponent,
 						state,
-						itemBinding,
+						renderItemBinding,
 						indexBinding,
 					)) ??
 			compileBlockValueAst(
 				node.body?.body ?? [],
 				state,
-				[itemBinding, indexBinding],
+				[renderItemBinding, indexBinding],
 				node.body ?? node,
 			),
 	];
@@ -3771,6 +3828,12 @@ function compileForAst(authored, context, state) {
 		args.push(b.literal(null, 'null'), b.literal(false), b.literal(false), b.literal(true));
 	} else if (node.empty) {
 		args.push(compileBlockValueAst(node.empty?.body ?? [], state, [], node.empty));
+	}
+	if (prepareItem !== null) {
+		while (args.length < 10) {
+			args.push(inheritGeneratedOrigin(b.unary('void', b.literal(0)), node));
+		}
+		args.push(prepareItem);
 	}
 	return addDynamicAst(context, generatedCall(referenceHelper(state, 'for'), args, node));
 }
