@@ -80,7 +80,7 @@ import {
 	type DEFAULT_CTX,
 	rendererRegionTryHandler,
 	promoteMemoAncestry,
-	type DirectContextRead,
+	type DirectContextReads,
 } from './context.js';
 import { CURSOR } from './hydration.js';
 import { findTryHandler } from './suspense.js';
@@ -217,8 +217,8 @@ export class BlockImpl {
 	// lite descendant that shares this block). The DIRECT signal: a changed
 	// version here means THIS block must re-run; if only $$ctxReads changed, the
 	// block can bail its body and refresh just its consuming child blocks.
-	declare $$ctxDirect: Map<Context<any>, DirectContextRead> | null;
-	// Epoch stamp for the two dep maps — see Block.$$ctxDepsEpoch. Number so the
+	declare $$ctxDirect: DirectContextReads | null;
+	// Epoch stamp for the dependency collections — see Block.$$ctxDepsEpoch. Number so the
 	// "unverified" poison (-1) stays inside the same monomorphic field type.
 	declare $$ctxDepsEpoch: number;
 	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.

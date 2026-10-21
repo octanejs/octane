@@ -28,7 +28,7 @@ import type {
 } from './view-transition.js';
 import type { TrackedThenable } from './use.js';
 import type { HookUpdate, TransitionHookSlot } from './transitions.js';
-import type { Context, DEFAULT_CTX, DirectContextRead } from './context.js';
+import type { Context, DEFAULT_CTX, DirectContextReads } from './context.js';
 import type { PortalSlot } from './portals.js';
 import type { BlockKind, BlockRare, SLOT_FLAG_TEARDOWN } from './block.js';
 import type {
@@ -368,11 +368,11 @@ export interface Block extends Scope {
 	 */
 	inactive: boolean;
 	/** Direct (own) context reads this render — drives memo invalidation alongside $$ctxReads. */
-	$$ctxDirect: Map<Context<any>, DirectContextRead> | null;
+	$$ctxDirect: DirectContextReads | null;
 	/**
 	 * The context epoch at which this block's $$ctxReads/$$ctxDirect
 	 * entries were last known consistent with live context versions: sampled when
-	 * renderBlock clears the maps (this render repopulates them at current
+	 * renderBlock clears the dependencies (this render repopulates them at current
 	 * versions) and re-stamped after a bailout verifies every recorded entry.
 	 * While it equals the current epoch NO context anywhere has changed since, so
 	 * the per-bail version scans are provably redundant. restampCtxDeps poisons it
