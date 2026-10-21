@@ -474,6 +474,7 @@ function rehomeSlot(member: any, frag: DocumentFragment, parent: Node): void {
 	// Its content bubbles to its logical parent, stamped as it rendered.
 	if (member.host !== frag) return;
 	member.host = parent;
+	if ((member.start as any).$$portalParent === frag) (member.start as any).$$portalParent = parent;
 	for (let n = getNextSibling(member.start); n !== null && n !== member.end; n = getNextSibling(n))
 		if ((n as any).$$portalParent === frag) (n as any).$$portalParent = parent;
 }

@@ -5,6 +5,13 @@ import {
 	ActionForm,
 	SubmitterActionForm,
 	FormWithStatus,
+	CommittedWrapperFrontierPortaledFormWithStatus,
+	FrontierPortaledFormWithStatus,
+	FrontierInnerFormPortaledFormWithStatus,
+	FrontierWrappedInnerFormPortaledFormWithStatus,
+	NestedFrontierPortaledFormWithStatus,
+	NestedPortaledFormWithStatus,
+	PortaledFormWithStatus,
 	RawFormWithStatus,
 	StatusProbe,
 	SelfFormStatus,
@@ -241,6 +248,311 @@ describe('useFormStatus', () => {
 		await settle();
 		expect(r.find('#status').textContent).toBe('idle');
 		r.unmount();
+	});
+
+	it('reports the logical ancestor form’s pending status through a portal', async () => {
+		const d = deferred();
+		let submittedDraft: FormDataEntryValue | null = null;
+		const target = document.createElement('aside');
+		document.body.appendChild(target);
+		const r = mount(PortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			target,
+		});
+		try {
+			flushSync(() => {});
+			const form = r.find('#save-form');
+			const button = target.querySelector('#portal-status') as HTMLButtonElement;
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.disabled).toBe(false);
+			expect(button.getAttribute('data-scope')).toBe('owned');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => (form as HTMLFormElement).requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+			expect(button.disabled).toBe(true);
+			expect(button.getAttribute('data-scope')).toBe('owned');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+			expect(button.disabled).toBe(false);
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			target.remove();
+		}
+	});
+
+	it('resolves a portaled form status when its source wrapper is still in a frontier', async () => {
+		const d = deferred();
+		let showPortal!: () => void;
+		let submittedDraft: FormDataEntryValue | null = null;
+		const target = document.createElement('aside');
+		document.body.appendChild(target);
+		const r = mount(FrontierPortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			target,
+			expose: (show: () => void) => (showPortal = show),
+		});
+		try {
+			flushSync(() => {});
+			const form = r.find('#save-form') as HTMLFormElement;
+			expect(target.querySelector('#portal-status')).toBeNull();
+
+			// The form is already committed; the new wrapper and its portal mount
+			// together through a detached frontier on this update.
+			flushSync(() => showPortal());
+			const button = target.querySelector('#portal-status') as HTMLButtonElement;
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.disabled).toBe(false);
+			expect(button.getAttribute('data-scope')).toBe('frontier');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => form.requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+			expect(button.disabled).toBe(true);
+			expect(button.getAttribute('data-scope')).toBe('frontier');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+			expect(button.disabled).toBe(false);
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			target.remove();
+		}
+	});
+
+	it('finds the source form through a committed wrapper around a frontier portal', async () => {
+		const d = deferred();
+		let showPortal!: () => void;
+		let submittedDraft: FormDataEntryValue | null = null;
+		const target = document.createElement('aside');
+		document.body.appendChild(target);
+		const r = mount(CommittedWrapperFrontierPortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			target,
+			expose: (show: () => void) => (showPortal = show),
+		});
+		try {
+			flushSync(() => {});
+			const form = r.find('#save-form') as HTMLFormElement;
+			flushSync(() => showPortal());
+			const button = target.querySelector('#portal-status') as HTMLButtonElement;
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.getAttribute('data-scope')).toBe('committed-wrapper');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => form.requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			target.remove();
+		}
+	});
+
+	it('does not use an outer portal target form as the logical ancestor', async () => {
+		const d = deferred();
+		let submittedDraft: FormDataEntryValue | null = null;
+		const outerTarget = document.createElement('aside');
+		const innerTarget = document.createElement('form');
+		innerTarget.id = 'other-form';
+		document.body.append(outerTarget, innerTarget);
+		const r = mount(NestedPortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			outerTarget,
+			innerTarget,
+		});
+		try {
+			flushSync(() => {});
+			const form = r.find('#save-form') as HTMLFormElement;
+			const button = innerTarget.querySelector('#portal-status') as HTMLButtonElement;
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.getAttribute('data-scope')).toBe('nested');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => form.requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			outerTarget.remove();
+			innerTarget.remove();
+		}
+	});
+
+	it('crosses a committed parent portal before resolving a nested frontier portal', async () => {
+		const d = deferred();
+		let showPortal!: () => void;
+		let submittedDraft: FormDataEntryValue | null = null;
+		const outerTarget = document.createElement('form');
+		outerTarget.id = 'other-form';
+		const innerTarget = document.createElement('aside');
+		document.body.append(outerTarget, innerTarget);
+		const r = mount(NestedFrontierPortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			outerTarget,
+			innerTarget,
+			expose: (show: () => void) => (showPortal = show),
+		});
+		try {
+			flushSync(() => {});
+			const form = r.find('#save-form') as HTMLFormElement;
+			expect(outerTarget.querySelector('#outer-portal-host')).not.toBeNull();
+			expect(innerTarget.querySelector('#portal-status')).toBeNull();
+
+			flushSync(() => showPortal());
+			const button = innerTarget.querySelector('#portal-status') as HTMLButtonElement;
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.getAttribute('data-scope')).toBe('nested-frontier');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => form.requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			outerTarget.remove();
+			innerTarget.remove();
+		}
+	});
+
+	it('uses a nearer form root that is still inside the source frontier', async () => {
+		const d = deferred();
+		let showPortal!: () => void;
+		let submittedDraft: FormDataEntryValue | null = null;
+		const target = document.createElement('aside');
+		document.body.appendChild(target);
+		const r = mount(FrontierInnerFormPortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			target,
+			expose: (show: () => void) => (showPortal = show),
+		});
+		try {
+			flushSync(() => {});
+			const outerForm = r.find('#outer-form') as HTMLFormElement;
+			expect(r.container.querySelector('#save-form')).toBeNull();
+
+			flushSync(() => showPortal());
+			const form = r.find('#save-form') as HTMLFormElement;
+			const button = target.querySelector('#portal-status') as HTMLButtonElement;
+			expect(outerForm.contains(form)).toBe(true);
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.getAttribute('data-scope')).toBe('frontier-inner-form');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => form.requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			target.remove();
+		}
+	});
+
+	it('walks the detached host before falling back past a wrapper form', async () => {
+		const d = deferred();
+		let showPortal!: () => void;
+		let submittedDraft: FormDataEntryValue | null = null;
+		const target = document.createElement('aside');
+		document.body.appendChild(target);
+		const r = mount(FrontierWrappedInnerFormPortaledFormWithStatus, {
+			action: (data: FormData) => {
+				submittedDraft = data.get('draft');
+				return d.promise;
+			},
+			target,
+			expose: (show: () => void) => (showPortal = show),
+		});
+		try {
+			flushSync(() => {});
+			const outerForm = r.find('#outer-form') as HTMLFormElement;
+			expect(r.container.querySelector('#save-form')).toBeNull();
+
+			flushSync(() => showPortal());
+			const form = r.find('#save-form') as HTMLFormElement;
+			const button = target.querySelector('#portal-status') as HTMLButtonElement;
+			expect(outerForm.contains(form)).toBe(true);
+			expect(button.form).toBe(form);
+			expect(button.textContent).toBe('idle');
+			expect(button.getAttribute('data-scope')).toBe('wrapped-frontier-inner-form');
+
+			(r.find('#field') as HTMLInputElement).value = 'edited';
+			flushSync(() => form.requestSubmit(button));
+			await tick();
+			expect(submittedDraft).toBe('edited');
+			expect(button.textContent).toBe('pending:edited');
+
+			d.resolve();
+			await settle();
+			expect(button.textContent).toBe('idle');
+		} finally {
+			d.resolve();
+			await settle();
+			r.unmount();
+			target.remove();
+		}
 	});
 
 	it('keeps the form pending until ALL queued submits drain', async () => {

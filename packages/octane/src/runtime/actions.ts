@@ -509,14 +509,91 @@ export function useActionState<S>(
 // when there is no ancestor form or no active submission.
 // ---------------------------------------------------------------------------
 
-function findAncestorForm(block: Block): HTMLFormElement | null {
+function findPortalAncestor(block: Block | null): Block | null {
+	while (block !== null && block.kind !== 'portal') block = block.parentBlock;
+	return block;
+}
+
+function findAncestorFormInBlocks(block: Block | null): HTMLFormElement | null {
+	while (block !== null) {
+		// A form can be the root of a block inside the same detached frontier;
+		// prefer it before following that frontier's next parent outward.
+		const root = block.startMarker;
+		if ((root as any)?.nodeName === 'FORM') return root as HTMLFormElement;
+		let n: Node | null = block.parentNode;
+		let portal = findPortalAncestor(block);
+		while (n !== null) {
+			// A block inside a portal can have a target form as its DOM parent. Cross
+			// that portal before treating any form in the target tree as an ancestor.
+			if (portal !== null && n === portal.parentNode) {
+				const host = (portal.startMarker as (Node & { $$portalParent?: Node }) | null)
+					?.$$portalParent;
+				n = host ?? n.parentNode;
+				portal = findPortalAncestor(portal.parentBlock);
+				continue;
+			}
+			if ((n as any).nodeName === 'FORM') return n as HTMLFormElement;
+			const parent = n.parentNode;
+			n =
+				parent ??
+				(n.nodeType === 11
+					? ((n as DocumentFragment & { $$next?: { parent: Node | null } }).$$next?.parent ?? null)
+					: null);
+		}
+		block = block.parentBlock;
+	}
+	return null;
+}
+
+function findAncestorFormInDetachedHost(node: Node, block: Block | null): HTMLFormElement | null {
+	let portal = findPortalAncestor(block);
+	let n: Node | null = node;
+	while (n !== null) {
+		if (portal !== null && n === portal.parentNode) {
+			const host = (portal.startMarker as (Node & { $$portalParent?: Node }) | null)
+				?.$$portalParent;
+			n = host ?? n.parentNode;
+			portal = findPortalAncestor(portal.parentBlock);
+			continue;
+		}
+		if ((n as any).nodeName === 'FORM') return n as HTMLFormElement;
+		n = n.parentNode;
+	}
+	return null;
+}
+
+function findAncestorForm(block: Block, portal: Block | null): HTMLFormElement | null {
 	// Start above the range: a single-root Block's start is its own root element,
 	// which may be the <form> this component renders.
 	const start = block.startMarker;
 	let n: Node | null = start ? start.parentNode : (block.parentNode ?? null);
 	while (n) {
+		// Portal children live in a foreign DOM tree. Stop at its target and resume
+		// from the portal's logical host, which is available before the body renders.
+		if (portal !== null && n === portal.parentNode) {
+			const host = (portal.startMarker as (Node & { $$portalParent?: Node }) | null)
+				?.$$portalParent;
+			// A host built in a frontier is detached until commit, so walking its
+			// DOM parents cannot reach an ancestor form from this first render.
+			if (host !== undefined && !host.isConnected) {
+				const localForm = findAncestorFormInDetachedHost(host, portal.parentBlock);
+				if (localForm !== null) return localForm;
+				const form = findAncestorFormInBlocks(portal.parentBlock);
+				if (form !== null) return form;
+			}
+			n = host ?? n.parentNode;
+			portal = findPortalAncestor(portal.parentBlock);
+			continue;
+		}
 		if ((n as any).nodeName === 'FORM') return n as HTMLFormElement;
-		n = n.parentNode;
+		const parent = n.parentNode;
+		// A frontier is detached during render; its slot records the parent it
+		// will commit into, which is still part of this component's source tree.
+		n =
+			parent ??
+			(n.nodeType === 11
+				? ((n as DocumentFragment & { $$next?: { parent: Node | null } }).$$next?.parent ?? null)
+				: null);
 	}
 	return null;
 }
@@ -524,6 +601,9 @@ function findAncestorForm(block: Block): HTMLFormElement | null {
 interface FormStatusSlot {
 	form: HTMLFormElement | null;
 	listener: (() => void) | null;
+	// The owning Block tree is stable for this hook scope; cache its portal edge
+	// so ordinary form-status renders keep the DOM-only ancestor fast path.
+	portal: Block | null;
 }
 
 export function useFormStatus(slot?: HookSlot): FormStatus;
@@ -534,7 +614,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as FormStatusSlot | undefined;
 	if (s === undefined) {
-		s = { form: null, listener: null };
+		s = { form: null, listener: null, portal: findPortalAncestor(scope.block) };
 		const slotRef = s;
 		ensureHooks(scope).set(slot, slotRef);
 		registerHookCleanup(scope, () => {
@@ -548,7 +628,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 	// would leave the hook stuck reporting idle for a form that showed up later.
 	// Start from this component's own range: a lite Scope's stand-in sits at its
 	// host node, inside any <form> the owning Block renders around it.
-	const form = findAncestorForm(scope.block);
+	const form = findAncestorForm(scope.block, s.portal);
 	if (form !== s.form) {
 		if (s.form && s.listener) FORM_STATUS_LISTENERS.get(s.form)?.delete(s.listener);
 		s.form = form;

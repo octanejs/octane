@@ -423,6 +423,9 @@ export function renderPortalState(
 		// the target owner's re-renders (React parity — portals coexist with the
 		// container's own children). See reconcileDeoptChildren.
 		(start as any).$$portalEnd = end;
+		// Hooks in the portal body can run before its direct children receive the
+		// ordinary $$portalParent stamp below.
+		(start as any).$$portalParent = host;
 		// A root render builds the portal off-document; its commit appends it.
 		const transaction = ROOT_RENDER_TRANSACTION;
 		const into =
@@ -475,7 +478,11 @@ export function renderPortalState(
 		}
 		renderBlock(block);
 	} else {
-		if (state.host !== host) journalRootProperty(state, 'host', state.host);
+		if (state.host !== host) {
+			journalRootProperty(state, 'host', state.host);
+			journalRootProperty(state.start!, '$$portalParent', (state.start as any).$$portalParent);
+			(state.start as any).$$portalParent = host;
+		}
 		state.host = host;
 		if (state.block!.body !== norm.body)
 			journalRootProperty(state.block!, 'body', state.block!.body);
