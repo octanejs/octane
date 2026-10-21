@@ -229,7 +229,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	readonly traceLimit: number;
 	events: SignalTraceEvent[] | undefined = undefined;
 	sequence = 0;
-	#lifetime = 0;
+	private lifetime = 0;
 	disposed = false;
 	// Installed by installPublicScope, so only applications that can hold a
 	// scope (createScope, currentSignalOwner) ship these.
@@ -242,10 +242,6 @@ export class ScopeImpl implements Scope, GraphOwner {
 	declare serialize: Scope['serialize'];
 	declare inspect: Scope['inspect'];
 	readBarrier: Promise<void> | undefined;
-
-	static hasHydrationOwnerBrand(value: object): boolean {
-		return #lifetime in value;
-	}
 
 	constructor(
 		private readonly key: string,
@@ -263,7 +259,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	}
 
 	get epoch(): number {
-		return this.#lifetime;
+		return this.lifetime;
 	}
 
 	get retired(): boolean {
@@ -301,7 +297,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		assertWritable();
 		signalBatch(() => {
 			this.disposed = true;
-			this.#lifetime++;
+			this.lifetime++;
 			// Optional capabilities keep their original order: producers stop before
 			// channels clear, and adoption leases release before the graph retires.
 			if (this.resources) {
@@ -323,8 +319,6 @@ export class ScopeImpl implements Scope, GraphOwner {
 		});
 	}
 }
-
-export const hasHydrationOwnerBrand = /* @__PURE__ */ (() => ScopeImpl.hasHydrationOwnerBrand)();
 
 /** Internal document lifecycle; the facade marks every owner before cancellation runs user code. */
 export function suspendScopeReads(scope: ScopeImpl): void {

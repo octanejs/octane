@@ -1636,8 +1636,6 @@ function requireRuntimeForContext(ctx, name) {
 		name === '__sameHydrationSource' ||
 		name === '__sameHydrationOptionalInput' ||
 		name === '__observeHydrationOptionalInput' ||
-		name === '__createHydrationQueryInput' ||
-		name === '__retainsHydrationQueryInput' ||
 		name === '__captureHydrationInput' ||
 		name === '__hydrationSignalRevision' ||
 		name === '__hydrationComponentSlot' ||
@@ -1850,11 +1848,6 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	if (local === (ctx.privateRuntimeAliases?.get(imported) ?? rtAlias(imported))) {
 		if (fallback === 'octane' && imported === '__hydrationSignalRevision')
 			return 'octane/internal/hydration-signal';
-		if (
-			fallback === 'octane' &&
-			(imported === '__createHydrationQueryInput' || imported === '__retainsHydrationQueryInput')
-		)
-			return 'octane/internal/hydration-query';
 		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
 			return 'octane/internal/client';
 		}
@@ -7676,73 +7669,6 @@ function confinedHydrationDerivedRead(render, name, propsName = null) {
 	);
 }
 
-// An otherwise opaque setup projection can coexist with a source-owned
-// request only when the primary's first authored operation is that request's
-// direct read. The request's exact source must still validate before the
-// boundary can keep the first read's original wake.
-function hydrationGetReceiver(node) {
-	const read = unwrapTsExpr(node);
-	return read?.type === 'CallExpression' &&
-		!read.optional &&
-		read.arguments.length === 0 &&
-		read.callee?.type === 'MemberExpression' &&
-		!read.callee.optional &&
-		staticDepMemberName(read.callee) === 'get' &&
-		read.callee.object?.type === 'Identifier'
-		? read.callee.object
-		: null;
-}
-
-function hydrationProjectedQuery(ctx, component, declaration, propsName, required, setupLocals) {
-	const setup = component.body.body;
-	if (
-		setup.length !== 2 ||
-		setup[0].declarations?.length !== 1 ||
-		setup[1].declarations?.length !== 1 ||
-		setup[1].declarations[0] !== declaration
-	)
-		return null;
-	const projection = unwrapTsExpr(declaration.init);
-	if (projection?.type !== 'BinaryExpression' || projection.operator !== '===') return null;
-	const left = unwrapTsExpr(projection.left);
-	const member = left?.expression;
-	const receiver = member?.object;
-	const source =
-		receiver?.type === 'Identifier' ? hydrationGetReceiver(setupLocals.get(receiver.name)) : null;
-	const first = component.body.render.block.body[0];
-	const query =
-		first?.type === 'VariableDeclaration' &&
-		first.kind === 'const' &&
-		first.declarations.length === 1 &&
-		first.declarations[0].id.type === 'Identifier'
-			? hydrationGetReceiver(first.declarations[0].init)
-			: null;
-	const field = staticDepMemberName(projection.right);
-	if (
-		left?.type !== 'ChainExpression' ||
-		member?.type !== 'MemberExpression' ||
-		!member.optional ||
-		staticDepMemberName(member) === null ||
-		source === null ||
-		query === null ||
-		projection.right?.type !== 'MemberExpression' ||
-		projection.right.optional ||
-		projection.right.object?.type !== 'Identifier' ||
-		projection.right.object.name !== propsName ||
-		field === null
-	)
-		return null;
-	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
-	for (const identifier of [source, query]) {
-		const binding = lexical.resolveBinding(lexical.nodeScopes.get(identifier), identifier.name);
-		if (binding?.scope !== lexical.rootScope || binding.importSource === null) return null;
-	}
-	const free = collectFreeIdentifiers(component.body.render.block, []);
-	if (free.has('arguments') || free.has('eval')) return null;
-	required.add(field);
-	return query;
-}
-
 // A passive effect's callback cannot execute during an unfinished adoption.
 // Its latest closure still belongs to the retried arm, but it does not decide
 // whether the initial suspended read was superseded. Only discard a callback
@@ -8009,7 +7935,6 @@ function exportedHydrationPropsPlans(ctx) {
 		const required = new Set();
 		const setupLocals = new Map();
 		let derived = null;
-		let query = null;
 		let safe = true;
 		for (const setup of component.body.body) {
 			if (
@@ -8051,18 +7976,8 @@ function exportedHydrationPropsPlans(ctx) {
 				)
 					derived = { name: declaration.id.name, field: proof.field };
 				else if (!hydrationSetupExpression(declaration.init, propsName, required, setupLocals)) {
-					query = hydrationProjectedQuery(
-						ctx,
-						component,
-						declaration,
-						propsName,
-						required,
-						setupLocals,
-					);
-					if (query === null) {
-						safe = false;
-						break;
-					}
+					safe = false;
+					break;
 				}
 				setupLocals.set(declaration.id.name, declaration.init);
 			}
@@ -8094,9 +8009,6 @@ function exportedHydrationPropsPlans(ctx) {
 			if (remaining === null || remaining.has(optional.field)) optional = null;
 			else fields.delete(optional.field);
 		}
-		// A first-query proof and other capture modes require different first
-		// authored operations and cannot share the boundary's capture mode.
-		if (query !== null && (derived !== null || optional !== null)) continue;
 		if (derived?.field) fields.set(derived.field, false);
 		for (const field of fields.keys()) required.add(field);
 		plans.set(component.id.name, {
@@ -8104,7 +8016,6 @@ function exportedHydrationPropsPlans(ctx) {
 			optional,
 			derived: derived?.source ? null : derived,
 			source: derived?.source,
-			query,
 			origin: component,
 			required: { warmRequiredProps: required },
 			sites: new Set(),
@@ -19324,7 +19235,6 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// (a placeholder leads when there are no user params), so a plain function
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
 	const { params: fnParams, bindings: paramBindings } = compiledBodyParams(node.params ?? []);
-	if (options?.hydrationQueryReader) fnParams.push(b.id(options.hydrationQueryReader));
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
@@ -30972,8 +30882,7 @@ function planJsx(
 		if (!catchOnly && (tc.propagateSuspense || tc.hydrationInputsEqual))
 			trailing.push(b.literal(tc.propagateSuspense === true));
 		if (tc.hydrationInputsEqual) trailing.push(b.id(tc.hydrationInputsEqual));
-		if (tc.hydrationQuery) trailing.push(b.id(tc.hydrationQuery));
-		else if (tc.preserveHydrationCapture) trailing.push(b.literal(tc.preserveHydrationCapture));
+		if (tc.preserveHydrationCapture) trailing.push(b.literal(tc.preserveHydrationCapture));
 		const boundaryArgs = [
 			b.id('__s'),
 			b.literal(slotIndex),
@@ -35297,7 +35206,6 @@ function hoistBodyHelper(
 	keyedSelection = null,
 	inlineBindingGuards = false,
 	mappedItem = false,
-	hydrationQueryReader = null,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -35373,7 +35281,6 @@ function hoistBodyHelper(
 		keyedSelection,
 		inlineBindingGuards,
 		mappedItem,
-		hydrationQueryReader,
 		// Only names materialized as this helper's own const captures may ride
 		// the original tuple into a nested arm. A union-only name can instead
 		// name an authored local shadow and must get a fresh environment.
@@ -36859,7 +36766,6 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 			),
 		),
 	]);
-	const accepted = plan?.query ? b.logical('&&', refined, b.literal(2)) : refined;
 	const inputTerm = capture?.source
 		? b.conditional(
 				ordinary,
@@ -36870,8 +36776,8 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 				),
 				refined,
 			)
-		: b.logical('||', ordinary, accepted);
-	const terms = plan?.optional || capture?.source || plan?.query ? [] : [inputTerm];
+		: b.logical('||', ordinary, refined);
+	const terms = plan?.optional || capture?.source ? [] : [inputTerm];
 	for (let index = 0; index < envNames.length; index++)
 		if (index !== propsIndex && index !== derivedIndex) terms.push(sameSlot(index));
 	// Arming the next actual access is the final comparator operation, including
@@ -36887,7 +36793,7 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 				b.literal(plan.optional.field),
 			),
 		);
-	else if (capture?.source || plan?.query) terms.push(inputTerm);
+	else if (capture?.source) terms.push(inputTerm);
 	const name = allocCompilerName(ctx, '__hydrationInputsEqual');
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -36899,7 +36805,7 @@ function hoistHydrationInputsEqual(ctx, bodies, envNames, origin, componentName)
 			origin,
 		),
 	);
-	return { name, capture, optional: plan?.optional, query: plan?.query };
+	return { name, capture, optional: plan?.optional };
 }
 
 function tryBodies(node, ctx) {
@@ -36998,73 +36904,17 @@ function makeTryCall(
 			b.sequence([call, tryStmts[0].declarations[0].init.left]),
 		).stmts;
 	}
-	const queryReader = hydrationInputsEqual?.query ? allocCompilerName(ctx, '__queryRead') : null;
-	let hydrationQuery = null;
-	let primaryStmts = tryStmts;
-	if (queryReader) {
-		hydrationQuery = allocCompilerName(ctx, '__hydrationQuery');
-		const witness = allocCompilerName(ctx, '__queryWitness');
-		ctx.hoistedHelpers.push(
-			inheritOriginLoc(
-				b.const(
-					hydrationQuery,
-					b.object([
-						b.prop(
-							'init',
-							b.id('capture'),
-							b.id(requireRuntimeForContext(ctx, '__createHydrationQueryInput')),
-						),
-						b.prop(
-							'init',
-							b.id('retains'),
-							b.arrow(
-								[b.id(witness)],
-								b.call(
-									requireRuntimeForContext(ctx, '__retainsHydrationQueryInput'),
-									b.id(witness),
-									{ ...hydrationInputsEqual.query },
-								),
-							),
-						),
-					]),
-				),
-				node,
-			),
-		);
-		const first = tryStmts[0];
-		const declaration = first.declarations[0];
-		primaryStmts = [
-			{
-				...first,
-				declarations: [
-					{
-						...declaration,
-						init: b.conditional(
-							b.id(queryReader),
-							b.call(b.id(queryReader), { ...hydrationInputsEqual.query }),
-							declaration.init,
-						),
-					},
-				],
-			},
-			...tryStmts.slice(1),
-		];
-	}
 
 	const tryHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
 		'__try',
-		primaryStmts,
+		tryStmts,
 		[],
 		parentNs,
 		cssHash,
 		envNames,
 		directiveKeywordOrigin(ctx, node),
-		null,
-		false,
-		false,
-		queryReader,
 	);
 
 	let pendingHelperName = 'null';
@@ -37110,7 +36960,6 @@ function makeTryCall(
 		hydrationInputsEqual: hydrationInputsEqual?.name,
 		hydrationInputCapture: hydrationInputsEqual?.capture,
 		preserveHydrationCapture,
-		hydrationQuery,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,

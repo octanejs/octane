@@ -16,7 +16,6 @@ import {
 	setTryBranch,
 	restartUncommittedTry,
 	type InitialSuspenseHydration,
-	type InitialHydrationQueryDescriptor,
 	initialSuspenseHydrations,
 	retireInitialSuspenseHydration,
 	TRY_OPS,
@@ -1838,51 +1837,11 @@ export function renderVisibleTry(state: TrySlot, source?: Block): void {
 	}
 }
 
-function acceptInitialHydrationQuery(
-	state: TrySlot,
-	initial: InitialSuspenseHydration,
-	query: NonNullable<InitialSuspenseHydration['query']>,
-	descriptor: InitialHydrationQueryDescriptor,
-): void {
-	if (
-		query.refined !== undefined ||
-		initial.query !== query ||
-		state.pendingThenable !== query.waiting ||
-		initialSuspenseHydrations?.get(state) !== initial
-	)
-		return;
-	journalRootProperty(query, 'refined', undefined);
-	query.refined = descriptor;
-}
-
 export function renderInitialSuspenseHydration(
 	state: TrySlot,
 	initial: InitialSuspenseHydration,
 	updated = false,
-	queryDescriptor?: InitialHydrationQueryDescriptor,
-	validateQuery = false,
 ): void {
-	if (validateQuery) {
-		const query = initial.query;
-		if (
-			query &&
-			state.pendingThenable === query.waiting &&
-			queryDescriptor?.retains(query.witness)
-		) {
-			if (query.refined === undefined) {
-				if (WIP_CAPTURE === null)
-					acceptInitialHydrationQuery(state, initial, query, queryDescriptor);
-				else
-					(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
-						if (!discarded) acceptInitialHydrationQuery(state, initial, query, queryDescriptor);
-					});
-			}
-			// Keep the original registered wake; its retry reads the latest state.env.
-			if (HYDRATION_PASS !== null) HYDRATION_PASS.node = getNextSibling(state.end);
-			return;
-		}
-		updated = true;
-	}
 	state.pendingThenable = null;
 	if (updated) {
 		// New inputs reached the arm while its hydration was suspended, or its
@@ -1906,12 +1865,7 @@ export function renderInitialSuspenseHydration(
 		initial = taken;
 	}
 	state.idState.next = initial.idStart;
-	const query = state.branch === -1 ? queryDescriptor?.capture() : undefined;
 	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
-	const body = block.body;
-	if (query)
-		block.body = (props, scope, extra) =>
-			(body as any).call(block, props, scope, extra, query.read);
 	state.block = block;
 	TRY_OPS!.setBranch(state, 1);
 	const hydration = new HydrationCapability(block, initial.first, null);
@@ -1983,7 +1937,6 @@ export function renderInitialSuspenseHydration(
 		state.tryBlock = null;
 		discardOffscreenCapture(capture);
 	} finally {
-		if (query) block.body = body;
 		// The attempt that commits, or the catch arm that replaces this one,
 		// reports what it finds. An attempt that found a mismatch is final: the
 		// arm renders on the client, and its diagnostics describe why.
@@ -2017,13 +1970,6 @@ export function renderInitialSuspenseHydration(
 		return;
 	}
 	if (suspended !== null) {
-		if (query || initial.query) {
-			if (initialSuspenseHydrations?.get(state) !== initial || state.pendingThenable !== null)
-				return;
-			if (query?.waiting === suspended && query.witness !== undefined)
-				initial.query = { witness: query.witness, waiting: suspended };
-			else if (initial.query?.waiting !== suspended) initial.query = undefined;
-		}
 		state.pendingThenable = suspended;
 		resumeOnSettle(suspended, () => {
 			if (
