@@ -40,7 +40,10 @@ Serve matching server and client compiler output. Signal control identities are
 derived from authored source sites, not generated branch or loop helper names;
 mixing HTML and client assets from different compiler/site-identity versions is
 not a supported hydration boundary. Deploy and invalidate cached HTML/assets as
-one matching build.
+one matching build. This includes separately cached HTML fragments: key them by
+the build that produced them or invalidate them when that build changes. A
+document's hydration protocol marker does not validate the build of a fragment
+inserted into it.
 
 Subtrees can defer activation through [`<Hydrate>`](./deferred-hydration.md),
 including native interaction capture and replay. `independent` boundaries can
@@ -568,8 +571,9 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
   Suspense or `<Hydrate>` boundary around it, or else the root, renders on the
   client instead of adopting the server HTML, and `onRecoverableError` reports
   it once (error #338). Keep comments when minifying server-rendered HTML.
-- The server and the client must use the same version of these markers. The
-  seed script names the version the server wrote, and a root whose server used
+- The server and the client must use the same version of these markers. A
+  comment in each hydratable root's output names the protocol version the server
+  wrote, even when no seed script is present. A root whose server used
   another version renders on the client instead of adopting the server HTML,
   reporting it once through `onRecoverableError` (error #348). Deploy the server
   and client bundles from the same Octane version.
