@@ -24,7 +24,6 @@
 //
 // Usage:
 //   pnpm --filter octane-tsrx-signal-bench dev  # :5190 (.tsrx)
-//   pnpm --filter octane-jsx-signal-bench dev   # :5194 (.tsx / JSX)
 //   pnpm --filter solid-signal-bench dev        # :5191
 //   pnpm --filter react-signal-bench dev        # :5192
 //   pnpm --filter ripple-signal-bench dev       # :5193
@@ -44,7 +43,6 @@ const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5190/' },
-			{ name: 'octane-jsx', url: 'http://localhost:5194/' },
 			{ name: 'solid', url: 'http://localhost:5191/' },
 			{ name: 'react', url: 'http://localhost:5192/' },
 			{ name: 'ripple', url: 'http://localhost:5193/' },
@@ -121,6 +119,7 @@ async function semanticGate(browser, url) {
 
 			await call('__mount');
 			const nodes = chain();
+			const leaf = document.querySelector('.leaf');
 			expect(nodes.length === 99, `mount rendered ${nodes.length} chain divs, expected 99`);
 			expect(document.querySelectorAll('.leaf').length === 1, 'mount did not render one C100 leaf');
 			expect(document.querySelector('.leaf')?.textContent === '100', 'C100 leaf text is incorrect');
@@ -156,6 +155,12 @@ async function semanticGate(browser, url) {
 			await call('__sweepBatchedReverse');
 			expected = Object.fromEntries(indices.map((index) => [index, expected[index] + 1]));
 			expectValues(expected, 'descendant-first batch');
+			const updatedNodes = chain();
+			expect(
+				updatedNodes.length === nodes.length && updatedNodes.every((node, i) => node === nodes[i]),
+				'updates replaced chain hosts',
+			);
+			expect(document.querySelector('.leaf') === leaf, 'updates replaced the leaf');
 
 			await call('__unmount');
 			expect(document.querySelectorAll('.c, .leaf').length === 0, 'unmount left chain nodes');
@@ -164,6 +169,10 @@ async function semanticGate(browser, url) {
 				root?.querySelector('*') === null && root.textContent?.trim() === '',
 				'unmount left rendered root content',
 			);
+			await call('__mount');
+			expectValues(Object.fromEntries(indices.map((index) => [index, 0])), 'fresh remount');
+			await call('__sweepBatched');
+			expectValues(Object.fromEntries(indices.map((index) => [index, 1])), 'remounted batch');
 			await call('__reset');
 			expect(document.getElementById('main')?.childNodes.length === 0, 'reset left root DOM');
 			return errors;
@@ -213,11 +222,11 @@ async function measureMount(browser, url) {
 // performance.now()'s effective resolution. Chromium clamps the clock of a page
 // that is not cross-origin isolated to 100 µs, and the cheapest bumps cost about
 // 0.5 µs. So each timed sample loops a calibrated number of bumps and divides:
-// the batch doubles from 50 until one batch spans BUMP_SAMPLE_MS, keeping every
+// the batch doubles from 50 until one batch spans UPDATE_SAMPLE_MS, keeping every
 // target's samples at least 200 ticks long and amortizing the slower first
 // bumps after each sample's gc(). A fixed 50 left TSRX samples at zero or one
 // tick; a fixed count large enough for TSRX made cascading targets slow.
-const BUMP_SAMPLE_MS = 20;
+const UPDATE_SAMPLE_MS = 20;
 
 // BUMP — mount once, time per-bump cost (calibrated bumps per sample) in a tight
 // in-page loop with gc() before each sample.
@@ -253,11 +262,11 @@ async function measureBump(browser, url, idx) {
 			}
 			return { samples: out, reps };
 		},
-		{ idx, SAMPLE_MS: BUMP_SAMPLE_MS, WARMUP, ITER, YIELD_MS },
+		{ idx, SAMPLE_MS: UPDATE_SAMPLE_MS, WARMUP, ITER, YIELD_MS },
 	);
 	await ctx.close();
 	console.error(`    ${reps} bumps per sample`);
-	return summarize(samples);
+	return { ...summarize(samples), repeat: reps };
 }
 
 // SWEEP — bump all 10 stateful nodes per sample. `batchFn` selects the mode:
@@ -279,20 +288,14 @@ async function measureSweep(browser, url, batchFn) {
 		if (result && typeof result.then === 'function') await result;
 	});
 	await sleep(50);
-	const samples = await page.evaluate(
-		async ({ indices, batchFn, WARMUP, ITER, YIELD_MS, REPEAT }) => {
+	const { samples, reps } = await page.evaluate(
+		async ({ indices, batchFn, WARMUP, ITER, YIELD_MS, SAMPLE_MS }) => {
 			const gc = window.gc || (() => {});
 			const sweep = batchFn ? window[batchFn] : null;
 			if (batchFn && typeof sweep !== 'function') throw new Error('missing ' + batchFn);
-			const out = [];
-			for (let i = 0; i < WARMUP + ITER; i++) {
-				gc();
-				// A single sweep is sub-millisecond, so the OS timer quantizes it to
-				// the ~0.1ms floor. Time REPEAT sweeps and divide — the per-sweep cost
-				// escapes quantization while each sweep still does identical work.
-				void document.body?.offsetHeight;
+			const batch = async (count) => {
 				const t0 = performance.now();
-				for (let k = 0; k < REPEAT; k++) {
+				for (let k = 0; k < count; k++) {
 					if (sweep) {
 						const r = sweep();
 						if (r && typeof r.then === 'function') await r;
@@ -300,24 +303,33 @@ async function measureSweep(browser, url, batchFn) {
 						for (const idx of indices) {
 							const fn = window['__bumpAt' + idx];
 							if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
-							// An async-commit bump (Preact/vue-vapor) is awaited per change —
-							// that IS the "flush on every change" mode for a microtask
-							// scheduler (each await lets flushJobs run before the next).
+							// Await each async commit so separate bumps cannot coalesce.
 							const r = fn();
 							if (r && typeof r.then === 'function') await r;
 						}
 					}
 				}
-				const dt = (performance.now() - t0) / REPEAT;
+				return performance.now() - t0;
+			};
+			// Native bindings make 25 sweeps too short for the browser clock.
+			// Use the same minimum batch duration as individual counter bumps.
+			let reps = 25;
+			while (reps < 1 << 20 && (await batch(reps)) < SAMPLE_MS) reps *= 2;
+			const out = [];
+			for (let i = 0; i < WARMUP + ITER; i++) {
+				gc();
+				void document.body?.offsetHeight;
+				const dt = (await batch(reps)) / reps;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
-			return out;
+			return { samples: out, reps };
 		},
-		{ indices: STATEFUL_INDICES, batchFn, WARMUP, ITER, YIELD_MS, REPEAT: 25 },
+		{ indices: STATEFUL_INDICES, batchFn, WARMUP, ITER, YIELD_MS, SAMPLE_MS: UPDATE_SAMPLE_MS },
 	);
 	await ctx.close();
-	return summarize(samples);
+	console.error(`    ${reps} sweeps per sample`);
+	return { ...summarize(samples), repeat: reps };
 }
 
 // UNMOUNT — per sample: mount (untimed), settle, time the synchronous
@@ -413,17 +425,10 @@ const OPS = [
 	'unmount',
 ];
 
-const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
-
 (async () => {
 	const all = {};
-	const dialectPairs = {};
 	const failures = [];
 	const failedTargets = new Set();
-	const dialectTargets = DIALECT_PAIR_NAMES.map((name) =>
-		TARGETS.find((target) => target.name === name),
-	).filter(Boolean);
-	const remainingTargets = TARGETS.filter((target) => !DIALECT_PAIR_NAMES.includes(target.name));
 	const runVerifiedTarget = async (t) => {
 		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
 		try {
@@ -445,41 +450,7 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			console.error(`  ✗ ${message}`);
 		}
 	};
-	for (const t of dialectTargets) await runVerifiedTarget(t);
-
-	// Repeat only the Octane twins in reverse and combine the two independent,
-	// fully-warmed sample sets. Ratio guards use these A-B-B-A aliases so a fixed
-	// target order cannot masquerade as a dialect cost.
-	if (dialectTargets.length === 2 && dialectTargets.every((target) => all[target.name])) {
-		const repeat = {};
-		for (const t of [...dialectTargets].reverse()) {
-			console.error(`Repeating ${t.name} for order-balanced dialect pair…`);
-			try {
-				const { results } = await runTarget(t, { verify: false });
-				repeat[t.name] = results;
-			} catch (error) {
-				const alias = `${t.name}-dialect-pair`;
-				failedTargets.add(alias);
-				const message = `${alias}: ${error instanceof Error ? error.message : String(error)}`;
-				failures.push(message);
-				console.error(`  ✗ ${message}`);
-			}
-		}
-		if (dialectTargets.every((target) => repeat[target.name])) {
-			for (const t of dialectTargets) {
-				const alias = `${t.name}-dialect-pair`;
-				dialectPairs[alias] = Object.fromEntries(
-					OPS.map((op) => [
-						op,
-						summarize([...all[t.name][op].__samples, ...repeat[t.name][op].__samples], {
-							scoreMode: 'mean',
-						}),
-					]),
-				);
-			}
-		}
-	}
-	for (const t of remainingTargets) await runVerifiedTarget(t);
+	for (const t of TARGETS) await runVerifiedTarget(t);
 
 	const successfulTargets = TARGETS.filter((t) => all[t.name]);
 	const cols = successfulTargets.map((t) => t.name);
@@ -497,17 +468,6 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			row.push(`${fmt(r.median)} (min ${fmt(r.min)}, sd ${fmt(r.stddev)})`.padEnd(W));
 		}
 		console.log(row.join('| '));
-	}
-
-	const tsrxPair = dialectPairs['octane-tsrx-dialect-pair'];
-	const jsxPair = dialectPairs['octane-jsx-dialect-pair'];
-	if (tsrxPair && jsxPair) {
-		console.log('\norder-balanced octane-jsx / octane-tsrx dialect ratio:');
-		for (const op of OPS) {
-			console.log(
-				`  ${op.padEnd(14)} ${(scoreOf(jsxPair[op]) / scoreOf(tsrxPair[op])).toFixed(2)}x`,
-			);
-		}
 	}
 
 	if (successfulTargets.length > 1) {
@@ -587,17 +547,25 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 				...TARGETS.map((t) => ({
 					name: t.name,
 					ops: all[t.name]
-						? Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])]))
+						? Object.fromEntries(
+								OPS.map((op) => {
+									const stat = all[t.name][op];
+									return [
+										op,
+										{
+											...timingStatForJson(stat),
+											...(stat.repeat
+												? { repeat: stat.repeat, sampleMs: stat.median * stat.repeat }
+												: null),
+										},
+									];
+								}),
+							)
 						: {},
 					meta: {
 						gates: failedTargets.has(t.name) ? 'fail' : 'pass',
 						...(all[t.name]?.__dom ? { dom: all[t.name].__dom } : null),
 					},
-				})),
-				...Object.entries(dialectPairs).map(([name, results]) => ({
-					name,
-					ops: Object.fromEntries(OPS.map((op) => [op, timingStatForJson(results[op])])),
-					meta: { gates: failedTargets.has(name) ? 'fail' : 'pass', order: 'ABBA' },
 				})),
 			],
 		};

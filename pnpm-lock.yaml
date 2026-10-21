@@ -3098,16 +3098,6 @@ importers:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  benchmarks/signal-favoring/octane-jsx:
-    dependencies:
-      octane:
-        specifier: workspace:*
-        version: link:../../../packages/octane
-    devDependencies:
-      vite:
-        specifier: catalog:default
-        version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-
   benchmarks/signal-favoring/octane-tsrx:
     dependencies:
       octane:

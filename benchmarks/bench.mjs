@@ -322,7 +322,6 @@ const SUITES = [
 			{ filter: 'solid-signal-bench', port: 5191 },
 			{ filter: 'react-signal-bench', port: 5192 },
 			{ filter: 'ripple-signal-bench', port: 5193 },
-			{ filter: 'octane-jsx-signal-bench', port: 5194 },
 			{ filter: 'vue-vapor-signal-bench', port: 5183 },
 			{ filter: 'preact-signal-bench', port: 5265 },
 			{ filter: 'svelte-signal-bench', port: 5276 },

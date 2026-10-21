@@ -4,7 +4,7 @@
 // chain is maintained here. Adapter main files are intentionally hand-written:
 // their framework-specific flush and batching contracts are too nuanced to
 // regenerate from the component template. Stateful counters live at C1, C11, C21,
-// ..., C91. On `__bumpAt<N>`, signal frameworks (solid, ripple) re-evaluate
+// ..., C91. On `__bumpAt<N>`, direct signal bindings (including Octane) re-evaluate
 // only the `{count}` text node inside CN; hook frameworks re-render CN and may
 // cascade through CN+1..C100. React Compiler can skip unchanged descendants by
 // caching eligible child elements. The bench measures the median cost of bumping
@@ -25,17 +25,17 @@ for (let i = 1; i <= N; i += 10) STATEFUL_INDICES.push(i);
 const isStateful = (i) => i % 10 === 1;
 
 // ----------------------------------------------------------------------------
-// octane (.tsrx, React-shape hooks)
+// octane (.tsrx, native signals)
 // ----------------------------------------------------------------------------
-function genRippleNew() {
-	let out = `import { useState } from 'octane';\n\n`;
+function genOctaneTsrx() {
+	let out = `import { useSignal$ } from 'octane/signals/client';\n\n`;
 	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
-	out += `// hook-frameworks cascade re-renders down the chain on each bump.\n\n`;
-	// Module-level setters + bump exports
-	for (const i of STATEFUL_INDICES) out += `let _set${i} = null;\n`;
+	out += `// Native signal bindings update the counter text without re-rendering the chain.\n\n`;
+	// Bump closures capture each component-owned signal for its mounted lifetime.
+	for (const i of STATEFUL_INDICES) out += `let _set${i}: (() => void) | null = null;\n`;
 	out += '\n';
 	for (const i of STATEFUL_INDICES) {
-		out += `export function bumpAt${i}() { if (_set${i}) _set${i}((v) => v + 1); }\n`;
+		out += `export function bumpAt${i}() { if (_set${i}) _set${i}(); }\n`;
 	}
 	out += '\n';
 	// Define components in reverse order so each one's child is already declared
@@ -44,54 +44,19 @@ function genRippleNew() {
 		if (i === N) {
 			out += `function C${i}(props) @{ <span class={props.kind}>${i}</span> }\n`;
 		} else if (i === N - 1) {
-			out += `function C${i}({ kind }) @{ <div class={kind}>${i} <C${i + 1} kind="leaf" /></div> }\n`;
+			out += `function C${i}({ kind }) @{ <div class={kind}>\n${i}\n<C${i + 1} kind="leaf" />\n</div> }\n`;
 		} else if (isStateful(i)) {
 			out += `function C${i}(props) @{\n`;
-			out += `  const [v, set] = useState(0);\n`;
-			out += `  _set${i} = set;\n`;
-			out += `  <div class='c'>${i}:{v as number} <C${i + 1} /></div>\n`;
+			out += `  const v$ = useSignal$(0);\n`;
+			out += `  _set${i} = () => v$.set((v) => v + 1);\n`;
+			out += `  <div class='c'>\n${i}:\n{v$}\n<C${i + 1} />\n</div>\n`;
 			out += `}\n`;
 		} else {
 			const childProps = i === N - 2 ? ' kind="c"' : '';
-			out += `function C${i}(props) @{ <div class='c'>${i} <C${i + 1}${childProps} /></div> }\n`;
+			out += `function C${i}(props) @{ <div class='c'>\n${i}\n<C${i + 1}${childProps} />\n</div> }\n`;
 		}
 	}
 	out += '\nexport default function App(props) @{ <C1 /> }\n';
-	return out;
-}
-
-// ----------------------------------------------------------------------------
-// octane JSX twin (React-style .tsx, same React-shape hooks)
-// ----------------------------------------------------------------------------
-// The same chain authored in React-style `.tsx` instead of `.tsrx`: `@{ … }`
-// bodies become `return <jsx>`, `class` → `className`, and `{v as number}` →
-// `{v}`. Octane's compiler lowers both dialects to the same runtime, so this is
-// the JSX backwards-compat twin of genRippleNew() above.
-function genOctaneJsx() {
-	let out = `import { useState } from 'octane';\n\n`;
-	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
-	out += `// React-style .tsx twin of ../../octane-tsrx/src/App.tsrx — hook frameworks cascade\n`;
-	out += `// re-renders down the chain on each bump.\n\n`;
-	for (const i of STATEFUL_INDICES) out += `let _set${i} = null;\n`;
-	out += '\n';
-	for (const i of STATEFUL_INDICES) {
-		out += `export function bumpAt${i}() { if (_set${i}) _set${i}((v) => v + 1); }\n`;
-	}
-	out += '\n';
-	for (let i = N; i >= 1; i--) {
-		if (i === N) {
-			out += `function C${i}() { return <span className="leaf">${i}</span>; }\n`;
-		} else if (isStateful(i)) {
-			out += `function C${i}() {\n`;
-			out += `  const [v, set] = useState(0);\n`;
-			out += `  _set${i} = set;\n`;
-			out += `  return <div className="c">${i}:{v} <C${i + 1} /></div>;\n`;
-			out += `}\n`;
-		} else {
-			out += `function C${i}() { return <div className="c">${i} <C${i + 1} /></div>; }\n`;
-		}
-	}
-	out += '\nexport default function App() { return <C1 />; }\n';
 	return out;
 }
 
@@ -117,10 +82,10 @@ function genRipple() {
 			out += `function C${i}(props) @{\n`;
 			out += `  const v = track(0);\n`;
 			out += `  _set${i} = () => { v.value += 1; };\n`;
-			out += `  <div class='c'>${i}:{v.value} <C${i + 1} /></div>\n`;
+			out += `  <div class='c'>\n${i}:\n{v.value}\n<C${i + 1} />\n</div>\n`;
 			out += `}\n`;
 		} else {
-			out += `function C${i}(props) @{ <div class='c'>${i} <C${i + 1} /></div> }\n`;
+			out += `function C${i}(props) @{ <div class='c'>\n${i}\n<C${i + 1} />\n</div> }\n`;
 		}
 	}
 	out += '\nexport default function App(props) @{ <C1 /> }\n';
@@ -227,8 +192,7 @@ function genSvelteApp() {
 // ----------------------------------------------------------------------------
 
 const targets = [
-	{ rel: 'octane-tsrx/src/App.tsrx', content: genRippleNew() },
-	{ rel: 'octane-jsx/src/App.tsx', content: genOctaneJsx() },
+	{ rel: 'octane-tsrx/src/App.tsrx', content: genOctaneTsrx() },
 	{ rel: 'ripple/src/App.tsrx', content: genRipple() },
 	{ rel: 'react/src/App.jsx', content: genReact() },
 	{ rel: 'solid/src/App.jsx', content: genSolid() },
