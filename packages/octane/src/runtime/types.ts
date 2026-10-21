@@ -793,6 +793,9 @@ export interface OffscreenCapture {
 	renderCleanups: Array<(discarded: boolean) => void> | undefined;
 	/** Only a structural binding lease records current-tree adoption receipts. */
 	presentations?: PresentationHydrationFrame[];
+	/** Host events become observable at root acceptance, before mutation callbacks. */
+	hostEvents?:
+		Array<(() => void | (() => void)) & { recover?: (error: unknown) => void }> | undefined;
 }
 
 // A target has one effective ref binding; array refs remain one composite value.

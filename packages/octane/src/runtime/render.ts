@@ -189,6 +189,7 @@ import {
 	releaseDiagnostics,
 	claimDeferred,
 	hydrationFailure,
+	hydrationHostFailure,
 	settleTexts,
 	parseSeedJson,
 	isBlockClose,
@@ -1840,6 +1841,8 @@ export function renderInitialSuspenseHydration(
 	initial: InitialSuspenseHydration,
 	updated = false,
 ): void {
+	if (state.pendingThenable !== null && ROOT_RENDER_TRANSACTION?.rootRequest === true)
+		journalObjectOnce(state);
 	state.pendingThenable = null;
 	if (updated) {
 		// New inputs reached the arm while its hydration was suspended, or its
@@ -1878,6 +1881,9 @@ export function renderInitialSuspenseHydration(
 	const capture = createOffscreenCapture();
 	// What the attempt queued for its root's commit goes with a discarded one.
 	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null && previousCapture !== null)
+		hydration.recoverHostEvent = (error) =>
+			TRY_OPS!.inBoundary(state, recoverHydrationEvent, error);
 	const opsMark = transaction === null ? 0 : transaction.ops.length;
 	const retiredMark = transaction?.retired?.size ?? 0;
 	swapHydration(hydration);
@@ -1951,7 +1957,10 @@ export function renderInitialSuspenseHydration(
 	}
 	if (!failed) {
 		if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
-		retireInitialSuspenseHydration(state);
+		retireInitialSuspenseHydration(
+			state,
+			capture.hostEvents !== undefined && transaction?.rootRequest === true ? initial : undefined,
+		);
 		// An enclosing boundary may still suspend after this arm rendered. Leave
 		// its server metadata and ranges replayable until that capture commits.
 		(capture.renderCleanups ??= []).push((discarded) => {
@@ -1998,6 +2007,13 @@ export function renderInitialSuspenseHydration(
 	} finally {
 		if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
 	}
+}
+
+function recoverHydrationEvent(state: TrySlot, error: unknown): void {
+	const failure = hydrationHostFailure(error);
+	markArmDiscard(state);
+	if (!clientRenderDehydratedTry(state, null))
+		noteRecoverableHydrationError(() => failure, state.parentBlock);
 }
 
 export function commitResumeInner(state: TrySlot): void {

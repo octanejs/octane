@@ -1257,6 +1257,53 @@ export function releaseRootLeases(owner: RootRenderOwner, root: Block | null): v
 	}
 }
 
+/** Publish a resumed arm's handlers before commit callbacks can observe it. */
+export function acceptHydrationHostEvents(transaction: RootRenderTransaction): boolean {
+	const hostEvents = transaction.capture.hostEvents!;
+	transaction.capture.hostEvents = undefined;
+	const owner = transaction.owner;
+	const previousOwner = COMMITTING_OWNER;
+	const previousGeneration = COMMITTING_GENERATION;
+	COMMITTING_OWNER = owner;
+	COMMITTING_GENERATION = owner.generation;
+	let failed: { recover: (error: unknown) => void; error: unknown } | undefined;
+	let stale: boolean;
+	try {
+		for (const install of hostEvents) {
+			if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
+			try {
+				const undo = install();
+				// A later installer may revoke this acceptance. Undo belongs to this
+				// transaction even though no render frame is active here.
+				if (undo !== undefined) transaction.log.push(JOURNAL_UNDO, undo, null, null);
+			} catch (error) {
+				if (install.recover === undefined) throw error;
+				failed = { recover: install.recover, error };
+				break;
+			}
+		}
+		stale = owner.disposed || owner.generation !== COMMITTING_GENERATION;
+	} finally {
+		COMMITTING_OWNER = previousOwner;
+		COMMITTING_GENERATION = previousGeneration;
+	}
+	if (failed === undefined && !stale) return true;
+	if (!transaction.aborted) rollbackRootRender(transaction);
+	if (owner.transaction === transaction) owner.transaction = null;
+	if (!owner.disposed) {
+		if (stale) owner.retry();
+		else {
+			const recoveryGeneration = owner.generation;
+			failed!.recover(failed!.error);
+			// Recovering the failed arm does not recover unrelated root work.
+			// Its fallback may itself replace the root, superseding this retry.
+			if (transaction.rootRequest && !owner.disposed && owner.generation === recoveryGeneration)
+				owner.retry();
+		}
+	}
+	return false;
+}
+
 /**
  * Commit every finished root render, in order. Each runs its queued commit ops
  * in render order (the mutation phase); a deletion cleanup that unmounts the
@@ -1312,6 +1359,12 @@ export function commitRootRenders(): void {
 					}
 					continue;
 				}
+				if (
+					hydrationStarted &&
+					transaction.capture.hostEvents !== undefined &&
+					!HYDRATION_DRIVER!.acceptHostEvents(transaction)
+				)
+					continue;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileRootCommitted(transaction);
 				if (owner.transaction === transaction) owner.transaction = null;

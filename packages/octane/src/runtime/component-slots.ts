@@ -1412,6 +1412,10 @@ export function spliceOffscreenCapture(
 ): void {
 	if (capture.presentations !== undefined && WIP_CAPTURE !== null)
 		(WIP_CAPTURE.presentations ??= []).push(...capture.presentations);
+	if (capture.hostEvents !== undefined && WIP_CAPTURE !== null) {
+		(WIP_CAPTURE.hostEvents ??= []).push(...capture.hostEvents);
+		capture.hostEvents = undefined;
+	}
 	// A staged root has queued native acceptance but has not published it yet.
 	// Keep that candidate on its original capture for the publication guard;
 	// there is no enclosing speculative capture to transfer it into here.
@@ -1487,6 +1491,7 @@ interface CaptureWindow {
 	rendered: number;
 	commits: number;
 	presentations: number;
+	hostEvents: number;
 }
 
 export function openCaptureWindow(capture: OffscreenCapture): CaptureWindow {
@@ -1504,6 +1509,7 @@ export function openCaptureWindow(capture: OffscreenCapture): CaptureWindow {
 		rendered: capture.renderedBlocks?.size ?? 0,
 		commits: capture.suspenseCommits?.size ?? 0,
 		presentations: capture.presentations?.length ?? 0,
+		hostEvents: capture.hostEvents?.length ?? 0,
 	};
 }
 
@@ -1523,6 +1529,7 @@ export function dropCaptureWindow(window: CaptureWindow): void {
 	for (let i = window.stores; i < stores.length; i++) stores[i].queued = false;
 	stores.length = window.stores;
 	if (capture.presentations !== undefined) capture.presentations.length = window.presentations;
+	if (capture.hostEvents !== undefined) capture.hostEvents.length = window.hostEvents;
 	const rendered = capture.renderedBlocks;
 	if (rendered !== null && rendered.size > window.rendered) {
 		// A completed earlier sibling's preserved props are not a valid bailout.
@@ -1548,6 +1555,7 @@ export function dropCaptureWindow(window: CaptureWindow): void {
 /** Drop captured commit work that never became visible. */
 export function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
+	capture.hostEvents = undefined;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCaptureDiscarded(capture);
 	if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.discardCapture(capture);

@@ -66,6 +66,7 @@ export const WRITERS = new Map(
 		setHTML: 'primitive',
 		setAttribute: 'primitive',
 		setPlainAttribute: 'primitive',
+		setCustomElementListener: 'primitive',
 		setURLAttribute: 'primitive',
 		setStringData: 'primitive',
 		setBooleanAttribute: 'primitive',

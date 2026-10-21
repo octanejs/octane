@@ -579,6 +579,25 @@ function attrNamespace(name: string): string | null {
 	return null;
 }
 
+/** Apply a custom element's native listener, returning whether the prop was consumed. */
+export function setCustomElementListener(el: Element, name: string, value: unknown): boolean {
+	if (typeof value !== 'function' && (el as any).$$ceListeners?.[name] === undefined) return false;
+	// The full prop name distinguishes native capture from bubble registration.
+	const capture = name.endsWith('Capture');
+	const type = capture ? name.slice(2, -7) : name.slice(2);
+	const map: Record<string, EventListener> = ((el as any).$$ceListeners ??= {});
+	const previous = map[name];
+	if (previous !== undefined && previous !== value) el.removeEventListener(type, previous, capture);
+	if (typeof value === 'function') {
+		if (previous !== value) el.addEventListener(type, value as EventListener, capture);
+		map[name] = value as EventListener;
+		el.removeAttribute(name);
+		return true;
+	}
+	delete map[name];
+	return false;
+}
+
 export function setAttribute(el: Element, name: string, value: any): void {
 	if (name === 'innerText' || name === 'textContent') return;
 	if (
@@ -728,26 +747,12 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		name.length > 2 &&
 		name.charCodeAt(0) === 111 /* o */ &&
 		name.charCodeAt(1) === 110 /* n */ &&
-		isHtmlCustomElement(el) &&
-		(typeof value === 'function' || (el as any).$$ceListeners?.[name] !== undefined)
+		isHtmlCustomElement(el)
 	) {
-		// React 19 treats a trailing Capture on a custom-element listener as
-		// native capture registration, while preserving the authored event case
-		// and punctuation. The full prop name remains the identity so capture and
-		// bubble listeners can coexist and be replaced or removed independently.
-		const capture = name.endsWith('Capture');
-		const type = capture ? name.slice(2, -7) : name.slice(2);
-		const map: Record<string, EventListener> = ((el as any).$$ceListeners ??= {});
-		const prev = map[name];
-		if (prev !== undefined && prev !== value) el.removeEventListener(type, prev, capture);
-		if (typeof value === 'function') {
-			if (prev !== value) el.addEventListener(type, value as EventListener, capture);
-			map[name] = value as EventListener;
-			el.removeAttribute(name); // a listener prop never lands in the markup
-			return;
-		}
-		delete map[name];
-		// fall through: non-function value now takes plain attribute semantics
+		if (hydrating && CURSOR?.stageNativeEvent(el, name, value) === true) {
+			if (typeof value === 'function') return;
+		} else if (setCustomElementListener(el, name, value)) return;
+		// Non-function values retain plain attribute semantics.
 	}
 	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
 	// `strokeWidth` → `stroke-width`, `xlinkHref` → `xlink:href`, … — the JSX
