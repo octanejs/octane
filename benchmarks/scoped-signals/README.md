@@ -3,13 +3,16 @@
 ## Suspended retry ancestry
 
 `retry-owner-ancestry.test.mjs` compares four keyed rows wrapped in 16 and 64
-components during a held transition and reveal. Both workloads must preserve the
-held screen, start one query, reveal the same row values, and fully unmount.
-The uninstrumented deep workload independently checks the instrumented result.
-The work guard bounds the growth in array entries copied by `concat` when the
-component depth quadruples. It counts the whole measured window, including
-the DOM implementation and harness; it is not an attributed heap measurement or
-a latency benchmark.
+components, with four preceding hookless siblings per level, during a held
+transition and reveal. Both workloads must preserve the held screen, start one
+query, reveal the same row values, and fully unmount. The uninstrumented deep
+workload independently checks the instrumented result. The work guards bound
+array entries copied by `concat` and entries in arrays beginning with the
+retry-path `scope` token when an iterator is requested. The latter observes
+spread-based copying as well as other path iteration; repeated walks may still
+grow quadratically, but a walk must not add another depth factor by copying its
+suffix at each level. Both counters include the whole measured window and are
+not attributed heap or latency measurements.
 
 ```bash
 node --test benchmarks/scoped-signals/retry-owner-ancestry.test.mjs

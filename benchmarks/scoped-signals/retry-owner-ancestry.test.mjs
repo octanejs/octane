@@ -7,10 +7,13 @@ import { compile } from '../../packages/octane/src/compiler/compile.js';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 const depth = 64;
+const siblings = Array.from({ length: 4 }, (_, index) => `<Noise id={id} index={${index}} />`).join(
+	'',
+);
 const layers = Array.from(
 	{ length: depth },
 	(_, index) =>
-		`function Layer${index}({ id }) @{ <section><${index + 1 === depth ? 'Leaf' : `Layer${index + 1}`} id={id} /></section> }`,
+		`function Layer${index}({ id }) @{ <section>${siblings}<${index + 1 === depth ? 'Leaf' : `Layer${index + 1}`} id={id} /></section> }`,
 ).join('\n');
 const app = (name, layer) => `export function ${name}({ active$, load }) @{
 	const live$ = useSignal$(true);
@@ -22,6 +25,7 @@ const app = (name, layer) => `export function ${name}({ active$, load }) @{
 }`;
 const source = `import { query$ } from 'octane/signals';
 import { useSignal$ } from 'octane/signals/client';
+function Noise({ id, index }) @{ <i data-id={id} data-index={index}></i> }
 function Leaf({ id }) @{ const value$ = useSignal$(id); <button>{String(value$.get())}</button> }
 ${layers}
 function Data({ load }) @{ const result$ = query$(() => true, load); <output>{String(result$.get())}</output> }
@@ -83,19 +87,27 @@ test('retrying deeper signal-owner trees bounds ancestry copying', async (t) => 
 			window.document.body.append(host);
 			let root = api.createRoot(host);
 			const original = Array.prototype.concat;
+			const originalIterator = Array.prototype[Symbol.iterator];
 			let copied = 0;
+			let iterated = 0;
 			try {
 				await api.act(() => root.render(App, { active$, load }));
-				if (observed)
+				if (observed) {
 					Array.prototype.concat = function (...args) {
 						copied += this.length;
 						for (const arg of args) copied += Array.isArray(arg) ? arg.length : 1;
 						return Reflect.apply(original, this, args);
 					};
+					Array.prototype[Symbol.iterator] = function () {
+						if (this[0] === 'scope') iterated += this.length;
+						return Reflect.apply(originalIterator, this, []);
+					};
+				}
 				await api.act(() => api.startTransition(() => active$.set(true)));
 				const held = host.textContent;
 				await api.act(() => pending.resolve('ready'));
 				Array.prototype.concat = original;
+				Array.prototype[Symbol.iterator] = originalIterator;
 				const visible = {
 					held,
 					output: host.querySelector('output')?.textContent,
@@ -105,9 +117,10 @@ test('retrying deeper signal-owner trees bounds ancestry copying', async (t) => 
 				root.unmount();
 				root = undefined;
 				assert.equal(host.childNodes.length, 0);
-				return { copied, visible };
+				return { copied, iterated, visible };
 			} finally {
 				Array.prototype.concat = original;
+				Array.prototype[Symbol.iterator] = originalIterator;
 				root?.unmount();
 				scope.dispose();
 				host.remove();
@@ -125,10 +138,16 @@ test('retrying deeper signal-owner trees bounds ancestry copying', async (t) => 
 		assert.deepEqual(shallow.visible, clean.visible);
 		assert.deepEqual(deep.visible, clean.visible);
 		t.diagnostic(`concat entries: depth 16 ${shallow.copied}; depth 64 ${deep.copied}`);
+		t.diagnostic(`scope-path entries: depth 16 ${shallow.iterated}; depth 64 ${deep.iterated}`);
 		// Allow a small fixed amount of incidental work in the measured transition window.
 		assert.ok(
 			deep.copied <= shallow.copied + 16,
 			'four times the depth should not meaningfully increase copied entries',
+		);
+		assert.ok(shallow.iterated > 0, 'the observer must see retry paths');
+		assert.ok(
+			deep.iterated <= shallow.iterated * 20,
+			'four times the depth should not add a further depth factor to retry-path iteration',
 		);
 	} finally {
 		window.close();

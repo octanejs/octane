@@ -146,32 +146,42 @@ export function signalRetryBoundary(block: Block): TrySlot | undefined {
 
 // A named function expression keeps recursive references inside its own
 // binding, so an unused retry walk can be removed with its callers.
-const signalRetrySlot = function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
+// One walk owns this buffer; backtrack after misses so the winning path alone escapes.
+const signalRetrySlot = function signalRetrySlot(
+	scope: Scope,
+	target: Scope,
+	path: unknown[] = [],
+): unknown[] | null {
 	const children = scope.children;
 	if (children !== null) {
+		const length = path.length;
 		for (const child of children) {
-			if (child.scope === target) return ['scope', child.key];
-			const nested = signalRetrySlot(child.scope, target);
-			if (nested !== null) return ['scope', child.key, ...nested];
+			path.push('scope', child.key);
+			if (child.scope === target || signalRetrySlot(child.scope, target, path) !== null)
+				return path;
+			path.length = length;
 		}
 	}
 	const block = target.block;
 	for (let index = 0; index < scope.slots.length; index++) {
 		const slot = scope.slots[index];
 		if (slot === null || typeof slot !== 'object') continue;
-		if (block.forSlot != null && (slot === block.forSlot || slot.forSlot === block.forSlot))
-			return ['slot', index, 'item', block.key];
+		if (block.forSlot != null && (slot === block.forSlot || slot.forSlot === block.forSlot)) {
+			path.push('slot', index, 'item', block.key);
+			return path;
+		}
 		if (slot.block === block || slot.tryBlock === block || slot.emptyBlock === block) {
 			// Slot indices and branch tags are compiler/reconciler identities. Do
 			// not retain a generated render-body closure as a retry-path token.
-			return [
+			path.push(
 				'slot',
 				index,
 				slot.__kind,
 				slot.tryBlock === block ? 'primary' : slot.branch,
 				slot.emptyBlock === block ? 'empty' : slot.currentIsBodyFn ? undefined : slot.currentComp,
 				slot.prevKey,
-			];
+			);
+			return path;
 		}
 	}
 	return null;
@@ -310,7 +320,8 @@ const signalRetryListPath = function signalRetryListPath(
 		const slot = scope.slots[index];
 		if (slot === state || slot?.forSlot === state) {
 			const path = signalRetryPath(scope, root);
-			return path === null ? null : path.concat('slot', index, 'item');
+			if (path !== null) path.push('slot', index, 'item');
+			return path;
 		}
 	}
 	if (scope.children !== null) {
