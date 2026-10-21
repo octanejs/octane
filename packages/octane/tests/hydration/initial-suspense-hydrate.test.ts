@@ -672,12 +672,6 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 		{ label: 'unchanged guarded request', request: 'unchanged', streamed: false, guarded: true },
 		{ label: 'changed guarded request', request: 'changed', streamed: false, guarded: true },
 		{ label: 'disabled guard', request: 'guard disabled', streamed: false, guarded: true },
-		{
-			label: 'query read in the alternate arm',
-			request: 'alternate query',
-			streamed: false,
-			guarded: true,
-		},
 		{ label: 'changed request', request: 'changed', streamed: false },
 		{ label: 'restarted request', request: 'restarted', streamed: false },
 		{
@@ -695,7 +689,6 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 		async (scenario) => {
 			const { request, streamed } = scenario;
 			const guardDisabled = request === 'guard disabled';
-			const alternateQuery = request === 'alternate query';
 			const replacementExpected =
 				request === 'changed' || request === 'restarted' || request === 'restarted after update';
 			const scopeKey = `pending-query-${dev}-${request}-${streamed}`;
@@ -726,9 +719,7 @@ export function App(props) @{ <section><output>{props.sibling}</output><Gate {..
 			};
 			await act(() => {});
 			const read =
-				'guarded' in scenario
-					? `active ? request$.get() : ${alternateQuery ? 'request$.get()' : '"inactive"'}`
-					: 'request$.get()';
+				'guarded' in scenario ? 'active ? request$.get() : "inactive"' : 'request$.get()';
 			const source = `import { selection$, request$ } from './model';
 function QueryInput(props) @{
   const selection = selection$.get();
@@ -752,7 +743,7 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 			const server = load('server');
 			const client = load('client');
 			const onRef = vi.fn();
-			const props = { sibling: 'waiting', domain: alternateQuery ? 'other' : 'saved', onRef };
+			const props = { sibling: 'waiting', domain: 'saved', onRef };
 			const container = document.createElement('div');
 			document.body.append(container);
 			cleanups.push(() => container.remove());
@@ -846,8 +837,9 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 		},
 	);
 
-	it('discards stale server content when later work reads a newer query attempt', async () => {
-		const scopeKey = `later-query-restart-${dev}`;
+	it.each(['later', 'alternate'])('discards stale query content (%s read)', async (scenario) => {
+		const alternate = scenario === 'alternate';
+		const scopeKey = `later-query-restart-${dev}-${scenario}`;
 		const waiting = gate();
 		const createModel$ = (side: 'server' | 'client') => {
 			const scope = Signals.createScope({ scopeKey });
@@ -875,13 +867,16 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 		const clientReadFresh = vi.fn((value: string) =>
 			value === 'original' ? earlierFrame.run(() => clientModel.request$.get()) : value,
 		);
+		const initialRead = alternate
+			? 'active ? request$.get() : readFresh(request$.get())'
+			: 'request$.get()';
 		const source = `import { selection$, request$, readFresh } from './model';
 function QueryInput(props) @{
   const selection = selection$.get();
   const active = selection?.id === props.domain;
   @try {
-    const value = request$.get();
-    const fresh = readFresh(value);
+    const value = ${initialRead};
+    const fresh = ${alternate ? 'value' : 'readFresh(value)'};
     <label>{fresh as string}<input disabled={!active} defaultValue={fresh} ref={props.onRef} /></label>;
   } @pending { <span>Loading</span>; }
 }
@@ -902,7 +897,7 @@ export function App(props) @{ <section><output>{props.sibling}</output><QueryInp
 		const server = load('server');
 		const client = load('client');
 		const onRef = vi.fn();
-		const props = { sibling: 'waiting', domain: 'saved', onRef };
+		const props = { sibling: 'waiting', domain: alternate ? 'other' : 'saved', onRef };
 		const container = document.createElement('div');
 		document.body.append(container);
 		cleanups.push(() => container.remove());
