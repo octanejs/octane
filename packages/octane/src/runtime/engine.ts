@@ -1177,6 +1177,12 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 			}
 			transaction.log.length = 0;
 		}
+		// Slot snapshots restore render state, but cannot restore a transition
+		// hold the parked reveal has already released outside the journal.
+		if (transaction.hostEventReveals !== undefined)
+			for (const reveal of transaction.hostEventReveals)
+				if (reveal.releasedHold && reveal.state.stagedCapture === reveal.capture)
+					reveal.state.transitionHeld = false;
 		// After the replay, which can restore a bag's queued state.
 		dropRootOps(transaction, 0, 0);
 		// A Block discarded with its parent has no creation entry
@@ -1297,8 +1303,23 @@ export function acceptHydrationHostEvents(transaction: RootRenderTransaction): b
 			failed!.recover(failed!.error);
 			// Recovering the failed arm does not recover unrelated root work.
 			// Its fallback may itself replace the root, superseding this retry.
-			if (transaction.rootRequest && !owner.disposed && owner.generation === recoveryGeneration)
-				owner.retry();
+			if (!owner.disposed && owner.generation === recoveryGeneration) {
+				if (transaction.rootRequest) owner.retry();
+				else if (transaction.hostEventReveals !== undefined) {
+					// This transaction may have consumed a resolved parent's reveal.
+					// Its parked capture was transferred and discarded during rollback;
+					// render the recovered subtree again instead of replaying that capture.
+					for (const { state, capture } of transaction.hostEventReveals) {
+						if (owner.disposed || owner.generation !== recoveryGeneration) break;
+						if (
+							state.branch === 2 &&
+							state.stagedCapture === capture &&
+							state.pendingThenable === null
+						)
+							SCHEDULED_VISIBILITY_DRIVER!.reveal(state, 'urgent');
+					}
+				}
+			}
 		}
 	}
 	return false;

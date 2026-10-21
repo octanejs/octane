@@ -570,6 +570,12 @@ export interface RootRenderOwner {
 	spareOps: any[] | null;
 }
 
+export interface HydrationEventReveal {
+	state: TrySlot;
+	capture: OffscreenCapture;
+	releasedHold: boolean;
+}
+
 export interface RootRenderTransaction {
 	owner: RootRenderOwner;
 	log: any[];
@@ -603,6 +609,8 @@ export interface RootRenderTransaction {
 	texts: Set<Text> | null;
 	aborted: boolean;
 	rootRequest: boolean;
+	/** Parked reveals whose staged host events this root must accept. */
+	hostEventReveals?: HydrationEventReveal[];
 	hydrating?: boolean;
 	/** A ViewTransition holds its commit for the native update (vtFlush). */
 	held?: boolean;

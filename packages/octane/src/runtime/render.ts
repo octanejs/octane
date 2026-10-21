@@ -87,6 +87,7 @@ import type {
 	TransitionActionBatch,
 	RootRenderOwner,
 	RootRenderTransaction,
+	HydrationEventReveal,
 	Phase,
 	SuspenseRefEntry,
 	OffscreenCapture,
@@ -2046,6 +2047,7 @@ export function commitResumeInner(state: TrySlot): void {
 	const hiddenActivity = findHiddenActivity(state.parentBlock);
 	const wasHeld = state.transitionHeld;
 	let releaseHeld = wasHeld;
+	let eventReveal: HydrationEventReveal | undefined;
 	if (wasHeld) state.transitionHeld = false;
 	// Leave the coordination sets — this boundary is committing now (a re-suspend
 	// during the re-render re-adds it via handleSuspense → enterHeldTransition).
@@ -2097,6 +2099,10 @@ export function commitResumeInner(state: TrySlot): void {
 				// Ref attach closures captured by a hidden pass can be stale after a
 				// later same-node ref supersession. Reveal uses the current manifest.
 				if (state.detachedRefs !== null) stagedCapture.refs.length = 0;
+				if (stagedCapture.hostEvents !== undefined && ROOT_RENDER_TRANSACTION !== null) {
+					eventReveal = { state, capture: stagedCapture, releasedHold: false };
+					(ROOT_RENDER_TRANSACTION.hostEventReveals ??= []).push(eventReveal);
+				}
 				spliceOffscreenCapture(stagedCapture, deferredNativeAcceptance);
 				state.hasResolved = true;
 			} else {
@@ -2221,6 +2227,11 @@ export function commitResumeInner(state: TrySlot): void {
 	} finally {
 		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 		if (releaseHeld) {
+			if (eventReveal !== undefined) {
+				eventReveal.releasedHold = true;
+				// A reentrant rollback may already have restored the parked slot.
+				if (state.stagedCapture === eventReveal.capture) state.transitionHeld = false;
+			}
 			tickTransitionCount(-1);
 			releaseTransitionHookHolder(state);
 		}
