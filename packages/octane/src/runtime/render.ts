@@ -2043,6 +2043,19 @@ export function commitResumeInner(state: TrySlot): void {
 		if (WIP_CAPTURE === null)
 			deferredNativeAcceptance = acceptNativeCapture(staged, state.parentBlock.idState.renderOwner);
 	}
+	const stagedCapture = state.stagedCapture;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (
+		stagedCapture?.hostEvents !== undefined &&
+		transaction !== null &&
+		!transaction.aborted &&
+		!ROOT_RENDER_ROLLBACK &&
+		transaction.owner === state.parentBlock.idState.renderOwner
+	) {
+		// A sibling can release this reveal inside its root render. Preserve the
+		// parked owner and its actions until the transferred host events are accepted.
+		journalRootReveal(state);
+	}
 	const wasPending = state.branch === 2;
 	const hiddenActivity = findHiddenActivity(state.parentBlock);
 	const wasHeld = state.transitionHeld;
@@ -2057,7 +2070,6 @@ export function commitResumeInner(state: TrySlot): void {
 		const tryBlock = state.tryBlock;
 		if (tryBlock && !tryBlock.disposed) {
 			const reconnectEffects = state.hiddenDom !== null;
-			const stagedCapture = state.stagedCapture;
 			state.stagedCapture = null;
 			state.stagedEffectDeps = null;
 			if (state.hiddenDom) {
