@@ -19,6 +19,7 @@ import { Session } from 'node:inspector/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import ts from 'typescript';
 import { readClientRuntime } from '../lib/client-runtime.mjs';
 
 if (!process.execArgv.includes('--jitless')) {
@@ -39,12 +40,30 @@ const repo = path.resolve(here, '../..');
 const runtimePath = path.join(repo, 'packages/octane/src/runtime.ts');
 const runtimeFile = path.resolve(process.argv[2] ?? runtimePath);
 const runtimeSource = readClientRuntime(runtimeFile);
-const commitSite = 'ROOT_RENDER_TRANSACTIONS = [];\n\tfor (const transaction of transactions) {';
-assert.equal(runtimeSource.split(commitSite).length, 2, 'one root commit loop');
-const observedRuntime = runtimeSource.replace(
-	commitSite,
-	commitSite + '\n\t\tglobalThis.__rootJournalSlots += transaction.log.length;',
+// Locate the commit loop structurally: queue reset and nesting can change without
+// changing the journal this synchronous fixture measures.
+const runtimeAst = ts.createSourceFile(runtimeFile, runtimeSource, ts.ScriptTarget.Latest, true);
+const commitFunction = runtimeAst.statements.find(
+	(node) => ts.isFunctionDeclaration(node) && node.name?.text === 'commitRootRenders',
 );
+assert.ok(commitFunction, 'root commit function exists');
+const commitLoops = [];
+(function visit(node) {
+	if (
+		ts.isForOfStatement(node) &&
+		ts.isIdentifier(node.expression) &&
+		node.expression.text === 'transactions' &&
+		ts.isBlock(node.statement)
+	)
+		commitLoops.push(node.statement);
+	ts.forEachChild(node, visit);
+})(commitFunction);
+assert.equal(commitLoops.length, 1, 'one root commit loop');
+const commitAt = commitLoops[0].getStart(runtimeAst) + 1;
+const observedRuntime =
+	runtimeSource.slice(0, commitAt) +
+	'\nglobalThis.__rootJournalSlots += transaction.log.length;' +
+	runtimeSource.slice(commitAt);
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const exportsMap = JSON.parse(
 	fs.readFileSync(path.join(repo, 'packages/octane/package.json')),

@@ -238,6 +238,27 @@ after its precise-coverage pass, and can also run independently via
 20 root updates per mode with 12 warmup updates; update times are diagnostics,
 not wall-time pass/fail gates.
 
+The direct dependency ledger also uses compact records instead of a per-consumer
+Map. On the October 21 runtime, that removes 512 additional Maps from both
+reader modes, restoring the 0/512 budgets while keeping provider-local values
+and memo invalidation intact.
+
+The separate cost control runs with:
+
+```bash
+node --expose-gc --min-semi-space-size=256 --max-semi-space-size=256 benchmarks/recursive-context/context-read-cost.mjs
+```
+
+It measures retained
+heap, allocation per update, and update time for 256 consumers reading 1, 2, 16,
+64, or 128 contexts in a minified production bundle. It checks every final
+value and host identity. These happy-dom measurements are observational, not
+browser scores or ratio gates. The compact ledger reduced retained heap by
+about 128/80 bytes per one/two-context reader in local A/B runs; large lists
+trade the Map's compact storage for records (about 2.5 KB more per reader at
+128 contexts). Timing differences on a shared workstation are not a latency
+claim.
+
 Default: 10 warmups + 20 iters. Pass an integer to `bench` to override iters
 (`bench:long` runs 40).
 

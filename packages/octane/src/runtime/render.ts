@@ -796,7 +796,7 @@ export function renderBlockInner(block: Block): true | undefined {
 	(block as any).__thenableDone = false;
 	// Clear last render's recorded context dependencies; this render repopulates
 	// them (its own reads + descendant reads propagated up). Only memo/armed
-	// blocks ever hold a non-null map, so this is a no-op for the common case.
+	// blocks hold dependency collections; the common case has nothing to clear.
 	if (block.$$ctxReads !== null) block.$$ctxReads.clear();
 	if (block.$$ctxDirect !== null) {
 		// Native refreshes retain Hydrate props. Save context invalidation before
@@ -810,9 +810,9 @@ export function renderBlockInner(block: Block): true | undefined {
 		) {
 			state.contextChanged = block.$$ctxDepsEpoch !== EPOCH_CELL.value && ctxDirectChanged(block);
 		}
-		block.$$ctxDirect.clear();
+		block.$$ctxDirect = null;
 	}
-	// Stamp the dep maps' consistency epoch: entries written during this render
+	// Stamp the dependencies' consistency epoch: entries written during this render
 	// record live versions, so while the global epoch still equals this sample
 	// no recorded dep can be stale. Sampling at the TOP is deliberate — a
 	// provider commit mid-render advances the epoch past this stamp, so the

@@ -73,6 +73,7 @@ import {
 	renderSharedBody,
 	invalidateSharedBodyOutput,
 	promoteMemoAncestry,
+	type DirectContextReads,
 } from './context.js';
 import { CURSOR, type HydrationCapability } from './hydration.js';
 import {
@@ -1732,7 +1733,8 @@ function ctxDepsChanged(block: Block): boolean {
 export function ctxDirectChanged(block: Block): boolean {
 	const direct = block.$$ctxDirect;
 	if (direct === null) return false;
-	for (const [ctx, read] of direct) {
+	for (let entry: DirectContextReads | null = direct; entry !== null; entry = entry.next) {
+		const { context: ctx, read } = entry;
 		const version = typeof read === 'number' ? read : read.version;
 		if (ctx.$$version === version) continue;
 		// Versions belong to the Context, not to one provider. Another provider
@@ -1852,7 +1854,7 @@ function restampCtxDeps(block: Block): void {
 	const reads = block.$$ctxReads;
 	const direct = block.$$ctxDirect;
 	const hasReads = reads !== null && reads.size > 0;
-	const hasDirect = direct !== null && direct.size > 0;
+	const hasDirect = direct !== null;
 	if (!hasReads && !hasDirect) return;
 	for (let b: Block | null = block.parentBlock; b !== null; b = b.parentBlock) {
 		if ((b.body as any)?.__memo !== true && b.$$implicitBail !== true) continue;
@@ -1872,7 +1874,8 @@ function restampCtxDeps(block: Block): void {
 			}
 		}
 		if (hasDirect) {
-			for (const [ctx, read] of direct!) {
+			for (let entry: DirectContextReads | null = direct; entry !== null; entry = entry.next) {
+				const { context: ctx, read } = entry;
 				const v = typeof read === 'number' ? read : read.version;
 				const cur = m.get(ctx);
 				if (cur !== v) {
@@ -1899,7 +1902,7 @@ export function restampCachedContextScope(scope: Scope): void {
 			restampCtxDeps(block);
 			return;
 		}
-		if (block.$$ctxDirect !== null && block.$$ctxDirect.size !== 0) {
+		if (block.$$ctxDirect !== null) {
 			restampCtxDeps(block);
 		}
 	}

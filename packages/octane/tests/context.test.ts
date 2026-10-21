@@ -7,6 +7,7 @@ import {
 	createRoot,
 	flushSync,
 	hydrateRoot,
+	memo,
 	use,
 } from '../src/index.js';
 import { mount, act } from './_helpers';
@@ -410,7 +411,7 @@ describe('context — retained provider resolution', () => {
 		}
 	});
 
-	it('keeps earlier and later reads aligned when a second context read appears conditionally', () => {
+	it.each([false, true])('keeps conditional reads current (memo=%s)', (memoized) => {
 		const First = createContext('a-default');
 		const Second = createContext('b-default');
 		const Third = createContext('c-default');
@@ -424,6 +425,7 @@ describe('context — retained provider resolution', () => {
 				`${first}|${second}|${third}`,
 			);
 		}
+		const Target = memoized ? memo(Reader) : Reader;
 		function Host(props: { readSecond: boolean; second: string; third: string }) {
 			return createElement(
 				First,
@@ -434,7 +436,7 @@ describe('context — retained provider resolution', () => {
 					createElement(
 						Third,
 						{ value: props.third },
-						createElement(Reader, { readSecond: props.readSecond }),
+						createElement(Target, { readSecond: props.readSecond }),
 					),
 				),
 			);
@@ -445,6 +447,10 @@ describe('context — retained provider resolution', () => {
 			expect(output.textContent).toBe('a0|(off)|c0');
 			r.update(Host, { readSecond: true, second: 'b0', third: 'c0' });
 			expect(output.textContent).toBe('a0|b0|c0');
+			r.update(Host, { readSecond: true, second: 'b1', third: 'c0' });
+			expect(output.textContent).toBe('a0|b1|c0');
+			r.update(Host, { readSecond: true, second: 'b1', third: 'c1' });
+			expect(output.textContent).toBe('a0|b1|c1');
 			r.update(Host, { readSecond: false, second: 'b0', third: 'c1' });
 			expect(output.textContent).toBe('a0|(off)|c1');
 			r.update(Host, { readSecond: true, second: 'b1', third: 'c1' });

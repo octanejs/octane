@@ -683,6 +683,17 @@ export function promoteMemoAncestry(scope: Scope): void {
 }
 
 export type DirectContextRead = number | { version: number; owner: Scope; value: unknown };
+// Most consumers read one context; keep their dependency in one small record.
+export type DirectContextReads = {
+	context: Context<any>;
+	read: DirectContextRead;
+	next: DirectContextReads | null;
+};
+
+function findDirectContextRead(direct: DirectContextReads | null, context: Context<any>) {
+	while (direct !== null && direct.context !== context) direct = direct.next;
+	return direct;
+}
 
 function recordContextDependency(
 	block: Block | null,
@@ -690,10 +701,12 @@ function recordContextDependency(
 ): DirectContextRead | undefined {
 	if (block === null || !block.memoInChain) return;
 	SKIPPED_ROW_REFRESH = refreshSkippedRows;
-	const direct = (block.$$ctxDirect ??= new Map());
-	const previous = direct.get(context);
+	const direct = findDirectContextRead(block.$$ctxDirect, context);
+	const previous = direct?.read;
 	// Stamp before resolving: hosted context reads may suspend or throw.
-	direct.set(context, context.$$version);
+	if (direct === null) {
+		block.$$ctxDirect = { context, read: context.$$version, next: block.$$ctxDirect };
+	} else direct.read = context.$$version;
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
 			(current.$$ctxReads ??= new Map()).set(context, context.$$version);
@@ -721,12 +734,13 @@ function recordLocalContextValue(
 				? (cache as Map<Context<any>, Scope | typeof DEFAULT_CTX>).get(context)
 				: undefined;
 	if (owner === null || owner === undefined || owner === DEFAULT_CTX) return;
+	const direct = findDirectContextRead(block.$$ctxDirect, context)!;
 	if (previous !== undefined) {
 		if (previous.owner !== owner || !Object.is(previous.value, value)) return;
 		previous.version = context.$$version;
-		block.$$ctxDirect!.set(context, previous);
+		direct.read = previous;
 	} else {
-		block.$$ctxDirect!.set(context, { version: context.$$version, owner, value });
+		direct.read = { version: context.$$version, owner, value };
 	}
 }
 
