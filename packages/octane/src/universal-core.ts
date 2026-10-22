@@ -30,6 +30,7 @@ import {
 	__profileTrackComponent,
 } from './profiling.js';
 import { getRendererHostFlusher } from './renderer-bridge.js';
+import { createUniversalChildren } from './universal-children.js';
 import { resolveLazyDefaultProps } from './shared-value-helpers.js';
 import {
 	deactivateEffectEventCells,
@@ -1686,6 +1687,20 @@ function renderableKey(value: UniversalRenderable): UniversalKey | null {
 	}
 	return null;
 }
+
+export { descriptorChildren } from './universal-children.js';
+
+export const Children = createUniversalChildren({
+	universalKey,
+	universalPlan,
+	universalValue,
+	normalizeProps: normalizePropsValue,
+	checkRenderer(renderer) {
+		if (CURRENT_OWNER !== null && renderer !== currentAttempt().root.renderer) {
+			throw new Error('Universal renderer mismatch while normalizing children.');
+		}
+	},
+});
 
 function defineUniversalProtoProp(props: Record<PropertyKey, unknown>, value: unknown): void {
 	// Assignment would invoke Object.prototype.__proto__ instead of creating

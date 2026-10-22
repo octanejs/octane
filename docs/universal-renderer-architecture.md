@@ -428,6 +428,9 @@ The executable universal target accepts normal Octane component composition:
   error ownership, HMR, profiling, and parallel-`use()` planning;
 - `<Activity mode="visible"|"hidden">` when the selected renderer declares
   `visibility`, with retained hosts and renderer-owned effect/event semantics.
+- `Children.toArray`/`Children.map` and the `descriptorChildren` marker, so a
+  shared `.tsrx` component that enumerates its children compiles for universal
+  renderers; scoped blocks and control flow stay opaque single entries.
 - `createPortal(children, target)` descriptors, whose execution requires the
   active driver's `portals` capability; renderer metadata may advertise
   `portal` for tooling while component/context/error/effect ownership stays at

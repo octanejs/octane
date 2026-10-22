@@ -242,6 +242,8 @@ const THREE_BUILTIN_CONSTRUCTORS = new Set([
 
 const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'Activity',
+	'Children',
+	'descriptorChildren',
 	'createContext',
 	'createPortal',
 	'lazy',

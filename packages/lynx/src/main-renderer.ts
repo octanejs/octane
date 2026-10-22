@@ -26,6 +26,7 @@ import type {
 	UniversalRenderContext,
 } from 'octane/universal/native';
 import { isContext, registerContext } from 'octane/internal/context';
+import { createUniversalChildren, descriptorChildren } from 'octane/internal/universal-children';
 import { hasOwnSymbolFields } from './core/own-symbols.js';
 import { isLynxNativeResource } from './resource.js';
 
@@ -376,6 +377,16 @@ export function universalComponent(
 		hasKey: key !== NO_KEY || normalized.hasKey,
 	} as never;
 }
+
+export { descriptorChildren } from 'octane/internal/universal-children';
+
+export const Children = createUniversalChildren({
+	universalKey,
+	universalPlan,
+	universalValue,
+	normalizeProps,
+	checkRenderer: assertRenderer,
+});
 
 export function universalChildren(
 	renderer: string,

@@ -156,12 +156,23 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/main-thread.ts',
 				'src/resource.ts',
 			],
-			packages: ['octane/internal/context'],
+			packages: ['octane/internal/context', 'octane/internal/universal-children'],
 		});
 		expect(
 			runtimeSourceGraph(resolve(REPOSITORY_ROOT, 'packages/octane/src/internal/context.ts')),
 		).toEqual({
 			files: ['../octane/src/context-identity.ts', '../octane/src/internal/context.ts'],
+			packages: [],
+		});
+		expect(
+			runtimeSourceGraph(
+				resolve(REPOSITORY_ROOT, 'packages/octane/src/internal/universal-children.ts'),
+			),
+		).toEqual({
+			files: [
+				'../octane/src/internal/universal-children.ts',
+				'../octane/src/universal-children.ts',
+			],
 			packages: [],
 		});
 	});

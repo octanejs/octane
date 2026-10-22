@@ -101,6 +101,7 @@
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
     "./internal/context": "./src/internal/context.ts",
+    "./internal/universal-children": "./src/internal/universal-children.ts",
     "./internal/signal-read": "./src/internal/signal-read.ts",
     "./internal/hydration-signal": "./src/signals/hydration-input-source.ts",
     "./internal/hydration-query": "./src/signals/hydration-query-input.ts",
@@ -342,6 +343,17 @@
         "import": "./dist/internal/server.js",
         "require": "./dist/cjs/internal/server.cjs",
         "default": "./dist/internal/server.js"
+      },
+      "./internal/universal-children": {
+        "types": "./dist/internal/universal-children.d.ts",
+        "node": {
+          "import": "./dist/node/internal/universal-children.js",
+          "require": "./dist/cjs/internal/universal-children.cjs",
+          "default": "./dist/node/internal/universal-children.js"
+        },
+        "import": "./dist/internal/universal-children.js",
+        "require": "./dist/cjs/internal/universal-children.cjs",
+        "default": "./dist/internal/universal-children.js"
       },
       "./internal/context": {
         "types": "./dist/internal/context.d.ts",

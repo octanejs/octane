@@ -49,6 +49,18 @@ const SETUP_BLOCK_SOURCE = `
 	}
 `;
 
+const CHILDREN_MAP_SOURCE = `
+	import { Children } from 'octane';
+
+	function Wrap(props) @{
+		<view>{Children.map(props.children, (child) => <view>{child}</view>)}</view>
+	}
+
+	export function App() @{
+		<Wrap><text>{'A'}</text><text>{'B'}</text></Wrap>
+	}
+`;
+
 const STATEFUL_BLOCK_SOURCE = `
 	import { useState } from 'octane';
 
@@ -113,6 +125,7 @@ process.stdout.write(JSON.stringify({
 				keyedDestructuredFor: KEYED_DESTRUCTURED_FOR_SOURCE,
 				keyedDestructuredObjectFor: KEYED_DESTRUCTURED_OBJECT_FOR_SOURCE,
 				setupBlock: SETUP_BLOCK_SOURCE,
+				childrenMap: CHILDREN_MAP_SOURCE,
 				statefulBlock: STATEFUL_BLOCK_SOURCE,
 			}),
 		},
@@ -284,6 +297,21 @@ describe('Lynx compiled output links against its renderer runtime', () => {
 				expect.objectContaining({ op: 'create', type: '#text', props: { value } }),
 			);
 		}
+		expect(main).toEqual(background);
+	});
+
+	it('maps Children on the first screen identically on both threads', async () => {
+		const main = await renderMainThread('childrenMap', {});
+		const background = await renderBackground('childrenMap', {});
+
+		for (const value of ['A', 'B']) {
+			expect(main.commands).toContainEqual(
+				expect.objectContaining({ op: 'create', type: '#text', props: { value } }),
+			);
+		}
+		expect(
+			main.commands.filter((command: { op: string; type?: string }) => command.type === 'view'),
+		).toHaveLength(3);
 		expect(main).toEqual(background);
 	});
 

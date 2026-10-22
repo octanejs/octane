@@ -27,6 +27,7 @@ export const COMMONJS_ENTRIES = [
 	'src/internal/client.ts',
 	'src/internal/server.ts',
 	'src/internal/context.ts',
+	'src/internal/universal-children.ts',
 	'src/signals/index.ts',
 	'src/signals/client.ts',
 	'src/signals/server.ts',
