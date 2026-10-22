@@ -9354,11 +9354,12 @@ function isReturnJsxFunction(node) {
 	return false;
 }
 
-// An uppercase `const X = (…) => <jsx/>` (or function expression) exported by
-// name or through `export default X`. It compiles as a plain value, so HMR
-// registers its binding rather than a lowered component declaration.
-/** @param {any} node @param {Set<string>} defaultNames @returns {{ name: string, exportKind: 'named' | 'default', declaration: any } | null} */
-function hmrValueComponent(node, defaultNames) {
+// An uppercase `const X = (…) => <jsx/>` (or function expression, or a
+// single-argument `memo(…)` of one) exported by name or through
+// `export default X`. It compiles as a plain value, so HMR registers its binding
+// rather than a lowered component declaration.
+/** @param {any} node @param {Set<string>} defaultNames @param {(callee: any) => boolean} isMemoCallee @returns {{ name: string, exportKind: 'named' | 'default', memo: boolean } | null} */
+function hmrValueComponent(node, defaultNames, isMemoCallee) {
 	const exported = node.type === 'ExportNamedDeclaration';
 	const declaration = exported ? node.declaration : node;
 	if (
@@ -9371,14 +9372,17 @@ function hmrValueComponent(node, defaultNames) {
 	if (declarator.id?.type !== 'Identifier' || !/^[A-Z]/.test(declarator.id.name)) return null;
 	const name = declarator.id.name;
 	if (!exported && !defaultNames.has(name)) return null;
-	const fn = unwrapTsExpr(declarator.init);
+	const init = declarator.init;
+	const memo =
+		init?.type === 'CallExpression' && init.arguments.length === 1 && isMemoCallee(init.callee);
+	const fn = unwrapTsExpr(memo ? init.arguments[0] : init);
 	if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') return null;
 	if (fn.async || fn.generator || !fn.body) return null;
 	const returnsJsx =
 		fn.body.type === 'BlockStatement'
 			? fn.body.body.some(statementHasOwnedJsxReturn)
 			: isJsxNode(fn.body);
-	return returnsJsx ? { name, exportKind: exported ? 'named' : 'default', declaration } : null;
+	return returnsJsx ? { name, exportKind: exported ? 'named' : 'default', memo } : null;
 }
 
 /** @param {any} stmt @returns {boolean} */
@@ -10423,7 +10427,7 @@ function runtimeExportBindings(body) {
 		if (node.type === 'ExportAllDeclaration') {
 			bindings.push([null, null]);
 		} else if (node.type === 'ExportDefaultDeclaration') {
-			const value = node.declaration;
+			const value = unwrapTsExpr(node.declaration);
 			bindings.push([
 				'default',
 				value.type === 'Identifier'
@@ -13524,7 +13528,9 @@ function compileInternal(
 			)
 				defaultNames.add(unwrapTsExpr(node.declaration).name);
 		for (const node of ast.body) {
-			const component = hmrValueComponent(node, defaultNames);
+			const component = hmrValueComponent(node, defaultNames, (callee) =>
+				isOctaneMemoCallee(callee, ctx, memoImportNames),
+			);
 			if (component === null) continue;
 			hmrValueComponents.set(node, component);
 			if (component.exportKind === 'default') hmrDefaultValues.add(component.name);
@@ -13621,15 +13627,41 @@ function compileInternal(
 				const name = valueComponent.name;
 				const declaration =
 					lowered.type === 'ExportNamedDeclaration' ? lowered.declaration : lowered;
-				const mutable = { ...declaration, kind: 'let' };
-				bodyNodes.push(
-					lowered === declaration ? mutable : { ...lowered, declaration: mutable },
-					inheritOriginLoc(
-						b.stmt(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))),
-						node,
-					),
-				);
-				hmrComponents.push({ name, exportKind: valueComponent.exportKind });
+				const [declarator] = declaration.declarations;
+				// A memo wrapper keeps its identity and comparator; HMR swaps the body it wraps.
+				const mutable = valueComponent.memo
+					? {
+							...declaration,
+							kind: 'let',
+							declarations: [
+								{
+									...declarator,
+									init: {
+										...declarator.init,
+										arguments: [
+											inheritOriginLoc(
+												b.call('_$hmr', declarator.init.arguments[0]),
+												declarator.init.arguments[0],
+											),
+										],
+									},
+								},
+							],
+						}
+					: { ...declaration, kind: 'let' };
+				bodyNodes.push(lowered === declaration ? mutable : { ...lowered, declaration: mutable });
+				if (!valueComponent.memo)
+					bodyNodes.push(
+						inheritOriginLoc(
+							b.stmt(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))),
+							node,
+						),
+					);
+				hmrComponents.push({
+					name,
+					exportKind: valueComponent.exportKind,
+					memo: valueComponent.memo,
+				});
 			} else if (
 				node.type === 'ExportDefaultDeclaration' &&
 				unwrapTsExpr(node.declaration)?.type === 'Identifier' &&
@@ -13759,6 +13791,7 @@ function compileInternal(
 			b.member(b.member(hot(), 'data'), b.id('__octaneComponents'), false, optional);
 		const previousComponent = (component) =>
 			b.member(componentStore(), b.id(componentKey(component)));
+		const hmrBody = (component, value) => (component.memo ? b.member(value, 'type') : value);
 		const handoffs = hmrComponents.map((c) =>
 			b.if(
 				// Newly added exports may be named constructor or __proto__; inherited
@@ -13777,8 +13810,8 @@ function compileInternal(
 						b.unary(
 							'!',
 							b.call(
-								b.member(b.member(previousComponent(c), b.id('_$HMR'), true), 'update'),
-								b.id(c.name),
+								b.member(b.member(hmrBody(c, previousComponent(c)), b.id('_$HMR'), true), 'update'),
+								hmrBody(c, b.id(c.name)),
 							),
 						),
 						b.block([b.stmt(b.call(b.member(hot(), 'invalidate')))]),
