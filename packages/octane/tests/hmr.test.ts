@@ -599,6 +599,59 @@ describe('hmr — runtime wrapper', () => {
 		container.remove();
 	});
 
+	it('refreshes a split Hydrate child with current captured props', async () => {
+		const filename = '/src/HydrateHmr.tsrx';
+		const query = './HydrateHmr.tsrx?octane-hydrate=0';
+		const source = (step: number) => `
+			import { Hydrate } from 'octane';
+			import { load } from 'octane/hydration';
+			export function App({ label, ready }) @{
+				<Hydrate when={load()}><span ref={ready}>{label as string} step${step}</span></Hydrate>
+			}
+		`;
+		const [initial, firstEdit, secondEdit] = await Promise.all(
+			[0, 1, 2].map((step) =>
+				compileHmrComponent(source(step), 'default', filename + '?octane-hydrate=0'),
+			),
+		);
+		const server = loadCompiledFixtureSource(source(0), {
+			id: filename,
+			mode: 'server',
+			compileOptions: { hmr: false },
+		});
+		const client = loadCompiledFixtureSource(source(0), {
+			id: filename,
+			mode: 'client',
+			compileOptions: { hmr: false },
+			runtimeModules: { [query]: { default: initial } },
+		});
+		const ready = vi.fn();
+		const props = { label: 'captured', ready };
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(server.App, props).html;
+		const serverNode = container.querySelector('span');
+		expect(serverNode?.textContent).toBe('captured step0');
+		document.body.append(container);
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, client.App, props, {
+			onUncaughtError: (error) => errors.push(error),
+		});
+		try {
+			await vi.waitFor(() => expect(ready).toHaveBeenCalledWith(serverNode));
+			expect(container.querySelector('span')).toBe(serverNode);
+			flushSync(() => expect((initial as any)[HMR].update(firstEdit)).toBe(true));
+			expect(container.textContent).toBe('captured step1');
+			flushSync(() => root.render(client.App, { label: 'fresh', ready }));
+			expect(container.textContent).toBe('fresh step1');
+			flushSync(() => expect((initial as any)[HMR].update(secondEdit)).toBe(true));
+			expect(container.textContent).toBe('fresh step2');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
 	it('mounts a component call introduced by a compiled update', async () => {
 		const initial = await compileHmrComponent(`
 			export function App() @{
