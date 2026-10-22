@@ -13518,8 +13518,11 @@ function compileInternal(
 	) {
 		const defaultNames = new Set();
 		for (const node of ast.body)
-			if (node.type === 'ExportDefaultDeclaration' && node.declaration?.type === 'Identifier')
-				defaultNames.add(node.declaration.name);
+			if (
+				node.type === 'ExportDefaultDeclaration' &&
+				unwrapTsExpr(node.declaration)?.type === 'Identifier'
+			)
+				defaultNames.add(unwrapTsExpr(node.declaration).name);
 		for (const node of ast.body) {
 			const component = hmrValueComponent(node, defaultNames);
 			if (component === null) continue;
@@ -13629,13 +13632,14 @@ function compileInternal(
 				hmrComponents.push({ name, exportKind: valueComponent.exportKind });
 			} else if (
 				node.type === 'ExportDefaultDeclaration' &&
-				node.declaration?.type === 'Identifier' &&
-				hmrDefaultValues.has(node.declaration.name)
+				unwrapTsExpr(node.declaration)?.type === 'Identifier' &&
+				hmrDefaultValues.has(unwrapTsExpr(node.declaration).name)
 			) {
-				// A live binding, so the handoff's rebinding reaches importers.
+				// A live binding, so the handoff's rebinding reaches importers. An
+				// export specifier cannot carry an `as`/`satisfies` assertion.
 				bodyNodes.push(
 					inheritOriginLoc(
-						b.export(null, [b.export_specifier(node.declaration.name, 'default')]),
+						b.export(null, [b.export_specifier(unwrapTsExpr(node.declaration).name, 'default')]),
 						node,
 					),
 				);

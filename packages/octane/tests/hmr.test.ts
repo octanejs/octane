@@ -1382,10 +1382,17 @@ describe('hmr — runtime wrapper', () => {
 		}
 	});
 
-	it('hot-updates an arrow component exported through export default', async () => {
+	// A TypeScript wrapper on the default export must not hide the binding.
+	it.each([
+		['Page'],
+		['Page as typeof Page'],
+		['Page satisfies typeof Page'],
+		['Page!'],
+		['(Page)'],
+	])('hot-updates an arrow component exported through export default %s', async (exported) => {
 		const source = (version: number) => `/** @jsxImportSource octane */
 			const Page = (props: { label: string }) => <p>{'v${version} ' + props.label}</p>;
-			export default Page;
+			export default ${exported};
 		`;
 		const load = async (version: number) =>
 			(await compileHmrModule(source(version), ['default'], '/src/Page.tsx', {}, { hmr: 'vite' }))[
