@@ -1357,6 +1357,66 @@ describe('hmr — runtime wrapper', () => {
 		expect(webpack).toContain('_$webpackHot.dispose');
 	});
 
+	// Exported `const X = () => <jsx/>` compiled without an accept boundary, so
+	// every edit to such a module reloaded the page.
+	it('hot-updates an exported arrow component in place, keeping its state', async () => {
+		const source = (version: number) => `/** @jsxImportSource octane */
+			import { useState } from 'octane';
+			export const App = () => {
+				const [count, setCount] = useState(0);
+				return <button id="bump" onClick={() => setCount(count + 1)}>{'v${version}:' + count}</button>;
+			};
+		`;
+		const hot = webpackHotModule('/src/App.tsx');
+		const r = mount(await hot.load(source(1)));
+		try {
+			r.click('#bump');
+			expect(r.find('#bump').textContent).toBe('v1:1');
+			await hot.load(source(2));
+			flushSync(() => {});
+			expect(hot.accepted).toBe(true);
+			expect(hot.invalidated).toBe(false);
+			expect(r.find('#bump').textContent).toBe('v2:1');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('hot-updates an arrow component exported through export default', async () => {
+		const source = (version: number) => `/** @jsxImportSource octane */
+			const Page = (props: { label: string }) => <p>{'v${version} ' + props.label}</p>;
+			export default Page;
+		`;
+		const load = async (version: number) =>
+			(await compileHmrModule(source(version), ['default'], '/src/Page.tsx', {}, { hmr: 'vite' }))[
+				'default'
+			];
+		const initial = await load(1);
+		const r = mount(initial, { label: 'a' });
+		try {
+			expect(r.find('p').textContent).toBe('v1 a');
+			const updated = await load(2);
+			flushSync(() => expect((initial as any)[HMR].update(updated)).toBe(true));
+			expect(r.find('p').textContent).toBe('v2 a');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('leaves non-component arrow exports unwrapped', async () => {
+		const { compile } = await import('octane/compiler');
+		const source =
+			`export const renderRow = () => <li />;\n` +
+			`export const Label = 'label';\n` +
+			`export let Mutable = () => <b />;\n`;
+		const { code } = compile(source, 'file.tsx', { hmr: 'vite' });
+		expect(code).not.toContain('_$hmr(');
+		expect(code).not.toContain('import.meta.hot');
+		const off = compile(`export const Foo = () => <span />;\n`, 'file.tsx').code;
+		expect(off).toContain('export const Foo =');
+		expect(off).not.toContain('import.meta.hot');
+	});
+
 	it('hmr option off → no wrapping, no accept block', async () => {
 		const { compile } = await import('octane/compiler');
 		const src = "export function Foo() @{ <span>{'hi'}</span> }\n";

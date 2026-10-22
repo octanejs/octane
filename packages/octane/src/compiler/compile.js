@@ -9354,6 +9354,33 @@ function isReturnJsxFunction(node) {
 	return false;
 }
 
+// An uppercase `const X = (…) => <jsx/>` (or function expression) exported by
+// name or through `export default X`. It compiles as a plain value, so HMR
+// registers its binding rather than a lowered component declaration.
+/** @param {any} node @param {Set<string>} defaultNames @returns {{ name: string, exportKind: 'named' | 'default', declaration: any } | null} */
+function hmrValueComponent(node, defaultNames) {
+	const exported = node.type === 'ExportNamedDeclaration';
+	const declaration = exported ? node.declaration : node;
+	if (
+		declaration?.type !== 'VariableDeclaration' ||
+		declaration.kind !== 'const' ||
+		declaration.declarations.length !== 1
+	)
+		return null;
+	const declarator = declaration.declarations[0];
+	if (declarator.id?.type !== 'Identifier' || !/^[A-Z]/.test(declarator.id.name)) return null;
+	const name = declarator.id.name;
+	if (!exported && !defaultNames.has(name)) return null;
+	const fn = unwrapTsExpr(declarator.init);
+	if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') return null;
+	if (fn.async || fn.generator || !fn.body) return null;
+	const returnsJsx =
+		fn.body.type === 'BlockStatement'
+			? fn.body.body.some(statementHasOwnedJsxReturn)
+			: isJsxNode(fn.body);
+	return returnsJsx ? { name, exportKind: exported ? 'named' : 'default', declaration } : null;
+}
+
 /** @param {any} stmt @returns {boolean} */
 function statementHasOwnedJsxReturn(stmt) {
 	if (!stmt) return false;
@@ -13479,6 +13506,27 @@ function compileInternal(
 	ctx.hydrationPropsModule = ast;
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
+	// Exported `const X = () => <jsx/>` components stay plain values; HMR rebinds
+	// them like lowered components. Keyed by authored top-level statement.
+	const hmrValueComponents = new Map();
+	const hmrDefaultValues = new Set();
+	if (
+		hmrEnabled &&
+		(options?.renderer?.target ?? 'dom') === 'dom' &&
+		universalRuntime === undefined &&
+		options?.__universal == null
+	) {
+		const defaultNames = new Set();
+		for (const node of ast.body)
+			if (node.type === 'ExportDefaultDeclaration' && node.declaration?.type === 'Identifier')
+				defaultNames.add(node.declaration.name);
+		for (const node of ast.body) {
+			const component = hmrValueComponent(node, defaultNames);
+			if (component === null) continue;
+			hmrValueComponents.set(node, component);
+			if (component.exportKind === 'default') hmrDefaultValues.add(component.name);
+		}
+	}
 	for (let node of ast.body) {
 		const firstStatement = bodyNodes.length;
 		if (
@@ -13544,6 +13592,7 @@ function compileInternal(
 			// (`const x = <style>…</style>`, exported or nested in a helper) become
 			// class-map objects and their sheets flow through cssInjections; scoped
 			// blocks inside plain functions' templates get their scope hashes.
+			const valueComponent = hmrValueComponents.get(node);
 			node = applyStyleScopes(node, ctx).node;
 			// HOOKS EVERYWHERE: a plain function (a custom hook, a helper) can hold
 			// octane hooks too — slot them the same way components do, so their base
@@ -13565,7 +13614,34 @@ function compileInternal(
 			const lowered = stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx);
 			// Top-level passthrough (imports, plain consts/functions): already a
 			// rewritten statement node — embedded directly in the module AST.
-			bodyNodes.push(lowered);
+			if (valueComponent !== undefined) {
+				const name = valueComponent.name;
+				const declaration =
+					lowered.type === 'ExportNamedDeclaration' ? lowered.declaration : lowered;
+				const mutable = { ...declaration, kind: 'let' };
+				bodyNodes.push(
+					lowered === declaration ? mutable : { ...lowered, declaration: mutable },
+					inheritOriginLoc(
+						b.stmt(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))),
+						node,
+					),
+				);
+				hmrComponents.push({ name, exportKind: valueComponent.exportKind });
+			} else if (
+				node.type === 'ExportDefaultDeclaration' &&
+				node.declaration?.type === 'Identifier' &&
+				hmrDefaultValues.has(node.declaration.name)
+			) {
+				// A live binding, so the handoff's rebinding reaches importers.
+				bodyNodes.push(
+					inheritOriginLoc(
+						b.export(null, [b.export_specifier(node.declaration.name, 'default')]),
+						node,
+					),
+				);
+			} else {
+				bodyNodes.push(lowered);
+			}
 		}
 		if (ctx.typescriptWeb && node.leadingComments && bodyNodes.length > firstStatement) {
 			bodyNodes[firstStatement] = {
