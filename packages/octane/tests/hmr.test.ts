@@ -1539,11 +1539,70 @@ describe('hmr — runtime wrapper', () => {
 		}
 	});
 
+	// `function X() {…}; export default X` compiled without an accept boundary.
+	it.each([
+		[
+			'/src/Page.tsx',
+			'function Page() { const [n, setN] = useState(0); return <button onClick={() => setN(n + 1)}>{VERSION + n}</button>; }',
+		],
+		[
+			'/src/Page.tsrx',
+			'function Page() @{ const [n, setN] = useState(0); <button onClick={() => setN(n + 1)}>{(VERSION + n) as string}</button> }',
+		],
+	])(
+		'hot-updates a function declaration in %s exported through export default',
+		async (filename, component) => {
+			const data: Record<string, unknown> = {};
+			let accept: Parameters<TestHotContext['accept']>[0];
+			let invalidated = false;
+			const load = async (version: number) => {
+				const previousAccept = accept;
+				accept = undefined;
+				const Page = await compileHmrComponent(
+					`/** @jsxImportSource octane */
+				import { useState } from 'octane';
+				${component.replace('VERSION', `'v${version}:'`)}
+				export default Page;`,
+					'default',
+					filename,
+					{},
+					{
+						hmr: 'vite',
+						hot: {
+							data,
+							dispose() {},
+							accept(callback) {
+								accept = callback;
+							},
+							invalidate() {
+								invalidated = true;
+							},
+						},
+					},
+				);
+				flushSync(() => previousAccept?.({ default: Page }));
+				return Page;
+			};
+			const Page = await load(1);
+			const r = mount(Page);
+			try {
+				r.click('button');
+				expect(r.find('button').textContent).toBe('v1:1');
+				expect(await load(2)).toBe(Page);
+				expect(invalidated).toBe(false);
+				expect(r.find('button').textContent).toBe('v2:1');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
 	it('leaves non-component arrow exports unwrapped', async () => {
 		const { compile } = await import('octane/compiler');
 		const source =
 			`export const renderRow = () => <li />;\n` +
 			`export const Label = 'label';\n` +
+			`function helper() { return 1; }\nexport default helper;\n` +
 			`export let Mutable = () => <b />;\n`;
 		const { code } = compile(source, 'file.tsx', { hmr: 'vite' });
 		expect(code).not.toContain('_$hmr(');

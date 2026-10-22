@@ -13514,6 +13514,7 @@ function compileInternal(
 	// them like lowered components. Keyed by authored top-level statement.
 	const hmrValueComponents = new Map();
 	const hmrDefaultValues = new Set();
+	const hmrDefaultFunctions = new Set();
 	if (
 		hmrEnabled &&
 		(options?.renderer?.target ?? 'dom') === 'dom' &&
@@ -13531,6 +13532,11 @@ function compileInternal(
 			const component = hmrValueComponent(node, defaultNames, (callee) =>
 				isOctaneMemoCallee(callee, ctx, memoImportNames),
 			);
+			if (
+				(isComponentFunction(node) || isReturnJsxFunction(node)) &&
+				defaultNames.has(node.id.name)
+			)
+				hmrDefaultFunctions.add(node.id.name);
 			if (component === null) continue;
 			hmrValueComponents.set(node, component);
 			if (component.exportKind === 'default') hmrDefaultValues.add(component.name);
@@ -13544,7 +13550,23 @@ function compileInternal(
 		) {
 			continue;
 		}
-		if (isComponentFunction(node)) {
+		if (hmrDefaultFunctions.has(node.id?.name) && node.type === 'FunctionDeclaration') {
+			// `function Foo() {…}` exported through `export default Foo` compiles
+			// like `export default function Foo() {…}`; that export is dropped below.
+			const c = { ...node, default: true };
+			bodyNodes.push(
+				...(isComponentFunction(node)
+					? compileComponent(c, ctx, compileOpts)
+					: compileReturnJsxFunction(node, ctx, { default: true, ...compileOpts })
+				).nodes,
+			);
+			hmrComponents.push({ name: node.id.name, exportKind: 'default' });
+		} else if (
+			node.type === 'ExportDefaultDeclaration' &&
+			hmrDefaultFunctions.has(unwrapTsExpr(node.declaration)?.name)
+		) {
+			continue;
+		} else if (isComponentFunction(node)) {
 			// `function Foo() @{ ... }` (new TSRX shape) — non-exported helper. HMR
 			// doesn't wrap these (they're not user-visible across module boundaries).
 			bodyNodes.push(...compileComponent(node, ctx).nodes);
