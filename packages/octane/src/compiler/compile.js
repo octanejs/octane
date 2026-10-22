@@ -12719,6 +12719,11 @@ function compileInternal(
 		// single module print must carry a loc (OCTANE_COMPILE_ASSERT_LOC).
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
+	if (ctx.inspect) {
+		for (const unit of [options?.__universal, ...universalUnits]) {
+			for (const sheet of unit?.styles ?? []) claimCssOrigins(ctx, sheet);
+		}
+	}
 	ctx.privateWarmLists = source.includes('@for') ? collectPrivateWarmLists(ast.body) : null;
 	if (hookDepHelperLocal !== null) {
 		ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);

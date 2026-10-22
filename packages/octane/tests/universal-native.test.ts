@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import { build } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import {
+	createUniversalStyleRegistry,
 	createContext,
 	createObjectContainer,
 	createObjectDriver,
@@ -77,6 +78,30 @@ async function drainMicrotasks(turns = 12): Promise<void> {
 }
 
 describe('host-neutral universal entry', () => {
+	it('replaces module CSS without browser globals and ignores stale disposers', () => {
+		const calls: unknown[] = [];
+		const register = createUniversalStyleRegistry((id, sheets) => calls.push([id, sheets]));
+		const original = [{ id: 'scope-a', css: '.scope-a { color: red }' }];
+		const stale = register('a', original);
+		const same = register(
+			'a',
+			original.map((sheet) => ({ ...sheet })),
+		);
+		expect(calls).toHaveLength(1);
+		stale();
+		expect(calls).toHaveLength(1);
+		const other = register('b', original);
+		const current = register('a', [{ id: 'scope-b', css: '.scope-b { color: green }' }]);
+		same();
+		expect(calls).toHaveLength(3);
+		current();
+		current();
+		other();
+		expect(calls.slice(3)).toEqual([
+			['a', []],
+			['b', []],
+		]);
+	});
 	it('provides renderer-local context without a DOM owner', () => {
 		const Theme = createContext('default');
 		const container = createObjectContainer(RENDERER);

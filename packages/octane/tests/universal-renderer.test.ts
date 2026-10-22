@@ -206,6 +206,7 @@ type HmrAccept = (module: HmrModule | undefined) => void;
 interface HmrContext {
 	data: Record<string, unknown> | undefined;
 	dispose(callback: HmrDispose): void;
+	prune?(callback: HmrDispose): void;
 	accept(callback?: HmrAccept): void;
 	invalidate(): void;
 }
@@ -333,6 +334,259 @@ function comparableCompiledAst(node: any): unknown {
 			.map(([key, value]) => [key, comparableCompiledAst(value)]),
 	);
 }
+
+describe('universal scoped styles', () => {
+	it.each(['vite', 'webpack'] as const)(
+		'cleans sibling renderer regions with %s disposal',
+		(hmr) => {
+			const owned = new Map<string, readonly UniversalRuntime.UniversalStyleSheet[]>();
+			const registerUniversalStyles = UniversalRuntime.createUniversalStyleRegistry(
+				(id, sheets) => {
+					if (sheets.length) owned.set(id, sheets);
+					else owned.delete(id);
+				},
+			);
+			const lowered = [0, 1].map((index) => {
+				const child = `function Child${index}() @{ const theme = <style>.row { color: red }</style>; <view class={theme.row} /> }`;
+				return lowerUniversalRendererRegion(
+					`<Child${index} />`,
+					'/src/Regions.tsrx',
+					'dom',
+					{ ...renderer, capabilities: ['scoped-styles'] },
+					index,
+					'children',
+					{ hmr, authoredSource: child, components: [{ code: child }] },
+				);
+			});
+			let disposals: HmrDispose[] = [];
+			let prune: HmrDispose = () => {};
+			const data = {};
+			const hot: HmrContext = {
+				data,
+				dispose(fn) {
+					if (hmr === 'vite') disposals = [fn];
+					else disposals.push(fn);
+				},
+				prune(fn) {
+					prune = fn;
+				},
+				accept() {},
+				invalidate() {},
+			};
+			evaluateUniversalHmrModule(lowered.map((region) => region.prelude).join('\n'), hot, {
+				'octane/universal': { ...UniversalRuntime, registerUniversalStyles },
+			});
+			expect(owned.size).toBe(2);
+			expect([...owned.values()].flat().every((sheet) => sheet.css.includes('red'))).toBe(true);
+			if (hmr === 'vite') {
+				prune(data);
+				expect(owned.size).toBe(0);
+			}
+			for (const dispose of disposals) dispose(data);
+			expect(owned.size).toBe(0);
+		},
+	);
+
+	it.each(['vite', 'webpack'] as const)('cleans CSS after failed %s evaluation', (hmr) => {
+		const owned = new Map<string, readonly UniversalRuntime.UniversalStyleSheet[]>();
+		let failHost = true;
+		const registerUniversalStyles = UniversalRuntime.createUniversalStyleRegistry((id, sheets) => {
+			if (failHost) throw new Error('host registration failed');
+			if (sheets.length) owned.set(id, sheets);
+			else owned.delete(id);
+		});
+		let disposals: HmrDispose[] = [];
+		const data = {};
+		const hot: HmrContext = {
+			data,
+			dispose(fn) {
+				disposals.push(fn);
+			},
+			accept() {},
+			invalidate() {},
+		};
+		const code = compile(
+			`export const theme = <style>view { color: red }</style>;
+			throw new Error('authored evaluation failed');`,
+			'/src/Failed.object.tsrx',
+			{
+				renderer: { ...renderer, capabilities: ['scoped-styles'] },
+				hmr,
+			},
+		).code;
+		const evaluate = () =>
+			evaluateUniversalHmrModule(code, hot, {
+				'octane/universal': { ...UniversalRuntime, registerUniversalStyles },
+			});
+		expect(evaluate).toThrow('host registration failed');
+		for (const dispose of disposals) dispose(data);
+		expect(owned.size).toBe(0);
+		disposals = [];
+		failHost = false;
+		expect(evaluate).toThrow('authored evaluation failed');
+		expect(owned.size).toBe(1);
+		for (const dispose of disposals) dispose(data);
+		expect(owned.size).toBe(0);
+	});
+
+	it('applies imported themes with CSS owned by their declaring module', () => {
+		const owned = new Map<string, readonly UniversalRuntime.UniversalStyleSheet[]>();
+		const registerUniversalStyles = UniversalRuntime.createUniversalStyleRegistry((id, sheets) => {
+			owned.set(id, sheets);
+		});
+		const modules: Record<string, unknown> = {
+			'octane/universal': { ...UniversalRuntime, registerUniversalStyles },
+		};
+		const hot = { data: {}, dispose() {}, accept() {}, invalidate() {} };
+		const options = { renderer: { ...renderer, capabilities: ['scoped-styles'] }, hmr: false };
+		const theme = evaluateUniversalHmrModule(
+			compile(
+				'export const theme = <style>.row { color: purple }</style>;',
+				'/src/theme.object.tsrx',
+				options,
+			).code,
+			hot,
+			modules,
+		);
+		modules['./theme.object.tsrx'] = theme;
+		const module = evaluateUniversalHmrModule(
+			compile(
+				`import { theme } from './theme.object.tsrx';
+			export function Scene() @{ <><style apply={theme}/><view class="row" /></> }`,
+				'/src/Imported.object.tsrx',
+				options,
+			).code,
+			hot,
+			modules,
+		);
+		const container = createObjectContainer('object');
+		const root = createUniversalRoot(container, createObjectDriver('object'));
+		root.render(module.Scene, {});
+		expect(container.children[0].props.class).toContain(theme.theme.$class);
+		expect([...owned.keys()]).toEqual(['/src/theme.object.tsrx']);
+		root.unmount();
+	});
+	it('preserves theme maps, apply chains, nested scope boundaries, and lexical CSS order', () => {
+		let sheets: readonly UniversalRuntime.UniversalStyleSheet[] = [];
+		const registerUniversalStyles = UniversalRuntime.createUniversalStyleRegistry((_id, next) => {
+			sheets = next;
+		});
+		const source = `
+			export const theme = <style>.unused { color: purple }</style>;
+			export const bundle = <style apply={theme} />;
+			export function Scene() @{
+				<view id="container"><style apply={bundle}>view { color: red }</style>
+					<view id="sibling" class={theme.unused} />
+					<view id="nested"><style>view { color: green }</style><view id="leaf" /></view>
+				</view>
+			}`;
+		const module = evaluateUniversalHmrModule(
+			compile(source, '/src/Themes.object.tsrx', {
+				renderer: { ...renderer, capabilities: ['scoped-styles'] },
+				hmr: false,
+			}).code,
+			{ data: {}, dispose() {}, accept() {}, invalidate() {} },
+			{
+				'octane/universal': { ...UniversalRuntime, registerUniversalStyles },
+			},
+		);
+		expect(sheets.map((sheet) => sheet.css)).toEqual([
+			expect.stringContaining('purple'),
+			expect.stringContaining('red'),
+			expect.stringContaining('green'),
+		]);
+		expect(module.bundle.$class).toBe(module.theme.$class);
+		const container = createObjectContainer('object');
+		const root = createUniversalRoot(container, createObjectDriver('object'));
+		root.render(module.Scene, {});
+		const outer = container.children[0];
+		expect(outer.props.class).toBeUndefined();
+		expect(outer.children[0].props.class).toContain(module.theme.$class);
+		expect(outer.children[0].props.class).toContain(module.theme.unused);
+		expect(outer.children[0].props.class).toContain(sheets[1].id);
+		expect(outer.children[1].props.class).not.toContain(sheets[2].id);
+		expect(outer.children[1].children[0].props.class).toContain(`${sheets[1].id} ${sheets[2].id}`);
+		root.unmount();
+	});
+	it.each([false, 'vite', 'webpack'] as const)(
+		'registers module CSS and cleans up HMR (%s)',
+		(hmr) => {
+			const owned = new Map<string, readonly { id: string; css: string }[]>();
+			const registerUniversalStyles = UniversalRuntime.createUniversalStyleRegistry(
+				(id, sheets) => {
+					if (sheets.length) owned.set(id, sheets);
+					else owned.delete(id);
+				},
+			);
+			let disposals: ((data: Record<string, unknown>) => void)[] = [];
+			const data = {};
+			const hot = {
+				data,
+				dispose(fn: (data: Record<string, unknown>) => void) {
+					if (hmr === 'webpack') disposals.push(fn);
+					else disposals = [fn];
+				},
+				accept() {},
+				invalidate() {},
+			};
+			const evaluate = (style: string | null, prefix = '', additionalBlock = '') =>
+				evaluateUniversalHmrModule(
+					compile(
+						`${prefix}
+			export function Scene({ active }) @{
+				<>${style === null ? '' : `<style>${style}</style>`}${additionalBlock}<view className={['row', active && 'active']} /></>
+			}`,
+						'/src/Scoped.object.tsrx',
+						{
+							renderer: { ...renderer, capabilities: ['scoped-styles', 'class-name-alias'] },
+							hmr,
+						},
+					).code,
+					hot,
+					{ 'octane/universal': { ...UniversalRuntime, registerUniversalStyles } },
+				);
+			const module = evaluate(
+				'.row { color: red } absent { color: blue }',
+				'',
+				'<style>.active { opacity: 0.5 }</style>',
+			);
+			expect([...owned.values()][0][0].css).toContain('opacity');
+			const sheets = [...owned.values()][0];
+			expect(sheets).toHaveLength(1);
+			expect(sheets[0].css).toContain('red');
+			expect(sheets[0].css).toContain('(unused)');
+			const container = createObjectContainer('object');
+			const root = createUniversalRoot(container, createObjectDriver('object'));
+			root.render(module.Scene, { active: true });
+			expect(container.children[0].props.class).toContain(sheets[0].id);
+			expect(container.children[0].props.class).toContain('row active');
+			root.render(module.Scene, { active: false });
+			expect([...owned.values()][0]).toBe(sheets);
+			const secondRoot = createUniversalRoot(
+				createObjectContainer('object'),
+				createObjectDriver('object'),
+			);
+			secondRoot.render(module.Scene, { active: true });
+			expect([...owned.values()][0]).toBe(sheets);
+			secondRoot.unmount();
+			root.unmount();
+			expect(owned.size).toBe(1);
+			if (hmr) {
+				for (const dispose of disposals) dispose(data);
+				expect(owned.size).toBe(0);
+				disposals = [];
+				evaluate('.row { color: green }', '// move scope\n');
+				expect([...owned.values()][0][0].id).not.toBe(sheets[0].id);
+				expect([...owned.values()][0][0].css).toContain('green');
+				expect([...owned.values()][0][0].css).not.toContain('opacity');
+				for (const dispose of disposals) dispose(data);
+				disposals = [];
+				evaluate(null);
+				expect(owned.size).toBe(0);
+			}
+		},
+	);
+});
 
 describe('universal compiler target', () => {
 	it('leaves the DOM compiler byte-identical when renderer selection stays DOM', () => {

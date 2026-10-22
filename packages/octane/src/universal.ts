@@ -6,6 +6,8 @@
  * retains Octane's existing DOM `createContext` identity.
  */
 export * from './universal-core.js';
+export * from './universal-styles.js';
+export { normalizeClass } from './class-names.js';
 export {
 	createSubSlot,
 	subSlot,

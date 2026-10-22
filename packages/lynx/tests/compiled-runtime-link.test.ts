@@ -169,6 +169,12 @@ function compilerRuntimeImports(renderer: UniversalRendererConfig): Map<string, 
 		) {
 			continue;
 		}
+		if (
+			(name === 'registerUniversalStyles' || name === 'normalizeClass') &&
+			!renderer.capabilities?.includes('scoped-styles')
+		) {
+			continue;
+		}
 		add(renderer.module, name);
 	}
 	add(renderer.module, 'rendererRegion');

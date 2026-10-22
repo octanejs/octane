@@ -7,6 +7,8 @@
  * do not provide DOM globals.
  */
 export * from './universal-core.js';
+export * from './universal-styles.js';
+export { normalizeClass } from './class-names.js';
 export {
 	createSubSlot,
 	subSlot,

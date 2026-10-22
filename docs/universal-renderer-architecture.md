@@ -1270,7 +1270,7 @@ declare, implement, or reject these independently.
 | --- | --- | --- |
 | Text | Registry and driver policies independently choose `host`, `ignore`, or `reject`; static authored text diagnoses at compile time and dynamic primitives fail at materialization when unsupported. | A concrete renderer defines whether and how it allocates/updates text hosts. |
 | Events | Driver classification lowers event props to listener-ID/priority commands; replacement, removal, teardown, owner-routed dispatch, and scoped multi-listener delivery are transactional. The local Three driver supplies the R3F-shaped ray/pointer surface. | A transported renderer must serialize native delivery/priority semantics. There is deliberately no synthetic event layer. |
-| Styles | No renderer-neutral style object or stylesheet lifecycle. | Add typed renderer extensions for material/style application and disposal; do not copy CSS rules into native renderers. |
+| Styles | `scoped-styles` delivers ordered module-owned CSS through the renderer module; see below. | The adapter supplies host CSS registration/removal. Style props remain renderer-specific. |
 | Assets | No prepare-time asset allocation. | Add cancellable/resource-owned capabilities whose acquisition is staged or externally cached. |
 | Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, and disconnect public refs, events, and layout/passive effects. Hidden Activity contains suspension without replacing the visible shell; reveal reconnects the current refs. Three maps visibility onto `Object3D.visible`, and its client pending/error projection is implemented. | Cross-boundary DOM-owner Activity propagation remains separate from local Three visibility. |
 | Portal | `createPortal` creates a logical range whose hosts are placed under an opaque, root-scoped driver target handle. Registration, stable reuse, retarget, retained Suspense, abort, rejected preparation, removal, and teardown are transactional. Three Milestone 6 supplies borrowed `Object3D` targets, R3F-style state/event enclaves, nested context, shared frame/interaction state, and physical Three event bubbling. | Transported renderers must resolve serializable target tokens without sharing local objects; cross-renderer portals remain unsupported. |
@@ -1284,6 +1284,108 @@ fails closed for Activity and authored text when statically knowable, while the
 prop codec and driver catch runtime values. It still cannot prove every
 renderer-specific host type or property. Unsupported cases must produce a
 renderer-naming diagnostic, never a DOM interpretation.
+
+### Scoped CSS for universal renderers
+
+A renderer that can consume CSS opts in with `capabilities: ['scoped-styles']`.
+The compiler uses the same scope pass as DOM/SSR: lexical sibling/descendant
+scopes, `tsrx-*` classes, conservative selector pruning, class composition,
+assigned theme maps (`$class` and selector keys), `style(expr)`, and `apply`
+(including imported themes) have the same semantics. The renderer must apply
+`class` values to its host's CSS class facility; `class-name-alias` can also
+canonicalize authored `className` to `class`.
+
+For example, a NativeScript integration can configure:
+
+```js
+const nativeRenderer = {
+  id: 'nativescript',
+  target: 'universal',
+  module: '@example/nativescript/renderer',
+  text: 'reject',
+  capabilities: ['scoped-styles', 'class-name-alias'],
+};
+```
+
+The renderer module re-exports `octane/universal/native` (which includes
+`normalizeClass`) and supplies `registerUniversalStyles`. Its public ABI is:
+
+```ts
+interface UniversalStyleSheet {
+  readonly id: string; // the tsrx-* scope class, not the ownership key
+  readonly css: string;
+}
+type RegisterUniversalStyles = (
+  moduleId: string,
+  sheets: readonly UniversalStyleSheet[],
+) => () => void;
+```
+
+The compiler calls this export once at module evaluation with the complete
+ordered sheet array, before component declarations. For instance:
+
+```ts
+// Authored:
+export function Card() @{
+  <><style>.card { color: red; }</style><view class="card" /></>
+}
+// Emitted delivery (illustrative hash):
+const disposeStyles = registerUniversalStyles('/src/Card.native.tsrx', [
+  { id: 'tsrx-ab123456', css: '.card.tsrx-ab123456 { color: red; }' },
+]);
+```
+
+`moduleId` is the compiler filename; a renderer-owned boundary specialization
+adds `#__octaneRendererRegionN` so sibling regions have separate owners. Build
+integrations must supply stable, unique filenames across updates. The scope
+hash can change when source positions change; it is never the module owner.
+Sheets arrive in lexical pre-order, matching DOM emission. Across modules,
+initial evaluation order determines registration order; adapters should retain
+an owner's position when replacing it in place. No global cross-module cascade
+order is promised after a disposed module is registered again.
+
+`createUniversalStyleRegistry` from `octane/universal/native` or
+`octane/universal` implements the registration ABI without browser globals:
+
+```ts
+import { createUniversalStyleRegistry } from 'octane/universal/native';
+export * from 'octane/universal/native';
+export const registerUniversalStyles = createUniversalStyleRegistry(
+  (moduleId, sheets) => replaceTaggedCss(moduleId, sheets),
+);
+```
+
+`replaceTaggedCss` is adapter code. It must synchronously replace **all** CSS
+owned by that module, in array order, and remove it for an empty array. For
+NativeScript, the adapter can remove the module's old tag with
+`removeTaggedAdditionalCSS` and add the ordered CSS under that tag with
+`addTaggedAdditionalCSS`. Keep the registry singleton in the renderer realm,
+not in individual roots or component instances. It skips identical sets and
+makes cleanup idempotent; an old evaluation's disposer cannot remove a newer
+registration. A replacement callback that throws must leave its previous host
+state intact; registration does not swallow errors or roll back host writes.
+
+Ownership is per module evaluation, not per mount: repeated component instances,
+updates, aborted renders, and root unmounts do not register or remove CSS.
+Production CSS persists for the realm's lifetime. Vite and webpack HMR call the
+returned disposer during module disposal, then register the replacement set on
+reevaluation. Vite also drains module cleanup on `hot.prune` when the module
+leaves the import graph. This removes deleted blocks, changed hashes, and CSS
+from modules that lose every style block. Imported themes retain their declaring module's
+ownership. Themes must be declared inside the universal region or in a module
+compiled for that renderer. CSS is not transported across renderer boundaries;
+statically identifiable captures of owner-local themes (including aliases)
+diagnose rather than producing unmatched classes. HMR may briefly remove CSS between disposal and reevaluation; failed
+replacement evaluation does not restore the disposed styles.
+
+This capability accepts static raw CSS in TSRX blocks. It does not implement
+browser `<style>{expression}</style>`, Float stylesheet resources, CSS asset
+loading, preprocessors, or CSS dialect translation. Browser style elements/resources
+with this capability diagnose at compile time. Unsupported renderers continue
+to reject scoped blocks, including themes and `apply`, with a capability
+message. Host CSS selector/property support remains the adapter's responsibility.
+DOM and SSR delivery remain unchanged; this ABI does not add universal SSR or
+hydration support.
 
 ## 10. Invariants
 
@@ -1385,8 +1487,7 @@ target and boundary decisions.
 The remaining foundation limitations are capability/scheduler boundaries:
 
 - live universal host serialization/adoption, cross-renderer portals, async
-  template collections, scoped styles (sibling style scopes, `$class`, and
-  `apply` are DOM-only), and neutral live layout measurement are not
+  template collections, and neutral live layout measurement are not
   implemented;
 - mixed-boundary suspension retains committed external content but does not yet
   drive the parent renderer's fallback or transition-hold timing, and a DOM

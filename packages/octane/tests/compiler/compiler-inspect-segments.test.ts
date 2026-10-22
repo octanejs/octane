@@ -684,6 +684,31 @@ describe.each([
 	['client', {}],
 	['client prod', { hmr: false as const }],
 	['server', { mode: 'server' as const }],
+	[
+		'universal',
+		{
+			renderer: {
+				id: 'native',
+				module: 'native-renderer',
+				target: 'universal',
+				text: 'host',
+				capabilities: ['scoped-styles'],
+			},
+		},
+	],
+	[
+		'universal prod',
+		{
+			hmr: false as const,
+			renderer: {
+				id: 'native',
+				module: 'native-renderer',
+				target: 'universal',
+				text: 'host',
+				capabilities: ['scoped-styles'],
+			},
+		},
+	],
 ])('scoped styles claim the block they came from — %s', (_label, options) => {
 	const SOURCE = `export default function App() @{
 	<div class="demo">

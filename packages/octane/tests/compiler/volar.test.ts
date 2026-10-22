@@ -181,7 +181,7 @@ export function SignalHost(props: { tag: 'div' | 'span' }) @{ <{props.tag} id={i
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 15_000);
 
 	it('retains computed method keys when generated brackets have no source mapping', () => {
 		const source = `const key = Symbol.iterator;

@@ -1030,7 +1030,10 @@ function addScopeClasses(element, state) {
 				// Normalize a dynamic value (clsx arrays/objects, null) BEFORE the
 				// chain is appended so the template-literal slot is a plain string.
 				ctx.runtimeNeeded.add('normalizeClass');
-				base = tools.inheritOriginLoc(b.call('_$normalizeClass', expression), expression);
+				base = tools.inheritOriginLoc(
+					b.call(ctx.normalizeClassName ?? '_$normalizeClass', expression),
+					expression,
+				);
 			}
 			newAttr = {
 				...existing,
