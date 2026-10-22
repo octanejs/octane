@@ -1234,9 +1234,8 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	else (el as any).className = cls;
 }
 
-// Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
-// `className` is a read-only SVGAnimatedString so the fast `setClassName` can't be
-// used), and every runtime host's class (spreads, descriptors) route here.
+// Attribute-based class setter: SVG/MathML compiled template bindings (where
+// `className` is a read-only SVGAnimatedString) and direct class bindings.
 // clsx-composes the value; a nullish/false value REMOVES the attribute (parity with
 // the generic setAttribute this binding routed through before clsx composition
 // existed).
@@ -1888,6 +1887,42 @@ function skipSpreadKey(el: Element, k: string, flags: number): boolean {
 	);
 }
 
+// Reuse normalized strings without revisiting retained user objects or keeping them alive.
+const SPREAD_CLASS_VALUES = /* @__PURE__ */ new WeakMap<object, string | null>();
+
+function previousSpreadClass(value: unknown): string | null | undefined {
+	if (value == null || value === false) return null;
+	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+		return normalizeClass(value);
+	if ((typeof value === 'object' && value !== null) || typeof value === 'function')
+		return SPREAD_CLASS_VALUES.get(value);
+	return undefined;
+}
+
+// Fresh host props can normalize to the class already on a spread's element.
+// Keep direct compiler class bindings on setClassAttr's write-only path.
+function setHostPropClassAttr(el: Element, value: unknown, prevValue: unknown): void {
+	const prevCls = previousSpreadClass(prevValue);
+	const cls = value == null || value === false ? null : normalizeClass(value);
+	if ((typeof value === 'object' && value !== null) || typeof value === 'function')
+		SPREAD_CLASS_VALUES.set(value, cls);
+	if (hydrating && CURSOR !== null) {
+		CURSOR.adopts(el);
+		if (process.env.NODE_ENV !== 'production') unpatchedClass(CURSOR, el, cls, false);
+		return;
+	}
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	// Compare the DOM only when the authored class could already match. Changed
+	// values need a write, while a staged write must reassert its value at publish.
+	// Reuse the previous snapshot's normalized result; its class object may contain
+	// getters and must not be traversed again.
+	if (ROOT_RENDER_TRANSACTION === null || pendingWrites(CURRENT_BLOCK) === null) {
+		if (prevCls !== undefined && prevCls === cls && el.getAttribute('class') === cls) return;
+	}
+	if (cls === null) el.removeAttribute('class');
+	else el.setAttribute('class', cls);
+}
+
 // The one generic host-prop writer, for spreads and element descriptors: it
 // diffs `prev` → `value` (`prev` is undefined on mount) by identity, removing a
 // vanished prop through the removal that mirrors its setter. Bindings whose
@@ -2007,7 +2042,8 @@ export function setHostProps(
 			if (v === pv && !initialHydration) continue;
 			// Hydration-aware + SVG-safe class write (suppress/warn parity with a
 			// direct class binding); nullish/false removes the attribute.
-			setClassAttr(el, v);
+			if (descriptor) setClassAttr(el, v);
+			else setHostPropClassAttr(el, v, pv);
 			continue;
 		}
 		if (k === 'style') {

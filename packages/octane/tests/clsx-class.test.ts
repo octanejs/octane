@@ -2,10 +2,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as ServerRT from 'octane/server';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync, normalizeClass } from '../src/index.js';
+import {
+	createElement,
+	flushSync,
+	hydrateRoot,
+	normalizeClass,
+	startTransition,
+	use,
+} from '../src/index.js';
 import { theme } from './_fixtures/style-theme.tsrx';
 import { SpreadApplied } from './_fixtures/style-theme-consumer.tsrx';
 import {
@@ -14,6 +21,7 @@ import {
 	NestedClass,
 	ClassNameArray,
 	SpreadClass,
+	SpreadClassInSvg,
 	ExplicitThenSpreadClass,
 	SpreadThenExplicitClass,
 	MultipleClassSpreads,
@@ -22,6 +30,21 @@ import {
 	ScopedArray,
 	ScopedNullish,
 } from './_fixtures/clsx-class.tsrx';
+
+const SpreadGate = (props: { value: unknown; gate?: PromiseLike<unknown> }) =>
+	createElement(
+		'section',
+		null,
+		createElement(SpreadClass, { class: props.value }),
+		props.gate ? createElement(SpreadGateBoundary, { promise: props.gate }) : null,
+	);
+
+const DescriptorClass = (props: { value: unknown }) => createElement('div', { class: props.value });
+
+const SpreadGateBoundary = (props: { promise: PromiseLike<unknown> }) => {
+	use(props.promise);
+	return null;
+};
 
 // clsx-style `class` / `className` composition (strings, numbers, arrays, objects, and
 // any nesting). Intentional divergence from React, which coerces an array className to a
@@ -106,6 +129,123 @@ describe('clsx class composition — client mount', () => {
 		r.unmount();
 	});
 
+	it.each([
+		['HTML', SpreadClass, 'div'],
+		['SVG', SpreadClassInSvg, 'svg'],
+	] as const)(
+		'avoids equivalent spread writes and reasserts edits on %s',
+		(_kind, Body, selector) => {
+			const r = mount(Body as any, { class: ['base', { active: true }] });
+			const element = r.find(selector);
+			const observer = new MutationObserver(() => {});
+			observer.observe(element, { attributes: true, attributeFilter: ['class'] });
+			try {
+				r.update(Body as any, { class: ['base', 'active'] });
+				expect(r.find(selector)).toBe(element);
+				expect(element.getAttribute('class')).toBe('base active');
+				expect(observer.takeRecords()).toHaveLength(0);
+
+				element.setAttribute('class', 'external');
+				observer.takeRecords();
+				r.update(Body as any, { class: ['base', 'active'] });
+				expect(element.getAttribute('class')).toBe('base active');
+				expect(observer.takeRecords()).toHaveLength(1);
+			} finally {
+				observer.disconnect();
+				r.unmount();
+			}
+		},
+	);
+
+	it('does not reread a retained spread class object on a later update', () => {
+		let reads = 0;
+		const active = Object.create(null);
+		Object.defineProperty(active, 'active', {
+			enumerable: true,
+			get() {
+				reads++;
+				if (reads > 1) throw new Error('retained class object was read again');
+				return true;
+			},
+		});
+		const initialClass = ['base', active];
+		const r = mount(SpreadClass, { class: initialClass });
+		const div = r.find('div');
+		const observer = new MutationObserver(() => {});
+		observer.observe(div, { attributes: true, attributeFilter: ['class'] });
+		try {
+			expect(div.className).toBe('base active');
+			r.update(SpreadClass, { class: initialClass });
+			expect(observer.takeRecords()).toHaveLength(0);
+
+			r.update(SpreadClass, { class: ['base', 'active'] });
+			expect(div.className).toBe('base active');
+			expect(observer.takeRecords()).toHaveLength(0);
+			expect(reads).toBe(1);
+
+			r.update(SpreadClass, { class: ['base', 'selected'] });
+			expect(div.className).toBe('base selected');
+			expect(reads).toBe(1);
+			expect(observer.takeRecords()).toHaveLength(1);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
+	it('keeps absent and empty spread classes distinct', () => {
+		const r = mount(SpreadClass, { class: '' });
+		const div = r.find('div');
+		const observer = new MutationObserver(() => {});
+		observer.observe(div, { attributes: true, attributeFilter: ['class'] });
+		try {
+			r.update(SpreadClass, { class: null });
+			expect(div.hasAttribute('class')).toBe(false);
+			expect(observer.takeRecords()).toHaveLength(1);
+
+			r.update(SpreadClass, { class: '' });
+			expect(div.getAttribute('class')).toBe('');
+			expect(div.hasAttribute('class')).toBe(true);
+			expect(observer.takeRecords()).toHaveLength(1);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
+	it('reasserts a staged spread class after an external edit', async () => {
+		let resolveGate!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			resolveGate = resolve;
+		});
+		const r = mount(SpreadGate, { value: ['base', { active: true }] });
+		const div = r.find('div');
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(div, { attributes: true, attributeFilter: ['class'] });
+		const mutations = () => {
+			records.push(...observer.takeRecords());
+			return records.splice(0);
+		};
+		try {
+			await act(() => {
+				startTransition(() => r.root.render(SpreadGate, { value: ['base', 'active'], gate }));
+			});
+			expect(div.getAttribute('class')).toBe('base active');
+			expect(mutations()).toHaveLength(0);
+
+			div.setAttribute('class', 'external');
+			expect(mutations()).toHaveLength(1);
+			await act(async () => resolveGate());
+			expect(r.find('div')).toBe(div);
+			expect(div.getAttribute('class')).toBe('base active');
+			expect(mutations()).toHaveLength(1);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
 	it('a later spread supplies the final composed class', () => {
 		const r = mount(ExplicitThenSpreadClass, {
 			href: '/story',
@@ -148,6 +288,17 @@ describe('clsx class composition — client mount', () => {
 		// SVGElement.className is an SVGAnimatedString — read the attribute directly.
 		expect(r.find('svg').getAttribute('class')).toBe('a b');
 		r.unmount();
+	});
+
+	it('updates class values on descriptor hosts', () => {
+		const r = mount(DescriptorClass, { value: ['base', 'active'] });
+		const div = r.find('div');
+		try {
+			r.update(DescriptorClass, { value: ['base', 'selected'] });
+			expect(div.className).toBe('base selected');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('recomposes across updates', () => {

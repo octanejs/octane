@@ -73,6 +73,7 @@ export const WRITERS = new Map(
 		setAriaAttribute: 'primitive',
 		setClassName: 'primitive',
 		setClassAttr: 'primitive',
+		setHostPropClassAttr: 'primitive',
 		setStyleProperty: 'primitive',
 		applyStyleValue: 'primitive',
 		applyStyleProperty: 'primitive',

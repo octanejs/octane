@@ -30,6 +30,10 @@ export function SpreadClass(props) @{
 	<div {...props}>{'x'}</div>
 }
 
+export function SpreadClassInSvg(props) @{
+	<svg {...props}></svg>
+}
+
 // A later spread owns the final class value when it supplies either `class` or
 // `className`. The class value itself still uses octane's clsx-style composition.
 export function ExplicitThenSpreadClass(props) @{
