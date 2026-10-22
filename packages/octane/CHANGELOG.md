@@ -1,5 +1,35 @@
 # octane
 
+## 0.15.0
+
+### Minor Changes
+
+- a37bddf: Export `Children` (`toArray`/`map`) and `descriptorChildren` from `octane/universal` and `octane/universal/native`, and accept them in universal renderer modules, so shared `.tsrx` components that enumerate their children compile for universal targets.
+
+### Patch Changes
+
+- ba56ef8: Vite and webpack HMR now hot-update components exported in the common React shapes instead of reloading the page: `export const X = () => <jsx/>`, `export const X = memo(() => <jsx/>)`, and a `const` arrow, `memo` arrow or `function X() {…}` exported through `export default X` (including `X as T`, `X satisfies T` and `X!`). These previously compiled without an accept boundary. A memo-wrapped component keeps its memo wrapper and comparator across updates, and its hook-owned resources such as `useSignal$` scopes survive the refresh.
+- b7def42: Ship generic host props and controlled forms only to apps that create host
+  element descriptors.
+
+  The runtime's value-child path reaches the de-opt host renderers, which apply
+  props through the generic attribute writer and its controlled-form, style,
+  event-name and URL tables. A host element descriptor can only come from an
+  element factory or a dynamic tag that resolves to a host string, so those sites
+  now install the writer, and an app whose renderable values are compiled bodies,
+  text and empties no longer bundles it.
+
+  The compiler also stops routing two kinds of call site through the generic
+  component entry, which keeps that capability for runtime string tags:
+  `<Suspense>` and `<ViewTransition>` imported from `octane` use the void entry,
+  since their bodies never return a value, and a module `const` bound to `lazy()`
+  uses a new function-only entry that still reconciles returned values.
+
+  On the bundle-size app shell authored in `.tsrx`, client JavaScript drops from
+  108.7 KB to 99.5 KB gzip when hydrating and from 90.2 KB to 81.3 KB client-only.
+- c62bf86: Preserve captured values when hot-reloading a split Hydrate child.
+- 4f6852b: Skip redundant class attribute writes when a spread's normalized class already matches the live DOM.
+
 ## 0.14.3
 
 ### Patch Changes
