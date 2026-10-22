@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/floating-ui",
-  "version": "0.1.67",
+  "version": "0.1.68",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -64,7 +64,7 @@
     "tabbable": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.14.0"
+    "octane": "workspace:^0.15.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

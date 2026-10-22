@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/content-loader",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "Octane binding for react-content-loader 7.1.2 (web). Native/React Native is an explicit gap.",
   "license": "MIT",
   "type": "module",
@@ -37,7 +37,7 @@
     "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.14.0"
+    "octane": "workspace:^0.15.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

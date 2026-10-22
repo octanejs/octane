@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/base-ui-utils",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Shared Base UI utilities and stores for Octane.",
   "license": "MIT",
   "type": "module",
@@ -260,7 +260,7 @@
     "reselect": "^5.2.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.14.0"
+    "octane": "workspace:^0.15.0"
   },
   "devDependencies": {
     "octane": "workspace:*",

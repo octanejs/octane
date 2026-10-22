@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/adapter-cloudflare",
-  "version": "0.0.61",
+  "version": "0.0.62",
   "license": "MIT",
   "type": "module",
   "engines": {
