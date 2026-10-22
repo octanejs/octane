@@ -306,7 +306,10 @@ export function prepareWebTypeScript(program, ctx, allocateName) {
 		return result;
 	};
 	const result = rewrite(program);
-	const body = [...liftedTypes, ...result.body];
+	let prologueEnd = 0;
+	while (typeof result.body[prologueEnd]?.directive === 'string') prologueEnd++;
+	const body = [...result.body];
+	body.splice(prologueEnd, 0, ...liftedTypes);
 	if (scopeName === undefined) return { ...result, body };
 	const imported = ctx.mode === 'server' ? 'SSRScope' : 'Scope';
 	const declaration = b.imports(
@@ -314,5 +317,6 @@ export function prepareWebTypeScript(program, ctx, allocateName) {
 		`octane/internal/${ctx.mode === 'server' ? 'server' : 'client'}`,
 	);
 	declaration.importKind = 'type';
-	return { ...result, body: [b.set_location(declaration, ctx._moduleOrigin), ...body] };
+	body.splice(prologueEnd, 0, b.set_location(declaration, ctx._moduleOrigin));
+	return { ...result, body };
 }

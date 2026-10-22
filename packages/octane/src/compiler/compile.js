@@ -12108,6 +12108,16 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 	return result;
 }
 
+// Directives must precede generated imports and setup to remain a module prologue.
+function moduleDirectives(body) {
+	const directives = [];
+	for (const statement of body) {
+		if (typeof statement.directive !== 'string') break;
+		directives.push(statement);
+	}
+	return directives;
+}
+
 function compileInternal(
 	source,
 	filename,
@@ -13514,6 +13524,7 @@ function compileInternal(
 	// esrap at the end, which also yields the entire module source map.
 	ctx.hydrationPropsModule = ast;
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
+	const directiveNodes = moduleDirectives(ast.body);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	// Exported `const X = () => <jsx/>` components stay plain values; HMR rebinds
 	// them like lowered components. Keyed by authored top-level statement.
@@ -13547,7 +13558,7 @@ function compileInternal(
 			if (component.exportKind === 'default') hmrDefaultValues.add(component.name);
 		}
 	}
-	for (let node of ast.body) {
+	for (let node of ast.body.slice(directiveNodes.length)) {
 		const firstStatement = bodyNodes.length;
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -14112,7 +14123,7 @@ function compileInternal(
 	const program = {
 		type: 'Program',
 		sourceType: 'module',
-		body: [...runtimeImportNodes, ...profileRuntimeImportNodes, ...moduleBody],
+		body: [...directiveNodes, ...runtimeImportNodes, ...profileRuntimeImportNodes, ...moduleBody],
 		metadata: { path: [] },
 		start: ast.start,
 		end: ast.end,
@@ -14364,7 +14375,8 @@ function compileServer(
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
-	for (const node of ast.body) {
+	const directiveNodes = moduleDirectives(ast.body);
+	for (const node of ast.body.slice(directiveNodes.length)) {
 		const firstStatement = bodyNodes.length;
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -14473,6 +14485,7 @@ function compileServer(
 		type: 'Program',
 		sourceType: 'module',
 		body: [
+			...directiveNodes,
 			...runtimeImportNodes,
 			...nativeActivation,
 			...signalActivation,
