@@ -2273,7 +2273,7 @@ export function memo<P>(
 //      Set, pruned lazily: disposed blocks are retained until the next
 //      `update()` call deletes them (dev-only, so retention is bounded by edit
 //      frequency). On `update(newFn)` we clear each block's compiler-owned
-//      template/slot state, point its `body` at the new fn, and re-render. Hook
+//      template/slot state and re-render through its existing body. Hook
 //      state is preserved because the Block stays live and the compiler emits
 //      `Symbol.for(stableId)` for hook slots (re-imports get the same Symbol
 //      identity, so the existing hooks Map continues to work).
@@ -2330,6 +2330,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// template/binding/component slots start from their mount path so arbitrary
 			// source edits cannot read the previous compilation's layout. The outgoing
 			// output stays on screen until the re-render's commit (clearHmrRange).
+			// Preserve the block body: it may adapt the arguments passed to this wrapper.
 			const it = meta.liveBlocks.values();
 			for (let r = it.next(); !r.done; r = it.next()) {
 				const b = r.value;
@@ -2337,7 +2338,6 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 					meta.liveBlocks.delete(b);
 					continue;
 				}
-				b.body = wrapper as unknown as ComponentBody<any>;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(b, 'hmr');
 				resetHmrBlock(b);
@@ -2364,8 +2364,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		// would. The call site's output still refreshes on edit: its owner's
 		// update() re-renders the owning block, which re-runs the direct call
 		// against the swapped-in body. Registering the AMBIENT block instead would
-		// let update() repoint that block's body at this wrapper, miswiring the
-		// caller. Only this branch reads `arguments`, so once the wrapper tiers up
+		// treat an ordinary call as a runtime-owned component invocation. Only this
+		// branch reads `arguments`, so once the wrapper tiers up
 		// Maglev and TurboFan elide the object on the per-render branch above (a
 		// rest parameter would stay allocated under Maglev).
 		return Reflect.apply(meta.fn, this, arguments);
