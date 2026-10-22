@@ -254,6 +254,7 @@ export {
 	activityBlock,
 	componentSlot,
 	componentSlotVoid,
+	componentSlotFunction,
 	componentSlotFromConfig,
 	componentSlotLite,
 	compilerCacheArray,

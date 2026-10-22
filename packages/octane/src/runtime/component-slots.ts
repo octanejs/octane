@@ -109,7 +109,13 @@ import {
 } from './elements.js';
 import { childSlot } from './child-slots.js';
 import { sharesBlockBoundary, freshSlotEnd, settleFreshSlot, removeAfter } from './branches.js';
-import { hostElementBody, hostStringTagBody, journalRootChildShape } from './deopt.js';
+import {
+	DESCRIPTOR_HOST_PROPS,
+	enableHostDescriptors,
+	hostElementBody,
+	hostStringTagBody,
+	journalRootChildShape,
+} from './deopt.js';
 import { forEachSubtreeChild, detachDeoptTreeRefs } from './activity.js';
 import { type ForSlot, removeRange } from './lists.js';
 import {
@@ -694,8 +700,10 @@ export function componentSlot(
 	}
 	// Dynamic JSX tags can resolve to a host STRING at runtime. Keep this
 	// descriptor/de-opt capability in the generic entry point: compiler-proven
-	// void component calls can then retain the function-only core without also
-	// retaining hostStringTagBody, generic attributes, or return reconciliation.
+	// function tags (componentSlotFunction) and void calls (componentSlotVoid,
+	// which also skips return reconciliation) then retain neither
+	// hostStringTagBody nor generic attributes.
+	if (typeof comp === 'string' && !DESCRIPTOR_HOST_PROPS) enableHostDescriptors();
 	const body = activity
 		? dispatch!.body
 		: typeof comp === 'string'
@@ -738,6 +746,42 @@ export function componentSlot(
 		hasKey,
 		// A dynamic tag that resolved to a host renders inline on the server.
 		typeof comp === 'string' ? RENDERER_INVOCATION_SITE : invocationSite,
+	);
+}
+
+/**
+ * Compiler-proven function tag, such as a module `lazy()` binding: it cannot
+ * resolve to a host string, but its body may return a renderable.
+ */
+export function componentSlotFunction(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	comp: ComponentBody,
+	props: any,
+	invocationSite?: string,
+	anchor?: Node | null,
+	singleRoot?: boolean | 2,
+	inherit?: boolean,
+	key?: any,
+	hasKey?: boolean,
+): void {
+	if (typeof comp !== 'function') throw invalidElementTypeError(comp);
+	componentSlotImpl(
+		renderReturnedValue,
+		parentScope,
+		slotKey,
+		domParent,
+		comp,
+		comp,
+		props,
+		props,
+		anchor,
+		key,
+		singleRoot,
+		inherit,
+		hasKey,
+		invocationSite,
 	);
 }
 

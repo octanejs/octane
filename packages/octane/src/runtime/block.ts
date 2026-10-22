@@ -92,7 +92,7 @@ import {
 	EFFECT_EVENT_ACTION_TARGET,
 } from './render.js';
 import { elementKeyWasProvided } from './elements.js';
-import { componentSlot, clearChildContent, HMR } from './component-slots.js';
+import { componentSlotFunction, clearChildContent, HMR } from './component-slots.js';
 import { childSlot } from './child-slots.js';
 import {
 	markerlessBranchRoots,
@@ -745,7 +745,7 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 					!__profileHasComponentMetadata(d.type as Function)
 				) {
 					withProfileComponentOverride(d.type as Function, null, () =>
-						componentSlot(
+						componentSlotFunction(
 							block,
 							0,
 							domParent,
@@ -760,7 +760,7 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 						),
 					);
 				} else {
-					componentSlot(
+					componentSlotFunction(
 						block,
 						0,
 						domParent,

@@ -353,6 +353,7 @@ export {
 	lazy,
 	componentSlot,
 	componentSlotVoid,
+	componentSlotFunction,
 	CompiledOutlet,
 	compilerCacheContext,
 	compilerOpaqueTag,

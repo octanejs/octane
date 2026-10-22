@@ -30781,11 +30781,7 @@ function planJsx(
 		// this compiled scope; the ordinary component runtime never sees memo deps.
 		if (cc.autoMemoDeps !== null) {
 			const liteMemo = cc.autoMemoLite === true && !cc.inheritRange;
-			const componentHelper = liteMemo
-				? 'componentSlotLite'
-				: cc.voidComponent
-					? 'componentSlotVoid'
-					: 'componentSlot';
+			const componentHelper = liteMemo ? 'componentSlotLite' : componentSlotHelper(cc);
 			const memoAnchor = liteMemo
 				? slotAnchorNodeFor(cc, 'compAnchor')
 				: anchorNodeFor(cc, 'compAnchor');
@@ -30847,8 +30843,9 @@ function planJsx(
 		// when the borrow is declined (incoherent parent regime) and the probe
 		// anchor for transition swaps.
 		if (cc.inheritRange) {
-			const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
-			ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
+			const helper = componentSlotHelper(cc);
+			const componentHelper = rtAlias(helper);
+			ctx.runtimeNeeded.add(helper);
 			pushAfterStmt(cc.id, org, {
 				...b.stmt(
 					b.call(
@@ -30896,7 +30893,7 @@ function planJsx(
 			});
 			continue;
 		}
-		const componentHelper = cc.voidComponent ? 'componentSlotVoid' : 'componentSlot';
+		const componentHelper = componentSlotHelper(cc);
 		// Anchor selection — see anchorNodeFor (the endMarker case keeps the
 		// slot's markers inside the block's range so for-of reorder / tryBlock
 		// unmount move the slot DOM along with the block; an element host with
@@ -31266,13 +31263,23 @@ const nullNode = () => b.literal(null);
 // undefined. Pass `null` for an absent entry: trailing absent entries are
 // omitted and interior ones become explicit `undefined` placeholders. Only use
 // it for writers that never inspect `arguments.length` (bindSignalText does).
-// componentSlot, componentSlotVoid, and componentSlotLite order their tail after
+// componentSlot, its void and function entries, and componentSlotLite order their tail after
 // `props` by how often a call site supplies it — (invocationSite, anchor,
 // singleRoot, inherit, key, hasKey) — so the common call keeps two of the six.
 function optionalCallArgs(...entries) {
 	let end = entries.length;
 	while (end > 0 && entries[end - 1] == null) end--;
 	return entries.slice(0, end).map((entry) => entry ?? undefinedNode());
+}
+
+// A full component slot's writer: void bodies skip return reconciliation, and
+// proven function tags skip the dynamic host-tag capability.
+function componentSlotHelper(call) {
+	return call.voidComponent
+		? 'componentSlotVoid'
+		: call.functionComponent
+			? 'componentSlotFunction'
+			: 'componentSlot';
 }
 
 // Preserve each selected writer and its first seven arguments. Longer tails
@@ -31282,7 +31289,9 @@ function hydrationComponentInvocation(ctx, call, helper, args) {
 	ctx.runtimeNeeded.add(helper);
 	if (
 		!call.hydrationInput ||
-		(helper !== 'componentSlot' && helper !== 'componentSlotVoid') ||
+		(helper !== 'componentSlot' &&
+			helper !== 'componentSlotVoid' &&
+			helper !== 'componentSlotFunction') ||
 		args.length > 7 ||
 		call.bindingSite
 	) {
@@ -35759,7 +35768,15 @@ function isCheckedCompiledBoundary(node, ctx) {
 		local = tag.object;
 		imported = tag.property.name;
 	}
-	if (imported !== 'CompiledOutlet' && imported !== 'CompiledContext') return false;
+	// Octane's own boundaries render their output imperatively and return
+	// nothing, whatever children or fallback they receive.
+	if (
+		imported !== 'CompiledOutlet' &&
+		imported !== 'CompiledContext' &&
+		imported !== 'Suspense' &&
+		imported !== 'ViewTransition'
+	)
+		return false;
 	if (ctx.currentComponentLocals?.has(local.name)) return false;
 	const binding = activityReferenceBinding(local, node, ctx);
 	return binding?.importSource?.value === 'octane';
@@ -36171,6 +36188,37 @@ function isImmutableComponentTag(tag, ctx) {
 		owner !== null &&
 		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === owner.scope
 	);
+}
+
+// A module `const` initialized by Octane's `lazy()` always holds the lazy
+// wrapper, a function, so its call sites never resolve a host string at runtime
+// and can skip the generic entry's dynamic-tag capability.
+function isLazyComponentTag(tag, ctx) {
+	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(tag);
+	if (scope === undefined || lexical.resolveBinding(scope, tag.name)?.scope !== lexical.rootScope)
+		return false;
+	ctx.lazyComponentBindings ??= collectLazyComponentBindings(ctx, lexical);
+	return ctx.lazyComponentBindings.has(tag.name);
+}
+
+function collectLazyComponentBindings(ctx, lexical) {
+	const names = new Set();
+	for (const statement of ctx.activityModuleAst.body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations) {
+			const callee = item.init?.type === 'CallExpression' ? item.init.callee : null;
+			if (item.id.type !== 'Identifier' || callee?.type !== 'Identifier') continue;
+			if (ctx.octaneImportLocals?.get(callee.name) !== 'lazy') continue;
+			const binding = lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name);
+			if (binding?.scope === lexical.rootScope && binding.importSource?.value === 'octane')
+				names.add(item.id.name);
+		}
+	}
+	return names;
 }
 
 function isCompiledHydrateTemplate(node, ctx, attrs) {
@@ -36743,6 +36791,8 @@ function makeCompCall(
 		autoMemoLite: node._octaneBindingSite ? false : autoMemoLite,
 		autoMemoPublicationWitnesses,
 		voidComponent,
+		functionComponent:
+			!voidComponent && isLazyComponentTag(node.openingElement?.name ?? node.id, ctx),
 		singleRoot: node._octaneBindingSite ? false : singleRoot,
 		maybeSingleRoot: node._octaneBindingSite ? false : maybeSingleRoot,
 		loc: devLoc(ctx, node),

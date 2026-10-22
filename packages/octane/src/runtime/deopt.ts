@@ -93,7 +93,7 @@ import { siteLoc } from './diagnostics.js';
 import {
 	sameRenderBody,
 	type CompSlot,
-	componentSlot,
+	componentSlotFunction,
 	clearChildContent,
 } from './component-slots.js';
 import { childSlot, childTextHole } from './child-slots.js';
@@ -159,6 +159,19 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 // this path are rendered via real Blocks (hostElementBody / the childSlot component
 // path) so their hooks/state reconcile too.
 // ---------------------------------------------------------------------------
+
+// Host element descriptors are built only by an element factory
+// (createElementFromConfig, a scoped element record) or by a dynamic tag that
+// resolves to a host string in componentSlot. Each of those installs generic
+// host props first, so a bundle whose renderable values are compiled bodies,
+// text and empties does not retain generic attributes or controlled forms. The
+// de-opt host paths below call it only for a host descriptor.
+export let DESCRIPTOR_HOST_PROPS: typeof setHostProps | null = null;
+
+/** @internal Installed by every site that can create a host element descriptor. */
+export function enableHostDescriptors(): void {
+	DESCRIPTOR_HOST_PROPS = setHostProps;
+}
 
 // React dedupes missing-key diagnostics by render owner/source. Octane does not
 // carry owner stacks, so use the closest durable equivalent: once per rendering
@@ -997,7 +1010,13 @@ export function reconcileDeoptNode(
 				pending = pendingDeoptOrder(el);
 				desc = changedDeoptRecord(el, value, pending);
 			} else {
-				setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
+				DESCRIPTOR_HOST_PROPS!(
+					el,
+					value.props,
+					getDeoptDesc(el)?.props ?? null,
+					ownerBlock,
+					DESCRIPTOR_HOST,
+				);
 				// Hydration orders an adopted host's children at commit, after what
 				// its reconcile removes, and stamps its record there: an attempt that
 				// never commits leaves the server node without one, so the next
@@ -1018,7 +1037,7 @@ export function reconcileDeoptNode(
 				elNs !== undefined
 					? document.createElementNS(elNs, value.type)
 					: document.createElement(value.type);
-			setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
+			DESCRIPTOR_HOST_PROPS!(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
 		}
 		if (desc === null) setDeoptDesc(el, value);
 		const nodes = hasHostPropContent(value)
@@ -1378,7 +1397,7 @@ function applyDeoptOrder(order: DeoptOrder): void {
 
 function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): void {
 	const committed = (el as DeoptStamped)[DEOPT_DESC];
-	setHostProps(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
+	DESCRIPTOR_HOST_PROPS!(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
 	stampDeoptDesc(el, record);
 }
 
@@ -1733,7 +1752,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 			try {
 				// The server frames the compiled body's call inside the item's range,
 				// which a hydrating call adopts instead of inheriting the item's.
-				componentSlot(
+				componentSlotFunction(
 					scope,
 					0,
 					parent,
@@ -1936,7 +1955,7 @@ export function hostElementBody(d: ElementDescriptor, block: Block): void {
 	) {
 		el = hydration.node as Element;
 		block.deoptNode = el;
-		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+		DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
 		setDeoptDesc(el, d);
 		const savedCursor = getNextSibling(hydration.node);
 		if (!hasHostPropContent(d)) {
@@ -2005,14 +2024,14 @@ export function hostElementBody(d: ElementDescriptor, block: Block): void {
 			const frag = queueFrontier(block, parent, block.endMarker);
 			frag.appendChild(el);
 		} else parent.insertBefore(el, block.endMarker);
-		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+		DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
 	} else if (usesFrontier(block, el)) {
 		// REUSE the committed element — its props change at commit, after its
 		// children's entries. Its childSlot owns the children's structure.
 		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// REUSE the existing element — diff props in place (no rebuild).
-		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
+		DESCRIPTOR_HOST_PROPS!(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
 	if (desc === null) setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
@@ -2062,7 +2081,7 @@ export function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 			// server emitted no inner markers).
 			el = hydration.node as Element;
 			block.deoptNode = el;
-			setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+			DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
 			setDeoptDesc(el, d);
 			const savedCursor = getNextSibling(hydration.node);
 			if (!hasHostPropContent(d)) {
@@ -2090,14 +2109,14 @@ export function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		block.deoptNode = el;
 		const parent = block.parentNode;
 		parent.insertBefore(el, block.endMarker);
-		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
+		DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
 	} else if (usesFrontier(block, el)) {
 		// A committed element's props change at commit, after its children's
 		// entries, as hostElementBody's do.
 		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// Re-render, same tag — diff props in place against the stamped descriptor.
-		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
+		DESCRIPTOR_HOST_PROPS!(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
 	if (desc === null) setDeoptDesc(el, d);
 	if (!hasHostPropContent(d)) renderHostTagChildren(d, block, el);

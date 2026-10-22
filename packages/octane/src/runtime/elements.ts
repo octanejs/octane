@@ -26,6 +26,8 @@ import { CURRENT_SCOPE, CURRENT_BLOCK } from './render.js';
 import {
 	POSITIONAL_CHILDREN,
 	enableDescriptorFragmentRefs,
+	enableHostDescriptors,
+	DESCRIPTOR_HOST_PROPS,
 	renderFragmentRefDescriptor,
 } from './deopt.js';
 import { componentSlot } from './component-slots.js';
@@ -250,6 +252,7 @@ function scopedElementRecord<P>(
 	resolve: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
+	if (typeof type === 'string' && !DESCRIPTOR_HOST_PROPS) enableHostDescriptors();
 	const descriptor = { $$kind: ELEMENT_TAG, type, props, key, ref } as ElementDescriptor<P>;
 	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, SCOPED_CHILDREN_RESOLVER, { value: resolve });
@@ -473,6 +476,7 @@ export function createElement<P>(
 function enableDescriptorCapabilities(): void {
 	enableDescriptorFormActions();
 	enableDescriptorFragmentRefs();
+	enableHostDescriptors();
 }
 
 /** @internal Compiler-emitted host descriptor: its props were classified statically. */
@@ -546,7 +550,9 @@ export function createElementFromConfig<P>(
 	props: P | null | undefined,
 	children: any[] = EMPTY_ARGS,
 ): ElementDescriptor<P> {
-	if (typeof type === 'function' && isRendererContext(type)) {
+	if (typeof type === 'string') {
+		if (!DESCRIPTOR_HOST_PROPS) enableHostDescriptors();
+	} else if (typeof type === 'function' && isRendererContext(type)) {
 		registerClientRendererBridge(renderClientContextProvider, flushSync);
 	}
 	const src = (props ?? null) as any;

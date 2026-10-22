@@ -85,6 +85,11 @@ const runtimeSurface = exportedNames(
 		{ lang: 'ts' },
 	),
 );
+// Generic host props and controlled forms, which element factories install.
+const HOST_DESCRIPTOR_PROPS = [
+	{ name: 'setHostProps', source: 'runtime/host-props.ts' },
+	{ name: 'armControlled', source: 'runtime/forms.ts' },
+];
 // Vite 8's default client minifier; see the fairness note above.
 const VITE_MINIFY = 'oxc';
 
@@ -149,14 +154,14 @@ const SETS = [
 	{
 		root: APP_SHELL,
 		prefix: 'shell_',
-		targets: ['octane-jsx', 'react'],
+		targets: ['octane-jsx', 'octane-tsrx', 'react'],
 		// Its signal and alien-signals imports would widen the rows ceilings.
 		ceiling: false,
 	},
 	{
 		root: APP_SHELL,
 		prefix: 'shell_client_',
-		targets: ['octane-jsx', 'react'],
+		targets: ['octane-jsx', 'octane-tsrx', 'react'],
 		entry: 'index-client.html',
 		ceiling: false,
 	},
@@ -259,9 +264,20 @@ const byName = new Map(); // merge every app set's ops per framework name
 // every framework entry point its fixtures import.
 const ceilings = new Map();
 
+// The .tsrx app shell renders only compiled bodies, text and empties: no
+// element factory runs, so generic host props must not be retained.
+// componentSlotFunction (its lazy route) is the control that proves the ranges
+// resolve against this build.
+const shellHostRanges = resolveDeclarationRanges(
+	(source) => fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
+	(text, source) => parseAst(text, { lang: 'ts' }, source),
+	[{ name: 'componentSlotFunction', source: 'runtime.ts' }, ...HOST_DESCRIPTOR_PROPS],
+);
+
 for (const set of SETS)
 	for (const name of set.targets.filter(selected)) {
 		const appRoot = path.join(set.root, name);
+		const shellHostGate = set.root === APP_SHELL && name === 'octane-tsrx';
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? set.prefix + '/' : '';
 		console.log(`building ${setLabel}${name} (production, ${VITE_MINIFY} minify)…`);
@@ -279,6 +295,7 @@ for (const set of SETS)
 				emptyOutDir: true,
 				minify: VITE_MINIFY,
 				target: 'esnext',
+				...(shellHostGate ? { sourcemap: 'hidden' } : {}),
 				rollupOptions: {
 					...(set.entry ? { input: path.join(appRoot, set.entry) } : {}),
 					output: buildOutput,
@@ -287,6 +304,24 @@ for (const set of SETS)
 		});
 
 		const { sums, files } = measure(name, outDir);
+		if (shellHostGate) {
+			const retained = new Set();
+			for (const file of walk(outDir)) {
+				if (!/\.m?js$/.test(file)) continue;
+				const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+				for (const declaration of retainedDeclarations(map, shellHostRanges))
+					retained.add(declaration);
+			}
+			assert(
+				retained.has('componentSlotFunction'),
+				`${setLabel}${name}: lazy-route control is absent; update its reachability check`,
+			);
+			assert.deepEqual(
+				HOST_DESCRIPTOR_PROPS.filter(({ name }) => retained.has(name)).map(({ name }) => name),
+				[],
+				`${setLabel}${name}: a body-only app retained generic host props`,
+			);
+		}
 		const total = {
 			raw: sums.app.raw + sums.fw.raw,
 			gzip: sums.app.gzip + sums.fw.gzip,
@@ -302,7 +337,8 @@ for (const set of SETS)
 			targets.push(entry);
 		}
 		// Void-root specialization verdict (octane targets only): the compiled
-		// app root should reach `__createVoidRoot`, not the generic `createRoot`.
+		// app root should reach `__createVoidRoot` (or `__hydrateVoidRoot`), not
+		// the generic `createRoot` or `hydrateRoot`.
 		// Inspected from this build's own result — the same renderedExports
 		// assertion run-minimal.mjs makes for its minimal scenarios. A
 		// non-specialized verdict means the proof chain broke upstream; a
@@ -322,8 +358,10 @@ for (const set of SETS)
 			const verdict = !runtimeSeen
 				? 'no-runtime-module'
 				: (runtimeExports.includes('__createVoidRoot') ||
-							runtimeExports.includes('__createVoidRootDefaultOptions')) &&
-					  !runtimeExports.includes('createRoot')
+							runtimeExports.includes('__createVoidRootDefaultOptions') ||
+							runtimeExports.includes('__hydrateVoidRoot')) &&
+					  !runtimeExports.includes('createRoot') &&
+					  !runtimeExports.includes('hydrateRoot')
 					? 'specialized'
 					: 'generic-root';
 			entry.meta.voidRoots[`${set.prefix}${name}`] = verdict;
