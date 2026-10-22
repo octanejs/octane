@@ -106,7 +106,7 @@ async function compileHmrModule(
 				},
 			)
 			.replace(
-				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])(\.\.?\/[^'"]+|octane\/signals)\2;/gm,
+				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])(\.\.?\/[^'"]+|octane\/signals(?:\/client)?)\2;/gm,
 				(_match: string, imports: string, _quote: string, request: string) => {
 					const properties = imports
 						.split(',')
@@ -1408,6 +1408,261 @@ describe('hmr — runtime wrapper', () => {
 		expect(webpack).toContain('export { Named };');
 		expect(webpack).toContain('export { Default as default };');
 		expect(webpack).toContain('_$webpackHot.dispose');
+	});
+
+	// Exported `const X = () => <jsx/>` compiled without an accept boundary, so
+	// every edit to such a module reloaded the page.
+	it('hot-updates an exported arrow component in place, keeping its state', async () => {
+		const source = (version: number) => `/** @jsxImportSource octane */
+			import { useState } from 'octane';
+			export const App = () => {
+				const [count, setCount] = useState(0);
+				return <button id="bump" onClick={() => setCount(count + 1)}>{'v${version}:' + count}</button>;
+			};
+		`;
+		const hot = webpackHotModule('/src/App.tsx');
+		const r = mount(await hot.load(source(1)));
+		try {
+			r.click('#bump');
+			expect(r.find('#bump').textContent).toBe('v1:1');
+			await hot.load(source(2));
+			flushSync(() => {});
+			expect(hot.accepted).toBe(true);
+			expect(hot.invalidated).toBe(false);
+			expect(r.find('#bump').textContent).toBe('v2:1');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// A TypeScript wrapper on the default export must not hide the binding.
+	it.each([
+		['Page'],
+		['Page as typeof Page'],
+		['Page satisfies typeof Page'],
+		['Page!'],
+		['(Page)'],
+	])('hot-updates an arrow component exported through export default %s', async (exported) => {
+		const source = (version: number) => `/** @jsxImportSource octane */
+			const Page = (props: { label: string }) => <p>{'v${version} ' + props.label}</p>;
+			export default ${exported};
+		`;
+		const load = async (version: number) =>
+			(await compileHmrModule(source(version), ['default'], '/src/Page.tsx', {}, { hmr: 'vite' }))[
+				'default'
+			];
+		const initial = await load(1);
+		const r = mount(initial, { label: 'a' });
+		try {
+			expect(r.find('p').textContent).toBe('v1 a');
+			const updated = await load(2);
+			flushSync(() => expect((initial as any)[HMR].update(updated)).toBe(true));
+			expect(r.find('p').textContent).toBe('v2 a');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Vite's accept callback compared a wrapped default as an anonymous value,
+	// so it invalidated every update even after the binding was registered.
+	it.each(['Page as typeof Page', 'Page satisfies typeof Page', 'Page!'])(
+		'accepts a Vite update of export default %s without invalidating',
+		async (exported) => {
+			let accept: Parameters<TestHotContext['accept']>[0];
+			let invalidated = false;
+			const data: Record<string, unknown> = {};
+			const load = async (version: number) => {
+				const previousAccept = accept;
+				accept = undefined;
+				const Page = await compileHmrComponent(
+					`/** @jsxImportSource octane */
+					const Page = () => <p>{'v${version}'}</p>;
+					export default ${exported};`,
+					'default',
+					'/src/Page.tsx',
+					{},
+					{
+						hmr: 'vite',
+						hot: {
+							data,
+							dispose() {},
+							accept(callback) {
+								accept = callback;
+							},
+							invalidate() {
+								invalidated = true;
+							},
+						},
+					},
+				);
+				flushSync(() => previousAccept?.({ default: Page }));
+				return Page;
+			};
+			const r = mount(await load(1));
+			try {
+				await load(2);
+				expect(invalidated).toBe(false);
+				expect(r.find('p').textContent).toBe('v2');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	// `export const X = memo(() => <jsx/>)` compiled without an accept boundary.
+	it.each(['memo', 'aliasedMemo'])(
+		'hot-updates a %s(arrow) export in place, keeping state and its memo wrapper',
+		async (callee) => {
+			const source = (version: number) => `/** @jsxImportSource octane */
+				import { memo, memo as aliasedMemo, useState } from 'octane';
+				export const Item = ${callee}((props: { label: string }) => {
+					const [count, setCount] = useState(0);
+					return <button id="bump" onClick={() => setCount(count + 1)}>{'v${version} ' + props.label + ':' + count}</button>;
+				});
+			`;
+			const data: Record<string, unknown> = {};
+			let accept: Parameters<TestHotContext['accept']>[0];
+			let invalidated = false;
+			const load = async (version: number) => {
+				const previousAccept = accept;
+				accept = undefined;
+				const namespace = await compileHmrModule(
+					source(version),
+					['Item'],
+					'/src/Item.tsx',
+					{},
+					{
+						hmr: 'vite',
+						hot: {
+							data,
+							dispose() {},
+							accept(callback) {
+								accept = callback;
+							},
+							invalidate() {
+								invalidated = true;
+							},
+						},
+					},
+				);
+				flushSync(() => previousAccept?.(namespace));
+				return namespace['Item'];
+			};
+			const Item = await load(1);
+			const r = mount(Item, { label: 'a' });
+			try {
+				r.click('#bump');
+				expect(r.find('#bump').textContent).toBe('v1 a:1');
+				expect(await load(2)).toBe(Item);
+				expect(invalidated).toBe(false);
+				expect(r.find('#bump').textContent).toBe('v2 a:1');
+				expect((Item as any).__memo).toBe(true);
+				r.update(Item, { label: 'b' });
+				expect(r.find('#bump').textContent).toBe('v2 b:1');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	// A `memo(hmr(fn))` block's body is the memo wrapper, so its hook cleanups
+	// were not kept across a refresh and a retained signal read its disposed scope.
+	it('keeps a hook-owned signal alive across a memo(arrow) refresh', async () => {
+		const modules = { 'octane/signals/client': await import('octane/signals/client') };
+		const source = (version: number) => `/** @jsxImportSource octane */
+			import { memo } from 'octane';
+			import { useSignal$ } from 'octane/signals/client';
+			export const Item = memo(() => {
+				const label$ = useSignal$('kept');
+				return <p>{'v${version} ' + label$.get()}</p>;
+			});
+		`;
+		const Item = await compileHmrComponent(source(1), 'Item', '/src/Item.tsx', modules, {
+			hmr: 'vite',
+		});
+		const updated = await compileHmrComponent(source(2), 'Item', '/src/Item.tsx', modules, {
+			hmr: 'vite',
+		});
+		const r = mount(Item);
+		try {
+			flushSync(() => expect((Item as any).type[HMR].update((updated as any).type)).toBe(true));
+			expect(r.find('p').textContent).toBe('v2 kept');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// `function X() {…}; export default X` compiled without an accept boundary.
+	it.each([
+		[
+			'/src/Page.tsx',
+			'function Page() { const [n, setN] = useState(0); return <button onClick={() => setN(n + 1)}>{VERSION + n}</button>; }',
+		],
+		[
+			'/src/Page.tsrx',
+			'function Page() @{ const [n, setN] = useState(0); <button onClick={() => setN(n + 1)}>{(VERSION + n) as string}</button> }',
+		],
+	])(
+		'hot-updates a function declaration in %s exported through export default',
+		async (filename, component) => {
+			const data: Record<string, unknown> = {};
+			let accept: Parameters<TestHotContext['accept']>[0];
+			let invalidated = false;
+			const load = async (version: number) => {
+				const previousAccept = accept;
+				accept = undefined;
+				const Page = await compileHmrComponent(
+					`/** @jsxImportSource octane */
+				import { useState } from 'octane';
+				${component.replace('VERSION', `'v${version}:'`)}
+				export default Page;`,
+					'default',
+					filename,
+					{},
+					{
+						hmr: 'vite',
+						hot: {
+							data,
+							dispose() {},
+							accept(callback) {
+								accept = callback;
+							},
+							invalidate() {
+								invalidated = true;
+							},
+						},
+					},
+				);
+				flushSync(() => previousAccept?.({ default: Page }));
+				return Page;
+			};
+			const Page = await load(1);
+			const r = mount(Page);
+			try {
+				r.click('button');
+				expect(r.find('button').textContent).toBe('v1:1');
+				expect(await load(2)).toBe(Page);
+				expect(invalidated).toBe(false);
+				expect(r.find('button').textContent).toBe('v2:1');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('leaves non-component arrow exports unwrapped', async () => {
+		const { compile } = await import('octane/compiler');
+		const source =
+			`export const renderRow = () => <li />;\n` +
+			`export const Label = 'label';\n` +
+			`function helper() { return 1; }\nexport default helper;\n` +
+			`export let Mutable = () => <b />;\n`;
+		const { code } = compile(source, 'file.tsx', { hmr: 'vite' });
+		expect(code).not.toContain('_$hmr(');
+		expect(code).not.toContain('import.meta.hot');
+		const off = compile(`export const Foo = () => <span />;\n`, 'file.tsx').code;
+		expect(off).toContain('export const Foo =');
+		expect(off).not.toContain('import.meta.hot');
 	});
 
 	it('hmr option off → no wrapping, no accept block', async () => {

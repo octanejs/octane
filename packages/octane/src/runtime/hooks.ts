@@ -94,8 +94,10 @@ export function ensureHooks(scope: Scope): Map<HookSlot, any> {
 export function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 	if (process.env.NODE_ENV !== 'production') {
 		// A lightweight child uses a host proxy without a component body. Its
-		// cleanup belongs to that child; refreshing the parent disposes it.
-		if ((scope.block.body as any)?.[HMR] !== undefined) {
+		// cleanup belongs to that child; refreshing the parent disposes it. A
+		// `memo(hmr(fn))` block's body is the memo wrapper around the hot one.
+		const body = scope.block.body as any;
+		if (body?.[HMR] !== undefined || body?.type?.[HMR] !== undefined) {
 			(cleanup as Cleanup & { [HMR]?: true })[HMR] = true;
 		}
 	}

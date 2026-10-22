@@ -9354,6 +9354,37 @@ function isReturnJsxFunction(node) {
 	return false;
 }
 
+// An uppercase `const X = (…) => <jsx/>` (or function expression, or a
+// single-argument `memo(…)` of one) exported by name or through
+// `export default X`. It compiles as a plain value, so HMR registers its binding
+// rather than a lowered component declaration.
+/** @param {any} node @param {Set<string>} defaultNames @param {(callee: any) => boolean} isMemoCallee @returns {{ name: string, exportKind: 'named' | 'default', memo: boolean } | null} */
+function hmrValueComponent(node, defaultNames, isMemoCallee) {
+	const exported = node.type === 'ExportNamedDeclaration';
+	const declaration = exported ? node.declaration : node;
+	if (
+		declaration?.type !== 'VariableDeclaration' ||
+		declaration.kind !== 'const' ||
+		declaration.declarations.length !== 1
+	)
+		return null;
+	const declarator = declaration.declarations[0];
+	if (declarator.id?.type !== 'Identifier' || !/^[A-Z]/.test(declarator.id.name)) return null;
+	const name = declarator.id.name;
+	if (!exported && !defaultNames.has(name)) return null;
+	const init = declarator.init;
+	const memo =
+		init?.type === 'CallExpression' && init.arguments.length === 1 && isMemoCallee(init.callee);
+	const fn = unwrapTsExpr(memo ? init.arguments[0] : init);
+	if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') return null;
+	if (fn.async || fn.generator || !fn.body) return null;
+	const returnsJsx =
+		fn.body.type === 'BlockStatement'
+			? fn.body.body.some(statementHasOwnedJsxReturn)
+			: isJsxNode(fn.body);
+	return returnsJsx ? { name, exportKind: exported ? 'named' : 'default', memo } : null;
+}
+
 /** @param {any} stmt @returns {boolean} */
 function statementHasOwnedJsxReturn(stmt) {
 	if (!stmt) return false;
@@ -10396,7 +10427,7 @@ function runtimeExportBindings(body) {
 		if (node.type === 'ExportAllDeclaration') {
 			bindings.push([null, null]);
 		} else if (node.type === 'ExportDefaultDeclaration') {
-			const value = node.declaration;
+			const value = unwrapTsExpr(node.declaration);
 			bindings.push([
 				'default',
 				value.type === 'Identifier'
@@ -13479,6 +13510,38 @@ function compileInternal(
 	ctx.hydrationPropsModule = ast;
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
+	// Exported `const X = () => <jsx/>` components stay plain values; HMR rebinds
+	// them like lowered components. Keyed by authored top-level statement.
+	const hmrValueComponents = new Map();
+	const hmrDefaultValues = new Set();
+	const hmrDefaultFunctions = new Set();
+	if (
+		hmrEnabled &&
+		(options?.renderer?.target ?? 'dom') === 'dom' &&
+		universalRuntime === undefined &&
+		options?.__universal == null
+	) {
+		const defaultNames = new Set();
+		for (const node of ast.body)
+			if (
+				node.type === 'ExportDefaultDeclaration' &&
+				unwrapTsExpr(node.declaration)?.type === 'Identifier'
+			)
+				defaultNames.add(unwrapTsExpr(node.declaration).name);
+		for (const node of ast.body) {
+			const component = hmrValueComponent(node, defaultNames, (callee) =>
+				isOctaneMemoCallee(callee, ctx, memoImportNames),
+			);
+			if (
+				(isComponentFunction(node) || isReturnJsxFunction(node)) &&
+				defaultNames.has(node.id.name)
+			)
+				hmrDefaultFunctions.add(node.id.name);
+			if (component === null) continue;
+			hmrValueComponents.set(node, component);
+			if (component.exportKind === 'default') hmrDefaultValues.add(component.name);
+		}
+	}
 	for (let node of ast.body) {
 		const firstStatement = bodyNodes.length;
 		if (
@@ -13487,7 +13550,23 @@ function compileInternal(
 		) {
 			continue;
 		}
-		if (isComponentFunction(node)) {
+		if (hmrDefaultFunctions.has(node.id?.name) && node.type === 'FunctionDeclaration') {
+			// `function Foo() {…}` exported through `export default Foo` compiles
+			// like `export default function Foo() {…}`; that export is dropped below.
+			const c = { ...node, default: true };
+			bodyNodes.push(
+				...(isComponentFunction(node)
+					? compileComponent(c, ctx, compileOpts)
+					: compileReturnJsxFunction(node, ctx, { default: true, ...compileOpts })
+				).nodes,
+			);
+			hmrComponents.push({ name: node.id.name, exportKind: 'default' });
+		} else if (
+			node.type === 'ExportDefaultDeclaration' &&
+			hmrDefaultFunctions.has(unwrapTsExpr(node.declaration)?.name)
+		) {
+			continue;
+		} else if (isComponentFunction(node)) {
 			// `function Foo() @{ ... }` (new TSRX shape) — non-exported helper. HMR
 			// doesn't wrap these (they're not user-visible across module boundaries).
 			bodyNodes.push(...compileComponent(node, ctx).nodes);
@@ -13544,6 +13623,7 @@ function compileInternal(
 			// (`const x = <style>…</style>`, exported or nested in a helper) become
 			// class-map objects and their sheets flow through cssInjections; scoped
 			// blocks inside plain functions' templates get their scope hashes.
+			const valueComponent = hmrValueComponents.get(node);
 			node = applyStyleScopes(node, ctx).node;
 			// HOOKS EVERYWHERE: a plain function (a custom hook, a helper) can hold
 			// octane hooks too — slot them the same way components do, so their base
@@ -13565,7 +13645,61 @@ function compileInternal(
 			const lowered = stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx);
 			// Top-level passthrough (imports, plain consts/functions): already a
 			// rewritten statement node — embedded directly in the module AST.
-			bodyNodes.push(lowered);
+			if (valueComponent !== undefined) {
+				const name = valueComponent.name;
+				const declaration =
+					lowered.type === 'ExportNamedDeclaration' ? lowered.declaration : lowered;
+				const [declarator] = declaration.declarations;
+				// A memo wrapper keeps its identity and comparator; HMR swaps the body it wraps.
+				const mutable = valueComponent.memo
+					? {
+							...declaration,
+							kind: 'let',
+							declarations: [
+								{
+									...declarator,
+									init: {
+										...declarator.init,
+										arguments: [
+											inheritOriginLoc(
+												b.call('_$hmr', declarator.init.arguments[0]),
+												declarator.init.arguments[0],
+											),
+										],
+									},
+								},
+							],
+						}
+					: { ...declaration, kind: 'let' };
+				bodyNodes.push(lowered === declaration ? mutable : { ...lowered, declaration: mutable });
+				if (!valueComponent.memo)
+					bodyNodes.push(
+						inheritOriginLoc(
+							b.stmt(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))),
+							node,
+						),
+					);
+				hmrComponents.push({
+					name,
+					exportKind: valueComponent.exportKind,
+					memo: valueComponent.memo,
+				});
+			} else if (
+				node.type === 'ExportDefaultDeclaration' &&
+				unwrapTsExpr(node.declaration)?.type === 'Identifier' &&
+				hmrDefaultValues.has(unwrapTsExpr(node.declaration).name)
+			) {
+				// A live binding, so the handoff's rebinding reaches importers. An
+				// export specifier cannot carry an `as`/`satisfies` assertion.
+				bodyNodes.push(
+					inheritOriginLoc(
+						b.export(null, [b.export_specifier(unwrapTsExpr(node.declaration).name, 'default')]),
+						node,
+					),
+				);
+			} else {
+				bodyNodes.push(lowered);
+			}
 		}
 		if (ctx.typescriptWeb && node.leadingComments && bodyNodes.length > firstStatement) {
 			bodyNodes[firstStatement] = {
@@ -13679,6 +13813,7 @@ function compileInternal(
 			b.member(b.member(hot(), 'data'), b.id('__octaneComponents'), false, optional);
 		const previousComponent = (component) =>
 			b.member(componentStore(), b.id(componentKey(component)));
+		const hmrBody = (component, value) => (component.memo ? b.member(value, 'type') : value);
 		const handoffs = hmrComponents.map((c) =>
 			b.if(
 				// Newly added exports may be named constructor or __proto__; inherited
@@ -13697,8 +13832,8 @@ function compileInternal(
 						b.unary(
 							'!',
 							b.call(
-								b.member(b.member(previousComponent(c), b.id('_$HMR'), true), 'update'),
-								b.id(c.name),
+								b.member(b.member(hmrBody(c, previousComponent(c)), b.id('_$HMR'), true), 'update'),
+								hmrBody(c, b.id(c.name)),
 							),
 						),
 						b.block([b.stmt(b.call(b.member(hot(), 'invalidate')))]),
