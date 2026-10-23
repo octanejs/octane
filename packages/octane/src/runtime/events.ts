@@ -1313,26 +1313,29 @@ function dispatchDelegated(this: Node, event: Event): void {
 	if (type === undefined) return;
 	const nativeCapture = (type.flags & EVENT_NATIVE_CAPTURE) !== 0;
 	let path = nativeCapture ? prepareDelegatedEvent(event, this) : undefined;
-	(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
-	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
-	const targetOnly = (type.flags & EVENT_TARGET_ONLY) !== 0;
-	_dispatchDepth++;
+	const pathBase = CAPTURE_PATH.length;
 	const node = event.target as any;
 	// A submit dispatch targeting a form opens the manual-action useFormStatus
 	// window (see publishManualFormPending): handlers' startTransition calls
 	// register on the record; the walk's end decides whether to publish.
 	const prevSubmitRec = ACTIVE_SUBMIT_DISPATCH;
-	const submitRec: SubmitDispatchRec | null =
-		event.type === 'submit' && node != null && node.nodeName === 'FORM'
-			? snapshotSubmitDispatch(node as HTMLFormElement, event as SubmitEvent)
-			: null;
-	if (submitRec !== null) ACTIVE_SUBMIT_DISPATCH = submitRec;
-	const nativeBatch = beginNativeEventBatch(event);
-	const pathBase = CAPTURE_PATH.length;
+	let submitRec: SubmitDispatchRec | null = null;
+	let nativeBatch: ReturnType<typeof beginNativeEventBatch> | undefined;
 	let stop: PropertyDescriptor | undefined;
 	let propagationStarted = false;
 	let frame: DelegatedEventFrame;
 	try {
+		// An ordinary child of a portal target belongs to its enclosing root.
+		// Only the listener that owns a route may finish this delivery and restore the edit.
+		if (!nativeCapture && buildDelegatedPath(event, this) === 0) return;
+		nativeBatch = beginNativeEventBatch(event);
+		_dispatchDepth++;
+		(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
+		if (event.type === 'submit' && node != null && node.nodeName === 'FORM') {
+			submitRec = snapshotSubmitDispatch(node as HTMLFormElement, event as SubmitEvent);
+			ACTIVE_SUBMIT_DISPATCH = submitRec;
+		}
 		// Non-bubbling families share one native capture callback. Run the logical
 		// capture queue first, independent of module registration order, and honor
 		// a stop within that phase before starting the emulated bubble queue.
@@ -1350,7 +1353,8 @@ function dispatchDelegated(this: Node, event: Event): void {
 			(type.flags & EVENT_CUSTOM_NATIVE_ONLY) !== 0
 		)
 			return;
-		buildDelegatedPath(event, this, path);
+		// A non-bubbling event's capture handlers can move its logical portal host.
+		if (nativeCapture) buildDelegatedPath(event, this, path);
 		// With no bubble handler on the logical path and no form action to drive,
 		// nothing can observe the propagation frame: leave the native event's
 		// stopPropagation/currentTarget untouched instead of patching and restoring
@@ -1359,6 +1363,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
 		propagationStarted = true;
 		frame = beginDelegatedPropagation(event, stop, null);
+		const targetOnly = (type.flags & EVENT_TARGET_ONLY) !== 0;
 		for (let i = pathBase; i < CAPTURE_PATH.length; i++) {
 			const current = CAPTURE_PATH[i];
 			// Target-only native families never transfer a handler to a root boundary.
@@ -1394,9 +1399,11 @@ function dispatchDelegated(this: Node, event: Event): void {
 		}
 		// Only this bubble queue sets currentTarget here; the capture queue clears its own.
 		if (propagationStarted) clearCurrentTarget(event);
-		closeNativeEventBatch(event, nativeBatch, false);
-		_dispatchDepth--;
-		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
+		if (nativeBatch !== undefined) {
+			closeNativeEventBatch(event, nativeBatch, false);
+			_dispatchDepth--;
+			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
+		}
 	}
 }
 
