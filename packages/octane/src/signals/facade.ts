@@ -1,24 +1,15 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
-	acceptScopeStreamedResult,
-	bindScopeStreamedSelection,
 	createDeclaredSignalCell,
 	createOwnerScope,
 	createSeededOwnerScope,
-	failScopeStreamedResult,
 	resumeScopeReads,
 	signalDeclarationSequence,
 	suspendScopeReads,
 	ScopeImpl,
 } from './engine.js';
 import { createDeclaredScalarCell } from './scalar-computations.js';
-import { ScopeDisposedError, SignalStreamError } from './errors.js';
-import {
-	scopeStreams,
-	isScopeStreamPending,
-	whenScopeStreamReady,
-	retainCompletedScopeStream,
-} from './scope-streams.js';
+import { ScopeDisposedError } from './errors.js';
 import {
 	isDeclarationView,
 	isRetiredDeclarationView,
@@ -36,7 +27,7 @@ import {
 	registerEarlySignalHydration,
 } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
-import { runAsDeclaredServerSignalReader as readAsDeclared } from './query-attempt-observer.js';
+import { runAsDeclaredServerSignalReader as readAsDeclared } from '#octane/signals/server-reads';
 
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 import {
@@ -67,25 +58,24 @@ import {
 	type SignalSnapshot,
 	type WritableSignal,
 } from './types.js';
-import type {
-	StreamFrameIdentity,
-	StreamedSignalResultFrame,
-} from '../streamed-signals-protocol.js';
 
 const identityScopes = new WeakMap<object, OwnerScope>();
 const scopeOwners = new WeakMap<OwnerScope, SignalOwner>();
-const retiredIdentities = new WeakSet<object>();
+/** @internal */
+export const retiredIdentities = new WeakSet<object>();
 
 registerEarlySignalHydration();
 const documentInstances = new WeakMap<object, Set<object>>();
 const instanceDocuments = new WeakMap<object, object>();
 const frozenDocuments = new WeakMap<object, Promise<void>>();
 
-function isScope(owner: SignalOwner): owner is OwnerScope {
+/** @internal */
+export function isScope(owner: SignalOwner): owner is OwnerScope {
 	return typeof (owner as OwnerScope).signal$ === 'function';
 }
 
-function isRendererOwner(owner: SignalOwner): owner is SignalRendererOwnerIdentity {
+/** @internal */
+export function isRendererOwner(owner: SignalOwner): owner is SignalRendererOwnerIdentity {
 	return (
 		'documentOwner' in owner &&
 		'instanceOwner' in owner &&
@@ -149,7 +139,8 @@ function resolveOwner(owner: SignalOwner): OwnerScope {
 	return resolveIdentity(owner, owner.scopeKey, owner);
 }
 
-function resolveDescriptorOwner(site: string | undefined, owner: SignalOwner): OwnerScope {
+/** @internal */
+export function resolveDescriptorOwner(site: string | undefined, owner: SignalOwner): OwnerScope {
 	if (isScope(owner)) owner = scopeOwners.get(owner) ?? owner;
 	if (!isRendererOwner(owner)) return resolveOwner(owner);
 	if (site?.startsWith('g:')) return resolveOwner(owner.documentOwner);
@@ -159,36 +150,11 @@ function resolveDescriptorOwner(site: string | undefined, owner: SignalOwner): O
 	return resolveOwner(owner);
 }
 
-function existingIdentityScope(identity: object): OwnerScope | undefined {
+/** @internal */
+export function existingIdentityScope(identity: object): OwnerScope | undefined {
 	if (retiredIdentities.has(identity)) return;
 	const scope = identityScopes.get(identity);
 	return scope?.retired ? undefined : scope;
-}
-
-function streamedScope(
-	owner: SignalOwner,
-	identity: StreamFrameIdentity,
-	create: boolean,
-): OwnerScope | undefined {
-	if (isScope(owner)) {
-		return !owner.retired && identity.ownerKey === owner.scopeKey ? owner : undefined;
-	}
-	if (!isRendererOwner(owner)) return;
-	if (
-		identity.ownerKey !== owner.documentOwner.scopeKey ||
-		identity.instanceKey !== owner.instanceKey ||
-		(!identity.nodeKey.startsWith('g:') && !identity.nodeKey.startsWith('i:'))
-	) {
-		return;
-	}
-	const documentRetired = isScope(owner.documentOwner)
-		? owner.documentOwner.retired
-		: retiredIdentities.has(owner.documentOwner);
-	if (documentRetired || retiredIdentities.has(owner.instanceOwner)) return;
-	const target: SignalOwner = identity.nodeKey.startsWith('g:') ? owner.documentOwner : owner;
-	if (create) return resolveDescriptorOwner(identity.nodeKey, target);
-	if (isScope(target)) return target.retired ? undefined : target;
-	return existingIdentityScope(isRendererOwner(target) ? target.instanceOwner : target);
 }
 
 installSignalOwnerRetirement((owner) => {
@@ -730,96 +696,4 @@ export function __startSignalReads(
 			}
 		}
 	});
-}
-
-/** Bind receiver-owned selection authority, optionally before the query descriptor resolves. */
-export function bindStreamedSignalSelection(
-	owner: SignalOwner,
-	identity: StreamFrameIdentity,
-): boolean {
-	const scope = streamedScope(owner, identity, true);
-	return scope ? bindScopeStreamedSelection(scope, identity) : false;
-}
-
-/** Accept one already-validated result frame without reviving a retired owner. */
-export function acceptStreamedSignalResult(
-	owner: SignalOwner,
-	frame: StreamedSignalResultFrame,
-): boolean {
-	const scope = streamedScope(owner, frame.identity, false);
-	return scope ? acceptScopeStreamedResult(scope, frame) : false;
-}
-
-/** Fail one exact result channel without exposing an untrusted remote stack. */
-export function failStreamedSignalResult(
-	owner: SignalOwner,
-	identity: StreamFrameIdentity,
-	code: string,
-): boolean {
-	const scope = streamedScope(owner, identity, false);
-	return scope ? failScopeStreamedResult(scope, identity, new SignalStreamError(code)) : false;
-}
-
-interface StreamedSignalReceiver {
-	attachResult(
-		identity: StreamFrameIdentity,
-		consumer: {
-			accept(frame: StreamedSignalResultFrame): void | false;
-			retainCompleted?(frames: StreamedSignalResultFrame[]): boolean;
-			fail(error: any): void;
-		},
-	): () => void;
-}
-
-function receiverErrorCode(error: unknown): string {
-	if (
-		error &&
-		(typeof error === 'object' || typeof error === 'function') &&
-		typeof (error as { code?: unknown }).code === 'string'
-	) {
-		return (error as { code: string }).code;
-	}
-	return 'receiver';
-}
-
-/** Connect a neutral early receiver to the signals engine without a hydration dependency. */
-export function attachStreamedSignalResult(
-	receiver: StreamedSignalReceiver,
-	owner: SignalOwner,
-	identity: StreamFrameIdentity,
-): () => void {
-	const scope = streamedScope(owner, identity, true);
-	if (!(scope instanceof ScopeImpl) || !bindScopeStreamedSelection(scope, identity))
-		throw new SignalStreamError('identity');
-	const streams = scopeStreams(scope);
-	const fail = (error: unknown): void => {
-		failStreamedSignalResult(owner, identity, receiverErrorCode(error));
-	};
-	const consumer = {
-		accept(frame: StreamedSignalResultFrame): void | false {
-			if (acceptStreamedSignalResult(owner, frame)) return;
-			// Only a still-authorized selector waiting on its dependencies may
-			// defer. Bad sequence/resource/attempt frames still fail closed.
-			if (isScopeStreamPending(streams, frame.identity)) return false;
-			fail(new SignalStreamError('identity'));
-			throw new SignalStreamError('identity');
-		},
-		retainCompleted(frames: StreamedSignalResultFrame[]): boolean {
-			return retainCompletedScopeStream(streams, identity, frames);
-		},
-		fail,
-	};
-	try {
-		let detach = receiver.attachResult(identity, consumer);
-		const stopWaiting = whenScopeStreamReady(streams, identity, () => {
-			detach = receiver.attachResult(identity, consumer);
-		});
-		return () => {
-			stopWaiting();
-			detach();
-		};
-	} catch (error) {
-		fail(error);
-		throw error;
-	}
 }

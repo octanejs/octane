@@ -49,6 +49,7 @@ const existingScenarios = [
 	['root-static-local', 'tsrx'],
 	['root-callback-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
+	['signal-counter', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -307,6 +308,7 @@ const featureControls = {
 		kept: ['childSlot'],
 	},
 	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
+	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
 	'hydrate-frame': {
 		dropped: [],
 		kept: ['renderPortalChild', 'bindImplicitSignalChild', ...signalOwnerDeclarations],

@@ -80,7 +80,7 @@ import {
 	setSpread,
 } from './host-props.js';
 import { coerceChildText, clearChildContent } from './component-slots.js';
-import { bindingChildSlot, childSlot, childTextHole } from './child-slots.js';
+import { renderSignalChildSlot, type SignalChildSlotRenderer } from './child-slots.js';
 import { teardownChildForSlot } from './deopt.js';
 import { BAG_SIZE, bagRecord, journalBag, journalObjectOnce } from './commit.js';
 import { getFirstChild, getNextSibling, htext, htextSwap, bindingText } from './templates.js';
@@ -1488,6 +1488,36 @@ export function bindSignalChild(
 	onlyChild?: boolean,
 	bindingMarker?: string,
 ): unknown {
+	return bindSignalChildWith(
+		renderSignalChildSlot,
+		parentScope,
+		previous,
+		slotKey,
+		domParent,
+		value,
+		anchor,
+		ownEnd,
+		ownsHost,
+		compactable,
+		onlyChild,
+		bindingMarker,
+	);
+}
+
+function bindSignalChildWith(
+	render: SignalChildSlotRenderer,
+	parentScope: Scope,
+	previous: unknown,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	anchor: Node | null | undefined,
+	ownEnd: boolean | undefined,
+	ownsHost: Element | undefined,
+	compactable: boolean | undefined,
+	onlyChild: boolean | undefined,
+	bindingMarker: string | undefined,
+): unknown {
 	// A markerless only-child hole keeps its last written primitive as the token
 	// (see below), whose Text node is the host's first child. An unchanged
 	// primitive then does nothing, as childTextHoleUpdate's raw-value guard does,
@@ -1535,12 +1565,19 @@ export function bindSignalChild(
 				return value;
 			}
 		}
-		const text = onlyChild
-			? childTextHole(parentScope, slotKey, domParent, value, cachedText)
-			: (bindingMarker === undefined
-					? childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, ownsHost, compactable)
-					: bindingChildSlot(parentScope, slotKey, domParent, value, bindingMarker, anchor, ownEnd),
-				null);
+		const text = render(
+			parentScope,
+			slotKey,
+			domParent,
+			value,
+			anchor,
+			ownEnd,
+			ownsHost,
+			compactable,
+			onlyChild,
+			bindingMarker,
+			cachedText,
+		);
 		if (prior !== null) {
 			if (TRANSITION_JOURNAL !== null) journalBag();
 			const finish = (discarded: boolean): void => {
@@ -1567,21 +1604,38 @@ export function bindSignalChild(
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
 		if (TRANSITION_JOURNAL !== null) journalObjectOnce(prior);
-		if (onlyChild) prior.text = childTextHole(parentScope, slotKey, domParent, next, cachedText);
-		else if (bindingMarker !== undefined)
-			bindingChildSlot(parentScope, slotKey, domParent, next, bindingMarker, anchor, ownEnd);
-		else childSlot(parentScope, slotKey, domParent, next, anchor, ownEnd, ownsHost, compactable);
+		const text = render(
+			parentScope,
+			slotKey,
+			domParent,
+			next,
+			anchor,
+			ownEnd,
+			ownsHost,
+			compactable,
+			onlyChild,
+			bindingMarker,
+			cachedText,
+		);
+		if (onlyChild) prior.text = text;
 		prior.value = next;
 		prior.state = parentScope.slots[slotKey] as ChildSlot | undefined;
 		return prior;
 	}
 	const initial = readSignalBinding(value);
-	const text = onlyChild
-		? childTextHole(parentScope, slotKey, domParent, initial, cachedText)
-		: (bindingMarker === undefined
-				? childSlot(parentScope, slotKey, domParent, initial, anchor, ownEnd, ownsHost, compactable)
-				: bindingChildSlot(parentScope, slotKey, domParent, initial, bindingMarker, anchor, ownEnd),
-			null);
+	const text = render(
+		parentScope,
+		slotKey,
+		domParent,
+		initial,
+		anchor,
+		ownEnd,
+		ownsHost,
+		compactable,
+		onlyChild,
+		bindingMarker,
+		cachedText,
+	);
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	const binding: DirectSignalChildBinding = {
 		[DIRECT_SIGNAL_CHILD]: true,
@@ -1611,6 +1665,7 @@ export function bindSignalChild(
 // untouched and activate the signal owner only after the nominal runtime
 // capability is observed. Returns whether it rendered the slot.
 export function bindImplicitSignalChild(
+	render: SignalChildSlotRenderer,
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
@@ -1633,13 +1688,13 @@ export function bindImplicitSignalChild(
 	let token: unknown;
 	try {
 		token = runWithBlockSignalOwner(parentScope, () =>
-			bindSignalChild(
+			bindSignalChildWith(
+				render,
 				parentScope,
 				previous,
 				slotKey,
 				domParent,
 				value,
-				`runtime:${slotKey}`,
 				anchor,
 				ownEnd,
 				ownsHost,

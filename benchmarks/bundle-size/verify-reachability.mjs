@@ -56,6 +56,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		cleanups: 1,
 		cleaned: true,
 	},
+	'signal-counter': {
+		before: '0',
+		after: '1',
+		cleaned: true,
+	},
 	'prop-attributes': {
 		sanitized: true,
 		title: 'Docs',
