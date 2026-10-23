@@ -1,11 +1,17 @@
 // A signal$ counter whose template has no renderable hole: installing the
-// implicit signal child must not retain the renderable-hole machinery.
+// implicit signal child must not retain the renderable-hole machinery. Its
+// instance derived$ keeps the declaration views a later render stages.
 import { createRoot } from 'octane';
-import { signal$ } from 'octane/signals';
+import { derived$, signal$ } from 'octane/signals';
 
 function SignalCounter() @{
 	const count$ = signal$(0);
-	<button id="minimal-signal-action" onClick={() => count$.set(count$.get() + 1)}>
+	const next$ = derived$(() => count$.get() + 1);
+	<button
+		id="minimal-signal-action"
+		title={String(next$.get())}
+		onClick={() => count$.set(count$.get() + 1)}
+	>
 		{String(count$.get()) as string}
 	</button>
 }

@@ -534,13 +534,15 @@ type Describe<T> = () => QueryRequest<T> | typeof skip;
 
 export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 	// Members that are not private are also used by a pending slot's producer
-	// (candidate-producers.ts), which forks this binding and publishes its selection.
+	// (candidate-producers.ts), which forks this binding and publishes its
+	// selection, and by its declaration views (installResourceViews).
 	declare candidate?: true;
 	/** Only a cell that a later render declared again with a new selection has a view. */
-	declare private view?: ResourceView<T> | undefined;
+	declare view?: ResourceView<T> | undefined;
 	/** A render's description that selected the committed request, and what it read. */
-	declare private probed?:
-		{ readonly describe: Describe<T>; readonly reads: ScopedNode[] } | undefined;
+	declare probed?: { readonly describe: Describe<T>; readonly reads: ScopedNode[] } | undefined;
+	/** Installed with the views; only a binding that has one calls it. */
+	declare releaseView: () => void;
 	/** The query definition this binding last selected, exempt from the conflict check. */
 	queryDefinition: QueryDefinition | undefined = undefined;
 	selected: RequestEntry | undefined;
@@ -585,7 +587,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		node.retryRequest = (options) => this.retry(options);
 	}
 
-	private request(describe = this.describe!): Request<T> | typeof skip {
+	request(describe = this.describe!): Request<T> | typeof skip {
 		const request = pure(() => describe());
 		if (request === skip) return request;
 		if (!(request instanceof Request)) throw new TypeError(formatClientError(200));
@@ -594,56 +596,6 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 
 	protected committedDefinition(): Describe<T> | undefined {
 		return this.describe;
-	}
-
-	/** An equal selection needs no view: the committed request already presents it. */
-	protected presentDefinition(describe: Describe<T>): ScopedNode | undefined {
-		let identity: string | typeof skip | undefined;
-		let reads: ScopedNode[] | undefined;
-		try {
-			const probe = readsDuring(this.owner, () => this.request(describe));
-			identity = probe.value === skip ? skip : probe.value.identity;
-			reads = probe.reads;
-		} catch {
-			// Suspended or failed descriptions get a private node that reports them.
-		}
-		const view = this.view;
-		if (
-			identity !== undefined &&
-			(identity === skip
-				? this.selected === undefined && this.node.state?.snapshot.status === 'idle'
-				: this.selected?.request.identity === identity)
-		) {
-			// Keep any view: a held render may still need it when it retries.
-			this.probed = { describe, reads: reads! };
-			return undefined;
-		}
-		// A retried or later render of the same selection shares the view's request.
-		if (view !== undefined && identity !== undefined && view.identity === identity) {
-			view.binding.describe = describe;
-			return view.node;
-		}
-		this.releaseView();
-		const node: ScopedNode<T> = createDeclarationView(this.node, (target) =>
-			candidateHooks.resource!.call(binding, target),
-		);
-		const binding: ResourceBinding<T> = new ResourceBinding(this.owner, node, describe);
-		// A view is private like a candidate fork: it never owns receiver streams.
-		binding.candidate = true;
-		binding.retainedRequest = this.retainedRequest;
-		binding.queryDefinition = this.queryDefinition;
-		this.view = { node, binding, identity };
-		return node;
-	}
-
-	private releaseView(): void {
-		const view = this.view;
-		if (view === undefined) return;
-		this.view = undefined;
-		signalBatch(() => {
-			releaseDeclarationView(view.node);
-			view.binding.dispose();
-		});
 	}
 
 	protected installDefinition(describe: Describe<T>, sequence: number): void {
@@ -677,36 +629,8 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		fork.resolvePending = undefined;
 	}
 
-	/** The accepted render presented the view; make its selection canonical. */
-	protected acceptView(node: ScopedNode, sequence: number): void {
-		const view = this.view;
-		if (view?.node !== node) return;
-		const fork = view.binding;
-		const previous = this.selected;
-		const resolve = this.resolvePending;
-		signalBatch(() => {
-			this.adoptSelection(fork);
-			this.releaseStreamedSelection(this.selected?.request.identity);
-			this.selectionAuthority = {};
-			this.describe = fork.describe;
-			this.sequence = sequence;
-			if (fork.queryDefinition !== undefined) {
-				this.queryDefinition = fork.queryDefinition;
-				(this.owner.queryDefinitions ??= new Map()).set(
-					fork.queryDefinition.key,
-					fork.queryDefinition,
-				);
-			}
-			this.view = undefined;
-			promoteDeclarationView(view.node, this.node);
-			fork.dispose();
-			if (resolve !== this.resolvePending) resolve?.();
-			if (previous !== this.selected) previous?.remove(this);
-		});
-	}
-
 	/** A receiver-owned selection belongs to one request; leaving it discards that channel. */
-	private releaseStreamedSelection(identity: string | undefined): void {
+	releaseStreamedSelection(identity: string | undefined): void {
 		const streams = this.owner.streams;
 		const streamed = streams?.selections.get(this.node.key);
 		if (streamed === undefined) return;
@@ -907,7 +831,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 	dispose(): void {
 		this.forgetStaged();
 		this.probed = undefined;
-		this.releaseView();
+		if (this.view) this.releaseView();
 		this.detach();
 		this.pendingObserver = undefined;
 		this.describe = undefined;
@@ -924,6 +848,94 @@ function matchesSeed(request: Request<unknown>, seed: SignalSeedEntry): boolean 
 		seed.request.kind === request.definition.kind &&
 		JSON.stringify(seed.request.argument) === JSON.stringify(encodeSignalValue(request.argument))
 	);
+}
+
+/** See installDerivedViews: compiled instance declarations install these. */
+export function installResourceViews(): void {
+	const prototype = ResourceBinding.prototype;
+	prototype.presentDefinition = presentResourceView;
+	prototype.acceptView = acceptResourceView;
+	prototype.releaseView = releaseResourceView;
+}
+
+/** An equal selection needs no view: the committed request already presents it. */
+function presentResourceView<T>(
+	this: ResourceBinding<T>,
+	describe: Describe<T>,
+): ScopedNode | undefined {
+	let identity: string | typeof skip | undefined;
+	let reads: ScopedNode[] | undefined;
+	try {
+		const probe = readsDuring(this.owner, () => this.request(describe));
+		identity = probe.value === skip ? skip : probe.value.identity;
+		reads = probe.reads;
+	} catch {
+		// Suspended or failed descriptions get a private node that reports them.
+	}
+	const view = this.view;
+	if (
+		identity !== undefined &&
+		(identity === skip
+			? this.selected === undefined && this.node.state?.snapshot.status === 'idle'
+			: this.selected?.request.identity === identity)
+	) {
+		// Keep any view: a held render may still need it when it retries.
+		this.probed = { describe, reads: reads! };
+		return undefined;
+	}
+	// A retried or later render of the same selection shares the view's request.
+	if (view !== undefined && identity !== undefined && view.identity === identity) {
+		view.binding.describe = describe;
+		return view.node;
+	}
+	if (view !== undefined) this.releaseView();
+	const node: ScopedNode<T> = createDeclarationView(this.node, (target) =>
+		candidateHooks.resource!.call(binding, target),
+	);
+	const binding: ResourceBinding<T> = new ResourceBinding(this.owner, node, describe);
+	// A view is private like a candidate fork: it never owns receiver streams.
+	binding.candidate = true;
+	binding.retainedRequest = this.retainedRequest;
+	binding.queryDefinition = this.queryDefinition;
+	this.view = { node, binding, identity };
+	return node;
+}
+
+/** The accepted render presented the view; make its selection canonical. */
+function acceptResourceView<T>(this: ResourceBinding<T>, node: ScopedNode, sequence: number): void {
+	const view = this.view;
+	if (view?.node !== node) return;
+	const fork = view.binding;
+	const previous = this.selected;
+	const resolve = this.resolvePending;
+	signalBatch(() => {
+		this.adoptSelection(fork);
+		this.releaseStreamedSelection(this.selected?.request.identity);
+		this.selectionAuthority = {};
+		this.describe = fork.describe;
+		this.sequence = sequence;
+		if (fork.queryDefinition !== undefined) {
+			this.queryDefinition = fork.queryDefinition;
+			(this.owner.queryDefinitions ??= new Map()).set(
+				fork.queryDefinition.key,
+				fork.queryDefinition,
+			);
+		}
+		this.view = undefined;
+		promoteDeclarationView(view.node, this.node);
+		fork.dispose();
+		if (resolve !== this.resolvePending) resolve?.();
+		if (previous !== this.selected) previous?.remove(this);
+	});
+}
+
+function releaseResourceView(this: ResourceBinding<unknown>): void {
+	const view = this.view!;
+	this.view = undefined;
+	signalBatch(() => {
+		releaseDeclarationView(view.node);
+		view.binding.dispose();
+	});
 }
 
 export function initializeResource<T>(
