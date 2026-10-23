@@ -2191,8 +2191,9 @@ As in React:
   warning per hydration pass; production compares nothing. A `<textarea>`'s
   text takes the client's value.
 - `dangerouslySetInnerHTML` keeps the server's HTML in the same way, and
-  production compares nothing. The next render that passes an `__html` object
-  rewrites it, even with the same string.
+  production compares nothing. As in React 19.3, it stays, even where it
+  differs, until a render passes a different `__html` string. React 19.0 to
+  19.2 instead rewrite it on every render that passes a new `__html` object.
 - Texts that match after the HTML parser's normalization (CRLF to LF,
   stripped `\u0000` and `\uFFFD`) count as a match, and the server text stays.
   `suppressHydrationWarning` keeps the server text one level deep. It never

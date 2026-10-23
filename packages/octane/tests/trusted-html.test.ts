@@ -42,15 +42,11 @@ describe('explicitly trusted HTML', () => {
 		try {
 			expect(container.querySelector('section')).toBe(section);
 			expect(container.querySelector('b')).toBe(content);
-			// As in React 19, hydration keeps the server's HTML and records nothing, so
-			// the next render that passes an `__html` object rewrites it, even with the
-			// same string.
+			// Adopted HTML that already is the next render's string stays, as in
+			// React 19.3, so the server's nodes keep their identity.
 			flushSync(() => root.render(client.TrustedMarkup, { ...props }));
-			const rewritten = container.querySelector('b');
-			expect(rewritten).not.toBe(content);
+			expect(container.querySelector('b')).toBe(content);
 			expect(section?.innerHTML).toBe(props.html);
-			flushSync(() => root.render(client.TrustedMarkup, { ...props }));
-			expect(container.querySelector('b')).toBe(rewritten);
 			flushSync(() => root.render(client.TrustedMarkup, { html: '<i>updated</i>' }));
 			expect(container.querySelector('section')).toBe(section);
 			expect(section?.innerHTML).toBe('<i>updated</i>');
@@ -79,7 +75,7 @@ describe('explicitly trusted HTML', () => {
 	});
 
 	it.each([false, true])(
-		'adopts parser-normalized HTML without a warning and rewrites it on the next render (dev: %s)',
+		'adopts parser-normalized HTML without a warning and keeps it on the next render (dev: %s)',
 		(dev) => {
 			const options = { id: 'trusted-html.tsrx', compileOptions: { dev, hmr: false } };
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -96,12 +92,11 @@ describe('explicitly trusted HTML', () => {
 					// comparison finds no difference to warn about, as React's does.
 					expect(container.querySelector('b')).toBe(content);
 					expect(warning).not.toHaveBeenCalled();
-					// React 19 rewrites adopted HTML on the next render that passes an
-					// `__html` object, even with the same string.
+					// Adopted HTML stands for the string it hydrated with, so the same
+					// string writes nothing, as in React 19.3.
 					flushSync(() => root.render(client.TrustedMarkup, { ...props }));
-					const rewritten = container.querySelector('b');
-					expect(rewritten).not.toBe(content);
-					expect(rewritten?.getAttribute('data-note')).toBe('&');
+					expect(container.querySelector('b')).toBe(content);
+					expect(content?.getAttribute('data-note')).toBe('&');
 				} finally {
 					root.unmount();
 				}
@@ -111,7 +106,7 @@ describe('explicitly trusted HTML', () => {
 		},
 	);
 
-	it.each([false, true])('updates retained hydration mismatches on render (dev: %s)', (dev) => {
+	it.each([false, true])('keeps hydration mismatches until __html changes (dev: %s)', (dev) => {
 		const options = { id: 'trusted-html.tsrx', compileOptions: { dev, hmr: false } };
 		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -140,11 +135,13 @@ describe('explicitly trusted HTML', () => {
 				const root = hydrateRoot(container, Component, props);
 				try {
 					expect(container.querySelector('b')).toBe(content);
+					// As in React 19.3, the server's HTML stays until `__html` changes.
 					flushSync(() => root.render(Component, { ...props }));
-					const updated = container.querySelector('i');
-					expect(updated?.textContent).toBe('client');
-					flushSync(() => root.render(Component, { ...props }));
-					expect(container.querySelector('i')).toBe(updated);
+					expect(container.querySelector('b')).toBe(content);
+					expect(container.querySelector('i')).toBeNull();
+					flushSync(() => root.render(Component, { ...props, html: '<i>changed</i>' }));
+					expect(container.querySelector('b')).toBeNull();
+					expect(container.querySelector('i')?.textContent).toBe('changed');
 				} finally {
 					root.unmount();
 				}

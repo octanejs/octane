@@ -319,15 +319,18 @@ export function setScriptText(el: Element, value: any): void {
 
 /**
  * React-compatible `dangerouslySetInnerHTML`. Hydration keeps an adopted
- * element's server content and records nothing (HydrationCapability.adoptHTML),
- * so the next render that passes an `__html` object rewrites it.
+ * element's server content (HydrationCapability.adoptHTML) and accepts it as
+ * the client's HTML, so only a changed string rewrites it, as in React 19.3.
  */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
 	const html = typeof value === 'object' ? trustedOr(value, next) : next;
+	const host = el as any;
 	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
 		hydration.adoptHTML(el, html);
+		journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+		host[DANGER_HTML_VALUE] = next;
 		return;
 	}
 	if (el.localName === 'script') {
@@ -336,7 +339,6 @@ export function setHTML(el: Element, value: any): void {
 	}
 	// Fresh wrappers must not replace identical children. Compare accepted authored
 	// HTML, including successful hydration adoption.
-	const host = el as any;
 	if (host[DANGER_HTML_VALUE] === next) return;
 	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
 	host[DANGER_HTML_VALUE] = next;
