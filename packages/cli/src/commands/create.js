@@ -85,6 +85,12 @@ export default defineCommand({
 			placeholder: '<name>',
 			description: 'Install with this one instead of the one that ran the command.',
 		},
+		typescript: {
+			type: 'string',
+			placeholder: '<version-or-range>',
+			description:
+				'Choose a supported TypeScript version or range; use "next" for the 7.1 nightly.',
+		},
 	},
 
 	async run(ctx, input) {
@@ -153,6 +159,7 @@ export default defineCommand({
 				title: 'octane create',
 				mode: input.flags.template,
 				modeFlag: '--template',
+				typescript: input.flags.typescript,
 				install: input.flags.install,
 				packageManager,
 			});

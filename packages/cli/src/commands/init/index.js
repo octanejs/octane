@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import semver from 'semver';
 import { defineCommand } from '../../kernel/command.js';
-import { setCompilerOption } from '../../kernel/edit.js';
-import { CliError, EXIT } from '../../kernel/errors.js';
+import { setCompilerOption, setRootProperty } from '../../kernel/edit.js';
+import { CliError, EXIT, usageError } from '../../kernel/errors.js';
 import { PACKAGE_MANAGERS, PNPM_ALLOWED_BUILDS, installPackages } from '../../kernel/install.js';
 import { readInstalled } from '../../kernel/project.js';
 import {
@@ -24,6 +25,67 @@ import {
 	tsconfig,
 	viteConfig,
 } from './templates.js';
+
+const CLASSIC_TYPESCRIPT_RANGE = '^5.9.3 || ^6.0.0';
+const NATIVE_TYPESCRIPT_RANGE = '>=7.1.0-0 <7.2.0-0';
+const DEFAULT_TYPESCRIPT_PEER_RANGE = '^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1';
+const TSRX_CONTENT_MAPPER = {
+	package: '@tsrx/content-mapper',
+	extensions: ['.tsrx'],
+	options: { compiler: 'octane/compiler/volar' },
+};
+
+/**
+ * @param {string | null} peerRange
+ * @returns {string}
+ */
+function classicTypescriptRange(peerRange) {
+	if (!peerRange) return CLASSIC_TYPESCRIPT_RANGE;
+	return (
+		['^5.9.3', '^6.0.0']
+			.filter((range) => semver.intersects(range, peerRange, { includePrerelease: true }))
+			.join(' || ') || CLASSIC_TYPESCRIPT_RANGE
+	);
+}
+
+/**
+ * @param {string} specifier
+ * @returns {string | null}
+ */
+function typescriptRange(specifier) {
+	return specifier === 'next' ? NATIVE_TYPESCRIPT_RANGE : semver.validRange(specifier);
+}
+
+/**
+ * @param {string | undefined} specifier
+ * @returns {boolean}
+ */
+function needsContentMapper(specifier) {
+	const range = specifier && typescriptRange(specifier);
+	return Boolean(
+		range && semver.intersects(range, NATIVE_TYPESCRIPT_RANGE, { includePrerelease: true }),
+	);
+}
+
+/**
+ * @param {string} specifier
+ * @param {string | null} peerRange
+ */
+function validateTypescriptSpecifier(specifier, peerRange) {
+	const range = typescriptRange(specifier);
+	if (!range) {
+		throw usageError(
+			`--typescript expects a valid version or semver range, or "next". Got "${specifier}".`,
+		);
+	}
+	const supportedRange = peerRange ?? DEFAULT_TYPESCRIPT_PEER_RANGE;
+	if (!semver.intersects(range, supportedRange, { includePrerelease: true })) {
+		throw usageError(
+			`TypeScript "${specifier}" is outside @tsrx/typescript-plugin's peer range "${supportedRange}".`,
+			'Choose a version or range allowed by the installed plugin.',
+		);
+	}
+}
 
 /**
  * @typedef {Object} Change
@@ -91,15 +153,11 @@ function prettierSettings(root, files, fromManifest) {
 }
 
 /**
- * The TypeScript range `tsrx-tsc` will start under, read from the plugin that
- * ships it once that plugin is on disk.
+ * The TypeScript peer range, read from the plugin that ships `tsrx-tsc`.
  *
- * It is a required peer there, not a dependency, so nothing carries a compiler
- * of its own. npm and pnpm install a required peer themselves; yarn does not,
- * and leaves a project whose `typecheck` script dies on `Cannot find module
- * 'typescript'`. Naming the package with no range is not the fix either: that
- * takes the newest major, which `tsrx-tsc` cannot start under. So the range
- * comes from the toolchain's own declaration, never from a guess here.
+ * The peer is optional, so init installs TypeScript explicitly. Its default
+ * stays on the stable 5.9/6 line instead of resolving the plugin's full range
+ * to a nightly; the selected value is checked against this peer range.
  *
  * @param {string} root
  * @returns {string | null} null when the plugin is not installed yet
@@ -120,9 +178,10 @@ function toolchainTypescriptRange(root) {
  * @param {import('../../kernel/project.js').Project} project
  * @param {keyof typeof MODES} mode
  * @param {ReturnType<typeof integrationFor>} integration
+ * @param {boolean} nativeTypeScript
  * @returns {{ changes: Change[], manual: string[] }}
  */
-function plan(project, mode, integration) {
+function plan(project, mode, integration, nativeTypeScript) {
 	const { root } = project;
 	/** @type {Change[]} */
 	const changes = [];
@@ -133,8 +192,16 @@ function plan(project, mode, integration) {
 	if (!project.tsconfig) {
 		changes.push({
 			file: 'tsconfig.json',
-			summary: 'create, configured for .tsrx',
-			apply: writeFile(at('tsconfig.json'), tsconfig),
+			summary: nativeTypeScript
+				? 'create, configured for .tsrx and TypeScript 7.1'
+				: 'create, configured for .tsrx',
+			apply() {
+				const edited = nativeTypeScript
+					? setRootProperty(tsconfig, 'contentMappers', [TSRX_CONTENT_MAPPER])
+					: { text: tsconfig };
+				if (!edited) throw new CliError('Could not configure tsconfig.json safely.');
+				writeFileSync(at('tsconfig.json'), edited.text);
+			},
 		});
 	} else {
 		const file = project.tsconfig.path;
@@ -164,6 +231,37 @@ function plan(project, mode, integration) {
 					writeFileSync(file, text);
 				},
 			});
+		}
+
+		if (nativeTypeScript) {
+			const mappers = project.tsconfig.config.contentMappers;
+			const configured =
+				Array.isArray(mappers) &&
+				mappers.some(
+					(/** @type {any} */ mapper) =>
+						mapper?.package === TSRX_CONTENT_MAPPER.package &&
+						mapper.extensions?.includes('.tsrx') &&
+						mapper.options?.compiler === TSRX_CONTENT_MAPPER.options.compiler,
+				);
+			if (
+				!configured &&
+				(mappers === undefined || (Array.isArray(mappers) && mappers.length === 0))
+			) {
+				changes.push({
+					file: path.relative(root, file),
+					summary: 'add the TypeScript 7.1 .tsrx content mapper',
+					apply() {
+						const source = readFileSync(file, 'utf8');
+						const edited = setRootProperty(source, 'contentMappers', [TSRX_CONTENT_MAPPER]);
+						if (!edited) throw new CliError(`Could not edit ${path.basename(file)} safely.`);
+						writeFileSync(file, edited.text);
+					},
+				});
+			} else if (!configured) {
+				manual.push(
+					`In ${path.relative(root, file)}, add { "package": "@tsrx/content-mapper", "extensions": [".tsrx"], "options": { "compiler": "octane/compiler/volar" } } to the top-level contentMappers array.`,
+				);
+			}
 		}
 	}
 
@@ -390,8 +488,8 @@ function plan(project, mode, integration) {
  *
  * @param {import('../../kernel/context.js').Ctx} ctx
  * @param {import('../../kernel/project.js').Project} project
- * @param {{ title: string, mode?: string, modeFlag?: string, install?: boolean,
- *   packageManager?: string }} options
+ * @param {{ title: string, mode?: string, modeFlag?: string, typescript?: string,
+ *   install?: boolean, packageManager?: string }} options
  * @returns {Promise<{ exitCode?: number, json: Record<string, unknown> }>}
  */
 export async function applyInit(ctx, project, options) {
@@ -421,11 +519,46 @@ export async function applyInit(ctx, project, options) {
 					packageManager: /** @type {typeof project.packageManager} */ (options.packageManager),
 				};
 
-	const integration = integrationFor(project.bundler, mode);
-	const { changes, manual } = plan(project, mode, integration);
 	const declared = project.declaredDependencies;
+	const installedPeerRange = toolchainTypescriptRange(project.root);
+	const defaultTypescriptRange = classicTypescriptRange(installedPeerRange);
+	const typescriptChoice =
+		options.typescript ??
+		(declared.typescript
+			? undefined
+			: ctx.ui.canPrompt
+				? await ctx.ui.select({
+						message: 'Which TypeScript line do you want?',
+						flag: '--typescript',
+						initial: defaultTypescriptRange,
+						options: [
+							{
+								value: defaultTypescriptRange,
+								label: 'TypeScript 5.9 or 6 (stable)',
+								hint: 'The classic compiler used by tsrx-tsc',
+							},
+							{
+								value: 'next',
+								label: 'TypeScript 7.1 nightly',
+								hint: 'Uses the native compiler and .tsrx content mapper',
+							},
+						],
+					})
+				: defaultTypescriptRange);
+	if (typescriptChoice !== undefined) {
+		validateTypescriptSpecifier(typescriptChoice, installedPeerRange);
+	}
+	const installedTypescript = readInstalled(project.root, 'typescript');
+	// A declared range can include 7.1 even while the installed compiler is 5.9 or 6.
+	const nativeTypeScript = needsContentMapper(typescriptChoice ?? installedTypescript?.version);
+	const needsTypeScript = typescriptChoice !== undefined || !declared.typescript;
+	const integration = integrationFor(project.bundler, mode);
+	const { changes, manual } = plan(project, mode, integration, nativeTypeScript);
 	const dependencies = integration.dependencies.filter((name) => !declared[name]);
 	const devDependencies = integration.devDependencies.filter((name) => !declared[name]);
+	if (nativeTypeScript && !declared['@tsrx/content-mapper']) {
+		devDependencies.push('@tsrx/content-mapper');
+	}
 	const needsParser = !declared['@tsrx/oxc'];
 
 	ctx.ui.intro(options.title);
@@ -434,7 +567,8 @@ export async function applyInit(ctx, project, options) {
 		changes.length === 0 &&
 		dependencies.length === 0 &&
 		devDependencies.length === 0 &&
-		!needsParser
+		!needsParser &&
+		!needsTypeScript
 	) {
 		ctx.ui.outro('Already set up. Run `octane doctor` to confirm.');
 		return { json: { ok: true, mode, changes: [], installed: [] } };
@@ -446,10 +580,15 @@ export async function applyInit(ctx, project, options) {
 			? changes.map((c) => `${c.file}  ${ctx.ui.colors.dim(c.summary)}`)
 			: ['nothing'],
 	);
-	if (dependencies.length + devDependencies.length > 0 || needsParser) {
+	if (dependencies.length + devDependencies.length > 0 || needsParser || needsTypeScript) {
 		ctx.ui.note('Will install', [
 			...dependencies,
 			...devDependencies.map((name) => `${name} (dev)`),
+			...(needsTypeScript
+				? [
+						`typescript@${typescriptChoice ?? toolchainTypescriptRange(project.root) ?? 'peer range'} (dev)`,
+					]
+				: []),
 			...(needsParser ? ['@tsrx/oxc (dev)'] : []),
 		]);
 	}
@@ -473,7 +612,7 @@ export async function applyInit(ctx, project, options) {
 	};
 	if (
 		options.install !== false &&
-		(dependencies.length + devDependencies.length > 0 || needsParser)
+		(dependencies.length + devDependencies.length > 0 || needsParser || needsTypeScript)
 	) {
 		const spinner = ctx.ui.spinner(`Installing with ${installing.packageManager ?? 'npm'}`);
 		try {
@@ -507,21 +646,35 @@ export async function applyInit(ctx, project, options) {
 				}
 			}
 
-			// Now that the plugin is on disk it can say which TypeScript it runs
-			// under. A package manager that installs required peers has already
-			// put one there and this pins the same range explicitly; one that does
-			// not, like yarn, would otherwise leave `typecheck` unable to start.
-			if (!declared.typescript) {
+			// The plugin owns the supported range. Its full peer range includes a
+			// TypeScript 7.1 nightly, so the unattended default stays on stable 5.9/6.
+			if (needsTypeScript) {
 				const range = toolchainTypescriptRange(project.root);
 				if (range === null) {
-					manual.push('Install typescript, at the range @tsrx/typescript-plugin declares.');
+					manual.push(
+						`Install typescript@${typescriptChoice ?? 'the classic supported range'} after @tsrx/typescript-plugin is installed.`,
+					);
 				} else {
-					const ran = await installPackages(ctx, installing, [`typescript@${range}`], {
+					const specifier =
+						options.typescript === undefined && typescriptChoice === defaultTypescriptRange
+							? classicTypescriptRange(range)
+							: (typescriptChoice ?? classicTypescriptRange(range));
+					validateTypescriptSpecifier(specifier, range);
+					const ran = await installPackages(ctx, installing, [`typescript@${specifier}`], {
 						dev: true,
 						allowBuilds: PNPM_ALLOWED_BUILDS,
 					});
 					warn(ran.warnings);
 					installed.push('typescript');
+					const resolved = readInstalled(project.root, 'typescript');
+					if (resolved && !semver.satisfies(resolved.version, range, { includePrerelease: true })) {
+						throw new CliError(
+							`Installed TypeScript ${resolved.version} is outside @tsrx/typescript-plugin's peer range "${range}".`,
+							{
+								hint: 'Choose a compatible --typescript version or range and run octane init again.',
+							},
+						);
+					}
 				}
 			}
 		} catch (error) {
@@ -529,14 +682,16 @@ export async function applyInit(ctx, project, options) {
 			throw error;
 		}
 		spinner.stop(`Installed ${installed.length} package(s)`);
-	} else if (dependencies.length + devDependencies.length > 0 || needsParser) {
+	} else if (dependencies.length + devDependencies.length > 0 || needsParser || needsTypeScript) {
 		// The range lives in the plugin, which is not installed yet, so it cannot
 		// be quoted here. Naming the package without one would send people to the
 		// newest major, which `tsrx-tsc` cannot start under.
 		if (dependencies.length + devDependencies.length > 0) {
+			manual.push(`Install: ${[...dependencies, ...devDependencies].join(' ')}`);
+		}
+		if (needsTypeScript) {
 			manual.push(
-				`Install: ${[...dependencies, ...devDependencies].join(' ')}`,
-				'then typescript, at the range @tsrx/typescript-plugin declares as its peer.',
+				`Then install typescript@${typescriptChoice ?? CLASSIC_TYPESCRIPT_RANGE} as a dev dependency, after checking @tsrx/typescript-plugin's peer range.`,
 			);
 		}
 		if (needsParser) manual.push('Install @tsrx/oxc at the range declared by octane.');
@@ -571,6 +726,12 @@ export default defineCommand({
 			placeholder: '<name>',
 			description: 'Install with this one instead of the project’s own.',
 		},
+		typescript: {
+			type: 'string',
+			placeholder: '<version-or-range>',
+			description:
+				'Choose a supported TypeScript version or range; use "next" for the 7.1 nightly.',
+		},
 		force: { type: 'boolean', description: 'Proceed even with uncommitted changes.' },
 	},
 
@@ -584,6 +745,7 @@ export default defineCommand({
 		return applyInit(ctx, ctx.project(), {
 			title: 'octane init',
 			mode: input.flags.mode,
+			typescript: input.flags.typescript,
 			install: input.flags.install,
 			packageManager: input.flags['package-manager'],
 		});

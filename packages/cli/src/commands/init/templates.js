@@ -55,12 +55,9 @@ export function integrationFor(bundler, mode) {
 	return {
 		specifier: target[mode].specifier,
 		dependencies: ['octane', ...target[mode].packages],
-		// TypeScript is absent from this list on purpose, but it does get
-		// installed: naming it here would take the newest major, which `tsrx-tsc`
-		// cannot start under, so it is installed afterwards at the range
-		// @tsrx/typescript-plugin declares as its peer. Nothing in the toolchain
-		// carries a compiler of its own. The bundler is only ours to install when
-		// we are the ones creating its config.
+		// TypeScript is installed separately so init can choose a supported line
+		// instead of resolving the plugin's full peer range to its nightly. The
+		// bundler is only ours to install when we are the ones creating its config.
 		devDependencies: [
 			'@tsrx/typescript-plugin',
 			'@tsrx/prettier-plugin',
