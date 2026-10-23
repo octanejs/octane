@@ -61,6 +61,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: '1',
 		cleaned: true,
 	},
+	'signal-instance-derived': {
+		before: '1',
+		after: '2',
+		cleaned: true,
+	},
 	'prop-attributes': {
 		sanitized: true,
 		title: 'Docs',

@@ -50,6 +50,7 @@ const existingScenarios = [
 	['root-callback-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
 	['signal-counter', 'tsrx'],
+	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -308,9 +309,10 @@ const featureControls = {
 		kept: ['childSlot'],
 	},
 	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
-	'signal-counter': {
-		dropped: ['childSlot', 'bindSignalChild'],
-		kept: ['enableSignalBindings', 'presentDerivedView', 'promoteDeclarationView'],
+	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
+	'signal-instance-derived': {
+		dropped: [],
+		kept: ['presentDerivedView', 'promoteDeclarationView'],
 	},
 	// Module declarations are never declared again, so no view stages them.
 	'hydrate-frame': {
