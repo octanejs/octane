@@ -30,6 +30,19 @@ describe('satisfies', () => {
 		expect(satisfies('2.0.0', '>=2.0.0')).toBe(true);
 	});
 
+	it.each([
+		['alpha', 'alpha.1'],
+		['alpha.1', 'alpha.beta'],
+		['alpha.beta', 'beta'],
+		['beta', 'beta.2'],
+		['beta.2', 'beta.11'],
+		['beta.11', 'rc.1'],
+		['beta.9007199254740992', 'beta.9007199254740993'],
+	])('orders prerelease identifiers %s before %s', (lower, higher) => {
+		expect(satisfies(`1.0.0-${lower}`, `<1.0.0-${higher}`)).toBe(true);
+		expect(satisfies(`1.0.0-${higher}`, `<1.0.0-${lower}`)).toBe(false);
+	});
+
 	it('returns null for ranges it cannot evaluate, rather than guessing', () => {
 		// The dependency checks report "not verified" on null. Answering true or
 		// false here would be an invented verdict about a workspace link.

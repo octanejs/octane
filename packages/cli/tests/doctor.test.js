@@ -113,6 +113,23 @@ describe('octane doctor', () => {
 		expect(duplicate.detail.join('\n')).toMatch(/some-lib/);
 	});
 
+	it.each([
+		['8.0.0-beta.10', 'pass'],
+		['8.0.0-beta.1', 'fail'],
+	])('orders numeric prerelease identifiers for Vite %s', async (version, status) => {
+		const { root } = fixture({
+			...HEALTHY,
+			...installed('octane', '0.1.17', {
+				peerDependencies: { vite: '>=8.0.0-beta.2 <8.0.0' },
+			}),
+			...installed('vite', version),
+		});
+
+		const result = await runCli(['doctor', '--cwd', root, '--json', '--only', 'deps.vite-peer']);
+		expect(check(result.json(), 'deps.vite-peer').status).toBe(status);
+		expect(result.exitCode).toBe(status === 'pass' ? 0 : 3);
+	});
+
 	it('does not fail the run on warning-severity findings alone', async () => {
 		const { root } = fixture({
 			...HEALTHY,

@@ -1086,6 +1086,26 @@ export function octane(options = {}) {
 	return {
 		name: 'octane',
 		enforce: 'pre',
+		api: {
+			/**
+			 * The `{ request, imported }` components a generated client module may
+			 * render as void root bodies: the same final-code proof a plain-module
+			 * root consumes, and none outside production client builds.
+			 */
+			async provenVoidImports(context, importer, imports) {
+				if (!specializeProductionRoots || hmrEnabled || profileEnabled) return [];
+				const proven = await loadImportMetadata(
+					context,
+					imports,
+					importer,
+					VOID_EXPORTS_META,
+					proofWaitGraph(context, 'client'),
+				);
+				return imports.filter(({ request, imported }) =>
+					proven.has(voidImportKey(request, imported)),
+				);
+			},
+		},
 		config(config, env) {
 			// Resolve the command-aware profile signal before recreating the
 			// compiler or emitting the define, so `'auto'` (devtools) picks up

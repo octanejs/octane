@@ -402,9 +402,10 @@ if (selected('octane-tsrx')) {
 	const appRoot = path.resolve(__dirname, '../../examples/wayfinder');
 	// This app has no function form actions or Fragment refs. Its real generated
 	// entry must not install their generic descriptor capabilities. Source ranges
-	// still identify retained implementations after minification or inlining.
+	// still identify retained implementations after minification or inlining;
+	// the hydration implementation every entry keeps proves they still match.
 	const entryDeclarations = [
-		'createElementFromConfig',
+		'hydrateRootWithOutputHandler',
 		'enableDescriptorFormActions',
 		'enableDescriptorFragmentRefs',
 		'renderFragmentRefDescriptor',
@@ -441,8 +442,8 @@ if (selected('octane-tsrx')) {
 	}
 	assert(totals.raw > 0, 'Wayfinder emitted no client JavaScript');
 	assert(
-		retainedEntryDeclarations.has('createElementFromConfig'),
-		'Wayfinder entry descriptor control is absent; update its reachability check',
+		retainedEntryDeclarations.has('hydrateRootWithOutputHandler'),
+		'Wayfinder entry hydration control is absent; update its reachability check',
 	);
 	assert.deepEqual(
 		entryDeclarations.slice(1).filter((name) => retainedEntryDeclarations.has(name)),

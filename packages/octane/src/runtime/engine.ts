@@ -329,6 +329,7 @@ import {
 	JOURNAL_EVENT_OWNER,
 	BAG_SIZE,
 	BAG_POOL,
+	commitQueuedBag,
 	queueFrontier,
 	noteFrontierMember,
 	queueRootDeletion,
@@ -1429,27 +1430,31 @@ export function commitRootRenders(): void {
 					try {
 						for (let i = 0; i < ops.length; i += 2) {
 							if (owner.disposed || owner.generation !== COMMITTING_GENERATION) break;
+							const op = ops[i];
 							const target = ops[i + 1];
+							const bag = op === commitQueuedBag;
 							COMMIT_OP = i;
 							try {
 								// A commit function's `careful` flag, as bagDone passes it.
-								ops[i](
-									target,
+								const careful =
 									TRANSITION_JOURNAL !== null ||
-										(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
-								);
+									(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0);
+								if (bag) {
+									// commitQueuedBag, inline.
+									const next = target.next;
+									next[(target.$ &= BAG_SIZE) + 2](target, next, careful);
+								} else op(target, careful);
 							} catch (error) {
 								// React routes a commit-phase error to the nearest boundary and keeps
 								// committing; the failed bag's state was cleared before its first write.
 								// A structural entry's cleanups already route their own errors.
-								if (typeof target?.$ !== 'number') throw error;
+								if (!bag) throw error;
 								if (SIGNAL_COMMIT_RETRY ? !SIGNAL_COMMIT_RETRY(target, error) : true)
 									reportEffectError(target.next[target.$ & BAG_SIZE].block, error);
 							}
 							// While the pool is short, an idle bag returns its cells and holds `C`
-							// again: a queued bag's entry always names its staged cells. Only a bag
-							// has `$`; any other target, null included, compares undefined.
-							if (BAG_POOL.length < 8 && target?.$ <= BAG_SIZE) {
+							// again: a queued bag's entry always names its staged cells.
+							if (bag && BAG_POOL.length < 8 && target.$ <= BAG_SIZE) {
 								const next = target.next;
 								BAG_POOL.push(next);
 								target.next = next[target.$ + 2];
