@@ -88,3 +88,22 @@ export function ViewTransitionBoundaries(props: { cache: TextCache }) @{
 		</ViewTransition>
 	</main>
 }
+
+// A boundary whose content comes from root props: `root.render` in a transition
+// folds no hook work, so its hold has no batch.
+export function PropAndCounter(props: { cache: TextCache; text: string }) @{
+	<main>
+		@try {
+			<div class="u">
+				<AsyncText cache={props.cache} text={props.text} />
+			</div>
+		} @pending {
+			<span class="fallback-u">{'loading u'}</span>
+		}
+		@try {
+			<Counter name="b" cache={props.cache} />
+		} @pending {
+			<span class="fallback-b">{'loading b'}</span>
+		}
+	</main>
+}

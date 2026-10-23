@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setTransitionFallbackTimeout, getTransitionFallbackTimeout } from 'octane';
+import {
+	setTransitionFallbackTimeout,
+	getTransitionFallbackTimeout,
+	startTransition,
+} from 'octane';
 import { act, mount, type MountResult } from '../_helpers.js';
 import { installViewTransitionMocks } from './_helpers/view-transition-mocks.js';
 import {
+	PropAndCounter,
 	SeparateBoundaries,
 	SharedBoundary,
 	ViewTransitionBoundaries,
@@ -116,6 +121,25 @@ describe('parallel transitions', () => {
 
 		await resolve('b: 1');
 		expect(counter(r, 'b')).toBe('idle|1|b: 1');
+	});
+
+	it('does not hold a hook transition behind an unrelated root.render transition', async () => {
+		const { cache, resolve } = createCache();
+		const r = mount(PropAndCounter, { cache, text: 'u: 0' });
+		mounted.push(r);
+		await resolve('u: 0', 'b: 0');
+		await act(() => startTransition(() => r.root.render(PropAndCounter, { cache, text: 'u: 1' })));
+		await act(() => r.click('.b .go'));
+		expect(r.find('.u .text').textContent).toBe('u: 0');
+		expect(counter(r, 'b')).toBe('pending|saving|b: 0');
+
+		// B's data arrives first: B commits while the root.render transition holds.
+		await resolve('b: 1');
+		expect(counter(r, 'b')).toBe('idle|1|b: 1');
+		expect(r.find('.u .text').textContent).toBe('u: 0');
+
+		await resolve('u: 1');
+		expect(r.find('.u .text').textContent).toBe('u: 1');
 	});
 
 	describe('with a transition fallback timeout', () => {
