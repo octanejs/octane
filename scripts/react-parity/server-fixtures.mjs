@@ -26,6 +26,9 @@ export function octaneServerFixtures(root) {
 			const result = await build({
 				entryPoints: [id.slice(prefix.length, -'.js'.length)],
 				bundle: true,
+				banner: {
+					js: '// octane-no-slot: each source module was already compiled for the server.',
+				},
 				write: false,
 				format: 'esm',
 				platform: 'node',
