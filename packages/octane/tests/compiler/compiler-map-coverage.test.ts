@@ -111,6 +111,22 @@ function expectMapped(
 	expectMappedIn(SOURCE, code, map, genNeedle, genOffset, srcNeedle, srcOffset);
 }
 
+describe.each(['client', 'server'] as const)('%s module directive source maps', (mode) => {
+	it.each([false, true])(
+		'maps preserved directives to their authored locations (dev=%s)',
+		(dev) => {
+			const source = `/* license */
+"use strong";
+"custom directive";
+export function App() @{ <p>Hello</p> }`;
+			const { code, map } = compile(source, 'Directives.tsrx', { mode, dev });
+			for (const directive of ['"use strong"', '"custom directive"']) {
+				expectMappedIn(source, code, map, directive, 0, directive);
+			}
+		},
+	);
+});
+
 // Attribute values, control-flow call sites, component props, and a hoisted
 // @for key function — coverage across both component interiors and the module
 // frame's generated helpers.

@@ -66,6 +66,56 @@ describe('compiled module imports', () => {
 		['server development', { mode: 'server', dev: true }],
 		['server production', { mode: 'server', dev: false }],
 	] as const) {
+		it.each(['js', 'ts'] as const)(
+			`preserves the module directive prologue in ${label} (%s)`,
+			(output) => {
+				const source = `/* license */
+"use strict";
+"use strong";
+"custom directive";
+import { useState } from 'octane';
+export function Counter() @{
+	const [count, setCount] = useState(0);
+	<button onClick={() => setCount(count + 1)}>{count as string}</button>
+}`;
+				const { code } = compile(source, '/src/Counter.tsrx', { ...options, output });
+				const filename = `/src/Counter.${output}`;
+				const body = parseModule(code, filename).body;
+				expect(
+					body
+						.slice(0, 3)
+						.map((statement) => ('directive' in statement ? statement.directive : undefined)),
+				).toEqual(['use strict', 'use strong', 'custom directive']);
+				expect(body.filter((statement) => 'directive' in statement)).toHaveLength(3);
+				const compiler = createOctaneCompiler({ root: '/src' });
+				expect(
+					compiler.transform(code, filename, {
+						environment: 'client',
+						dev: false,
+						hmr: false,
+					}),
+				).toEqual(expect.objectContaining({ code: expect.any(String) }));
+			},
+		);
+
+		it(`does not promote a string after an import into the prologue in ${label}`, () => {
+			const { code } = compile(
+				`import './setup.js';
+"custom directive";
+export function App() @{ <div /> }`,
+				'/src/App.tsrx',
+				options,
+			);
+			const body = parseModule(code, '/src/App.js').body;
+			expect(body.some((statement) => 'directive' in statement)).toBe(false);
+			expect(body).toContainEqual(
+				expect.objectContaining({
+					type: 'ExpressionStatement',
+					expression: expect.objectContaining({ value: 'custom directive' }),
+				}),
+			);
+		});
+
 		for (const strong of [false, true]) {
 			it(`preserves meta-property syntax in memoized creations in ${label} (strong=${strong})`, () => {
 				const { code } = compile(
