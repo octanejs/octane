@@ -1,9 +1,13 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import semver from 'semver';
 import { fail, pass, skip, warn } from '../check.js';
 import { findNestedProperty, setCompilerOption } from '../../../kernel/edit.js';
+import { readInstalled } from '../../../kernel/project.js';
 
 const TSRX_PLUGIN = '@tsrx/typescript-plugin';
+const TSRX_CONTENT_MAPPER = '@tsrx/content-mapper';
+const NATIVE_TYPESCRIPT_RANGE = '>=7.1.0-0 <7.2.0-0';
 const WILDCARD_DECL = /^\s*declare\s+module\s+['"]\*\.tsrx['"]/;
 const LEGACY_RESOLUTION = new Set(['node', 'node10', 'classic']);
 // `tsc` as its own command word. `\btsc\b` also matches the tail of `vue-tsc`
@@ -18,6 +22,51 @@ const BARE_TSC_GLOBAL = new RegExp(BARE_TSC.source, 'g');
  * @returns {boolean}
  */
 const hasTsconfig = (project) => project.tsconfig !== null;
+
+/**
+ * @param {import('../../../kernel/project.js').Project} project
+ * @returns {boolean}
+ */
+function usesNativeTypeScript(project) {
+	const typescript = readInstalled(project.root, 'typescript');
+	return Boolean(
+		typescript &&
+		semver.satisfies(typescript.version, NATIVE_TYPESCRIPT_RANGE, { includePrerelease: true }),
+	);
+}
+
+/** @type {import('../check.js').Check} */
+const nativeTypeScriptCheck = {
+	id: 'ts.native-content-mapper',
+	title: 'Native TypeScript content mapper',
+	category: 'typescript',
+	severity: 'error',
+	applies: (project) => project.tsrxFiles.length > 0 && usesNativeTypeScript(project),
+	run(ctx, project) {
+		const mappers = project.tsconfig?.config.contentMappers;
+		const configured =
+			Array.isArray(mappers) &&
+			mappers.some(
+				(mapper) =>
+					mapper?.package === TSRX_CONTENT_MAPPER &&
+					mapper.extensions?.includes('.tsrx') &&
+					mapper.options?.compiler === 'octane/compiler/volar',
+			);
+		const missing = [];
+		if (!readInstalled(project.root, TSRX_CONTENT_MAPPER)) {
+			missing.push(`Install ${TSRX_CONTENT_MAPPER} as a dev dependency.`);
+		}
+		if (!configured) {
+			missing.push(
+				`Add { "package": "${TSRX_CONTENT_MAPPER}", "extensions": [".tsrx"], "options": { "compiler": "octane/compiler/volar" } } to the top-level contentMappers array in tsconfig.json.`,
+			);
+		}
+		if (missing.length > 0) {
+			return fail('TypeScript 7.1 needs a configured .tsrx content mapper', { detail: missing });
+		}
+		return pass('TypeScript 7.1 has the .tsrx content mapper installed and configured');
+	},
+};
 
 /**
  * @param {import('../../../kernel/project.js').Project} project
@@ -48,6 +97,7 @@ function applyCompilerOption(project, key, value) {
 
 /** @type {import('../check.js').Check[]} */
 export const typescriptChecks = [
+	nativeTypeScriptCheck,
 	{
 		id: 'ts.jsx-import-source',
 		title: 'JSX import source',

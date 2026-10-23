@@ -1,4 +1,4 @@
-import { useContext, useRef, useSyncExternalStore } from 'octane';
+import { useContext, useEffect, useRef, useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
 import { SeoContext } from './context.ts';
 import { createSeoRegistry, type SeoRegistry } from './registry.ts';
@@ -57,6 +57,8 @@ function SeoOutlet() @{
 		registry.getSnapshot,
 		registry.getSnapshot,
 	);
+	// A render that read uncommitted writes is corrected once its effects run.
+	useEffect(() => registry.flush(), [descriptors]);
 	<>
 		@for (const descriptor of descriptors; key descriptor.key) {
 			<SeoTag descriptor={descriptor} />

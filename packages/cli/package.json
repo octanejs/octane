@@ -42,7 +42,8 @@
   },
   "dependencies": {
     "@clack/prompts": "catalog:default",
-    "picocolors": "catalog:default"
+    "picocolors": "catalog:default",
+    "semver": "7.8.5"
   },
   "devDependencies": {
     "vitest": "catalog:default"

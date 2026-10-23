@@ -91,6 +91,35 @@ describe('octane create', () => {
 		expect(existsSync(path.join(app, 'src/server/health.ts'))).toBe(false);
 	});
 
+	it('adds the native TypeScript mapper when the 7.1 nightly is selected', async () => {
+		const cwd = workspace();
+
+		const result = await create([
+			'my-app',
+			'--cwd',
+			cwd,
+			'--template',
+			'spa',
+			'--typescript',
+			'next',
+			'--yes',
+			'--no-install',
+			'--json',
+		]);
+		const app = path.join(cwd, 'my-app');
+
+		expect(result.exitCode).toBe(0);
+		expect(JSON.parse(read(app, 'tsconfig.json')).contentMappers).toEqual([
+			{
+				package: '@tsrx/content-mapper',
+				extensions: ['.tsrx'],
+				options: { compiler: 'octane/compiler/volar' },
+			},
+		]);
+		expect(result.json().manual.join(' ')).toContain('@tsrx/content-mapper');
+		expect(result.json().manual.join(' ')).toContain('typescript@next');
+	});
+
 	it('creates a routed, server-rendered app whose template carries the SSR markers', async () => {
 		const cwd = workspace();
 

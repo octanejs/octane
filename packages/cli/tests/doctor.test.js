@@ -68,6 +68,44 @@ describe('octane doctor', () => {
 		expect(result.exitCode).toBe(0);
 	});
 
+	it('reports the mapper required by TypeScript 7.1', async () => {
+		const { root } = fixture({
+			...HEALTHY,
+			...installed('typescript', '7.1.0-dev.20261004.1'),
+		});
+		const report = (await runCli(['doctor', '--cwd', root, '--json'])).json();
+		const finding = check(report, 'ts.native-content-mapper');
+
+		expect(finding.status).toBe('fail');
+		expect(finding.detail.join('\n')).toContain('@tsrx/content-mapper');
+		expect(finding.detail.join('\n')).toContain('contentMappers');
+	});
+
+	it('accepts the installed and configured TypeScript 7.1 mapper', async () => {
+		const { root } = fixture({
+			...HEALTHY,
+			'tsconfig.json': {
+				contentMappers: [
+					{
+						package: '@tsrx/content-mapper',
+						extensions: ['.tsrx'],
+						options: { compiler: 'octane/compiler/volar' },
+					},
+				],
+				compilerOptions: {
+					jsxImportSource: 'octane',
+					moduleResolution: 'bundler',
+					plugins: [{ name: '@tsrx/typescript-plugin' }],
+				},
+			},
+			...installed('typescript', '7.1.0-dev.20261004.1'),
+			...installed('@tsrx/content-mapper', '0.1.2'),
+		});
+		const report = (await runCli(['doctor', '--cwd', root, '--json'])).json();
+
+		expect(check(report, 'ts.native-content-mapper').status).toBe('pass');
+	});
+
 	it('reports each misconfiguration and exits 3', async () => {
 		const { root } = fixture({
 			...HEALTHY,

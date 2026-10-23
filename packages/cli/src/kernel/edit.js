@@ -189,6 +189,38 @@ export function setCompilerOption(text, key, value) {
 	const close = matchBrace(text, open);
 	if (close === -1) return null;
 
+	return setProperty(text, open, close, key, value);
+}
+
+/**
+ * Set a top-level property while preserving the surrounding JSONC text.
+ *
+ * @param {string} text
+ * @param {string} key
+ * @param {unknown} value
+ * @returns {{ text: string, changed: boolean } | null}
+ */
+export function setRootProperty(text, key, value) {
+	const rootOpen = findRootBrace(text);
+	if (rootOpen === -1) return null;
+	const rootClose = matchBrace(text, rootOpen);
+	if (rootClose === -1) return null;
+	return setProperty(text, rootOpen, rootClose, key, value);
+}
+
+/**
+ * Set a property in the object bounded by `open` and `close`.
+ *
+ * @param {string} text
+ * @param {number} open
+ * @param {number} close
+ * @param {string} key
+ * @param {unknown} value
+ * @returns {{ text: string, changed: boolean }}
+ */
+function setProperty(text, open, close, key, value) {
+	const serialized = JSON.stringify(value);
+
 	const existing = findProperty(text, open, close, key);
 	if (existing) {
 		if (text.slice(existing.valueStart, existing.valueEnd).trim() === serialized) {
