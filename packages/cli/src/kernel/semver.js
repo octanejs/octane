@@ -31,7 +31,19 @@ export function compareVersions(a, b) {
 	if (a.prerelease === b.prerelease) return 0;
 	if (a.prerelease === null) return 1;
 	if (b.prerelease === null) return -1;
-	return a.prerelease < b.prerelease ? -1 : 1;
+	const left = a.prerelease.split('.');
+	const right = b.prerelease.split('.');
+	for (let i = 0; i < Math.max(left.length, right.length); i++) {
+		if (left[i] === undefined) return -1;
+		if (right[i] === undefined) return 1;
+		if (left[i] === right[i]) continue;
+		const leftNumeric = /^\d+$/.test(left[i]);
+		const rightNumeric = /^\d+$/.test(right[i]);
+		if (leftNumeric && rightNumeric) return BigInt(left[i]) < BigInt(right[i]) ? -1 : 1;
+		if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+		return left[i] < right[i] ? -1 : 1;
+	}
+	return 0;
 }
 
 /**
