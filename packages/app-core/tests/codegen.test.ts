@@ -56,6 +56,7 @@ async function runClientEntry(
 		widgetModuleReady?: Promise<void>;
 		documentId?: string;
 		fails?: boolean;
+		entry?: Parameters<typeof create_client_entry_source>[0];
 	} = {},
 ) {
 	const styleRequests: { url: string; respond: (status: number) => void }[] = [];
@@ -147,6 +148,7 @@ async function runClientEntry(
 				independentEntries:
 					registry === 'static' ? [{ id: 'widget', specifier: '@fixture/widget' }] : [],
 				runtimeModuleId: '@fixture/runtime',
+				...options.entry,
 			}),
 			loader: 'js',
 		},
@@ -170,6 +172,7 @@ async function runClientEntry(
 							path === '@fixture/runtime'
 								? `export const initializeHydrationEventCapture = globalThis.capture;
 							export const hydrateRoot = globalThis.hydrate;
+							export const __hydrateVoidRoot = globalThis.hydrateVoid;
 							export function Suspense() {} export function ErrorBoundary() {} export function createElement() {}`
 								: path === 'octane/hydration'
 									? `globalThis.imports.push('hydration'); export const bootstrapIndependentHydration = globalThis.bootstrap;`
@@ -228,6 +231,15 @@ async function runClientEntry(
 			owners.push(settings?.signalOwner);
 			target.setAttribute('data-ready', '');
 		},
+		hydrateVoid: (
+			_target: unknown,
+			_body: unknown,
+			_props: unknown,
+			settings?: { signalOwner?: SignalOwner },
+		) => {
+			owners.push(settings?.signalOwner);
+			target.setAttribute('data-ready', 'void');
+		},
 		bootstrap: (element: ParentNode, options: IndependentHydrateBootstrapOptions) => {
 			cleanup = bootstrapIndependentHydration(element, options);
 			return cleanup;
@@ -251,6 +263,7 @@ async function runClientEntry(
 		expect(options.fails ? errors.length > 0 : target.hasAttribute('data-ready')).toBe(true);
 	});
 	return {
+		code: outputFiles[0].text,
 		target,
 		imports,
 		errors,
@@ -551,6 +564,71 @@ describe('bundler-neutral app codegen', () => {
 			expect(app.pages).toEqual(['page']);
 			expect(app.imports).toEqual([]);
 			expect(app.errors).toEqual([]);
+		} finally {
+			await app.dispose();
+		}
+	});
+
+	it('narrows a completed build entry to the features its graph uses', async () => {
+		const narrowed = {
+			rootBoundary: false,
+			voidRoot: true,
+			independentHydration: false,
+			streamedSignals: false,
+		};
+		const source = create_client_entry_source(narrowed);
+		for (const omitted of ['octane/hydration', 'Suspense', 'ErrorBoundary', 'createElement'])
+			expect(source).not.toContain(omitted);
+		const app = await runClientEntry('none', {
+			clientBuildId: 'build',
+			documentId: 'ordinary-document',
+			clientBuild: {
+				version: 1,
+				buildId: 'build',
+				mode: 'production',
+				capabilities: { independentHydration: false },
+			},
+			entry: narrowed,
+		});
+		try {
+			expect(app.target.getAttribute('data-ready')).toBe('void');
+			expect(app.pages).toEqual(['page']);
+			app.transition('pagehide', true);
+			app.transition('pageshow', true);
+			expect(app.imports).toEqual([]);
+			expect(app.errors).toEqual([]);
+		} finally {
+			await app.dispose();
+		}
+		// Control: the general entry keeps every optional feature and the generic root.
+		const general = create_client_entry_source();
+		for (const kept of ['octane/hydration', 'octane/hydration/streamed-signals', 'Suspense'])
+			expect(general).toContain(kept);
+		expect(general).not.toContain('__hydrateVoidRoot');
+	});
+
+	it('fails loudly when streamed signals reach a build that compiled none', async () => {
+		const app = await runClientEntry('none', {
+			clientBuildId: 'build',
+			clientBuild: {
+				version: 1,
+				buildId: 'build',
+				mode: 'production',
+				capabilities: { independentHydration: false },
+			},
+			streamed: { documentId: 'signal-document', html: '', read: () => undefined },
+			entry: { streamedSignals: false },
+			fails: true,
+		});
+		try {
+			expect(app.errors).toEqual([
+				[
+					'[octane] Failed to bootstrap client hydration.',
+					new Error('[octane] Streamed signals reached a client build that compiled none.'),
+				],
+			]);
+			expect(app.imports).toEqual([]);
+			expect(app.target.hasAttribute('data-ready')).toBe(false);
 		} finally {
 			await app.dispose();
 		}

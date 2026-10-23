@@ -209,7 +209,12 @@ function importModule(path) {
   return loader ? loader() : dynamicImport(path);
 }
 
-const independentStyles = new Map();
+${
+	options.independentHydration === false
+		? `// This build compiled no independent islands.
+async function bootstrapIndependentIslands() {}
+`
+		: `const independentStyles = new Map();
 
 function clientAssetPath(path) {
   return path.startsWith('/') ? path : '/' + path;
@@ -280,8 +285,14 @@ async function bootstrapIndependentIslands(target) {
   });
   return independentBootstrap;
 }
-
-async function bootstrapDocumentLifecycle() {
+`
+}
+${
+	options.streamedSignals === false
+		? `// This build compiled no streamed signals.
+async function bootstrapDocumentLifecycle() {}
+`
+		: `async function bootstrapDocumentLifecycle() {
   if (clientBuildId === null || !documentData?.streamedSignals) return;
   if (lifecycleBootstrap) return lifecycleBootstrap;
   lifecycleBootstrap = (async () => {
@@ -298,7 +309,8 @@ async function bootstrapDocumentLifecycle() {
   })();
   return lifecycleBootstrap;
 }
-
+`
+}
 `;
 }
 
@@ -345,6 +357,15 @@ async function bootstrapDocumentLifecycle() {
  *     app-level client router uses to commit its match tree so the first
  *     hydration pass adopts the same resolved tree the server rendered.
  *
+ * A build that knows its whole client graph narrows the entry to it. Each flag
+ * defaults to the general entry, and `false` drops that feature's code:
+ *   - `rootBoundary`: the config names a root pending or catch boundary.
+ *   - `independentHydration` / `streamedSignals`: some compiled module has an
+ *     independent island / streamed signal state, so its lazy runtime loads.
+ *   - `voidRoot: true` hydrates without returned-value reconciliation. Only a
+ *     build that proved every page and layout it can render is a void `@{}`
+ *     body, with no root boundary, may set it (see compiler/void-roots.js).
+ *
  * `getComponentExport` mirrors routes.js `get_component_export` (route named
  * export > default > first PascalCase) so server and client pick the SAME
  * component.
@@ -359,16 +380,26 @@ async function bootstrapDocumentLifecycle() {
  *   resolveImport?: (id: string) => string,
  *   runtimeModuleId?: string,
  *   generatedBy?: string,
+ *   rootBoundary?: boolean,
+ *   voidRoot?: boolean,
+ *   independentHydration?: boolean,
+ *   streamedSignals?: boolean,
  * }} [options]
  * @returns {string}
  */
 export function create_client_entry_source(options = {}) {
 	const runtimeModuleId =
 		options.runtimeModuleId ?? fileURLToPath(new URL('./client-entry-runtime.js', import.meta.url));
+	const rootBoundary = options.rootBoundary !== false;
+	const imports = [
+		options.voidRoot ? '__hydrateVoidRoot as hydrateRoot' : 'hydrateRoot',
+		'initializeHydrationEventCapture',
+		...(rootBoundary ? ['Suspense', 'ErrorBoundary', 'createElement'] : []),
+	];
 	return (
 		client_entry_prelude(
 			options,
-			`import { hydrateRoot, initializeHydrationEventCapture, Suspense, ErrorBoundary, createElement } from ${JSON.stringify(runtimeModuleId)};`,
+			`import { ${imports.join(', ')} } from ${JSON.stringify(runtimeModuleId)};`,
 		) +
 		`function getComponentExport(module, exportName) {
   // Explicit export name requires an exact match; do NOT fall back, so a
@@ -377,7 +408,9 @@ export function create_client_entry_source(options = {}) {
   if (typeof module.default === 'function') return module.default;
   return Object.entries(module).find(([key, value]) => typeof value === 'function' && /^[A-Z]/.test(key))?.[1];
 }
-
+${
+	rootBoundary
+		? `
 function withRootBoundary(content, boundary) {
   let body = content;
   // Keep ErrorBoundary closest to the route. Suspense may retain its pending
@@ -401,7 +434,9 @@ function withRootBoundary(content, boundary) {
   }
   return body;
 }
-
+`
+		: ''
+}
 (async () => {
   try {
     const el = document.getElementById('__octane_data');
@@ -428,11 +463,15 @@ function withRootBoundary(content, boundary) {
     )) throw new Error('[octane] Invalid streamed signal document identity.');
     if (globalThis.__octaneStreamedSignalSelections !== undefined) {
       if (!data.streamedSignals) throw new Error('[octane] Missing streamed signal document identity.');
-      signalHydrationModule = await import('octane/hydration/streamed-signals');
+${
+	options.streamedSignals === false
+		? `      throw new Error('[octane] Streamed signals reached a client build that compiled none.');`
+		: `      signalHydrationModule = await import('octane/hydration/streamed-signals');
       if (incompatibleBuild) return;
       streamedHydration = signalHydrationModule.bootstrapStreamedSignalHydration(data.streamedSignals);
       signalOwner = streamedHydration.signalOwner;
-      await bootstrapDocumentLifecycle();
+      await bootstrapDocumentLifecycle();`
+}
     }
     if (!data.entry) {
       console.error('[octane] Unable to hydrate: no route entry in #__octane_data.');
@@ -489,7 +528,9 @@ function withRootBoundary(content, boundary) {
       Content = (_props, scope, extra) => Component({ params, url }, scope, extra);
     }
 
-    const rootBoundary = { pending: null, catch: null };
+${
+	rootBoundary
+		? `    const rootBoundary = { pending: null, catch: null };
     for (const kind of ['pending', 'catch']) {
       const entry = data.rootBoundary?.[kind];
       if (!entry) continue;
@@ -503,10 +544,13 @@ function withRootBoundary(content, boundary) {
       }
       rootBoundary[kind] = Boundary;
     }
-
+    Content = withRootBoundary(Content, rootBoundary);
+`
+		: ''
+}
     if (incompatibleBuild) return;
     if (documentLifecycle && !await documentLifecycle.whenActive()) return;
-    hydrateRoot(target, withRootBoundary(Content, rootBoundary), undefined,
+    hydrateRoot(target, Content, undefined,
       signalOwner === undefined ? undefined : { signalOwner });
   } catch (error) {
     console.error('[octane] Failed to bootstrap client hydration.', error);

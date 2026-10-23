@@ -1,5 +1,11 @@
 // @ts-check
-export { hydrateRoot, initializeHydrationEventCapture, Suspense, ErrorBoundary } from 'octane';
+export {
+	hydrateRoot,
+	__hydrateVoidRoot,
+	initializeHydrationEventCapture,
+	Suspense,
+	ErrorBoundary,
+} from 'octane';
 import { createElementFromConfig } from 'octane/internal/client';
 
 /**

@@ -405,6 +405,59 @@ function collect_hydrate_module_paths(config) {
 }
 
 /**
+ * Narrow the production hydrate entry to the features its client graph uses.
+ * Loading that graph first runs every compiled transform, so independent
+ * islands and streamed signals are recorded before the entry's own lazy
+ * imports reach chunking. A void root needs every page and layout the entry can
+ * render proven a void `@{}` body, by the compiler's own final-code proof.
+ *
+ * @param {import('vite').Rollup.PluginContext} context
+ * @param {ResolvedOctaneConfig} config
+ * @param {string[]} entries
+ * @param {ReturnType<typeof createClientBuildState>} clientBuild
+ * @param {(context: any, importer: string, imports: Array<{ request: string, imported: string }>) => Promise<unknown[]>} provenVoidImports
+ */
+async function hydrate_entry_features(context, config, entries, clientBuild, provenVoidImports) {
+	const seen = new Set();
+	// Rolldown's ModuleInfo cannot tell an external import apart, and loading
+	// one never settles, so each import is resolved again from its importer.
+	/** @param {string} request @param {string} importer @returns {Promise<void>} */
+	const visit = async (request, importer) => {
+		const resolved = await context.resolve(request, importer);
+		if (!resolved || resolved.external || seen.has(resolved.id)) return;
+		seen.add(resolved.id);
+		const info = await context.load({ id: resolved.id, resolveDependencies: true });
+		await Promise.all(
+			[...info.importedIds, ...info.dynamicallyImportedIds].map((id) => visit(id, resolved.id)),
+		);
+	};
+	await Promise.all(entries.map((entry) => visit(entry, RESOLVED_VIRTUAL_HYDRATE_ID)));
+	const rootBoundary = !!(config.rootBoundary.pending || config.rootBoundary.catch);
+	const imports = config.router.routes
+		.filter(
+			/** @returns {route is RenderRoute} */
+			(route) => route.type === 'render' && route.hydrate !== 'islands',
+		)
+		.flatMap((route) => [
+			{
+				request: /** @type {string} */ (get_route_entry_path(route.entry)),
+				imported: get_route_entry_export_name(route.entry) ?? 'default',
+			},
+			...(route.layout ? [{ request: route.layout, imported: 'default' }] : []),
+		]);
+	return {
+		rootBoundary,
+		independentHydration: clientBuild.metadata().capabilities.independentHydration,
+		streamedSignals: clientBuild.hasStreamedSignals,
+		voidRoot:
+			!rootBoundary &&
+			imports.length > 0 &&
+			(await provenVoidImports(context, RESOLVED_VIRTUAL_HYDRATE_ID, imports)).length ===
+				imports.length,
+	};
+}
+
+/**
  * The recommended Octane Vite integration. With no octane.config.ts it behaves
  * as a compiler plugin inside a normal Vite SPA; configured routes activate the
  * metaframework layer.
@@ -833,6 +886,17 @@ export function octane(inlineOptions = {}) {
 				// restarts. Literal `import('/src/…')` entries go through import
 				// analysis and share url identity with every other importer.
 				let entries = staticEntries;
+				// A watch rebuild can add a feature after this entry has loaded.
+				const features =
+					isBuild && config.build.watch == null && buildOctaneConfig
+						? await hydrate_entry_features(
+								this,
+								buildOctaneConfig,
+								entries,
+								clientBuild,
+								compilerPlugin.api.provenVoidImports,
+							)
+						: null;
 				if (!isBuild) {
 					const loaded = octaneConfig ?? (await loadStartupConfig(root))?.config ?? null;
 					entries = collect_hydrate_module_paths(loaded);
@@ -845,6 +909,7 @@ export function octane(inlineOptions = {}) {
 						staticEntries: entries,
 						clientBuildId: clientBuild.buildId,
 						devClientBuild: !isBuild,
+						...features,
 					}),
 				);
 				return fs.readFileSync(file, 'utf-8');
