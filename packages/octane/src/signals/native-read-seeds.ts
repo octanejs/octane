@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import type { AdoptionFrame, ScopeSeed, SignalSeedEntry } from './types.js';
+import type { ScopeSeed, SignalSeedEntry } from './types.js';
 import type { NativeReadWitness } from './native-read-collector.js';
 import type { NativeAdoptionOwner, NativeReadSource } from './read-protocol.js';
 import { decodeSignalValue, snapshotSignalValue } from '../data-encoding.js';
