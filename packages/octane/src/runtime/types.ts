@@ -510,6 +510,8 @@ export interface TransitionActionBatch {
 	waiting: number;
 	/** Set once its work and every hold are over (finishTransitionHookBatch). */
 	finished: boolean;
+	/** Runtime callbacks waiting for this batch's work and every hold to finish. */
+	finishListeners: Set<() => void> | null;
 	/** Holds keeping it from rendering (TransitionHold.suspends). */
 	suspended: number;
 	/** Profile builds only: queued updates as (cell, block, cause, slot) quadruples. */

@@ -220,6 +220,7 @@ export function createTransitionActionBatch(): TransitionActionBatch {
 		members: null,
 		waiting: 0,
 		finished: false,
+		finishListeners: null,
 		suspended: 0,
 		hook: null,
 		hooks: null,
@@ -328,7 +329,35 @@ export function scheduleTransitionBatch(batch: TransitionActionBatch): void {
 export function flushTransitionActionBatchIfReady(batch: TransitionActionBatch): void {
 	if (batch.closed && batch.pendingActions === 0) flushTransitionActionBatch(batch);
 }
-export const TRANSITION_LISTENERS = new Set<() => void>();
+
+/** Subscribe to the lifetime of one transition batch, including any holds it acquires. */
+export function onTransitionBatchFinished(
+	batch: TransitionActionBatch,
+	listener: () => void,
+): () => void {
+	let listeners = batch.finishListeners;
+	if (listeners === null) batch.finishListeners = listeners = new Set();
+	listeners.add(listener);
+	return () => {
+		const current = batch.finishListeners;
+		if (current === null) return;
+		current.delete(listener);
+		if (current.size === 0) batch.finishListeners = null;
+	};
+}
+
+function publishTransitionBatchFinished(batch: TransitionActionBatch): void {
+	const listeners = batch.finishListeners;
+	if (listeners === null) return;
+	batch.finishListeners = null;
+	for (const listener of listeners) {
+		try {
+			listener();
+		} catch (error) {
+			console.error(error);
+		}
+	}
+}
 
 /**
  * Count `batch` toward `hook`'s pending indicator. Idempotent per batch: a hook
@@ -376,6 +405,7 @@ export function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 	// An entangled batch finishes with the batch it joined.
 	if (batch.merged !== null && !rootTransitionBatch(batch).finished) return;
 	batch.finished = true;
+	publishTransitionBatchFinished(batch);
 	if (batch.hooksPending) {
 		batch.hooksPending = false;
 		const hook = batch.hook!;

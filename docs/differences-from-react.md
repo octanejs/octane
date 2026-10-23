@@ -1205,6 +1205,37 @@ Other current differences:
 - Child boundaries can leave empty comment anchors inside an `option`; its
   visible text and selected value are the supported observations.
 
+## Trusted Types
+
+As in React 19.3, a Trusted Types object reaches its DOM sink as the object, not
+its string. This covers `dangerouslySetInnerHTML.__html` and attributes such as
+`srcdoc`, a script's `src`, and SVG `xlinkHref`, so they work under an enforced
+`require-trusted-types-for 'script'`. Server rendering stringifies as before.
+
+What differs:
+
+- React parses no markup itself, but Octane does: compiled templates, binding
+  fragments, and streamed regions. That markup goes through a module-private
+  policy named `octane`. The streaming bootstrap script uses its own
+  `octane-stream` policy for JSON-carried boundaries. A CSP that lists
+  `trusted-types` must name both:
+
+  ```text
+  Content-Security-Policy: require-trusted-types-for 'script'; trusted-types octane octane-stream <your policies>
+  ```
+
+  A page that loads two copies of Octane also needs `'allow-duplicates'`.
+  Application strings never go through these policies.
+- `<script dangerouslySetInnerHTML>` writes the script's text, not its HTML
+  (see [Raw script and scoped style bodies](#raw-script-and-scoped-style-bodies)).
+  Under enforcement it takes a `TrustedScript`, where React takes `TrustedHTML`.
+- Only Trusted Types objects pass through. Other objects still stringify once
+  before the write; React hands every object to the sink.
+- A `TrustedScriptURL` that URL sanitizing blocks, such as a `javascript:`
+  URL, is written as the blocked string.
+- Float resource URLs (`preinit`, `preload`, hoisted async scripts) take
+  strings, as in React.
+
 ## Development diagnostics and production errors
 
 Octane progressively ports applicable development warnings and errors from the
