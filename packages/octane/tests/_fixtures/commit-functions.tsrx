@@ -167,3 +167,39 @@ export function CommitCallback(props: { value: string; tail: string; log: string
 		<CallbackTail tail={props.tail} />
 	</section>
 }
+
+// Two templates whose commit functions are the same code, beside one that
+// differs only in its setter.
+function TwinTitle(props: { label: string }) @{
+	<p id="twin-title" title={props.label}>
+		{props.label as string}
+	</p>
+}
+
+function TwinTitleCopy(props: { label: string }) @{
+	<em id="twin-copy" title={props.label}>
+		{props.label as string}
+	</em>
+}
+
+function TwinClass(props: { label: string }) @{
+	<i id="twin-class" class={props.label}>
+		{props.label as string}
+	</i>
+}
+
+export function Twins(props: {
+	title: string;
+	copy: string;
+	cls: string;
+	wait: Promise<unknown> | null;
+}) @{
+	<section>
+		<TwinTitle label={props.title} />
+		<TwinTitleCopy label={props.copy} />
+		<TwinClass label={props.cls} />
+		@if (props.wait) {
+			<Wait wait={props.wait} />
+		}
+	</section>
+}

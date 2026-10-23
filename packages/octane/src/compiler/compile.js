@@ -12663,6 +12663,7 @@ function compileInternal(
 		hoistedTemplates: [], // { name, ast, html, ns, frag, origins }
 		internedTemplates: new Map(), // HTML -> one template or namespace/fragment variants
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
+		commitFunctions: new Map(), // structural key -> { name, body } of a shared commit function (emitCommitFunction)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		// Descriptor capabilities this module's JSX values can select (see
@@ -29233,6 +29234,7 @@ function planJsx(
 	const commit = !noTemplate && !ctx.presentationHydration ? makeCommitPlan() : null;
 	const BAG_LOCALS_PLACEHOLDER = `    /*__bagLocals__*/`;
 	if (!noTemplate) mountLines.push(BAG_LOCALS_PLACEHOLDER);
+	const BAG_FACTORY_PLACEHOLDER = `    /*__bagFactory__*/`;
 
 	let elementVars;
 	let ensureVar;
@@ -29374,6 +29376,8 @@ function planJsx(
 		}
 		// Template paths prove the node kind and presence; the runtime's generic
 		// navigation signatures cannot express that compile-time topology.
+		// sibling() steps once by default.
+		const siblingCount = (n) => (n === 1 ? [] : [b.literal(n)]);
 		const typedPath = (expression) =>
 			ctx.typescriptWeb ? b.ts_as(expression, b.ts_keyword_type('any')) : expression;
 		ensureVar = (path) => {
@@ -29410,7 +29414,7 @@ function planJsx(
 				// hydrating); raw `.nextSibling` for hole-free templates. sibVar already resolves to the
 				// (k−sibSteps)-th child, so n steps across lands on the k-th.
 				if (hasHoles) {
-					step = typedPath(b.call('_$sibling', b.id(sibVar), b.literal(sibSteps)));
+					step = typedPath(b.call('_$sibling', b.id(sibVar), ...siblingCount(sibSteps)));
 				} else {
 					step = b.id(sibVar);
 					for (let i = 0; i < sibSteps; i++) step = typedPath(b.member(step, 'nextSibling'));
@@ -29425,7 +29429,7 @@ function planJsx(
 				const parentVar = prefix.length === 0 ? '_root' : ensureVar(prefix);
 				if (hasHoles) {
 					step = typedPath(b.call('_$child', b.id(parentVar)));
-					if (k > 0) step = typedPath(b.call('_$sibling', step, b.literal(k)));
+					if (k > 0) step = typedPath(b.call('_$sibling', step, ...siblingCount(k)));
 				} else {
 					step = typedPath(b.member(b.id(parentVar), 'firstChild'));
 					for (let n = 0; n < k; n++) step = typedPath(b.member(step, 'nextSibling'));
@@ -29828,12 +29832,15 @@ function planJsx(
 					? constArgNode(f.constExpr)
 					: b.id(f.local);
 		const rootArg = () => (single ? b.id('_root') : b.literal(null));
-		if (bag.fields.length <= BAG_FACTORY_MAX) {
-			ctx.runtimeNeeded.add(`bag${bag.fields.length}`);
-			// The arity factory's object literal still declares every field, so an
-			// omitted trailing `undefined` seed keeps the same bag shape.
-			mountLines.push(
-				inheritOriginLoc(
+		const commits = commit !== null && commit.size() > 0;
+		ctx.runtimeNeeded.add(
+			bag.fields.length <= BAG_FACTORY_MAX ? `bag${bag.fields.length}` : 'bagOf',
+		);
+		const factoryLine = (commitName) => {
+			if (bag.fields.length <= BAG_FACTORY_MAX) {
+				// The arity factory's object literal still declares every field, so an
+				// omitted trailing `undefined` seed keeps the same bag shape.
+				return inheritOriginLoc(
 					b.stmt(
 						b.assignment(
 							'=',
@@ -29842,12 +29849,8 @@ function planJsx(
 								`_$bag${bag.fields.length}`,
 								b.id('__s'),
 								rootArg(),
-								...(commit !== null && commit.size() > 0
-									? [
-											...bag.fields.map(bagFieldValue),
-											b.literal(commit.size()),
-											b.id(commitFunctionName(ctx, commit)),
-										]
+								...(commits
+									? [...bag.fields.map(bagFieldValue), b.literal(commit.size()), b.id(commitName)]
 									: optionalCallArgs(
 											...bag.fields.map((f) =>
 												f.constExpr === 'undefined' ? null : bagFieldValue(f),
@@ -29857,44 +29860,39 @@ function planJsx(
 						),
 					),
 					planOrigin,
-				),
-			);
-		} else {
+				);
+			}
 			// Spill path — beyond the shared-factory arities: one inline literal
 			// (still real values, single allocation) through the generic commit.
-			ctx.runtimeNeeded.add('bagOf');
-			mountLines.push(
-				inheritOriginLoc(
-					b.stmt(
-						b.assignment(
-							'=',
-							b.id('_b'),
-							b.call(
-								'_$bagOf',
-								b.id('__s'),
-								rootArg(),
-								b.object([
-									...bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f))),
-									// The same state fields as the arity factories (see bagRecord).
-									b.prop('init', b.id('$'), b.literal(commit?.size() ?? 0)),
-									b.prop(
-										'init',
-										b.id('next'),
-										commit !== null && commit.size() > 0
-											? b.id(commitFunctionName(ctx, commit))
-											: b.literal(null),
-									),
-								]),
-								// The compiler owns this literal; opt into rehoming only
-								// when a field actually caches the block's DOM parent.
-								...(bag.hosts.has('__block.parentNode') ? [b.literal(1)] : []),
-							),
+			return inheritOriginLoc(
+				b.stmt(
+					b.assignment(
+						'=',
+						b.id('_b'),
+						b.call(
+							'_$bagOf',
+							b.id('__s'),
+							rootArg(),
+							b.object([
+								...bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f))),
+								// The same state fields as the arity factories (see bagRecord).
+								b.prop('init', b.id('$'), b.literal(commit?.size() ?? 0)),
+								b.prop('init', b.id('next'), commits ? b.id(commitName) : b.literal(null)),
+							]),
+							// The compiler owns this literal; opt into rehoming only
+							// when a field actually caches the block's DOM parent.
+							...(bag.hosts.has('__block.parentNode') ? [b.literal(1)] : []),
 						),
 					),
-					planOrigin,
 				),
+				planOrigin,
 			);
-		}
+		};
+		// A commit function is named once its body is known (emitCommitFunction).
+		if (commits) {
+			commit.factory = factoryLine;
+			mountLines.push(BAG_FACTORY_PLACEHOLDER);
+		} else mountLines.push(factoryLine(null));
 		// REF MANIFEST (compiled-output plan, ref-manifest phase): bodies with
 		// ref-carrying bindings stamp a module-scope constant on the scope so the
 		// runtime's suspense-hide walk (detachSubtreeRefs) finds the bag fields
@@ -29984,6 +29982,8 @@ function planJsx(
 	if (commit?.resumed)
 		updateLines.unshift(inheritOriginLoc(commitResumedDeclaration(), planOrigin));
 	const commitName = commit !== null ? emitCommitFunction(ctx, commit, planOrigin) : null;
+	if (commit?.factory)
+		mountLines[mountLines.indexOf(BAG_FACTORY_PLACEHOLDER)] = commit.factory(commitName);
 	if (ctx.scalarBindingClaims) {
 		// Only opted-in scalar views can retain another writer's publication at
 		// hydration. Record their existing cache fields; ordinary output is unchanged.
@@ -30070,7 +30070,7 @@ function planJsx(
 								b.let('_n', b.literal(null)),
 								commitResumedDeclaration(),
 								update,
-								commitDoneStatement(ctx, commitName, planOrigin),
+								commitDoneStatement(ctx, planOrigin),
 							]),
 							planOrigin,
 						)
@@ -31084,7 +31084,7 @@ function planJsx(
 	if (holes.length !== 0) {
 		// After the last hole: commit or queue what the holes recorded.
 		const last = holes.reduce((latest, cc) => (cc.id > latest.id ? cc : latest));
-		pushAfterStmt(last.id, planOrigin, commitDoneStatement(ctx, commitName, planOrigin));
+		pushAfterStmt(last.id, planOrigin, commitDoneStatement(ctx, planOrigin));
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
@@ -31243,10 +31243,7 @@ function planJsx(
 		everyRender:
 			commitName === null || bindingCells === 0
 				? everyRenderLines
-				: [
-						...everyRenderLines,
-						commitDoneStatement(ctx, commitName, planOrigin, holes.length !== 0),
-					],
+				: [...everyRenderLines, commitDoneStatement(ctx, planOrigin, holes.length !== 0)],
 		commitCells: commitName !== null,
 		after: afterStatements,
 		head: headEmit.head,
@@ -32255,8 +32252,10 @@ function emitBindingMount(bind, elVar, bag) {
 // The template's hoisted commit function walks the cells straight-line, writes
 // each changed one through the ordinary setter, then publishes it:
 //
-//   function _c$7(_b) { const _n = _b.next; let _v; _b.$ &= 255;
+//   function _c$7(_b, _n) { let _v;
 //     if ((_v = _n[3]) !== _b) { _$setText(_b.f, _v); _b.g = _v; } … }
+//
+// Its caller clears the bag's staged state and passes the cells (`_n`).
 //
 // Handler slots and bundles are written in place unless the runtime passes
 // `careful` (`_f`: an open journal or a dispatch in flight). The bag factory
@@ -32297,8 +32296,8 @@ function makeCommitPlan() {
 			size = 0;
 			writes = [];
 		},
-		/** The commit function's name, allocated by commitFunctionName. */
-		name: null,
+		/** Builds the bag factory call once the commit function is named. */
+		factory: null,
 		/** A write takes the commit function's `careful` parameter (`_f`). */
 		careful: false,
 		/** An update binding compares inline, so the update branch declares `_r`. */
@@ -32361,27 +32360,27 @@ function commitCellCount(bind) {
 	return bind.kind === 'styleProperties' ? bind.properties.length : 1;
 }
 
-/** The template's commit function, named once its bag factory needs it. */
-function commitFunctionName(ctx, commit) {
-	commit.name ??= allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
-	return commit.name;
-}
-
+/**
+ * The template's commit function. A production build shares byte-identical
+ * ones, as allocTemplate interns templates; dev, HMR and profile builds keep
+ * one per template, so each debugs and maps to its own component.
+ */
 function emitCommitFunction(ctx, commit, origin) {
 	const writes = commit.writes();
-	if (writes.length === 0 && commit.name === null) return null;
-	const name = commitFunctionName(ctx, commit);
+	if (writes.length === 0 && commit.factory === null) return null;
 	const cells = [];
 	for (const make of writes) if (make !== undefined) cells.push(make(commit.size()));
-	const body = [
-		b.const('_n', b.member(b.id('_b'), 'next')),
-		b.declaration('let', [b.declarator('_v')]),
-		// Clear the staged state first: a setter that throws leaves the bag idle,
-		// its committed slots still describing the DOM.
-		b.stmt(b.assignment('&=', b.member(b.id('_b'), '$'), b.literal(COMMIT_MAX_CELLS))),
-		...cells,
-	];
-	const params = commit.careful ? [b.id('_b'), b.id('_f')] : [b.id('_b')];
+	const body = [b.declaration('let', [b.declarator('_v')]), ...cells];
+	const params = [b.id('_b'), b.id('_n'), ...(commit.careful ? [b.id('_f')] : [])];
+	const share = !ctx.hmr && !ctx.dev && !ctx.profile;
+	const key = share ? astStructuralKey([params, body]) : null;
+	const shared = share ? ctx.commitFunctions.get(key) : undefined;
+	if (shared !== undefined) {
+		if (ctx.inspect) aliasSharedOrigins(ctx, body, shared.body, new Set());
+		return shared.name;
+	}
+	const name = allocCompilerName(ctx, `_c$${ctx.nextHelperId++}`);
+	if (share) ctx.commitFunctions.set(key, { name, body });
 	// A body without its own origin (a helper's) takes its first binding's.
 	ctx.hoistedHelpers.push(
 		inheritOriginLoc(
@@ -32390,6 +32389,28 @@ function emitCommitFunction(ctx, commit, origin) {
 		),
 	);
 	return name;
+}
+
+/**
+ * A shared commit function emits only its first template's bindings: alias each
+ * later one onto the node it shares, so inspection still reaches its code. The
+ * two trees match node for node (their structural keys are equal).
+ */
+function aliasSharedOrigins(ctx, copy, canonical, seen) {
+	if (copy === null || typeof copy !== 'object') return;
+	if (Array.isArray(copy)) {
+		for (let i = 0; i < copy.length; i++) aliasSharedOrigins(ctx, copy[i], canonical[i], seen);
+		return;
+	}
+	if (typeof copy.type === 'string' && copy.start != null && canonical.start != null) {
+		const pair = `${copy.start}:${copy.end}:${canonical.start}`;
+		if (!seen.has(pair)) {
+			seen.add(pair);
+			registerOriginAlias(ctx, copy, canonical);
+		}
+	}
+	for (const key of Object.keys(copy))
+		if (!AST_STRUCTURAL_KEY_SKIP.has(key)) aliasSharedOrigins(ctx, copy[key], canonical[key], seen);
 }
 
 /** `_r`: an earlier render of this transaction staged the bag (see bagRecord). */
@@ -32407,9 +32428,9 @@ function commitOwnersDeclaration(ctx) {
 // under 512) commits or queues it here. `reset` when holes record after it: a
 // bag its commit function already wrote (back under 256) stages afresh; a
 // queued one keeps its cells.
-function commitDoneStatement(ctx, name, origin, reset = false) {
+function commitDoneStatement(ctx, origin, reset = false) {
 	ctx.runtimeNeeded.add('bagDone');
-	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b'), b.id(name)));
+	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b')));
 	return inheritOriginLoc(
 		b.if(
 			b.logical(

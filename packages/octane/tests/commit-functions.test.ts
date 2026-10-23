@@ -14,6 +14,7 @@ import {
 	MemoHeld,
 	Nested,
 	Revert,
+	Twins,
 } from './_fixtures/commit-functions.tsrx';
 import { Item, RevertingRows, TextHoles } from './_fixtures/text-hole-commit.tsrx';
 import { HostWrites } from './_fixtures/host-commit.tsrx';
@@ -238,6 +239,46 @@ describe('commit functions', () => {
 		await act(() => root.render(CommitCallback, { value: 'later', tail: 'later', log }));
 		expect(container.querySelector('#tail')).toBe(tail);
 		expect(tail.textContent).toBe('later');
+		root.unmount();
+	});
+
+	it('commits each template through its own bag when templates share commit code', async () => {
+		const container = host();
+		const root = createRoot(container);
+		const shown = () =>
+			['#twin-title', '#twin-copy', '#twin-class'].map((id) => {
+				const el = container.querySelector(id) as HTMLElement;
+				return [el.textContent, el.title, el.className];
+			});
+		flushSync(() => root.render(Twins, { title: 'a', copy: 'b', cls: 'c', wait: null }));
+		expect(shown()).toEqual([
+			['a', 'a', ''],
+			['b', 'b', ''],
+			['c', '', 'c'],
+		]);
+
+		flushSync(() => root.render(Twins, { title: 'a', copy: 'B', cls: 'c', wait: null }));
+		expect(shown()).toEqual([
+			['a', 'a', ''],
+			['B', 'B', ''],
+			['c', '', 'c'],
+		]);
+
+		await act(() =>
+			startTransition(() => root.render(Twins, { title: 'x', copy: 'y', cls: 'z', wait: never() })),
+		);
+		expect(shown()).toEqual([
+			['a', 'a', ''],
+			['B', 'B', ''],
+			['c', '', 'c'],
+		]);
+
+		flushSync(() => root.render(Twins, { title: 'A', copy: 'B', cls: 'C', wait: null }));
+		expect(shown()).toEqual([
+			['A', 'A', ''],
+			['B', 'B', ''],
+			['C', '', 'C'],
+		]);
 		root.unmount();
 	});
 

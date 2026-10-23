@@ -62,4 +62,29 @@ describe.each([false, true])('a ViewTransition scope host (dev=%s)', (dev) => {
 			container.remove();
 		}
 	});
+
+	// The commit queue holds DOM elements beside template bags; an element's own
+	// expandos are the application's, whatever their names.
+	it.each([300, 3])('commits a host carrying an application `$` of %s untouched', async (mark) => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const probe = () => {};
+		try {
+			flushSync(() => root.render(client.App, { scope: 'element', text: 'one', probe }));
+			const host = container.querySelector('#scoped') as HTMLElement & { $?: number };
+			host.$ = mark;
+			await act(() => root.render(client.App, { scope: undefined, text: 'two', probe }));
+			expect(host.hasAttribute('vt-scope')).toBe(false);
+			expect(host.textContent).toBe('two');
+			expect(host.$).toBe(mark);
+			await act(() => root.render(client.App, { scope: 'element', text: 'three', probe }));
+			expect(host.getAttribute('vt-scope')).toBe('element');
+			expect(host.textContent).toBe('three');
+			expect(host.$).toBe(mark);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
 });
