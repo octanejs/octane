@@ -5075,10 +5075,23 @@ export function runDeferredSwaps(): void {
 }
 
 function swapDeferredValue<T>(s: DeferredSlot<T>): void {
-	// A slot that unmounted, or whose spawning render was rolled back, since
-	// the spawn has nothing to swap. A duplicate entry finds `scheduled` clear.
-	if (!s.scheduled || s.block.disposed) return;
+	// A duplicate entry finds `scheduled` clear.
+	if (!s.scheduled) return;
 	s.scheduled = false;
+	if (s.block.disposed) {
+		// The slot unmounted, or its spawning render was rolled back. A root still
+		// waiting for its first commit renders the final value as another attempt,
+		// as React renders the deferred lane the suspended render spawned. Either
+		// attempt commits once it is ready (suspendRootRender).
+		const owner = s.block.idState.renderOwner;
+		if (
+			owner !== undefined &&
+			owner.wakeable !== null &&
+			(owner.current === null || owner.current.disposed)
+		)
+			owner.retry(true);
+		return;
+	}
 	if (Object.is(s.value, s.next)) return;
 	// Set the flag INSIDE the callback so it wraps only the scheduleRender
 	// for the deferred block: startTransition synchronously notifies
@@ -5197,6 +5210,7 @@ export function makeRoot(
 		props: any,
 		nextKey: any,
 		mode?: 'urgent' | 'transition',
+		deferred = false,
 	): void => {
 		if (unmounted) return;
 		// Root render entry can carry contexts bumped outside provideContext —
@@ -5363,6 +5377,7 @@ export function makeRoot(
 			}
 			const mountedRoot = rootBlock;
 			mountedRoot.pendingMode = mode ?? null;
+			mountedRoot.pendingDeferred = deferred;
 			try {
 				renderBlock(mountedRoot);
 				// Mount-time self-updates are part of this first commit. Replay before
@@ -5523,7 +5538,8 @@ export function makeRoot(
 			renderOwner.retryKey = null;
 			renderOwner.request = null;
 			if (renderOwner.transaction?.aborted === true) renderOwner.transaction = null;
-			renderOwner.retry = () => renderResolved(body, props, nextKey);
+			renderOwner.retry = (deferred) =>
+				renderResolved(body, props, nextKey, deferred ? 'transition' : undefined, deferred);
 			renderResolved(body, props, nextKey);
 		},
 		unmount() {

@@ -1,4 +1,11 @@
-import { ViewTransition, use, useOptimistic, useState, useTransition } from 'octane';
+import {
+	ViewTransition,
+	use,
+	useDeferredValue,
+	useOptimistic,
+	useState,
+	useTransition,
+} from 'octane';
 
 export interface TextCache {
 	read(key: string): Promise<string>;
@@ -87,4 +94,14 @@ export function ViewTransitionBoundaries(props: { cache: TextCache }) @{
 			</section>
 		</ViewTransition>
 	</main>
+}
+
+// ReactDeferredValue-test.js: the initial value and the deferred final value
+// each suspend on a sibling, under a root with no Suspense boundary.
+export function DeferredSiblings(props: { cache: TextCache }) @{
+	const text = useDeferredValue('Final', 'Loading...');
+	<>
+		<AsyncText cache={props.cache} text={text} />{' '}
+		<AsyncText cache={props.cache} text={`Sibling: ${text}`} />
+	</>
 }
