@@ -21,7 +21,7 @@ import {
 } from './descriptors.js';
 
 export interface SeoRegistry {
-	/** Record (or replace) one source's descriptors. Called during render. */
+	/** Record (or replace) one source's descriptors during render. */
 	register(sourceId: number, descriptors: readonly SeoDescriptor[]): void;
 	/** Record app-level settings from one source; merged last-wins like metadata. */
 	configure(sourceId: number, config: SeoConfig): void;
@@ -33,6 +33,13 @@ export interface SeoRegistry {
 	subscribe(listener: () => void): () => void;
 	/** Notify subscribers if anything changed since the last flush. */
 	flush(): void;
+}
+
+const registryCommits = new WeakMap<SeoRegistry, (sourceId: number) => void>();
+
+/** @internal Confirm a source's render-time writes once its render commits. */
+export function commitSeoSource(registry: SeoRegistry, sourceId: number): void {
+	registryCommits.get(registry)?.(sourceId);
 }
 
 function sameDescriptors(a: readonly SeoDescriptor[], b: readonly SeoDescriptor[]): boolean {
@@ -59,6 +66,14 @@ function sameConfig(a: SeoConfig, b: SeoConfig): boolean {
 export function createSeoRegistry(): SeoRegistry {
 	const sources = new Map<number, readonly SeoDescriptor[]>();
 	const configs = new Map<number, SeoConfig>();
+	// Render writes stay visible for SSR/hydration until a layout effect confirms
+	// them. Every committed source is confirmed before any passive `flush()`, so
+	// whatever is still pending there came from a render that never committed
+	// (a caught or abandoned one) and is reverted before subscribers see it.
+	const pending = new Map<
+		number,
+		{ descriptors: readonly SeoDescriptor[] | undefined; config: SeoConfig | undefined }
+	>();
 	const listeners = new Set<() => void>();
 	let nextId = 1;
 	let snapshot: readonly SeoDescriptor[] | null = null;
@@ -69,7 +84,31 @@ export function createSeoRegistry(): SeoRegistry {
 		dirty = true;
 	}
 
-	return {
+	function stage(sourceId: number): void {
+		if (pending.has(sourceId)) return;
+		pending.set(sourceId, {
+			descriptors: sources.get(sourceId),
+			config: configs.get(sourceId),
+		});
+	}
+
+	function commit(sourceId: number): void {
+		pending.delete(sourceId);
+	}
+
+	function revertUncommitted(): void {
+		if (pending.size === 0) return;
+		for (const [sourceId, previous] of pending) {
+			if (previous.descriptors === undefined) sources.delete(sourceId);
+			else sources.set(sourceId, previous.descriptors);
+			if (previous.config === undefined) configs.delete(sourceId);
+			else configs.set(sourceId, previous.config);
+		}
+		pending.clear();
+		invalidate();
+	}
+
+	const registry: SeoRegistry = {
 		nextSourceId() {
 			return nextId++;
 		},
@@ -79,6 +118,7 @@ export function createSeoRegistry(): SeoRegistry {
 			// suspense re-pass and on any parent re-render; treating it as a no-op
 			// keeps the snapshot reference stable so the outlet does not re-render.
 			if (previous !== undefined && sameDescriptors(previous, descriptors)) return;
+			stage(sourceId);
 			sources.set(sourceId, descriptors);
 			invalidate();
 		},
@@ -87,10 +127,12 @@ export function createSeoRegistry(): SeoRegistry {
 			// Compared field-by-field over the union of keys, so adding a SeoConfig
 			// field cannot silently escape this check and stop invalidating.
 			if (previous !== undefined && sameConfig(previous, config)) return;
+			stage(sourceId);
 			configs.set(sourceId, config);
 			invalidate();
 		},
 		remove(sourceId) {
+			pending.delete(sourceId);
 			const had = sources.delete(sourceId);
 			if (configs.delete(sourceId) || had) invalidate();
 		},
@@ -117,9 +159,12 @@ export function createSeoRegistry(): SeoRegistry {
 			};
 		},
 		flush() {
+			revertUncommitted();
 			if (!dirty) return;
 			dirty = false;
 			for (const listener of listeners) listener();
 		},
 	};
+	registryCommits.set(registry, commit);
+	return registry;
 }

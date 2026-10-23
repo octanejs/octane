@@ -19,7 +19,7 @@ beforeEach(() => {
 	document.head.innerHTML = '';
 	container = document.createElement('div');
 	document.body.appendChild(container);
-	root = createRoot(container);
+	root = createRoot(container, { onCaughtError() {} });
 	root.render(NavApp);
 	settle();
 });
@@ -107,6 +107,37 @@ describe('client navigation', () => {
 		expect(head().querySelectorAll('link[rel="icon"]')).toHaveLength(1);
 		expect(document.title).toBe('Home');
 		expect(metaContent('description')).toBe('home description');
+	});
+
+	it('discards metadata from a caught render that never committed', () => {
+		click('to-failed');
+		expect(container.querySelector('#caught')?.textContent).toBe('caught');
+		expect(document.title).toBe('Site default');
+		expect(metaContent('robots')).toBeNull();
+
+		click('remove-failed');
+
+		expect(container.querySelector('#caught')).toBeNull();
+		expect(document.title).toBe('Site default');
+		expect(metaContent('robots')).toBeNull();
+	});
+
+	it('never publishes metadata from a caught render beside a committed update', () => {
+		click('to-failed');
+		const observer = new MutationObserver(() => {});
+		observer.observe(head(), { childList: true, subtree: true, attributes: true });
+
+		click('fail-local');
+
+		const robotsWrites = observer
+			.takeRecords()
+			.flatMap((record) => [record.target, ...record.addedNodes])
+			.filter((node) => node instanceof Element && node.getAttribute('name') === 'robots');
+		observer.disconnect();
+		expect(container.querySelector('#caught-local')?.textContent).toBe('caught');
+		expect(metaContent('description')).toBe('local failed');
+		expect(robotsWrites).toEqual([]);
+		expect(metaContent('robots')).toBeNull();
 	});
 
 	it('removes everything it owns when the app unmounts', () => {
