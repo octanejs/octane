@@ -492,10 +492,12 @@ export const STAGED_REVEALS = new Set<TrySlot>();
 
 /**
  * A group of held boundaries that is fully staged, or null, skipping the groups
- * already `flushed` and adding the result's members to it. A group joins held
- * boundaries that share a batch, transitively. A held boundary with no batch hold
- * (its transition folded no hook work) joins every group, the barrier before
- * parallel transitions. Runs when a boundary stages, on a handful of boundaries.
+ * already `flushed` and adding the result's members to it. Boundaries that hold
+ * a common batch form a group, transitively. Boundaries with no batch hold (their
+ * transition folded no hook work, such as `root.render`, or their hold is being
+ * retried) form one group of their own, the barrier before parallel transitions,
+ * and never join a batch's group. Runs when a boundary stages, on a handful of
+ * boundaries.
  */
 export function stagedRevealGroup(flushed: Set<TrySlot>): TrySlot[] | null {
 	// A group still waiting is scanned again on the next call: flushing another
@@ -504,20 +506,23 @@ export function stagedRevealGroup(flushed: Set<TrySlot>): TrySlot[] | null {
 	for (const start of STAGED_REVEALS) {
 		if (seen.has(start) || flushed.has(start)) continue;
 		const group = [start];
-		const batches = new Set<TransitionActionBatch>();
-		let unbounded = false;
-		for (let i = 0; i < group.length; i++) {
-			const hold = TRANSITION_HOLDERS?.get(group[i]);
-			if (hold === undefined) unbounded = true;
-			else for (const batch of hold.batches) batches.add(rootTransitionBatch(batch));
-			for (const other of HELD_TRANSITIONS) {
-				if (group.includes(other)) continue;
-				const peer = TRANSITION_HOLDERS?.get(other);
-				let shares = unbounded || peer === undefined;
-				if (!shares)
-					for (const batch of peer!.batches)
-						if (batches.has(rootTransitionBatch(batch))) shares = true;
-				if (shares) group.push(other);
+		if (TRANSITION_HOLDERS?.get(start) === undefined) {
+			for (const other of HELD_TRANSITIONS)
+				if (other !== start && TRANSITION_HOLDERS?.get(other) === undefined) group.push(other);
+		} else {
+			const batches = new Set<TransitionActionBatch>();
+			for (let i = 0; i < group.length; i++) {
+				for (const batch of TRANSITION_HOLDERS!.get(group[i])!.batches)
+					batches.add(rootTransitionBatch(batch));
+				for (const other of HELD_TRANSITIONS) {
+					const peer = TRANSITION_HOLDERS!.get(other);
+					if (peer === undefined || group.includes(other)) continue;
+					for (const batch of peer.batches)
+						if (batches.has(rootTransitionBatch(batch))) {
+							group.push(other);
+							break;
+						}
+				}
 			}
 		}
 		for (const member of group) seen.add(member);
