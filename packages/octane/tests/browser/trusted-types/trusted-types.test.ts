@@ -8,6 +8,7 @@ import * as ServerRuntime from 'octane/server';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { loadServerFixture } from '../../_server-fixture.js';
 import { deferred } from '../../_server-stream.js';
+import type * as App from './app.tsrx';
 
 // Enforced, with no default policy: every HTML, script, or script-URL sink must
 // receive a Trusted Types object. `octane` is the client runtime's policy,
@@ -15,7 +16,9 @@ import { deferred } from '../../_server-stream.js';
 const CSP = "require-trusted-types-for 'script'; trusted-types octane octane-stream app";
 const LATE_HTML = '<b id="late-b">late</b><template id="late-t"></template>';
 
-const fixture = loadServerFixture(resolve('packages/octane/tests/browser/trusted-types/app.tsrx'));
+const fixture = loadServerFixture<typeof App>(
+	resolve('packages/octane/tests/browser/trusted-types/app.tsrx'),
+);
 let browser: Browser;
 
 beforeAll(async () => {
