@@ -1,4 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
+import { FRAMEWORK_POLICY } from '../trusted-types.js';
 import { HYDRATE_INPUT_ATTR } from '../hydration-protocol.js';
 import { rendererRangeClose } from '../stream-protocol.js';
 import {
@@ -123,9 +124,8 @@ function placeFullRegion(registration: StreamedRegionRegistration, html: string)
 	}
 
 	const template = start.ownerDocument!.createElement('template');
-	// This sink receives only a protocol-validated renderer artifact. Trusted
-	// Types policy creation/enforcement is intentionally outside this PR.
-	template.innerHTML = html;
+	// This sink receives only a protocol-validated renderer artifact.
+	template.innerHTML = FRAMEWORK_POLICY ? FRAMEWORK_POLICY.createHTML(html) : html;
 	const incomingOpen = template.content.firstChild;
 	const incomingClose = rendererRangeClose(incomingOpen);
 	if (

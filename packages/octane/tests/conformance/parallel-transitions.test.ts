@@ -172,10 +172,12 @@ describe('parallel transitions', () => {
 			await act(() => vi.advanceTimersByTime(150));
 			expect(r.findAll('.fallback')).toHaveLength(1);
 
-			// B's data alone cannot reveal the boundary, and A is still waiting.
+			// B's data alone cannot reveal the boundary, and A is still waiting. (Behind a
+			// timeout fallback, A's optimistic value follows the optimistic revert rule
+			// in actions.ts; this case pins only its pending state.)
 			await resolve('b: 1');
 			expect(r.findAll('.fallback')).toHaveLength(1);
-			expect(counter(r, 'a')).toBe('pending|saving|a: 0');
+			expect(r.find('.a .pending').textContent).toBe('pending');
 
 			await resolve('a: 1');
 			expect(r.findAll('.fallback')).toHaveLength(0);

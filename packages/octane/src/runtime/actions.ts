@@ -9,7 +9,7 @@ import { hydrating } from '../hydration-flag.js';
 import { __profileSchedule } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import type { HookSlot, Block, TransitionActionBatch } from './types.js';
-import { resolveSlot, noop } from './drivers.js';
+import { resolveSlot, noop, TRANSITION_ROOT_DRIVER } from './drivers.js';
 import {
 	VIEW_TRANSITION_DRIVER,
 	TRANSITION_DEPTH,
@@ -23,12 +23,14 @@ import {
 	transitionActionBatchForUpdate,
 	onTransitionBatchFinished,
 	markTransitionCue,
+	rootTransitionBatch,
 	startTransition,
 } from './transitions.js';
 import { CURSOR } from './hydration.js';
 import { reassertControlledIn } from './portals.js';
 import { findTryHandler } from './suspense.js';
-import { CURRENT_SCOPE, CURRENT_BLOCK } from './render.js';
+import { CURRENT_SCOPE, CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
+import { atCommit } from './commit.js';
 import { setAttribute } from './host-props.js';
 import { delegateEvents, ACTIVE_SUBMIT_DISPATCH } from './events.js';
 import { queueFormActionAuthoringDiagnostic, atCommitIf } from './forms.js';
@@ -660,9 +662,14 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 // which case it is `state` folded through `updateFn(acc, value)` for each queued
 // addOptimistic call. Without an updateFn the fold is React's basicStateReducer:
 // a function value is an updater called with the pending state, as in useState,
-// and any other value replaces it. The queue is cleared when its owning batch
-// finishes, so later renders derive from the real state on success or revert to
-// the unchanged state on error.
+// and any other value replaces it. A transition render that folds the owning
+// batch's updates skips that batch's values and drops them at commit, as React
+// reverts them in the transition's lane. Urgent renders show them, as React
+// renders optimistic values urgently, unless a timeout fallback lets the batch
+// commit while its hold stays open: an urgent render folding it then skips them
+// too. A batch that finishes without such a render clears its values then, so
+// later renders derive from the real state on success or revert to the
+// unchanged state on error.
 // addOptimistic should be called inside an Action.
 // ---------------------------------------------------------------------------
 
@@ -672,6 +679,8 @@ interface OptimisticSlot<V> {
 	batches: Map<TransitionActionBatch, () => void> | null;
 	unownedPending: boolean;
 	add: (value: V) => void;
+	/** Drop `owner`'s values, returning whether any were queued. */
+	compact: (owner: TransitionActionBatch | null) => boolean;
 }
 
 function basicOptimisticReducer<S>(state: S, value: unknown): S {
@@ -737,6 +746,7 @@ export function useOptimistic<S, V = S>(
 			owners: null,
 			batches: null,
 			unownedPending: false,
+			compact,
 			add: (value: V) => {
 				const inAction = isTransitionUpdateContext();
 				if (process.env.NODE_ENV !== 'production' && !inAction) {
@@ -794,6 +804,24 @@ export function useOptimistic<S, V = S>(
 	}
 	let optimistic = passthrough;
 	const reduce = updateFn ?? basicOptimisticReducer;
-	for (let i = 0; i < s.queue.length; i++) optimistic = reduce(optimistic, s.queue[i]);
+	const queue = s.queue;
+	const owners = s.owners;
+	const transition = block.currentRenderMode === 'transition';
+	let reverted: TransitionActionBatch[] | null = null;
+	for (let i = 0; i < queue.length; i++) {
+		const owner = owners === null ? null : owners[i];
+		// The owner's updates fold here exactly as in foldHookQueue. A ready batch
+		// with an open hold has only non-suspending (timeout fallback) holds left.
+		if (
+			owner !== null &&
+			TRANSITION_ROOT_DRIVER &&
+			(transition || (rootTransitionBatch(owner).pendingHolds ?? 0) !== 0) &&
+			TRANSITION_ROOT_DRIVER.fold(owner, transition, ROOT_RENDER_TRANSACTION)
+		) {
+			if (reverted === null) reverted = [owner];
+			else if (reverted.indexOf(owner) === -1) reverted.push(owner);
+		} else optimistic = reduce(optimistic, queue[i]);
+	}
+	if (reverted !== null) for (const owner of reverted) atCommit(s.compact, owner);
 	return [optimistic, s.add];
 }
