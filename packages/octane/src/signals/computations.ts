@@ -140,21 +140,23 @@ function resolveHandle<T>(handle$: SignalHandle<T>, owner: Scope): ScopedNode<T>
 
 export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 	// Members that are not private are also used by a pending slot's producer
-	// (candidate-producers.ts), which forks and publishes this binding.
+	// (candidate-producers.ts), which forks and publishes this binding, and by
+	// its declaration views (installDerivedViews).
 	current: DerivedAttempt<T> | undefined;
 	compute: DerivedCompute<T> | undefined;
 	frozen = false;
 	candidate: CandidateContext | undefined;
 	/** The latest evaluation produced asynchronous work rather than a value. */
-	private asynchronous = false;
+	asynchronous = false;
 	/** A later render's computation, evaluated privately until that render is accepted. */
-	declare private view?:
-		{ readonly node: ScopedNode<T>; readonly binding: DerivedBinding<T> } | undefined;
+	declare view?: { readonly node: ScopedNode<T>; readonly binding: DerivedBinding<T> } | undefined;
 	/** A render's computation that produced the committed value, and what it read. */
-	declare private probed?:
+	declare probed?:
 		{ readonly compute: DerivedCompute<T>; readonly reads: ScopedNode[] } | undefined;
 	/** A view's first result, already produced by the render's probe. */
-	declare private seeded?: { readonly result: unknown } | undefined;
+	declare seeded?: { readonly result: unknown } | undefined;
+	/** Installed with the views; only a binding that has one calls it. */
+	declare releaseView: () => void;
 
 	constructor(
 		readonly owner: Scope & GraphOwner,
@@ -196,52 +198,6 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		signalBatch(() => reevaluateNode(this.node));
 	}
 
-	protected presentDefinition(compute: DerivedCompute<T>): ScopedNode | undefined {
-		// A frozen document keeps presenting committed values. The new closure is
-		// installed at acceptance and evaluated when reads resume.
-		if (this.asynchronous || this.frozen || this.owner.readBarrier !== undefined) return undefined;
-		// A zero-argument computation runs once here. An equal synchronous value
-		// needs no view; any other result seeds the view, so the closure never
-		// runs twice and asynchronous work never starts twice.
-		let probe: { value: unknown; reads: ScopedNode[] } | undefined;
-		if (compute.length === 0) {
-			try {
-				probe = readsDuring(this.owner, compute as () => unknown);
-			} catch {
-				// A suspended or failing computation reports itself through a view.
-			}
-		}
-		if (probe !== undefined && !this.producesWork(probe.value)) {
-			const state = untrack(() => refreshNode(this.node));
-			if (state.snapshot.status === 'ready' && Object.is(state.snapshot.value, probe.value)) {
-				this.probed = { compute, reads: probe.reads };
-				return undefined;
-			}
-		}
-		this.releaseView();
-		const node: ScopedNode<T> = createDeclarationView(this.node, (target, context) =>
-			candidateHooks.derived!.call(binding, target, context),
-		);
-		const binding: DerivedBinding<T> = new DerivedBinding(this.owner, node, compute, this.options);
-		this.view = { node, binding };
-		if (probe !== undefined) binding.seeded = { result: probe.value };
-		refreshNode(node);
-		if (probe !== undefined) linkReads(node, probe.reads);
-		// A render that may be discarded never presents asynchronous work: its
-		// retry could not be matched with this attempt and would start another.
-		return binding.asynchronous ? undefined : node;
-	}
-
-	/** Whether a result is asynchronous work rather than a value. */
-	private producesWork(result: unknown): boolean {
-		if (this.options?.sync) return false;
-		try {
-			return isThenable(result) || asyncIterator(result) !== undefined;
-		} catch {
-			return true;
-		}
-	}
-
 	/** Transfer an accepted binding's attempt and evaluation classification. */
 	adoptAttempt(fork: DerivedBinding<T>): void {
 		const current = fork.current;
@@ -253,36 +209,8 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		fork.node.invalidateAttempt = undefined;
 	}
 
-	protected acceptView(node: ScopedNode, sequence: number, compute: DerivedCompute<T>): void {
-		const view = this.view;
-		if (view?.node !== node) return;
-		this.view = undefined;
-		const fork = view.binding;
-		const previous = this.current;
-		const current = fork.current;
-		this.compute = compute;
-		this.sequence = sequence;
-		this.adoptAttempt(fork);
-		signalBatch(() => {
-			this.node.pending?.refreshDeclaration();
-			promoteDeclarationView(node, this.node);
-			fork.dispose();
-			if (previous !== current) this.stop(previous);
-		});
-	}
-
 	protected override discardDefinition(): void {
 		if (this.view?.binding.asynchronous) this.releaseView();
-	}
-
-	private releaseView(): void {
-		const view = this.view;
-		if (view === undefined) return;
-		this.view = undefined;
-		signalBatch(() => {
-			releaseDeclarationView(view.node);
-			view.binding.dispose();
-		});
 	}
 
 	private static context<T>(current: DerivedAttempt<T>): DerivedContext {
@@ -686,11 +614,106 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 	dispose(): void {
 		this.forgetStaged();
 		this.probed = undefined;
-		this.releaseView();
+		if (this.view) this.releaseView();
 		this.stop(this.current);
 		this.current = undefined;
 		this.compute = undefined;
 		this.candidate = undefined;
 		this.node.invalidateAttempt = undefined;
 	}
+}
+
+/**
+ * A later render can declare an instance cell again with closures capturing new
+ * render values (redeclaration.ts). Compiled instance declarations install the
+ * private views that present it, so a bundle whose cells are all module
+ * declarations ships none. The methods go on the shared prototype, which keeps
+ * every binding one shape.
+ */
+export function installDerivedViews(): void {
+	const prototype = DerivedBinding.prototype;
+	prototype.presentDefinition = presentDerivedView;
+	prototype.acceptView = acceptDerivedView;
+	prototype.releaseView = releaseDerivedView;
+}
+
+function presentDerivedView<T>(
+	this: DerivedBinding<T>,
+	compute: DerivedCompute<T>,
+): ScopedNode | undefined {
+	// A frozen document keeps presenting committed values. The new closure is
+	// installed at acceptance and evaluated when reads resume.
+	if (this.asynchronous || this.frozen || this.owner.readBarrier !== undefined) return undefined;
+	// A zero-argument computation runs once here. An equal synchronous value
+	// needs no view; any other result seeds the view, so the closure never
+	// runs twice and asynchronous work never starts twice.
+	let probe: { value: unknown; reads: ScopedNode[] } | undefined;
+	if (compute.length === 0) {
+		try {
+			probe = readsDuring(this.owner, compute as () => unknown);
+		} catch {
+			// A suspended or failing computation reports itself through a view.
+		}
+	}
+	if (probe !== undefined && !producesWork(this, probe.value)) {
+		const state = untrack(() => refreshNode(this.node));
+		if (state.snapshot.status === 'ready' && Object.is(state.snapshot.value, probe.value)) {
+			this.probed = { compute, reads: probe.reads };
+			return undefined;
+		}
+	}
+	if (this.view) this.releaseView();
+	const node: ScopedNode<T> = createDeclarationView(this.node, (target, context) =>
+		candidateHooks.derived!.call(binding, target, context),
+	);
+	const binding: DerivedBinding<T> = new DerivedBinding(this.owner, node, compute, this.options);
+	this.view = { node, binding };
+	if (probe !== undefined) binding.seeded = { result: probe.value };
+	refreshNode(node);
+	if (probe !== undefined) linkReads(node, probe.reads);
+	// A render that may be discarded never presents asynchronous work: its
+	// retry could not be matched with this attempt and would start another.
+	return binding.asynchronous ? undefined : node;
+}
+
+/** Whether a result is asynchronous work rather than a value. */
+function producesWork<T>(binding: DerivedBinding<T>, result: unknown): boolean {
+	if (binding.options?.sync) return false;
+	try {
+		return isThenable(result) || asyncIterator(result) !== undefined;
+	} catch {
+		return true;
+	}
+}
+
+function acceptDerivedView<T>(
+	this: DerivedBinding<T>,
+	node: ScopedNode,
+	sequence: number,
+	compute: DerivedCompute<T>,
+): void {
+	const view = this.view;
+	if (view?.node !== node) return;
+	this.view = undefined;
+	const fork = view.binding;
+	const previous = this.current;
+	const current = fork.current;
+	this.compute = compute;
+	this.sequence = sequence;
+	this.adoptAttempt(fork);
+	signalBatch(() => {
+		this.node.pending?.refreshDeclaration();
+		promoteDeclarationView(node, this.node);
+		fork.dispose();
+		if (previous !== current) this.stop(previous);
+	});
+}
+
+function releaseDerivedView(this: DerivedBinding<unknown>): void {
+	const view = this.view!;
+	this.view = undefined;
+	signalBatch(() => {
+		releaseDeclarationView(view.node);
+		view.binding.dispose();
+	});
 }
