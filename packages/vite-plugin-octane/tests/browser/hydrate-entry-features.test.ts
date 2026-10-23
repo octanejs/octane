@@ -9,10 +9,11 @@ import { once } from 'node:events';
 import type { Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, type Plugin } from 'vite';
-import { createTempProject } from '../../octane/tests/_temp-project.js';
-import { createNodeServer } from '../../app-core/src/server/node-http.js';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
+import { createTempProject } from '../../../octane/tests/_temp-project.js';
+import { createNodeServer } from '../../../app-core/src/server/node-http.js';
 
-const packageRoot = fileURLToPath(new URL('../', import.meta.url));
+const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
 const repoRoot = path.resolve(packageRoot, '../..');
 const projects: Array<ReturnType<typeof createTempProject>> = [];
 
@@ -98,8 +99,7 @@ async function expectHydrates(root: string, buttonSelector: string) {
 		staticDir: path.join(root, 'dist/client'),
 	}).listen(0);
 	await once(server, 'listening');
-	const { chromium } = await import('playwright');
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser({ headless: true });
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];
