@@ -8,6 +8,7 @@ import {
 	TransitionMountGate,
 	SuspenseInitialFinal,
 	RootInitialFinal,
+	RootInitialFinalPair,
 	WaterfallApp,
 	RemountPreviewApp,
 	ActivityDeferredContainer,
@@ -229,6 +230,29 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		r.unmount();
 	});
 
+	it('a held root with two deferred values still commits the initial values once they load (no Suspense boundary)', async () => {
+		// Both hooks spawn a swap from the same held render. The root renders
+		// the final values as one attempt, which keeps the original attempt
+		// waiting on its own data.
+		const { getText, resolveText } = makeTextCache(() => {});
+		const r = mount(RootInitialFinalPair, { getText });
+		await act(() => {});
+		expect(r.container.textContent).toBe('');
+
+		await act(() => {
+			resolveText('First preview');
+			resolveText('Second preview');
+		});
+		expect(r.container.textContent).toBe('First preview Second preview');
+
+		await act(() => {
+			resolveText('First');
+			resolveText('Second');
+		});
+		expect(r.container.textContent).toBe('First Second');
+		r.unmount();
+	});
+
 	it('a suspended transition mount can switch to the deferred task too (no Suspense boundary)', async () => {
 		// The :407 shape with the root's first render inside startTransition,
 		// which still shows initialValue first (:390). The final value commits as
@@ -406,7 +430,8 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 //   :407 "…spawns a deferred task… (no Suspense boundary)" — PORTED (passes;
 //        a root holding its first render renders the deferred value as a
 //        second attempt in the swap's host task, and either attempt commits
-//        once ready). Also pinned for a transition mount.
+//        once ready). Also pinned for a transition mount and for two hooks
+//        spawning from one held render.
 //   :442 "…(no Suspense boundary, synchronous parent update)" —
 //        COVERED-BY-EXISTING: the first root.render() already mounts
 //        synchronously, so the flushSync variant is the :407 port.

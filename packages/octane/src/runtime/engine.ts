@@ -5067,16 +5067,24 @@ export function runDeferredSwaps(): void {
 	// Every swap schedules its render here, so they all join the one flush
 	// that ends this task rather than posting another.
 	TRANSITION_TASK_ACTIVE = true;
+	let roots: RootRenderOwner[] | null = null;
 	try {
-		for (let i = 0; i < slots.length; i++) swapDeferredValue(slots[i]);
+		for (let i = 0; i < slots.length; i++) {
+			const root = swapDeferredValue(slots[i]);
+			if (root !== null && !(roots ??= []).includes(root)) roots.push(root);
+		}
+		// One deferred attempt per held root. A second would roll back the first,
+		// and its suspension would stop watching the attempt that spawned both.
+		if (roots !== null) for (const root of roots) root.retry(true);
 	} finally {
 		TRANSITION_TASK_ACTIVE = false;
 	}
 }
 
-function swapDeferredValue<T>(s: DeferredSlot<T>): void {
+/** Swap `s`, or return the held root its rolled-back render left to retry deferred. */
+function swapDeferredValue<T>(s: DeferredSlot<T>): RootRenderOwner | null {
 	// A duplicate entry finds `scheduled` clear.
-	if (!s.scheduled) return;
+	if (!s.scheduled) return null;
 	s.scheduled = false;
 	if (s.block.disposed) {
 		// The slot unmounted, or its spawning render was rolled back. A root still
@@ -5084,15 +5092,13 @@ function swapDeferredValue<T>(s: DeferredSlot<T>): void {
 		// as React renders the deferred lane the suspended render spawned. Either
 		// attempt commits once it is ready (suspendRootRender).
 		const owner = s.block.idState.renderOwner;
-		if (
-			owner !== undefined &&
+		return owner !== undefined &&
 			owner.wakeable !== null &&
 			(owner.current === null || owner.current.disposed)
-		)
-			owner.retry(true);
-		return;
+			? owner
+			: null;
 	}
-	if (Object.is(s.value, s.next)) return;
+	if (Object.is(s.value, s.next)) return null;
 	// Set the flag INSIDE the callback so it wraps only the scheduleRender
 	// for the deferred block: startTransition synchronously notifies
 	// useTransition listeners (tickTransitionCount) BEFORE running fn, and
@@ -5114,6 +5120,7 @@ function swapDeferredValue<T>(s: DeferredSlot<T>): void {
 			DEFERRED_SPAWN = false;
 		}
 	});
+	return null;
 }
 
 /** Disconnect the committed identities, including refs replaced by this render. */

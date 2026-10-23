@@ -95,6 +95,16 @@ export function RootInitialFinal(props) @{
 	<RootAsyncText getText={props.getText} text={text} />
 }
 
+// Two initialValue hooks in one held root render: both spawn a deferred swap.
+export function RootInitialFinalPair(props) @{
+	const first = useDeferredValue('First', 'First preview');
+	const second = useDeferredValue('Second', 'Second preview');
+	<>
+		<RootAsyncText getText={props.getText} text={first} />{' '}
+		<RootAsyncText getText={props.getText} text={second} />
+	</>
+}
+
 // Per ReactDeferredValue-test.js:564 — nested useDeferredValue hooks: React
 // only defers the FIRST level; a hook mounted inside the spawned deferred
 // render goes straight to its final value (no preview waterfall).
