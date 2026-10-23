@@ -307,13 +307,14 @@ export function setScriptText(el: Element, value: any): void {
 		transaction.ops.push(commitScriptText, [el, raw]);
 		return;
 	}
+	// An unchanged body writes nothing. A change goes through the script's own
+	// text sink, never its existing Text node, so Trusted Types sees every write:
+	// a TrustedScript reaches it, and an enforcing page rejects a string.
 	const first = getFirstChild(el);
-	if (first !== null && first === el.lastChild && first.nodeType === 3) {
-		updateTextValue(first as Text, text);
-	} else {
-		if (ROOT_RENDER_TRANSACTION !== null) journalBag();
-		el.textContent = raw;
-	}
+	if (first !== null && first === el.lastChild && first.nodeType === 3 && first.nodeValue === text)
+		return;
+	if (ROOT_RENDER_TRANSACTION !== null) journalBag();
+	el.textContent = raw;
 }
 
 /**

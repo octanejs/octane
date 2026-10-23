@@ -116,13 +116,22 @@ describe('Trusted Types', () => {
 		}
 	});
 
-	it('writes a TrustedScript script body itself', () => {
+	it('writes a TrustedScript script body itself on mount and update', () => {
 		const writes = spySetter(Node.prototype, 'textContent');
-		const code = tt.script('{"a":1}');
-		const result = mount(client.ScriptText, { code });
+		const first = tt.script('{"a":1}');
+		const second = tt.script('{"a":2}');
+		const result = mount(client.ScriptText, { code: first });
 		try {
-			expect(writes).toContain(code);
+			expect(writes).toContain(first);
 			expect(result.container.querySelector('#script')!.textContent).toBe('{"a":1}');
+			// A changed body reaches the script's sink, not its existing Text node.
+			writes.length = 0;
+			flushSync(() => result.root.render(client.ScriptText, { code: second }));
+			expect(writes).toEqual([second]);
+			expect(result.container.querySelector('#script')!.textContent).toBe('{"a":2}');
+			// An unchanged body writes nothing.
+			flushSync(() => result.root.render(client.ScriptText, { code: tt.script('{"a":2}') }));
+			expect(writes).toEqual([second]);
 		} finally {
 			result.unmount();
 		}
