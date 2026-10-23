@@ -8,6 +8,7 @@ import { hydrating, hydrationStarted } from '../hydration-flag.js';
 import { HYDRATION_END } from '../constants.js';
 import { describeTextareaChild, textareaChildText } from '../shared-value-helpers.js';
 import { formatClientError } from '../error-codes.client.generated.js';
+import { FRAMEWORK_POLICY } from '../trusted-types.js';
 import {
 	HYDRATION_FOR_PREFIX,
 	isRangeOpen,
@@ -197,7 +198,7 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	if (ns === 0) {
 		// Parse roots in template context first: a synthetic HTML parent would
 		// discard table sections, rows, and cells before they reach their host.
-		t.innerHTML = html;
+		t.innerHTML = FRAMEWORK_POLICY ? FRAMEWORK_POLICY.createHTML(html) : html;
 		if (frag) {
 			// Stay in the template's inert document so custom elements upgrade in
 			// authored insertion order, rather than while assembling the cache.
@@ -220,7 +221,8 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	// so the caller can drain its children — stamped like <octane-frag> above,
 	// since the synthetic wrapper has no server counterpart either.
 	const wrap = ns === 1 ? 'svg' : 'math';
-	t.innerHTML = `<${wrap}>${html}</${wrap}>`;
+	const wrapped = `<${wrap}>${html}</${wrap}>`;
+	t.innerHTML = FRAMEWORK_POLICY ? FRAMEWORK_POLICY.createHTML(wrapped) : wrapped;
 	const wrapEl = getFirstChild(t.content) as Element;
 	if (frag) {
 		return fragmentTemplate(wrapEl);

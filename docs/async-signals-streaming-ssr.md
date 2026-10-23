@@ -23,7 +23,7 @@ distinguish implemented APIs from remaining work. The longer host examples below
 are design sketches, not a list of published exports. For executable examples,
 start with [signals](./signals.md), [deferred hydration](./deferred-hydration.md),
 or the [conversation benchmark](../benchmarks/conversation-streaming/README.md).
-Trusted Types integration and enforcement tests remain out of scope.
+Trusted Types integration has since landed; see [differences from React](./differences-from-react.md#trusted-types).
 
 ## Accepted author model
 
@@ -604,7 +604,7 @@ Custom-class reducers/revivers and a switch to devalue are deferred. The existin
 - Inert JSON data tags plus an observer are an alternative where policy forbids executable result scripts, at a scanning and queueing cost. The proposal favors the inline resolver **if** strict CSP and measured parser/byte behavior support it; either transport preserves the author API.
 - Bootstrap order prevents a first frame from being lost. A bounded mailbox and per-channel deadline keep an unactivated island from retaining unbounded data.
 
-**Trusted Types compatibility (future integration; implementation/enforcement tests excluded from this PR).** This is renderer/CSP work, separate from the async-signal author API:
+**Trusted Types compatibility (implemented later; see [differences from React](./differences-from-react.md#trusted-types)).** This is renderer/CSP work, separate from the async-signal author API:
 
 - Browser parsing of response bytes is not a client DOM injection sink. Octane's streamed boundary swap, compiled templates, hydration raw-HTML path, and dynamic script URLs are. Under [Trusted Types](https://developer.mozilla.org/en-US/docs/Web/API/Trusted_Types_API) enforcement, the core needs narrowly named, allowlisted policies for its generated markup and approved URLs, created once per realm.
 - Applications own sanitation of authored raw HTML. The result codec must still escape HTML and script delimiters, and server HTML injection still needs trusted provenance and escaping; Trusted Types does not sanitize response bytes. A CSP nonce allows an inline script to execute but does not satisfy a Trusted Types sink.

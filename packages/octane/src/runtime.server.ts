@@ -11501,9 +11501,12 @@ function streamRuntimeJs(): string {
 		'/.test(v)};' +
 		// Share parser/range rules with the optional driver; the base swap owns
 		// transport even when animation prepares its carrier before insertion.
-		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
+		// The JSON carrier's markup is renderer output, so under Trusted Types it
+		// parses through this script's own `octane-stream` policy (the client
+		// runtime owns `octane`), created on first use (trusted-types.ts).
+		'var H,P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
 		STREAM_SCRIPT_ATTR +
-		'")){var z=d.createElement("template");try{z.innerHTML=JSON.parse(q.textContent);return z.content;}catch(e){return null;}}return s;};' +
+		'")){var z=d.createElement("template");try{if(H===void 0)try{var T=window.trustedTypes;H=T?T.createPolicy("octane-stream",{createHTML:function(h){return h}}):null}catch(e){H=null}var x=JSON.parse(q.textContent);z.innerHTML=H?H.createHTML(x):x;return z.content;}catch(e){return null;}}return s;};' +
 		'var C=function(c,nc){if(!nc)return c;var n=c.firstElementChild;while(n&&n.localName==="script")n=n.nextElementSibling;return n;};' +
 		'window.$OCTRC=function(id,nc){' +
 		"var t=d.querySelector('template[" +

@@ -126,14 +126,15 @@ const SCRIPT_DATA_NORMALIZATION = /\r\n?|\u0000/g;
  * An adopted element keeps its server `dangerouslySetInnerHTML` content where
  * the client renders `next`. The client's HTML is parsed in the element's
  * context, so that spellings the parser canonicalizes, such as `<span/>` and
- * `<span></span>`, compare equal, as in React.
+ * `<span></span>`, compare equal, as in React. `next` is the value setHTML
+ * would write, so a Trusted Types object parses under an enforced policy.
  */
 export function unpatchedHTML(pass: object, el: Element, next: string): void {
 	let server: string;
 	let client: string;
 	if (el.localName === 'script') {
 		server = el.textContent ?? '';
-		client = next
+		client = String(next)
 			.replace(
 				INLINE_SCRIPT_TOKEN,
 				(_match, prefix: string, s: string, suffix: string) =>
