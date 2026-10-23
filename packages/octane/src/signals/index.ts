@@ -15,13 +15,15 @@ export {
 	__derivedScalarAt,
 	__signalAt,
 	__startSignalReads,
+	readSignalBinding,
+	signal$,
+} from './facade.js';
+export {
 	acceptStreamedSignalResult,
 	attachStreamedSignalResult,
 	bindStreamedSignalSelection,
-	readSignalBinding,
 	failStreamedSignalResult,
-	signal$,
-} from './facade.js';
+} from './streamed-results.js';
 export {
 	captureSignalOwner,
 	retireSignalOwnerIdentity,

@@ -831,3 +831,46 @@ describe.each([false, true])('binding views in a render that waits (dev=%s)', (d
 		}
 	});
 });
+
+// A handle that reaches a binding view's renderable hole through a prop renders
+// its value in the hole's own range and follows the handle until it leaves.
+it('renders and updates a signal handle passed to a binding view hole', () => {
+	const view = loadCompiledFixtureSource(
+		`export function Card(props) @{
+  'use dom bindings';
+  <p>{props.content}</p>
+}`,
+		{
+			id: '/src/binding-signal-child.tsrx',
+			mode: 'client',
+			compileOptions: { dev: false, hmr: false },
+			runtimeModules: {
+				'octane/dom-bindings': DomBindings,
+				'octane/dom-binding-signals': DomBindingSignals,
+			},
+		},
+	);
+	const scope = Signals.createScope({ scopeKey: 'binding-signal-child' });
+	const content$ = scope.signal$('content', 'first');
+	const container = document.createElement('div');
+	document.body.append(container);
+	const root = createRoot(container);
+	try {
+		flushSync(() => root.render(view['Card'], { content: content$ }));
+		const host = container.querySelector('p')!;
+		expect(host.textContent).toBe('first');
+
+		flushSync(() => content$.set('second'));
+		expect(container.querySelector('p')).toBe(host);
+		expect(host.textContent).toBe('second');
+
+		flushSync(() => root.render(view['Card'], { content: 'plain' }));
+		flushSync(() => content$.set('third'));
+		expect(host.textContent).toBe('plain');
+		expect(scope.inspect().nodes.every((node) => node.subscribers === 0)).toBe(true);
+	} finally {
+		root.unmount();
+		container.remove();
+		scope.dispose();
+	}
+});

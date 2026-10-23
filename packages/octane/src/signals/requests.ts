@@ -51,8 +51,8 @@ import {
 	captureCurrentServerSignalQueryAttemptObserver,
 	hasServerSignalQueryAttemptObserver,
 	serverSignalQueryAttemptObserver,
-	type ServerSignalQueryAttemptObservations,
-} from './query-attempt-observer.js';
+} from '#octane/signals/server-reads';
+import type { ServerSignalQueryAttemptObservations } from './query-attempt-observer.js';
 
 export interface QueryDefinition {
 	readonly key: string;

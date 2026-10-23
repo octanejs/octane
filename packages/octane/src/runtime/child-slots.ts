@@ -456,6 +456,34 @@ export function mapSlot(
 	}
 }
 
+/**
+ * Renders a signal child's value into its slot. bindSignalChild and a hole that
+ * receives a handle at run time (bindImplicitSignalChild) both pass this, so
+ * installing the implicit signal child names none of the hole machinery that an
+ * application without holes never ships.
+ */
+export function renderSignalChildSlot(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	anchor: Node | null | undefined,
+	ownEnd: boolean | undefined,
+	ownsHost: Element | undefined,
+	compactable: boolean | undefined,
+	onlyChild: boolean | undefined,
+	bindingMarker: string | undefined,
+	cachedText: Text | null,
+): Text | null {
+	if (onlyChild) return childTextHole(parentScope, slotKey, domParent, value, cachedText);
+	if (bindingMarker === undefined)
+		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, ownsHost, compactable);
+	else bindingChildSlot(parentScope, slotKey, domParent, value, bindingMarker, anchor, ownEnd);
+	return null;
+}
+
+export type SignalChildSlotRenderer = typeof renderSignalChildSlot;
+
 /** @internal Address an ordinary renderable slot without narrowing its value semantics. */
 export function bindingChildSlot(
 	parentScope: Scope,
@@ -587,6 +615,7 @@ export function childSlot(
 	if (SIGNAL_CHILD) {
 		if (
 			SIGNAL_CHILD(
+				renderSignalChildSlot,
 				parentScope,
 				slotKey,
 				domParent,
@@ -602,6 +631,7 @@ export function childSlot(
 	} else if (
 		NATIVE_SIGNAL_HYDRATION &&
 		bindImplicitSignalChild(
+			renderSignalChildSlot,
 			parentScope,
 			slotKey,
 			domParent,

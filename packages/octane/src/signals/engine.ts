@@ -1,7 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, snapshotSignalValue } from './encoding.js';
 import { SignalFrameError, SignalSerializationError } from './errors.js';
-import { scopeStreams, type ScopeStreams } from './scope-streams.js';
+import type { ScopeStreams } from './scope-streams.js';
 import { scopeSeedEntry } from './seed-serialization.js';
 import {
 	ScopedNode,
@@ -48,10 +48,6 @@ import type {
 	RequestEntry,
 	ResourceBinding,
 } from './requests.js';
-import type {
-	StreamFrameIdentity,
-	StreamedSignalResultFrame,
-} from '../streamed-signals-protocol.js';
 import type {
 	AdoptionFrame,
 	DerivedSignal,
@@ -934,43 +930,6 @@ export function getResourceSelectionAuthority(handle$: SignalHandle<unknown>): o
 	const binding = handle$.owner.resources?.get(handle$);
 	if (!binding) return;
 	return binding.selected ? binding.selectionAuthority : undefined;
-}
-
-/**
- * @internal Bind receiver-owned selection authority before result delivery.
- * This is the only ingress that creates a scope's stream capability.
- */
-export function bindScopeStreamedSelection(
-	owner: OwnerScope,
-	identity: StreamFrameIdentity,
-): boolean {
-	if (!(owner instanceof ScopeImpl)) return false;
-	assertAlive(owner);
-	const node = owner.nodes.get(identity.nodeKey);
-	if (node && node.kind !== 'async') return false;
-	return scopeStreams(owner).bind(identity, node);
-}
-
-/** @internal Publish a receiver-validated result into an exact current request. */
-export function acceptScopeStreamedResult(
-	owner: OwnerScope,
-	frame: StreamedSignalResultFrame,
-): boolean {
-	if (!(owner instanceof ScopeImpl)) return false;
-	assertAlive(owner);
-	// Without a bound selection there is no request this frame could belong to.
-	return owner.streams?.accept(frame) ?? false;
-}
-
-/** @internal Fail one exact streamed attempt after receiver timeout or rejection. */
-export function failScopeStreamedResult(
-	owner: OwnerScope,
-	identity: StreamFrameIdentity,
-	error: Error,
-): boolean {
-	if (!(owner instanceof ScopeImpl)) return false;
-	assertAlive(owner);
-	return owner.streams?.fail(identity, error) ?? false;
 }
 
 export { startSignalBatch, endSignalBatch };
