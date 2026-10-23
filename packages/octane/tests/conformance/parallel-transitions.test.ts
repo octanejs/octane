@@ -7,6 +7,7 @@ import {
 import { act, mount, type MountResult } from '../_helpers.js';
 import { installViewTransitionMocks } from './_helpers/view-transition-mocks.js';
 import {
+	DeferredSiblings,
 	PropAndCounter,
 	SeparateBoundaries,
 	SharedBoundary,
@@ -240,6 +241,51 @@ describe('parallel transitions', () => {
 			} finally {
 				vt.restore();
 			}
+		});
+	});
+
+	// ReactDeferredValue-test.js: a root holding its first render on a
+	// useDeferredValue initial value also renders the final value. Whichever
+	// attempt has all its data first commits. React 19.3 changed only these
+	// cases' pre-warm logs; the committed output is the contract.
+	describe('a deferred task spawned by a suspended root render', () => {
+		async function mountDeferredSiblings() {
+			const { cache, resolve } = createCache();
+			const r = mount(DeferredSiblings, { cache });
+			mounted.push(r);
+			await act(() => {});
+			expect(r.container.textContent).toBe('');
+			// Each value loads, but each attempt still waits on its sibling.
+			await resolve('Final');
+			expect(r.container.textContent).toBe('');
+			await resolve('Loading...');
+			expect(r.container.textContent).toBe('');
+			return { r, resolve };
+		}
+
+		// "if a suspended render spawns a deferred task that suspends on a
+		// sibling, we can finish the original task if the original sibling loads
+		// first": upstream's steps load the final value's sibling first.
+		it('commits the deferred value when its sibling loads first', async () => {
+			const { r, resolve } = await mountDeferredSiblings();
+			await resolve('Sibling: Final');
+			expect(r.container.textContent).toBe('Final Sibling: Final');
+
+			// The initial value is no longer needed.
+			await resolve('Sibling: Loading...');
+			expect(r.container.textContent).toBe('Final Sibling: Final');
+		});
+
+		// "if a suspended render spawns a deferred task that suspends on a
+		// sibling, we can switch to the deferred task without finishing the
+		// original one": here the initial value's sibling loads first.
+		it('commits the initial value first when its sibling loads first', async () => {
+			const { r, resolve } = await mountDeferredSiblings();
+			await resolve('Sibling: Loading...');
+			expect(r.container.textContent).toBe('Loading... Sibling: Loading...');
+
+			await resolve('Sibling: Final');
+			expect(r.container.textContent).toBe('Final Sibling: Final');
 		});
 	});
 });

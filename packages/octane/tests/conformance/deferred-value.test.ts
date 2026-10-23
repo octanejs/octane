@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { mount, act, createLog } from '../_helpers';
-import { flushSync, startTransition } from '../../src/index.js';
+import { createRoot, flushSync, startTransition } from '../../src/index.js';
 import {
 	UnmemoizedObjectHost,
 	RenderPhaseDeferredHost,
 	InitialValueApp,
 	TransitionMountGate,
 	SuspenseInitialFinal,
+	RootInitialFinal,
+	RootInitialFinalPair,
 	WaterfallApp,
 	RemountPreviewApp,
 	ActivityDeferredContainer,
@@ -210,6 +212,87 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		r.unmount();
 	});
 
+	it('if a suspended render spawns a deferred task, we can switch to the deferred task without finishing the original one (no Suspense boundary)', async () => {
+		// Per ReactDeferredValue-test.js:407 — the root holds its first render
+		// while the initial value suspends, and still renders the final value.
+		// When the FINAL value loads the root commits it directly; the initial
+		// value resolving later is a no-op.
+		const { getText, resolveText } = makeTextCache(() => {});
+		const r = mount(RootInitialFinal, { getText });
+		await act(() => {});
+		expect(r.container.textContent).toBe('');
+
+		await act(() => resolveText('Final'));
+		expect(r.container.textContent).toBe('Final');
+
+		await act(() => resolveText('Loading...'));
+		expect(r.container.textContent).toBe('Final');
+		r.unmount();
+	});
+
+	it('a held root with two deferred values still commits the initial values once they load (no Suspense boundary)', async () => {
+		// Both hooks spawn a swap from the same held render. The root renders
+		// the final values as one attempt, which keeps the original attempt
+		// waiting on its own data.
+		const { getText, resolveText } = makeTextCache(() => {});
+		const r = mount(RootInitialFinalPair, { getText });
+		await act(() => {});
+		expect(r.container.textContent).toBe('');
+
+		await act(() => {
+			resolveText('First preview');
+			resolveText('Second preview');
+		});
+		expect(r.container.textContent).toBe('First preview Second preview');
+
+		await act(() => {
+			resolveText('First');
+			resolveText('Second');
+		});
+		expect(r.container.textContent).toBe('First Second');
+		r.unmount();
+	});
+
+	it('a suspended transition mount can switch to the deferred task too (no Suspense boundary)', async () => {
+		// The :407 shape with the root's first render inside startTransition,
+		// which still shows initialValue first (:390). The final value commits as
+		// soon as it loads.
+		const { getText, resolveText } = makeTextCache(() => {});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		try {
+			await act(() => startTransition(() => root.render(RootInitialFinal, { getText })));
+			expect(container.textContent).toBe('');
+
+			await act(() => resolveText('Final'));
+			expect(container.textContent).toBe('Final');
+
+			await act(() => resolveText('Loading...'));
+			expect(container.textContent).toBe('Final');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('if a suspended render spawns a deferred task that also suspends, we can finish the original task if that one loads first', async () => {
+		// Per ReactDeferredValue-test.js:526 — no Suspense boundary. The initial
+		// value loads first, so the root commits it and then swaps to the final
+		// value once that loads.
+		const { getText, resolveText } = makeTextCache(() => {});
+		const r = mount(RootInitialFinal, { getText });
+		await act(() => {});
+		expect(r.container.textContent).toBe('');
+
+		await act(() => resolveText('Loading...'));
+		expect(r.container.textContent).toBe('Loading...');
+
+		await act(() => resolveText('Final'));
+		expect(r.container.textContent).toBe('Final');
+		r.unmount();
+	});
+
 	it('if there are multiple useDeferredValues in the same tree, only the first level defers; subsequent ones go straight to the final value, to avoid a waterfall', async () => {
 		// Per ReactDeferredValue-test.js:564 — a useDeferredValue hook MOUNTED
 		// inside the spawned deferred render must skip its own preview state and
@@ -344,18 +427,17 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 //   :374 "supports initialValue argument" — PORTED (passes).
 //   :390 "defers during initial render when initialValue is provided, even if
 //        render is not sync" — PORTED (passes).
-//   :407 "…spawns a deferred task… (no Suspense boundary)" — N/A: requires a
-//        parked, uncommitted root-level render (concurrent work-loop
-//        machinery). Octane's sync scheduler must commit every pass and
-//        requires a boundary for suspension; there is no root-level "attempt"
-//        to abandon or switch away from.
-//   :442 "…(no Suspense boundary, synchronous parent update)" — N/A: same
-//        reason (flushSync variant of :407).
+//   :407 "…spawns a deferred task… (no Suspense boundary)" — PORTED (passes;
+//        a root holding its first render renders the deferred value as a
+//        second attempt in the swap's host task, and either attempt commits
+//        once ready). Also pinned for a transition mount and for two hooks
+//        spawning from one held render.
+//   :442 "…(no Suspense boundary, synchronous parent update)" —
+//        COVERED-BY-EXISTING: the first root.render() already mounts
+//        synchronously, so the flushSync variant is the :407 port.
 //   :484 "…(Suspense boundary)" — PORTED (passes, outcome-level).
-//   :526 "…finish the original task if that one loads first" — N/A: no
-//        Suspense boundary (see :407), and choosing between two parked
-//        in-flight renders is time-slicing choreography; octane's deferred
-//        swap supersedes the initial value as soon as its task runs.
+//   :526 "…finish the original task if that one loads first" — PORTED
+//        (passes).
 //   :564 "only the first level defers…" — PORTED (passes; the spawned swap
 //        tags its pass with Block.currentRenderDeferred and the mount path
 //        adopts the final value directly inside such a pass).
@@ -377,4 +459,7 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 //        treated as a fresh mount for the slot).
 //   :894 "does not show 'previous' value when revealing a hidden tree (no
 //        initial value)" — PORTED (passes; same fresh-mount reveal rule).
+//
+// React 19.3.0 added two sibling cases with parallel transitions
+// (facebook/react#35392); they are ported in parallel-transitions.test.ts.
 // ============================================================================
