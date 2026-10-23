@@ -1455,9 +1455,9 @@ export class HydrationCapability {
 
 	/**
 	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. As in React, the
-	 * server's content stays and production compares nothing; the first write
-	 * compares it instead (setHTML). Development lists a difference
-	 * (hydration/dev-values.ts).
+	 * server's content stays, even where it differs, until `next` changes
+	 * (setHTML), and production compares nothing. Development lists a
+	 * difference (hydration/dev-values.ts).
 	 */
 	adoptHTML(el: Element, next: string): void {
 		if (process.env.NODE_ENV !== 'production') unpatchedHTML(this, el, next);

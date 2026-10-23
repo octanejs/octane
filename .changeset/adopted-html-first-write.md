@@ -2,7 +2,7 @@
 'octane': patch
 ---
 
-Keep an adopted `dangerouslySetInnerHTML`'s server nodes on the first render
-after hydration when its HTML already serializes to the render's `__html`
-string, as React 19.3 does, instead of reparsing and replacing them. Hydration
-still compares nothing in production, and mismatched HTML is still rewritten.
+Keep an adopted `dangerouslySetInnerHTML`'s server nodes after hydration until
+a render passes a different `__html` string, as React 19.3 does, instead of
+reparsing and replacing them on the first render. This includes server HTML
+that differs from the client's; development still warns about it at hydration.

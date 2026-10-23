@@ -75,7 +75,7 @@ describe('explicitly trusted HTML', () => {
 	});
 
 	it.each([false, true])(
-		'adopts parser-normalized HTML without a warning and rewrites it on the next render (dev: %s)',
+		'adopts parser-normalized HTML without a warning and keeps it on the next render (dev: %s)',
 		(dev) => {
 			const options = { id: 'trusted-html.tsrx', compileOptions: { dev, hmr: false } };
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -92,12 +92,11 @@ describe('explicitly trusted HTML', () => {
 					// comparison finds no difference to warn about, as React's does.
 					expect(container.querySelector('b')).toBe(content);
 					expect(warning).not.toHaveBeenCalled();
-					// The server's spelling is not the string, so the next render cannot
-					// tell they match without parsing it, and rewrites it.
+					// Adopted HTML stands for the string it hydrated with, so the same
+					// string writes nothing, as in React 19.3.
 					flushSync(() => root.render(client.TrustedMarkup, { ...props }));
-					const rewritten = container.querySelector('b');
-					expect(rewritten).not.toBe(content);
-					expect(rewritten?.getAttribute('data-note')).toBe('&');
+					expect(container.querySelector('b')).toBe(content);
+					expect(content?.getAttribute('data-note')).toBe('&');
 				} finally {
 					root.unmount();
 				}
@@ -107,7 +106,7 @@ describe('explicitly trusted HTML', () => {
 		},
 	);
 
-	it.each([false, true])('updates retained hydration mismatches on render (dev: %s)', (dev) => {
+	it.each([false, true])('keeps hydration mismatches until __html changes (dev: %s)', (dev) => {
 		const options = { id: 'trusted-html.tsrx', compileOptions: { dev, hmr: false } };
 		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -136,11 +135,13 @@ describe('explicitly trusted HTML', () => {
 				const root = hydrateRoot(container, Component, props);
 				try {
 					expect(container.querySelector('b')).toBe(content);
+					// As in React 19.3, the server's HTML stays until `__html` changes.
 					flushSync(() => root.render(Component, { ...props }));
-					const updated = container.querySelector('i');
-					expect(updated?.textContent).toBe('client');
-					flushSync(() => root.render(Component, { ...props }));
-					expect(container.querySelector('i')).toBe(updated);
+					expect(container.querySelector('b')).toBe(content);
+					expect(container.querySelector('i')).toBeNull();
+					flushSync(() => root.render(Component, { ...props, html: '<i>changed</i>' }));
+					expect(container.querySelector('b')).toBeNull();
+					expect(container.querySelector('i')?.textContent).toBe('changed');
 				} finally {
 					root.unmount();
 				}

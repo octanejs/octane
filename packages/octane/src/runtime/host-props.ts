@@ -319,16 +319,18 @@ export function setScriptText(el: Element, value: any): void {
 
 /**
  * React-compatible `dangerouslySetInnerHTML`. Hydration keeps an adopted
- * element's server content uncompared (HydrationCapability.adoptHTML) and
- * marks it null, the server's, for the first write to compare.
+ * element's server content (HydrationCapability.adoptHTML) and accepts it as
+ * the client's HTML, so only a changed string rewrites it, as in React 19.3.
  */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
 	const html = typeof value === 'object' ? trustedOr(value, next) : next;
+	const host = el as any;
 	const hydration = hydrating ? CURSOR : null;
 	if (hydration !== null) {
 		hydration.adoptHTML(el, html);
-		(el as any)[DANGER_HTML_VALUE] = null;
+		journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+		host[DANGER_HTML_VALUE] = next;
 		return;
 	}
 	if (el.localName === 'script') {
@@ -336,14 +338,10 @@ export function setHTML(el: Element, value: any): void {
 		return;
 	}
 	// Fresh wrappers must not replace identical children. Compare accepted authored
-	// HTML or, once, the server's (null) by its serialization, so a mismatch or
-	// another spelling of the string is rewritten.
-	const host = el as any;
-	const previous = host[DANGER_HTML_VALUE];
-	if (previous === next) return;
-	journalRootProperty(el, DANGER_HTML_VALUE, previous);
+	// HTML, including successful hydration adoption.
+	if (host[DANGER_HTML_VALUE] === next) return;
+	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
 	host[DANGER_HTML_VALUE] = next;
-	if (previous === null && el.innerHTML === next) return;
 	// A render that may be dropped replaces the raw HTML at its commit, so a
 	// dropped one leaves the committed nodes, and any input in them, untouched.
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);

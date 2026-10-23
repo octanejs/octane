@@ -2190,12 +2190,10 @@ As in React:
   until the client next changes it. Development logs one "won't be patched up"
   warning per hydration pass; production compares nothing. A `<textarea>`'s
   text takes the client's value.
-- `dangerouslySetInnerHTML` keeps the server's HTML, and production compares
-  nothing while hydrating. The first render after that keeps the HTML if its
-  serialization is the render's `__html` string, as React 19.3 keeps an
-  unchanged string, and otherwise rewrites it. React 19.3 instead keeps a
-  mismatched HTML until the string changes, and React 19.0 to 19.2 rewrite it
-  on every render that passes a new `__html` object.
+- `dangerouslySetInnerHTML` keeps the server's HTML in the same way, and
+  production compares nothing. As in React 19.3, it stays, even where it
+  differs, until a render passes a different `__html` string. React 19.0 to
+  19.2 instead rewrite it on every render that passes a new `__html` object.
 - Texts that match after the HTML parser's normalization (CRLF to LF,
   stripped `\u0000` and `\uFFFD`) count as a match, and the server text stays.
   `suppressHydrationWarning` keeps the server text one level deep. It never
