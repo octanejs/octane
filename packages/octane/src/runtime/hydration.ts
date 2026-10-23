@@ -1454,10 +1454,9 @@ export class HydrationCapability {
 	}
 
 	/**
-	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. React 19 keeps the
-	 * server's content and records nothing, so the next render that passes an
-	 * `__html` object rewrites it, even with the same string (setHTML).
-	 * Production therefore compares nothing. Development lists a difference
+	 * Hydrating `el`'s `dangerouslySetInnerHTML`, `next`. As in React, the
+	 * server's content stays and production compares nothing; the first write
+	 * compares it instead (setHTML). Development lists a difference
 	 * (hydration/dev-values.ts).
 	 */
 	adoptHTML(el: Element, next: string): void {

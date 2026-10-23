@@ -42,15 +42,11 @@ describe('explicitly trusted HTML', () => {
 		try {
 			expect(container.querySelector('section')).toBe(section);
 			expect(container.querySelector('b')).toBe(content);
-			// As in React 19, hydration keeps the server's HTML and records nothing, so
-			// the next render that passes an `__html` object rewrites it, even with the
-			// same string.
+			// Adopted HTML that already is the next render's string stays, as in
+			// React 19.3, so the server's nodes keep their identity.
 			flushSync(() => root.render(client.TrustedMarkup, { ...props }));
-			const rewritten = container.querySelector('b');
-			expect(rewritten).not.toBe(content);
+			expect(container.querySelector('b')).toBe(content);
 			expect(section?.innerHTML).toBe(props.html);
-			flushSync(() => root.render(client.TrustedMarkup, { ...props }));
-			expect(container.querySelector('b')).toBe(rewritten);
 			flushSync(() => root.render(client.TrustedMarkup, { html: '<i>updated</i>' }));
 			expect(container.querySelector('section')).toBe(section);
 			expect(section?.innerHTML).toBe('<i>updated</i>');
@@ -96,8 +92,8 @@ describe('explicitly trusted HTML', () => {
 					// comparison finds no difference to warn about, as React's does.
 					expect(container.querySelector('b')).toBe(content);
 					expect(warning).not.toHaveBeenCalled();
-					// React 19 rewrites adopted HTML on the next render that passes an
-					// `__html` object, even with the same string.
+					// The server's spelling is not the string, so the next render cannot
+					// tell they match without parsing it, and rewrites it.
 					flushSync(() => root.render(client.TrustedMarkup, { ...props }));
 					const rewritten = container.querySelector('b');
 					expect(rewritten).not.toBe(content);
