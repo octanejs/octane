@@ -26,7 +26,10 @@ transition does not reveal as soon as one input resolves. Once fallback is visib
 Octane retries the detached primary under capture and stages it only after the entire
 body completes; exact set membership then flushes every staged member's DOM, refs, and
 layout effects in one tree-ordered batch. Superseding inputs invalidate stale readiness,
-and abandon paths remove the boundary so siblings are not stranded. A pre-timeout live
+and abandon paths remove the boundary so siblings are not stranded. Coordination
+covers the boundaries that hold a common transition batch: unrelated transitions
+reveal independently (React 19.3 parallel transitions,
+[conformance/parallel-transitions.test.ts](__tests__/conformance/parallel-transitions.test.ts)). A pre-timeout live
 retry can still discover a later dependent suspension while committing; that is the
 global-WIP limitation retained in #4, not covered by this closed fallback-visible case.
 

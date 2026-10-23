@@ -3134,7 +3134,7 @@
     },
     {
       "caseId": "react-case-v1:09313c24e9a1720e2d44",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactDeferredValue-test.js",
       "title": null,
@@ -3143,7 +3143,19 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Executable public-hook evidence holds an uncommitted root on the suspended initial value, renders the spawned final value as a second attempt, and commits it as soon as it loads; the initial value loading later changes nothing. A transition mount behaves the same.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/deferred-value.test.ts",
+          "testName": "if a suspended render spawns a deferred task, we can switch to the deferred task without finishing the original one (no Suspense boundary)",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/deferred-value.test.ts",
+          "testName": "a suspended transition mount can switch to the deferred task too (no Suspense boundary)",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0947138912e2ec214035",
@@ -11965,7 +11977,7 @@
     },
     {
       "caseId": "react-case-v1:271d6576d8db741594cb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactDeferredValue-test.js",
       "title": null,
@@ -11974,7 +11986,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Executable public-hook evidence follows the upstream resolution order with no Suspense boundary and asserts the committed DOM: the initial value commits once its sibling loads, then the final value once its own sibling loads. React's pre-warm log entries are not ported.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/parallel-transitions.test.ts",
+          "testName": "commits the initial value first when its sibling loads first",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2726782de51e6d5dd5a0",
@@ -25504,7 +25523,7 @@
     },
     {
       "caseId": "react-case-v1:53eda710fc5a1b928d16",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactDeferredValue-test.js",
       "title": null,
@@ -25513,7 +25532,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Executable public-hook evidence follows the upstream resolution order with no Suspense boundary and asserts the committed DOM: nothing commits until the final value's sibling loads, then the final value commits without the initial one ever showing. React's pre-warm log entries are not ported.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/parallel-transitions.test.ts",
+          "testName": "commits the deferred value when its sibling loads first",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:54043ad6f6322ea615a1",
@@ -70426,7 +70452,7 @@
     },
     {
       "caseId": "react-case-v1:e8a46b9b8abb972e6a2b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactDeferredValue-test.js",
       "title": null,
@@ -70435,7 +70461,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Executable public-hook evidence holds an uncommitted root while both values suspend, commits the initial value once it loads, then swaps to the final value when that loads.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/deferred-value.test.ts",
+          "testName": "if a suspended render spawns a deferred task that also suspends, we can finish the original task if that one loads first",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e8acd2ed27197470e871",

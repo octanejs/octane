@@ -83,6 +83,28 @@ export function SuspenseInitialFinal(props) @{
 	</>
 }
 
+// Per ReactDeferredValue-test.js:407/:526 — initialValue whose consumer
+// suspends, under a root with NO Suspense boundary.
+function RootAsyncText(props) @{
+	const value = use(props.getText(props.text));
+	<span>{value as string}</span>
+}
+
+export function RootInitialFinal(props) @{
+	const text = useDeferredValue('Final', 'Loading...');
+	<RootAsyncText getText={props.getText} text={text} />
+}
+
+// Two initialValue hooks in one held root render: both spawn a deferred swap.
+export function RootInitialFinalPair(props) @{
+	const first = useDeferredValue('First', 'First preview');
+	const second = useDeferredValue('Second', 'Second preview');
+	<>
+		<RootAsyncText getText={props.getText} text={first} />{' '}
+		<RootAsyncText getText={props.getText} text={second} />
+	</>
+}
+
 // Per ReactDeferredValue-test.js:564 — nested useDeferredValue hooks: React
 // only defers the FIRST level; a hook mounted inside the spawned deferred
 // render goes straight to its final value (no preview waterfall).

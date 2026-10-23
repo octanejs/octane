@@ -516,6 +516,10 @@ export function suspendRootRender(block: Block, wakeable: PromiseLike<unknown>):
 	if (owner === undefined || owner.disposed) return false;
 	const transaction = owner.transaction;
 	if (transaction === null) return false;
+	// A deferred pass does not supersede the attempt that spawned it: whichever
+	// of their wakeables settles first retries the root. Read it before the
+	// rollback, whose disposal of the root's Block clears it.
+	const spawning = block.currentRenderDeferred ? owner.wakeable : null;
 	// A transition render holds its batches at the root; the origin's end drops it.
 	if (block.currentRenderMode === 'transition' && transaction.batches !== null)
 		(transaction.holders ??= []).push(owner);
@@ -555,6 +559,7 @@ export function suspendRootRender(block: Block, wakeable: PromiseLike<unknown>):
 		});
 	};
 	resumeOnSettle(wakeable, ping);
+	if (spawning !== null && spawning !== wakeable) resumeOnSettle(spawning, ping);
 	return true;
 }
 

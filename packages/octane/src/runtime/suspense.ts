@@ -105,7 +105,12 @@ import {
 	resumeOnSettle,
 	blockIsAncestor,
 } from './use.js';
-import { releaseTransitionHookHolder, HELD_TRANSITIONS, STAGED_REVEALS } from './transitions.js';
+import {
+	releaseTransitionHookHolder,
+	HELD_TRANSITIONS,
+	STAGED_REVEALS,
+	stagedRevealGroup,
+} from './transitions.js';
 import {
 	RENDERER_REGION_OWNER_COUNT,
 	rendererRegionOwnerForBlock,
@@ -2972,19 +2977,20 @@ function abandonHeldTransition(state: TrySlot): void {
 	flushStagedRevealsIfReady();
 }
 
-/** Commit a staged group once exact membership shows every held boundary is ready. */
+/** Commit the staged groups whose every held member is ready (stagedRevealGroup). */
 export function flushStagedRevealsIfReady(): void {
 	// Stale readiness can never satisfy the barrier. Defensive pruning covers
-	// terminal paths as well as superseding hidden retries; then require exact set
-	// membership rather than relying on equal cardinality alone.
+	// terminal paths as well as superseding hidden retries.
 	for (const state of STAGED_REVEALS) {
 		if (!HELD_TRANSITIONS.has(state)) STAGED_REVEALS.delete(state);
 	}
-	if (STAGED_REVEALS.size === 0 || STAGED_REVEALS.size !== HELD_TRANSITIONS.size) return;
-	for (const state of HELD_TRANSITIONS) {
-		if (!STAGED_REVEALS.has(state)) return;
-	}
-	flushStagedReveals();
+	// Each group commits on its own: a retry renders only its own batches, so a
+	// group flushed with it would lose its staged reveal. A group whose reveal a
+	// view transition defers stays staged until it runs, so each flushes once here.
+	const flushed = new Set<TrySlot>();
+	let group: TrySlot[] | null;
+	while (!flushingStagedReveals && (group = stagedRevealGroup(flushed)) !== null)
+		flushStagedReveals(group);
 }
 
 function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
@@ -2995,7 +3001,7 @@ function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
 	return 0;
 }
 
-function flushStagedReveals(): void {
+function flushStagedReveals(group: TrySlot[]): void {
 	if (flushingStagedReveals) return; // re-entrancy guard (a reveal may abandon a sibling)
 	// A boundary holding a dropped transition reveals by rendering it again:
 	// the batches' Blocks re-render at transition priority and reach every held
@@ -3003,10 +3009,10 @@ function flushStagedReveals(): void {
 	// hidden-retry path instead.
 	if (TRANSITION_ROOT_DRIVER) {
 		let retried = false;
-		for (const state of STAGED_REVEALS)
+		for (const state of group)
 			if (state.hiddenDom === null && TRANSITION_ROOT_DRIVER.retry(state)) retried = true;
 		if (retried) {
-			STAGED_REVEALS.clear();
+			for (const state of group) STAGED_REVEALS.delete(state);
 			flush();
 			return;
 		}
@@ -3014,8 +3020,11 @@ function flushStagedReveals(): void {
 	flushingStagedReveals = true;
 	try {
 		const run = (): void => {
-			const batch = [...STAGED_REVEALS];
-			STAGED_REVEALS.clear();
+			// A deferred run commits only the members still staged: another flush may
+			// have revealed them first.
+			const batch = group.filter((state) => STAGED_REVEALS.has(state));
+			if (batch.length === 0) return;
+			for (const state of batch) STAGED_REVEALS.delete(state);
 			// Only fallback-hidden members have completed rollback-safe render
 			// captures. A pre-timeout visible hold remains within Octane's documented
 			// per-swap/global-WIP limitation and may discover another suspension while
@@ -3053,9 +3062,7 @@ function flushStagedReveals(): void {
 		// pre-timeout batch retains the documented per-swap limitation.
 		if (
 			!VIEW_TRANSITION_DRIVER ||
-			!VIEW_TRANSITION_DRIVER.wrapResume(run, () =>
-				[...STAGED_REVEALS].map((state) => state.parentBlock),
-			)
+			!VIEW_TRANSITION_DRIVER.wrapResume(run, () => group.map((state) => state.parentBlock))
 		)
 			run();
 	} finally {
@@ -3072,7 +3079,22 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
 	const retry = () => {
-		if (state.pendingThenable !== thenable) return; // superseded by a fresher suspend
+		if (state.pendingThenable !== thenable) {
+			// A fresher suspend supersedes this one. A boundary holding transitions
+			// on screen holds each one's batches (Transition holds), though, and this
+			// may be all one of them waited for: render them again. Those still
+			// waiting hold again, and the fresher thenable keeps its resume and
+			// fallback timeout. Behind a fallback the holds no longer suspend, and the
+			// hidden primary reveals only once its fresher thenable settles.
+			if (
+				TRANSITION_ROOT_DRIVER &&
+				state.hiddenDom === null &&
+				HELD_TRANSITIONS.has(state) &&
+				TRANSITION_ROOT_DRIVER.retry(state)
+			)
+				flush();
+			return;
+		}
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.BOUNDARY_RETRY);
 		state.pendingThenable = null;
@@ -3110,8 +3132,7 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 				return;
 			}
 			STAGED_REVEALS.add(state);
-			if (STAGED_REVEALS.size < HELD_TRANSITIONS.size) return; // others still pending
-			flushStagedReveals();
+			flushStagedRevealsIfReady(); // waits while its group has members pending
 			return;
 		}
 		if (state.branch === 2 && (state.tryBlock === null || state.tryBlock.disposed)) {
