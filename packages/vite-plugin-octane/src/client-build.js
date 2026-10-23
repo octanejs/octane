@@ -30,6 +30,9 @@ export function createClientBuildState(onIncompatibleDiscovery) {
 		get hasStatefulModules() {
 			return sources.size !== 0 || signalSources.size !== 0;
 		},
+		get hasStreamedSignals() {
+			return signalSources.size !== 0;
+		},
 		begin() {
 			buildId = PENDING_CLIENT_BUILD_ID;
 			hadHotUpdates = false;
