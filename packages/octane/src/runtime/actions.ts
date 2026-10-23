@@ -8,28 +8,29 @@ export {} from './templates.js';
 import { hydrating } from '../hydration-flag.js';
 import { __profileSchedule } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
-import type { HookSlot, Block } from './types.js';
-import { resolveSlot, noop } from './drivers.js';
+import type { HookSlot, Block, TransitionActionBatch } from './types.js';
+import { resolveSlot, noop, TRANSITION_ROOT_DRIVER } from './drivers.js';
 import {
 	VIEW_TRANSITION_DRIVER,
 	TRANSITION_DEPTH,
 	ASYNC_TRANSITION_COUNT,
-	TRANSITION_PENDING_COUNT,
 	isTransitionUpdateContext,
 	scheduleRender,
-	scheduleUrgentRender,
+	scheduleHookPublication,
 } from './engine.js';
 import { ensureHooks, registerHookCleanup, missingSlot } from './hooks.js';
 import {
 	transitionActionBatchForUpdate,
-	TRANSITION_LISTENERS,
+	onTransitionBatchFinished,
 	markTransitionCue,
+	rootTransitionBatch,
 	startTransition,
 } from './transitions.js';
 import { CURSOR } from './hydration.js';
 import { reassertControlledIn } from './portals.js';
 import { findTryHandler } from './suspense.js';
-import { CURRENT_SCOPE, CURRENT_BLOCK } from './render.js';
+import { CURRENT_SCOPE, CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
+import { atCommit } from './commit.js';
 import { setAttribute } from './host-props.js';
 import { delegateEvents, ACTIVE_SUBMIT_DISPATCH } from './events.js';
 import { queueFormActionAuthoringDiagnostic, atCommitIf } from './forms.js';
@@ -661,22 +662,25 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 // which case it is `state` folded through `updateFn(acc, value)` for each queued
 // addOptimistic call. Without an updateFn the fold is React's basicStateReducer:
 // a function value is an updater called with the pending state, as in useState,
-// and any other value replaces it. The queue is cleared when the owning
-// transition settles, so optimistic and real state converge in the same commit —
-// on success `state` has advanced, on error it is unchanged (automatic revert).
+// and any other value replaces it. A transition render that folds the owning
+// batch's updates skips that batch's values and drops them at commit, as React
+// reverts them in the transition's lane. Urgent renders show them, as React
+// renders optimistic values urgently, unless a timeout fallback lets the batch
+// commit while its hold stays open: an urgent render folding it then skips them
+// too. A batch that finishes without such a render clears its values then, so
+// later renders derive from the real state on success or revert to the
+// unchanged state on error.
 // addOptimistic should be called inside an Action.
 // ---------------------------------------------------------------------------
 
 interface OptimisticSlot<V> {
 	queue: V[];
+	owners: Array<TransitionActionBatch | null> | null;
+	batches: Map<TransitionActionBatch, () => void> | null;
+	unownedPending: boolean;
 	add: (value: V) => void;
-	/**
-	 * True when the queue was populated INSIDE a transition, so it should clear
-	 * when that transition settles (count → 0). Without this, an addOptimistic
-	 * called outside any transition would (a) never clear via the listener, and
-	 * (b) be wiped by an unrelated transition elsewhere settling. See `add`.
-	 */
-	armed: boolean;
+	/** Drop `owner`'s values, returning whether any were queued. */
+	compact: (owner: TransitionActionBatch | null) => boolean;
 }
 
 function basicOptimisticReducer<S>(state: S, value: unknown): S {
@@ -711,34 +715,38 @@ export function useOptimistic<S, V = S>(
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as OptimisticSlot<V> | undefined;
 	if (s === undefined) {
-		let unownedIndices: number[] | null = null;
-		const clear = (indices?: number[]): void => {
-			if (indices !== undefined && unownedIndices !== indices) return;
-			unownedIndices = null;
-			const hadUpdates = slotRef.queue.length > 0;
-			if (indices === undefined) {
-				slotRef.armed = false;
-				slotRef.queue.length = 0;
-			} else {
-				// Compact once so an unowned burst is linear in the queue length.
-				let write = indices[0];
-				let skip = 0;
-				for (let read = write; read < slotRef.queue.length; read++) {
-					if (read === indices[skip]) skip++;
-					else slotRef.queue[write++] = slotRef.queue[read];
-				}
-				slotRef.queue.length = write;
+		const compact = (owner: TransitionActionBatch | null): boolean => {
+			const queue = slotRef.queue;
+			const owners = slotRef.owners;
+			if (owners === null) {
+				if (owner !== null || queue.length === 0) return false;
+				queue.length = 0;
+				return true;
 			}
-			if (hadUpdates && !block.disposed) {
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-					__profileSchedule(block, 'optimistic-revert', slot);
-				if (indices === undefined) scheduleRender(block);
-				else scheduleUrgentRender(block);
+			let write = 0;
+			for (let read = 0; read < queue.length; read++) {
+				if (owners[read] === owner) continue;
+				queue[write] = queue[read];
+				owners[write++] = owners[read];
 			}
+			const removed = write !== queue.length;
+			queue.length = write;
+			owners.length = write;
+			if (slotRef.batches === null || slotRef.batches.size === 0) slotRef.owners = null;
+			return removed;
+		};
+		const revert = (): void => {
+			if (block.disposed) return;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileSchedule(block, 'optimistic-revert', slot);
+			scheduleHookPublication(block);
 		};
 		const slotRef: OptimisticSlot<V> = {
 			queue: [],
-			armed: false,
+			owners: null,
+			batches: null,
+			unownedPending: false,
+			compact,
 			add: (value: V) => {
 				const inAction = isTransitionUpdateContext();
 				if (process.env.NODE_ENV !== 'production' && !inAction) {
@@ -747,17 +755,34 @@ export function useOptimistic<S, V = S>(
 					);
 				}
 				slotRef.queue.push(value);
-				if (inAction && TRANSITION_PENDING_COUNT > 0) {
-					// Inside an Action: the optimistic value is held until that
-					// transition settles (the listener below clears it then).
-					slotRef.armed = true;
+				const batch = inAction ? transitionActionBatchForUpdate() : null;
+				if (batch !== null) {
+					const owners =
+						slotRef.owners ?? (slotRef.owners = new Array(slotRef.queue.length - 1).fill(null));
+					owners.push(batch);
+					if (batch.finished) compact(batch);
+					else {
+						let batches = slotRef.batches;
+						if (batches === null) slotRef.batches = batches = new Map();
+						if (!batches.has(batch))
+							batches.set(
+								batch,
+								onTransitionBatchFinished(batch, () => {
+									batches!.delete(batch);
+									if (batches!.size === 0) slotRef.batches = null;
+									if (compact(batch)) revert();
+								}),
+							);
+					}
 				} else {
-					// Revert only unowned updates: this slot may already contain
-					// optimistic updates owned by a pending Action.
-					if (unownedIndices === null) {
-						const indices = (unownedIndices = [slotRef.queue.length - 1]);
-						queueMicrotask(() => clear(indices));
-					} else unownedIndices.push(slotRef.queue.length - 1);
+					slotRef.owners?.push(null);
+					if (!slotRef.unownedPending) {
+						slotRef.unownedPending = true;
+						queueMicrotask(() => {
+							slotRef.unownedPending = false;
+							if (compact(null)) revert();
+						});
+					}
 				}
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -769,18 +794,34 @@ export function useOptimistic<S, V = S>(
 		};
 		s = slotRef;
 		ensureHooks(scope).set(slot, slotRef);
-		// When the owning transition settles (pending count hits 0), drop the
-		// optimistic queue so the next render re-derives from the real state. Gated
-		// on `armed` so an unrelated transition settling doesn't wipe a queue this
-		// hook populated outside any transition (that path self-clears via microtask).
-		const listener = (): void => {
-			if (TRANSITION_PENDING_COUNT === 0 && slotRef.armed) clear();
-		};
-		TRANSITION_LISTENERS.add(listener);
-		registerHookCleanup(scope, () => TRANSITION_LISTENERS.delete(listener));
+		registerHookCleanup(scope, () => {
+			const batches = slotRef.batches;
+			if (batches === null) return;
+			for (const unsubscribe of batches.values()) unsubscribe();
+			batches.clear();
+			slotRef.batches = null;
+		});
 	}
 	let optimistic = passthrough;
 	const reduce = updateFn ?? basicOptimisticReducer;
-	for (let i = 0; i < s.queue.length; i++) optimistic = reduce(optimistic, s.queue[i]);
+	const queue = s.queue;
+	const owners = s.owners;
+	const transition = block.currentRenderMode === 'transition';
+	let reverted: TransitionActionBatch[] | null = null;
+	for (let i = 0; i < queue.length; i++) {
+		const owner = owners === null ? null : owners[i];
+		// The owner's updates fold here exactly as in foldHookQueue. A ready batch
+		// with an open hold has only non-suspending (timeout fallback) holds left.
+		if (
+			owner !== null &&
+			TRANSITION_ROOT_DRIVER &&
+			(transition || (rootTransitionBatch(owner).pendingHolds ?? 0) !== 0) &&
+			TRANSITION_ROOT_DRIVER.fold(owner, transition, ROOT_RENDER_TRANSACTION)
+		) {
+			if (reverted === null) reverted = [owner];
+			else if (reverted.indexOf(owner) === -1) reverted.push(owner);
+		} else optimistic = reduce(optimistic, queue[i]);
+	}
+	if (reverted !== null) for (const owner of reverted) atCommit(s.compact, owner);
 	return [optimistic, s.add];
 }

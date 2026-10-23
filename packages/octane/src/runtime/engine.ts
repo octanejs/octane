@@ -237,7 +237,6 @@ import {
 	clearFlushedTransitions,
 	scheduleTransitionBatch,
 	flushTransitionActionBatchIfReady,
-	TRANSITION_LISTENERS,
 	addTransitionHookToBatch,
 	publishTransitionHookBatch,
 	finishTransitionHookBatch,
@@ -729,8 +728,8 @@ let DEFERRED_SPAWN = false;
 /**
  * Outstanding transition WORK count — incremented when startTransition fires,
  * decremented when its renders commit (and again for any tryBlock that holds
- * the transition pending while suspended). Optimistic lifetimes subscribe to
- * this global count; useTransition tracks only its hook-owned Action batches.
+ * the transition pending while suspended). Devtools reports it; useTransition
+ * and useOptimistic track their own Action batches instead.
  */
 export let TRANSITION_PENDING_COUNT = 0;
 /**
@@ -803,12 +802,20 @@ export function unsuspendTransitionHolder(holder: object): void {
 			scheduleTransitionTask();
 		}
 }
-// useTransition/useOptimistic listeners are runtime-owned publication work.
-// When a transition boundary changes the pending count while another component
-// is rendering, their scheduled refreshes must not be diagnosed as userland
-// cross-component render updates. Keep this depth scoped to listener invocation;
-// startTransition's user callback runs only after tickTransitionCount returns.
-let TRANSITION_LISTENER_PUBLISH_DEPTH = 0;
+// Pending-state hook publications are runtime-owned render work. When a hook
+// publishes while another component is rendering, its scheduled refresh must
+// not be diagnosed as a userland cross-component render update.
+let TRANSITION_HOOK_PUBLISH_DEPTH = 0;
+
+/** Schedule a hook's urgent publication; its batch may finish while a boundary renders. */
+export function scheduleHookPublication(block: Block): void {
+	TRANSITION_HOOK_PUBLISH_DEPTH++;
+	try {
+		scheduleUrgentRender(block);
+	} finally {
+		TRANSITION_HOOK_PUBLISH_DEPTH--;
+	}
+}
 
 /** The scheduled Block drainQueue is rendering, while transitions are in use. */
 export let TRANSITION_ORIGIN: Block | null = null;
@@ -1651,18 +1658,6 @@ export function tickTransitionCount(delta: number): void {
 	if (TRANSITION_PENDING_COUNT < 0) TRANSITION_PENDING_COUNT = 0;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__devtoolsSetTransitionCount(TRANSITION_PENDING_COUNT);
-	TRANSITION_LISTENER_PUBLISH_DEPTH++;
-	try {
-		for (const fn of TRANSITION_LISTENERS) {
-			try {
-				fn();
-			} catch (err) {
-				console.error(err);
-			}
-		}
-	} finally {
-		TRANSITION_LISTENER_PUBLISH_DEPTH--;
-	}
 }
 // Commit actions that must run after the callback bodies above publish. Activity
 // uses this for visible→hidden deactivation+DOM hiding so its cleanup sees the
@@ -1972,7 +1967,7 @@ export function scheduleRender(
 	const renderPhaseOther =
 		CURRENT_BLOCK !== null &&
 		(!renderPhaseSelf || CURRENT_SCOPE !== block) &&
-		TRANSITION_LISTENER_PUBLISH_DEPTH === 0 &&
+		TRANSITION_HOOK_PUBLISH_DEPTH === 0 &&
 		EFFECT_EVENT_LIFECYCLE_DEPTH === 0;
 	if (renderPhaseOther) {
 		block.crossRenderUpdate = true;
@@ -5003,7 +4998,7 @@ export function useTransition(
 				hook.tentative = false;
 				if (hook.isPending === pending || block.disposed) return;
 				hook.isPending = pending;
-				TRANSITION_LISTENER_PUBLISH_DEPTH++;
+				TRANSITION_HOOK_PUBLISH_DEPTH++;
 				try {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
@@ -5011,7 +5006,7 @@ export function useTransition(
 					if (pending) markTransitionCue(block);
 					scheduleRender(block, false, pending);
 				} finally {
-					TRANSITION_LISTENER_PUBLISH_DEPTH--;
+					TRANSITION_HOOK_PUBLISH_DEPTH--;
 				}
 			},
 		};

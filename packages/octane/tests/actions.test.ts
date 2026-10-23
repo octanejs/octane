@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mount, flushEffects } from './_helpers';
-import { flushSync, setFormAction, startTransition } from '../src/index.js';
+import { act, mount, flushEffects } from './_helpers';
+import {
+	flushSync,
+	getTransitionFallbackTimeout,
+	setFormAction,
+	setTransitionFallbackTimeout,
+	startTransition,
+} from '../src/index.js';
 import {
 	ActionForm,
 	SubmitterActionForm,
@@ -19,6 +25,9 @@ import {
 	OptimisticForm,
 	BareOptimistic,
 	OptimisticCounter,
+	OptimisticSuspenseAction,
+	SuspendedTransitionRoot,
+	OptimisticSupersededTransition,
 	DirectAction,
 	ExposedDispatch,
 	RawForm,
@@ -34,6 +43,21 @@ function deferred<T = void>() {
 		reject = rej;
 	});
 	return { promise, resolve, reject };
+}
+
+function suspenseGate() {
+	const gate = deferred();
+	let ready = false;
+	return {
+		read: () => {
+			if (!ready) throw gate.promise;
+			return 'ready';
+		},
+		resolve: () => {
+			ready = true;
+			gate.resolve();
+		},
+	};
 }
 
 // Commit a microtask's worth of scheduled (transition-priority) work — used to
@@ -663,6 +687,174 @@ describe('useFormStatus', () => {
 });
 
 describe('useOptimistic', () => {
+	it('keeps optimistic state through a Suspense hold owned by its action', async () => {
+		const save = deferred();
+		const detail = suspenseGate();
+		const r = mount(OptimisticSuspenseAction, {
+			save: save.promise,
+			read: detail.read,
+			suspend: true,
+		});
+		try {
+			flushSync(() => (r.find('#save') as HTMLButtonElement).click());
+			await tick();
+			expect(r.find('#optimistic').textContent).toBe('1');
+			expect(r.find('#pending').textContent).toBe('pending');
+			flushSync(() => (r.find('#bare-add') as HTMLButtonElement).click());
+			await tick();
+			expect(r.find('#optimistic').textContent).toBe('1');
+
+			save.resolve();
+			await settle();
+			expect(r.find('#saved').textContent).toBe('0');
+			expect(r.find('#optimistic').textContent).toBe('1');
+			expect(r.find('#pending').textContent).toBe('pending');
+			expect(r.find('#detail').textContent).toBe('old');
+
+			detail.resolve();
+			await settle();
+			expect(r.find('#saved').textContent).toBe('1');
+			expect(r.find('#optimistic').textContent).toBe('1');
+			expect(r.find('#pending').textContent).toBe('idle');
+			expect(r.find('#detail').textContent).toBe('ready');
+		} finally {
+			save.resolve();
+			detail.resolve();
+			await settle();
+			r.unmount();
+		}
+	});
+
+	it('reverts its optimistic state while an unrelated root stays suspended', async () => {
+		const save = deferred();
+		const detail = suspenseGate();
+		const unrelated = mount(SuspendedTransitionRoot, { read: detail.read });
+		const r = mount(OptimisticSuspenseAction, {
+			save: save.promise,
+			read: detail.read,
+			suspend: false,
+		});
+		try {
+			flushSync(() => (unrelated.find('#navigate') as HTMLButtonElement).click());
+			await settle();
+			expect(unrelated.find('#pending').textContent).toBe('pending');
+			expect(unrelated.find('#detail').textContent).toBe('old');
+
+			flushSync(() => (r.find('#save') as HTMLButtonElement).click());
+			await tick();
+			expect(r.find('#optimistic').textContent).toBe('1');
+			expect(r.find('#pending').textContent).toBe('pending');
+
+			save.resolve();
+			await settle();
+			expect(r.find('#saved').textContent).toBe('1');
+			expect(r.find('#optimistic').textContent).toBe('1');
+			expect(r.find('#pending').textContent).toBe('idle');
+			expect(unrelated.find('#pending').textContent).toBe('pending');
+
+			detail.resolve();
+			await settle();
+			expect(unrelated.find('#pending').textContent).toBe('idle');
+			expect(unrelated.find('#detail').textContent).toBe('ready');
+		} finally {
+			save.resolve();
+			detail.resolve();
+			await settle();
+			r.unmount();
+			unrelated.unmount();
+		}
+	});
+
+	for (const urgentFirst of [false, true]) {
+		it(`reverts with the held work a timeout fallback lets commit (urgentFirst=${urgentFirst})`, async () => {
+			vi.useFakeTimers({ shouldAdvanceTime: false });
+			const previousTimeout = getTransitionFallbackTimeout();
+			setTransitionFallbackTimeout(100);
+			const save = deferred();
+			const detail = suspenseGate();
+			const r = mount(OptimisticSuspenseAction, {
+				save: save.promise,
+				read: detail.read,
+				suspend: true,
+			});
+			try {
+				r.click('#save');
+				await act(async () => {
+					save.resolve();
+					await save.promise;
+				});
+				expect(r.find('#saved').textContent).toBe('0');
+				expect(r.find('#optimistic').textContent).toBe('1');
+
+				if (urgentFirst) {
+					// An urgent render folds the released work before its retry task.
+					vi.advanceTimersByTime(100);
+				} else await act(() => vi.advanceTimersByTimeAsync(100));
+				expect(r.find('#fallback').textContent).toBe('loading');
+				expect(r.find('#pending').textContent).toBe('pending');
+
+				r.click('#bare-add');
+				expect(r.find('#saved').textContent).toBe('1');
+				expect(r.find('#optimistic').textContent).toBe('11');
+				await act(() => {});
+				expect(r.find('#saved').textContent).toBe('1');
+				expect(r.find('#optimistic').textContent).toBe('1');
+				expect(r.find('#pending').textContent).toBe('pending');
+
+				await act(async () => {
+					detail.resolve();
+				});
+				expect(r.find('#detail').textContent).toBe('ready');
+				expect(r.find('#optimistic').textContent).toBe('1');
+				expect(r.find('#pending').textContent).toBe('idle');
+			} finally {
+				save.resolve();
+				detail.resolve();
+				await act(() => {});
+				r.unmount();
+				setTransitionFallbackTimeout(previousTimeout);
+				vi.useRealTimers();
+			}
+		});
+	}
+
+	it('reverts without a cross-render warning when an urgent update supersedes its transition', async () => {
+		const fulfilled = (value: string) =>
+			Object.assign(Promise.resolve(value), { status: 'fulfilled', value });
+		const next = deferred<string>();
+		const r = mount(OptimisticSupersededTransition, {
+			initial: fulfilled('A'),
+			next: next.promise,
+			urgent: fulfilled('C'),
+		});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			flushSync(() => (r.find('#transition') as HTMLButtonElement).click());
+			await settle();
+			expect(r.find('#value').textContent).toBe('A');
+			expect(r.find('#optimistic').textContent).toBe('1');
+			expect(r.find('#pending').textContent).toBe('pending');
+
+			flushSync(() => (r.find('#urgent') as HTMLButtonElement).click());
+			await settle();
+			expect(r.find('#value').textContent).toBe('C');
+			// The superseded transition's retry finishes its batch in a task.
+			await act(() => {});
+			expect(r.find('#optimistic').textContent).toBe('0');
+			expect(r.find('#pending').textContent).toBe('idle');
+			expect(
+				error.mock.calls.filter(([message]) =>
+					String(message).includes('Cannot update a component'),
+				),
+			).toEqual([]);
+		} finally {
+			error.mockRestore();
+			next.resolve('B');
+			await settle();
+			r.unmount();
+		}
+	});
+
 	it('shows the optimistic value during the action, then converges to real state', async () => {
 		const d = deferred();
 		const r = mount(OptimisticForm, { initial: ['x'], action: () => d.promise });
