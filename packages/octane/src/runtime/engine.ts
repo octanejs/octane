@@ -60,12 +60,12 @@ import {
 	endNativeBatch,
 	runNativeBatch,
 } from '../signals/read-protocol.js';
+import type { NativeSignalManifest } from '../signals/native-read-seeds.js';
 import {
 	type NativeAdoptionState,
-	type NativeSignalManifest,
 	createNativeAdoptionState,
 	parseNativeSignalManifest,
-} from '../signals/native-read-seeds.js';
+} from '../signals/native-adoption.js';
 import { retireSignalOwnerIdentity } from '../signals/owner-context.js';
 import { signalDocumentEnabled } from '../signals/document-owner.js';
 import type { SignalOwner, SignalRendererOwnerIdentity } from '../signals/types.js';

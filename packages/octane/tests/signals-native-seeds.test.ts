@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { SignalSerializationError } from '../src/signals/errors.js';
 import {
 	captureInitialDocumentSignals,
-	materializeNativeSignalManifest,
-	parseNativeSignalManifest,
 	serializeNativeSeedReads,
 	type NativeSignalManifest,
 	type NativeSignalReference,
 } from '../src/signals/native-read-seeds.js';
+import {
+	materializeNativeSignalManifest,
+	parseNativeSignalManifest,
+} from '../src/signals/native-adoption.js';
 import type { NativeReadWitness } from '../src/signals/native-read-collector.js';
 import type { NativeAdoptionOwner, NativeReadSource } from '../src/signals/read-protocol.js';
 import type { EncodedSignalValue, ScopeSeed, SignalSeedEntry } from '../src/signals/types.js';

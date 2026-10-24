@@ -33,16 +33,18 @@ class ScalarBinding<T>
 	extends RedeclarableBinding<DerivedCompute<T>>
 	implements DerivedBindingLifecycle
 {
-	private frozen = false;
-	private compute: DerivedCompute<T> | undefined;
+	// Not private: its declaration views (installScalarViews) use these too.
+	frozen = false;
+	compute: DerivedCompute<T> | undefined;
 	/** A later render's computation, evaluated privately until that render is accepted. */
-	declare private view?:
-		{ readonly node: ScopedNode<T>; readonly binding: ScalarBinding<T> } | undefined;
+	declare view?: { readonly node: ScopedNode<T>; readonly binding: ScalarBinding<T> } | undefined;
 	/** A render's computation that produced the committed value, and what it read. */
-	declare private probed?:
+	declare probed?:
 		{ readonly compute: DerivedCompute<T>; readonly reads: ScopedNode[] } | undefined;
 	/** A view's first value, already computed by the render's probe. */
-	declare private seeded?: { readonly value: T } | undefined;
+	declare seeded?: { readonly value: T } | undefined;
+	/** Installed with the views; only a binding that has one calls it. */
+	declare releaseView: () => void;
 
 	constructor(
 		readonly owner: ScopeImpl,
@@ -94,60 +96,6 @@ class ScalarBinding<T>
 		});
 	}
 
-	/** An equal value needs no view; a changed one is evaluated once, privately. */
-	protected presentDefinition(compute: DerivedCompute<T>): ScopedNode | undefined {
-		// A frozen document keeps presenting committed values. The new closure is
-		// installed at acceptance and evaluated when reads resume.
-		if (this.frozen || this.owner.readBarrier !== undefined) return undefined;
-		let probe: { value: T; reads: ScopedNode[] } | undefined;
-		try {
-			probe = readsDuring(this.owner, () => (compute as () => T)());
-		} catch {
-			// A suspended or failing computation reports itself through a view.
-		}
-		if (probe !== undefined) {
-			const state = untrack(() => refreshNode(this.node));
-			if (state.snapshot.status === 'ready' && Object.is(state.snapshot.value, probe.value)) {
-				this.probed = { compute, reads: probe.reads };
-				return undefined;
-			}
-		}
-		this.releaseView();
-		const node: ScopedNode<T> = createDeclarationView(this.node, (target) =>
-			binding.forkCandidate(target),
-		);
-		const binding: ScalarBinding<T> = new ScalarBinding(this.owner, node, compute);
-		this.view = { node, binding };
-		if (probe !== undefined) {
-			binding.seeded = { value: probe.value };
-			refreshNode(node);
-			linkReads(node, probe.reads);
-		}
-		return node;
-	}
-
-	protected acceptView(node: ScopedNode, sequence: number): void {
-		const view = this.view;
-		if (view?.node !== node) return;
-		this.view = undefined;
-		this.compute = view.binding.compute;
-		this.sequence = sequence;
-		signalBatch(() => {
-			const shadow = this.node.pending?.shadow;
-			if (shadow !== undefined) invalidateNode(shadow);
-			promoteDeclarationView(node, this.node);
-		});
-		view.binding.dispose();
-	}
-
-	private releaseView(): void {
-		const view = this.view;
-		if (view === undefined) return;
-		this.view = undefined;
-		signalBatch(() => releaseDeclarationView(view.node));
-		view.binding.dispose();
-	}
-
 	forkCandidate(target: ScopedNode): undefined {
 		if (this.frozen || this.owner.readBarrier || !this.compute) {
 			throw new CandidateUnsupportedError(formatClientError(205));
@@ -172,7 +120,7 @@ class ScalarBinding<T>
 	dispose(): void {
 		this.forgetStaged();
 		this.probed = undefined;
-		this.releaseView();
+		if (this.view) this.releaseView();
 		this.compute = undefined;
 	}
 }
@@ -195,4 +143,68 @@ export function createDeclaredScalarCell<T>(
 		captures,
 		declaring,
 	);
+}
+
+/** See installDerivedViews: compiled instance declarations install these. */
+export function installScalarViews(): void {
+	const prototype = ScalarBinding.prototype;
+	prototype.presentDefinition = presentScalarView;
+	prototype.acceptView = acceptScalarView;
+	prototype.releaseView = releaseScalarView;
+}
+
+/** An equal value needs no view; a changed one is evaluated once, privately. */
+function presentScalarView<T>(
+	this: ScalarBinding<T>,
+	compute: DerivedCompute<T>,
+): ScopedNode | undefined {
+	// A frozen document keeps presenting committed values. The new closure is
+	// installed at acceptance and evaluated when reads resume.
+	if (this.frozen || this.owner.readBarrier !== undefined) return undefined;
+	let probe: { value: T; reads: ScopedNode[] } | undefined;
+	try {
+		probe = readsDuring(this.owner, () => (compute as () => T)());
+	} catch {
+		// A suspended or failing computation reports itself through a view.
+	}
+	if (probe !== undefined) {
+		const state = untrack(() => refreshNode(this.node));
+		if (state.snapshot.status === 'ready' && Object.is(state.snapshot.value, probe.value)) {
+			this.probed = { compute, reads: probe.reads };
+			return undefined;
+		}
+	}
+	if (this.view) this.releaseView();
+	const node: ScopedNode<T> = createDeclarationView(this.node, (target) =>
+		binding.forkCandidate(target),
+	);
+	const binding: ScalarBinding<T> = new ScalarBinding(this.owner, node, compute);
+	this.view = { node, binding };
+	if (probe !== undefined) {
+		binding.seeded = { value: probe.value };
+		refreshNode(node);
+		linkReads(node, probe.reads);
+	}
+	return node;
+}
+
+function acceptScalarView<T>(this: ScalarBinding<T>, node: ScopedNode, sequence: number): void {
+	const view = this.view;
+	if (view?.node !== node) return;
+	this.view = undefined;
+	this.compute = view.binding.compute;
+	this.sequence = sequence;
+	signalBatch(() => {
+		const shadow = this.node.pending?.shadow;
+		if (shadow !== undefined) invalidateNode(shadow);
+		promoteDeclarationView(node, this.node);
+	});
+	view.binding.dispose();
+}
+
+function releaseScalarView(this: ScalarBinding<unknown>): void {
+	const view = this.view!;
+	this.view = undefined;
+	signalBatch(() => releaseDeclarationView(view.node));
+	view.binding.dispose();
 }

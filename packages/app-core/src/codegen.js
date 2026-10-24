@@ -148,6 +148,18 @@ let independentBootstrap;
 let disposeIndependentHydration;
 let incompatibleBuild = false;
 ${
+	options.streamedSignals === false
+		? ''
+		: `// Destructured so a bundler keeps only these two exports. The router never
+// registers a streamed HTML region, so it joins results without placement.
+const loadSignalHydration = () =>
+  import('octane/hydration/streamed-signals').then(
+    ({ bootstrapStreamedSignalResults, installSignalDocumentLifecycle }) =>
+      ({ bootstrapStreamedSignalResults, installSignalDocumentLifecycle }),
+  );
+`
+}
+${
 	options.devClientBuild
 		? `
 if (import.meta.hot) {
@@ -296,7 +308,7 @@ async function bootstrapDocumentLifecycle() {}
   if (clientBuildId === null || !documentData?.streamedSignals) return;
   if (lifecycleBootstrap) return lifecycleBootstrap;
   lifecycleBootstrap = (async () => {
-    signalHydrationModule ??= await import('octane/hydration/streamed-signals');
+    signalHydrationModule ??= await loadSignalHydration();
     if (incompatibleBuild) return;
     documentLifecycle = signalHydrationModule.installSignalDocumentLifecycle({
       document, buildId: clientBuildId, documentId: documentData.streamedSignals.documentId,
@@ -466,9 +478,9 @@ function withRootBoundary(content, boundary) {
 ${
 	options.streamedSignals === false
 		? `      throw new Error('[octane] Streamed signals reached a client build that compiled none.');`
-		: `      signalHydrationModule = await import('octane/hydration/streamed-signals');
+		: `      signalHydrationModule ??= await loadSignalHydration();
       if (incompatibleBuild) return;
-      streamedHydration = signalHydrationModule.bootstrapStreamedSignalHydration(data.streamedSignals);
+      streamedHydration = signalHydrationModule.bootstrapStreamedSignalResults(data.streamedSignals);
       signalOwner = streamedHydration.signalOwner;
       await bootstrapDocumentLifecycle();`
 }
@@ -608,11 +620,15 @@ export function create_islands_entry_source(options = {}) {
     )) throw new Error('[octane] Invalid streamed signal document identity.');
     if (globalThis.__octaneStreamedSignalSelections !== undefined) {
       if (!data.streamedSignals) throw new Error('[octane] Missing streamed signal document identity.');
-      signalHydrationModule = await import('octane/hydration/streamed-signals');
+${
+	options.streamedSignals === false
+		? `      throw new Error('[octane] Streamed signals reached a client build that compiled none.');`
+		: `      signalHydrationModule ??= await loadSignalHydration();
       if (incompatibleBuild) return;
-      streamedHydration = signalHydrationModule.bootstrapStreamedSignalHydration(data.streamedSignals);
+      streamedHydration = signalHydrationModule.bootstrapStreamedSignalResults(data.streamedSignals);
       signalOwner = streamedHydration.signalOwner;
-      await bootstrapDocumentLifecycle();
+      await bootstrapDocumentLifecycle();`
+}
     }
 
     // The shell stays server-owned: only its independent islands activate.

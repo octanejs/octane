@@ -6,9 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { build, transform } from 'esbuild';
 import { Window } from 'happy-dom';
 import {
-	bootstrapStreamedSignalHydration,
+	bootstrapStreamedSignalResults,
 	installSignalDocumentLifecycle,
-	type StreamedSignalHydration,
+	type StreamedSignalResults,
 	type StreamedSignalHydrationOptions,
 } from '../../octane/src/hydration/streamed-signals.js';
 import { enableSignalBindings } from '../../octane/src/runtime.js';
@@ -98,7 +98,7 @@ async function runClientEntry(
 	const pageValues: unknown[] = [];
 	const owners: (SignalOwner | undefined)[] = [];
 	const owner = { scopeKey: 'octane:document' };
-	let signalHydration: StreamedSignalHydration | undefined;
+	let signalHydration: StreamedSignalResults | undefined;
 	const mailboxes: Record<string, unknown> = options.streamed
 		? {
 				__octaneStreamedSignalSelections: {
@@ -177,7 +177,7 @@ async function runClientEntry(
 								: path === 'octane/hydration'
 									? `globalThis.imports.push('hydration'); export const bootstrapIndependentHydration = globalThis.bootstrap;`
 									: path === 'octane/hydration/streamed-signals'
-										? `globalThis.imports.push('streamed-signals'); export const bootstrapStreamedSignalHydration = globalThis.bootstrapSignals; export const installSignalDocumentLifecycle = globalThis.installLifecycle;`
+										? `globalThis.imports.push('streamed-signals'); export const bootstrapStreamedSignalResults = globalThis.bootstrapSignals; export const installSignalDocumentLifecycle = globalThis.installLifecycle;`
 										: path === '@fixture/widget'
 											? `globalThis.imports.push('widget'); export default globalThis.activateWidget;`
 											: "globalThis.pages.push('page'); globalThis.readPage(); export default function Page() {}",
@@ -214,7 +214,7 @@ async function runClientEntry(
 		bootstrapSignals: (settings: StreamedSignalHydrationOptions) => {
 			// Imported browser helpers execute in this realm, outside the entry's VM.
 			vi.stubGlobal('document', document);
-			signalHydration = bootstrapStreamedSignalHydration({
+			signalHydration = bootstrapStreamedSignalResults({
 				...settings,
 				signalOwner: owner,
 				target: mailboxes,

@@ -1,6 +1,6 @@
 import type { RenderResult } from '../runtime.server.js';
 import type { ScopeSeed } from '../signals/types.js';
-import { materializeNativeSignalManifest } from '../signals/native-read-seeds.js';
+import { materializeNativeSignalManifest } from '../signals/native-adoption.js';
 import {
 	isStreamedRendererFrame,
 	type StreamFrameIdentity,

@@ -22,6 +22,26 @@ const SIGNAL_FACTORIES = new Map([
 	['query$', '__queryAt'],
 ]);
 
+// A later render declares an instance cell again with new closures. Only a
+// module with such a declaration installs the views that stage it until the
+// renderer accepts that render (signals/redeclaration.ts).
+const VIEW_INSTALLERS = new Map([
+	['__derivedAt', '__derivedViews'],
+	['__derivedScalarAt', '__derivedScalarViews'],
+	['__queryAt', '__queryViews'],
+]);
+
+function viewInstallers(declarations, trustedFactory) {
+	const installers = new Map();
+	for (const { node } of declarations) {
+		const trusted = trustedFactory(node);
+		const installer = VIEW_INSTALLERS.get(declarationHelper(trusted.factory, node));
+		if (installer !== undefined && !installers.has(installer))
+			installers.set(installer, trusted.helper(installer));
+	}
+	return [...installers.values()];
+}
+
 const SCALAR_UNARY_OPERATORS = new Set(['!', '+', '-', '~', 'typeof', 'void']);
 const SCALAR_BINARY_OPERATORS = new Set([
 	'-',
@@ -944,6 +964,7 @@ export function lowerSignalDeclarations(ast, filename, options) {
 		};
 	});
 
+	const installers = viewInstallers(declarations, trustedFactory);
 	const body = lowered.body.map((statement) => {
 		const helpers = importRecords.get(statement);
 		if (helpers === undefined || helpers.size === 0) return statement;
@@ -960,6 +981,16 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			at,
 			0,
 			inheritHookMemoOrigin(b.const({ ...revision }, b.object([])), body[at] ?? body[at - 1]),
+		);
+	}
+	if (installers.length > 0) {
+		const first = body.findIndex((statement) => statement.type !== 'ImportDeclaration');
+		const at = first === -1 ? body.length : first;
+		const origin = body[at] ?? body[at - 1];
+		body.splice(
+			at,
+			0,
+			...installers.map((helper) => inheritHookMemoOrigin(b.stmt(b.call(helper)), origin)),
 		);
 	}
 	return { ...lowered, _octaneSignalDeclarations: true, body };
@@ -1146,13 +1177,14 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 			text: `${captureSeparator(node, source)}${'void 0, '.repeat(missing)}[${elements.join(', ')}]`,
 		});
 	}
+	const installers = viewInstallers(declarations, trustedFactory).map((helper) => `${helper}();`);
 	return {
 		edits,
 		lexicalEdits,
 		producerCopies,
 		imports: [...helpers.values()],
 		// Declared with the imports, ahead of any authored statement.
-		prelude: revision === null ? '' : `var ${revision} = {};`,
+		prelude: (revision === null ? '' : `var ${revision} = {};`) + installers.join(''),
 		usedNames,
 		usesSignals: edits.length > 0,
 	};
