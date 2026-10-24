@@ -1,4 +1,3 @@
-import { yieldForHostBudget } from './host-budget.js';
 import { decodeSignalValue, encodeSignalValue } from './data-encoding.js';
 import type { EncodedSignalValue } from './signals/types.js';
 
@@ -100,69 +99,4 @@ export function encodeServerResultFrame(sequence: number, frame: ServerResultFra
 				? frame.error
 				: null;
 	return new TextEncoder().encode(JSON.stringify([1, sequence, frame.kind, payload]) + '\n');
-}
-
-export function decodeServerResultFrame(line: string, sequence: number): ServerResultFrame {
-	const frame: unknown = JSON.parse(line);
-	if (!Array.isArray(frame) || frame.length !== 4 || frame[0] !== 1 || frame[1] !== sequence) {
-		throw new Error('Invalid or out-of-order server result frame');
-	}
-	const [, , kind, payload] = frame;
-	if (kind === 'value') {
-		return { kind, value: decodeSignalValue(payload as EncodedSignalValue) };
-	}
-	if (kind === 'error' && typeof payload === 'string') return { kind, error: payload };
-	if ((kind === 'stream' || kind === 'complete') && payload === null) return { kind };
-	throw new Error('Invalid server result frame');
-}
-
-/**
- * Read one line at a time without concatenating the entire response or repeatedly
- * copying a growing partial frame. A transport chunk may contain several frames.
- */
-export function serverResultReader(
-	reader: ReadableStreamDefaultReader<Uint8Array>,
-	limits: ResolvedServerResultLimits,
-	isClosed: () => boolean,
-) {
-	let chunk: Uint8Array = new Uint8Array(0);
-	let offset = 0;
-	let sequence = 0;
-	let totalBytes = 0;
-	return async (): Promise<ServerResultFrame> => {
-		const parts: Uint8Array[] = [];
-		let bytes = 0;
-		while (true) {
-			if (isClosed()) return { kind: 'complete' };
-			const wait = yieldForHostBudget();
-			if (wait !== undefined) {
-				await wait;
-				continue;
-			}
-			if (offset === chunk.length) {
-				const next = await reader.read();
-				if (next.done) throw new Error('Server result ended without a terminal frame');
-				chunk = next.value;
-				offset = 0;
-				// Ready transport results re-enter the shared budget and retirement guard.
-				continue;
-			}
-			const newline = chunk.indexOf(10, offset);
-			const end = newline === -1 ? chunk.length : newline + 1;
-			const part = chunk.subarray(offset, end);
-			bytes += part.length;
-			totalBytes += part.length;
-			if (bytes > limits.maxFrameBytes || totalBytes > limits.maxTotalBytes) {
-				throw new Error('Server result exceeded its response budget');
-			}
-			parts.push(part);
-			offset = end;
-			if (newline !== -1) {
-				const decoder = new TextDecoder('utf-8', { fatal: true });
-				const text = parts.map((value) => decoder.decode(value, { stream: true }));
-				text.push(decoder.decode());
-				return decodeServerResultFrame(text.join(''), sequence++);
-			}
-		}
-	};
 }

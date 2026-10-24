@@ -227,7 +227,7 @@ export default function octaneLoader(source, inputSourceMap) {
 					...(result.streamedSignals === true ? { streamedSignals: true } : null),
 					serverRpc:
 						result.kind === 'compile' &&
-						(result.code.includes('_$__serverRpc(') ||
+						(result.code.includes('_$__serverRpc') ||
 							result.code.includes('export const _$_server_$_')),
 					...(Array.isArray(result.independentWidgets) && result.independentWidgets.length > 0
 						? { independentWidgets: result.independentWidgets }

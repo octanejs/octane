@@ -105,6 +105,7 @@
     "./internal/signal-read": "./src/internal/signal-read.ts",
     "./internal/hydration-signal": "./src/signals/hydration-input-source.ts",
     "./internal/hydration-query": "./src/signals/hydration-query-input.ts",
+    "./internal/server-rpc": "./src/internal/server-rpc.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
@@ -272,6 +273,11 @@
         "types": "./dist/signals/hydration-query-input.d.ts",
         "node": "./dist/node/signals/hydration-query-input.js",
         "default": "./dist/signals/hydration-query-input.js"
+      },
+      "./internal/server-rpc": {
+        "types": "./dist/internal/server-rpc.d.ts",
+        "node": "./dist/node/internal/server-rpc.js",
+        "default": "./dist/internal/server-rpc.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

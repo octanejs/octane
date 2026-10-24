@@ -34,6 +34,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'__createVoidRoot',
 		'__s',
 		'__serverRpc',
+		'__serverRpcStream',
 		'__useReducerWithGetter',
 		'__useStateWithGetter',
 		'__vtSeen',
@@ -367,6 +368,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./internal/signal-read': ['readNativeDomValue'],
 	'./internal/hydration-signal': ['__hydrationSignalRevision'],
 	'./internal/hydration-query': ['__beginHydrationQueryRead', '__readHydrationQueryInput'],
+	'./internal/server-rpc': ['__serverRpcPreload'],
 	'./internal/context': ['isContext', 'registerContext'],
 	'./internal/universal-children': ['createUniversalChildren', 'descriptorChildren'],
 	'./internal/client': [

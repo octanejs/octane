@@ -329,7 +329,7 @@ export type {
 } from './hydration/types.js';
 
 // Semi-public compiler target for `module server` browser stubs.
-export { __serverRpc } from './server-rpc-client.js';
+export { __serverRpc, __serverRpcStream } from './server-rpc-client.js';
 export { ServerCallUncertainError } from './server-rpc-protocol.js';
 export { batchServerCalls, type ServerCallBatchOptions } from './server-rpc-batch-client.js';
 

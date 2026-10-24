@@ -1856,6 +1856,8 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 			(imported === '__beginHydrationQueryRead' || imported === '__readHydrationQueryInput')
 		)
 			return 'octane/internal/hydration-query';
+		if (fallback === 'octane' && imported === '__serverRpcPreload')
+			return 'octane/internal/server-rpc';
 		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
 			return 'octane/internal/client';
 		}
@@ -10704,7 +10706,11 @@ function analyzeServerModule(ast, filename) {
 
 /**
  * Each client `import { f } from 'server'` local becomes a
- * `const f = (...args) => _$__serverRpc(hash, args);` statement node.
+ * `const f = (...args) => _$__serverRpc(hash, args);` statement node, or an
+ * `_$__serverRpcStream` call when `f` takes a server call context, so an app
+ * whose calls all stream never loads the legacy devalue encoder. A module with
+ * stubs also calls `_$__serverRpcPreload()` from `octane/internal/server-rpc`,
+ * so only builds with server functions load the response reader.
  */
 function emitServerModuleClientStubs(info, ctx) {
 	if (info === null) return [];
@@ -10715,9 +10721,10 @@ function emitServerModuleClientStubs(info, ctx) {
 			const imported = identifierName(specifier.imported);
 			const local = specifier.local?.name;
 			if (!imported || !local) continue;
-			ctx.runtimeNeeded.add('__serverRpc');
 			const hash = strongHash(info.filename + '#' + imported);
 			const contextIndex = info.contexts.get(imported);
+			const target = contextIndex === undefined ? '__serverRpc' : '__serverRpcStream';
+			ctx.runtimeNeeded.add(target);
 			const rpcArgs =
 				contextIndex === undefined
 					? [b.literal(hash, JSON.stringify(hash)), b.id('args')]
@@ -10725,15 +10732,18 @@ function emitServerModuleClientStubs(info, ctx) {
 							b.literal(hash, JSON.stringify(hash)),
 							b.call(b.member(b.id('args'), 'slice'), b.literal(0), b.literal(contextIndex)),
 							b.member(b.id('args'), b.literal(contextIndex), true),
-							b.literal(true, 'true'),
 						];
 			nodes.push(
 				inheritOriginLoc(
-					b.const(local, b.arrow([b.rest(b.id('args'))], b.call('_$__serverRpc', ...rpcArgs))),
+					b.const(local, b.arrow([b.rest(b.id('args'))], b.call('_$' + target, ...rpcArgs))),
 					specifier,
 				),
 			);
 		}
+	}
+	if (nodes.length !== 0) {
+		ctx.runtimeNeeded.add('__serverRpcPreload');
+		nodes.push(inheritOriginLoc(b.stmt(b.call('_$__serverRpcPreload')), info.imports[0]));
 	}
 	return nodes;
 }

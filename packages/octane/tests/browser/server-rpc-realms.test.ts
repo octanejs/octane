@@ -42,6 +42,9 @@ it('accepts iframe cancellation signals and rejects signal lookalikes before dis
 			type: 'module',
 			content:
 				"import { __serverRpc } from '/packages/octane/src/server-rpc-client.ts';" +
+				// As a compiled module with server function stubs does.
+				"import { __serverRpcPreload } from '/packages/octane/src/internal/server-rpc.ts';" +
+				'__serverRpcPreload();' +
 				'globalThis.__serverRpc = __serverRpc;',
 		});
 		await page.waitForFunction(() => '__serverRpc' in globalThis);

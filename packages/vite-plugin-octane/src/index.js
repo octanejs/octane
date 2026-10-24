@@ -938,12 +938,13 @@ export function octane(inlineOptions = {}) {
 
 		/**
 		 * Observe the compiler's client output after the pre-transform. A generated
-		 * __serverRpc call is an exact, syntax-level signal that this source owns a
-		 * `module server`; production uses the collected paths as static SSR imports.
+		 * __serverRpc or __serverRpcStream call is an exact, syntax-level signal that
+		 * this source owns a `module server`; production uses the collected paths as
+		 * static SSR imports.
 		 */
 		transform(code, id, options) {
 			if (!isBuild || options?.ssr || !is_octane_module_path(id.split('?')[0])) return null;
-			if (!code.includes('_$__serverRpc(')) return null;
+			if (!code.includes('_$__serverRpc')) return null;
 			const file = id.split('?')[0];
 			const relative = path.relative(root, file);
 			const isWithinRoot =

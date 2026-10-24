@@ -32,6 +32,11 @@ describe('module server compilation', () => {
 		expect(code).toContain('__serverRpc as _$__serverRpc');
 		expect(code).toContain(`_$__serverRpc("${hash('greet')}", args)`);
 		expect(code).toContain(`_$__serverRpc("${hash('add')}", args)`);
+		// Once per module, so only pages that can call the server preload a reader.
+		expect(code.match(/_\$__serverRpcPreload\(\)/g)).toHaveLength(1);
+		expect(compile('export const x = 1;', filename, { mode: 'client' }).code).not.toContain(
+			'__serverRpcPreload',
+		);
 		expect(code).not.toContain('node:path');
 		expect(code).not.toContain('hello ');
 	});
@@ -87,8 +92,7 @@ export function App() @{ <button onClick={() => save('draft')}>Save</button> }
 `;
 		const client = compile(contextual, filename, { mode: 'client' }).code;
 		const server = compile(contextual, filename, { mode: 'server' }).code;
-		expect(client).toContain('args.slice(0, 1)');
-		expect(client).toContain('args[1], true');
+		expect(client).toContain(`_$__serverRpcStream("${hash('save')}", args.slice(0, 1), args[1])`);
 		expect(client).not.toContain('context.viewer');
 		expect(server).toContain('__registerServerFunction');
 		expect(server).toContain(`id: "${hash('save')}"`);
