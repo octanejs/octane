@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { __serverRpc } from 'octane';
+import { __serverRpcPreload } from 'octane/internal/server-rpc';
 import * as devalue from 'devalue';
 import {
 	executeServerFunction,
@@ -8,6 +9,9 @@ import {
 	__setServerCallContextSource,
 	type ServerCallContext,
 } from 'octane/server';
+
+// As a compiled module with server function stubs does.
+__serverRpcPreload();
 
 // The dev RPC executor the vite plugin loads via ssrLoadModule('octane/server').
 // Wire format is devalue on both sides, mirroring @ripple-ts/adapter's client
@@ -544,6 +548,131 @@ describe('streamed server-function results', () => {
 		} finally {
 			fetch.mockRestore();
 			vi.useRealTimers();
+		}
+	});
+});
+
+// A page's first call loads the response reader on demand. The request and the
+// argument snapshot must not wait for it.
+describe('first server call on a page', () => {
+	// While the document is loading, the reader waits for its load event, which
+	// these tests dispatch only when they mean to.
+	async function freshClient() {
+		vi.resetModules();
+		const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading');
+		try {
+			const { __serverRpcPreload } = await import('../src/internal/server-rpc.js');
+			__serverRpcPreload();
+			return await import('../src/server-rpc-client.js');
+		} finally {
+			readyState.mockRestore();
+		}
+	}
+
+	it('loads the reader once the page has loaded and gone idle, before any call', async () => {
+		const loaded = vi.fn();
+		vi.doMock('../src/server-rpc-response.js', async (load) => {
+			loaded();
+			return load();
+		});
+		try {
+			await freshClient();
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			expect(loaded).not.toHaveBeenCalled();
+			window.dispatchEvent(new Event('load'));
+			await vi.waitFor(() => expect(loaded).toHaveBeenCalledOnce());
+		} finally {
+			vi.doUnmock('../src/server-rpc-response.js');
+		}
+	});
+
+	it.each([false, true])(
+		'sends the request at call time with the arguments it was called with (stream: %s)',
+		async (stream) => {
+			const { __serverRpc } = await freshClient();
+			const response = Promise.withResolvers<Response>();
+			const fetch = vi.spyOn(globalThis, 'fetch').mockReturnValue(response.promise);
+			try {
+				const input = { text: 'original' };
+				const result = __serverRpc('deadbeef', [input], {}, stream);
+				input.text = 'mutated after the call';
+				expect(fetch).toHaveBeenCalledOnce();
+				const body = String(fetch.mock.calls[0]![1]!.body);
+				expect(body).toContain('original');
+				expect(body).not.toContain('mutated');
+				response.resolve(
+					stream
+						? new Response(
+								executeServerFunctionStream(() => 'answer', '[1,["array",[]]]'),
+								{ headers: { 'Content-Type': 'application/x-octane-rpc+ndjson' } },
+							)
+						: new Response(devalue.stringify({ value: 'answer' })),
+				);
+				await expect(result).resolves.toBe('answer');
+			} finally {
+				fetch.mockRestore();
+			}
+		},
+	);
+
+	it.each([
+		['lost', () => Promise.reject(new TypeError('Connection lost after accepting the write'))],
+		[
+			'aborted',
+			(_: unknown, init: RequestInit) =>
+				new Promise((_resolve, reject) =>
+					init.signal!.addEventListener('abort', () => reject(init.signal!.reason)),
+				),
+		],
+	] as const)(
+		'settles a request %s before the reader loads at once, as uncertain',
+		async (_, request) => {
+			// Like a chunk fetched over the network, the reader arrives later.
+			const reader = Promise.withResolvers<void>();
+			vi.doMock('../src/server-rpc-response.js', async (load) => {
+				await reader.promise;
+				return load();
+			});
+			const { __serverRpc } = await freshClient();
+			// A plain function: a spy would observe the rejected request itself.
+			vi.stubGlobal('fetch', request);
+			const unhandled = vi.fn();
+			process.on('unhandledRejection', unhandled);
+			try {
+				const cancellation = new AbortController();
+				const call = __serverRpc('deadbeef', [], { signal: cancellation.signal }, true);
+				cancellation.abort();
+				await expect(call).rejects.toMatchObject({ code: 'OCTANE_RPC_UNCERTAIN' });
+				reader.resolve();
+				await new Promise((resolve) => setTimeout(resolve, 10));
+				expect(unhandled).not.toHaveBeenCalled();
+			} finally {
+				reader.resolve();
+				process.off('unhandledRejection', unhandled);
+				vi.doUnmock('../src/server-rpc-response.js');
+				vi.unstubAllGlobals();
+			}
+		},
+	);
+
+	it('reports a reader that fails to load as uncertain and retries it on the next call', async () => {
+		vi.doMock('../src/server-rpc-response.js', () => {
+			throw new Error('chunk failed to load');
+		});
+		const { __serverRpc } = await freshClient();
+		const fetch = vi
+			.spyOn(globalThis, 'fetch')
+			.mockImplementation(async () => new Response(devalue.stringify({ value: 'answer' })));
+		try {
+			await expect(__serverRpc('deadbeef', [])).rejects.toMatchObject({
+				code: 'OCTANE_RPC_UNCERTAIN',
+			});
+			vi.doUnmock('../src/server-rpc-response.js');
+			await expect(__serverRpc('deadbeef', [])).resolves.toBe('answer');
+			expect(fetch).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.doUnmock('../src/server-rpc-response.js');
+			fetch.mockRestore();
 		}
 	});
 });

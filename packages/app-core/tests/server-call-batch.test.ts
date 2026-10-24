@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __serverRpc, batchServerCalls } from 'octane';
+import { __serverRpcPreload } from 'octane/internal/server-rpc';
 import {
 	__registerServerFunction,
 	executeServerFunction,
@@ -11,6 +12,9 @@ import {
 import type { Middleware, RpcRequestOptions } from '@octanejs/app-core';
 import { handleRpcRequest } from '../src/server/rpc.js';
 import { encodeServerResultFrame } from '../../octane/src/server-rpc-protocol.js';
+
+// As a compiled module with server function stubs does.
+__serverRpcPreload();
 
 const policy = {
 	kind: 'independent-reads',
@@ -63,12 +67,13 @@ describe('finite server-call batches through the HTTP authorization boundary', (
 		const call = batchServerCalls({ ...policy, timeoutMs: 5 }, () =>
 			__serverRpc('aaaaaaaa', [], {}, true),
 		);
+		// The window also covers this page's first call loading its response reader.
 		const result = await Promise.race([
 			call.then(
 				() => 'fulfilled',
 				() => 'rejected',
 			),
-			new Promise((resolve) => setTimeout(() => resolve('still pending'), 40)),
+			new Promise((resolve) => setTimeout(() => resolve('still pending'), 1_000)),
 		]);
 		expect(result).toBe('rejected');
 	});
@@ -239,5 +244,45 @@ describe('finite server-call batches through the HTTP authorization boundary', (
 		);
 		await expect(Promise.all(results)).resolves.toEqual(Array.from({ length: count }, (_, i) => i));
 		expect(requests).toHaveLength(1);
+	});
+});
+
+describe('a page’s first server-call batch', () => {
+	it('sends one request before its reader loads and settles a lost request at once', async () => {
+		// Like a chunk fetched over the network, the reader arrives later.
+		const reader = Promise.withResolvers<void>();
+		vi.doMock('../../octane/src/server-rpc-response.js', async (load) => {
+			await reader.promise;
+			return load();
+		});
+		vi.resetModules();
+		const { __serverRpcPreload } = await import('../../octane/src/internal/server-rpc.js');
+		__serverRpcPreload();
+		const { batchServerCalls } = await import('../../octane/src/server-rpc-batch-client.js');
+		const { __serverRpc } = await import('../../octane/src/server-rpc-client.js');
+		let requests = 0;
+		vi.stubGlobal('fetch', () => {
+			requests++;
+			return Promise.reject(new TypeError('Connection lost after accepting the batch'));
+		});
+		const unhandled = vi.fn();
+		process.on('unhandledRejection', unhandled);
+		try {
+			const calls = batchServerCalls(policy, () => [
+				__serverRpc('aaaaaaaa', [], {}, true),
+				__serverRpc('bbbbbbbb', [], {}, true),
+			]);
+			await Promise.resolve();
+			expect(requests).toBe(1);
+			for (const call of calls)
+				await expect(call).rejects.toMatchObject({ code: 'OCTANE_RPC_UNCERTAIN' });
+			reader.resolve();
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			expect(unhandled).not.toHaveBeenCalled();
+		} finally {
+			reader.resolve();
+			process.off('unhandledRejection', unhandled);
+			vi.doUnmock('../../octane/src/server-rpc-response.js');
+		}
 	});
 });
