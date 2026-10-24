@@ -4,7 +4,8 @@ import {
 	enableSignalDocument,
 	installStreamedSignalOwnerActivator,
 } from '../signals/document-owner.js';
-import { attachStreamedSignalResult, initializeDocumentSignalOwner } from '../signals/facade.js';
+import { initializeDocumentSignalOwner } from '../signals/facade.js';
+import { attachStreamedSignalResult } from '../signals/streamed-results.js';
 import { registerSignalOwnerDocument } from '../signals/early-values.js';
 import { retireSignalOwnerIdentity } from '../signals/owner-context.js';
 import {

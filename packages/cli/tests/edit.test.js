@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findNestedProperty, setCompilerOption } from '../src/kernel/edit.js';
+import { findNestedProperty, setCompilerOption, setRootProperty } from '../src/kernel/edit.js';
 import { parseJsonc } from '../src/kernel/jsonc.js';
 
 describe('setCompilerOption', () => {
@@ -110,5 +110,31 @@ describe('findNestedProperty', () => {
 
 	it('returns null when the path is absent', () => {
 		expect(findNestedProperty('{"scripts":{}}', ['scripts', 'typecheck'])).toBe(null);
+	});
+});
+
+describe('setRootProperty', () => {
+	it('inserts a top-level value without moving comments', () => {
+		const source = '{\n\t// keep me\n\t"compilerOptions": { "strict": true }\n}';
+		const edited = setRootProperty(source, 'contentMappers', [
+			{ package: '@tsrx/content-mapper', extensions: ['.tsrx'] },
+		]);
+
+		expect(edited?.changed).toBe(true);
+		expect(edited?.text).toContain('// keep me');
+		expect(parseJsonc(edited.text)).toEqual({
+			contentMappers: [{ package: '@tsrx/content-mapper', extensions: ['.tsrx'] }],
+			compilerOptions: { strict: true },
+		});
+	});
+
+	it('replaces and recognizes an existing top-level value', () => {
+		const source = '{\n\t"contentMappers": []\n}';
+		const value = [{ package: '@tsrx/content-mapper', extensions: ['.tsrx'] }];
+		const edited = setRootProperty(source, 'contentMappers', value);
+
+		expect(edited?.changed).toBe(true);
+		expect(parseJsonc(edited.text).contentMappers).toEqual(value);
+		expect(setRootProperty(edited.text, 'contentMappers', value)?.changed).toBe(false);
 	});
 });

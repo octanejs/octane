@@ -36,7 +36,7 @@ import {
 import { PORTAL_TAG } from '../runtime-tags.js';
 import { isRendererStreamBoundaryTemplate } from '../stream-protocol.js';
 import { setNativeAdoptionResolver, NativeAdoptionMiss } from '../signals/read-protocol.js';
-import type { NativeAdoptionState } from '../signals/native-read-seeds.js';
+import type { NativeAdoptionState } from '../signals/native-adoption.js';
 import type {
 	Scope,
 	Block,

@@ -7,6 +7,10 @@ export { createResource, query } from './requests.js';
 export { ActionUncertainError, action$, isActionUncertain, optimistic$ } from './actions.js';
 export { __derivedAt, derived$ } from './derived-facade.js';
 export { __queryAt, query$ } from './query-facade.js';
+// Compiled instance declarations install the views that stage a redeclaration.
+export { installDerivedViews as __derivedViews } from './computations.js';
+export { installScalarViews as __derivedScalarViews } from './scalar-computations.js';
+export { installResourceViews as __queryViews } from './requests.js';
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 // Compiled declarations list method-call captures through the hook helper.
 export { __methodDep } from '../method-dep.js';
@@ -15,13 +19,15 @@ export {
 	__derivedScalarAt,
 	__signalAt,
 	__startSignalReads,
+	readSignalBinding,
+	signal$,
+} from './facade.js';
+export {
 	acceptStreamedSignalResult,
 	attachStreamedSignalResult,
 	bindStreamedSignalSelection,
-	readSignalBinding,
 	failStreamedSignalResult,
-	signal$,
-} from './facade.js';
+} from './streamed-results.js';
 export {
 	captureSignalOwner,
 	retireSignalOwnerIdentity,

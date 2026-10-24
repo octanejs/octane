@@ -49,6 +49,8 @@ const existingScenarios = [
 	['root-static-local', 'tsrx'],
 	['root-callback-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
+	['signal-counter', 'tsrx'],
+	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -307,8 +309,14 @@ const featureControls = {
 		kept: ['childSlot'],
 	},
 	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
-	'hydrate-frame': {
+	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
+	'signal-instance-derived': {
 		dropped: [],
+		kept: ['presentDerivedView', 'promoteDeclarationView'],
+	},
+	// Module declarations are never declared again, so no view stages them.
+	'hydrate-frame': {
+		dropped: ['presentDerivedView', 'promoteDeclarationView'],
 		kept: ['renderPortalChild', 'bindImplicitSignalChild', ...signalOwnerDeclarations],
 	},
 };
@@ -334,11 +342,16 @@ const splitControls = {
 	],
 	kept: ['renderBlockInner'],
 };
+// Feature controls declared outside runtime.ts, by their owning module.
+const declarationSources = {
+	presentDerivedView: 'signals/computations.ts',
+	promoteDeclarationView: 'signals/graph.ts',
+};
 const runtimeRanges = (names) =>
 	resolveDeclarationRanges(
 		(source) => fs.readFileSync(path.join(repository, 'packages/octane/src', source), 'utf8'),
 		(text, source) => parseAst(text, { lang: 'ts' }, source),
-		names.map((name) => ({ name, source: 'runtime.ts' })),
+		names.map((name) => ({ name, source: declarationSources[name] ?? 'runtime.ts' })),
 	);
 const effectRanges = selectedScenarios.some(({ id }) => mappedScenario(id))
 	? runtimeRanges([...effectDeclarations, ...featureDeclarations])

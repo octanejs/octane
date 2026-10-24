@@ -467,15 +467,12 @@ describe('octane init', () => {
 		}
 	});
 
-	it('installs TypeScript at the range the toolchain declares', async () => {
-		// `typescript` is a required peer of the plugin that ships `tsrx-tsc`, and
-		// nothing in the toolchain carries a compiler of its own. npm and pnpm
-		// install a required peer themselves, so this is redundant there; yarn
-		// does not, and without it `yarn create octane` leaves a project whose
-		// typecheck script dies on `Cannot find module 'typescript'`.
+	it('defaults to the stable TypeScript lines rather than the plugin nightly', async () => {
 		const { root } = fixture(
 			installed('@tsrx/typescript-plugin', '0.3.118', {
-				peerDependencies: { typescript: '^5.9.3' },
+				peerDependencies: {
+					typescript: '^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1',
+				},
 			}),
 		);
 		const recorder = recordingExec();
@@ -483,10 +480,163 @@ describe('octane init', () => {
 		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
 
 		const requested = recorder.args.flat();
-		expect(requested).toContain('typescript@^5.9.3');
-		// Never bare: that resolves to the newest major, which `tsrx-tsc` cannot
-		// start under, which is how a fresh scaffold ends up unable to typecheck.
+		expect(requested).toContain('typescript@^5.9.3 || ^6.0.0');
+		expect(requested).not.toContain('typescript@^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1');
 		expect(requested).not.toContain('typescript');
+	});
+
+	it('uses the installed TypeScript version when a declared range includes the nightly', async () => {
+		const peerRange = '^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1';
+		const { root } = fixture({
+			'package.json': {
+				name: 'ready-app',
+				type: 'module',
+				dependencies: { octane: '^0.10.0' },
+				devDependencies: {
+					'@tsrx/typescript-plugin': '^0.3.118',
+					typescript: peerRange,
+				},
+			},
+			'tsconfig.json': {
+				compilerOptions: {
+					jsxImportSource: 'octane',
+					plugins: [{ name: '@tsrx/typescript-plugin' }],
+				},
+			},
+			...installed('typescript', '5.9.3'),
+			...installed('@tsrx/typescript-plugin', '0.3.118', {
+				peerDependencies: { typescript: peerRange },
+			}),
+		});
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
+
+		expect(JSON.parse(read(root, 'tsconfig.json')).contentMappers).toBeUndefined();
+		expect(recorder.args.flat()).not.toContain('@tsrx/content-mapper');
+	});
+
+	it('accepts a supported TypeScript range from the flag', async () => {
+		const { root } = fixture(
+			installed('@tsrx/typescript-plugin', '0.6.2', {
+				peerDependencies: { typescript: '^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1' },
+			}),
+		);
+		const recorder = recordingExec();
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--typescript', '~5.9', '--yes'],
+			{ exec: recorder.exec },
+		);
+
+		expect(result.exitCode).toBe(0);
+		expect(recorder.args.flat()).toContain('typescript@~5.9');
+	});
+
+	it('rejects a TypeScript version outside the installed plugin peer range', async () => {
+		const { root } = fixture(
+			installed('@tsrx/typescript-plugin', '0.6.2', {
+				peerDependencies: { typescript: '^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1' },
+			}),
+		);
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--typescript', '7.0.2', '--yes'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("outside @tsrx/typescript-plugin's peer range");
+	});
+
+	it('rejects an unsupported TypeScript version before installing the toolchain', async () => {
+		const { root } = fixture();
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--typescript', '7.0.2', '--yes', '--no-install'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("outside @tsrx/typescript-plugin's peer range");
+	});
+
+	it('installs the TypeScript 7.1 mapper and checks it with doctor', async () => {
+		const { root, write } = fixture({
+			'package.json': {
+				name: 'ready-app',
+				type: 'module',
+				scripts: {
+					dev: 'vite',
+					build: 'vite build',
+					typecheck: 'tsrx-tsc --noEmit -p tsconfig.json',
+				},
+				dependencies: { octane: '^0.10.0' },
+				devDependencies: {
+					'@tsrx/typescript-plugin': '^0.6.2',
+					'@tsrx/prettier-plugin': '^0.6.3',
+					'@tsrx/oxc': '^0.16.0',
+					prettier: '^3.6.0',
+					vite: '^8.1.0',
+				},
+			},
+			'tsconfig.json': {
+				compilerOptions: {
+					jsxImportSource: 'octane',
+					plugins: [{ name: '@tsrx/typescript-plugin' }],
+				},
+			},
+			'.prettierrc': { plugins: ['@tsrx/prettier-plugin'] },
+			'vite.config.ts':
+				"import { octane } from 'octane/compiler/vite';\nexport default { plugins: [octane()] };\n",
+			'index.html': '<div id="root"></div>\n',
+			'src/App.tsrx': "export function App() @{ <div>{'ready' as string}</div> }\n",
+			...installed('octane', '0.10.0', { peerDependencies: { '@tsrx/oxc': '0.16.0' } }),
+			...installed('@tsrx/typescript-plugin', '0.6.2', {
+				peerDependencies: { typescript: '^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1' },
+			}),
+		});
+		const requested = [];
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ args) => {
+				if (file === 'git') return { code: 0, stdout: '', stderr: '' };
+				requested.push(args);
+				if (args.includes('@tsrx/content-mapper')) {
+					write('node_modules/@tsrx/content-mapper/package.json', {
+						name: '@tsrx/content-mapper',
+						version: '0.1.2',
+					});
+				}
+				if (args.includes('typescript@next')) {
+					write('node_modules/typescript/package.json', {
+						name: 'typescript',
+						version: '7.1.0-dev.20261004.1',
+					});
+				}
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		};
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--typescript', 'next', '--yes'],
+			{ exec },
+		);
+
+		expect(result.exitCode).toBe(0);
+		expect(requested.flat()).toContain('@tsrx/content-mapper');
+		expect(requested.flat()).toContain('typescript@next');
+		expect(JSON.parse(read(root, 'tsconfig.json')).contentMappers).toEqual([
+			{
+				package: '@tsrx/content-mapper',
+				extensions: ['.tsrx'],
+				options: { compiler: 'octane/compiler/volar' },
+			},
+		]);
+		const doctor = (await runCli(['doctor', '--cwd', root, '--json'])).json();
+		expect(doctor.checks.find((check) => check.id === 'ts.native-content-mapper').status).toBe(
+			'pass',
+		);
 	});
 
 	it.each(['spa', 'fullstack'])('installs the parser peer for a new %s app', async (mode) => {

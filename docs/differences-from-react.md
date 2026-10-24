@@ -1533,6 +1533,16 @@ startTransition(async () => {
 The nested transition joins the pending Action. This explicit post-`await`
 pattern is portable to React.
 
+Unrelated transitions commit independently, as React 19.3's parallel transitions
+do. A transition that suspends holds only its own work: another transition commits
+as soon as its data is ready, in a separate Suspense boundary or in the same one,
+and its `isPending` falls and its `useOptimistic` values revert when it commits.
+Transitions that update the same state stay entangled and commit together, with
+only the latest value rendered, as do the boundaries a single transition suspends.
+React has ten transition lanes and reuses them past ten, which can entangle
+transitions that share a lane. Octane tracks each transition separately and never
+does.
+
 Action result rendering is task-batched; Action callback invocation is not paced.
 As in React, a callback can run synchronously during dispatch, and queued callbacks
 run as earlier Actions complete. Many already-ready callbacks doing substantial

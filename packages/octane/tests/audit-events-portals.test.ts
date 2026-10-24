@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { createElement as h, createPortal, createRoot, flushSync } from '../src/index.js';
+import { describe, it, expect, vi } from 'vitest';
+import {
+	createElement as h,
+	createPortal,
+	createRoot,
+	flushSync,
+	type OctaneNode,
+} from '../src/index.js';
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as flushReact } from 'react-dom';
@@ -19,6 +25,88 @@ function mouse(node: Element, type = 'click') {
 }
 
 describe('audit event and portal behavior', () => {
+	describe('controlled fields inside a portal target', () => {
+		function mountField(field: OctaneNode, onInputCapture?: () => void) {
+			const App = ({ target }: { target: Element | null }) =>
+				h(
+					'main',
+					{ onInputCapture },
+					h('section', null, field),
+					target && createPortal('sibling', target),
+				);
+			const r = mount(App, { target: null });
+			r.update(App, { target: r.find('section') });
+			return r;
+		}
+
+		it.each(['input', 'textarea'])(
+			'lets a controlled %s accept the edit in its owning handler',
+			(tag) => {
+				const { Field } = fixture(`
+import { useState } from 'octane';
+export function Field() @{
+	const [value, setValue] = useState('');
+	<div>
+		<${tag} value={value} onInput={(event) => setValue(event.currentTarget.value)} />
+		<output>{value as string}</output>
+	</div>
+}`);
+				const r = mountField(h(Field, null));
+				try {
+					const field = r.find(tag) as HTMLInputElement | HTMLTextAreaElement;
+					field.value = 'abc';
+					field.dispatchEvent(new Event('input', { bubbles: true }));
+					expect(r.find('output').textContent).toBe('abc');
+					expect(field.value).toBe('abc');
+				} finally {
+					r.unmount();
+				}
+			},
+		);
+
+		it.each(['rejecting', 'absent'])(
+			'restores the edit when the owning handler is %s',
+			(handler) => {
+				const seen: string[] = [];
+				const r = mountField(
+					h('input', {
+						value: 'fixed',
+						onInput:
+							handler === 'rejecting'
+								? (event: Event) => seen.push((event.currentTarget as HTMLInputElement).value)
+								: undefined,
+					}),
+				);
+				try {
+					const input = r.find('input') as HTMLInputElement;
+					input.value = 'edit';
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+					expect(seen).toEqual(handler === 'rejecting' ? ['edit'] : []);
+					expect(input.value).toBe('fixed');
+				} finally {
+					r.unmount();
+				}
+			},
+		);
+
+		it('restores an unheard edit after native bubbling stops above the portal target', async () => {
+			const onCapture = vi.fn();
+			const r = mountField(h('input', { value: 'fixed' }), onCapture);
+			const input = r.find('input') as HTMLInputElement;
+			try {
+				r.find('main').addEventListener('input', (event) => event.stopPropagation());
+				input.value = 'edit';
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+				expect(onCapture).toHaveBeenCalledOnce();
+				expect(input.value).toBe('edit');
+				await Promise.resolve();
+				expect(input.value).toBe('fixed');
+			} finally {
+				r.unmount();
+			}
+		});
+	});
+
 	it.each(['button', 'input', 'select', 'textarea'])(
 		'skips disabled %s mouse handlers while ancestors receive events',
 		(tag) => {

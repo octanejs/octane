@@ -23,7 +23,7 @@ import {
 } from './engine.js';
 import { hydrationStarted } from '../hydration-flag.js';
 import { __profileQueueCleanup, __profileWorkEnter, __profileRootExit } from '../profiling.js';
-import type { NativeAdoptionState } from '../signals/native-read-seeds.js';
+import type { NativeAdoptionState } from '../signals/native-adoption.js';
 import type {
 	Cleanup,
 	Block,

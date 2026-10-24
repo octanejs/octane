@@ -20,7 +20,7 @@ pnpm dlx @octanejs/cli doctor
 | Command | What it does |
 | --- | --- |
 | `octane create [dir]` | Create an Octane app in a new directory. This is what `npm create octane` runs. |
-| `octane init` | Wire Octane into the project in this directory: bundler plugin, tsconfig, scripts, dependencies. |
+| `octane init` | Wire Octane into the project in this directory: bundler plugin, tsconfig, scripts, dependencies, and TypeScript. |
 | `octane doctor` | Check the project for the mistakes that break Octane quietly. `--fix` repairs the mechanical ones. |
 | `octane analyze` | Compile the project and report every Octane compiler diagnostic, with its code and suggested edit. |
 | `octane add <package>` | Install a binding, by its own name or by the React package it ports, and print its divergences. |
@@ -33,6 +33,12 @@ Run `octane <command> --help` for the flags. Every command accepts the same
 global options: `--json`, `--cwd <dir>`, `--yes`, `--dry-run`, `--no-color`,
 `--verbose`.
 
+`octane init` defaults to TypeScript 5.9 or 6 in unattended runs. In a
+terminal, choose that stable line or the TypeScript 7.1 nightly. Pass
+`--typescript <version-or-range>` to `octane init` or `octane create` to select
+a supported version directly; use `--typescript next` for the nightly. The nightly also installs
+`@tsrx/content-mapper` and adds its `.tsrx` entry to `tsconfig.json`.
+
 ## `octane doctor`
 
 Octane is a compiler framework, so its misconfigurations tend to fail quietly
@@ -44,6 +50,8 @@ rather than loudly. Doctor looks for the ones that do:
   missing from `compilerOptions.plugins`.
 - **`tsc` instead of `tsrx-tsc`** in the typecheck script. Plain `tsc` cannot
   read `.tsrx`.
+- **TypeScript 7.1 without its `.tsrx` content mapper.** Native TypeScript needs
+  `@tsrx/content-mapper` and a top-level `contentMappers` entry.
 - **`declare module '*.tsrx'`** anywhere in your sources. It silences `.tsrx`
   resolution instead of fixing it, so every import it covers becomes `any`,
   including your own components.
@@ -140,8 +148,9 @@ It is a report and never fails the run. See
 
 Every command is fully drivable by flags and emits a single JSON document under
 `--json`. Prompts only ever fill in *missing* input, and only in a real
-terminal: in a pipe or under `CI`, a missing answer is an error naming the flag
-that would have supplied it, never a hang.
+terminal: in a pipe or under `CI`, init uses the stable TypeScript default while
+other missing answers are errors naming the flag that would have supplied them,
+never a hang.
 
 Exit codes: `0` success, `1` command failure, `2` usage error, `3` doctor found
 error-severity problems.

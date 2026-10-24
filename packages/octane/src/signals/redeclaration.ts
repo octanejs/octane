@@ -27,7 +27,7 @@ interface StagedDeclaration<D> {
  */
 export abstract class RedeclarableBinding<D> {
 	/** Declaration order of the committed definition. Older closures never rebind it. */
-	protected sequence = 0;
+	sequence = 0;
 	declare private staged?: StagedDeclaration<D> | undefined;
 	/** Kept by an attempt that restarted before any render declaring it was accepted. */
 	declare private provisional?: boolean;
@@ -42,13 +42,18 @@ export abstract class RedeclarableBinding<D> {
 	protected abstract committedDefinition(): D | undefined;
 	/** Install a definition that the committed cell can present itself. */
 	protected abstract installDefinition(definition: D, sequence: number): void;
-	/** A private view presenting the definition, or undefined if the cell already does. */
-	protected abstract presentDefinition(definition: D): ScopedNode | undefined;
+	/**
+	 * A private view presenting the definition, or undefined if the cell already
+	 * does. Only a render stage reaches it, and only an instance declaration
+	 * (`i:` site) is declared again, so its compiled module installs the views on
+	 * the binding's prototype (installDerivedViews and its siblings).
+	 */
+	declare presentDefinition: (definition: D) => ScopedNode | undefined;
 	/**
 	 * The accepted render presented this view; make it canonical if it is still
 	 * current. `definition` is the closure that render declared.
 	 */
-	protected abstract acceptView(view: ScopedNode, sequence: number, definition: D): void;
+	declare acceptView: (view: ScopedNode, sequence: number, definition: D) => void;
 	/** The renderer discarded the render that staged this definition. */
 	protected discardDefinition(): void {}
 

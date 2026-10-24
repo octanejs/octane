@@ -556,7 +556,8 @@ export interface RootRenderOwner {
 	hydrationFallback?: ((failed: boolean) => SlotNext | null) | undefined;
 	bindingContainer?: Node;
 	adopt?: ((block: Block) => void) | undefined;
-	retry: () => void;
+	/** Render the latest request again; `deferred` renders it as a spawned deferred pass. */
+	retry: (deferred?: boolean) => void;
 	request: ((mode: 'urgent' | 'transition') => void) | null;
 	generation: number;
 	wakeable: PromiseLike<unknown> | null;

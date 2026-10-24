@@ -172,7 +172,7 @@ describe.each([false, true])('events in a parked hydration reveal (dev: %s)', (d
 	);
 
 	it.each(['ordinary', 'registration recovery'] as const)(
-		'publishes a ready boundary when a sibling transition ends: %s',
+		'publishes a ready boundary while an unrelated transition still holds: %s',
 		async (scenario) => {
 			let setLater!: (revision: number) => void;
 			let resolveOuter!: () => void;
@@ -246,11 +246,11 @@ describe.each([false, true])('events in a parked hydration reveal (dev: %s)', (d
 				expect(container.querySelector('[data-later]')?.textContent).toBe('0');
 				outerPending = false;
 				wakeInner = true;
+				// Gate's own data reveals it: Later's transition is unrelated and keeps
+				// holding (parallel transitions).
 				await act(() => resolveOuter());
-				expect(container.querySelector('[data-fallback]')).not.toBeNull();
-				await act(() => setLater(2));
-				expect(container.querySelector('[data-later]')?.textContent).toBe('2');
 				expect(container.querySelector('[data-fallback]')).toBeNull();
+				expect(container.querySelector('[data-later]')?.textContent).toBe('0');
 				expect(container.querySelector('[data-primary]')).toBe(primary);
 				if (scenario === 'registration recovery') {
 					expect(container.querySelector('[data-native]')).not.toBe(native);

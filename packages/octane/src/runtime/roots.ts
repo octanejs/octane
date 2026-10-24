@@ -54,9 +54,11 @@ import {
 import {
 	captureInitialDocumentSignals,
 	NATIVE_SIGNAL_SEED_ATTR,
+} from '../signals/native-read-seeds.js';
+import {
 	materializeNativeSignalManifest,
 	parseNativeSignalManifest,
-} from '../signals/native-read-seeds.js';
+} from '../signals/native-adoption.js';
 import { signalDocumentEnabled, documentSignalOwner } from '../signals/document-owner.js';
 import { installEarlyControlBridge } from '../signals/early-values.js';
 import type { SignalOwner, ScopeSeed, SignalRendererOwnerIdentity } from '../signals/types.js';
