@@ -3000,6 +3000,15 @@ function rewriteSourceAst(node, state) {
 		if (isTemplateNode(value)) {
 			return compileRenderableExpressionAst(value, state);
 		}
+		// Any statement list, including an ordinary function's body outside a
+		// component (a factory, a registration or test callback), declares
+		// components the way component setup does.
+		if (value.type === 'BlockStatement') {
+			const body = rewriteSetupStatementsAst(value.body, state);
+			return body.length === value.body.length && body.every((node, i) => node === value.body[i])
+				? value
+				: { ...value, body };
+		}
 		let output = null;
 		for (const [key, child] of Object.entries(value)) {
 			if (AST_SKIP_KEYS.has(key)) continue;
@@ -3529,17 +3538,42 @@ function compileComponentElementAst(node, context, state) {
 function rewriteSetupStatementsAst(statements, state) {
 	const hoisted = [];
 	const body = [];
-	for (const statement of statements ?? []) {
-		const component = nestedFunctionComponentAst(statement, state);
-		const nodes = component === null ? rewriteSetupStatementAst(statement, state) : component;
-		const prefixed = [
-			...(state.astNodePrefixes?.get(statement) ?? []),
-			...(Array.isArray(nodes) ? nodes : nodes === null ? [] : [nodes]),
-		];
-		if (component === null) body.push(...prefixed);
-		else hoisted.push(...prefixed);
+	for (const original of statements ?? []) {
+		let prefixes = state.astNodePrefixes?.get(original) ?? [];
+		for (const statement of splitDeclarators(original, state)) {
+			const component = nestedFunctionComponentAst(statement, state);
+			const nodes = component ?? rewriteSetupStatementAst(statement, state);
+			(component === null ? body : hoisted).push(...prefixes, ...nodes);
+			prefixes = [];
+		}
 	}
 	return [...hoisted, ...body];
+}
+
+// `const A = () => <a />, b = 1` declares each binding on its own, so a
+// component declarator lowers exactly like a single one. Other statements
+// keep their identity for node-keyed replacements.
+function splitDeclarators(node, state) {
+	const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
+	if (declaration?.type !== 'VariableDeclaration' || declaration.declarations.length < 2) {
+		return [node];
+	}
+	const singles = declaration.declarations.map((declarator) => {
+		const single = { ...declaration, declarations: [declarator] };
+		return node === declaration ? single : { ...node, declaration: single };
+	});
+	// Same decision the module loop makes for a single declarator, so thread
+	// functions and non-component functions keep the original statement.
+	return singles.some((single) => {
+		const shape = componentShape(single, state);
+		return (
+			shape !== null &&
+			componentRender(shape.fn, state, forcesComponent(shape.name, shape.exportKind, state)) !==
+				null
+		);
+	})
+		? singles
+		: [node];
 }
 
 const LOOP_STATEMENT_TYPES = new Set([
@@ -3660,13 +3694,9 @@ function nestedFunctionComponentAst(statement, state) {
 
 function rewriteSetupStatementAst(statement, state) {
 	const variable = singleFunctionDeclarator(statement, state);
-	if (
-		variable !== null &&
-		(variable.fn.body?.type === 'JSXCodeBlock' ||
-			hasOwnTemplateReturn(variable.fn) ||
-			state.componentNames.has(variable.name))
-	) {
-		return emitComponentAst({ ...variable, exportKind: null }, state);
+	if (variable !== null) {
+		const component = emitComponentAst({ ...variable, exportKind: null }, state);
+		if (component !== null) return component;
 	}
 	const rewritten = rewriteSourceAst(statement, state);
 	return rewritten === null ? [] : [rewritten];
@@ -4241,14 +4271,23 @@ function extractEntryParallelUsesAst(expression, state) {
 	});
 }
 
+// A binding rendered as a component, a default export, or a capitalized named
+// export is a component whatever its body returns.
+function forcesComponent(name, exportKind, state) {
+	return (
+		state.componentNames.has(name) ||
+		exportKind === 'default' ||
+		(exportKind === 'named' && /^[A-Z]/.test(name ?? ''))
+	);
+}
+
 function emitComponentAst(shape, state) {
 	const { fn, exportKind } = shape;
-	const exportedComponentName = shape.name ?? fn.id?.name;
-	const force =
-		state.componentNames.has(exportedComponentName) ||
-		exportKind === 'default' ||
-		(exportKind === 'named' && /^[A-Z]/.test(exportedComponentName ?? ''));
-	const render = componentRender(fn, state, force);
+	const render = componentRender(
+		fn,
+		state,
+		forcesComponent(shape.name ?? fn.id?.name, exportKind, state),
+	);
 	if (render === null) return null;
 	let name = shape.name ?? fn.id?.name;
 	if (!name) name = allocName(state, '__octaneUniversalDefault');
@@ -5158,17 +5197,19 @@ export function compileUniversal(
 	const emitted = [];
 	for (const node of ast.body ?? []) {
 		emitted.push(...(state.astNodePrefixes?.get(node) ?? []));
-		const shape = componentShape(node, state);
-		if (shape !== null) {
-			const component = emitComponentAst(shape, state);
+		for (const statement of splitDeclarators(node, state)) {
+			const shape = componentShape(statement, state);
+			const component = shape === null ? null : emitComponentAst(shape, state);
 			if (component !== null) {
 				emitted.push(...component);
 				continue;
 			}
+			// Module values and callbacks lower their JSX as renderable values;
+			// nothing may reach DOM codegen.
+			const rewritten = rewriteSourceAst(statement, state);
+			assertNoResidualTemplate(rewritten, state, 'a module declaration');
+			if (rewritten !== null) emitted.push(rewritten);
 		}
-		assertNoResidualTemplate(node, state, 'an unsupported module declaration');
-		const rewritten = rewriteSourceAst(node, state);
-		if (rewritten !== null) emitted.push(rewritten);
 	}
 
 	const moduleOrigin = ast.body?.[0] ?? ast;

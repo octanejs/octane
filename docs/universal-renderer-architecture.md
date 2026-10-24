@@ -419,6 +419,14 @@ The executable universal target accepts normal Octane component composition:
 
 - local and imported function components, props, render-body children,
   fragments, arrays, null, primitives, and legal early/non-JSX returns;
+- JSX anywhere in a module, as in the DOM target. A JSX expression outside a
+  component (a module value, a registry entry, a registration, route, or test
+  callback) lowers to a renderable value, and a callback that returns it stays
+  an ordinary function. A function declared in any statement list, including a
+  factory's or callback's body, becomes a component when its own return is JSX,
+  exactly as in component setup; a multi-declarator statement declares such a
+  component on its own. Render a component through a declared binding
+  (`const Screen = () => <view />`), not an inline callback;
 - ordered host and component spreads, including later-property precedence,
   `children`, `key`, `ref`, `undefined` removal, and callback replacement;
 - `@if`/`@else`, `@switch`/`@case`/`@default`, keyed `@for` with `@empty`, and

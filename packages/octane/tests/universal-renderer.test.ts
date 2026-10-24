@@ -32,6 +32,7 @@ import { mount } from './_helpers.js';
 import { UniversalBoundaryFixture, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 import { CompiledUniversalScene } from './_fixtures/compiled-universal.object.tsrx';
 import { UniversalPropScene } from './_fixtures/universal-jsx-prop.object.tsrx';
+import { ModuleJsxScene } from './_fixtures/universal-module-jsx.object.tsrx';
 import { inspectProfileOutput } from './_profile-output.js';
 
 const renderer = {
@@ -4473,6 +4474,78 @@ export function App() @{
 
 		root.render(UniversalPropScene, { title: 'second' });
 		expect(container.children[0].children[0].children[0].props.value).toBe('second');
+	});
+
+	it.each([
+		['a registry callback', `export const tabs = [{ id: 'home', render: () => <view /> }];`, 0],
+		['an object callback', 'export const screen = { render: () => <view /> };', 0],
+		['a registration callback', `registerScreen('settings', () => <view />);`, 0],
+		['a chained callback', 'defineRoute(options).screen((props) => <view />);', 0],
+		['a module value', 'const el = <view />;', 0],
+		[
+			'a factory declaration',
+			'function makeScreen() { function Screen() { return <view /> } return Screen; }',
+			1,
+		],
+		[
+			'a factory arrow',
+			'const makeScreen = () => { const Screen = () => <view />; return Screen; };',
+			1,
+		],
+		['a test callback', `it('screen', () => { function Screen() { return <view /> } });`, 1],
+		['a multi-declarator component', 'const Home = () => <view />, x = 1;', 1],
+		[
+			'a multi-declarator named export',
+			'export const Home = (props) => (props.ok ? <view /> : null), x = 1;',
+			1,
+		],
+		[
+			'a multi-declarator rendered binding',
+			'const Home = (props) => (props.ok ? <view /> : null), x = 1;\nexport function App() { return <Home ok /> }',
+			2,
+		],
+	])('lowers JSX in %s without a DOM fallback (#2213)', (_name, source, components) => {
+		const output = compile(source, '/src/Placement.object.tsrx', { renderer, hmr: false });
+		expect(output.code).not.toMatch(/<[A-Za-z{]/);
+		expect(output.code).toContain('universalValue as __octaneUniversalValue');
+		// Callbacks stay ordinary functions; declared components are branded.
+		expect(
+			(callsByImportedName(output.code, 'octane/universal').get('defineUniversalComponent') ?? [])
+				.length,
+		).toBe(components);
+	});
+
+	it('renders JSX authored outside a component through the object driver', async () => {
+		// #2213: module values, registry and registration callbacks, a factory's
+		// nested component, and a multi-declarator component all lower like JSX
+		// inside a component instead of rejecting the module.
+		const { container, root } = objectRoot();
+
+		root.render(ModuleJsxScene, { tone: 'warm' });
+		const scene = container.children[0];
+		expect(scene.children.map((child) => child.type)).toEqual([
+			'banner',
+			'tab',
+			'screen',
+			'counter',
+			'badge',
+			'footer',
+			'label',
+		]);
+		expect(scene.children[1].props).toMatchObject({ id: 'home', tone: 'warm' });
+		expect(scene.children[3].props).toMatchObject({ label: 'module', count: 0 });
+		expect(scene.children[4].props.tone).toBe('bright');
+		expect(scene.children[6].children[0].props.value).toBe('end');
+
+		scene.children[3].props.increment();
+		await Promise.resolve();
+		expect(scene.children[3].props.count).toBe(1);
+
+		root.render(ModuleJsxScene, { tone: 'cool' });
+		expect(scene.children[1].props.tone).toBe('cool');
+		expect(scene.children[3].props.count).toBe(1);
+		root.unmount();
+		expect(container.children).toEqual([]);
 	});
 
 	it('executes a compiler-produced static plan through the object driver', () => {
