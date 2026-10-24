@@ -3,7 +3,7 @@
 // The runtime de-opt renderer for markup produced at runtime: descriptor
 // reconciliation, keyed descriptor children and host component descriptors.
 
-import { replaceSharedBlockBoundary, removeAfter } from './branches.js';
+import { owningBlock, replaceSharedBlockBoundary, removeAfter } from './branches.js';
 import { hydrating } from '../hydration-flag.js';
 import { hasOwnProp } from '../has-own.js';
 import { childrenIterator, textareaChildText } from '../shared-value-helpers.js';
@@ -1387,9 +1387,10 @@ function applyDeoptOrder(order: DeoptOrder): void {
 		return;
 	}
 	// A hydrated host applied its props in render and commits only its record.
+	// A lite arm's stand-in is no Scope: commit in the Block that owns it.
 	if (order.desc !== null) {
 		if (order.owner === null) stampDeoptDesc(node, order.desc);
-		else commitInScope(order.owner, commitDeoptHost, node, order.desc);
+		else commitInScope(owningBlock(order.owner), commitDeoptHost, node, order.desc);
 	}
 	// Foreign ranges among the children stay where they are.
 	if (order.nodes !== null) placeDeoptChildren(node, order.nodes, true, false);
