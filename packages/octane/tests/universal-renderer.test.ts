@@ -4494,6 +4494,16 @@ export function App() @{
 		],
 		['a test callback', `it('screen', () => { function Screen() { return <view /> } });`, 1],
 		['a multi-declarator component', 'const Home = () => <view />, x = 1;', 1],
+		[
+			'a multi-declarator named export',
+			'export const Home = (props) => (props.ok ? <view /> : null), x = 1;',
+			1,
+		],
+		[
+			'a multi-declarator rendered binding',
+			'const Home = (props) => (props.ok ? <view /> : null), x = 1;\nexport function App() { return <Home ok /> }',
+			2,
+		],
 	])('lowers JSX in %s without a DOM fallback (#2213)', (_name, source, components) => {
 		const output = compile(source, '/src/Placement.object.tsrx', { renderer, hmr: false });
 		expect(output.code).not.toMatch(/<[A-Za-z{]/);

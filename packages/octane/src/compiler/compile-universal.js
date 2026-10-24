@@ -3558,13 +3558,18 @@ function splitDeclarators(node, state) {
 	if (declaration?.type !== 'VariableDeclaration' || declaration.declarations.length < 2) {
 		return [node];
 	}
+	const exportKind = node === declaration ? null : 'named';
 	const singles = declaration.declarations.map((declarator) => {
 		const single = { ...declaration, declarations: [declarator] };
-		return node === declaration ? single : { ...node, declaration: single };
+		return exportKind === null ? single : { ...node, declaration: single };
 	});
 	return singles.some((single) => {
 		const variable = singleFunctionDeclarator(single.declaration ?? single, state);
-		return variable !== null && componentRender(variable.fn, state) !== null;
+		return (
+			variable !== null &&
+			componentRender(variable.fn, state, forcesComponent(variable.name, exportKind, state)) !==
+				null
+		);
 	})
 		? singles
 		: [node];
@@ -4265,14 +4270,23 @@ function extractEntryParallelUsesAst(expression, state) {
 	});
 }
 
+// A binding rendered as a component, a default export, or a capitalized named
+// export is a component whatever its body returns.
+function forcesComponent(name, exportKind, state) {
+	return (
+		state.componentNames.has(name) ||
+		exportKind === 'default' ||
+		(exportKind === 'named' && /^[A-Z]/.test(name ?? ''))
+	);
+}
+
 function emitComponentAst(shape, state) {
 	const { fn, exportKind } = shape;
-	const exportedComponentName = shape.name ?? fn.id?.name;
-	const force =
-		state.componentNames.has(exportedComponentName) ||
-		exportKind === 'default' ||
-		(exportKind === 'named' && /^[A-Z]/.test(exportedComponentName ?? ''));
-	const render = componentRender(fn, state, force);
+	const render = componentRender(
+		fn,
+		state,
+		forcesComponent(shape.name ?? fn.id?.name, exportKind, state),
+	);
 	if (render === null) return null;
 	let name = shape.name ?? fn.id?.name;
 	if (!name) name = allocName(state, '__octaneUniversalDefault');
