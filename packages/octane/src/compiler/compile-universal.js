@@ -3558,16 +3558,17 @@ function splitDeclarators(node, state) {
 	if (declaration?.type !== 'VariableDeclaration' || declaration.declarations.length < 2) {
 		return [node];
 	}
-	const exportKind = node === declaration ? null : 'named';
 	const singles = declaration.declarations.map((declarator) => {
 		const single = { ...declaration, declarations: [declarator] };
-		return exportKind === null ? single : { ...node, declaration: single };
+		return node === declaration ? single : { ...node, declaration: single };
 	});
+	// Same decision the module loop makes for a single declarator, so thread
+	// functions and non-component functions keep the original statement.
 	return singles.some((single) => {
-		const variable = singleFunctionDeclarator(single.declaration ?? single, state);
+		const shape = componentShape(single, state);
 		return (
-			variable !== null &&
-			componentRender(variable.fn, state, forcesComponent(variable.name, exportKind, state)) !==
+			shape !== null &&
+			componentRender(shape.fn, state, forcesComponent(shape.name, shape.exportKind, state)) !==
 				null
 		);
 	})
