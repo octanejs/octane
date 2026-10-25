@@ -26,34 +26,34 @@ function templateFlags(body: string): Array<[string, string]> {
 
 describe('component-root template namespace — static resolution', () => {
 	it('an HTML-only root compiles as a plain HTML template (no namespace flag)', () => {
-		expect(templateFlags('<header>x</header>')).toEqual([['"<header>x</header>"', '']]);
+		expect(templateFlags('<header>x</header>')).toEqual([['"<header>x"', '']]);
 	});
 
 	it('an SVG-only root compiles with the SVG flag', () => {
-		expect(templateFlags('<g>x</g>')).toEqual([['"<g>x</g>"', ', 1']]);
+		expect(templateFlags('<g>x</g>')).toEqual([['"<g>x"', ', 1']]);
 	});
 
 	it('a MathML-only root compiles with the MathML flag', () => {
-		expect(templateFlags('<mi>x</mi>')).toEqual([['"<mi>x</mi>"', ', 2']]);
+		expect(templateFlags('<mi>x</mi>')).toEqual([['"<mi>x"', ', 2']]);
 	});
 
 	it('an all-HTML multi-root fragment compiles as an HTML frag template', () => {
 		expect(templateFlags('<>\n\t\t<div>a</div>\n\t\t<span>b</span>\n\t</>')).toEqual([
-			['"<div>a</div><span>b</span>"', ', 0, 2'],
+			['"<div>a</div><span>b"', ', 0, 2'],
 		]);
 	});
 
 	it('an ambiguous root (a name SVG also defines) keeps the opaque flag', () => {
-		expect(templateFlags('<a href="/">x</a>')).toEqual([['"<a href=\\"/\\">x</a>"', ', 3']]);
+		expect(templateFlags('<a href="/">x</a>')).toEqual([['"<a href=/>x"', ', 3']]);
 	});
 
 	it('a custom-element root keeps the opaque flag', () => {
-		expect(templateFlags('<x-chip>x</x-chip>')).toEqual([['"<x-chip>x</x-chip>"', ', 3']]);
+		expect(templateFlags('<x-chip>x</x-chip>')).toEqual([['"<x-chip>x"', ', 3']]);
 	});
 
 	it('a mixed fragment (HTML + ambiguous roots) keeps the opaque frag flags', () => {
 		expect(templateFlags('<>\n\t\t<div>a</div>\n\t\t<a>b</a>\n\t</>')).toEqual([
-			['"<div>a</div><a>b</a>"', ', 3, 2'],
+			['"<div>a</div><a>b"', ', 3, 2'],
 		]);
 	});
 });

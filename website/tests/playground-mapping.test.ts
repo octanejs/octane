@@ -551,8 +551,13 @@ describe('client mapping — static template origins', () => {
 	// attributes and text have no map segment of their own. The compiler
 	// records their authored ranges out of band; without resolving those into
 	// the printed literal the whole static half of a component is unmappable.
+	// The trailing sibling keeps `</button>` in the template: the client leaves
+	// the close tags that end one to the parser.
 	const source = `export function App() @{
-	<button class="cta" type="submit">Increment</button>
+	<>
+		<button class="cta" type="submit">Increment</button>
+		<p>end</p>
+	</>
 }
 `;
 	const { code, mapping } = runtimeArtifact(source, 'client');

@@ -214,7 +214,10 @@ function classCandidates(key: string, chain: string[], hashes: Map<string, strin
 	);
 	if (!isExpression) {
 		const value = [key, ...parts].join(' ');
-		return hasRuntime ? [`\`${value}\``] : [`class="${value}"`, `class: "${value}"`];
+		if (hasRuntime) return [`\`${value}\``];
+		// A client template leaves a single class token unquoted.
+		const unquoted = /\s/.test(value) ? [] : [`class=${value}>`, `class=${value} `];
+		return [`class="${value}"`, `class: "${value}"`, ...unquoted];
 	}
 	const expression = key.slice(1, -1);
 	if (parts.length === 0) {

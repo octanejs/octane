@@ -150,6 +150,7 @@ import {
 	appendTemplateIr,
 	templatePart,
 	templateElement,
+	compactTemplateIr,
 	serializeTemplateIr,
 } from './template-ir.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
@@ -39476,8 +39477,9 @@ function bodyContainsJsx(node) {
 	return isJsxNode(node);
 }
 
-/** @param {TemplateIR} ast */
-function allocTemplate(ctx, ast, ns = 0, frag = 0, scriptPaths = null) {
+/** @param {TemplateIR} authored */
+function allocTemplate(ctx, authored, ns = 0, frag = 0, scriptPaths = null) {
+	const ast = compactTemplateIr(authored, ns === 0);
 	const { html, origins } = serializeTemplateIr(ast);
 	const scripts = scriptPaths === null ? null : JSON.stringify(scriptPaths);
 	const intern = !ctx.hmr && !ctx.dev && !ctx.profile;
