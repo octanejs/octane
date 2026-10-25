@@ -158,11 +158,12 @@ export const OPS_CHECKPOINTS: number[] = [];
  * resumed bag (the bag itself when it equals the committed value, so a later
  * render can revert a cell).
  *
- * A compiled handler bundle compares itself in the template and passes its
- * new callback, or the bag (unchanged) against the bag as its committed value,
- * then itself and its captures (or, for arity N, its argument array): a change
+ * A compiled handler bundle compares itself in the template and, when it changed
+ * or its bag resumed, passes its callback against the bag as its committed
+ * value, then itself and its captures (or, for arity N, its argument array): it
  * records the whole pending bundle, so the commit function tests its first cell
- * alone. A handler's signal authority refreshes in the template, through
+ * alone. A resumed bundle that did not change commits its own values back. A
+ * handler's signal authority refreshes in the template, through
  * setEventHandler, which this recorder never names: a template without
  * handlers does not retain it.
  */
