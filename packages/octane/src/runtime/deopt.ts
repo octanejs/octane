@@ -6,6 +6,7 @@
 import { owningBlock, replaceSharedBlockBoundary, removeAfter } from './branches.js';
 import { hydrating } from '../hydration-flag.js';
 import { hasOwnProp } from '../has-own.js';
+import { moveNativeNodeBefore } from '../dom-focused-move.js';
 import { childrenIterator, textareaChildText } from '../shared-value-helpers.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
@@ -1414,7 +1415,7 @@ function placeDeoptChildren(el: Element, result: Node[], skip: boolean, adopt: b
 		const want = result[i];
 		const at = skip ? nextDeoptOwnedChild(cursor, adopt) : cursor;
 		if (at !== want) {
-			if (renderingFocus === null) el.insertBefore(want, at);
+			if (renderingFocus === null) moveNativeNodeBefore(el, want, at, null, false);
 			else {
 				captureFocusedMovement(el, renderingFocus);
 				moveFocusedNodeBefore(el, want, at, renderingFocus);

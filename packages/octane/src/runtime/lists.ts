@@ -9,7 +9,7 @@ import { hydrating } from '../hydration-flag.js';
 import { EPOCH_CELL } from '../context-epoch.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
 import { selfDelimits } from '../hydration-protocol.js';
-import { moveNativeNodeBefore } from '../dom-focused-move.js';
+import { isChildOf, moveNativeNodeBefore } from '../dom-focused-move.js';
 import type {
 	ComponentBody,
 	Scope,
@@ -2157,46 +2157,46 @@ function lastBefore(parent: Node, anchor: Node | null): ChildNode | null {
 export function moveBlockBefore(block: Block, anchor: Node): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_MOVE);
-	const parent = block.startMarker!.parentNode!;
+	const start = block.startMarker!;
+	const parent = start.parentNode!;
 	const end = block.endMarker!;
-	let n: Node | null = block.startMarker!;
-	if (renderingFocus !== null) {
-		captureFocusedMovement(parent, renderingFocus);
-		moveFocusedBlockBefore(parent, n, end, anchor, renderingFocus);
+	const focus = renderingFocus;
+	if (focus !== null) captureFocusedMovement(parent, focus);
+	// The range's nodes are children of `parent`, so one check admits the
+	// state-preserving move for all of them. A form's named controls can shadow
+	// both members, so only a real `true` and a callable move count (as in
+	// moveNativeNodeBefore, which a focused move goes through instead).
+	const moveBefore =
+		focus === null && parent.isConnected === true
+			? (parent as Node & { moveBefore?: unknown }).moveBefore
+			: undefined;
+	const move =
+		typeof moveBefore === 'function'
+			? (moveBefore as (node: Node, anchor: Node | null) => void)
+			: null;
+	if (start === end) {
+		if (focus !== null) moveFocusedNodeBefore(parent, start, anchor, focus);
+		else if (move !== null) move.call(parent, start, anchor);
+		else parent.insertBefore(start, anchor);
 		return;
 	}
-	// Walk by checking `n === end` BEFORE moving. The previous design captured
-	// `stop = endMarker.nextSibling` at function entry, then iterated until
-	// `n === stop`. That breaks when the block range has multi-root content
-	// (e.g. fragment items with start/end Comment markers + N body nodes):
-	// after moving start + body nodes adjacent to `anchor`, the rest of the
-	// range (including `endMarker`) sits at the OLD position. When the walker
-	// finally reaches `endMarker`, its captured `nextSibling` points BACK to
-	// the already-moved start (now adjacent at `endMarker`'s new neighbour
-	// position), so the walker loops back into the range and never terminates.
-	while (n) {
-		const isEnd = n === end;
-		const next: Node | null = getNextSibling(n);
-		parent.insertBefore(n, anchor);
-		if (isEnd) break;
-		n = next;
+	// Snapshot a multi-root range before moving it. A moved custom element's
+	// connectedMoveCallback (or connected callbacks under insertBefore) runs
+	// synchronously and can remove or add siblings, so the range cannot be
+	// re-walked through nextSibling between moves. A node such a callback
+	// removed stays removed; nodes it added outside the range stay put. A form's
+	// named control can shadow `parentNode`, so membership reads the native one.
+	const nodes: Node[] = [];
+	for (let n: Node | null = start; n !== null; n = getNextSibling(n)) {
+		nodes.push(n);
+		if (n === end) break;
 	}
-}
-
-function moveFocusedBlockBefore(
-	parent: Node,
-	node: Node,
-	end: Node,
-	anchor: Node,
-	snapshots: Exclude<FocusSelectionBatch, null>,
-): void {
-	let current: Node | null = node;
-	while (current !== null) {
-		const isEnd = current === end;
-		const next: Node | null = getNextSibling(current);
-		moveFocusedNodeBefore(parent, current, anchor, snapshots);
-		if (isEnd) break;
-		current = next;
+	for (let i = 0; i < nodes.length; i++) {
+		const node = nodes[i];
+		if (!isChildOf(node, parent)) continue;
+		if (focus !== null) moveFocusedNodeBefore(parent, node, anchor, focus);
+		else if (move !== null) move.call(parent, node, anchor);
+		else parent.insertBefore(node, anchor);
 	}
 }
 

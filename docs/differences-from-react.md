@@ -1471,6 +1471,13 @@ The keyed reconciler minimizes DOM moves (LIS) instead of React's
 stress-tested (including under mid-reconcile throws); only the set of
 physically-moved nodes can differ.
 
+Where the browser provides `moveBefore()` (Chromium 133+, Firefox 144+), a keyed
+move of a connected node uses it instead of `insertBefore()`. A moved row keeps
+its iframe loaded, its CSS animations running, its open popovers
+shown, and its focus without `blur`. React detaches and reinserts the node, so
+those reset. Browsers without `moveBefore()`, such as Safari, behave as React
+does, and Octane still restores focus and text selection there.
+
 ## Scheduler: synchronous, two priorities
 
 Renders run to completion — no lanes beyond the two priorities, yields,

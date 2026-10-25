@@ -35,7 +35,6 @@ export const WRITERS = new Map(
 		commitHTML: 'commit',
 		namespaceHead: 'commit',
 		drainQueuedControlledSyncs: 'commit',
-		placeDeoptChildren: 'commit',
 		insertArmPair: 'commit',
 		ownTryBodyRange: 'commit',
 		placeHydratedText: 'commit',
