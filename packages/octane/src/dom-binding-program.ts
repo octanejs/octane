@@ -62,6 +62,7 @@ import type {
 	BindingControlPrepared,
 } from './dom-binding-controls.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
+import { isThenable } from './signals/handle-protocol.js';
 import { renderSlice, watchRenderSlices } from './render-slice.js';
 
 export { __methodDep } from './method-dep.js';
@@ -1284,14 +1285,6 @@ function prepareFragment(
 	}
 	requireActive(transaction);
 	return plan;
-}
-
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-	return (
-		value !== null &&
-		(typeof value === 'object' || typeof value === 'function') &&
-		typeof (value as { then?: unknown }).then === 'function'
-	);
 }
 
 /**

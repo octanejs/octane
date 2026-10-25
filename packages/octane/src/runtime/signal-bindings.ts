@@ -24,11 +24,10 @@ import {
 import { currentSignalOwner } from '../signals/owner-context.js';
 import { signalDocumentEnabled, enableSignalDocument } from '../signals/document-owner.js';
 import { registerHydrationControlSignalWriter } from '../signals/early-values.js';
+import { isSignalHandle, isWritableSignal } from '../signals/handle-protocol.js';
 import {
 	type SignalHandle,
-	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
-	type WritableSignal,
 	SIGNAL_BINDING_SUBSCRIBE,
 } from '../signals/types.js';
 import { styleName } from '../css.js';
@@ -219,14 +218,6 @@ export interface DirectSignalBinding {
 	disposed: boolean;
 }
 
-export function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
-	return (
-		(typeof value === 'object' || typeof value === 'function') &&
-		value !== null &&
-		(value as SignalHandle<unknown>)[SIGNAL_HANDLE] === true
-	);
-}
-
 /**
  * A transition that writes what a direct binding presents renders the
  * binding's owner with its batch (signals/pending.ts), so the read the render
@@ -240,14 +231,6 @@ export function bindingTransitionNotify(binding: { scope: Scope }, notify: () =>
 
 export function readSignalBinding(handle: SignalHandle<unknown>): unknown {
 	return handle[SIGNAL_BINDING_READ]();
-}
-
-export function isWritableSignal(value: unknown): value is WritableSignal<unknown> {
-	return (
-		isSignalHandle(value) &&
-		(value as { kind?: unknown }).kind === 'signal' &&
-		typeof (value as { set?: unknown }).set === 'function'
-	);
 }
 
 export function disposeDirectSignalBinding(binding: DirectSignalBinding): void {

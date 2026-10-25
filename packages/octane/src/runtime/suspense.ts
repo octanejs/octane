@@ -1046,7 +1046,7 @@ export function errorBlock(
 	if (state === undefined) {
 		const passthrough = hydration?.passthroughRanges === true;
 		// As the server frames every boundary, a missing range is a mismatch,
-		// unless the client built the range around the slot (branchOpen).
+		// which branchOpen throws.
 		const open = passthrough
 			? null
 			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
@@ -1058,10 +1058,6 @@ export function errorBlock(
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
-		} else if (hydration !== null) {
-			return hydration.suspend(() =>
-				errorBlock(parentScope, slotKey, domParent, tryBody, catchBody, anchor, env),
-			);
 		} else {
 			start = document.createComment('try');
 			end = document.createComment('/try');
@@ -1209,57 +1205,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 		if (state.parentBlock.disposed || state.block !== null) return;
 	}
 	state.hasResolved = false;
-	setTryBranch(state, 0);
-	state.err = error;
-	let armParent = state.domParent;
-	let start: Node | null = null;
-	let end: Node | null = null;
-	if (!state.passthrough) {
-		start = document.createComment('catch-b');
-		end = document.createComment('/catch-b');
-		if (hydration !== null && hydration.isClose(state.end)) {
-			discardServerArm(state);
-			hydration.rebuiltSlot(state.end);
-		}
-		armParent = insertArmPair(state, start, end, state.end);
-	}
-	const caught = createBlock(
-		'control-flow',
-		state.parentBlock,
-		armParent,
-		start,
-		end,
-		state.catchBody,
-		catchProps(error, state.reset, true),
-		state.env,
-	);
-	caught.idState = state.idState;
-	state.block = caught;
-	let control = false;
-	try {
-		if (!state.passthrough && hydration !== null) {
-			hydration.suspend(() => renderBlock(caught));
-		} else {
-			renderBlock(caught);
-		}
-	} catch (nextError) {
-		if (forwardFallbackSuspension(caught, nextError)) return;
-		// Hydration control flow passes through every application boundary.
-		if (isAdoptionControl(nextError)) {
-			control = true;
-			throw nextError;
-		}
-		if (state.block !== null) {
-			unmountBlock(state.block);
-			state.block = null;
-		}
-		if (CURRENT_BLOCK !== null && findTryHandler(state.parentBlock) !== null) throw nextError;
-		const parent = findTryHandler(state.parentBlock);
-		if (parent !== null) parent(nextError);
-		else console.error('catch body threw, no outer tryBlock:', nextError);
-	} finally {
-		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
-	}
+	mountCatchArm(state, error, reportInline);
 }
 
 export function tryBlock(
@@ -1353,7 +1299,7 @@ export function tryBlock(
 		// the router `Match` shape `<Context> @try {…}`), where the anchor is the
 		// enclosing scope's end marker and the cursor is parked on the @try's open.
 		// As the server frames every boundary, a missing range is a mismatch,
-		// unless the client built the range around the slot (branchOpen).
+		// which branchOpen throws.
 		const open = passthrough
 			? null
 			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
@@ -1363,22 +1309,6 @@ export function tryBlock(
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
-		} else if (hydration !== null) {
-			return hydration.suspend(() =>
-				tryBlock(
-					parentScope,
-					slotKey,
-					domParent,
-					tryBody,
-					catchBody,
-					pendingBody,
-					anchor,
-					env,
-					propagateSuspense,
-					hydrationInputsEqual,
-					preserveHydrationCapture,
-				),
-			);
 		} else {
 			start = document.createComment('try');
 			end = document.createComment('/try');
@@ -3311,68 +3241,83 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 		handleResumeError(state.parentBlock, err);
 		return;
 	}
+	mountCatchArm(state, err, reportInline);
+}
+
+/**
+ * Mount `state`'s catch arm for `error`. Its `reset` is the slot's, so the arm
+ * sees one reset function across renders. A catch body that throws tears the
+ * arm down and passes its error to the next boundary.
+ */
+function mountCatchArm(state: TrySlot | ErrorSlot, error: any, reportInline: boolean): void {
+	// Read here, not passed in, so client-only bundles fold the hydration paths.
+	const hydration = hydrating ? CURSOR : null;
 	setTryBranch(state, 0);
-	state.err = err;
-	const bStart = document.createComment('catch-b');
-	const bEnd = document.createComment('/catch-b');
-	if (hydration !== null && hydration.isClose(state.end)) {
-		// Hydrating, but the server rendered a DIFFERENT arm in this slot (the
-		// try body threw on the CLIENT), so the catch arm is a client-fresh
-		// build. The aborted try adoption kept the server range: the catch arm's
-		// commit discards it, and the cursor parks past the slot so FOLLOWING
-		// siblings keep adopting from an aligned position. Only an adopted slot
-		// pair bounds server DOM.
-		discardServerArm(state);
-		hydration.rebuiltSlot(state.end);
+	state.err = error;
+	let armParent = state.domParent;
+	let start: Node | null = null;
+	let end: Node | null = null;
+	if (!state.passthrough) {
+		start = document.createComment('catch-b');
+		end = document.createComment('/catch-b');
+		if (hydration !== null && hydration.isClose(state.end)) {
+			// Hydrating, but the server rendered a DIFFERENT arm in this slot (the
+			// try body threw on the CLIENT), so the catch arm is a client-fresh
+			// build. The aborted try adoption kept the server range: the catch arm's
+			// commit discards it, and the cursor parks past the slot so FOLLOWING
+			// siblings keep adopting from an aligned position. Only an adopted slot
+			// pair bounds server DOM.
+			discardServerArm(state);
+			hydration.rebuiltSlot(state.end);
+		}
+		armParent = insertArmPair(state, start, end, state.end);
 	}
-	const armParent = insertArmPair(state, bStart, bEnd, state.end);
-	const reset = () => requestReset(state);
-	const b = createBlock(
+	const caught = createBlock(
 		'control-flow',
 		state.parentBlock,
 		armParent,
-		bStart,
-		bEnd,
-		state.catchBody,
-		catchProps(err, reset, true),
+		start,
+		end,
+		state.catchBody!,
+		catchProps(error, state.reset, true),
 		state.env,
 	);
-	b.idState = state.idState;
-	state.block = b;
+	caught.idState = state.idState;
+	state.block = caught;
 	let control = false;
 	try {
 		// A client-fresh catch build during hydration must not read the adoption
 		// cursor — the server rendered the try arm here, so adopting would consume
 		// (and warn about) another slot's server DOM. Suspend for the subtree.
-		if (hydration !== null) hydration.suspend(() => renderBlock(b));
-		else renderBlock(b);
-	} catch (e2) {
-		if (forwardFallbackSuspension(b, e2)) return;
+		if (hydration !== null && !state.passthrough) hydration.suspend(() => renderBlock(caught));
+		else renderBlock(caught);
+	} catch (nextError) {
+		if (forwardFallbackSuspension(caught, nextError)) return;
 		// Hydration control flow passes through every application boundary.
-		if (isAdoptionControl(e2)) {
+		if (isAdoptionControl(nextError)) {
 			control = true;
-			throw e2;
+			throw nextError;
 		}
-		// Catch body itself threw — bubble to next enclosing tryBlock.
-		if (state.block) {
+		// Catch body itself threw — bubble to next enclosing boundary.
+		if (state.block !== null) {
 			unmountBlock(state.block);
 			state.block = null;
 		}
 		// Mid-render (a component render stack is live) with an outer boundary to
 		// take the error: RETHROW instead of delegating synchronously — the same
-		// rule as the no-catch-arm path above. The outer boundary's switch sweeps
-		// the DOM of every frame between this boundary and itself; delegating here
-		// and returning would let those still-on-stack frames keep rendering into
-		// the swept range (stale anchors → NotFoundError, and the bookkeeping
-		// error would REPLACE the original). The rethrow unwinds them; the outer
-		// boundary catches it at its own tryBlock frame. With NO outer handler the
+		// rule as switchToCatch's no-catch-arm path. The outer boundary's switch
+		// sweeps the DOM of every frame between this boundary and itself;
+		// delegating here and returning would let those still-on-stack frames keep
+		// rendering into the swept range (stale anchors → NotFoundError, and the
+		// bookkeeping error would REPLACE the original). The rethrow unwinds them;
+		// the outer boundary catches it at its own frame. With NO outer handler the
 		// error must not escape to the render caller: fall through to the
 		// console.error surface below (the boundary's content is already torn
 		// down — no content, no fallback).
-		if (CURRENT_BLOCK !== null && findTryHandler(state.parentBlock) !== null) throw e2;
+		if (CURRENT_BLOCK !== null && findTryHandler(state.parentBlock) !== null) throw nextError;
 		const parent = findTryHandler(state.parentBlock);
-		if (parent) parent(e2);
-		else console.error('catch body threw, no outer tryBlock:', e2);
+		if (parent !== null) parent(nextError);
+		else console.error('catch body threw, no outer tryBlock:', nextError);
 	} finally {
 		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
 	}

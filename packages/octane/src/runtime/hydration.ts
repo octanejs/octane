@@ -32,6 +32,7 @@ import {
 	boundaryIdCount,
 	parserNormalizedMatch,
 	isRangeOpen,
+	isBlockOpen,
 } from '../hydration-protocol.js';
 import { PORTAL_TAG } from '../runtime-tags.js';
 import { isRendererStreamBoundaryTemplate } from '../stream-protocol.js';
@@ -1122,7 +1123,7 @@ export class HydrationCapability {
 	 * another arm of an enclosing `@if`. A range the client builds renders with
 	 * hydration suspended, and asks nothing.
 	 */
-	branchOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment | null {
+	branchOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment {
 		const open = this.resolveOpen(anchor, domParent);
 		if (open !== null) return open;
 		this.failAt(
@@ -2311,11 +2312,6 @@ export function parseSeedJson(raw: string): unknown[] | null {
 // adopt. Without an active capability these are trivial DOM reads; hydration-only
 // navigation stays behind methods that client-only builds discard.
 // ---------------------------------------------------------------------------
-
-/** True if `node` opens a hydration range (hydration-protocol.ts). */
-export function isBlockOpen(node: Node | null): node is Comment {
-	return node !== null && node.nodeType === 8 && isRangeOpen((node as Comment).data);
-}
 
 /** True if `node` closes a hydration range. */
 export function isBlockClose(node: Node | null): node is Comment {

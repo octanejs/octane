@@ -1,3 +1,4 @@
+import { isKey, isRecord } from './data-encoding.js';
 import type { EncodedSignalValue, ScopeSeed } from './signals/types.js';
 
 /** Independent resource/HTML channel identity. Arrival order is never freshness. */
@@ -44,22 +45,6 @@ export type StreamedRegionPlacementFrame = StreamFrameBase & {
 };
 
 export type StreamedRendererFrame = StreamedSignalResultFrame | StreamedRegionPlacementFrame;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) return false;
-	for (const key of Reflect.ownKeys(value)) {
-		if (typeof key !== 'string') return false;
-		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
-		if (!descriptor.enumerable || !('value' in descriptor)) return false;
-	}
-	return true;
-}
-
-function isKey(value: unknown): value is string {
-	return typeof value === 'string' && value.length > 0 && value.length <= 1024;
-}
 
 function isCounter(value: unknown): value is number {
 	return Number.isSafeInteger(value) && (value as number) >= 0;

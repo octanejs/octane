@@ -46,7 +46,7 @@ import { DIRECT_SIGNAL_BINDING, type DirectSignalBinding } from './signal-bindin
 import { HTML_NS, isHtmlCustomElement } from './host-props.js';
 import { componentSourceLoc } from './diagnostics.js';
 import { JOURNAL_PROP, atCommit, journalBag, journalObjectOnce } from './commit.js';
-import { radioGroupCandidates } from '../radio-group.js';
+import { radioGroupCandidates, toControlledString } from '../radio-group.js';
 import { getFirstChild, getNextSibling } from './templates.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
@@ -363,15 +363,6 @@ export function armControlled(el: Element): ControlledState {
 		el.addEventListener('compositionend', onCtrlCompositionEnd);
 	}
 	return ctrl;
-}
-
-/** The controlled string for a raw rendered value (nullish never reaches here). */
-function toControlledString(v: unknown): string {
-	return typeof v === 'string'
-		? v
-		: typeof v === 'function' || typeof v === 'symbol'
-			? ''
-			: String(v);
 }
 
 /**

@@ -56,6 +56,7 @@ import {
 	type SignalSnapshot,
 	type SignalTraceEvent,
 } from './types.js';
+import { isThenable } from './handle-protocol.js';
 
 export interface GraphOwner {
 	readonly scopeKey: string;
@@ -410,14 +411,6 @@ function isValidLink(checkLink: Link, sub: ReactiveNode): boolean {
 		link = link.prevDep;
 	}
 	return false;
-}
-
-export function isThenable(value: unknown): value is PromiseLike<unknown> {
-	return (
-		value !== null &&
-		(typeof value === 'object' || typeof value === 'function') &&
-		typeof (value as PromiseLike<unknown>).then === 'function'
-	);
 }
 
 export function assertWritable(): void {

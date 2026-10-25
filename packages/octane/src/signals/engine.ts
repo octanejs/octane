@@ -12,7 +12,6 @@ import {
 	historicalBindingRead,
 	initializeValue,
 	inspectNativeNode,
-	isThenable,
 	presentDuringFlush,
 	readNode,
 	readyState,
@@ -31,6 +30,7 @@ import {
 	type SignalReadMode,
 	type CandidateContext,
 } from './graph.js';
+import { isThenable } from './handle-protocol.js';
 import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,

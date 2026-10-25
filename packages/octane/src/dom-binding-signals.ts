@@ -2,8 +2,8 @@ import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import { __retiredBindingSource } from './dom-binding-styles.js';
 import { setNativeReadObserver, type NativeReadSource } from './signals/read-protocol.js';
+import { isSignalHandle } from './signals/handle-protocol.js';
 import {
-	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_SUBSCRIBE,
@@ -196,12 +196,8 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 export function __createBindingSignals() {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
-	const isSignal = (value: unknown): value is SignalHandle<unknown> =>
-		value !== null &&
-		(typeof value === 'object' || typeof value === 'function') &&
-		(value as SignalHandle<unknown>)[SIGNAL_HANDLE] === true;
 	return {
-		isSignal,
+		isSignal: isSignalHandle,
 		connect(notify: () => void): BindingSignalConnection {
 			let value: unknown;
 			let handle: SignalHandle<unknown> | undefined;
@@ -234,7 +230,7 @@ export function __createBindingSignals() {
 				},
 				read(next): unknown {
 					if (disposed) return undefined;
-					const nextHandle = isSignal(next) ? next : undefined;
+					const nextHandle = isSignalHandle(next) ? next : undefined;
 					if (nextHandle !== handle) {
 						const ticket = ++generation;
 						const stop = unsubscribe;

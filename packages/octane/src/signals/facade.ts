@@ -13,7 +13,6 @@ import { ScopeDisposedError } from './errors.js';
 import {
 	isDeclarationView,
 	isRetiredDeclarationView,
-	isThenable,
 	readSignalBinding as readBinding,
 	untrack,
 } from './graph.js';
@@ -26,7 +25,7 @@ import {
 	forwardNativeTransitionConsumer,
 	registerEarlySignalHydration,
 } from './read-protocol.js';
-import { isSignalHandle } from './handle-protocol.js';
+import { isSignalHandle, isThenable } from './handle-protocol.js';
 import { runAsDeclaredServerSignalReader as readAsDeclared } from '#octane/signals/server-reads';
 
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';

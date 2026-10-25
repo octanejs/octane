@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 351,
+  "nextCode": 362,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2101,6 +2101,72 @@
     },
     "350": {
       "message": "__runOnCatch must be called from an active catch arm.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "351": {
+      "message": "Cannot register behavior on a disposed behavior root.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "352": {
+      "message": "%s must belong to the behavior root container and document.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "353": {
+      "message": "Behavior event names must be non-empty strings.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "354": {
+      "message": "A behavior entry requires an adopt(element, context) function.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "355": {
+      "message": "A behavior with identity %s is already registered.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "356": {
+      "message": "Behavior dependency %s is not registered.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "357": {
+      "message": "The requested behavior conflicts with an existing behavior registration.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "358": {
+      "message": "An external range requires an explicit owner identity.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "359": {
+      "message": "External ownership conflict: pass replace: true to hand this range off.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "360": {
+      "message": "A behavior root requires an element with an owner document.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "361": {
+      "message": "This container already has a behavior root; pass replace: true to replace it.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"
