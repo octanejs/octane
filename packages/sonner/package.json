@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/sonner",
-  "version": "0.1.62",
+  "version": "0.1.63",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -38,7 +38,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.15.0"
+    "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
