@@ -2177,7 +2177,7 @@ export function moveBlockBefore(block: Block, anchor: Node): void {
 	while (n) {
 		const isEnd = n === end;
 		const next: Node | null = getNextSibling(n);
-		parent.insertBefore(n, anchor);
+		moveNativeNodeBefore(parent, n, anchor, null, false);
 		if (isEnd) break;
 		n = next;
 	}

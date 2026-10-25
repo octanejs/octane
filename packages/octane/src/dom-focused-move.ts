@@ -1,7 +1,7 @@
 /**
- * Move native presentation without detaching active editing when possible.
- * Both the general renderer and renderer-free keyed views use this leaf; callers
- * retain their own focus/selection capture and commit lifetime.
+ * Move native presentation without resetting its live state when possible.
+ * Keyed, descriptor, and binding reconciliation all move through this leaf;
+ * callers retain their own focus/selection capture and commit lifetime.
  */
 export function moveNativeNodeBefore(
 	parent: Node,
@@ -10,41 +10,21 @@ export function moveNativeNodeBefore(
 	focused: Element | null,
 	contentEditable: boolean,
 ): void {
-	let containsFocused = node === focused;
-	if (!containsFocused && focused !== null && node.nodeType === 1) {
-		let candidate: Element | undefined = focused;
-		do {
-			if ((node as Element).contains(candidate)) {
-				containsFocused = true;
-				break;
-			}
-			// Native contains() stops at a shadow root. Its host remains part of
-			// the editing subtree, including across nested or closed shadow roots.
-			// A retired link can now be its own root, and its .host is a URL
-			// string. Only a document fragment can be a ShadowRoot across realms.
-			const root = candidate.getRootNode();
-			candidate = root.nodeType === 11 ? (root as ShadowRoot).host : undefined;
-		} while (candidate !== undefined);
+	// A state-preserving move keeps iframes loaded, animations running, open
+	// popovers shown, and native input focus and composition alive.
+	// It requires connected nodes in the same document, so fresh or detached
+	// nodes take insertBefore. Chromium still collapses live Range selections
+	// inside a moved content-editable tree, so that tree is rotated instead.
+	if (node.isConnected && parent.isConnected && parent.ownerDocument === node.ownerDocument) {
+		const moveBefore = (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
+			.moveBefore;
+		if (typeof moveBefore === 'function' && !(contentEditable && containsFocus(node, focused))) {
+			moveBefore.call(parent, node, anchor);
+			return;
+		}
 	}
-	if (!containsFocused) {
+	if (!containsFocus(node, focused)) {
 		parent.insertBefore(node, anchor);
-		return;
-	}
-
-	const moveBefore = (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-		.moveBefore;
-	// A state-preserving move keeps native input composition alive, but Chromium
-	// still collapses live Range selections inside a moved content-editable tree.
-	// It also requires connected nodes in the same document; a previously focused
-	// host can have been relocated or disconnected during the update.
-	if (
-		!contentEditable &&
-		typeof moveBefore === 'function' &&
-		parent.isConnected &&
-		node.isConnected &&
-		parent.ownerDocument === node.ownerDocument
-	) {
-		moveBefore.call(parent, node, anchor);
 		return;
 	}
 
@@ -78,4 +58,20 @@ export function moveNativeNodeBefore(
 			cursor = next;
 		}
 	}
+}
+
+function containsFocus(node: Node, focused: Element | null): boolean {
+	if (node === focused) return true;
+	if (focused === null || node.nodeType !== 1) return false;
+	let candidate: Element | undefined = focused;
+	do {
+		if ((node as Element).contains(candidate)) return true;
+		// Native contains() stops at a shadow root. Its host remains part of
+		// the editing subtree, including across nested or closed shadow roots.
+		// A retired link can now be its own root, and its .host is a URL
+		// string. Only a document fragment can be a ShadowRoot across realms.
+		const root = candidate.getRootNode();
+		candidate = root.nodeType === 11 ? (root as ShadowRoot).host : undefined;
+	} while (candidate !== undefined);
+	return false;
 }
