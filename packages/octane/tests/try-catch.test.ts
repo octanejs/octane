@@ -5,6 +5,7 @@ import { act, mount, nextPaint } from './_helpers';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import {
 	RenderBoundary,
+	ResetIdentityBoundary,
 	ReportingBoundary,
 	EffectBoundary,
 	Nested,
@@ -35,6 +36,16 @@ describe('tryBlock — render errors', () => {
 		r.click('.caught button');
 		expect(r.find('.ok').textContent).toBe('rendered');
 		expect(r.findAll('.caught')).toHaveLength(0);
+		r.unmount();
+	});
+
+	it('gives the catch arm one reset function across renders', () => {
+		const resets: Array<() => void> = [];
+		const r = mount(ResetIdentityBoundary, { label: 'first', resets });
+		r.update(ResetIdentityBoundary, { label: 'second', resets });
+		expect(r.find('.caught').textContent).toBe('second');
+		expect(resets).toHaveLength(2);
+		expect(resets[1]).toBe(resets[0]);
 		r.unmount();
 	});
 });

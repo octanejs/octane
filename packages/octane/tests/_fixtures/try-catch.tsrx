@@ -35,6 +35,16 @@ export function RenderBoundary(props) @{
 	</>
 }
 
+// The catch arm records the reset function it receives on each render.
+export function ResetIdentityBoundary(props: { label: string; resets: Array<() => void> }) @{
+	@try {
+		<ThrowsOnRender bang={true} />
+	} @catch (err, reset) {
+		props.resets.push(reset);
+		<p class="caught">{props.label as string}</p>
+	}
+}
+
 interface ReportingBoundaryProps {
 	bang: boolean;
 	label: string;

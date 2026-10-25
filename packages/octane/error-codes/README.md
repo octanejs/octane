@@ -3,9 +3,9 @@
 `codes.json` is the canonical, Octane-owned catalog for framework-created errors
 in the core DOM client and server runtimes (`runtime.ts` and
 `runtime.server.ts`), the signal engine (`signals/*.ts`), the hydration modules
-(`hydration/*.ts` and `independent-hydration-protocol.ts`), and the compiled DOM
-binding runtime (`dom-binding*.ts`, `dom-bindings.ts`) that remain observable in
-production. The numbers are unrelated to React's error codes.
+(`hydration/*.ts` and `independent-hydration-protocol.ts`), the compiled DOM
+binding runtime (`dom-binding*.ts`, `dom-bindings.ts`), and the behavior root
+(`behavior-root.ts`) that remain observable in production. The numbers are unrelated to React's error codes.
 
 - Add new codes at `nextCode`, then increment `nextCode`.
 - Never reuse or renumber a published code.

@@ -35,7 +35,6 @@ import { resolveLazyDefaultProps } from './shared-value-helpers.js';
 import {
 	deactivateEffectEventCells,
 	depsEqual,
-	isThenable,
 	runEffectCleanup,
 	runEffectCreate,
 	trackUniversalThenable,
@@ -53,6 +52,7 @@ import {
 	type UniversalHookUpdateQueue as KernelUniversalHookUpdateQueue,
 	type UniversalTrackedThenable,
 } from './owner-kernel/hooks.js';
+import { isThenable } from './signals/handle-protocol.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 

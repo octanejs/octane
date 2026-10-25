@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { radioGroupCandidates } from '../radio-group.js';
+import { radioGroupCandidates, toControlledString } from '../radio-group.js';
 import {
 	consumeHydrationControl,
 	initializeHydrationControlCapture,
@@ -31,16 +31,6 @@ import { withCommittedSignals } from './transition-state.js';
 type SignalControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type ControlChannel = 'value' | 'checked';
 const RADIO_WRITERS = /* @__PURE__ */ new WeakMap<Element, (value: unknown) => void>();
-
-// Sampled JSX values use the native renderer's scalar coercion, not the stricter
-// writable-handle contract. Keep this optional leaf independent of the renderer.
-function controlString(value: unknown): string {
-	return typeof value === 'string'
-		? value
-		: typeof value === 'function' || typeof value === 'symbol'
-			? ''
-			: String(value);
-}
 
 /** Publish the platform's native radio-group edit, never arbitrate a checked write. */
 function publishRadioInput(input: HTMLInputElement): void {
@@ -260,13 +250,19 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 								? formatClientError(120)
 								: formatClientError(121),
 					);
+				// A sampled JSX value takes the renderer's scalar coercion, not the
+				// stricter writable-handle contract.
 				let selected: Set<string> | undefined;
 				if (multiple && Array.isArray(value)) {
 					selected = new Set();
-					for (const item of value) selected.add(candidate ? item : controlString(item));
+					for (const item of value) selected.add(candidate ? item : toControlledString(item));
 				}
 				const normalized =
-					channel === 'checked' ? !!value : value == null || multiple ? '' : controlString(value);
+					channel === 'checked'
+						? !!value
+						: value == null || multiple
+							? ''
+							: toControlledString(value);
 				const ticket = generation;
 				const version = revision;
 				return {

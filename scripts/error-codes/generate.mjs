@@ -164,8 +164,9 @@ export function generateFiles(catalog) {
 // also come from the catalog. Paths are relative to packages/octane/src.
 // independent-hydration-protocol.ts shares its manifest message with
 // hydration/independent-island.ts, so it is covered with the hydration modules.
+// behavior-root.ts is the `octane/behavior` entry.
 const COVERED_MODULE =
-	/^(?:signals\/[^/]+|hydration\/[^/]+|dom-bindings?(?:-[a-z-]+)?|independent-hydration-protocol)\.ts$/;
+	/^(?:signals\/[^/]+|hydration\/[^/]+|dom-bindings?(?:-[a-z-]+)?|independent-hydration-protocol|behavior-root)\.ts$/;
 // Surfaces follow static import reachability from the package entries: modules
 // reachable only from client entries are "client"; only from server entries
 // (runtime.server.ts, octane/server, octane/signals/server, ...) are "server".

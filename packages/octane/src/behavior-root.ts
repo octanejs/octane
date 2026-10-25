@@ -1,6 +1,7 @@
 export { adoptBindings, mountBindings, unbound } from './dom-bindings.js';
 export type { BindingSource, BindingOptions, BindingHandle } from './dom-bindings.js';
 export type { BindingRange, BindingMountTarget } from './dom-binding-program.js';
+import { formatClientError } from './error-codes.client.generated.js';
 import type { CapturedFormSubmission } from './form-submission.js';
 import type { FormSubmissionCapture } from './behavior-form-submissions.js';
 export type { FormSubmissionCapture } from './behavior-form-submissions.js';
@@ -204,7 +205,7 @@ function contains(root: RootRecord, element: Element, container = root.container
 
 function assertActiveRoot(root: RootRecord): void {
 	if (root.disposed || root.controller.signal.aborted) {
-		throw new Error('Cannot register behavior on a disposed behavior root.');
+		throw new Error(formatClientError(351));
 	}
 }
 
@@ -214,7 +215,7 @@ function assertContainedElement(
 	label: string,
 ): asserts element is Element {
 	if (!root.dom.element(element) || !contains(root, element)) {
-		throw new Error(`${label} must belong to the behavior root container and document.`);
+		throw new Error(formatClientError(352, label));
 	}
 }
 
@@ -588,7 +589,7 @@ function installListeners(root: RootRecord, events: readonly string[] | undefine
 	if (events === undefined) return;
 	for (const event of new Set(events)) {
 		if (typeof event !== 'string' || event.length === 0) {
-			throw new Error('Behavior event names must be non-empty strings.');
+			throw new Error(formatClientError(353));
 		}
 		if (root.listeners.has(event)) continue;
 		const listener: EventListener = (nativeEvent) => handleDelegatedEvent(root, nativeEvent);
@@ -653,7 +654,7 @@ function activateBehavior(record: EntryRecord): void {
 function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegistration {
 	assertActiveRoot(root);
 	if (entry === null || typeof entry !== 'object' || typeof entry.adopt !== 'function') {
-		throw new Error('A behavior entry requires an adopt(element, context) function.');
+		throw new Error(formatClientError(354));
 	}
 	if (typeof entry.target !== 'string') {
 		assertContainedElement(root, entry.target, 'A behavior target');
@@ -662,13 +663,13 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 		root.dom.matches(root.container, entry.target);
 	}
 	if (entry.id !== undefined && root.byId.has(entry.id)) {
-		throw new Error(`A behavior with identity ${JSON.stringify(entry.id)} is already registered.`);
+		throw new Error(formatClientError(355, JSON.stringify(entry.id)));
 	}
 	const dependencies: EntryRecord[] = [];
 	for (const id of entry.dependencies ?? []) {
 		const dependency = root.byId.get(id);
 		if (dependency === undefined) {
-			throw new Error(`Behavior dependency ${JSON.stringify(id)} is not registered.`);
+			throw new Error(formatClientError(356, JSON.stringify(id)));
 		}
 		dependencies.push(dependency);
 	}
@@ -677,7 +678,7 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 			(entry.id !== undefined && existing.entry.conflicts?.includes(entry.id)) ||
 			(existing.entry.id !== undefined && entry.conflicts?.includes(existing.entry.id))
 		) {
-			throw new Error('The requested behavior conflicts with an existing behavior registration.');
+			throw new Error(formatClientError(357));
 		}
 	}
 	const controller = createController(root.document);
@@ -763,7 +764,7 @@ function registerExternalRange(
 	assertActiveRoot(root);
 	assertContainedElement(root, element, 'An externally owned range');
 	if (options === null || typeof options !== 'object' || !('owner' in options)) {
-		throw new Error('An external range requires an explicit owner identity.');
+		throw new Error(formatClientError(358));
 	}
 	const existing = root.registry.ranges.get(element);
 	if (existing !== undefined) {
@@ -771,7 +772,7 @@ function registerExternalRange(
 			return existing.publicRange;
 		}
 		if (!options.replace) {
-			throw new Error('External ownership conflict: pass replace: true to hand this range off.');
+			throw new Error(formatClientError(359));
 		}
 		if (!options.signal?.aborted) disposeRange(existing);
 	}
@@ -908,15 +909,13 @@ export function attachBehaviorRoot(
 				: null
 			: capture.document(container);
 	if (document === null) {
-		throw new Error('A behavior root requires an element with an owner document.');
+		throw new Error(formatClientError(360));
 	}
 	let registry = registryFor(document);
 	const existing = registry.roots.get(container);
 	if (existing !== undefined) {
 		if (!options.replace) {
-			throw new Error(
-				'This container already has a behavior root; pass replace: true to replace it.',
-			);
+			throw new Error(formatClientError(361));
 		}
 		if (!options.signal?.aborted) {
 			disposeRoot(existing);

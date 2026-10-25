@@ -3560,6 +3560,61 @@
       "message": "__runOnCatch must be called from an active catch arm.",
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "351": {
+      "message": "Cannot register behavior on a disposed behavior root.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "352": {
+      "message": "%s must belong to the behavior root container and document.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "353": {
+      "message": "Behavior event names must be non-empty strings.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "354": {
+      "message": "A behavior entry requires an adopt(element, context) function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "355": {
+      "message": "A behavior with identity %s is already registered.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "356": {
+      "message": "Behavior dependency %s is not registered.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "357": {
+      "message": "The requested behavior conflicts with an existing behavior registration.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "358": {
+      "message": "An external range requires an explicit owner identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "359": {
+      "message": "External ownership conflict: pass replace: true to hand this range off.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "360": {
+      "message": "A behavior root requires an element with an owner document.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "361": {
+      "message": "This container already has a behavior root; pass replace: true to replace it.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

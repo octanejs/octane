@@ -29,6 +29,7 @@ import {
 import { signalDocumentEnabled } from '../signals/document-owner.js';
 import { hasHydrationControlSignalWriter } from '../signals/early-values.js';
 import { SIGNAL_BINDING_SUBSCRIBE } from '../signals/types.js';
+import { isSignalHandle, isWritableSignal } from '../signals/handle-protocol.js';
 import { normalizeClass } from '../css.js';
 import type { Scope, Block, RootRenderOwner, OffscreenCapture, HostPropSource } from './types.js';
 import { SIGNAL_BINDINGS_ENABLED } from './drivers.js';
@@ -72,10 +73,8 @@ import {
 	DIRECT_SIGNAL_BINDING,
 	type DirectSignalAttributeKind,
 	type DirectSignalBinding,
-	isSignalHandle,
 	bindingTransitionNotify,
 	readSignalBinding,
-	isWritableSignal,
 	disposeDirectSignalBinding,
 	validateDirectSignalControl,
 	writeDirectSignalBinding,

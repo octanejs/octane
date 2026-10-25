@@ -1,5 +1,5 @@
 import { formatClientError } from './error-codes.client.generated.js';
-import { decodeSignalValue, encodeSignalValue } from './data-encoding.js';
+import { decodeSignalValue, encodeSignalValue, isKey, isRecord } from './data-encoding.js';
 import type { EncodedSignalValue } from './signals/types.js';
 
 export interface IndependentHydrateCapture {
@@ -33,23 +33,8 @@ export interface IndependentHydrateManifest extends IndependentHydrateManifestTe
 	readonly styles: readonly string[];
 }
 
-function plainRecord(value: unknown): value is Record<string, unknown> {
-	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) return false;
-	return Reflect.ownKeys(value).every((key) => {
-		if (typeof key !== 'string') return false;
-		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
-		return descriptor.enumerable && 'value' in descriptor;
-	});
-}
-
-function key(value: unknown): value is string {
-	return typeof value === 'string' && value.length > 0 && value.length <= 1024;
-}
-
 function uniqueKeys(value: unknown): value is readonly string[] {
-	return Array.isArray(value) && value.every(key) && new Set(value).size === value.length;
+	return Array.isArray(value) && value.every(isKey) && new Set(value).size === value.length;
 }
 
 function captures(value: unknown, count: number): value is readonly EncodedSignalValue[] {
@@ -63,7 +48,7 @@ function captures(value: unknown, count: number): value is readonly EncodedSigna
 }
 
 export function isIndependentHydrateManifest(value: unknown): value is IndependentHydrateManifest {
-	if (!plainRecord(value)) return false;
+	if (!isRecord(value)) return false;
 	const allowed = new Set([
 		'version',
 		'buildId',
@@ -81,10 +66,10 @@ export function isIndependentHydrateManifest(value: unknown): value is Independe
 	if (!Object.keys(value).every((name) => allowed.has(name))) return false;
 	if (
 		value['version'] !== 1 ||
-		!key(value['buildId']) ||
-		!key(value['boundaryId']) ||
-		!key(value['moduleId']) ||
-		!key(value['exportName']) ||
+		!isKey(value['buildId']) ||
+		!isKey(value['boundaryId']) ||
+		!isKey(value['moduleId']) ||
+		!isKey(value['exportName']) ||
 		!Number.isSafeInteger(value['hookSeed']) ||
 		(value['hookSeed'] as number) < 0 ||
 		!Number.isSafeInteger(value['idSeed']) ||
@@ -99,9 +84,9 @@ export function isIndependentHydrateManifest(value: unknown): value is Independe
 	const names = new Set<string>();
 	for (const capture of value['captureSchema']) {
 		if (
-			!plainRecord(capture) ||
+			!isRecord(capture) ||
 			Object.keys(capture).length !== 2 ||
-			!key(capture['name']) ||
+			!isKey(capture['name']) ||
 			capture['type'] !== 'json' ||
 			names.has(capture['name'])
 		) {

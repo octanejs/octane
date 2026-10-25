@@ -19,7 +19,8 @@ import {
 } from './engine.js';
 import { isSuspenseException } from './use.js';
 import { SHARED_BODY_SCOPE } from './context.js';
-import { CURSOR, END_OF_CONTENT, isBlockOpen } from './hydration.js';
+import { CURSOR, END_OF_CONTENT } from './hydration.js';
+import { isBlockOpen } from '../stream-protocol.js';
 import {
 	ScopeImpl,
 	createBlock,
@@ -1151,12 +1152,6 @@ export function ifBlock(
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
-		} else if (hydration !== null && !passthrough) {
-			// Inside a range the client built (branchOpen).
-			hydration.suspend(() =>
-				ifBlock(parentScope, slotKey, domParent, cond, thenBody, elseBody, anchor, env, lite),
-			);
-			return;
 		}
 		state = {
 			__kind: 'ifBlockSlot',
@@ -1257,22 +1252,6 @@ export function switchBlock(
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
-		} else if (hydration !== null && !passthrough) {
-			// Inside a range the client built (branchOpen).
-			hydration.suspend(() =>
-				switchBlock(
-					parentScope,
-					slotKey,
-					domParent,
-					discriminant,
-					cases,
-					defaultBody,
-					anchor,
-					env,
-					lite,
-				),
-			);
-			return;
 		}
 		state = {
 			__kind: 'switchBlockSlot',

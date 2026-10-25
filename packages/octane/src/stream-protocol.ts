@@ -32,13 +32,14 @@ export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 /** Render-unique token stamped on deferred-hydration owners in a streamed shell. */
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
 
-function isHydrationOpen(node: Node | null): node is Comment {
+/** Whether `node` is a comment that opens a hydration range. */
+export function isBlockOpen(node: Node | null): node is Comment {
 	return node !== null && node.nodeType === 8 && isRangeOpen((node as Comment).data);
 }
 
 /** Find a physical hydration range's close without trusting malformed comment input. */
 export function rendererRangeClose(open: Node | null): Comment | null {
-	if (!isHydrationOpen(open)) return null;
+	if (!isBlockOpen(open)) return null;
 	let depth = 0;
 	let node = open.nextSibling;
 	while (node !== null) {
@@ -124,5 +125,5 @@ export function isRendererStreamBoundaryTemplate(
 	const token = streamTokenFromBoundaryId(id);
 	if (token === null || (expectedToken !== undefined && token !== expectedToken)) return false;
 	const open = node.previousSibling;
-	return isHydrationOpen(open) && open.nextSibling === node && rendererRangeClose(open) !== null;
+	return isBlockOpen(open) && open.nextSibling === node && rendererRangeClose(open) !== null;
 }

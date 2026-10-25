@@ -44,7 +44,8 @@ import {
 import { ROOT_RENDER_ROLLBACK, journalRootProperty, isCreatedInRootRender } from './engine.js';
 import { type TrackedThenable, useThenable } from './use.js';
 import { CONTEXT_CHILD, type Context, promoteMemoAncestry } from './context.js';
-import { KEPT_TEXT_CONTENT, clearKeptTextContent, CURSOR, isBlockOpen } from './hydration.js';
+import { KEPT_TEXT_CONTENT, clearKeptTextContent, CURSOR } from './hydration.js';
+import { isBlockOpen } from '../stream-protocol.js';
 import { PORTAL_CHILD } from './portals.js';
 import {
 	createBlock,
@@ -56,7 +57,8 @@ import {
 } from './block.js';
 import { CURRENT_BLOCK, ROOT_RENDER_TRANSACTION, preserveRootCreatedDom } from './render.js';
 import { PRESENTATION_HYDRATION, BINDING_CHILDREN_SITE } from './hydration-presentation.js';
-import { isSignalHandle, bindImplicitSignalChild } from './signal-bindings.js';
+import { bindImplicitSignalChild } from './signal-bindings.js';
+import { isSignalHandle } from '../signals/handle-protocol.js';
 import {
 	updateTextValue,
 	setText,

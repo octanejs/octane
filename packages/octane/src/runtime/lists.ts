@@ -9,6 +9,7 @@ import { hydrating } from '../hydration-flag.js';
 import { EPOCH_CELL } from '../context-epoch.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
 import { selfDelimits } from '../hydration-protocol.js';
+import { isBlockOpen } from '../stream-protocol.js';
 import { isChildOf, moveNativeNodeBefore } from '../dom-focused-move.js';
 import type {
 	ComponentBody,
@@ -30,7 +31,7 @@ import {
 } from './engine.js';
 import { isSuspenseException, retainDiscardedWarmMemos } from './use.js';
 import { SKIPPED_ROW_REFRESH, isHostContextRequest } from './context.js';
-import { CURSOR, isRendererHydrationStyle, auditHydrationProbe, isBlockOpen } from './hydration.js';
+import { CURSOR, isRendererHydrationStyle, auditHydrationProbe } from './hydration.js';
 import {
 	createBlock,
 	RETURNED_OUTPUT_SCOPE,

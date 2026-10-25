@@ -144,13 +144,6 @@ export function depsEqual(
 	return true;
 }
 
-export function isThenable(value: unknown): value is PromiseLike<unknown> {
-	return (
-		(value !== null && typeof value === 'object' && typeof (value as any).then === 'function') ||
-		(typeof value === 'function' && typeof (value as any).then === 'function')
-	);
-}
-
 // Instrument an untagged thenable exactly once. A status we did not write, even
 // one React does not recognize such as router-core's `'resolved'`, belongs to
 // the thenable's owner: leave it alone and treat it as pending, as React's

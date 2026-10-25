@@ -6,7 +6,6 @@ import {
 	derivedResult,
 	errorState,
 	invalidateNode,
-	isThenable,
 	linkReads,
 	pendingState,
 	promoteDeclarationView,
@@ -19,6 +18,7 @@ import {
 	untrack,
 	type ScopedNode,
 } from './graph.js';
+import { isThenable } from './handle-protocol.js';
 import { RedeclarableBinding } from './redeclaration.js';
 import type { DerivedCompute, DerivedSignal, OwnerScope } from './types.js';
 

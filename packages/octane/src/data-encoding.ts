@@ -7,6 +7,24 @@ function unsupported(): never {
 	);
 }
 
+/** A plain object with only enumerable string data properties, the record shape on the wire. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return false;
+	for (const key of Reflect.ownKeys(value)) {
+		if (typeof key !== 'string') return false;
+		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+		if (!descriptor.enumerable || !('value' in descriptor)) return false;
+	}
+	return true;
+}
+
+/** A non-empty wire identity of bounded length. */
+export function isKey(value: unknown): value is string {
+	return typeof value === 'string' && value.length > 0 && value.length <= 1024;
+}
+
 export function encodeSignalValue(
 	value: unknown,
 	ancestors = new Set<object>(),

@@ -243,6 +243,17 @@ type ServerErrorArguments = {
 	345: [];
 	346: [];
 	350: [];
+	351: [];
+	352: [unknown];
+	353: [];
+	354: [];
+	355: [unknown];
+	356: [unknown];
+	357: [];
+	358: [];
+	359: [];
+	360: [];
+	361: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -992,6 +1003,49 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				);
 			case 350:
 				return formatDevErrorMessage('__runOnCatch must be called from an active catch arm.', args);
+			case 351:
+				return formatDevErrorMessage('Cannot register behavior on a disposed behavior root.', args);
+			case 352:
+				return formatDevErrorMessage(
+					'%s must belong to the behavior root container and document.',
+					args,
+				);
+			case 353:
+				return formatDevErrorMessage('Behavior event names must be non-empty strings.', args);
+			case 354:
+				return formatDevErrorMessage(
+					'A behavior entry requires an adopt(element, context) function.',
+					args,
+				);
+			case 355:
+				return formatDevErrorMessage('A behavior with identity %s is already registered.', args);
+			case 356:
+				return formatDevErrorMessage('Behavior dependency %s is not registered.', args);
+			case 357:
+				return formatDevErrorMessage(
+					'The requested behavior conflicts with an existing behavior registration.',
+					args,
+				);
+			case 358:
+				return formatDevErrorMessage(
+					'An external range requires an explicit owner identity.',
+					args,
+				);
+			case 359:
+				return formatDevErrorMessage(
+					'External ownership conflict: pass replace: true to hand this range off.',
+					args,
+				);
+			case 360:
+				return formatDevErrorMessage(
+					'A behavior root requires an element with an owner document.',
+					args,
+				);
+			case 361:
+				return formatDevErrorMessage(
+					'This container already has a behavior root; pass replace: true to replace it.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

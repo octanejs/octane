@@ -50,6 +50,7 @@ import { markComponentFlags, COMPONENT_FLAG_BOUNDARY } from '../component-flags.
 import { formatClientError } from '../error-codes.client.generated.js';
 import { HYDRATE_MARKER_SELECTOR } from '../hydration-protocol.js';
 import {
+	isBlockOpen,
 	isRendererStreamToken,
 	rendererRangeClose,
 	HYDRATE_STREAM_TOKEN_ATTR,
@@ -75,12 +76,7 @@ import {
 	trackThenable,
 } from './use.js';
 import type { Context } from './context.js';
-import {
-	CURSOR,
-	isRendererHydrationStyle,
-	type HydrationCapability,
-	isBlockOpen,
-} from './hydration.js';
+import { CURSOR, isRendererHydrationStyle, type HydrationCapability } from './hydration.js';
 import { suspenseRetryBatchForSubtree, tryBlock } from './suspense.js';
 import {
 	CURRENT_SCOPE,

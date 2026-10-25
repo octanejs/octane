@@ -8,7 +8,6 @@ import {
 	derivedValueState,
 	errorState,
 	invalidateNode,
-	isThenable,
 	linkReads,
 	pendingState,
 	promoteDeclarationView,
@@ -28,6 +27,7 @@ import {
 	type GraphOwner,
 	type CandidateContext,
 } from './graph.js';
+import { isThenable } from './handle-protocol.js';
 import {
 	SIGNAL_DEPENDENT_NODE,
 	publishNativeProducer,

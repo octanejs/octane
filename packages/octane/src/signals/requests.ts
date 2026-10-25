@@ -12,7 +12,6 @@ import {
 	errorState,
 	idleState,
 	invalidateNode,
-	isThenable,
 	pendingState,
 	promoteDeclarationView,
 	publishNode,
@@ -30,6 +29,7 @@ import {
 	type GraphOwner,
 	type NodeState,
 } from './graph.js';
+import { isThenable } from './handle-protocol.js';
 import { RedeclarableBinding } from './redeclaration.js';
 import { candidateHooks } from './transition-state.js';
 import { installResourceCandidates } from '#octane/signal-actions/bindings';

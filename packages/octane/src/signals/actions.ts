@@ -11,15 +11,8 @@ import {
 	resolveSignalHandleForOwner,
 	resolveUnlessRetired,
 } from './facade.js';
-import {
-	ScopedNode,
-	assertWritable,
-	isThenable,
-	pure,
-	signalBatch,
-	subscribeNode,
-	untrack,
-} from './graph.js';
+import { ScopedNode, assertWritable, pure, signalBatch, subscribeNode, untrack } from './graph.js';
+import { isThenable } from './handle-protocol.js';
 import { captureSignalOwner, currentSignalOwner, runWithSignalOwner } from './owner-context.js';
 import { forwardNativeTransitionConsumer } from './read-protocol.js';
 import {

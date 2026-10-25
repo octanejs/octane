@@ -28,7 +28,8 @@ import { HYDRATION_PASS, CURSOR, type HydrationCapability } from './hydration.js
 import { BlockImpl } from './block.js';
 import { CURRENT_SCOPE, ROOT_RENDER_TRANSACTION } from './render.js';
 import { PRESENTATION_HYDRATION, preparePresentationOperation } from './hydration-presentation.js';
-import { isSignalHandle, readSignalBinding } from './signal-bindings.js';
+import { readSignalBinding } from './signal-bindings.js';
+import { isSignalHandle } from '../signals/handle-protocol.js';
 import {
 	DANGER_HTML_ACTIVE,
 	DANGER_HTML_STATIC_CHILD,
