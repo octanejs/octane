@@ -1,5 +1,45 @@
 # @octanejs/app-core
 
+## 0.2.0
+
+### Minor Changes
+
+- 8aa17d0: Production Vite builds now ship a hydrate entry sized to the app. When every
+  hydrated page and layout is a proven void `@{}` component and no root boundary
+  is configured, the entry hydrates without returned-value reconciliation. Root
+  boundary, independent island and streamed signal code ships only when the
+  build configures or compiles that feature. A one-button RenderRoute app's
+  initial JavaScript drops from 86.2 kB to 39.9 kB gzip.
+
+### Patch Changes
+
+- 3827e24: Ship less signal code that a page never runs. The private views that stage a
+  component's redeclared `derived$` or `query$` until the renderer accepts the
+  render now ship only with modules that declare such a cell inside a component
+  or hook, so an application whose signals are all module declarations no longer
+  carries them. Router entries join streamed results without the HTML region
+  placement that no route registers, and native seed adoption is no longer part
+  of the chunk that islands and streamed-result bootstraps load. An islands-only
+  signal page loads about 2.8 kB gzip less.
+- Updated dependencies [de689bf]
+- Updated dependencies [a7457a1]
+- Updated dependencies [b7e4965]
+- Updated dependencies [f47ddbf]
+- Updated dependencies [0764a19]
+- Updated dependencies [c08072b]
+- Updated dependencies [8aa17d0]
+- Updated dependencies [b7e4965]
+- Updated dependencies [1580f0c]
+- Updated dependencies [f3998b0]
+- Updated dependencies [9ab525f]
+- Updated dependencies [3827e24]
+- Updated dependencies [3c05c86]
+- Updated dependencies [af767d7]
+- Updated dependencies [31d7f86]
+- Updated dependencies [1085e32]
+- Updated dependencies [41ba7bd]
+  - octane@0.16.0
+
 ## 0.1.9
 
 ### Patch Changes

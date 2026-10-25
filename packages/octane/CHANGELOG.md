@@ -1,5 +1,74 @@
 # octane
 
+## 0.16.0
+
+### Minor Changes
+
+- b7e4965: Commit unrelated transitions independently, as React 19.3's parallel transitions
+  do. A suspended transition no longer holds back another one: each commits when
+  its own data is ready, whether its Suspense boundary is separate or shared, and
+  its `isPending` falls when it commits. Transitions that update the same state, and the boundaries one transition
+  suspends, still commit together.
+- 31d7f86: Support Trusted Types, as in React 19.3. A `TrustedHTML`, `TrustedScript`, or
+  `TrustedScriptURL` passed to `dangerouslySetInnerHTML` or an attribute such as
+  `srcdoc` or a script's `src` now reaches the DOM as the object instead of its
+  string. That lets these values work under an enforced
+  `require-trusted-types-for 'script'` CSP.
+
+  Octane parses its own compiled templates, binding fragments, and streamed
+  regions through a policy named `octane`. The streaming bootstrap uses one named
+  `octane-stream`. A CSP that restricts policy names with `trusted-types` must
+  allow both. Application strings never go through either policy.
+- 41ba7bd: Add opt-in scoped CSS compilation for universal renderers, with shared theme/apply semantics and a host-neutral module style registry ABI supporting HMR cleanup.
+
+### Patch Changes
+
+- de689bf: Keep an adopted `dangerouslySetInnerHTML`'s server nodes after hydration until
+  a render passes a different `__html` string, as React 19.3 does, instead of
+  reparsing and replacing them on the first render. This includes server HTML
+  that differs from the client's; development still warns about it at hydration.
+- a7457a1: Shrink compiled commit functions: the runtime now clears a bag's staged state and passes its cells, `bagDone` no longer takes the commit function, `sibling()` omits its default step, and byte-identical commit functions in one module share a declaration.
+- b7e4965: Render a `useDeferredValue` final value while a root with no Suspense boundary holds its first render on the initial value, and commit whichever is ready first, as React does.
+- f47ddbf: Preserve authored module directive prologues before generated imports and setup
+  in client and server compiler output. Compiled Strong modules can pass through a
+  subsequent compiler transform without a misplaced `"use strong"` diagnostic.
+- 0764a19: Load the server-call response reader off the critical path. Calls still encode their arguments and send their request at call time; the reader (result streaming, batch decoding and devalue's parser) now preloads once the page has loaded and gone idle, and a call made before then fetches it alongside the server's reply. Server functions that take a `ServerCallContext` compile to a new `__serverRpcStream` target, so an app whose calls all stream no longer ships devalue's encoder. In the signal-chat example this removes about 4.2 KB gzip from the first view.
+- c08072b: Fix a crash (`Cannot read properties of undefined (reading 'idState')`) when a stored element with a runtime-composed `className`, such as an array, re-rendered inside an `@if` arm.
+- 8aa17d0: Production Vite builds now ship a hydrate entry sized to the app. When every
+  hydrated page and layout is a proven void `@{}` component and no root boundary
+  is configured, the entry hydrates without returned-value reconciliation. Root
+  boundary, independent island and streamed signal code ships only when the
+  build configures or compiles that feature. A one-button RenderRoute app's
+  initial JavaScript drops from 86.2 kB to 39.9 kB gzip.
+- 1580f0c: Preserve edits to controlled inputs and textareas inside a portal target until their owning input handlers run.
+- f3998b0: Keep a committed universal `@pending` boundary retrying when a replacement
+  attempt is aborted or its host preparation fails. A later `prepare()` takes
+  over that retry instead of letting it discard the newer attempt.
+- 9ab525f: Ship less signal code. An application that declares signals but renders no
+  renderable hole no longer bundles the hole and descriptor-reconciliation
+  machinery (about 19 kB gzip off a `signal$` counter). Streamed signal results
+  now enter the engine through their own module, so a route that declares
+  signals no longer carries the stream and request code that only the lazily
+  loaded streamed-signals receiver uses. Browser bundles also drop the server
+  query-attempt observer.
+- 3827e24: Ship less signal code that a page never runs. The private views that stage a
+  component's redeclared `derived$` or `query$` until the renderer accepts the
+  render now ship only with modules that declare such a cell inside a component
+  or hook, so an application whose signals are all module declarations no longer
+  carries them. Router entries join streamed results without the HTML region
+  placement that no route registers, and native seed adoption is no longer part
+  of the chunk that islands and streamed-result bootstraps load. An islands-only
+  signal page loads about 2.8 kB gzip less.
+- 3c05c86: Move keyed rows with `moveBefore()` where the browser supports it, so a reorder
+  no longer reloads a row's iframes, restarts its CSS animations, or closes its
+  open popovers. Browsers without `moveBefore()` keep using `insertBefore()`.
+- af767d7: Keep optimistic updates until their owning transition finishes, regardless of unrelated pending transitions.
+- 1085e32: Universal renderers now compile JSX outside a recognized component, as the DOM
+  target does: module values, registry and registration callbacks, and components
+  declared inside factories, callbacks, or multi-declarator statements lower to
+  universal plans instead of failing with "JSX in an unsupported module
+  declaration".
+
 ## 0.15.0
 
 ### Minor Changes

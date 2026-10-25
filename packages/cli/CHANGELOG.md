@@ -1,5 +1,12 @@
 # @octanejs/cli
 
+## 0.2.4
+
+### Patch Changes
+
+- eadfb51: Let `octane init` select a supported TypeScript release and configure the content mapper for TypeScript 7.1.
+- 861096c: Compare prerelease version identifiers in SemVer order when checking dependency peer ranges, so doctor does not incorrectly reject versions such as `beta.10` against a `>=beta.2` minimum.
+
 ## 0.2.3
 
 ### Patch Changes

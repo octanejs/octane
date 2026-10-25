@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/resizable-panels",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -38,7 +38,7 @@
     "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.15.0"
+    "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
