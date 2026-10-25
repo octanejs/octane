@@ -48,8 +48,9 @@ import {
 } from '../hydration/event-capture.js';
 import { markComponentFlags, COMPONENT_FLAG_BOUNDARY } from '../component-flags.js';
 import { formatClientError } from '../error-codes.client.generated.js';
-import { HYDRATE_MARKER_SELECTOR, isBlockOpen } from '../hydration-protocol.js';
+import { HYDRATE_MARKER_SELECTOR } from '../hydration-protocol.js';
 import {
+	isBlockOpen,
 	isRendererStreamToken,
 	rendererRangeClose,
 	HYDRATE_STREAM_TOKEN_ATTR,

@@ -8,7 +8,6 @@ import {
 	HYDRATION_FOR_ITEMS,
 	HYDRATION_FOR_PREFIX,
 	HYDRATION_START,
-	isBlockOpen,
 	isRangeClose,
 	isRangeOpen,
 } from './hydration-protocol.js';
@@ -32,6 +31,11 @@ export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 
 /** Render-unique token stamped on deferred-hydration owners in a streamed shell. */
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
+
+/** Whether `node` is a comment that opens a hydration range. */
+export function isBlockOpen(node: Node | null): node is Comment {
+	return node !== null && node.nodeType === 8 && isRangeOpen((node as Comment).data);
+}
 
 /** Find a physical hydration range's close without trusting malformed comment input. */
 export function rendererRangeClose(open: Node | null): Comment | null {

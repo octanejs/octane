@@ -8,7 +8,8 @@ export {} from './activity.js';
 import { hydrating } from '../hydration-flag.js';
 import { EPOCH_CELL } from '../context-epoch.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
-import { isBlockOpen, selfDelimits } from '../hydration-protocol.js';
+import { selfDelimits } from '../hydration-protocol.js';
+import { isBlockOpen } from '../stream-protocol.js';
 import { isChildOf, moveNativeNodeBefore } from '../dom-focused-move.js';
 import type {
 	ComponentBody,

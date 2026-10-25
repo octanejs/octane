@@ -124,11 +124,6 @@ export function isRangeOpen(data: string): boolean {
 			: kind === 98 && next === 59;
 }
 
-/** Whether `node` is a comment that opens a range. */
-export function isBlockOpen(node: Node | null): node is Comment {
-	return node !== null && node.nodeType === 8 && isRangeOpen((node as Comment).data);
-}
-
 /**
  * isRangeOpen as regular-expression source, for the inline stream swap script,
  * which cannot import this module. A stream test holds the two equal.

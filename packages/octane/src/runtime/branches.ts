@@ -20,7 +20,7 @@ import {
 import { isSuspenseException } from './use.js';
 import { SHARED_BODY_SCOPE } from './context.js';
 import { CURSOR, END_OF_CONTENT } from './hydration.js';
-import { isBlockOpen } from '../hydration-protocol.js';
+import { isBlockOpen } from '../stream-protocol.js';
 import {
 	ScopeImpl,
 	createBlock,

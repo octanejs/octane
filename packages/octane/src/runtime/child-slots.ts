@@ -45,7 +45,7 @@ import { ROOT_RENDER_ROLLBACK, journalRootProperty, isCreatedInRootRender } from
 import { type TrackedThenable, useThenable } from './use.js';
 import { CONTEXT_CHILD, type Context, promoteMemoAncestry } from './context.js';
 import { KEPT_TEXT_CONTENT, clearKeptTextContent, CURSOR } from './hydration.js';
-import { isBlockOpen } from '../hydration-protocol.js';
+import { isBlockOpen } from '../stream-protocol.js';
 import { PORTAL_CHILD } from './portals.js';
 import {
 	createBlock,
