@@ -42,13 +42,12 @@ export function moveNativeNodeBefore(
 	// connected by rotating only its intervening siblings around it. Those
 	// siblings are children of the parent, so they move natively when it can.
 	// A form's named controls can shadow every member read here, so the walk
-	// goes through Node.prototype.
+	// goes through Node.prototype (nodeProto).
 	if (node === anchor || nextOf(node) === anchor) return;
 	const forward =
 		anchor === null ||
-		(Node.prototype.compareDocumentPosition.call(node, anchor) &
-			Node.DOCUMENT_POSITION_FOLLOWING) !==
-			0;
+		// 4 is Node.DOCUMENT_POSITION_FOLLOWING.
+		(nodeProto(node).compareDocumentPosition.call(node, anchor) & 4) !== 0;
 	// Snapshot the siblings first: a moved custom element's
 	// connectedMoveCallback runs synchronously and can remove a sibling, which
 	// then stays removed instead of being moved while detached.
@@ -73,11 +72,27 @@ export function moveNativeNodeBefore(
 	}
 }
 
+let NODE_PROTO: Node | undefined;
 let parentNodeGetter: ((this: Node) => Node | null) | undefined;
 let nextSiblingGetter: ((this: Node) => Node | null) | undefined;
 
-function nodeGetter(name: 'parentNode' | 'nextSibling'): (this: Node) => Node | null {
-	return Object.getOwnPropertyDescriptor(Node.prototype, name)!.get as (this: Node) => Node | null;
+/**
+ * Node.prototype, found through a node's own prototype chain: a host can lack
+ * the `Node` global (a Node process driving a jsdom document), and a form's
+ * named controls shadow the members read through the node itself.
+ */
+function nodeProto(node: Node): Node {
+	if (NODE_PROTO === undefined) {
+		let proto = Object.getPrototypeOf(node);
+		while (!Object.prototype.hasOwnProperty.call(proto, 'nextSibling'))
+			proto = Object.getPrototypeOf(proto);
+		NODE_PROTO = proto as Node;
+	}
+	return NODE_PROTO;
+}
+
+function nodeGetter(node: Node, name: 'parentNode' | 'nextSibling'): (this: Node) => Node | null {
+	return Object.getOwnPropertyDescriptor(nodeProto(node), name)!.get as (this: Node) => Node | null;
 }
 
 /**
@@ -85,13 +100,13 @@ function nodeGetter(name: 'parentNode' | 'nextSibling'): (this: Node) => Node | 
  * which a form's named control cannot shadow the way it shadows `parentNode`.
  */
 export function isChildOf(node: Node, parent: Node): boolean {
-	parentNodeGetter ??= nodeGetter('parentNode');
+	parentNodeGetter ??= nodeGetter(node, 'parentNode');
 	return parentNodeGetter.call(node) === parent;
 }
 
 /** `node.nextSibling` through the native accessor, as isChildOf reads its parent. */
 function nextOf(node: Node): Node | null {
-	nextSiblingGetter ??= nodeGetter('nextSibling');
+	nextSiblingGetter ??= nodeGetter(node, 'nextSibling');
 	return nextSiblingGetter.call(node);
 }
 
@@ -111,7 +126,7 @@ function containsFocus(node: Node, focused: Element | null): boolean {
 	if (focused === null || node.nodeType !== 1) return false;
 	let candidate: Element | undefined = focused;
 	do {
-		if (Node.prototype.contains.call(node, candidate)) return true;
+		if (nodeProto(node).contains.call(node, candidate)) return true;
 		// Native contains() stops at a shadow root. Its host remains part of
 		// the editing subtree, including across nested or closed shadow roots.
 		// A retired link can now be its own root, and its .host is a URL
