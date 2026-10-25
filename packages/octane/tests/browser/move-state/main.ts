@@ -1,34 +1,71 @@
-import { createElement, createRoot, flushSync, type Root } from '../../../src/index.js';
+import {
+	createElement,
+	createRoot,
+	flushSync,
+	type OctaneNode,
+	type Root,
+} from '../../../src/index.js';
 import { mountBoundRows } from './bound-rows.tsrx';
-import { CompiledRows, type StatefulRow } from './rows.tsrx';
+import { CompiledRows, FormRows, TipRows, type StatefulRow } from './rows.tsrx';
 
 type RowKind = 'compiled' | 'descriptor' | 'binding';
 
-const rows: StatefulRow[] = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
+const allRows: StatefulRow[] = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
 
 let root: Root | undefined;
 let bound: ReturnType<typeof mountBoundRows> | undefined;
 let kind: RowKind = 'compiled';
+let rows = allRows;
 let primed = new Map<number, { article: Element; animation: Animation }>();
 
-function DescriptorRows(props: { items: readonly StatefulRow[] }) {
-	return createElement('section', {
-		children: props.items.map((row) =>
-			createElement('article', {
-				key: row.id,
-				'data-row': String(row.id),
-				children: [
-					createElement('iframe', { key: 'frame', srcDoc: '<p>frame</p>' }),
-					createElement('div', { key: 'spinner', className: 'spinner' }),
-					createElement('div', {
-						key: 'popover',
-						popover: 'manual',
-						children: `popover ${row.id}`,
-					}),
-				],
+// Creates a tooltip beside itself and dismisses it when it is moved, as a
+// popover-style widget would when its anchor relocates.
+class MoveTip extends HTMLElement {
+	tip: HTMLElement | null = null;
+	showTip(): void {
+		this.tip = document.createElement('span');
+		this.tip.className = 'tooltip';
+		this.after(this.tip);
+	}
+	connectedMoveCallback(): void {
+		this.tip?.remove();
+		this.tip = null;
+	}
+}
+customElements.define('move-tip', MoveTip);
+
+function DescriptorRows(props: { items: readonly StatefulRow[]; form?: boolean }) {
+	const children: OctaneNode[] = props.items.map((row) =>
+		createElement('article', {
+			key: row.id,
+			'data-row': String(row.id),
+			children: [
+				createElement('iframe', { key: 'frame', srcDoc: '<p>frame</p>' }),
+				createElement('div', { key: 'spinner', className: 'spinner' }),
+				createElement('div', {
+					key: 'popover',
+					popover: 'manual',
+					children: `popover ${row.id}`,
+				}),
+				createElement('div', {
+					key: 'editor',
+					className: 'editor',
+					contentEditable: true,
+					suppressContentEditableWarning: true,
+					children: 'editable text',
+				}),
+			],
+		}),
+	);
+	// A form's named controls shadow its DOM members, including isConnected.
+	if (props.form)
+		children.push(
+			createElement('form', {
+				key: 'form',
+				children: createElement('input', { name: 'isConnected' }),
 			}),
-		),
-	});
+		);
+	return createElement('section', { children });
 }
 
 function render(items: readonly StatefulRow[]): void {
@@ -41,13 +78,18 @@ function articles(): HTMLElement[] {
 	return Array.from(document.querySelectorAll<HTMLElement>('#root article'));
 }
 
-async function mount(nextKind: RowKind): Promise<void> {
+function reset(): Element {
 	root?.unmount();
 	root = undefined;
 	bound?.dispose();
 	bound = undefined;
+	return document.querySelector('#root')!;
+}
+
+async function mount(nextKind: RowKind, count = allRows.length): Promise<void> {
+	const container = reset();
 	kind = nextKind;
-	const container = document.querySelector('#root')!;
+	rows = allRows.slice(0, count);
 	if (kind === 'binding') bound = mountBoundRows(container, rows);
 	else root = createRoot(container);
 	flushSync(() => render(rows));
@@ -71,31 +113,125 @@ async function mount(nextKind: RowKind): Promise<void> {
 	}
 }
 
-function reverse() {
-	flushSync(() => render(rows.toReversed()));
-	return articles().map((article) => {
-		const id = Number(article.dataset['row']);
-		const before = primed.get(id)!;
-		const frame = article.querySelector('iframe');
-		const animation = article.querySelector('.spinner')!.getAnimations()[0];
-		return {
-			id,
-			sameArticle: article === before.article,
-			frameMarker:
-				frame === null
-					? id
-					: (frame.contentWindow as (Window & { rowMarker?: number }) | null)?.rowMarker,
-			sameAnimation: animation === before.animation,
-			animationTime: Number(animation?.currentTime ?? 0),
-			popoverOpen: article.querySelector('[popover]')!.matches(':popover-open'),
-		};
-	});
+function rowState(article: HTMLElement) {
+	const id = Number(article.dataset['row']);
+	const before = primed.get(id)!;
+	const frame = article.querySelector('iframe');
+	const animation = article.querySelector('.spinner')!.getAnimations()[0];
+	return {
+		id,
+		sameArticle: article === before.article,
+		frameMarker:
+			frame === null
+				? null
+				: ((frame.contentWindow as (Window & { rowMarker?: number }) | null)?.rowMarker ?? null),
+		sameAnimation: animation === before.animation,
+		animationTime: Number(animation?.currentTime ?? 0),
+		popoverOpen: article.querySelector('[popover]')!.matches(':popover-open'),
+	};
 }
 
-window.__moveState = { mount, reverse };
+function reverse() {
+	flushSync(() => render(rows.toReversed()));
+	return articles().map(rowState);
+}
+
+/** Select text in the last row's editor, then reverse the rows around it. */
+function reverseBesideEditor() {
+	const editor = articles().at(-1)!.querySelector<HTMLElement>('.editor')!;
+	const text = editor.firstChild!;
+	editor.focus();
+	const selection = getSelection()!;
+	const range = document.createRange();
+	range.setStart(text, 2);
+	range.setEnd(text, 7);
+	selection.removeAllRanges();
+	selection.addRange(range);
+	const placed = reverse();
+	return {
+		placed,
+		focused: document.activeElement === editor,
+		selection: [
+			selection.anchorNode === text,
+			selection.anchorOffset,
+			selection.focusNode === text,
+			selection.focusOffset,
+		],
+	};
+}
+
+function insertFormIntoMountedSection() {
+	const container = reset();
+	kind = 'descriptor';
+	root = createRoot(container);
+	flushSync(() => root!.render(DescriptorRows, { items: allRows.slice(0, 2) }));
+	flushSync(() => root!.render(DescriptorRows, { items: allRows.slice(0, 2), form: true }));
+	const form = container.querySelector('section > form');
+	return {
+		formPlaced: form !== null && form.previousElementSibling?.localName === 'article',
+		controlInside: form?.querySelector('input[name="isConnected"]') !== null,
+	};
+}
+
+function reverseFormRows() {
+	const container = reset();
+	root = createRoot(container);
+	const items = allRows.slice(0, 3);
+	flushSync(() => root!.render(FormRows, { items }));
+	const before = Array.from(container.querySelectorAll('article'));
+	flushSync(() => root!.render(FormRows, { items: items.toReversed() }));
+	const after = Array.from(container.querySelectorAll('article'));
+	return {
+		order: after.map((article) => Number(article.dataset['row'])),
+		sameNodes: after.every((article, index) => article === before[before.length - 1 - index]),
+	};
+}
+
+function reverseTipRows(focusOther: boolean) {
+	const container = reset();
+	root = createRoot(container);
+	const items = allRows.slice(0, 3);
+	flushSync(() => root!.render(TipRows, { items }));
+	for (const tip of container.querySelectorAll<MoveTip>('move-tip')) tip.showTip();
+	if (focusOther) container.querySelector<HTMLInputElement>('#tip-other')!.focus();
+	flushSync(() => root!.render(TipRows, { items: items.toReversed() }));
+	const children = Array.from(container.querySelector('section')!.children);
+	return {
+		rows: children
+			.filter((child) => child.className !== 'tooltip')
+			.map((child) =>
+				child.localName === 'move-tip'
+					? `tip ${(child as HTMLElement).dataset['row']}`
+					: child.localName === 'i'
+						? child.textContent
+						: child.id,
+			),
+		// A tooltip that survived belongs to an unmoved row and sits beside it.
+		strayTooltips: children.filter(
+			(child, index) =>
+				child.className === 'tooltip' && children[index - 1]?.localName !== 'move-tip',
+		).length,
+	};
+}
+
+window.__moveState = {
+	mount,
+	reverse,
+	reverseBesideEditor,
+	insertFormIntoMountedSection,
+	reverseFormRows,
+	reverseTipRows,
+};
 
 declare global {
 	interface Window {
-		__moveState: { mount: typeof mount; reverse: typeof reverse };
+		__moveState: {
+			mount: typeof mount;
+			reverse: typeof reverse;
+			reverseBesideEditor: typeof reverseBesideEditor;
+			insertFormIntoMountedSection: typeof insertFormIntoMountedSection;
+			reverseFormRows: typeof reverseFormRows;
+			reverseTipRows: typeof reverseTipRows;
+		};
 	}
 }

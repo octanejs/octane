@@ -15,13 +15,15 @@ export function moveNativeNodeBefore(
 	// It requires connected nodes in the same document, so fresh or detached
 	// nodes take insertBefore. Chromium still collapses live Range selections
 	// inside a moved content-editable tree, so that tree is rotated instead.
-	if (node.isConnected && parent.isConnected && parent.ownerDocument === node.ownerDocument) {
-		const moveBefore = (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-			.moveBefore;
-		if (typeof moveBefore === 'function' && !(contentEditable && containsFocus(node, focused))) {
-			moveBefore.call(parent, node, anchor);
-			return;
-		}
+	const move = nativeMove(parent);
+	if (
+		move !== null &&
+		node.isConnected === true &&
+		parent.ownerDocument === node.ownerDocument &&
+		!(contentEditable && containsFocus(node, focused))
+	) {
+		move.call(parent, node, anchor);
+		return;
 	}
 	if (!containsFocus(node, focused)) {
 		parent.insertBefore(node, anchor);
@@ -37,7 +39,9 @@ export function moveNativeNodeBefore(
 
 	// insertBefore detaches an existing node, which can end a trusted keyboard
 	// composition even if focus is restored afterward. Keep the editing subtree
-	// connected by rotating only its intervening siblings around it.
+	// connected by rotating only its intervening siblings around it. Those
+	// siblings are children of the parent, so they move natively when it can.
+	const rotate = move ?? parent.insertBefore;
 	if (node === anchor || node.nextSibling === anchor) return;
 	if (
 		anchor === null ||
@@ -46,7 +50,7 @@ export function moveNativeNodeBefore(
 		let cursor = node.nextSibling;
 		while (cursor !== anchor) {
 			const next = cursor!.nextSibling;
-			parent.insertBefore(cursor!, node);
+			rotate.call(parent, cursor!, node);
 			cursor = next;
 		}
 	} else {
@@ -54,10 +58,21 @@ export function moveNativeNodeBefore(
 		let cursor: Node | null = anchor;
 		while (cursor !== node) {
 			const next: Node | null = cursor!.nextSibling;
-			parent.insertBefore(cursor!, end);
+			rotate.call(parent, cursor!, end);
 			cursor = next;
 		}
 	}
+}
+
+/**
+ * The parent's state-preserving move, or null without one or while the
+ * parent is detached. A form's named controls shadow both members, so only a
+ * real `true` and a callable move count.
+ */
+function nativeMove(parent: Node): ((node: Node, anchor: Node | null) => void) | null {
+	if (parent.isConnected !== true) return null;
+	const move = (parent as Node & { moveBefore?: unknown }).moveBefore;
+	return typeof move === 'function' ? (move as (node: Node, anchor: Node | null) => void) : null;
 }
 
 function containsFocus(node: Node, focused: Element | null): boolean {
