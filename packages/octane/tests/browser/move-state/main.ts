@@ -6,7 +6,7 @@ import {
 	type Root,
 } from '../../../src/index.js';
 import { mountBoundRows } from './bound-rows.tsrx';
-import { CompiledRows, FormRows, TipRows, type StatefulRow } from './rows.tsrx';
+import { CompiledRows, FormParentRows, FormRows, TipRows, type StatefulRow } from './rows.tsrx';
 
 type RowKind = 'compiled' | 'descriptor' | 'binding';
 
@@ -187,13 +187,18 @@ function reverseFormRows() {
 	};
 }
 
-function reverseTipRows(focusOther: boolean) {
+function reverseTipRows(focus: 'none' | 'other' | 'editor') {
 	const container = reset();
 	root = createRoot(container);
 	const items = allRows.slice(0, 3);
 	flushSync(() => root!.render(TipRows, { items }));
 	for (const tip of container.querySelectorAll<MoveTip>('move-tip')) tip.showTip();
-	if (focusOther) container.querySelector<HTMLInputElement>('#tip-other')!.focus();
+	let focused: HTMLElement | null = null;
+	if (focus === 'other') focused = container.querySelector<HTMLInputElement>('#tip-other')!;
+	// The last row's editor makes its row rotate the other rows around it.
+	if (focus === 'editor')
+		focused = Array.from(container.querySelectorAll<HTMLElement>('i')).at(-1)!;
+	focused?.focus();
 	flushSync(() => root!.render(TipRows, { items: items.toReversed() }));
 	const children = Array.from(container.querySelector('section')!.children);
 	return {
@@ -211,7 +216,21 @@ function reverseTipRows(focusOther: boolean) {
 			(child, index) =>
 				child.className === 'tooltip' && children[index - 1]?.localName !== 'move-tip',
 		).length,
+		focusKept: focused === null || document.activeElement === focused,
 	};
+}
+
+function reverseFormParentRows() {
+	const container = reset();
+	root = createRoot(container);
+	const items = allRows.slice(0, 3);
+	flushSync(() => root!.render(FormParentRows, { items }));
+	flushSync(() => root!.render(FormParentRows, { items: items.toReversed() }));
+	return Array.from(container.querySelector('section')!.children, (child) =>
+		child.localName === 'form'
+			? `form ${(child as HTMLElement).dataset['row']}`
+			: child.textContent,
+	);
 }
 
 window.__moveState = {
@@ -221,6 +240,7 @@ window.__moveState = {
 	insertFormIntoMountedSection,
 	reverseFormRows,
 	reverseTipRows,
+	reverseFormParentRows,
 };
 
 declare global {
@@ -232,6 +252,7 @@ declare global {
 			insertFormIntoMountedSection: typeof insertFormIntoMountedSection;
 			reverseFormRows: typeof reverseFormRows;
 			reverseTipRows: typeof reverseTipRows;
+			reverseFormParentRows: typeof reverseFormParentRows;
 		};
 	}
 }

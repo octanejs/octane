@@ -104,27 +104,29 @@ describe.sequential('real-browser keyed moves', () => {
 		expect(result.selection).toEqual([true, 2, true, 7]);
 	});
 
-	it.each([false, true])(
-		'keeps two-root rows whole when a moved element removes a sibling (other focus=%s)',
-		async (focusOther) => {
+	it.each(['none', 'other', 'editor'] as const)(
+		'keeps two-root rows whole when a moved element removes a sibling (focus=%s)',
+		async (focus) => {
 			const current = await openCase(false);
 			const result = await current.evaluate(
-				(focusOther) => window.__moveState.reverseTipRows(focusOther),
-				focusOther,
+				(focus) => window.__moveState.reverseTipRows(focus),
+				focus,
 			);
 
-			expect(result.rows).toEqual([
-				'tip 3',
-				'row 3',
-				'tip 2',
-				'row 2',
-				'tip 1',
-				'row 1',
-				'tip-other',
-			]);
-			expect(result.strayTooltips).toBe(0);
+			expect(result).toEqual({
+				rows: ['tip 3', 'row 3', 'tip 2', 'row 2', 'tip 1', 'row 1', 'tip-other'],
+				strayTooltips: 0,
+				focusKept: true,
+			});
 		},
 	);
+
+	it('keeps two-root rows whole when a form control is named parentNode', async () => {
+		const current = await openCase(false);
+		const placed = await current.evaluate(() => window.__moveState.reverseFormParentRows());
+
+		expect(placed).toEqual(['form 3', 'row 3', 'form 2', 'row 2', 'form 1', 'row 1']);
+	});
 
 	it('reorders rows inside a form whose control is named moveBefore', async () => {
 		const current = await openCase(false);

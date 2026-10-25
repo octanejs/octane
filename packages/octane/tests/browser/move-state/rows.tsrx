@@ -53,9 +53,25 @@ export function TipRows(props: { items: readonly StatefulRow[] }) @{
 		@for (const row of props.items; key row.id) {
 			<>
 				<move-tip data-row={String(row.id)} />
-				<i>{'row ' + row.id}</i>
+				<i contentEditable={true} suppressContentEditableWarning={true}>
+					{'row ' + row.id}
+				</i>
 			</>
 		}
 		<input id="tip-other" />
+	</section>
+}
+
+// Two-root rows whose form shadows `parentNode` with a named control.
+export function FormParentRows(props: { items: readonly StatefulRow[] }) @{
+	<section>
+		@for (const row of props.items; key row.id) {
+			<>
+				<form data-row={String(row.id)}>
+					<input name="parentNode" />
+				</form>
+				<i>{'row ' + row.id}</i>
+			</>
+		}
 	</section>
 }

@@ -9,7 +9,7 @@ import { hydrating } from '../hydration-flag.js';
 import { EPOCH_CELL } from '../context-epoch.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
 import { selfDelimits } from '../hydration-protocol.js';
-import { moveNativeNodeBefore } from '../dom-focused-move.js';
+import { isChildOf, moveNativeNodeBefore } from '../dom-focused-move.js';
 import type {
 	ComponentBody,
 	Scope,
@@ -2184,7 +2184,8 @@ export function moveBlockBefore(block: Block, anchor: Node): void {
 	// connectedMoveCallback (or connected callbacks under insertBefore) runs
 	// synchronously and can remove or add siblings, so the range cannot be
 	// re-walked through nextSibling between moves. A node such a callback
-	// removed stays removed; nodes it added outside the range stay put.
+	// removed stays removed; nodes it added outside the range stay put. A form's
+	// named control can shadow `parentNode`, so membership reads the native one.
 	const nodes: Node[] = [];
 	for (let n: Node | null = start; n !== null; n = getNextSibling(n)) {
 		nodes.push(n);
@@ -2192,7 +2193,7 @@ export function moveBlockBefore(block: Block, anchor: Node): void {
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		if (node.parentNode !== parent) continue;
+		if (!isChildOf(node, parent)) continue;
 		if (focus !== null) moveFocusedNodeBefore(parent, node, anchor, focus);
 		else if (move !== null) move.call(parent, node, anchor);
 		else parent.insertBefore(node, anchor);

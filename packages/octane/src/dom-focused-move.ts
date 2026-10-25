@@ -32,7 +32,7 @@ export function moveNativeNodeBefore(
 
 	// Rotation requires siblings in one parent. Cross-parent moves must insert
 	// the editing node itself; let native insertion validate foreign anchors.
-	if (node.parentNode !== parent || (anchor !== null && anchor.parentNode !== parent)) {
+	if (!isChildOf(node, parent) || (anchor !== null && !isChildOf(anchor, parent))) {
 		parent.insertBefore(node, anchor);
 		return;
 	}
@@ -41,27 +41,45 @@ export function moveNativeNodeBefore(
 	// composition even if focus is restored afterward. Keep the editing subtree
 	// connected by rotating only its intervening siblings around it. Those
 	// siblings are children of the parent, so they move natively when it can.
-	const rotate = move ?? parent.insertBefore;
 	if (node === anchor || node.nextSibling === anchor) return;
-	if (
+	const forward =
 		anchor === null ||
-		(node.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-	) {
-		let cursor = node.nextSibling;
-		while (cursor !== anchor) {
-			const next = cursor!.nextSibling;
-			rotate.call(parent, cursor!, node);
-			cursor = next;
-		}
-	} else {
-		const end = node.nextSibling;
-		let cursor: Node | null = anchor;
-		while (cursor !== node) {
-			const next: Node | null = cursor!.nextSibling;
-			rotate.call(parent, cursor!, end);
-			cursor = next;
+		(node.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+	// Snapshot the siblings first: a moved custom element's
+	// connectedMoveCallback runs synchronously and can remove a sibling, which
+	// then stays removed instead of being moved while detached.
+	const siblings: Node[] = [];
+	for (
+		let cursor: Node | null = forward ? node.nextSibling : anchor;
+		cursor !== null && cursor !== (forward ? anchor : node);
+		cursor = cursor.nextSibling
+	)
+		siblings.push(cursor);
+	const rotate = move ?? parent.insertBefore;
+	let after: Node = node;
+	for (let i = 0; i < siblings.length; i++) {
+		const sibling = siblings[i];
+		if (!isChildOf(sibling, parent)) continue;
+		if (forward) rotate.call(parent, sibling, node);
+		else {
+			// Each earlier sibling lands after the previous one, keeping their order.
+			rotate.call(parent, sibling, after.nextSibling);
+			if (isChildOf(sibling, parent)) after = sibling;
 		}
 	}
+}
+
+let parentNodeGetter: ((this: Node) => ParentNode | null) | undefined;
+
+/**
+ * Whether `node` is still a child of `parent`. Reads the native accessor,
+ * which a form's named control cannot shadow the way it shadows `parentNode`.
+ */
+export function isChildOf(node: Node, parent: Node): boolean {
+	parentNodeGetter ??= Object.getOwnPropertyDescriptor(Node.prototype, 'parentNode')!.get as (
+		this: Node,
+	) => ParentNode | null;
+	return parentNodeGetter.call(node) === parent;
 }
 
 /**
