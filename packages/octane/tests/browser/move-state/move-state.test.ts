@@ -128,6 +128,13 @@ describe.sequential('real-browser keyed moves', () => {
 		expect(placed).toEqual(['form 3', 'row 3', 'form 2', 'row 2', 'form 1', 'row 1']);
 	});
 
+	it('rotates form rows whose control is named nextSibling around a focused editor', async () => {
+		const current = await openCase(false);
+		const result = await current.evaluate(() => window.__moveState.moveFocusedEditorFormRow());
+
+		expect(result).toEqual({ children: [4, 1, 2, 3], focused: true });
+	});
+
 	it('reorders rows inside a form whose control is named moveBefore', async () => {
 		const current = await openCase(false);
 		const result = await current.evaluate(() => window.__moveState.reverseFormRows());

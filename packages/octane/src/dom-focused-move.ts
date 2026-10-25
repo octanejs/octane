@@ -41,18 +41,22 @@ export function moveNativeNodeBefore(
 	// composition even if focus is restored afterward. Keep the editing subtree
 	// connected by rotating only its intervening siblings around it. Those
 	// siblings are children of the parent, so they move natively when it can.
-	if (node === anchor || node.nextSibling === anchor) return;
+	// A form's named controls can shadow every member read here, so the walk
+	// goes through Node.prototype.
+	if (node === anchor || nextOf(node) === anchor) return;
 	const forward =
 		anchor === null ||
-		(node.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+		(Node.prototype.compareDocumentPosition.call(node, anchor) &
+			Node.DOCUMENT_POSITION_FOLLOWING) !==
+			0;
 	// Snapshot the siblings first: a moved custom element's
 	// connectedMoveCallback runs synchronously and can remove a sibling, which
 	// then stays removed instead of being moved while detached.
 	const siblings: Node[] = [];
 	for (
-		let cursor: Node | null = forward ? node.nextSibling : anchor;
+		let cursor: Node | null = forward ? nextOf(node) : anchor;
 		cursor !== null && cursor !== (forward ? anchor : node);
-		cursor = cursor.nextSibling
+		cursor = nextOf(cursor)
 	)
 		siblings.push(cursor);
 	const rotate = move ?? parent.insertBefore;
@@ -63,23 +67,32 @@ export function moveNativeNodeBefore(
 		if (forward) rotate.call(parent, sibling, node);
 		else {
 			// Each earlier sibling lands after the previous one, keeping their order.
-			rotate.call(parent, sibling, after.nextSibling);
+			rotate.call(parent, sibling, nextOf(after));
 			if (isChildOf(sibling, parent)) after = sibling;
 		}
 	}
 }
 
-let parentNodeGetter: ((this: Node) => ParentNode | null) | undefined;
+let parentNodeGetter: ((this: Node) => Node | null) | undefined;
+let nextSiblingGetter: ((this: Node) => Node | null) | undefined;
+
+function nodeGetter(name: 'parentNode' | 'nextSibling'): (this: Node) => Node | null {
+	return Object.getOwnPropertyDescriptor(Node.prototype, name)!.get as (this: Node) => Node | null;
+}
 
 /**
  * Whether `node` is still a child of `parent`. Reads the native accessor,
  * which a form's named control cannot shadow the way it shadows `parentNode`.
  */
 export function isChildOf(node: Node, parent: Node): boolean {
-	parentNodeGetter ??= Object.getOwnPropertyDescriptor(Node.prototype, 'parentNode')!.get as (
-		this: Node,
-	) => ParentNode | null;
+	parentNodeGetter ??= nodeGetter('parentNode');
 	return parentNodeGetter.call(node) === parent;
+}
+
+/** `node.nextSibling` through the native accessor, as isChildOf reads its parent. */
+function nextOf(node: Node): Node | null {
+	nextSiblingGetter ??= nodeGetter('nextSibling');
+	return nextSiblingGetter.call(node);
 }
 
 /**
@@ -98,7 +111,7 @@ function containsFocus(node: Node, focused: Element | null): boolean {
 	if (focused === null || node.nodeType !== 1) return false;
 	let candidate: Element | undefined = focused;
 	do {
-		if ((node as Element).contains(candidate)) return true;
+		if (Node.prototype.contains.call(node, candidate)) return true;
 		// Native contains() stops at a shadow root. Its host remains part of
 		// the editing subtree, including across nested or closed shadow roots.
 		// A retired link can now be its own root, and its .host is a URL

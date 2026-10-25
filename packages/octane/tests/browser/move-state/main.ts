@@ -68,6 +68,29 @@ function DescriptorRows(props: { items: readonly StatefulRow[]; form?: boolean }
 	return createElement('section', { children });
 }
 
+// Form rows that shadow `nextSibling`, each with an editor that can hold focus.
+// Descriptor reconciliation moves a focused row, rotating its siblings.
+function EditorFormRows(props: { items: readonly StatefulRow[] }) {
+	return createElement('section', {
+		children: props.items.map((row) =>
+			createElement('form', {
+				key: row.id,
+				'data-row': String(row.id),
+				children: [
+					createElement('input', { key: 'shadow', name: 'nextSibling' }),
+					createElement('div', {
+						key: 'editor',
+						className: 'editor',
+						contentEditable: true,
+						suppressContentEditableWarning: true,
+						children: `row ${row.id}`,
+					}),
+				],
+			}),
+		),
+	});
+}
+
 function render(items: readonly StatefulRow[]): void {
 	if (kind === 'binding') bound!.update(items);
 	else if (kind === 'compiled') root!.render(CompiledRows, { items });
@@ -233,6 +256,29 @@ function reverseFormParentRows() {
 	);
 }
 
+/**
+ * Move the last row, which holds a focused editor, to the front. Descriptor
+ * reconciliation moves that row, rotating the other rows around it.
+ */
+function moveFocusedEditorFormRow() {
+	const container = reset();
+	root = createRoot(container);
+	flushSync(() => root!.render(EditorFormRows, { items: allRows }));
+	const moved = allRows.at(-1)!;
+	const editor = container.querySelector<HTMLElement>(`form[data-row="${moved.id}"] .editor`)!;
+	editor.focus();
+	const rest = allRows.filter((row) => row !== moved);
+	flushSync(() => root!.render(EditorFormRows, { items: [moved, ...rest] }));
+	return {
+		// Every direct child must be a whole form row: a broken walk pulls form
+		// controls out into the section.
+		children: Array.from(container.querySelector('section')!.children, (child) =>
+			child.localName === 'form' ? Number((child as HTMLElement).dataset['row']) : child.localName,
+		),
+		focused: document.activeElement === editor,
+	};
+}
+
 window.__moveState = {
 	mount,
 	reverse,
@@ -241,6 +287,7 @@ window.__moveState = {
 	reverseFormRows,
 	reverseTipRows,
 	reverseFormParentRows,
+	moveFocusedEditorFormRow,
 };
 
 declare global {
@@ -253,6 +300,7 @@ declare global {
 			reverseFormRows: typeof reverseFormRows;
 			reverseTipRows: typeof reverseTipRows;
 			reverseFormParentRows: typeof reverseFormParentRows;
+			moveFocusedEditorFormRow: typeof moveFocusedEditorFormRow;
 		};
 	}
 }
