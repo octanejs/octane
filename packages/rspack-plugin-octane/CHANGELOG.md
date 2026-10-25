@@ -1,5 +1,29 @@
 # @octanejs/rspack-plugin
 
+## 0.2.8
+
+### Patch Changes
+
+- 0764a19: Load the server-call response reader off the critical path. Calls still encode their arguments and send their request at call time; the reader (result streaming, batch decoding and devalue's parser) now preloads once the page has loaded and gone idle, and a call made before then fetches it alongside the server's reply. Server functions that take a `ServerCallContext` compile to a new `__serverRpcStream` target, so an app whose calls all stream no longer ships devalue's encoder. In the signal-chat example this removes about 4.2 KB gzip from the first view.
+- Updated dependencies [de689bf]
+- Updated dependencies [a7457a1]
+- Updated dependencies [b7e4965]
+- Updated dependencies [f47ddbf]
+- Updated dependencies [0764a19]
+- Updated dependencies [c08072b]
+- Updated dependencies [8aa17d0]
+- Updated dependencies [b7e4965]
+- Updated dependencies [1580f0c]
+- Updated dependencies [f3998b0]
+- Updated dependencies [9ab525f]
+- Updated dependencies [3827e24]
+- Updated dependencies [3c05c86]
+- Updated dependencies [af767d7]
+- Updated dependencies [31d7f86]
+- Updated dependencies [1085e32]
+- Updated dependencies [41ba7bd]
+  - octane@0.16.0
+
 ## 0.2.7
 
 ### Patch Changes
