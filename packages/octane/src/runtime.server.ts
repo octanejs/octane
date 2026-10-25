@@ -116,7 +116,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
-import { READ_ONLY_VALUE_INPUT_TYPES } from './dom-tables.js';
+import { RAW_TEXT_CONTENT, READ_ONLY_VALUE_INPUT_TYPES } from './dom-tables.js';
 import { STREAM_RETRY_PROP } from './stream-protocol.js';
 import {
 	createIndependentHydrateManifest,
@@ -3021,21 +3021,8 @@ function ssrDescriptorPart(v: unknown, scope: SSRScope): string {
 	return ssrContentParsesComments() ? TEXT_SEPARATOR + text : text;
 }
 
-// HTML elements whose content the parser reads as RCDATA or raw text (noscript
-// is raw text whenever scripting is enabled). A comment there is literal text,
-// and the parser keeps the whole content as one text node anyway.
-const RAW_TEXT_CONTENT = new Set([
-	'textarea',
-	'title',
-	'script',
-	'style',
-	'xmp',
-	'iframe',
-	'noembed',
-	'noframes',
-	'noscript',
-	'plaintext',
-]);
+// A comment in a RAW_TEXT_CONTENT host is literal text, and the parser keeps
+// the whole content as one text node anyway.
 
 // Whether the host whose content is being serialized tokenizes comments.
 function ssrContentParsesComments(): boolean {

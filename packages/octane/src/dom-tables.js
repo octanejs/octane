@@ -43,6 +43,25 @@ export const VOID_ELEMENTS = new Set([
 ]);
 
 /**
+ * HTML elements whose content the parser reads as RCDATA or raw text (noscript
+ * is raw text whenever scripting is enabled): markup written inside one is its
+ * text. The SSR serializer emits no comment separators there; the compiler's
+ * template compaction leaves that content byte for byte.
+ */
+export const RAW_TEXT_CONTENT = new Set([
+	'textarea',
+	'title',
+	'script',
+	'style',
+	'xmp',
+	'iframe',
+	'noembed',
+	'noframes',
+	'noscript',
+	'plaintext',
+]);
+
+/**
  * `<input>` types whose value the user never edits (ReactDOMInput's
  * hasReadOnlyValue): a controlled `value` there needs no client re-assertion.
  * Shared by the compiler's and the server runtime's islands shell witness.

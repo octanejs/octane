@@ -13,6 +13,8 @@
 // concatenation) but not for source-span arrays.
 // ---------------------------------------------------------------------------
 
+import { RAW_TEXT_CONTENT } from '../dom-tables.js';
+
 /**
  * @typedef {{ start: number, end: number, srcStart: number, srcEnd: number,
  *   kind: 'tag-open' | 'tag-close' | 'attr-name' | 'attr-value' | 'text' }} TemplateOrigin
@@ -222,7 +224,10 @@ export function compactTemplateIr(template, htmlParse) {
 			node.openingEnd.value === '/>' && !keepsSlash
 				? createTemplatePart('>', 'syntax')
 				: node.openingEnd;
-		const children = compactNodes(node.children, last);
+		// A raw-text or RCDATA host reads its content as text, so it keeps every byte.
+		const children = RAW_TEXT_CONTENT.has(node.tag)
+			? node.children
+			: compactNodes(node.children, last);
 		const closing = last ? null : node.closing;
 		// An omitted close tag's authored name resolves to the opening one, which
 		// names the same element (`</` is one byte longer than `<`).

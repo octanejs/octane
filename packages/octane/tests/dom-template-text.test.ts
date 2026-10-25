@@ -9,6 +9,7 @@ import {
 	ForeignSvg,
 	FragmentTextRows,
 	OpaqueLink,
+	RawTextHost,
 	RootTextPair,
 	StaticMarkup,
 	TableSections,
@@ -197,20 +198,24 @@ describe('compiled fragment and text children', () => {
 		for (const [Component, ServerComponent] of [
 			[StaticMarkup, server.StaticMarkup],
 			[OpaqueLink, server.OpaqueLink],
+			[RawTextHost, server.RawTextHost],
 		] as const) {
 			const container = document.createElement('div');
 			document.body.appendChild(container);
 			if (mode === 'hydrate')
 				container.innerHTML = ServerRT.renderToString(ServerComponent, {}).html;
-			const adopted = container.querySelector('a');
+			const adopted = container.querySelector('a, iframe');
 			const root =
 				mode === 'hydrate' ? hydrateRoot(container, Component, {}) : createRoot(container);
 			try {
 				if (mode === 'mount') root.render(Component, {});
 				flushSync(() => {});
-				const link = container.querySelector('a')!;
+				const link = container.querySelector('a, iframe')!;
 				if (mode === 'hydrate') expect(link).toBe(adopted);
-				if (Component === StaticMarkup) {
+				if (Component === RawTextHost) {
+					expect(link.localName).toBe('iframe');
+					expect(link.textContent).toBe('<p class="inside">x</p>');
+				} else if (Component === StaticMarkup) {
 					const nav = container.querySelector('nav')!;
 					expect(nav.className).toBe('menu');
 					expect([...nav.children].map((child) => child.localName)).toEqual(['a', 'input', 'ul']);

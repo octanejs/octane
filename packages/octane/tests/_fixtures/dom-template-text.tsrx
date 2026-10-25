@@ -106,3 +106,13 @@ export function OpaqueLink() @{
 		<img alt="logo" src="logo.png" />
 	</a>
 }
+
+// A raw-text host reads its content as text, so markup written inside one
+// stays byte for byte, even where it ends the template.
+export function RawTextHost() @{
+	<div>
+		<iframe title="frame">
+			<p class="inside">x</p>
+		</iframe>
+	</div>
+}
