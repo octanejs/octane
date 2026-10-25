@@ -178,7 +178,7 @@ describe('compiler template-origin recording (inspect: true)', () => {
 
 		expect(inspected.code).toBe(plain.code);
 		expect(templates).toHaveLength(1);
-		expect(templates[0].html).toBe('<div class="same">same</div>');
+		expect(templates[0].html).toBe('<div class=same>same');
 
 		const secondOpening = source.indexOf('<div', source.indexOf('\n')) + 1;
 		const firstOpening = source.indexOf('<div') + 1;
@@ -232,9 +232,7 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		});
 
 		expect(
-			(result.inspect.templates as InspectTemplate[]).filter(
-				(template) => template.html === '<a></a>',
-			),
+			(result.inspect.templates as InspectTemplate[]).filter((template) => template.html === '<a>'),
 		).toHaveLength(2);
 	});
 
@@ -330,12 +328,16 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		const ofKind = (kind: OriginKind) => app.origins.filter((o) => o.kind === kind);
 
 		// Non-void tags get open+close; the void <input> records open only. Note
-		// <rect/> is NOT an HTML void element — its authored self-close emits an
-		// explicit </rect> in the template, hence a tag-close entry.
+		// <rect/> is NOT an HTML void element — its authored self-close records
+		// a tag-close entry. The close tags that end the template
+		// (</rect></svg></div>) are left to the parser, so theirs sit on the
+		// opening names.
 		const opens = ofKind('tag-open').map(bySrc);
 		const closes = ofKind('tag-close').map(bySrc);
 		expect(opens.sort()).toEqual(['div', 'input', 'p', 'rect', 'span', 'svg'].sort());
 		expect(closes.sort()).toEqual(['div', 'p', 'rect', 'span', 'svg'].sort());
+		const onOpening = ofKind('tag-close').filter((o) => app.html[o.start - 1] === '<');
+		expect(onOpening.map(bySrc).sort()).toEqual(['div', 'rect', 'svg']);
 
 		// Every authored attribute has an attr-name entry.
 		const names = ofKind('attr-name').map(bySrc);
@@ -343,7 +345,7 @@ describe('compiler template-origin recording (inspect: true)', () => {
 			['class', 'title', 'data-x', 'disabled', 'class', 'viewBox', 'width'].sort(),
 		);
 
-		// Bare boolean attrs record their attr-name ONLY — `disabled=""` bakes an
+		// Bare boolean attrs record their attr-name ONLY — `disabled` bakes an
 		// empty presence value, so exactly the six real values are recorded.
 		const values = ofKind('attr-value').map(bySrc);
 		expect(values.sort()).toEqual(
@@ -389,7 +391,7 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		// An opaque component destination resolves to raw multi-root markup +
 		// frag flag (parseTemplate adds the wrapper at runtime), so the recorded
 		// html — and therefore the offsets — carry no wrapper.
-		const pair = templates.find((t) => t.html === '<em>a</em><strong>b</strong>')!;
+		const pair = templates.find((t) => t.html === '<em>a</em><strong>b')!;
 		expect(pair).toBeDefined();
 		const slice = (o: Origin) => pair.html.slice(o.start, o.end);
 		const em = pair.origins.find((o) => o.kind === 'tag-open' && slice(o) === 'em');
@@ -405,7 +407,7 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		// The branch body is its own planJsx run → its own hoisted template with
 		// its own origin frame (raw multi-root markup + frag flag; the runtime
 		// adds the wrapper, so offsets carry none).
-		const branch = templates.find((t) => t.html === '<em>c</em><strong>d</strong>')!;
+		const branch = templates.find((t) => t.html === '<em>c</em><strong>d')!;
 		expect(branch).toBeDefined();
 		const slice = (o: Origin) => branch.html.slice(o.start, o.end);
 		const em = branch.origins.find((o) => o.kind === 'tag-open' && slice(o) === 'em');
@@ -419,7 +421,7 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		expect(texts.sort()).toEqual(['c', 'd']);
 		// The host template's <!> anchor carries no origin — only real baked
 		// content is recorded.
-		const host = templates.find((t) => t.html === '<section><!></section>')!;
+		const host = templates.find((t) => t.html === '<section><!>')!;
 		expect(host).toBeDefined();
 		const hostSlices = host.origins.map((o) => host.html.slice(o.start, o.end));
 		expect(hostSlices.sort()).toEqual(['section', 'section']);
@@ -486,7 +488,7 @@ describe.each([
 		const [template] = templatesOf(CLOSE_SOURCE);
 		// `<button>` has no authored class, so the compiler adds one. Reporting
 		// the opening tag as its origin made a hover on `onClick` resolve to it.
-		expect(template.html).toContain('<button class="tsrx-');
+		expect(template.html).toContain('<button class=tsrx-');
 		for (const origin of template.origins) {
 			const authored = CLOSE_SOURCE.slice(origin.srcStart, origin.srcEnd);
 			expect(authored, `${origin.kind} claims ${JSON.stringify(authored)}`).not.toContain(

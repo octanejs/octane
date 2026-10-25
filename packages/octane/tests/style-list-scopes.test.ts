@@ -232,7 +232,9 @@ export function Applied() @{
 			const unescaped = code.replace(/\\"/g, '"');
 			expect(unescaped).toContain(`class="in ${scope.hash} ${themeHash}"`);
 			// The containing section is neither hashed nor themed.
-			expect(unescaped).toContain('<section id="outside">');
+			expect(unescaped).toContain(
+				mode === 'client' ? '<section id=outside>' : '<section id="outside">',
+			);
 		}
 	});
 

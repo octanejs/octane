@@ -115,7 +115,7 @@ describe('rule C: <style>{expr}</style> is an ordinary element', () => {
 			const { code } = compile(PLAIN, 'style-value.tsrx', options);
 			expect(code).not.toContain('injectStyle');
 			expect(code).not.toMatch(/tsrx-[a-z0-9]+/);
-			expect(code).toContain('<section><style></style><div class=\\"a\\"></div></section>');
+			expect(code).toContain('<section><style></style><div class=a>');
 			expect(code).toContain('props.css');
 			expect(code).not.toContain('HeadHoist');
 			expect(code).not.toContain('styleResource');
@@ -138,16 +138,15 @@ describe('rule C: <style>{expr}</style> is an ordinary element', () => {
 		// hash; the style host between them is emitted bare on both sides — one
 		// static template on the client, nested template-literal runs with the
 		// text hole on the server.
-		expect(unescaped).toContain(`<section class="${hash}">`);
 		expect(unescaped).toContain(`<div class="a ${hash}">`);
 		expect(unescaped).not.toContain('<style class=');
 		expect(unescaped).not.toContain(`<style ${hash}`);
 		if ('mode' in options && options.mode === 'server') {
+			expect(unescaped).toContain(`<section class="${hash}">`);
 			expect(unescaped).toContain('<style>${_$ssrChildText(props.css, __s)}</style>');
 		} else {
-			expect(unescaped).toContain(
-				`<section class="${hash}"><style></style><div class="a ${hash}"></div></section>`,
-			);
+			// The client template needs no quotes around a single class token.
+			expect(unescaped).toContain(`<section class=${hash}><style></style><div class="a ${hash}">`);
 		}
 	});
 });

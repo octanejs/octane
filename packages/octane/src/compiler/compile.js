@@ -150,6 +150,7 @@ import {
 	appendTemplateIr,
 	templatePart,
 	templateElement,
+	compactTemplateIr,
 	serializeTemplateIr,
 } from './template-ir.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
@@ -31870,19 +31871,20 @@ function emitBindingMount(bind, elVar, bag) {
 			// htext's append behavior when a separate Text child already exists.
 			// Hydration adopts the server text in either case. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
-			// hydration mismatch re-render).
+			// hydration mismatch re-render). The seed is the mount's own argument.
 			return st(
-				b.block([
-					b.const('_v', bind.expr),
-					b.stmt(
-						b.assignment(
-							'=',
-							local(`_txt$${bind.id}`),
-							b.call('_$htext', el(), V(), ...(bind.seededText ? [b.literal(1)] : [])),
+				b.stmt(
+					b.assignment(
+						'=',
+						local(`_txt$${bind.id}`),
+						b.call(
+							'_$htext',
+							el(),
+							b.assignment('=', local(`_prev$${bind.id}`), bind.expr),
+							...(bind.seededText ? [b.literal(1)] : []),
 						),
 					),
-					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
-				]),
+				),
 			);
 		}
 		case 'htmlOnlyChild': {
@@ -31979,22 +31981,18 @@ function emitBindingMount(bind, elVar, bag) {
 			// SERVER's text node at that logical position, which htextSwap ADOPTS.
 			// htextSwap coerces the value itself, so the mount is a bare call.
 			return st(
-				b.block([
-					b.const('_v', bind.expr),
-					b.stmt(
-						b.assignment(
-							'=',
-							local(`_txt$${bind.id}`),
-							b.call(
-								bind.bindingMarker ? '_$bindingText' : '_$htextSwap',
-								el(),
-								V(),
-								...(bind.bindingMarker ? [b.literal(bind.bindingMarker)] : []),
-							),
+				b.stmt(
+					b.assignment(
+						'=',
+						local(`_txt$${bind.id}`),
+						b.call(
+							bind.bindingMarker ? '_$bindingText' : '_$htextSwap',
+							el(),
+							b.assignment('=', local(`_prev$${bind.id}`), bind.expr),
+							...(bind.bindingMarker ? [b.literal(bind.bindingMarker)] : []),
 						),
 					),
-					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
-				]),
+				),
 			);
 		}
 		case 'attr':
@@ -32435,19 +32433,16 @@ function commitOwnersDeclaration(ctx) {
 }
 
 // A render whose recorders staged the bag without queueing it (its state word
-// under 512) commits or queues it here. `reset` when holes record after it: a
-// bag its commit function already wrote (back under 256) stages afresh; a
-// queued one keeps its cells.
+// in 256–511: staged, not queued) commits it here. Its own records staged it:
+// a bag an earlier render left staged resumes (`_r`), so this render records
+// it again. `reset` when holes record after it: a bag its commit function
+// already wrote (back under 256) stages afresh; a queued one keeps its cells.
 function commitDoneStatement(ctx, origin, reset = false) {
 	ctx.runtimeNeeded.add('bagDone');
 	const done = b.stmt(b.call('_$bagDone', b.id('__s'), b.id('_b')));
 	return inheritOriginLoc(
 		b.if(
-			b.logical(
-				'&&',
-				b.binary('!==', b.id('_n'), b.literal(null)),
-				b.binary('<', b.member(b.id('_b'), '$'), b.literal(2 * (COMMIT_MAX_CELLS + 1))),
-			),
+			b.binary('===', b.binary('>>', b.member(b.id('_b'), '$'), b.literal(8)), b.literal(1)),
 			reset
 				? b.block([
 						done,
@@ -32785,34 +32780,33 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 			);
 			// The committed callback and captures are the dispatched bundle's own,
 			// compared here (SameValue keeps signed zero and NaN captures observable).
-			// bagRecord sees the change (`_c`) as its new callback against the bag;
-			// an arity-N argument array is fresh every render, so it always records.
+			// A recorded bundle passes its callback against the bag, so every cell
+			// records: a resumed (`_r`) but unchanged one commits its own values
+			// back. An arity-N argument array is fresh every render, so it always
+			// records.
 			const capture = (i) => b.id(`_a${i}`);
 			const held = (name) => b.member(b.id('_e'), name);
 			const captures = n > 2 ? [b.array(bind.argExprs.slice())] : bind.argExprs;
-			const changed =
-				n > 2
-					? null
-					: orChain([
-							b.binary('!==', V(), held('fn')),
-							...captures.map((_, i) =>
-								b.unary('!', b.call(b.member(b.id('Object'), 'is'), capture(i), held(`a${i}`))),
-							),
-						]);
 			return recordHandler(
 				[
 					b.const('_v', bind.fnExpr),
 					...captures.map((arg, i) => b.const(`_a${i}`, arg)),
 					b.const('_e', bundle()),
-					...(changed === null ? [] : [b.const('_c', changed)]),
 				],
 				held('el'),
-				changed === null ? [] : [b.id('_c')],
+				n > 2
+					? []
+					: [
+							b.binary('!==', V(), held('fn')),
+							...captures.map((_, i) =>
+								b.unary('!', b.call(b.member(b.id('Object'), 'is'), capture(i), held(`a${i}`))),
+							),
+						],
 				() =>
 					recordScope(
 						'bagRecord',
 						cell,
-						changed === null ? V() : b.conditional(b.id('_c'), V(), b.id('_b')),
+						V(),
 						b.id('_b'),
 						b.id('_e'),
 						...captures.map((_, i) => capture(i)),
@@ -39483,8 +39477,9 @@ function bodyContainsJsx(node) {
 	return isJsxNode(node);
 }
 
-/** @param {TemplateIR} ast */
-function allocTemplate(ctx, ast, ns = 0, frag = 0, scriptPaths = null) {
+/** @param {TemplateIR} authored */
+function allocTemplate(ctx, authored, ns = 0, frag = 0, scriptPaths = null) {
+	const ast = compactTemplateIr(authored, ns === 0);
 	const { html, origins } = serializeTemplateIr(ast);
 	const scripts = scriptPaths === null ? null : JSON.stringify(scriptPaths);
 	const intern = !ctx.hmr && !ctx.dev && !ctx.profile;

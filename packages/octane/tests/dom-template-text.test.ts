@@ -8,7 +8,10 @@ import {
 	ForeignMath,
 	ForeignSvg,
 	FragmentTextRows,
+	OpaqueLink,
+	RawTextHost,
 	RootTextPair,
+	StaticMarkup,
 	TableSections,
 } from './_fixtures/dom-template-text.tsrx';
 
@@ -188,5 +191,53 @@ describe('compiled fragment and text children', () => {
 		expect(math.find('mn').namespaceURI).toBe('http://www.w3.org/1998/Math/MathML');
 		expect(math.find('mn').textContent).toBe('M');
 		math.unmount();
+	});
+
+	it.each(['mount', 'hydrate'])('builds static markup exactly as authored on %s', (mode) => {
+		const server = loadServerFixture('packages/octane/tests/_fixtures/dom-template-text.tsrx');
+		for (const [Component, ServerComponent] of [
+			[StaticMarkup, server.StaticMarkup],
+			[OpaqueLink, server.OpaqueLink],
+			[RawTextHost, server.RawTextHost],
+		] as const) {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			if (mode === 'hydrate')
+				container.innerHTML = ServerRT.renderToString(ServerComponent, {}).html;
+			const adopted = container.querySelector('a, iframe');
+			const root =
+				mode === 'hydrate' ? hydrateRoot(container, Component, {}) : createRoot(container);
+			try {
+				if (mode === 'mount') root.render(Component, {});
+				flushSync(() => {});
+				const link = container.querySelector('a, iframe')!;
+				if (mode === 'hydrate') expect(link).toBe(adopted);
+				if (Component === RawTextHost) {
+					expect(link.localName).toBe('iframe');
+					expect(link.textContent).toBe('<p class="inside">x</p>');
+				} else if (Component === StaticMarkup) {
+					const nav = container.querySelector('nav')!;
+					expect(nav.className).toBe('menu');
+					expect([...nav.children].map((child) => child.localName)).toEqual(['a', 'input', 'ul']);
+					expect(link.getAttribute('href')).toBe('/');
+					expect(link.title).toBe('home page');
+					expect(link.getAttribute('data-empty')).toBe('');
+					expect(link.textContent).toBe('home');
+					const input = nav.querySelector('input')!;
+					expect(input.className).toBe('field');
+					expect(input.type).toBe('text');
+					expect(nav.querySelector('ul > li > b')!.textContent).toBe('deep');
+				} else {
+					expect(link.getAttribute('href')).toBe('/home');
+					const image = link.querySelector('img')!;
+					expect(image.getAttribute('src')).toBe('logo.png');
+					expect(image.alt).toBe('logo');
+					expect(link.childNodes.length).toBe(1);
+				}
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		}
 	});
 });

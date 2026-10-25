@@ -172,7 +172,7 @@ describe('.tsx string-literal expression children — client matches server/.tsr
 		const tsrx = compileClient(TSRX_PRETTIER_SPACE, 'f.tsrx');
 
 		expect(stringLiteralHoleValues(client)).toEqual([]);
-		expect(hostParagraphTemplate(client)).toBe('<p>Try the <!> page</p>');
+		expect(hostParagraphTemplate(client)).toBe('<p>Try the <!> page');
 		expect(countAnchors(hostParagraphTemplate(client))).toBe(1);
 		expect(countAnchors(hostParagraphTemplate(tsrx))).toBe(1);
 		expect(server).toContain('Try the ');
@@ -184,7 +184,7 @@ describe('.tsx string-literal expression children — client matches server/.tsr
 		const client = compileClient(LITERAL_RUNS);
 		const server = compileServer(LITERAL_RUNS);
 		expect(stringLiteralHoleValues(client)).toEqual([]);
-		expect(hostParagraphTemplate(client)).toBe('<p>foobar!baz</p>');
+		expect(hostParagraphTemplate(client)).toBe('<p>foobar!baz');
 		expect(countAnchors(hostParagraphTemplate(client))).toBe(0);
 		expect(server).toContain('foobar!baz');
 		expect(server).not.toContain('ssrText');
@@ -193,7 +193,7 @@ describe('.tsx string-literal expression children — client matches server/.tsr
 	it('treats empty string literals as adjacency-transparent, not holes', function () {
 		const client = compileClient(EMPTY_LITERAL);
 		expect(stringLiteralHoleValues(client)).toEqual([]);
-		expect(hostParagraphTemplate(client)).toBe('<p>before<!>after</p>');
+		expect(hostParagraphTemplate(client)).toBe('<p>before<!>after');
 		expect(countAnchors(hostParagraphTemplate(client))).toBe(1);
 	});
 
@@ -202,7 +202,7 @@ describe('.tsx string-literal expression children — client matches server/.tsr
 		const server = compileServer(DYNAMIC_TEXT);
 		expect(stringLiteralHoleValues(client)).toEqual([]);
 		expect(countAnchors(hostParagraphTemplate(client))).toBe(2);
-		expect(hostParagraphTemplate(client)).toBe('<p>Try the<!><!> page</p>');
+		expect(hostParagraphTemplate(client)).toBe('<p>Try the<!><!> page');
 		expect(server).toContain('ssrText');
 		expect(server).toContain('ssrComponent');
 	});

@@ -81,3 +81,38 @@ export function TableSections({ label }: { readonly label: string }) @{
 		</tbody>
 	</Table>
 }
+
+// Static markup in the forms a client template string shortens: values that
+// need no quotes (one ending in `/`), an empty value, values that keep theirs,
+// a void element's `/`, and the close tags that end the template.
+export function StaticMarkup() @{
+	<nav class="menu">
+		<a href="/" title="home page" data-empty="">
+			home
+		</a>
+		<input class="field" type="text" />
+		<ul>
+			<li>
+				<b>deep</b>
+			</li>
+		</ul>
+	</nav>
+}
+
+// `a` is also an SVG name, so this root's template is destination-opaque: its
+// void <img> keeps `/>`, and the value before it keeps its quotes.
+export function OpaqueLink() @{
+	<a href="/home">
+		<img alt="logo" src="logo.png" />
+	</a>
+}
+
+// A raw-text host reads its content as text, so markup written inside one
+// stays byte for byte, even where it ends the template.
+export function RawTextHost() @{
+	<div>
+		<iframe title="frame">
+			<p class="inside">x</p>
+		</iframe>
+	</div>
+}

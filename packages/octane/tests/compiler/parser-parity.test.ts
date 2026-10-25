@@ -57,49 +57,49 @@ const SOURCES: Record<string, { source: string; client: string; server: string }
 	// decoded text, as Babel applies it.
 	'a double-encoded reference in text': {
 		source: `export function App() @{\n\t<p>&amp;lt;b&amp;gt; &amp;amp;</p>\n}`,
-		client: '<p>&amp;lt;b&amp;gt; &amp;amp;</p>',
+		client: '<p>&amp;lt;b&amp;gt; &amp;amp;',
 		server: '<p>${`&amp;lt;b&amp;gt; &amp;amp;`}</p>',
 	},
 	'text that is only a reference': {
 		source: `export function App() @{\n\t<p>&nbsp;</p>\n}`,
-		client: '<p>\u00a0</p>',
+		client: '<p>\u00a0',
 		server: '<p>${`\u00a0`}</p>',
 	},
 	'an encoded line break at the end of a line': {
 		source: `export function App() @{\n\t<p>a&#10;\n\t\tb</p>\n}`,
-		client: '<p>a b</p>',
+		client: '<p>a b',
 		server: '<p>${`a b`}</p>',
 	},
 	// JSX decodes the XHTML named references only, so a later HTML name is text.
 	'a named reference JSX does not define': {
 		source: `export function App() @{\n\t<p title="&check;">&check; &hellip;</p>\n}`,
-		client: '<p title=\\"&amp;check;\\">&amp;check; \u2026</p>',
+		client: '<p title=&amp;check;>&amp;check; \u2026',
 		server: '<p title="&amp;check;">${`&amp;check; \u2026`}</p>',
 	},
 	'CRLF line breaks in text': {
 		source: 'export function App() @{\r\n\t<p>\r\n\t\ta &quot;b&quot;\r\n\t\tc\r\n\t</p>\r\n}',
-		client: '<p>a \\"b\\" c</p>',
+		client: '<p>a \\"b\\" c',
 		server: '<p>${`a "b" c`}</p>',
 	},
 	// #1328, #1338: a comment between template texts renders like `{/* */}` in TSX.
 	'a line comment between template texts': {
 		source: `export function App() @{\n\t<p>\n\t\ta\n\t\t// note\n\t\tb\n\t</p>\n}`,
-		client: '<p>ab</p>',
+		client: '<p>ab',
 		server: '<p>${`ab`}</p>',
 	},
 	'a block comment in the text of plain-function JSX': {
 		source: `export function App() {\n\treturn <p>a /* note */ b</p>;\n}`,
-		client: '<p>a  b</p>',
+		client: '<p>a  b',
 		server: '<p>${`a  b`}</p>',
 	},
 	'the space after a comment before an element': {
 		source: `export function App() @{\n\t<div>\n\t\t<b>t</b>\n\t\t/* c */ <i />\n\t</div>\n}`,
-		client: '<b>t</b> <i></i>',
+		client: '<b>t</b> <i>',
 		server: '`<b>${`t`}</b>`} ${`<i></i>`}',
 	},
 	'slashes that touch other text': {
 		source: `export function App() @{\n\t<p>see https://x.dev and a//b</p>\n}`,
-		client: '<p>see https://x.dev and a//b</p>',
+		client: '<p>see https://x.dev and a//b',
 		server: 'see https://x.dev and a//b',
 	},
 	// #1330: a `>` in an element inside a container is text.
@@ -124,7 +124,7 @@ const SOURCES: Record<string, { source: string; client: string; server: string }
 		}
 	</ul>
 }`,
-		client: '<ul><li>one</li><!></ul>',
+		client: '<ul><li>one</li><!>',
 		server: '<li>${`one`}</li>',
 	},
 	// #1354: a type parameter's name is an Identifier in both trees.
@@ -134,7 +134,7 @@ type Item<X> = X extends Array<infer U> ? U : never;
 export function Pick<const T extends string>(props: { value: T; keys?: Keys<{ a: 1 }>; item?: Item<T[]> }) @{
 	<b>{props.value as string}</b>
 }`,
-		client: '<b> </b>',
+		client: '<b> ',
 		server: '<b>',
 	},
 };

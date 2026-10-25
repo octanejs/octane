@@ -59,3 +59,56 @@ for (const strong of [false, true]) {
 		});
 	});
 }
+
+// A child that updates its parent while rendering re-renders the parent inside
+// the same root render. That pass resumes the cells the first one staged and
+// records every bundle again: one that changes only in the second pass, one it
+// changes back, and one that never changes all dispatch what it rendered.
+const { Replayed } = loadCompiledFixtureSource(
+	`import { useState } from 'octane';
+ function Sync({value,onValue}) @{
+  onValue(value);
+  <i>{value as string}</i>
+ }
+ export function Replayed({invoke,value,label}) @{
+  const [shown, setShown] = useState(value);
+  <section>
+   <output>{value as string}</output>
+   <button data-kind="shown" onClick={()=>invoke(shown)}>shown</button>
+   <button data-kind="pending" onClick={()=>invoke(shown === value ? 'settled' : value)}>pending</button>
+   <button data-kind="label" onClick={()=>invoke(label)}>label</button>
+   <Sync value={value} onValue={setShown} />
+  </section>
+ }`,
+	{
+		id: 'event-bundle-replayed.tsrx',
+		mode: 'client',
+		compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+	},
+);
+
+describe('native bundle captures across a resumed render', () => {
+	it('dispatches the captures the last pass rendered', () => {
+		const host = document.createElement('div');
+		document.body.append(host);
+		const root = createRoot(host);
+		const seen: unknown[] = [];
+		const invoke = (value: unknown) => seen.push(value);
+		try {
+			root.render(Replayed, { invoke, value: 'a', label: 'fixed' });
+			const click = () => {
+				for (const button of host.querySelectorAll('button')) button.click();
+				return seen.splice(0);
+			};
+			expect(click()).toEqual(['a', 'settled', 'fixed']);
+			for (const value of ['b', 'c']) {
+				flushSync(() => root.render(Replayed, { invoke, value, label: 'fixed' }));
+				expect(host.querySelector('output')!.textContent).toBe(value);
+				expect(click()).toEqual([value, 'settled', 'fixed']);
+			}
+		} finally {
+			root.unmount();
+			host.remove();
+		}
+	});
+});

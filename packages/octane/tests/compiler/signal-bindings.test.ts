@@ -22,8 +22,11 @@ export function App() @{
 }
 `;
 
+// Server markup quotes the site; a client template needs no quotes around it.
 function controlSites(code: string) {
-	return [...code.matchAll(/data-octane-input=\\?"(i:[^"\\]+)\\?"/g)].map((match) => match[1]);
+	return [...code.matchAll(/data-octane-input=(?:\\?"(i:[^"\\]+)\\?"|(i:[^\s"\\>]+))/g)].map(
+		(match) => match[1] ?? match[2],
+	);
 }
 
 function callArguments(code: string, callee?: string) {

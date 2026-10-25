@@ -2226,7 +2226,7 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 				rawOctane.source,
 			);
 			expect(compiled?.kind).toBe('compile');
-			expect(compiled?.code).toContain('<p>octane</p>');
+			expect(compiled?.code).toContain('<p>octane');
 			expect(compiled?.dependencies).toContain(rawOctane.manifest);
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
@@ -2271,7 +2271,7 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 				marked.source,
 			);
 			expect(compiled?.kind).toBe('compile');
-			expect(compiled?.code).toContain('<p>marked</p>');
+			expect(compiled?.code).toContain('<p>marked');
 			expect(compiled?.dependencies).toContain(marked.manifest);
 
 			expect(
