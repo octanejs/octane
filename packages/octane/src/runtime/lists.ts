@@ -2174,10 +2174,17 @@ export function moveBlockBefore(block: Block, anchor: Node): void {
 	// finally reaches `endMarker`, its captured `nextSibling` points BACK to
 	// the already-moved start (now adjacent at `endMarker`'s new neighbour
 	// position), so the walker loops back into the range and never terminates.
+	//
+	// The range's nodes are children of `parent`, so one connected check admits
+	// the state-preserving move for all of them (see moveNativeNodeBefore).
+	const moveBefore = parent.isConnected
+		? (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void }).moveBefore
+		: undefined;
 	while (n) {
 		const isEnd = n === end;
 		const next: Node | null = getNextSibling(n);
-		moveNativeNodeBefore(parent, n, anchor, null, false);
+		if (moveBefore) moveBefore.call(parent, n, anchor);
+		else parent.insertBefore(n, anchor);
 		if (isEnd) break;
 		n = next;
 	}
