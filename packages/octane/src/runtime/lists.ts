@@ -85,7 +85,7 @@ import {
 	type FocusSelectionSnapshot,
 	type FocusSelectionBatch,
 } from './commit.js';
-import { getNextSibling } from './templates.js';
+import { getNextSibling, getParentNode } from './templates.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -2192,7 +2192,7 @@ export function moveBlockBefore(block: Block, anchor: Node): void {
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		if (node.parentNode !== parent) continue;
+		if (getParentNode(node) !== parent) continue;
 		if (focus !== null) moveFocusedNodeBefore(parent, node, anchor, focus);
 		else if (move !== null) move.call(parent, node, anchor);
 		else parent.insertBefore(node, anchor);

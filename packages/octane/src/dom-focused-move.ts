@@ -41,27 +41,35 @@ export function moveNativeNodeBefore(
 	// composition even if focus is restored afterward. Keep the editing subtree
 	// connected by rotating only its intervening siblings around it. Those
 	// siblings are children of the parent, so they move natively when it can.
+	// Snapshot before rotating: a moved custom element's connectedMoveCallback
+	// can remove siblings, and moveBefore throws on a detached node.
 	const rotate = move ?? parent.insertBefore;
 	if (node === anchor || node.nextSibling === anchor) return;
 	if (
 		anchor === null ||
 		(node.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 	) {
-		let cursor = node.nextSibling;
-		while (cursor !== anchor) {
-			const next = cursor!.nextSibling;
-			rotate.call(parent, cursor!, node);
-			cursor = next;
+		const siblings: Node[] = [];
+		for (let c = node.nextSibling; c !== null && c !== anchor; c = c.nextSibling) siblings.push(c);
+		for (let i = 0; i < siblings.length; i++) {
+			if (unshadowedParent(siblings[i]) !== parent) continue;
+			rotate.call(parent, siblings[i], node);
 		}
 	} else {
 		const end = node.nextSibling;
-		let cursor: Node | null = anchor;
-		while (cursor !== node) {
-			const next: Node | null = cursor!.nextSibling;
-			rotate.call(parent, cursor!, end);
-			cursor = next;
+		const siblings: Node[] = [];
+		for (let c: Node | null = anchor; c !== null && c !== node; c = c.nextSibling) siblings.push(c);
+		for (let i = 0; i < siblings.length; i++) {
+			if (unshadowedParent(siblings[i]) !== parent) continue;
+			rotate.call(parent, siblings[i], end);
 		}
 	}
+}
+
+let _parentNodeGet: ((this: Node) => (Node & ParentNode) | null) | undefined;
+function unshadowedParent(node: Node): (Node & ParentNode) | null {
+	_parentNodeGet ??= Object.getOwnPropertyDescriptor(Node.prototype, 'parentNode')!.get!;
+	return _parentNodeGet.call(node);
 }
 
 /**

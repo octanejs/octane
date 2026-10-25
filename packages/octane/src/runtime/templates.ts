@@ -77,6 +77,7 @@ declare const process: { env: { NODE_ENV?: string } };
 
 let firstChildGetter: ((this: Node) => ChildNode | null) | undefined;
 export let nextSiblingGetter: ((this: Node) => ChildNode | null) | undefined;
+let parentNodeGetter: ((this: Node) => (Node & ParentNode) | null) | undefined;
 
 export function getFirstChild(node: Node): ChildNode | null {
 	// Fallback keeps DOM-less/uninitialized callers correct; the branch is a
@@ -86,6 +87,10 @@ export function getFirstChild(node: Node): ChildNode | null {
 
 export function getNextSibling(node: Node): ChildNode | null {
 	return nextSiblingGetter === undefined ? node.nextSibling : nextSiblingGetter.call(node);
+}
+
+export function getParentNode(node: Node): (Node & ParentNode) | null {
+	return parentNodeGetter === undefined ? node.parentNode : parentNodeGetter.call(node);
 }
 
 /** Pre-seed one expando key on a prototype (see bootstrap comment, trick 2). */
@@ -108,6 +113,7 @@ export function initDomOperations(): void {
 	const nodeProto = Node.prototype;
 	firstChildGetter = Object.getOwnPropertyDescriptor(nodeProto, 'firstChild')?.get;
 	nextSiblingGetter = Object.getOwnPropertyDescriptor(nodeProto, 'nextSibling')?.get;
+	parentNodeGetter = Object.getOwnPropertyDescriptor(nodeProto, 'parentNode')?.get;
 	const elementProto = Element.prototype;
 	if (Object.isExtensible(elementProto)) {
 		// Polled on every delegated event's ancestor walk.
