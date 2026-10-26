@@ -35,6 +35,14 @@ const RENDER_STATE_UPDATE =
 	'\t<main>{count as string}</main>\n' +
 	'}\n';
 
+// `@tsrx/core` rejects `override accessor`, which is valid TypeScript that
+// `@tsrx/oxc` parses, so the Vite preflight fails while authoritative
+// compilation succeeds. Replace it when `expectPreflightRejects` fails.
+const PARSER_DISAGREEMENT_SOURCE = `
+	class Base { accessor label = 'base'; }
+	class Store extends Base { override accessor label = 'ready'; }
+	export function App() @{ <main>{new Store().label as string}</main> }`;
+
 function deepFreeze(value: unknown, seen = new WeakSet<object>()): void {
 	if (value === null || typeof value !== 'object' || seen.has(value)) return;
 	seen.add(value);
@@ -67,6 +75,13 @@ async function transform(
 	return (
 		plugin.transform as (source: string, id: string, options?: { ssr?: boolean }) => unknown
 	).call({}, source, id, options) as Promise<{ code: string } | null> | { code: string } | null;
+}
+
+function expectPreflightRejects(source: string, id = `${ROOT}/src/App.tsrx`) {
+	expect(
+		() => parseModule(source, id),
+		'@tsrx/core now parses the parser-disagreement input, so it no longer reaches the failed preflight',
+	).toThrow();
 }
 
 function componentChildren(code: string, component: string): unknown {
@@ -464,16 +479,13 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 	});
 
 	it('leaves parser-disagreement syntax to authoritative compilation', async () => {
+		expectPreflightRejects(PARSER_DISAGREEMENT_SOURCE);
 		const plugin = octane({ hmr: false });
 		configure(plugin, 'build');
-		const result = await transform(
-			plugin,
-			`using resource = acquire();
-			export function App() @{ <main>{resource.label as string}</main> }`,
-		);
+		const result = await transform(plugin, PARSER_DISAGREEMENT_SOURCE);
 
 		expect(result).not.toBeNull();
-		expect(result?.code).toContain('using resource = acquire()');
+		expect(result?.code).toContain("accessor label = 'ready'");
 	});
 
 	it('keeps authoritative syntax diagnostics after preflight failure', async () => {
@@ -502,11 +514,10 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 			import { Slot } from './Slot.tsrx';
 			export function App() @{ <main><Leaf /><Slot><b>slotted</b></Slot></main> }`;
 		const plainApp = 'export function App() @{ <main>plain</main> }';
-		// The adapter parser rejects source-phase imports, so its failed preflight
-		// is reused while the authoritative compiler still compiles the module.
-		const unparsedApp = `
-			import source wasm from './module.wasm';
-			export function App() @{ <main>{wasm.name as string}</main> }`;
+		// Its failed preflight is reused while the authoritative compiler still
+		// compiles the module.
+		const unparsedApp = PARSER_DISAGREEMENT_SOURCE;
+		expectPreflightRejects(unparsedApp, appId);
 		const helperSource = 'export function compute(value: number): number { return value + 1; }';
 		const environments = {
 			server: { name: 'ssr', config: { consumer: 'server' } },
