@@ -26,13 +26,12 @@ import { CURRENT_SCOPE, CURRENT_BLOCK } from './render.js';
 import {
 	POSITIONAL_CHILDREN,
 	enableDescriptorFragmentRefs,
-	enableHostDescriptors,
-	DESCRIPTOR_HOST_PROPS,
 	renderFragmentRefDescriptor,
 } from './deopt.js';
 import { componentSlot } from './component-slots.js';
 import { type FragmentProps, renderActivityDescriptor } from './activity.js';
 import { EMPTY_ARGS } from './events.js';
+import { HOST_DESCRIPTORS, enableHostDescriptors } from './drivers.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -252,7 +251,7 @@ function scopedElementRecord<P>(
 	resolve: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
-	if (typeof type === 'string' && !DESCRIPTOR_HOST_PROPS) enableHostDescriptors();
+	if (typeof type === 'string' && !HOST_DESCRIPTORS) enableHostDescriptors();
 	const descriptor = { $$kind: ELEMENT_TAG, type, props, key, ref } as ElementDescriptor<P>;
 	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, SCOPED_CHILDREN_RESOLVER, { value: resolve });
@@ -485,6 +484,7 @@ export function createHostElement<P>(
 	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
+	if (!HOST_DESCRIPTORS) enableHostDescriptors();
 	return createElementFromConfig(undefined, type, props, children);
 }
 
@@ -543,6 +543,10 @@ function renderFragmentConfig(props: { children?: unknown }): unknown {
 /**
  * @internal Compiler-owned positional children; omitted children allocate no rest array.
  * Also consumed by app-core/src/client-entry-runtime.js; coordinate ABI changes with that adapter.
+ * A caller whose type can be a host string installs the host renderer first
+ * (enableHostDescriptors): compiled JSX does so once per module, when it
+ * cannot prove its tag is a function, so a bundle whose descriptors are all
+ * components does not retain the renderer.
  */
 export function createElementFromConfig<P>(
 	invocationSite: string | undefined,
@@ -550,9 +554,7 @@ export function createElementFromConfig<P>(
 	props: P | null | undefined,
 	children: any[] = EMPTY_ARGS,
 ): ElementDescriptor<P> {
-	if (typeof type === 'string') {
-		if (!DESCRIPTOR_HOST_PROPS) enableHostDescriptors();
-	} else if (typeof type === 'function' && isRendererContext(type)) {
+	if (typeof type === 'function' && isRendererContext(type)) {
 		registerClientRendererBridge(renderClientContextProvider, flushSync);
 	}
 	const src = (props ?? null) as any;

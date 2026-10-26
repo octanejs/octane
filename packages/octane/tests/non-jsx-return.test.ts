@@ -578,8 +578,10 @@ export function Parent(p) @{
 		expect(code).toContain('return undefined ?? null;');
 		// A bare return is an empty template branch in production, so EarlyVoid
 		// takes the lite path, as during HMR, without retaining return
-		// reconciliation.
-		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(4);
+		// reconciliation. Module functions cannot resolve to a host string, so
+		// they skip the generic entry's dynamic-tag capability.
+		expect(code).not.toMatch(/_\$componentSlot\(/);
+		expect(code.match(/_\$componentSlotFunction\(/g)).toHaveLength(4);
 		expect(code.match(/_\$componentSlotVoid\(/g)).toHaveLength(1);
 		expect(code).toMatch(/_\$componentSlotLite\([^;]*, EarlyVoid,/);
 	});
@@ -587,7 +589,7 @@ export function Parent(p) @{
 	it('uses the generic component path during HMR', () => {
 		const code = compile(source, 'value-return.tsrx', { hmr: true }).code;
 		expect(code).not.toContain('componentSlotVoid');
-		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(5);
+		expect(code.match(/_\$componentSlotFunction\(/g)).toHaveLength(5);
 		expect(code.match(/_\$componentSlotLite\(/g)).toHaveLength(1);
 	});
 });

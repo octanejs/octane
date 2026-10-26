@@ -7497,7 +7497,8 @@ describe('compiler-owned component-region memoization', () => {
 		expectCompilerRegion(defaultBuild);
 		// Rows is hookless and cannot read context, so its cache keeps it lite.
 		expect(defaultBuild).toContain('componentSlotLite as');
-		expect(defaultBuild).toContain('componentSlot as');
+		// A module function cannot resolve to a host string.
+		expect(defaultBuild).toContain('componentSlotFunction as');
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.items\)?;/);
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.label\)?;/);
 		expect(defaultBuild).not.toMatch(/const __memoDep[\w$]* = \(?props\)?;/);
@@ -7505,7 +7506,7 @@ describe('compiler-owned component-region memoization', () => {
 			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotLite\([^;]*, Rows,/,
 		);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot\([^;]*, Returned,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotFunction\([^;]*, Returned,/,
 		);
 		expectNoCompilerRegion(optedOut);
 		expectNoCompilerRegion(hmrBuild);

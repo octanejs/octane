@@ -61,6 +61,7 @@ const existingScenarios = [
 	['server-render', 'ts'],
 	['component-owned-effects', 'ts'],
 	['descriptor-children', 'ts'],
+	['renderable-holes', 'tsrx'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -303,10 +304,22 @@ const signalOwnerDeclarations = [
 	'pruneSignalRetryVisit',
 	'trackSignalRetryListKeys',
 ];
+// Only host element factories install the host descriptor renderer. Holes over
+// text, arrays and component descriptors keep the shared list path.
+const hostDescriptorRenderer = [
+	'reconcileDeoptHost',
+	'reconcileDeoptChildren',
+	'hostElementBody',
+	'setHostProps',
+];
 const featureControls = {
 	'descriptor-children': {
 		dropped: ['renderPortalChild', 'bindImplicitSignalChild', 'useContextInternal'],
-		kept: ['childSlot'],
+		kept: ['childSlot', ...hostDescriptorRenderer],
+	},
+	'renderable-holes': {
+		dropped: hostDescriptorRenderer,
+		kept: ['childSlot', 'renderPreparedChildList'],
 	},
 	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
 	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },

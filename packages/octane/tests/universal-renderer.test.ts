@@ -3583,12 +3583,13 @@ export default function Default() @{ <scene version={1} /> }`);
 				},
 			});
 			const domRuntime = await import('../src/index.js');
+			const internalClient = await import('../src/internal/client.js');
 			const modules =
 				owner === 'universal'
 					? undefined
 					: {
 							octane: domRuntime,
-							'octane/internal/client': domRuntime,
+							'octane/internal/client': internalClient,
 							'octane/universal': UniversalRuntime,
 							[bridge]: { Canvas: UniversalRuntime.createUniversalHostBoundary('object') },
 						};
@@ -3776,6 +3777,7 @@ export default (function Counter({ depth }) @{
 		'preserves thread cleanup across %s edits to mixed renderer modules',
 		async (hmr) => {
 			const domRuntime = await import('../src/index.js');
+			const internalClient = await import('../src/internal/client.js');
 			const definitions = new Map<string, (...args: any[]) => unknown>();
 			let failRegistration = false;
 			const bridgeModule = '@test/hmr-renderer-bridge';
@@ -3796,7 +3798,7 @@ export default (function Counter({ depth }) @{
 			});
 			const modules = {
 				octane: domRuntime,
-				'octane/internal/client': domRuntime,
+				'octane/internal/client': internalClient,
 				'octane/universal': {
 					...UniversalRuntime,
 					registerThreadFunction(

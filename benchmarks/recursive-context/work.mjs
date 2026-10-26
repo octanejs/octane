@@ -36,6 +36,7 @@ for (const target of TARGETS) {
 const METRICS = [
 	'renderBlock',
 	'componentSlot',
+	'componentSlotFunction',
 	'componentSlotVoid',
 	'componentSlotLite',
 	'childSlot',
@@ -390,7 +391,11 @@ const GATES = {
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const METRIC_NAMES = new Set(METRICS);
-const AGGREGATED_SLOT_METRICS = new Set(['componentSlotVoid', 'componentSlotLite']);
+const AGGREGATED_SLOT_METRICS = new Set([
+	'componentSlotFunction',
+	'componentSlotVoid',
+	'componentSlotLite',
+]);
 
 function validate(target, op, counts, failures) {
 	const gate = GATES[target][op];
@@ -422,7 +427,8 @@ function validate(target, op, counts, failures) {
 			return;
 		}
 	}
-	const fullSlotCalls = counts.componentSlot + counts.componentSlotVoid;
+	const fullSlotCalls =
+		counts.componentSlot + counts.componentSlotFunction + counts.componentSlotVoid;
 	const slotCalls = fullSlotCalls + counts.componentSlotLite;
 	if (fullSlotCalls > gate.maxFullSlotCalls) {
 		failures.push(
@@ -548,7 +554,7 @@ for (const target of TARGETS) {
 	for (const op of OPS) {
 		const c = results[target.name][op.name];
 		console.log(
-			`${`${target.name}.${op.name}`.padEnd(25)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${c.hostElementBody}/${c.deoptItemBody}/${c.reconcileKeyed}/${c.updateSurvivor} | ${String(c.setText).padStart(4)} | ${`${c.useBatch}/${c.registerWarmPlan}`.padStart(10)} | ${c.unmountBlock}/${c.unmountScope}`,
+			`${`${target.name}.${op.name}`.padEnd(25)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot + c.componentSlotFunction).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${c.hostElementBody}/${c.deoptItemBody}/${c.reconcileKeyed}/${c.updateSurvivor} | ${String(c.setText).padStart(4)} | ${`${c.useBatch}/${c.registerWarmPlan}`.padStart(10)} | ${c.unmountBlock}/${c.unmountScope}`,
 		);
 	}
 }

@@ -129,6 +129,15 @@ import { withRegisteredRefDetachSuppression } from './commit.js';
 import { publishRegisteredManualFormPending } from './actions.js';
 import { delegateEvents } from './events.js';
 import {
+	reconcileDeoptHost,
+	hostElementBody,
+	adoptsPureHost,
+	landHostPair,
+	unchangedScopedHostDescriptor,
+	buildDeoptAdoptQueue,
+	placeUpgradedList,
+} from './deopt.js';
+import {
 	maybeFlushDiscrete,
 	UNCONTROLLED,
 	type ControlledState,
@@ -211,6 +220,44 @@ export let drainControlledSyncs: typeof drainQueuedControlledSyncs = noop;
 export let publishManualFormPending: typeof publishRegisteredManualFormPending = noop;
 export function installManualFormPending(): void {
 	publishManualFormPending = publishRegisteredManualFormPending;
+}
+/**
+ * The host element descriptor renderer. Host descriptors are built only by an
+ * element factory (createHostElement, a scoped element record, the public
+ * factories) or by compiled JSX whose tag can resolve to a host string, and
+ * each installs this first (enableHostDescriptors). Renderable values reach
+ * the renderer only through it, so a bundle whose values are compiled bodies,
+ * component descriptors, text, arrays and empties retains neither the renderer
+ * nor the generic attribute and controlled-form writers it calls.
+ */
+export interface HostDescriptorDriver {
+	/** Reconcile a host descriptor against the node at its position. */
+	reconcile: typeof reconcileDeoptHost;
+	/** The stable body of a host descriptor whose subtree needs Blocks. */
+	body: typeof hostElementBody;
+	/** Whether a raw host element can become a descriptor's Block's element. */
+	adopts: typeof adoptsPureHost;
+	/** Place an adopted host's new marker pair around it at commit. */
+	landPair: typeof landHostPair;
+	/** Whether a deferred host shell still resolves to its committed record. */
+	unchanged: typeof unchangedScopedHostDescriptor;
+	/** An upgraded host's raw children, keyed for its first list to adopt. */
+	adoptQueue: typeof buildDeoptAdoptQueue;
+	/** Commit an upgraded host's first list over the children it adopted. */
+	placeUpgraded: typeof placeUpgradedList;
+}
+export let HOST_DESCRIPTORS: HostDescriptorDriver | null = null;
+/** @internal Installed by every site that can create a host element descriptor. */
+export function enableHostDescriptors(): void {
+	HOST_DESCRIPTORS ??= {
+		reconcile: reconcileDeoptHost,
+		body: hostElementBody,
+		adopts: adoptsPureHost,
+		landPair: landHostPair,
+		unchanged: unchangedScopedHostDescriptor,
+		adoptQueue: buildDeoptAdoptQueue,
+		placeUpgraded: placeUpgradedList,
+	};
 }
 export let SIGNAL_CHILD: typeof bindImplicitSignalChild | null = null;
 // A signal binding's commit-time read can find its handle pending since render.
