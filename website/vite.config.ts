@@ -155,6 +155,13 @@ const PREBUNDLED = [
 	// avoiding a second optimize pass while the devtools island is mounting.
 	'@octanejs/tanstack-devtools > @tanstack/devtools',
 	'@octanejs/devtools > @tanstack/devtools-event-client',
+	// The playground's version combobox imports @octanejs/base-ui as raw .tsrx
+	// source; pre-declare the npm leaves it reaches.
+	'@octanejs/base-ui > @floating-ui/utils',
+	'@octanejs/base-ui > @floating-ui/utils/dom',
+	'@octanejs/base-ui > @octanejs/floating-ui > @floating-ui/dom',
+	'@octanejs/base-ui > @octanejs/floating-ui > tabbable',
+	'@octanejs/base-ui > @octanejs/base-ui-utils > reselect',
 ];
 
 export default defineConfig({

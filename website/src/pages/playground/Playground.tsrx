@@ -277,6 +277,8 @@ export function Playground() @{
 		let outputView: any;
 		let astPreview: any;
 		let preview: any = null;
+		// A version's sandbox while it boots hidden, before it replaces `preview`.
+		let stagedPreview: any = null;
 		let compileDebounceId = 0;
 		let hashDebounceId = 0;
 		// Validate the URL payload before loading CodeMirror, Shiki, or the
@@ -1239,7 +1241,9 @@ export function Playground() @{
 			// change once the sandbox has loaded a module). The new sandbox boots
 			// in a hidden slot and replaces the running one only once its runtime
 			// has loaded, so any failure — compiler or runtime — keeps the running
-			// toolchain and preview. The newest request wins. A selection writes
+			// toolchain and preview. The first load has nothing to keep, so it
+			// installs at once and compiles while the sandbox boots. The newest
+			// request wins. A selection writes
 			// the URL only after its load succeeds; a URL change never writes it
 			// back.
 			let versionSeq = 0;
@@ -1288,17 +1292,22 @@ export function Playground() @{
 				}
 				if (disposed || seq !== versionSeq) return;
 				const slot = previewHost.ownerDocument.createElement('div');
-				slot.style.cssText = 'height:100%;display:none;';
+				slot.style.cssText = 'height:100%;';
 				previewHost.appendChild(slot);
 				const nextPreview = pg.createPreview(slot, onRuntimeError, next.runtime);
-				const readyError = await nextPreview.ready;
+				const staging = toolchain !== null;
+				if (staging) {
+					slot.style.display = 'none';
+					stagedPreview = nextPreview;
+				}
+				const readyError = staging ? await nextPreview.ready : null;
+				if (stagedPreview === nextPreview) stagedPreview = null;
 				if (disposed || seq !== versionSeq || readyError) {
 					nextPreview.destroy();
 					slot.remove();
 					if (readyError && !disposed && seq === versionSeq) fail(readyError);
 					return;
 				}
-				loadingVersion = null;
 				failedVersion = null;
 				pg.setPlaygroundCompiler(next.compiler);
 				toolchain = {
@@ -1324,7 +1333,10 @@ export function Playground() @{
 				// The status stays up until the new sandbox has run the workspace:
 				// a release's runtime is still downloading from esm.sh until then.
 				await compileAndRun();
-				if (!disposed && seq === versionSeq) setVersionLoading(null);
+				if (!disposed && seq === versionSeq) {
+					loadingVersion = null;
+					setVersionLoading(null);
+				}
 			};
 			controllerRef.current.loadVersion = (param, fromUrl) => {
 				if (!disposed) void loadVersion(param, fromUrl);
@@ -1390,6 +1402,7 @@ export function Playground() @{
 			outputView?.destroy();
 			astPreview?.destroy();
 			preview?.destroy();
+			stagedPreview?.destroy();
 		};
 	});
 
