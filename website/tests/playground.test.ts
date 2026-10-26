@@ -376,6 +376,25 @@ describe('playground sandbox boundary', () => {
 		}
 	});
 
+	it('exposes runtime readiness so a version swap can wait for it', async () => {
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const preview = createPreview(host, () => {}, { kind: 'esm', imports: {} });
+		try {
+			const iframe = host.querySelector('iframe')!;
+			window.dispatchEvent(
+				new MessageEvent('message', {
+					source: iframe.contentWindow,
+					data: { [PROTOCOL_KEY]: true, type: 'ready', error: 'esm.sh unreachable' },
+				}),
+			);
+			await expect(preview.ready).resolves.toBe('esm.sh unreachable');
+		} finally {
+			preview.destroy();
+			host.remove();
+		}
+	});
+
 	it('reports when a ready iframe never returns a render result', async () => {
 		vi.useFakeTimers();
 		const host = document.createElement('div');

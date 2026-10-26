@@ -649,6 +649,9 @@ export function Playground() @{
 				// re-tokenize of the output document. syncOutput re-runs this when
 				// the pane is revealed, so it refreshes exactly once, on demand.
 				if (resultModeRef.current.view !== 'compiled') return null;
+				// Until the requested version's compiler has loaded there is no
+				// output to show — compiling with main would mislabel it.
+				if (!toolchain) return null;
 				if (resultModeRef.current.compiledMode === 'ast') {
 					const { entry, error } = astEntry(currentFile);
 					if (entry && entry.ast !== lastShownAst?.ast) {
@@ -1233,24 +1236,35 @@ export function Playground() @{
 
 			// Loads `param`'s compiler and runtime, then swaps both in and
 			// recompiles the workspace into a fresh preview (an import map cannot
-			// change once the sandbox has loaded a module). The newest request
-			// wins; a failure keeps the running toolchain. A selection writes the
-			// URL only after its load succeeds; a URL change never writes it back.
+			// change once the sandbox has loaded a module). The new sandbox boots
+			// in a hidden slot and replaces the running one only once its runtime
+			// has loaded, so any failure — compiler or runtime — keeps the running
+			// toolchain and preview. The newest request wins. A selection writes
+			// the URL only after its load succeeds; a URL change never writes it
+			// back.
 			let versionSeq = 0;
+			let loadingVersion: string | null = null;
 			let failedVersion: { param: string; fromUrl: boolean } | null = null;
+			let previewSlot: HTMLElement | null = null;
 			const loadVersion = async (param: string, fromUrl: boolean) => {
 				const parsed = pgVersion.parseVersionParam(param);
 				const wanted = parsed.ok ? parsed.version : null;
+				// Already loading this version (e.g. the URL write that follows a
+				// selection): let that load finish.
+				if (wanted !== null && wanted === loadingVersion) return;
 				if (wanted !== null && wanted === toolchain?.version) {
-					// Back on the running version — drop any superseded load.
+					// Back on the running version — drop a load of another one.
 					versionSeq++;
+					loadingVersion = null;
 					failedVersion = null;
 					setVersionLoading(null);
 					setVersionError('');
 					return;
 				}
 				const seq = ++versionSeq;
+				loadingVersion = wanted;
 				const fail = (message: string) => {
+					loadingVersion = null;
 					failedVersion = { param, fromUrl };
 					setVersionLoading(null);
 					setVersionError(message);
@@ -1273,6 +1287,18 @@ export function Playground() @{
 					return fail(loadError instanceof Error ? loadError.message : String(loadError));
 				}
 				if (disposed || seq !== versionSeq) return;
+				const slot = previewHost.ownerDocument.createElement('div');
+				slot.style.cssText = 'height:100%;display:none;';
+				previewHost.appendChild(slot);
+				const nextPreview = pg.createPreview(slot, onRuntimeError, next.runtime);
+				const readyError = await nextPreview.ready;
+				if (disposed || seq !== versionSeq || readyError) {
+					nextPreview.destroy();
+					slot.remove();
+					if (readyError && !disposed && seq === versionSeq) fail(readyError);
+					return;
+				}
+				loadingVersion = null;
 				failedVersion = null;
 				pg.setPlaygroundCompiler(next.compiler);
 				toolchain = {
@@ -1283,7 +1309,10 @@ export function Playground() @{
 							: pgVersion.RUNTIME_ENTRIES,
 				};
 				preview?.destroy();
-				preview = pg.createPreview(previewHost, onRuntimeError, next.runtime);
+				previewSlot?.remove();
+				preview = nextPreview;
+				previewSlot = slot;
+				slot.style.display = '';
 				typesCache.clear();
 				runtimeCache.clear();
 				reactCache.clear();

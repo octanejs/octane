@@ -178,6 +178,8 @@ export interface RunPayload {
 }
 
 export interface Preview {
+	/** Resolves once the sandbox has loaded its runtime: null, or why it could not. */
+	ready: Promise<string | null>;
 	/** Execute a compiled playground module graph and render its entry component. Never throws. */
 	run(payload: RunPayload): Promise<{ error: string | null }>;
 	destroy(): void;
@@ -324,6 +326,7 @@ export function createPreview(
 	}
 
 	return {
+		ready,
 		async run(payload) {
 			const gen = ++generation;
 			const readyError = await ready;
