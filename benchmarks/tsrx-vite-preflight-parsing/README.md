@@ -111,11 +111,15 @@ for the second-client, development-edit, and host-owned TypeScript sequences,
 instead of `1`, `2`, and `1`. The integrated semantic checksums are identical
 for `main` and the candidate.
 
-The original parser-disagreement fixture used `using` declarations, which
-`@tsrx/core` 0.4 now parses, so those rows had stopped measuring a failed
-preflight. They now use a source-phase import, which the adapter parser still
-rejects. The integrated semantic manifest was refreshed from `main`, whose
-compiler output had changed since the manifest was recorded.
+The parser-disagreement rows need syntax the adapter parser rejects and the
+authoritative compiler accepts. They first used `using` declarations, which
+`@tsrx/core` 0.4 parses, and then a source-phase import, which 0.5.5 parses.
+Each time, the rows stopped measuring a failed preflight. They now use
+`override accessor` on a subclass field: valid TypeScript that `@tsrx/core`
+0.5.5 rejects. With each fixture change the integrated semantic manifest was
+refreshed from `main`, whose compiler output had changed since the manifest was
+recorded. The second refresh changed only the client entries' output, map, and
+metadata checksums; the classification checksums did not change.
 
 The wall-clock targets and local baseline are machine-specific evidence, not
 portable budgets. CI enforces the same-run, checksum-backed classification

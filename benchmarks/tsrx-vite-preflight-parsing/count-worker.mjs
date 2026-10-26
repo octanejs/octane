@@ -8,10 +8,11 @@ import {
 } from './harness.mjs';
 
 const COUNTER_KEY = Symbol.for('octane.tsrx-vite-preflight-parsing.parse-counts');
-// The adapter's @tsrx/core parser rejects source-phase imports, while the
-// authoritative compiler parser accepts them.
-const PARSER_DISAGREEMENT = `import source wasm from './module.wasm';
-export function App() @{ <main>{wasm.name as string}</main> }`;
+// The adapter's @tsrx/core parser rejects `override accessor`, which is valid
+// TypeScript that the authoritative compiler parser accepts.
+const PARSER_DISAGREEMENT = `class Base { accessor label = 'base'; }
+class Store extends Base { override accessor label = 'ready'; }
+export function App() @{ <main>{new Store().label as string}</main> }`;
 const cases = [
 	{ mode: 'production-client', expected: { adapter: 1, authoritative: 1 } },
 	{ mode: 'production-server', expected: { adapter: 1, authoritative: 1 } },
