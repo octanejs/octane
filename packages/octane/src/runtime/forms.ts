@@ -227,6 +227,9 @@ let activationCheckable: Element | null = null;
 // select restoration keep only the nullable call when checked/radio support is
 // absent, allowing the concrete checked + radio-group graph to tree-shake.
 let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) | null = null;
+// Likewise installed by the first controlled select value, the only writer of
+// a non-null `sv`, so restoration keeps no select projection without one.
+let SELECT_RESTORE: typeof projectSelectValue | null = null;
 
 // Commit-deferred controlled work, drained at the HEAD of commitEffects:
 //  - select re-projection: compiled binding mounts run BEFORE the same
@@ -811,6 +814,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	}
 	if (process.env.NODE_ENV !== 'production' && !first && ctrl.sv === null)
 		devWarnControlledFlip(el, true);
+	SELECT_RESTORE ??= projectSelectValue;
 	if (sel.multiple) {
 		if (!Array.isArray(value)) {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
@@ -1397,7 +1401,7 @@ export function restoreControlledElement(el: Element): void {
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
 	if (ctrl === undefined || ctrl.composing || !el.isConnected) return;
 	if (el.localName === 'select') {
-		if (ctrl.sv !== null) projectSelectValue(el as HTMLSelectElement, ctrl.sv, false);
+		if (SELECT_RESTORE && ctrl.sv !== null) SELECT_RESTORE(el as HTMLSelectElement, ctrl.sv, false);
 		return;
 	}
 	CHECKED_RESTORE?.(el as HTMLInputElement, ctrl);

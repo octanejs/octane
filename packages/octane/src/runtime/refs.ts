@@ -353,6 +353,11 @@ export function applyRefValue(ref: any, el: object | null, prevTarget?: object |
 // resolution later.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// A portal's range can belong to a Fragment ref only once an instance exists,
+// so portals register Fragment owners only after the first one, and bundles
+// without Fragment refs omit that registration.
+export let FRAGMENT_REFS = false;
+
 /** Fragment ref forms (fragment-refs parity): callback, object, or arrays. */
 export type FragmentRefValue =
 	| ((instance: FragmentInstance | null) => void | (() => void))
@@ -421,6 +426,7 @@ export class FragmentInstance {
 			this._children.add(child);
 			this._attachChild(child);
 		}
+		FRAGMENT_REFS = true;
 		activeFragments.add(this);
 	}
 

@@ -57,6 +57,11 @@ import {
 	isChildrenBlock,
 	childrenAsBody,
 	CHILDREN_DIALECT_SLOT,
+	ctxBailDepsClean,
+	restampCtxDeps,
+	ctxDirectChanged,
+	refreshBlockForContext,
+	restampCachedSlotContext,
 } from './component-slots.js';
 import { forEachSubtreeChild } from './activity.js';
 import { refreshSkippedRows } from './lists.js';
@@ -76,14 +81,25 @@ import { getFirstChild, getNextSibling } from './templates.js';
 // a browser app that has no `@types/node`.
 declare const process: { env: { NODE_ENV?: string } };
 
-// Only a recorded context read can leave a skipped list row stale, so the
-// recorder installs the row refresh and applications that never read context
-// omit the refresh graph from their lists.
-export let SKIPPED_ROW_REFRESH: typeof refreshSkippedRows | null = null;
+// Only a recorded context read gives a Block dependencies to verify, so the
+// recorder installs the work that consumes them: memo and implicit bail checks,
+// cache-hit refreshes and skipped list rows. Applications that never record a
+// read omit that graph. Until the first read no Block holds a dependency, and
+// that work would find nothing to check, restamp or refresh.
+export let CONTEXT_DEPENDENCIES: {
+	clean: typeof ctxBailDepsClean;
+	restamp: typeof restampCtxDeps;
+	directChanged: typeof ctxDirectChanged;
+	refresh: typeof refreshBlockForContext;
+	restampSlot: typeof restampCachedSlotContext;
+	skippedRows: typeof refreshSkippedRows;
+} | null = null;
 export let CONTEXT_CHILD: typeof useContextInternal | null = null;
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
 // Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
-// one, so this collapses the per-read bridge check to a single integer test.
+// one, so every bridge lookup's caller first tests this count by truthiness:
+// one integer test per read, and a bundle without bindRendererRegionOwner
+// never assigns it and omits the lookups.
 export let RENDERER_REGION_OWNER_COUNT = 0;
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 	Block,
@@ -497,7 +513,7 @@ export function use<T>(
  */
 function useForeignContext<T>(usable: unknown, api: string): T {
 	if (usable !== null && typeof usable === 'object') {
-		const bridge = rendererRegionOwnerForBlock(CURRENT_BLOCK);
+		const bridge = RENDERER_REGION_OWNER_COUNT ? rendererRegionOwnerForBlock(CURRENT_BLOCK) : null;
 		const mirror = bridge?.resolveForeignContext?.(usable as object);
 		if (mirror != null) return useContextInternal(mirror as Context<T>);
 		if ((usable as { $$typeof?: unknown }).$$typeof === REACT_FOREIGN_CONTEXT_TAG) {
@@ -545,7 +561,6 @@ export function rendererRegionOwnerForBlock(block: Block | null): RendererRegion
 	// (kind 'root', no parent), so ancestors below the chain top can never be
 	// keys — climb straight there and pay one lookup per call instead of one
 	// per ancestor on every no-provider context read.
-	if (RENDERER_REGION_OWNER_COUNT === 0) return null;
 	let current = block;
 	while (current !== null && current.parentBlock !== null) current = current.parentBlock;
 	if (current === null) return null;
@@ -554,8 +569,6 @@ export function rendererRegionOwnerForBlock(block: Block | null): RendererRegion
 }
 
 export function rendererRegionTryHandler(block: Block | null): ((error: unknown) => void) | null {
-	// Every top-level teardown asks; a document with no region bridge has none.
-	if (RENDERER_REGION_OWNER_COUNT === 0) return null;
 	const bridge = rendererRegionOwnerForBlock(block);
 	if (bridge === null) return null;
 	return (error) => {
@@ -700,7 +713,14 @@ function recordContextDependency(
 	context: Context<any>,
 ): DirectContextRead | undefined {
 	if (block === null || !block.memoInChain) return;
-	SKIPPED_ROW_REFRESH = refreshSkippedRows;
+	CONTEXT_DEPENDENCIES ??= {
+		clean: ctxBailDepsClean,
+		restamp: restampCtxDeps,
+		directChanged: ctxDirectChanged,
+		refresh: refreshBlockForContext,
+		restampSlot: restampCachedSlotContext,
+		skippedRows: refreshSkippedRows,
+	};
 	const direct = findDirectContextRead(block.$$ctxDirect, context);
 	const previous = direct?.read;
 	// Stamp before resolving: hosted context reads may suspend or throw.
@@ -938,7 +958,7 @@ function readContextFrom<T>(reader: Scope | null, block: Block | null, context: 
 					: undefined;
 		if (hit !== null && hit !== undefined) {
 			if (hit === DEFAULT_CTX) {
-				const bridge = rendererRegionOwnerForBlock(block);
+				const bridge = RENDERER_REGION_OWNER_COUNT ? rendererRegionOwnerForBlock(block) : null;
 				return bridge === null ? context.defaultValue : bridge.readContext(context);
 			}
 			return (hit as Scope).$$ctxValues!.get(context) as T;
@@ -963,7 +983,7 @@ function readContextFrom<T>(reader: Scope | null, block: Block | null, context: 
 		}
 		current = current.parentBlock;
 	}
-	const bridge = rendererRegionOwnerForBlock(block);
+	const bridge = RENDERER_REGION_OWNER_COUNT ? rendererRegionOwnerForBlock(block) : null;
 	if (bridge !== null) return bridge.readContext(context);
 	cacheContextOwner(reader, context, DEFAULT_CTX);
 	return context.defaultValue;

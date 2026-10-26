@@ -128,6 +128,7 @@ import {
 import { withRegisteredRefDetachSuppression } from './commit.js';
 import { publishRegisteredManualFormPending } from './actions.js';
 import { delegateEvents } from './events.js';
+import type { tryMemoBail } from './component-slots.js';
 import {
 	maybeFlushDiscrete,
 	UNCONTROLLED,
@@ -211,6 +212,12 @@ export let drainControlledSyncs: typeof drainQueuedControlledSyncs = noop;
 export let publishManualFormPending: typeof publishRegisteredManualFormPending = noop;
 export function installManualFormPending(): void {
 	publishManualFormPending = publishRegisteredManualFormPending;
+}
+// Only memo() marks a memo boundary, so it installs the bail that compares the
+// boundary's props, and applications without memo() skip that call per update.
+export let MEMO_BAIL: typeof tryMemoBail | null = null;
+export function installMemoBail(bail: typeof tryMemoBail): void {
+	MEMO_BAIL = bail;
 }
 export let SIGNAL_CHILD: typeof bindImplicitSignalChild | null = null;
 // A signal binding's commit-time read can find its handle pending since render.

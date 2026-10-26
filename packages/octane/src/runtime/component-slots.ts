@@ -44,7 +44,12 @@ import type {
 	ElementDescriptor,
 	ChildSlot,
 } from './types.js';
-import { NATIVE_READ_DRIVER, SIGNAL_BINDINGS_ENABLED } from './drivers.js';
+import {
+	NATIVE_READ_DRIVER,
+	SIGNAL_BINDINGS_ENABLED,
+	MEMO_BAIL,
+	installMemoBail,
+} from './drivers.js';
 import {
 	type SignalInstanceKey,
 	RENDERER_INVOCATION_SITE,
@@ -74,6 +79,7 @@ import {
 	invalidateSharedBodyOutput,
 	promoteMemoAncestry,
 	type DirectContextReads,
+	CONTEXT_DEPENDENCIES,
 } from './context.js';
 import { CURSOR, type HydrationCapability } from './hydration.js';
 import {
@@ -1251,7 +1257,7 @@ export function componentSlotImpl(
 		// `memo(Component)` — skip the body when new props shallow-equal the
 		// committed props (React.memo's contract; see tryMemoBail). A string comp
 		// is never memo-wrapped, so it falls through to the re-render below.
-		if (tryMemoBail(state.block, identity, props)) return;
+		if (MEMO_BAIL && MEMO_BAIL(state.block, identity, props)) return;
 		if (state.block.props !== renderProps)
 			journalRootProperty(state.block, 'props', state.block.props);
 		state.block.props = renderProps;
@@ -1800,7 +1806,7 @@ export function ctxDirectChanged(block: Block): boolean {
 // map iterators. A clean scan re-stamps the block; a changed transitive dep
 // refreshes just its consumers. Returns false when a DIRECT dep changed and
 // the block's own body must re-run (bail refused).
-function ctxBailDepsClean(block: Block): boolean {
+export function ctxBailDepsClean(block: Block): boolean {
 	if (block.$$ctxDepsEpoch !== EPOCH_CELL.value) {
 		if (ctxDirectChanged(block)) return false;
 		if (ctxDepsChanged(block)) refreshContextConsumers(block);
@@ -1855,8 +1861,10 @@ export function tryMemoBail(block: Block, comp: any, props: any): boolean {
 			: compare(block.props, props)
 		: shallowEqualProps(block.props, props);
 	if (!equal) return false;
-	if (!ctxBailDepsClean(block)) return false;
-	restampCtxDeps(block);
+	if (CONTEXT_DEPENDENCIES) {
+		if (!CONTEXT_DEPENDENCIES.clean(block)) return false;
+		CONTEXT_DEPENDENCIES.restamp(block);
+	}
 	reconnectBailedEffects(block);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileBail(block, comp, 'memo-bailout');
@@ -1878,8 +1886,10 @@ export function tryImplicitBail(block: Block): boolean {
 	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
 	const checkLazyBody = (block.body as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
 	if (checkLazyBody !== undefined && !checkLazyBody(block)) return false;
-	if (!ctxBailDepsClean(block)) return false;
-	restampCtxDeps(block);
+	if (CONTEXT_DEPENDENCIES) {
+		if (!CONTEXT_DEPENDENCIES.clean(block)) return false;
+		CONTEXT_DEPENDENCIES.restamp(block);
+	}
 	reconnectBailedEffects(block);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileBail(block, block.body, 'implicit-bailout');
@@ -1894,7 +1904,7 @@ export function tryImplicitBail(block: Block): boolean {
 // never descend). Merge onto every memo/armed ancestor; prefer a STALE version
 // over a current one so a still-pending refresh can't be masked by a fresher
 // read of the same context elsewhere in the ancestor's subtree.
-function restampCtxDeps(block: Block): void {
+export function restampCtxDeps(block: Block): void {
 	const reads = block.$$ctxReads;
 	const direct = block.$$ctxDirect;
 	const hasReads = reads !== null && reads.size > 0;
@@ -1953,7 +1963,7 @@ export function restampCachedContextScope(scope: Scope): void {
 	forEachSubtreeChild(scope, restampCachedContextScope);
 }
 
-function restampCachedSlotContext(slot: any): void {
+export function restampCachedSlotContext(slot: any): void {
 	if (slot.__kind === 'forBlockSlot') {
 		for (let item: Block | null = slot.head; item !== null; item = item.nextSibling) {
 			restampCachedContextScope(item);
@@ -2012,7 +2022,7 @@ export function refreshBlockForContext(block: Block): void {
 /** Revisit incomplete work without refreshing unrelated, still-valid cached subtrees. */
 function refreshCachedBlock(block: Block, contextChanged: boolean): void {
 	if (block.renderStatus !== RENDER_VALID) renderBlock(block);
-	else if (contextChanged) refreshBlockForContext(block);
+	else if (CONTEXT_DEPENDENCIES && contextChanged) CONTEXT_DEPENDENCIES.refresh(block);
 }
 
 /**
@@ -2070,22 +2080,23 @@ export function compilerCacheContext(
 				if (reconnect) reconnectBailedEffects(block);
 			}
 		}
-		if (restamp) restampCachedSlotContext(slot);
+		if (CONTEXT_DEPENDENCIES && restamp) CONTEXT_DEPENDENCIES.restampSlot(slot);
 		return current;
 	}
-	if (previous !== current) {
+	if (CONTEXT_DEPENDENCIES && previous !== current) {
+		const refresh = CONTEXT_DEPENDENCIES.refresh;
 		if (slot.__kind === 'forBlockSlot') {
-			for (const item of slot.items.values()) refreshBlockForContext(item);
-			if (slot.emptyBlock) refreshBlockForContext(slot.emptyBlock);
+			for (const item of slot.items.values()) refresh(item);
+			if (slot.emptyBlock) refresh(slot.emptyBlock);
 		} else if (slot.block) {
-			refreshBlockForContext(slot.block);
+			refresh(slot.block);
 		} else if (slot.__kind === 'childSlot' && slot.forSlot) {
-			for (const item of slot.forSlot.items.values()) refreshBlockForContext(item);
+			for (const item of slot.forSlot.items.values()) refresh(item);
 		} else if (slot.__kind === 'childSlot' && slot.portal?.block) {
-			refreshBlockForContext(slot.portal.block);
+			refresh(slot.portal.block);
 		}
 	}
-	if (restamp) restampCachedSlotContext(slot);
+	if (CONTEXT_DEPENDENCIES && restamp) CONTEXT_DEPENDENCIES.restampSlot(slot);
 	return current;
 }
 
@@ -2206,6 +2217,7 @@ export function memo<P>(
 	component: ComponentBody<P>,
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
 ): ComponentBody<P> & { readonly type: ComponentBody<P>; displayName?: string } {
+	installMemoBail(tryMemoBail);
 	function memoWrapper(props: P, scope: Scope, extra: any): unknown {
 		// A render-function slot may replace its body while retaining children.
 		// Arm only the Block this wrapper actually owns, never a direct call that

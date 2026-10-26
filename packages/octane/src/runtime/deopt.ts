@@ -31,7 +31,7 @@ import {
 	captureFocusedMovement,
 	retireEventHostTree,
 } from './engine.js';
-import { SKIPPED_ROW_REFRESH } from './context.js';
+import { CONTEXT_DEPENDENCIES } from './context.js';
 import {
 	HYDRATION_PASS,
 	CURSOR,
@@ -2659,7 +2659,7 @@ export function renderPreparedChildList(
 			ssrMarkerless,
 			normalizeKey,
 		);
-		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state.forSlot, parentBlock);
+		if (pure && CONTEXT_DEPENDENCIES) CONTEXT_DEPENDENCIES.skippedRows(state.forSlot, parentBlock);
 	}
 	// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 	// children whose keys have no new item) are orphans inside the range —

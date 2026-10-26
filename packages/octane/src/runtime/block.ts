@@ -1060,10 +1060,9 @@ export function unmountBlock(block: Block, detachDom: boolean = true): void {
 		return;
 	}
 	if (TEARDOWN_DEPTH === 0) {
-		// rendererRegionTryHandler's test, inline: a document with no region bridge.
 		TEARDOWN_HANDLER =
 			findTryHandler(block.parentBlock) ??
-			(RENDERER_REGION_OWNER_COUNT === 0 ? null : rendererRegionTryHandler(block));
+			(RENDERER_REGION_OWNER_COUNT ? rendererRegionTryHandler(block) : null);
 		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
@@ -1385,7 +1384,9 @@ export function unmountSlot(val: any, detachDom: boolean): void {
  */
 export function resetHmrBlock(block: Block): void {
 	if (TEARDOWN_DEPTH === 0) {
-		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		TEARDOWN_HANDLER =
+			findTryHandler(block.parentBlock) ??
+			(RENDERER_REGION_OWNER_COUNT ? rendererRegionTryHandler(block) : null);
 		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
@@ -1455,7 +1456,9 @@ export function resetScopeChildren(scope: Scope, detachDom = true): void {
 	// and be logged instead of reaching the boundary enclosing the deletion.
 	const block = scope.block;
 	if (TEARDOWN_DEPTH === 0) {
-		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		TEARDOWN_HANDLER =
+			findTryHandler(block.parentBlock) ??
+			(RENDERER_REGION_OWNER_COUNT ? rendererRegionTryHandler(block) : null);
 		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
@@ -1507,7 +1510,9 @@ export function releaseLiteArm(scope: Scope): void {
 	// A lite arm's stand-in always has its owner's Block above it.
 	const parent = scope.block.parentBlock!;
 	if (TEARDOWN_DEPTH === 0) {
-		TEARDOWN_HANDLER = findTryHandler(parent) ?? rendererRegionTryHandler(parent);
+		TEARDOWN_HANDLER =
+			findTryHandler(parent) ??
+			(RENDERER_REGION_OWNER_COUNT ? rendererRegionTryHandler(parent) : null);
 		TEARDOWN_BLOCK = owningBlock(parent);
 	}
 	TEARDOWN_DEPTH++;
@@ -1529,7 +1534,7 @@ export function clearItems(first: Block | null, start: Comment, end: Comment, si
 	if (first !== null && TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER =
 			findTryHandler(first.parentBlock) ??
-			(RENDERER_REGION_OWNER_COUNT === 0 ? null : rendererRegionTryHandler(first));
+			(RENDERER_REGION_OWNER_COUNT ? rendererRegionTryHandler(first) : null);
 		TEARDOWN_BLOCK = first;
 	}
 	TEARDOWN_DEPTH++;
